@@ -13,7 +13,7 @@
  * the worker. The cache is versioned; bump CACHE_VERSION to evict on deploy.
  */
 
-const CACHE_VERSION = 'planet-rush-v1';
+const CACHE_VERSION = 'planet-rush-v2';
 // The shell entry points; hashed asset chunks are cached lazily on first fetch.
 const SHELL = ['./', './index.html', './manifest.webmanifest'];
 
@@ -56,7 +56,20 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => null);
 
-      // Stale-while-revalidate: serve cache immediately if present, refresh behind it.
+      // NAVIGATIONS ARE NETWORK-FIRST. The index references hashed bundles that
+      // old deploys delete — serving a stale index points at assets that no
+      // longer exist and bricks the page (this happened; see studio incident
+      // log). Cache is the OFFLINE fallback for navigations, never the fast
+      // path. Hashed immutable assets keep stale-while-revalidate below.
+      if (req.mode === 'navigate') {
+        const fresh = await network;
+        if (fresh) return fresh;
+        if (cached) return cached;
+        const shell = await cache.match('./index.html');
+        return shell ?? Response.error();
+      }
+
+      // Stale-while-revalidate for subresources (hashed, content-addressed).
       if (cached) {
         event.waitUntil(network);
         return cached;
@@ -64,12 +77,6 @@ self.addEventListener('fetch', (event) => {
 
       const fresh = await network;
       if (fresh) return fresh;
-
-      // Offline with no cached copy: fall back to the shell for navigations.
-      if (req.mode === 'navigate') {
-        const shell = await cache.match('./index.html');
-        if (shell) return shell;
-      }
       return Response.error();
     }),
   );

@@ -34,8 +34,10 @@ import {
   parseDebugFlags,
   isLayoutContributor,
 } from '@platform/layout-registry';
-import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
+import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
+import { installDebugHook } from '@platform/debug-hook';
+import type { Viewport } from '@platform/camera';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
 import { Hud } from './ui';
@@ -75,8 +77,16 @@ async function boot(): Promise<void> {
     })),
   });
 
-  // --- Renderer.
-  const renderer = new Renderer(app.stage, app.screen.width, app.screen.height);
+  // --- Renderer. The camera centres on the *visual* viewport (URL-bar / notch /
+  //     fullscreen aware), not the raw canvas — see camera.ts and readViewport().
+  let viewport: Viewport = readViewport();
+  const renderer = new Renderer(app.stage, viewport);
+
+  // --- Debug instrument (debug-hook.ts): only when ?debug=1. Exposes the read-
+  //     only window.__planetRush the QA suite asserts centring against. Inert
+  //     (and skipped in the render loop) otherwise.
+  const debug = installDebugHook(window.location.search);
+  const shipScreenScratch: Vec2 = { x: 0, y: 0 };
 
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
@@ -146,7 +156,7 @@ async function boot(): Promise<void> {
   if (registry) {
     installLayoutHook({
       registry,
-      viewport: (): Viewport => ({ width: app.screen.width, height: app.screen.height }),
+      viewport: (): LayoutViewport => ({ width: app.screen.width, height: app.screen.height }),
       frozen: () => flags.freeze,
       freezeTick: () => (flags.freeze ? FREEZE_TICK : null),
       worldHash: () => frozenHash,
@@ -169,8 +179,27 @@ async function boot(): Promise<void> {
       touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height);
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
+      // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
+      if (debug.enabled) updateDebug();
     },
   });
+
+  /** Push this frame's local-ship screen position into the debug instrument, in
+   *  visual-viewport space (visible centre = {viewport.width/2, height/2}), so QA
+   *  can assert centring. Reads the *actual* worldRoot transform via the renderer
+   *  so it measures what is really drawn, not a recomputed ideal. */
+  function updateDebug(): void {
+    const ship = world.ships.find(isLocalShip);
+    if (!ship) return;
+    renderer.projectToScreen(ship.pos, shipScreenScratch); // canvas-local CSS px
+    debug.update(
+      shipScreenScratch.x - viewport.originX, // → visual-viewport space
+      shipScreenScratch.y - viewport.originY,
+      viewport.width,
+      viewport.height,
+      performance.now(),
+    );
+  }
 
   /** Merge every device's control state into one, then map to abstract actions.
    *  Also tracks the active device (latest to act wins) for the HUD (GDD §2.4). */
@@ -278,11 +307,36 @@ async function boot(): Promise<void> {
   function relayout(): void {
     const w = app.screen.width;
     const h = app.screen.height;
-    renderer.resize(w, h);
+    // Camera centres on the *visual* viewport (read fresh from the DOM here, so it
+    // never uses a cached/stale size after a resize or orientation flip). HUD,
+    // touch halves, and the overlay lay out in canvas space (app.screen).
+    viewport = readViewport();
+    renderer.setViewport(viewport);
     touch.setScreenWidth(w);
     hud.resize(w, h);
     rotateOverlay.resize(w, h);
     refreshOrientation();
+  }
+
+  /** Read the current *visual* viewport (what the player actually sees) in the
+   *  canvas's own CSS-pixel space. On mobile the canvas is sized to the layout
+   *  viewport (`resizeTo: window`) but the URL bar, a notch (`safe-area-inset`),
+   *  and fullscreen transitions crop and shift the visible region — `visualViewport`
+   *  plus the canvas's client rect give the visible size and its offset within the
+   *  canvas. Desktop (and browsers without `visualViewport`) fall back to the whole
+   *  canvas. This is the one DOM read the camera path depends on. */
+  function readViewport(): Viewport {
+    const vv = window.visualViewport;
+    if (vv) {
+      const rect = app.canvas.getBoundingClientRect();
+      return {
+        width: vv.width,
+        height: vv.height,
+        originX: vv.offsetLeft - rect.left,
+        originY: vv.offsetTop - rect.top,
+      };
+    }
+    return { width: app.screen.width, height: app.screen.height, originX: 0, originY: 0 };
   }
 
   /** Show the ROTATE overlay only on a touch device that cannot lock landscape
@@ -296,6 +350,12 @@ async function boot(): Promise<void> {
 
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);
+  // Mobile URL-bar show/hide and pinch reflow the *visual* viewport without a
+  // window resize — these fire then. Fullscreen enter/exit reshapes it too. All
+  // route through relayout so the camera re-centres on what's actually visible.
+  window.visualViewport?.addEventListener('resize', relayout);
+  window.visualViewport?.addEventListener('scroll', relayout);
+  document.addEventListener('fullscreenchange', relayout);
   refreshOrientation();
 
   // --- First touch gesture: enter fullscreen + lock to landscape (Android

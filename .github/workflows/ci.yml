@@ -139,3 +139,32 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # --- After deploy: prove the LIVE url actually boots (twice — the second
+  # --- visit goes through the service worker, the path that once shipped dead).
+  verify-live:
+    name: Verify live deploy boots
+    needs: deploy
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - env:
+          LIVE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: npx playwright test --config tests/live/playwright.live.config.ts
