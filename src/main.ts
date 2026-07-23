@@ -23,6 +23,7 @@ import { GameLoop } from '@platform/loop';
 import { KeyboardMouseSource, GamepadSource } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
+import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals } from '@platform/touch-visuals';
 import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
@@ -124,7 +125,10 @@ async function boot(): Promise<void> {
   const touch = new TouchController({ screenWidth: app.screen.width });
   touch.setFireMode(fireMode);
   const touchState = createControlState();
-  bindTouch(app.canvas, touch);
+  // Route the canvas's touch pointer events into the twin sticks (touch-dom.ts —
+  // the filter/decode/route edge, unit-tested headless). CSS-pixel samples, the
+  // same space the controller's half-split lives in.
+  bindTouchControls(app.canvas, touch, window);
 
   // --- HUD feed: one reusable mutable HudFrame, overwritten in place every frame
   //     so the feed path allocates nothing (GDD §4.3). All fields are primitives.
@@ -453,25 +457,6 @@ function mergeControl(dst: ControlState, src: ControlState): void {
   dst.boost = dst.boost || src.boost;
   dst.build = dst.build || src.build;
   if (!dst.ping && src.ping) dst.ping = src.ping;
-}
-
-/** Route the canvas's touch pointer events into the twin-stick controller. */
-function bindTouch(canvas: HTMLCanvasElement, touch: TouchController): void {
-  canvas.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'touch') return;
-    touch.onPointerDown({ id: e.pointerId, x: e.clientX, y: e.clientY });
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'touch') return;
-    touch.onPointerMove({ id: e.pointerId, x: e.clientX, y: e.clientY });
-  });
-  const up = (e: PointerEvent): void => {
-    if (e.pointerType !== 'touch') return;
-    touch.onPointerUp(e.pointerId);
-  };
-  canvas.addEventListener('pointerup', up);
-  canvas.addEventListener('pointercancel', up);
-  window.addEventListener('blur', () => touch.clear());
 }
 
 void boot();
