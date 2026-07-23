@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite / test caches
+.vite/
+coverage/
+
+# Editor / OS cruft
+.DS_Store
+*.log

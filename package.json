@@ -1,0 +1,23 @@
+{
+  "name": "planet-rush",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Planet Rush — a top-down 2D space arena game. TypeScript + PixiJS, online and offline, desktop and mobile.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pixi.js": "8.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "typescript": "5.7.3",
+    "vite": "6.0.7",
+    "vitest": "2.1.8"
+  }
+}
