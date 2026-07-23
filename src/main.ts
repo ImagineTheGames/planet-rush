@@ -201,6 +201,8 @@ async function boot(): Promise<void> {
       shipScreenScratch.y - viewport.originY,
       viewport.width,
       viewport.height,
+      ship.pos.x, // world space — moves as the ship flies (camera keeps it centred)
+      ship.pos.y,
       performance.now(),
     );
   }

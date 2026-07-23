@@ -9,6 +9,12 @@
  *     shipScreen: { x: number, y: number },  // local ship position, in VISUAL-
  *                                             // VIEWPORT space (CSS px): the
  *                                             // visible centre is {w/2, h/2}
+ *     shipWorld:  { x: number, y: number },  // local ship position in WORLD space
+ *                                             // (sim units) — moves as the ship
+ *                                             // flies even though the follow-camera
+ *                                             // keeps shipScreen centred; a
+ *                                             // render-speed-independent movement
+ *                                             // truth for "did the drag move it?"
  *     viewport:   { w: number, h: number },  // visual-viewport size (CSS px)
  *     fps:        number,                     // smoothed frames/sec
  *   }
@@ -33,6 +39,7 @@
 /** The frozen shape of `window.__planetRush` (see the contract above). */
 export interface DebugState {
   readonly shipScreen: { x: number; y: number };
+  readonly shipWorld: { x: number; y: number };
   readonly viewport: { w: number; h: number };
   readonly fps: number;
 }
@@ -50,6 +57,8 @@ export interface DebugHook {
     shipScreenY: number,
     viewportW: number,
     viewportH: number,
+    shipWorldX: number,
+    shipWorldY: number,
     nowMs: number,
   ): void;
 }
@@ -84,6 +93,7 @@ export function installDebugHook(
   // place, never reassigned, so the exposed handle stays a stable read-only ref.
   const state = {
     shipScreen: { x: 0, y: 0 },
+    shipWorld: { x: 0, y: 0 },
     viewport: { w: 0, h: 0 },
     fps: 0,
   };
@@ -105,9 +115,11 @@ export function installDebugHook(
 
   return {
     enabled: true,
-    update(shipScreenX, shipScreenY, viewportW, viewportH, nowMs): void {
+    update(shipScreenX, shipScreenY, viewportW, viewportH, shipWorldX, shipWorldY, nowMs): void {
       state.shipScreen.x = shipScreenX;
       state.shipScreen.y = shipScreenY;
+      state.shipWorld.x = shipWorldX;
+      state.shipWorld.y = shipWorldY;
       state.viewport.w = viewportW;
       state.viewport.h = viewportH;
 
