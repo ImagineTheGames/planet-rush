@@ -266,7 +266,7 @@ Front-loaded on the Gameplay Engineer (M1–M3), mid-loaded on the Netcode Engin
 
 ### 4.6 The milestone plan
 
-| Milestone | Milestone (playable check) |
+| Milestone | Playable check |
 |---|---|
 | M0 | Concept boards + tone locked into style-guide.md; repo, CI, Pages, server deploy pipeline live; **Netcode spike:** real snapshot size measured, sustainable tick rate established, host benchmarked and chosen (pre-production — not a playable build; phone verification starts at M1) |
 | M1 | Ship flies, shoots, mines; two-number ore HUD; first onboarding prompts; touch controls (twin sticks, fire-mode setting) ship alongside keyboard/mouse and gamepad — playable at the public URL — phone-verified |
