@@ -22,6 +22,38 @@ export interface Vec2 {
 }
 
 // ---------------------------------------------------------------------------
+// Beam state (GDD §2.3, §4.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The public geometry of a ship's beam for the tick it is firing. The sim
+ * already casts a segment-vs-circle ray to find the nearest hit for damage /
+ * mining (GDD §4.1, "immune to tunnelling"); this exposes that same hit so the
+ * renderer draws the beam stopping at what it strikes instead of running full
+ * length through it.
+ *
+ * Present (non-null on `Ship.beam`) only on ticks the ship is actually firing;
+ * `null` otherwise. Plain data, so it serializes for snapshots and compares
+ * cleanly under the determinism replay (GDD §4.8).
+ */
+export interface Beam {
+  /** Beam emitter — the firing ship's position this tick. */
+  origin: Vec2;
+  /** Unit direction the beam travels (cos/sin of the ship's facing). */
+  dir: Vec2;
+  /**
+   * World-space point of the first strike (asteroid, ship, and later turret /
+   * shield / core), or `null` when the beam reaches its full range unobstructed.
+   */
+  hitPoint: Vec2 | null;
+  /**
+   * Distance from `origin` to the first hit, clamped to max beam range. Equals
+   * the range when nothing is hit; the nearest of several hits wins.
+   */
+  length: number;
+}
+
+// ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
