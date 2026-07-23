@@ -36,7 +36,7 @@ describe('installDebugHook — off path (no ?debug=1)', () => {
     expect(hook.enabled).toBe(false);
     expect(DEBUG_GLOBAL_KEY in win).toBe(false);
     // update is a safe no-op.
-    expect(() => hook.update(1, 2, 3, 4, 100)).not.toThrow();
+    expect(() => hook.update(1, 2, 3, 4, 5, 6, 100)).not.toThrow();
     expect(DEBUG_GLOBAL_KEY in win).toBe(false);
   });
 });
@@ -49,17 +49,24 @@ describe('installDebugHook — armed path (?debug=1)', () => {
 
     const state = read(win);
     expect(state).toBeDefined();
-    expect(state).toEqual({ shipScreen: { x: 0, y: 0 }, viewport: { w: 0, h: 0 }, fps: 0 });
+    expect(state).toEqual({
+      shipScreen: { x: 0, y: 0 },
+      shipWorld: { x: 0, y: 0 },
+      viewport: { w: 0, h: 0 },
+      fps: 0,
+    });
 
-    hook.update(195, 422, 390, 844, 1000);
+    hook.update(195, 422, 390, 844, 1500, 2600, 1000);
     expect(state!.shipScreen).toEqual({ x: 195, y: 422 });
+    expect(state!.shipWorld).toEqual({ x: 1500, y: 2600 });
     expect(state!.viewport).toEqual({ w: 390, h: 844 });
 
     // Same object mutated in place — no per-frame reallocation of the handle.
     const before = read(win);
-    hook.update(10, 20, 30, 40, 1016);
+    hook.update(10, 20, 30, 40, 50, 60, 1016);
     expect(read(win)).toBe(before);
     expect(before!.shipScreen).toEqual({ x: 10, y: 20 });
+    expect(before!.shipWorld).toEqual({ x: 50, y: 60 });
   });
 
   it('installs a read-only handle that cannot be reassigned', () => {
@@ -84,11 +91,11 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     const state = read(win)!;
 
     // First frame: no prior timestamp, fps stays 0.
-    hook.update(0, 0, 100, 100, 0);
+    hook.update(0, 0, 100, 100, 0, 0, 0);
     expect(state.fps).toBe(0);
 
     // ~60fps: 16ms steps.
-    for (let t = 16; t <= 16 * 30; t += 16) hook.update(0, 0, 100, 100, t);
+    for (let t = 16; t <= 16 * 30; t += 16) hook.update(0, 0, 100, 100, 0, 0, t);
     expect(state.fps).toBeGreaterThan(55);
     expect(state.fps).toBeLessThan(65);
   });
@@ -97,9 +104,9 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     const win = fakeWindow();
     const hook = installDebugHook('?debug=1', win);
     const state = read(win)!;
-    hook.update(0, 0, 10, 10, 500);
-    hook.update(0, 0, 10, 10, 500); // dt == 0 → skipped
-    hook.update(0, 0, 10, 10, 400); // dt < 0 → skipped
+    hook.update(0, 0, 10, 10, 0, 0, 500);
+    hook.update(0, 0, 10, 10, 0, 0, 500); // dt == 0 → skipped
+    hook.update(0, 0, 10, 10, 0, 0, 400); // dt < 0 → skipped
     expect(Number.isNaN(state.fps)).toBe(false);
     expect(state.fps).toBe(0);
   });

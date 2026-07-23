@@ -19,7 +19,7 @@
  *  - touch: FIRE button (Auto-aim default) + left ghost-stick zone render;
  *           the desktop controls strip is ABSENT;
  *  - portrait: ROTATE overlay covers the game; landscape: overlay gone;
- *  - touch drag on the left half moves the ship (field screenshot pixel diff);
+ *  - touch drag on the left half moves the ship (world-space truth, ?debug=1);
  *  - desktop: no touch affordances; controls strip PRESENT.
  *
  * ORIENTATION CONTRACT: the phone projects declare *portrait* viewports
@@ -35,7 +35,6 @@ import { test, expect, type Page, type CDPSession } from '@playwright/test';
 import {
   decode,
   count,
-  diffRatio,
   isPlasma,
   isBlueGlow,
   isYellow,
@@ -46,7 +45,6 @@ import {
   REGION_STRIP_MID,
   REGION_ORE_HUD,
   REGION_FULL,
-  REGION_FIELD,
   type Img,
 } from './pixels';
 
@@ -71,12 +69,15 @@ const STRIP_PRESENT_MIN_PX = 100;
 /** The overlay blacks out the field: almost nothing non-vacuum survives its
  *  opaque backdrop (only its own thin plasma glyph/label line-art). */
 const OVERLAY_MAX_NONVACUUM_RATIO = 0.1;
-/** Thrusting into the field pans the follow-camera so asteroids stream in — a
- *  large field diff versus the near-static idle frame. */
-const MOVE_MIN_DIFF = 0.05;
-/** Drag must beat the ambient (spawn-glow) idle diff by at least this factor,
- *  isolating camera motion from the pulsing spawn-protection glow. */
-const MOVE_OVER_IDLE_FACTOR = 2.5;
+/** Minimum WORLD-space distance (sim units) the local ship must travel under a
+ *  1.4 s left-half thrust drag. The ship is stationary at spawn (no input → no
+ *  motion), so any real drag clears this by a wide margin; the bar sits far above
+ *  that zero floor yet far below the hundreds of units a live drag actually
+ *  covers, so it holds even on the CI runner's slow software-WebGL (where a
+ *  render-derived field diff collapses — see the drag test). Locally the ship
+ *  travels ~840–980 units; a field-diff-passing CI run moved it ~150–245; this
+ *  bar sits below even a worst-case ~1 fps run yet far above the zero idle. */
+const DRAG_MIN_WORLD_MOVE = 25;
 
 // --- Fixtures / helpers -----------------------------------------------------
 
@@ -236,41 +237,56 @@ test('portrait shows the ROTATE overlay; landscape hides it', async ({ page }, t
 // Touch drag moves the ship (brief: screenshot pixel diff of the field)
 // ===========================================================================
 
-test('touch drag on the left half moves the ship (field pixel diff)', async ({ page }, testInfo) => {
+test('touch drag on the left half moves the ship (world-space truth)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
   // Gameplay assertion → landscape. In portrait the field is the blocked,
   // squashed non-play state (the ROTATE-overlay guard), and the first-gesture
-  // requestLandscape path perturbs layout mid-drag — either way the field diff
-  // is meaningless. Landscape is the only orientation where "ship moved" holds.
+  // requestLandscape path perturbs layout mid-drag. Landscape is the only
+  // orientation where "ship moved" holds.
   await useLandscape(page);
-  await boot(page);
+
+  // Assert against SIM TRUTH, not a field screenshot diff. The follow-camera
+  // keeps the ship centred on screen, so a pixel diff can only observe the
+  // *field* panning — a proxy whose magnitude tracks render throughput and
+  // collapses on the CI runner's software-WebGL (~1 fps: the fixed-timestep
+  // loop's catch-up clamp drops the dropped-frame time, so the field barely
+  // moves even though the ship does). The ship's WORLD position (?debug=1 hook,
+  // shipWorld) advances whenever the sim integrates thrust, however slowly the
+  // frame paints — the device-independent "did the drag move the ship?" the
+  // brief actually asks. (Platform note m1-12: this replaced a render-fragile
+  // field-pixel-diff; the ?debug=1 shipWorld field is the enabling instrument.)
+  await page.goto('/?debug=1');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as { __planetRush?: { viewport: { w: number; h: number } } }).__planetRush;
+      return !!d && d.viewport.w > 0 && d.viewport.h > 0;
+    },
+    undefined,
+    { timeout: 15_000 },
+  );
+
+  const readShipWorld = (): Promise<{ x: number; y: number }> =>
+    page.evaluate(() => {
+      const d = (window as unknown as { __planetRush?: { shipWorld: { x: number; y: number } } }).__planetRush;
+      return { x: d!.shipWorld.x, y: d!.shipWorld.y };
+    });
+
   const { width, height } = page.viewportSize() ?? { width: 844, height: 390 };
-
-  // Ambient baseline: with no input the follow-camera is still and the field is
-  // near-static (only the localised spawn-protection glow animates). Measure it
-  // over a comparable duration so the comparison is fair.
-  const idle0 = await shoot(page);
-  await page.waitForTimeout(1000);
-  const idle1 = await shoot(page);
-  const idleDiff = diffRatio(idle0, idle1, REGION_FIELD);
-
-  // Sustained thrust *toward the field*: the local ship spawns at the ring's
-  // outer edge facing inward, with the asteroid field to screen-left. Drag
-  // leftward within the LEFT half (both endpoints x < width/2, so one thrust
-  // stick stays engaged) to pan the follow-camera into the rocks — the field
-  // visibly streams in. A vertical/outward drag would only pan empty vacuum.
-  const pre = await shoot(page);
   const midY = Math.round(height * 0.5);
-  await touchDrag(page, { x: Math.round(width * 0.42), y: midY }, { x: Math.round(width * 0.04), y: midY }, 1400);
-  const post = await shoot(page);
-  const dragDiff = diffRatio(pre, post, REGION_FIELD);
 
-  expect(dragDiff, 'field changed under a left-half drag').toBeGreaterThan(MOVE_MIN_DIFF);
+  // Left-half leftward drag: both endpoints x < width/2, so one thrust stick
+  // stays engaged and drives sustained full-deflection thrust for 1.4 s.
+  const before = await readShipWorld();
+  await touchDrag(page, { x: Math.round(width * 0.42), y: midY }, { x: Math.round(width * 0.04), y: midY }, 1400);
+  const after = await readShipWorld();
+
+  const moved = Math.hypot(after.x - before.x, after.y - before.y);
   expect(
-    dragDiff,
-    `drag diff (${dragDiff.toFixed(3)}) must exceed idle diff (${idleDiff.toFixed(3)}) × ${MOVE_OVER_IDLE_FACTOR}`,
-  ).toBeGreaterThan(idleDiff * MOVE_OVER_IDLE_FACTOR);
+    moved,
+    `ship world-distance under a 1.4s left-half drag (${moved.toFixed(1)} units)`,
+  ).toBeGreaterThan(DRAG_MIN_WORLD_MOVE);
 });
 
 // ===========================================================================

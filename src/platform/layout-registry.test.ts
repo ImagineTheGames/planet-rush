@@ -24,6 +24,7 @@ import {
   type Viewport,
   type LayoutEntry,
   type HookTarget,
+  type PlanetRushDebug,
 } from './layout-registry';
 
 const VP: Viewport = { width: 1200, height: 800 };
@@ -298,6 +299,53 @@ describe('installLayoutHook — read-only window.__planetRush', () => {
     expect(target.__planetRush!.frozen).toBe(true);
     expect(target.__planetRush!.freezeTick).toBe(120);
     expect(target.__planetRush!.worldHash).toBe('deadbeef');
+  });
+
+  // Co-tenancy with the camera debug hook (src/platform/debug-hook.ts). Under
+  // `?debug=1` BOTH instruments share window.__planetRush; the camera hook is
+  // installed first, READ-ONLY (defineProperty, non-writable/non-configurable).
+  // A plain re-assign would throw in strict mode and abort boot — this pins the
+  // additive install that avoids it.
+  it('extends an existing read-only __planetRush without clobbering or throwing', () => {
+    const reg = new LayoutRegistry();
+    reg.beginFrame();
+    reg.register('ore-hud', { region: 'top-left', margin: 16 }, rect(16, 16, 100, 40));
+
+    // Stand in for the camera hook: a read-only handle to a live-updated object
+    // whose `viewport` is the camera's {w,h} shape (distinct from layout's).
+    const cameraState = { shipScreen: { x: 5, y: 7 }, viewport: { w: 844, h: 390 }, fps: 60 };
+    const target: Record<string, unknown> = {};
+    Object.defineProperty(target, '__planetRush', {
+      value: cameraState,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+
+    // The layout hook must NOT throw here (the boot-aborting bug), and must merge.
+    expect(() =>
+      installLayoutHook(
+        {
+          registry: reg,
+          viewport: () => VP,
+          frozen: () => false,
+          freezeTick: () => null,
+          worldHash: () => null,
+        },
+        target as unknown as HookTarget,
+      ),
+    ).not.toThrow();
+
+    // Same shared object; the camera hook's keys are intact (viewport is the
+    // {w,h} shape it owns, not overwritten by layout's Viewport getter)…
+    expect(target.__planetRush).toBe(cameraState);
+    expect((target.__planetRush as unknown as typeof cameraState).viewport).toEqual({ w: 844, h: 390 });
+    expect((target.__planetRush as unknown as typeof cameraState).shipScreen).toEqual({ x: 5, y: 7 });
+    // …and the layout surface's own keys are now additively present.
+    const merged = target.__planetRush as unknown as PlanetRushDebug;
+    expect(merged.layout).toHaveLength(1);
+    expect(merged.layout[0]!.id).toBe('ore-hud');
+    expect(merged.resolveAnchor({ region: 'full' })).toEqual({ x: 0, y: 0, width: 1200, height: 800 });
   });
 });
 
