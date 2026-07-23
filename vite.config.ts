@@ -1,11 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 
-// Planet Rush client build. The base is set for GitHub Pages project-page
-// hosting (served under /planet-rush/); override with VITE_BASE for the /dev
-// path or a custom domain. See GDD §4.8.
+// Planet Rush client build. A relative base ('./') keeps asset URLs
+// path-independent so the same bundle serves correctly from a GitHub Pages
+// project subpath (/planet-rush/), the /dev path, or a custom domain without a
+// rebuild; override with VITE_BASE only when an absolute base is required. See
+// GDD §4.8.
 export default defineConfig({
-  base: process.env.VITE_BASE ?? '/',
+  base: process.env.VITE_BASE ?? './',
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),
