@@ -11,6 +11,7 @@ import {
   TouchVisuals,
   affordanceVisibility,
   writeAffordanceVisibility,
+  affordanceRects,
   type TouchReadout,
 } from './touch-visuals';
 import { FireMode } from './actions';
@@ -136,5 +137,34 @@ describe('TouchVisuals — the Pixi layer honours the matrix', () => {
         720,
       ),
     ).not.toThrow();
+  });
+});
+
+// The anchored affordance rects the layout registry reads (touch controls are
+// Platform-owned, so these register with precise, self-computed bounds).
+describe('affordanceRects — anchored home rects for the layout registry', () => {
+  it('yields nothing on desktop', () => {
+    const r = affordanceRects(false, FireMode.AutoAim, 1280, 720);
+    expect(r).toEqual({ leftStickZone: null, aimZone: null, fireButton: null });
+  });
+
+  it('touch + Auto-aim: left stick zone + FIRE button, no aim zone', () => {
+    const r = affordanceRects(true, FireMode.AutoAim, 1280, 720);
+    expect(r.leftStickZone).not.toBeNull();
+    expect(r.fireButton).not.toBeNull();
+    expect(r.aimZone).toBeNull();
+    // FIRE button sits in the bottom-right (right half, lower band).
+    expect(r.fireButton!.x).toBeGreaterThan(1280 / 2);
+    expect(r.fireButton!.y + r.fireButton!.height).toBeLessThanOrEqual(720);
+  });
+
+  it('touch + Manual: left stick zone + aim zone, no FIRE button', () => {
+    const r = affordanceRects(true, FireMode.Manual, 1280, 720);
+    expect(r.leftStickZone).not.toBeNull();
+    expect(r.aimZone).not.toBeNull();
+    expect(r.fireButton).toBeNull();
+    // Left zone in the left half, aim zone in the right half.
+    expect(r.leftStickZone!.x).toBeLessThan(1280 / 2);
+    expect(r.aimZone!.x).toBeGreaterThan(1280 / 2 - r.aimZone!.width);
   });
 });

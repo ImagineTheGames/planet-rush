@@ -32,6 +32,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { Vec2 } from '@shared/types';
 import { PALETTE } from '@render/index';
 import { FireMode } from './actions';
+import type { Rect } from './layout-registry';
 
 // ---------------------------------------------------------------------------
 // Layout constants (CSS pixels; the Application handles devicePixelRatio)
@@ -118,6 +119,86 @@ export function affordanceVisibility(isTouch: boolean, mode: FireMode): Affordan
     fireButton: false,
     aimHint: false,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Anchored affordance rects — for the layout registry (?debug=1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The screen rects of the touch controls' *anchored home positions* — the fixed
+ * spots the idle stick-zone ghosts and the FIRE button occupy, computed from the
+ * very constants that draw them ({@link R_STICK}, {@link R_FIRE},
+ * {@link EDGE_MARGIN}), so the layout registry never has to duplicate this
+ * geometry. Dynamic engaged sticks appear under the thumb (by design); these are
+ * the fixed affordances a placement check can actually assert against.
+ *
+ * `null` for a control not present in the current device/mode (all null on
+ * desktop; the aim zone is absent in Auto-aim; the FIRE button is absent in
+ * Manual).
+ */
+export interface TouchAffordanceRects {
+  /** Left thrust-stick zone ghost (always present on touch). */
+  leftStickZone: Rect | null;
+  /** Right-half aim-stick zone hint (Manual mode only). */
+  aimZone: Rect | null;
+  /** Hold-to-FIRE button (Auto-aim mode only). */
+  fireButton: Rect | null;
+}
+
+/**
+ * Fill `out` with the anchored rects of the visible touch affordances for the
+ * given device/mode/viewport, mirroring {@link TouchVisuals.update}'s own
+ * placement math exactly. Allocation-light: the three `Rect`s are reused across
+ * frames (their fields are overwritten). Returns `out`.
+ */
+export function writeAffordanceRects(
+  isTouch: boolean,
+  mode: FireMode,
+  w: number,
+  h: number,
+  out: TouchAffordanceRects,
+): TouchAffordanceRects {
+  if (!isTouch) {
+    out.leftStickZone = null;
+    out.aimZone = null;
+    out.fireButton = null;
+    return out;
+  }
+
+  const bottom = h - EDGE_MARGIN - R_STICK;
+  const leftAnchorX = EDGE_MARGIN + R_STICK;
+  const rightAnchorX = w - EDGE_MARGIN - R_STICK;
+
+  out.leftStickZone = assign(out.leftStickZone, leftAnchorX - R_STICK, bottom - R_STICK, 2 * R_STICK, 2 * R_STICK);
+
+  if (mode === FireMode.Manual) {
+    out.aimZone = assign(out.aimZone, rightAnchorX - R_STICK, bottom - R_STICK, 2 * R_STICK, 2 * R_STICK);
+    out.fireButton = null;
+  } else {
+    out.aimZone = null;
+    const fx = w - EDGE_MARGIN - R_FIRE;
+    const fy = h - EDGE_MARGIN - R_FIRE;
+    out.fireButton = assign(out.fireButton, fx - R_FIRE, fy - R_FIRE, 2 * R_FIRE, 2 * R_FIRE);
+  }
+  return out;
+}
+
+/** Overwrite (or allocate) a Rect in place — keeps the per-frame path alloc-free. */
+function assign(r: Rect | null, x: number, y: number, width: number, height: number): Rect {
+  if (r) {
+    r.x = x;
+    r.y = y;
+    r.width = width;
+    r.height = height;
+    return r;
+  }
+  return { x, y, width, height };
+}
+
+/** Allocating convenience over {@link writeAffordanceRects} — tests/one-off use. */
+export function affordanceRects(isTouch: boolean, mode: FireMode, w: number, h: number): TouchAffordanceRects {
+  return writeAffordanceRects(isTouch, mode, w, h, { leftStickZone: null, aimZone: null, fireButton: null });
 }
 
 // ---------------------------------------------------------------------------
