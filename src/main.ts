@@ -9,7 +9,7 @@
  */
 import { Application } from 'pixi.js';
 import { ShipClass } from '@shared/types';
-import type { Action } from '@shared/types';
+import type { Action, Vec2 } from '@shared/types';
 import { createWorld, step, BEAM_RANGE } from './sim';
 import {
   createControlState,
@@ -104,21 +104,18 @@ async function boot(): Promise<void> {
     return mapActions(merged, fireMode);
   }
 
-  /** The local ship's beam segment when firing (render is told; sim has no beam). */
+  /** The local ship's beam segment when firing (render is told; sim has no beam).
+   *  Mutates one reusable scratch beam/array — no per-frame allocation while fire
+   *  is held (mirrors EMPTY_BEAMS for the idle case; GDD §4.3b risk 5). */
   function currentBeams(): BeamView[] {
     if (!merged.fire) return EMPTY_BEAMS;
     const ship = world.ships.find((s) => s.id === LOCAL_PLAYER);
     if (!ship || !ship.alive) return EMPTY_BEAMS;
-    return [
-      {
-        from: ship.pos,
-        to: {
-          x: ship.pos.x + Math.cos(ship.angle) * BEAM_RANGE,
-          y: ship.pos.y + Math.sin(ship.angle) * BEAM_RANGE,
-        },
-        color: PLAYER_COLORS[LOCAL_PLAYER] ?? 0x4dc3ff,
-      },
-    ];
+    SCRATCH_BEAM.from = ship.pos;
+    SCRATCH_BEAM_TO.x = ship.pos.x + Math.cos(ship.angle) * BEAM_RANGE;
+    SCRATCH_BEAM_TO.y = ship.pos.y + Math.sin(ship.angle) * BEAM_RANGE;
+    SCRATCH_BEAM.color = PLAYER_COLORS[LOCAL_PLAYER] ?? 0x4dc3ff;
+    return SCRATCH_BEAMS;
   }
 
   // --- Viewport: keep renderer and touch halves in sync with the canvas.
@@ -148,6 +145,18 @@ async function boot(): Promise<void> {
 }
 
 const EMPTY_BEAMS: BeamView[] = [];
+
+// Reusable scratch beam for the firing case: mutated in place each frame so the
+// hot render path allocates nothing while fire is held (GDD §4.3b risk 5). The
+// `to` endpoint and `from`/`color` fields are overwritten per frame in
+// currentBeams(); typed mutable here (BeamView's fields are readonly to callers).
+const SCRATCH_BEAM_TO: Vec2 = { x: 0, y: 0 };
+const SCRATCH_BEAM: { from: Vec2; to: Vec2; color: number } = {
+  from: SCRATCH_BEAM_TO,
+  to: SCRATCH_BEAM_TO,
+  color: 0x4dc3ff,
+};
+const SCRATCH_BEAMS: BeamView[] = [SCRATCH_BEAM];
 
 /** Read the persisted fire mode, falling back to the platform default (§2.4). */
 function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouch: boolean): FireMode {
