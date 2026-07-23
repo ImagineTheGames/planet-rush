@@ -151,6 +151,16 @@ export class TouchController {
     return this.mode;
   }
 
+  /**
+   * Whether a thumb is currently holding the Auto-aim hold-to-FIRE button (the
+   * right half in Auto-aim mode). Always `false` in Manual mode — there the
+   * right side is the aim stick ({@link right}), not a button. The visuals layer
+   * reads this to draw the FIRE button's pressed state (touch-visuals.ts).
+   */
+  get rightButtonEngaged(): boolean {
+    return this.rightButtonPointer !== null;
+  }
+
   private isLeftHalf(x: number): boolean {
     return x < this.cfg.screenWidth / 2;
   }

@@ -16,6 +16,10 @@
 export interface Platform {
   /** Request/exit fullscreen. */
   setFullscreen(on: boolean): Promise<void>;
+  /** Enter fullscreen — a named convenience over {@link setFullscreen}(true),
+   *  called on the first touch gesture on mobile (mobile amendment §2). Rejected
+   *  requests (no user gesture, iOS Safari) degrade to a no-op, never throw. */
+  requestFullscreen(): Promise<void>;
   /** Haptic feedback (no-op where unsupported, e.g. desktop). */
   vibrate(ms: number): void;
   /** Persistent key/value storage (settings, chosen fire mode, etc.). */
@@ -25,6 +29,19 @@ export interface Platform {
   };
   /** Lock orientation where supported (landscape; cuttable per §4.9). */
   lockOrientation(orientation: 'landscape' | 'portrait'): Promise<void>;
+  /** Whether this platform can actually lock orientation. Android Chrome can;
+   *  iOS Safari cannot — the caller shows a ROTATE overlay there instead of
+   *  locking (mobile amendment §2). Feature-detected, no bare global in game
+   *  code (GDD §4.1). */
+  canLockOrientation(): boolean;
+}
+
+/** The non-standard-typed `screen.orientation.lock` surface, feature-detected
+ *  behind the seam so no game code touches a bare browser global (GDD §4.1). */
+type LockableOrientation = { lock?: (o: string) => Promise<void> };
+function orientationLock(): LockableOrientation | undefined {
+  const scr = screen as Screen & { orientation?: LockableOrientation };
+  return scr.orientation;
 }
 
 /**
@@ -32,18 +49,28 @@ export interface Platform {
  * an unsupported capability degrades to a no-op instead of throwing.
  */
 export function createBrowserPlatform(): Platform {
+  async function enterFullscreen(): Promise<void> {
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    } catch {
+      /* Fullscreen can be rejected (no user gesture, iOS Safari) — never fatal. */
+    }
+  }
+
   return {
     async setFullscreen(on: boolean): Promise<void> {
+      if (on) {
+        await enterFullscreen();
+        return;
+      }
       try {
-        if (on) {
-          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-        } else if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
+        if (document.fullscreenElement) await document.exitFullscreen();
       } catch {
-        /* Fullscreen can be rejected (no user gesture, iOS Safari) — never fatal. */
+        /* Exiting fullscreen can also reject — never fatal. */
       }
     },
+
+    requestFullscreen: enterFullscreen,
 
     vibrate(ms: number): void {
       // navigator.vibrate is absent on desktop and iOS Safari — feature-detect.
@@ -69,16 +96,19 @@ export function createBrowserPlatform(): Platform {
 
     async lockOrientation(orientation: 'landscape' | 'portrait'): Promise<void> {
       // screen.orientation.lock is non-standard-typed and unsupported on iOS.
-      const scr = screen as Screen & {
-        orientation?: { lock?: (o: string) => Promise<void> };
-      };
+      const orient = orientationLock();
       try {
-        if (scr.orientation && typeof scr.orientation.lock === 'function') {
-          await scr.orientation.lock(orientation);
+        if (orient && typeof orient.lock === 'function') {
+          await orient.lock(orientation);
         }
       } catch {
         /* Orientation lock is cuttable (GDD §4.9); a rejection is never fatal. */
       }
+    },
+
+    canLockOrientation(): boolean {
+      const orient = orientationLock();
+      return !!orient && typeof orient.lock === 'function';
     },
   };
 }
