@@ -59,6 +59,10 @@ export interface BeamView {
   readonly from: Vec2;
   readonly to: Vec2;
   readonly color: number;
+  /** Where the beam struck (asteroid/ship surface), or `null` on a clean miss
+   *  that runs the full range. A pooled plasma impact glow is drawn here when
+   *  present; `to` already ends at this point (sim clamps it — GDD §4.1). */
+  readonly hit: Vec2 | null;
 }
 
 /** What the renderer needs beyond the world to draw one frame. */
@@ -117,6 +121,20 @@ function makeUnitChunk(): Graphics {
   return new Graphics().circle(0, 0, 1).fill(PALETTE.signalYellow);
 }
 
+// Impact flare radius (world units) at the beam's hit point. Punchy but small
+// so it reads as a torch bite, not an explosion (style-guide §8 "bright, punchy").
+const IMPACT_RADIUS = 7;
+
+function makeImpactGlow(): Graphics {
+  // Plasma cutting-torch impact (style-guide §1 Plasma, RESERVED energy hue).
+  // Soft outer halo + a bright core, drawn once at unit radius and scaled per
+  // frame via transform so the hot path stays allocation-free (GDD §4.3 risk 5).
+  const g = new Graphics();
+  g.circle(0, 0, 1).fill({ color: PALETTE.plasma, alpha: 0.35 }); // halo
+  g.circle(0, 0, 0.45).fill({ color: PALETTE.plasma, alpha: 0.95 }); // core
+  return g;
+}
+
 function makeShip(id: number): Graphics {
   // Placeholder triangle pointing +x (angle 0 faces +x, matching the sim). Hull
   // stays steel; the cockpit carries player identity (style-guide §3 rule 2).
@@ -140,11 +158,13 @@ export class Renderer {
   private readonly asteroidLayer = new Container();
   private readonly chunkLayer = new Container();
   private readonly beamLayer = new Container();
+  private readonly impactLayer = new Container();
   private readonly shipLayer = new Container();
 
   private readonly asteroidPool: GraphicsPool;
   private readonly chunkPool: GraphicsPool;
   private readonly beamPool: GraphicsPool;
+  private readonly impactPool: GraphicsPool;
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
 
@@ -153,13 +173,23 @@ export class Renderer {
     private screenWidth: number,
     private screenHeight: number,
   ) {
-    // Back to front: rocks, chunks, beams, ships.
-    this.worldRoot.addChild(this.asteroidLayer, this.chunkLayer, this.beamLayer, this.shipLayer);
+    // Back to front: rocks, chunks, beams, impact glows (over the beam end),
+    // ships. Labels aid the layout registry + render tests.
+    this.beamLayer.label = 'beams';
+    this.impactLayer.label = 'impacts';
+    this.worldRoot.addChild(
+      this.asteroidLayer,
+      this.chunkLayer,
+      this.beamLayer,
+      this.impactLayer,
+      this.shipLayer,
+    );
     stage.addChild(this.worldRoot);
 
     this.asteroidPool = new GraphicsPool(this.asteroidLayer, makeUnitRock);
     this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
     this.beamPool = new GraphicsPool(this.beamLayer, () => new Graphics());
+    this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
   }
 
   /** Keep the world scaled/centred correctly on viewport resize (DPR handled by
@@ -232,12 +262,23 @@ export class Renderer {
   }
 
   private drawBeams(beams: readonly BeamView[]): void {
+    // A beam that hits ends at its impact point and gets a plasma glow there; a
+    // clean miss runs full range with no glow (GDD §4.1). Glows are pooled
+    // separately since only some beams strike — index them independently.
+    let glows = 0;
     for (let i = 0; i < beams.length; i++) {
       const b = beams[i]!;
       const g = this.beamPool.at(i);
       g.clear();
       g.moveTo(b.from.x, b.from.y).lineTo(b.to.x, b.to.y).stroke({ width: 3, color: b.color, cap: 'round' });
+      if (b.hit) {
+        const glow = this.impactPool.at(glows++);
+        glow.x = b.hit.x;
+        glow.y = b.hit.y;
+        glow.scale.set(IMPACT_RADIUS);
+      }
     }
     this.beamPool.hideFrom(beams.length);
+    this.impactPool.hideFrom(glows);
   }
 }
