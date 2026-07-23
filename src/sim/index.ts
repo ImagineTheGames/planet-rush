@@ -6,6 +6,11 @@
  * live here. This module runs with no GPU, no canvas, no window — the match
  * server and the QA harness both import it headless (GDD §4.1).
  *
- * Placeholder only — no game logic yet (day-0 scaffold).
+ * Public surface (day 1): build a world with `createWorld`, advance it with
+ * `step`, read plain-data `World`/`Ship`/`Asteroid`/`OreChunk`. Every tuning
+ * value lives in `./constants` (GDD §2.8, TUNABLE — QA owns it from day 2).
  */
-export const SIM_PLACEHOLDER = true;
+
+export * from './constants';
+export * from './state';
+export * from './step';
