@@ -1,10 +1,10 @@
 # Planet Rush
-## Game Design Document — v0.4
+## Game Design Document — v0.5
 
 **Course:** Multi-Agent AI for Game Development — Assignment #01
 **Author:** Reinaldo Vieira
-**Date:** July 22, 2026
-**Status:** Draft v0.4 — revised after a six-agent design review board (see `gdd-review-kit/`), a technical review, and a full art-direction pass. Circulated for feedback. v0.4 adds mobile/cross-platform play (touch controls, PWA, playable-milestone definition, reconnect grace).
+**Date:** July 23, 2026
+**Status:** Draft v0.5 — revised after a six-agent design review board (see `gdd-review-kit/`), a technical review, and a full art-direction pass. Circulated for feedback. v0.5 converts the schedule from calendar days to milestones — the build is gated by playable increments, not time.
 
 ---
 
@@ -16,7 +16,7 @@ The pitch is a clock, and a home. Your mining beam is also your weapon, so every
 
 Matches are guaranteed to end: the asteroid field's total yield is finite, arriving in waves that spawn progressively closer to the map center, and when the last wave is exhausted the match enters a collapse phase — shields stop regenerating, repair shuts off, and entropy finishes whoever the players don't.
 
-The game ships in one week, built by a team of specialized Claude agents, with all art and audio agent-produced. It runs in desktop and mobile browsers (TypeScript + PixiJS/WebGL, PWA-installable), plays online over WebSockets, and plays offline against bots. Keyboard/mouse, gamepad, and touch are all supported.
+The game ships milestone by milestone, each one playable, built by a team of specialized Claude agents, with all art and audio agent-produced. It runs in desktop and mobile browsers (TypeScript + PixiJS/WebGL, PWA-installable), plays online over WebSockets, and plays offline against bots. Keyboard/mouse, gamepad, and touch are all supported.
 
 **Genre:** Top-down arena shooter with a build-and-defend economy.
 **Players:** 1–8 online; AI bots (Easy/Medium/Hard) fill empty slots; fully playable solo and offline.
@@ -108,9 +108,9 @@ Respawning is **free and fast** (5 seconds at your home planet, upgrades intact)
 
 When a planet's core is destroyed, its owner is eliminated and gets an immediate **Rematch** button (plus spectate if they want to watch). The dead planet leaves a **wreck** that persists for the rest of the match, surrounded by ore-laden debris that *anyone* can scavenge. Small cargo holds mean nobody hauls a dead player's fortune away in one trip — wreck sites stay contested, and fights over a fresh wreck are a feature, not a bug.
 
-### 2.8 Baseline constants (day-1 hypotheses, owned by QA thereafter)
+### 2.8 Baseline constants (opening hypotheses, owned by QA thereafter)
 
-These are starting values, not commitments — they exist so the Gameplay Engineer types design numbers on day 1 instead of inventing them, and so QA has a hypothesis to falsify. All are flagged `TUNABLE`.
+These are starting values, not commitments — they exist so the Gameplay Engineer types design numbers at M1 instead of inventing them, and so QA has a hypothesis to falsify. All are flagged `TUNABLE`.
 
 | Constant | Notes | Baseline |
 |---|---|---|
@@ -142,11 +142,11 @@ The seven bots are **characters, not difficulty labels**: Rusty (Easy, timid hoa
 
 ### 2.10 Onboarding
 
-The game's central mechanic — your gun is your mining tool — inverts player expectations, so it is taught, not assumed. Onboarding is **owned by the UI Engineer and built on days 1–2**, not deferred: contextual first-match prompts fire on triggers ("Hold fire on the asteroid — your beam mines it," "Hold full — fly home and press E," "Spend ore on defense — or UPGRADE SHIP to mine and hit harder," "Your planet is under attack — follow the arrow"). The upgrade prompt fires the first time the wheel opens, because upgrades are the half of the economy a player can most easily miss. The prompts are the day-1/day-2 milestones translated into player-facing language, they are input-agnostic for free via the action mapping (2.4), and they never appear again after each is completed once. No separate tutorial mode: the first match is the tutorial.
+The game's central mechanic — your gun is your mining tool — inverts player expectations, so it is taught, not assumed. Onboarding is **owned by the UI Engineer and built across M1–M2**, not deferred: contextual first-match prompts fire on triggers ("Hold fire on the asteroid — your beam mines it," "Hold full — fly home and press E," "Spend ore on defense — or UPGRADE SHIP to mine and hit harder," "Your planet is under attack — follow the arrow"). The upgrade prompt fires the first time the wheel opens, because upgrades are the half of the economy a player can most easily miss. The prompts are the M1/M2 milestones translated into player-facing language, they are input-agnostic for free via the action mapping (2.4), and they never appear again after each is completed once. No separate tutorial mode: the first match is the tutorial.
 
 ### 2.11 Ship classes
 
-Players choose a hull in the lobby; the choice is locked for the match and sets all five core attributes: **top speed, acceleration, turn rate, armor (hull HP), and beam damage** (which is also mining speed — one beam, one stat). Four classes ship in week one. Baselines are day-1 hypotheses (TUNABLE), relative to the Vanguard:
+Players choose a hull in the lobby; the choice is locked for the match and sets all five core attributes: **top speed, acceleration, turn rate, armor (hull HP), and beam damage** (which is also mining speed — one beam, one stat). Four classes ship in core scope. Baselines are opening hypotheses (TUNABLE), relative to the Vanguard:
 
 | Class (hull) | Role · Speed / Accel / Turn / Hull / Beam / Cargo |
 |---|---|
@@ -171,13 +171,13 @@ Planet Rush is developed by seven specialized Claude agents plus a coordinating 
 
 4. **Platform Engineer** — *The game feels identical on a trackpad, an Xbox pad, and a phone screen, and it runs at 60 fps on a laptop — and on the developer's phone.* Owns the deterministic fixed-timestep loop, the input-action mapping (keyboard/mouse, gamepad, and touch), the dynamic virtual sticks, the device-aware controls strip, the PWA manifest and service worker, viewport/devicePixelRatio scaling, the `platform.ts` abstraction (the Capacitor seam), the determinism replay test, and the PixiJS render layer.
 
-5. **Netcode Engineer** — *Eight people in four countries fight over the same asteroid and it feels like one room.* Owns the `Transport` interface and both of its implementations, the authoritative match server, snapshot encoding, client-side prediction and reconciliation, and the room/lobby protocol. Runs a **day-0 spike** before any of it is designed, and the spike *decides* rather than confirms: measure a real snapshot's size, establish the tick rate the sim can sustain, and evaluate candidate hosts against the one requirement that matters — holding a persistent WebSocket under load without sleeping — then pick one. The numbers in 4.2 are inputs to that spike, not conclusions from it. *Scope note:* netcode is the highest-variance work in the week and lands mid-week, so it is owned separately — a slip here cannot also stall input, rendering, and the game loop.
+5. **Netcode Engineer** — *Eight people in four countries fight over the same asteroid and it feels like one room.* Owns the `Transport` interface and both of its implementations, the authoritative match server, snapshot encoding, client-side prediction and reconciliation, and the room/lobby protocol. Runs an **M0 spike** before any of it is designed, and the spike *decides* rather than confirms: measure a real snapshot's size, establish the tick rate the sim can sustain, and evaluate candidate hosts against the one requirement that matters — holding a persistent WebSocket under load without sleeping — then pick one. The numbers in 4.2 are inputs to that spike, not conclusions from it. *Scope note:* netcode is the highest-variance work in the build and lands mid-sequence, so it is owned separately — a slip here cannot also stall input, rendering, and the game loop.
 
-6. **Art & Audio Agent** — *Every mechanic in section 2 has a visible and audible tell.* Produces every visual and sound: procedural SVG/sprite ships (one livery per bot personality), planets, asteroids, wrecks, and UI in one palette; **a specified VFX set** — beam impacts, asteroid crack-and-burst, shield shimmer, turret muzzle flashes, explosions, thruster trails, spawn-protection glow, and the planet-death moment; synthesized SFX (jsfxr-style) including the under-attack alarm and the distinct rock-vs-hull beam sounds; and an ambient loop. Runs the day-0 concept mode (4.7).
+6. **Art & Audio Agent** — *Every mechanic in section 2 has a visible and audible tell.* Produces every visual and sound: procedural SVG/sprite ships (one livery per bot personality), planets, asteroids, wrecks, and UI in one palette; **a specified VFX set** — beam impacts, asteroid crack-and-burst, shield shimmer, turret muzzle flashes, explosions, thruster trails, spawn-protection glow, and the planet-death moment; synthesized SFX (jsfxr-style) including the under-attack alarm and the distinct rock-vs-hull beam sounds; and an ambient loop. Runs the M0 concept mode (4.7).
 
 7. **UI Engineer** — *The player always knows the triangle state, and a first-time player learns the game inside their first match — on a laptop or a phone.* Builds the HUD (ore squares + banked total, asteroid-wave clock, alarm, screen-edge arrow, over-ship hull bars, device-aware controls strip), thumb-scale HUD layout and safe-area-aware anchoring for touch devices, the fire-mode setting (Manual/Auto-aim) and its settings-menu UI, radial build menu, upgrade panel, minimap, main menu, settings, lobby with ship-class select and player colors, end-of-match summary with Rematch, **and the onboarding prompts (2.10)**.
 
-8. **QA Agent** — *The clock the design promises is the clock the player gets — on desktop and in your hand.* Runs headless bot-vs-bot matches **with an enforced match timeout** (a hung match is a failed test, not a hung harness), owns the constants table from day 2 onward, writes sim unit tests and the determinism replay test, owns the mobile performance gate (4.3) and verifies every milestone (4.6) on the developer's phone before it ships, and files balance reports against two measurable targets: match length lands in 10–15 minutes, and no strategy exceeds a stated win-rate threshold across bot mirrors.
+8. **QA Agent** — *The clock the design promises is the clock the player gets — on desktop and in your hand.* Runs headless bot-vs-bot matches **with an enforced match timeout** (a hung match is a failed test, not a hung harness), owns the constants table from M2 onward, writes sim unit tests and the determinism replay test, owns the mobile performance gate (4.3) and verifies every milestone (4.6) on the developer's phone before it ships, and files balance reports against two measurable targets: match length lands in 10–15 minutes, and no strategy exceeds a stated win-rate threshold across bot mirrors.
 
 Coordination stays deliberately boring: agents communicate through shared interface files, PRs, and the Director's reviews. There is no runtime multi-agent system in the shipped game — the multi-agent system is the studio, not the product. Runtime token cost: zero.
 
@@ -188,9 +188,9 @@ Coordination stays deliberately boring: agents communicate through shared interf
 ### 4.1 Stack and platform path
 
 - **Language:** TypeScript throughout — client, server, and bots share one codebase and one set of types. Agents write and test plain text files; no engine-editor tooling in the loop.
-- **Renderer:** PixiJS (WebGL2), drawing a 2D top-down scene. Sprites are batched and pooled from day 1.
-- **PWA:** a manifest and service worker make the client installable to the home screen and playable fullscreen; the service worker caches the app shell, so the game is offline-capable against bots by the same mechanism that makes it installable. Store packaging (Capacitor) is designed for, not built, this week.
-- **Platform abstraction:** all platform-specific calls — fullscreen, vibration, storage, orientation — go through one `platform.ts` interface; game code never touches a bare browser global directly. This is the Capacitor seam: wrapping it for native store packaging is a post-week task, not a rewrite.
+- **Renderer:** PixiJS (WebGL2), drawing a 2D top-down scene. Sprites are batched and pooled from M1.
+- **PWA:** a manifest and service worker make the client installable to the home screen and playable fullscreen; the service worker caches the app shell, so the game is offline-capable against bots by the same mechanism that makes it installable. Store packaging (Capacitor) is designed for, not built, in this build.
+- **Platform abstraction:** all platform-specific calls — fullscreen, vibration, storage, orientation — go through one `platform.ts` interface; game code never touches a bare browser global directly. This is the Capacitor seam: wrapping it for native store packaging is a post-v0.1 task, not a rewrite.
 - **Collision:** hand-written, no physics engine. Every colliding body is a circle, so:
   - **Broad phase:** uniform-grid spatial hash, cell size ≈ 2× largest radius; test same + adjacent cells only.
   - **Narrow phase:** `dx² + dy² < (r1+r2)²`. No square roots.
@@ -202,46 +202,46 @@ Coordination stays deliberately boring: agents communicate through shared interf
 - **Animation:** procedural, no libraries. Ship rotation is a transform, thrusters are alpha oscillation, explosions are pooled particles, asteroid cracks are sprite swaps at damage thresholds, UI uses tweens.
 - **Simulation:** deterministic fixed-timestep (60 Hz), fully decoupled from rendering. **The match server never imports PixiJS** — it runs the sim with no GPU, no canvas, no window, and so does the QA harness. **Determinism policy:** netcode is authoritative state-sync, not lockstep; determinism is asserted per build by a CI replay test (same inputs, same final state hash), with a table-based math fallback if it ever fails.
 
-### 4.2 Multiplayer: in scope for week one
+### 4.2 Multiplayer: in core scope
 
-Online multiplayer ships in week one. A small **authoritative Node.js match server** over WebSockets holds all simulation authority: clients send input ticks, the server runs the one true sim and broadcasts state, clients interpolate. Rooms are created from the lobby with a shareable code; bots fill empty slots server-side, so a 3-human classroom match is still an 8-planet war.
+Online multiplayer is in core scope. A small **authoritative Node.js match server** over WebSockets holds all simulation authority: clients send input ticks, the server runs the one true sim and broadcasts state, clients interpolate. Rooms are created from the lobby with a shareable code; bots fill empty slots server-side, so a 3-human classroom match is still an 8-planet war.
 
 **"Host" is a lobby word, not a network role.** The player who creates a room picks the bot difficulties and is otherwise a client like any other. There are no listen servers and no peer-to-peer: browsers cannot accept incoming connections.
 
-**Hosting: decided by the day-0 spike, not by this document.** The requirement is narrow and testable — hold a persistent WebSocket for a full match under 8-player load, without sleeping or dropping connections, at zero or near-zero cost. Candidates to evaluate: Oracle Cloud Always Free (always-on ARM), Cloudflare Durable Objects (WebSocket-native, one object per room), and a low-cost VPS as the paid baseline. The Netcode Engineer benchmarks them and picks one; the choice is recorded in the repo, not here.
+**Hosting: decided by the M0 spike, not by this document.** The requirement is narrow and testable — hold a persistent WebSocket for a full match under 8-player load, without sleeping or dropping connections, at zero or near-zero cost. Candidates to evaluate: Oracle Cloud Always Free (always-on ARM), Cloudflare Durable Objects (WebSocket-native, one object per room), and a low-cost VPS as the paid baseline. The Netcode Engineer benchmarks them and picks one; the choice is recorded in the repo, not here.
 
 Regardless of the winner, the server ships as a **plain Dockerized Node process with no vendor-specific APIs**, so it redeploys elsewhere in an afternoon. That portability is the actual requirement — the host is replaceable, and the spec treats it that way (risk 1).
 
 **What goes over the wire.** Static entities — asteroids, turrets, shields, wrecks — are sent as **events**, on join and on change. Only ships and projectiles stream as **binary snapshots**. Server ticks at 20–30 Hz; clients render at 60 with interpolation. **Client-side prediction** makes input feel instant: your own ship simulates locally the moment you press a key and reconciles against server authority — available because the sim is deterministic and the client runs the same code the server does.
 
-**The `Transport` interface** has two implementations: `LocalLoopback` (solo, offline) and `WebSocketTransport` (online). The simulation consumes ordered input ticks and never knows which one it is talking to. The server deploys from GitHub Actions, so the developer's travel connectivity never gates the classroom's ability to play. If the week runs long, the cut list (4.9) degrades multiplayer to 2 players + bots rather than cutting it.
+**The `Transport` interface** has two implementations: `LocalLoopback` (solo, offline) and `WebSocketTransport` (online). The simulation consumes ordered input ticks and never knows which one it is talking to. The server deploys from GitHub Actions, so the developer's travel connectivity never gates the classroom's ability to play. If scope runs over, the cut list (4.9) degrades multiplayer to 2 players + bots rather than cutting it.
 
 **Reconnect grace.** On a mid-match disconnect, a bot substitutes for the player immediately, so the match keeps its shape and the room doesn't stall. The player may rejoin the same match by room code within ~60 seconds (`TUNABLE`) and reclaim their ship, with all upgrades intact. This is motivated by mobile play, where screen lock, app backgrounding, and cellular drops are routine in a way they are not on desktop.
 
 ### 4.3 Named constraints
 
-1. **One-week build window.** One map layout, one ship type, four buildables, elimination-only. The ranked cut list (4.9) is the enforcement instrument — cuts are decided now, in daylight, not at 2 a.m. on day 7.
+1. **Bounded scope, milestone-gated.** One map layout, four buildables, elimination-only — the ranked cut list enforces scope; milestones gate progress, not calendar time. The ranked cut list (4.9) is the enforcement instrument — cuts are decided now, in daylight, not at 2 a.m. on M7.
 2. **Spotty internet while traveling (primary constraint).** (a) The solo/offline game is a complete product on its own; (b) the dev environment is fully local; (c) agent work is batched into bursts with Director briefs prepared offline; (d) server deploys run in the cloud via Actions, so a hotel-Wi-Fi push is enough to update both the game and the server.
-3. **Browser performance budget.** 8 ships, up to 32 turrets (design cap 4 × 8 planets), ~200 asteroids, hundreds of projectiles at 60 fps on integrated graphics: object pooling, spatial hash collisions, instanced sprites, zero per-frame allocations in the sim. **Mobile gate:** 60 fps on the developer's own phone — the primary mobile test device — at the same entity counts, with a 30 fps floor on a 3-year-old mid-range Android; sustained drops below the floor auto-engage the "reduce VFX" setting. Entity counts are unchanged for mobile — the same pooling and batching disciplines are what make the phone target feasible. Verified by the day-5 performance gate, not assumed.
+3. **Browser performance budget.** 8 ships, up to 32 turrets (design cap 4 × 8 planets), ~200 asteroids, hundreds of projectiles at 60 fps on integrated graphics: object pooling, spatial hash collisions, instanced sprites, zero per-frame allocations in the sim. **Mobile gate:** 60 fps on the developer's own phone — the primary mobile test device — at the same entity counts, with a 30 fps floor on a 3-year-old mid-range Android; sustained drops below the floor auto-engage the "reduce VFX" setting. Entity counts are unchanged for mobile — the same pooling and batching disciplines are what make the phone target feasible. Verified by the M5 performance gate, not assumed.
 4. **Runtime token cost must be zero.** All in-game AI is behavior trees; LLMs build the game but never run it.
 
 ### 4.3b Named risks
 
-Keeping online multiplayer in week one is a deliberate bet. These are the ways it can go wrong, each with the thing that stops it becoming fatal:
+Keeping online multiplayer in core scope is a deliberate bet. These are the ways it can go wrong, each with the thing that stops it becoming fatal:
 
 | # | Risk | Why it's real | Mitigation |
 |---|---|---|---|
-| 1 | **Free hosting tiers change without warning** | Free tiers are withdrawn, throttled, or quietly halved with no announcement, and some close idle WebSockets outright. Whichever host the spike picks can move under us mid-week. | The server is a plain Dockerized Node process with no vendor-specific APIs, so it redeploys anywhere in an afternoon. A ~4 EUR/month VPS is the standing paid fallback. The portability is the mitigation — not the vendor. |
-| 2 | **Netcode slips and eats the back half** | It's the highest-variance work in the plan and it lands on days 3–4, where an overrun cascades into integration (day 5) and balance (day 6). | Three layers. The cut list degrades 8 players to 2 players + bots rather than cutting online. The offline solo game is complete and ships regardless. And the Netcode Engineer is a separate agent, so a netcode slip can't also stall input, rendering, and the loop. |
-| 3 | **WebSocket is TCP — head-of-line blocking** | One dropped packet stalls everything queued behind it. At 8 players on a small map this is *probably* fine; nobody has measured it. | The day-0 spike measures it before the design locks. If it bites, geckos.io (UDP over WebRTC) drops in behind the same `Transport` interface — transport work, not a rewrite. |
-| 4 | **The bandwidth numbers in 4.2 are arithmetic, not measurements** | ~40 KB/s per client and ~2 KB snapshots come from *assumed* entity counts and tick rates. No one has run it. | Explicitly a day-0 spike deliverable, treated like the balance constants in 2.8: a hypothesis for QA to falsify, not a fact to build on. |
-| 5 | **PixiJS perf at target entity counts is unverified** | 8 ships, 32 turrets, ~200 asteroids and hundreds of projectiles at 60 fps on integrated graphics is a claim, not a result. | Pooling, spatial hashing and instanced sprites from day 1, not retrofitted. The day-5 integration gate verifies it on real hardware, with "reduce VFX" already in the settings menu as the escape hatch. |
+| 1 | **Free hosting tiers change without warning** | Free tiers are withdrawn, throttled, or quietly halved with no announcement, and some close idle WebSockets outright. Whichever host the spike picks can move under us mid-build. | The server is a plain Dockerized Node process with no vendor-specific APIs, so it redeploys anywhere in an afternoon. A ~4 EUR/month VPS is the standing paid fallback. The portability is the mitigation — not the vendor. |
+| 2 | **Netcode slips and eats the back half** | It's the highest-variance work in the plan and it lands on M3–M4, where an overrun cascades into integration (M5) and balance (M6). | Three layers. The cut list degrades 8 players to 2 players + bots rather than cutting online. The offline solo game is complete and ships regardless. And the Netcode Engineer is a separate agent, so a netcode slip can't also stall input, rendering, and the loop. |
+| 3 | **WebSocket is TCP — head-of-line blocking** | One dropped packet stalls everything queued behind it. At 8 players on a small map this is *probably* fine; nobody has measured it. | The M0 spike measures it before the design locks. If it bites, geckos.io (UDP over WebRTC) drops in behind the same `Transport` interface — transport work, not a rewrite. |
+| 4 | **The bandwidth numbers in 4.2 are arithmetic, not measurements** | ~40 KB/s per client and ~2 KB snapshots come from *assumed* entity counts and tick rates. No one has run it. | Explicitly an M0 spike deliverable, treated like the balance constants in 2.8: a hypothesis for QA to falsify, not a fact to build on. |
+| 5 | **PixiJS perf at target entity counts is unverified** | 8 ships, 32 turrets, ~200 asteroids and hundreds of projectiles at 60 fps on integrated graphics is a claim, not a result. | Pooling, spatial hashing and instanced sprites from M1, not retrofitted. The M5 integration gate verifies it on real hardware, with "reduce VFX" already in the settings menu as the escape hatch. |
 | 6 | **Server dies, and with it all online play** | Free tier, single instance, no redundancy. | Offline solo-vs-bots is a first-class mode, not a fallback — it needs no server, no internet, and is the mode the developer builds against while travelling. A dead server costs the classroom a session, never the deliverable. |
-| 7 | **Mobile browser quirks** | Audio unlock requires a user gesture, fullscreen API behaves differently across mobile browsers, and Safari enforces tight WebGL memory limits — any of which can silently break a build that only tested on desktop. | The developer's phone is a first-class test device from day 1; every milestone (4.6) is phone-verified before it ships, so quirks surface the day they're introduced, not at day 6. |
+| 7 | **Mobile browser quirks** | Audio unlock requires a user gesture, fullscreen API behaves differently across mobile browsers, and Safari enforces tight WebGL memory limits — any of which can silently break a build that only tested on desktop. | The developer's phone is a first-class test device from M1; every milestone (4.6) is phone-verified before it ships, so quirks surface the milestone they're introduced, not at M6. |
 
 ### 4.4 Token budget
 
-Budget assumes Claude Code sessions over 7 days plus a half-day of pre-production, batched for offline gaps. Figures are input+output combined, with headroom.
+Budget assumes Claude Code sessions across the build (M0 pre-production through M7), batched for offline gaps. Figures are input+output combined, with headroom.
 
 | Agent | Main deliverables | Est. tokens |
 |---|---|---|
@@ -249,14 +249,14 @@ Budget assumes Claude Code sessions over 7 days plus a half-day of pre-productio
 | Gameplay Engineer | Sim: collision, beam, ore, building, repair, siege, win/loss | 6.0 M |
 | Bot Engineer | 3-difficulty behavior trees + 7 personalities | 3.5 M |
 | Platform Engineer | Game loop, input mapping (incl. touch), controls strip, PWA/service worker, Pixi render layer | 4.5 M |
-| Netcode Engineer | Day-0 spike, Transport, match server, snapshots, prediction | 4.5 M |
+| Netcode Engineer | M0 spike, Transport, match server, snapshots, prediction | 4.5 M |
 | Art & Audio Agent | Concept boards + sprites, VFX set, SFX, alarm, palette | 5.0 M |
 | UI Engineer | HUD, build menu, upgrade panel, lobby, onboarding, rematch, fire-mode/settings UI | 4.5 M |
 | QA Agent | Headless harness (with timeout), tests, balance to targets, mobile perf gate | 4.0 M |
 | Contingency (~20%) | Rework, integration bugs, balance passes | 6.5 M |
 | **Total** | | **~41.5 M tokens** |
 
-Front-loaded on the Gameplay Engineer (days 1–3), mid-loaded on the Netcode Engineer (days 3–4, plus the day-0 spike), back-loaded on QA (days 5–7). Headless QA matches consume no tokens — they're compiled code.
+Front-loaded on the Gameplay Engineer (M1–M3), mid-loaded on the Netcode Engineer (M3–M4, plus the M0 spike), back-loaded on QA (M5–M7). Headless QA matches consume no tokens — they're compiled code.
 
 ### 4.5 API constraints and mitigations
 
@@ -264,40 +264,40 @@ Front-loaded on the Gameplay Engineer (days 1–3), mid-loaded on the Netcode En
 - **Context limits:** the codebase is split along agent ownership lines; interfaces are the contract, so no agent needs the whole repo in context.
 - **Asset generation:** art is generated as code (SVG/procedural sprites) — reproducible, diffable, license-clean, regenerable offline.
 
-### 4.6 Seven-day plan
+### 4.6 The milestone plan
 
-| Day | Milestone (playable check) |
+| Milestone | Milestone (playable check) |
 |---|---|
-| 0 (half-day) | Concept boards + tone locked into style-guide.md; repo, CI, Pages, server deploy pipeline live; **Netcode spike:** real snapshot size measured, sustainable tick rate established, host benchmarked and chosen (pre-production — not a playable build; phone verification starts at day 1) |
-| 1 | Ship flies, shoots, mines; two-number ore HUD; first onboarding prompts; touch controls (twin sticks, fire-mode setting) ship alongside keyboard/mouse and gamepad — playable at the public URL — phone-verified |
-| 2 | Planets, cores, turrets, shields, repair channel, build menu, under-attack alarm; win/loss + last-to-die rule fires vs. do-nothing bots — phone-verified |
-| 3 | WebSocket transport + authoritative server deployed; 2-player online match works — phone-verified |
-| 4 | 8-slot lobby with room codes, ship-class select, player colors; Easy/Medium/Hard bots with personalities fill empty slots, online and offline — phone-verified |
-| 5 | **Integration day:** full 8-slot online match end-to-end; 60 fps performance gate on integrated graphics and on the developer's phone; first balance pass against the constants table; art/VFX/audio replace placeholders — phone-verified |
-| 6 | QA balance passes to the 10–15 min target; gamepad and touch verified; onboarding polished — phone-verified |
-| 7 | Polish, main menu + settings + end-of-match/rematch flow, tagged v0.1 release for the classroom — phone-verified |
+| M0 | Concept boards + tone locked into style-guide.md; repo, CI, Pages, server deploy pipeline live; **Netcode spike:** real snapshot size measured, sustainable tick rate established, host benchmarked and chosen (pre-production — not a playable build; phone verification starts at M1) |
+| M1 | Ship flies, shoots, mines; two-number ore HUD; first onboarding prompts; touch controls (twin sticks, fire-mode setting) ship alongside keyboard/mouse and gamepad — playable at the public URL — phone-verified |
+| M2 | Planets, cores, turrets, shields, repair channel, build menu, under-attack alarm; win/loss + last-to-die rule fires vs. do-nothing bots — phone-verified |
+| M3 | WebSocket transport + authoritative server deployed; 2-player online match works — phone-verified |
+| M4 | 8-slot lobby with room codes, ship-class select, player colors; Easy/Medium/Hard bots with personalities fill empty slots, online and offline — phone-verified |
+| M5 | **Integration milestone:** full 8-slot online match end-to-end; 60 fps performance gate on integrated graphics and on the developer's phone; first balance pass against the constants table; art/VFX/audio replace placeholders — phone-verified |
+| M6 | QA balance passes to the 10–15 min target; gamepad and touch verified; onboarding polished — phone-verified |
+| M7 | Polish, main menu + settings + end-of-match/rematch flow, tagged v0.1 release for the classroom — phone-verified |
 
 ### 4.6a Playable milestones
 
-> A **playable milestone** is a tagged, CI-green build, live at the public URL, that a first-time player can open on a phone browser and verify that day's player-facing checks in under 2 minutes — touch and keyboard both working — announced by a phone ping containing the play URL and a 2-line "what to test" note.
+> A **playable milestone** is a tagged, CI-green build, live at the public URL, that a first-time player can open on a phone browser and verify that milestone's player-facing checks in under 2 minutes — touch and keyboard both working — announced by a phone ping containing the play URL and a 2-line "what to test" note.
 
-The seven day-milestones above (days 1–7) are the playable milestones; day 0 is pre-production and the netcode spike, not itself a player-facing build. Each milestone gains a `test_notes` field in `milestones.json`; the deploy workflow pings ntfy on tag with the URL and those notes — Planet Rush Studio's existing milestones.json → ping plumbing is reused as-is, not rebuilt.
+The seven milestones above (M1–M7) are the playable milestones; M0 is pre-production and the netcode spike, not itself a player-facing build. Each milestone gains a `test_notes` field in `milestones.json`; the deploy workflow pings ntfy on tag with the URL and those notes — Planet Rush Studio's existing milestones.json → ping plumbing is reused as-is, not rebuilt.
 
-**On-demand deploys.** Saying "deploy now" to the Director pushes the current `main` to the `/dev` URL and fires the same ping, with no tag required — so a milestone can be phone-verified mid-day, not just at its scheduled end.
+**On-demand deploys.** Saying "deploy now" to the Director pushes the current `main` to the `/dev` URL and fires the same ping, with no tag required — so a milestone can be phone-verified mid-cycle, not just at its scheduled end.
 
 ### 4.7 Pre-production: concept iteration and tone
 
-Before production, the Art & Audio Agent runs a half-day concept mode (day 0), delivering instantly viewable HTML/SVG artifacts: two to three **theme boards** showing the *same* scene (ship, defended planet, asteroid field, HUD, open build menu); **level layout variants** (one SVG, three planet-ring/field arrangements — spacing tunes the triangle, since travel time home is the defense tax); and **UI mockups** in the two leading themes.
+Before production, the Art & Audio Agent runs the M0 concept mode, delivering instantly viewable HTML/SVG artifacts: two to three **theme boards** showing the *same* scene (ship, defended planet, asteroid field, HUD, open build menu); **level layout variants** (one SVG, three planet-ring/field arrangements — spacing tunes the triangle, since travel time home is the defense tax); and **UI mockups** in the two leading themes.
 
 The boards are judged against a **tone paragraph**, written into this GDD so the choice has criteria instead of vibes:
 
 > *Planet Rush is a Saturday-morning space brawl: fast, bright, and a little cheeky. Ships are toys, explosions are fireworks, bots are cartoon rivals with names. But homes are the one serious thing in it — when a planet dies, the game goes briefly quiet, the wreck stays on the map all match, and nobody jokes for three seconds. Arcade on the surface, a small ache underneath.*
 
-The developer picks a winner (one revision round max), frozen into `style-guide.md` — a contract like the interfaces, changeable only through the Director. Concept iteration is deliberately not a standing loop: after day 2 the game is playable, and iterating on the real build beats iterating on pictures. Budget: ~1.0 M tokens inside the Art & Audio line.
+The developer picks a winner (one revision round max), frozen into `style-guide.md` — a contract like the interfaces, changeable only through the Director. Concept iteration is deliberately not a standing loop: after M2 the game is playable, and iterating on the real build beats iterating on pictures. Budget: ~1.0 M tokens inside the Art & Audio line.
 
 ### 4.8 Source control, CI, and classroom distribution
 
-Everything lives in one GitHub repository from day 0: code, this GDD, `style-guide.md`, agent briefs, and all generated assets (which are code, so the whole game is reproducible from a clone). Agents work in short-lived branches scoped to briefs; the Director merges to `main` via PR review — the same channel as the escalation path in section 3.
+Everything lives in one GitHub repository from M0: code, this GDD, `style-guide.md`, agent briefs, and all generated assets (which are code, so the whole game is reproducible from a clone). Agents work in short-lived branches scoped to briefs; the Director merges to `main` via PR review — the same channel as the escalation path in section 3.
 
 GitHub Actions runs four jobs. **CI on every push:** typecheck, unit tests, the determinism replay test, and a headless bot smoke match (with timeout) — a commit that breaks or hangs the game cannot merge. **Deploy on green `main`:** the web client to GitHub Pages, the match server to its free-tier host — one public URL the whole classroom can open and play, solo or together. **Release on tag:** the stable classroom link serves the latest *tagged* build, with `main`'s newest on a `/dev` path, so experiments never break the link the class is using.
 
@@ -305,7 +305,7 @@ Git is offline-first: commit locally all day, push in a burst, and the cloud doe
 
 ### 4.9 Ranked cut list
 
-If the week runs long, features die in this order — decided now, not by whoever is tired on day 7:
+If scope runs over, features die in this order — decided now, not by whoever is tired at M7:
 
 1. Minimap ping
 2. Boost
@@ -321,7 +321,7 @@ Not cuttable: the triangle (mine/defend/attack), the finite field and collapse p
 
 ## 5. Art Direction
 
-The visual direction was chosen on day 0 and frozen into `style-guide.md` — the contract the Art & Audio and UI agents build against, changeable only through the Director (4.7). This chapter is that reference.
+The visual direction was chosen at M0 and frozen into `style-guide.md` — the contract the Art & Audio and UI agents build against, changeable only through the Director (4.7). This chapter is that reference.
 
 ### 5.1 Cold Vacuum — the chosen direction
 
@@ -366,17 +366,19 @@ The HUD shows only what the player acts on: ore squares and banked total, the as
 
 ### 5.8 The game in play
 
-The ruleset's distinct moments, drawn before day 1. Each one is a legibility test: if a moment doesn't read at a glance, that's a design bug found in pre-production rather than on day 6.
+The ruleset's distinct moments, drawn before M1. Each one is a legibility test: if a moment doesn't read at a glance, that's a design bug found in pre-production rather than at M6.
 
 
 ---
 
-*End of v0.4. This document is the Assignment #01 deliverable and the contract the build agents work against.*
+*End of v0.5. This document is the Assignment #01 deliverable and the contract the build agents work against.*
 
 *Changes from the first draft, in response to a six-agent design review board: the ore economy is bounded and ends in a collapse phase, so the match is structurally guaranteed to terminate; starting ore and spawn protection replace the naked-core opening; the siege model is stated as design rather than deferred to tuning (turrets deter / the ship defends / pressure beats regeneration / two beats one); core repair replaces the mine layer; ties resolve last-to-die; respawn is free with time as the cost; Hard bots target by threat rather than weakness, and are fog-honest; onboarding is designed, owned and scheduled; online multiplayer was promoted into week-one scope; a baseline constants table gives day 1 real numbers; a tone paragraph gives day 0 real criteria; day 5 became an integration and performance gate; and a ranked cut list decides in daylight what dies if the week runs long.*
 
 *Changes since, from technical review: PixiJS replaces Three.js; collision is hand-written circles with no physics engine; multiplayer runs on a dedicated authoritative server, with the host chosen by a day-0 spike rather than assumed; a Netcode Engineer was split out as the eighth agent; and six risks are named with mitigations. Scope was cut to exactly one platform — a browser game, online and offline. There are no stretch goals in this document.*
 
 *Changes in v0.4: mobile/cross-platform play added as first-class scope — touch controls (dynamic twin sticks; Manual and Auto-aim fire modes with mode-morphing right-side control), PWA installability with a Capacitor-ready platform seam, a formal playable-milestone definition with phone-verification and ntfy pings, a mobile performance gate, a reconnect-grace rule for drop-prone mobile connections, and a seventh named risk (mobile browser quirks). Multiplayer architecture re-evaluated against Photon/Nakama/gRPC alternatives and reaffirmed: authoritative TypeScript WebSocket server, one deterministic codebase.*
+
+*Changes in v0.5: the schedule is milestone-based — M0-M7 replace calendar days; the one-week window is retired in favor of scope-bounded, playable-increment gating. No mechanical changes.*
 
 *Open questions for the build: exact wave pacing curve, whether spectators get a ghost-ping ability, and alliance signalling in 8-player matches.*

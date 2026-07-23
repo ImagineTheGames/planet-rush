@@ -1,5 +1,5 @@
 {
-  "_comment": "Planet Rush playable milestones (GDD 4.6 / 4.6a). The deploy workflow (.github/workflows/ci.yml) pings ntfy on a v* tag with the play URL and the matching entry's `test_notes`. Lookup: .tags[<tag>] first, else .default. As the team tags a milestone, add a `tags` entry pointing at that day's notes below. `days` is the source of truth for the notes text (GDD 4.6).",
+  "_comment": "Planet Rush playable milestones (GDD 4.6 / 4.6a). Entries are milestones (M0-M7); the `day` field on each entry is a milestone index, not a calendar day. The deploy workflow (.github/workflows/ci.yml) pings ntfy on a v* tag with the play URL and the matching entry's `test_notes`. Lookup: .tags[<tag>] first, else .default. As the team tags a milestone, add a `tags` entry pointing at that milestone's notes below. `days` is the source of truth for the notes text (GDD 4.6).",
   "default": {
     "title": "New build",
     "test_notes": "A new tagged build is live. Open it on your phone: verify touch controls and keyboard both work, and that it installs to the home screen."
