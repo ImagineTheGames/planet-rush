@@ -471,6 +471,31 @@ export function installLayoutHook(
       return state.worldHash();
     },
   });
+
+  // Additive install. `window.__planetRush` is a SHARED debug surface: the camera
+  // centring instrument (src/platform/debug-hook.ts) also lives here, and under
+  // `?debug=1` it is installed FIRST — read-only (non-writable, non-configurable)
+  // via defineProperty. A plain `target.__planetRush = surface` would then throw
+  // a TypeError in strict-mode ESM ("Cannot assign to read only property"),
+  // aborting boot() before loop.start() — the game loop would never run and the
+  // instrument would report a dead {0,0} viewport forever (QA's centring suite
+  // times out). So when a co-tenant already owns the handle, MERGE our own keys
+  // onto it instead, never clobbering a key it already owns (e.g. its `viewport`,
+  // which the camera hook keeps as {w,h}). Best-effort per key so one frozen/
+  // non-configurable collision can't abort the whole install.
+  const existing = target.__planetRush;
+  if (existing) {
+    const own = Object.getOwnPropertyDescriptors(surface);
+    for (const key of Object.keys(own)) {
+      if (Object.prototype.hasOwnProperty.call(existing, key)) continue;
+      try {
+        Object.defineProperty(existing, key, own[key]!);
+      } catch {
+        /* co-tenant is non-extensible for this key — skip it, keep the rest */
+      }
+    }
+    return existing;
+  }
   target.__planetRush = surface;
   return surface;
 }
