@@ -1,0 +1,213 @@
+# Planet Rush — Style Guide
+
+## Cold Vacuum — the frozen art contract
+
+**Status:** FROZEN. Extracted and operationalized from GDD chapter 5 (Art
+Direction), §2.11 (ship classes), and §4.7 (tone). This file is a contract, like
+the shared TypeScript interfaces. **Changeable only through the Director.** The
+Art & Audio and UI agents build against it and check every asset against it.
+
+**Cold Vacuum** in one line: gunmetal hulls, teal patina for corrosion, signal
+yellow for anything that matters, a cold plasma-blue cutting torch for the beam.
+Industrial and grubby, but in vacuum rather than in a mine shaft — no rust, no
+amber, no cave.
+
+The palette is small on purpose: every colour has exactly one job.
+
+---
+
+## 1. Palette — the six colours (frozen)
+
+| Role | Hex | Job |
+|---|---|---|
+| **Vacuum** | `#0D1015` | Background. Near-black, so every entity carries its own contrast. |
+| **Hull steel** | `#7E8894` | All ships, all players. Hulls never take player colour. |
+| **Patina** | `#4FA08B` | Corrosion, continents, the repair channel. The "old system" tint. |
+| **Signal yellow** | `#F2D24B` | Ore, hazard stripes, costs, the planet core. **RESERVED — see §2.** |
+| **Plasma** | `#4DC3FF` | Beams, cockpits, energy. Per-player beams are this hue, tinted by player colour. |
+| **Threat red** | `#B23A3A` | Damage, alarms, enemy fire, the under-attack tell. |
+
+**These six are the whole world palette.** No seventh material colour enters
+the game without the Director. Player identity colours (§3) are a separate,
+additive layer that lives only on trim — they never replace a material colour.
+
+**Contrast rule:** every entity must read against Vacuum `#0D1015` on its own.
+Do not rely on a lighter backdrop; there isn't one.
+
+---
+
+## 2. The RESERVED rule (the rule that carries the most weight)
+
+> **Signal yellow `#F2D24B` means ore or danger, and nothing else. Ever.**
+
+- Yellow is allowed on: ore chunks, asteroids' ore veins, the ore HUD squares
+  and banked total, cost numerals on the build wheel, hazard/danger stripes, and
+  the planet **core** (it is the win condition — a thing that matters).
+- Yellow is **forbidden** as decoration, as a player identity colour, as a UI
+  accent, in a menu highlight, in a particle that isn't ore or a hazard — in
+  anything a player might mistake for "ore is here" or "this is dangerous."
+- A player scanning a chaotic screen must be able to trust yellow completely.
+  Every misuse spends that trust. Treat yellow as a controlled substance.
+
+Threat red `#B23A3A` carries the danger half of the same discipline: it is
+damage, alarm, and enemy fire only — never a neutral or friendly accent.
+
+---
+
+## 3. Player colour and identity
+
+Eight players, eight identity colours — humans and bots alike. Identity is an
+**additive trim layer** over the steel fleet, never a repaint.
+
+**Rules (all four are hard):**
+
+1. **Hulls stay steel `#7E8894`.** Every ship reads as one industrial fleet.
+2. **Player colour appears only on:** wing tips / trim, cockpit glass, engine
+   flame, beam tint, planet **beacon ring**, and the **HP / hull bar**. Nowhere
+   else on the sprite. This makes a livery a palette swap, not a new sprite.
+3. **Every ship carries its player number as a hull decal.** Identity never
+   depends on colour alone — this is the colourblind-safe path and costs nothing.
+   The decal is the source of truth; the colour is the fast-read shortcut.
+4. **Silhouette carries class identity** (§4), colour carries player identity.
+   The two channels are independent so a colourblind player still reads *who*
+   (decal) and *what* (shape) with colour removed.
+
+### 3.1 Player colour roster — operational (8 slots)
+
+Concrete instantiation of the 8-colour roster the lobby assigns (GDD §2.1).
+Chosen for mutual distinctness and to avoid semantic collision with RESERVED
+signal yellow and threat red. Distinctness is backed by the hull decal (§3 rule
+3), so no player is ever identified by hue alone.
+
+| Slot | Name | Hex |
+|---|---|---|
+| P1 | Azure | `#3D7BFF` |
+| P2 | Cyan | `#22D3C5` |
+| P3 | Spring | `#3DD68C` |
+| P4 | Violet | `#9B5DE5` |
+| P5 | Magenta | `#F15BB5` |
+| P6 | Orange | `#FF8A3D` |
+| P7 | Chalk | `#DCE3EC` |
+| P8 | Slate-Blue | `#5C6CE0` |
+
+Roster hues sit clear of `#F2D24B` (ore) and `#B23A3A` (danger); no slot is pure
+red or pure yellow. This roster is part of the frozen contract — change it only
+through the Director.
+
+---
+
+## 4. Ship classes — four silhouettes
+
+Four hulls, four silhouettes, four playstyles (GDD §2.11). Because bot
+personalities map to hulls, **the shape is information.**
+
+> **Readability requirement (hard): each of the four silhouettes must be
+> unambiguously distinguishable from the other three at 24×24 px, in flat steel
+> `#7E8894` with player colour removed.** Test every hull sprite by rendering it
+> at 24 px, greyed, on Vacuum — if two hulls are confusable at that size, the
+> shape has failed and must be redrawn. This is why hulls stay steel: the
+> silhouette must carry the read, not the colour.
+
+| Class (hull) | Role | Silhouette intent |
+|---|---|---|
+| **Interceptor** (Quadfin) | Scout, miner-hunter | Fastest read: narrow, swept, four fins — visibly the light, quick shape. |
+| **Vanguard** (Anvil) | All-rounder, onboarding default | The neutral baseline shape; balanced, symmetric, "default ship." |
+| **Excavator** (Pincer) | Mining engine, close bruiser | Front-heavy pincer/mandible prow — reads as a mining tool up front. |
+| **Hauler** (Hammerhead) | Logistics, siege tank | Widest, blunt hammerhead mass — visibly the heavy, slow, tanky hull. |
+
+One livery per bot personality (GDD §2.9) is a palette swap over these four
+silhouettes — never a new shape.
+
+---
+
+## 5. Planets
+
+Earthlike, randomised per player from **four variants** so no two home worlds
+look identical (GDD §5.4).
+
+**Rules:**
+
+- **Oceans are steel-blue, continents are patina-green `#4FA08B`** — keeps
+  "Earth" inside the Cold Vacuum palette instead of importing a second one.
+- **The core is signal yellow `#F2D24B`** — it is the win condition, a thing
+  that matters, so it obeys the RESERVED rule (§2).
+- **Ownership = beacon ring in the player's colour (§3), always visible.**
+- **Health = a damage ring, visible only within sensor range** (GDD §2.2) —
+  enemy planet HP is scouted, never broadcast.
+- **Four variants** differ in continent layout / ocean-to-land ratio only;
+  all four stay within the ocean-steel-blue + continent-patina + yellow-core
+  rule. Variety comes from arrangement, not from new colours.
+- A burning/dying planet reads from further away than its numbers do (smoke) —
+  see the tone contract (§8) for the planet-death moment.
+
+---
+
+## 6. Turrets and asteroids
+
+- **Turrets must read as cannons at a glance and telegraph threat while
+  spinning** (GDD §5.5). Steel hull, player-colour trim, plasma/threat accents
+  on the barrel per state.
+- **Asteroids are the economy, so they crack visibly across three stages** and
+  let a player judge a payout before committing beam time. Ore veins are the
+  only yellow on an asteroid; the rock body is neutral steel-grey mineral.
+  Crack stages are sprite swaps at damage thresholds (GDD §4.1 animation).
+
+---
+
+## 7. Typography
+
+Both faces are **OFL licensed and self-hosted in the repo** (GDD §4.5 / §5.6),
+so they render offline and carry no licence risk.
+
+| Face | Use | Why |
+|---|---|---|
+| **Audiowide** | Wordmark, headings, menu confirmations | Rounded retro-techno — playful without being a toy, which is exactly the tone brief (§8). |
+| **Oxanium** | HUD numerals, body text | Designed for game interfaces; holds up at 12px; shares Audiowide's squared geometry without competing with it. |
+
+**Rules:**
+
+- Never set HUD numerals in Audiowide, never set the wordmark in Oxanium.
+- Both fonts ship as self-hosted `@font-face` files under `assets/` — no CDN,
+  no Google Fonts network call. Offline-first (GDD §4.3, §4.8).
+- Oxanium must remain legible at 12px on the HUD — verify at the mobile
+  thumb-scale layout, not just desktop.
+
+---
+
+## 8. Tone — the emotional contract (GDD §4.7, verbatim)
+
+Every asset, every VFX, every sound is judged against this paragraph. It is
+quoted here unaltered as the contract:
+
+> *Planet Rush is a Saturday-morning space brawl: fast, bright, and a little
+> cheeky. Ships are toys, explosions are fireworks, bots are cartoon rivals with
+> names. But homes are the one serious thing in it — when a planet dies, the game
+> goes briefly quiet, the wreck stays on the map all match, and nobody jokes for
+> three seconds. Arcade on the surface, a small ache underneath.*
+
+**Operational reading for Art & Audio:**
+
+- **Arcade on the surface:** ships are toys, explosions are fireworks. VFX are
+  bright, punchy, generous — beam impacts, muzzle flashes, thruster trails,
+  spawn glow all lean fun and readable, not gritty-realistic.
+- **A small ache underneath:** homes are the one serious thing. The
+  **planet-death moment goes briefly quiet** — audio drops out, the beat holds
+  for ~3 seconds, and nobody jokes. This quiet is a *mechanic of tone*, not
+  polish, and cannot be cut.
+- Every mechanic in GDD §2 gets a **visible and audible tell** — that is the
+  Art & Audio mandate. If a moment doesn't read at a glance, that's a design
+  bug found in pre-production, not on day 6 (GDD §5.8).
+
+---
+
+## 9. Legibility test (the standing check)
+
+Each of the ruleset's distinct moments is a legibility test (GDD §5.8): mine,
+spend, fight, alarm, siege, planet-death, wreck-scavenge. **If a moment doesn't
+read at a glance — at 24px, at mobile thumb-scale, against Vacuum, with colour
+removed — it fails and is redrawn.** This guide exists so that "reads at a
+glance" has criteria instead of vibes.
+
+---
+
+*Frozen day 0. Changeable only through the Director (GDD §4.7).*
