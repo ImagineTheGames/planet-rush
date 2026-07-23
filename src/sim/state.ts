@@ -15,7 +15,7 @@
  * below steps it with the ratified mulberry32 algorithm (`@shared/types`).
  */
 
-import type { PlayerId, Vec2 } from '@shared/types';
+import type { Beam, PlayerId, Vec2 } from '@shared/types';
 import { ShipClass, mulberry32 } from '@shared/types';
 import {
   ASTEROID,
@@ -59,6 +59,10 @@ export interface Ship {
   spawnProtect: number;
   /** Collision radius. */
   radius: number;
+  /** Public beam geometry for the tick it is firing, else `null` (GDD §4.1).
+   *  The sim's raycast already finds the nearest hit for damage/mining; this
+   *  exposes it so the renderer stops the beam at what it strikes. */
+  beam: Beam | null;
 }
 
 /** A minable asteroid — the economy (GDD §2.3, §5.5). */
@@ -184,6 +188,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     respawnTimer: 0,
     spawnProtect: SPAWN_PROTECTION_S,
     radius: SHIP_RADIUS,
+    beam: null,
   };
 }
 
