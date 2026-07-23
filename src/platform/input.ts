@@ -1,21 +1,168 @@
 /**
- * src/platform/input.ts — the input→action mapping. OWNER: Platform Engineer.
+ * src/platform/input.ts — device input sources. OWNER: Platform Engineer.
  *
- * Turns keyboard/mouse, gamepad, and touch into the abstract `Action` union
- * (src/shared/types) BEFORE input crosses into the sim (GDD §2.4). Touch is the
- * dynamic twin virtual sticks with fire-mode morph (mobile amendment §2); the
- * device-aware controls strip reads its labels from this same map so it can
- * never drift out of sync with the real bindings.
+ * Keyboard/mouse and gamepad each fold their raw state into the device-neutral
+ * {@link ControlState} (GDD §2.4), exactly as `touch.ts` does for the virtual
+ * sticks. `mapActions` (actions.ts) then turns that one state into the abstract
+ * `Action[]` the sim consumes — the sim never sees a device.
  *
- * Placeholder only — no mapping yet (day-0 scaffold; touch + kb/mouse + gamepad
- * all land in the day-1 milestone).
+ * The DOM listeners live here at the edge; the mapping logic they feed is pure
+ * (actions.ts / touch.ts) and headless-testable. This file references browser
+ * globals only inside method bodies, so it is import-safe under any tsconfig but
+ * is only ever constructed in the browser.
  */
-import type { Action } from '@shared/types';
 
-/** A source of abstract actions for one player, whatever the device. */
+import type { Vec2 } from '@shared/types';
+import type { ControlState } from './actions';
+
+/** A device that contributes to the shared control state each frame. */
 export interface InputSource {
-  /** Drain the actions produced since the last poll. */
-  poll(): Action[];
+  /** Fold this device's current state into `state`. Called once per frame. */
+  update(state: ControlState): void;
+  /** Detach listeners / release resources. */
+  dispose(): void;
 }
 
-export const INPUT_PLACEHOLDER = true;
+// ---------------------------------------------------------------------------
+// Keyboard + mouse (GDD §2.4: WASD, mouse aim, LMB fire, E build, Space boost)
+// ---------------------------------------------------------------------------
+
+/** Provides the ship's current screen position so mouse aim is relative to it.
+ *  The camera centers the local ship, so this is the canvas center by default. */
+export type ScreenCenterFn = () => Vec2;
+
+export class KeyboardMouseSource implements InputSource {
+  private readonly keys = new Set<string>();
+  private readonly mouse: Vec2 = { x: 0, y: 0 };
+  private firing = false;
+  private pingRequest: Vec2 | null = null;
+
+  private readonly onKeyDown = (e: KeyboardEvent): void => {
+    this.keys.add(e.code);
+  };
+  private readonly onKeyUp = (e: KeyboardEvent): void => {
+    this.keys.delete(e.code);
+  };
+  private readonly onMouseMove = (e: MouseEvent): void => {
+    this.mouse.x = e.clientX;
+    this.mouse.y = e.clientY;
+  };
+  private readonly onMouseDown = (e: MouseEvent): void => {
+    if (e.button === 0) this.firing = true;
+    if (e.button === 1) this.pingRequest = { x: e.clientX, y: e.clientY };
+  };
+  private readonly onMouseUp = (e: MouseEvent): void => {
+    if (e.button === 0) this.firing = false;
+  };
+  private readonly onBlur = (): void => {
+    this.keys.clear();
+    this.firing = false;
+  };
+
+  constructor(
+    private readonly center: ScreenCenterFn,
+    private readonly target: Window = window,
+  ) {
+    target.addEventListener('keydown', this.onKeyDown);
+    target.addEventListener('keyup', this.onKeyUp);
+    target.addEventListener('mousemove', this.onMouseMove);
+    target.addEventListener('mousedown', this.onMouseDown);
+    target.addEventListener('mouseup', this.onMouseUp);
+    target.addEventListener('blur', this.onBlur);
+  }
+
+  update(state: ControlState): void {
+    // WASD → thrust (screen space, y-down, matching world y-down).
+    let tx = 0;
+    let ty = 0;
+    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) tx -= 1;
+    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) tx += 1;
+    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) ty -= 1;
+    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) ty += 1;
+    // Normalize the diagonal so keyboard corners don't exceed the analog disc.
+    if (tx !== 0 && ty !== 0) {
+      const inv = 1 / Math.SQRT2;
+      tx *= inv;
+      ty *= inv;
+    }
+    state.thrust.x = tx;
+    state.thrust.y = ty;
+
+    // Mouse aim relative to the (centered) ship. Manual mode uses it; the mapper
+    // drops it in Auto-aim.
+    const c = this.center();
+    const ax = this.mouse.x - c.x;
+    const ay = this.mouse.y - c.y;
+    state.aim = ax !== 0 || ay !== 0 ? { x: ax, y: ay } : null;
+
+    state.fire = this.firing;
+    state.boost = this.keys.has('Space') || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    state.build = this.keys.has('KeyE');
+
+    if (this.pingRequest) {
+      state.ping = this.pingRequest;
+      this.pingRequest = null;
+    }
+  }
+
+  dispose(): void {
+    this.target.removeEventListener('keydown', this.onKeyDown);
+    this.target.removeEventListener('keyup', this.onKeyUp);
+    this.target.removeEventListener('mousemove', this.onMouseMove);
+    this.target.removeEventListener('mousedown', this.onMouseDown);
+    this.target.removeEventListener('mouseup', this.onMouseUp);
+    this.target.removeEventListener('blur', this.onBlur);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gamepad (GDD §2.4: left stick, right stick aim, RT fire, LT boost, Y build)
+// ---------------------------------------------------------------------------
+
+const STICK_DEADZONE = 0.2;
+const TRIGGER_THRESHOLD = 0.4;
+
+/** Reads gamepad 0 via the browser Gamepad API (GDD §2.4 — not on the cut list). */
+export class GamepadSource implements InputSource {
+  constructor(private readonly index = 0) {}
+
+  private pad(): Gamepad | null {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    return pads[this.index] ?? null;
+  }
+
+  update(state: ControlState): void {
+    const pad = this.pad();
+    if (!pad) return;
+
+    const ax = deadzone(pad.axes[0] ?? 0);
+    const ay = deadzone(pad.axes[1] ?? 0);
+    state.thrust.x = ax;
+    state.thrust.y = ay;
+
+    const rx = deadzone(pad.axes[2] ?? 0);
+    const ry = deadzone(pad.axes[3] ?? 0);
+    state.aim = rx !== 0 || ry !== 0 ? { x: rx, y: ry } : null;
+
+    // Right trigger fires; standard mapping puts triggers on buttons 6 (LT) / 7 (RT).
+    state.fire = buttonValue(pad, 7) > TRIGGER_THRESHOLD;
+    state.boost = buttonValue(pad, 6) > TRIGGER_THRESHOLD;
+    state.build = buttonPressed(pad, 3); // Y / Triangle
+  }
+
+  dispose(): void {
+    // Stateless polling — nothing to detach.
+  }
+}
+
+function deadzone(v: number): number {
+  return Math.abs(v) < STICK_DEADZONE ? 0 : v;
+}
+
+function buttonValue(pad: Gamepad, i: number): number {
+  return pad.buttons[i]?.value ?? 0;
+}
+
+function buttonPressed(pad: Gamepad, i: number): boolean {
+  return pad.buttons[i]?.pressed ?? false;
+}
