@@ -8,6 +8,12 @@ dist/
 .vite/
 coverage/
 
+# Playwright (mobile-emulation suite) output
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # Editor / OS cruft
 .DS_Store
 *.log
