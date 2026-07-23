@@ -171,6 +171,90 @@ describe('cargo hold cap (GDD §2.3, §2.8)', () => {
   });
 });
 
+// --- 3b. full-hold tractor: chunks stay put (GDD §2.3) ---------------------
+
+describe('full-hold tractor (GDD §2.3: "when it\'s full, chunks stay where they are for anyone")', () => {
+  it('a full hold exerts no tractor pull — a resting chunk stays exactly put', () => {
+    // Vanguard cap = 2; start full. A chunk at rest well inside tractor range.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, cargo: 2 });
+    const chunk = { id: 3000, pos: { x: 500, y: 560 }, vel: { x: 0, y: 0 }, amount: 1, radius: 6 };
+    const world = emptyWorld({ ships: [ship], chunks: [chunk] });
+
+    const start = { x: chunk.pos.x, y: chunk.pos.y };
+    for (let t = 0; t < 180; t++) step(world, []);
+
+    // Never attracted, never collected: position and hold both unchanged.
+    expect(world.chunks).toHaveLength(1);
+    expect(world.chunks[0]!.pos).toEqual(start);
+    expect(world.ships[0]!.cargo).toBe(2);
+  });
+
+  it('a chunk in flight toward a ship whose hold fills mid-pull loses its target and coasts to rest', () => {
+    // Room for exactly one more ore. A chunk touching the ship fills it on the
+    // first tick; a second chunk is already flying inward when that happens.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, cargo: 1 }); // room = 1
+    const near = { id: 3100, pos: { x: 500, y: 520 }, vel: { x: 0, y: 0 }, amount: 1, radius: 6 };
+    const flight = { id: 3101, pos: { x: 500, y: 600 }, vel: { x: 0, y: -80 }, amount: 1, radius: 6 };
+    // `near` first in the array so it is collected (filling the hold) before
+    // `flight` is processed on the very same tick.
+    const world = emptyWorld({ ships: [ship], chunks: [near, flight] });
+
+    let prevSpeed = Math.hypot(flight.vel.x, flight.vel.y);
+    for (let t = 0; t < 600; t++) {
+      step(world, []);
+      const live = world.chunks.find((c) => c.id === 3101);
+      if (!live) break;
+      const speed = Math.hypot(live.vel.x, live.vel.y);
+      // Only drag ever acts on it once the hold is full — never re-accelerated.
+      expect(speed).toBeLessThanOrEqual(prevSpeed + 1e-9);
+      prevSpeed = speed;
+    }
+
+    const ship0 = world.ships[0]!;
+    const released = world.chunks.find((c) => c.id === 3101)!;
+    // Hold filled to the cap by `near`; the in-flight chunk was never collected.
+    expect(ship0.cargo).toBe(2);
+    expect(released).toBeDefined();
+    expect(released.amount).toBe(1);
+    // It coasted to a stop free-floating, short of the ship — not pulled in.
+    expect(Math.hypot(released.vel.x, released.vel.y)).toBeLessThan(1e-3);
+    const gap = Math.hypot(released.pos.x - ship0.pos.x, released.pos.y - ship0.pos.y);
+    expect(gap).toBeGreaterThan(ship0.radius + released.radius);
+  });
+
+  it('a released chunk is collectable by another ship that still has space', () => {
+    // ship0 is full and sits nearest the chunk; ship1 has room and is farther.
+    const full = makeShip({ id: 0, pos: { x: 500, y: 500 }, cargo: 2 });
+    const roomy = makeShip({ id: 1, pos: { x: 500, y: 600 }, cargo: 0 });
+    const chunk = { id: 3200, pos: { x: 500, y: 560 }, vel: { x: 0, y: 0 }, amount: 1, radius: 6 };
+    const world = emptyWorld({ ships: [full, roomy], chunks: [chunk] });
+
+    for (let t = 0; t < 240 && world.chunks.length > 0; t++) step(world, []);
+
+    // The full ship ignored it; the ship with space tractored and collected it.
+    expect(world.ships[0]!.cargo).toBe(2);
+    expect(world.ships[1]!.cargo).toBe(1);
+    expect(world.chunks).toHaveLength(0);
+  });
+
+  it('attraction resumes once the hold frees up (banking / spending)', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, cargo: 2 }); // full
+    const chunk = { id: 3300, pos: { x: 500, y: 560 }, vel: { x: 0, y: 0 }, amount: 1, radius: 6 };
+    const world = emptyWorld({ ships: [ship], chunks: [chunk] });
+
+    // While full: no pull, chunk stays put.
+    const start = { x: chunk.pos.x, y: chunk.pos.y };
+    for (let t = 0; t < 60; t++) step(world, []);
+    expect(world.chunks[0]!.pos).toEqual(start);
+
+    // Banking empties the hold (banked ore is safe, GDD §2.3) — tractor resumes.
+    world.ships[0]!.cargo = 0;
+    for (let t = 0; t < 240 && world.chunks.length > 0; t++) step(world, []);
+    expect(world.ships[0]!.cargo).toBe(1);
+    expect(world.chunks).toHaveLength(0);
+  });
+});
+
 // --- 4. ship-asteroid reflection ------------------------------------------
 
 describe('ship-vs-asteroid reflection (GDD §4.1)', () => {
