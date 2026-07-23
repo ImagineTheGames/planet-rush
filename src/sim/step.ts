@@ -494,11 +494,16 @@ function killShip(world: World, ship: Ship): void {
 function updateChunks(world: World, dt: number): void {
   const range2 = TRACTOR.range * TRACTOR.range;
   for (const chunk of world.chunks) {
-    // Nearest alive ship within tractor range pulls the chunk in.
+    // Nearest alive ship *with room in its hold* within tractor range pulls the
+    // chunk in. A full hold never attracts: chunks stay where they are for
+    // anyone (GDD §2.3). A chunk in flight toward a ship whose hold fills
+    // mid-pull loses its target here and coasts to a stop under drag — dropping
+    // back to free-floating, collectable by any ship that still has space.
     let target: Ship | null = null;
     let bestD2 = range2;
     for (const ship of world.ships) {
       if (!ship.alive) continue;
+      if (ship.cargoCap - ship.cargo <= 1e-9) continue;
       const d2 = dist2(chunk.pos, ship.pos);
       if (d2 < bestD2) {
         bestD2 = d2;
