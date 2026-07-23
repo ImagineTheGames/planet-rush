@@ -97,10 +97,9 @@ jobs:
           entry=$(jq -c --arg t "$TAG" '.tags[$t] // .default' milestones.json)
           title=$(printf '%s' "$entry" | jq -r '.title')
           notes=$(printf '%s' "$entry" | jq -r '.test_notes')
+          body=$(printf '%s\n\nPlay: %s' "${notes}" "${PAGE_URL}")
           curl -fsS \
             -H "Title: ${title} (${TAG})" \
             -H "Tags: rocket" \
-            -d "${notes}
-
-Play: ${PAGE_URL}" \
+            -d "${body}" \
             "https://ntfy.sh/${NTFY_TOPIC}"
