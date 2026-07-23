@@ -18,6 +18,8 @@
 
 import { Container, Graphics } from 'pixi.js';
 import type { PlayerId, Vec2 } from '@shared/types';
+import { writeCameraOffset } from '@platform/camera';
+import type { Viewport } from '@platform/camera';
 import type { Asteroid, OreChunk, Ship, World } from '../sim/state';
 
 // ---------------------------------------------------------------------------
@@ -130,6 +132,10 @@ function makeShip(id: number): Graphics {
 // against Vacuum as it's mined out (style-guide §5.5, three stages).
 const CRACK_ALPHA = [1, 0.78, 0.56];
 
+// Module-level scratch point for the camera target, so centerCamera passes the
+// target to the pure camera math without allocating a Vec2 each frame (GDD §4.3).
+const TARGET_SCRATCH: Vec2 = { x: 0, y: 0 };
+
 // ---------------------------------------------------------------------------
 // The renderer
 // ---------------------------------------------------------------------------
@@ -148,11 +154,16 @@ export class Renderer {
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
 
-  constructor(
-    stage: Container,
-    private screenWidth: number,
-    private screenHeight: number,
-  ) {
+  /** The visible viewport the camera centres on. This is the *visual* viewport
+   *  (URL-bar / notch / fullscreen aware), not the raw canvas — see camera.ts.
+   *  Mutated whole via {@link setViewport}; read every frame in centerCamera. */
+  private viewport: Viewport;
+  /** Reused scratch so centerCamera allocates nothing per frame (GDD §4.3). */
+  private readonly offsetScratch: Vec2 = { x: 0, y: 0 };
+
+  constructor(stage: Container, viewport: Viewport) {
+    this.viewport = viewport;
+
     // Back to front: rocks, chunks, beams, ships.
     this.worldRoot.addChild(this.asteroidLayer, this.chunkLayer, this.beamLayer, this.shipLayer);
     stage.addChild(this.worldRoot);
@@ -162,11 +173,21 @@ export class Renderer {
     this.beamPool = new GraphicsPool(this.beamLayer, () => new Graphics());
   }
 
-  /** Keep the world scaled/centred correctly on viewport resize (DPR handled by
-   *  the Application's `autoDensity`, so these are CSS pixels). */
-  resize(width: number, height: number): void {
-    this.screenWidth = width;
-    this.screenHeight = height;
+  /** Point the camera at a new visible viewport (resize / orientationchange /
+   *  fullscreen / URL-bar reflow). DPR is handled by the Application's
+   *  `autoDensity`, so the viewport is in CSS pixels. */
+  setViewport(viewport: Viewport): void {
+    this.viewport = viewport;
+  }
+
+  /** The screen position (canvas-local CSS px) a world point draws at this frame,
+   *  read from the *actual* worldRoot transform. The debug instrument
+   *  (debug-hook.ts) projects the local ship through this so QA asserts against
+   *  what is really on screen, not a recomputed ideal. Call after {@link draw}. */
+  projectToScreen(world: Vec2, out: Vec2): Vec2 {
+    out.x = this.worldRoot.x + world.x;
+    out.y = this.worldRoot.y + world.y;
+    return out;
   }
 
   /** Draw one frame from read-only sim state. Allocation-free on the hot paths. */
@@ -182,8 +203,13 @@ export class Renderer {
     const target = world.ships.find((s) => s.id === targetId) ?? world.ships[0];
     const cx = target ? target.pos.x : world.bounds.width / 2;
     const cy = target ? target.pos.y : world.bounds.height / 2;
-    this.worldRoot.x = this.screenWidth / 2 - cx;
-    this.worldRoot.y = this.screenHeight / 2 - cy;
+    // Offset worldRoot so the target lands at the *visible* viewport centre — not
+    // the canvas centre, which drifts off-screen on mobile (camera.ts).
+    TARGET_SCRATCH.x = cx;
+    TARGET_SCRATCH.y = cy;
+    writeCameraOffset(this.offsetScratch, TARGET_SCRATCH, this.viewport);
+    this.worldRoot.x = this.offsetScratch.x;
+    this.worldRoot.y = this.offsetScratch.y;
   }
 
   private drawAsteroids(asteroids: readonly Asteroid[]): void {
