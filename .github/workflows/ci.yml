@@ -1,0 +1,106 @@
+# Planet Rush CI + classroom distribution (GDD §4.8).
+#
+#   push (any branch/PR) -> typecheck, unit tests, build     (the merge gate)
+#   push to main         -> + deploy dist/ to GitHub Pages    (the public URL)
+#   push of a v* tag     -> + ping ntfy with the milestone's play notes
+#
+# A relative Vite base ('./', see vite.config.ts) lets the one built bundle
+# serve from any Pages subpath, so deploy needs no per-ref rebuild.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+# Least privilege by default; the deploy job widens this for itself.
+permissions:
+  contents: read
+
+jobs:
+  # --- The merge gate: runs on every push and PR. ------------------------
+  ci:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build
+        run: npx vite build
+
+      # Only main and v* tags ship; feature branches stop at the gate above.
+      - name: Package Pages artifact
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # --- Publish the built client to GitHub Pages. ------------------------
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: ci
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Serialize deploys without cancelling an in-flight publish.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  # --- On a v* tag: ping the classroom with the milestone's play notes. --
+  notify:
+    name: Ping ntfy (tagged release)
+    needs: deploy
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Post milestone notes to ntfy
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "NTFY_TOPIC secret is unset — skipping the release ping."
+            exit 0
+          fi
+          # Milestone lookup mirrors the deploy contract: .tags[<tag>] first,
+          # else .default (milestones.json header, GDD §4.6a).
+          entry=$(jq -c --arg t "$TAG" '.tags[$t] // .default' milestones.json)
+          title=$(printf '%s' "$entry" | jq -r '.title')
+          notes=$(printf '%s' "$entry" | jq -r '.test_notes')
+          curl -fsS \
+            -H "Title: ${title} (${TAG})" \
+            -H "Tags: rocket" \
+            -d "${notes}
+
+Play: ${PAGE_URL}" \
+            "https://ntfy.sh/${NTFY_TOPIC}"
