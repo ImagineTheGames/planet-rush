@@ -26,6 +26,16 @@ import { TouchController } from '@platform/touch';
 import { TouchVisuals } from '@platform/touch-visuals';
 import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
+import { writeAffordanceRects } from '@platform/touch-visuals';
+import type { TouchAffordanceRects } from '@platform/touch-visuals';
+import {
+  LayoutRegistry,
+  installLayoutHook,
+  parseDebugFlags,
+  isLayoutContributor,
+} from '@platform/layout-registry';
+import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
+import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
 import { Hud } from './ui';
@@ -37,6 +47,10 @@ const FIRE_MODE_KEY = 'planet-rush:fireMode';
 
 async function boot(): Promise<void> {
   const platform = createBrowserPlatform();
+
+  // Dev flags (?debug=1, ?freeze=1). Off in a normal build — everything gated on
+  // `flags.debug` below is zero-cost when the query string is absent.
+  const flags = parseDebugFlags(typeof window !== 'undefined' ? window.location.search : '');
 
   const app = new Application();
   await app.init({
@@ -115,9 +129,34 @@ async function boot(): Promise<void> {
     nearAsteroid: false,
   };
 
+  // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
+  //     tick, then hold it there so screenshots are deterministic across boots
+  //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
+  //     the entry point pins the frame (src/platform/freeze.ts).
+  if (flags.freeze) advanceToFreezeTick(world, FREEZE_TICK);
+  const frozenHash = flags.freeze ? hashWorld(world) : null;
+
+  // --- Layout registry (?debug=1): every positioned visual element registers
+  //     its declared anchor + actual rendered rect each frame, exposed READ-ONLY
+  //     at window.__planetRush.layout (src/platform/layout-registry.ts). Null —
+  //     and every registration below skipped — in a normal build.
+  const registry = flags.debug ? new LayoutRegistry() : null;
+  const touchRects: TouchAffordanceRects = { leftStickZone: null, aimZone: null, fireButton: null };
+  const shipRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  if (registry) {
+    installLayoutHook({
+      registry,
+      viewport: (): Viewport => ({ width: app.screen.width, height: app.screen.height }),
+      frozen: () => flags.freeze,
+      freezeTick: () => (flags.freeze ? FREEZE_TICK : null),
+      worldHash: () => frozenHash,
+    });
+  }
+
   // --- Fixed-timestep loop: sample input → step sim → render (GDD §4.1).
   const loop = new GameLoop({
     update: () => {
+      if (flags.freeze) return; // sim is pinned at the seeded freeze tick
       step(world, [{ id: LOCAL_PLAYER, actions: sampleInput() }]);
     },
     render: () => {
@@ -128,6 +167,8 @@ async function boot(): Promise<void> {
       // no-op layer on desktop). Reads the viewport each frame so the idle
       // affordances and FIRE button track resize/orientation flips.
       touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height);
+      // Refresh the layout registry from what was just drawn (debug only).
+      if (registry) refreshLayout(registry);
     },
   });
 
@@ -163,6 +204,46 @@ async function boot(): Promise<void> {
     hudFrame.cargoCap = ship.cargoCap;
     hudFrame.banked = ship.banked;
     hudFrame.nearAsteroid = nearAsteroid(ship.pos);
+  }
+
+  /** Refresh the layout registry from this frame's drawn state (debug only).
+   *  Every positioned element registers its declared anchor + actual rendered
+   *  rect, so a tool can assert "it appears where it's supposed to" (the whole
+   *  point of the registry). Owned elements register precise, self-computed
+   *  bounds; HUD-owned elements come through the public {@link isLayoutContributor}
+   *  seam when the UI exposes it (see PR notes). */
+  function refreshLayout(reg: LayoutRegistry): void {
+    const w = app.screen.width;
+    const h = app.screen.height;
+    reg.beginFrame();
+
+    // Local ship: the camera keeps it centred (GDD §2.2) → anchor `center`.
+    const ship = world.ships.find(isLocalShip);
+    if (ship && ship.alive) {
+      const r = ship.radius;
+      shipRect.x = w / 2 - r;
+      shipRect.y = h / 2 - r;
+      shipRect.width = 2 * r;
+      shipRect.height = 2 * r;
+      reg.register('ship-local', SHIP_ANCHOR, shipRect);
+    }
+
+    // Touch controls: anchored home rects from the same constants that draw them
+    // (touch-visuals). All null on desktop, so nothing registers there.
+    writeAffordanceRects(isTouch, fireMode, w, h, touchRects);
+    if (touchRects.leftStickZone) reg.register('touch-left-stick', LEFT_STICK_ANCHOR, touchRects.leftStickZone);
+    if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
+    if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
+
+    // HUD-owned elements (ore HUD, banked total, wave clock, controls strip,
+    // onboarding prompt): registered via the Hud's public describeLayout() seam
+    // if present. Not implemented at M1 — see PR notes; no src/ui internals are
+    // touched, and the registry lights them up the moment the seam lands.
+    if (isLayoutContributor(hud)) {
+      for (const e of hud.describeLayout({ width: w, height: h })) {
+        reg.register(e.id, e.anchor, e.bounds);
+      }
+    }
   }
 
   /** True if any asteroid is within beam reach of `pos` — the mine prompt's
@@ -250,6 +331,13 @@ async function boot(): Promise<void> {
     });
   }
 }
+
+// --- Layout anchors (declared regions; ratified vocabulary — see
+//     layout-registry.ts). The registry checks each element's actual bounds
+//     against these zones.
+const SHIP_ANCHOR: AnchorSpec = { region: 'center' };
+const LEFT_STICK_ANCHOR: AnchorSpec = { region: 'left-half-bottom', margin: 8 };
+const RIGHT_STICK_ANCHOR: AnchorSpec = { region: 'right-half-bottom', margin: 8 };
 
 const EMPTY_BEAMS: BeamView[] = [];
 
