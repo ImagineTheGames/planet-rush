@@ -1,0 +1,51 @@
+{
+  "_comment": "Planet Rush playable milestones (GDD 4.6 / 4.6a). The deploy workflow (.github/workflows/ci.yml) pings ntfy on a v* tag with the play URL and the matching entry's `test_notes`. Lookup: .tags[<tag>] first, else .default. As the team tags a milestone, add a `tags` entry pointing at that day's notes below. `days` is the source of truth for the notes text (GDD 4.6).",
+  "default": {
+    "title": "New build",
+    "test_notes": "A new tagged build is live. Open it on your phone: verify touch controls and keyboard both work, and that it installs to the home screen."
+  },
+  "tags": {
+    "v0.1": {
+      "day": 7,
+      "title": "Classroom release",
+      "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone."
+    }
+  },
+  "days": [
+    {
+      "day": 1,
+      "title": "Ship flies, shoots, mines",
+      "test_notes": "Fly the ship, hold fire on an asteroid to mine it, watch the two-number ore HUD fill. First onboarding prompts fire. Touch twin sticks and fire-mode setting work alongside keyboard/mouse and gamepad."
+    },
+    {
+      "day": 2,
+      "title": "Planets, defenses, win/loss",
+      "test_notes": "Build turrets, a shield, and run the repair channel at your planet; trigger the under-attack alarm. Win/loss and the last-to-die rule fire against do-nothing bots."
+    },
+    {
+      "day": 3,
+      "title": "2-player online",
+      "test_notes": "WebSocket transport + authoritative server are live. Join a room and confirm a 2-player online match plays and stays in sync."
+    },
+    {
+      "day": 4,
+      "title": "Lobby, classes, bots",
+      "test_notes": "8-slot lobby with room codes, ship-class select, and player colors. Easy/Medium/Hard bots with personalities fill empty slots, online and offline."
+    },
+    {
+      "day": 5,
+      "title": "Integration & performance gate",
+      "test_notes": "A full 8-slot online match runs end-to-end at 60 fps on integrated graphics and on the phone. First balance pass; art/VFX/audio replace placeholders."
+    },
+    {
+      "day": 6,
+      "title": "Balance & polish",
+      "test_notes": "Match length lands in the 10-15 minute target. Gamepad and touch verified; onboarding polished."
+    },
+    {
+      "day": 7,
+      "title": "Classroom release",
+      "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone."
+    }
+  ]
+}
