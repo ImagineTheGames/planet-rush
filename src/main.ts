@@ -23,6 +23,8 @@ import { GameLoop } from '@platform/loop';
 import { KeyboardMouseSource, GamepadSource } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
+import { TouchVisuals } from '@platform/touch-visuals';
+import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
@@ -69,6 +71,17 @@ async function boot(): Promise<void> {
 
   // --- Input: per-device control states, merged into one each frame.
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
+  //     the fire-mode morph the player actually sees. On top of the HUD so the
+  //     thumbs read clearly; the layer hides itself entirely on desktop.
+  const touchVisuals = new TouchVisuals();
+  app.stage.addChild(touchVisuals);
+
+  // --- Portrait handling (orientation.ts): a ROTATE overlay where landscape
+  //     lock is unsupported (iOS Safari). Added last so it covers everything.
+  const rotateOverlay = new RotateOverlay(app.screen.width, app.screen.height);
+  app.stage.addChild(rotateOverlay);
   let fireMode = readFireMode(platform, isTouch);
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
@@ -111,6 +124,10 @@ async function boot(): Promise<void> {
       renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
       feedHud();
       hud.update(hudFrame);
+      // Draw the visible touch controls from the live stick/button state (a
+      // no-op layer on desktop). Reads the viewport each frame so the idle
+      // affordances and FIRE button track resize/orientation flips.
+      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height);
     },
   });
 
@@ -174,12 +191,45 @@ async function boot(): Promise<void> {
     return SCRATCH_BEAMS;
   }
 
-  // --- Viewport: keep renderer and touch halves in sync with the canvas.
-  window.addEventListener('resize', () => {
-    renderer.resize(app.screen.width, app.screen.height);
-    touch.setScreenWidth(app.screen.width);
-    hud.resize(app.screen.width, app.screen.height);
-  });
+  // --- Viewport: keep renderer, touch halves, HUD, and overlay in sync with the
+  //     canvas. Re-run on both resize and orientationchange so the canvas
+  //     re-layouts when a phone is turned (mobile amendment §2, gap #2).
+  function relayout(): void {
+    const w = app.screen.width;
+    const h = app.screen.height;
+    renderer.resize(w, h);
+    touch.setScreenWidth(w);
+    hud.resize(w, h);
+    rotateOverlay.resize(w, h);
+    refreshOrientation();
+  }
+
+  /** Show the ROTATE overlay only on a touch device that cannot lock landscape
+   *  (iOS Safari) while the viewport is portrait; hidden the moment it turns
+   *  landscape (mobile amendment §2). Dimensions read at the DOM edge here. */
+  function refreshOrientation(): void {
+    const show =
+      isTouch && shouldShowRotateOverlay(window.innerWidth, window.innerHeight, platform.canLockOrientation());
+    rotateOverlay.setShown(show);
+  }
+
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
+  refreshOrientation();
+
+  // --- First touch gesture: enter fullscreen + lock to landscape (Android
+  //     path; best-effort, never throws). Fullscreen/lock require a user
+  //     gesture, so this fires once on the first touch (mobile amendment §2).
+  if (isTouch) {
+    app.canvas.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.pointerType !== 'touch') return;
+        requestLandscape(platform);
+      },
+      { once: true },
+    );
+  }
 
   // --- Fire-mode toggle: single key for day-1 (UI owns the settings screen).
   window.addEventListener('keydown', (e) => {
