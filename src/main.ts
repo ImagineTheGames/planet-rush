@@ -293,16 +293,22 @@ async function boot(): Promise<void> {
     return false;
   }
 
-  /** The local ship's beam segment when firing (render is told; sim has no beam).
-   *  Mutates one reusable scratch beam/array — no per-frame allocation while fire
-   *  is held (mirrors EMPTY_BEAMS for the idle case; GDD §4.3b risk 5). */
+  /** The local ship's beam segment this frame, read from the sim's published
+   *  beam geometry (m2-00): the line ends at `hitPoint` (or full range when the
+   *  beam misses) so it never draws through what it strikes, and the impact
+   *  glow rides the same hit point. Mutates one reusable scratch beam/array — no
+   *  per-frame allocation while fire is held (mirrors EMPTY_BEAMS for the idle
+   *  case; GDD §4.3b risk 5). */
   function currentBeams(): BeamView[] {
-    if (!merged.fire) return EMPTY_BEAMS;
     const ship = world.ships.find((s) => s.id === LOCAL_PLAYER);
-    if (!ship || !ship.alive) return EMPTY_BEAMS;
-    SCRATCH_BEAM.from = ship.pos;
-    SCRATCH_BEAM_TO.x = ship.pos.x + Math.cos(ship.angle) * BEAM_RANGE;
-    SCRATCH_BEAM_TO.y = ship.pos.y + Math.sin(ship.angle) * BEAM_RANGE;
+    const beam = ship?.beam;
+    if (!beam) return EMPTY_BEAMS; // sim clears `beam` unless the ship fired this tick
+    SCRATCH_BEAM.from = beam.origin;
+    // `length` is clamped to the first hit (or full range on a miss), so the
+    // endpoint is the hit point when there is one — never through the object.
+    SCRATCH_BEAM_TO.x = beam.origin.x + beam.dir.x * beam.length;
+    SCRATCH_BEAM_TO.y = beam.origin.y + beam.dir.y * beam.length;
+    SCRATCH_BEAM.hit = beam.hitPoint; // null on a clean miss → no impact glow
     SCRATCH_BEAM.color = PLAYER_COLORS[LOCAL_PLAYER] ?? 0x4dc3ff;
     return SCRATCH_BEAMS;
   }
@@ -412,10 +418,11 @@ const EMPTY_BEAMS: BeamView[] = [];
 // `to` endpoint and `from`/`color` fields are overwritten per frame in
 // currentBeams(); typed mutable here (BeamView's fields are readonly to callers).
 const SCRATCH_BEAM_TO: Vec2 = { x: 0, y: 0 };
-const SCRATCH_BEAM: { from: Vec2; to: Vec2; color: number } = {
+const SCRATCH_BEAM: { from: Vec2; to: Vec2; color: number; hit: Vec2 | null } = {
   from: SCRATCH_BEAM_TO,
   to: SCRATCH_BEAM_TO,
   color: 0x4dc3ff,
+  hit: null,
 };
 const SCRATCH_BEAMS: BeamView[] = [SCRATCH_BEAM];
 
