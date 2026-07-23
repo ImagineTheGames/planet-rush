@@ -21,6 +21,15 @@
  *  - portrait: ROTATE overlay covers the game; landscape: overlay gone;
  *  - touch drag on the left half moves the ship (field screenshot pixel diff);
  *  - desktop: no touch affordances; controls strip PRESENT.
+ *
+ * ORIENTATION CONTRACT: the phone projects declare *portrait* viewports
+ * (390×844 / 412×915) — the orientation the ROTATE overlay guards (m1-05). Any
+ * test that asserts something about *play* (controls rendered, ship moving)
+ * must boot in LANDSCAPE via {@link useLandscape}, because portrait is a
+ * blocked, non-play state — the guard the overlay-visibility test exists to
+ * cover. Portrait is reserved EXCLUSIVELY for that overlay-visibility case; a
+ * gameplay assertion booted in portrait races the very guard it shares a suite
+ * with. Landscape dims: 844×390 / 915×412.
  */
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
 import {
@@ -143,6 +152,22 @@ async function touchDrag(
   }
 }
 
+/**
+ * Force a LANDSCAPE viewport before the app boots. The phone projects declare
+ * portrait dimensions (390×844 / 412×915) — the orientation the ROTATE overlay
+ * guards, i.e. a *non-play* state. Gameplay/affordance assertions need the
+ * playable field, so swap the viewport to landscape (844×390 / 915×412) before
+ * `boot()` runs `goto`, so the app lays out in landscape from the first frame
+ * and `shouldShowRotateOverlay` is false (w ≥ h) regardless of lock capability.
+ * No-op if already landscape (e.g. the desktop control). Must run before boot.
+ */
+async function useLandscape(page: Page): Promise<void> {
+  const vp = page.viewportSize();
+  if (vp && vp.height > vp.width) {
+    await page.setViewportSize({ width: vp.height, height: vp.width });
+  }
+}
+
 // ===========================================================================
 // Touch profiles — visible controls (the M1 gap #1: invisible touch UI)
 // ===========================================================================
@@ -150,6 +175,8 @@ async function touchDrag(
 test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
+  // Play-mode affordance assertion → landscape (portrait is the blocked state).
+  await useLandscape(page);
   await boot(page);
   const img = await shoot(page);
 
@@ -212,8 +239,13 @@ test('portrait shows the ROTATE overlay; landscape hides it', async ({ page }, t
 test('touch drag on the left half moves the ship (field pixel diff)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
+  // Gameplay assertion → landscape. In portrait the field is the blocked,
+  // squashed non-play state (the ROTATE-overlay guard), and the first-gesture
+  // requestLandscape path perturbs layout mid-drag — either way the field diff
+  // is meaningless. Landscape is the only orientation where "ship moved" holds.
+  await useLandscape(page);
   await boot(page);
-  const { width, height } = page.viewportSize() ?? { width: 390, height: 844 };
+  const { width, height } = page.viewportSize() ?? { width: 844, height: 390 };
 
   // Ambient baseline: with no input the follow-camera is still and the field is
   // near-static (only the localised spawn-protection glow animates). Measure it
