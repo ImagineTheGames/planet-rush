@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import type { Action } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { createWorld, step, type Inputs, type Ship, type Asteroid, type World } from './index';
-import { MINING_RATE, SHIP_RADIUS, SHIP_STATS, CARGO_BASE } from './constants';
+import { BEAM_RANGE, MINING_RATE, SHIP_RADIUS, SHIP_STATS, CARGO_BASE } from './constants';
 
 // --- builders --------------------------------------------------------------
 
@@ -36,6 +36,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     respawnTimer: over.respawnTimer ?? 0,
     spawnProtect: over.spawnProtect ?? 0,
     radius: over.radius ?? SHIP_RADIUS,
+    beam: over.beam ?? null,
   };
 }
 
@@ -146,6 +147,104 @@ describe('beam mining (GDD §2.3, §2.8)', () => {
     const inputs: Inputs = [{ id: 0, actions: [fire()] }];
     for (let t = 0; t < 30; t++) step(world, inputs);
     expect(world.ships[1]!.hull).toBe(target.maxHull);
+  });
+});
+
+// --- beam hit geometry (GDD §4.1) -----------------------------------------
+
+describe('beam hit geometry (GDD §4.1)', () => {
+  it('hitPoint sits on the mined asteroid and length is the distance to it', () => {
+    const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 }); // faces +x
+    const rock = makeAsteroid({ id: 0, pos: { x: 300, y: 100 }, radius: 30, ore: 20 });
+    const world = emptyWorld({ ships: [ship], asteroids: [rock] });
+
+    step(world, [{ id: 0, actions: [fire()] }]);
+
+    const beam = world.ships[0]!.beam!;
+    expect(beam).not.toBeNull();
+    // Nearest intersection is at centerDist(200) - radius(30) = 170.
+    expect(beam.length).toBeCloseTo(170, 6);
+    expect(beam.hitPoint).not.toBeNull();
+    expect(beam.hitPoint!.x).toBeCloseTo(270, 6);
+    expect(beam.hitPoint!.y).toBeCloseTo(100, 6);
+    // hitPoint matches the damage target: it lies on that asteroid's surface,
+    // and that asteroid is the one losing ore.
+    const hp = beam.hitPoint!;
+    expect(Math.hypot(hp.x - rock.pos.x, hp.y - rock.pos.y)).toBeCloseTo(rock.radius, 6);
+    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre);
+  });
+
+  it('hitPoint matches the damaged ship (one beam, one stat)', () => {
+    const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+    const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: 0 });
+    const world = emptyWorld({ ships: [shooter, target] });
+
+    const before = target.hull;
+    step(world, [{ id: 0, actions: [fire()] }]);
+
+    const beam = world.ships[0]!.beam!;
+    expect(beam.length).toBeCloseTo(120 - SHIP_RADIUS, 6); // to the target's near surface
+    const hp = beam.hitPoint!;
+    expect(Math.hypot(hp.x - target.pos.x, hp.y - target.pos.y)).toBeCloseTo(target.radius, 6);
+    expect(world.ships[1]!.hull).toBeLessThan(before); // the point's owner took the damage
+  });
+
+  it('length equals range and hitPoint is null when nothing is hit', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+    const world = emptyWorld({ ships: [ship] }); // empty field ahead
+
+    step(world, [{ id: 0, actions: [fire()] }]);
+
+    const beam = world.ships[0]!.beam!;
+    expect(beam.hitPoint).toBeNull();
+    expect(beam.length).toBe(BEAM_RANGE);
+    // Direction is the ship's facing.
+    expect(beam.dir.x).toBeCloseTo(1, 6);
+    expect(beam.dir.y).toBeCloseTo(0, 6);
+    expect(beam.origin).toEqual({ x: 500, y: 500 });
+  });
+
+  it('nearest of several targets wins', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 }); // +x
+    const near = makeAsteroid({ id: 0, pos: { x: 700, y: 500 }, radius: 30, ore: 20 });
+    const far = makeAsteroid({ id: 1, pos: { x: 900, y: 500 }, radius: 30, ore: 20 });
+    const world = emptyWorld({ ships: [ship], asteroids: [near, far] });
+
+    step(world, [{ id: 0, actions: [fire()] }]);
+
+    const beam = world.ships[0]!.beam!;
+    expect(beam.length).toBeCloseTo(170, 6); // 200 - 30, the near rock
+    // Only the near rock is mined; the far one is occluded and untouched.
+    expect(world.asteroids[0]!.ore).toBeLessThan(near.maxOre);
+    expect(world.asteroids[1]!.ore).toBe(far.maxOre);
+  });
+
+  it('auto-aim hitPoint lands on the acquired target', () => {
+    // Target is perpendicular to the ship's facing — only auto-aim reaches it.
+    const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+    const target = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
+    const world = emptyWorld({ ships: [shooter, target] });
+
+    const before = target.hull;
+    step(world, [{ id: 0, actions: [fire(true)] }]); // auto-aim
+
+    const beam = world.ships[0]!.beam!;
+    expect(beam.length).toBeCloseTo(150 - SHIP_RADIUS, 6);
+    const hp = beam.hitPoint!;
+    expect(Math.hypot(hp.x - target.pos.x, hp.y - target.pos.y)).toBeCloseTo(target.radius, 6);
+    expect(world.ships[1]!.hull).toBeLessThan(before);
+  });
+
+  it('beam clears to null on the tick the ship stops firing', () => {
+    const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 });
+    const rock = makeAsteroid({ id: 0, pos: { x: 300, y: 100 }, radius: 30, ore: 20 });
+    const world = emptyWorld({ ships: [ship], asteroids: [rock] });
+
+    step(world, [{ id: 0, actions: [fire()] }]);
+    expect(world.ships[0]!.beam).not.toBeNull();
+
+    step(world, [{ id: 0, actions: [] }]); // no fire this tick
+    expect(world.ships[0]!.beam).toBeNull();
   });
 });
 

@@ -267,18 +267,39 @@ type BeamHit =
   | { kind: 'ship'; index: number };
 
 function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, dt: number): void {
-  if (!intent.fire) return;
+  if (!intent.fire) {
+    ship.beam = null;
+    return;
+  }
 
   let hit: BeamHit | null;
+  let hitT: number; // distance along the beam to the first hit (BEAM_RANGE if none)
   if (intent.auto) {
     // Auto-aim: nearest valid target across the full 360°, no front arc
-    // (GDD §2.4). Facing snaps to it.
+    // (GDD §2.4). Facing snaps to it, then the beam runs to that target's
+    // surface — the drawn beam ends on whatever it damages.
     hit = acquireNearest(world, ship);
     if (hit) faceTarget(world, ship, hit);
+    hitT = hit ? surfaceDistance(world, ship, hit) : BEAM_RANGE;
   } else {
-    // Manual: raycast a segment along current facing.
-    hit = raycastBeam(world, ship, hash);
+    // Manual: raycast a segment along current facing, nearest hit wins.
+    const cast = raycastBeam(world, ship, hash);
+    hit = cast.hit;
+    hitT = cast.t;
   }
+
+  // Publish the beam geometry so the renderer stops the beam at the hit
+  // (GDD §4.1). `length` clamps to range; `hitPoint` is null on a clean miss.
+  const dx = Math.cos(ship.angle);
+  const dy = Math.sin(ship.angle);
+  const length = Math.min(hitT, BEAM_RANGE);
+  ship.beam = {
+    origin: { x: ship.pos.x, y: ship.pos.y },
+    dir: { x: dx, y: dy },
+    hitPoint: hit ? { x: ship.pos.x + dx * length, y: ship.pos.y + dy * length } : null,
+    length,
+  };
+
   if (!hit) return;
 
   if (hit.kind === 'asteroid') {
@@ -286,6 +307,17 @@ function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, d
   } else {
     damageShip(world, world.ships[hit.index]!, ship, dt);
   }
+}
+
+/** Distance from the ship to the surface of an acquired (auto-aim) target along
+ *  the current facing. The beam points at the target center, so the near
+ *  intersection is `centerDist - radius`; falls back to range if degenerate. */
+function surfaceDistance(world: World, ship: Ship, hit: BeamHit): number {
+  const c = hit.kind === 'asteroid' ? world.asteroids[hit.index]! : world.ships[hit.index]!;
+  const dx = Math.cos(ship.angle);
+  const dy = Math.sin(ship.angle);
+  const t = segCircle(ship.pos, dx, dy, c.pos, c.radius);
+  return t ?? BEAM_RANGE;
 }
 
 /** Nearest asteroid or enemy ship whose center is within beam range. */
@@ -320,10 +352,11 @@ function faceTarget(world: World, ship: Ship, hit: BeamHit): void {
 
 /**
  * Cast the beam segment (origin → range along facing) and return the nearest
- * asteroid or enemy ship it strikes. Broad phase narrows asteroid candidates;
- * ships (≤8) are tested directly.
+ * asteroid or enemy ship it strikes together with the distance to it (`t`,
+ * = `BEAM_RANGE` on a clean miss). Broad phase narrows asteroid candidates;
+ * ships (≤8) are tested directly. Nearest hit wins.
  */
-function raycastBeam(world: World, ship: Ship, hash: SpatialHash): BeamHit | null {
+function raycastBeam(world: World, ship: Ship, hash: SpatialHash): { hit: BeamHit | null; t: number } {
   const dx = Math.cos(ship.angle);
   const dy = Math.sin(ship.angle);
 
@@ -352,7 +385,7 @@ function raycastBeam(world: World, ship: Ship, hash: SpatialHash): BeamHit | nul
       best = { kind: 'ship', index: i };
     }
   }
-  return best;
+  return { hit: best, t: bestT };
 }
 
 /**
@@ -430,6 +463,7 @@ function killShip(world: World, ship: Ship): void {
   ship.respawnTimer = RESPAWN_S;
   ship.vel.x = 0;
   ship.vel.y = 0;
+  ship.beam = null;
 
   const drop = ship.cargo * DEATH_ORE_DROP_FRACTION;
   ship.cargo = 0;
