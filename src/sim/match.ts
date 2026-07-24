@@ -198,8 +198,10 @@ function enterCollapseIfDue(world: World): void {
   for (const planet of world.planets) planet.repairing = false;
 }
 
-/** "Entropy finishes whoever the players don't" (GDD §1) — off at the baseline
- *  (`COLLAPSE_CORE_DECAY` = 0); see the constant for why it exists anyway. */
+/** "Entropy finishes whoever the players don't" (GDD §1) — every surviving core
+ *  decays at `COLLAPSE_CORE_DECAY` HP/s once collapse opens (ratified 1 at M5;
+ *  see the constant). Spawn-protected and dead cores are skipped; a core that
+ *  hits zero here is destroyed like any other kill. */
 function applyCollapseDecay(world: World, dt: number): void {
   if (COLLAPSE_CORE_DECAY <= 0 || !isCollapsed(world)) return;
   for (const planet of world.planets) {

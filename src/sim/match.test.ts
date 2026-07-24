@@ -25,6 +25,7 @@ import {
   type Inputs,
 } from './index';
 import {
+  COLLAPSE_CORE_DECAY,
   CORE_HP,
   FIELD_YIELD,
   PLANET,
@@ -410,7 +411,7 @@ describe('asteroid waves (GDD §2.3)', () => {
     for (let i = 1; i < reach.length; i++) expect(reach[i]!).toBeLessThan(reach[i - 1]!);
   });
 
-  it('delivers the whole field yield, and not one wave more', () => {
+  it('delivers the whole field yield, and the idle field then resolves itself', () => {
     const world = createWorld({
       seed: 11,
       players: [
@@ -421,9 +422,22 @@ describe('asteroid waves (GDD §2.3)', () => {
     expect(world.match.wavesSpawned).toBe(1); // wave 1 is the opening field
     expect(oreInWorld(world)).toBeCloseTo(FIELD_YIELD / WAVE_COUNT, 6);
 
-    for (let t = 0; t < 900; t++) step(world, [], 1);
+    // Run the whole wave schedule out. Nobody mines, so the field closes on the
+    // collapse deadline (GDD §2.3) rather than by exhaustion — the moment it
+    // does, every wave is in and the field is shut, so the loose ore is exactly
+    // the yield: not one wave more. Measured here, before entropy kills a core
+    // and scatters wreck debris that would inflate the count.
+    while (!isCollapsed(world)) step(world, [], 1);
     expect(world.match.wavesSpawned).toBe(WAVE_COUNT);
     expect(oreInWorld(world)).toBeCloseTo(FIELD_YIELD, 6);
+
+    // New truth (M5, COLLAPSE_CORE_DECAY = 1, GDD §1/§2.3): a full-turtle field
+    // no longer stalemates — entropy finishes both idle homes and the match
+    // resolves. Were decay ever silently zeroed, these two untouched cores would
+    // never die and this loop would run to the ceiling with no winner declared.
+    while (world.match.phase !== 'ended' && world.time < 20 * 60) step(world, [], 1);
+    expect(world.match.phase).toBe('ended');
+    expect(world.match.winner).not.toBeNull();
   });
 
   it('two runs of the whole wave schedule deep-equal (GDD §4.8)', () => {
@@ -510,15 +524,22 @@ describe('collapse (GDD §2.3)', () => {
     expect(live.planet.coreHp).toBeCloseTo(52, 6);
 
     // Collapse: an open channel closes, and a fresh order is refused outright.
+    // No repair pushes the core back up — and with COLLAPSE_CORE_DECAY = 1 (M5)
+    // entropy now pulls it *down*: the core decays by exactly the decay rate,
+    // spending no ore to do it.
     const { world, ship, planet } = endgame();
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
     step(world, []); // collapse opens at the end of this tick
     const coreHp = planet.coreHp;
     const banked = ship.banked;
-    for (let t = 0; t < 300; t++) step(world, []);
+    const steps = 300; // × TICK_DT = 5 s of collapse; a 50-HP core survives it
+    for (let t = 0; t < steps; t++) step(world, []);
 
     expect(planet.repairing).toBe(false);
-    expect(planet.coreHp).toBe(coreHp);
+    // Entropy only: down by exactly the decay, never a drop of repair back up.
+    // Zeroing decay would hold the core flat and fail the strict checks below.
+    expect(planet.coreHp).toBeCloseTo(coreHp - COLLAPSE_CORE_DECAY * steps * TICK_DT, 6);
+    expect(planet.coreHp).toBeLessThan(coreHp);
     expect(ship.banked).toBe(banked);
     expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
   });

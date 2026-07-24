@@ -226,13 +226,30 @@ export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
  * Core HP lost per second, per planet, during collapse — "entropy finishes
  * whoever the players don't" (GDD §1).
  *
- * **Baseline 0**, because GDD §2.3 spells out collapse as exactly three rules —
- * no shield regeneration, no repair, no new ore — and adding a fourth is a
- * design decision, not a tuning one. The mechanism is implemented and wired so
- * QA (who owns this table from M2) can falsify the stalemate hypothesis by
- * raising this number instead of editing the sim. TUNABLE
+ * **Ratified 1** (Director, M5). The v0.1 release check
+ * (`tests/reports/release-check.md` §D.1, first raised in
+ * `tests/reports/balance-01.md`) measured a field of non-aggressive bots that
+ * NEVER resolves at the old baseline `0`: with no shield regen, no repair, and
+ * no new ore but *also no core damage*, a full-turtle field runs to the
+ * 20-minute ceiling and "outlast everyone" beats "go get them" — the opposite
+ * of the GDD §2.6 intent. QA measured the fix (a naked core dies in
+ * `CORE_HP / 1` = 100 s of collapse) and every passive strategy then resolves
+ * inside the 10–15 min target (GDD §3.8, §1). The constant's original doc
+ * anticipated this: it exists precisely so the stalemate hypothesis could be
+ * falsified by raising this number instead of editing the sim. Collapse is now
+ * four rules, not three — the design decision the doc flagged, made.
+ *
+ * At `1` HP/s, decay is intentionally slow: it is the backstop that guarantees
+ * an ending (GDD §2.3), not a race — an attacker's beam (`BEAM_DPS_CORE` = 5)
+ * still finishes a home far faster than entropy does. TUNABLE
+ *
+ * (Written `= 1 as Tunable<number>` rather than the file's usual
+ * `: Tunable<number> =` so the shipped value sits directly after the name: the
+ * M5 DoD greps `COLLAPSE_CORE_DECAY\s*=\s*(\d+)` to guarantee decay is never
+ * silently returned to zero, and the grep must read the real assignment, not a
+ * comment.)
  */
-export const COLLAPSE_CORE_DECAY: Tunable<number> = 0;
+export const COLLAPSE_CORE_DECAY = 1 as Tunable<number>;
 
 /** Respawn time — free; time is the cost (GDD §2.7, §2.8), seconds. TUNABLE */
 export const RESPAWN_S: Tunable<number> = 5;
