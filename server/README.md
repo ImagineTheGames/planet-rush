@@ -24,6 +24,11 @@ docker run --rm -p 8080:8080 planet-rush-server
 curl localhost:8080/health
 ```
 
+A two-player match against a server started exactly this way is what
+`tests/net/online-2p.test.ts` runs on every CI push — real TCP, real handshake,
+two predicting clients — so "it works locally" is a test result rather than a
+memory.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8080` | Listen port |
@@ -61,12 +66,15 @@ not broadcast (GDD §2.2), so the server sends a rival's core HP only to a clien
 whose ship is inside sensor range of it. A client that is never sent a number
 cannot draw it, leak it, or free-ride on someone else's siege.
 
+**The ack names input that has been run.** `ackSeq` on a snapshot is the newest
+input from that client the *world has simulated*, not the newest the server has
+received — the seq rides through `InputQueue` to the tick that consumes it. A
+predicting client replays everything past the ack (`src/net/prediction.ts`), so
+an ack issued on arrival would make it discard a press whose effect has not
+happened yet, and the ship would stutter backwards on every correction.
+
 ## Still open
 
-- **Client-side prediction and reconciliation** (GDD §4.2). The protocol already
-  carries what it needs — `ackSeq` on every snapshot, the shared match seed on
-  `matchStart` — but an online client is snapshot-fed until the predicted world
-  lands (M4–M5).
 - **TCP head-of-line blocking under real loss** (risk 3). The spike argued it
   down on frame size; measuring it needs a lossy network and a full room.
 - **A binary input encoding.** Input is JSON today, which the spike's numbers say

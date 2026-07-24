@@ -18,6 +18,26 @@ The measured code lives in `src/net/spike/` (`snapshot.ts` wire layout +
 `sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface is in
 `src/net/transport.ts`.
 
+**Status since (prediction):** the client no longer waits for the wire. It runs
+the same `step()` the server runs on its own input the moment that input is sent,
+and reconciles the result against every snapshot — rewind to the snapshot's tick,
+write authority over it, replay everything past `ackSeq`
+(`src/net/prediction.ts`, GDD §4.2). Three things this document should record,
+because they are measurements rather than intentions:
+
+- **The replay is bounded by the round trip, not by a constant.** Pending input
+  is exactly what the server has not yet simulated, so a client replays ~RTT
+  ticks per snapshot: at the 100 ms link in `src/net/prediction.test.ts` that is
+  ~6 steps, 30 times a second — ~180 extra sim steps/s against the 0.0146 ms/step
+  measured below, i.e. **~2.6 ms of CPU per second**, 0.26% of one core.
+- **The client's lead is emergent.** Nothing configures how far ahead of the
+  server a client runs: replaying every unacknowledged input on top of each
+  snapshot lands it exactly one round trip ahead, which is the lead that makes
+  its input arrive *for* the tick it names. The tests watch late arrivals stop.
+- **`ackSeq` had to change meaning.** It now names input the world has *run*, not
+  input the server has *received*. Acknowledging on arrival tells a predicting
+  client to retire a press whose effect has not happened yet.
+
 **Status since (day 3):** `Transport` now has its first implementation —
 `LocalLoopback` (`src/net/loopback.ts`), which runs the authoritative sim
 in-process for offline play and speaks the protocol below with the wire
@@ -155,6 +175,16 @@ interpolation target, not desync. HoL risk at 8 players is therefore **low but
 unmeasured**; flagged for the day-3 real-network test. If it bites, geckos.io
 (UDP over WebRTC) drops in behind the same `Transport` interface — transport
 work, not a rewrite.
+
+**Update, and the honest half of it.** Two clients now play a real match over a
+real socket (`tests/net/online-2p.test.ts`) — TCP, handshake, framing, the lot —
+so the *stack* is measured end to end. Loopback TCP does not drop packets, so
+risk 3 itself is **still unmeasured**, and this document will keep saying so
+until it is run over a lossy link. What did change is the cost of a stall:
+prediction means a client whose snapshot is late keeps flying its own ship at
+60 Hz on its own input, and the snapshot that eventually arrives is corrected
+against rather than waited for. A head-of-line stall is now a *stale rival* for
+its duration, not a frozen game.
 
 ### Host candidates (GDD §4.2 criteria)
 
