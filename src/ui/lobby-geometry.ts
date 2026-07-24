@@ -145,6 +145,39 @@ export const ROSTER_COLUMN_FRACTION = 0.56;
 export const CLASS_BLOCK_FRACTION = 0.42;
 
 // ---------------------------------------------------------------------------
+// The entry screen (./lobby-entry) — the door, and the keypad behind JOIN
+// ---------------------------------------------------------------------------
+
+/** Door buttons: ≥56 px for the same reason RUSH! is (GDD §2.4 — a plain tap). */
+export const DOOR_HEIGHT = 56;
+export const DOOR_HEIGHT_TOUCH = 64;
+/** Room under each door for its one-line hint ("Seven bots, no connection…"). */
+export const DOOR_HINT_HEIGHT = 18;
+/** A door never runs the full width of a desktop — a 1920px-wide button reads as
+ *  a banner, not a control. Capped, and centred in whatever is left. */
+export const DOOR_WIDTH_MAX = 420;
+
+/** The four code cells: big, because this is the number being read across a
+ *  room and typed one character at a time (GDD §4.2). */
+export const CODE_CELL_MAX = 72;
+export const CODE_CELL_GAP = 10;
+
+/** Keypad keys. 44 px is the floor a fingertip needs; below it the pad would be
+ *  a lottery, so the *cells* shrink before the keys do. */
+export const KEY_MIN = 34;
+export const KEY_MAX = 56;
+export const KEY_GAP = 4;
+/** Columns in the pad — mirrors `./lobby-entry` KEYPAD_COLUMNS (asserted equal
+ *  in the tests), kept here so the geometry stays free of the model. */
+export const KEYPAD_COLUMNS = 8;
+/** Keys in the alphabet — mirrors `./lobby-entry` KEYPAD_KEYS.length. */
+export const KEYPAD_KEY_COUNT = 32;
+
+/** The BACK / JOIN pair under the pad. */
+export const ENTRY_ACTION_HEIGHT = 48;
+export const ENTRY_ACTION_HEIGHT_TOUCH = 56;
+
+// ---------------------------------------------------------------------------
 // The layout
 // ---------------------------------------------------------------------------
 
@@ -312,6 +345,227 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   }
   if (hit(layout.roomCode, x, y)) return { kind: 'roomCode' };
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// The entry screen's layout
+// ---------------------------------------------------------------------------
+
+/** Every rect the entry screen draws in. Both screens are laid out every time —
+ *  they cost a dozen rects, the view draws only the active one, and a layout
+ *  that does not branch on state cannot be wrong for the state it is in. */
+export interface EntryLayout {
+  readonly content: Rect;
+  /** Wordmark band. */
+  readonly title: Rect;
+  /** The one line under it: the prompt, or the failure (`./lobby-entry`). */
+  readonly message: Rect;
+  /** The three doors, in `DOOR_ORDER`. Home screen. */
+  readonly doors: readonly Rect[];
+  /** The four code cells, left to right. Join screen. */
+  readonly cells: readonly Rect[];
+  /** The keypad, in `KEYPAD_KEYS` order: across a row, then down. */
+  readonly keys: readonly Rect[];
+  /** BACK — out of the keypad, back to the doors. */
+  readonly back: Rect;
+  /** The erase key. Sized like a button, not like a key: it is pressed far more
+   *  often than any single letter, and a mis-hit on it costs a whole character. */
+  readonly erase: Rect;
+  /** JOIN. */
+  readonly submit: Rect;
+  readonly isTouch: boolean;
+}
+
+/** What a tap on the entry screen hit. Index-based, like {@link LobbyTarget}:
+ *  the caller maps an index through the model's own order (`./lobby-entry`
+ *  DOOR_ORDER / KEYPAD_KEYS), so the two can never drift. */
+export type EntryTarget =
+  | { readonly kind: 'door'; readonly index: number }
+  | { readonly kind: 'key'; readonly index: number }
+  | { readonly kind: 'erase' }
+  | { readonly kind: 'back' }
+  | { readonly kind: 'submit' };
+
+/**
+ * Lay the entry screen out for a viewport.
+ *
+ * Same discipline as {@link lobbyLayout}: space is handed out top-down — title,
+ * message, the action row off the bottom — and every block is *capped* rather
+ * than stretched, so nothing can escape the content box by construction.
+ *
+ * Where the two screens compete for the same band, the **keys win and the cells
+ * give**: a code cell that is a little small is still readable, while a key too
+ * small to hit reliably makes the screen unusable (GDD §2.4).
+ */
+export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}): EntryLayout {
+  const isTouch = options.isTouch ?? false;
+  const content = contentBox(viewport, options.insets);
+
+  const titleHeight = Math.min(TITLE_HEIGHT, content.height);
+  const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
+  const messageHeight = Math.min(DOOR_HINT_HEIGHT, Math.max(0, content.height - titleHeight));
+  const message: Rect = {
+    x: content.x,
+    y: content.y + titleHeight,
+    width: content.width,
+    height: messageHeight,
+  };
+
+  // --- The action row, hung off the bottom ---------------------------------
+  const actionHeight = Math.min(
+    isTouch ? ENTRY_ACTION_HEIGHT_TOUCH : ENTRY_ACTION_HEIGHT,
+    Math.max(0, content.height - titleHeight - messageHeight),
+  );
+  const actionsY = content.y + content.height - actionHeight;
+  const actionWidth = Math.min(DOOR_WIDTH_MAX + 2 * BLOCK_GAP, content.width);
+  const actionX = content.x + (content.width - actionWidth) / 2;
+  // BACK and the erase key share the left half; JOIN takes the right, because it
+  // is the one of the three that ends the screen.
+  const third = Math.max(0, (actionWidth - 2 * ROW_GAP) / 3);
+  const back: Rect = { x: actionX, y: actionsY, width: third, height: actionHeight };
+  const erase: Rect = { x: actionX + third + ROW_GAP, y: actionsY, width: third, height: actionHeight };
+  const submit: Rect = {
+    x: actionX + 2 * (third + ROW_GAP),
+    y: actionsY,
+    width: third,
+    height: actionHeight,
+  };
+
+  // --- The band both screens divide ----------------------------------------
+  const middleY = message.y + messageHeight + BLOCK_GAP;
+  const middle: Rect = {
+    x: content.x,
+    y: middleY,
+    width: content.width,
+    height: Math.max(0, actionsY - BLOCK_GAP - middleY),
+  };
+
+  return {
+    content,
+    title,
+    message,
+    doors: placeDoors(middle, isTouch),
+    ...placeCodeEntry(middle),
+    back,
+    erase,
+    submit,
+    isTouch,
+  };
+}
+
+/**
+ * The target a tap at `(x, y)` hits on the entry screen, or `null`.
+ *
+ * The caller passes only the targets the *current* screen has (`./lobby-entry`
+ * EntryScreen), so a tap cannot land on a door that is not drawn: geometry that
+ * is always laid out is not geometry that is always live.
+ */
+export function entryHitTest(
+  layout: EntryLayout,
+  x: number,
+  y: number,
+  screen: 'home' | 'join',
+): EntryTarget | null {
+  if (screen === 'home') {
+    for (let i = 0; i < layout.doors.length; i++) {
+      const rect = layout.doors[i];
+      if (rect && hit(rect, x, y)) return { kind: 'door', index: i };
+    }
+    return null;
+  }
+  if (hit(layout.submit, x, y)) return { kind: 'submit' };
+  if (hit(layout.erase, x, y)) return { kind: 'erase' };
+  if (hit(layout.back, x, y)) return { kind: 'back' };
+  for (let i = 0; i < layout.keys.length; i++) {
+    const rect = layout.keys[i];
+    if (rect && hit(rect, x, y)) return { kind: 'key', index: i };
+  }
+  return null;
+}
+
+/**
+ * The three doors, stacked and centred in the band, each with room for its hint
+ * line underneath. Stacked on every device: three full-width-ish buttons down
+ * the middle is the one arrangement that works identically on a 320px phone and
+ * a 1920px desktop, and this is the screen where "it works everywhere" beats
+ * "it uses the space".
+ */
+function placeDoors(band: Rect, isTouch: boolean): Rect[] {
+  const count = 3;
+  const hint = DOOR_HINT_HEIGHT;
+  const wanted = isTouch ? DOOR_HEIGHT_TOUCH : DOOR_HEIGHT;
+  // Compress the buttons — never the hint, which is what tells a player that
+  // SOLO needs no connection (GDD §4.8 risk 6).
+  const height = Math.max(
+    0,
+    Math.min(wanted, (band.height - (count - 1) * BLOCK_GAP) / count - hint),
+  );
+  const width = Math.min(DOOR_WIDTH_MAX, band.width);
+  const block = height + hint;
+  const total = count * block + (count - 1) * BLOCK_GAP;
+  const top = band.y + Math.max(0, (band.height - total) / 2);
+  const x = band.x + (band.width - width) / 2;
+  const doors: Rect[] = [];
+  for (let i = 0; i < count; i++) {
+    doors.push({ x, y: top + i * (block + BLOCK_GAP), width, height });
+  }
+  return doors;
+}
+
+/**
+ * The code cells over the keypad.
+ *
+ * The keypad is sized first and the cells take what is left, because a key too
+ * small to hit is a broken screen while a small cell is only a plain one. Both
+ * are capped and centred, so a desktop gets a pad of thumb-sized keys in the
+ * middle of the window rather than eight 200px slabs.
+ */
+function placeCodeEntry(band: Rect): { cells: Rect[]; keys: Rect[] } {
+  const rows = Math.ceil(KEYPAD_KEY_COUNT / KEYPAD_COLUMNS);
+
+  // What the pad would like, and what the band can actually give it.
+  const keyWidth = Math.max(
+    0,
+    Math.min(KEY_MAX, (band.width - (KEYPAD_COLUMNS - 1) * KEY_GAP) / KEYPAD_COLUMNS),
+  );
+  // What the pad must keep is its *floor*, not its ceiling: reserving KEY_MAX
+  // would leave a landscape phone's band with nothing for the cells, and a code
+  // you cannot see yourself typing is worse than one typed on smaller keys.
+  const padFloor = rows * KEY_MIN + (rows - 1) * KEY_GAP;
+  const cellsWanted = Math.min(CODE_CELL_MAX, (band.width - 3 * CODE_CELL_GAP) / 4);
+  // Give the cells their share only out of what the pad does not need.
+  const cellSize = Math.max(
+    0,
+    Math.min(cellsWanted, band.height - padFloor - BLOCK_GAP, band.height * 0.4),
+  );
+  const padHeight = Math.max(0, band.height - cellSize - (cellSize > 0 ? BLOCK_GAP : 0));
+  const keyHeight = Math.max(0, Math.min(KEY_MAX, rowHeight(padHeight, rows, KEY_GAP, KEY_MAX)));
+
+  const cells: Rect[] = [];
+  const cellsWidth = 4 * cellSize + 3 * CODE_CELL_GAP;
+  const cellsX = band.x + (band.width - cellsWidth) / 2;
+  for (let i = 0; i < 4; i++) {
+    cells.push({
+      x: cellsX + i * (cellSize + CODE_CELL_GAP),
+      y: band.y,
+      width: cellSize,
+      height: cellSize,
+    });
+  }
+
+  const keys: Rect[] = [];
+  const padWidth = KEYPAD_COLUMNS * keyWidth + (KEYPAD_COLUMNS - 1) * KEY_GAP;
+  const padX = band.x + (band.width - padWidth) / 2;
+  const padY = band.y + cellSize + (cellSize > 0 ? BLOCK_GAP : 0);
+  for (let i = 0; i < KEYPAD_KEY_COUNT; i++) {
+    keys.push({
+      x: padX + (i % KEYPAD_COLUMNS) * (keyWidth + KEY_GAP),
+      y: padY + Math.floor(i / KEYPAD_COLUMNS) * (keyHeight + KEY_GAP),
+      width: keyWidth,
+      height: keyHeight,
+    });
+  }
+  return { cells, keys };
 }
 
 // ---------------------------------------------------------------------------
