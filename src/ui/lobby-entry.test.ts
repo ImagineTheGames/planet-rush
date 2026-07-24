@@ -445,8 +445,21 @@ describe('a tap hits what it looks like it hits', () => {
           expected,
         );
       }
+
+      // SETTINGS — the fourth main-menu option — is live on the home screen only.
+      const settings = center(layout.settings);
+      expect(entryHitTest(layout, settings.x, settings.y, 'home'), `settings on ${name}`).toEqual({
+        kind: 'settings',
+      });
     });
   }
+
+  it('keeps SETTINGS off the join screen — it shares the band with the keypad’s row', () => {
+    const layout = entryLayout({ width: 1280, height: 800 });
+    const settings = center(layout.settings);
+    const onJoin = entryHitTest(layout, settings.x, settings.y, 'join');
+    expect(onJoin === null || onJoin.kind !== 'settings').toBe(true);
+  });
 
   it('never lets a tap land on a control the screen is not showing', () => {
     const layout = entryLayout({ width: 1280, height: 800 });

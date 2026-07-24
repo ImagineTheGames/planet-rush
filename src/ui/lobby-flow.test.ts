@@ -19,13 +19,19 @@ import { FireMode } from '@platform/actions';
 import type { ClientMessage, LobbySlot } from '../net/transport';
 import {
   createFlow,
+  flowCloseSettings,
   flowConnected,
+  flowEliminated,
   flowFailed,
   flowKey,
   flowLobbySlots,
+  flowMatchEnded,
   flowMatchStart,
+  flowOpenSettings,
+  flowTapEnd,
   flowTapEntry,
   flowTapLobby,
+  flowTapSettings,
   resetFlow,
   setFlowFireMode,
   tickFlow,
@@ -34,6 +40,8 @@ import {
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
 import { DOOR_ORDER, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import { CLASS_ORDER, DEFAULT_SHIP_CLASS, RUSH_COUNTDOWN_SECONDS, lobbyModel } from './lobby';
+import { endOfMatchModel } from './end-of-match';
+import { createSettings, volumeLevel } from './settings';
 
 // ---------------------------------------------------------------------------
 // Helpers — a flow is driven the way main.ts will drive it: state in, effects
@@ -391,5 +399,138 @@ describe('the whole front of a match, in one pass', () => {
     result = flowMatchStart(result.state);
 
     expect(result.state.screen).toBe('match');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The Day-7 menus: settings off the main menu, and the end-of-match summary.
+// ---------------------------------------------------------------------------
+
+/** A flow watching a live match: seat `you`, host `host`, world built. Reaches
+ *  `match` the way a guest does — `flowMatchStart` on the lobby — so no countdown
+ *  is needed to get there. */
+function inMatch(you = 0, host = you): FlowState {
+  return flowMatchStart(inLobby(you, host)).state;
+}
+
+describe('the settings screen (the fourth main-menu option)', () => {
+  it('opens from the main menu and returns to it', () => {
+    const rng = mulberry32(21);
+    const opened = flowTapEntry(createFlow(), { kind: 'settings' }, rng);
+    expect(opened.state.screen).toBe('settings');
+    expect(opened.state.settingsReturn).toBe('entry');
+    expect(opened.effects).toEqual([]); // opening a screen owes the wire nothing
+
+    const done = flowTapSettings(opened.state, { kind: 'back' });
+    expect(done.state.screen).toBe('entry');
+  });
+
+  it('only opens from a screen a settings button can be pressed on', () => {
+    // Mid-lobby there is no main-menu settings button; the flow refuses to jump.
+    expect(flowOpenSettings(inLobby()).state.screen).toBe('lobby');
+  });
+
+  it('backs out on Escape, and ignores other keys', () => {
+    const settings = flowOpenSettings(createFlow()).state;
+    expect(flowKey(settings, 'A').state).toBe(settings); // swallowed, no churn
+    expect(flowKey(settings, 'Escape').state.screen).toBe('entry');
+  });
+
+  it('toggles the fire mode, and it is the SAME value the wire will carry', () => {
+    const settings = flowOpenSettings(createFlow(FireMode.Manual)).state;
+    const toggled = flowTapSettings(settings, { kind: 'fireMode' });
+    expect(toggled.state.fireMode).toBe(FireMode.AutoAim);
+    expect(toggled.effects).toEqual([]); // no lobby on the main menu, so no message
+
+    // …and it rides the first lobbyChoice when a room finally opens.
+    const done = flowCloseSettings(toggled.state).state;
+    const rng = mulberry32(22);
+    const opened = flowTapEntry(done, { kind: 'door', index: doorIndex('solo') }, rng);
+    expect(sent(flowConnected(opened.state, 0))[0]).toMatchObject({ fireMode: 'auto' });
+  });
+
+  it('toggles reduce VFX and steps a volume, without a message either', () => {
+    const settings = flowOpenSettings(createFlow()).state;
+    const vfx = flowTapSettings(settings, { kind: 'reduceVfx' });
+    expect(vfx.state.settings.reduceVfx).toBe(true);
+    expect(vfx.effects).toEqual([]);
+
+    const before = volumeLevel(settings.settings, 'master');
+    const down = flowTapSettings(vfx.state, { kind: 'volume', channel: 'master', dir: -1 });
+    expect(volumeLevel(down.state.settings, 'master')).toBe(before - 1);
+  });
+
+  it('stays perfectly still on a tap that changed nothing', () => {
+    // A volume already at zero, nudged down again: identical settings, identical
+    // flow — no new object for anything watching by identity.
+    let s = flowOpenSettings(createFlow()).state;
+    for (let i = 0; i < 15; i++) s = flowTapSettings(s, { kind: 'volume', channel: 'sfx', dir: -1 }).state;
+    const again = flowTapSettings(s, { kind: 'volume', channel: 'sfx', dir: -1 });
+    expect(again.state).toBe(s);
+  });
+});
+
+describe('the end-of-match summary, and Rematch (resets the world cleanly)', () => {
+  it('shows VICTORY to the winner and DEFEAT to everyone else', () => {
+    const ended = flowMatchEnded(inMatch(4, 0), 4); // seat 4 won, and seat 4 is you
+    expect(ended.state.screen).toBe('end');
+    expect(ended.state.end).toEqual({ you: 4, winner: 4, matchOver: true });
+    expect(endOfMatchModel(ended.state.end!).kind).toBe('victory');
+
+    const lost = flowMatchEnded(inMatch(4, 0), 0);
+    expect(endOfMatchModel(lost.state.end!).kind).toBe('defeat');
+  });
+
+  it('ignores a matchEnd that did not arrive during a live match', () => {
+    // On the door, or a second time over — a stray end must not conjure a summary.
+    expect(flowMatchEnded(createFlow(), 0).state.screen).toBe('entry');
+    const ended = flowMatchEnded(inMatch(0), 0).state;
+    expect(flowMatchEnded(ended, 3).state).toBe(ended);
+  });
+
+  it('offers Spectate only when you were eliminated but the match lives on', () => {
+    const eliminated = flowEliminated(inMatch(2, 0));
+    expect(eliminated.state.screen).toBe('end');
+    expect(eliminated.state.end).toMatchObject({ matchOver: false });
+    expect(endOfMatchModel(eliminated.state.end!).buttons.map((b) => b.id)).toEqual(['rematch', 'spectate']);
+
+    // Spectate dismisses the summary and returns to watching, flagged spectator.
+    const watching = flowTapEnd(eliminated.state, { kind: 'spectate' });
+    expect(watching.state.screen).toBe('match');
+    expect(watching.state.spectating).toBe(true);
+    expect(watching.state.end).toBeNull();
+  });
+
+  it('refuses Spectate on a whole-match-over screen — nothing left to watch', () => {
+    const ended = flowMatchEnded(inMatch(0), 0).state;
+    expect(flowTapEnd(ended, { kind: 'spectate' }).state).toBe(ended);
+  });
+
+  it('Rematch resets the world to a clean door, keeping fire mode and settings', () => {
+    // A match played with non-default preferences.
+    let state = setFlowFireMode(inMatch(0), FireMode.AutoAim);
+    state = { ...state, settings: { ...createSettings(), reduceVfx: true } };
+    const ended = flowMatchEnded(state, 0).state;
+
+    const rematch = flowTapEnd(ended, { kind: 'rematch' });
+    const back = rematch.state;
+    expect(back.screen).toBe('entry');
+    expect(back.lobby).toBeNull(); // the world is gone
+    expect(back.end).toBeNull();
+    expect(back.spectating).toBe(false);
+    expect(back.entry.code).toBe(''); // and the door is clean
+    // …but the player's choices survive the reset.
+    expect(back.fireMode).toBe(FireMode.AutoAim);
+    expect(back.settings.reduceVfx).toBe(true);
+  });
+
+  it('a fresh match after spectating never opens over a stale summary', () => {
+    // Eliminated → spectate → a rematch elsewhere brings a new matchStart.
+    const watching = flowTapEnd(flowEliminated(inMatch(3, 0)).state, { kind: 'spectate' }).state;
+    expect(watching.spectating).toBe(true);
+    const relit = flowMatchStart(watching);
+    expect(relit.state.spectating).toBe(false);
+    expect(relit.state.end).toBeNull();
+    expect(relit.state.screen).toBe('match');
   });
 });

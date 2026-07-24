@@ -89,6 +89,8 @@ export class LobbyEntryView extends Container {
   private readonly back: ButtonNodes;
   private readonly erase: ButtonNodes;
   private readonly submit: ButtonNodes;
+  /** The home screen's own bottom control — the fourth main-menu option. */
+  private readonly settings: ButtonNodes;
 
   private layout: EntryLayout;
   private screen: EntryModel['screen'] = 'home';
@@ -109,6 +111,7 @@ export class LobbyEntryView extends Container {
     this.back = this.makeButton('BACK', FONT_HEADING, 13);
     this.erase = this.makeButton('⌫ ERASE', FONT_BODY, 13);
     this.submit = this.makeButton('JOIN', FONT_HEADING, 15);
+    this.settings = this.makeButton('SETTINGS', FONT_HEADING, 14);
   }
 
   /** Re-lay-out for a new viewport, device or safe area. */
@@ -181,6 +184,11 @@ export class LobbyEntryView extends Container {
       // that reads as plasma; BACK and ERASE are steel chrome.
       if (!home) this.drawButton(nodes, rect, enabled, nodes === this.submit);
     }
+
+    // SETTINGS lives in the same band, but only on the home screen. Steel, never
+    // plasma: PLAY SOLO is the screen's affirmative action, not this.
+    setVisible(home, this.settings.body, this.settings.label);
+    if (home) this.drawButton(this.settings, this.layout.settings, !model.connecting, false);
   }
 
   // --- Title and the one line under it --------------------------------------

@@ -373,6 +373,9 @@ export interface EntryLayout {
   readonly erase: Rect;
   /** JOIN. */
   readonly submit: Rect;
+  /** SETTINGS — home screen only. Shares the action band with the join controls
+   *  (only one screen is ever drawn), so it costs a rect, not a branch. */
+  readonly settings: Rect;
   readonly isTouch: boolean;
 }
 
@@ -384,7 +387,10 @@ export type EntryTarget =
   | { readonly kind: 'key'; readonly index: number }
   | { readonly kind: 'erase' }
   | { readonly kind: 'back' }
-  | { readonly kind: 'submit' };
+  | { readonly kind: 'submit' }
+  /** The SETTINGS button, home screen only — the fourth way out of the main menu
+   *  (GDD §3.7), and the one that opens a screen rather than a room. */
+  | { readonly kind: 'settings' };
 
 /**
  * Lay the entry screen out for a viewport.
@@ -440,6 +446,13 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: Math.max(0, actionsY - BLOCK_GAP - middleY),
   };
 
+  // The home screen's own bottom control, in the same band the join screen hangs
+  // its action row from — the two screens never draw together, so one rect can
+  // sit under another and the hit test (which is told the live screen) keeps them
+  // apart. SETTINGS is centred and full-width: it is the home screen's one
+  // control down here, so it need not share the row into thirds.
+  const settings: Rect = { x: actionX, y: actionsY, width: actionWidth, height: actionHeight };
+
   return {
     content,
     title,
@@ -449,6 +462,7 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     back,
     erase,
     submit,
+    settings,
     isTouch,
   };
 }
@@ -471,6 +485,7 @@ export function entryHitTest(
       const rect = layout.doors[i];
       if (rect && hit(rect, x, y)) return { kind: 'door', index: i };
     }
+    if (hit(layout.settings, x, y)) return { kind: 'settings' };
     return null;
   }
   if (hit(layout.submit, x, y)) return { kind: 'submit' };

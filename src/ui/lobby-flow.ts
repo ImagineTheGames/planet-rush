@@ -54,11 +54,15 @@
  *     does not own.
  */
 
-import type { Rng } from '@shared/types';
+import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { FireMode } from '@platform/actions';
 import type { ClientMessage, FireMode as WireFireMode, LobbySlot, RoomCode } from '../net/transport';
 import type { EntryTarget, LobbyTarget } from './lobby-geometry';
+import { adjustVolume, createSettings, toggleReduceVfx } from './settings';
+import type { SettingsState, SettingsTarget } from './settings';
+import { endButtons } from './end-of-match';
+import type { EndTarget, MatchOutcome } from './end-of-match';
 import {
   DOOR_ORDER,
   ENTRY_ERRORS,
@@ -92,13 +96,18 @@ import type { LobbyState } from './lobby';
 // ---------------------------------------------------------------------------
 
 /**
- * Which of the three screens owns the display.
+ * Which screen owns the display.
  *
- *  - `entry` — the doors and the keypad ({@link ./lobby-entry-view}).
- *  - `lobby` — the roster, the hulls and RUSH! ({@link ./lobby-view}).
- *  - `match` — neither; the world has the screen and this module is finished.
+ *  - `entry`    — the doors and the keypad ({@link ./lobby-entry-view}).
+ *  - `settings` — the fire mode, reduce-VFX and volumes ({@link ./settings-view}),
+ *                 reached from the main menu and returned from to wherever it was
+ *                 opened ({@link FlowState.settingsReturn}).
+ *  - `lobby`    — the roster, the hulls and RUSH! ({@link ./lobby-view}).
+ *  - `match`    — the world has the screen; this module is watching for the end.
+ *  - `end`      — the end-of-match summary ({@link ./end-of-match-view}): VICTORY /
+ *                 DEFEAT / DRAW / ELIMINATED, with Rematch and maybe Spectate.
  */
-export type FlowScreen = 'entry' | 'lobby' | 'match';
+export type FlowScreen = 'entry' | 'settings' | 'lobby' | 'match' | 'end';
 
 /** The whole front-of-match, as one immutable value. */
 export interface FlowState {
@@ -112,9 +121,22 @@ export interface FlowState {
   /** False for the SOLO door — the caller's cue for `LocalLoopback` over a
    *  WebSocket (GDD §4.2). Meaningless before a door has been chosen. */
   readonly online: boolean;
-  /** The fire mode sent with every `lobbyChoice`. Settings owns the value; the
-   *  flow only carries it so the message it builds is complete. */
+  /** The fire mode sent with every `lobbyChoice`. The value the settings screen
+   *  toggles, carried here because it rides the wire — one home, no drift. */
   readonly fireMode: FireMode;
+  /** The rest of the player's settings — reduce VFX and the three volumes. Always
+   *  present; survives a rematch ({@link resetFlow}), because a setting is not
+   *  match state. */
+  readonly settings: SettingsState;
+  /** The end-of-match outcome, once a match has ended. Null on every other
+   *  screen; the {@link ./end-of-match} summary is built from it. */
+  readonly end: MatchOutcome | null;
+  /** True while watching a match you are no longer playing (chose Spectate on the
+   *  elimination summary). Purely a display flag: the world is unchanged. */
+  readonly spectating: boolean;
+  /** Where DONE on the settings screen returns to — the screen it was opened
+   *  from. The main menu is `entry`; a future pause menu would set `match`. */
+  readonly settingsReturn: FlowScreen;
 }
 
 /**
@@ -137,8 +159,12 @@ export interface FlowResult {
 
 const NO_EFFECTS: readonly FlowEffect[] = [];
 
-/** A flow resting on a clean entry screen. */
-export function createFlow(fireMode: FireMode = FireMode.Manual): FlowState {
+/** A flow resting on a clean entry screen. Fire mode and the rest of settings
+ *  carry in, so a rematch keeps a player's choices ({@link resetFlow}). */
+export function createFlow(
+  fireMode: FireMode = FireMode.Manual,
+  settings: SettingsState = createSettings(),
+): FlowState {
   return {
     screen: 'entry',
     entry: createEntry(),
@@ -146,6 +172,10 @@ export function createFlow(fireMode: FireMode = FireMode.Manual): FlowState {
     room: null,
     online: false,
     fireMode,
+    settings,
+    end: null,
+    spectating: false,
+    settingsReturn: 'entry',
   };
 }
 
@@ -244,6 +274,10 @@ export function flowTapEntry(state: FlowState, target: EntryTarget, rng: Rng): F
       return withEntry(state, backToDoors(state.entry).state);
     case 'submit':
       return resolve(state, submitJoin(state.entry));
+    case 'settings':
+      // The fourth main-menu option opens a screen, not a room — no transport,
+      // no code, just the settings the player already has in hand.
+      return flowOpenSettings(state);
   }
 }
 
@@ -267,6 +301,9 @@ function resolve(state: FlowState, result: { state: EntryState; intent: EntryInt
  * offered as a character and silently dropped if it is not one.
  */
 export function flowKey(state: FlowState, key: string): FlowResult {
+  // Escape backs out of the settings screen the way DONE does — the one key the
+  // settings screen listens for, since everything else on it is a tap.
+  if (state.screen === 'settings') return key === 'Escape' ? flowCloseSettings(state) : rest(state);
   if (state.screen !== 'entry') return rest(state);
   if (key === 'Enter') return resolve(state, submitJoin(state.entry));
   if (key === 'Backspace') return withEntry(state, eraseEntryCode(state.entry));
@@ -398,10 +435,123 @@ export function flowLobbySlots(state: FlowState, slots: readonly LobbySlot[]): F
 }
 
 /** The server said the match is live. The world is built by whoever owns the
- *  world; this module's last act is to get off the screen (rule 3). */
+ *  world; this module's job is to get off the lobby screen (rule 3) and clear any
+ *  summary a previous match left, so a fresh match never opens over a stale end
+ *  screen or an inherited spectate flag. */
 export function flowMatchStart(state: FlowState): FlowResult {
-  if (!state.lobby) return rest({ ...state, screen: 'match' });
-  return rest({ ...state, screen: 'match', lobby: startLobbyMatch(state.lobby) });
+  const fresh = { ...state, screen: 'match' as const, end: null, spectating: false };
+  if (!state.lobby) return rest(fresh);
+  return rest({ ...fresh, lobby: startLobbyMatch(state.lobby) });
+}
+
+// ---------------------------------------------------------------------------
+// Settings — the fourth main-menu screen
+// ---------------------------------------------------------------------------
+
+/**
+ * Open the settings screen, remembering where to return. Reachable from the main
+ * menu today ({@link flowTapEntry} `settings`); the `settingsReturn` it records
+ * is what lets a future pause menu open the same screen and land back in the
+ * match. A no-op from anywhere the player cannot have pressed a settings button.
+ */
+export function flowOpenSettings(state: FlowState): FlowResult {
+  if (state.screen !== 'entry' && state.screen !== 'match') return rest(state);
+  return rest({ ...state, screen: 'settings', settingsReturn: state.screen });
+}
+
+/** Leave the settings screen for wherever it was opened from. DONE and Escape
+ *  both land here; the changes are already applied, so there is nothing to
+ *  confirm or discard. */
+export function flowCloseSettings(state: FlowState): FlowResult {
+  if (state.screen !== 'settings') return rest(state);
+  return rest({ ...state, screen: state.settingsReturn });
+}
+
+/**
+ * Apply a tap on the settings screen — from {@link ./settings} `settingsHitTest`.
+ *
+ * Every change is applied on the spot (there is no cancel), and none of them
+ * costs the wire anything on the main menu, where there is no lobby to tell. If
+ * the fire mode is ever changed from a pause menu mid-lobby, the lobby is owed a
+ * fresh `lobbyChoice`, so that one case re-sends it — the same rule
+ * {@link withLobby} keeps for a hull.
+ */
+export function flowTapSettings(state: FlowState, target: SettingsTarget): FlowResult {
+  if (state.screen !== 'settings') return rest(state);
+  switch (target.kind) {
+    case 'back':
+      return flowCloseSettings(state);
+    case 'fireMode':
+      return applyFireMode(state, state.fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim);
+    case 'reduceVfx':
+      return foldSettings(state, toggleReduceVfx(state.settings));
+    case 'volume':
+      return foldSettings(state, adjustVolume(state.settings, target.channel, target.dir));
+  }
+}
+
+/** Fold a new settings value in, staying identical on a no-op so a slider against
+ *  its stop stops churning state. Settings other than fire mode never touch the
+ *  wire, so this emits nothing. */
+function foldSettings(state: FlowState, settings: SettingsState): FlowResult {
+  return settings === state.settings ? rest(state) : rest({ ...state, settings });
+}
+
+/** Set the fire mode, re-sending the lobby's choice only if there is a lobby to
+ *  hear it (the pause-menu case). On the main menu there is none, so nothing goes
+ *  out — the mode simply rides the next `lobbyChoice` when a room opens. */
+function applyFireMode(state: FlowState, fireMode: FireMode): FlowResult {
+  if (state.fireMode === fireMode) return rest(state);
+  const next = { ...state, fireMode };
+  return next.lobby ? { state: next, effects: [choiceFor(next, next.lobby)] } : rest(next);
+}
+
+// ---------------------------------------------------------------------------
+// The end of a match
+// ---------------------------------------------------------------------------
+
+/**
+ * The whole match resolved (`matchEnd`, `src/net/transport.ts`). Moves to the
+ * summary with the winner named — VICTORY if it is you, DEFEAT if it is someone
+ * else, DRAW on the no-survivor end. Only from a live match: a `matchEnd` arriving
+ * on the door or twice over is ignored.
+ *
+ * `you` is read from the lobby the match was built from, so the summary knows
+ * whose result it is showing without a wire field for it.
+ */
+export function flowMatchEnded(state: FlowState, winner: PlayerId | null): FlowResult {
+  if (state.screen !== 'match') return rest(state);
+  const you = state.lobby?.you ?? 0;
+  return rest({ ...state, screen: 'end', end: { you, winner, matchOver: true } });
+}
+
+/**
+ * Your core was destroyed but the match goes on (GDD §2 wreck rule). Moves to the
+ * summary in its ELIMINATED form — Rematch and Spectate, because there is still a
+ * match to watch. Only from a live match.
+ */
+export function flowEliminated(state: FlowState): FlowResult {
+  if (state.screen !== 'match') return rest(state);
+  const you = state.lobby?.you ?? 0;
+  return rest({ ...state, screen: 'end', end: { you, winner: null, matchOver: false } });
+}
+
+/**
+ * A tap on the end-of-match summary — from {@link ./end-of-match}
+ * `endOfMatchHitTest`.
+ *
+ *  - **Rematch** tears the world down to a clean door ({@link resetFlow}),
+ *    keeping the player's settings. This is the "resets the world cleanly" path.
+ *  - **Spectate** dismisses the summary and returns to watching the still-live
+ *    match, flagged as a spectator. Refused when the outcome did not offer it (a
+ *    whole-match-over screen has nothing left to watch), so a stale tap cannot
+ *    strand the player on an empty match screen.
+ */
+export function flowTapEnd(state: FlowState, target: EndTarget): FlowResult {
+  if (state.screen !== 'end' || !state.end) return rest(state);
+  if (target.kind === 'rematch') return rest(resetFlow(state));
+  if (!endButtons(state.end).includes('spectate')) return rest(state);
+  return rest({ ...state, screen: 'match', spectating: true, end: null });
 }
 
 /** Settings changed the fire mode. Carried into the next `lobbyChoice` rather
@@ -411,9 +561,11 @@ export function setFlowFireMode(state: FlowState, fireMode: FireMode): FlowState
   return state.fireMode === fireMode ? state : { ...state, fireMode };
 }
 
-/** Leave the match and come back to a clean door (the end-of-match screen's
- *  way out). Deliberately a full reset: a stale roster behind a new door is how
- *  a player ends up looking at the previous match's colours. */
+/** Leave the match and come back to a clean door — Rematch's way out, and the
+ *  reset the end-of-match summary performs. Deliberately a full reset: a stale
+ *  roster behind a new door is how a player ends up looking at the previous
+ *  match's colours. Fire mode and settings survive it — they are the player's,
+ *  not the match's. */
 export function resetFlow(state: FlowState): FlowState {
-  return createFlow(state.fireMode);
+  return createFlow(state.fireMode, state.settings);
 }

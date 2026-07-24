@@ -306,19 +306,128 @@ export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 
 export {
   createFlow,
+  flowCloseSettings,
   flowConnected,
+  flowEliminated,
   flowFailed,
   flowKey,
   flowLobbySlots,
+  flowMatchEnded,
   flowMatchStart,
+  flowOpenSettings,
+  flowTapEnd,
   flowTapEntry,
   flowTapLobby,
+  flowTapSettings,
   resetFlow,
   setFlowFireMode,
   tickFlow,
   wireFireMode,
 } from './lobby-flow';
 export type { FlowEffect, FlowResult, FlowScreen, FlowState } from './lobby-flow';
+
+// --- The Day-7 menus: main-menu settings, end-of-match, connection status ---
+//
+// Three flat screens that hang off the flow above. Each is the same three-piece
+// shape as the lobby: a pure model (with its layout co-located, since a stack of
+// rows needs no responsive geometry of its own), and a thin Pixi view. The flow
+// owns *when* each is shown; these own *what* each shows.
+//
+//   settings   ← flow.screen === 'settings'  (from the main menu's SETTINGS)
+//   end        ← flow.screen === 'end'        (from flowMatchEnded/flowEliminated)
+//   connection ← driven by the transport's ConnectionState, independent of screen
+//
+// Wiring continues the flow seam:
+//   settingsView.hitTest(x,y) → flowTapSettings(flow, target)
+//   endView.hitTest(x,y)      → flowTapEnd(flow, target)   // rematch | spectate
+//   on `matchEnd`  → flowMatchEnded(flow, msg.winner)
+//   on your core's death (from the snapshot) → flowEliminated(flow)
+//   connectionView.update(connectionStatusModel({ state: transport.state, online }))
+
+export {
+  FONT_BODY,
+  FONT_HEADING,
+  TEXT_DIM,
+  TEXT_PRIMARY,
+} from './typography';
+
+export {
+  MENU_COLUMN_MAX,
+  MENU_PAD,
+  MENU_ROW_GAP,
+  centeredColumn,
+  centeredPanel,
+  clamp,
+  hitRect,
+  menuContent,
+} from './menu-geometry';
+
+export {
+  DEFAULT_VOLUMES,
+  SETTINGS_ID,
+  SETTINGS_ROWS,
+  VOLUME_CHANNELS,
+  VOLUME_STEP,
+  VOLUME_STEPS,
+  adjustVolume,
+  createSettings,
+  setReduceVfx,
+  setVolume,
+  settingsHitTest,
+  settingsLayout,
+  settingsModel,
+  toggleReduceVfx,
+  volumeButtons,
+  volumeLevel,
+} from './settings';
+export type {
+  SettingsLayout,
+  SettingsModel,
+  SettingsRowSpec,
+  SettingsRowView,
+  SettingsState,
+  SettingsTarget,
+  Volumes,
+  VolumeChannel,
+} from './settings';
+
+export { SettingsView, SETTINGS_ANCHOR } from './settings-view';
+
+export {
+  END_OF_MATCH_ID,
+  endButtons,
+  endKind,
+  endOfMatchHitTest,
+  endOfMatchLayout,
+  endOfMatchModel,
+} from './end-of-match';
+export type {
+  EndButton,
+  EndButtonView,
+  EndKind,
+  EndOfMatchLayout,
+  EndOfMatchModel,
+  EndTarget,
+  MatchOutcome,
+} from './end-of-match';
+
+export { EndOfMatchView, END_OF_MATCH_ANCHOR } from './end-of-match-view';
+
+export {
+  CONNECTION_STATUS_ID,
+  connectionStatusHitTest,
+  connectionStatusLayout,
+  connectionStatusModel,
+} from './connection-status';
+export type {
+  ConnectionSeverity,
+  ConnectionStatusInput,
+  ConnectionStatusLayout,
+  ConnectionStatusModel,
+  ConnectionTarget,
+} from './connection-status';
+
+export { ConnectionStatusView, CONNECTION_STATUS_ANCHOR } from './connection-status-view';
 
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
