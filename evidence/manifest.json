@@ -114,39 +114,39 @@
     "title": "GATE: 8-planet ring on screen",
     "area": "match",
     "image": "images/planet-ring.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Widest available frame (1600×1000) on the seeded ?debug=1&freeze=1 world, whose roster is a full 8-planet ring (freeze.ts FREEZE_PLAYER_COUNT=8, and the sim's createWorld does build world.planets[8]). ON SCREEN: only grey asteroid circles clustered in the upper-left, the local ship at centre, and the HUD. There is NO ring of planets — no coloured planet bodies, no cores, no home bases anywhere in the frame. The 8-planet ring exists in sim state but is NOT rendered by the client (src/render/index.ts draws only ships, asteroids, ore chunks and beams — it has no planet/turret draw path). FAILS the gate: the ring is not visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build (PR #40, m2-wire-the-war). Seeded ?debug=1&freeze=1 world, viewport widened to 3600×2000 so the 1:1 follow-camera can reach the whole ring (planets sit ~896 world-px from the arena centre, the far one ~1702 px from the local ship it centres on). ON SCREEN: EIGHT planet bodies arranged in a ring around a central cluster of grey asteroids (the field). Each planet is a dark patina disc with a signal-yellow core and two teal segments, encircled by a distinct owner beacon ring — I count eight different colours (white/grey top-centre, orange upper-left, blue upper-right, magenta far-left, blue right, purple lower-left, teal lower-right, green bottom-centre) — and each has its own small ship triangle beside it. HUD reads 'WAVE 1/5 · Outer Drift / NEXT 2:28 / MATCH 0:02', 'ORE 3', 'HOME' top-right. This is the full 8-planet ring, rendered. PASSES the gate.",
+    "verdict": "verified"
   },
   {
     "id": "build-wheel-open",
     "title": "GATE: Build wheel open with costs",
     "area": "build-wheel",
     "image": "images/build-wheel-open.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Held 'E' (the strip's 'E Build & Upgrade' binding) at the ship's spawn — its own planet, i.e. docked, the one place GDD §2.5 says the wheel opens. The match clock advanced to 'MATCH 0:05', so input was accepted. ON SCREEN: no build wheel — no radial segments, no segment labels, and none of the expected cost numbers. The scene is the ordinary game frame with ship, asteroids and HUD. The HUD module contains a BuildWheelView, but main.ts never feeds its wheel signals (feedHud sets only cargo/cargoCap/banked/time/device/fireMode/isTouch/nearAsteroid; docked defaults false), so the wheel stays hidden. FAILS the gate: no wheel, no costs visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. Held 'E' (the strip's 'E Build & Upgrade' binding) while docked at the ship's spawn planet. ON SCREEN: the Build & Upgrade wheel is OPEN — a radial ring of FIVE labelled segments around a hub. Reading clockwise from twelve o'clock: 'TURRET / YOUR PLANET' with cost '3'; 'SHIELD / YOUR PLANET' cost '5'; 'REPAIR CORE / YOUR PLANET' cost '1'; 'UPGRADE SHIP / YOUR SHIP' (highlighted, with a ▶ pointer and no cost — it opens the upgrade panel); 'BANK / YOUR PLANET' (no cost). The hub prints the live ore total '3 · ORE' inside a cyan selection ring. A tooltip banner reads 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder' (the SPEND onboarding lesson). Build stamp 'c97f60a · 21:44Z' bottom-right. The wheel is open and its costs — 3, 5, 1 — are the only numbers on the wedges, exactly as GDD §2.5 specifies. PASSES the gate.",
+    "verdict": "verified"
   },
   {
-    "id": "turret-under-construction",
+    "id": "turret-construction",
     "title": "GATE: turret mid-construction",
     "area": "build-wheel",
-    "image": "images/turret-under-construction.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Held 'E', swept clicks around where wheel segments would sit, pressed confirm, then let the sim run ~4 s for a build to progress (clock reached 'MATCH 0:09'). ON SCREEN: no turret at any stage of construction, no build-progress ring or bar, and — as with planet-ring — no planet for a turret to mount on. The frame is indistinguishable from an idle boot. Turret construction is simulated (sim/buildings.ts) but nothing in the render/HUD feed surfaces planets or turrets to the client. FAILS the gate: no turret under construction is visible.",
-    "verdict": "failed"
+    "image": "images/turret-construction.png",
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. Opened the wheel (hold E), clicked the TURRET wedge at twelve o'clock to place the order, closed the wheel (hold E again) to unobscure the planet, then let the 10 s build (TURRET.buildTime) run partway. ON SCREEN: the home planet (dark disc, blue owner beacon ring, yellow core, teal segments) carries a build-progress overlay — a faint full steel ring at the planet's edge with a bright plasma-cyan arc drawn over it, starting at twelve o'clock and sweeping clockwise about two-thirds of the way round, with an open gap in the upper-left. No completed turret stands on the rim yet, so the arc is mid-build, not done. 'ORE' now reads '0' — down from the '3' it showed before the order — i.e. the turret's cost-3 was spent to queue this build. HUD 'WAVE 1/5 · Outer Drift / NEXT 2:23 / MATCH 0:08', stamp 'c97f60a · 21:44Z'. A turret is visibly under construction on the planet. PASSES the gate. (Manifest id renamed from the prior 'turret-under-construction' to 'turret-construction' to match the M2 gate key.)",
+    "verdict": "verified"
   },
   {
     "id": "alarm-arrow",
     "title": "GATE: under-attack alarm arrow",
     "area": "match",
     "image": "images/alarm-arrow.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "A ~2-minute unattended run (clock reached 'MATCH 2:01', 'NEXT 0:30' — the wave clock did count down toward the next wave). ON SCREEN: no under-attack alarm — no red screen-edge frame and no edge arrow pointing home — and no planet anywhere. Two caveats, both honest: offline there is no attacker to trigger a sustained-damage alarm, AND the alarm/home-arrow surface (ui/alarm.ts, ui/hud.ts) is never fed by main.ts (no planetWorld position, no turretHp), so it could not show even under attack. FAILS the gate: no alarm frame or arrow is visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. The prior caveat — 'offline there is no attacker' — no longer holds: the seven rivals are live bots (match-boot.ts), and leaving your home undefended draws one onto the core within seconds. Method: held 'A' to thrust toward the arena centre so home recedes off the right edge, and gated the shutter on the sim's own tick counter (window.__planetRush.ticks ≥ 1200) rather than wall time. A headless replay of this exact input confirms the alarm fires from ~tick 790 with the core alive past tick 2000, so this frame sits inside a real siege. ON SCREEN, at 'MATCH 0:21': the under-attack ALARM is firing — a threat-red frame around the screen edges (pulsing, so faint at this instant but visible along the top edge and corners) and, decisively, the alarm's own banner 'Your planet is under attack — follow the arrow' (ui/onboarding.ts, shown only while the alarm is active). A threat-red screen-edge ARROW sits at the right edge pointing right — toward the home planet, which is off-screen to the right because I flew away. The local ship (blue triangle) is centred out in the field beside a rival's planet (centre, shown with a threat-red damage ring — a scouted enemy home, not mine), with other bot ships nearby. Alarm + directional home arrow, during an actual attack. PASSES the gate.",
+    "verdict": "verified"
   }
 ]
