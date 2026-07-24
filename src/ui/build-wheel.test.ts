@@ -165,6 +165,23 @@ describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)'
     expect(stateOf('repair', { cargo: 0, banked: 0, coreHp: 10 })).toBe('unaffordable');
     expect(stateOf('repair', { cargo: 1, banked: 0, coreHp: 10 })).toBe('ready');
   });
+
+  it('kills REPAIR CORE once collapse begins (GDD §2.3 — "repair shuts off")', () => {
+    // A wounded core and plenty of ore: everything about the press is right
+    // except that the match has entered collapse, where `placeOrder` answers
+    // `collapsed`. Offering it anyway would be the wheel lying.
+    expect(stateOf('repair', { banked: 99, coreHp: 10, collapsed: false })).toBe('ready');
+    expect(stateOf('repair', { banked: 99, coreHp: 10, collapsed: true })).toBe('inactive');
+  });
+
+  it('leaves turrets, shields and BANK buyable under collapse', () => {
+    // GDD §2.3 names exactly three collapse rules — no shield regeneration, no
+    // repair, no new ore. Buying a shield that will never regenerate is still a
+    // legal (and sometimes correct) way to spend a doomed stockpile.
+    expect(stateOf('turret', { banked: 99, collapsed: true })).toBe('ready');
+    expect(stateOf('shield', { banked: 99, collapsed: true })).toBe('ready');
+    expect(stateOf('bank', { cargo: 2, collapsed: true })).toBe('ready');
+  });
 });
 
 describe('the wheel opens at your own planet and nowhere else (GDD §2.5, §2.4)', () => {

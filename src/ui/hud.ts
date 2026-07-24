@@ -176,6 +176,13 @@ export interface HudFrame {
   readonly shipPos?: Point;
   /** The local player's planet's world position. Default: no arrow. */
   readonly homePos?: Point;
+
+  // --- Day 2: the endgame (GDD §2.3) ---------------------------------------
+
+  /** The collapse phase has begun (the sim's `isCollapsed`): no shield regen,
+   *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
+   *  COLLAPSE on the wave clock. Default false. */
+  readonly collapsed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,11 +370,20 @@ export class Hud extends Container {
   // --- Wave clock ----------------------------------------------------------
 
   private updateWaveClock(frame: HudFrame): void {
-    const clock = computeWaveClock(frame.time);
+    const clock = computeWaveClock(frame.time, frame.collapsed ?? false);
     this.waveName.text = `WAVE ${clock.wave}/${clock.waveCount} · ${clock.name}`;
-    this.waveNext.text = clock.isFinalWave
-      ? 'FINAL WAVE'
-      : `NEXT ${formatClock(clock.countdownToNext ?? 0)}`;
+    // COLLAPSE outranks FINAL WAVE: the field is spent, repair is off and
+    // shields no longer regenerate (GDD §2.3). It is threat red because it is
+    // the match's danger state, which is what that colour is for.
+    if (clock.isCollapsed) {
+      this.waveNext.text = 'COLLAPSE';
+      this.waveNext.style.fill = PALETTE.threatRed;
+    } else {
+      this.waveNext.text = clock.isFinalWave
+        ? 'FINAL WAVE'
+        : `NEXT ${formatClock(clock.countdownToNext ?? 0)}`;
+      this.waveNext.style.fill = PALETTE.plasma;
+    }
     this.waveMatch.text = `MATCH ${formatClock(clock.matchTime)}`;
   }
 
@@ -556,6 +572,7 @@ export class Hud extends Container {
       shields: frame.shields ?? 0,
       coreHp: frame.coreHp ?? 0,
       maxCoreHp: frame.maxCoreHp ?? 0,
+      collapsed: frame.collapsed ?? false,
     };
     const wheel = buildWheelModel(signals);
     const panel = upgradePanelModel({

@@ -63,7 +63,11 @@ export type SegmentTarget = 'planet' | 'ship';
  *                    (GDD §2.5 — "design rules, not renderer limits"). Queued
  *                    construction counts, so a player cannot buy past the cap.
  * - `inactive`     — the press would be a no-op: BANK with an empty hold, or
- *                    REPAIR CORE on a core that is already full.
+ *                    REPAIR CORE on a core that is already full *or* after the
+ *                    collapse phase has shut repair off for good (GDD §2.3).
+ *                    The sim distinguishes those two (`core-full` vs
+ *                    `collapsed`); the wheel does not, because the player-facing
+ *                    answer is the same — this button does nothing now.
  */
 export type SegmentState = 'ready' | 'unaffordable' | 'capped' | 'inactive';
 
@@ -171,6 +175,16 @@ export interface BuildWheelSignals {
   readonly coreHp: number;
   /** Max core HP. */
   readonly maxCoreHp: number;
+  /**
+   * The collapse phase has begun (the sim's `isCollapsed`). From here on "no
+   * shield regeneration, no repair, no new ore" (GDD §2.3) — so REPAIR CORE is
+   * dead for the rest of the match and the wheel must say so rather than
+   * offering a channel `placeOrder` now answers `collapsed` to.
+   *
+   * Optional: a caller that predates the endgame reads as "not collapsed",
+   * which is the pre-collapse behaviour it had.
+   */
+  readonly collapsed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +289,9 @@ export function segmentState(
       if (signals.shields >= SHIELD.capPerPlanet) return 'capped';
       return ore + 1e-9 >= SHIELD.cost ? 'ready' : 'unaffordable';
     case 'repair':
+      // Collapse shuts repair off for the rest of the match (GDD §2.3) — the
+      // sim answers `collapsed`, and the wheel must not keep offering it.
+      if (signals.collapsed === true) return 'inactive';
       // A full core has nothing to repair — the press would be a no-op, and the
       // sim answers `core-full`. Ore only matters once there is damage to undo.
       if (signals.coreHp >= signals.maxCoreHp - 1e-9) return 'inactive';
