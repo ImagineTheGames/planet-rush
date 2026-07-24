@@ -268,6 +268,58 @@ export type { EntryLayout, EntryTarget } from './lobby-geometry';
 
 export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 
+// --- The seam itself (./lobby-flow) ----------------------------------------
+//
+// The two blocks above describe the order the door and the room are called in.
+// `./lobby-flow` **is** that order, in code, asserted headless
+// (`./lobby-flow.test.ts` plays a whole match front with no server and no
+// canvas) — because M2 was retracted for features that were merged, tested and
+// never wired, and prose cannot fail a test.
+//
+// Platform's whole integration is: hold a `FlowState`, route input into it,
+// and drain the `FlowEffect`s it returns.
+//
+//   let flow = createFlow(defaultFireMode(isTouch));
+//
+//   function drain({ state, effects }: FlowResult): void {
+//     flow = state;
+//     for (const effect of effects) {
+//       if (effect.kind === 'open-transport') {
+//         transport = effect.intent.online ? new WebSocketTransport(...) : new LocalLoopback(...);
+//         transport.send({ type: 'join', room: effect.intent.room });
+//       } else transport?.send(effect.message);   // lobbyChoice / startMatch
+//     }
+//   }
+//
+//   // per frame:  drain(tickFlow(flow, dt))
+//   //             entry.visible = flow.screen === 'entry';
+//   //             lobby.visible = flow.screen === 'lobby';
+//   //             if (flow.screen === 'entry') entry.update(entryModel(flow.entry));
+//   //             else if (flow.lobby) lobby.update(lobbyModel(flow.lobby));
+//   // on tap:     const hit = entry.hitTest(x, y) / lobby.hitTest(x, y)
+//   //             drain(flowTapEntry(flow, hit, rng) / flowTapLobby(flow, hit))
+//   // on keydown: drain(flowKey(flow, event.key))
+//   // from wire:  welcome    → drain(flowConnected(flow, msg.you, { room: msg.room }))
+//   //             lobbyState → drain(flowLobbySlots(flow, msg.slots))
+//   //             matchStart → drain(flowMatchStart(flow))   // then build the world
+//   //             refused/dropped → drain(flowFailed(flow, ENTRY_ERRORS.full))
+
+export {
+  createFlow,
+  flowConnected,
+  flowFailed,
+  flowKey,
+  flowLobbySlots,
+  flowMatchStart,
+  flowTapEntry,
+  flowTapLobby,
+  resetFlow,
+  setFlowFireMode,
+  tickFlow,
+  wireFireMode,
+} from './lobby-flow';
+export type { FlowEffect, FlowResult, FlowScreen, FlowState } from './lobby-flow';
+
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
 // Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
