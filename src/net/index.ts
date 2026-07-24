@@ -14,13 +14,20 @@
  * encoding — the measured 510-byte worst case from docs/netcode-spike.md — is
  * in `./snapshot`.
  *
- * Landing later: `WebSocketTransport` and the room/lobby protocol over a real
- * socket, client-side prediction/reconciliation against snapshots, static
- * entity events, and the reconnect grace rule (GDD §4.2, M3–M4).
+ * Online is here too: `./wire` is how the protocol is spelled on a socket (JSON
+ * for words, binary frames for snapshots) and is shared with `server/`, and
+ * `./websocket-transport` is the client end — one persistent socket, and a
+ * redial that reclaims the seat a bot is holding (GDD §4.2 reconnect grace).
+ *
+ * Landing later: client-side prediction and reconciliation against snapshots,
+ * so an online client renders a predicted world instead of a snapshot-fed one
+ * (GDD §4.2, M4–M5).
  */
 
 export * from './transport';
 export * from './input-queue';
 export * from './snapshot';
+export * from './wire';
 export * from './loopback';
+export * from './websocket-transport';
 export * from './session';
