@@ -21,6 +21,7 @@ import type { World } from '../sim';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
 import type {
+  BotDifficulty,
   ConnectionState,
   FireMode,
   RoomCode,
@@ -28,6 +29,8 @@ import type {
   Tick,
   Transport,
 } from './transport';
+import { WebSocketTransport } from './websocket-transport';
+import type { WebSocketTransportConfig } from './websocket-transport';
 
 /** What the game loop needs from the network, and nothing more. */
 export interface MatchSession {
@@ -110,9 +113,40 @@ export class TransportSession implements MatchSession {
   private nextTick: Tick = 1;
   private seq = 0;
   private snapshotTick: Tick = -1;
+  private readonly observers: ((message: ServerMessage) => void)[] = [];
 
   constructor(private readonly transport: Transport) {
     transport.onMessage((message) => this.receive(message));
+  }
+
+  /**
+   * Watch the server's messages without taking them over. The loop's contract
+   * is input in, world out; the lobby screen, the reconnect banner and the
+   * end-of-match summary all need to *see* the protocol without owning the
+   * transport's single message handler, so they observe here (GDD §4.6 M4, M7).
+   */
+  observe(handler: (message: ServerMessage) => void): void {
+    this.observers.push(handler);
+  }
+
+  /** Send the lobby choice: hull, fire mode, and — honoured only from the room
+   *  creator — the bots' difficulties (GDD §2.1, §2.11, §4.2). */
+  chooseInLobby(options: {
+    shipClass: ShipClass;
+    fireMode?: FireMode;
+    botDifficulties?: readonly BotDifficulty[];
+  }): void {
+    this.transport.send({
+      type: 'lobbyChoice',
+      shipClass: options.shipClass,
+      fireMode: options.fireMode ?? 'manual',
+      ...(options.botDifficulties ? { botDifficulties: options.botDifficulties } : {}),
+    });
+  }
+
+  /** RUSH! Honoured from the room creator alone; a no-op from anyone else. */
+  startMatch(): void {
+    this.transport.send({ type: 'startMatch' });
   }
 
   /** Join the room and start the match. Offline the room is ours alone, so the
@@ -183,8 +217,86 @@ export class TransportSession implements MatchSession {
       case 'matchEnd':
         // Lobby, static entities, the reconnect-grace pair, and the end-of-match
         // summary are the UI's business; the loop's contract is input in, world
-        // out. They are routed when those screens land (GDD §4.6 M4, M7).
+        // out. They reach those screens through `observe` (GDD §4.6 M4, M7).
         break;
     }
+    for (const observer of this.observers) observer(message);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Online
+// ---------------------------------------------------------------------------
+
+/** Everything an online match needs: where the server is, and which room. */
+export interface OnlineSessionConfig {
+  /** `wss://…` (or `ws://` in dev) — the match server's endpoint. */
+  readonly url: string;
+  /** The room code to create or join. Shared with the other players (GDD §4.2). */
+  readonly room: RoomCode;
+  /** Hull picked in the lobby (GDD §2.11). Sent as soon as the socket opens. */
+  readonly shipClass?: ShipClass;
+  /** Fire mode picked in settings (GDD §2.4) — lobby metadata; the sim never
+   *  reads it, because the mode is resolved client-side into `FireAction.auto`. */
+  readonly fireMode?: FireMode;
+  /** Bot difficulties, honoured only if this client created the room. */
+  readonly botDifficulties?: readonly BotDifficulty[];
+  /** Ambient overrides for the transport — injected in tests (see
+   *  `./websocket-transport`); production passes none and gets the browser's. */
+  readonly transport?: Omit<WebSocketTransportConfig, 'url' | 'room'>;
+}
+
+/** An online session, with the two lobby gestures a room needs. */
+export interface OnlineSession extends MatchSession {
+  /** Re-send the lobby choice (hull, fire mode, bot difficulties). */
+  chooseInLobby(options: {
+    shipClass: ShipClass;
+    fireMode?: FireMode;
+    botDifficulties?: readonly BotDifficulty[];
+  }): void;
+  /** RUSH! — the room creator starts the match. */
+  startMatch(): void;
+  /** Watch the protocol: lobby state, the reconnect-grace pair, match end. */
+  observe(handler: (message: ServerMessage) => void): void;
+}
+
+/**
+ * Stand up an online match: one `WebSocketTransport` to the match server, one
+ * session over it.
+ *
+ * `join` is deliberately *not* sent from here. The transport sends it itself on
+ * every dial, because a redial inside the grace window has to carry the reclaim
+ * slot and token to get the player's ship back (GDD §4.2) — putting that in one
+ * place means a reconnect cannot forget to ask for the seat. What this function
+ * does own is the lobby gesture that follows a successful open, re-sent on each
+ * reconnect so a returning client's hull choice is never lost with its socket.
+ *
+ * Note what an online session's `world` is: null. The predicted, reconciled
+ * client world lands with client-side prediction (GDD §4.2); until then an
+ * online client is snapshot-fed, and `lastSnapshotTick` is how it knows the
+ * server is still talking.
+ */
+export function createOnlineSession(config: OnlineSessionConfig): OnlineSession {
+  const transport = new WebSocketTransport({
+    url: config.url,
+    room: config.room,
+    ...(config.transport ?? {}),
+  });
+  const session = new TransportSession(transport);
+
+  const sendLobbyChoice = (): void => {
+    if (config.shipClass === undefined) return;
+    session.chooseInLobby({
+      shipClass: config.shipClass,
+      ...(config.fireMode !== undefined ? { fireMode: config.fireMode } : {}),
+      ...(config.botDifficulties ? { botDifficulties: config.botDifficulties } : {}),
+    });
+  };
+
+  transport.onStateChange((state) => {
+    if (state === 'open') sendLobbyChoice();
+  });
+  if (transport.state === 'open') sendLobbyChoice();
+
+  return session;
 }
