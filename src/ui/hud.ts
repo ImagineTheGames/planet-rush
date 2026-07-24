@@ -28,7 +28,10 @@
  *
  * All decision logic lives in the pure, unit-tested sibling modules
  * ({@link ./onboarding}, {@link ./wave-clock}, {@link ./ore-hud},
- * {@link ./controls-strip}); this file is the thin Pixi *view* that draws them.
+ * {@link ./controls-strip}), and every day-2 element's screen geometry lives in
+ * {@link ./hud-geometry} so its placement is asserted headless against the
+ * layout registry's own resolver; this file is the thin Pixi *view* that draws
+ * them and reports what it drew ({@link Hud.describeLayout}).
  * Integration (constructing this and calling {@link Hud.update} each frame) is
  * the Platform Engineer's wiring in `main.ts` — see the PR notes.
  *
@@ -56,6 +59,7 @@ import type { UpgradeTiers } from './upgrade-panel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { ARROW_SIZE, arrowPoly, ALARM_FRAME_INSET, ALARM_FRAME_STROKE } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -81,15 +85,30 @@ const SQUARE = 18;
 const SQUARE_GAP = 5;
 const STRIP_PAD = 12;
 
+/**
+ * Outline width of an *empty* ore slot's ghost square.
+ *
+ * Drawn **inset by half its width**, so the stroke lands entirely inside the
+ * `SQUARE × SQUARE` footprint the row was laid out with. Pixi centres a stroke
+ * on its path: an outline drawn on the footprint itself would bleed
+ * `SLOT_STROKE / 2` px *outside* it, which put the ore HUD's real rendered
+ * bounds at x = PAD − 0.75 and escaped the `top-left` margin-`PAD` anchor by a
+ * quarter pixel on every phone profile. The registry was right and the drawing
+ * was wrong (GDD §2.2 puts ore at a glance in the top-left corner, and the
+ * margin is what "corner, not edge" means), so the stroke moved inward rather
+ * than the anchor outward.
+ */
+const SLOT_STROKE = 1.5;
+
+/** Horizontal padding inside the onboarding prompt's panel, CSS px. */
+const PROMPT_PAD_X = 40;
+
 /** Own-planet HP bar (top-right, GDD §2.2). Wide enough to read a quarter-core
  *  loss at arm's length on a phone. */
 const HP_BAR_WIDTH = 140;
 const HP_BAR_HEIGHT = 10;
 /** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
 const SHIELD_BAR_HEIGHT = 4;
-
-/** Screen-edge arrow triangle size, CSS px. */
-const ARROW_SIZE = 15;
 
 // ---------------------------------------------------------------------------
 // The per-frame HUD input
@@ -232,6 +251,10 @@ export class Hud extends Container {
    *  caller for a damage event, so the alarm needs no new sim plumbing. */
   private lastDefenseHp = -1;
   private lastTime = -1;
+  /** Whether the screen-edge arrow actually drew this frame. The arrow is hidden
+   *  while home is already on screen (the planet is its own tell), and the
+   *  registry records what is drawn, never what would have been. */
+  private arrowDrawn = false;
 
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
@@ -360,7 +383,14 @@ export class Hud extends Container {
         g.fill({ color: PALETTE.signalYellow, alpha: model.full && !flashOn ? 0.45 : 1 });
       } else {
         g.fill({ color: PALETTE.signalYellow, alpha: 0.1 }); // faint slot ghost
-        g.stroke({ width: 1.5, color: PALETTE.signalYellow, alpha: 0.5 });
+        // Outline on an inset path, so the centred stroke stays inside the
+        // square's footprint and the row's bounds are exactly its layout box.
+        const i2 = SLOT_STROKE / 2;
+        g.roundRect(i2, i2, SQUARE - SLOT_STROKE, SQUARE - SLOT_STROKE, 3 - i2).stroke({
+          width: SLOT_STROKE,
+          color: PALETTE.signalYellow,
+          alpha: 0.5,
+        });
       }
     }
 
@@ -520,8 +550,13 @@ export class Hud extends Container {
     const pulse = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(frame.time * 8));
     this.alarmFrame.clear();
     this.alarmFrame
-      .rect(2, 2, this.screenWidth - 4, this.screenHeight - 4)
-      .stroke({ width: 4, color: PALETTE.threatRed, alpha: pulse });
+      .rect(
+        ALARM_FRAME_INSET,
+        ALARM_FRAME_INSET,
+        this.screenWidth - 2 * ALARM_FRAME_INSET,
+        this.screenHeight - 2 * ALARM_FRAME_INSET,
+      )
+      .stroke({ width: ALARM_FRAME_STROKE, color: PALETTE.threatRed, alpha: pulse });
 
     this.drawHomeArrow(frame, pulse);
     return true;
@@ -533,6 +568,7 @@ export class Hud extends Container {
     const ship = frame.shipPos;
     const home = frame.homePos;
     this.alarmArrow.clear();
+    this.arrowDrawn = false;
     if (!ship || !home) return;
 
     const arrow = homeArrow(
@@ -542,17 +578,13 @@ export class Hud extends Container {
       ARROW_EDGE_INSET,
     );
     if (arrow.onScreen) return;
+    this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn at the clamped edge position.
-    const cos = Math.cos(arrow.angle);
-    const sin = Math.sin(arrow.angle);
-    const tip = { x: arrow.x + cos * ARROW_SIZE, y: arrow.y + sin * ARROW_SIZE };
-    const backX = arrow.x - cos * ARROW_SIZE * 0.5;
-    const backY = arrow.y - sin * ARROW_SIZE * 0.5;
-    const nx = -sin * ARROW_SIZE * 0.7;
-    const ny = cos * ARROW_SIZE * 0.7;
+    // The polygon comes from ./hud-geometry so the rect the registry records is
+    // the rect a headless test can measure.
     this.alarmArrow
-      .poly([tip.x, tip.y, backX + nx, backY + ny, backX - nx, backY - ny])
+      .poly(arrowPoly(arrow, ARROW_SIZE))
       .fill({ color: PALETTE.threatRed, alpha: 0.55 + 0.45 * pulse });
   }
 
@@ -605,9 +637,17 @@ export class Hud extends Container {
 
     // Input-agnostic wording via the action layer (GDD §2.10).
     this.promptText.text = resolvePromptText(active, frame.device, frame.fireMode);
+    // Thumb-scale: wrap rather than run off the side of a phone. "Hold the FIRE
+    // button on the asteroid — your beam mines it" is ~440 px on one line, which
+    // is wider than a 390 px portrait screen; a prompt the player can't read is a
+    // prompt that didn't fire (GDD §2.10, style-guide §9 "reads at a glance").
+    const maxTextWidth = Math.max(80, this.screenWidth - 2 * PAD - PROMPT_PAD_X);
+    this.promptText.style.wordWrap = true;
+    this.promptText.style.wordWrapWidth = maxTextWidth;
+    this.promptText.style.align = 'center';
 
     // Size the panel to the text, centre-anchored on the group origin.
-    const w = this.promptText.width + 40;
+    const w = this.promptText.width + PROMPT_PAD_X;
     const h = this.promptText.height + 22;
     this.promptPanel.clear();
     this.promptPanel
@@ -636,28 +676,50 @@ export class Hud extends Container {
    * out of its corner has to be *caught*, not restated. Hidden elements are
    * omitted: the registry records what is drawn, never what would have been.
    *
-   * **Not yet registered, and why.** QA's layout contract
-   * (`tests/mobile/layout.spec.ts`) declares two more HUD ids — `wave-clock`
-   * (`top-center`) and `onboarding` (`center`) — and asserts every *registered*
-   * element sits inside its anchor. Both of those zones are one third of the
-   * viewport wide, and at phone widths the wave clock's line ("WAVE 1/5 ·
-   * Outer Drift") and the onboarding prompt's sentence are both intrinsically
-   * wider than that; the prompt also sits below the vertical centre band by
-   * design, under the ship rather than on top of it. Registering them today
-   * would turn QA's suite red on a *real* finding that is a design question —
-   * shrink the copy, wrap it, or give those regions a full-width variant — and
-   * that is the Director's call, not something to force mid-milestone. They land
-   * the moment it is answered; nothing else here changes.
+   * **Every M2 element is here.** The wheel, the upgrade panel behind its arrow,
+   * the under-attack frame and the screen-edge arrow home all register the frame
+   * they are drawn, alongside the own-planet HP bar. Their anchors are argued in
+   * the table below rather than picked for convenience:
+   *
+   * | id              | anchor        | why that region                        |
+   * |-----------------|---------------|----------------------------------------|
+   * | `planet-hp`     | `top-right`   | GDD §2.2 puts own-planet HP top-right. |
+   * | `build-wheel`   | `full` + 0    | GDD §2.2 opens the wheel "near your own planet"; the follow camera keeps your ship — and so your docked planet — at the screen centre, and the wheel is drawn there. It is an **overlay**: at thumb scale it is ~72% of the shorter screen dimension (GDD §2.4 makes it a touch target first), so no third-width band can hold it and `full` is the region the vocabulary reserves for overlays. The assertion that bites is the real failure mode — a thumb-scaled radial menu spilling off a phone's edge. |
+   * | `upgrade-panel` | `full` + 0    | Same overlay, one screen deeper (GDD §2.5). Its width is clamped to the viewport (`panelSize`) precisely so this holds on a narrow phone. |
+   * | `alarm-frame`   | `full` + 0    | It *is* the screen frame — `full` is a statement of intent, not a fallback. |
+   * | `alarm-arrow`   | `full` + 0    | GDD §2.2's "screen-edge arrow": it hugs an edge but must never leave the screen, which is exactly what `full` asserts. There is no narrower region in the ratified vocabulary for "on an edge", and inventing one is the Director's call, not a placement fix. |
+   *
+   * **Still not registered, and why.** QA's layout contract
+   * (`tests/mobile/layout.spec.ts`) also lists `wave-clock` (`top-center`) and
+   * `onboarding` (`center`). Both of those zones are one third of the viewport
+   * wide, and both elements are intrinsically wider: "WAVE 1/5 · Outer Drift" is
+   * ~178 px against a 98 px zone on a 390 px portrait phone, and the prompt's
+   * sentence is wider still (it also sits *below* the vertical centre band by
+   * design, under the ship). Registering them would turn QA's suite red on a
+   * *real* finding that is a design question — shrink the copy, stack it, or
+   * give those regions a full-width variant — and that remains the Director's
+   * call. Unlike the M2 elements above, neither can be honestly answered with
+   * `full`: "top centre" and "centre" are placement claims that `full` would not
+   * check at all. They land the moment it is answered; nothing else changes here.
    */
   describeLayout(viewport: Viewport): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
+    /** Visible all the way up to this HUD — a child of a hidden group is not
+     *  drawn, and the registry records only what is drawn. */
+    const shown = (node: Container): boolean => {
+      for (let n: Container | null = node; n; n = n.parent) {
+        if (!n.visible) return false;
+        if (n === (this as Container)) return true;
+      }
+      return false;
+    };
     const push = (
       id: string,
       region: LayoutEntry['anchor']['region'],
       margin: number,
       node: Container,
     ): void => {
-      if (!node.visible) return;
+      if (!shown(node)) return;
       const b = node.getBounds();
       entries.push({
         id,
@@ -666,11 +728,18 @@ export class Hud extends Container {
       });
     };
 
-    // Ids and regions are QA's, from the PENDING list in their layout contract.
+    // M1 ids and regions are QA's, from the PENDING list in their layout contract.
     push('ore-hud', 'top-left', PAD, this.oreGroup);
     push('banked-total', 'top-left', PAD, this.bankedText);
-    push('planet-hp', 'top-right', PAD, this.planetGroup);
     push('controls-strip', 'bottom-strip', 0, this.stripGroup);
+
+    // M2 (see the table above).
+    push('planet-hp', 'top-right', PAD, this.planetGroup);
+    push('build-wheel', 'full', 0, this.wheel.wheelNode);
+    push('upgrade-panel', 'full', 0, this.wheel.panelNode);
+    push('alarm-frame', 'full', 0, this.alarmFrame);
+    if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
+
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.
     void viewport;

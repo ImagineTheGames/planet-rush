@@ -102,3 +102,30 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
+
+// --- Screen geometry for the M2 overlays (layout-registry contract) ---------
+//
+// Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
+// drawn at are asserted against the registry's own anchor resolver headless —
+// the frozen golden scene never opens a wheel or takes a hit, so QA's live
+// layout contract cannot see these three (see ./hud-geometry.test.ts).
+
+export {
+  wheelRadius,
+  wheelBounds,
+  panelSize,
+  panelBounds,
+  alarmFrameBounds,
+  arrowPoly,
+  polyBounds,
+  ARROW_SIZE,
+  ALARM_FRAME_STROKE,
+  ALARM_FRAME_INSET,
+  WHEEL_SCALE,
+  WHEEL_MIN_RADIUS,
+  WHEEL_MAX_RADIUS,
+  PANEL_MAX_WIDTH,
+  PANEL_EDGE_PAD,
+  PANEL_CHROME_HEIGHT,
+  PANEL_ROW_HEIGHT,
+} from './hud-geometry';
