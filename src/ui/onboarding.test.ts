@@ -3,7 +3,9 @@
  *  - the right prompt fires on the right contextual trigger;
  *  - each prompt fires **once** and never re-appears after completion;
  *  - the wording is input-agnostic *via the action layer* (touch ≠ keyboard).
- * These are the day-1 DoD tests: prompt-trigger logic + once-only behavior.
+ * Day-1 covered the first two prompts; day 2 adds SPEND (fires the first time
+ * the wheel opens) and UNDER-ATTACK (rides the alarm), and completes the
+ * haul-home copy now that there is a planet to fly home to.
  */
 import { describe, it, expect } from 'vitest';
 import { Onboarding, PromptId, resolvePromptText } from './onboarding';
@@ -64,17 +66,96 @@ describe('Onboarding — HAUL-HOME prompt (GDD §2.3 "hold full — fly home")',
   });
 });
 
+describe('Onboarding — SPEND prompt (GDD §2.10 "the first time the wheel opens")', () => {
+  it('fires the first time the Build & Upgrade wheel opens', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+  });
+
+  it('does not fire while the wheel is shut, however much ore is held', () => {
+    const ob = new Onboarding();
+    ob.update(sig({ nearAsteroid: true, cargo: 1 })); // retire MINE
+    expect(ob.update(sig({ wheelOpen: false, cargo: 1, cargoCap: 4 }))).toBeNull();
+  });
+
+  it('completes once ore has actually been spent, and never re-fires', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+    // The player buys something — they have found the economy (GDD §2.5).
+    expect(ob.update(sig({ wheelOpen: true, hasOrdered: true }))).toBeNull();
+    expect(ob.isCompleted(PromptId.Spend)).toBe(true);
+    // Opening the wheel again must not bring the lesson back.
+    expect(ob.update(sig({ wheelOpen: true, hasOrdered: true }))).toBeNull();
+  });
+
+  it('stays up across an open wheel until something is bought', () => {
+    const ob = new Onboarding();
+    for (let i = 0; i < 5; i++) {
+      expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+    }
+  });
+});
+
+describe('Onboarding — UNDER-ATTACK prompt (GDD §2.2, §2.10)', () => {
+  it('fires while the alarm is sounding', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+  });
+
+  it('outranks every other prompt — a siege beats a shopping tip', () => {
+    const ob = new Onboarding();
+    const shown = ob.update(
+      sig({ underAttack: true, wheelOpen: true, nearAsteroid: true, cargo: 2, cargoCap: 2 }),
+    );
+    expect(shown).toBe(PromptId.UnderAttack);
+  });
+
+  it('stays up for the whole siege, then completes once it is survived', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+    // Alarm falls silent — the lesson has been lived.
+    expect(ob.update(sig({ underAttack: false }))).toBeNull();
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
+    // A second siege gets the alarm and the arrow, but not the tutorial text.
+    expect(ob.update(sig({ underAttack: true }))).toBeNull();
+  });
+
+  it('does not fire on a quiet planet', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: false }))).toBeNull();
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+  });
+});
+
 describe('Onboarding — once-only across the whole session (GDD §2.10)', () => {
-  it('retires both day-1 prompts after each has fired once', () => {
+  it('retires every prompt after each has fired once', () => {
     const ob = new Onboarding();
     expect(ob.allCompleted()).toBe(false);
     ob.update(sig({ nearAsteroid: true })); // MINE shows
     ob.update(sig({ nearAsteroid: true, cargo: 1 })); // MINE done
     ob.update(sig({ cargo: 2, cargoCap: 2 })); // HAUL shows
     ob.update(sig({ cargo: 0, cargoCap: 2 })); // HAUL done
+    ob.update(sig({ wheelOpen: true })); // SPEND shows
+    ob.update(sig({ wheelOpen: true, hasOrdered: true })); // SPEND done
+    ob.update(sig({ underAttack: true })); // UNDER-ATTACK shows
+    ob.update(sig({ underAttack: false })); // survived — done
     expect(ob.allCompleted()).toBe(true);
     // Nothing ever fires again.
-    expect(ob.update(sig({ nearAsteroid: true, cargo: 2, cargoCap: 2 }))).toBeNull();
+    expect(
+      ob.update(
+        sig({ nearAsteroid: true, cargo: 2, cargoCap: 2, wheelOpen: true, underAttack: true }),
+      ),
+    ).toBeNull();
+  });
+
+  it('treats the day-2 signals as absent-means-quiet, so an M1 feed still works', () => {
+    // `main.ts`'s M1 HudFrame carries none of the day-2 fields; the machine must
+    // behave exactly as it did on day 1 rather than firing on `undefined`.
+    const ob = new Onboarding();
+    expect(ob.update({ nearAsteroid: false, cargo: 0, cargoCap: 2 })).toBeNull();
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+    expect(ob.isCompleted(PromptId.Spend)).toBe(false);
   });
 
   it('never shows two prompts at once — mine requires empty, haul requires full', () => {
@@ -106,10 +187,31 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
     expect(touch).not.toBe(desktop);
   });
 
-  it('leaves a token-free prompt (haul-home) identical across devices', () => {
-    const a = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual);
-    const b = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim);
-    expect(a).toBe('Hold full — fly home');
+  it('renders the haul-home prompt with each device\'s BUILD binding', () => {
+    // GDD §2.10 quotes this as "Hold full — fly home and press E"; the {build}
+    // token is how the same sentence reads on a pad and on a phone.
+    const keyboard = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual);
+    expect(keyboard).toBe('Hold full — fly home and press E');
+    const touch = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim);
+    expect(touch).toBe('Hold full — fly home and press BUILD');
+    const pad = resolvePromptText(PromptId.HaulHome, 'gamepad', FireMode.Manual);
+    expect(pad).toContain('Y / △');
+    expect(pad).not.toContain('{build}');
+  });
+
+  it('leaves a token-free prompt identical across devices', () => {
+    // The under-attack prompt points at the arrow, which is device-agnostic.
+    const a = resolvePromptText(PromptId.UnderAttack, 'keyboard', FireMode.Manual);
+    const b = resolvePromptText(PromptId.UnderAttack, 'touch', FireMode.AutoAim);
+    expect(a).toBe('Your planet is under attack — follow the arrow');
     expect(b).toBe(a);
+  });
+
+  it('names UPGRADE SHIP in the wheel\'s own words, so the segment is findable', () => {
+    // "The upgrade prompt fires the first time the wheel opens, because upgrades
+    // are the half of the economy a player can most easily miss" (GDD §2.10).
+    const text = resolvePromptText(PromptId.Spend, 'keyboard', FireMode.Manual);
+    expect(text).toContain('UPGRADE SHIP');
+    expect(text).toBe('Spend ore on defense — or UPGRADE SHIP to mine and hit harder');
   });
 });

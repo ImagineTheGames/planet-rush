@@ -16,15 +16,19 @@
  */
 
 import type { Beam, PlayerId, Vec2 } from '@shared/types';
-import { ShipClass, mulberry32 } from '@shared/types';
+import { ShipClass } from '@shared/types';
 import {
-  ASTEROID,
   CARGO_BASE,
+  CORE_HP,
+  PLANET,
+  SHIELD,
   SHIP_RADIUS,
   SHIP_STATS,
   SPAWN_PROTECTION_S,
   STARTING_ORE,
+  WAVE,
 } from './constants';
+import { spawnWave } from './waves';
 
 // ---------------------------------------------------------------------------
 // Entities
@@ -39,7 +43,9 @@ export interface Ship {
   /** Home spawn point — where the player's planet sits; respawn returns here
    *  (GDD §2.7). Day 1 has no planets, so this is just the ring spawn. */
   home: Vec2;
-  /** Facing, radians. The beam fires along this; auto-aim overwrites it. */
+  /** Facing, radians. The manual beam fires along this. Resolved once per tick
+   *  by the facing ladder (aim input → auto-aim target → velocity → hold) and
+   *  always turn-rate limited — it never snaps (see `resolveFacing`). */
   angle: number;
   /** Current hull HP. Ships are cheap and not repairable (GDD §2.5). */
   hull: number;
@@ -57,6 +63,10 @@ export interface Ship {
   respawnTimer: number;
   /** Seconds of spawn protection remaining (GDD §2.1). */
   spawnProtect: number;
+  /** True once this player's home core has been destroyed: they are out of the
+   *  match (GDD §2.7 — "its owner is eliminated"). An eliminated ship is dead
+   *  and never respawns; the player gets the Rematch button instead. */
+  eliminated: boolean;
   /** Collision radius. */
   radius: number;
   /** Public beam geometry for the tick it is firing, else `null` (GDD §4.1).
@@ -90,6 +100,109 @@ export interface OreChunk {
   radius: number;
 }
 
+// --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
+
+/** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
+ *  the ship defends"). Cheap, killable, and a beam target in its own right. */
+export interface Turret {
+  readonly id: number;
+  /** The planet owner's slot — turrets never shoot their own fleet. */
+  readonly owner: PlayerId;
+  /** Mount slot 0..`TURRET.capPerPlanet`-1. Fixes the mount angle around the
+   *  planet and frees for re-use when the turret dies, so a rebuilt turret
+   *  lands in a hole rather than on top of a survivor. */
+  readonly slot: number;
+  pos: Vec2;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  /** Barrel facing, radians — turn-rate limited toward the tracked ship. Purely
+   *  the visible telegraph: alignment never gates the shot (DPS is DPS). */
+  angle: number;
+  /** Seconds until it may fire again. */
+  cooldown: number;
+  /** Ship it is tracking this tick, or null when nothing is in range. */
+  targetId: PlayerId | null;
+}
+
+/** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each
+ *  generator is its own HP pool and regenerates independently, so the second
+ *  shield doubles both the buffer and the recovery rate. */
+export interface Shield {
+  readonly id: number;
+  hp: number;
+  maxHp: number;
+  /** Bubble radius — the beam target that stands in front of the core. */
+  radius: number;
+}
+
+/** A building under construction (GDD §2.5: "defenses are bought before the
+ *  attack, not during it"). Ore is spent when the order is placed; only time
+ *  remains. */
+export interface BuildJob {
+  readonly id: number;
+  readonly kind: 'turret' | 'shield';
+  /** Reserved mount slot (turrets only; 0 for shields) — held for the whole
+   *  build so two queued turrets can never claim the same mount. */
+  readonly slot: number;
+  /** Seconds of construction left. */
+  remaining: number;
+  /** Seconds the job started with — the renderer's progress denominator. */
+  total: number;
+}
+
+/** A player's home planet: the win condition, and the only thing in the match
+ *  that does not respawn (GDD §2.1, §2.7). One per slot. */
+export interface Planet {
+  readonly id: number;
+  readonly owner: PlayerId;
+  /** Static — planets do not move. */
+  pos: Vec2;
+  radius: number;
+  /** Core HP. Zero ends this player's match (GDD §1 loss condition). */
+  coreHp: number;
+  maxCoreHp: number;
+  /** false once the core has been destroyed; the wreck stays on the map. */
+  alive: boolean;
+  /** Sim time the core died, or -1 while it lives. The dead planet *is* the
+   *  wreck (GDD §2.7): it keeps its position and radius, stays solid, and never
+   *  leaves the world — this is the timestamp the renderer's death moment and
+   *  the wreck sprite swap hang off. */
+  deathTime: number;
+  /** Seconds of match-start spawn protection left on the core (GDD §2.1). */
+  spawnProtect: number;
+  /** Outward angle from the arena centre — the turret mount ring starts here. */
+  angle: number;
+  /** Seconds since the core or any shield last took damage. Drives both halves
+   *  of "pressure beats regeneration" (GDD §2.6): shields regenerate only past
+   *  `SHIELD.regenDelay`, and any hit at all interrupts the repair channel. */
+  sinceDamage: number;
+  /** True while the owner is holding the repair channel open (GDD §2.5). */
+  repairing: boolean;
+  turrets: Turret[];
+  shields: Shield[];
+  builds: BuildJob[];
+}
+
+/**
+ * A turret shot. **Pooled**: slots are reused and `active` marks a live shot,
+ * so a firefight allocates nothing per frame (GDD §4.3). Consumers — renderer,
+ * snapshot encoder — must skip `active === false` slots rather than assume the
+ * array is dense.
+ */
+export interface Projectile {
+  id: number;
+  active: boolean;
+  /** Firing player, so a shot never hits its own fleet. */
+  owner: PlayerId;
+  pos: Vec2;
+  vel: Vec2;
+  damage: number;
+  radius: number;
+  /** Seconds of flight left before it despawns. */
+  life: number;
+}
+
 // ---------------------------------------------------------------------------
 // World
 // ---------------------------------------------------------------------------
@@ -100,6 +213,43 @@ export interface Bounds {
   height: number;
 }
 
+/**
+ * Where the match is on its one-way road to an ending (GDD §2.3).
+ *
+ *  - `live`     — waves are still arriving or ore is still in the field.
+ *  - `collapse` — the field is spent: no shield regeneration, no repair, no new
+ *                 ore. Entropy finishes whoever the players don't (GDD §1).
+ *  - `ended`    — one planet left standing (or none, resolved last-to-die).
+ */
+export type MatchPhase = 'live' | 'collapse' | 'ended';
+
+/**
+ * The match's own state: the wave metronome, the collapse phase, and win/loss
+ * (GDD §1, §2.3, §2.7). Plain data like everything else, so it snapshots and
+ * hashes with the rest of the world.
+ */
+export interface MatchState {
+  phase: MatchPhase;
+  /** Waves delivered so far, 0..`WAVE_COUNT`. Wave 1 lands at match creation. */
+  wavesSpawned: number;
+  /** Sim time collapse began, or -1 while the field still has something in it.
+   *  This — not `phase` — is the durable "collapse has happened" marker, so the
+   *  collapse rules survive the transition to `ended`. */
+  collapseTime: number;
+  /**
+   * Players eliminated, **in the order their cores reached zero**. This array is
+   * the last-to-die tiebreak (GDD §1): if the final cores die in the same tick,
+   * the last entry — the last core to reach zero in the simulation's resolution
+   * order — is the winner.
+   */
+  eliminated: PlayerId[];
+  /** The winning slot once `phase === 'ended'`; null until then, and null in the
+   *  degenerate case where a match had nobody to win it. */
+  winner: PlayerId | null;
+  /** Sim time the match ended, or -1 while it runs. */
+  endTime: number;
+}
+
 /** The complete simulation state for one match at one tick. Plain data. */
 export interface World {
   /** Elapsed sim time, seconds. */
@@ -108,45 +258,37 @@ export interface World {
   tick: number;
   /** mulberry32 state as a bare uint32 — serializable RNG (see module doc). */
   rngState: number;
-  /** Monotonic id allocator for spawned entities (chunks, future turrets). */
+  /** Monotonic id allocator for spawned entities (chunks, turrets, shields). */
   nextEntityId: number;
   ships: Ship[];
   asteroids: Asteroid[];
   chunks: OreChunk[];
+  /** Home planets, one per slot, in the ring layout (GDD §2.1). */
+  planets: Planet[];
+  /** Turret shot pool — dense array, sparse liveness (see {@link Projectile}). */
+  projectiles: Projectile[];
   bounds: Bounds;
+  /** Radius of wave 1's scatter disc around the arena centre. Every later wave
+   *  is a fraction of it (`waveRadiusFraction`), so the shrinking field is
+   *  derived from one stored number rather than re-derived from the config. */
+  fieldRadius: number;
+  /** Rocks per wave (`WorldConfig.asteroidCount`, else `WAVE.asteroidsPerWave`).
+   *  Stored so waves 2..5 are the same size as the opening field. */
+  asteroidsPerWave: number;
+  /** Waves, collapse, and win/loss (GDD §1, §2.3). */
+  match: MatchState;
 }
 
 // ---------------------------------------------------------------------------
 // Seeded RNG over explicit state (ratified mulberry32, @shared/types)
 // ---------------------------------------------------------------------------
+//
+// The generator itself lives in `./rng` (a leaf module, so `./waves` can draw
+// from it without a cycle). Re-exported here because `world.rngState` is the
+// state it threads, and callers reach for both together.
 
-/**
- * Draw one float in [0, 1) and return it with the advanced state. Pure: the
- * caller threads `state` explicitly so the RNG lives in the serializable world
- * tree instead of a closure. Uses the ratified mulberry32 algorithm by seeding
- * a fresh instance at `state` and reading its next output — identical sequence,
- * no hidden state.
- */
-export function advanceRng(state: number): { value: number; state: number } {
-  // mulberry32's internal step: state += 0x6d2b79f5, then mix. We reproduce it
-  // by advancing the shared implementation one step from `state`.
-  const next = (state + 0x6d2b79f5) | 0;
-  const value = mulberry32(state).next();
-  return { value, state: next >>> 0 };
-}
-
-/** Draw an integer in [min, max] inclusive, deterministically. Reserved for
- *  wave spawning (post-day-1, GDD §2.3); exported so it is part of the RNG API. */
-export function rngInt(state: number, min: number, max: number): { value: number; state: number } {
-  const r = advanceRng(state);
-  return { value: min + Math.floor(r.value * (max - min + 1)), state: r.state };
-}
-
-/** Draw a float in [min, max), deterministically. */
-function rngRange(state: number, min: number, max: number): { value: number; state: number } {
-  const r = advanceRng(state);
-  return { value: min + r.value * (max - min), state: r.state };
-}
+export { advanceRng, rngInt, rngRange } from './rng';
+export type { RngDraw } from './rng';
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -164,8 +306,10 @@ export interface WorldConfig {
   readonly players: readonly PlayerSpec[];
   /** Play bounds (world units). */
   readonly bounds?: Bounds;
-  /** How many asteroids to place in the opening field (day-1 static field;
-   *  timed waves land later). */
+  /** Asteroids per wave, overriding `WAVE.asteroidsPerWave`. Wave 1 is placed
+   *  at construction, so this is also the opening field's rock count; the
+   *  wave's *ore* budget is unchanged, so fewer rocks means richer ones (the
+   *  finite field is the design constant, GDD §2.3). */
   readonly asteroidCount?: number;
 }
 
@@ -187,21 +331,64 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     alive: true,
     respawnTimer: 0,
     spawnProtect: SPAWN_PROTECTION_S,
+    eliminated: false,
     radius: SHIP_RADIUS,
     beam: null,
   };
 }
 
+/** Build a player's home planet at its ring station (GDD §2.1, §2.8). */
+function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): Planet {
+  return {
+    id: index,
+    owner: spec.id,
+    pos: { x: pos.x, y: pos.y },
+    radius: PLANET.radius,
+    coreHp: CORE_HP,
+    maxCoreHp: CORE_HP,
+    alive: true,
+    deathTime: -1,
+    spawnProtect: SPAWN_PROTECTION_S,
+    angle,
+    // No damage has ever landed, so the shield-regen window opens immediately
+    // and the repair channel is available from tick 0.
+    sinceDamage: SHIELD.regenDelay,
+    repairing: false,
+    turrets: [],
+    shields: [],
+    builds: [],
+  };
+}
+
+/** A fresh match's clock: nothing has spawned, collapsed, or been won yet. */
+function initialMatch(): MatchState {
+  return {
+    phase: 'live',
+    wavesSpawned: 0,
+    collapseTime: -1,
+    eliminated: [],
+    winner: null,
+    endTime: -1,
+  };
+}
+
 /**
- * Construct a fresh, deterministic match world. Ships spawn evenly around a
- * ring (GDD §2.1 "planets placed in a ring"); asteroids scatter in the central
- * field from the seeded RNG. Same config ⇒ byte-identical world.
+ * Construct a fresh, deterministic match world. Planets sit evenly around a
+ * ring with each player's ship spawning in orbit of its own — inboard of the
+ * planet, facing the field (GDD §2.1); the opening field is **asteroid wave 1**,
+ * scattered in the central disc from the seeded RNG (GDD §2.3 — the remaining
+ * four waves arrive on the metronome, each closer to centre). Same config ⇒
+ * byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
   const bounds: Bounds = config.bounds ?? { width: 1920, height: 1920 };
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
-  const ringRadius = Math.min(bounds.width, bounds.height) * 0.42;
+  const halfMin = Math.min(bounds.width, bounds.height) / 2;
+  const ringRadius = halfMin * 2 * PLANET.ringFraction;
+  // Planets sit outboard of the ship ring, clamped to stay wholly inside the
+  // arena on small maps (the QA harness runs cramped worlds on purpose).
+  const planetRing = Math.min(ringRadius + PLANET.orbitOffset, halfMin - PLANET.radius);
 
   // Ships around the ring, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {
@@ -213,44 +400,31 @@ export function createWorld(config: WorldConfig): World {
     return ship;
   });
 
-  // Asteroid field: scatter within the central disc using the seeded RNG.
-  const count = config.asteroidCount ?? 60;
-  const fieldRadius = ringRadius * 0.7;
-  const asteroids: Asteroid[] = [];
-  let rng = config.seed >>> 0;
-  for (let i = 0; i < count; i++) {
-    let r = rngRange(rng, 0, fieldRadius);
-    const radius = r.value;
-    rng = r.state;
-    r = rngRange(rng, 0, 2 * Math.PI);
-    const angle = r.value;
-    rng = r.state;
-    r = rngRange(rng, ASTEROID.minRadius, ASTEROID.maxRadius);
-    const rockRadius = r.value;
-    rng = r.state;
-    const oreDraw = rngRange(rng, ASTEROID.minOre, ASTEROID.maxOre);
-    const ore = oreDraw.value;
-    rng = oreDraw.state;
+  // One home planet per slot, on the same spoke as its ship, outboard of it.
+  const planets: Planet[] = config.players.map((spec, i) => {
+    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
+    const pos = { x: cx + Math.cos(theta) * planetRing, y: cy + Math.sin(theta) * planetRing };
+    return makePlanet(spec, i, pos, theta);
+  });
 
-    asteroids.push({
-      id: i,
-      pos: { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius },
-      radius: rockRadius,
-      ore,
-      maxOre: ore,
-      crackStage: 0,
-      mineBuffer: 0,
-    });
-  }
-
-  return {
+  const world: World = {
     time: 0,
     tick: 0,
-    rngState: rng,
-    nextEntityId: count, // asteroid ids used [0, count); chunks continue from here
+    rngState: config.seed >>> 0,
+    nextEntityId: 0, // wave 1's rocks take ids [0, count); everything continues from there
     ships,
-    asteroids,
+    asteroids: [],
     chunks: [],
+    planets,
+    projectiles: [],
     bounds,
+    fieldRadius: ringRadius * 0.7,
+    asteroidsPerWave: config.asteroidCount ?? WAVE.asteroidsPerWave,
+    match: initialMatch(),
   };
+
+  // Wave 1 is the opening field — same spawner, same schedule, so the rock a
+  // player mines at t=0 and the rock that lands at t=600 come from one code path.
+  spawnWave(world);
+  return world;
 }

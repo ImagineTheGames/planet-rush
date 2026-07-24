@@ -75,13 +75,44 @@ export const CARGO_PER_TIER: Tunable<number> = 2;
 /** Cargo hold hard cap across all upgrades (GDD §2.8). TUNABLE */
 export const CARGO_CAP_MAX: Tunable<number> = 8;
 
-/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-planet cap. TUNABLE */
+/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-planet cap, plus
+ *  the geometry and rate of fire the sim needs to actually shoot. `dps` stays
+ *  the single balance number: per-shot damage is *derived* (`dps *
+ *  fireInterval`), so retuning DPS retunes the turret and nothing else drifts.
+ *  TUNABLE */
 export const TURRET = {
   cost: 3,
   hp: 30,
   dps: 4,
   buildTime: 10,
   capPerPlanet: 4,
+  /** Engagement radius (world units). Deliberately *under* `BEAM_RANGE` (260):
+   *  GDD §2.6 — "a patient attacker can pick off turrets from the edge of their
+   *  range." That only exists as a skill if the beam out-ranges the turret. */
+  range: 240,
+  /** Seconds between shots. Per-shot damage = `dps * fireInterval` = 2. */
+  fireInterval: 0.5,
+  /** Projectile muzzle speed (units/s) — fast enough that lead is small at
+   *  `range`, slow enough that a boosting ship can outrun a stale shot. */
+  projectileSpeed: 700,
+  /** Turret collision radius (it is a beam target — GDD §2.6 "turrets deter"). */
+  radius: 12,
+  /** Mount height above the planet surface; turret slots ring the planet. */
+  mountOffset: 12,
+  /** Rotation rate (rad/s) tracking its target — the "telegraph its threat while
+   *  spinning" read (style-guide §5.5). Aim never gates the shot; DPS is DPS. */
+  turnRate: 3.0,
+} as const;
+
+/** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
+export const PROJECTILE = {
+  /** Damage per shot — derived from the turret's design DPS, never typed twice. */
+  damage: TURRET.dps * TURRET.fireInterval,
+  /** Collision radius (world units). */
+  radius: 4,
+  /** Seconds a shot lives before it despawns — exactly its flight time to the
+   *  edge of turret range, so a turret can never out-reach its own engagement. */
+  life: TURRET.range / TURRET.projectileSpeed,
 } as const;
 
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
@@ -107,6 +138,25 @@ export const REPAIR = {
   interruptedByDamage: true,
 } as const;
 
+/** The home planet (GDD §2.1 ring layout, §2.5 "built at your own planet").
+ *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
+ *  on — but the sim cannot place a core without it. TUNABLE */
+export const PLANET = {
+  /** Core body radius: the collision/beam target and the mount ring for turrets. */
+  radius: 64,
+  /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
+   *  in a ring around the central asteroid field). */
+  ringFraction: 0.42,
+  /** How far outboard of the ship's spawn point the planet sits — the ship
+   *  spawns *orbiting* its home planet, between the planet and the field
+   *  (GDD §2.1). */
+  orbitOffset: 96,
+  /** Ship-to-planet distance inside which the Build & Upgrade wheel is live:
+   *  ordering, banking, and holding the repair channel all require it
+   *  (GDD §2.5 "your ship must sit at your planet"). Measured centre-to-centre. */
+  dockRange: 160,
+} as const;
+
 /** Field yield — total ore per match, delivered in 5 asteroid waves each
  *  spawning closer to center (GDD §2.3, §2.8). TUNABLE */
 export const FIELD_YIELD: Tunable<number> = 400;
@@ -117,8 +167,91 @@ export const WAVE_COUNT: Tunable<number> = 5;
 /** Asteroid wave interval — the metronome of the match (GDD §2.8), seconds. TUNABLE */
 export const WAVE_INTERVAL_S: Tunable<number> = 150;
 
+/**
+ * Asteroid-wave geometry (GDD §2.3: five waves, "each spawning closer to the
+ * map center than the last, pulling every surviving player into a smaller and
+ * smaller contested space"). The wave *schedule* is `WAVE_INTERVAL_S` and the
+ * wave *yield* is `FIELD_YIELD / WAVE_COUNT`; this is where they land. TUNABLE
+ */
+export const WAVE = {
+  /** Asteroids delivered per wave. `WAVE_COUNT × this` is the whole match's
+   *  rock count — 5 × 20 = 100, half the ~200-asteroid performance budget
+   *  (GDD §4.3) even if nobody mines a thing. At `WAVE_ORE` = 80 that is ~4 ore
+   *  a rock: eight seconds of Vanguard beam time, two round trips for a base
+   *  2-slot hold — small enough that "how full do I run?" is asked often. */
+  asteroidsPerWave: 20,
+  /** Wave 1's scatter disc, as a fraction of the base field radius. */
+  firstRadiusFraction: 1.0,
+  /** The final wave's scatter disc, same units. Strictly smaller than the
+   *  first: the shrinking ring *is* the mechanic. */
+  lastRadiusFraction: 0.25,
+} as const;
+
+/** Ore delivered by one wave — the finite field, divided evenly (GDD §2.3). */
+export const WAVE_ORE: Tunable<number> = FIELD_YIELD / WAVE_COUNT;
+
+/**
+ * Sim time (seconds) at which wave `n` (1-based) arrives. Wave 1 is present at
+ * match start and each later wave lands one `WAVE_INTERVAL_S` after the one
+ * before it — the same schedule the HUD's wave clock counts down to, so the
+ * clock and the spawner can never drift.
+ */
+export function waveTime(n: number): number {
+  return (n - 1) * WAVE_INTERVAL_S;
+}
+
+/**
+ * Scatter-disc radius of wave `n`, as a fraction of the base field radius —
+ * linear from `WAVE.firstRadiusFraction` down to `WAVE.lastRadiusFraction`, so
+ * every wave lands strictly closer to the centre than the one before it.
+ */
+export function waveRadiusFraction(n: number): number {
+  if (WAVE_COUNT <= 1) return WAVE.lastRadiusFraction;
+  const t = Math.min(Math.max((n - 1) / (WAVE_COUNT - 1), 0), 1);
+  return WAVE.firstRadiusFraction + (WAVE.lastRadiusFraction - WAVE.firstRadiusFraction) * t;
+}
+
+/**
+ * How long after the final wave the collapse phase begins regardless of what is
+ * left in the field (GDD §2.3: "the match cannot stalemate; the ruleset
+ * guarantees an ending"). Collapse normally starts the moment the field runs
+ * dry; this is the backstop for a match where nobody bothers to mine the last
+ * rock. Final wave at 600 s + 150 s ⇒ collapse by 12.5 minutes, inside the
+ * 10–15 minute target (GDD §1). TUNABLE
+ */
+export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
+
+/**
+ * Core HP lost per second, per planet, during collapse — "entropy finishes
+ * whoever the players don't" (GDD §1).
+ *
+ * **Baseline 0**, because GDD §2.3 spells out collapse as exactly three rules —
+ * no shield regeneration, no repair, no new ore — and adding a fourth is a
+ * design decision, not a tuning one. The mechanism is implemented and wired so
+ * QA (who owns this table from M2) can falsify the stalemate hypothesis by
+ * raising this number instead of editing the sim. TUNABLE
+ */
+export const COLLAPSE_CORE_DECAY: Tunable<number> = 0;
+
 /** Respawn time — free; time is the cost (GDD §2.7, §2.8), seconds. TUNABLE */
 export const RESPAWN_S: Tunable<number> = 5;
+
+/**
+ * The wreck a dead planet leaves behind (GDD §2.7): it "persists for the rest of
+ * the match, surrounded by ore-laden debris that *anyone* can scavenge." The
+ * dead player's *banked* ore is what funds the debris field — the fortune they
+ * were saving becomes the thing their killers fight over — plus a floor so a
+ * broke player still leaves a contested wreck. TUNABLE
+ */
+export const WRECK = {
+  /** Ore scattered on top of the dead owner's banked total. */
+  baseDebrisOre: 8,
+  /** How far outboard of the planet surface the debris ring sits. */
+  debrisRingOffset: 40,
+  /** Hard cap on debris chunks from one wreck — a hoarder's bank cannot flood
+   *  the map with collectables (the excess dies with the planet). */
+  maxDebrisChunks: 40,
+} as const;
 
 /** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
 export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
@@ -209,6 +342,15 @@ export const BASE_ACCEL: Tunable<number> = 900;
 
 /** Vanguard turn rate (rad/s). Class `turnMul` scales it. TUNABLE */
 export const BASE_TURN_RATE: Tunable<number> = 6.5;
+
+/**
+ * Speed (units/s) above which a ship with no aim input and no auto-aim target
+ * turns its nose toward its velocity, so motion reads naturally. Below it the
+ * ship holds its current facing — a drifting, nearly-stopped hull must not
+ * spin to chase the direction of a millimetre of residual drift. ≈5% of
+ * `BASE_SPEED`. TUNABLE
+ */
+export const FACE_VELOCITY_MIN_SPEED: Tunable<number> = 12;
 
 /** Linear drag coefficient (per second). `vel -= vel * DRAG * dt`. With
  *  `BASE_ACCEL`/`BASE_SPEED` this also caps terminal velocity; the sim clamps
