@@ -30,6 +30,7 @@ import { PALETTE } from '@render/index';
 import { SEGMENT_ARC } from './build-wheel';
 import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel';
 import type { UpgradePanelModel, UpgradeRow } from './upgrade-panel';
+import { wheelRadius, panelSize, PANEL_ROW_HEIGHT, WHEEL_MIN_RADIUS } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §5.6 — shared with the HUD)
@@ -53,14 +54,9 @@ const INNER_RADIUS = 0.30;
 /** Where a segment's words sit, between the inner ring and the outer edge. */
 const LABEL_RADIUS = 0.60;
 
-/** Reference wheel size as a fraction of the smaller viewport dimension. Big
- *  enough to hit with a thumb, small enough to leave the field readable behind
- *  it — the wheel is opened *at* your planet, so the world under it is calm. */
-const WHEEL_SCALE = 0.36;
-/** Clamp so the wheel is neither unreadable on a small phone nor absurd on a
- *  4K desktop. CSS px radius of the outer ring. */
-const WHEEL_MIN = 120;
-const WHEEL_MAX = 230;
+// Wheel and panel sizing live in the pure ./hud-geometry module, so the exact
+// rects these draw at are unit-tested against the layout registry's resolver
+// without booting PixiJS (the golden scene never opens a wheel).
 
 // ---------------------------------------------------------------------------
 // Per-state tinting
@@ -134,7 +130,10 @@ export class BuildWheelView extends Container {
   }[] = [];
 
   /** Outer ring radius in CSS px, recomputed on resize. */
-  private radius = WHEEL_MIN;
+  private radius = WHEEL_MIN_RADIUS;
+  /** Live viewport, CSS px — the panel is clamped to it (see {@link panelSize}). */
+  private viewWidth = 0;
+  private viewHeight = 0;
 
   constructor(screenWidth: number, screenHeight: number) {
     super();
@@ -167,11 +166,26 @@ export class BuildWheelView extends Container {
   /** Re-centre and re-scale for a new viewport. Thumb-scale on a phone, sane on
    *  a desktop — the wheel is a touch target first (GDD §2.4 BUILD button). */
   resize(width: number, height: number): void {
-    this.radius = clamp(Math.min(width, height) * WHEEL_SCALE, WHEEL_MIN, WHEEL_MAX);
+    this.viewWidth = width;
+    this.viewHeight = height;
+    this.radius = wheelRadius(width, height);
     this.wheelGroup.x = width / 2;
     this.wheelGroup.y = height / 2;
     this.panelGroup.x = width / 2;
     this.panelGroup.y = height / 2;
+  }
+
+  /** The wheel's drawn container — the layout registry's `build-wheel` entry
+   *  (GDD §2.2: the wheel appears "when near your own planet", which the follow
+   *  camera puts at the screen centre). Exposed so the HUD can register what was
+   *  really drawn without reaching into this view's internals. */
+  get wheelNode(): Container {
+    return this.wheelGroup;
+  }
+
+  /** The upgrade panel's drawn container — the registry's `upgrade-panel`. */
+  get panelNode(): Container {
+    return this.panelGroup;
   }
 
   /**
@@ -302,9 +316,10 @@ export class BuildWheelView extends Container {
   /** The one screen where ship stats appear (GDD §2.2, §2.5): one row per
    *  track, each giving current value → next tier → ore cost. */
   private drawPanel(model: UpgradePanelModel): void {
-    const w = Math.min(360, this.radius * 3);
-    const rowH = 30;
-    const h = 92 + model.rows.length * rowH;
+    const size = panelSize(this.viewWidth, this.viewHeight, model.rows.length);
+    const w = size.width;
+    const rowH = PANEL_ROW_HEIGHT;
+    const h = size.height;
     const x0 = -w / 2;
     const y0 = -h / 2;
 
@@ -403,8 +418,4 @@ function makeText(
   fontWeight: TextStyleFontWeight = 'normal',
 ): Text {
   return new Text({ text, style: { fontFamily, fontSize, fill, fontWeight, letterSpacing: 0.5 } });
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
