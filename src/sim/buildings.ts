@@ -34,6 +34,7 @@ import {
   TURRET,
 } from './constants';
 import { damageShip } from './damage';
+import { destroyCore, isCollapsed } from './match';
 import type { Planet, Projectile, Ship, Shield, Turret, World } from './state';
 import { dist2, turnToward } from './vec';
 
@@ -142,7 +143,9 @@ export type OrderResult =
   | 'cap-reached'
   | 'cannot-afford'
   | 'core-full'
-  | 'nothing-to-bank';
+  | 'nothing-to-bank'
+  /** Repair only: the collapse phase has shut it off for good (GDD §2.3). */
+  | 'collapsed';
 
 /** Ore cost of a wheel segment. Repair and bank are not flat purchases. */
 export function orderCost(item: BuildItem): number {
@@ -176,6 +179,9 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       return 'ok';
     }
     case 'repair': {
+      // Collapse shuts repair off entirely (GDD §2.3): from here on, damage to a
+      // core is permanent and the only defence left is the ship in front of it.
+      if (isCollapsed(world)) return 'collapsed';
       if (planet.coreHp >= planet.maxCoreHp - 1e-9) return 'core-full';
       if (spendableOre(ship) <= 1e-9) return 'cannot-afford';
       // The channel opens now and runs until the core is full, the ore runs
@@ -225,14 +231,22 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
  * effect on the next tick's regen/repair decision, never retroactively.
  */
 export function updatePlanets(world: World, dt: number): void {
+  const collapsed = isCollapsed(world);
   for (const planet of world.planets) {
     if (!planet.alive) continue;
     if (planet.spawnProtect > 0) planet.spawnProtect = Math.max(0, planet.spawnProtect - dt);
     planet.sinceDamage += dt;
 
     advanceConstruction(world, planet, dt);
-    regenShields(planet, dt);
-    runRepairChannel(world, planet, dt);
+    // Collapse: shields stop regenerating and repair shuts off (GDD §2.3).
+    // Construction still finishes — the ore was already spent, and a turret
+    // half-built when the field ran dry is the player's money, not entropy's.
+    if (!collapsed) {
+      regenShields(planet, dt);
+      runRepairChannel(world, planet, dt);
+    } else {
+      planet.repairing = false;
+    }
   }
 }
 
@@ -368,28 +382,6 @@ export function damagePlanet(world: World, planet: Planet, amount: number): bool
 
   if (planet.coreHp <= 0) destroyCore(world, planet);
   return true;
-}
-
-/**
- * The core is gone: the planet stops being a planet and becomes a wreck that
- * stays on the map for the rest of the match (GDD §2.7). Its defenses die with
- * it and any unfinished construction is lost. Elimination, the Rematch button
- * and the last-to-die tiebreak are win/loss rules and land with them; this only
- * makes sure a dead planet cannot shoot, shield, or repair.
- *
- * Turrets are zeroed rather than spliced — see {@link damageTurret}.
- */
-function destroyCore(world: World, planet: Planet): void {
-  planet.coreHp = 0;
-  planet.alive = false;
-  planet.repairing = false;
-  for (const t of planet.turrets) t.hp = 0;
-  for (const s of planet.shields) s.hp = 0;
-  planet.builds.length = 0;
-  // Shots already in the air from this planet's turrets stop being a threat.
-  for (const p of world.projectiles) {
-    if (p.active && p.owner === planet.owner) p.active = false;
-  }
 }
 
 /**

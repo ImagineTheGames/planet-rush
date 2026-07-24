@@ -16,7 +16,12 @@
  * layout, the Build & Upgrade orders (turret, shield, repair channel, bank),
  * construction timers, shield regeneration, turret auto-fire with pooled
  * projectiles, and the beam extended to the rest of the target list — turrets,
- * shields and cores (GDD §2.4). Win/loss, waves and collapse land next.
+ * shields and cores (GDD §2.4).
+ *
+ * Day-2 endgame (GDD §1, §2.3, §2.7): the five asteroid waves on their
+ * metronome, each landing closer to centre than the last (`./waves`); core
+ * destruction, elimination, the wreck and its scavengeable debris; the collapse
+ * phase; and win/loss with the last-to-die tiebreak (`./match`).
  *
  * Subsystem order is fixed and documented; it is part of the determinism
  * contract (GDD §4.8 — same inputs, same final state hash).
@@ -54,9 +59,11 @@ import {
   updateTurrets,
 } from './buildings';
 import { damageShip } from './damage';
+import { updateMatch } from './match';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, Ship, World } from './state';
 import { dist2, normalize } from './vec';
+import { spawnDueWaves } from './waves';
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -157,14 +164,21 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   world.time += dt;
 
   // 1. Timers: spawn protection countdown and respawn revival (GDD §2.1, §2.7).
+  //    An eliminated player's ship is not on a clock — their home is a wreck and
+  //    their match is over (GDD §2.7).
   for (const ship of world.ships) {
     if (ship.alive) {
       if (ship.spawnProtect > 0) ship.spawnProtect = Math.max(0, ship.spawnProtect - dt);
-    } else {
+    } else if (!ship.eliminated) {
       ship.respawnTimer -= dt;
       if (ship.respawnTimer <= 0) respawn(ship);
     }
   }
+
+  // 1a. Asteroid waves: whatever the metronome owes by now, each landing closer
+  //     to centre than the last (GDD §2.3). Before movement and the broad phase,
+  //     so a rock that arrives this tick is collidable and minable this tick.
+  spawnDueWaves(world);
 
   // 1b. Planets: core spawn protection, the undamaged clock, construction
   //     timers, shield regen, and the repair channel (GDD §2.5, §2.6). Ahead of
@@ -232,6 +246,11 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   //     stable array (GDD §4.8).
   world.asteroids = world.asteroids.filter((a) => a.ore > 1e-9);
   sweepDeadTurrets(world);
+
+  // 11. The match itself: enter collapse when the field is spent, and resolve a
+  //     winner when one home is left standing (GDD §1, §2.3). Last, so a core
+  //     that died anywhere in this tick is counted in this tick's result.
+  updateMatch(world, dt);
 
   return world;
 }
@@ -763,6 +782,17 @@ function updateChunks(world: World, dt: number): void {
 // Respawn (GDD §2.7)
 // ---------------------------------------------------------------------------
 
+/**
+ * Come back at your home planet, five seconds later, with **everything you
+ * bought still on the hull** (GDD §2.7: "free and fast … upgrades intact").
+ *
+ * Respawn is deliberately additive-free: it restores hull to `maxHull` and puts
+ * the ship home, and touches nothing else. Every upgrade a player owns lives in
+ * a field it does not write — `maxHull`, `cargoCap`, `shipClass` — and the bank
+ * is never lost to a ship death, so the cost of dying stays exactly what the
+ * design says it is: time, position, and the half-hold already dropped as
+ * debris where you exploded (`killShip`).
+ */
 function respawn(ship: Ship): void {
   ship.alive = true;
   ship.hull = ship.maxHull;

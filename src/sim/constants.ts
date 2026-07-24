@@ -167,8 +167,88 @@ export const WAVE_COUNT: Tunable<number> = 5;
 /** Asteroid wave interval — the metronome of the match (GDD §2.8), seconds. TUNABLE */
 export const WAVE_INTERVAL_S: Tunable<number> = 150;
 
+/**
+ * Asteroid-wave geometry (GDD §2.3: five waves, "each spawning closer to the
+ * map center than the last, pulling every surviving player into a smaller and
+ * smaller contested space"). The wave *schedule* is `WAVE_INTERVAL_S` and the
+ * wave *yield* is `FIELD_YIELD / WAVE_COUNT`; this is where they land. TUNABLE
+ */
+export const WAVE = {
+  /** Asteroids delivered per wave. `WAVE_COUNT × this` is the whole match's
+   *  rock count — 5 × 12 = 60, the day-1 field size, now spread over time. */
+  asteroidsPerWave: 12,
+  /** Wave 1's scatter disc, as a fraction of the base field radius. */
+  firstRadiusFraction: 1.0,
+  /** The final wave's scatter disc, same units. Strictly smaller than the
+   *  first: the shrinking ring *is* the mechanic. */
+  lastRadiusFraction: 0.25,
+} as const;
+
+/** Ore delivered by one wave — the finite field, divided evenly (GDD §2.3). */
+export const WAVE_ORE: Tunable<number> = FIELD_YIELD / WAVE_COUNT;
+
+/**
+ * Sim time (seconds) at which wave `n` (1-based) arrives. Wave 1 is present at
+ * match start and each later wave lands one `WAVE_INTERVAL_S` after the one
+ * before it — the same schedule the HUD's wave clock counts down to, so the
+ * clock and the spawner can never drift.
+ */
+export function waveTime(n: number): number {
+  return (n - 1) * WAVE_INTERVAL_S;
+}
+
+/**
+ * Scatter-disc radius of wave `n`, as a fraction of the base field radius —
+ * linear from `WAVE.firstRadiusFraction` down to `WAVE.lastRadiusFraction`, so
+ * every wave lands strictly closer to the centre than the one before it.
+ */
+export function waveRadiusFraction(n: number): number {
+  if (WAVE_COUNT <= 1) return WAVE.lastRadiusFraction;
+  const t = Math.min(Math.max((n - 1) / (WAVE_COUNT - 1), 0), 1);
+  return WAVE.firstRadiusFraction + (WAVE.lastRadiusFraction - WAVE.firstRadiusFraction) * t;
+}
+
+/**
+ * How long after the final wave the collapse phase begins regardless of what is
+ * left in the field (GDD §2.3: "the match cannot stalemate; the ruleset
+ * guarantees an ending"). Collapse normally starts the moment the field runs
+ * dry; this is the backstop for a match where nobody bothers to mine the last
+ * rock. Final wave at 600 s + 150 s ⇒ collapse by 12.5 minutes, inside the
+ * 10–15 minute target (GDD §1). TUNABLE
+ */
+export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
+
+/**
+ * Core HP lost per second, per planet, during collapse — "entropy finishes
+ * whoever the players don't" (GDD §1).
+ *
+ * **Baseline 0**, because GDD §2.3 spells out collapse as exactly three rules —
+ * no shield regeneration, no repair, no new ore — and adding a fourth is a
+ * design decision, not a tuning one. The mechanism is implemented and wired so
+ * QA (who owns this table from M2) can falsify the stalemate hypothesis by
+ * raising this number instead of editing the sim. TUNABLE
+ */
+export const COLLAPSE_CORE_DECAY: Tunable<number> = 0;
+
 /** Respawn time — free; time is the cost (GDD §2.7, §2.8), seconds. TUNABLE */
 export const RESPAWN_S: Tunable<number> = 5;
+
+/**
+ * The wreck a dead planet leaves behind (GDD §2.7): it "persists for the rest of
+ * the match, surrounded by ore-laden debris that *anyone* can scavenge." The
+ * dead player's *banked* ore is what funds the debris field — the fortune they
+ * were saving becomes the thing their killers fight over — plus a floor so a
+ * broke player still leaves a contested wreck. TUNABLE
+ */
+export const WRECK = {
+  /** Ore scattered on top of the dead owner's banked total. */
+  baseDebrisOre: 8,
+  /** How far outboard of the planet surface the debris ring sits. */
+  debrisRingOffset: 40,
+  /** Hard cap on debris chunks from one wreck — a hoarder's bank cannot flood
+   *  the map with collectables (the excess dies with the planet). */
+  maxDebrisChunks: 40,
+} as const;
 
 /** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
 export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;

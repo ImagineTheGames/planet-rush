@@ -45,6 +45,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     alive: over.alive ?? true,
     respawnTimer: over.respawnTimer ?? 0,
     spawnProtect: over.spawnProtect ?? 0,
+    eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
     beam: over.beam ?? null,
   };
@@ -75,6 +76,19 @@ function emptyWorld(over: Partial<World> = {}): World {
     planets: over.planets ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
+    fieldRadius: over.fieldRadius ?? 600,
+    // Zero rocks per wave: a hand-built world's field is exactly what the test
+    // puts in it, so the wave metronome cannot drop asteroids into a physics
+    // fixture. The collapse phase needs all five waves and so never opens here.
+    asteroidsPerWave: over.asteroidsPerWave ?? 0,
+    match: over.match ?? {
+      phase: 'live',
+      wavesSpawned: 0,
+      collapseTime: -1,
+      eliminated: [],
+      winner: null,
+      endTime: -1,
+    },
   };
 }
 
