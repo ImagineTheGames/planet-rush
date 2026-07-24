@@ -2,16 +2,38 @@
  * src/main.ts — client bootstrap. OWNER: Platform Engineer.
  *
  * Wires the platform seam, the input funnel, the fixed-timestep loop, and the
- * PixiJS render layer into the day-1 playable build (GDD §4.6 day 1: "ship
- * flies, shoots, mines … touch controls ship alongside keyboard/mouse and
- * gamepad"). All input becomes abstract `Action`s here before it crosses into
- * the sim — the sim never sees a device (GDD §2.4).
+ * PixiJS render layer into the playable build. All input becomes abstract
+ * `Action`s here before it crosses into the sim — the sim never sees a device
+ * (GDD §2.4).
+ *
+ * **M2 (GDD §4.6): this boots a real match, not a sandbox.** Eight planets in a
+ * ring, the local player owning slot 0's home and do-nothing bots (`src/bots`)
+ * filing input for the other seven through the same ordered-input protocol a
+ * human uses; the wave metronome, the collapse phase and win/loss running off
+ * `world.match`; the Build & Upgrade wheel opening at your own planet and
+ * spending through the sim's own `buildOrder` / `upgradeOrder`; the under-attack
+ * alarm and the own-planet HP bar fed from the real core, shields and turrets.
+ *
+ * Everything below is *wiring*. Every decision it feeds on belongs to the module
+ * that owns it: the sim answers "am I docked" (`isDocked`) and "has the field
+ * collapsed" (`isCollapsed`), the UI decides what the wheel says and whether the
+ * alarm sounds, the bots decide what the other seven slots do. This file's job
+ * is that none of those answers is invented here.
  */
 import { Application } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import type { Action, Vec2 } from '@shared/types';
-import { BEAM_RANGE } from './sim';
-import { createLocalSession } from './net';
+import {
+  BEAM_RANGE,
+  isCollapsed,
+  isDocked,
+  planetOf,
+  shieldCount,
+  shieldPool,
+  turretCount,
+} from './sim';
+import type { Planet } from './sim';
+import { bootOfflineMatch } from '@platform/match-boot';
 import {
   createControlState,
   mapActions,
@@ -25,7 +47,8 @@ import { KeyboardMouseSource, GamepadSource } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
 import { bindTouchControls } from '@platform/touch-dom';
-import { TouchVisuals } from '@platform/touch-visuals';
+import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
+import { WheelInput, writeWheelOrders } from '@platform/wheel-input';
 import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -44,12 +67,27 @@ import type { Viewport } from '@platform/camera';
 import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
-import { Hud } from './ui';
+import {
+  Hud,
+  PANEL_ROW_HEIGHT,
+  TRACK_ORDER,
+  WHEEL_ORDER,
+  panelSize,
+  wheelRadius,
+} from './ui';
 import type { HudFrame } from './ui';
 
 const LOCAL_PLAYER = 0;
-const PLAYER_COUNT = 8;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
+/** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
+ *  picks it once rooms exist (M4); until then every offline match is the same
+ *  arena, which is also what makes a bug report reproducible. */
+const MATCH_SEED = 1;
+/** The onboarding default hull (GDD §2.11) — the lobby's job from M4. */
+const LOCAL_SHIP_CLASS = ShipClass.Vanguard;
+/** Index of UPGRADE SHIP: the one segment that opens a screen instead of
+ *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
+const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
 
 async function boot(): Promise<void> {
   // Which build is this? One line, first thing in the console, every build —
@@ -77,27 +115,24 @@ async function boot(): Promise<void> {
   if (mount) mount.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none'; // sticks own the gestures (amendment §2)
 
-  // --- Match session: the client does not step the sim any more. Input leaves
-  //     here as ordered input ticks over a `Transport`, and the world comes back
-  //     from whoever holds authority (GDD §4.2). Offline that is a LocalLoopback
-  //     running the authoritative sim in this process — no server, no internet,
-  //     same protocol as the online match. A full ring so the field reads; only
-  //     LOCAL_PLAYER is driven until the bots and the online lobby land.
-  const session = createLocalSession({
-    match: {
-      seed: 1,
-      players: Array.from({ length: PLAYER_COUNT }, (_, id) => ({
-        id,
-        shipClass: ShipClass.Vanguard,
-      })),
-    },
+  // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
+  //     and the seven empty seats are filled by the cast (`src/bots`), each
+  //     bringing its character's hull. The bots are an *action source*, not a
+  //     special kind of player — they file input through the same ordered queue
+  //     this client does, so the sim cannot tell a bot's tick from a human's
+  //     (GDD §2.9). Offline the authority is a `LocalLoopback` in this process:
+  //     no server, no internet, same protocol as the online match (GDD §4.2).
+  //
+  //     The composition lives in `@platform/match-boot` rather than here, so
+  //     "does the client actually assemble a match" is a headless test rather
+  //     than something only a browser can answer — which is the exact gap this
+  //     milestone was retracted for.
+  const match = bootOfflineMatch({
+    seed: MATCH_SEED,
     localPlayer: LOCAL_PLAYER,
-    // Offline the renderer reads the authoritative world directly, so the
-    // binary snapshot stream is off: it would cost encoding for a wire that
-    // isn't there. It turns on with the WebSocket transport.
-    snapshotIntervalTicks: 0,
+    shipClass: LOCAL_SHIP_CLASS,
   });
-  const world = session.world;
+  const world = match.world;
 
   // --- Renderer. The camera centres on the *visual* viewport (URL-bar / notch /
   //     fullscreen aware), not the raw canvas — see camera.ts and readViewport().
@@ -157,6 +192,71 @@ async function boot(): Promise<void> {
   const touch = new TouchController({ screenWidth: app.screen.width });
   touch.setFireMode(fireMode);
   const touchState = createControlState();
+  // --- The Build & Upgrade wheel (GDD §2.5). `buildWheel` holds the two bits of
+  //     screen state the pure UI models deliberately don't — is it up, is the
+  //     upgrade panel in front of it — and turns a press into a segment. What
+  //     the wheel *says* is `src/ui`'s; what a press *lands on* is here.
+  const buildWheel = new WheelInput();
+  /** The sim's own docking answer, refreshed each input tick. Read by the touch
+   *  BUILD button (which exists only at your own planet) and the HUD. */
+  let docked = false;
+  /** Rising-edge trackers: the wheel toggles on a *press* of `build`, and a
+   *  press of `fire` confirms the pointed-at segment — neither on the hold. */
+  let buildHeld = false;
+  let fireHeld = false;
+  /** Any wheel order placed this match — retires the SPEND onboarding prompt. */
+  let hasOrdered = false;
+
+  // Drawn-geometry scratch, overwritten per press (never per frame): the hit
+  // targets are computed from the very functions `src/ui` draws the wheel and
+  // the panel with, so a press lands on the wedge the player actually sees.
+  const buildWheelLayout = { centerX: 0, centerY: 0, radius: 0, segments: WHEEL_ORDER.length };
+  const panelLayout = {
+    centerX: 0,
+    centerY: 0,
+    width: 0,
+    height: 0,
+    rowHeight: PANEL_ROW_HEIGHT,
+    rows: TRACK_ORDER.length,
+  };
+  const pressPoint: Vec2 = { x: 0, y: 0 };
+
+  // Wheel presses are bound **before** the twin sticks, and consume the event
+  // when they land: at the target element listeners run in registration order,
+  // so an open wheel gets first refusal on a tap and a thumb buying a turret
+  // never also flies the ship. Mouse and touch are one gesture here (GDD §2.4).
+  app.canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+    const w = app.screen.width;
+    const h = app.screen.height;
+    const rect = app.canvas.getBoundingClientRect();
+    pressPoint.x = e.clientX - rect.left;
+    pressPoint.y = e.clientY - rect.top;
+
+    // The touch BUILD button — the E-equivalent, on screen only at your own
+    // planet (GDD §2.4). Toggles the wheel exactly as E and Y do.
+    const build = buildButtonRect(isTouch, docked, w, h);
+    if (build && inRect(pressPoint, build)) {
+      buildWheel.toggle();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
+    buildWheelLayout.centerX = w / 2;
+    buildWheelLayout.centerY = h / 2;
+    buildWheelLayout.radius = wheelRadius(w, h);
+    const size = panelSize(w, h, TRACK_ORDER.length);
+    panelLayout.centerX = w / 2;
+    panelLayout.centerY = h / 2;
+    panelLayout.width = size.width;
+    panelLayout.height = size.height;
+
+    if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    }
+  });
+
   // Route the canvas's touch pointer events into the twin sticks (touch-dom.ts —
   // the filter/decode/route edge, unit-tested headless). CSS-pixel samples, the
   // same space the controller's half-split lives in.
@@ -209,8 +309,9 @@ async function boot(): Promise<void> {
     update: () => {
       if (flags.freeze) return; // sim is pinned at the seeded freeze tick
       // One input tick per fixed step, in order — the pulse the whole protocol
-      // is built on. The transport advances the authoritative sim (GDD §4.2).
-      session.sendInput(sampleInput());
+      // is built on. Every bot seat files for the same tick first, then this
+      // client's input advances the authoritative sim (GDD §4.2, §2.9).
+      match.tick(sampleInput());
       simTicks++;
     },
     render: () => {
@@ -220,7 +321,7 @@ async function boot(): Promise<void> {
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the viewport each frame so the idle
       // affordances and FIRE button track resize/orientation flips.
-      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height);
+      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height, docked);
       // Keep the build stamp cornered as the viewport changes (two writes).
       buildBadge.update(app.screen.width, app.screen.height);
       // Refresh the layout registry from what was just drawn (debug only).
@@ -266,22 +367,104 @@ async function boot(): Promise<void> {
     for (const s of sources) mergeControl(merged, s.state);
     mergeControl(merged, touchState);
 
+    updateBuildWheel();
     return mapActions(merged, fireMode);
   }
 
-  /** Fill the reusable HudFrame from the local ship + world — no allocation
-   *  (predicate hoisted; primitive fields overwritten in place). */
+  /**
+   * Fold this frame's merged input into the Build & Upgrade wheel, then turn
+   * whatever was bought into the one-shot order fields the funnel maps
+   * (`@platform/actions`).
+   *
+   * Availability is the sim's answer, not a distance re-derived here: alive
+   * ship, live core, `isDocked`. The wheel opens at your own planet and nowhere
+   * else (GDD §2.5), and it closes itself the moment you fly off — so undocking
+   * is always a way out of it.
+   *
+   * While it is open the ship holds still and holds fire. That is deliberate
+   * rather than incidental: it frees the thrust stick to *point* the wheel and
+   * the fire button to *confirm*, which is what gives the gamepad and the
+   * keyboard a complete path to a purchase without inventing a binding the
+   * controls strip would then have to explain (GDD §2.4).
+   */
+  function updateBuildWheel(): void {
+    const ship = world.ships.find(isLocalShip);
+    const planet = planetOf(world, LOCAL_PLAYER);
+    docked = ship !== undefined && planet !== null && isDocked(ship, planet);
+    buildWheel.setAvailable(docked && planet !== null && planet.alive && ship !== undefined && ship.alive);
+
+    // E / Y / the BUILD button: one press opens, the next closes.
+    if (merged.build && !buildHeld && (docked || buildWheel.open)) buildWheel.toggle();
+    buildHeld = merged.build;
+
+    const confirmPressed = merged.fire && !fireHeld;
+    fireHeld = merged.fire;
+
+    if (buildWheel.open) {
+      buildWheel.aim(merged.thrust.x, merged.thrust.y, WHEEL_ORDER.length);
+      if (confirmPressed) buildWheel.confirm(UPGRADE_SEGMENT);
+      merged.thrust.x = 0;
+      merged.thrust.y = 0;
+      merged.fire = false;
+    }
+
+    // Four segments spend on the spot; the fifth opened a screen and never
+    // reaches here (GDD §2.5). The sim validates every one of them again —
+    // ownership, docking, cost, caps — and refuses on its own terms.
+    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, TRACK_ORDER)) hasOrdered = true;
+  }
+
+  /**
+   * Fill the reusable HudFrame from the local ship, its home, and the match —
+   * no allocation (predicate hoisted; every field a primitive or a reference to
+   * live sim data the HUD only reads).
+   *
+   * Three of the M2 elements are fed here and nowhere else, and each is a
+   * mechanic rather than a readout (GDD §2.2):
+   *
+   *  - **Own-planet HP** comes off the real core, with the shield pool over it.
+   *  - **The under-attack alarm** derives its damage from the fall in
+   *    core + shields + turrets between frames, so a turret being picked off at
+   *    the edge of its range rings it exactly as a beam on the core does — and a
+   *    single stray shot does not (the sustained-damage trigger is `src/ui`'s).
+   *  - **The wave clock and the collapse state** are `world.time` and the sim's
+   *    own `isCollapsed`, so the clock on screen is the clock the match runs on.
+   */
   function feedHud(): void {
     hudFrame.time = world.time;
     hudFrame.device = activeDevice;
     hudFrame.fireMode = fireMode;
     hudFrame.isTouch = isTouch;
+    hudFrame.owner = LOCAL_PLAYER;
+    hudFrame.collapsed = isCollapsed(world);
+    hudFrame.buildRequested = buildWheel.open;
+    hudFrame.upgradePanelOpen = buildWheel.panelOpen;
+    hudFrame.hasOrdered = hasOrdered;
+    hudFrame.docked = docked;
+
+    const planet = planetOf(world, LOCAL_PLAYER);
+    if (planet) {
+      hudFrame.coreHp = planet.coreHp;
+      hudFrame.maxCoreHp = planet.maxCoreHp;
+      hudFrame.shieldHp = shieldPool(planet);
+      hudFrame.maxShieldHp = shieldPoolMax(planet);
+      hudFrame.turretHp = turretPool(planet);
+      hudFrame.planetAlive = planet.alive;
+      hudFrame.turrets = turretCount(planet);
+      hudFrame.shields = shieldCount(planet);
+      hudFrame.homePos = planet.pos;
+    }
+
     const ship = world.ships.find(isLocalShip);
     if (!ship) return;
     hudFrame.cargo = ship.cargo;
     hudFrame.cargoCap = ship.cargoCap;
     hudFrame.banked = ship.banked;
     hudFrame.nearAsteroid = nearAsteroid(ship.pos);
+    hudFrame.shipAlive = ship.alive;
+    hudFrame.shipClass = ship.shipClass;
+    hudFrame.upgradeTiers = ship.tiers;
+    hudFrame.shipPos = ship.pos;
   }
 
   /** Refresh the layout registry from this frame's drawn state (debug only).
@@ -493,6 +676,28 @@ function controlActive(s: ControlState): boolean {
 /** Hoisted local-ship predicate so the per-frame lookup allocates no closure. */
 function isLocalShip(s: { id: number }): boolean {
   return s.id === LOCAL_PLAYER;
+}
+
+/** Whether a point is inside a screen rect (CSS px). */
+function inRect(p: Vec2, r: { x: number; y: number; width: number; height: number }): boolean {
+  return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+}
+
+/** Shield HP at full over a planet's core — 0 with no generator built, so the
+ *  HUD's shield overbar appears the frame the first one finishes (GDD §2.5).
+ *  The sim publishes the *current* pool (`shieldPool`); this is its ceiling. */
+function shieldPoolMax(planet: Planet): number {
+  let hp = 0;
+  for (const s of planet.shields) hp += s.maxHp;
+  return hp;
+}
+
+/** Summed HP of a planet's live turrets — the third term in the alarm's
+ *  "your planet is being hurt" signal (GDD §2.2). */
+function turretPool(planet: Planet): number {
+  let hp = 0;
+  for (const t of planet.turrets) hp += t.hp;
+  return hp;
 }
 
 /** Read the persisted fire mode, falling back to the platform default (§2.4). */

@@ -25,6 +25,9 @@
  * drift apart without a red test.
  */
 
+import type { BuildItem, UpgradeTrack } from '@shared/types';
+import type { ControlState } from './actions';
+
 // ---------------------------------------------------------------------------
 // Geometry (mirrors src/ui/build-wheel-view.ts, which does not export it)
 // ---------------------------------------------------------------------------
@@ -262,4 +265,51 @@ export class WheelInput {
     this.row = null;
     return r;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Into the action funnel
+// ---------------------------------------------------------------------------
+
+/**
+ * Drain whatever the wheel bought this frame into the device-neutral
+ * {@link ControlState}, where {@link ./actions.mapActions} turns it into the
+ * `buildOrder` / `upgradeOrder` the sim consumes.
+ *
+ * `segments` and `tracks` are the *wheel's own* orders, passed in rather than
+ * imported, so this module still needs nothing from `src/ui` and the caller
+ * cannot get the mapping wrong by hand. `'upgrade'` is skipped here because it
+ * opened a screen instead of spending — the purchase it leads to arrives as a
+ * row (GDD §2.5).
+ *
+ * Returns true when something was actually bought — the caller's cue that the
+ * SPEND onboarding prompt has been satisfied (GDD §2.10).
+ */
+export function writeWheelOrders(
+  wheel: WheelInput,
+  state: ControlState,
+  segments: readonly (BuildItem | 'upgrade')[],
+  tracks: readonly UpgradeTrack[],
+): boolean {
+  let bought = false;
+
+  const segment = wheel.takeSegment();
+  if (segment !== null) {
+    const id = segments[segment];
+    if (id !== undefined && id !== 'upgrade') {
+      state.order = id;
+      bought = true;
+    }
+  }
+
+  const row = wheel.takeRow();
+  if (row !== null) {
+    const track = tracks[row];
+    if (track !== undefined) {
+      state.upgrade = track;
+      bought = true;
+    }
+  }
+
+  return bought;
 }
