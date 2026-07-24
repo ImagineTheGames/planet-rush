@@ -39,7 +39,9 @@ export interface Ship {
   /** Home spawn point — where the player's planet sits; respawn returns here
    *  (GDD §2.7). Day 1 has no planets, so this is just the ring spawn. */
   home: Vec2;
-  /** Facing, radians. The beam fires along this; auto-aim overwrites it. */
+  /** Facing, radians. The manual beam fires along this. Resolved once per tick
+   *  by the facing ladder (aim input → auto-aim target → velocity → hold) and
+   *  always turn-rate limited — it never snaps (see `resolveFacing`). */
   angle: number;
   /** Current hull HP. Ships are cheap and not repairable (GDD §2.5). */
   hull: number;
