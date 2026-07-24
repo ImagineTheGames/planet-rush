@@ -174,6 +174,12 @@ export class Renderer {
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
 
+  /** When true, shed the non-load-bearing VFX (impact glows) to buy back frame
+   *  time on a struggling device. Driven by the platform's auto-reducer on a
+   *  sustained drop below the fps floor (GDD §4.3, risk 5 "reduce VFX"). The
+   *  readable tells — beam line, ships, ore — always draw; only decoration goes. */
+  private reduceVfx = false;
+
   /** The visible viewport the camera centres on. This is the *visual* viewport
    *  (URL-bar / notch / fullscreen aware), not the raw canvas — see camera.ts.
    *  Mutated whole via {@link setViewport}; read every frame in centerCamera. */
@@ -208,6 +214,12 @@ export class Renderer {
    *  `autoDensity`, so the viewport is in CSS pixels. */
   setViewport(viewport: Viewport): void {
     this.viewport = viewport;
+  }
+
+  /** Toggle reduced-VFX mode (GDD §4.3). Cheap and idempotent — the flag is read
+   *  in {@link draw}; nothing is created or destroyed, so it can flip any frame. */
+  setReduceVfx(on: boolean): void {
+    this.reduceVfx = on;
   }
 
   /** The screen position (canvas-local CSS px) a world point draws at this frame,
@@ -297,7 +309,9 @@ export class Renderer {
       const g = this.beamPool.at(i);
       g.clear();
       g.moveTo(b.from.x, b.from.y).lineTo(b.to.x, b.to.y).stroke({ width: 3, color: b.color, cap: 'round' });
-      if (b.hit) {
+      // The beam line always draws (it is the mining/attack tell); the impact
+      // glow is decoration, so it is the first thing reduce-VFX sheds (§4.3).
+      if (b.hit && !this.reduceVfx) {
         const glow = this.impactPool.at(glows++);
         glow.x = b.hit.x;
         glow.y = b.hit.y;
