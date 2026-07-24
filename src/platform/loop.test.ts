@@ -60,4 +60,20 @@ describe('GameLoop.advance — fixed-step accumulation', () => {
     const steps = loop.advance(10);
     expect(steps).toBeLessThanOrEqual(Math.ceil(0.25 / FIXED_DT));
   });
+
+  it('advances SIM time slower than wall clock on a slow host — by design', () => {
+    // The consequence of the clamp above, pinned as a contract because tooling
+    // now depends on it: on a host rendering ~1 fps, one second of wall clock
+    // buys at most 0.25 s of sim and the rest is DROPPED — not banked, the
+    // accumulator never sees it. So "hold an input for N real seconds" says
+    // nothing fixed about how far the sim advanced, and any assertion on sim
+    // progress has to count sim ticks instead (the ?debug=1 `ticks` field exists
+    // for exactly this — see debug-hook.ts and the QA touch-drag test, m1-12).
+    const { loop } = counting();
+    let steps = 0;
+    for (let frame = 0; frame < 5; frame++) steps += loop.advance(1.0); // 5 s wall @ 1 fps
+    const simSeconds = steps * FIXED_DT;
+    expect(simSeconds).toBeLessThanOrEqual(5 * 0.25 + FIXED_DT);
+    expect(simSeconds).toBeLessThan(5); // …a 4× dilation, not a rounding error
+  });
 });

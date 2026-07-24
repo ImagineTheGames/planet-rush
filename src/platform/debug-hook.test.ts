@@ -36,7 +36,7 @@ describe('installDebugHook — off path (no ?debug=1)', () => {
     expect(hook.enabled).toBe(false);
     expect(DEBUG_GLOBAL_KEY in win).toBe(false);
     // update is a safe no-op.
-    expect(() => hook.update(1, 2, 3, 4, 5, 6, 100)).not.toThrow();
+    expect(() => hook.update(1, 2, 3, 4, 5, 6, 100, 7)).not.toThrow();
     expect(DEBUG_GLOBAL_KEY in win).toBe(false);
   });
 });
@@ -52,21 +52,40 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     expect(state).toEqual({
       shipScreen: { x: 0, y: 0 },
       shipWorld: { x: 0, y: 0 },
-      viewport: { w: 0, h: 0 },
+      viewport: { w: 0, h: 0, width: 0, height: 0 },
       fps: 0,
+      ticks: 0,
     });
 
-    hook.update(195, 422, 390, 844, 1500, 2600, 1000);
+    hook.update(195, 422, 390, 844, 1500, 2600, 1000, 42);
     expect(state!.shipScreen).toEqual({ x: 195, y: 422 });
     expect(state!.shipWorld).toEqual({ x: 1500, y: 2600 });
-    expect(state!.viewport).toEqual({ w: 390, h: 844 });
+    // Both spellings, one source: the layout-registry co-tenant reads
+    // {width,height} off this same shared object (see the module contract).
+    expect(state!.viewport).toEqual({ w: 390, h: 844, width: 390, height: 844 });
 
     // Same object mutated in place — no per-frame reallocation of the handle.
     const before = read(win);
-    hook.update(10, 20, 30, 40, 50, 60, 1016);
+    hook.update(10, 20, 30, 40, 50, 60, 1016, 43);
     expect(read(win)).toBe(before);
     expect(before!.shipScreen).toEqual({ x: 10, y: 20 });
     expect(before!.shipWorld).toEqual({ x: 50, y: 60 });
+  });
+
+  it('reports the sim tick count verbatim — the render-independent time base', () => {
+    const win = fakeWindow();
+    const hook = installDebugHook('?debug=1', win);
+    const state = read(win)!;
+
+    // The whole point of `ticks`: it tracks SIM steps, not frames. One slow frame
+    // that catches up 15 steps must report 15 — that is what makes "movement per
+    // tick" invariant when the host's frame rate collapses (see the module doc).
+    hook.update(0, 0, 100, 100, 0, 0, 1000, 0);
+    expect(state.ticks).toBe(0);
+    hook.update(0, 0, 100, 100, 0, 0, 2000, 15); // one 1 fps frame, 15 catch-up steps
+    expect(state.ticks).toBe(15);
+    hook.update(0, 0, 100, 100, 0, 0, 2016, 16); // one 60 fps frame, 1 step
+    expect(state.ticks).toBe(16);
   });
 
   it('installs a read-only handle that cannot be reassigned', () => {
@@ -91,11 +110,11 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     const state = read(win)!;
 
     // First frame: no prior timestamp, fps stays 0.
-    hook.update(0, 0, 100, 100, 0, 0, 0);
+    hook.update(0, 0, 100, 100, 0, 0, 0, 0);
     expect(state.fps).toBe(0);
 
     // ~60fps: 16ms steps.
-    for (let t = 16; t <= 16 * 30; t += 16) hook.update(0, 0, 100, 100, 0, 0, t);
+    for (let t = 16; t <= 16 * 30; t += 16) hook.update(0, 0, 100, 100, 0, 0, t, t / 16);
     expect(state.fps).toBeGreaterThan(55);
     expect(state.fps).toBeLessThan(65);
   });
@@ -104,9 +123,9 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     const win = fakeWindow();
     const hook = installDebugHook('?debug=1', win);
     const state = read(win)!;
-    hook.update(0, 0, 10, 10, 0, 0, 500);
-    hook.update(0, 0, 10, 10, 0, 0, 500); // dt == 0 → skipped
-    hook.update(0, 0, 10, 10, 0, 0, 400); // dt < 0 → skipped
+    hook.update(0, 0, 10, 10, 0, 0, 500, 1);
+    hook.update(0, 0, 10, 10, 0, 0, 500, 2); // dt == 0 → skipped
+    hook.update(0, 0, 10, 10, 0, 0, 400, 3); // dt < 0 → skipped
     expect(Number.isNaN(state.fps)).toBe(false);
     expect(state.fps).toBe(0);
   });
