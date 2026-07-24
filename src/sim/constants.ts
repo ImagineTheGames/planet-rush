@@ -1,8 +1,9 @@
 /**
  * src/sim/constants.ts — the baseline constants table. OWNER: Gameplay Engineer.
  *
- * This is the ENTIRE GDD §2.8 table (plus the §2.11 ship-class stats and the
- * derived physics constants the sim needs to move a ship), written out on day 1
+ * This is the ENTIRE GDD §2.8 table (plus the §2.11 ship-class stats, the §2.5
+ * ship-upgrade ladder, and the derived physics constants the sim needs to move a
+ * ship), written out on day 1
  * so design numbers are typed, not invented, and so QA has a hypothesis to
  * falsify (GDD §2.8: "starting values, not commitments").
  *
@@ -15,7 +16,7 @@
  * length here.
  */
 
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 
 /** Marks a value as a day-1 hypothesis QA may retune (GDD §2.8). Documentation
  *  only — it is the literal string every tunable constant is tagged with so the
@@ -325,6 +326,111 @@ export function beamCoreDps(cls: ShipClass): number {
 export function miningRate(cls: ShipClass): number {
   return MINING_RATE * (SHIP_STATS[cls].beam / VANGUARD_BEAM);
 }
+
+// ---------------------------------------------------------------------------
+// GDD §2.5 — Ship upgrades: the ladder, and its escalating costs
+// ---------------------------------------------------------------------------
+//
+// "Ship upgrades (escalating cost): beam power (mining speed and weapon damage —
+// one beam, one stat), engine speed, cargo capacity (base hold 2, +2 per tier),
+// hull HP. … Upgrades *multiply* the class base stats (2.11), so a maxed
+// Interceptor is still the fastest thing on the map and a maxed Hauler still the
+// toughest." (GDD §2.5)
+//
+// That last sentence is why the ladder is one table shared by all four hulls
+// rather than four per-class tables: a *multiplier* ladder cannot reorder the
+// classes, so class identity is preserved at every tier by construction instead
+// of by careful tuning. Cargo is the one additive track, because GDD §2.8 states
+// it additively ("+2 per tier, cap 8") — and the cap is what makes the Hauler's
+// extra slot a head start rather than a permanent lead.
+
+/** How a tier applies to the class base: scale it, or add a flat step to it. */
+export type UpgradeMode = 'multiply' | 'add';
+
+/** One track's ladder. `steps[0]` is the stock hull, so `steps.length - 1` is
+ *  the max tier and `costs` is one shorter than `steps`. */
+export interface UpgradeTrackSpec {
+  readonly track: UpgradeTrack;
+  readonly mode: UpgradeMode;
+  /** `steps[tier]`, applied to the class base per `mode`. */
+  readonly steps: readonly number[];
+  /** `costs[tier]` is the ore price of moving from `tier` to `tier + 1`. */
+  readonly costs: readonly number[];
+  /** Hard ceiling on the resulting value (GDD §2.8 cargo "cap 8"), or `null`. */
+  readonly max: number | null;
+}
+
+/**
+ * The upgrade ladder: three buyable tiers per track, costs escalating with the
+ * first tier cheap (GDD §2.5 "escalating cost", §2.8 "first tier cheap,
+ * escalating").
+ *
+ * The whole ladder costs 26 + 22 + 20 + 22 = 90 ore, against a field that yields
+ * ~400 for eight players (GDD §2.8) — so nobody maxes everything, and every tier
+ * bought is a turret, a shield, or a core repair not bought (GDD §2.5: "every ore
+ * in the hold has five competing uses"). That is the point of the numbers, and
+ * the reason they are all TUNABLE.
+ *
+ * These values match the provisional ladder the upgrade panel shipped with
+ * (`src/ui/upgrade-panel.ts`), which was written as "the UI's own opening
+ * hypothesis … the day the Gameplay Engineer lands real upgrade tiers, the
+ * wiring passes theirs and no UI code changes." Adopting them makes the panel's
+ * printed numbers true on the day the sim starts honouring them, with no drift
+ * between what a player is shown and what they are sold. All TUNABLE.
+ */
+export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
+  // Beam: mining speed *and* weapon damage, one stat (GDD §2.5). Multiplies the
+  // class beam, so the Excavator stays the mining engine at every tier — and the
+  // track pays for itself twice, which is why it is the dearest.
+  [UpgradeTrack.Beam]: {
+    track: UpgradeTrack.Beam,
+    mode: 'multiply',
+    steps: [1, 1.25, 1.5, 1.8],
+    costs: [4, 8, 14], // TUNABLE
+    max: null,
+  },
+  // Engine: top speed *and* acceleration — an engine is thrust, and a hull that
+  // gained a ceiling it takes twice as long to reach would feel like a downgrade.
+  // Turn rate is deliberately NOT on this ladder: turning is the airframe, so it
+  // stays class-only and the Interceptor keeps sole ownership of agility.
+  [UpgradeTrack.Engine]: {
+    track: UpgradeTrack.Engine,
+    mode: 'multiply',
+    steps: [1, 1.15, 1.3, 1.45],
+    costs: [3, 7, 12], // TUNABLE
+    max: null,
+  },
+  // Cargo: "+2 per tier" with a hard cap of 8 — both ratified numbers, read from
+  // the table above rather than typed twice (GDD §2.8). The cheapest first tier
+  // in the ladder: doubling a 2-slot hold is the upgrade a first-time player
+  // feels immediately, and onboarding leans on it (GDD §2.10).
+  [UpgradeTrack.Cargo]: {
+    track: UpgradeTrack.Cargo,
+    mode: 'add',
+    steps: [0, CARGO_PER_TIER, CARGO_PER_TIER * 2, CARGO_PER_TIER * 3],
+    costs: [2, 6, 12], // TUNABLE
+    max: CARGO_CAP_MAX,
+  },
+  // Hull: ships are cheap, respawn free, and hull is not repairable at all
+  // (GDD §2.5) — so this track buys time inside one fight and never a heal.
+  [UpgradeTrack.Hull]: {
+    track: UpgradeTrack.Hull,
+    mode: 'multiply',
+    steps: [1, 1.2, 1.4, 1.6],
+    costs: [3, 7, 12], // TUNABLE
+    max: null,
+  },
+};
+
+/** Iteration order over the four tracks. Fixed, because anything that walks all
+ *  four inside the sim must walk them in one order (GDD §4.8). Beam leads: it is
+ *  the stat that pays for itself twice, and the upgrade panel lists it first. */
+export const TRACK_ORDER: readonly UpgradeTrack[] = [
+  UpgradeTrack.Beam,
+  UpgradeTrack.Engine,
+  UpgradeTrack.Cargo,
+  UpgradeTrack.Hull,
+];
 
 // ---------------------------------------------------------------------------
 // Derived physics constants (GDD §4.1 — Euler + drag, hand-written circles)

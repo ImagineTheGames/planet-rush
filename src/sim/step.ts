@@ -23,16 +23,21 @@
  * destruction, elimination, the wreck and its scavengeable debris; the collapse
  * phase; and win/loss with the last-to-die tiebreak (`./match`).
  *
+ * Day-4 scope (GDD §2.5, §2.11): **ship classes take effect.** Every stat the
+ * step reads — acceleration, top speed, turn rate, beam damage, core damage,
+ * mining rate, hull, hold — now comes from `./upgrades`, which resolves the
+ * §2.11 class base against the §2.5 tier ladder the player has been buying with
+ * ore. Tiers are bought through the action stream (`upgradeOrder`), persist
+ * through respawn, and *multiply* the class base, so the hull a player picked in
+ * the lobby still decides who they are at every tier.
+ *
  * Subsystem order is fixed and documented; it is part of the determinism
  * contract (GDD §4.8 — same inputs, same final state hash).
  */
 
-import type { Action, BuildItem, PlayerId, Vec2 } from '@shared/types';
+import type { Action, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   ASTEROID,
-  BASE_ACCEL,
-  BASE_SPEED,
-  BASE_TURN_RATE,
   BEAM_RANGE,
   BOOST_MULTIPLIER,
   CHUNK,
@@ -40,15 +45,12 @@ import {
   FACE_VELOCITY_MIN_SPEED,
   HASH_CELL_SIZE,
   SHIP_ASTEROID_RESTITUTION,
-  SHIP_STATS,
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
-  beamCoreDps,
-  beamShipDps,
-  miningRate,
 } from './constants';
 import {
+  buyUpgrade,
   damagePlanet,
   damageTurret,
   placeOrder,
@@ -62,6 +64,15 @@ import { damageShip } from './damage';
 import { updateMatch } from './match';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, Ship, World } from './state';
+import {
+  refreshDerivedStats,
+  shipAccel,
+  shipBeamCoreDps,
+  shipBeamShipDps,
+  shipMiningRate,
+  shipTopSpeed,
+  shipTurnRate,
+} from './upgrades';
 import { dist2, normalize } from './vec';
 import { spawnDueWaves } from './waves';
 
@@ -89,9 +100,12 @@ interface Intent {
   /** Wheel presses this tick, in the order they arrived. Unlike the held verbs
    *  these accumulate: two presses in one tick are two orders (GDD §2.5). */
   orders: BuildItem[];
+  /** Upgrade-panel row presses this tick, same terms as `orders` (GDD §2.5). */
+  upgrades: UpgradeTrack[];
 }
 
 const NO_ORDERS: BuildItem[] = [];
+const NO_UPGRADES: UpgradeTrack[] = [];
 const NO_INTENT: Intent = {
   thrust: { x: 0, y: 0 },
   aim: null,
@@ -99,10 +113,11 @@ const NO_INTENT: Intent = {
   auto: false,
   boost: false,
   orders: NO_ORDERS,
+  upgrades: NO_UPGRADES,
 };
 
 /** Collapse a tick's actions into one intent (last write wins per verb; wheel
- *  orders accumulate). */
+ *  orders and panel presses accumulate). */
 function resolveIntent(actions: readonly Action[]): Intent {
   const intent: Intent = {
     thrust: { x: 0, y: 0 },
@@ -111,6 +126,7 @@ function resolveIntent(actions: readonly Action[]): Intent {
     auto: false,
     boost: false,
     orders: NO_ORDERS,
+    upgrades: NO_UPGRADES,
   };
   for (const a of actions) {
     switch (a.type) {
@@ -131,6 +147,10 @@ function resolveIntent(actions: readonly Action[]): Intent {
         // Allocate the list only for the rare tick that carries an order.
         if (intent.orders === NO_ORDERS) intent.orders = [];
         intent.orders.push(a.item);
+        break;
+      case 'upgradeOrder':
+        if (intent.upgrades === NO_UPGRADES) intent.upgrades = [];
+        intent.upgrades.push(a.track);
         break;
       case 'build':
       case 'ping':
@@ -190,12 +210,17 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   const intents = world.ships.map((s) => intentFor(s.id, inputs));
 
   // 2b. Wheel orders — validated and paid for here, so a job ordered this tick
-  //     starts its clock next tick and a 10 s turret takes exactly 10 s.
+  //     starts its clock next tick and a 10 s turret takes exactly 10 s. Then the
+  //     upgrade panel's row presses, from the same wallet: a tick carrying both
+  //     spends on the planet first and the ship second, which is arbitrary but
+  //     fixed, and part of the determinism contract (GDD §4.8). In practice they
+  //     are one-shot presses on two different screens, so a tick carries one.
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
-    const orders = intents[i]!.orders;
-    if (!ship.alive || orders.length === 0) continue;
-    for (const item of orders) placeOrder(world, ship, item);
+    const intent = intents[i]!;
+    if (!ship.alive) continue;
+    for (const item of intent.orders) placeOrder(world, ship, item);
+    for (const track of intent.upgrades) buyUpgrade(world, ship, track);
   }
 
   // 3. Movement — Euler integration with drag (GDD §4.1).
@@ -268,10 +293,11 @@ function intentFor(id: PlayerId, inputs: Inputs): Intent {
 // ---------------------------------------------------------------------------
 
 function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds']): void {
-  const stats = SHIP_STATS[ship.shipClass];
+  // Class base × engine tier (GDD §2.11, §2.5) — resolved in `./upgrades`, so the
+  // hull a player picked and the ore they spent on it arrive as one number.
   const boost = intent.boost ? BOOST_MULTIPLIER : 1;
-  const accel = BASE_ACCEL * stats.accelMul * boost;
-  const maxSpeed = BASE_SPEED * stats.speedMul * boost;
+  const accel = shipAccel(ship) * boost;
+  const maxSpeed = shipTopSpeed(ship) * boost;
 
   // Thrust adds acceleration in the (analog-scaled) thrust direction.
   ship.vel.x += intent.thrust.x * accel * dt;
@@ -337,8 +363,8 @@ function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds
 function resolveFacing(world: World, ship: Ship, intent: Intent, autoTarget: BeamHit | null, dt: number): void {
   const desired = desiredFacing(world, ship, intent, autoTarget);
   if (desired === null) return; // priority 4: hold current facing
-  const stats = SHIP_STATS[ship.shipClass];
-  ship.angle = turnToward(ship.angle, desired, BASE_TURN_RATE * stats.turnMul * dt);
+  // Turn rate is class-only — no upgrade buys agility (`./upgrades`).
+  ship.angle = turnToward(ship.angle, desired, shipTurnRate(ship) * dt);
 }
 
 /** The angle a ship wants to face this tick, or null to hold (see ladder). */
@@ -502,13 +528,13 @@ function fireBeam(
       mineAsteroid(world, world.asteroids[hit.index]!, ship, dt);
       break;
     case 'ship':
-      damageShip(world, world.ships[hit.index]!, beamShipDps(ship.shipClass) * dt);
+      damageShip(world, world.ships[hit.index]!, shipBeamShipDps(ship) * dt);
       break;
     case 'turret':
-      damageTurret(world.planets[hit.planet]!.turrets[hit.index]!, beamShipDps(ship.shipClass) * dt);
+      damageTurret(world.planets[hit.planet]!.turrets[hit.index]!, shipBeamShipDps(ship) * dt);
       break;
     case 'planet':
-      damagePlanet(world, world.planets[hit.planet]!, beamCoreDps(ship.shipClass) * dt);
+      damagePlanet(world, world.planets[hit.planet]!, shipBeamCoreDps(ship) * dt);
       break;
   }
 }
@@ -685,7 +711,7 @@ function segCircle(o: Vec2, dx: number, dy: number, c: Vec2, r: number): number 
 // ---------------------------------------------------------------------------
 
 function mineAsteroid(world: World, a: Asteroid, ship: Ship, dt: number): void {
-  const amount = Math.min(miningRate(ship.shipClass) * dt, a.ore);
+  const amount = Math.min(shipMiningRate(ship) * dt, a.ore);
   a.ore -= amount;
   a.mineBuffer += amount;
 
@@ -786,15 +812,19 @@ function updateChunks(world: World, dt: number): void {
  * Come back at your home planet, five seconds later, with **everything you
  * bought still on the hull** (GDD §2.7: "free and fast … upgrades intact").
  *
- * Respawn is deliberately additive-free: it restores hull to `maxHull` and puts
- * the ship home, and touches nothing else. Every upgrade a player owns lives in
- * a field it does not write — `maxHull`, `cargoCap`, `shipClass` — and the bank
- * is never lost to a ship death, so the cost of dying stays exactly what the
- * design says it is: time, position, and the half-hold already dropped as
- * debris where you exploded (`killShip`).
+ * Upgrade persistence is *structural*, not a promise that this function happens
+ * not to break: `tiers` is the only record of what a player owns, respawn never
+ * writes it, and the derived ceilings are re-derived from it here — so a fresh
+ * hull is exactly as good as the one that died, and no future edit to this path
+ * can quietly cost a player a tier they paid for (GDD §2.5).
+ *
+ * The bank is never lost to a ship death either, so the cost of dying stays
+ * exactly what the design says it is: time, position, and the half-hold already
+ * dropped as debris where you exploded (`killShip`).
  */
 function respawn(ship: Ship): void {
   ship.alive = true;
+  refreshDerivedStats(ship);
   ship.hull = ship.maxHull;
   ship.pos.x = ship.home.x;
   ship.pos.y = ship.home.y;
