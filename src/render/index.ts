@@ -199,6 +199,11 @@ function withinSensorRange(viewer: { pos: Vec2 }, planet: Planet): boolean {
 export class Renderer {
   /** World-space root; the camera moves this so the target ship stays centered. */
   private readonly worldRoot = new Container();
+  /** The arena boundary — the wall the sim clamps every ship against
+   *  (`step.ts` integrate). It is a blocking volume like a planet, so it is
+   *  drawn like one: without it the play-field edge is an invisible wall a
+   *  player crashes into "beside their planet" (which sits right on it). */
+  private readonly boundaryLayer = new Container();
   private readonly planetLayer = new Container();
   private readonly turretLayer = new Container();
   private readonly asteroidLayer = new Container();
@@ -227,6 +232,11 @@ export class Renderer {
    *  One Graphics per planet, redrawn per frame — eight of them, and every one
    *  is a handful of arcs. */
   private readonly planetOverlay: Graphics[] = [];
+  /** The arena boundary, drawn once. Static — the play bounds never move — so it
+   *  is redrawn only if the bounds themselves change (they don't mid-match). */
+  private boundaryGfx: Graphics | null = null;
+  private boundaryW = -1;
+  private boundaryH = -1;
 
   /** When true, shed the non-load-bearing VFX (impact glows) to buy back frame
    *  time on a struggling device. Driven by the platform's auto-reducer on a
@@ -248,10 +258,17 @@ export class Renderer {
     // everything that moves over them), turrets mounted on them, rocks, chunks,
     // beams, impact glows (over the beam end), ships, turret shots. Labels aid
     // the layout registry + render tests.
+    this.boundaryLayer.label = 'boundary';
     this.planetLayer.label = 'planets';
+    this.turretLayer.label = 'turrets';
+    this.asteroidLayer.label = 'asteroids';
+    this.chunkLayer.label = 'chunks';
     this.beamLayer.label = 'beams';
     this.impactLayer.label = 'impacts';
+    this.shipLayer.label = 'ships';
+    this.shotLayer.label = 'shots';
     this.worldRoot.addChild(
+      this.boundaryLayer, // behind everything: the wall the arena is drawn inside
       this.planetLayer,
       this.turretLayer,
       this.asteroidLayer,
@@ -297,6 +314,7 @@ export class Renderer {
   /** Draw one frame from read-only sim state. Allocation-free on the hot paths. */
   draw(world: World, view: RenderView): void {
     this.centerCamera(world, view.cameraTarget);
+    this.drawBoundary(world.bounds);
     this.drawPlanets(world, view.cameraTarget);
     this.drawAsteroids(world.asteroids);
     this.drawChunks(world.chunks);
@@ -316,6 +334,41 @@ export class Renderer {
     writeCameraOffset(this.offsetScratch, TARGET_SCRATCH, this.viewport);
     this.worldRoot.x = this.offsetScratch.x;
     this.worldRoot.y = this.offsetScratch.y;
+  }
+
+  /**
+   * The arena wall (GDD §4.1 — the sim clamps every ship inside `world.bounds`).
+   * It is as much a blocking volume as a planet, so it gets a drawn surface: the
+   * field report was a ship crashing into the invisible right edge "beside my
+   * planet" — planets are pinned right against this wall (`createWorld`), so the
+   * boundary and the home read as one place, and one of them was never drawn.
+   *
+   * Static, so it is stroked once and only redrawn if the bounds change (they do
+   * not mid-match) — no per-frame allocation on this path (GDD §4.3).
+   */
+  private drawBoundary(bounds: World['bounds']): void {
+    if (this.boundaryGfx && this.boundaryW === bounds.width && this.boundaryH === bounds.height) return;
+    let g = this.boundaryGfx;
+    if (!g) {
+      g = new Graphics();
+      g.label = 'boundary-wall';
+      this.boundaryGfx = g;
+      this.boundaryLayer.addChild(g);
+    }
+    this.boundaryW = bounds.width;
+    this.boundaryH = bounds.height;
+
+    // A double steel frame at the play edge: hull steel is structure, never a
+    // player colour (style-guide §3), and never signal yellow (reserved for ore
+    // / danger, §2). Dim, so it marks the limit without competing with the
+    // entities that move against it — the read is "the world ends here."
+    g.clear();
+    g.rect(0, 0, bounds.width, bounds.height).stroke({ width: 4, color: PALETTE.hullSteel, alpha: 0.5 });
+    g.rect(6, 6, bounds.width - 12, bounds.height - 12).stroke({
+      width: 1,
+      color: PALETTE.hullSteel,
+      alpha: 0.25,
+    });
   }
 
   /**
