@@ -21,6 +21,12 @@
  * **under-attack alarm** with its sustained-damage trigger and screen-edge arrow
  * home (§2.2, a mechanic and not polish), and the remaining two onboarding
  * prompts (§2.10).
+ *
+ * M4 surface: the **8-slot lobby** (§2.1) — room code create/join, the roster
+ * with its player colours (§5.2 / style-guide §3.1), ship-class select with the
+ * four role blurbs and the Vanguard preselected (§2.11), the host's per-seat bot
+ * difficulty picks (§2.9), and the RUSH! countdown, in a layout that holds on a
+ * phone in landscape and on a desktop.
  */
 
 export { Hud } from './hud';
@@ -102,6 +108,93 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
+
+// --- The 8-slot lobby (GDD §2.1, §2.11, §4.2) ------------------------------
+//
+// The same three-piece shape as everything else here: a pure model
+// (`./lobby`), pure geometry (`./lobby-geometry`), and a Pixi view
+// (`./lobby-view`) that only draws what those two return.
+//
+// **Wiring seam**, for whoever boots the client (`src/main.ts`, Platform):
+//
+//   const lobby = new LobbyView(app.screen.width, app.screen.height, isTouch);
+//   app.stage.addChild(lobby);
+//   let state = createLobby({ room: makeRoomCode(rng) });   // host creates a code;
+//                        // a joiner passes the one they typed (normalizeRoomCode)
+//   // per frame:  state = tickLobby(state, dt); lobby.update(lobbyModel(state));
+//   // on resize:  lobby.resize(w, h, isTouch, safeAreaInsets)
+//   // on tap:     const hit = lobby.hitTest(x, y)  →  'class' | 'seat' | 'rush'
+//   //             'class' → selectShipClass(state, CLASS_ORDER[hit.index])
+//   //             'seat'  → cycleBotDifficulty(state, hit.index)   (host only)
+//   //             'rush'  → pressRush(state)  → session.start()
+//   // from the wire: applyLobbySlots(state, msg.slots) on `lobbyState`,
+//   //             startLobbyMatch(state) on `matchStart`, and send
+//   //             botDifficulties(state) with the host's `lobbyChoice`.
+//
+// `LobbyView` implements `LayoutContributor`, so the same registry loop that
+// already registers the HUD registers the lobby with no change (see `main.ts`).
+
+export {
+  CLASS_OPTIONS,
+  CLASS_ORDER,
+  COLOR_NAMES,
+  DEFAULT_SHIP_CLASS,
+  DIFFICULTY_CYCLE,
+  DIFFICULTY_LABELS,
+  LOBBY_SLOTS,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  RUSH_COUNTDOWN_SECONDS,
+  RUSH_LABEL,
+  applyLobbySlots,
+  botDifficulties,
+  canStart,
+  castForEmptySeat,
+  classLocked,
+  colorName,
+  countdownLabel,
+  createLobby,
+  cycleBotDifficulty,
+  defaultDifficultyForEmptySeat,
+  eraseRoomCode,
+  hostControls,
+  isJoinableRoomCode,
+  lobbyModel,
+  makeRoomCode,
+  normalizeRoomCode,
+  pressRush,
+  seatLocalPlayer,
+  selectShipClass,
+  startLobbyMatch,
+  tickLobby,
+  typeRoomCode,
+} from './lobby';
+export type {
+  LobbyModel,
+  LobbyOptions,
+  LobbyPhase,
+  LobbySeat,
+  LobbySeatView,
+  LobbyState,
+  SeatOccupant,
+  ShipClassOption,
+} from './lobby';
+
+export {
+  CLASS_TILE_MAX,
+  CLASS_TILE_MIN,
+  LOBBY_PAD,
+  RUSH_HEIGHT,
+  RUSH_HEIGHT_TOUCH,
+  SEAT_ROW_MAX,
+  SEAT_ROW_MAX_TOUCH,
+  TWO_COLUMN_MIN_WIDTH,
+  lobbyHitTest,
+  lobbyLayout,
+} from './lobby-geometry';
+export type { Insets, LobbyLayout, LobbyLayoutOptions, LobbyTarget, TileShape } from './lobby-geometry';
+
+export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
