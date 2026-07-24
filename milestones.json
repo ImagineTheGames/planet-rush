@@ -9,6 +9,11 @@
       "day": 7,
       "title": "Classroom release",
       "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone."
+    },
+    "v0.1.0-m1": {
+      "milestone": 1,
+      "title": "Milestone 1 — the ship, in your hands",
+      "test_notes": "On your PHONE: twin sticks fly the ship (nose banks into motion), hold-to-FIRE mines an asteroid, ore HUD fills, chunks stay put when your hold is full, the beam stops at what it hits, landscape behaves, and the corner badge tells you exactly which build this is. Two minutes. Your thumbs-up closes M1 and opens M2: planets, turrets, war."
     }
   },
   "days": [
