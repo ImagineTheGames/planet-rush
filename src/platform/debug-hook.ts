@@ -15,7 +15,9 @@
  *                                             // keeps shipScreen centred; a
  *                                             // render-speed-independent movement
  *                                             // truth for "did the drag move it?"
- *     viewport:   { w: number, h: number },  // visual-viewport size (CSS px)
+ *     viewport:   { w, h, width, height },   // visual-viewport size (CSS px) —
+ *                                             // the same two numbers under both
+ *                                             // spellings, see the note below
  *     fps:        number,                     // smoothed frames/sec
  *     ticks:      number,                     // fixed sim steps executed since
  *                                             // boot — the sim's OWN clock
@@ -41,6 +43,16 @@
  * QA divide the two — movement per elapsed tick — which is invariant across
  * render throughput (platform note m1-12).
  *
+ * `viewport` answers to BOTH spellings on purpose. `__planetRush` is a SHARED
+ * debug surface: the layout registry (layout-registry.ts) installs onto the same
+ * global and, finding `viewport` already owned here, leaves it alone — as it must,
+ * since this one is the *visual* viewport, the whole point of the centring
+ * instrument. But the two co-tenants name the field differently: the centring
+ * contract is `{w, h}`, the layout contract is `{width, height}`. Whichever reader
+ * lost the key got `undefined` and a baffling failure (the QA layout suite did).
+ * Four fields, one source, written together: neither contract is weakened and both
+ * are readable at once.
+ *
  * Without `?debug=1` this module is inert: it installs nothing, attaches nothing
  * to `window`, and its `update` is a no-op. It is an instrument only — no game
  * code reads `__planetRush`, and this file exposes nothing else on the global.
@@ -51,7 +63,7 @@
 export interface DebugState {
   readonly shipScreen: { x: number; y: number };
   readonly shipWorld: { x: number; y: number };
-  readonly viewport: { w: number; h: number };
+  readonly viewport: { w: number; h: number; width: number; height: number };
   readonly fps: number;
   /** Fixed sim steps executed since boot — monotonic, render-rate independent. */
   readonly ticks: number;
@@ -108,7 +120,9 @@ export function installDebugHook(
   const state = {
     shipScreen: { x: 0, y: 0 },
     shipWorld: { x: 0, y: 0 },
-    viewport: { w: 0, h: 0 },
+    // Two numbers, four fields: the layout-registry co-tenant reads this same
+    // object as {width, height} (see the `viewport` note in the contract above).
+    viewport: { w: 0, h: 0, width: 0, height: 0 },
     fps: 0,
     ticks: 0,
   };
@@ -146,6 +160,8 @@ export function installDebugHook(
       state.shipWorld.y = shipWorldY;
       state.viewport.w = viewportW;
       state.viewport.h = viewportH;
+      state.viewport.width = viewportW; // alias — the layout registry's spelling
+      state.viewport.height = viewportH;
       state.ticks = simTicks;
 
       // Smooth fps off successive frame timestamps; ignore non-advancing clocks.
