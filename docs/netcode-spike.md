@@ -15,8 +15,20 @@ npx tsc --noEmit                 # the whole spike type-checks under the strict 
 ```
 
 The measured code lives in `src/net/spike/` (`snapshot.ts` wire layout +
-`sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface
-sketch is in `src/net/transport.ts` (types only, no implementation yet).
+`sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface is in
+`src/net/transport.ts`.
+
+**Status since (day 3):** `Transport` now has its first implementation —
+`LocalLoopback` (`src/net/loopback.ts`), which runs the authoritative sim
+in-process for offline play and speaks the protocol below with the wire
+removed. The measured wire layout is promoted to `src/net/snapshot.ts` and
+encodes the *real* `World` rather than the stand-in; `src/net/snapshot.test.ts`
+pins it to the same 510-byte worst case measured here, so the bandwidth numbers
+in this document cannot silently drift. Two spike items remain open and are
+called out below rather than quietly closed: the **TCP head-of-line measurement
+still needs a real lossy network**, which arrives with `WebSocketTransport`, and
+the tick-rate headroom is still measured against the stand-in workload, not the
+real sim plus server-side bot AI plus 8-socket fan-out.
 
 ---
 

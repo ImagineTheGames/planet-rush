@@ -1,12 +1,12 @@
 /**
- * src/net/transport.ts — the `Transport` interface SKETCH.
+ * src/net/transport.ts — the `Transport` interface.
  *
- * OWNER: Netcode Engineer (GDD §3.5, §4.2). Day-0 spike deliverable: **types
- * only, no implementation yet**. The two implementations land mid-week —
- * `LocalLoopback` (solo / offline) and `WebSocketTransport` (online). The
- * simulation consumes ordered input ticks and never knows which transport it is
- * talking to (GDD §4.2); everything the sim needs from the network crosses this
- * one seam.
+ * OWNER: Netcode Engineer (GDD §3.5, §4.2). Written as a day-0 spike
+ * deliverable and unchanged since: `LocalLoopback` (solo / offline, in
+ * `./loopback.ts`) implements it as written, and `WebSocketTransport` (online)
+ * lands behind the same shape. The simulation consumes ordered input ticks and
+ * never knows which transport it is talking to (GDD §4.2); everything the sim
+ * needs from the network crosses this one seam.
  *
  * "Host" is a lobby word, not a network role (GDD §4.2): every client — the
  * room creator included — speaks this same interface. The server holds all
@@ -23,6 +23,14 @@
  * behavior — it is the contract the implementations and the Director review
  * against, not code that runs.
  */
+// Implementation notes, recorded where the contract is read:
+//   • `Transport` says nothing about who owns the world, because that differs
+//     by implementation: `LocalLoopback` holds the authoritative sim in-process
+//     and exposes it through `LocalAuthority` (./loopback.ts), while an online
+//     client will keep a predicted world and reconcile it against `snapshot`.
+//   • Message *ordering* is the transport's promise; message *tick order* is
+//     not. Late, duplicate, and far-future input is filed and judged by the
+//     shared `InputQueue` (./input-queue.ts) on the authoritative side.
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
 
