@@ -1,0 +1,152 @@
+[
+  {
+    "id": "boot-desktop",
+    "title": "Boot — desktop 1280×800",
+    "area": "boot",
+    "image": "images/boot-desktop.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Desktop boot of the real preview bundle. Top-left: 'ORE 3' in signal-yellow beside two empty yellow-outlined cargo slots. Top-centre: 'WAVE 1/5 · Outer Drift', 'NEXT 2:29' in cyan, 'MATCH 0:02' in grey. Screen centre: a small steel triangle ship pointing left with a blue cockpit dot (the placeholder ship). Six grey filled circles (asteroids) are scattered down the left third. Bottom edge: the full controls strip — 'WASD Thrust · Mouse Aim · Left mouse Fire / Mine · E Build & Upgrade · Space / Shift Boost · Middle click Ping'. Bottom-right corner: the build stamp '4bb8a15 · 18:29Z'. No error overlay. This proves the client boots to a playable frame on desktop.",
+    "verdict": "verified"
+  },
+  {
+    "id": "boot-phone-landscape",
+    "title": "Boot — emulated phone, landscape 844×390",
+    "area": "boot",
+    "image": "images/boot-phone-landscape.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Boot on an emulated iPhone-class device (844×390, dpr 3, touch) held landscape. Same HUD as desktop — 'ORE 3' + two cargo slots top-left, 'WAVE 1/5 · Outer Drift / NEXT 2:29 / MATCH 0:02' top-centre, steel triangle ship centred. Touch affordances are drawn unprompted: a thin cyan idle ring (the left thumb-stick home) bottom-left, and a cyan-ringed circular 'FIRE' button bottom-right. Build stamp '4bb8a15 · 18:29Z' bottom-right. The controls-strip text is not shown on the phone (touch layer owns the bottom), which is correct. Proves the client boots and lays out for a landscape phone with the touch UI present.",
+    "verdict": "verified"
+  },
+  {
+    "id": "hud-desktop",
+    "title": "HUD — live, running match (desktop)",
+    "area": "hud",
+    "image": "images/hud-desktop.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Desktop HUD after ~7 s of live (un-frozen) play. The wave clock reads 'NEXT 2:24 / MATCH 0:07' — advanced from the 'NEXT 2:29 / MATCH 0:02' seen at boot, so the clock is genuinely counting, not a still. 'ORE 3' + two cargo slots top-left; controls strip along the bottom. This is the three HUD elements the brief asks for together in one live frame: the ore squares, the wave clock, and the controls strip.",
+    "verdict": "verified"
+  },
+  {
+    "id": "hud-detail-ore-wave",
+    "title": "HUD close-up — ore readout + wave clock (2×)",
+    "area": "hud",
+    "image": "images/hud-detail-ore-wave.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "A 2× device-scale crop of the top band so the text is legible at pixel scale. Left: two square cargo slots with yellow outlines (both empty) above 'ORE 3' in bold signal-yellow — three is the only ore number shown. Right: 'WAVE 1/5 · Outer Drift' in white, 'NEXT 2:26' in cyan, 'MATCH 0:05' in grey monospace. Confirms the exact ore and wave-clock strings, not merely that something is there.",
+    "verdict": "verified"
+  },
+  {
+    "id": "hud-detail-controls-strip",
+    "title": "HUD close-up — controls strip (2×)",
+    "area": "hud",
+    "image": "images/hud-detail-controls-strip.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "A 2× crop of the bottom controls strip. Six bindings, each a cyan key/verb + grey action: 'WASD Thrust', 'Mouse Aim', 'Left mouse Fire / Mine', 'E Build & Upgrade', 'Space / Shift Boost', 'Middle click Ping'. A grey asteroid overlaps behind the strip near the centre (world layer showing through). All six labels are legible and spelled as listed. Note: the strip advertises 'E Build & Upgrade', a control whose on-screen result is tested separately (see build-wheel-open).",
+    "verdict": "verified"
+  },
+  {
+    "id": "touch-affordances-idle-phone",
+    "title": "Touch affordances — idle (emulated phone, landscape)",
+    "area": "touch",
+    "image": "images/touch-affordances-phone.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Emulated iPhone-class phone, landscape, no touch held. Drawn unprompted: a thin cyan idle ring in the lower-left (the dynamic left thumb-stick's home position) and a cyan-ringed 'FIRE' button in the lower-right. Both are rendered into the WebGL canvas with no gesture, which is exactly the affordance-visibility the M1 phone report caught missing. This is the resting state of the touch UI.",
+    "verdict": "verified"
+  },
+  {
+    "id": "touch-stick-engaged-phone",
+    "title": "Touch — left stick engaged under thumb",
+    "area": "touch",
+    "image": "images/touch-stick-engaged-phone.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Emulated phone, landscape, with a synthetic touch pointer pressed and dragged in the lower-left. A filled translucent-cyan disc (the stick knob) now sits at the upper-right edge of the left-stick ring — the knob has moved off centre toward the drag, i.e. the dynamic stick is tracking the thumb. The 'FIRE' button remains cyan-ringed in the lower-right. Proves the ghost/thumb-stick responds to touch, not just that its idle ring is drawn.",
+    "verdict": "verified"
+  },
+  {
+    "id": "rotate-overlay-portrait-ios",
+    "title": "ROTATE overlay — portrait, iOS-Safari capability profile",
+    "area": "mobile",
+    "image": "images/rotate-overlay-portrait-ios.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Emulated iPhone-class phone held PORTRAIT (390×844), with screen.orientation.lock removed before boot to emulate the iOS-Safari profile the overlay is gated to (it only shows where orientation lock is unavailable). A full-screen overlay is drawn: a cyan phone-with-curved-arrow rotate glyph, 'ROTATE YOUR DEVICE' in bold cyan, and 'Planet Rush plays in landscape' beneath it. The game HUD is dimmed behind. Proves the portrait ROTATE overlay renders on the platform it targets.",
+    "verdict": "verified"
+  },
+  {
+    "id": "rotate-overlay-portrait-chromium",
+    "title": "Portrait on lock-capable Chromium (overlay correctly absent)",
+    "area": "mobile",
+    "image": "images/rotate-overlay-portrait.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "The SAME portrait phone WITHOUT the capability stub — stock headless Chromium, which reports orientation-lock support. The ROTATE overlay is NOT shown; the normal portrait game renders instead (centred ship, 'ORE 3', idle left-stick ring, 'FIRE' button, wave clock). This is the specified behaviour — a lock-capable platform takes the lock path, not the overlay — so this shot does NOT prove the overlay; it documents that the gate is real. The overlay itself is proven by rotate-overlay-portrait-ios. Marked inconclusive for the overlay claim.",
+    "verdict": "inconclusive"
+  },
+  {
+    "id": "golden-frozen-desktop",
+    "title": "Golden frozen scene — desktop",
+    "area": "match",
+    "image": "images/golden-frozen-desktop.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "The deterministic golden scene, desktop, at ?debug=1&freeze=1 — the debug hook confirmed frozen before capture. Ship centred pointing left; grey asteroids down the left; HUD pinned at 'NEXT 2:28 / MATCH 0:02'. The build stamp is intentionally absent (freeze hides the one per-commit element so the frame is byte-stable). This frame matches the committed baseline tests/mobile/goldens.spec.ts-snapshots/desktop-frozen-desktop-linux.png. Verifies the golden pipeline reproduces the same frozen frame.",
+    "verdict": "verified"
+  },
+  {
+    "id": "golden-frozen-phone-landscape",
+    "title": "Golden frozen scene — landscape phone",
+    "area": "match",
+    "image": "images/golden-frozen-phone-landscape.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "The deterministic golden scene on the emulated iPhone-class phone, landscape, at ?debug=1&freeze=1 (frozen confirmed). Same pinned HUD 'NEXT 2:28 / MATCH 0:02', centred ship, plus the idle left-stick ring and 'FIRE' button. Corresponds to the committed baseline phone-landscape-frozen-iphone-linux.png. Verifies the frozen golden frame on a phone profile.",
+    "verdict": "verified"
+  },
+  {
+    "id": "planet-ring",
+    "title": "GATE: 8-planet ring on screen",
+    "area": "match",
+    "image": "images/planet-ring.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Widest available frame (1600×1000) on the seeded ?debug=1&freeze=1 world, whose roster is a full 8-planet ring (freeze.ts FREEZE_PLAYER_COUNT=8, and the sim's createWorld does build world.planets[8]). ON SCREEN: only grey asteroid circles clustered in the upper-left, the local ship at centre, and the HUD. There is NO ring of planets — no coloured planet bodies, no cores, no home bases anywhere in the frame. The 8-planet ring exists in sim state but is NOT rendered by the client (src/render/index.ts draws only ships, asteroids, ore chunks and beams — it has no planet/turret draw path). FAILS the gate: the ring is not visible.",
+    "verdict": "failed"
+  },
+  {
+    "id": "build-wheel-open",
+    "title": "GATE: Build wheel open with costs",
+    "area": "build-wheel",
+    "image": "images/build-wheel-open.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Held 'E' (the strip's 'E Build & Upgrade' binding) at the ship's spawn — its own planet, i.e. docked, the one place GDD §2.5 says the wheel opens. The match clock advanced to 'MATCH 0:05', so input was accepted. ON SCREEN: no build wheel — no radial segments, no segment labels, and none of the expected cost numbers. The scene is the ordinary game frame with ship, asteroids and HUD. The HUD module contains a BuildWheelView, but main.ts never feeds its wheel signals (feedHud sets only cargo/cargoCap/banked/time/device/fireMode/isTouch/nearAsteroid; docked defaults false), so the wheel stays hidden. FAILS the gate: no wheel, no costs visible.",
+    "verdict": "failed"
+  },
+  {
+    "id": "turret-under-construction",
+    "title": "GATE: turret mid-construction",
+    "area": "build-wheel",
+    "image": "images/turret-under-construction.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "Held 'E', swept clicks around where wheel segments would sit, pressed confirm, then let the sim run ~4 s for a build to progress (clock reached 'MATCH 0:09'). ON SCREEN: no turret at any stage of construction, no build-progress ring or bar, and — as with planet-ring — no planet for a turret to mount on. The frame is indistinguishable from an idle boot. Turret construction is simulated (sim/buildings.ts) but nothing in the render/HUD feed surfaces planets or turrets to the client. FAILS the gate: no turret under construction is visible.",
+    "verdict": "failed"
+  },
+  {
+    "id": "alarm-arrow",
+    "title": "GATE: under-attack alarm arrow",
+    "area": "match",
+    "image": "images/alarm-arrow.png",
+    "capturedAt": "2026-07-24T18:39:24Z",
+    "buildSha": "4bb8a15",
+    "attestation": "A ~2-minute unattended run (clock reached 'MATCH 2:01', 'NEXT 0:30' — the wave clock did count down toward the next wave). ON SCREEN: no under-attack alarm — no red screen-edge frame and no edge arrow pointing home — and no planet anywhere. Two caveats, both honest: offline there is no attacker to trigger a sustained-damage alarm, AND the alarm/home-arrow surface (ui/alarm.ts, ui/hud.ts) is never fed by main.ts (no planetWorld position, no turretHp), so it could not show even under attack. FAILS the gate: no alarm frame or arrow is visible.",
+    "verdict": "failed"
+  }
+]
