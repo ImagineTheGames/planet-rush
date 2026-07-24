@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:mobile": "playwright test",
+    "test:live": "playwright test --config tests/live/playwright.live.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
