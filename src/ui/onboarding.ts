@@ -15,10 +15,21 @@
  * "Hold fire" becomes "Hold Left mouse" on desktop and "Hold the FIRE button"
  * on a touch phone without this module ever knowing which device is present.
  *
- * Day-1 scope (GDD §4.6 day 1): the first two prompts —
- *   1. "Hold {fire} on the asteroid — your beam mines it"  (teaches mining)
- *   2. "Hold full — fly home"                              (teaches the haul)
- * The later prompts (upgrade, under-attack) arrive with planets/build on day 2.
+ * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers):
+ *   1. "Hold {fire} on the asteroid — your beam mines it"      (teaches mining)
+ *   2. "Hold full — fly home and press {build}"                (teaches the haul)
+ *   3. "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
+ *   4. "Your planet is under attack — follow the arrow"
+ *
+ * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside planets, the
+ * build wheel and the under-attack alarm, and completes (2)'s copy — it now has
+ * a planet to fly home *to*, so the clause GDD §2.10 quotes ("and press E")
+ * joins it, resolved through the action layer like every other binding.
+ *
+ * (3) is the one GDD §2.10 singles out: it "fires the first time the wheel
+ * opens, because upgrades are the half of the economy a player can most easily
+ * miss." (4) rides the alarm's sustained-damage trigger ({@link ../ui/alarm}),
+ * so it fires on a siege and never on a taunt-tap.
  */
 
 import { describeBindings, FireMode } from '@platform/actions';
@@ -28,13 +39,21 @@ import type { DeviceKind } from '@platform/actions';
 // Prompt identity and copy
 // ---------------------------------------------------------------------------
 
-/** The onboarding prompts. Day-1 ships the first two (GDD §2.10, §4.6). */
+/** The onboarding prompts (GDD §2.10, §4.6 — M1 ships the first two, M2 all four). */
 export enum PromptId {
   /** "Hold {fire} on the asteroid — your beam mines it." Teaches that the gun
    *  is the mining tool — the inversion the whole game turns on (GDD §2.10). */
   Mine = 'mine',
-  /** "Hold full — fly home." Teaches that held ore is not safe ore (GDD §2.3). */
+  /** "Hold full — fly home and press {build}." Teaches that held ore is not safe
+   *  ore, and where the ore goes when you get there (GDD §2.3, §2.5). */
   HaulHome = 'haul-home',
+  /** "Spend ore on defense — or UPGRADE SHIP to mine and hit harder." Fires the
+   *  first time the wheel opens: upgrades are the half of the economy a player
+   *  can most easily miss (GDD §2.10, §2.5). */
+  Spend = 'spend',
+  /** "Your planet is under attack — follow the arrow." The alarm's lesson: the
+   *  triangle decision, made audible (GDD §2.2, §2.10). */
+  UnderAttack = 'under-attack',
 }
 
 /**
@@ -54,16 +73,40 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
     id: PromptId.Mine,
     template: 'Hold {fire} on the asteroid — your beam mines it',
   },
-  // No token: day-1 has no planet to "press E" at yet (that clause joins the
-  // prompt on day 2 with the build wheel). "Held ore is not safe ore" (GDD §2.3).
+  // `{build}` resolves to the Build & Upgrade binding — "E" on a keyboard, the
+  // BUILD button on touch. GDD §2.10 quotes this prompt as "fly home and press
+  // E"; the token is how it says that on a pad and a phone too.
+  // "Held ore is not safe ore" (GDD §2.3).
   [PromptId.HaulHome]: {
     id: PromptId.HaulHome,
-    template: 'Hold full — fly home',
+    template: 'Hold full — fly home and press {build}',
+  },
+  // No token: this one fires *while the wheel is open*, so the bindings are on
+  // screen already. It names UPGRADE SHIP in the wheel's own words, because the
+  // whole point is that the player finds the segment they'd otherwise miss.
+  [PromptId.Spend]: {
+    id: PromptId.Spend,
+    template: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder',
+  },
+  // No token: the arrow is the instruction, and it is device-agnostic already.
+  [PromptId.UnderAttack]: {
+    id: PromptId.UnderAttack,
+    template: 'Your planet is under attack — follow the arrow',
   },
 };
 
-/** Iteration order for prompts (also the priority when two are eligible). */
-const PROMPT_ORDER: readonly PromptId[] = [PromptId.Mine, PromptId.HaulHome];
+/**
+ * Iteration order for prompts, and the priority when two are eligible at once.
+ * UNDER-ATTACK leads: it is the only prompt about something happening *to* the
+ * player rather than something they could do next, and a siege outranks a
+ * shopping tip (GDD §2.2 — "the triangle decision, made audible").
+ */
+const PROMPT_ORDER: readonly PromptId[] = [
+  PromptId.UnderAttack,
+  PromptId.Mine,
+  PromptId.HaulHome,
+  PromptId.Spend,
+];
 
 // ---------------------------------------------------------------------------
 // Input-agnostic text resolution (via the action layer)
@@ -107,6 +150,16 @@ export interface OnboardingSignals {
   readonly cargo: number;
   /** Hold capacity — cargo === cargoCap means "hold full" (GDD §2.3). */
   readonly cargoCap: number;
+  /** The Build & Upgrade wheel is open this frame — the SPEND prompt's trigger
+   *  ("fires the first time the wheel opens", GDD §2.10). Optional so day-1
+   *  callers that predate the wheel keep compiling; absent reads as closed. */
+  readonly wheelOpen?: boolean;
+  /** An order has been placed from the wheel at least once this match — the
+   *  SPEND lesson, learned. Optional for the same reason. */
+  readonly hasOrdered?: boolean;
+  /** The under-attack alarm is sounding ({@link ../ui/alarm}) — the UNDER-ATTACK
+   *  prompt's trigger (GDD §2.2, §2.10). Optional; absent reads as quiet. */
+  readonly underAttack?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +181,8 @@ export class Onboarding {
   private hasMined = false;
   /** Sticky within a haul: the hold has reached full since it was last emptied. */
   private wasFull = false;
+  /** Sticky: the alarm has sounded at least once since it last fell silent. */
+  private wasUnderAttack = false;
 
   /**
    * Advance the machine one tick and return the prompt to show, or `null`.
@@ -136,10 +191,12 @@ export class Onboarding {
    */
   update(signals: OnboardingSignals): PromptId | null {
     const full = signals.cargoCap > 0 && signals.cargo >= signals.cargoCap;
+    const underAttack = signals.underAttack === true;
 
     // --- Latch progress facts (sticky) --------------------------------------
     if (signals.cargo > 0) this.hasMined = true;
     if (full) this.wasFull = true;
+    if (underAttack) this.wasUnderAttack = true;
 
     // --- Completion: a lesson learned is a prompt retired forever ------------
     // MINE is done the moment the player has any ore — they mined (GDD §2.3).
@@ -147,6 +204,13 @@ export class Onboarding {
     // HAUL-HOME is done once a full hold has been emptied (flew home / dropped
     // on death) — they experienced held-ore-is-not-safe (GDD §2.3, §2.7).
     if (this.wasFull && !full) this.completed.add(PromptId.HaulHome);
+    // SPEND is done the moment ore is actually spent from the wheel — the
+    // player has found the economy, including the segment behind the arrow.
+    if (signals.hasOrdered === true) this.completed.add(PromptId.Spend);
+    // UNDER-ATTACK is done once a siege has been *survived* — the alarm sounded
+    // and then fell silent. Retiring it while it is still sounding would pull
+    // the instruction off screen mid-lesson.
+    if (this.wasUnderAttack && !underAttack) this.completed.add(PromptId.UnderAttack);
 
     // --- Active prompt: first eligible, uncompleted, in priority order -------
     for (const id of PROMPT_ORDER) {
@@ -165,6 +229,14 @@ export class Onboarding {
       // Show the haul lesson the moment the hold fills (GDD §2.3).
       case PromptId.HaulHome:
         return full;
+      // "Fires the first time the wheel opens" (GDD §2.10) — and stays up for
+      // as long as it is open and nothing has been bought yet.
+      case PromptId.Spend:
+        return signals.wheelOpen === true;
+      // Rides the alarm's sustained-damage trigger, so it never fires on a
+      // taunt-tap (GDD §2.2) — see {@link ../ui/alarm}.
+      case PromptId.UnderAttack:
+        return signals.underAttack === true;
     }
   }
 
@@ -173,7 +245,8 @@ export class Onboarding {
     return this.completed.has(id);
   }
 
-  /** Whether every day-1 prompt has been completed (onboarding done). */
+  /** Whether every prompt has been completed — the first match has finished
+   *  being the tutorial (GDD §2.10: "no separate tutorial mode"). */
   allCompleted(): boolean {
     return PROMPT_ORDER.every((id) => this.completed.has(id));
   }

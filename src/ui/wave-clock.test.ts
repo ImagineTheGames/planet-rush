@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computeWaveClock, formatClock, WAVE_NAMES } from './wave-clock';
-import { WAVE_COUNT, WAVE_INTERVAL_S } from '../sim/constants';
+import { WAVE_COUNT, WAVE_INTERVAL_S, waveTime } from '../sim/constants';
 
 describe('computeWaveClock (GDD §2.3)', () => {
   it('is wave 1, named, at match start', () => {
@@ -46,6 +46,39 @@ describe('computeWaveClock (GDD §2.3)', () => {
     const c = computeWaveClock(-5);
     expect(c.wave).toBe(1);
     expect(c.matchTime).toBe(0);
+  });
+
+  it('counts down to the sim\'s own arrival times, not a second copy of them', () => {
+    // src/sim/waves.ts spawns wave n at waveTime(n) and says so in its header:
+    // "the same function the HUD's wave clock counts down to." Calling it is
+    // what makes the clock unable to promise a wave the sim will not deliver.
+    for (let n = 1; n <= WAVE_COUNT; n++) {
+      const atArrival = computeWaveClock(waveTime(n));
+      expect(atArrival.wave).toBe(n);
+      // A hair before the arrival, it is still the previous wave, counting down
+      // to zero — the boundary lands exactly where the spawner puts it.
+      if (n > 1) {
+        const justBefore = computeWaveClock(waveTime(n) - 0.001);
+        expect(justBefore.wave).toBe(n - 1);
+        expect(justBefore.countdownToNext).toBeCloseTo(0.001, 6);
+      }
+    }
+  });
+});
+
+describe('the collapse phase (GDD §2.3)', () => {
+  it('is not collapsed by default — a caller that predates the endgame is safe', () => {
+    expect(computeWaveClock(0).isCollapsed).toBe(false);
+    expect(computeWaveClock(WAVE_INTERVAL_S * 99).isCollapsed).toBe(false);
+  });
+
+  it('reports collapse when the sim says so, independently of the wave number', () => {
+    // Collapse begins the instant the field runs dry, which can happen during
+    // the final wave — so it is not "final wave, later", and the clock takes
+    // the sim's verdict rather than inferring one from the time.
+    const early = computeWaveClock(WAVE_INTERVAL_S * (WAVE_COUNT - 1) + 1, true);
+    expect(early.isCollapsed).toBe(true);
+    expect(early.isFinalWave).toBe(true);
   });
 });
 

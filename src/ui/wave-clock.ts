@@ -12,13 +12,15 @@
  * and never drifts from the sim's own clock. The Pixi view in {@link ./hud}
  * only formats what this returns.
  *
- * NOTE: the sim does not yet expose per-wave state (day-1 has a static field;
- * timed spawning lands later — see `createWorld`'s asteroidCount). Until it does,
- * this clock is computed from time + constants, the same numbers the sim will
- * spawn against, so the HUD is correct the day waves go live.
+ * The countdown is computed with the sim's **own** {@link waveTime} — the
+ * function `src/sim/waves.ts` spawns against — rather than a second copy of the
+ * schedule here. That is structural, not tidiness: the spawner's own note says
+ * "the same function the HUD's wave clock counts down to, so the clock can never
+ * promise a wave the sim does not deliver," and calling it is what makes that
+ * true instead of merely intended.
  */
 
-import { WAVE_COUNT, WAVE_INTERVAL_S } from '../sim/constants';
+import { WAVE_COUNT, waveTime } from '../sim/constants';
 
 /** Full names for the five waves — each "closer to the map center than the last"
  *  (GDD §2.3), so the names read outer→inner. Player-facing flavor (not a
@@ -45,26 +47,39 @@ export interface WaveClock {
   readonly matchTime: number;
   /** True once the final wave has arrived — no more ore incoming (GDD §2.3). */
   readonly isFinalWave: boolean;
+  /**
+   * True once the collapse phase has begun (the sim's `isCollapsed`): no shield
+   * regeneration, no repair, no new ore (GDD §2.3). The clock says so, because
+   * this is the moment the match stops being about the economy — and a player
+   * who does not know it has started cannot read why their repair stopped
+   * working. Note the sim can enter collapse *during* the final wave, the
+   * instant the field runs dry, so this is not merely "final wave, later".
+   */
+  readonly isCollapsed: boolean;
 }
 
 /**
  * Compute the wave clock at a given match time (seconds).
  *
- * Waves arrive on a metronome: wave 1 is present at t=0, and each subsequent
- * wave at k·`WAVE_INTERVAL_S`. The countdown is the time to the next boundary;
- * on the final wave there is no "next", so it is `null` (the HUD reads FINAL).
+ * Waves arrive on a metronome: wave 1 is present at t=0 and wave `n` lands at
+ * the sim's own {@link waveTime}`(n)`. The countdown is the time to the next
+ * wave's arrival; on the final wave there is no "next", so it is `null` (the HUD
+ * reads FINAL).
+ *
+ * @param timeSeconds `world.time`.
+ * @param collapsed   The sim's `isCollapsed(world)`. Optional — a caller that
+ *                    predates the endgame reads as "not collapsed".
  */
-export function computeWaveClock(timeSeconds: number): WaveClock {
+export function computeWaveClock(timeSeconds: number, collapsed = false): WaveClock {
   const t = Math.max(0, timeSeconds);
-  const interval = WAVE_INTERVAL_S;
 
-  // Boundaries passed so far (0-based); wave number is one more, capped.
-  const boundariesPassed = Math.floor(t / interval);
-  const wave = Math.min(boundariesPassed + 1, WAVE_COUNT);
+  // The highest wave whose arrival time has passed, from the sim's schedule.
+  let wave = 1;
+  while (wave < WAVE_COUNT && t >= waveTime(wave + 1)) wave++;
   const isFinalWave = wave >= WAVE_COUNT;
 
-  // Time to the next wave boundary — null once the last wave is out.
-  const countdownToNext = isFinalWave ? null : interval - (t % interval);
+  // Time to the next wave's arrival — null once the last wave is out.
+  const countdownToNext = isFinalWave ? null : waveTime(wave + 1) - t;
 
   return {
     wave,
@@ -73,6 +88,7 @@ export function computeWaveClock(timeSeconds: number): WaveClock {
     countdownToNext,
     matchTime: t,
     isFinalWave,
+    isCollapsed: collapsed,
   };
 }
 

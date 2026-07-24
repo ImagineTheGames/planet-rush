@@ -1,0 +1,103 @@
+/**
+ * src/ui/planet-hp.ts — your own planet's HP. OWNER: UI Engineer.
+ *
+ * Top-right of the HUD (GDD §2.2): "**your own planet's HP** (top right, in your
+ * player color, mirrored as a bar over the planet itself)". It is one of the
+ * five things the HUD shows at all times, because it is the loss condition
+ * (GDD §1) and therefore something the player acts on.
+ *
+ * **Your own planet only.** Enemy planet health is scouted, never broadcast
+ * (GDD §2.2, style-guide §5): a rival's HP appears as a damage ring on that
+ * planet within sensor range, and never as a HUD bar. This module models one
+ * bar, for one planet — the local player's — and there is deliberately no code
+ * path here that takes another player's planet.
+ *
+ * Colour: **the player's identity colour** (style-guide §3 rule 2 — HP bars are
+ * one of the six places identity colour is allowed). The roster is read from the
+ * ratified `PLAYER_COLORS` so this bar and the ship trim beside it can never
+ * disagree. The critical-state flash is threat red, which style-guide §2 reserves
+ * for exactly this kind of danger tell.
+ *
+ * Pure and DOM-free; the Pixi view in {@link ./hud} draws what this returns.
+ */
+
+import type { PlayerId } from '@shared/types';
+import { PALETTE, PLAYER_COLORS } from '@render/index';
+
+/** Core fraction at or below which the bar reads as critical and flashes. The
+ *  fraction, not an HP number: a damage ring is a shape, not a readout. TUNABLE */
+export const PLANET_CRITICAL_FRACTION = 0.25;
+
+/** The own-planet HP element for one frame. */
+export interface PlanetHpModel {
+  /** Core HP as a fraction 0..1 — the bar's fill. */
+  readonly coreFraction: number;
+  /** Pooled shield HP as a fraction of full shields, 0..1. Shields stand in
+   *  front of the core (GDD §2.5), so the view draws them as a thin overbar. */
+  readonly shieldFraction: number;
+  /** Whether any shield generator is standing at all. */
+  readonly hasShield: boolean;
+  /** The bar's colour: the owner's identity colour (style-guide §3). */
+  readonly color: number;
+  /** Colour of the critical tell — threat red (style-guide §2). */
+  readonly criticalColor: number;
+  /** True at or below {@link PLANET_CRITICAL_FRACTION}: the bar flashes. */
+  readonly critical: boolean;
+  /** True once the core is gone — the planet is a wreck (GDD §2.7). */
+  readonly destroyed: boolean;
+}
+
+/** The identity colour for a player slot (style-guide §3.1, 8-slot roster).
+ *  Wraps the roster so an out-of-range slot degrades to steel instead of
+ *  `undefined` — identity is also carried by the hull decal, never colour alone. */
+export function playerColor(id: PlayerId): number {
+  if (!Number.isFinite(id) || id < 0) return PALETTE.hullSteel;
+  return PLAYER_COLORS[Math.floor(id) % PLAYER_COLORS.length] ?? PALETTE.hullSteel;
+}
+
+/**
+ * Build the own-planet HP model.
+ *
+ * @param owner       The local player's slot — selects the identity colour.
+ * @param coreHp      Current core HP.
+ * @param maxCoreHp   Full core HP (`CORE_HP` at match start).
+ * @param shieldHp    Pooled shield HP standing over the core, 0 when none.
+ * @param maxShieldHp Pooled shield HP at full, 0 when no generator is built.
+ */
+export function planetHpModel(
+  owner: PlayerId,
+  coreHp: number,
+  maxCoreHp: number,
+  shieldHp = 0,
+  maxShieldHp = 0,
+): PlanetHpModel {
+  const coreFraction = maxCoreHp > 0 ? clamp01(coreHp / maxCoreHp) : 0;
+  const shieldFraction = maxShieldHp > 0 ? clamp01(shieldHp / maxShieldHp) : 0;
+  return {
+    coreFraction,
+    shieldFraction,
+    hasShield: maxShieldHp > 0,
+    color: playerColor(owner),
+    criticalColor: PALETTE.threatRed,
+    // A core standing behind a shield is not yet in danger — the shield is what
+    // is being shot (GDD §2.5), so the critical tell waits until it is the core.
+    critical: coreFraction > 0 && coreFraction <= PLANET_CRITICAL_FRACTION,
+    destroyed: coreFraction <= 0,
+  };
+}
+
+/**
+ * Whether the critical flash is "on" this frame. Driven by match time, not a
+ * wall clock, so it is deterministic and needs no timer — the same discipline
+ * as the ore HUD's full-hold blink. ~3 Hz: faster than the ore flash, because
+ * this one means something worse.
+ */
+export function planetHpFlashOn(model: PlanetHpModel, timeSeconds: number): boolean {
+  if (!model.critical) return false;
+  return Math.floor(timeSeconds * 6) % 2 === 0;
+}
+
+function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
