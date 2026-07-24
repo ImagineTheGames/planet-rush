@@ -30,6 +30,36 @@ still needs a real lossy network**, which arrives with `WebSocketTransport`, and
 the tick-rate headroom is still measured against the stand-in workload, not the
 real sim plus server-side bot AI plus 8-socket fan-out.
 
+**Status since (day 3, the server):** the decisions in this document are now
+running code rather than a plan.
+
+- **The 30 Hz broadcast decision is implemented as the room's snapshot divisor**
+  (`server/room.ts`, one snapshot every 2 ticks of the 60 Hz sim), and static
+  entities are diffed and sent as events at 10 Hz — they cost nothing per tick,
+  exactly as §4.2 of the GDD assumes and this document's bandwidth table bills.
+- **The wire layout measured here is what actually goes over the socket**, inside
+  a 10-byte frame header (kind, version, tick, ackSeq — `src/net/wire.ts`). Frame
+  overhead is therefore 10 B on top of the 510 B worst case, not the ~44 B
+  transport overhead already billed above; the per-client numbers stand.
+- **Control traffic is JSON, deliberately.** Join/lobby/events/match-end are a
+  handful of messages per match, and input is the only frequent one — the
+  measurement above says upstream is never the bottleneck, so a binary input
+  encoding is recorded as a follow-up rather than done on spec.
+- **The host decision is honoured by construction.** The server is a plain
+  Dockerized Node process (`server/Dockerfile`) with a **dependency-free**
+  RFC 6455 endpoint (`server/ws.ts`), so the runtime image is `node` plus one
+  bundled file: nothing native to rebuild for the chosen ARM Ampere core, and
+  nothing vendor-specific to port. Oracle Always Free → the €4 VPS remains an
+  afternoon, which was the whole point (risk 1).
+
+**Still open, and still stated rather than quietly closed:** the TCP
+head-of-line measurement needs a real lossy network with eight real clients —
+the transport and the server that make that test possible now both exist, so it
+is a test to run, not a thing to build. The tick-rate headroom is still measured
+against the stand-in, not the real sim plus seven server-side bots plus the
+8-socket fan-out; the honest place to close that is the M5 integration gate,
+against the real bot trees rather than today's do-nothing baseline.
+
 ---
 
 ## MEASUREMENTS
