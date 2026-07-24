@@ -57,7 +57,7 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     expect(state).toEqual({
       shipScreen: { x: 0, y: 0 },
       shipWorld: { x: 0, y: 0 },
-      viewport: { w: 0, h: 0 },
+      viewport: { w: 0, h: 0, width: 0, height: 0 },
       fps: 0,
       build: STAMP,
     });
@@ -65,7 +65,7 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     hook.update(195, 422, 390, 844, 1500, 2600, 1000);
     expect(state!.shipScreen).toEqual({ x: 195, y: 422 });
     expect(state!.shipWorld).toEqual({ x: 1500, y: 2600 });
-    expect(state!.viewport).toEqual({ w: 390, h: 844 });
+    expect(state!.viewport).toEqual({ w: 390, h: 844, width: 390, height: 844 });
 
     // Same object mutated in place — no per-frame reallocation of the handle.
     const before = read(win);
@@ -73,6 +73,20 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     expect(read(win)).toBe(before);
     expect(before!.shipScreen).toEqual({ x: 10, y: 20 });
     expect(before!.shipWorld).toEqual({ x: 50, y: 60 });
+  });
+
+  it('reports the viewport under both spellings (shared-handle co-tenancy)', () => {
+    // window.__planetRush is shared with the layout registry, whose readers
+    // speak {width,height}; this module's own contract is {w,h}. One object
+    // answers both, so neither reader sees `undefined` (see debug-hook.ts).
+    const win = fakeWindow();
+    const hook = installDebugHook('?debug=1', win, STAMP);
+    hook.update(0, 0, 844, 390, 0, 0, 1000);
+    const vp = read(win)!.viewport;
+    expect(vp.w).toBe(844);
+    expect(vp.width).toBe(844);
+    expect(vp.h).toBe(390);
+    expect(vp.height).toBe(390);
   });
 
   it('reports which build it is, frozen and stable across frames', () => {
