@@ -175,8 +175,11 @@ export const WAVE_INTERVAL_S: Tunable<number> = 150;
  */
 export const WAVE = {
   /** Asteroids delivered per wave. `WAVE_COUNT × this` is the whole match's
-   *  rock count — 5 × 12 = 60, the day-1 field size, now spread over time. */
-  asteroidsPerWave: 12,
+   *  rock count — 5 × 20 = 100, half the ~200-asteroid performance budget
+   *  (GDD §4.3) even if nobody mines a thing. At `WAVE_ORE` = 80 that is ~4 ore
+   *  a rock: eight seconds of Vanguard beam time, two round trips for a base
+   *  2-slot hold — small enough that "how full do I run?" is asked often. */
+  asteroidsPerWave: 20,
   /** Wave 1's scatter disc, as a fraction of the base field radius. */
   firstRadiusFraction: 1.0,
   /** The final wave's scatter disc, same units. Strictly smaller than the
