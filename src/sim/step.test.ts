@@ -13,7 +13,17 @@ import { describe, it, expect } from 'vitest';
 import type { Action } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { createWorld, step, type Inputs, type Ship, type Asteroid, type World } from './index';
-import { BEAM_RANGE, MINING_RATE, SHIP_RADIUS, SHIP_STATS, CARGO_BASE } from './constants';
+import {
+  BASE_TURN_RATE,
+  BEAM_RANGE,
+  CARGO_BASE,
+  DRAG,
+  FACE_VELOCITY_MIN_SPEED,
+  MINING_RATE,
+  SHIP_RADIUS,
+  SHIP_STATS,
+  TICK_DT,
+} from './constants';
 
 // --- builders --------------------------------------------------------------
 
@@ -372,6 +382,187 @@ describe('ship-vs-asteroid reflection (GDD §4.1)', () => {
     const dy = s.pos.y - rock.pos.y;
     const sep = Math.sqrt(dx * dx + dy * dy);
     expect(sep).toBeGreaterThanOrEqual(s.radius + rock.radius - 1e-6);
+  });
+});
+
+// --- 5. facing ladder: aim → auto-aim → velocity → hold --------------------
+
+describe('facing ladder (aim input → auto-aim target → velocity → hold)', () => {
+  const aim = (x: number, y: number): Action => ({ type: 'aim', dir: { x, y } });
+  /** One class turn step, radians per tick. */
+  const turnStep = (cls = ShipClass.Vanguard) => BASE_TURN_RATE * SHIP_STATS[cls].turnMul * TICK_DT;
+
+  it('3. with no aim and no auto-aim target, the nose turns toward velocity', () => {
+    // Moving straight up (+y), facing +x. Nothing aimed, nothing fired.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: 200 }, angle: 0 });
+    const world = emptyWorld({ ships: [ship] });
+
+    step(world, []);
+    // Exactly one turn step toward +y — no snap.
+    expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
+
+    // Converges to the velocity direction and then holds it.
+    for (let t = 0; t < 20; t++) step(world, []);
+    expect(world.ships[0]!.angle).toBeCloseTo(Math.PI / 2, 6);
+  });
+
+  it('3. thrusting from rest turns the nose into the direction of travel', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 }); // at rest, facing +x
+    const world = emptyWorld({ ships: [ship] });
+    const inputs: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: -1, y: 0 } }] }];
+
+    for (let t = 0; t < 60; t++) step(world, inputs);
+
+    const s = world.ships[0]!;
+    expect(s.vel.x).toBeLessThan(0); // travelling -x
+    expect(Math.abs(s.angle)).toBeCloseTo(Math.PI, 4); // nose came about to -x
+  });
+
+  it('1. an explicit aim input outranks both velocity and an auto-aim target', () => {
+    // Travelling +x (velocity would say angle 0); an auto-aim target sits at
+    // +y; the player aims at -y. Aim must win, so the ship turns negative.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 200, y: 0 }, angle: 0 });
+    const target = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
+    const world = emptyWorld({ ships: [ship, target] });
+
+    step(world, [{ id: 0, actions: [aim(0, -1), fire(true)] }]);
+
+    expect(world.ships[0]!.angle).toBeCloseTo(-turnStep(), 9);
+  });
+
+  it('2. an engaged auto-aim target outranks velocity', () => {
+    // Same setup, minus the aim input: the ship turns toward the target (+y),
+    // not toward its velocity (+x, i.e. hold at 0).
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 200, y: 0 }, angle: 0 });
+    const target = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
+    const world = emptyWorld({ ships: [ship, target] });
+
+    step(world, [{ id: 0, actions: [fire(true)] }]);
+
+    expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
+  });
+
+  it('2→3. auto-aim with nothing in range falls through to velocity', () => {
+    // Firing on auto with an empty field: the ladder drops to velocity.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: 200 }, angle: 0 });
+    const world = emptyWorld({ ships: [ship] });
+
+    step(world, [{ id: 0, actions: [fire(true)] }]);
+
+    expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
+  });
+
+  it('3. firing manually without an aim input still faces velocity', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: 200 }, angle: 0 });
+    const world = emptyWorld({ ships: [ship] });
+
+    step(world, [{ id: 0, actions: [fire()] }]); // manual fire, no aim action
+
+    expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
+    // The beam still runs along the (newly turned) facing.
+    expect(world.ships[0]!.beam!.dir.x).toBeCloseTo(Math.cos(turnStep()), 9);
+  });
+
+  it('4. below the speed epsilon the ship holds its facing exactly', () => {
+    const slow = FACE_VELOCITY_MIN_SPEED * 0.5;
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: slow }, angle: 1 });
+    const world = emptyWorld({ ships: [ship] });
+
+    for (let t = 0; t < 120; t++) step(world, []); // drag only shrinks it further
+    expect(world.ships[0]!.angle).toBe(1); // bit-identical hold, no drift
+  });
+
+  it('4. a ship at rest holds its facing', () => {
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: 0 }, angle: -2 });
+    const world = emptyWorld({ ships: [ship] });
+
+    for (let t = 0; t < 60; t++) step(world, []);
+    expect(world.ships[0]!.angle).toBe(-2);
+  });
+
+  it('3/4. the epsilon is the switch: just above it turns, just below it holds', () => {
+    // Facing is resolved after integration, so it reads the post-drag speed —
+    // pre-drag speeds are pre-divided by one tick of decay to land either side
+    // of the epsilon by 1%.
+    const decay = 1 - DRAG * TICK_DT;
+    const over = makeShip({ id: 0, pos: { x: 500, y: 500 }, vel: { x: 0, y: (FACE_VELOCITY_MIN_SPEED * 1.01) / decay }, angle: 0 });
+    const under = makeShip({ id: 1, pos: { x: 1500, y: 500 }, vel: { x: 0, y: (FACE_VELOCITY_MIN_SPEED * 0.99) / decay }, angle: 0 });
+    const world = emptyWorld({ ships: [over, under] });
+
+    step(world, []);
+
+    expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
+    expect(world.ships[1]!.angle).toBe(0);
+  });
+
+  it('never turns faster than the class turn rate, and converges monotonically', () => {
+    // Worst case: velocity is a half-turn away from the current facing.
+    for (const cls of [ShipClass.Interceptor, ShipClass.Vanguard, ShipClass.Excavator, ShipClass.Hauler]) {
+      const ship = makeShip({ id: 0, shipClass: cls, pos: { x: 900, y: 900 }, vel: { x: -240, y: 0 }, angle: 0 });
+      const world = emptyWorld({ ships: [ship] });
+      const maxDelta = turnStep(cls);
+
+      let prev = 0;
+      let prevGap = Math.PI;
+      for (let t = 0; t < 40; t++) {
+        // Thrust keeps the velocity pinned at -x so the target angle is fixed.
+        step(world, [{ id: 0, actions: [{ type: 'thrust', dir: { x: -1, y: 0 } }] }]);
+        const angle = world.ships[0]!.angle;
+        expect(Math.abs(angle - prev)).toBeLessThanOrEqual(maxDelta + 1e-9);
+        const gap = Math.abs(Math.abs(angle) - Math.PI);
+        expect(gap).toBeLessThanOrEqual(prevGap + 1e-9); // never overshoots away
+        prev = angle;
+        prevGap = gap;
+      }
+      expect(Math.abs(world.ships[0]!.angle)).toBeCloseTo(Math.PI, 6);
+    }
+  });
+
+  it('a faster-turning class reaches the velocity heading sooner', () => {
+    const ticksToFace = (cls: ShipClass): number => {
+      const ship = makeShip({ id: 0, shipClass: cls, pos: { x: 900, y: 900 }, vel: { x: 0, y: 240 }, angle: 0 });
+      const world = emptyWorld({ ships: [ship] });
+      for (let t = 1; t <= 200; t++) {
+        step(world, [{ id: 0, actions: [{ type: 'thrust', dir: { x: 0, y: 1 } }] }]);
+        if (Math.abs(world.ships[0]!.angle - Math.PI / 2) < 1e-9) return t;
+      }
+      return Infinity;
+    };
+    // turnMul 1.4 (Quadfin) vs 0.8 (Pincer) — GDD §2.11.
+    expect(ticksToFace(ShipClass.Interceptor)).toBeLessThan(ticksToFace(ShipClass.Excavator));
+  });
+
+  it('determinism holds with velocity facing engaged (GDD §4.8)', () => {
+    const cfg = {
+      seed: 4242,
+      players: [
+        { id: 0, shipClass: ShipClass.Interceptor },
+        { id: 1, shipClass: ShipClass.Vanguard },
+        { id: 2, shipClass: ShipClass.Excavator },
+        { id: 3, shipClass: ShipClass.Hauler },
+      ],
+      asteroidCount: 30,
+    } as const;
+
+    // Thrust only — no aim, no fire — so every ship's facing comes from rung 3.
+    const inputsAt = (tick: number): Inputs =>
+      cfg.players.map((p) => ({
+        id: p.id,
+        actions: [
+          { type: 'thrust', dir: { x: Math.cos(tick * 0.07 + p.id), y: Math.sin(tick * 0.11 + p.id) } },
+        ] as Action[],
+      }));
+
+    const a = createWorld(cfg);
+    const b = createWorld(cfg);
+    const startAngles = a.ships.map((s) => s.angle);
+    for (let t = 0; t < 300; t++) {
+      step(a, inputsAt(t));
+      step(b, inputsAt(t));
+    }
+    expect(a).toEqual(b);
+    // Sanity: the facing rung actually fired (every ship rotated).
+    expect(a.ships.every((s, i) => s.angle !== startAngles[i])).toBe(true);
   });
 });
 

@@ -8,7 +8,8 @@
  * Day-1 scope (GDD §2.3, §2.8): ship Euler integration with drag, the shared
  * beam as a segment-vs-circle raycast that both mines asteroids and damages
  * ships (one beam, one stat), asteroids that crack and burst into ore chunks,
- * proximity-tractor collection into a capped hold, and ship-vs-asteroid
+ * proximity-tractor collection into a capped hold, turn-rate-limited facing
+ * (aim input → auto-aim target → velocity → hold), and ship-vs-asteroid
  * reflection — all over a uniform-grid spatial-hash broad phase. Planets,
  * turrets, shields, repair, win/loss and waves land day 2+.
  *
@@ -27,6 +28,7 @@ import {
   CHUNK,
   DEATH_ORE_DROP_FRACTION,
   DRAG,
+  FACE_VELOCITY_MIN_SPEED,
   HASH_CELL_SIZE,
   RESPAWN_S,
   SHIP_ASTEROID_RESTITUTION,
@@ -141,16 +143,28 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     if (ship.alive) reflectOffAsteroids(ship, world.asteroids, hash);
   }
 
-  // 6. Beam — mine asteroids / damage ships (one beam, one stat; GDD §2.3).
+  // 6. Facing — one priority ladder per ship, always turn-rate-limited. The
+  //    auto-aim target is acquired here (positions are final for the tick) and
+  //    handed to the beam so acquisition happens exactly once.
+  const autoTargets: (BeamHit | null)[] = world.ships.map(() => null);
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
-    if (ship.alive) fireBeam(world, ship, intents[i]!, hash, dt);
+    if (!ship.alive) continue;
+    const intent = intents[i]!;
+    if (intent.fire && intent.auto) autoTargets[i] = acquireNearest(world, ship);
+    resolveFacing(world, ship, intent, autoTargets[i]!, dt);
   }
 
-  // 7. Chunk drift + proximity tractor collection (GDD §2.3).
+  // 7. Beam — mine asteroids / damage ships (one beam, one stat; GDD §2.3).
+  for (let i = 0; i < world.ships.length; i++) {
+    const ship = world.ships[i]!;
+    if (ship.alive) fireBeam(world, ship, intents[i]!, autoTargets[i]!, hash, dt);
+  }
+
+  // 8. Chunk drift + proximity tractor collection (GDD §2.3).
   updateChunks(world, dt);
 
-  // 8. Remove depleted asteroids (any that a burst flushed to ~0 ore).
+  // 9. Remove depleted asteroids (any that a burst flushed to ~0 ore).
   world.asteroids = world.asteroids.filter((a) => a.ore > 1e-9);
 
   return world;
@@ -190,11 +204,8 @@ function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds
     ship.vel.y *= s;
   }
 
-  // Facing: turn-rate-limited toward manual aim; auto-aim overrides in fireBeam.
-  if (intent.aim && (intent.aim.x !== 0 || intent.aim.y !== 0)) {
-    const target = Math.atan2(intent.aim.y, intent.aim.x);
-    ship.angle = turnToward(ship.angle, target, BASE_TURN_RATE * stats.turnMul * dt);
-  }
+  // Facing is resolved in its own phase after collisions (see `resolveFacing`),
+  // so the nose can follow the ship's *post-bounce* travel direction.
 
   // Integrate position.
   ship.pos.x += ship.vel.x * dt;
@@ -216,6 +227,58 @@ function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds
     ship.pos.y = bounds.height - r;
     if (ship.vel.y > 0) ship.vel.y = 0;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Facing (the priority ladder)
+// ---------------------------------------------------------------------------
+
+/**
+ * Rotate a ship toward the facing it wants this tick, at most one class
+ * turn-rate step. Priority (highest first):
+ *
+ *  1. **Explicit aim input** — mouse-aim delta, right stick, or an engaged
+ *     touch aim stick; the sim only ever sees an `aim` action (GDD §2.4).
+ *  2. **Auto-aim's engaged target** — the nose follows what the beam engaged.
+ *  3. **Velocity** — with nothing aimed, the nose follows travel so motion
+ *     reads naturally, once speed clears `FACE_VELOCITY_MIN_SPEED`.
+ *  4. **Hold** — a stationary, unaimed ship keeps the facing it had.
+ *
+ * Rotation is *always* turn-rate limited, including toward an auto-aim target:
+ * a hull never snaps. (Auto-aim's *engagement* is still the full 360° with no
+ * front arc, per GDD §2.4 — the beam reaches its target while the hull is
+ * still swinging around; see `fireBeam`.)
+ */
+function resolveFacing(world: World, ship: Ship, intent: Intent, autoTarget: BeamHit | null, dt: number): void {
+  const desired = desiredFacing(world, ship, intent, autoTarget);
+  if (desired === null) return; // priority 4: hold current facing
+  const stats = SHIP_STATS[ship.shipClass];
+  ship.angle = turnToward(ship.angle, desired, BASE_TURN_RATE * stats.turnMul * dt);
+}
+
+/** The angle a ship wants to face this tick, or null to hold (see ladder). */
+function desiredFacing(world: World, ship: Ship, intent: Intent, autoTarget: BeamHit | null): number | null {
+  // 1. Explicit aim input this tick.
+  if (intent.aim && (intent.aim.x !== 0 || intent.aim.y !== 0)) {
+    return Math.atan2(intent.aim.y, intent.aim.x);
+  }
+
+  // 2. Auto-aim's engaged target.
+  if (autoTarget) {
+    const t = targetPos(world, autoTarget);
+    const dx = t.x - ship.pos.x;
+    const dy = t.y - ship.pos.y;
+    if (dx * dx + dy * dy > 1e-18) return Math.atan2(dy, dx);
+  }
+
+  // 3. Velocity, above the epsilon — nose follows travel.
+  const sp2 = ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y;
+  if (sp2 > FACE_VELOCITY_MIN_SPEED * FACE_VELOCITY_MIN_SPEED) {
+    return Math.atan2(ship.vel.y, ship.vel.x);
+  }
+
+  // 4. Nothing to face.
+  return null;
 }
 
 /** Local copy of vec.turnToward to keep the hot path import-light. */
@@ -266,7 +329,14 @@ type BeamHit =
   | { kind: 'asteroid'; index: number }
   | { kind: 'ship'; index: number };
 
-function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, dt: number): void {
+function fireBeam(
+  world: World,
+  ship: Ship,
+  intent: Intent,
+  autoTarget: BeamHit | null,
+  hash: SpatialHash,
+  dt: number,
+): void {
   if (!intent.fire) {
     ship.beam = null;
     return;
@@ -274,13 +344,26 @@ function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, d
 
   let hit: BeamHit | null;
   let hitT: number; // distance along the beam to the first hit (BEAM_RANGE if none)
+  // Beam direction — the ship's facing, except that an auto-aim beam runs to
+  // the target it engaged (see below).
+  let dx = Math.cos(ship.angle);
+  let dy = Math.sin(ship.angle);
+
   if (intent.auto) {
     // Auto-aim: nearest valid target across the full 360°, no front arc
-    // (GDD §2.4). Facing snaps to it, then the beam runs to that target's
-    // surface — the drawn beam ends on whatever it damages.
-    hit = acquireNearest(world, ship);
-    if (hit) faceTarget(world, ship, hit);
-    hitT = hit ? surfaceDistance(world, ship, hit) : BEAM_RANGE;
+    // (GDD §2.4). Engagement does not wait for the hull — the beam runs to the
+    // acquired target's surface while the nose turns toward it at the class
+    // turn rate (`resolveFacing`), so a 360° engagement stays 360°.
+    hit = autoTarget;
+    if (hit) {
+      const t = targetPos(world, hit);
+      const aim = normalize({ x: t.x - ship.pos.x, y: t.y - ship.pos.y }, { x: dx, y: dy });
+      dx = aim.x;
+      dy = aim.y;
+      hitT = surfaceDistance(ship, dx, dy, world, hit);
+    } else {
+      hitT = BEAM_RANGE;
+    }
   } else {
     // Manual: raycast a segment along current facing, nearest hit wins.
     const cast = raycastBeam(world, ship, hash);
@@ -290,8 +373,6 @@ function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, d
 
   // Publish the beam geometry so the renderer stops the beam at the hit
   // (GDD §4.1). `length` clamps to range; `hitPoint` is null on a clean miss.
-  const dx = Math.cos(ship.angle);
-  const dy = Math.sin(ship.angle);
   const length = Math.min(hitT, BEAM_RANGE);
   ship.beam = {
     origin: { x: ship.pos.x, y: ship.pos.y },
@@ -310,12 +391,10 @@ function fireBeam(world: World, ship: Ship, intent: Intent, hash: SpatialHash, d
 }
 
 /** Distance from the ship to the surface of an acquired (auto-aim) target along
- *  the current facing. The beam points at the target center, so the near
+ *  the beam direction. The beam points at the target center, so the near
  *  intersection is `centerDist - radius`; falls back to range if degenerate. */
-function surfaceDistance(world: World, ship: Ship, hit: BeamHit): number {
+function surfaceDistance(ship: Ship, dx: number, dy: number, world: World, hit: BeamHit): number {
   const c = hit.kind === 'asteroid' ? world.asteroids[hit.index]! : world.ships[hit.index]!;
-  const dx = Math.cos(ship.angle);
-  const dy = Math.sin(ship.angle);
   const t = segCircle(ship.pos, dx, dy, c.pos, c.radius);
   return t ?? BEAM_RANGE;
 }
@@ -344,10 +423,9 @@ function acquireNearest(world: World, ship: Ship): BeamHit | null {
   return best;
 }
 
-/** Snap the ship's facing to point at an acquired target. */
-function faceTarget(world: World, ship: Ship, hit: BeamHit): void {
-  const target = hit.kind === 'asteroid' ? world.asteroids[hit.index]!.pos : world.ships[hit.index]!.pos;
-  ship.angle = Math.atan2(target.y - ship.pos.y, target.x - ship.pos.x);
+/** Center of whatever a beam hit resolved to. */
+function targetPos(world: World, hit: BeamHit): Vec2 {
+  return hit.kind === 'asteroid' ? world.asteroids[hit.index]!.pos : world.ships[hit.index]!.pos;
 }
 
 /**

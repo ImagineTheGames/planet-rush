@@ -210,6 +210,15 @@ export const BASE_ACCEL: Tunable<number> = 900;
 /** Vanguard turn rate (rad/s). Class `turnMul` scales it. TUNABLE */
 export const BASE_TURN_RATE: Tunable<number> = 6.5;
 
+/**
+ * Speed (units/s) above which a ship with no aim input and no auto-aim target
+ * turns its nose toward its velocity, so motion reads naturally. Below it the
+ * ship holds its current facing — a drifting, nearly-stopped hull must not
+ * spin to chase the direction of a millimetre of residual drift. ≈5% of
+ * `BASE_SPEED`. TUNABLE
+ */
+export const FACE_VELOCITY_MIN_SPEED: Tunable<number> = 12;
+
 /** Linear drag coefficient (per second). `vel -= vel * DRAG * dt`. With
  *  `BASE_ACCEL`/`BASE_SPEED` this also caps terminal velocity; the sim clamps
  *  to top speed as well so drag tuning never changes the ceiling. TUNABLE */
