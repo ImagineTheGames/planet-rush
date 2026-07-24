@@ -635,12 +635,19 @@ export class MatchRoom {
     });
   }
 
+  /** RUSH!, and the arguments the world was built from — the client rebuilds the
+   *  same arena from them and predicts inside it (GDD §4.2, `src/net/prediction`). */
   private sendMatchStart(slot: Slot): void {
     if (!this.authoritative) return;
     this.sendTo(slot, {
       type: 'matchStart',
       tick: this.authoritative.tick,
       seed: this.config.seed,
+      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass })),
+      ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
+      ...(this.config.asteroidCount !== undefined
+        ? { asteroidCount: this.config.asteroidCount }
+        : {}),
     });
   }
 

@@ -17,7 +17,7 @@ import type { EntityEventMessage, ServerMessage } from '../../src/net/transport'
 import { SENSOR_RANGE } from '../../src/sim';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
-import type { PlanetHealthData } from '../../server/static-events';
+import type { PlanetHealthData } from '../../src/net/entity-events';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];

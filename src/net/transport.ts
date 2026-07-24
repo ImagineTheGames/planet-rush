@@ -149,11 +149,33 @@ export interface LobbyStateMessage {
   slots: readonly LobbySlot[];
 }
 
-/** RUSH! — the match countdown resolved; the sim is now live. */
+/**
+ * RUSH! — the match countdown resolved; the sim is now live.
+ *
+ * This message is the client's **world constructor call**. Prediction is only
+ * "available because the sim is deterministic and the client runs the same code
+ * the server does" (GDD §4.2), and running the same code means being handed the
+ * same arguments: the seed, the seated roster in slot order, and the two world
+ * dimensions a room may override. A client that guessed any of them would build
+ * a different arena and reconcile against it forever.
+ */
 export interface MatchStartMessage {
   type: 'matchStart';
   tick: Tick;
   seed: number; // shared RNG seed so prediction matches authority (GDD §4.1)
+  /** Every seat as the server seated it — humans and bots alike, in slot order,
+   *  each with the hull the lobby locked in (GDD §2.11). */
+  slots: readonly MatchStartSlot[];
+  /** Play bounds, when the room overrode the sim default. */
+  bounds?: { width: number; height: number };
+  /** Asteroids per wave, when the room overrode the sim default. */
+  asteroidCount?: number;
+}
+
+/** One seat at RUSH!, as the world was built from it. */
+export interface MatchStartSlot {
+  player: PlayerId;
+  shipClass: ShipClass;
 }
 
 /**

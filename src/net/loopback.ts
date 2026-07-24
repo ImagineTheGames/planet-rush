@@ -235,11 +235,21 @@ export class LocalLoopback implements Transport, LocalAuthority {
     if (this.authoritative || this.connection !== 'open') return;
     // RUSH! — the world is built from the lobby as it stands, so a ship class
     // picked a moment ago is the hull that spawns.
-    this.authoritative = createWorld({
-      ...this.config.match,
-      players: this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass })),
+    const players = this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass }));
+    this.authoritative = createWorld({ ...this.config.match, players });
+    // The same arguments the world was just built from. Offline nobody needs
+    // them — the client reads this very world — but the protocol is the protocol
+    // with the wire removed, so the message is complete either way.
+    this.emit({
+      type: 'matchStart',
+      tick: this.authoritative.tick,
+      seed: this.config.match.seed,
+      slots: players.map((spec) => ({ player: spec.id, shipClass: spec.shipClass })),
+      ...(this.config.match.bounds ? { bounds: { ...this.config.match.bounds } } : {}),
+      ...(this.config.match.asteroidCount !== undefined
+        ? { asteroidCount: this.config.match.asteroidCount }
+        : {}),
     });
-    this.emit({ type: 'matchStart', tick: this.authoritative.tick, seed: this.config.match.seed });
     this.broadcastSnapshot();
   }
 
