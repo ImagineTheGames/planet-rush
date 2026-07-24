@@ -184,13 +184,17 @@ const SHOTS = [
   },
   {
     id: 'planet-ring',
-    device: { viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+    // The follow-camera renders 1:1 and holds the LOCAL ship (slot 0) centred, so
+    // the home planet is ~90 px off-centre and the seven others sit on a ring of
+    // radius ~896 world-px around the arena centre, which is itself ~806 px from
+    // the ship. To frame the whole ring in one shot the viewport must reach the
+    // far-side planet at x-offset ≈ -1702 and the top/bottom at y-offset ≈ ±896
+    // (planet radius 64): half-extents ≥ 1766 × 960 → 3600 × 2000. Big canvas,
+    // static frozen scene, so it composites fine headless.
+    device: { viewport: { width: 3600, height: 2000 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
     url: '/?debug=1&freeze=1',
-    // The widest frame we can ask for, on the deterministic seeded world whose
-    // roster is a full 8-planet ring (freeze.ts FREEZE_PLAYER_COUNT = 8). If the
-    // ring is drawn at all, this is the frame with the best chance of showing it.
     async run(page) {
-      await settle(page, { frozen: true, ms: 1500 });
+      await settle(page, { frozen: true, ms: 2000 });
     },
   },
   {
@@ -207,39 +211,59 @@ const SHOTS = [
     },
   },
   {
-    id: 'turret-under-construction',
+    id: 'turret-construction',
     device: DESKTOP,
     url: '/?debug=1',
-    // Hold E to request the wheel, then drive the confirm gestures a turret
-    // order would need (click the wheel area / press the confirm keys) and let
-    // the sim run long enough for a build to be visibly in progress.
+    // The wheel opens at your own planet (docked at spawn). E is a rising-edge
+    // TOGGLE (main.ts:434), and segment 0 — TURRET — sits at twelve o'clock
+    // (wheel-input.ts `segmentIndexAt`). So: tap E to open, click straight above
+    // centre to buy the turret (ORE 3 → 0), tap E again to CLOSE the wheel so the
+    // planet is unobscured, then let the 10 s build (TURRET.buildTime) run partway
+    // — the plasma construction arc grows around the home planet while it does.
     async run(page) {
       await settle(page, { ms: 2500 });
-      await page.keyboard.down('KeyE');
-      await page.waitForTimeout(800);
       const { width, height } = page.viewportSize();
-      // Sweep the ring where wheel segments would sit, clicking each.
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        await page.mouse.click(width / 2 + Math.cos(a) * 160, height / 2 + Math.sin(a) * 160);
-        await page.waitForTimeout(120);
-      }
-      await page.keyboard.press('Enter');
+      // HOLD E — a tapped key can fall entirely between two of this container's
+      // slow per-tick input samples, so the wheel's rising-edge toggle never sees
+      // it (a bare `press` left ORE untouched). A held-then-released key spans
+      // several frames and toggles reliably.
+      await page.keyboard.down('KeyE');
+      await page.waitForTimeout(700); // wheel opens on the rising edge
       await page.keyboard.up('KeyE');
-      await page.waitForTimeout(4000); // let any queued build progress
+      await page.waitForTimeout(300);
+      // TURRET wedge: twelve o'clock, between the hub (0.3 r) and the rim. The
+      // press is an event-driven canvas pointerdown, so it lands regardless of fps.
+      await page.mouse.click(width / 2, height / 2 - 140);
+      await page.waitForTimeout(600); // order placed, ORE 3 → 0, build queued
+      await page.keyboard.down('KeyE'); // toggle the wheel shut — reveal the planet
+      await page.waitForTimeout(500);
+      await page.keyboard.up('KeyE');
+      await page.waitForTimeout(2500); // partway into the 10 s build: arc clearly mid
     },
   },
   {
     id: 'alarm-arrow',
     device: DESKTOP,
     url: '/?debug=1',
-    // The under-attack alarm is a sustained-damage trigger on your own planet
-    // (GDD §2.2). Offline there is no attacker, so this shot documents the
-    // longest unattended run we can give it — if the alarm frame/arrow can
-    // appear in the shipped client at all, a two-minute idle match on the
-    // seeded 8-player ring is where.
+    // The under-attack alarm fires on SUSTAINED damage to your own planet, paired
+    // with a screen-edge arrow pointing home (GDD §2.2, ui/alarm.ts) — the "deep
+    // in the field and the alarm fires" moment. Offline the seven rivals are live
+    // bots (match-boot.ts), and abandoning your home draws an adjacent bot onto
+    // the undefended core within seconds. So: hold A to thrust toward the arena
+    // centre (home recedes off the right edge, arming the arrow), then wait —
+    // gated on the sim's own tick counter (window.__planetRush.ticks), not wall
+    // time, so a slow-fps host just takes longer rather than missing the window.
+    // A headless replay of this exact input (evidence/README notes the probe)
+    // puts the alarm firing from ~tick 790 with the core alive past tick 2000;
+    // tick 1200 sits squarely inside that siege, well before the core falls.
     async run(page) {
-      await settle(page, { ms: 120_000 });
+      await settle(page, { ms: 1500 });
+      await page.keyboard.down('KeyA'); // thrust toward centre — leave home behind
+      await page.waitForFunction(() => (window.__planetRush?.ticks ?? 0) >= 1200, undefined, {
+        timeout: 180_000,
+      });
+      // Hold the thrust through the shutter so the ship is still off-home (the
+      // arrow only draws while home is outside the viewport).
     },
   },
 ];
