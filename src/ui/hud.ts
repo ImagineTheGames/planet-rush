@@ -24,7 +24,12 @@
  *  - **The Build & Upgrade wheel** and the upgrade panel behind its arrow
  *    (GDD §2.5), drawn by {@link ./build-wheel-view}, open at your own planet.
  *
- * Over-ship hull bars and the minimap arrive with the remaining M2 wiring.
+ * Day-6 surface (GDD §2.2, §2.4): the **minimap** (bottom-right, with the ping),
+ * and **enemy-planet damage rings** drawn as a follow-camera world overlay under
+ * the fog rule — a rival's health is revealed only within sensor range, its
+ * number withheld otherwise ({@link ./enemy-fog}, {@link ./minimap}).
+ *
+ * Over-ship hull bars arrive with the remaining M2 wiring.
  *
  * All decision logic lives in the pure, unit-tested sibling modules
  * ({@link ./onboarding}, {@link ./wave-clock}, {@link ./ore-hud},
@@ -58,7 +63,13 @@ import { upgradePanelModel, STOCK_TIERS } from './upgrade-panel';
 import type { UpgradeTiers } from './upgrade-panel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
-import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { planetHpModel, planetHpFlashOn, playerColor } from './planet-hp';
+import { enemyPlanetsFog } from './enemy-fog';
+import type { EnemyPlanet, EnemyPlanetFog } from './enemy-fog';
+import { MinimapView } from './minimap-view';
+import { MINIMAP_MARGIN } from './minimap';
+import type { Ping, MinimapEntity } from './minimap';
+import { PLANET } from '../sim/constants';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -101,6 +112,10 @@ const PAD = HUD_PAD;
 const SQUARE = 18;
 const SQUARE_GAP = 5;
 const STRIP_PAD = 12;
+
+/** Gap between an enemy planet's body edge and its damage ring, CSS px — the ring
+ *  sits just outside the rock so it never hides the planet it reports on. */
+const ENEMY_RING_GAP = 6;
 
 /**
  * Outline width of an *empty* ore slot's ghost square.
@@ -210,6 +225,25 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+
+  // --- Day 6: enemy-planet fog + minimap (GDD §2.2 "scouted", §2.4 ping) ----
+
+  /** The rectangular play bounds (the sim's `Bounds`) — the minimap's world
+   *  extent. Absent ⇒ the minimap is hidden (M1 feed / lobby). */
+  readonly arena?: { readonly width: number; readonly height: number };
+  /** Every *rival* planet's true state. Fogged per {@link ./enemy-fog} before a
+   *  single pixel is drawn, so health becomes a damage ring only within sensor
+   *  range and is withheld — not zeroed — otherwise (GDD §2.2). Also supplies the
+   *  minimap's enemy planet blips (position + identity only). Default: none.
+   *  The local player's own planet is **not** here — its HP is always-on
+   *  top-right ({@link ./planet-hp}), never fog-gated. */
+  readonly enemyPlanets?: readonly EnemyPlanet[];
+  /** Ships to blip on the minimap — all of them, including the local one.
+   *  Identity + position only, never HP (GDD §2.2). Default: the local ship
+   *  alone, derived from `shipPos`/`owner`. */
+  readonly ships?: readonly MinimapEntity[];
+  /** A live minimap ping to show, if any (GDD §2.4). Default: none. */
+  readonly ping?: Ping;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +298,15 @@ export class Hud extends Container {
    *  registry records what is drawn, never what would have been. */
   private arrowDrawn = false;
 
+  // --- Enemy-planet damage rings (world overlay, fog-gated — GDD §2.2) -----
+  /** Drawn in world space via the follow camera, under {@link ./enemy-fog}: a
+   *  rival's ring appears only inside sensor range and its number never leaks. */
+  private readonly enemyRingsGroup = new Container();
+  private readonly enemyRings = new Graphics();
+
+  // --- Minimap (bottom-right, GDD §2.2) + ping (GDD §2.4) -----------------
+  private readonly minimap = new MinimapView();
+
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
@@ -308,13 +351,21 @@ export class Hud extends Container {
     this.alarmGroup.addChild(this.alarmFrame, this.alarmArrow);
     this.alarmGroup.visible = false;
 
+    // Enemy damage rings live in *world* space (they hang over rival planets),
+    // so they draw first, beneath every screen-space HUD element.
+    this.enemyRingsGroup.addChild(this.enemyRings);
+    this.enemyRingsGroup.visible = false;
+
     // The wheel draws above the HUD chrome: while it is open it *is* the screen.
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
+      // World-space overlay, behind all screen-space chrome.
+      this.enemyRingsGroup,
       this.oreGroup,
       this.waveGroup,
       this.planetGroup,
+      this.minimap,
       this.stripGroup,
       this.alarmGroup,
       this.wheel,
@@ -353,6 +404,8 @@ export class Hud extends Container {
     this.updateOre(frame);
     this.updateWaveClock(frame);
     this.updatePlanetHp(frame);
+    this.updateEnemyRings(frame);
+    this.updateMinimap(frame);
     this.updateControlsStrip(frame);
     // The alarm runs before the wheel and the prompts, because both read its
     // verdict: the wheel is not hidden by it, but the onboarding prompt is
@@ -519,6 +572,148 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+  }
+
+  // --- Enemy-planet damage rings (world overlay, fog-gated — GDD §2.2) -----
+
+  /**
+   * Draw each *rival* planet's health as a damage ring over the planet, but only
+   * as far as the fog allows: {@link ./enemy-fog} reveals the exact ring inside
+   * sensor range and a number-free smoke tell farther out, and withholds
+   * everything else — so "who is wounded" stays information the player scouts.
+   *
+   * The ring is drawn in **world space via the follow camera**: the local ship
+   * is held at the viewport centre, so an enemy planet's screen position is the
+   * centre plus its world offset — the same 1:1 convention the home arrow uses
+   * ({@link ./alarm}), no camera matrix needed. Own-planet health is not drawn
+   * here; it is the always-on top-right bar ({@link ./planet-hp}).
+   */
+  private updateEnemyRings(frame: HudFrame): void {
+    this.enemyRings.clear();
+    const ship = frame.shipPos;
+    const planets = frame.enemyPlanets;
+    if (!ship || !planets || planets.length === 0) {
+      this.enemyRingsGroup.visible = false;
+      return;
+    }
+    this.enemyRingsGroup.visible = true;
+
+    const cx = this.screenWidth / 2;
+    const cy = this.screenHeight / 2;
+    const ringRadius = PLANET.radius + ENEMY_RING_GAP;
+    // Same ~3 Hz critical flash as the own-planet bar, so a red ring means the
+    // same "on the ropes" on a rival's planet as on yours ({@link ./planet-hp}).
+    const flash = Math.floor(frame.time * 6) % 2 === 0;
+    const cullMargin = ringRadius + 8;
+
+    for (const fog of enemyPlanetsFog(ship, planets)) {
+      const sx = cx + (fog.pos.x - ship.x);
+      const sy = cy + (fog.pos.y - ship.y);
+      if (
+        sx < -cullMargin ||
+        sx > this.screenWidth + cullMargin ||
+        sy < -cullMargin ||
+        sy > this.screenHeight + cullMargin
+      ) {
+        continue; // off screen — nothing to draw
+      }
+      // A wreck's tell is the render layer's (a hole where a core was, GDD §2.7);
+      // a ring reports live HP, and a dead core has none.
+      if (fog.destroyed) continue;
+
+      if (fog.ringVisible && fog.coreFraction !== null) {
+        this.drawDamageRing(sx, sy, ringRadius, fog, flash);
+      } else if (fog.smoking) {
+        // The smoke: you can see it is burning, never how badly (no arc, no
+        // number) — a faint red ring that pulses with the same flash.
+        this.enemyRings
+          .circle(sx, sy, ringRadius)
+          .stroke({ width: 2, color: PALETTE.threatRed, alpha: flash ? 0.3 : 0.16 });
+      }
+    }
+  }
+
+  /** One revealed enemy planet's damage ring: a faint full-circle track with the
+   *  core-health arc over it in the owner's colour (threat red when critical and
+   *  flashing), plus a thin plasma shield arc just outside when a generator
+   *  stands (GDD §2.5). The arc *is* the readout — a ring is a shape, not a
+   *  number, which is the whole reason enemy HP is safe to show at all. */
+  private drawDamageRing(
+    x: number,
+    y: number,
+    radius: number,
+    fog: EnemyPlanetFog,
+    flash: boolean,
+  ): void {
+    const start = -Math.PI / 2; // sweep clockwise from the top
+    // Track: the full ring, faint, so the missing arc reads as damage taken.
+    this.enemyRings
+      .circle(x, y, radius)
+      .stroke({ width: 3, color: PALETTE.hullSteel, alpha: 0.22 });
+
+    const frac = fog.coreFraction ?? 0;
+    if (frac > 0) {
+      const color = fog.critical && flash ? PALETTE.threatRed : playerColor(fog.owner);
+      this.enemyRings
+        .arc(x, y, radius, start, start + frac * Math.PI * 2)
+        .stroke({ width: 3, color, alpha: 0.9 });
+    }
+    // Shield overbar — a thin plasma ring outside the core ring (GDD §2.5).
+    if (fog.hasShield && fog.shieldFraction && fog.shieldFraction > 0) {
+      this.enemyRings
+        .arc(x, y, radius + 4, start, start + fog.shieldFraction * Math.PI * 2)
+        .stroke({ width: 2, color: PALETTE.plasma, alpha: 0.7 });
+    }
+  }
+
+  // --- Minimap (bottom-right, GDD §2.2) + ping (GDD §2.4) -----------------
+
+  /**
+   * Feed the minimap its per-frame model. The minimap shows *positions and
+   * identity* — every planet's beacon-coloured blip and every ship's — and the
+   * live ping, but **never HP**: enemy health is scouted on the planet, never
+   * broadcast onto a map (GDD §2.2). Own-planet and local-ship blips are derived
+   * from the fields the HUD already carries; rival planets come from the same
+   * `enemyPlanets` the fog rings read (their HP simply isn't passed on).
+   */
+  private updateMinimap(frame: HudFrame): void {
+    const arena = frame.arena;
+    if (!arena || arena.width <= 0 || arena.height <= 0) {
+      this.minimap.visible = false;
+      return;
+    }
+    const self = frame.owner ?? 0;
+
+    const planets: MinimapEntity[] = [];
+    if (frame.homePos) {
+      planets.push({ owner: self, pos: frame.homePos, alive: frame.planetAlive !== false });
+    }
+    if (frame.enemyPlanets) {
+      for (const p of frame.enemyPlanets) {
+        planets.push({ owner: p.owner, pos: p.pos, alive: p.alive !== false });
+      }
+    }
+
+    let ships: MinimapEntity[];
+    if (frame.ships) {
+      ships = [...frame.ships];
+    } else if (frame.shipPos) {
+      ships = [{ owner: self, pos: frame.shipPos, alive: frame.shipAlive !== false }];
+    } else {
+      ships = [];
+    }
+
+    this.minimap.update({
+      viewport: { width: this.screenWidth, height: this.screenHeight },
+      arena,
+      self,
+      planets,
+      ships,
+      now: frame.time,
+      // `exactOptionalPropertyTypes`: omit the key entirely when there is no
+      // ping rather than passing `undefined`.
+      ...(frame.ping ? { ping: frame.ping } : {}),
+    });
   }
 
   // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) -------------
@@ -810,6 +1005,22 @@ export class Hud extends Container {
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
+
+    // Minimap (day 6): registered with its *plate* rect from the pure model, not
+    // `getBounds()` — the ping's pulse is an ephemeral overlay that can bloom a
+    // few px past the map, and the declared footprint is the instrument itself.
+    // The plate is `bottom-right`, and minimap.test.ts pins it inside that zone.
+    if (this.minimap.visible) {
+      const b = this.minimap.bounds;
+      entries.push({
+        id: 'minimap',
+        anchor: { region: 'bottom-right', margin: MINIMAP_MARGIN },
+        bounds: { x: b.x, y: b.y, width: b.width, height: b.height },
+      });
+    }
+    // The enemy damage rings are world-positioned (they hang over rival planets),
+    // so they have no screen anchor to register — like nothing else in world
+    // space, they are validated by ./enemy-fog's tests, not the layout registry.
 
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.
