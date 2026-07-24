@@ -52,7 +52,7 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     expect(state).toEqual({
       shipScreen: { x: 0, y: 0 },
       shipWorld: { x: 0, y: 0 },
-      viewport: { w: 0, h: 0 },
+      viewport: { w: 0, h: 0, width: 0, height: 0 },
       fps: 0,
       ticks: 0,
     });
@@ -60,7 +60,9 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     hook.update(195, 422, 390, 844, 1500, 2600, 1000, 42);
     expect(state!.shipScreen).toEqual({ x: 195, y: 422 });
     expect(state!.shipWorld).toEqual({ x: 1500, y: 2600 });
-    expect(state!.viewport).toEqual({ w: 390, h: 844 });
+    // Both spellings, one source: the layout-registry co-tenant reads
+    // {width,height} off this same shared object (see the module contract).
+    expect(state!.viewport).toEqual({ w: 390, h: 844, width: 390, height: 844 });
 
     // Same object mutated in place — no per-frame reallocation of the handle.
     const before = read(win);
