@@ -122,13 +122,42 @@ export class KeyboardMouseSource implements InputSource {
 const STICK_DEADZONE = 0.2;
 const TRIGGER_THRESHOLD = 0.4;
 
-/** Reads gamepad 0 via the browser Gamepad API (GDD §2.4 — not on the cut list). */
-export class GamepadSource implements InputSource {
-  constructor(private readonly index = 0) {}
+/** Snapshot of the connected pads this frame. The browser default reads the live
+ *  {@link navigator.getGamepads} array; tests inject a fake so the mapping is
+ *  unit-verified headless (the sim never sees a device; neither need the tests). */
+export type GamepadProvider = () => readonly (Gamepad | null)[];
 
+const liveGamepads: GamepadProvider = () =>
+  typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+
+/**
+ * Reads the active gamepad via the browser Gamepad API (GDD §2.4 — not on the
+ * cut list) and folds it into the shared {@link ControlState}, exactly as the
+ * keyboard and touch sources do.
+ *
+ * It **scans for the first connected pad** rather than assuming slot 0: browsers
+ * assign a pad's index lazily on first input and it varies by device and port,
+ * so a controller plugged into a later slot still drives the ship. Pass an
+ * explicit `preferredIndex` to pin one pad (e.g. a future two-player split).
+ */
+export class GamepadSource implements InputSource {
+  constructor(
+    private readonly getPads: GamepadProvider = liveGamepads,
+    private readonly preferredIndex: number | null = null,
+  ) {}
+
+  /** The active pad: the pinned index if requested, else the first pad the
+   *  browser reports as connected. `null` when no pad is present (poll is inert). */
   private pad(): Gamepad | null {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    return pads[this.index] ?? null;
+    const pads = this.getPads();
+    if (this.preferredIndex !== null) {
+      const pinned = pads[this.preferredIndex];
+      return pinned && pinned.connected ? pinned : null;
+    }
+    for (const p of pads) {
+      if (p && p.connected) return p;
+    }
+    return null;
   }
 
   update(state: ControlState): void {

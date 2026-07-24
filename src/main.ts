@@ -21,6 +21,7 @@ import {
 } from '@platform/actions';
 import type { ControlState, DeviceKind } from '@platform/actions';
 import { GameLoop } from '@platform/loop';
+import { VfxAutoQuality } from '@platform/vfx-quality';
 import { KeyboardMouseSource, GamepadSource } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
@@ -28,6 +29,7 @@ import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals } from '@platform/touch-visuals';
 import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
+import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
 import type { TouchAffordanceRects } from '@platform/touch-visuals';
 import {
@@ -114,6 +116,13 @@ async function boot(): Promise<void> {
   let viewport: Viewport = readViewport();
   const renderer = new Renderer(app.stage, viewport);
 
+  // --- Auto VFX-reduction (vfx-quality.ts): watches real frame times and engages
+  //     the "reduce VFX" setting on a sustained drop below the fps floor (GDD
+  //     §4.3, risk 5), releasing again with hysteresis once the device recovers.
+  //     Fed the measured frame delta each render; the flag drives renderer VFX.
+  const vfxQuality = new VfxAutoQuality();
+  let lastRenderMs = performance.now();
+
   // --- Debug instrument (debug-hook.ts): only when ?debug=1. Exposes the read-
   //     only window.__planetRush the QA suite asserts centring against. Inert
   //     (and skipped in the render loop) otherwise.
@@ -163,6 +172,16 @@ async function boot(): Promise<void> {
     },
     { source: new GamepadSource(), state: createControlState(), device: 'gamepad' },
   ];
+
+  // Gamepad connect/disconnect are logged so the end-to-end verification pass can
+  // confirm the pad registered (GDD §2.4). Polling in GamepadSource does the real
+  // work — it scans for the first connected pad — so play needs no event here.
+  window.addEventListener('gamepadconnected', (e) => {
+    console.info(`[gamepad] connected: ${(e as GamepadEvent).gamepad.id}`);
+  });
+  window.addEventListener('gamepaddisconnected', () => {
+    console.info('[gamepad] disconnected');
+  });
 
   const touch = new TouchController({ screenWidth: app.screen.width });
   touch.setFireMode(fireMode);
@@ -224,6 +243,14 @@ async function boot(): Promise<void> {
       simTicks++;
     },
     render: () => {
+      // Measure this real frame and let the auto-reducer decide VFX quality. In
+      // freeze mode the sim is pinned for byte-deterministic goldens, so VFX stay
+      // full — a reduced glow would change the frame the screenshot captures.
+      const nowMs = performance.now();
+      const frameSeconds = (nowMs - lastRenderMs) / 1000;
+      lastRenderMs = nowMs;
+      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
+
       renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
       feedHud();
       hud.update(hudFrame);
@@ -454,6 +481,20 @@ async function boot(): Promise<void> {
   });
 
   loop.start();
+
+  // --- PWA install prompt (install-prompt.ts): capture and defer the browser's
+  //     `beforeinstallprompt` so install is offered on our terms, not via the
+  //     disruptive infobar (GDD §4.1, §4.9). The visible affordance is UI's to
+  //     wire onto `installPrompt.prompt()`; here we own the plumbing and log the
+  //     signal so the phone-verification pass can confirm the app is installable.
+  const installPrompt = new InstallPromptController(window, () => {
+    if (installPrompt.canInstall) console.info('[pwa] installable — Add to Home Screen available');
+    if (installPrompt.isInstalled) console.info('[pwa] installed');
+  });
+  // Exposed for a future settings/menu "Install" button (UI layer) without a
+  // bare global reaching across ownership lines.
+  (window as unknown as { __planetRushInstall?: InstallPromptController }).__planetRushInstall =
+    installPrompt;
 
   // Register the service worker (PWA app-shell caching, GDD §4.1). Optional and
   // best-effort — mobile-browser play survives without it (§4.9).
