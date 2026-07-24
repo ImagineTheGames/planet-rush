@@ -72,6 +72,8 @@ function emptyWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
+    planets: over.planets ?? [],
+    projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
   };
 }

@@ -20,6 +20,9 @@ import { ShipClass, mulberry32 } from '@shared/types';
 import {
   ASTEROID,
   CARGO_BASE,
+  CORE_HP,
+  PLANET,
+  SHIELD,
   SHIP_RADIUS,
   SHIP_STATS,
   SPAWN_PROTECTION_S,
@@ -92,6 +95,104 @@ export interface OreChunk {
   radius: number;
 }
 
+// --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
+
+/** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
+ *  the ship defends"). Cheap, killable, and a beam target in its own right. */
+export interface Turret {
+  readonly id: number;
+  /** The planet owner's slot — turrets never shoot their own fleet. */
+  readonly owner: PlayerId;
+  /** Mount slot 0..`TURRET.capPerPlanet`-1. Fixes the mount angle around the
+   *  planet and frees for re-use when the turret dies, so a rebuilt turret
+   *  lands in a hole rather than on top of a survivor. */
+  readonly slot: number;
+  pos: Vec2;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  /** Barrel facing, radians — turn-rate limited toward the tracked ship. Purely
+   *  the visible telegraph: alignment never gates the shot (DPS is DPS). */
+  angle: number;
+  /** Seconds until it may fire again. */
+  cooldown: number;
+  /** Ship it is tracking this tick, or null when nothing is in range. */
+  targetId: PlayerId | null;
+}
+
+/** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each
+ *  generator is its own HP pool and regenerates independently, so the second
+ *  shield doubles both the buffer and the recovery rate. */
+export interface Shield {
+  readonly id: number;
+  hp: number;
+  maxHp: number;
+  /** Bubble radius — the beam target that stands in front of the core. */
+  radius: number;
+}
+
+/** A building under construction (GDD §2.5: "defenses are bought before the
+ *  attack, not during it"). Ore is spent when the order is placed; only time
+ *  remains. */
+export interface BuildJob {
+  readonly id: number;
+  readonly kind: 'turret' | 'shield';
+  /** Reserved mount slot (turrets only; 0 for shields) — held for the whole
+   *  build so two queued turrets can never claim the same mount. */
+  readonly slot: number;
+  /** Seconds of construction left. */
+  remaining: number;
+  /** Seconds the job started with — the renderer's progress denominator. */
+  total: number;
+}
+
+/** A player's home planet: the win condition, and the only thing in the match
+ *  that does not respawn (GDD §2.1, §2.7). One per slot. */
+export interface Planet {
+  readonly id: number;
+  readonly owner: PlayerId;
+  /** Static — planets do not move. */
+  pos: Vec2;
+  radius: number;
+  /** Core HP. Zero ends this player's match (GDD §1 loss condition). */
+  coreHp: number;
+  maxCoreHp: number;
+  /** false once the core has been destroyed; the wreck stays on the map. */
+  alive: boolean;
+  /** Seconds of match-start spawn protection left on the core (GDD §2.1). */
+  spawnProtect: number;
+  /** Outward angle from the arena centre — the turret mount ring starts here. */
+  angle: number;
+  /** Seconds since the core or any shield last took damage. Drives both halves
+   *  of "pressure beats regeneration" (GDD §2.6): shields regenerate only past
+   *  `SHIELD.regenDelay`, and any hit at all interrupts the repair channel. */
+  sinceDamage: number;
+  /** True while the owner is holding the repair channel open (GDD §2.5). */
+  repairing: boolean;
+  turrets: Turret[];
+  shields: Shield[];
+  builds: BuildJob[];
+}
+
+/**
+ * A turret shot. **Pooled**: slots are reused and `active` marks a live shot,
+ * so a firefight allocates nothing per frame (GDD §4.3). Consumers — renderer,
+ * snapshot encoder — must skip `active === false` slots rather than assume the
+ * array is dense.
+ */
+export interface Projectile {
+  id: number;
+  active: boolean;
+  /** Firing player, so a shot never hits its own fleet. */
+  owner: PlayerId;
+  pos: Vec2;
+  vel: Vec2;
+  damage: number;
+  radius: number;
+  /** Seconds of flight left before it despawns. */
+  life: number;
+}
+
 // ---------------------------------------------------------------------------
 // World
 // ---------------------------------------------------------------------------
@@ -110,11 +211,15 @@ export interface World {
   tick: number;
   /** mulberry32 state as a bare uint32 — serializable RNG (see module doc). */
   rngState: number;
-  /** Monotonic id allocator for spawned entities (chunks, future turrets). */
+  /** Monotonic id allocator for spawned entities (chunks, turrets, shields). */
   nextEntityId: number;
   ships: Ship[];
   asteroids: Asteroid[];
   chunks: OreChunk[];
+  /** Home planets, one per slot, in the ring layout (GDD §2.1). */
+  planets: Planet[];
+  /** Turret shot pool — dense array, sparse liveness (see {@link Projectile}). */
+  projectiles: Projectile[];
   bounds: Bounds;
 }
 
@@ -194,16 +299,43 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
   };
 }
 
+/** Build a player's home planet at its ring station (GDD §2.1, §2.8). */
+function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): Planet {
+  return {
+    id: index,
+    owner: spec.id,
+    pos: { x: pos.x, y: pos.y },
+    radius: PLANET.radius,
+    coreHp: CORE_HP,
+    maxCoreHp: CORE_HP,
+    alive: true,
+    spawnProtect: SPAWN_PROTECTION_S,
+    angle,
+    // No damage has ever landed, so the shield-regen window opens immediately
+    // and the repair channel is available from tick 0.
+    sinceDamage: SHIELD.regenDelay,
+    repairing: false,
+    turrets: [],
+    shields: [],
+    builds: [],
+  };
+}
+
 /**
- * Construct a fresh, deterministic match world. Ships spawn evenly around a
- * ring (GDD §2.1 "planets placed in a ring"); asteroids scatter in the central
- * field from the seeded RNG. Same config ⇒ byte-identical world.
+ * Construct a fresh, deterministic match world. Planets sit evenly around a
+ * ring with each player's ship spawning in orbit of its own — inboard of the
+ * planet, facing the field (GDD §2.1); asteroids scatter in the central field
+ * from the seeded RNG. Same config ⇒ byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
   const bounds: Bounds = config.bounds ?? { width: 1920, height: 1920 };
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
-  const ringRadius = Math.min(bounds.width, bounds.height) * 0.42;
+  const halfMin = Math.min(bounds.width, bounds.height) / 2;
+  const ringRadius = halfMin * 2 * PLANET.ringFraction;
+  // Planets sit outboard of the ship ring, clamped to stay wholly inside the
+  // arena on small maps (the QA harness runs cramped worlds on purpose).
+  const planetRing = Math.min(ringRadius + PLANET.orbitOffset, halfMin - PLANET.radius);
 
   // Ships around the ring, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {
@@ -213,6 +345,13 @@ export function createWorld(config: WorldConfig): World {
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
     return ship;
+  });
+
+  // One home planet per slot, on the same spoke as its ship, outboard of it.
+  const planets: Planet[] = config.players.map((spec, i) => {
+    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
+    const pos = { x: cx + Math.cos(theta) * planetRing, y: cy + Math.sin(theta) * planetRing };
+    return makePlanet(spec, i, pos, theta);
   });
 
   // Asteroid field: scatter within the central disc using the seeded RNG.
@@ -253,6 +392,8 @@ export function createWorld(config: WorldConfig): World {
     ships,
     asteroids,
     chunks: [],
+    planets,
+    projectiles: [],
     bounds,
   };
 }
