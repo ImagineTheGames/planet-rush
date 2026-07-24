@@ -28,7 +28,7 @@
 
 import type { Action, PlayerId } from '@shared/types';
 import type { InputMessage, Tick } from './transport';
-import type { Inputs, PlayerInput } from '../sim';
+import type { PlayerInput } from '../sim';
 
 /**
  * How far ahead of the simulated tick input may be filed: 2 seconds at the
@@ -49,6 +49,13 @@ export type InputVerdict =
   /** Beyond {@link MAX_FUTURE_TICKS} ahead of the sim: refused, not buffered. */
   | 'far-future';
 
+/** What a filed message keeps until its tick runs: the actions, and the client
+ *  sequence number that will be acknowledged when they are simulated. */
+interface FiledInput {
+  readonly actions: readonly Action[];
+  readonly seq: number;
+}
+
 /** Running counts, for server logging and for tests to assert against. */
 export interface InputStats {
   queued: number;
@@ -57,9 +64,28 @@ export interface InputStats {
   farFuture: number;
 }
 
+/**
+ * One player's input row for a tick, carrying the client sequence number it was
+ * filed under.
+ *
+ * The sim only ever reads `id` and `actions` — this is a plain {@link PlayerInput}
+ * as far as `step()` is concerned. The extra field exists for the authority that
+ * runs the sim: the moment a row is handed to `step()`, its `seq` is the newest
+ * input from that client the world has *actually simulated*, which is exactly
+ * what a snapshot's `ackSeq` must mean for client-side reconciliation to line up
+ * (GDD §4.2). Acknowledging on arrival instead would tell a predicting client
+ * that input it can still feel in its own hands has already been accounted for.
+ */
+export interface AppliedInput extends PlayerInput {
+  readonly seq: number;
+}
+
+/** A tick's worth of {@link AppliedInput} rows — an `Inputs` the sim can eat. */
+export type AppliedInputs = readonly AppliedInput[];
+
 /** No input for this tick — a frozen empty array, so the common idle case for
  *  a slot allocates nothing (GDD §4.3). */
-const NO_INPUTS: Inputs = Object.freeze([]) as Inputs;
+const NO_INPUTS: AppliedInputs = Object.freeze([]) as AppliedInputs;
 
 /**
  * A tick-indexed buffer of the input that has arrived but not yet been
@@ -67,7 +93,7 @@ const NO_INPUTS: Inputs = Object.freeze([]) as Inputs;
  * may use `Map` freely (the sim's plain-data rule applies to `World`, not here).
  */
 export class InputQueue {
-  private readonly pending = new Map<Tick, Map<PlayerId, readonly Action[]>>();
+  private readonly pending = new Map<Tick, Map<PlayerId, FiledInput>>();
   private readonly counts: InputStats = { queued: 0, late: 0, duplicate: 0, farFuture: 0 };
 
   /**
@@ -95,7 +121,7 @@ export class InputQueue {
     // one would make the result depend on delivery timing.
     if (bucket.has(player)) return this.count('duplicate');
 
-    bucket.set(player, message.actions);
+    bucket.set(player, { actions: message.actions, seq: message.seq });
     return this.count('queued');
   }
 
@@ -105,13 +131,13 @@ export class InputQueue {
    * with no input is a legal tick (every ship simply holds its last intent,
    * which the sim already models as a neutral intent).
    */
-  take(tick: Tick): Inputs {
+  take(tick: Tick): AppliedInputs {
     const bucket = this.pending.get(tick);
     if (bucket === undefined) return NO_INPUTS;
     this.pending.delete(tick);
 
-    const out: PlayerInput[] = [];
-    for (const [id, actions] of bucket) out.push({ id, actions });
+    const out: AppliedInput[] = [];
+    for (const [id, filed] of bucket) out.push({ id, actions: filed.actions, seq: filed.seq });
     // Sorted, so packet races cannot reorder the sim (property 2 above).
     out.sort((a, b) => a.id - b.id);
     return out;

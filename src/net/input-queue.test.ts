@@ -23,9 +23,9 @@ describe('InputQueue', () => {
     expect(q.accept(0, input(3, BOOST), 0)).toBe('queued');
     expect(q.accept(0, input(1, FIRE), 0)).toBe('queued');
 
-    expect(q.take(1)).toEqual([{ id: 0, actions: FIRE }]);
+    expect(q.take(1)).toEqual([{ id: 0, actions: FIRE, seq: 1 }]);
     expect(q.take(2)).toEqual([]);
-    expect(q.take(3)).toEqual([{ id: 0, actions: BOOST }]);
+    expect(q.take(3)).toEqual([{ id: 0, actions: BOOST, seq: 3 }]);
   });
 
   it('hands players to the sim in slot order, whatever order they arrived in', () => {
@@ -48,8 +48,19 @@ describe('InputQueue', () => {
     expect(q.accept(2, input(1, FIRE), 0)).toBe('queued');
     expect(q.accept(2, input(1, BOOST), 0)).toBe('duplicate');
 
-    expect(q.take(1)).toEqual([{ id: 2, actions: FIRE }]);
+    expect(q.take(1)).toEqual([{ id: 2, actions: FIRE, seq: 1 }]);
     expect(q.stats.duplicate).toBe(1);
+  });
+
+  it('carries the client sequence through to the tick that runs it', () => {
+    // The seq is what a snapshot acknowledges, and it may only be acknowledged
+    // once the sim has actually consumed the row (GDD §4.2 reconciliation): the
+    // queue is where that number survives the wait between arrival and tick.
+    const q = new InputQueue();
+    q.accept(0, input(5, FIRE, 41), 0);
+    q.accept(1, input(5, BOOST, 907), 0);
+
+    expect(q.take(5).map((row) => row.seq)).toEqual([41, 907]);
   });
 
   it('refuses input beyond the future horizon instead of buffering it', () => {
