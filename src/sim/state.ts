@@ -133,6 +133,23 @@ export interface Turret {
   cooldown: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
+  /**
+   * Muzzle geometry for the tick this turret actually loosed a shot, else
+   * `null` — the turret's answer to `Ship.beam` (GDD §2.6, §4.1). A turret's
+   * damage rides a pooled projectile, but its *tell* is the muzzle flash, and
+   * that tell has to come from sim combat state so **every** turret in the world
+   * flashes when it fires — not just the local player's. Origin at the barrel
+   * tip, direction at the tracked ship, `hitPoint`/`length` clamped to that
+   * ship's surface, so a renderer can draw a muzzle bloom or a tracer without
+   * re-deriving the shot. Set only on fire ticks (~twice a second), cleared
+   * every other tick, so it is a transient event, not a standing beam.
+   *
+   * Optional so this render tell can be added without breaking the turret
+   * literals other agents build (wire-event reconstruction, bot fixtures) — the
+   * sim's own turrets always carry it (`makeTurret` sets it), and a turret with
+   * no `muzzle` field simply is not flashing.
+   */
+  muzzle?: Beam | null;
 }
 
 /** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each

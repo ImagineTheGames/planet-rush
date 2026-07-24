@@ -29,3 +29,5 @@ export * from './match';
 export * from './step';
 export * from './buildings';
 export * from './damage';
+// Read model: every firing ship + turret this tick, for the renderer / audio.
+export * from './combat-view';
