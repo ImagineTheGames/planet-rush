@@ -126,7 +126,9 @@ function eliminate(world: World, planet: Planet): void {
   scatterWreckDebris(world, planet, banked + WRECK.baseDebrisOre);
 }
 
-/** The ship in a given slot, or null (slots and ships are 1:1 in a match). */
+/** The ship in a given slot, or null (slots and ships are 1:1 in a match).
+ *  A local copy of `buildings.shipOf` on purpose: `./buildings` imports this
+ *  module for `destroyCore`, and four lines beat an import cycle. */
 function shipOwnedBy(world: World, owner: PlayerId) {
   for (const s of world.ships) {
     if (s.id === owner) return s;

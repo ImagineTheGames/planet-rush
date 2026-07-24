@@ -229,6 +229,10 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
  *
  * Runs *before* this tick's beams and projectiles, so damage dealt now takes
  * effect on the next tick's regen/repair decision, never retroactively.
+ *
+ * Under collapse, two of those five stop happening for the rest of the match
+ * (GDD §2.3) — the phase is read once per tick, not per planet, because it is a
+ * property of the match rather than of anyone's home.
  */
 export function updatePlanets(world: World, dt: number): void {
   const collapsed = isCollapsed(world);
