@@ -47,10 +47,10 @@
  */
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
-import { BEAM_RANGE, SPAWN_PROTECTION_S, TICK_DT, step } from '../sim';
+import { BEAM_RANGE, PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, step } from '../sim';
 import type { World } from '../sim';
 import { applyEntityEvent } from './entity-events';
-import { SHIP_FLAG, dequantizeAngle } from './snapshot';
+import { MAX_PROJECTILES, SHIP_FLAG, dequantizeAngle } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
 import type { EntityEventMessage, Tick } from './transport';
 
@@ -256,7 +256,9 @@ export class PredictedMatch {
     }
     this.snapshotTick = snapshot.tick;
 
-    const before = this.localShipPos();
+    // A copy, not the live vector: `absorb` measures how far this reconcile
+    // moved the ship, and the ship is about to move.
+    const before = { ...this.localShipPos() };
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -411,18 +413,49 @@ export function applySnapshot(world: World, snapshot: DecodedSnapshot): void {
     else if (ship.spawnProtect <= 0) ship.spawnProtect = SPAWN_PROTECTION_S;
   }
 
-  // The pool is fixed and sparse (`src/sim/state.ts`): the snapshot names the
-  // live slots, so every slot it does not name is a shot that has landed or
-  // expired. Clearing first is what makes that true.
+  // The pool is sparse and slot-keyed (`src/sim/state.ts`): the snapshot names
+  // the live slots, so every slot it does not name holds a shot that has landed
+  // or expired. Clearing first is what makes that true.
   for (const projectile of world.projectiles) projectile.active = false;
   for (const snap of snapshot.projectiles) {
-    const projectile = world.projectiles[snap.id];
+    const projectile = poolSlot(world, snap.id);
     if (!projectile) continue;
     projectile.active = true;
     projectile.owner = snap.meta & 0x7;
     projectile.pos.x = snap.posX;
     projectile.pos.y = snap.posY;
+    // Velocity is not streamed for shots — six bytes each, and a client that
+    // sees the whole board can watch them fly. A slot the client was already
+    // flying keeps its heading and is merely corrected; a slot it has never seen
+    // starts still and is placed again 2 ticks later. What it must *not* do is
+    // expire between snapshots, so the clock is wound back on every one.
+    projectile.life = PROJECTILE.life;
   }
+}
+
+/**
+ * The pool slot a snapshot names, growing the pool to reach it.
+ *
+ * A client's pool only grows when *it* fires something, and a client predicts
+ * nobody's turret but the ones on its own screen — so an arriving shot can name
+ * a slot this world has never allocated. Bounded by the encoder's own cap, so a
+ * malformed snapshot cannot make a client allocate a megabyte of shots.
+ */
+function poolSlot(world: World, index: number): World['projectiles'][number] | null {
+  if (index >= MAX_PROJECTILES) return null;
+  while (world.projectiles.length <= index) {
+    world.projectiles.push({
+      id: 0,
+      active: false,
+      owner: -1,
+      pos: { x: 0, y: 0 },
+      vel: { x: 0, y: 0 },
+      damage: 0,
+      radius: PROJECTILE.radius,
+      life: 0,
+    });
+  }
+  return world.projectiles[index] ?? null;
 }
 
 /**
