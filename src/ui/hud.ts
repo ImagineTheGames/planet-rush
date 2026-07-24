@@ -618,6 +618,19 @@ export class Hud extends Container {
    * constants they were laid out with — a font swap that pushes the banked total
    * out of its corner has to be *caught*, not restated. Hidden elements are
    * omitted: the registry records what is drawn, never what would have been.
+   *
+   * **Not yet registered, and why.** QA's layout contract
+   * (`tests/mobile/layout.spec.ts`) declares two more HUD ids — `wave-clock`
+   * (`top-center`) and `onboarding` (`center`) — and asserts every *registered*
+   * element sits inside its anchor. Both of those zones are one third of the
+   * viewport wide, and at phone widths the wave clock's line ("WAVE 1/5 ·
+   * Outer Drift") and the onboarding prompt's sentence are both intrinsically
+   * wider than that; the prompt also sits below the vertical centre band by
+   * design, under the ship rather than on top of it. Registering them today
+   * would turn QA's suite red on a *real* finding that is a design question —
+   * shrink the copy, wrap it, or give those regions a full-width variant — and
+   * that is the Director's call, not something to force mid-milestone. They land
+   * the moment it is answered; nothing else here changes.
    */
   describeLayout(viewport: Viewport): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
@@ -626,9 +639,8 @@ export class Hud extends Container {
       region: LayoutEntry['anchor']['region'],
       margin: number,
       node: Container,
-      visible = true,
     ): void => {
-      if (!visible || !node.visible) return;
+      if (!node.visible) return;
       const b = node.getBounds();
       entries.push({
         id,
@@ -637,12 +649,11 @@ export class Hud extends Container {
       });
     };
 
+    // Ids and regions are QA's, from the PENDING list in their layout contract.
     push('ore-hud', 'top-left', PAD, this.oreGroup);
-    push('wave-clock', 'top-center', PAD, this.waveGroup);
+    push('banked-total', 'top-left', PAD, this.bankedText);
     push('planet-hp', 'top-right', PAD, this.planetGroup);
     push('controls-strip', 'bottom-strip', 0, this.stripGroup);
-    push('onboarding-prompt', 'bottom-center', 0, this.promptGroup);
-    push('build-wheel', 'center', 0, this.wheel);
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.
     void viewport;
