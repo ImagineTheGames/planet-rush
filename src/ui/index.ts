@@ -26,7 +26,10 @@
  * with its player colours (§5.2 / style-guide §3.1), ship-class select with the
  * four role blurbs and the Vanguard preselected (§2.11), the host's per-seat bot
  * difficulty picks (§2.9), and the RUSH! countdown, in a layout that holds on a
- * phone in landscape and on a desktop.
+ * phone in landscape and on a desktop — reached through the **entry screen**
+ * (§4.2), whose three doors are PLAY SOLO (no server: §4.8 risk 6), CREATE ROOM
+ * and JOIN ROOM, the last behind an on-screen keypad because the game is a
+ * canvas with no text field to focus.
  */
 
 export { Hud } from './hud';
@@ -195,6 +198,75 @@ export {
 export type { Insets, LobbyLayout, LobbyLayoutOptions, LobbyTarget, TileShape } from './lobby-geometry';
 
 export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
+
+// --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
+//
+// The screen *before* the lobby: PLAY SOLO / CREATE ROOM / JOIN ROOM, and the
+// on-screen keypad a room code is typed on (the game is a canvas — there is no
+// DOM input to focus, see `./lobby-entry`).
+//
+// **Wiring seam**, continuing the one above:
+//
+//   const entry = new LobbyEntryView(app.screen.width, app.screen.height, isTouch);
+//   app.stage.addChild(entry);
+//   let door = createEntry();
+//   // per frame:  entry.update(entryModel(door))
+//   // on tap:     const hit = entry.hitTest(x, y)
+//   //   'door'   → chooseDoor(door, DOOR_ORDER[hit.index], rng)
+//   //   'key'    → typeEntryCode(door, KEYPAD_KEYS[hit.index])
+//   //   'erase'  → eraseEntryCode(door)   'back' → backToDoors(door)
+//   //   'submit' → submitJoin(door)
+//   // on a desktop keypress: typeEntryCode / eraseEntryCode take it unchanged.
+//
+// Every one of those returns an `EntryResult`; when `.intent` is non-null the
+// caller opens the transport and hands the lobby the same room code:
+//
+//   if (result.intent) {
+//     const transport = result.intent.online          // 'solo' is the offline door
+//       ? new WebSocketTransport(...) : new LocalLoopback(...);
+//     transport.send({ type: 'join', room: result.intent.room });
+//     state = createLobby({ room: result.intent.room });   // ← the lobby above
+//     entry.visible = false;
+//   }
+//   // …and on a refusal: door = entryFailed(door, ENTRY_ERRORS.full)  — which
+//   // keeps the typed code, so retrying is one tap and not four.
+
+export {
+  DOOR_OPTIONS,
+  DOOR_ORDER,
+  ENTRY_ERRORS,
+  KEYPAD_COLUMNS,
+  KEYPAD_KEYS,
+  KEYPAD_ROWS,
+  backToDoors,
+  canSubmitJoin,
+  chooseDoor,
+  createEntry,
+  entryConnected,
+  entryFailed,
+  entryLive,
+  entryModel,
+  eraseEntryCode,
+  submitJoin,
+  typeEntryCode,
+} from './lobby-entry';
+export type {
+  EntryCodeCell,
+  EntryDoor,
+  EntryDoorOption,
+  EntryDoorView,
+  EntryIntent,
+  EntryModel,
+  EntryResult,
+  EntryScreen,
+  EntryState,
+  EntryStatus,
+} from './lobby-entry';
+
+export { entryHitTest, entryLayout, DOOR_HEIGHT, DOOR_HEIGHT_TOUCH, KEY_MAX, KEY_MIN } from './lobby-geometry';
+export type { EntryLayout, EntryTarget } from './lobby-geometry';
+
+export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
