@@ -41,7 +41,9 @@ import {
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook } from '@platform/debug-hook';
-import { BUILD_INFO, formatBootLine } from '@platform/build-info';
+import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
+import { requireWebGl, probeWebGl } from '@platform/gl-probe';
+import { describeBootFailure, showBootError } from '@platform/boot-error';
 import type { Viewport } from '@platform/camera';
 import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
 import { Renderer, PLAYER_COLORS } from '@render/index';
@@ -58,6 +60,14 @@ async function boot(): Promise<void> {
   // so a bug report can carry the sha instead of "the version I had open"
   // (src/platform/build-info.ts; the corner badge says the same thing on screen).
   console.info(formatBootLine(BUILD_INFO));
+
+  // Is there a GPU to draw on? Asked BEFORE Pixi is touched (gl-probe.ts), because
+  // the day Chrome's GPU process wedged, `Application.init()` threw
+  // `autoDetectRenderer: CanvasRenderer is not yet implemented` and the game died
+  // to a black screen with only that stack. Throwing here routes the failure
+  // through the one catch below and onto the friendly screen instead.
+  const gl = requireWebGl();
+  console.info(`WebGL available: ${gl.api}`);
 
   const platform = createBrowserPlatform();
 
@@ -559,4 +569,49 @@ function mergeControl(dst: ControlState, src: ControlState): void {
   if (!dst.ping && src.ping) dst.ping = src.ping;
 }
 
-void boot();
+/**
+ * Present a boot failure as the friendly DOM screen (boot-error.ts): plain words,
+ * things to try, the raw error text, the build stamp, and a Retry button. This is
+ * the *only* way a failed boot ends — never a black page, never a console-only
+ * stack (the incident that produced this code).
+ *
+ * Retry semantics differ by kind, and deliberately do not lie:
+ *   - **no WebGL** — re-probe on the spot. A wedged GPU process almost never
+ *     recovers without a browser restart, so a reload would just repaint the same
+ *     screen; only reload when the probe actually says yes. Otherwise the status
+ *     line reports that nothing changed.
+ *   - **any other init failure** — reload, since a one-off start-up error often
+ *     does not repeat.
+ */
+function presentBootFailure(err: unknown): void {
+  const build = formatBuildBadge(BUILD_INFO);
+  // The console still gets the truth — this screen is *in addition to* the stack,
+  // not instead of it. One clear line first, so the cryptic part has a caption.
+  console.error(`Planet Rush failed to boot (build ${build})`, err);
+  try {
+    const content = describeBootFailure(err, build);
+    const mounted = showBootError({
+      dom: document,
+      content,
+      onRetry: () => {
+        if (content.kind !== 'no-webgl') {
+          window.location.reload();
+          return true;
+        }
+        if (!probeWebGl().ok) return false; // still no GL — say so, don't reload
+        window.location.reload();
+        return true;
+      },
+    });
+    // No #app and no body to write into is the one case the screen cannot rescue.
+    if (!mounted) console.error('Planet Rush: no element to mount the boot-error screen into.');
+  } catch (screenErr) {
+    // The failure path must not fail silently on top of the original failure.
+    console.error('Planet Rush: could not render the boot-error screen', screenErr);
+  }
+}
+
+// The whole of boot() runs inside one catch, so ANY init failure — no WebGL, a
+// bad asset, a thrown constructor — lands on the friendly screen with its error
+// text, rather than on a black canvas (GDD §4.3b risk 7).
+void boot().catch(presentBootFailure);
