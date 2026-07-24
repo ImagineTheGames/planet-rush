@@ -122,6 +122,35 @@ export interface BuildAction {
   active: boolean;
 }
 
+/**
+ * What a Build & Upgrade wheel segment buys (GDD §2.5). Four of the five
+ * segments are simulated from day 2; `UPGRADE SHIP` joins this union when ship
+ * upgrades land, because it opens a second screen rather than spending on the
+ * spot.
+ *
+ * - `turret` / `shield` — pay the cost now, construction takes time.
+ * - `repair`  — open the repair channel on your own core (a channel, not a
+ *               purchase: it consumes ore as it ticks and any core/shield
+ *               damage interrupts it).
+ * - `bank`    — move the ship's held ore into the safe banked total.
+ */
+export type BuildItem = 'turret' | 'shield' | 'repair' | 'bank';
+
+/**
+ * Confirm a Build & Upgrade wheel segment (GDD §2.5). Distinct from
+ * {@link BuildAction}, which only *opens* the wheel: this is the press that
+ * spends. One-shot — it is acted on for the tick it appears in and never held,
+ * so a wheel confirmation can never double-charge by being latched.
+ *
+ * Bots issue it through the same action interface a human uses (GDD §2.9), and
+ * the simulation validates it: it never trusts the sender for ownership,
+ * proximity, cost, or per-planet caps.
+ */
+export interface BuildOrderAction {
+  type: 'buildOrder';
+  item: BuildItem;
+}
+
 /** Boost (GDD §2.4). Held state. */
 export interface BoostAction {
   type: 'boost';
@@ -135,15 +164,16 @@ export interface PingAction {
 }
 
 /**
- * The abstract action union (GDD §2.4). Six verbs: thrust, aim, fire, build,
- * boost, ping. This is the contract every input device targets and the
- * simulation consumes.
+ * The abstract action union (GDD §2.4). Seven verbs: thrust, aim, fire, build,
+ * buildOrder, boost, ping. This is the contract every input device targets and
+ * the simulation consumes.
  */
 export type Action =
   | ThrustAction
   | AimAction
   | FireAction
   | BuildAction
+  | BuildOrderAction
   | BoostAction
   | PingAction;
 
