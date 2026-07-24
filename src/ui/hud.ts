@@ -69,6 +69,11 @@ import {
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
   SHIELD_BAR_HEIGHT,
+  PROMPT_PAD_X,
+  PROMPT_PAD_Y,
+  PROMPT_STROKE,
+  PROMPT_CENTER_Y,
+  promptWrapWidth,
 } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
@@ -111,9 +116,6 @@ const STRIP_PAD = 12;
  * than the anchor outward.
  */
 const SLOT_STROKE = 1.5;
-
-/** Horizontal padding inside the onboarding prompt's panel, CSS px. */
-const PROMPT_PAD_X = 40;
 
 
 // ---------------------------------------------------------------------------
@@ -337,9 +339,12 @@ export class Hud extends Container {
     this.planetGroup.y = PAD;
     this.stripGroup.y = this.screenHeight - SQUARE - STRIP_PAD;
     this.promptGroup.x = this.screenWidth / 2;
-    // Below the ship, above the controls strip, and clear of the bottom third's
-    // upper edge so the registry's `bottom-center` anchor holds at any height.
-    this.promptGroup.y = this.screenHeight * 0.72;
+    // Below the ship (the follow camera holds it at the centre) and above the
+    // controls strip, so the prompt never covers the thing it is pointing at.
+    // The fraction lives in hud-geometry.ts with the rest of the prompt's
+    // geometry, so `describeLayout`'s registered rect is computed from the same
+    // number this draws with.
+    this.promptGroup.y = this.screenHeight * PROMPT_CENTER_Y;
     this.wheel.resize(this.screenWidth, this.screenHeight);
   }
 
@@ -647,22 +652,27 @@ export class Hud extends Container {
     // button on the asteroid — your beam mines it" is ~440 px on one line, which
     // is wider than a 390 px portrait screen; a prompt the player can't read is a
     // prompt that didn't fire (GDD §2.10, style-guide §9 "reads at a glance").
-    const maxTextWidth = Math.max(80, this.screenWidth - 2 * PAD - PROMPT_PAD_X);
     this.promptText.style.wordWrap = true;
-    this.promptText.style.wordWrapWidth = maxTextWidth;
+    this.promptText.style.wordWrapWidth = promptWrapWidth(this.screenWidth);
     this.promptText.style.align = 'center';
 
-    // Size the panel to the text, centre-anchored on the group origin.
+    // Size the panel to the text, centre-anchored on the group origin. The
+    // stroke is centred on the path by Pixi, so it adds PROMPT_STROKE to the
+    // drawn footprint — the same term promptWrapWidth() already subtracted, and
+    // the same rect promptBounds() reports to the registry.
     const w = this.promptText.width + PROMPT_PAD_X;
-    const h = this.promptText.height + 22;
+    const h = this.promptText.height + PROMPT_PAD_Y;
     this.promptPanel.clear();
     this.promptPanel
       .roundRect(-w / 2, -h / 2, w, h, 8)
       .fill({ color: PALETTE.vacuum, alpha: 0.82 })
-      .stroke({ width: 1, color: PALETTE.plasma, alpha: 0.6 });
+      .stroke({ width: PROMPT_STROKE, color: PALETTE.plasma, alpha: 0.6 });
     // Plasma accent bar on the left — the beam is plasma (style-guide §1).
     this.promptAccent.clear();
     this.promptAccent.rect(-w / 2, -h / 2, 4, h).fill({ color: PALETTE.plasma });
+    // The accent is drawn on the panel's left edge and is narrower than it, so
+    // the group's footprint stays exactly the stroked panel — what promptBounds
+    // reports and what `full` + PAD is asserted against.
 
     this.promptGroup.visible = true;
   }
@@ -694,11 +704,26 @@ export class Hud extends Container {
    * | `upgrade-panel` | `full` + 0    | Same overlay, one screen deeper (GDD §2.5). Its width is clamped to the viewport (`panelSize`) precisely so this holds on a narrow phone. |
    * | `alarm-frame`   | `full` + 0    | It *is* the screen frame — `full` is a statement of intent, not a fallback. |
    * | `alarm-arrow`   | `full` + 0    | GDD §2.2's "screen-edge arrow": it hugs an edge but must never leave the screen, which is exactly what `full` asserts. There is no narrower region in the ratified vocabulary for "on an edge", and inventing one is the Director's call, not a placement fix. |
+   * | `onboarding`    | `full` + PAD  | The one M2 element GDD §2.2 lists **without a position** — it names a corner or a band for every other element (ore top-left, HP top-right, clock top-centre, minimap bottom-right, strip along the bottom) and for the prompts says only "Onboarding prompts (section 2.10)"; §2.10 adds none either. So `center` (QA's placeholder in the PENDING list) is not a GDD claim to honour, and the honest contract is the one the design *does* make: a prompt the player cannot read is a prompt that didn't fire (§2.10), so it must never leave the screen. `full` + `PAD` asserts exactly that, and `promptWrapWidth()` is what makes it true rather than hopeful — see the note below. |
    *
-   * **Still not registered, and why — measured, not estimated.** QA's layout
-   * contract (`tests/mobile/layout.spec.ts`) also lists `wave-clock`
-   * (`top-center`) and `onboarding` (`center`). Both zones are one third of the
-   * viewport wide, and both elements are intrinsically wider. The numbers below
+   * **Why `onboarding` is `full` and not a band.** A prompt is a *sentence*, and
+   * every interior region in the vocabulary is one third of the viewport wide.
+   * "Hold the FIRE button on the asteroid — your beam mines it" is ~440 px on one
+   * line — wider than a 390 px portrait phone, let alone its 98 px `center` zone
+   * — so no band can hold it at any type size the style guide permits. The prompt
+   * therefore takes the screen and signs the stronger promise it *can* keep: it
+   * stays inside the HUD margin. `promptWrapWidth()` wraps the text at
+   * `W − 2·PAD − PROMPT_PAD_X − PROMPT_STROKE` so the stroked panel lands exactly
+   * on that margin in the worst case, which is why this registers with a real
+   * `PAD` margin rather than the bare `full` the overlays above use.
+   *
+   * Its vertical placement (`PROMPT_CENTER_Y`, below the ship, above the strip)
+   * is a readability choice, not an anchor claim — no region in the vocabulary
+   * distinguishes it, and `hud-geometry.test.ts` pins the footprint it produces.
+   *
+   * **Still not registered, and why — measured, not estimated.** One element is
+   * left: `wave-clock` (`top-center` in QA's contract). Its zone is one third of
+   * the viewport wide and the clock is intrinsically wider. The numbers below
    * were read out of a real browser frame — the zone from the registry's own
    * `resolveAnchor`, the widths from `measureText` in the shipped font stack:
    *
@@ -719,15 +744,18 @@ export class Hud extends Container {
    * the wave names, accept a floor-type four-line clock on phones, or give
    * `top-center` a full-width variant. The last one lives in
    * `src/platform/layout-registry.ts`'s ratified anchor vocabulary, which is not
-   * mine to extend. Unlike the M2 elements above, neither element can be
-   * honestly answered with `full`: "top centre" and "centre" are placement
-   * claims that `full` would not check at all.
+   * mine to extend.
    *
-   * `onboarding` is the same shape of question one step further along — the
-   * prompt's sentence is wider still, and it deliberately sits at `0.72·H`,
-   * *below* the vertical centre band, under the ship (see `resize()`), so
-   * `center` is the wrong region for it as designed rather than merely a tight
-   * one.
+   * **And `full` is not the escape hatch here that it is for `onboarding`.** The
+   * difference is not the geometry — both elements are wider than a third-width
+   * band — it is what the GDD claims. §2.2 puts "the **ASTEROID WAVE clock** (top
+   * center)" in writing, so `top-center` is a *specified* placement; answering it
+   * with `full` would keep the element green while silently discarding the only
+   * claim worth checking, which is the definition of loosening the contract. The
+   * prompts are listed in that same paragraph with **no position at all**, so
+   * `full` + `PAD` there discards nothing — it is the strongest promise the
+   * design actually makes. Same region, opposite honesty, because the GDD says
+   * different things about the two.
    *
    * **Caveat that cuts in our favour.** `assets/` ships no fonts yet (Art &
    * Audio's deliverable), so those widths were measured in the
@@ -736,9 +764,9 @@ export class Hud extends Container {
    * harder once the fonts land. That same dependency is why both golden
    * baselines will legitimately need regenerating on the day they do.
    *
-   * Registering these two today would turn QA's suite red on a real finding that
-   * nobody has been given the call on. They land the moment it is made; nothing
-   * else here changes.
+   * Registering `wave-clock` today would turn QA's suite red on a real finding
+   * that nobody has been given the call on. It lands the moment one is made;
+   * nothing else here changes.
    */
   describeLayout(viewport: Viewport): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
@@ -777,6 +805,7 @@ export class Hud extends Container {
     push('upgrade-panel', 'full', 0, this.wheel.panelNode);
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
+    push('onboarding', 'full', PAD, this.promptGroup);
 
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.

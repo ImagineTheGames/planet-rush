@@ -37,6 +37,9 @@ import {
   HP_BAR_WIDTH,
   HP_BAR_TOP,
   SHIELD_BAR_HEIGHT,
+  promptBounds,
+  promptWrapWidth,
+  PROMPT_CENTER_Y,
 } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
@@ -191,6 +194,64 @@ describe('planet-hp placement', () => {
     // edge; that has to stay below the label, i.e. inside the element's own
     // footprint rather than poking out above y = HUD_PAD.
     expect(SHIELD_BAR_HEIGHT + 2).toBeLessThanOrEqual(HP_BAR_TOP);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The onboarding prompt (GDD §2.10) — registered `full`, margin HUD_PAD
+// ---------------------------------------------------------------------------
+
+describe('onboarding placement', () => {
+  const FULL_PAD: AnchorSpec = { region: 'full', margin: HUD_PAD };
+
+  /** A worst-case prompt: text wrapped to the widest line the wrap allows, over
+   *  enough lines to cover the longest authored string on the narrowest phone.
+   *  Line box ≈ 20px at the prompt's 16px heading type. */
+  const worstCase = (vp: Viewport, lines: number): { w: number; h: number } => ({
+    w: promptWrapWidth(vp.width),
+    h: lines * 20,
+  });
+
+  for (const { name, vp } of PROFILES) {
+    it(`stays on screen and inside the HUD margin at ${name}`, () => {
+      const { w, h } = worstCase(vp, 4);
+      expectWithin(promptBounds(vp.width, vp.height, w, h), FULL_PAD, vp, 'onboarding');
+    });
+  }
+
+  it('lands exactly on the HUD margin at the wrap ceiling — the assertion that earns its keep', () => {
+    // The prompt claims `full` + PAD *because* it is wrapped to fit it. If the
+    // wrap budget ever stops paying for PROMPT_PAD_X and the stroke, a prompt
+    // whose text reaches the ceiling registers wider than its own anchor zone —
+    // and it is the longest prompt on the narrowest phone that would do it, the
+    // one case least likely to be looked at by eye.
+    for (const { name, vp } of PROFILES) {
+      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 20);
+      expect(b.x, name).toBeCloseTo(HUD_PAD, 6);
+      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
+    }
+  });
+
+  it('sits below the ship it is talking about, and clear of the controls strip', () => {
+    // GDD §2.10's prompts point at the ship and the world; a panel drawn over the
+    // centre would cover the thing it names. PROMPT_CENTER_Y is below centre —
+    // and still clear of the bottom edge once the panel has height.
+    expect(PROMPT_CENTER_Y).toBeGreaterThan(0.5);
+    for (const { name, vp } of PROFILES) {
+      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 4 * 20);
+      expect(b.y, name).toBeGreaterThan(vp.height / 2);
+      expect(b.y + b.height, name).toBeLessThanOrEqual(vp.height - HUD_PAD);
+    }
+  });
+
+  it('is wider than any band the vocabulary offers — which is why it is `full`', () => {
+    // The same test the wheel gets, for the same reason: if a sentence ever does
+    // fit a third-width band, revisit the anchor instead of keeping `full`.
+    for (const { name, vp } of PROFILES) {
+      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 20);
+      const centerZone = resolveAnchor({ region: 'center', margin: HUD_PAD }, vp);
+      expect(b.width, name).toBeGreaterThan(centerZone.width);
+    }
   });
 });
 

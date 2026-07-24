@@ -154,6 +154,74 @@ export function planetHpBounds(viewportWidth: number, labelWidth = 0): Rect {
 }
 
 // ---------------------------------------------------------------------------
+// The onboarding prompt (GDD §2.10)
+// ---------------------------------------------------------------------------
+
+/** Horizontal padding inside the prompt panel — text box edge to panel edge on
+ *  each side is half of this. */
+export const PROMPT_PAD_X = 40;
+/** Vertical padding inside the prompt panel, CSS px. */
+export const PROMPT_PAD_Y = 22;
+/** The panel's 1px outline (style-guide §1 plasma). It is part of the drawn
+ *  footprint — `getBounds()` reports it — so the wrap budget has to pay for it. */
+export const PROMPT_STROKE = 1;
+/** The prompt's vertical centre, as a fraction of viewport height. Below the
+ *  ship (which the follow camera holds at the centre) and above the controls
+ *  strip, so it never covers the thing it is telling the player to look at. */
+export const PROMPT_CENTER_Y = 0.72;
+/** Wrap floor, so a comically narrow viewport still wraps rather than clamping
+ *  to zero. */
+export const PROMPT_MIN_TEXT_WIDTH = 80;
+
+/**
+ * The width the prompt's text box wraps at, CSS px.
+ *
+ * **This is the whole reason the prompt can claim an anchor at all.** The prompt
+ * is a sentence, and a sentence is intrinsically wider than any third-width band
+ * in the anchor vocabulary — "Hold the FIRE button on the asteroid — your beam
+ * mines it" is ~440 px on one line, wider than a 390 px portrait phone. So the
+ * prompt does not get a band; it gets the screen, and the contract it signs is
+ * that it *never leaves* it (`full` + {@link HUD_PAD}, see `Hud.describeLayout`).
+ *
+ * Wrapping here is what makes that contract true rather than hopeful: the panel
+ * is `textWidth + PROMPT_PAD_X + PROMPT_STROKE`, so wrapping at
+ * `W − 2·HUD_PAD − PROMPT_PAD_X − PROMPT_STROKE` makes the *stroked* panel land
+ * exactly on the HUD margin in the worst case and inside it in every other. The
+ * stroke is subtracted deliberately: leave it out and a prompt whose text hits
+ * the wrap ceiling registers 1 px wider than its own anchor zone.
+ */
+export function promptWrapWidth(viewportWidth: number): number {
+  return Math.max(
+    PROMPT_MIN_TEXT_WIDTH,
+    viewportWidth - 2 * HUD_PAD - PROMPT_PAD_X - PROMPT_STROKE,
+  );
+}
+
+/**
+ * The onboarding prompt's drawn footprint: a panel sized to its (already
+ * wrapped) text box, centred horizontally and on {@link PROMPT_CENTER_Y}.
+ *
+ * `textWidth`/`textHeight` are the measured metrics of the wrapped text — the
+ * registry records what was actually drawn, so the caller passes real numbers
+ * rather than the ceiling. Feed {@link promptWrapWidth} to get the worst case.
+ */
+export function promptBounds(
+  viewportWidth: number,
+  viewportHeight: number,
+  textWidth: number,
+  textHeight: number,
+): Rect {
+  const width = textWidth + PROMPT_PAD_X + PROMPT_STROKE;
+  const height = textHeight + PROMPT_PAD_Y + PROMPT_STROKE;
+  return {
+    x: viewportWidth / 2 - width / 2,
+    y: viewportHeight * PROMPT_CENTER_Y - height / 2,
+    width,
+    height,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The under-attack alarm (GDD §2.2 — a mechanic, not polish)
 // ---------------------------------------------------------------------------
 
