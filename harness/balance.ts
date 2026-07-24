@@ -151,12 +151,26 @@ export interface LengthStats {
   readonly inTarget: number;
 }
 
-/** One contestant's record. */
+/**
+ * One contestant's record.
+ *
+ * Two rates, because a sweep can contain matches nobody won (a timeout is a
+ * match with no winner, and it stays in the sample — see the module note):
+ *
+ *  - `rate` is **wins ÷ decided matches**. This is the one the 55% ceiling is
+ *    checked against, because it answers "when this ruleset produces a winner,
+ *    how often is it this contestant?" — the question the target is about.
+ *  - `rateEntered` is wins ÷ matches entered. Lower whenever matches timed out,
+ *    and reported alongside so the dilution is visible rather than silent.
+ */
 export interface WinRecord {
   readonly name: string;
   readonly matches: number;
+  /** Matches this contestant entered that produced a winner. */
+  readonly decided: number;
   readonly wins: number;
   readonly rate: number;
+  readonly rateEntered: number;
   /** Mean sim seconds this contestant's seats survived. */
   readonly meanSurvival: number;
 }
@@ -236,6 +250,7 @@ export function winRecords(
   keyOf: (slot: { strategy: StrategyId; shipClass: ShipClass }) => string,
 ): WinRecord[] {
   const played = new Map<string, number>();
+  const decided = new Map<string, number>();
   const won = new Map<string, number>();
   const survival = new Map<string, { total: number; seats: number }>();
 
@@ -249,7 +264,10 @@ export function winRecords(
       s.seats++;
       survival.set(key, s);
     }
-    for (const key of seen) played.set(key, (played.get(key) ?? 0) + 1);
+    for (const key of seen) {
+      played.set(key, (played.get(key) ?? 0) + 1);
+      if (m.winner !== null) decided.set(key, (decided.get(key) ?? 0) + 1);
+    }
     if (m.winner !== null) {
       const w = m.slots.find((s) => s.id === m.winner);
       if (w) {
@@ -262,11 +280,15 @@ export function winRecords(
   return [...played.entries()]
     .map(([name, count]) => {
       const s = survival.get(name);
+      const wins = won.get(name) ?? 0;
+      const dec = decided.get(name) ?? 0;
       return {
         name,
         matches: count,
-        wins: won.get(name) ?? 0,
-        rate: count > 0 ? (won.get(name) ?? 0) / count : 0,
+        decided: dec,
+        wins,
+        rate: dec > 0 ? wins / dec : 0,
+        rateEntered: count > 0 ? wins / count : 0,
         meanSurvival: s && s.seats > 0 ? s.total / s.seats : 0,
       };
     })
@@ -341,6 +363,15 @@ export interface ReportInput {
   /** Mirror runs: one contestant in all eight seats — the degenerate cases that
    *  bound the ruleset from both ends. */
   readonly mirrors: readonly { label: string; matches: readonly MatchResult[] }[];
+  /**
+   * QA's reading of the numbers, as markdown, rendered under the scoreboard.
+   * This is the **one hand-written part of a report** — a table of measurements
+   * is not an interpretation, and a balance report that only prints numbers
+   * makes the reader do QA's job. Everything else is generated.
+   */
+  readonly findings?: string;
+  /** A note on what changed in the constants table for this run, if anything. */
+  readonly tuning?: string;
 }
 
 /** The pass/fail line for every target, from a finished report input. */
@@ -350,8 +381,11 @@ export function verdicts(input: ReportInput): Verdicts {
   const term = terminationStats(all);
   const strat = input.strategySweeps.flatMap((s) => s.matches);
   const cls = input.classSweeps.flatMap((s) => s.matches);
-  const worstStrategy = winRecords(strat, (s) => s.strategy)[0];
-  const worstClass = winRecords(cls, (s) => s.shipClass)[0];
+  // A contestant with no decided match has no measured win rate, and a ceiling
+  // cannot be checked against a rate that does not exist — that is a *coverage*
+  // failure (target 1's timeouts), reported there rather than passed off here.
+  const worstStrategy = winRecords(strat, (s) => s.strategy).filter((r) => r.decided > 0)[0];
+  const worstClass = winRecords(cls, (s) => s.shipClass).filter((r) => r.decided > 0)[0];
   return {
     length: len.inTarget >= 0.5,
     termination: term.endedRate >= 1,
@@ -418,6 +452,13 @@ export function renderReport(input: ReportInput): string {
     ),
     '',
   );
+
+  if (input.tuning) {
+    out.push('> **Tuning this run.** ' + input.tuning, '');
+  }
+  if (input.findings) {
+    out.push('## QA reading', '', input.findings, '');
+  }
 
   // --- Match length ---
   out.push('## 1 · Match length', '', `Sample: **${len.n} matches** across every sweep below.`, '');
@@ -527,11 +568,11 @@ export function renderReport(input: ReportInput): string {
   return out.join('\n');
 }
 
-/** "top: rusher 100.0% (ceiling 55%)" — the scoreboard's one-line summary. */
+/** "top: `rusher` 100.0% of 24 decided" — the scoreboard's one-line summary. */
 function topLine(records: readonly WinRecord[]): string {
-  const top = records[0];
-  if (!top) return 'no data';
-  return `top: \`${top.name}\` ${pct(top.rate)}`;
+  const top = records.filter((r) => r.decided > 0)[0];
+  if (!top) return 'no decided match — nothing to measure';
+  return `top: \`${top.name}\` ${pct(top.rate)} of ${top.decided} decided`;
 }
 
 /** The seeds-and-rotations line under a sweep heading. */
@@ -544,19 +585,24 @@ function sweepLine(sweep: Sweep): string {
 /** A win-record table, with the fair share spelled out next to the ceiling. */
 function recordsTable(records: readonly WinRecord[], contestants: number): string {
   const fair = contestants > 0 ? 1 / contestants : 0;
+  const undecided = records.some((r) => r.decided === 0);
   return [
     table(
-      ['Contestant', 'matches', 'wins', 'win rate', 'vs fair share', 'mean survival'],
+      ['Contestant', 'entered', 'decided', 'wins', 'win rate (of decided)', 'vs fair share', 'mean survival'],
       records.map((r) => [
         `\`${r.name}\``,
         String(r.matches),
+        String(r.decided),
         String(r.wins),
-        `${pct(r.rate)}${r.rate > WIN_RATE_CEILING ? ' ⚠' : ''}`,
-        `${(r.rate / (fair || 1)).toFixed(2)}×`,
+        r.decided === 0 ? '—' : `${pct(r.rate)}${r.rate > WIN_RATE_CEILING ? ' ⚠' : ''}`,
+        r.decided === 0 ? '—' : `${(r.rate / (fair || 1)).toFixed(2)}×`,
         mmss(r.meanSurvival),
       ]),
     ),
     '',
-    `Fair share with ${contestants} contestants is **${pct(fair)}**; the GDD ceiling is **${pct(WIN_RATE_CEILING)}**.`,
+    `Fair share with ${contestants} contestants is **${pct(fair)}**; the GDD ceiling is **${pct(WIN_RATE_CEILING)}**.` +
+      (undecided
+        ? ' A `—` means every match this contestant entered timed out: no win rate exists to compare, which is a target-1 failure, not a pass here.'
+        : ''),
   ].join('\n');
 }
