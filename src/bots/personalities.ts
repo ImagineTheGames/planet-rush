@@ -162,6 +162,16 @@ export type PersonalityId =
  * The cast (GDD §2.9), in the order the design lists them — which is also the
  * order empty slots are filled, so a solo match always meets Rusty first and
  * only meets Warden in a full house.
+ *
+ * **The hulls are not a choice this file gets to make.** GDD §2.11 assigns them
+ * by name — "Bolt/Sable fly Interceptors, Foreman/Warden Excavators,
+ * Rusty/Patch Haulers, Vulture a Vanguard" — because "a silhouette on the
+ * minimap is information": the shape has to tell you who you are dealing with
+ * before you can read the name (style-guide §4). Each row below matches that
+ * sentence exactly, and a personality's weights are then written to *suit* its
+ * hull rather than the other way round — Patch repairs through a siege in the
+ * hull that tanks one, Warden holds its ground in the hull that out-earns
+ * everyone standing still.
  */
 export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
   rusty: {
@@ -213,7 +223,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'patch',
     name: 'Patch',
     difficulty: Difficulty.Medium,
-    shipClass: ShipClass.Vanguard,
+    shipClass: ShipClass.Hauler,
     blurb: 'Defensive fixer — answers every alarm and repairs through a siege.',
     weights: {
       triangle: { mine: 0.35, defend: 0.5, attack: 0.15 },
@@ -243,7 +253,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'vulture',
     name: 'Vulture',
     difficulty: Difficulty.Hard,
-    shipClass: ShipClass.Hauler,
+    shipClass: ShipClass.Vanguard,
     blurb: 'Wreck scavenger — farms kill sites and hauls a dead rival home.',
     weights: {
       triangle: { mine: 0.4, defend: 0.2, attack: 0.4 },
@@ -258,7 +268,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'warden',
     name: 'Warden',
     difficulty: Difficulty.Hard,
-    shipClass: ShipClass.Vanguard,
+    shipClass: ShipClass.Excavator,
     blurb: 'Territorial enforcer — treats the space around its planet as its own.',
     weights: {
       triangle: { mine: 0.3, defend: 0.45, attack: 0.25 },
