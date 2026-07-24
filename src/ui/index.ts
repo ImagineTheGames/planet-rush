@@ -119,6 +119,30 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
 
+// --- Over-entity health bars — the field report's enemy bars (GDD §2.2) ----
+//
+// A pooled, screen-space layer that floats a hull/HP bar over every *non-local*
+// combat entity (enemy ships, enemy turrets, hostile wave units) that is damaged
+// or in combat — never over the local player's own ship (they read their hull
+// from the HUD). Folded into the `Hud`: pass `combatants` on the `HudFrame` with
+// each entity's HP and **screen-space** position (project world → screen via
+// `renderer.projectToScreen`), and set `owner` to the local player's slot. The
+// layer registers itself through `Hud.describeLayout`, so no `main.ts` change is
+// needed beyond filling the frame.
+
+export {
+  combatantGetsBar,
+  healthBarModel,
+  isLocalCombatant,
+  HEALTHBAR_FULL_EPSILON,
+  HEALTHBAR_GAP,
+  HEALTHBAR_HEIGHT,
+  HEALTHBAR_WIDTH,
+} from './healthbar';
+export type { Combatant, HealthBar } from './healthbar';
+
+export { HealthBarView, HEALTHBAR_ID, HEALTHBAR_ANCHOR } from './healthbar-view';
+
 // --- The 8-slot lobby (GDD §2.1, §2.11, §4.2) ------------------------------
 //
 // The same three-piece shape as everything else here: a pure model

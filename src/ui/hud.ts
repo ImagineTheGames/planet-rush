@@ -24,7 +24,9 @@
  *  - **The Build & Upgrade wheel** and the upgrade panel behind its arrow
  *    (GDD §2.5), drawn by {@link ./build-wheel-view}, open at your own planet.
  *
- * Over-ship hull bars and the minimap arrive with the remaining M2 wiring.
+ * Over-ship hull bars now land as a pooled, screen-space layer over every
+ * non-local combat entity ({@link ./healthbar}, {@link ./healthbar-view}); the
+ * minimap arrives with the remaining M2 wiring.
  *
  * All decision logic lives in the pure, unit-tested sibling modules
  * ({@link ./onboarding}, {@link ./wave-clock}, {@link ./ore-hud},
@@ -59,6 +61,9 @@ import type { UpgradeTiers } from './upgrade-panel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { healthBarModel } from './healthbar';
+import type { Combatant } from './healthbar';
+import { HealthBarView } from './healthbar-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -210,7 +215,21 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+
+  // --- Day 2: over-entity health bars (GDD §2.2 — a hull bar over every ship) --
+
+  /** Non-local combat entities — enemy ships, enemy turrets, hostile wave units
+   *  — each with its HP and its **screen-space** position (the caller projects
+   *  world → screen via the renderer's camera). The health-bar layer draws a bar
+   *  over each that is damaged or in combat; the local player's own ship and
+   *  turrets are filtered out by {@link ./healthbar}, so passing them is harmless.
+   *  Default: none ⇒ no bars (the M1 feed predates enemies). */
+  readonly combatants?: readonly Combatant[];
 }
+
+/** Reused for a frame that carries no combatants, so the empty case allocates
+ *  nothing (GDD §4.3 — no per-frame allocation on the hot path). */
+const NO_COMBATANTS: readonly Combatant[] = [];
 
 // ---------------------------------------------------------------------------
 // The HUD
@@ -264,6 +283,11 @@ export class Hud extends Container {
    *  registry records what is drawn, never what would have been. */
   private arrowDrawn = false;
 
+  // --- Over-entity health bars (GDD §2.2 — the field report's enemy bars) ---
+  //     A pooled, screen-space layer, drawn behind the HUD chrome and over the
+  //     world render layer below the HUD. Its decisions live in ./healthbar.
+  private readonly healthbars = new HealthBarView();
+
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
@@ -312,6 +336,10 @@ export class Hud extends Container {
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
+      // Health bars draw first: they float over the world but under every piece
+      // of HUD chrome, so a bar never sits on top of the ore squares or the
+      // wave clock.
+      this.healthbars,
       this.oreGroup,
       this.waveGroup,
       this.planetGroup,
@@ -352,6 +380,7 @@ export class Hud extends Container {
   update(frame: HudFrame): void {
     this.updateOre(frame);
     this.updateWaveClock(frame);
+    this.updateHealthBars(frame);
     this.updatePlanetHp(frame);
     this.updateControlsStrip(frame);
     // The alarm runs before the wheel and the prompts, because both read its
@@ -519,6 +548,18 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+  }
+
+  // --- Over-entity health bars (GDD §2.2) ---------------------------------
+
+  /** Draw a bar over every non-local combat entity that is damaged or fighting
+   *  (GDD §2.2's over-ship hull bar, generalised to enemy turrets and hostile
+   *  wave units — the field report). The pure model in {@link ./healthbar} owns
+   *  the "which entities, what fill" decision; this only hands it the frame's
+   *  combatants and the local player's slot, and draws the result. */
+  private updateHealthBars(frame: HudFrame): void {
+    const bars = healthBarModel(frame.combatants ?? NO_COMBATANTS, frame.owner ?? 0);
+    this.healthbars.update(bars, this.screenWidth, this.screenHeight);
   }
 
   // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) -------------
@@ -810,6 +851,14 @@ export class Hud extends Container {
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
+
+    // Over-entity health bars: the layer computes its own union bounds (only the
+    // bars that actually drew on-screen), so it registers itself rather than
+    // going through `push` — its footprint is not one child's getBounds(). Gated
+    // on the HUD's own visibility, the same as `shown()` does for `push`.
+    if (shown(this.healthbars)) {
+      for (const entry of this.healthbars.describeLayout(viewport)) entries.push(entry);
+    }
 
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.
