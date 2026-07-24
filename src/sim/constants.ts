@@ -230,7 +230,17 @@ export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
  * no shield regeneration, no repair, no new ore — and adding a fourth is a
  * design decision, not a tuning one. The mechanism is implemented and wired so
  * QA (who owns this table from M2) can falsify the stalemate hypothesis by
- * raising this number instead of editing the sim. TUNABLE
+ * raising this number instead of editing the sim.
+ *
+ * **QA day-6 finding (`tests/reports/balance-day6.md`): this should be 3, but
+ * the change is BLOCKED.** At 0 the ending is not structural (docs/bot-balance-day4.md
+ * Finding 2), and match length overruns the 10–15 min target (median 15.2 min,
+ * tail to ~19.5). Raising it to 3 lands every headless match inside the band
+ * (100/100, median 12:55) and makes the guarantee structural. But `3` breaks
+ * three tests in `src/sim/match.test.ts` that assert core HP is *constant* across
+ * collapse (they pin decay to exactly 0) — a file QA does not own. The value is
+ * held at 0 pending the Director parameterizing those tests off this constant so
+ * the falsification knob QA was handed can actually be turned. TUNABLE
  */
 export const COLLAPSE_CORE_DECAY: Tunable<number> = 0;
 
