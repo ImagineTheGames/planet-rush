@@ -10,7 +10,8 @@
 import { Application } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import type { Action, Vec2 } from '@shared/types';
-import { createWorld, step, BEAM_RANGE } from './sim';
+import { BEAM_RANGE } from './sim';
+import { createLocalSession } from './net';
 import {
   createControlState,
   mapActions,
@@ -76,14 +77,27 @@ async function boot(): Promise<void> {
   if (mount) mount.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none'; // sticks own the gestures (amendment §2)
 
-  // --- Sim world: a full ring so the field reads; only LOCAL_PLAYER is driven.
-  const world = createWorld({
-    seed: 1,
-    players: Array.from({ length: PLAYER_COUNT }, (_, id) => ({
-      id,
-      shipClass: ShipClass.Vanguard,
-    })),
+  // --- Match session: the client does not step the sim any more. Input leaves
+  //     here as ordered input ticks over a `Transport`, and the world comes back
+  //     from whoever holds authority (GDD §4.2). Offline that is a LocalLoopback
+  //     running the authoritative sim in this process — no server, no internet,
+  //     same protocol as the online match. A full ring so the field reads; only
+  //     LOCAL_PLAYER is driven until the bots and the online lobby land.
+  const session = createLocalSession({
+    match: {
+      seed: 1,
+      players: Array.from({ length: PLAYER_COUNT }, (_, id) => ({
+        id,
+        shipClass: ShipClass.Vanguard,
+      })),
+    },
+    localPlayer: LOCAL_PLAYER,
+    // Offline the renderer reads the authoritative world directly, so the
+    // binary snapshot stream is off: it would cost encoding for a wire that
+    // isn't there. It turns on with the WebSocket transport.
+    snapshotIntervalTicks: 0,
   });
+  const world = session.world;
 
   // --- Renderer. The camera centres on the *visual* viewport (URL-bar / notch /
   //     fullscreen aware), not the raw canvas — see camera.ts and readViewport().
@@ -194,7 +208,9 @@ async function boot(): Promise<void> {
   const loop = new GameLoop({
     update: () => {
       if (flags.freeze) return; // sim is pinned at the seeded freeze tick
-      step(world, [{ id: LOCAL_PLAYER, actions: sampleInput() }]);
+      // One input tick per fixed step, in order — the pulse the whole protocol
+      // is built on. The transport advances the authoritative sim (GDD §4.2).
+      session.sendInput(sampleInput());
       simTicks++;
     },
     render: () => {
