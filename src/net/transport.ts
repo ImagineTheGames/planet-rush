@@ -71,6 +71,14 @@ export interface JoinMessage {
   room: RoomCode;
   /** Present when rejoining mid-match to reclaim a slot (reconnect grace). */
   reclaim?: PlayerId;
+  /**
+   * The opaque token this client was issued in its `welcome` (see
+   * {@link WelcomeMessage.reclaimToken}), presented to prove it is the same
+   * player coming back. A room code is shared by design — it is printed on
+   * screen for the whole classroom — so the code alone must not be enough to
+   * take over a slot that is merely inside its grace window (GDD §4.2).
+   */
+  reclaimToken?: string;
 }
 
 /** Lobby choices before RUSH!: ship class and, for the creator, bot difficulty. */
@@ -118,6 +126,12 @@ export interface WelcomeMessage {
   room: RoomCode;
   /** Server tick the client should predict from. */
   tick: Tick;
+  /**
+   * A per-slot secret to present as {@link JoinMessage.reclaimToken} when
+   * rejoining inside the grace window (GDD §4.2). Absent from `LocalLoopback`,
+   * which has no connection to lose and nothing to prove.
+   */
+  reclaimToken?: string;
 }
 
 /** One slot's public lobby state (GDD §2.1 lobby; §5.2 player colors). */
