@@ -78,6 +78,9 @@ import {
   WHEEL_ORDER,
   panelSize,
   wheelRadius,
+  buildButtonVisible,
+  BUILD_BUTTON_ID,
+  BUILD_BUTTON_ANCHOR,
 } from './ui';
 import type { HudFrame } from './ui';
 
@@ -229,6 +232,12 @@ async function boot(): Promise<void> {
   /** The sim's own docking answer, refreshed each input tick. Read by the touch
    *  BUILD button (which exists only at your own planet) and the HUD. */
   let docked = false;
+  /** Whether the open-build-wheel button is on screen this frame — the UI's own
+   *  persistence rule (`buildButtonVisible`, src/ui/build-button.ts): docked, on
+   *  touch, and nothing else. Pinning it here (not to wheel/onboarding state) is
+   *  what makes building unable to take the button away (the field-report fix).
+   *  One source drives the drawing, the hit target, and the layout registration. */
+  let buildVisible = false;
   /** Rising-edge trackers: the wheel toggles on a *press* of `build`, and a
    *  press of `fire` confirms the pointed-at segment — neither on the hold. */
   let buildHeld = false;
@@ -262,8 +271,10 @@ async function boot(): Promise<void> {
     pressPoint.y = e.clientY - rect.top;
 
     // The touch BUILD button — the E-equivalent, on screen only at your own
-    // planet (GDD §2.4). Toggles the wheel exactly as E and Y do.
-    const build = buildButtonRect(isTouch, docked, w, h);
+    // planet (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
+    // comes from the same `buildVisible` that draws it, so a tap can only land on
+    // a button that is actually there.
+    const build = buildButtonRect(isTouch, buildVisible, w, h);
     if (build && inRect(pressPoint, build)) {
       buildWheel.toggle();
       e.stopImmediatePropagation();
@@ -358,7 +369,7 @@ async function boot(): Promise<void> {
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the viewport each frame so the idle
       // affordances and FIRE button track resize/orientation flips.
-      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height, docked);
+      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height, buildVisible);
       // Keep the build stamp cornered as the viewport changes (two writes).
       buildBadge.update(app.screen.width, app.screen.height);
       // Refresh the layout registry from what was just drawn (debug only).
@@ -428,6 +439,7 @@ async function boot(): Promise<void> {
     const ship = world.ships.find(isLocalShip);
     const planet = planetOf(world, LOCAL_PLAYER);
     docked = ship !== undefined && planet !== null && isDocked(ship, planet);
+    buildVisible = buildButtonVisible({ docked, isTouch });
     buildWheel.setAvailable(docked && planet !== null && planet.alive && ship !== undefined && ship.alive);
 
     // E / Y / the BUILD button: one press opens, the next closes.
@@ -532,6 +544,17 @@ async function boot(): Promise<void> {
     if (touchRects.leftStickZone) reg.register('touch-left-stick', LEFT_STICK_ANCHOR, touchRects.leftStickZone);
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
+
+    // The open-build-wheel button — a permanent HUD fixture at your own planet
+    // (GDD §2.2, §2.4). Registered from the SAME `buildVisible`/`buildButtonRect`
+    // that draw it, so the registry records what is really on screen: present
+    // exactly while docked, and unaffected by opening the wheel or building —
+    // which is the field-report bug made mechanically checkable. Null (and so
+    // unregistered) off-touch and away from the planet. Its id + anchor are the
+    // UI's contract (`@ui` build-button.ts); see there for why the region is
+    // `full` on a short landscape phone.
+    const buildBtn = buildButtonRect(isTouch, buildVisible, w, h);
+    if (buildBtn) reg.register(BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildBtn);
 
     // Build badge: declared bottom-right, actual rect measured from the real
     // text metrics — so a font swap that pushes the stamp off-corner is caught
