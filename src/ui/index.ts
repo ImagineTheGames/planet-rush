@@ -71,6 +71,13 @@ export type {
 
 export { BuildWheelView } from './build-wheel-view';
 
+// --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
+//     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,
+//     its persistence rule + layout contract owned here.
+
+export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
+export type { BuildButtonSignals } from './build-button';
+
 // --- Upgrade panel — the only place ship stats appear (GDD §2.2, §2.5) -----
 
 export {
