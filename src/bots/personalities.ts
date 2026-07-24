@@ -261,7 +261,10 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
       greed: 0.9,
       caution: 1.0,
       scavenge: 1.0,
-      homebody: 0.2,
+      // A scavenger that never comes home feeds every wreck it makes to a rival:
+      // enough territorial pull to survive to the collapse it profits from, still
+      // well below Warden's — it patrols kill sites, it does not homestead. TUNABLE
+      homebody: 0.4,
       opportunism: 0.8,
     },
   },
@@ -276,7 +279,13 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
       greed: 0.4,
       caution: 1.0,
       scavenge: 0.3,
-      homebody: 1.0,
+      // Still the most territorial of the cast — the highest homebody in the Hard
+      // pool by a clear margin — but no longer *dominant*. At 1.0 its threat-near-
+      // home bias out-survived every aggressor to the last core standing and it
+      // won 71% of the equal-skill Hard contest (GDD §2.11: no strategy should).
+      // Tempered so Sable's raiding and Vulture's scavenging are competitive
+      // against it, not so it stops holding ground. TUNABLE — measured in the PR.
+      homebody: 0.55,
       opportunism: 0.5,
     },
   },
