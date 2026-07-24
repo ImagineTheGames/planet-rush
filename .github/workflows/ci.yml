@@ -106,10 +106,6 @@ jobs:
 
   mobile:
     name: Mobile emulation (Playwright)
-    # TODO-m1-12: continue-on-error is TEMPORARY while the touch-drag test is
-    # known-red (brief m1-12) — a failing run on every push was pure alert
-    # spam. The m1-12 fix MUST remove this so the job gates again.
-    continue-on-error: true
     # Run where gating matters (PRs + main) — not on every agent branch push.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
