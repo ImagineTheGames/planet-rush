@@ -515,6 +515,18 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
     expect(pooled).toBeLessThanOrEqual(4);
   });
 
+  it('gives every shot a fresh id, so a recycled slot is not a teleporting shot', () => {
+    const { world } = turretWorld({ x: 200, y: 0 });
+    const seen = new Set<number>();
+    for (let t = 0; t < Math.round(10 / TICK_DT); t++) {
+      step(world, []);
+      for (const p of live(world)) seen.add(p.id);
+    }
+    // Far more distinct shots than pool slots — ids never come back round.
+    expect(seen.size).toBeGreaterThan(world.projectiles.length);
+    expect(seen.size).toBeGreaterThan(10);
+  });
+
   it('a turret killed this tick does not also get a shot off', () => {
     const { turret, world } = turretWorld({ x: 200, y: 0 });
     turret.hp = 0;
@@ -639,6 +651,21 @@ describe('the ring layout (GDD §2.1)', () => {
     }
     // One ring: every planet the same distance from the centre.
     for (const r of radii) expect(r).toBeCloseTo(radii[0]!, 6);
+  });
+
+  it('a planet is a solid body — you dock at your world, you do not fly through it', () => {
+    const planet = makePlanet({ id: 0, owner: 0, pos: at(0, 0) });
+    const ship = makeShip({ id: 0, pos: at(-200, 0), vel: { x: 400, y: 0 } });
+    const world = makeWorld({ ships: [ship], planets: [planet] });
+
+    const thrust: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: 1, y: 0 } }] }];
+    for (let t = 0; t < Math.round(3 / TICK_DT); t++) {
+      step(world, thrust);
+      const gap = Math.hypot(ship.pos.x - planet.pos.x, ship.pos.y - planet.pos.y);
+      expect(gap).toBeGreaterThanOrEqual(planet.radius + ship.radius - 1e-6);
+    }
+    // Still docked at the surface it bounced off, which is the point.
+    expect(isDocked(ship, planet)).toBe(true);
   });
 
   it('two runs with orders, turret fire and repair deep-equal (GDD §4.8)', () => {

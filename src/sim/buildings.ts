@@ -475,6 +475,9 @@ function fireProjectile(world: World, turret: Turret, aim: number): void {
   const dx = Math.cos(aim);
   const dy = Math.sin(aim);
   const slot = takeProjectile(world);
+  // A recycled slot gets a *fresh* id: a renderer or snapshot encoder keying on
+  // id must never mistake this shot for the one that used the slot before it.
+  slot.id = world.nextEntityId++;
   slot.owner = turret.owner;
   slot.pos.x = turret.pos.x + dx * turret.radius;
   slot.pos.y = turret.pos.y + dy * turret.radius;
@@ -491,7 +494,7 @@ function takeProjectile(world: World): Projectile {
     if (!p.active) return p;
   }
   const fresh: Projectile = {
-    id: world.nextEntityId++,
+    id: 0, // assigned per shot by `fireProjectile`
     active: false,
     owner: -1,
     pos: { x: 0, y: 0 },

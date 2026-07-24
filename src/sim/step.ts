@@ -193,9 +193,11 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 4. Broad phase over the (static) asteroid field, reused by collision + beam.
   const hash = SpatialHash.from(world.asteroids.map((a) => a.pos), HASH_CELL_SIZE);
 
-  // 5. Ship-vs-asteroid reflection (GDD §4.1).
+  // 5. Ship-vs-asteroid and ship-vs-planet reflection (GDD §4.1).
   for (const ship of world.ships) {
-    if (ship.alive) reflectOffAsteroids(ship, world.asteroids, hash);
+    if (!ship.alive) continue;
+    reflectOffAsteroids(ship, world.asteroids, hash);
+    reflectOffPlanets(ship, world);
   }
 
   // 6. Facing — one priority ladder per ship, always turn-rate-limited. The
@@ -364,24 +366,39 @@ function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHas
   for (const idx of candidates) {
     const a = asteroids[idx];
     if (!a) continue;
-    const rr = ship.radius + a.radius;
-    const d2 = dist2(ship.pos, a.pos);
-    if (d2 >= rr * rr) continue;
+    reflectOffCircle(ship, a.pos, a.radius);
+  }
+}
 
-    // Overlapping: separate along the contact normal and reflect velocity.
-    const d = Math.sqrt(d2);
-    const nx = d > 1e-9 ? (ship.pos.x - a.pos.x) / d : 1;
-    const ny = d > 1e-9 ? (ship.pos.y - a.pos.y) / d : 0;
-    const overlap = rr - d;
-    ship.pos.x += nx * overlap;
-    ship.pos.y += ny * overlap;
+/** Planets are solid bodies too — you dock *at* your world, you do not fly
+ *  through it. Same contact response as a rock (GDD §4.1: every colliding body
+ *  is a circle); the shield bubble is energy and is not a collider. */
+function reflectOffPlanets(ship: Ship, world: World): void {
+  for (const planet of world.planets) {
+    reflectOffCircle(ship, planet.pos, planet.radius);
+  }
+}
 
-    const vn = ship.vel.x * nx + ship.vel.y * ny;
-    if (vn < 0) {
-      const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
-      ship.vel.x -= j * nx;
-      ship.vel.y -= j * ny;
-    }
+/** Push a ship out of an overlapping circle and reflect the normal component of
+ *  its velocity. No sqrt until a contact is confirmed. */
+function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
+  const rr = ship.radius + radius;
+  const d2 = dist2(ship.pos, center);
+  if (d2 >= rr * rr) return;
+
+  // Overlapping: separate along the contact normal and reflect velocity.
+  const d = Math.sqrt(d2);
+  const nx = d > 1e-9 ? (ship.pos.x - center.x) / d : 1;
+  const ny = d > 1e-9 ? (ship.pos.y - center.y) / d : 0;
+  const overlap = rr - d;
+  ship.pos.x += nx * overlap;
+  ship.pos.y += ny * overlap;
+
+  const vn = ship.vel.x * nx + ship.vel.y * ny;
+  if (vn < 0) {
+    const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
+    ship.vel.x -= j * nx;
+    ship.vel.y -= j * ny;
   }
 }
 
