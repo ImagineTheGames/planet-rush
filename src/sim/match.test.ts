@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 import {
   createWorld,
   damagePlanet,
@@ -25,14 +25,12 @@ import {
   type Inputs,
 } from './index';
 import {
-  CARGO_BASE,
   CORE_HP,
   FIELD_YIELD,
   PLANET,
   RESPAWN_S,
   SHIELD,
   SHIP_RADIUS,
-  SHIP_STATS,
   SPAWN_PROTECTION_S,
   TICK_DT,
   TURRET,
@@ -40,6 +38,7 @@ import {
   WRECK,
   waveRadiusFraction,
 } from './constants';
+import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
 import type { MatchState, Planet, Ship, World } from './state';
 
 // --- builders --------------------------------------------------------------
@@ -55,18 +54,22 @@ const at = (x: number, y: number) => ({ x: ORIGIN + x, y: ORIGIN + y });
 
 function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   const cls = over.shipClass ?? ShipClass.Vanguard;
-  const stats = SHIP_STATS[cls];
+  // A fixture's stats come from the same derived-stat path a real ship's do —
+  // GDD §2.11 class base × the §2.5 tier ladder — so a test that hands over
+  // `tiers` gets a correctly-equipped hull without restating the arithmetic.
+  const loadout = { shipClass: cls, tiers: over.tiers ?? stockTiers() };
   return {
     id: over.id,
     shipClass: cls,
+    tiers: loadout.tiers,
     pos: over.pos ?? at(0, 0),
     vel: over.vel ?? { x: 0, y: 0 },
     home: over.home ?? at(0, 0),
     angle: over.angle ?? 0,
-    hull: over.hull ?? stats.hull,
-    maxHull: over.maxHull ?? stats.hull,
+    hull: over.hull ?? shipMaxHull(loadout),
+    maxHull: over.maxHull ?? shipMaxHull(loadout),
     cargo: over.cargo ?? 0,
-    cargoCap: over.cargoCap ?? Math.max(CARGO_BASE, stats.cargo),
+    cargoCap: over.cargoCap ?? shipCargoCap(loadout),
     banked: over.banked ?? 0,
     alive: over.alive ?? true,
     respawnTimer: over.respawnTimer ?? 0,
@@ -321,21 +324,25 @@ describe('elimination and the wreck (GDD §2.7)', () => {
 
 describe('death and respawn (GDD §2.7)', () => {
   it('respawns in 5 s with upgrades intact, having dropped half the hold', () => {
-    // A player who has bought hull and cargo tiers: the upgrade state lives in
-    // `maxHull` / `cargoCap`, and respawn must not touch either (GDD §2.5).
-    const upgradedHull = 80;
-    const upgradedCargo = 6;
+    // A player who has bought a hull tier and a cargo tier. The upgrade state is
+    // `tiers`, and respawn *re-derives* the ceilings from it rather than trusting
+    // the stored numbers — which is what makes "upgrades intact" structural
+    // instead of a promise this path merely doesn't break (GDD §2.5, §2.7).
     const ship = makeShip({
       id: 0,
       pos: at(400, 0),
       home: at(0, 0),
       hull: 4,
-      maxHull: upgradedHull,
       cargo: 4,
-      cargoCap: upgradedCargo,
       banked: 7,
       shipClass: ShipClass.Hauler,
+      tiers: { ...stockTiers(), [UpgradeTrack.Cargo]: 1, [UpgradeTrack.Hull]: 1 },
     });
+    // Hauler 70 hull × the first hull tier's 1.2, and its 3-slot hold + 2.
+    const upgradedHull = shipMaxHull(ship);
+    const upgradedCargo = shipCargoCap(ship);
+    expect(upgradedHull).toBeCloseTo(84, 9);
+    expect(upgradedCargo).toBe(5);
     const world = makeWorld({ ships: [ship] });
 
     damageShip(world, ship, 4);
@@ -351,8 +358,8 @@ describe('death and respawn (GDD §2.7)', () => {
     step(world, []);
 
     expect(ship.alive).toBe(true);
-    expect(ship.hull).toBe(upgradedHull);
-    expect(ship.maxHull).toBe(upgradedHull);
+    expect(ship.hull).toBeCloseTo(upgradedHull, 9);
+    expect(ship.maxHull).toBeCloseTo(upgradedHull, 9);
     expect(ship.cargoCap).toBe(upgradedCargo);
     expect(ship.shipClass).toBe(ShipClass.Hauler);
     expect(ship.banked).toBe(7);

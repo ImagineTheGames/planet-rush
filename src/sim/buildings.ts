@@ -15,6 +15,11 @@
  *    a docked ship and interrupted by *any* core or shield damage.
  *  - **Turrets** — auto-fire at enemy ships in range with pooled projectiles at
  *    a design DPS of 4.
+ *  - **UPGRADE SHIP** — the fifth segment, and the only one that spends on the
+ *    *ship* instead of the planet (GDD §2.5). It lands here because the wheel and
+ *    the panel behind its arrow are one purchase point at your own planet, so a
+ *    row press gets the same validation a wheel order does; the tier ladder and
+ *    every stat it derives live in `./upgrades`.
  *
  * The two halves of GDD §2.6's "pressure beats regeneration" are one field:
  * `planet.sinceDamage`. A hit zeroes it, which both closes the shield-regen
@@ -25,7 +30,7 @@
  * then the projectile pool), no RNG, every rate `* dt`.
  */
 
-import type { PlayerId, BuildItem } from '@shared/types';
+import type { PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
 import {
   PLANET,
   PROJECTILE,
@@ -36,6 +41,7 @@ import {
 import { damageShip } from './damage';
 import { destroyCore, isCollapsed } from './match';
 import type { Planet, Projectile, Ship, Shield, Turret, World } from './state';
+import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
 
 // ---------------------------------------------------------------------------
@@ -216,6 +222,56 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       return 'ok';
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// The fifth segment: UPGRADE SHIP (GDD §2.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why an upgrade purchase was refused. Deliberately the same vocabulary as
+ * {@link OrderResult} for the four reasons they share, so the UI can say why a
+ * press did nothing without caring which screen it came from.
+ */
+export type UpgradeResult =
+  | 'ok'
+  | 'no-planet'
+  | 'planet-dead'
+  | 'not-docked'
+  | 'cannot-afford'
+  /** The ladder on that track is finished — there is no next tier to sell. */
+  | 'maxed';
+
+/**
+ * Buy one tier on one track (GDD §2.5) — the press on a row of the upgrade
+ * panel. Validated exactly like a wheel order and for the same reason: the wheel
+ * and the panel are one purchase point, "opened at your own planet", and the sim
+ * never trusts the sender (GDD §2.5, §2.9).
+ *
+ * Deliberately **not** blocked by the collapse phase. Collapse is spelled out as
+ * exactly three rules — no shield regeneration, no repair, no new ore (GDD §2.3)
+ * — so ore already in hand still buys what it always bought. What ends is the
+ * supply, which is the whole point: the stockpile a turtle spent on standing
+ * still is gone, and the ship that banked instead can still tool up for the last
+ * fight (GDD §2.6, "the economy is the siege engine of last resort").
+ *
+ * Cost is drawn hold-first then bank, like every other purchase ({@link spendOre}),
+ * and the derived stats are written back through `./upgrades` so `maxHull` and
+ * `cargoCap` can never disagree with the tiers that produced them.
+ */
+export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): UpgradeResult {
+  const planet = planetOf(world, ship.id);
+  if (!planet) return 'no-planet';
+  if (!planet.alive) return 'planet-dead';
+  if (!isDocked(ship, planet)) return 'not-docked';
+
+  const cost = nextUpgradeCost(ship, track);
+  if (cost === null) return 'maxed';
+  if (!spendOre(ship, cost)) return 'cannot-afford';
+
+  ship.tiers[track] += 1;
+  applyPurchasedStats(ship);
+  return 'ok';
 }
 
 // ---------------------------------------------------------------------------
