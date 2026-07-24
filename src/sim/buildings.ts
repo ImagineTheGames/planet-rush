@@ -30,7 +30,7 @@
  * then the projectile pool), no RNG, every rate `* dt`.
  */
 
-import type { PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
+import type { Beam, PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
 import {
   PLANET,
   PROJECTILE,
@@ -340,6 +340,7 @@ function makeTurret(world: World, planet: Planet, slot: number): Turret {
     angle: planet.angle + (2 * Math.PI * slot) / TURRET.capPerPlanet,
     cooldown: 0,
     targetId: null,
+    muzzle: null,
   };
 }
 
@@ -484,6 +485,10 @@ export function updateTurrets(world: World, dt: number): void {
     if (!planet.alive) continue;
     for (const turret of planet.turrets) {
       if (turret.hp <= 0) continue; // killed this tick, swept at end of step
+      // The muzzle tell is a per-tick event: assume not firing, and only the
+      // branch that actually looses a shot below sets it. Cleared here so a
+      // renderer never draws a stale flash a tick after the shot left.
+      turret.muzzle = null;
       const target = acquireTarget(world, turret);
       turret.targetId = target ? target.id : null;
 
@@ -497,6 +502,9 @@ export function updateTurrets(world: World, dt: number): void {
 
       if (turret.cooldown <= 0) {
         fireProjectile(world, turret, aim);
+        // Publish the muzzle flash from the same firing decision the projectile
+        // rode out on, so the tell can never disagree with the shot (GDD §2.6).
+        turret.muzzle = muzzleBeam(turret, target, aim);
         turret.cooldown = TURRET.fireInterval;
       }
     }
@@ -518,6 +526,32 @@ function acquireTarget(world: World, turret: Turret): Ship | null {
     }
   }
   return best;
+}
+
+/**
+ * The muzzle-flash geometry for a shot leaving `turret` at `target` along `aim`
+ * (GDD §2.6, §4.1). Origin is the barrel tip — where the projectile is born, so
+ * the flash sits on the muzzle — and the segment runs to the tracked ship's
+ * near surface, clamped to it exactly the way `Ship.beam` is clamped to what it
+ * strikes. This is the *tell*, not the hit test: the projectile does the damage
+ * and can still miss a dodging ship; the flash only reports that the turret
+ * fired and where it aimed, which is all a renderer needs to make enemy turrets
+ * visibly shoot. Allocates only on fire ticks, like `spawnChunk` on a mine.
+ */
+function muzzleBeam(turret: Turret, target: Ship, aim: number): Beam {
+  const dx = Math.cos(aim);
+  const dy = Math.sin(aim);
+  const origin = { x: turret.pos.x + dx * turret.radius, y: turret.pos.y + dy * turret.radius };
+  const centerDist = Math.sqrt(dist2(turret.pos, target.pos));
+  // Barrel tip → target surface: total centre distance less both radii, floored
+  // at zero for the degenerate point-blank case.
+  const length = Math.max(0, centerDist - target.radius - turret.radius);
+  return {
+    origin,
+    dir: { x: dx, y: dy },
+    hitPoint: { x: origin.x + dx * length, y: origin.y + dy * length },
+    length,
+  };
 }
 
 /** Take a slot from the pool, or grow it once. Growth is the only allocation

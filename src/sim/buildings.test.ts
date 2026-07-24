@@ -118,6 +118,7 @@ function makeTurret(over: Partial<Turret> & Pick<Turret, 'id' | 'owner'>): Turre
     angle: over.angle ?? 0,
     cooldown: over.cooldown ?? 0,
     targetId: over.targetId ?? null,
+    muzzle: over.muzzle ?? null,
   };
 }
 
