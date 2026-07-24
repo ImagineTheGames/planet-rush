@@ -695,18 +695,50 @@ export class Hud extends Container {
    * | `alarm-frame`   | `full` + 0    | It *is* the screen frame — `full` is a statement of intent, not a fallback. |
    * | `alarm-arrow`   | `full` + 0    | GDD §2.2's "screen-edge arrow": it hugs an edge but must never leave the screen, which is exactly what `full` asserts. There is no narrower region in the ratified vocabulary for "on an edge", and inventing one is the Director's call, not a placement fix. |
    *
-   * **Still not registered, and why.** QA's layout contract
-   * (`tests/mobile/layout.spec.ts`) also lists `wave-clock` (`top-center`) and
-   * `onboarding` (`center`). Both of those zones are one third of the viewport
-   * wide, and both elements are intrinsically wider: "WAVE 1/5 · Outer Drift" is
-   * ~178 px against a 98 px zone on a 390 px portrait phone, and the prompt's
-   * sentence is wider still (it also sits *below* the vertical centre band by
-   * design, under the ship). Registering them would turn QA's suite red on a
-   * *real* finding that is a design question — shrink the copy, stack it, or
-   * give those regions a full-width variant — and that remains the Director's
-   * call. Unlike the M2 elements above, neither can be honestly answered with
-   * `full`: "top centre" and "centre" are placement claims that `full` would not
-   * check at all. They land the moment it is answered; nothing else changes here.
+   * **Still not registered, and why — measured, not estimated.** QA's layout
+   * contract (`tests/mobile/layout.spec.ts`) also lists `wave-clock`
+   * (`top-center`) and `onboarding` (`center`). Both zones are one third of the
+   * viewport wide, and both elements are intrinsically wider. The numbers below
+   * were read out of a real browser frame — the zone from the registry's own
+   * `resolveAnchor`, the widths from `measureText` in the shipped font stack:
+   *
+   *  - `top-center` resolves to **98 px** wide on a 390 px portrait phone
+   *    (`W/3 − 2·PAD`), and **74.7 px** on the 320 px narrowest profile in the
+   *    matrix.
+   *  - "WAVE 1/5 · Outer Drift" is **168 px** at its drawn 15 px, and still
+   *    **134 px** at 12 px — the floor style-guide §5.6 sets for HUD type
+   *    ("Oxanium must remain legible at 12px"). That is 1.4× the zone *at the
+   *    smallest type the style guide permits*, so this cannot be fixed by
+   *    shrinking: the copy runs out of road before the zone does.
+   *  - Splitting the name onto its own line does not rescue it either. That is a
+   *    four-line clock, and on the 320 px profile "Outer Drift" (81 px) and
+   *    "MATCH 0:02" (91 px) each still overflow a 74.7 px zone at 15 px; both
+   *    only fit once *every* line drops to the 12 px floor.
+   *
+   * So the honest options are all design decisions, not placement bugs: shorten
+   * the wave names, accept a floor-type four-line clock on phones, or give
+   * `top-center` a full-width variant. The last one lives in
+   * `src/platform/layout-registry.ts`'s ratified anchor vocabulary, which is not
+   * mine to extend. Unlike the M2 elements above, neither element can be
+   * honestly answered with `full`: "top centre" and "centre" are placement
+   * claims that `full` would not check at all.
+   *
+   * `onboarding` is the same shape of question one step further along — the
+   * prompt's sentence is wider still, and it deliberately sits at `0.72·H`,
+   * *below* the vertical centre band, under the ship (see `resize()`), so
+   * `center` is the wrong region for it as designed rather than merely a tight
+   * one.
+   *
+   * **Caveat that cuts in our favour.** `assets/` ships no fonts yet (Art &
+   * Audio's deliverable), so those widths were measured in the
+   * `"Trebuchet MS", sans-serif` fallback. Audiowide is a *wider* display face:
+   * every number above is a lower bound, and the real clock only overflows
+   * harder once the fonts land. That same dependency is why both golden
+   * baselines will legitimately need regenerating on the day they do.
+   *
+   * Registering these two today would turn QA's suite red on a real finding that
+   * nobody has been given the call on. They land the moment it is made; nothing
+   * else here changes.
    */
   describeLayout(viewport: Viewport): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
