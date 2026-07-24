@@ -59,7 +59,17 @@ import type { UpgradeTiers } from './upgrade-panel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn } from './planet-hp';
-import { ARROW_SIZE, arrowPoly, ALARM_FRAME_INSET, ALARM_FRAME_STROKE } from './hud-geometry';
+import {
+  ARROW_SIZE,
+  arrowPoly,
+  ALARM_FRAME_INSET,
+  ALARM_FRAME_STROKE,
+  HUD_PAD,
+  HP_BAR_WIDTH,
+  HP_BAR_HEIGHT,
+  HP_BAR_TOP,
+  SHIELD_BAR_HEIGHT,
+} from './hud-geometry';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -80,7 +90,9 @@ const TEXT_DIM = PALETTE.hullSteel;
 // Layout constants (CSS pixels; the Application handles devicePixelRatio)
 // ---------------------------------------------------------------------------
 
-const PAD = 16;
+/** The corner margin, and the `margin` of the corner anchors — one constant, in
+ *  `hud-geometry.ts`, so the drawing and the registered anchor cannot drift. */
+const PAD = HUD_PAD;
 const SQUARE = 18;
 const SQUARE_GAP = 5;
 const STRIP_PAD = 12;
@@ -103,12 +115,6 @@ const SLOT_STROKE = 1.5;
 /** Horizontal padding inside the onboarding prompt's panel, CSS px. */
 const PROMPT_PAD_X = 40;
 
-/** Own-planet HP bar (top-right, GDD §2.2). Wide enough to read a quarter-core
- *  loss at arm's length on a phone. */
-const HP_BAR_WIDTH = 140;
-const HP_BAR_HEIGHT = 10;
-/** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
-const SHIELD_BAR_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------
 // The per-frame HUD input
@@ -486,7 +492,7 @@ export class Hud extends Container {
     const flash = planetHpFlashOn(model, frame.time);
     const fill = model.critical && flash ? model.criticalColor : model.color;
 
-    const y = 16;
+    const y = HP_BAR_TOP;
     this.planetBar.clear();
     // Track: the full width, so the missing part is visible as absence.
     this.planetBar
@@ -683,7 +689,7 @@ export class Hud extends Container {
    *
    * | id              | anchor        | why that region                        |
    * |-----------------|---------------|----------------------------------------|
-   * | `planet-hp`     | `top-right`   | GDD §2.2 puts own-planet HP top-right. |
+   * | `planet-hp`     | `top-right`   | GDD §2.2 puts own-planet HP top-right. The only M2 element with a *narrow* anchor, so it is the only one whose width is a real constraint: `top-right`'s zone starts at the half-width line, giving the bar a `W/2 − PAD` budget — 144px on a 320px phone against a 140px bar. `hud-geometry.ts` owns that number and `hud-geometry.test.ts` pins it. |
    * | `build-wheel`   | `full` + 0    | GDD §2.2 opens the wheel "near your own planet"; the follow camera keeps your ship — and so your docked planet — at the screen centre, and the wheel is drawn there. It is an **overlay**: at thumb scale it is ~72% of the shorter screen dimension (GDD §2.4 makes it a touch target first), so no third-width band can hold it and `full` is the region the vocabulary reserves for overlays. The assertion that bites is the real failure mode — a thumb-scaled radial menu spilling off a phone's edge. |
    * | `upgrade-panel` | `full` + 0    | Same overlay, one screen deeper (GDD §2.5). Its width is clamped to the viewport (`panelSize`) precisely so this holds on a narrow phone. |
    * | `alarm-frame`   | `full` + 0    | It *is* the screen frame — `full` is a statement of intent, not a fallback. |

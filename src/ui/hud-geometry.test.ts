@@ -26,12 +26,17 @@ import {
   wheelBounds,
   panelBounds,
   panelSize,
+  planetHpBounds,
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
   ARROW_SIZE,
   PANEL_MAX_WIDTH,
   PANEL_EDGE_PAD,
+  HUD_PAD,
+  HP_BAR_WIDTH,
+  HP_BAR_TOP,
+  SHIELD_BAR_HEIGHT,
 } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
@@ -141,6 +146,51 @@ describe('upgrade-panel placement', () => {
     const four = panelSize(1280, 800, 4).height;
     const five = panelSize(1280, 800, 5).height;
     expect(five - four).toBe(30);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Your own planet's HP (GDD §2.2) — registered `top-right`, margin HUD_PAD
+// ---------------------------------------------------------------------------
+
+describe('planet-hp placement', () => {
+  const TOP_RIGHT: AnchorSpec = { region: 'top-right', margin: HUD_PAD };
+  /** Measured width of the widest label the element ever draws ("HOME LOST" at
+   *  11px Audiowide ≈ 62px). Generous on purpose: the assertion should survive a
+   *  font swap, and the footprint is the union of the label and the bar. */
+  const LABEL_WIDTH = 80;
+
+  for (const { name, vp } of PROFILES) {
+    it(`stays in the top-right corner at ${name}`, () => {
+      expectWithin(planetHpBounds(vp.width, LABEL_WIDTH), TOP_RIGHT, vp, 'planet-hp');
+    });
+  }
+
+  it('hugs the right margin exactly — a corner element, not a floating box', () => {
+    for (const { name, vp } of PROFILES) {
+      const b = planetHpBounds(vp.width, LABEL_WIDTH);
+      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
+      expect(b.y, name).toBeCloseTo(HUD_PAD, 6);
+    }
+  });
+
+  it('never crosses the half-width line into the left half of the screen', () => {
+    // This is the constraint that makes HP_BAR_WIDTH a decision rather than a
+    // number. `top-right`'s zone starts at W/2, so the bar's budget is
+    // W/2 − HUD_PAD: 144px on the narrowest screen the game claims (GDD §4.3),
+    // against a 140px bar. Widen the bar and own-planet HP silently leaves its
+    // anchor — and because the day-2 HUD fields are not fed at runtime yet, QA's
+    // layout contract cannot see it happen. This assertion is that guard.
+    const narrowest = Math.min(...PROFILES.map((p) => p.vp.width));
+    expect(narrowest).toBe(320);
+    expect(HP_BAR_WIDTH).toBeLessThanOrEqual(narrowest / 2 - HUD_PAD);
+  });
+
+  it('leaves room for the shield overbar above the core bar', () => {
+    // The shield overbar is drawn SHIELD_BAR_HEIGHT + 2 above the core bar's top
+    // edge; that has to stay below the label, i.e. inside the element's own
+    // footprint rather than poking out above y = HUD_PAD.
+    expect(SHIELD_BAR_HEIGHT + 2).toBeLessThanOrEqual(HP_BAR_TOP);
   });
 });
 

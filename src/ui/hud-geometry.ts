@@ -111,6 +111,49 @@ export function panelBounds(
 }
 
 // ---------------------------------------------------------------------------
+// Your own planet's HP (GDD §2.2 — top-right, in your player colour)
+// ---------------------------------------------------------------------------
+
+/** The HUD's corner margin, CSS px — and the `margin` of the anchors the corner
+ *  elements register under, so the two can never drift apart. */
+export const HUD_PAD = 16;
+
+/** Own-planet HP bar. Wide enough to read a quarter-core loss at arm's length on
+ *  a phone (GDD §2.2). See {@link planetHpBounds} for why 140 is not free. */
+export const HP_BAR_WIDTH = 140;
+export const HP_BAR_HEIGHT = 10;
+/** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
+export const SHIELD_BAR_HEIGHT = 4;
+/** The bar's top edge within the element, below the `HOME` label, CSS px. */
+export const HP_BAR_TOP = 16;
+
+/**
+ * The own-planet HP element's drawn footprint: the right-aligned `HOME` label
+ * stacked over the core bar, hugging the top-right corner (GDD §2.2).
+ *
+ * Vertical placement does not depend on the viewport height — the element hangs
+ * from the top edge — so the height is not a parameter. `labelWidth` is the
+ * measured text width of `HOME` / `HOME LOST`; the footprint is the union of the
+ * label and the bar, since the registry records what was actually drawn.
+ *
+ * **The width is not free.** The element registers under `top-right`, whose zone
+ * starts at the viewport's half-width line, so the bar must satisfy
+ * `HP_BAR_WIDTH ≤ viewportWidth / 2 − HUD_PAD` — a 144 px budget on the 320 px
+ * phone the game claims to run on (GDD §4.3). Widening the bar past that puts
+ * own-planet HP into the left half of the screen and breaks the anchor;
+ * `hud-geometry.test.ts` pins it.
+ */
+export function planetHpBounds(viewportWidth: number, labelWidth = 0): Rect {
+  const width = Math.max(HP_BAR_WIDTH, labelWidth);
+  return {
+    x: viewportWidth - HUD_PAD - width,
+    y: HUD_PAD,
+    width,
+    height: HP_BAR_TOP + HP_BAR_HEIGHT,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The under-attack alarm (GDD §2.2 — a mechanic, not polish)
 // ---------------------------------------------------------------------------
 
