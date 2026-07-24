@@ -17,11 +17,12 @@
  * perception is one fog-honest code path for every tier (`./perception`), and a
  * Hard bot that knows you are wounded knows it because it scouted you.
  *
- * Day 2 ships the roster as **data**: every personality is wired to the
- * do-nothing baseline tree (`./bot`) so the harness, the slot filling, and the
- * action stream can be proven end-to-end before any of them has an opinion. The
- * weights below are the day-2 hypothesis for the trees that land next, in the
- * same spirit as the sim's `TUNABLE` constants table.
+ * Day 4 gave the weights something to bend: `./easy`, `./medium` and `./hard`
+ * read every dial below at least once per decision, so the difference between
+ * losing to Vulture and losing to Warden is these numbers and nothing else —
+ * same tree, same tier, same fog. They remain a hypothesis in the same spirit as
+ * the sim's `TUNABLE` constants table, and QA owns the balance question they
+ * answer (GDD §2.8, §3.8; measured results in `docs/bot-balance-day4.md`).
  */
 
 import { ShipClass } from '@shared/types';
@@ -162,6 +163,16 @@ export type PersonalityId =
  * The cast (GDD §2.9), in the order the design lists them — which is also the
  * order empty slots are filled, so a solo match always meets Rusty first and
  * only meets Warden in a full house.
+ *
+ * **The hulls are not a choice this file gets to make.** GDD §2.11 assigns them
+ * by name — "Bolt/Sable fly Interceptors, Foreman/Warden Excavators,
+ * Rusty/Patch Haulers, Vulture a Vanguard" — because "a silhouette on the
+ * minimap is information": the shape has to tell you who you are dealing with
+ * before you can read the name (style-guide §4). Each row below matches that
+ * sentence exactly, and a personality's weights are then written to *suit* its
+ * hull rather than the other way round — Patch repairs through a siege in the
+ * hull that tanks one, Warden holds its ground in the hull that out-earns
+ * everyone standing still.
  */
 export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
   rusty: {
@@ -213,7 +224,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'patch',
     name: 'Patch',
     difficulty: Difficulty.Medium,
-    shipClass: ShipClass.Vanguard,
+    shipClass: ShipClass.Hauler,
     blurb: 'Defensive fixer — answers every alarm and repairs through a siege.',
     weights: {
       triangle: { mine: 0.35, defend: 0.5, attack: 0.15 },
@@ -243,7 +254,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'vulture',
     name: 'Vulture',
     difficulty: Difficulty.Hard,
-    shipClass: ShipClass.Hauler,
+    shipClass: ShipClass.Vanguard,
     blurb: 'Wreck scavenger — farms kill sites and hauls a dead rival home.',
     weights: {
       triangle: { mine: 0.4, defend: 0.2, attack: 0.4 },
@@ -258,7 +269,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     id: 'warden',
     name: 'Warden',
     difficulty: Difficulty.Hard,
-    shipClass: ShipClass.Vanguard,
+    shipClass: ShipClass.Excavator,
     blurb: 'Territorial enforcer — treats the space around its planet as its own.',
     weights: {
       triangle: { mine: 0.3, defend: 0.45, attack: 0.25 },

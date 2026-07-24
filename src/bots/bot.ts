@@ -20,19 +20,27 @@
  *     the world tree on purpose: the determinism replay (GDD §4.8) hashes the
  *     sim, and feeding it recorded inputs must not depend on bot internals.
  *
- * **Day 2 ships one tree: {@link doNothing}.** It is not a placeholder — it is
- * the baseline the harness and the QA match loop are proven against. A match of
- * eight bots that do nothing still has to spawn eight planets, run five waves,
- * enter collapse, and produce a winner; if that does not work, no amount of
- * clever behavior would have saved it. The Easy / Medium / Hard trees plug into
- * {@link createBot} without moving anything else.
+ * **Day 4 lands the three trees.** `./easy`, `./medium` and `./hard` are the
+ * GDD §2.9 paragraph in priority order; this file is only the wiring — seat,
+ * character, seeded stream, decision cadence, and the {@link Brain} that carries
+ * a bot's expiring memory beside the simulation rather than inside it.
+ *
+ * {@link doNothing} stays, because it is the baseline the harness and the QA
+ * match loop are proven against: a match of eight bots that do nothing still has
+ * to spawn eight planets, run five waves, enter collapse, and produce a winner,
+ * and that claim is about the simulation rather than about the bots.
  */
 
 import type { Action, PlayerId, Rng } from '@shared/types';
 import { mulberry32 } from '@shared/types';
+import { easyTree } from './easy';
+import { hardTree } from './hard';
+import { mediumTree } from './medium';
 import type { BotView } from './perception';
 import type { Personality, PersonalityId } from './personalities';
 import { Difficulty, personality, tuningFor } from './personalities';
+import type { Brain, Node } from './tree';
+import { context, createBrain, runTree } from './tree';
 
 // ---------------------------------------------------------------------------
 // Seats
@@ -68,6 +76,13 @@ export interface Bot {
   readonly reactionInterval: number;
   /** This bot's private deterministic random source. Never `Math.random`. */
   readonly rng: Rng;
+  /**
+   * The mind behind the tree (`./tree`): character weights, tier tuning, the
+   * seeded stream, and the expiring fog-honest memory (`./memory`). Exposed so a
+   * test or a debug overlay can ask *why* a bot did something —
+   * `brain.lastBehavior` names the leaf that won the last decision.
+   */
+  readonly brain: Brain;
   /** Seconds since the last decision. Harness-owned. */
   sinceDecision: number;
   /** The action stream held between decisions. Harness-owned. */
@@ -135,19 +150,20 @@ export function botSeed(seed: number, id: PlayerId): number {
 }
 
 /**
- * Build the bot for a seat. **Day 2: every tier runs {@link doNothing}** — the
- * switch below is written out anyway, because it is the one place the Easy,
- * Medium, and Hard trees will land, and naming them here keeps the seam visible
- * instead of implied.
+ * Build the bot for a seat: its character, its tier's tree, its own seeded
+ * stream, and the mind that carries memory between decisions.
  *
- * Difficulty is applied *around* the tree as well as inside it: the tier's
- * `reactionInterval` is copied onto the bot here, so competence differences
- * exist from the moment the trees do.
+ * Difficulty is applied *around* the tree as well as inside it — the tier's
+ * `reactionInterval` is copied onto the bot here, so a Hard bot re-decides
+ * twenty times a second and an Easy bot six, which is reaction time modelled as
+ * cadence (GDD §2.9) and costs the tree nothing.
  */
 export function createBot(seat: BotSeat, options: BotOptions = {}): Bot {
   const character = personality(seat.personality);
   const tuning = tuningFor(seat.personality);
   const rng = mulberry32(botSeed(options.seed ?? DEFAULT_BOT_SEED, seat.id));
+  const brain = createBrain(character, rng);
+  const tree = treeFor(character.difficulty);
 
   return {
     seat,
@@ -155,28 +171,33 @@ export function createBot(seat: BotSeat, options: BotOptions = {}): Bot {
     difficulty: character.difficulty,
     reactionInterval: tuning.reactionInterval,
     rng,
+    brain,
     // Due immediately: a fresh bot decides on its first tick rather than
     // idling for one reaction interval.
     sinceDecision: tuning.reactionInterval,
     actions: IDLE_ACTIONS,
-    decide: treeFor(character.difficulty),
+    decide: (view: BotView) => runTree(tree, context(view, brain)),
   };
 }
 
 /**
- * The tree a tier runs. **Day 2: all three are {@link doNothing}** — the switch
- * is written out anyway, because it is the one place the Easy, Medium, and Hard
- * trees will land, and an exhaustive switch makes adding a tier a compile error
- * rather than a silently missing behavior.
+ * The tree a tier runs (GDD §2.9). An exhaustive switch, so adding a tier is a
+ * compile error rather than a silently missing behavior.
+ *
+ * The trees are module-level constants rather than per-bot constructions: a tree
+ * is pure structure — priority order and pure leaves — and everything mutable
+ * about a bot lives in its {@link Brain}. Eight bots therefore share three tree
+ * objects and allocate nothing per decision beyond the actions they emit
+ * (GDD §4.3).
  */
-export function treeFor(difficulty: Difficulty): (view: BotView) => readonly Action[] {
+export function treeFor(difficulty: Difficulty): Node {
   switch (difficulty) {
     case Difficulty.Easy:
-      return doNothing;
+      return easyTree;
     case Difficulty.Medium:
-      return doNothing;
+      return mediumTree;
     case Difficulty.Hard:
-      return doNothing;
+      return hardTree;
   }
 }
 

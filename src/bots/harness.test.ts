@@ -26,6 +26,7 @@ import {
   botLobby,
   createBots,
   fillEmptySlots,
+  holdable,
   runHeadlessMatch,
   thinkOnce,
 } from './harness';
@@ -81,10 +82,36 @@ describe('harness — the action stream', () => {
     expect(inputs).toHaveLength(MATCH_SLOTS);
     expect(inputs.map((i) => i.id)).toEqual(bots.map((b) => b.seat.id));
     for (const row of inputs) {
-      expect(row.actions).toEqual(IDLE_ACTIONS);
-      // The seven abstract verbs and nothing else (GDD §2.4).
-      for (const a of row.actions) expect(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'boost', 'ping']).toContain(a.type);
+      // The abstract action union and nothing else (GDD §2.4) — a bot that
+      // reached past it would be a bot the simulation could tell apart from a
+      // human, which is the one thing this module may never be.
+      expect(row.actions.length).toBeGreaterThan(0);
+      for (const a of row.actions) {
+        expect(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'upgradeOrder', 'boost', 'ping']).toContain(a.type);
+      }
+      // Every stream steers and states its trigger, so a held stream is a
+      // complete control state rather than a delta.
+      expect(row.actions.some((a) => a.type === 'thrust')).toBe(true);
+      expect(row.actions.some((a) => a.type === 'fire')).toBe(true);
     }
+  });
+
+  it('never latches a one-shot press between decisions (GDD §2.5)', () => {
+    const { world, bots } = allBotMatch();
+    const bot = bots[0]!;
+
+    // Every bot spawns docked with starting ore, so the opening decision is a
+    // purchase — the exact stream this rule exists for.
+    const decided = thinkOnce(world, bot, TICK_DT);
+    expect(decided.some((a) => a.type === 'buildOrder' || a.type === 'upgradeOrder')).toBe(true);
+
+    // The next fifty-nine ticks are inside the reaction interval: the sticks are
+    // still held, the wheel press is not. A latched order would buy a turret on
+    // every tick of the cadence and empty the bank into the build queue.
+    const held = thinkOnce(world, bot, TICK_DT);
+    expect(held.some((a) => a.type === 'buildOrder' || a.type === 'upgradeOrder')).toBe(false);
+    expect(held.some((a) => a.type === 'thrust')).toBe(true);
+    expect(holdable(IDLE_ACTIONS)).toBe(IDLE_ACTIONS);
   });
 
   it('holds its stream between decisions — reaction time, as cadence', () => {
@@ -179,7 +206,9 @@ describe('harness — the enforced timeout (GDD §3.8)', () => {
     const seats = fillEmptySlots([0]);
     const players = [{ id: 0, shipClass: ShipClass.Vanguard }, ...botLobby(seats)];
     const world = createWorld({ seed: 2, players });
-    const bots = createBots(seats);
+    // Do-nothing bots, so the only thing that can have moved a ship is the
+    // caller's own input row: this test is about the merge, not the trees.
+    const bots = seats.map((seat) => createDoNothingBot(seat));
 
     runHeadlessMatch(world, bots, {
       maxSeconds: 30 * TICK_DT,

@@ -40,9 +40,10 @@ import {
   isCollapsed,
   isDocked,
   shieldPool,
+  stockTiers,
   waveTime,
 } from '../sim';
-import type { Asteroid, Bounds, MatchPhase, Planet, Ship, World } from '../sim';
+import type { Asteroid, Bounds, MatchPhase, Planet, Ship, UpgradeTiers, World } from '../sim';
 
 // ---------------------------------------------------------------------------
 // The perception envelope
@@ -180,6 +181,15 @@ export interface PerceivedChunk {
 export interface SelfView {
   readonly id: PlayerId;
   readonly shipClass: ShipClass;
+  /**
+   * Tiers bought on the four upgrade tracks (GDD §2.5). Own-ship knowledge: the
+   * upgrade panel is "the one screen where ship stats are shown" and it is this
+   * player's own screen (GDD §2.5). A copy, never the world's array, so a tree
+   * cannot write to the simulation — and paired with `shipClass` it satisfies the
+   * sim's `ShipLoadout`, so a bot prices its next tier through exactly the
+   * function the panel prints.
+   */
+  readonly tiers: UpgradeTiers;
   readonly pos: Vec2;
   readonly vel: Vec2;
   readonly angle: number;
@@ -410,6 +420,7 @@ function selfView(ship: Ship | null, planet: Planet | null, env: Perception): Se
     return {
       id: -1,
       shipClass: ShipClass.Vanguard,
+      tiers: stockTiers(),
       pos,
       vel: { x: 0, y: 0 },
       angle: 0,
@@ -434,6 +445,7 @@ function selfView(ship: Ship | null, planet: Planet | null, env: Perception): Se
   return {
     id: ship.id,
     shipClass: ship.shipClass,
+    tiers: { ...ship.tiers },
     pos: { x: ship.pos.x, y: ship.pos.y },
     vel: { x: ship.vel.x, y: ship.vel.y },
     angle: ship.angle,
