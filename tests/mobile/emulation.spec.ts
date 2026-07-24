@@ -303,6 +303,17 @@ test('portrait shows the ROTATE overlay; landscape hides it', async ({ page }, t
 test('touch drag on the left half moves the ship (world units per sim tick)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
+  // The one test in this suite that buys a fixed amount of SIM time, so it is the
+  // one whose WALL-CLOCK cost scales with how slowly the host renders — that is
+  // the trade the tick-based window makes, not a flaw in it. Measured end-to-end:
+  // 3.8 s at full speed, 33.4 s with the CPU throttled 200x (~1 fps, the CI
+  // software-WebGL profile). The suite default of 60 s leaves under 2x headroom
+  // there, which is too thin for a job that gates merges, so this test — and only
+  // this test — gets a longer bound. It does not weaken the assertion: a host too
+  // slow to run 90 ticks still fails, it just fails on the tick target rather than
+  // on an arbitrary stopwatch.
+  test.setTimeout(120_000);
+
   // Gameplay assertion → landscape. In portrait the field is the blocked,
   // squashed non-play state (the ROTATE-overlay guard), and the first-gesture
   // requestLandscape path perturbs layout mid-drag. Landscape is the only
