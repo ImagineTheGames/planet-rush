@@ -40,6 +40,22 @@ import { profileSuite } from './perf';
 import { SIM_BUDGET_60_MS, SIM_BUDGET_30_MS } from './perf';
 import { STRATEGY_IDS } from './strategies';
 import type { StrategyId } from './strategies';
+import {
+  CLASSES,
+  HARD_POOL,
+  LENGTH_TARGET_MAX_S,
+  LENGTH_TARGET_MIN_S,
+  WIN_RATE_CEILING as SOAK_CEILING,
+  classLineup,
+  lengthStats as botLengthStats,
+  rosterCast,
+  runBotMatch,
+  strategyLineup,
+  terminationStats as botTerminationStats,
+  winRates,
+} from './soak';
+import type { BotMatchResult } from './soak';
+import { PERSONALITIES } from '../src/bots';
 
 /** Probes that actually play; `idle` is kept out of competitive sweeps because
  *  a seat that never acts is not a contestant, it is a control. */
@@ -268,11 +284,121 @@ function balance(seedCount: number, outPath: string | null): number {
 }
 
 // ---------------------------------------------------------------------------
+// soak — N shipped-bot matches: zero hangs, then the shipped-bot balance targets
+// ---------------------------------------------------------------------------
+
+/** The behaviour the class contest holds fixed while it varies the hull. It must
+ *  be one that actually *decides* matches — a low-aggression field never kills a
+ *  core at the shipped baseline (`COLLAPSE_CORE_DECAY = 0`), so a miner mirror
+ *  times out with no winner and measures nothing. Sable is the Hard opportunist
+ *  raider: eight of it produce constant combat, so the win falls to the hull, not
+ *  the character. The trade-off — class balance is read under aggression — is
+ *  named in the report. */
+const CLASS_CONTEST_BEHAVIOUR = 'sable' as const;
+
+function pct(x: number): string {
+  return `${(x * 100).toFixed(1)}%`;
+}
+
+/** One rotated contest → a printed table + the top contestant's rate. */
+function contest(
+  title: string,
+  fairShare: number,
+  results: readonly BotMatchResult[],
+  contestants: readonly string[],
+  keyOf: (r: BotMatchResult) => string | null,
+): { top: string; rate: number; pass: boolean } {
+  const term = botTerminationStats(results);
+  const records = winRates(results, contestants, keyOf);
+  log(`  ${title}: ${results.length} matches, ${term.ended} decided, ${term.simTimeout} sim-timeout, ${term.hangs} hangs`);
+  for (const r of records) {
+    const flag = r.rate > SOAK_CEILING ? ' ⚠' : '';
+    log(`    ${r.name.padEnd(12)} ${r.wins}/${r.decided}  ${pct(r.rate).padStart(6)}  (${(r.rate / fairShare).toFixed(2)}× fair)${flag}`);
+  }
+  const top = records[0];
+  return { top: top?.name ?? '—', rate: top?.rate ?? 0, pass: (top?.rate ?? 0) <= SOAK_CEILING };
+}
+
+/**
+ * The release soak. Runs `matchCount` matches of the real offline cast for the
+ * hang gate and the length distribution, then two rotated contests for the
+ * class and strategy win-rate targets — all against the *shipped* trees, not the
+ * probes. Exits non-zero only on a **hang** (GDD §3.8): a balance miss is news
+ * the report carries, a hung harness is a broken instrument.
+ */
+function soak(matchCount: number, rotations: number): number {
+  log(`soak: ${matchCount} shipped-bot matches (real cast), then class & strategy contests`);
+  const seeds = seedRange(matchCount);
+
+  // 1. Termination + length, on the exact match a solo player gets.
+  const cast = rosterCast();
+  const rosterResults = seeds.map((seed) => runBotMatch(seed, cast));
+  const term = botTerminationStats(rosterResults);
+  const len = botLengthStats(rosterResults);
+  log('');
+  log(`  roster soak: ${term.matches} matches · ${term.ended} ended · ${term.simTimeout} sim-timeout · ${term.hangs} hangs · max wall ${term.maxWallClockMs.toFixed(0)} ms`);
+  log(
+    `  match length: min ${mmss(len.min)} · p10 ${mmss(len.p10)} · median ${mmss(len.median)} · ` +
+      `mean ${mmss(len.mean)} · p90 ${mmss(len.p90)} · max ${mmss(len.max)} · ` +
+      `${pct(len.insideFraction)} inside ${mmss(LENGTH_TARGET_MIN_S)}–${mmss(LENGTH_TARGET_MAX_S)}`,
+  );
+  const charWins = winRates(rosterResults, cast.map((s) => PERSONALITIES[s.personality].name), (r) =>
+    r.winnerPersonality ? PERSONALITIES[r.winnerPersonality].name : null,
+  );
+  log(`  character wins (fixed seats — a soak, not a fair contest): ${charWins.map((r) => `${r.name} ${r.wins}`).filter((_, i) => i < 3).join(', ')} …`);
+
+  log('');
+  // 2. Ship-class contest: one behaviour, four hulls rotated (GDD §2.11).
+  const classResults: BotMatchResult[] = [];
+  for (let rot = 0; rot < rotations; rot++) {
+    for (const seed of seeds) classResults.push(runBotMatch(seed, classLineup(CLASS_CONTEST_BEHAVIOUR, rot)));
+  }
+  const cls = contest(
+    `ship class (behaviour=${CLASS_CONTEST_BEHAVIOUR}, ${rotations} rotations)`,
+    1 / CLASSES.length,
+    classResults,
+    CLASSES.map((c) => String(c)),
+    (r) => (r.winnerClass !== null ? String(r.winnerClass) : null),
+  );
+
+  log('');
+  // 3. Strategy contest: one hull, the three Hard characters rotated (GDD §3.8).
+  const stratResults: BotMatchResult[] = [];
+  for (let rot = 0; rot < rotations; rot++) {
+    for (const seed of seeds) stratResults.push(runBotMatch(seed, strategyLineup(HARD_POOL, ShipClass.Vanguard, rot)));
+  }
+  const strat = contest(
+    `strategy (hull=vanguard, Hard pool, ${rotations} rotations)`,
+    1 / HARD_POOL.length,
+    stratResults,
+    HARD_POOL.map((p) => PERSONALITIES[p].name),
+    (r) => (r.winnerPersonality ? PERSONALITIES[r.winnerPersonality].name : null),
+  );
+
+  const ceiling = `${(SOAK_CEILING * 100).toFixed(0)}%`;
+  const lengthPass = len.insideFraction >= 0.5 && len.median >= LENGTH_TARGET_MIN_S && len.median <= LENGTH_TARGET_MAX_S;
+  log('');
+  log(`  hangs (soak gate) : ${term.hangs === 0 ? 'PASS' : 'FAIL'} (${term.hangs} roster hangs)`);
+  log(`  match length      : ${lengthPass ? 'PASS' : 'FAIL'} (median ${mmss(len.median)}, ${pct(len.insideFraction)} inside target)`);
+  log(`  strategy ≤ ${ceiling}      : ${strat.pass ? 'PASS' : 'FAIL'} (top ${strat.top} ${pct(strat.rate)})`);
+  log(`  ship class ≤ ${ceiling}    : ${cls.pass ? 'PASS' : 'FAIL'} (top ${cls.top} ${pct(cls.rate)})`);
+
+  // The soak's own exit code gates only the thing it must never allow: a hang.
+  const hangs = term.hangs + botTerminationStats(classResults).hangs + botTerminationStats(stratResults).hangs;
+  if (hangs > 0) {
+    log('');
+    log(`  SOAK FAILED: ${hangs} match(es) hung (wall-clock or stalled) — GDD §3.8`);
+    return 1;
+  }
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
 function usage(): number {
-  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism> [args]');
+  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak> [args]');
   return 2;
 }
 
@@ -290,6 +416,12 @@ function main(argv: readonly string[]): number {
       const out = flag >= 0 ? (rest[flag + 1] ?? null) : null;
       const seedArg = rest[0] && !rest[0].startsWith('--') ? Number(rest[0]) : 6;
       return balance(seedArg, out);
+    }
+    case 'soak': {
+      const matches = rest[0] && !rest[0].startsWith('--') ? Number(rest[0]) : 50;
+      const rotFlag = rest.indexOf('--rotations');
+      const rotations = rotFlag >= 0 ? Number(rest[rotFlag + 1] ?? 4) : 4;
+      return soak(matches, rotations);
     }
     default:
       return usage();
