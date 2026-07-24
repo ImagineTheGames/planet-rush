@@ -24,9 +24,18 @@
  * const tex = cache.getBy(`ship:${cls}:${slot}`, () => shipSprite({ shipClass: cls, playerId: slot }), 64);
  * ```
  *
- * VFX (GDD §3.6's beam impacts, cracks, shimmer, muzzle flashes, explosions,
- * thruster trails, spawn glow, planet-death), synthesized SFX and the ambient
- * loop land in their own briefs; this module is the sprite set they play over.
+ * The other two thirds of the mandate live in subdirectories, each with its own
+ * index, because each is a whole subsystem rather than another sprite:
+ *
+ *  - `./vfx/` — the specified VFX set (GDD §3.6): beam impacts, crack-and-burst,
+ *    shield shimmer, muzzle flashes, explosions, thruster trails, spawn glow,
+ *    and the planet-death moment with its three seconds of quiet (§4.7).
+ *  - `./audio/` — synthesized SFX, the two beam voices, the under-attack alarm
+ *    (§2.2) and the ambient loop. No binary assets: audio is code too.
+ *
+ * Both read one vocabulary of moments (`./tells`), so a mechanic can never be
+ * visible but silent. `./presenter` puts all of it behind one object and two
+ * calls a frame, which is the intended way to wire it into the game loop.
  */
 
 export * from './palette';
@@ -44,3 +53,5 @@ export * from './svg';
 export * from './preview';
 export * from './textures';
 export * from './atlas';
+export * from './tells';
+export * from './presenter';
