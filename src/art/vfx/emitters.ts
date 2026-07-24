@@ -87,7 +87,7 @@ export function tintFor(kind: ParticleKind, requested: number): number {
  * rock chips off an asteroid, red flecks off a hull.
  *
  * The two variants are the visible half of the same split the audio makes with
- * its two beam voices (`../audio/voices`), so a player looking away still knows
+ * its two beam voices (`../audio/beams`), so a player looking away still knows
  * from the sound what a looking player knows from the sparks.
  *
  * @param power  Beam power 0..1 — mining speed and weapon damage are one stat.
