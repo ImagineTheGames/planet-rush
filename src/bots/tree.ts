@@ -71,6 +71,18 @@ export interface Brain {
   escapeUntil: number;
   /** The committed escape heading while `escapeUntil` is in the future. */
   escapeDir: Vec2;
+  /**
+   * Spendable ore that was already aboard when this bot first took the controls
+   * — ore it did not earn, and will not spend (`./behaviors`'s `spendAtHome`).
+   *
+   * A bot seated at the match opening earns its `STARTING_ORE` grant outright,
+   * so its endowment is zero and it spends freely. A bot that takes the stick
+   * *mid-match* is a stand-in for a pilot who dropped (GDD §4.2), and the cargo
+   * and bank it inherits are the pilot's to reclaim, not the stand-in's to burn
+   * on turrets — so they are booked here and only ore the stand-in mines itself
+   * lifts `spendable` back above the line. `-1` until the first decision sets it.
+   */
+  endowment: number;
 }
 
 /** Build the mind for a character. */
@@ -87,6 +99,7 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     lastThrust: 0,
     escapeUntil: -1,
     escapeDir: { x: 0, y: 0 },
+    endowment: -1,
   };
 }
 
@@ -129,6 +142,11 @@ export const STUCK_DECISIONS = 12;
 export function context(view: BotView, brain: Brain): BotCtx {
   brain.memory.observe(view);
   trackStuck(view, brain);
+  // Book the endowment once, on the first decision. A bot seated at the opening
+  // (`tick 0`) earns its `STARTING_ORE` grant and owes nothing; a bot that takes
+  // over after the match has begun inherits a dropped pilot's ore and must leave
+  // it for the reclaim (GDD §4.2). See {@link Brain.endowment}.
+  if (brain.endowment < 0) brain.endowment = view.tick > 0 ? view.self.spendable : 0;
   // Cleared here and re-written by `go`: a decision that never asks to travel
   // leaves it at zero, and cannot be mistaken for a bot pinned against a rock.
   brain.lastThrust = 0;

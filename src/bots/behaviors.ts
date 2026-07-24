@@ -198,6 +198,11 @@ export function purchaseAction(purchase: Purchase): Action {
 export function spendAtHome(ctx: BotCtx, plan: (ctx: BotCtx) => Purchase | null): readonly Action[] | null {
   const planet = ctx.self.planet;
   if (!planet || !planet.alive || !ctx.self.docked) return null;
+  // A stand-in never spends the ore it inherited — that is the dropped pilot's
+  // to reclaim (GDD §4.2). Only what this bot has mined since it sat down lifts
+  // `spendable` past its endowment; an opening bot's endowment is zero, so this
+  // never stays the hand of a bot that earned its own start (`./tree`).
+  if (ctx.self.spendable <= ctx.brain.endowment + 1e-9) return null;
   const purchase = plan(ctx);
   if (!purchase) return null;
   return [go(ctx, orbit(ctx.self, planet.pos, DOCK_RADIUS, 0.2)), fire(false), purchaseAction(purchase)];
