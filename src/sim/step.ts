@@ -10,14 +10,19 @@
  * ships (one beam, one stat), asteroids that crack and burst into ore chunks,
  * proximity-tractor collection into a capped hold, turn-rate-limited facing
  * (aim input → auto-aim target → velocity → hold), and ship-vs-asteroid
- * reflection — all over a uniform-grid spatial-hash broad phase. Planets,
- * turrets, shields, repair, win/loss and waves land day 2+.
+ * reflection — all over a uniform-grid spatial-hash broad phase.
+ *
+ * Day-2 scope (GDD §2.1, §2.5, §2.6): home planets and their cores in the ring
+ * layout, the Build & Upgrade orders (turret, shield, repair channel, bank),
+ * construction timers, shield regeneration, turret auto-fire with pooled
+ * projectiles, and the beam extended to the rest of the target list — turrets,
+ * shields and cores (GDD §2.4). Win/loss, waves and collapse land next.
  *
  * Subsystem order is fixed and documented; it is part of the determinism
  * contract (GDD §4.8 — same inputs, same final state hash).
  */
 
-import type { Action, PlayerId, Vec2 } from '@shared/types';
+import type { Action, BuildItem, PlayerId, Vec2 } from '@shared/types';
 import {
   ASTEROID,
   BASE_ACCEL,
@@ -26,19 +31,29 @@ import {
   BEAM_RANGE,
   BOOST_MULTIPLIER,
   CHUNK,
-  DEATH_ORE_DROP_FRACTION,
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   HASH_CELL_SIZE,
-  RESPAWN_S,
   SHIP_ASTEROID_RESTITUTION,
   SHIP_STATS,
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
+  beamCoreDps,
   beamShipDps,
   miningRate,
 } from './constants';
+import {
+  damagePlanet,
+  damageTurret,
+  placeOrder,
+  planetTargetRadius,
+  sweepDeadTurrets,
+  updatePlanets,
+  updateProjectiles,
+  updateTurrets,
+} from './buildings';
+import { damageShip } from './damage';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, Ship, World } from './state';
 import { dist2, normalize } from './vec';
@@ -64,13 +79,32 @@ interface Intent {
   fire: boolean;
   auto: boolean;
   boost: boolean;
+  /** Wheel presses this tick, in the order they arrived. Unlike the held verbs
+   *  these accumulate: two presses in one tick are two orders (GDD §2.5). */
+  orders: BuildItem[];
 }
 
-const NO_INTENT: Intent = { thrust: { x: 0, y: 0 }, aim: null, fire: false, auto: false, boost: false };
+const NO_ORDERS: BuildItem[] = [];
+const NO_INTENT: Intent = {
+  thrust: { x: 0, y: 0 },
+  aim: null,
+  fire: false,
+  auto: false,
+  boost: false,
+  orders: NO_ORDERS,
+};
 
-/** Collapse a tick's actions into one intent (last write wins per verb). */
+/** Collapse a tick's actions into one intent (last write wins per verb; wheel
+ *  orders accumulate). */
 function resolveIntent(actions: readonly Action[]): Intent {
-  const intent: Intent = { thrust: { x: 0, y: 0 }, aim: null, fire: false, auto: false, boost: false };
+  const intent: Intent = {
+    thrust: { x: 0, y: 0 },
+    aim: null,
+    fire: false,
+    auto: false,
+    boost: false,
+    orders: NO_ORDERS,
+  };
   for (const a of actions) {
     switch (a.type) {
       case 'thrust':
@@ -86,9 +120,15 @@ function resolveIntent(actions: readonly Action[]): Intent {
       case 'boost':
         intent.boost = a.active;
         break;
+      case 'buildOrder':
+        // Allocate the list only for the rare tick that carries an order.
+        if (intent.orders === NO_ORDERS) intent.orders = [];
+        intent.orders.push(a.item);
+        break;
       case 'build':
       case 'ping':
-        // Not simulated on day 1 (planets/UI land day 2+).
+        // Opening the wheel and pinging the minimap are UI-side; the sim acts
+        // only on the confirmed order (`buildOrder`).
         break;
     }
   }
@@ -126,8 +166,23 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     }
   }
 
+  // 1b. Planets: core spawn protection, the undamaged clock, construction
+  //     timers, shield regen, and the repair channel (GDD §2.5, §2.6). Ahead of
+  //     this tick's damage, so a hit landing now is felt next tick — never
+  //     retroactively cancelling a repair that already ticked.
+  updatePlanets(world, dt);
+
   // 2. Resolve intents once, indexed to ships by id.
   const intents = world.ships.map((s) => intentFor(s.id, inputs));
+
+  // 2b. Wheel orders — validated and paid for here, so a job ordered this tick
+  //     starts its clock next tick and a 10 s turret takes exactly 10 s.
+  for (let i = 0; i < world.ships.length; i++) {
+    const ship = world.ships[i]!;
+    const orders = intents[i]!.orders;
+    if (!ship.alive || orders.length === 0) continue;
+    for (const item of orders) placeOrder(world, ship, item);
+  }
 
   // 3. Movement — Euler integration with drag (GDD §4.1).
   for (let i = 0; i < world.ships.length; i++) {
@@ -138,9 +193,11 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 4. Broad phase over the (static) asteroid field, reused by collision + beam.
   const hash = SpatialHash.from(world.asteroids.map((a) => a.pos), HASH_CELL_SIZE);
 
-  // 5. Ship-vs-asteroid reflection (GDD §4.1).
+  // 5. Ship-vs-asteroid and ship-vs-planet reflection (GDD §4.1).
   for (const ship of world.ships) {
-    if (ship.alive) reflectOffAsteroids(ship, world.asteroids, hash);
+    if (!ship.alive) continue;
+    reflectOffAsteroids(ship, world.asteroids, hash);
+    reflectOffPlanets(ship, world);
   }
 
   // 6. Facing — one priority ladder per ship, always turn-rate-limited. The
@@ -161,11 +218,20 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     if (ship.alive) fireBeam(world, ship, intents[i]!, autoTargets[i]!, hash, dt);
   }
 
-  // 8. Chunk drift + proximity tractor collection (GDD §2.3).
+  // 8. Turrets acquire, track, and fire; their shots fly and land (GDD §2.6).
+  //    After the beam, so a turret killed this tick does not also get a shot
+  //    off — the attacker's kill is worth the tick it cost them.
+  updateTurrets(world, dt);
+  updateProjectiles(world, dt);
+
+  // 9. Chunk drift + proximity tractor collection (GDD §2.3).
   updateChunks(world, dt);
 
-  // 9. Remove depleted asteroids (any that a burst flushed to ~0 ore).
+  // 10. End-of-tick cleanup: depleted asteroids and turrets killed this tick.
+  //     Both are removed only here so every beam resolved this tick indexed a
+  //     stable array (GDD §4.8).
   world.asteroids = world.asteroids.filter((a) => a.ore > 1e-9);
+  sweepDeadTurrets(world);
 
   return world;
 }
@@ -300,24 +366,39 @@ function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHas
   for (const idx of candidates) {
     const a = asteroids[idx];
     if (!a) continue;
-    const rr = ship.radius + a.radius;
-    const d2 = dist2(ship.pos, a.pos);
-    if (d2 >= rr * rr) continue;
+    reflectOffCircle(ship, a.pos, a.radius);
+  }
+}
 
-    // Overlapping: separate along the contact normal and reflect velocity.
-    const d = Math.sqrt(d2);
-    const nx = d > 1e-9 ? (ship.pos.x - a.pos.x) / d : 1;
-    const ny = d > 1e-9 ? (ship.pos.y - a.pos.y) / d : 0;
-    const overlap = rr - d;
-    ship.pos.x += nx * overlap;
-    ship.pos.y += ny * overlap;
+/** Planets are solid bodies too — you dock *at* your world, you do not fly
+ *  through it. Same contact response as a rock (GDD §4.1: every colliding body
+ *  is a circle); the shield bubble is energy and is not a collider. */
+function reflectOffPlanets(ship: Ship, world: World): void {
+  for (const planet of world.planets) {
+    reflectOffCircle(ship, planet.pos, planet.radius);
+  }
+}
 
-    const vn = ship.vel.x * nx + ship.vel.y * ny;
-    if (vn < 0) {
-      const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
-      ship.vel.x -= j * nx;
-      ship.vel.y -= j * ny;
-    }
+/** Push a ship out of an overlapping circle and reflect the normal component of
+ *  its velocity. No sqrt until a contact is confirmed. */
+function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
+  const rr = ship.radius + radius;
+  const d2 = dist2(ship.pos, center);
+  if (d2 >= rr * rr) return;
+
+  // Overlapping: separate along the contact normal and reflect velocity.
+  const d = Math.sqrt(d2);
+  const nx = d > 1e-9 ? (ship.pos.x - center.x) / d : 1;
+  const ny = d > 1e-9 ? (ship.pos.y - center.y) / d : 0;
+  const overlap = rr - d;
+  ship.pos.x += nx * overlap;
+  ship.pos.y += ny * overlap;
+
+  const vn = ship.vel.x * nx + ship.vel.y * ny;
+  if (vn < 0) {
+    const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
+    ship.vel.x -= j * nx;
+    ship.vel.y -= j * ny;
   }
 }
 
@@ -325,9 +406,21 @@ function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHas
 // Beam — segment-vs-circle raycast; one beam mines AND damages (GDD §2.3, §4.1)
 // ---------------------------------------------------------------------------
 
+/**
+ * What the beam struck. The full GDD §2.4 target list — "asteroid, ship,
+ * turret, shield, or core". Shield and core are one `planet` hit: the bubble is
+ * what stands in front of the core, and `damagePlanet` decides which pool the
+ * damage lands in (GDD §2.6).
+ *
+ * Indices are into the arrays as they stand *this tick*; nothing is removed
+ * from `asteroids` or `turrets` until end of step, so a hit resolved early in
+ * the tick is still valid when it is applied.
+ */
 type BeamHit =
   | { kind: 'asteroid'; index: number }
-  | { kind: 'ship'; index: number };
+  | { kind: 'ship'; index: number }
+  | { kind: 'turret'; planet: number; index: number }
+  | { kind: 'planet'; planet: number };
 
 function fireBeam(
   world: World,
@@ -383,10 +476,21 @@ function fireBeam(
 
   if (!hit) return;
 
-  if (hit.kind === 'asteroid') {
-    mineAsteroid(world, world.asteroids[hit.index]!, ship, dt);
-  } else {
-    damageShip(world, world.ships[hit.index]!, ship, dt);
+  // One beam, one stat — the same emitter mines rock, cuts hulls and turrets at
+  // the ship rate, and cuts shields and cores at the core rate (GDD §2.8).
+  switch (hit.kind) {
+    case 'asteroid':
+      mineAsteroid(world, world.asteroids[hit.index]!, ship, dt);
+      break;
+    case 'ship':
+      damageShip(world, world.ships[hit.index]!, beamShipDps(ship.shipClass) * dt);
+      break;
+    case 'turret':
+      damageTurret(world.planets[hit.planet]!.turrets[hit.index]!, beamShipDps(ship.shipClass) * dt);
+      break;
+    case 'planet':
+      damagePlanet(world, world.planets[hit.planet]!, beamCoreDps(ship.shipClass) * dt);
+      break;
   }
 }
 
@@ -394,12 +498,16 @@ function fireBeam(
  *  the beam direction. The beam points at the target center, so the near
  *  intersection is `centerDist - radius`; falls back to range if degenerate. */
 function surfaceDistance(ship: Ship, dx: number, dy: number, world: World, hit: BeamHit): number {
-  const c = hit.kind === 'asteroid' ? world.asteroids[hit.index]! : world.ships[hit.index]!;
-  const t = segCircle(ship.pos, dx, dy, c.pos, c.radius);
+  const t = segCircle(ship.pos, dx, dy, targetPos(world, hit), targetRadius(world, hit));
   return t ?? BEAM_RANGE;
 }
 
-/** Nearest asteroid or enemy ship whose center is within beam range. */
+/**
+ * Nearest valid target whose center is within beam range — asteroid, enemy
+ * ship, enemy turret, or enemy planet, checked across the full 360° with no
+ * front arc (GDD §2.4). Your own planet and your own turrets are never targets:
+ * the beam passes over your home.
+ */
 function acquireNearest(world: World, ship: Ship): BeamHit | null {
   let best: BeamHit | null = null;
   let bestD2 = BEAM_RANGE * BEAM_RANGE;
@@ -420,12 +528,55 @@ function acquireNearest(world: World, ship: Ship): BeamHit | null {
       best = { kind: 'ship', index: i };
     }
   }
+  for (let p = 0; p < world.planets.length; p++) {
+    const planet = world.planets[p]!;
+    if (planet.owner === ship.id) continue;
+    for (let i = 0; i < planet.turrets.length; i++) {
+      const turret = planet.turrets[i]!;
+      if (turret.hp <= 0) continue;
+      const d2 = dist2(ship.pos, turret.pos);
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = { kind: 'turret', planet: p, index: i };
+      }
+    }
+    if (!planet.alive || planet.spawnProtect > 0) continue;
+    const d2 = dist2(ship.pos, planet.pos);
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = { kind: 'planet', planet: p };
+    }
+  }
   return best;
 }
 
 /** Center of whatever a beam hit resolved to. */
 function targetPos(world: World, hit: BeamHit): Vec2 {
-  return hit.kind === 'asteroid' ? world.asteroids[hit.index]!.pos : world.ships[hit.index]!.pos;
+  switch (hit.kind) {
+    case 'asteroid':
+      return world.asteroids[hit.index]!.pos;
+    case 'ship':
+      return world.ships[hit.index]!.pos;
+    case 'turret':
+      return world.planets[hit.planet]!.turrets[hit.index]!.pos;
+    case 'planet':
+      return world.planets[hit.planet]!.pos;
+  }
+}
+
+/** Collision radius of whatever a beam hit resolved to — for a planet, the
+ *  shield bubble while one is up, the core body once they are down. */
+function targetRadius(world: World, hit: BeamHit): number {
+  switch (hit.kind) {
+    case 'asteroid':
+      return world.asteroids[hit.index]!.radius;
+    case 'ship':
+      return world.ships[hit.index]!.radius;
+    case 'turret':
+      return world.planets[hit.planet]!.turrets[hit.index]!.radius;
+    case 'planet':
+      return planetTargetRadius(world.planets[hit.planet]!);
+  }
 }
 
 /**
@@ -461,6 +612,31 @@ function raycastBeam(world: World, ship: Ship, hash: SpatialHash): { hit: BeamHi
     if (hitT !== null && hitT < bestT) {
       bestT = hitT;
       best = { kind: 'ship', index: i };
+    }
+  }
+
+  // Enemy turrets and planets (≤8 planets × ≤4 turrets — a direct loop beats a
+  // hash for that count). Your own home is skipped entirely, so no beam ever
+  // stops on your own turret or core.
+  for (let p = 0; p < world.planets.length; p++) {
+    const planet = world.planets[p]!;
+    if (planet.owner === ship.id) continue;
+    for (let i = 0; i < planet.turrets.length; i++) {
+      const turret = planet.turrets[i]!;
+      if (turret.hp <= 0) continue;
+      const hitT = segCircle(ship.pos, dx, dy, turret.pos, turret.radius);
+      if (hitT !== null && hitT < bestT) {
+        bestT = hitT;
+        best = { kind: 'turret', planet: p, index: i };
+      }
+    }
+    // A core inside spawn protection is not a target at all — the beam passes
+    // over it rather than stopping dead on an invulnerable circle (GDD §2.1).
+    if (!planet.alive || planet.spawnProtect > 0) continue;
+    const hitT = segCircle(ship.pos, dx, dy, planet.pos, planetTargetRadius(planet));
+    if (hitT !== null && hitT < bestT) {
+      bestT = hitT;
+      best = { kind: 'planet', planet: p };
     }
   }
   return { hit: best, t: bestT };
@@ -526,44 +702,8 @@ function spawnChunk(world: World, a: Asteroid, ship: Ship, amount: number): void
   });
 }
 
-/** Apply beam weapon damage to an enemy ship, respecting spawn protection. */
-function damageShip(world: World, target: Ship, shooter: Ship, dt: number): void {
-  if (target.spawnProtect > 0) return;
-  target.hull -= beamShipDps(shooter.shipClass) * dt;
-  if (target.hull <= 0) killShip(world, target);
-}
-
-/** Destroy a ship: drop half its held ore as debris and start the respawn clock
- *  (GDD §2.3, §2.7). Banked ore is untouched. */
-function killShip(world: World, ship: Ship): void {
-  ship.alive = false;
-  ship.hull = 0;
-  ship.respawnTimer = RESPAWN_S;
-  ship.vel.x = 0;
-  ship.vel.y = 0;
-  ship.beam = null;
-
-  const drop = ship.cargo * DEATH_ORE_DROP_FRACTION;
-  ship.cargo = 0;
-  if (drop <= 1e-9) return;
-
-  // Scatter debris in a deterministic ring (no RNG needed — angle by index).
-  const whole = Math.floor(drop);
-  const pieces = whole + (drop - whole > 1e-9 ? 1 : 0);
-  for (let i = 0; i < pieces; i++) {
-    const amount = i < whole ? CHUNK.ore : drop - whole;
-    const theta = (2 * Math.PI * i) / Math.max(1, pieces);
-    const dx = Math.cos(theta);
-    const dy = Math.sin(theta);
-    world.chunks.push({
-      id: world.nextEntityId++,
-      pos: { x: ship.pos.x + dx * (ship.radius + CHUNK.radius), y: ship.pos.y + dy * (ship.radius + CHUNK.radius) },
-      vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
-      amount,
-      radius: CHUNK.radius,
-    });
-  }
-}
+// Ship damage, death, and the half-hold ore drop live in `./damage`, shared
+// with turret fire (`./buildings`) so both killers agree exactly (GDD §2.7).
 
 // ---------------------------------------------------------------------------
 // Chunk drift + proximity tractor (GDD §2.3)

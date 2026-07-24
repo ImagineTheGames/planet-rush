@@ -75,13 +75,44 @@ export const CARGO_PER_TIER: Tunable<number> = 2;
 /** Cargo hold hard cap across all upgrades (GDD §2.8). TUNABLE */
 export const CARGO_CAP_MAX: Tunable<number> = 8;
 
-/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-planet cap. TUNABLE */
+/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-planet cap, plus
+ *  the geometry and rate of fire the sim needs to actually shoot. `dps` stays
+ *  the single balance number: per-shot damage is *derived* (`dps *
+ *  fireInterval`), so retuning DPS retunes the turret and nothing else drifts.
+ *  TUNABLE */
 export const TURRET = {
   cost: 3,
   hp: 30,
   dps: 4,
   buildTime: 10,
   capPerPlanet: 4,
+  /** Engagement radius (world units). Deliberately *under* `BEAM_RANGE` (260):
+   *  GDD §2.6 — "a patient attacker can pick off turrets from the edge of their
+   *  range." That only exists as a skill if the beam out-ranges the turret. */
+  range: 240,
+  /** Seconds between shots. Per-shot damage = `dps * fireInterval` = 2. */
+  fireInterval: 0.5,
+  /** Projectile muzzle speed (units/s) — fast enough that lead is small at
+   *  `range`, slow enough that a boosting ship can outrun a stale shot. */
+  projectileSpeed: 700,
+  /** Turret collision radius (it is a beam target — GDD §2.6 "turrets deter"). */
+  radius: 12,
+  /** Mount height above the planet surface; turret slots ring the planet. */
+  mountOffset: 12,
+  /** Rotation rate (rad/s) tracking its target — the "telegraph its threat while
+   *  spinning" read (style-guide §5.5). Aim never gates the shot; DPS is DPS. */
+  turnRate: 3.0,
+} as const;
+
+/** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
+export const PROJECTILE = {
+  /** Damage per shot — derived from the turret's design DPS, never typed twice. */
+  damage: TURRET.dps * TURRET.fireInterval,
+  /** Collision radius (world units). */
+  radius: 4,
+  /** Seconds a shot lives before it despawns — exactly its flight time to the
+   *  edge of turret range, so a turret can never out-reach its own engagement. */
+  life: TURRET.range / TURRET.projectileSpeed,
 } as const;
 
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
@@ -105,6 +136,25 @@ export const REPAIR = {
   hpPerSecond: 2,
   orePerHp: 1 / 5,
   interruptedByDamage: true,
+} as const;
+
+/** The home planet (GDD §2.1 ring layout, §2.5 "built at your own planet").
+ *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
+ *  on — but the sim cannot place a core without it. TUNABLE */
+export const PLANET = {
+  /** Core body radius: the collision/beam target and the mount ring for turrets. */
+  radius: 64,
+  /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
+   *  in a ring around the central asteroid field). */
+  ringFraction: 0.42,
+  /** How far outboard of the ship's spawn point the planet sits — the ship
+   *  spawns *orbiting* its home planet, between the planet and the field
+   *  (GDD §2.1). */
+  orbitOffset: 96,
+  /** Ship-to-planet distance inside which the Build & Upgrade wheel is live:
+   *  ordering, banking, and holding the repair channel all require it
+   *  (GDD §2.5 "your ship must sit at your planet"). Measured centre-to-centre. */
+  dockRange: 160,
 } as const;
 
 /** Field yield — total ore per match, delivered in 5 asteroid waves each
