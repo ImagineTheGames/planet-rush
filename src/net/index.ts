@@ -19,14 +19,19 @@
  * `./websocket-transport` is the client end — one persistent socket, and a
  * redial that reclaims the seat a bot is holding (GDD §4.2 reconnect grace).
  *
- * Landing later: client-side prediction and reconciliation against snapshots,
- * so an online client renders a predicted world instead of a snapshot-fed one
- * (GDD §4.2, M4–M5).
+ * And `./prediction` is why online feels like a game rather than a telegram:
+ * the client runs the same `step()` the server runs, one tick ahead per input
+ * in flight, and reconciles the result against each snapshot — rewind, overwrite
+ * with authority, replay everything the server has not yet run (GDD §4.2). The
+ * static half of the world that does not stream arrives as events and is applied
+ * by `./entity-events`.
  */
 
 export * from './transport';
 export * from './input-queue';
 export * from './snapshot';
+export * from './entity-events';
+export * from './prediction';
 export * from './wire';
 export * from './loopback';
 export * from './websocket-transport';

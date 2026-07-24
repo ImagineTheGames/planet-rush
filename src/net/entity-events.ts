@@ -139,6 +139,28 @@ export function applyEntityEvent(world: World, message: EntityEventMessage): boo
   }
 }
 
+/**
+ * Empty a client world of every static entity, ready to be refilled from an
+ * authoritative full-state burst.
+ *
+ * Used on exactly one path: joining a match already in progress — a reconnect
+ * inside the grace window (GDD §4.2), where sixty seconds is long enough for the
+ * field to have changed underneath the player. The world was rebuilt from
+ * `matchStart`'s seed, so it is holding the *opening* field: rocks that have
+ * long since been mined out, and no turret anyone built while the client was
+ * away. Those rocks would never be corrected, because a server only announces
+ * the destruction of things it still believes exist.
+ */
+export function resetStaticEntities(world: World): void {
+  world.asteroids.length = 0;
+  world.chunks.length = 0;
+  for (const planet of world.planets) {
+    planet.turrets.length = 0;
+    planet.shields.length = 0;
+    planet.builds.length = 0;
+  }
+}
+
 // --- Asteroids -------------------------------------------------------------
 
 function applyAsteroid(world: World, data: AsteroidEventData): boolean {
