@@ -28,69 +28,25 @@
  */
 
 import type { PlayerId } from '@shared/types';
+import type {
+  AsteroidEventData,
+  PlanetEventData,
+  PlanetHealthData,
+  ShieldEventData,
+  TurretEventData,
+} from '../src/net/entity-events';
 import type { EntityEventMessage, Tick } from '../src/net/transport';
 import { SENSOR_RANGE } from '../src/sim';
 import type { Planet, World } from '../src/sim';
 
 // ---------------------------------------------------------------------------
-// Event payloads — plain data, one shape per entity kind
+// Event payloads
 // ---------------------------------------------------------------------------
-
-/** A planet's structure: where it is, whose it is, and whether it is a wreck.
- *  Deliberately **no HP** — that is {@link PlanetHealthData}'s job. */
-export interface PlanetEventData {
-  id: number;
-  owner: PlayerId;
-  x: number;
-  y: number;
-  radius: number;
-  /** false once the core is destroyed: the wreck stays on the map (GDD §2.7). */
-  alive: boolean;
-  /** Sim time the core died, or -1 while it lives — the death moment's anchor. */
-  deathTime: number;
-}
-
-/** An asteroid, the economy (GDD §2.3). `ore` and `crackStage` let a client draw
- *  a payout judgement without being told a number every tick. */
-export interface AsteroidEventData {
-  id: number;
-  x: number;
-  y: number;
-  radius: number;
-  ore: number;
-  maxOre: number;
-  crackStage: number;
-}
-
-/** A turret that has finished building (GDD §2.5). */
-export interface TurretEventData {
-  id: number;
-  owner: PlayerId;
-  x: number;
-  y: number;
-  radius: number;
-  maxHp: number;
-}
-
-/** A shield bubble over a core (GDD §2.5). */
-export interface ShieldEventData {
-  id: number;
-  owner: PlayerId;
-  radius: number;
-  maxHp: number;
-}
-
-/**
- * The scouted half: one planet's live health, sent only to a client entitled to
- * see it. Turret and shield HP ride along, because a defender's alarm and a
- * scout's read of a siege are the same information (GDD §2.2, §2.6).
- */
-export interface PlanetHealthData {
-  id: number;
-  coreHp: number;
-  shields: { id: number; hp: number }[];
-  turrets: { id: number; hp: number }[];
-}
+//
+// The shapes themselves live in `src/net/entity-events.ts`, next to the client
+// applier that consumes them — one file owns both ends of the contract, the same
+// way `src/net/wire.ts` owns both ends of the framing. This module is the
+// producer: it decides *what* to say and *who* may hear it.
 
 // ---------------------------------------------------------------------------
 // Full state — what a client gets on join, and on reclaim
@@ -134,6 +90,7 @@ function turretEvent(
   const data: TurretEventData = {
     id: turret.id,
     owner: turret.owner,
+    slot: turret.slot,
     x: turret.pos.x,
     y: turret.pos.y,
     radius: turret.radius,

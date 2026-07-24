@@ -235,21 +235,26 @@ export class LocalLoopback implements Transport, LocalAuthority {
     if (this.authoritative || this.connection !== 'open') return;
     // RUSH! — the world is built from the lobby as it stands, so a ship class
     // picked a moment ago is the hull that spawns.
-    this.authoritative = createWorld({
-      ...this.config.match,
-      players: this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass })),
+    const players = this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass }));
+    this.authoritative = createWorld({ ...this.config.match, players });
+    // The same arguments the world was just built from. Offline nobody needs
+    // them — the client reads this very world — but the protocol is the protocol
+    // with the wire removed, so the message is complete either way.
+    this.emit({
+      type: 'matchStart',
+      tick: this.authoritative.tick,
+      seed: this.config.match.seed,
+      slots: players.map((spec) => ({ player: spec.id, shipClass: spec.shipClass })),
+      ...(this.config.match.bounds ? { bounds: { ...this.config.match.bounds } } : {}),
+      ...(this.config.match.asteroidCount !== undefined
+        ? { asteroidCount: this.config.match.asteroidCount }
+        : {}),
     });
-    this.emit({ type: 'matchStart', tick: this.authoritative.tick, seed: this.config.match.seed });
     this.broadcastSnapshot();
   }
 
   private input(player: PlayerId, message: InputMessage): void {
     const verdict = this.queue.accept(player, message, this.simTick);
-    // The ack only ever moves forward, and only for input the server actually
-    // holds — a dropped tick must not look acknowledged to the predictor.
-    if (verdict === 'queued' && player === this.you && message.seq > this.ackSeq) {
-      this.ackSeq = message.seq;
-    }
     // The driving client's tick is the offline clock — but a tick the queue
     // refused outright is not a clock reading, so it moves nothing.
     if (player === this.driver && verdict !== 'far-future') this.advanceTo(message.tick);
@@ -268,7 +273,14 @@ export class LocalLoopback implements Transport, LocalAuthority {
 
     const limit = Math.min(target, world.tick + MAX_CATCHUP_TICKS);
     while (world.tick < limit) {
-      step(world, this.queue.take(world.tick + 1), this.dt);
+      const rows = this.queue.take(world.tick + 1);
+      // The ack names the newest local input the sim has *run*, not the newest
+      // it has been handed — the same rule the match server follows, because the
+      // predicting client reconciles against both (GDD §4.2, `./prediction`).
+      for (const row of rows) {
+        if (row.id === this.you && row.seq > this.ackSeq) this.ackSeq = row.seq;
+      }
+      step(world, rows, this.dt);
       this.broadcastSnapshot();
       if (world.match.phase === 'ended') {
         // The authoritative match is over; the server stops the clock here and

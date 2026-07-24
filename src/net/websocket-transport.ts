@@ -183,11 +183,16 @@ export class WebSocketTransport implements Transport {
     socket.onopen = (): void => {
       this.attempt = 0;
       this.droppedAt = -1;
-      this.setState('open');
       // Every dial ends the same way: ask for the room. On a first connect that
       // is a join; on a redial inside the grace window it is a reclaim, and the
       // server hands the ship back rather than seating us somewhere new.
+      //
+      // Sent *before* the state change is announced, and that order is
+      // load-bearing: a listener told the socket is open will immediately send
+      // its lobby choice, and the server drops any message from a connection it
+      // has not yet seated. Open means joined, or it means nothing.
       this.sendJoin();
+      this.setState('open');
     };
 
     socket.onmessage = (event): void => {

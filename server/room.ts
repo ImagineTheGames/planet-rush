@@ -139,8 +139,17 @@ interface Slot {
   graceUntil: number;
   /** The secret issued to the human who holds this seat (GDD §4.2 reclaim). */
   token: string | null;
-  /** Latest input sequence the server has accepted from this slot; echoed in
-   *  every snapshot so the client can retire settled predictions. */
+  /**
+   * Latest input sequence from this slot the world has **actually simulated**;
+   * echoed in every snapshot so the client can retire settled predictions.
+   *
+   * Acknowledged on application, not on arrival (`InputQueue.take` carries the
+   * seq through to here). The difference is the whole of client-side
+   * reconciliation: a client replays every input past `ackSeq` on top of the
+   * snapshot, so an ack for input the server is still holding in its queue would
+   * make the client throw away a press whose effect has not happened yet, and
+   * the ship would visibly stutter backwards (GDD §4.2).
+   */
   ackSeq: number;
   /** Per-client fog of war over planet health (GDD §2.2). */
   fog: FogTracker | null;
@@ -416,17 +425,14 @@ export class MatchRoom {
    * been simulated) is re-filed on the next unsimulated tick rather than thrown
    * away. On a real network a player whose packet lost a race would otherwise
    * have their hands go dead for a frame — the ship holding its last intent is a
-   * far better lie than the ship forgetting the player pressed anything.
+   * far better lie than the ship forgetting the player pressed anything. The
+   * re-filed message keeps its `seq`, so it is acknowledged when it is *run*,
+   * one tick later than the client asked for — which is the truth.
    */
   private acceptInput(slot: Slot, message: InputMessage): void {
     const simTick = this.authoritative?.tick ?? 0;
-    let verdict = this.queue.accept(slot.player, message, simTick);
-    if (verdict === 'late') {
-      verdict = this.queue.accept(slot.player, { ...message, tick: simTick + 1 }, simTick);
-    }
-    // The ack only ever moves forward, and only for input the server actually
-    // holds: a dropped tick must never look acknowledged to the predictor.
-    if (verdict === 'queued' && message.seq > slot.ackSeq) slot.ackSeq = message.seq;
+    const verdict = this.queue.accept(slot.player, message, simTick);
+    if (verdict === 'late') this.queue.accept(slot.player, { ...message, tick: simTick + 1 }, simTick);
   }
 
   // --- The match ----------------------------------------------------------
@@ -550,7 +556,12 @@ export class MatchRoom {
       rows.push({ id: slot.player, actions: thinkOnce(world, slot.bot, this.dt) });
     }
     for (const row of this.queue.take(nextTick)) {
-      if (!botSeats.has(row.id)) rows.push(row);
+      if (botSeats.has(row.id)) continue; // a substitute's seat ignores its human
+      rows.push(row);
+      // This input is about to be simulated, so this is the moment it becomes
+      // true to tell its client "I have run this" (GDD §4.2 reconciliation).
+      const slot = this.slots[row.id];
+      if (slot && row.seq > slot.ackSeq) slot.ackSeq = row.seq;
     }
 
     // Sorted, so packet arrival order can never change the sim's resolution
@@ -624,12 +635,19 @@ export class MatchRoom {
     });
   }
 
+  /** RUSH!, and the arguments the world was built from — the client rebuilds the
+   *  same arena from them and predicts inside it (GDD §4.2, `src/net/prediction`). */
   private sendMatchStart(slot: Slot): void {
     if (!this.authoritative) return;
     this.sendTo(slot, {
       type: 'matchStart',
       tick: this.authoritative.tick,
       seed: this.config.seed,
+      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass })),
+      ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
+      ...(this.config.asteroidCount !== undefined
+        ? { asteroidCount: this.config.asteroidCount }
+        : {}),
     });
   }
 
