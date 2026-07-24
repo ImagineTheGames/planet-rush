@@ -69,15 +69,33 @@ const STRIP_PRESENT_MIN_PX = 100;
 /** The overlay blacks out the field: almost nothing non-vacuum survives its
  *  opaque backdrop (only its own thin plasma glyph/label line-art). */
 const OVERLAY_MAX_NONVACUUM_RATIO = 0.1;
-/** Minimum WORLD-space distance (sim units) the local ship must travel under a
- *  1.4 s left-half thrust drag. The ship is stationary at spawn (no input → no
- *  motion), so any real drag clears this by a wide margin; the bar sits far above
- *  that zero floor yet far below the hundreds of units a live drag actually
- *  covers, so it holds even on the CI runner's slow software-WebGL (where a
- *  render-derived field diff collapses — see the drag test). Locally the ship
- *  travels ~840–980 units; a field-diff-passing CI run moved it ~150–245; this
- *  bar sits below even a worst-case ~1 fps run yet far above the zero idle. */
-const DRAG_MIN_WORLD_MOVE = 25;
+/** How much SIM time the drag is held for, in fixed ticks (60 Hz → 1.5 s of sim).
+ *  Measured in *ticks*, never seconds: the window must be the same amount of
+ *  simulation on every host (see {@link dragOverSimTicks}). Short enough that the
+ *  ship is still in open space — a much longer hold runs it into the arena bound,
+ *  where displacement saturates and the per-tick rate would sag for a reason that
+ *  has nothing to do with input. */
+const DRAG_SIM_TICKS = 90;
+
+/** Minimum WORLD-space distance (sim units) the ship must cover PER ELAPSED SIM
+ *  TICK under a sustained full-deflection thrust drag.
+ *
+ *  Per *tick*, not per second, is the whole point. Wall-clock time is not a fixed
+ *  quantity of simulation: the loop clamps a slow frame's catch-up (loop.ts
+ *  `MAX_FRAME_SECONDS` = 0.25 s), so on the CI runner's software-WebGL (~1 fps)
+ *  the sim advances ~15 ticks per second of wall clock instead of 60. An absolute
+ *  distance bar therefore silently asserts the host's frame rate. Dividing by the
+ *  ticks the sim actually ran removes that term by construction.
+ *
+ *  The bar: at full thrust from rest the Vanguard accelerates at `BASE_ACCEL`
+ *  900 u/s² against `DRAG` 3.0/s, so it approaches 300 u/s and is clamped to
+ *  `BASE_SPEED` 260 u/s. Averaged over a from-rest window of `DRAG_SIM_TICKS`
+ *  that is ~234 u/s → ~3.9 units per `TICK_DT` (1/60 s) tick. Measured on the
+ *  real build it is ~3.3 (the stick ramps in over the first frames, and the ship
+ *  slews to face the thrust vector). This floor sits at roughly a quarter of the
+ *  ideal — 3× under measurement, and infinitely above the idle case, which reads
+ *  exactly 0.000 because a ship with no input does not move at all. */
+const DRAG_MIN_UNITS_PER_TICK = 1.0;
 
 // --- Fixtures / helpers -----------------------------------------------------
 
@@ -113,41 +131,86 @@ async function emulateNoOrientationLock(page: Page): Promise<void> {
   });
 }
 
+/** What one tick-bounded drag measured: world distance covered and the number of
+ *  fixed sim steps it was measured over. */
+interface DragMeasurement {
+  /** World-space distance (sim units) the local ship covered. */
+  readonly moved: number;
+  /** Fixed sim steps the sim actually ran during the hold. */
+  readonly ticks: number;
+}
+
 /**
- * Synthetic touch drag via CDP (Chromium only), producing real `touchstart/
- * move/end` — which the browser surfaces as `pointerType:'touch'`, the exact
- * events `main.ts` binds the twin sticks to. `page.mouse` would report
- * `pointerType:'mouse'` and be ignored. Coordinates are CSS px. Holds at the end
- * point so the game loop integrates several ship-thrust frames.
+ * Synthetic touch drag via CDP (Chromium only), held for a fixed amount of SIM
+ * time and reporting how far the ship travelled over exactly that window.
+ *
+ * CDP produces real `touchstart/move/end` — which the browser surfaces as
+ * `pointerType:'touch'`, the exact events `main.ts` binds the twin sticks to.
+ * `page.mouse` would report `pointerType:'mouse'` and be ignored. Coordinates
+ * are CSS px.
+ *
+ * Two details make this dilation-proof, which a wall-clock hold is not:
+ *
+ *  - **The window is counted in sim ticks**, read from the `?debug=1` instrument.
+ *    Holding "1.4 seconds" means 84 ticks at 60 fps but only ~20 on the CI
+ *    runner's ~1 fps software-WebGL, because the loop clamps each slow frame's
+ *    catch-up — the same gesture would be measured over wildly different amounts
+ *    of simulation. Counting ticks pins the window instead.
+ *  - **The sampling runs in-page on `requestAnimationFrame`**, so the window
+ *    closes within one frame of hitting the target rather than one slow CDP
+ *    round trip. Polling over the wire from the test overshot to 700+ ticks at
+ *    ~1 fps; on rAF the window lands within a tick or two of the target.
+ *
+ * After the ramp-in we stop dispatching entirely: a virtual stick holds its last
+ * position until `touchEnd` (touch.ts — `current` is only rewritten by a move),
+ * so thrust stays at full deflection with no further events.
  */
-async function touchDrag(
+async function dragOverSimTicks(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number },
-  holdMs: number,
-): Promise<void> {
+  ticks: number,
+): Promise<DragMeasurement> {
   const client: CDPSession = await page.context().newCDPSession(page);
   try {
     await client.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
       touchPoints: [{ x: from.x, y: from.y }],
     });
+    // Ramp to full deflection in a few steps, as a thumb would.
     const steps = 8;
     for (let i = 1; i <= steps; i++) {
       const x = from.x + ((to.x - from.x) * i) / steps;
       const y = from.y + ((to.y - from.y) * i) / steps;
       await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
-      await page.waitForTimeout(16);
     }
-    const holdSteps = Math.max(1, Math.ceil(holdMs / 50));
-    for (let i = 0; i < holdSteps; i++) {
-      await client.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x: to.x, y: to.y }],
-      });
-      await page.waitForTimeout(50);
-    }
+
+    const measured = await page.evaluate(
+      (want) =>
+        new Promise<{ moved: number; ticks: number }>((resolve) => {
+          const d = (
+            window as unknown as {
+              __planetRush: { shipWorld: { x: number; y: number }; ticks: number };
+            }
+          ).__planetRush;
+          const t0 = d.ticks;
+          const x0 = d.shipWorld.x;
+          const y0 = d.shipWorld.y;
+          const poll = (): void => {
+            const elapsed = d.ticks - t0;
+            if (elapsed >= want) {
+              resolve({ moved: Math.hypot(d.shipWorld.x - x0, d.shipWorld.y - y0), ticks: elapsed });
+            } else {
+              requestAnimationFrame(poll);
+            }
+          };
+          requestAnimationFrame(poll);
+        }),
+      ticks,
+    );
+
     await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    return measured;
   } finally {
     await client.detach();
   }
@@ -234,11 +297,22 @@ test('portrait shows the ROTATE overlay; landscape hides it', async ({ page }, t
 });
 
 // ===========================================================================
-// Touch drag moves the ship (brief: screenshot pixel diff of the field)
+// Touch drag moves the ship (world-space truth, per elapsed SIM tick)
 // ===========================================================================
 
-test('touch drag on the left half moves the ship (world-space truth)', async ({ page }, testInfo) => {
+test('touch drag on the left half moves the ship (world units per sim tick)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
+
+  // The one test in this suite that buys a fixed amount of SIM time, so it is the
+  // one whose WALL-CLOCK cost scales with how slowly the host renders — that is
+  // the trade the tick-based window makes, not a flaw in it. Measured end-to-end:
+  // 3.8 s at full speed, 33.4 s with the CPU throttled 200x (~1 fps, the CI
+  // software-WebGL profile). The suite default of 60 s leaves under 2x headroom
+  // there, which is too thin for a job that gates merges, so this test — and only
+  // this test — gets a longer bound. It does not weaken the assertion: a host too
+  // slow to run 90 ticks still fails, it just fails on the tick target rather than
+  // on an arbitrary stopwatch.
+  test.setTimeout(120_000);
 
   // Gameplay assertion → landscape. In portrait the field is the blocked,
   // squashed non-play state (the ROTATE-overlay guard), and the first-gesture
@@ -246,16 +320,26 @@ test('touch drag on the left half moves the ship (world-space truth)', async ({ 
   // orientation where "ship moved" holds.
   await useLandscape(page);
 
-  // Assert against SIM TRUTH, not a field screenshot diff. The follow-camera
-  // keeps the ship centred on screen, so a pixel diff can only observe the
-  // *field* panning — a proxy whose magnitude tracks render throughput and
-  // collapses on the CI runner's software-WebGL (~1 fps: the fixed-timestep
-  // loop's catch-up clamp drops the dropped-frame time, so the field barely
-  // moves even though the ship does). The ship's WORLD position (?debug=1 hook,
-  // shipWorld) advances whenever the sim integrates thrust, however slowly the
-  // frame paints — the device-independent "did the drag move the ship?" the
-  // brief actually asks. (Platform note m1-12: this replaced a render-fragile
-  // field-pixel-diff; the ?debug=1 shipWorld field is the enabling instrument.)
+  // Assert against SIM TRUTH on the SIM's OWN CLOCK — two separate corrections,
+  // both needed, because rendering is the thing that breaks down under CI:
+  //
+  //  1. *What* is measured. The follow-camera keeps the ship centred, so a field
+  //     screenshot diff can only observe the field panning — a render-side proxy.
+  //     `shipWorld` (?debug=1) is the sim's own answer to "did the ship move?".
+  //  2. *Over what* it is measured. Wall-clock seconds are not a fixed amount of
+  //     simulation. The loop clamps each frame's catch-up to `MAX_FRAME_SECONDS`
+  //     (0.25 s), so on the CI runner's software-WebGL at ~1 fps the sim advances
+  //     ~15 ticks per wall-clock second instead of 60 — measured here at 14.7.
+  //     A gesture "held 1.4 s" is then a *quarter* of the simulation it is on a
+  //     real phone, and any absolute distance bar is really an assertion about
+  //     the host's frame rate. Dividing by the ticks the sim actually ran removes
+  //     that term by construction.
+  //
+  // Verified by CPU-throttling this same build from 1× to 200× (36 fps → 1.0 fps,
+  // the CI profile): the per-tick rate moved 3.300 → 3.319 while the identical
+  // gesture's wall-clock cost went 2.5 s → 31.4 s. The no-input control reads
+  // exactly 0.000 at both rates, so the bar still fails a genuinely dead stick.
+  // (Platform note m1-12.)
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
@@ -267,26 +351,28 @@ test('touch drag on the left half moves the ship (world-space truth)', async ({ 
     { timeout: 15_000 },
   );
 
-  const readShipWorld = (): Promise<{ x: number; y: number }> =>
-    page.evaluate(() => {
-      const d = (window as unknown as { __planetRush?: { shipWorld: { x: number; y: number } } }).__planetRush;
-      return { x: d!.shipWorld.x, y: d!.shipWorld.y };
-    });
-
   const { width, height } = page.viewportSize() ?? { width: 844, height: 390 };
   const midY = Math.round(height * 0.5);
 
   // Left-half leftward drag: both endpoints x < width/2, so one thrust stick
-  // stays engaged and drives sustained full-deflection thrust for 1.4 s.
-  const before = await readShipWorld();
-  await touchDrag(page, { x: Math.round(width * 0.42), y: midY }, { x: Math.round(width * 0.04), y: midY }, 1400);
-  const after = await readShipWorld();
+  // stays engaged and drives sustained full-deflection thrust for the window.
+  const { moved, ticks } = await dragOverSimTicks(
+    page,
+    { x: Math.round(width * 0.42), y: midY },
+    { x: Math.round(width * 0.04), y: midY },
+    DRAG_SIM_TICKS,
+  );
 
-  const moved = Math.hypot(after.x - before.x, after.y - before.y);
+  // Guard the denominator: a window that never ran can't be divided by, and
+  // would otherwise read as a pass-by-vacuum.
+  expect(ticks, 'sim ticks elapsed during the drag').toBeGreaterThanOrEqual(DRAG_SIM_TICKS);
+
+  const perTick = moved / ticks;
   expect(
-    moved,
-    `ship world-distance under a 1.4s left-half drag (${moved.toFixed(1)} units)`,
-  ).toBeGreaterThan(DRAG_MIN_WORLD_MOVE);
+    perTick,
+    `ship world-distance per sim tick under a left-half drag ` +
+      `(${moved.toFixed(1)} units over ${ticks} ticks = ${perTick.toFixed(3)} u/tick)`,
+  ).toBeGreaterThan(DRAG_MIN_UNITS_PER_TICK);
 });
 
 // ===========================================================================

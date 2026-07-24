@@ -185,11 +185,17 @@ async function boot(): Promise<void> {
     });
   }
 
+  /** Fixed sim steps executed since boot — the sim's own clock, exposed via the
+   *  ?debug=1 instrument. Counts real steps only, so it does not advance while
+   *  the sim is pinned by ?freeze=1. */
+  let simTicks = 0;
+
   // --- Fixed-timestep loop: sample input → step sim → render (GDD §4.1).
   const loop = new GameLoop({
     update: () => {
       if (flags.freeze) return; // sim is pinned at the seeded freeze tick
       step(world, [{ id: LOCAL_PLAYER, actions: sampleInput() }]);
+      simTicks++;
     },
     render: () => {
       renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
@@ -224,6 +230,7 @@ async function boot(): Promise<void> {
       ship.pos.x, // world space — moves as the ship flies (camera keeps it centred)
       ship.pos.y,
       performance.now(),
+      simTicks, // sim-time base: lets QA divide movement by ticks, not seconds
     );
   }
 
