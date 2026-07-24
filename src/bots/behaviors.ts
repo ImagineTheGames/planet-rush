@@ -203,14 +203,6 @@ export function spendAtHome(ctx: BotCtx, plan: (ctx: BotCtx) => Purchase | null)
   return [go(ctx, orbit(ctx.self, planet.pos, DOCK_RADIUS, 0.2)), fire(false), purchaseAction(purchase)];
 }
 
-/** Sit at the wheel doing nothing but holding the channel open — what a repair
- *  looks like from outside (GDD §2.5: "your ship must sit at your planet"). */
-export function holdStation(ctx: BotCtx): readonly Action[] | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
-  return [go(ctx, orbit(ctx.self, planet.pos, DOCK_RADIUS, 0.2)), fire(false)];
-}
-
 // ---------------------------------------------------------------------------
 // Mine (GDD §2.3)
 // ---------------------------------------------------------------------------

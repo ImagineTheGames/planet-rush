@@ -70,11 +70,6 @@ export function isEngageable(ship: PerceivedShip): boolean {
   return ship.alive && !ship.eliminated && ship.spawnProtected !== true;
 }
 
-/** Enemy ships worth pointing a beam at, nearest first is the caller's problem. */
-export function engageableShips(ctx: BotCtx): readonly PerceivedShip[] {
-  return ctx.view.ships.filter(isEngageable);
-}
-
 /** How threatening a hull looks on sight (GDD §2.11 roles). The Interceptor
  *  "catches miners in the open", so it is the one you turn to face. */
 export function classThreat(cls: ShipClass): number {

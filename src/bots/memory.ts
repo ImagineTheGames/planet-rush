@@ -180,11 +180,6 @@ export class BotMemory {
     return this.planets.get(owner) ?? null;
   }
 
-  /** Every home this bot has ever seen, in first-sighting order. */
-  knownPlanets(): readonly PlanetMemo[] {
-    return [...this.planets.values()];
-  }
-
   /**
    * A remembered ship, but only while the memory is fresher than `window`
    * seconds. Past that the bot has to go and look again — which is the fog doing
@@ -194,15 +189,6 @@ export class BotMemory {
     const memo = this.ships.get(id);
     if (!memo) return null;
     return this.time - memo.seenAt <= window ? memo : null;
-  }
-
-  /** Every ship remembered within `window` seconds, in first-sighting order. */
-  recentShips(window: number): readonly ShipMemo[] {
-    const out: ShipMemo[] = [];
-    for (const memo of this.ships.values()) {
-      if (this.time - memo.seenAt <= window) out.push(memo);
-    }
-    return out;
   }
 
   /** How stale a planet's scouted numbers are, in seconds; `Infinity` if never

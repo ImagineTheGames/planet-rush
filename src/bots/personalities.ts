@@ -17,11 +17,12 @@
  * perception is one fog-honest code path for every tier (`./perception`), and a
  * Hard bot that knows you are wounded knows it because it scouted you.
  *
- * Day 2 ships the roster as **data**: every personality is wired to the
- * do-nothing baseline tree (`./bot`) so the harness, the slot filling, and the
- * action stream can be proven end-to-end before any of them has an opinion. The
- * weights below are the day-2 hypothesis for the trees that land next, in the
- * same spirit as the sim's `TUNABLE` constants table.
+ * Day 4 gave the weights something to bend: `./easy`, `./medium` and `./hard`
+ * read every dial below at least once per decision, so the difference between
+ * losing to Vulture and losing to Warden is these numbers and nothing else —
+ * same tree, same tier, same fog. They remain a hypothesis in the same spirit as
+ * the sim's `TUNABLE` constants table, and QA owns the balance question they
+ * answer (GDD §2.8, §3.8; measured results in `docs/bot-balance-day4.md`).
  */
 
 import { ShipClass } from '@shared/types';
