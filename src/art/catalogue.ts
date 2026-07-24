@@ -28,6 +28,7 @@ import {
 import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
 import type { SpriteDef } from './shapes';
 import { debrisFieldSprite, planetWreckSprite } from './wrecks';
+import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
 
 /** One catalogued sprite: what it is, and a caption for the contact sheet. */
 export interface CatalogueEntry {
@@ -106,6 +107,16 @@ function entries(): CatalogueEntry[] {
   }
   for (const seed of [0, 4]) {
     out.push({ group: 'Wrecks — the quiet', label: `debris ${seed}`, def: debrisFieldSprite(seed) });
+  }
+
+  // --- VFX ------------------------------------------------------------------
+  // The eleven particle looks carry the whole effects set (./vfx/kinds), and
+  // they are sprites like any other — so they belong on the same review surface
+  // and go through the same palette audit. A spark that quietly went signal
+  // yellow is a RESERVED-rule violation (style-guide §2) whether it is drawn on
+  // a hull or thrown by an explosion.
+  for (const spec of PARTICLE_KINDS) {
+    out.push({ group: 'VFX — the eleven particle looks', label: spec.name, def: particleSprite(spec.kind) });
   }
 
   return out;
