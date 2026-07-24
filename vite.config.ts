@@ -1,5 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
+import { readGitStamp, defineBuildInfo, versionJsonPlugin } from './src/platform/build-stamp';
+
+// Build identity, stamped once at config load: short git sha, ISO build time,
+// dirty-tree flag. Injected as the `__BUILD_INFO__` define (typed and given a
+// dev fallback in src/platform/build-info.ts) and emitted as version.json for
+// the studio dashboard. Never throws — a repo-less checkout stamps 'dev'.
+const buildInfo = readGitStamp();
 
 // Planet Rush client build. A relative base ('./') keeps asset URLs
 // path-independent so the same bundle serves correctly from a GitHub Pages
@@ -8,6 +15,8 @@ import { resolve } from 'node:path';
 // GDD §4.8.
 export default defineConfig({
   base: process.env.VITE_BASE ?? './',
+  define: defineBuildInfo(buildInfo),
+  plugins: [versionJsonPlugin(buildInfo)],
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),

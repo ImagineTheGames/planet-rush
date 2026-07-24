@@ -7,6 +7,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import { installDebugHook, isDebugEnabled, DEBUG_GLOBAL_KEY, type DebugState } from './debug-hook';
+import type { BuildInfo } from './build-info';
+
+/** A known build stamp, so the shape assertion doesn't depend on the real git
+ *  state of the checkout the suite happens to run in. */
+const STAMP: BuildInfo = { sha: 'a1b2c3d', time: '2026-07-24T09:07:42.000Z', dirty: false };
 
 /** A fresh window-like attach target per test. */
 function fakeWindow(): Record<string, unknown> {
@@ -44,7 +49,7 @@ describe('installDebugHook — off path (no ?debug=1)', () => {
 describe('installDebugHook — armed path (?debug=1)', () => {
   it('exposes the contract shape and updates it in place per frame', () => {
     const win = fakeWindow();
-    const hook = installDebugHook('?debug=1', win);
+    const hook = installDebugHook('?debug=1', win, STAMP);
     expect(hook.enabled).toBe(true);
 
     const state = read(win);
@@ -54,6 +59,7 @@ describe('installDebugHook — armed path (?debug=1)', () => {
       shipWorld: { x: 0, y: 0 },
       viewport: { w: 0, h: 0 },
       fps: 0,
+      build: STAMP,
     });
 
     hook.update(195, 422, 390, 844, 1500, 2600, 1000);
@@ -67,6 +73,16 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     expect(read(win)).toBe(before);
     expect(before!.shipScreen).toEqual({ x: 10, y: 20 });
     expect(before!.shipWorld).toEqual({ x: 50, y: 60 });
+  });
+
+  it('reports which build it is, frozen and stable across frames', () => {
+    const win = fakeWindow();
+    const hook = installDebugHook('?debug=1', win, STAMP);
+    const state = read(win);
+    expect(state!.build).toEqual(STAMP);
+    expect(Object.isFrozen(state!.build)).toBe(true);
+    hook.update(1, 2, 3, 4, 5, 6, 1000);
+    expect(state!.build).toEqual(STAMP);
   });
 
   it('installs a read-only handle that cannot be reassigned', () => {

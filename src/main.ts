@@ -38,7 +38,9 @@ import {
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook } from '@platform/debug-hook';
+import { BUILD_INFO, formatBootLine } from '@platform/build-info';
 import type { Viewport } from '@platform/camera';
+import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
 import { Hud } from './ui';
@@ -49,6 +51,11 @@ const PLAYER_COUNT = 8;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
 
 async function boot(): Promise<void> {
+  // Which build is this? One line, first thing in the console, every build —
+  // so a bug report can carry the sha instead of "the version I had open"
+  // (src/platform/build-info.ts; the corner badge says the same thing on screen).
+  console.info(formatBootLine(BUILD_INFO));
+
   const platform = createBrowserPlatform();
 
   // Dev flags (?debug=1, ?freeze=1). Off in a normal build — everything gated on
@@ -102,6 +109,17 @@ async function boot(): Promise<void> {
   //     thumbs read clearly; the layer hides itself entirely on desktop.
   const touchVisuals = new TouchVisuals();
   app.stage.addChild(touchVisuals);
+
+  // --- Build badge (render/build-badge.ts): the always-on corner stamp naming
+  //     the build on screen. Above the HUD/controls so a screenshot always
+  //     carries it, below the ROTATE overlay (which owns the screen when up).
+  const buildBadge = new BuildBadge();
+  // ?freeze=1 exists so the frame is byte-deterministic across boots (golden
+  // screenshots). The stamp is the one thing on screen that changes every
+  // commit, so it is the one thing freeze must hide — and the only case where
+  // the badge is not shown. Every real build carries it.
+  buildBadge.visible = !flags.freeze;
+  app.stage.addChild(buildBadge);
 
   // --- Portrait handling (orientation.ts): a ROTATE overlay where landscape
   //     lock is unsupported (iOS Safari). Added last so it covers everything.
@@ -181,6 +199,8 @@ async function boot(): Promise<void> {
       // no-op layer on desktop). Reads the viewport each frame so the idle
       // affordances and FIRE button track resize/orientation flips.
       touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height);
+      // Keep the build stamp cornered as the viewport changes (two writes).
+      buildBadge.update(app.screen.width, app.screen.height);
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -269,6 +289,13 @@ async function boot(): Promise<void> {
     if (touchRects.leftStickZone) reg.register('touch-left-stick', LEFT_STICK_ANCHOR, touchRects.leftStickZone);
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
+
+    // Build badge: declared bottom-right, actual rect measured from the real
+    // text metrics — so a font swap that pushes the stamp off-corner is caught
+    // by the placement check rather than by squinting at a screenshot. Skipped
+    // when frozen, where the badge is hidden (the registry records what is
+    // actually drawn, never what would have been).
+    if (buildBadge.visible) reg.register(BADGE_ID, BADGE_ANCHOR, buildBadge.layoutBounds(w, h));
 
     // HUD-owned elements (ore HUD, banked total, wave clock, controls strip,
     // onboarding prompt): registered via the Hud's public describeLayout() seam

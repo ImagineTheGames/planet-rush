@@ -17,7 +17,11 @@
  *                                             // truth for "did the drag move it?"
  *     viewport:   { w: number, h: number },  // visual-viewport size (CSS px)
  *     fps:        number,                     // smoothed frames/sec
+ *     build:      { sha, time, dirty },       // WHICH BUILD this is (build-info.ts)
  *   }
+ *
+ * `build` is a frozen snapshot of the build stamp, so a failing QA run can name
+ * the build it failed on instead of "the one that was deployed at the time".
  *
  * Updated in place every rendered frame. The handle is installed read-only
  * (non-writable, non-configurable) — QA reads it, nothing (game or test) reassigns
@@ -36,12 +40,18 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
+import { BUILD_INFO } from './build-info';
+import type { BuildInfo } from './build-info';
+
 /** The frozen shape of `window.__planetRush` (see the contract above). */
 export interface DebugState {
   readonly shipScreen: { x: number; y: number };
   readonly shipWorld: { x: number; y: number };
   readonly viewport: { w: number; h: number };
   readonly fps: number;
+  /** The build stamp this page is running (src/platform/build-info.ts). Fixed
+   *  for the life of the page — frozen, never rewritten per frame. */
+  readonly build: BuildInfo;
 }
 
 /** The property name placed on `window` — the only global this module touches. */
@@ -86,16 +96,19 @@ export function isDebugEnabled(search: string): boolean {
 export function installDebugHook(
   search: string,
   target: Record<string, unknown> = globalThis as unknown as Record<string, unknown>,
+  build: BuildInfo = BUILD_INFO,
 ): DebugHook {
   if (!isDebugEnabled(search)) return NOOP_HOOK;
 
   // Mutable backing store; the readonly `DebugState` fields are overwritten in
   // place, never reassigned, so the exposed handle stays a stable read-only ref.
+  // `build` is the exception: a compile-time constant, frozen on the way in.
   const state = {
     shipScreen: { x: 0, y: 0 },
     shipWorld: { x: 0, y: 0 },
     viewport: { w: 0, h: 0 },
     fps: 0,
+    build: Object.freeze({ ...build }),
   };
 
   // Read-only handle: the instrument cannot be swapped out from under QA.
