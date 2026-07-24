@@ -722,8 +722,12 @@ export class Hud extends Container {
    * distinguishes it, and `hud-geometry.test.ts` pins the footprint it produces.
    *
    * **Still not registered, and why — measured, not estimated.** One element is
-   * left: `wave-clock` (`top-center` in QA's contract). Its zone is one third of
-   * the viewport wide and the clock is intrinsically wider. The numbers below
+   * left: `wave-clock` (`top-center` in QA's contract). It is worth being exact
+   * about what kind of gap that is: the clock is **not an M2 element**. It
+   * shipped with the day-1 HUD (`b923b53`), so it is a pre-existing M1 straggler
+   * that this M2 reconcile inherited rather than introduced — every element M2
+   * actually added is in the table above. Its zone is one third of the viewport
+   * wide and the clock is intrinsically wider. The numbers below
    * were read out of a real browser frame — the zone from the registry's own
    * `resolveAnchor`, the widths from `measureText` in the shipped font stack:
    *
