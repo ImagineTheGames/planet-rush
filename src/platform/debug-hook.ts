@@ -17,6 +17,8 @@
  *                                             // truth for "did the drag move it?"
  *     viewport:   { w: number, h: number },  // visual-viewport size (CSS px)
  *     fps:        number,                     // smoothed frames/sec
+ *     ticks:      number,                     // fixed sim steps executed since
+ *                                             // boot — the sim's OWN clock
  *   }
  *
  * Updated in place every rendered frame. The handle is installed read-only
@@ -30,6 +32,15 @@
  * a centred ship reads {w/2, h/2} whether or not the URL bar or a notch has
  * cropped the canvas.
  *
+ * `ticks` is the same idea applied to TIME. Wall-clock seconds are not a fixed
+ * amount of simulation: the loop clamps a slow frame's catch-up (loop.ts
+ * `MAX_FRAME_SECONDS`), so on a software-WebGL CI runner at ~1 fps a 1.4 s
+ * gesture advances the sim only a fraction of what the same gesture advances it
+ * at 60 fps. Any assertion phrased in *absolute* movement is therefore really an
+ * assertion about the host's frame rate. Reporting the sim's own step count lets
+ * QA divide the two — movement per elapsed tick — which is invariant across
+ * render throughput (platform note m1-12).
+ *
  * Without `?debug=1` this module is inert: it installs nothing, attaches nothing
  * to `window`, and its `update` is a no-op. It is an instrument only — no game
  * code reads `__planetRush`, and this file exposes nothing else on the global.
@@ -42,6 +53,8 @@ export interface DebugState {
   readonly shipWorld: { x: number; y: number };
   readonly viewport: { w: number; h: number };
   readonly fps: number;
+  /** Fixed sim steps executed since boot — monotonic, render-rate independent. */
+  readonly ticks: number;
 }
 
 /** The property name placed on `window` — the only global this module touches. */
@@ -60,6 +73,7 @@ export interface DebugHook {
     shipWorldX: number,
     shipWorldY: number,
     nowMs: number,
+    simTicks: number,
   ): void;
 }
 
@@ -96,6 +110,7 @@ export function installDebugHook(
     shipWorld: { x: 0, y: 0 },
     viewport: { w: 0, h: 0 },
     fps: 0,
+    ticks: 0,
   };
 
   // Read-only handle: the instrument cannot be swapped out from under QA.
@@ -115,13 +130,23 @@ export function installDebugHook(
 
   return {
     enabled: true,
-    update(shipScreenX, shipScreenY, viewportW, viewportH, shipWorldX, shipWorldY, nowMs): void {
+    update(
+      shipScreenX,
+      shipScreenY,
+      viewportW,
+      viewportH,
+      shipWorldX,
+      shipWorldY,
+      nowMs,
+      simTicks,
+    ): void {
       state.shipScreen.x = shipScreenX;
       state.shipScreen.y = shipScreenY;
       state.shipWorld.x = shipWorldX;
       state.shipWorld.y = shipWorldY;
       state.viewport.w = viewportW;
       state.viewport.h = viewportH;
+      state.ticks = simTicks;
 
       // Smooth fps off successive frame timestamps; ignore non-advancing clocks.
       if (hasLast) {
