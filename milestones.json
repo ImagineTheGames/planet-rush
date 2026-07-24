@@ -33,7 +33,7 @@
       "day": 1,
       "title": "Ship flies, shoots, mines",
       "test_notes": "Fly the ship, hold fire on an asteroid to mine it, watch the two-number ore HUD fill. First onboarding prompts fire. Touch twin sticks and fire-mode setting work alongside keyboard/mouse and gamepad.",
-      "done": false
+      "done": true
     },
     {
       "day": 2,
