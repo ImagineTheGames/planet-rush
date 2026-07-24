@@ -227,6 +227,10 @@ interface TurretMemo {
   y: number;
   angle: number;
   radius: number;
+  /** The planet owner's slot. Kept because a dead turret has no planet to ask:
+   *  the `turretDown` tell is emitted from the memo, and the under-attack alarm
+   *  needs to know whose deterrent just died (GDD §2.2, `../audio/alarm`). */
+  owner: number;
   seen: number;
 }
 
@@ -580,6 +584,7 @@ export class WorldObserver {
           y: turret.pos.y,
           angle: turret.angle,
           radius: turret.radius,
+          owner: planet.owner,
           seen: this.frame,
         };
         this.turrets.set(turret.id, memo);
@@ -599,13 +604,16 @@ export class WorldObserver {
       memo.y = turret.pos.y;
       memo.angle = turret.angle;
       memo.radius = turret.radius;
+      memo.owner = planet.owner;
     }
 
     for (const [id, memo] of this.turrets) {
       if (memo.seen === this.frame) continue;
       // "A patient attacker can pick off turrets from the edge of their range"
-      // (GDD §2.6) — a deterrent dying is a tell the owner should hear.
-      if (!silent) out.push(TELL.turretDown, memo.x, memo.y, memo.angle, 1, -1);
+      // (GDD §2.6) — a deterrent dying is a tell the owner should hear, so it
+      // carries the owner: this is one of the three damage kinds that ring the
+      // under-attack alarm (GDD §2.2, "core, shield, or turrets").
+      if (!silent) out.push(TELL.turretDown, memo.x, memo.y, memo.angle, 1, memo.owner);
       this.turrets.delete(id);
     }
   }

@@ -164,7 +164,7 @@ export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
   [TELL.collapseBegin]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1' },
   [TELL.planetDeath]: { at: 'the dying planet', angle: 'outward angle from centre', magnitude: 'planet radius / 64' },
   [TELL.matchEnd]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1 win, 0 loss' },
-  [TELL.turretDown]: { at: 'the turret mount', angle: 'barrel facing', magnitude: '1' },
+  [TELL.turretDown]: { at: 'the turret mount', angle: 'barrel facing', magnitude: '1 (player = the owner whose deterrent died)' },
 };
 
 // ---------------------------------------------------------------------------
