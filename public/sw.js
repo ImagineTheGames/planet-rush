@@ -43,7 +43,15 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle same-origin GETs; everything else (WebSocket upgrades, the match
   // server, cross-origin) passes straight through to the network.
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  // version.json IS the freshness signal (the build stamp the studio dashboard
+  // polls). A cached copy would report a build that is no longer deployed —
+  // precisely the confusion the stamp exists to end. Always network, never
+  // cached; offline it simply fails, which is the honest answer.
+  if (url.pathname.endsWith('/version.json')) return;
 
   event.respondWith(
     caches.open(CACHE_VERSION).then(async (cache) => {

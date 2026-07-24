@@ -19,9 +19,22 @@
  *                                             // the same two numbers under both
  *                                             // spellings, see the note below
  *     fps:        number,                     // smoothed frames/sec
+ *     build:      { sha, time, dirty },       // WHICH BUILD this is (build-info.ts)
  *     ticks:      number,                     // fixed sim steps executed since
  *                                             // boot — the sim's OWN clock
  *   }
+ *
+ * `build` is a frozen snapshot of the build stamp, so a failing QA run can name
+ * the build it failed on instead of "the one that was deployed at the time".
+ *
+ * `viewport` reports its size under BOTH `{w,h}` and `{width,height}`. That is
+ * not indecision: `__planetRush` is a SHARED handle — the layout registry
+ * (layout-registry.ts) merges its own surface onto whatever this module installed
+ * first, and its merge deliberately never clobbers a key the co-tenant already
+ * owns. So `viewport` stays this module's object, and the layout suite, which
+ * speaks the registry's `{width,height}` vocabulary, read `undefined` off it.
+ * Carrying both spellings on one object satisfies both contracts additively,
+ * with no reader anywhere needing to know which module answered.
  *
  * Updated in place every rendered frame. The handle is installed read-only
  * (non-writable, non-configurable) — QA reads it, nothing (game or test) reassigns
@@ -59,12 +72,20 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
+import { BUILD_INFO } from './build-info';
+import type { BuildInfo } from './build-info';
+
 /** The frozen shape of `window.__planetRush` (see the contract above). */
 export interface DebugState {
   readonly shipScreen: { x: number; y: number };
   readonly shipWorld: { x: number; y: number };
+  /** Visual-viewport size, CSS px. Carries BOTH spellings on purpose — see the
+   *  shared-handle note in {@link installDebugHook}. */
   readonly viewport: { w: number; h: number; width: number; height: number };
   readonly fps: number;
+  /** The build stamp this page is running (src/platform/build-info.ts). Fixed
+   *  for the life of the page — frozen, never rewritten per frame. */
+  readonly build: BuildInfo;
   /** Fixed sim steps executed since boot — monotonic, render-rate independent. */
   readonly ticks: number;
 }
@@ -112,11 +133,13 @@ export function isDebugEnabled(search: string): boolean {
 export function installDebugHook(
   search: string,
   target: Record<string, unknown> = globalThis as unknown as Record<string, unknown>,
+  build: BuildInfo = BUILD_INFO,
 ): DebugHook {
   if (!isDebugEnabled(search)) return NOOP_HOOK;
 
   // Mutable backing store; the readonly `DebugState` fields are overwritten in
   // place, never reassigned, so the exposed handle stays a stable read-only ref.
+  // `build` is the exception: a compile-time constant, frozen on the way in.
   const state = {
     shipScreen: { x: 0, y: 0 },
     shipWorld: { x: 0, y: 0 },
@@ -124,6 +147,7 @@ export function installDebugHook(
     // object as {width, height} (see the `viewport` note in the contract above).
     viewport: { w: 0, h: 0, width: 0, height: 0 },
     fps: 0,
+    build: Object.freeze({ ...build }),
     ticks: 0,
   };
 
@@ -160,6 +184,8 @@ export function installDebugHook(
       state.shipWorld.y = shipWorldY;
       state.viewport.w = viewportW;
       state.viewport.h = viewportH;
+      state.viewport.width = viewportW;
+      state.viewport.height = viewportH;
       state.viewport.width = viewportW; // alias — the layout registry's spelling
       state.viewport.height = viewportH;
       state.ticks = simTicks;

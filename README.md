@@ -23,6 +23,26 @@ npm test          # vitest (add -- run for a single pass)
 npm run build     # typecheck + production build to dist/
 ```
 
+## Which build am I playing?
+
+Every build is self-identifying — stamped at build time from git (short sha, ISO
+build time, dirty-tree flag) and surfaced four ways:
+
+- **Corner badge** — bottom-right, muted steel, `a1b2c3d · 09:07Z` (UTC). A
+  trailing `*` on the sha means the build was made from a dirty working tree.
+  Always visible; hidden only under `?freeze=1`, where golden screenshots need a
+  byte-deterministic frame.
+- **Console** — `Planet Rush build <sha> built <time>`, first line at boot.
+- **`version.json`** — emitted at the root of the build output (`{ sha, time }`)
+  and served uncached, for the studio dashboard's live-build freshness check.
+- **`?debug=1`** — `window.__planetRush.build` carries the same stamp, so a QA
+  failure can name the build it failed on.
+
+Put the sha in every bug report. Source: [`src/platform/build-info.ts`](./src/platform/build-info.ts)
+(client) and [`src/platform/build-stamp.ts`](./src/platform/build-stamp.ts)
+(build time). A checkout with no git history stamps `dev` rather than failing
+the build.
+
 ## CI, deploys & milestone pings
 
 Everything is driven by [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
