@@ -43,3 +43,4 @@ export * from './catalogue';
 export * from './svg';
 export * from './preview';
 export * from './textures';
+export * from './atlas';
