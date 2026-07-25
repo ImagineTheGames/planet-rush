@@ -24,6 +24,7 @@
 
 import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
+import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_WIDTH } from './healthbar';
 import type { HealthBar } from './healthbar';
@@ -37,11 +38,37 @@ export const HEALTHBAR_ANCHOR: AnchorSpec = { region: 'full' };
  *  as absence, not as nothing drawn. Steel, never a material colour of its own. */
 const TRACK_ALPHA = 0.28;
 
+/**
+ * One bar the layer actually drew this frame (post-cull), captured only when
+ * {@link HealthBarView.enableDebugCapture} has been called — the ?debug=1
+ * live-stage seam behind {@link HealthBarView.debugBars}. It exists because the
+ * enemy bars shipped dead twice: the model was green but nothing on a real boot
+ * proved a *drawn* bar tracked a damaged enemy. This lets a Playwright test read
+ * that out of the running client. Never allocated or written in a normal build.
+ */
+export interface DrawnHealthBar {
+  owner: PlayerId;
+  fraction: number;
+  /** Bar centre-x in screen space, CSS px (the entity the bar tracks). */
+  x: number;
+  /** Bar-top y in screen space, CSS px. */
+  y: number;
+}
+
 export class HealthBarView extends Container {
   private readonly bars: Graphics[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew — what the
    *  registry records (only what is actually on screen). */
   private drawnBounds: Rect | null = null;
+
+  // --- ?debug=1 live-stage capture (off in every normal build) -------------
+  /** When true, each drawn bar is recorded into {@link debugDrawn} for the
+   *  live-stage harness. Left false unless {@link enableDebugCapture} is called. */
+  private debugCapture = false;
+  /** Pooled drawn-bar snapshots (grows to fit, never shrinks) and the count that
+   *  drew last frame — read back by {@link debugBars}. */
+  private readonly debugDrawn: DrawnHealthBar[] = [];
+  private debugCount = 0;
 
   /**
    * Draw one frame of bars into the given viewport. `bars` come from
@@ -65,6 +92,7 @@ export class HealthBarView extends Container {
         continue;
       }
 
+      if (this.debugCapture) this.recordDebug(drawn, bar, top);
       const g = this.slot(drawn++);
       g.clear();
       // Track first, then the owner-colour fill over its left portion.
@@ -86,6 +114,38 @@ export class HealthBarView extends Container {
     this.hideFrom(drawn);
     this.drawnBounds =
       drawn > 0 ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null;
+    this.debugCount = this.debugCapture ? drawn : 0;
+  }
+
+  // --- ?debug=1 live-stage seam --------------------------------------------
+
+  /** Turn on capture of the drawn bars so {@link debugBars} reports them. The
+   *  live-stage harness (main.ts, only under ?debug=1) calls this once; a normal
+   *  build never does, so the record path stays cold. Idempotent. */
+  enableDebugCapture(): void {
+    this.debugCapture = true;
+  }
+
+  /** The bars that actually drew last frame (post-cull) — owner, fill fraction,
+   *  and screen position of each — for a live-stage test to assert a real bar
+   *  tracks a damaged enemy. Empty unless {@link enableDebugCapture} was called. */
+  debugBars(): DrawnHealthBar[] {
+    return this.debugDrawn.slice(0, this.debugCount);
+  }
+
+  /** Record one drawn bar into the reusable pool at `i` (grows to fit). Only
+   *  reached under {@link debugCapture}, so it costs nothing in a normal build. */
+  private recordDebug(i: number, bar: HealthBar, top: number): void {
+    let d = this.debugDrawn[i];
+    if (!d) {
+      d = { owner: bar.owner, fraction: bar.fraction, x: bar.x, y: top };
+      this.debugDrawn[i] = d;
+      return;
+    }
+    d.owner = bar.owner;
+    d.fraction = bar.fraction;
+    d.x = bar.x;
+    d.y = top;
   }
 
   /** The layer's registry entry — the union of the bars that drew, or nothing

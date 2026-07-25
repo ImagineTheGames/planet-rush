@@ -22,7 +22,7 @@
  */
 import { Application } from 'pixi.js';
 import { ShipClass } from '@shared/types';
-import type { Action, Vec2 } from '@shared/types';
+import type { Action, PlayerId, Vec2 } from '@shared/types';
 import {
   BEAM_RANGE,
   isCollapsed,
@@ -82,7 +82,7 @@ import {
   BUILD_BUTTON_ID,
   BUILD_BUTTON_ANCHOR,
 } from './ui';
-import type { HudFrame } from './ui';
+import type { HudFrame, Combatant } from './ui';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -171,6 +171,21 @@ async function boot(): Promise<void> {
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
   const hud = new Hud(app.screen.width, app.screen.height);
   app.stage.addChild(hud);
+
+  // --- Health-bar live-stage seam (?debug=1 only). The enemy over-ship health
+  //     bars shipped dead twice: the model was green but nothing on a real boot
+  //     proved a *drawn* bar tracked a damaged enemy. This exposes a read-only
+  //     `window.__healthbarStage` that a Playwright test drives to stage a bot
+  //     taking damage and read back the bars the real layer drew. It arms the
+  //     HUD's drawn-bar capture and, when a static frame is pinned (?freeze=1),
+  //     parks an enemy beside the local ship at a chosen fill so a bar must
+  //     appear. Behind ?debug=1, never present in a normal build, and it mutates
+  //     only the plain sim data the boot path already reads — it does not reach
+  //     into src/sim.
+  if (flags.debug) {
+    hud.enableHealthBarDebug();
+    installHealthbarStage();
+  }
 
   // --- Input: per-device control states, merged into one each frame.
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -315,6 +330,12 @@ async function boot(): Promise<void> {
     nearAsteroid: false,
   };
 
+  // --- Over-entity health-bar feed: a reused pool of mutable combatant records
+  //     and the frame array `feedCombatants()` fills each render, so the enemy
+  //     hull bars allocate nothing after warm-up (GDD §4.3). See feedCombatants.
+  const combatantPool: MutCombatant[] = [];
+  const combatantFrame: Combatant[] = [];
+
   // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
   //     tick, then hold it there so screenshots are deterministic across boots
   //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
@@ -365,6 +386,12 @@ async function boot(): Promise<void> {
 
       renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
       feedHud();
+      // Health bars over every non-local combat entity (GDD §2.2). Fed AFTER
+      // renderer.draw so the camera transform is current: each combatant's world
+      // position is projected to the same screen space the bars draw in. This is
+      // the wiring the M2 field report caught missing — the model and the layer
+      // were both right, but nothing ever handed the layer the enemies.
+      feedCombatants();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the viewport each frame so the idle
@@ -514,6 +541,118 @@ async function boot(): Promise<void> {
     hudFrame.shipClass = ship.shipClass;
     hudFrame.upgradeTiers = ship.tiers;
     hudFrame.shipPos = ship.pos;
+  }
+
+  /**
+   * Build this frame's over-entity health-bar feed from live sim state and hand
+   * it to the HUD (GDD §2.2 — the hull bar over every non-local ship, plus enemy
+   * turrets and hostile wave units). This is the boot-path wiring the field
+   * report caught missing: `src/ui/healthbar` decides *which* entities get a bar
+   * and what fill, but only if someone feeds it the entities — and until now
+   * nobody did, so the bars were dead on a real boot even though the model tests
+   * were green.
+   *
+   * Every enemy ship and every turret is offered; the pure model filters out the
+   * local player's own (by ownership) and anything full-and-idle, so passing them
+   * all is both correct and simplest. Positions are projected world → screen via
+   * the renderer's *actual* camera transform (`projectToScreen`, called after
+   * `renderer.draw`), so a bar sits exactly over the sprite and is a fixed screen
+   * size regardless of zoom — the camera renders 1:1, so a world radius is a
+   * screen radius.
+   *
+   * Allocation-free after warm-up (GDD §4.3): the combatant records are pooled
+   * and overwritten in place, and the frame array is reused. The count is bounded
+   * by the entity caps (≤8 ships, ≤32 turrets).
+   */
+  function feedCombatants(): void {
+    let n = 0;
+    for (const ship of world.ships) {
+      if (ship.id === LOCAL_PLAYER) continue; // the local ship never gets a bar
+      const c = combatantSlot(n++);
+      c.owner = ship.id;
+      c.hp = ship.hull;
+      c.maxHp = ship.maxHull;
+      c.alive = ship.alive;
+      c.inCombat = ship.beam !== null; // firing this tick (sim publishes the beam)
+      renderer.projectToScreen(ship.pos, c.pos);
+      c.radius = ship.radius;
+    }
+    for (const planet of world.planets) {
+      for (const turret of planet.turrets) {
+        if (turret.owner === LOCAL_PLAYER) continue; // own turrets: read off HOME HP
+        const c = combatantSlot(n++);
+        c.owner = turret.owner;
+        c.hp = turret.hp;
+        c.maxHp = turret.maxHp;
+        c.alive = turret.hp > 0;
+        c.inCombat = turret.muzzle != null; // loosing a shot this tick
+        renderer.projectToScreen(turret.pos, c.pos);
+        c.radius = turret.radius;
+      }
+    }
+    combatantFrame.length = 0;
+    for (let i = 0; i < n; i++) combatantFrame.push(combatantPool[i]!);
+    hudFrame.combatants = combatantFrame;
+  }
+
+  /** Pooled combatant record `i`, grown to fit and reused across frames so the
+   *  feed allocates nothing after warm-up (GDD §4.3). */
+  function combatantSlot(i: number): MutCombatant {
+    let c = combatantPool[i];
+    if (!c) {
+      c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0 };
+      combatantPool[i] = c;
+    }
+    return c;
+  }
+
+  /**
+   * Install `window.__healthbarStage` — the ?debug=1 live-stage seam a Playwright
+   * test drives to prove the enemy health bars are wired on a real boot. Two
+   * methods:
+   *
+   *  - `damageEnemy(fraction)` — park a live enemy ship a fixed offset from the
+   *    local ship and set its hull to `fraction` of max, so the health-bar model
+   *    must draw a bar over it (damaged ⇒ a bar). Best paired with `?freeze=1`,
+   *    which pins the sim so the staged frame holds still. Returns the staged
+   *    enemy's slot and the exact fill it was left at, or null if there is no
+   *    enemy to stage.
+   *  - `bars()` — the bars the real layer actually drew last frame (owner, fill,
+   *    screen position), read back so the test can assert one tracks the enemy.
+   *
+   * Mutating `hull`/`pos` here is a debug-only staging affordance, not gameplay:
+   * it writes the same plain sim data the render loop already reads every frame,
+   * and lives entirely behind ?debug=1.
+   */
+  function installHealthbarStage(): void {
+    const stage = {
+      damageEnemy(fraction: number): { owner: PlayerId; fraction: number } | null {
+        const local = world.ships.find(isLocalShip);
+        const enemy = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
+        if (!local || !enemy) return null;
+        // Beside the local ship, which the camera holds centred, so the bar is on
+        // screen and un-culled for any sane viewport.
+        enemy.pos.x = local.pos.x + 120;
+        enemy.pos.y = local.pos.y;
+        enemy.alive = true;
+        const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+        enemy.hull = f * enemy.maxHull;
+        return { owner: enemy.id, fraction: enemy.hull / enemy.maxHull };
+      },
+      bars(): ReturnType<typeof hud.debugHealthBars> {
+        return hud.debugHealthBars();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__healthbarStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
   }
 
   /** Refresh the layout registry from this frame's drawn state (debug only).
@@ -717,6 +856,19 @@ async function boot(): Promise<void> {
 const SHIP_ANCHOR: AnchorSpec = { region: 'center' };
 const LEFT_STICK_ANCHOR: AnchorSpec = { region: 'left-half-bottom', margin: 8 };
 const RIGHT_STICK_ANCHOR: AnchorSpec = { region: 'right-half-bottom', margin: 8 };
+
+/** A mutable {@link Combatant} — the pooled records `feedCombatants()` overwrites
+ *  in place each frame. A `Combatant`'s fields are readonly to the consumer, so
+ *  the writable pool is typed here and handed over as `Combatant`. */
+interface MutCombatant {
+  owner: PlayerId;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  inCombat: boolean;
+  pos: Vec2;
+  radius: number;
+}
 
 const EMPTY_BEAMS: BeamView[] = [];
 
