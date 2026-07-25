@@ -406,6 +406,7 @@ async function boot(): Promise<void> {
     hud.enableHealthBarDebug();
     installHealthbarStage();
     installOreDepositStage();
+    installOreHudStage();
     installEndScreenStage();
   }
 
@@ -1134,6 +1135,93 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__oreDepositStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__oreHudStage` — the ?debug=1 live-stage seam for the ore-HUD
+   * split field rule (*"show ore held on ship under the ship, not top left — top
+   * left is to show total ore"*). The held-ore squares moved under the ship as a
+   * pooled, screen-space indicator; the top-left now shows only the banked TOTAL.
+   * The pure models are unit-green, but only booting the real bundle proves the
+   * HUD *draws* a hold indicator that tracks the ship and a total that rises as
+   * the hold deposits — the same reason `__healthbarStage` and `__oreDepositStage`
+   * exist. It runs WITHOUT ?freeze=1, because the deposit phase watches the LIVE
+   * sim drain the hold into the bank. Methods:
+   *
+   *  - `mine(ore)` — stage a carried hold *away from home* so the deposit rule
+   *    does not touch it: park the LOCAL ship at rest far from its planet with
+   *    `ore` in the hold (widening the bay to fit). The camera still holds it at
+   *    screen centre, so the under-ship indicator must appear there. Returns the
+   *    staged hold/cap/bank, or null if there is no local ship/planet.
+   *  - `dock(ore)` — park the LOCAL ship at rest *at* its own planet with `ore` in
+   *    the hold, starting the sim's auto-deposit drain (the same staging the
+   *    ore-deposit seam uses). Returns the staged hold/bank.
+   *  - `hold()` — the under-ship hold indicator the HUD actually drew this frame
+   *    (screen position + pip counts), or null when hidden — read back to assert
+   *    the indicator tracks the ship's screen position and its filled count
+   *    matches sim hold.
+   *  - `total()` — the banked TOTAL the top-left actually drew this frame.
+   *  - `readout()` — the live hold and bank the sim holds this frame.
+   *
+   * Like its siblings it mutates only the plain sim data the boot path already
+   * reads every frame, lives entirely behind ?debug=1, and never reaches into
+   * src/sim — the deposit rule is sim-owned; this only stages inputs to it and
+   * reads back what the HUD (src/ui) drew.
+   */
+  function installOreHudStage(): void {
+    const stage = {
+      mine(ore: number): { cargo: number; cargoCap: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        // Far from home and at rest, so the docked-and-parked deposit rule leaves
+        // the staged hold intact — the mine phase asserts the indicator appears
+        // with the hold it was given, not one that is already draining.
+        ship.pos.x = planet.pos.x + 900;
+        ship.pos.y = planet.pos.y + 900;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        if (ore > ship.cargoCap) ship.cargoCap = ore; // widen the bay to fit the stage
+        ship.cargo = ore;
+        return { cargo: ship.cargo, cargoCap: ship.cargoCap, banked: ship.banked };
+      },
+      dock(ore: number): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        // Settle clear of the planet's collider, at rest, inside dock range — the
+        // sim's auto-deposit rule takes it from here (same staging as ore-deposit).
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        if (ore > ship.cargoCap) ship.cargoCap = ore;
+        ship.cargo = ore;
+        return { cargo: ship.cargo, banked: ship.banked };
+      },
+      hold(): ReturnType<typeof hud.debugOreHold> {
+        return hud.debugOreHold();
+      },
+      total(): number {
+        return hud.debugBankedTotal();
+      },
+      readout(): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        return ship ? { cargo: ship.cargo, banked: ship.banked } : null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__oreHudStage', {
         value: stage,
         writable: false,
         configurable: false,
