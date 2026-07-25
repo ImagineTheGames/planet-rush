@@ -29,18 +29,29 @@ interface MainMenuSeam {
   visible: boolean;
   /** Which screen owns the menu — 'menu' or 'settings'. */
   screen: 'menu' | 'settings';
-  /** Flipped true only once `boot()` has actually built the match world. */
+  /** Flipped true only once `boot()` has actually built the match world — which,
+   *  since M4, is after the LOBBY's RUSH!, not directly on PLAY (see below). */
   matchStarted: boolean;
   /** Activate PLAY as a real tap would — resolves boot's `untilPlay()`. */
   play(): void;
 }
+/** The lobby seam PLAY now hands off to (src/main.ts `openLobby`) — the M4 gate
+ *  between the menu and the match. This spec only needs to see it appear and to
+ *  RUSH! through it. */
+interface LobbySeam {
+  visible: boolean;
+  rush(): void;
+}
 interface StageWindow {
   __mainMenu?: MainMenuSeam;
+  __lobby?: LobbySeam;
   __planetRush?: unknown;
 }
 declare const window: Window & StageWindow;
 
-test('a clean boot lands on the main menu and builds no match world until PLAY', async ({ page }) => {
+test('a clean boot lands on the main menu; PLAY opens the lobby, RUSH builds the world', async ({
+  page,
+}) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
 
@@ -67,24 +78,35 @@ test('a clean boot lands on the main menu and builds no match world until PLAY',
   const debugPresent = await page.evaluate(() => '__planetRush' in window);
   expect(debugPresent, 'the ?debug=1 instrument must be absent on a clean boot').toBe(false);
 
-  // Press PLAY (the debug hook the field report §4 permits) — the match world is
-  // built only now.
+  // Press PLAY. Since M4 this no longer builds the world — it dismisses the menu
+  // and hands off to the LOBBY (GDD §2.1: MAIN MENU → PLAY → LOBBY). The world is
+  // still NOT built: the lobby's RUSH! gates it.
   await page.evaluate(() => window.__mainMenu!.play());
-
-  // The world is built: the seam's matchStarted flips true (main.ts calls
-  // handle.matchStarted() right after bootOfflineMatch). This is the assertion
-  // that proves PLAY — not boot — starts the match.
-  await page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, {
+  await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, {
     timeout: 20_000,
   });
   const afterPlay = await page.evaluate(() => ({
-    visible: window.__mainMenu!.visible,
+    menuVisible: window.__mainMenu!.visible,
     matchStarted: window.__mainMenu!.matchStarted,
+    lobbyVisible: window.__lobby!.visible,
   }));
-  expect(afterPlay.matchStarted, 'PLAY builds the match world').toBe(true);
-  expect(afterPlay.visible, 'the menu is dismissed once PLAY builds the match').toBe(false);
+  expect(afterPlay.menuVisible, 'the menu is dismissed once PLAY opens the lobby').toBe(false);
+  expect(afterPlay.lobbyVisible, 'the lobby is on screen after PLAY').toBe(true);
+  expect(afterPlay.matchStarted, 'PLAY opens the lobby — the world is not built until RUSH').toBe(
+    false,
+  );
 
-  expect(pageErrors, 'no page errors across the menu → match transition').toEqual([]);
+  // RUSH! runs the countdown and boots the match: matchStarted flips true only now
+  // (main.ts calls the menu handle's matchStarted() right after bootOfflineMatch).
+  // This is the assertion that proves the world is built by the lobby, not by boot.
+  await page.evaluate(() => window.__lobby!.rush());
+  await page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, {
+    timeout: 20_000,
+  });
+  const afterRush = await page.evaluate(() => window.__mainMenu!.matchStarted);
+  expect(afterRush, 'RUSH! builds the match world').toBe(true);
+
+  expect(pageErrors, 'no page errors across the menu → lobby → match transition').toEqual([]);
 });
 
 test('?debug=1 skips the menu and boots straight into a match', async ({ page }) => {

@@ -106,17 +106,30 @@ import {
   createSettings,
   toggleReduceVfx,
   adjustVolume,
+  LobbyView,
+  createLobby,
+  lobbyModel,
+  lobbyLayout,
+  tickLobby,
+  pressRush,
+  selectShipClass,
+  cycleBotDifficulty,
+  DEFAULT_SHIP_CLASS,
+  CLASS_ORDER,
 } from './ui';
-import type { HudFrame, Combatant, SettingsState, SettingsTarget, MainMenuOption } from './ui';
+import type { HudFrame, Combatant, SettingsState, SettingsTarget, MainMenuOption, LobbyState } from './ui';
+import { OFFLINE_ROOM } from './net';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
+/** Where the last hull picked in the lobby is remembered, so a returning player
+ *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
+ *  storage seam as the fire mode, so both survive a reload identically. */
+const SHIP_CLASS_KEY = 'planet-rush:shipClass';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
  *  arena, which is also what makes a bug report reproducible. */
 const MATCH_SEED = 1;
-/** The onboarding default hull (GDD §2.11) — the lobby's job from M4. */
-const LOCAL_SHIP_CLASS = ShipClass.Vanguard;
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -229,20 +242,43 @@ async function boot(): Promise<void> {
   //     the immediate-match boot they assert against (field report §3, §5). PLAY
   //     is the only path here that reaches `bootOfflineMatch`; SETTINGS reuses
   //     the Day-7 settings screen. The whole screen is `src/ui`'s; this awaits it.
-  const mainMenu = flags.debug
-    ? null
-    : openMainMenu(app, platform, {
-        root: gameRoot,
-        logicalSize: () => ({ w: transform.logicalWidth, h: transform.logicalHeight }),
-        toLogical,
-        toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
-        recomputeTransform,
-        isRotated: () => transform.rotated,
-        // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
-        // native landscape lock here. A no-op on desktop and where unsupported.
-        enterImmersive: () => fullscreen.enter(),
-      });
+  // The landscape-lock context both front-of-match screens (menu, then lobby)
+  // lay out against: they attach to the rotating game root, read the live logical
+  // (landscape) viewport, and remap their own taps through it.
+  const frontCtx: MenuContext = {
+    root: gameRoot,
+    logicalSize: () => ({ w: transform.logicalWidth, h: transform.logicalHeight }),
+    toLogical,
+    toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
+    recomputeTransform,
+    isRotated: () => transform.rotated,
+    // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
+    // native landscape lock here. A no-op on desktop and where unsupported.
+    enterImmersive: () => fullscreen.enter(),
+  };
+
+  const mainMenu = flags.debug ? null : openMainMenu(app, platform, frontCtx);
   if (mainMenu) await mainMenu.untilPlay();
+
+  // --- The lobby (GDD §2.1, §2.11; M4). PLAY lands here, not in the match: the
+  //     8-slot roster (your seat plus the seven-character bot cast, hulls and
+  //     personalities visible), the four hull tiles, and RUSH!. The hull you pick
+  //     here is the hull you fly — it is threaded into `bootOfflineMatch` below,
+  //     so the ship the sim builds IS the choice, not a hardcoded default (the M4
+  //     dark-matter bug: the lobby merged in #39 and PLAY never reached it).
+  //
+  //     Offline flavour: the room-code UI is hidden (`online: false`) until the
+  //     WebSocket lobby is wired (M3/online) — the empty seats are the bot cast,
+  //     not seats a second player can join. The map picker (m8-02) drops into this
+  //     same screen once it lands; there is a clear seam for it here.
+  //
+  //     `?debug=1` skips the lobby exactly as it skips the menu (harness
+  //     contract): the match boots straight in with the persisted-or-default hull,
+  //     so the frozen goldens and every existing harness keep their immediate boot.
+  const lobby = flags.debug ? null : openLobby(app, platform, frontCtx);
+  const chosenShipClass = lobby ? await lobby.untilRush() : readShipClass(platform);
+  // Persist the pick so a returning player finds it pre-selected (GDD §2.11).
+  if (lobby) platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
   //     and the seven empty seats are filled by the cast (`src/bots`), each
@@ -259,7 +295,7 @@ async function boot(): Promise<void> {
   const match = bootOfflineMatch({
     seed: MATCH_SEED,
     localPlayer: LOCAL_PLAYER,
-    shipClass: LOCAL_SHIP_CLASS,
+    shipClass: chosenShipClass,
   });
   const world = match.world;
 
@@ -267,6 +303,11 @@ async function boot(): Promise<void> {
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
+  // Hand the lobby seam the hull the sim ACTUALLY built the local ship with, read
+  // back off the world — the assertion that the picked class reached the sim
+  // (GDD §2.11; the M4 debug hook the live-stage spec reads). A no-op under
+  // ?debug=1, where there was no lobby.
+  lobby?.matchStarted(world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass);
 
   // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
   //     with everything else under the landscape lock. The camera centres on the
@@ -1268,6 +1309,19 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
   return defaultFireMode(isTouch);
 }
 
+/** The hull to pre-select in the lobby: the last one this player chose, or the
+ *  Vanguard default the first time out (GDD §2.11 — "the pre-selected default so
+ *  onboarding never blocks on the choice", plus "persist last choice"). Validated
+ *  against the enum so a stale or hand-edited storage value can never seat a hull
+ *  the sim does not know. Read through the same platform seam as the fire mode. */
+function readShipClass(platform: ReturnType<typeof createBrowserPlatform>): ShipClass {
+  const stored = platform.storage.get(SHIP_CLASS_KEY);
+  if (stored !== null && (Object.values(ShipClass) as string[]).includes(stored)) {
+    return stored as ShipClass;
+  }
+  return DEFAULT_SHIP_CLASS;
+}
+
 /** Combine one device's control state into the accumulator: strongest thrust
  *  wins, latest aim wins, held states OR together (GDD §2.4 auto device-switch). */
 function mergeControl(dst: ControlState, src: ControlState): void {
@@ -1536,6 +1590,255 @@ function openMainMenu(
 function installMainMenuSeam(seam: object): void {
   try {
     Object.defineProperty(window, '__mainMenu', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
+}
+
+/** What `boot()` holds the lobby by: a promise resolving with the hull the
+ *  player locked in at RUSH!, and a one-shot `matchStarted()` the boot path calls
+ *  once the world is built, to hand the seam the class the sim actually flew. */
+interface LobbyHandle {
+  /** Resolves the moment the RUSH! countdown reaches zero, with the chosen hull —
+   *  `boot()` builds the world with it (GDD §2.11). */
+  untilRush(): Promise<ShipClass>;
+  /** Report the hull the built world gave the local ship — the proof the picked
+   *  class reached the sim (drives `window.__lobby.localShipClass`). */
+  matchStarted(worldShipClass: ShipClass): void;
+}
+
+/** The read-only `window.__lobby` live-stage seam: the lobby as plain,
+ *  structured-cloneable truth, plus two drive methods a Playwright test presses
+ *  as taps would (tests/live-stage/lobby-flow.spec.ts). Present only on a clean
+ *  boot; absent under `?debug=1`, where the lobby never runs. */
+interface LobbySeam {
+  /** The lobby layer is up (true until RUSH! hands the screen to the match). */
+  visible: boolean;
+  /** Seats laid out — eight (GDD §2.1). */
+  slotCount: number;
+  /** Laid out at thumb scale (the phone case). */
+  isTouch: boolean;
+  /** Joinable over the wire — false offline, so the room code is hidden. */
+  online: boolean;
+  /** The hull currently selected — the tile drawn as chosen. */
+  selectedClass: ShipClass;
+  /** The onboarding default (Vanguard), so a test can pick anything *but* it. */
+  defaultClass: ShipClass;
+  /** Hull order, so a test maps a tile index to a class the way the view does. */
+  classOrder: readonly ShipClass[];
+  /** The logical (landscape) viewport the lobby laid out against. */
+  logicalViewport: { width: number; height: number };
+  /** The content box the lobby drew inside — the layout-registry `full` rect,
+   *  reported here so a clean boot (no `?debug=1` registry) can still assert the
+   *  lobby sits inside the safe viewport. */
+  content: Rect;
+  /** One roster row's height — a thumb-size assertion target. */
+  seatHeight: number;
+  /** RUSH!'s height — likewise. */
+  rushHeight: number;
+  /** True while the RUSH! countdown is running. */
+  counting: boolean;
+  /** The hull the built world gave the local ship, or null until the match boots
+   *  — the debug hook that proves the pick reached the sim (GDD §2.11). */
+  localShipClass: ShipClass | null;
+  /** Select the hull tile at `index` in {@link classOrder} — a tap on a tile. */
+  selectClass(index: number): void;
+  /** Press RUSH! — starts the countdown that boots the match. */
+  rush(): void;
+}
+
+/**
+ * The lobby (GDD §2.1, §2.11; M4). Shown after PLAY on a clean boot — `boot()`
+ * skips it under `?debug=1`, which drops straight into a match with the
+ * persisted-or-default hull so every existing harness keeps its immediate boot.
+ *
+ * Offline flavour: opened with `online: false`, so the room-code UI is hidden and
+ * the empty seats read as the bot cast rather than joinable slots — there is no
+ * transport for a second player to arrive on until the WebSocket lobby is wired.
+ * The local player is seat 0 and the host, so hull selection, per-seat difficulty
+ * cycling, and RUSH! are all live.
+ *
+ * The pure model/geometry/view are `src/ui`'s ({@link LobbyView}, `lobbyModel`,
+ * `lobbyLayout`); this function is the *wiring* — screen state, input routing,
+ * the countdown clock off Pixi's ticker, and teardown. A read-only
+ * `window.__lobby` seam lets the live-stage suite drive it and read back the hull
+ * the sim ended up flying.
+ */
+function openLobby(
+  app: Application,
+  platform: ReturnType<typeof createBrowserPlatform>,
+  ctx: MenuContext,
+): LobbyHandle {
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  // Offline solo-vs-bots: seat 0 is you and the host; the room code is hidden
+  // (`online: false`); the pre-selected hull is your last pick (GDD §2.11).
+  let state: LobbyState = createLobby({
+    room: OFFLINE_ROOM,
+    you: LOCAL_PLAYER,
+    host: LOCAL_PLAYER,
+    shipClass: readShipClass(platform),
+    online: false,
+  });
+  let resolved = false;
+
+  const size0 = ctx.logicalSize();
+  const view = new LobbyView(size0.w, size0.h, isTouch);
+  ctx.root.addChild(view);
+
+  const seam: LobbySeam = {
+    visible: true,
+    slotCount: 0,
+    isTouch,
+    online: false,
+    selectedClass: state.shipClass,
+    defaultClass: DEFAULT_SHIP_CLASS,
+    classOrder: CLASS_ORDER,
+    logicalViewport: { width: size0.w, height: size0.h },
+    content: { x: 0, y: 0, width: 0, height: 0 },
+    seatHeight: 0,
+    rushHeight: 0,
+    counting: false,
+    localShipClass: null,
+    selectClass: (index: number): void => selectClassAt(index),
+    rush: (): void => rush(),
+  };
+
+  let resolveRush: (cls: ShipClass) => void = () => {};
+  const rushPromise = new Promise<ShipClass>((resolve) => {
+    resolveRush = resolve;
+  });
+
+  /** Redraw the lobby from current state and refresh the seam's layout facts. */
+  function render(): void {
+    const model = lobbyModel(state);
+    view.update(model);
+    const { w, h } = ctx.logicalSize();
+    const layout = lobbyLayout({ width: w, height: h }, { isTouch });
+    seam.visible = view.visible;
+    seam.slotCount = layout.seats.length;
+    seam.online = model.online;
+    seam.selectedClass = state.shipClass;
+    seam.logicalViewport = { width: w, height: h };
+    seam.content = { ...layout.content };
+    seam.seatHeight = layout.seats[0]?.height ?? 0;
+    seam.rushHeight = layout.rushButton.height;
+    seam.counting = model.countdown.active;
+  }
+
+  /** Pick the hull tile at `index` (a tap on a tile). Refused after RUSH!, where
+   *  {@link selectShipClass} returns the same state and the choice is locked. */
+  function selectClassAt(index: number): void {
+    if (resolved) return;
+    const shipClass = CLASS_ORDER[index];
+    if (shipClass === undefined) return;
+    state = selectShipClass(state, shipClass);
+    render();
+  }
+
+  /** Press RUSH! — starts the countdown (offline you are the host, so it always
+   *  takes). A no-op once counting or once the match has been handed the screen. */
+  function rush(): void {
+    if (resolved) return;
+    const next = pressRush(state);
+    if (next === state) return;
+    state = next;
+    render();
+  }
+
+  /** Advance the countdown off Pixi's render ticker (the only clock running
+   *  pre-match — the fixed-timestep game loop starts after the lobby resolves).
+   *  On the frame it reaches zero, the match owns the screen and the hull locks. */
+  function onTick(): void {
+    if (state.phase !== 'counting') return;
+    state = tickLobby(state, app.ticker.deltaMS / 1000);
+    render();
+    if (state.phase === 'started' && !resolved) {
+      resolved = true;
+      const chosen = state.shipClass;
+      teardown();
+      seam.visible = false;
+      resolveRush(chosen);
+    }
+  }
+
+  function onPointerDown(e: PointerEvent): void {
+    // Un-rotate the physical tap into the logical space the lobby is drawn in
+    // (landscape lock), then test it against the same geometry the view drew.
+    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+    const hit = view.hitTest(x, y);
+    if (!hit) return;
+    switch (hit.kind) {
+      case 'class':
+        selectClassAt(hit.index);
+        break;
+      case 'seat':
+        // Host taps a bot row to cycle its difficulty (GDD §2.1). A no-op on your
+        // own row and — offline you are always host — never refused for that.
+        state = cycleBotDifficulty(state, hit.index);
+        render();
+        break;
+      case 'rush':
+        rush();
+        break;
+      case 'roomCode':
+        break; // hidden offline; nothing to copy
+    }
+    e.preventDefault();
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    // Enter or Space is RUSH! — a keyboard player never reaches for the mouse to
+    // start, the same courtesy the main menu gives PLAY.
+    if (e.code === 'Enter' || e.code === 'Space') rush();
+  }
+
+  function relayout(): void {
+    ctx.recomputeTransform();
+    const { w, h } = ctx.logicalSize();
+    view.resize(w, h, isTouch);
+    render();
+  }
+
+  function teardown(): void {
+    app.ticker.remove(onTick);
+    app.canvas.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('resize', relayout);
+    window.removeEventListener('orientationchange', relayout);
+    window.visualViewport?.removeEventListener('resize', relayout);
+    ctx.root.removeChild(view);
+    view.destroy({ children: true });
+  }
+
+  app.ticker.add(onTick);
+  app.canvas.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
+  window.visualViewport?.addEventListener('resize', relayout);
+
+  installLobbySeam(seam);
+  render();
+
+  return {
+    untilRush: () => rushPromise,
+    matchStarted: (worldShipClass: ShipClass): void => {
+      seam.localShipClass = worldShipClass;
+    },
+  };
+}
+
+/** Install the read-only `window.__lobby` live-stage seam (see {@link openLobby}).
+ *  Its fields are mutated in place as the lobby runs and after the match boots;
+ *  the handle itself is fixed, like the menu and fullscreen seams. */
+function installLobbySeam(seam: object): void {
+  try {
+    Object.defineProperty(window, '__lobby', {
       value: seam,
       writable: false,
       configurable: false,

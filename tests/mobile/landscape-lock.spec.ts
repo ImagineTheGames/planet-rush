@@ -212,7 +212,7 @@ test('a physical touch lands on the logical PLAY control (touch remapped through
   expect(target.y).toBeLessThanOrEqual(vp.height);
 
   // Tap the physical spot the logical PLAY button occupies. The DOM edge un-rotates
-  // it back to the logical PLAY rect, hit-tests PLAY, and boots the match world.
+  // it back to the logical PLAY rect, hit-tests PLAY, and opens the lobby.
   const client: CDPSession = await page.context().newCDPSession(page);
   try {
     await client.send('Input.dispatchTouchEvent', {
@@ -224,8 +224,16 @@ test('a physical touch lands on the logical PLAY control (touch remapped through
     await client.detach();
   }
 
-  // PLAY is the one door that builds a match world (main.ts) — matchStarted flips
-  // only after the world is actually assembled, so this proves the tap landed.
+  // Since M4, PLAY opens the LOBBY between the menu and the match (GDD §2.1). The
+  // lobby seam appearing proves the tap landed on PLAY — the un-rotation worked —
+  // and RUSH! through it then builds the match world (matchStarted flips true),
+  // which is the end of the same chain this test was always asserting.
+  await page.waitForFunction(
+    () => typeof (window as unknown as { __lobby?: { rush(): void } }).__lobby?.rush === 'function',
+    undefined,
+    { timeout: 15_000 },
+  );
+  await page.evaluate(() => (window as unknown as { __lobby: { rush(): void } }).__lobby.rush());
   await page.waitForFunction(
     () => (window as unknown as { __mainMenu?: MenuSeam }).__mainMenu?.matchStarted === true,
     undefined,
