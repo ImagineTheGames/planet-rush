@@ -41,9 +41,11 @@ import {
   BEAM_RANGE,
   BOOST_MULTIPLIER,
   CHUNK,
+  DEPOSIT,
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   HASH_CELL_SIZE,
+  PLANET,
   SHIP_ASTEROID_RESTITUTION,
   SPAWN_PROTECTION_S,
   TICK_DT,
@@ -54,7 +56,9 @@ import {
   buyUpgrade,
   damagePlanet,
   damageTurret,
+  isDocked,
   placeOrder,
+  planetOf,
   planetTargetRadius,
   sweepDeadTurrets,
   updatePlanets,
@@ -64,7 +68,7 @@ import {
 import { damageShip } from './damage';
 import { updateMatch } from './match';
 import { SpatialHash } from './spatial-hash';
-import type { Asteroid, Ship, World } from './state';
+import type { Asteroid, OreChunk, Planet, Ship, World } from './state';
 import {
   refreshDerivedStats,
   shipAccel,
@@ -264,7 +268,14 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   updateTurrets(world, dt);
   updateProjectiles(world, dt);
 
-  // 9. Chunk drift + proximity tractor collection (GDD §2.3).
+  // 8b. Auto-deposit: a ship docked at its own planet drains its hold into the
+  //     safe bank at a steady rate and spins off the ore-flight chunks that show
+  //     it (field report v0.1.2; GDD §2.3, §2.5). Before the chunk update, so a
+  //     courier emitted this tick starts its flight home this tick.
+  updateDeposits(world, dt);
+
+  // 9. Chunk drift + proximity tractor collection (GDD §2.3), and the homing of
+  //    deposit couriers spun off just above.
   updateChunks(world, dt);
 
   // 10. End-of-tick cleanup: depleted asteroids and turrets killed this tick.
@@ -761,6 +772,13 @@ function spawnChunk(world: World, a: Asteroid, ship: Ship, amount: number): void
 function updateChunks(world: World, dt: number): void {
   const range2 = TRACTOR.range * TRACTOR.range;
   for (const chunk of world.chunks) {
+    // Deposit couriers fly home and are absorbed, and are never tractored or
+    // collected — the ore they represent already left the hold for the bank in
+    // `updateDeposits`, so grabbing one back would double-count it.
+    if (chunk.deposit) {
+      updateDepositFlight(chunk, dt);
+      continue;
+    }
     // Nearest alive ship *with room in its hold* within tractor range pulls the
     // chunk in. A full hold never attracts: chunks stay where they are for
     // anyone (GDD §2.3). A chunk in flight toward a ship whose hold fills
@@ -804,8 +822,92 @@ function updateChunks(world: World, dt: number): void {
     }
   }
 
-  // Drop emptied chunks.
+  // Drop emptied chunks (collected mines and arrived deposit couriers alike).
   world.chunks = world.chunks.filter((c) => c.amount > 1e-9);
+}
+
+// ---------------------------------------------------------------------------
+// Auto-deposit at your own planet (field report v0.1.2; GDD §2.3, §2.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * While a ship sits docked at its own living planet, drain its hold into the
+ * safe banked total at `DEPOSIT.drainRate` and, on a fixed tick cadence, spin
+ * off a courier chunk that flies ship→planet to show it. Undock (or empty the
+ * hold, or lose the planet) and the drain simply stops the next tick — the
+ * transfer is readable and interruptible, exactly as the field report asks.
+ *
+ * The transfer is authoritative here (hold and bank are the truth the HUD ticks
+ * off); the couriers are cosmetic and carry no ore, so this can never bank more
+ * than the hold held. Deterministic: the cadence is keyed to the integer tick,
+ * the courier's heading is pure geometry, and no RNG is drawn.
+ */
+function updateDeposits(world: World, dt: number): void {
+  // Interval → whole ticks on the canonical grid, so the cadence is the same
+  // whatever `dt` a caller steps at (part of the determinism contract).
+  const flightEvery = Math.max(1, Math.round(DEPOSIT.flightInterval / TICK_DT));
+  const emitThisTick = world.tick % flightEvery === 0;
+  const parkSpeed2 = DEPOSIT.parkSpeed * DEPOSIT.parkSpeed;
+  for (const ship of world.ships) {
+    if (!ship.alive || ship.cargo <= 1e-9) continue;
+    // Parked, not skimming: you unload when you settle at your planet, not when
+    // you clip dock range at cruise on the way somewhere else.
+    if (ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y > parkSpeed2) continue;
+    const planet = planetOf(world, ship.id);
+    if (!planet || !planet.alive || !isDocked(ship, planet)) continue;
+
+    // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
+    const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);
+    ship.cargo -= moved;
+    ship.banked += moved;
+    if (ship.cargo < 1e-9) ship.cargo = 0;
+
+    // The telegraph: a courier chunk leaves the hull for the planet.
+    if (emitThisTick) spawnDepositFlight(world, ship, planet);
+  }
+}
+
+/** Spin off one ore-flight courier from `ship` toward `planet`. Pooled through
+ *  the same chunk array (and the same renderer) as mined ore; flagged `deposit`
+ *  so it is homed and absorbed rather than tractored (see {@link updateChunks}). */
+function spawnDepositFlight(world: World, ship: Ship, planet: Planet): void {
+  const dir = normalize({ x: planet.pos.x - ship.pos.x, y: planet.pos.y - ship.pos.y });
+  world.chunks.push({
+    id: world.nextEntityId++,
+    pos: { x: ship.pos.x, y: ship.pos.y },
+    vel: { x: dir.x * DEPOSIT.flightSpeed, y: dir.y * DEPOSIT.flightSpeed },
+    // Cosmetic: one chunk's worth of sprite, not one chunk's worth of ore — the
+    // ore already moved in `updateDeposits`. Zeroed on arrival to be swept.
+    amount: CHUNK.ore,
+    radius: CHUNK.radius,
+    deposit: true,
+    homeTo: { x: planet.pos.x, y: planet.pos.y },
+  });
+}
+
+/** Fly a deposit courier straight at its planet and mark it spent on arrival.
+ *  Re-homed every tick because the docked ship it left may still be drifting to
+ *  rest, so the stream reads as a clean line into the core. */
+function updateDepositFlight(chunk: OreChunk, dt: number): void {
+  const home = chunk.homeTo;
+  if (!home) {
+    chunk.amount = 0; // malformed courier (no target): drop it this sweep
+    return;
+  }
+  const dx = home.x - chunk.pos.x;
+  const dy = home.y - chunk.pos.y;
+  const d2 = dx * dx + dy * dy;
+  // Reached the planet surface: the bank already holds this ore, so the courier
+  // is absorbed — zero its amount for the end-of-tick sweep in `updateChunks`.
+  if (d2 <= PLANET.radius * PLANET.radius) {
+    chunk.amount = 0;
+    return;
+  }
+  const d = Math.sqrt(d2);
+  chunk.vel.x = (dx / d) * DEPOSIT.flightSpeed;
+  chunk.vel.y = (dy / d) * DEPOSIT.flightSpeed;
+  chunk.pos.x += chunk.vel.x * dt;
+  chunk.pos.y += chunk.vel.y * dt;
 }
 
 // ---------------------------------------------------------------------------

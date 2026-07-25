@@ -124,6 +124,20 @@ export interface OreChunk {
   /** Ore value carried. */
   amount: number;
   radius: number;
+  /**
+   * Deposit-flight chunk (field report v0.1.2): a ship docked at its own planet
+   * spins these off as its hold drains into the bank, and they fly to `homeTo`
+   * and vanish on arrival. They are the *telegraph*, not the ore — the drain
+   * itself is authoritative on `Ship.cargo`/`banked`, so a flight chunk carries
+   * no economic weight: the tractor never grabs it, no ship ever collects it,
+   * and it is absorbed silently at the planet. Optional and unset on a normal
+   * mined chunk, so the renderer (which draws every chunk by `pos`) and the net
+   * codec keep working unchanged — the same backward-compatible discipline as
+   * `Turret.muzzle`.
+   */
+  deposit?: boolean;
+  /** Where a `deposit` flight is headed — its planet's centre. Unset otherwise. */
+  homeTo?: Vec2;
 }
 
 // --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------

@@ -34,6 +34,12 @@ import type { Insets } from './menu-geometry';
 // The outcome, and what it means for you
 // ---------------------------------------------------------------------------
 
+/** How a core fell — the DEFEATED overlay's cause line (field report v0.1.2).
+ *  The sim does not attribute a killing blow, so this is the coarse truth it
+ *  *does* know: a rival finished you (`destroyed`) or the field's collapse did
+ *  (`collapse`). Left off when the seat that built the outcome can't say. */
+export type DeathCause = 'destroyed' | 'collapse';
+
 /** How a match ended, from one player's seat. */
 export interface MatchOutcome {
   /** The seat reading this summary — whose victory or defeat it is. */
@@ -44,6 +50,14 @@ export interface MatchOutcome {
   /** `true`: the whole match is over. `false`: you were eliminated and the
    *  others fight on — the case that still has something to spectate. */
   readonly matchOver: boolean;
+  /** 1-based finishing place on an elimination — the "6th" of "6th of 8" (field
+   *  report v0.1.2). First core to fall places last; the lone survivor is 1st.
+   *  Omitted (and the placement line dropped) when the wiring didn't supply it. */
+  readonly placement?: number;
+  /** How many seats the match started with — the "8" of "6th of 8". */
+  readonly totalPlayers?: number;
+  /** Why your core fell, for the DEFEATED overlay's cause line. */
+  readonly cause?: DeathCause;
 }
 
 /** What the summary says happened. */
@@ -60,9 +74,10 @@ export function endKind(outcome: MatchOutcome): EndKind {
 // The two buttons
 // ---------------------------------------------------------------------------
 
-/** The summary's actions. Rematch is always offered; spectate only while a match
- *  is still live for others to watch. */
-export type EndButton = 'rematch' | 'spectate';
+/** The summary's actions. Rematch is always offered. Spectate rides only the
+ *  elimination case (a match still live for others); BACK TO MENU rides only the
+ *  whole-match-over case (nothing left to watch — field report v0.1.2). */
+export type EndButton = 'rematch' | 'spectate' | 'menu';
 
 /** A tap on the summary. */
 export type EndTarget = { readonly kind: EndButton };
@@ -70,15 +85,18 @@ export type EndTarget = { readonly kind: EndButton };
 const BUTTON_LABELS: Record<EndButton, string> = {
   rematch: 'REMATCH',
   spectate: 'SPECTATE',
+  menu: 'BACK TO MENU',
 };
 
 /**
  * The buttons this outcome offers, in draw order (Rematch first — it is the one
- * a player reaches for and the one that always survives, GDD §4.7). Spectate is
- * appended only when the match is still running for others.
+ * a player reaches for and the one that always survives, GDD §4.7). The second
+ * button is the one that fits the moment: **spectate** while you are eliminated
+ * but the others fight on, **back to menu** once the whole match is over and
+ * there is nothing left to spectate.
  */
 export function endButtons(outcome: MatchOutcome): readonly EndButton[] {
-  return outcome.matchOver ? ['rematch'] : ['rematch', 'spectate'];
+  return outcome.matchOver ? ['rematch', 'menu'] : ['rematch', 'spectate'];
 }
 
 // ---------------------------------------------------------------------------
@@ -122,22 +140,73 @@ export function endOfMatchModel(outcome: MatchOutcome): EndOfMatchModel {
   return {
     kind,
     headline: HEADLINES[kind],
-    subhead: subheadFor(kind, outcome.winner),
+    subhead: subheadFor(kind, outcome),
     accent: accentFor(kind, outcome),
     buttons,
   };
 }
 
-function subheadFor(kind: EndKind, winner: PlayerId | null): string {
+function subheadFor(kind: EndKind, outcome: MatchOutcome): string {
   switch (kind) {
     case 'victory':
       return 'You took the system.';
     case 'defeat':
-      return `${playerLabel(winner)} took the system.`;
+      return `${playerLabel(outcome.winner)} took the system.`;
     case 'draw':
       return 'No core survived the collapse.';
     case 'eliminated':
-      return 'Your core is gone — but the fight goes on.';
+      return eliminatedSubhead(outcome);
+  }
+}
+
+/**
+ * The DEFEATED overlay's line — the two things the field report asked for:
+ * *placement* ("6th of 8") and *cause of death* ("your core was destroyed").
+ * Both are optional, so this degrades cleanly: placement alone, cause alone, or
+ * the plain fallback the pure model shipped with, in that order.
+ */
+function eliminatedSubhead(outcome: MatchOutcome): string {
+  const place =
+    outcome.placement && outcome.totalPlayers
+      ? `${ordinal(outcome.placement)} of ${outcome.totalPlayers}`
+      : null;
+  const cause = causePhrase(outcome.cause);
+  if (place && cause) return `${place} — ${cause}`;
+  if (place) return place;
+  if (cause) return capitalize(cause);
+  return 'Your core is gone — but the fight goes on.';
+}
+
+/** The cause half of the elimination line, lower-case so it reads as the tail of
+ *  "6th of 8 — …"; capitalised by {@link eliminatedSubhead} when it stands alone. */
+function causePhrase(cause: DeathCause | undefined): string | null {
+  switch (cause) {
+    case 'destroyed':
+      return 'your core was destroyed.';
+    case 'collapse':
+      return 'the collapse closed over your core.';
+    default:
+      return null;
+  }
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
+}
+
+/** "1st", "2nd", "3rd", "6th" — English ordinal for the placement line. */
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
   }
 }
 

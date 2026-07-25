@@ -438,6 +438,7 @@ export {
   endOfMatchModel,
 } from './end-of-match';
 export type {
+  DeathCause,
   EndButton,
   EndButtonView,
   EndKind,

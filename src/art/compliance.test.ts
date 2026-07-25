@@ -27,6 +27,49 @@ import {
   type DerivedKey,
 } from './palette';
 import { circle, fill, sprite, spriteColors } from './shapes';
+import {
+  MATERIALS,
+  PALETTE as TOKENS,
+  PLAYER_ROSTER,
+  WHITE as TOKEN_WHITE,
+  type MaterialName,
+  type PaletteKey,
+} from './tokens';
+
+describe('tokens.ts is the art-direction single source (a2-01)', () => {
+  it('owns the six hexes: palette.ts re-exports them, never re-declares them', () => {
+    expect(TOKENS).toEqual({
+      vacuum: 0x0d1015,
+      hullSteel: 0x7e8894,
+      patina: 0x4fa08b,
+      signalYellow: 0xf2d24b,
+      plasma: 0x4dc3ff,
+      threatRed: 0xb23a3a,
+    });
+    // Not a copy that could drift — the very same object flows through the art
+    // layer and (via the cross-check below) the render layer.
+    expect(PALETTE).toBe(TOKENS);
+    expect(PLAYER_COLORS).toBe(PLAYER_ROSTER);
+  });
+
+  it('grounds the allow-list: the six + white all trace back to tokens', () => {
+    for (const c of Object.values(TOKENS)) expect(ALLOWED_COLORS.has(c)).toBe(true);
+    expect(ALLOWED_COLORS.has(TOKEN_WHITE)).toBe(true);
+    for (const c of PLAYER_ROSTER) expect(ALLOWED_COLORS.has(c)).toBe(true);
+  });
+
+  it('names every palette colour in exactly one material family (steel/ice/ember/void)', () => {
+    const claimed = new Map<PaletteKey, MaterialName>();
+    for (const name of Object.keys(MATERIALS) as MaterialName[]) {
+      for (const base of MATERIALS[name].bases) {
+        expect(claimed.has(base), `${base} claimed by two families`).toBe(false);
+        expect(Object.keys(TOKENS)).toContain(base);
+        claimed.set(base, name);
+      }
+    }
+    expect([...claimed.keys()].sort()).toEqual(Object.keys(TOKENS).sort());
+  });
+});
 
 describe('palette (style-guide §1, §3.1)', () => {
   it('is the six frozen colours, exactly', () => {

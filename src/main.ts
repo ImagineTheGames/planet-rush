@@ -26,8 +26,10 @@ import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
 import {
   BEAM_RANGE,
   combatBeams,
+  destroyCore,
   isCollapsed,
   isDocked,
+  isOver,
   planetOf,
   shieldCount,
   shieldPool,
@@ -35,6 +37,7 @@ import {
 } from './sim';
 import type { CombatBeam, Planet, Turret, World } from './sim';
 import { bootOfflineMatch } from '@platform/match-boot';
+import type { MatchBoot } from '@platform/match-boot';
 import {
   createControlState,
   mapActions,
@@ -106,17 +109,42 @@ import {
   createSettings,
   toggleReduceVfx,
   adjustVolume,
+  EndOfMatchView,
+  endOfMatchModel,
+  LobbyView,
+  createLobby,
+  lobbyModel,
+  lobbyLayout,
+  tickLobby,
+  pressRush,
+  selectShipClass,
+  cycleBotDifficulty,
+  DEFAULT_SHIP_CLASS,
+  CLASS_ORDER,
 } from './ui';
-import type { HudFrame, Combatant, SettingsState, SettingsTarget, MainMenuOption } from './ui';
+import type {
+  HudFrame,
+  Combatant,
+  SettingsState,
+  SettingsTarget,
+  MainMenuOption,
+  EndButton,
+  MatchOutcome,
+  DeathCause,
+  LobbyState,
+} from './ui';
+import { OFFLINE_ROOM } from './net';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
+/** Where the last hull picked in the lobby is remembered, so a returning player
+ *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
+ *  storage seam as the fire mode, so both survive a reload identically. */
+const SHIP_CLASS_KEY = 'planet-rush:shipClass';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
  *  arena, which is also what makes a bug report reproducible. */
 const MATCH_SEED = 1;
-/** The onboarding default hull (GDD §2.11) — the lobby's job from M4. */
-const LOCAL_SHIP_CLASS = ShipClass.Vanguard;
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -229,20 +257,43 @@ async function boot(): Promise<void> {
   //     the immediate-match boot they assert against (field report §3, §5). PLAY
   //     is the only path here that reaches `bootOfflineMatch`; SETTINGS reuses
   //     the Day-7 settings screen. The whole screen is `src/ui`'s; this awaits it.
-  const mainMenu = flags.debug
-    ? null
-    : openMainMenu(app, platform, {
-        root: gameRoot,
-        logicalSize: () => ({ w: transform.logicalWidth, h: transform.logicalHeight }),
-        toLogical,
-        toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
-        recomputeTransform,
-        isRotated: () => transform.rotated,
-        // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
-        // native landscape lock here. A no-op on desktop and where unsupported.
-        enterImmersive: () => fullscreen.enter(),
-      });
+  // The landscape-lock context both front-of-match screens (menu, then lobby)
+  // lay out against: they attach to the rotating game root, read the live logical
+  // (landscape) viewport, and remap their own taps through it.
+  const frontCtx: MenuContext = {
+    root: gameRoot,
+    logicalSize: () => ({ w: transform.logicalWidth, h: transform.logicalHeight }),
+    toLogical,
+    toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
+    recomputeTransform,
+    isRotated: () => transform.rotated,
+    // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
+    // native landscape lock here. A no-op on desktop and where unsupported.
+    enterImmersive: () => fullscreen.enter(),
+  };
+
+  const mainMenu = flags.debug ? null : openMainMenu(app, platform, frontCtx);
   if (mainMenu) await mainMenu.untilPlay();
+
+  // --- The lobby (GDD §2.1, §2.11; M4). PLAY lands here, not in the match: the
+  //     8-slot roster (your seat plus the seven-character bot cast, hulls and
+  //     personalities visible), the four hull tiles, and RUSH!. The hull you pick
+  //     here is the hull you fly — it is threaded into `bootOfflineMatch` below,
+  //     so the ship the sim builds IS the choice, not a hardcoded default (the M4
+  //     dark-matter bug: the lobby merged in #39 and PLAY never reached it).
+  //
+  //     Offline flavour: the room-code UI is hidden (`online: false`) until the
+  //     WebSocket lobby is wired (M3/online) — the empty seats are the bot cast,
+  //     not seats a second player can join. The map picker (m8-02) drops into this
+  //     same screen once it lands; there is a clear seam for it here.
+  //
+  //     `?debug=1` skips the lobby exactly as it skips the menu (harness
+  //     contract): the match boots straight in with the persisted-or-default hull,
+  //     so the frozen goldens and every existing harness keep their immediate boot.
+  const lobby = flags.debug ? null : openLobby(app, platform, frontCtx);
+  const chosenShipClass = lobby ? await lobby.untilRush() : readShipClass(platform);
+  // Persist the pick so a returning player finds it pre-selected (GDD §2.11).
+  if (lobby) platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
   //     and the seven empty seats are filled by the cast (`src/bots`), each
@@ -256,17 +307,32 @@ async function boot(): Promise<void> {
   //     "does the client actually assemble a match" is a headless test rather
   //     than something only a browser can answer — which is the exact gap this
   //     milestone was retracted for.
-  const match = bootOfflineMatch({
-    seed: MATCH_SEED,
-    localPlayer: LOCAL_PLAYER,
-    shipClass: LOCAL_SHIP_CLASS,
-  });
-  const world = match.world;
+  // Fresh matches are re-bootable, because REMATCH (below) tears the current one
+  // down and stands a new one up in place — "straight to a fresh match" (GDD
+  // §2.7). The seed advances each time so a rematch is a *different* arena, still
+  // deterministic (GDD §4.8). `matchId` counts every world this boot builds — the
+  // live-stage seam reads it to prove REMATCH constructed a new one, not re-showed
+  // the old. `match`/`world` are `let`: every closure below reads the live binding,
+  // so a rematch redirects the whole render/input path onto the new world at once.
+  // The hull is the LOBBY's choice (#73) — rematches keep the class you picked.
+  let matchSeed = MATCH_SEED;
+  let matchId = 0;
+  function bootMatch(seed: number): MatchBoot {
+    matchId += 1;
+    return bootOfflineMatch({ seed, localPlayer: LOCAL_PLAYER, shipClass: chosenShipClass });
+  }
+  let match = bootMatch(matchSeed);
+  let world = match.world;
 
   // The match world now exists — flip the menu's test seam so a clean-boot
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
+  // Hand the lobby seam the hull the sim ACTUALLY built the local ship with, read
+  // back off the world — the assertion that the picked class reached the sim
+  // (GDD §2.11; the M4 debug hook the live-stage spec reads). A no-op under
+  // ?debug=1, where there was no lobby.
+  lobby?.matchStarted(world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass);
 
   // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
   //     with everything else under the landscape lock. The camera centres on the
@@ -313,6 +379,8 @@ async function boot(): Promise<void> {
   if (flags.debug) {
     hud.enableHealthBarDebug();
     installHealthbarStage();
+    installOreDepositStage();
+    installEndScreenStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -340,6 +408,33 @@ async function boot(): Promise<void> {
   //     thumb can reach it. Hidden until `fullscreen.affordanceVisible()` says so.
   const fsAffordance = new FullscreenAffordance();
   gameRoot.addChild(fsAffordance);
+
+  // --- End-of-match / DEFEATED overlay (field report v0.1.2; GDD §2.7, §4.7).
+  //     The two ways a player's match can end, each with its own screen:
+  //       - Your core dies while the others fight on → the DEFEATED overlay,
+  //         with SPECTATE (free the camera, watch the rest) or REMATCH.
+  //       - The last core falls (you win, or you're a spectator when it does) →
+  //         the result screen: winner, and REMATCH / BACK TO MENU.
+  //     The screen the field report caught missing entirely: the developer's home
+  //     died and NOTHING happened, because these views (PR #45) were never wired
+  //     into the boot path. Topmost so its backdrop covers the live match under
+  //     it; hidden until `syncEndScreen()` (fed off `world.match`) says otherwise.
+  //     The UI decides presentation; the sim decides truth; this file only wires.
+  const endOverlay = new EndOfMatchView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  endOverlay.visible = false;
+  gameRoot.addChild(endOverlay);
+  /** Which end screen is up, if any — driven each frame from sim state. */
+  let endScreen: 'none' | 'defeated' | 'result' = 'none';
+  /** The player chose SPECTATE: suppress the DEFEATED overlay and let the live
+   *  match play on under a freed camera — until it ends and the result screen
+   *  takes over. Reset on rematch. */
+  let spectating = false;
+  /** The buttons the overlay is currently offering — the live-stage seam reads
+   *  these back to prove SPECTATE/REMATCH are present on the DEFEATED screen. */
+  let endButtonsShown: EndButton[] = [];
+  /** Who the camera follows. Your own ship until you're eliminated and SPECTATE
+   *  frees it onto a survivor (GDD §2.7 "watch the rest"). Reset on rematch. */
+  let cameraTarget: PlayerId = LOCAL_PLAYER;
 
   let fireMode = readFireMode(platform, isTouch);
   // The active input device drives the controls strip + prompt wording (GDD
@@ -416,6 +511,18 @@ async function boot(): Promise<void> {
     const lp = toLogical(e.clientX, e.clientY);
     pressPoint.x = lp.x;
     pressPoint.y = lp.y;
+
+    // The end-of-match / DEFEATED overlay owns the whole screen while it's up: a
+    // tap either lands on REMATCH / SPECTATE / BACK TO MENU or on nothing, but it
+    // NEVER falls through to fly a dead ship or open the wheel. First refusal,
+    // and it always consumes the event.
+    if (endOverlay.visible) {
+      const target = endOverlay.hitTest(lp.x, lp.y);
+      if (target) handleEndTarget(target.kind);
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
 
     // The re-enter-fullscreen affordance — present only after the player backed
     // out of fullscreen (field request v0.1.1). This tap IS a fresh user gesture,
@@ -531,7 +638,7 @@ async function boot(): Promise<void> {
       lastRenderMs = nowMs;
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
 
-      renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
+      renderer.draw(world, { cameraTarget, beams: currentBeams() });
       feedHud();
       // Health bars over every non-local combat entity (GDD §2.2). Fed AFTER
       // renderer.draw so the camera transform is current: each combatant's world
@@ -551,6 +658,11 @@ async function boot(): Promise<void> {
       // and no longer are (field request v0.1.1). Corner it in logical space.
       fullscreen.sync();
       fsAffordance.update(fullscreen.affordanceVisible(), transform.logicalWidth, transform.logicalHeight);
+      // End-of-match / DEFEATED overlay: read the sim's own result off `world.match`
+      // and show the screen that fits — nothing, the DEFEATED overlay, or the final
+      // result. The whole "your planet died and nothing happened" fix (field report
+      // v0.1.2) lives on this one call, fed truth the sim decides.
+      syncEndScreen();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -576,6 +688,112 @@ async function boot(): Promise<void> {
       performance.now(),
       simTicks, // sim-time base: lets QA divide movement by ticks, not seconds
     );
+  }
+
+  /**
+   * Show the end screen the match's own state calls for — the presentation half
+   * of the win/loss the sim decides (`world.match`). Two distinct moments, two
+   * screens (GDD §2.7, §4.7):
+   *
+   *  - **The whole match is over** (`isOver`): the result screen — winner + the
+   *    d7-01 REMATCH / BACK TO MENU. Shown whether you won or were long since
+   *    eliminated and watching.
+   *  - **You're eliminated but the match goes on**: the DEFEATED overlay, unless
+   *    you chose SPECTATE (then it holds off until the match itself ends).
+   *
+   * Runs every rendered frame; cheap and idempotent — it only touches the view
+   * when the desired screen changes or its model does. The screen is derived, not
+   * latched, so a match that resolves while you're staring at DEFEATED rolls the
+   * overlay straight over to the result screen on its own.
+   */
+  function syncEndScreen(): void {
+    const over = isOver(world);
+    const eliminatedLocal = world.match.eliminated.includes(LOCAL_PLAYER);
+    const desired: typeof endScreen = over ? 'result' : eliminatedLocal && !spectating ? 'defeated' : 'none';
+
+    endScreen = desired;
+    if (desired === 'none') {
+      if (endOverlay.visible) endOverlay.visible = false;
+      if (endButtonsShown.length) endButtonsShown = [];
+      return;
+    }
+    if (!endOverlay.visible) endOverlay.visible = true;
+    const model = endOfMatchModel(currentOutcome(over));
+    endButtonsShown = model.buttons.map((b) => b.id);
+    endOverlay.update(model);
+  }
+
+  /**
+   * Read a plain {@link MatchOutcome} off the sim — truth in, presentation out.
+   * On an elimination it works out placement (first core to fall places last; the
+   * lone survivor is 1st, so a seat eliminated `k`-th of `N` places `N − k`) and a
+   * coarse cause of death: the collapse if the field had closed over the core by
+   * the time it fell, otherwise a rival destroyed it (the sim tracks no killer, so
+   * this is the honest limit of what it can say — field report v0.1.2).
+   */
+  function currentOutcome(over: boolean): MatchOutcome {
+    const total = world.planets.length;
+    if (over) return { you: LOCAL_PLAYER, winner: world.match.winner, matchOver: true };
+
+    const k = world.match.eliminated.indexOf(LOCAL_PLAYER);
+    const planet = planetOf(world, LOCAL_PLAYER);
+    const byCollapse =
+      isCollapsed(world) && planet !== null && planet.deathTime >= world.match.collapseTime;
+    const cause: DeathCause = byCollapse ? 'collapse' : 'destroyed';
+    const base: MatchOutcome = { you: LOCAL_PLAYER, winner: null, matchOver: false, totalPlayers: total, cause };
+    // First core to fall places last; the survivor is 1st — so `N − k`. Present
+    // only when we actually found the seat in the elimination order.
+    return k >= 0 ? { ...base, placement: total - k } : base;
+  }
+
+  /** Route a tap on the end overlay: REMATCH → a fresh match, SPECTATE → free the
+   *  camera onto the live match, BACK TO MENU → a clean boot (which lands back on
+   *  the main menu). */
+  function handleEndTarget(kind: EndButton): void {
+    if (kind === 'rematch') rematch();
+    else if (kind === 'spectate') startSpectate();
+    else if (kind === 'menu') window.location.reload();
+  }
+
+  /** SPECTATE (GDD §2.7 "spectate if they want to watch"): drop the DEFEATED
+   *  overlay and let the live match play on, camera freed onto a survivor so
+   *  there is something to watch. The sim never stopped — the loop keeps ticking
+   *  every seat — so this is purely a camera + overlay change. */
+  function startSpectate(): void {
+    spectating = true;
+    endOverlay.visible = false;
+    cameraTarget = firstSurvivor() ?? LOCAL_PLAYER;
+  }
+
+  /** A living opponent to watch after you're out — its ship if it's flying, else
+   *  any owner whose planet still stands. Null if nobody is left (the match is
+   *  about to end, and the result screen takes the camera's place anyway). */
+  function firstSurvivor(): PlayerId | null {
+    for (const s of world.ships) {
+      if (s.id !== LOCAL_PLAYER && !s.eliminated && s.alive) return s.id;
+    }
+    for (const p of world.planets) {
+      if (p.alive && p.owner !== LOCAL_PLAYER) return p.owner;
+    }
+    return null;
+  }
+
+  /** REMATCH (GDD §2.7 / §4.7): tear the current match down and stand a fresh one
+   *  up in place — straight to a new match, not back to the menu. Every render/
+   *  input closure reads the live `world`/`match` binding, so re-pointing them
+   *  here redirects the whole client onto the new world at once. */
+  function rematch(): void {
+    match.close();
+    matchSeed += 1;
+    match = bootMatch(matchSeed);
+    world = match.world;
+    spectating = false;
+    cameraTarget = LOCAL_PLAYER;
+    endScreen = 'none';
+    endButtonsShown = [];
+    endOverlay.visible = false;
+    hasOrdered = false;
+    if (buildWheel.open) buildWheel.toggle();
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -839,6 +1057,145 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__oreDepositStage` — the ?debug=1 live-stage seam for the
+   * v0.1.2 ore-deposit field report ("there's no way to deposit ore … it just
+   * stays on my ship"). The sim now auto-transfers a docked, parked ship's hold
+   * into the bank and flies ore couriers ship→planet to show it; this seam lets
+   * a Playwright test prove that on a REAL boot, the same way `__healthbarStage`
+   * proved the bars. Unlike that one it runs WITHOUT ?freeze=1, because the whole
+   * point is to watch the live sim drain the hold over a second or so. Methods:
+   *
+   *  - `stage(ore)` — park the LOCAL ship at rest at its own planet with `ore` in
+   *    the hold (widening the bay if needed), so the deposit drain starts. Returns
+   *    the staged hold/bank, or null if there is no local ship/planet.
+   *  - `readout()` — the live hold and bank the sim holds this frame: the two
+   *    numbers the HUD ticks down/up. The test watches the hold fall and the bank
+   *    rise off the same source.
+   *  - `flights()` — how many ore-flight couriers are in the world this frame. The
+   *    renderer draws every chunk by position, so these deposit couriers ARE drawn
+   *    flight sprites — reusing the already-wired chunk layer, no new render path.
+   *
+   * Like its sibling it mutates only the plain sim data the boot path already
+   * reads every frame, lives entirely behind ?debug=1, and does not reach into
+   * src/sim (the rule itself is sim-owned; this only stages inputs to it).
+   */
+  function installOreDepositStage(): void {
+    const stage = {
+      stage(ore: number): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        // Settle clear of the planet's collider, at rest, inside dock range.
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        if (ore > ship.cargoCap) ship.cargoCap = ore; // widen the bay to fit the stage
+        ship.cargo = ore;
+        return { cargo: ship.cargo, banked: ship.banked };
+      },
+      readout(): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        return ship ? { cargo: ship.cargo, banked: ship.banked } : null;
+      },
+      flights(): number {
+        let n = 0;
+        for (const c of world.chunks) if (c.deposit) n++;
+        return n;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__oreDepositStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__endScreenStage` — the ?debug=1 live-stage seam for the
+   * v0.1.2 end-screen field report ("there was no end match screen after my planet
+   * died"). The DEFEATED overlay and the result screen (PR #45) were merged and
+   * unit-green but never wired into boot; this seam lets a Playwright test prove
+   * they now show on a REAL boot, the same way `__healthbarStage` proved the bars.
+   *
+   * Like the ore-deposit seam it runs WITHOUT ?freeze=1, because SPECTATE must be
+   * watched letting the LIVE match play on. Methods stage the two moments through
+   * the sim's OWN elimination path (`destroyCore`, the exported rule) and read the
+   * wired screen state back — they never fake the UI, only the deaths that drive it:
+   *
+   *  - `eliminateLocal()` — destroy the LOCAL core while the others stand, so the
+   *    DEFEATED overlay must appear (match continues). Returns whether it staged.
+   *  - `endMatch()` — destroy every core but one non-local survivor, so the next
+   *    tick resolves a winner and the result screen must appear (you, a spectator,
+   *    watching someone else take the system). Returns whether it staged.
+   *  - `screen()` — which end screen the wiring has up this frame ('none' |
+   *    'defeated' | 'result'), read off the same `endScreen` the render loop sets.
+   *  - `buttons()` — the buttons that screen is offering, so the test asserts
+   *    SPECTATE + REMATCH on DEFEATED and REMATCH + BACK TO MENU on the result.
+   *  - `spectate()` / `rematch()` — drive those actions exactly as a tap would.
+   *  - `matchId()` — how many worlds this boot has built; REMATCH bumps it, which
+   *    is the proof a NEW world booted rather than the old one being re-shown.
+   *  - `ticks()` — the sim's own step count, so the test proves the match keeps
+   *    advancing while spectating (the loop never stopped ticking).
+   *
+   * It drives the sim's public `destroyCore` rather than faking screen state: the
+   * rule stays sim-owned (GDD §2.7), and this only stages the input to it. Behind
+   * ?debug=1, absent in every normal build.
+   */
+  function installEndScreenStage(): void {
+    const stage = {
+      eliminateLocal(): boolean {
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!planet || !planet.alive) return false;
+        destroyCore(world, planet); // the sim's own elimination path
+        return true;
+      },
+      endMatch(): boolean {
+        const survivor = world.planets.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
+        if (!survivor) return false;
+        for (const p of world.planets) {
+          if (p.owner !== survivor.owner && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
+      screen(): 'none' | 'defeated' | 'result' {
+        return endScreen;
+      },
+      buttons(): EndButton[] {
+        return endButtonsShown.slice();
+      },
+      spectate(): void {
+        startSpectate();
+      },
+      rematch(): void {
+        rematch();
+      },
+      matchId(): number {
+        return matchId;
+      },
+      ticks(): number {
+        return simTicks;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__endScreenStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -954,6 +1311,7 @@ async function boot(): Promise<void> {
     renderer.setViewport(viewport);
     touch.setScreenWidth(w);
     hud.resize(w, h);
+    endOverlay.resize(w, h, isTouch);
   }
 
   /** The camera's LOGICAL (landscape) viewport, in the space the world is drawn
@@ -1268,6 +1626,19 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
   return defaultFireMode(isTouch);
 }
 
+/** The hull to pre-select in the lobby: the last one this player chose, or the
+ *  Vanguard default the first time out (GDD §2.11 — "the pre-selected default so
+ *  onboarding never blocks on the choice", plus "persist last choice"). Validated
+ *  against the enum so a stale or hand-edited storage value can never seat a hull
+ *  the sim does not know. Read through the same platform seam as the fire mode. */
+function readShipClass(platform: ReturnType<typeof createBrowserPlatform>): ShipClass {
+  const stored = platform.storage.get(SHIP_CLASS_KEY);
+  if (stored !== null && (Object.values(ShipClass) as string[]).includes(stored)) {
+    return stored as ShipClass;
+  }
+  return DEFAULT_SHIP_CLASS;
+}
+
 /** Combine one device's control state into the accumulator: strongest thrust
  *  wins, latest aim wins, held states OR together (GDD §2.4 auto device-switch). */
 function mergeControl(dst: ControlState, src: ControlState): void {
@@ -1536,6 +1907,270 @@ function openMainMenu(
 function installMainMenuSeam(seam: object): void {
   try {
     Object.defineProperty(window, '__mainMenu', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
+}
+
+/** What `boot()` holds the lobby by: a promise resolving with the hull the
+ *  player locked in at RUSH!, and a one-shot `matchStarted()` the boot path calls
+ *  once the world is built, to hand the seam the class the sim actually flew. */
+interface LobbyHandle {
+  /** Resolves the moment the RUSH! countdown reaches zero, with the chosen hull —
+   *  `boot()` builds the world with it (GDD §2.11). */
+  untilRush(): Promise<ShipClass>;
+  /** Report the hull the built world gave the local ship — the proof the picked
+   *  class reached the sim (drives `window.__lobby.localShipClass`). */
+  matchStarted(worldShipClass: ShipClass): void;
+}
+
+/** The read-only `window.__lobby` live-stage seam: the lobby as plain,
+ *  structured-cloneable truth, plus two drive methods a Playwright test presses
+ *  as taps would (tests/live-stage/lobby-flow.spec.ts). Present only on a clean
+ *  boot; absent under `?debug=1`, where the lobby never runs. */
+interface LobbySeam {
+  /** The lobby layer is up (true until RUSH! hands the screen to the match). */
+  visible: boolean;
+  /** Seats laid out — eight (GDD §2.1). */
+  slotCount: number;
+  /** Laid out at thumb scale (the phone case). */
+  isTouch: boolean;
+  /** Joinable over the wire — false offline, so the room code is hidden. */
+  online: boolean;
+  /** The hull currently selected — the tile drawn as chosen. */
+  selectedClass: ShipClass;
+  /** The onboarding default (Vanguard), so a test can pick anything *but* it. */
+  defaultClass: ShipClass;
+  /** Hull order, so a test maps a tile index to a class the way the view does. */
+  classOrder: readonly ShipClass[];
+  /** The logical (landscape) viewport the lobby laid out against. */
+  logicalViewport: { width: number; height: number };
+  /** The content box the lobby drew inside — the layout-registry `full` rect,
+   *  reported here so a clean boot (no `?debug=1` registry) can still assert the
+   *  lobby sits inside the safe viewport. */
+  content: Rect;
+  /** One roster row's height — a thumb-size assertion target. */
+  seatHeight: number;
+  /** RUSH!'s height — likewise. */
+  rushHeight: number;
+  /** The RUSH! control's logical rect + the physical point a tap must land on to
+   *  hit it (through the landscape-lock rotation) — the twin of the menu seam's
+   *  control reports. Lets the mobile landscape-lock suite prove a *physical* touch
+   *  on RUSH remaps to the logical control, rather than only driving rush()
+   *  programmatically (tests/mobile/landscape-lock.spec.ts). */
+  rushControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /** True while the RUSH! countdown is running. */
+  counting: boolean;
+  /** The hull the built world gave the local ship, or null until the match boots
+   *  — the debug hook that proves the pick reached the sim (GDD §2.11). */
+  localShipClass: ShipClass | null;
+  /** Select the hull tile at `index` in {@link classOrder} — a tap on a tile. */
+  selectClass(index: number): void;
+  /** Press RUSH! — starts the countdown that boots the match. */
+  rush(): void;
+}
+
+/**
+ * The lobby (GDD §2.1, §2.11; M4). Shown after PLAY on a clean boot — `boot()`
+ * skips it under `?debug=1`, which drops straight into a match with the
+ * persisted-or-default hull so every existing harness keeps its immediate boot.
+ *
+ * Offline flavour: opened with `online: false`, so the room-code UI is hidden and
+ * the empty seats read as the bot cast rather than joinable slots — there is no
+ * transport for a second player to arrive on until the WebSocket lobby is wired.
+ * The local player is seat 0 and the host, so hull selection, per-seat difficulty
+ * cycling, and RUSH! are all live.
+ *
+ * The pure model/geometry/view are `src/ui`'s ({@link LobbyView}, `lobbyModel`,
+ * `lobbyLayout`); this function is the *wiring* — screen state, input routing,
+ * the countdown clock off Pixi's ticker, and teardown. A read-only
+ * `window.__lobby` seam lets the live-stage suite drive it and read back the hull
+ * the sim ended up flying.
+ */
+function openLobby(
+  app: Application,
+  platform: ReturnType<typeof createBrowserPlatform>,
+  ctx: MenuContext,
+): LobbyHandle {
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  // Offline solo-vs-bots: seat 0 is you and the host; the room code is hidden
+  // (`online: false`); the pre-selected hull is your last pick (GDD §2.11).
+  let state: LobbyState = createLobby({
+    room: OFFLINE_ROOM,
+    you: LOCAL_PLAYER,
+    host: LOCAL_PLAYER,
+    shipClass: readShipClass(platform),
+    online: false,
+  });
+  let resolved = false;
+
+  const size0 = ctx.logicalSize();
+  const view = new LobbyView(size0.w, size0.h, isTouch);
+  ctx.root.addChild(view);
+
+  const seam: LobbySeam = {
+    visible: true,
+    slotCount: 0,
+    isTouch,
+    online: false,
+    selectedClass: state.shipClass,
+    defaultClass: DEFAULT_SHIP_CLASS,
+    classOrder: CLASS_ORDER,
+    logicalViewport: { width: size0.w, height: size0.h },
+    content: { x: 0, y: 0, width: 0, height: 0 },
+    seatHeight: 0,
+    rushHeight: 0,
+    rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    counting: false,
+    localShipClass: null,
+    selectClass: (index: number): void => selectClassAt(index),
+    rush: (): void => rush(),
+  };
+
+  let resolveRush: (cls: ShipClass) => void = () => {};
+  const rushPromise = new Promise<ShipClass>((resolve) => {
+    resolveRush = resolve;
+  });
+
+  /** Redraw the lobby from current state and refresh the seam's layout facts. */
+  function render(): void {
+    const model = lobbyModel(state);
+    view.update(model);
+    const { w, h } = ctx.logicalSize();
+    const layout = lobbyLayout({ width: w, height: h }, { isTouch });
+    seam.visible = view.visible;
+    seam.slotCount = layout.seats.length;
+    seam.online = model.online;
+    seam.selectedClass = state.shipClass;
+    seam.logicalViewport = { width: w, height: h };
+    seam.content = { ...layout.content };
+    seam.seatHeight = layout.seats[0]?.height ?? 0;
+    seam.rushHeight = layout.rushButton.height;
+    // The RUSH! rect in logical (landscape) space and the physical tap point it
+    // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
+    // uses, so the landscape-lock suite can tap RUSH physically (see LobbySeam).
+    const rush = layout.rushButton;
+    seam.rushControl = {
+      logical: { ...rush },
+      physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
+    };
+    seam.counting = model.countdown.active;
+  }
+
+  /** Pick the hull tile at `index` (a tap on a tile). Refused after RUSH!, where
+   *  {@link selectShipClass} returns the same state and the choice is locked. */
+  function selectClassAt(index: number): void {
+    if (resolved) return;
+    const shipClass = CLASS_ORDER[index];
+    if (shipClass === undefined) return;
+    state = selectShipClass(state, shipClass);
+    render();
+  }
+
+  /** Press RUSH! — starts the countdown (offline you are the host, so it always
+   *  takes). A no-op once counting or once the match has been handed the screen. */
+  function rush(): void {
+    if (resolved) return;
+    const next = pressRush(state);
+    if (next === state) return;
+    state = next;
+    render();
+  }
+
+  /** Advance the countdown off Pixi's render ticker (the only clock running
+   *  pre-match — the fixed-timestep game loop starts after the lobby resolves).
+   *  On the frame it reaches zero, the match owns the screen and the hull locks. */
+  function onTick(): void {
+    if (state.phase !== 'counting') return;
+    state = tickLobby(state, app.ticker.deltaMS / 1000);
+    render();
+    if (state.phase === 'started' && !resolved) {
+      resolved = true;
+      const chosen = state.shipClass;
+      teardown();
+      seam.visible = false;
+      resolveRush(chosen);
+    }
+  }
+
+  function onPointerDown(e: PointerEvent): void {
+    // Un-rotate the physical tap into the logical space the lobby is drawn in
+    // (landscape lock), then test it against the same geometry the view drew.
+    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+    const hit = view.hitTest(x, y);
+    if (!hit) return;
+    switch (hit.kind) {
+      case 'class':
+        selectClassAt(hit.index);
+        break;
+      case 'seat':
+        // Host taps a bot row to cycle its difficulty (GDD §2.1). A no-op on your
+        // own row and — offline you are always host — never refused for that.
+        state = cycleBotDifficulty(state, hit.index);
+        render();
+        break;
+      case 'rush':
+        rush();
+        break;
+      case 'roomCode':
+        break; // hidden offline; nothing to copy
+    }
+    e.preventDefault();
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    // Enter or Space is RUSH! — a keyboard player never reaches for the mouse to
+    // start, the same courtesy the main menu gives PLAY.
+    if (e.code === 'Enter' || e.code === 'Space') rush();
+  }
+
+  function relayout(): void {
+    ctx.recomputeTransform();
+    const { w, h } = ctx.logicalSize();
+    view.resize(w, h, isTouch);
+    render();
+  }
+
+  function teardown(): void {
+    app.ticker.remove(onTick);
+    app.canvas.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('resize', relayout);
+    window.removeEventListener('orientationchange', relayout);
+    window.visualViewport?.removeEventListener('resize', relayout);
+    ctx.root.removeChild(view);
+    view.destroy({ children: true });
+  }
+
+  app.ticker.add(onTick);
+  app.canvas.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
+  window.visualViewport?.addEventListener('resize', relayout);
+
+  installLobbySeam(seam);
+  render();
+
+  return {
+    untilRush: () => rushPromise,
+    matchStarted: (worldShipClass: ShipClass): void => {
+      seam.localShipClass = worldShipClass;
+    },
+  };
+}
+
+/** Install the read-only `window.__lobby` live-stage seam (see {@link openLobby}).
+ *  Its fields are mutated in place as the lobby runs and after the match boots;
+ *  the handle itself is fixed, like the menu and fullscreen seams. */
+function installLobbySeam(seam: object): void {
+  try {
+    Object.defineProperty(window, '__lobby', {
       value: seam,
       writable: false,
       configurable: false,
