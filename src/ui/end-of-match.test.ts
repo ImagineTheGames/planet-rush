@@ -36,9 +36,18 @@ describe('reading an outcome', () => {
 
   it('offers spectate ONLY while the match is still live for others', () => {
     expect(endButtons(eliminated(0))).toEqual(['rematch', 'spectate']);
-    expect(endButtons(over(0, 0))).toEqual(['rematch']);
-    expect(endButtons(over(0, 3))).toEqual(['rematch']);
-    expect(endButtons(over(0, null))).toEqual(['rematch']);
+    // A whole-match-over screen has nothing to watch — spectate never rides it.
+    for (const outcome of [over(0, 0), over(0, 3), over(0, null)]) {
+      expect(endButtons(outcome)).not.toContain('spectate');
+    }
+  });
+
+  it('offers BACK TO MENU ONLY once the whole match is over', () => {
+    expect(endButtons(over(0, 0))).toEqual(['rematch', 'menu']);
+    expect(endButtons(over(0, 3))).toEqual(['rematch', 'menu']);
+    expect(endButtons(over(0, null))).toEqual(['rematch', 'menu']);
+    // Eliminated-but-live gets spectate instead, never the menu.
+    expect(endButtons(eliminated(0))).not.toContain('menu');
   });
 
   it('always keeps Rematch (GDD §4.7), first', () => {
@@ -70,6 +79,42 @@ describe('the frame model', () => {
 
   it('names the victor in a defeat’s subhead, one-based', () => {
     expect(endOfMatchModel(over(0, 4)).subhead).toContain('Player 5');
+  });
+
+  it('offers REMATCH + BACK TO MENU on a whole-match-over screen', () => {
+    const model = endOfMatchModel(over(0, 3));
+    expect(model.buttons.map((b) => b.id)).toEqual(['rematch', 'menu']);
+    expect(model.buttons[1]).toMatchObject({ id: 'menu', primary: false });
+  });
+
+  it('writes placement and cause into the DEFEATED overlay line', () => {
+    const model = endOfMatchModel({
+      you: 2,
+      winner: null,
+      matchOver: false,
+      placement: 6,
+      totalPlayers: 8,
+      cause: 'destroyed',
+    });
+    expect(model.headline).toBe('ELIMINATED');
+    expect(model.subhead).toContain('6th of 8');
+    expect(model.subhead).toContain('destroyed');
+  });
+
+  it('names the collapse as a cause of death', () => {
+    const model = endOfMatchModel({
+      you: 1,
+      winner: null,
+      matchOver: false,
+      placement: 2,
+      totalPlayers: 8,
+      cause: 'collapse',
+    });
+    expect(model.subhead).toBe('2nd of 8 — the collapse closed over your core.');
+  });
+
+  it('falls back to the plain elimination line with no placement or cause', () => {
+    expect(endOfMatchModel(eliminated(0)).subhead).toBe('Your core is gone — but the fight goes on.');
   });
 });
 
