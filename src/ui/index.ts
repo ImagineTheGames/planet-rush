@@ -460,6 +460,36 @@ export type {
 
 export { ConnectionStatusView, CONNECTION_STATUS_ANCHOR } from './connection-status-view';
 
+// --- The main menu — the front door a clean boot opens on (GDD §4.6 M7) -----
+//
+// The screen the field report found missing: the Day-7 menus merged, but boot
+// dropped the player straight into a match, so the menu was never wired. PLAY is
+// the only door that builds a match world; SETTINGS reuses the screen above.
+// The gate that defers the world until PLAY lives in `src/main.ts` — this is the
+// same pure-model + Pixi-view pair as every other screen here.
+
+export {
+  MAIN_MENU_ID,
+  MAIN_MENU_ITEMS,
+  MAIN_MENU_TITLE,
+  MAIN_MENU_TITLE_HEIGHT,
+  MAIN_MENU_BUTTON_HEIGHT,
+  MAIN_MENU_BUTTON_HEIGHT_TOUCH,
+  mainMenuHitTest,
+  mainMenuLayout,
+  mainMenuModel,
+} from './main-menu';
+export type {
+  MainMenuButtonView,
+  MainMenuItem,
+  MainMenuLayout,
+  MainMenuLayoutOptions,
+  MainMenuModel,
+  MainMenuOption,
+} from './main-menu';
+
+export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
+
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
 // Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
