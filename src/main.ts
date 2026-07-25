@@ -20,7 +20,7 @@
  * alarm sounds, the bots decide what the other seven slots do. This file's job
  * is that none of those answers is invented here.
  */
-import { Application } from 'pixi.js';
+import { Application, Container } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
 import {
@@ -51,7 +51,14 @@ import { TouchController } from '@platform/touch';
 import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
 import { WheelInput, writeWheelOrders } from '@platform/wheel-input';
-import { RotateOverlay, shouldShowRotateOverlay, requestLandscape } from '@platform/orientation';
+import {
+  requestLandscape,
+  computeRootTransform,
+  applyRootTransform,
+  physicalToLogical,
+  logicalToPhysical,
+} from '@platform/orientation';
+import type { RootTransform } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -86,12 +93,14 @@ import {
   MainMenuView,
   SettingsView,
   mainMenuModel,
+  mainMenuLayout,
+  MAIN_MENU_ITEMS,
   settingsModel,
   createSettings,
   toggleReduceVfx,
   adjustVolume,
 } from './ui';
-import type { HudFrame, Combatant, SettingsState, SettingsTarget } from './ui';
+import type { HudFrame, Combatant, SettingsState, SettingsTarget, MainMenuOption } from './ui';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -139,6 +148,60 @@ async function boot(): Promise<void> {
   if (mount) mount.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none'; // sticks own the gestures (amendment §2)
 
+  // Touch device? Drives the fire-mode default, the visible controls, AND the
+  // landscape lock: a portrait mobile viewport is rotated to landscape (below).
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // --- The landscape lock (field report v0.1.1; orientation.ts). Planet Rush IS
+  //     landscape on mobile, always: the whole game draws into ONE root container
+  //     (`gameRoot`), and when a mobile viewport is held portrait that root is
+  //     rotated 90° with width/height swapped, so the player sees a landscape game
+  //     regardless of how the phone is held — no more asking them to rotate. Every
+  //     module below lays out in the LOGICAL (always-landscape) viewport; only the
+  //     pointer edge (`toLogical`) and this one transform touch physical space.
+  const gameRoot = new Container();
+  gameRoot.label = 'game-root';
+  app.stage.addChild(gameRoot);
+  let transform: RootTransform = computeRootTransform(app.screen.width, app.screen.height, isTouch);
+  applyRootTransform(gameRoot, transform);
+
+  /** Recompute the root transform from the live canvas size and re-apply it
+   *  (resize / orientationchange). Called first in every relayout.
+   *
+   *  Pixi debounces `resizeTo: window` to the next animation frame, so on a
+   *  synchronous resize/orientationchange event `app.screen` is still the OLD
+   *  size — which would leave the transform (and the whole logical layout) a frame
+   *  behind and, mid-rotation, read the wrong orientation entirely. `app.resize()`
+   *  forces the pending resize to run now, so `app.screen` is fresh before we read
+   *  it. This is what makes the rotate-and-back sequence re-layout every time. */
+  function recomputeTransform(): void {
+    app.resize();
+    transform = computeRootTransform(app.screen.width, app.screen.height, isTouch);
+    applyRootTransform(gameRoot, transform);
+  }
+
+  /** Map a raw physical pointer coordinate (`clientX/Y`) to the logical landscape
+   *  point the game lays out in — un-rotating the tap so it lands on the control
+   *  the player actually sees (the part that silently breaks). Reads the live
+   *  transform, so it tracks orientation flips. */
+  function toLogical(clientX: number, clientY: number): Vec2 {
+    const rect = app.canvas.getBoundingClientRect();
+    return physicalToLogical(clientX - rect.left, clientY - rect.top, transform);
+  }
+
+  /** Convert a rect measured in GLOBAL (physical canvas) space — as Pixi's
+   *  `getBounds()` reports it, e.g. the UI's `describeLayout` — into the LOGICAL
+   *  (landscape) space the layout registry reports in. Under the 90° root rotation
+   *  an axis-aligned rect stays axis-aligned, so this maps two opposite corners
+   *  and rebuilds the box; identity when un-rotated. Elements this file lays out
+   *  itself (ship, sticks, badge) are already computed in logical space and skip it. */
+  function physicalBoundsToLogical(b: Rect): Rect {
+    if (!transform.rotated) return b;
+    // physicalToLogical(px,py) = {x: py, y: physW − px}; applied to the rect's
+    // corners this collapses to: x = top, y = physW − right, w = height, h = width.
+    return { x: b.y, y: transform.x - b.x - b.width, width: b.height, height: b.width };
+  }
+
   // --- Main menu (field report P1; GDD §4.6 M7). A clean boot opens the MAIN
   //     MENU and builds NO match world until the player presses PLAY — the bug
   //     the field report caught was that boot dropped the player straight into a
@@ -148,7 +211,16 @@ async function boot(): Promise<void> {
   //     the immediate-match boot they assert against (field report §3, §5). PLAY
   //     is the only path here that reaches `bootOfflineMatch`; SETTINGS reuses
   //     the Day-7 settings screen. The whole screen is `src/ui`'s; this awaits it.
-  const mainMenu = flags.debug ? null : openMainMenu(app, platform);
+  const mainMenu = flags.debug
+    ? null
+    : openMainMenu(app, platform, {
+        root: gameRoot,
+        logicalSize: () => ({ w: transform.logicalWidth, h: transform.logicalHeight }),
+        toLogical,
+        toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
+        recomputeTransform,
+        isRotated: () => transform.rotated,
+      });
   if (mainMenu) await mainMenu.untilPlay();
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
@@ -175,10 +247,12 @@ async function boot(): Promise<void> {
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
 
-  // --- Renderer. The camera centres on the *visual* viewport (URL-bar / notch /
-  //     fullscreen aware), not the raw canvas — see camera.ts and readViewport().
+  // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
+  //     with everything else under the landscape lock. The camera centres on the
+  //     LOGICAL viewport (landscape), URL-bar / notch / fullscreen aware on the
+  //     un-rotated path — see camera.ts and readViewport().
   let viewport: Viewport = readViewport();
-  const renderer = new Renderer(app.stage, viewport);
+  const renderer = new Renderer(gameRoot, viewport);
 
   // --- Auto VFX-reduction (vfx-quality.ts): watches real frame times and engages
   //     the "reduce VFX" setting on a sustained drop below the fps floor (GDD
@@ -202,8 +276,8 @@ async function boot(): Promise<void> {
 
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
-  const hud = new Hud(app.screen.width, app.screen.height);
-  app.stage.addChild(hud);
+  const hud = new Hud(transform.logicalWidth, transform.logicalHeight);
+  gameRoot.addChild(hud);
 
   // --- Health-bar live-stage seam (?debug=1 only). The enemy over-ship health
   //     bars shipped dead twice: the model was green but nothing on a real boot
@@ -220,30 +294,24 @@ async function boot(): Promise<void> {
     installHealthbarStage();
   }
 
-  // --- Input: per-device control states, merged into one each frame.
-  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
   //     thumbs read clearly; the layer hides itself entirely on desktop.
   const touchVisuals = new TouchVisuals();
-  app.stage.addChild(touchVisuals);
+  gameRoot.addChild(touchVisuals);
 
   // --- Build badge (render/build-badge.ts): the always-on corner stamp naming
   //     the build on screen. Above the HUD/controls so a screenshot always
-  //     carries it, below the ROTATE overlay (which owns the screen when up).
+  //     carries it. Under the landscape lock it rides `gameRoot`, so it stays in
+  //     the logical bottom-right corner however the phone is held.
   const buildBadge = new BuildBadge();
   // ?freeze=1 exists so the frame is byte-deterministic across boots (golden
   // screenshots). The stamp is the one thing on screen that changes every
   // commit, so it is the one thing freeze must hide — and the only case where
   // the badge is not shown. Every real build carries it.
   buildBadge.visible = !flags.freeze;
-  app.stage.addChild(buildBadge);
+  gameRoot.addChild(buildBadge);
 
-  // --- Portrait handling (orientation.ts): a ROTATE overlay where landscape
-  //     lock is unsupported (iOS Safari). Added last so it covers everything.
-  const rotateOverlay = new RotateOverlay(app.screen.width, app.screen.height);
-  app.stage.addChild(rotateOverlay);
   let fireMode = readFireMode(platform, isTouch);
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
@@ -252,7 +320,7 @@ async function boot(): Promise<void> {
   const merged = createControlState();
   const sources: { source: InputSource; state: ControlState; device: DeviceKind }[] = [
     {
-      source: new KeyboardMouseSource(() => ({ x: app.screen.width / 2, y: app.screen.height / 2 })),
+      source: new KeyboardMouseSource(() => ({ x: transform.logicalWidth / 2, y: transform.logicalHeight / 2 })),
       state: createControlState(),
       device: 'keyboard',
     },
@@ -269,7 +337,7 @@ async function boot(): Promise<void> {
     console.info('[gamepad] disconnected');
   });
 
-  const touch = new TouchController({ screenWidth: app.screen.width });
+  const touch = new TouchController({ screenWidth: transform.logicalWidth });
   touch.setFireMode(fireMode);
   const touchState = createControlState();
   // --- The Build & Upgrade wheel (GDD §2.5). `buildWheel` holds the two bits of
@@ -312,11 +380,13 @@ async function boot(): Promise<void> {
   // so an open wheel gets first refusal on a tap and a thumb buying a turret
   // never also flies the ship. Mouse and touch are one gesture here (GDD §2.4).
   app.canvas.addEventListener('pointerdown', (e: PointerEvent) => {
-    const w = app.screen.width;
-    const h = app.screen.height;
-    const rect = app.canvas.getBoundingClientRect();
-    pressPoint.x = e.clientX - rect.left;
-    pressPoint.y = e.clientY - rect.top;
+    const w = transform.logicalWidth;
+    const h = transform.logicalHeight;
+    // Un-rotate the tap into logical space (landscape lock) so it lands on the
+    // wheel/BUILD-button geometry drawn in that same space.
+    const lp = toLogical(e.clientX, e.clientY);
+    pressPoint.x = lp.x;
+    pressPoint.y = lp.y;
 
     // The touch BUILD button — the E-equivalent, on screen only at your own
     // planet (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
@@ -346,9 +416,11 @@ async function boot(): Promise<void> {
   });
 
   // Route the canvas's touch pointer events into the twin sticks (touch-dom.ts —
-  // the filter/decode/route edge, unit-tested headless). CSS-pixel samples, the
-  // same space the controller's half-split lives in.
-  bindTouchControls(app.canvas, touch, window);
+  // the filter/decode/route edge, unit-tested headless). Samples are remapped
+  // through the landscape lock (`toLogical`) so a physical portrait tap reaches
+  // the controller as the rotated logical point — the half-split, sticks and
+  // FIRE button all live in logical (landscape) space.
+  bindTouchControls(app.canvas, touch, window, toLogical);
 
   // --- HUD feed: one reusable mutable HudFrame, overwritten in place every frame
   //     so the feed path allocates nothing (GDD §4.3). All fields are primitives.
@@ -386,7 +458,9 @@ async function boot(): Promise<void> {
   if (registry) {
     installLayoutHook({
       registry,
-      viewport: (): LayoutViewport => ({ width: app.screen.width, height: app.screen.height }),
+      // The layout contract speaks the LOGICAL (landscape) viewport — the space
+      // every element lays out in under the landscape lock (orientation.ts).
+      viewport: (): LayoutViewport => ({ width: transform.logicalWidth, height: transform.logicalHeight }),
       frozen: () => flags.freeze,
       freezeTick: () => (flags.freeze ? FREEZE_TICK : null),
       worldHash: () => frozenHash,
@@ -427,11 +501,11 @@ async function boot(): Promise<void> {
       feedCombatants();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
-      // no-op layer on desktop). Reads the viewport each frame so the idle
-      // affordances and FIRE button track resize/orientation flips.
-      touchVisuals.update(touch, isTouch, app.screen.width, app.screen.height, buildVisible);
-      // Keep the build stamp cornered as the viewport changes (two writes).
-      buildBadge.update(app.screen.width, app.screen.height);
+      // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
+      // idle affordances and FIRE button track resize/orientation flips.
+      touchVisuals.update(touch, isTouch, transform.logicalWidth, transform.logicalHeight, buildVisible);
+      // Keep the build stamp cornered (logical bottom-right) as the viewport changes.
+      buildBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -695,8 +769,10 @@ async function boot(): Promise<void> {
    *  bounds; HUD-owned elements come through the public {@link isLayoutContributor}
    *  seam when the UI exposes it (see PR notes). */
   function refreshLayout(reg: LayoutRegistry): void {
-    const w = app.screen.width;
-    const h = app.screen.height;
+    // Logical (landscape) viewport — the space every registered element lays out
+    // in under the landscape lock, and the space the registry contract reports.
+    const w = transform.logicalWidth;
+    const h = transform.logicalHeight;
     reg.beginFrame();
 
     // Local ship: the camera keeps it centred (GDD §2.2) → anchor `center`.
@@ -741,7 +817,11 @@ async function boot(): Promise<void> {
     // touched, and the registry lights them up the moment the seam lands.
     if (isLayoutContributor(hud)) {
       for (const e of hud.describeLayout({ width: w, height: h })) {
-        reg.register(e.id, e.anchor, e.bounds);
+        // The HUD reports bounds via Pixi getBounds() — GLOBAL (physical) space,
+        // which the root rotation offsets from the logical viewport. Convert so the
+        // registry sees every HUD element in the same logical space it resolves
+        // anchors against (a no-op when un-rotated).
+        reg.register(e.id, e.anchor, physicalBoundsToLogical(e.bounds));
       }
     }
   }
@@ -780,27 +860,33 @@ async function boot(): Promise<void> {
   //     canvas. Re-run on both resize and orientationchange so the canvas
   //     re-layouts when a phone is turned (mobile amendment §2, gap #2).
   function relayout(): void {
-    const w = app.screen.width;
-    const h = app.screen.height;
-    // Camera centres on the *visual* viewport (read fresh from the DOM here, so it
-    // never uses a cached/stale size after a resize or orientation flip). HUD,
-    // touch halves, and the overlay lay out in canvas space (app.screen).
+    // Landscape lock first: recompute the root transform from the live canvas
+    // size and re-apply it, so a portrait phone stays a landscape game and the
+    // layout NEVER strands after an orientation flip (the field-report bug). Then
+    // everything below lays out in the LOGICAL (landscape) viewport.
+    recomputeTransform();
+    const w = transform.logicalWidth;
+    const h = transform.logicalHeight;
     viewport = readViewport();
     renderer.setViewport(viewport);
     touch.setScreenWidth(w);
     hud.resize(w, h);
-    rotateOverlay.resize(w, h);
-    refreshOrientation();
   }
 
-  /** Read the current *visual* viewport (what the player actually sees) in the
-   *  canvas's own CSS-pixel space. On mobile the canvas is sized to the layout
-   *  viewport (`resizeTo: window`) but the URL bar, a notch (`safe-area-inset`),
-   *  and fullscreen transitions crop and shift the visible region — `visualViewport`
-   *  plus the canvas's client rect give the visible size and its offset within the
-   *  canvas. Desktop (and browsers without `visualViewport`) fall back to the whole
-   *  canvas. This is the one DOM read the camera path depends on. */
+  /** The camera's LOGICAL (landscape) viewport, in the space the world is drawn
+   *  in under the root transform.
+   *
+   *  When rotated (portrait phone) the logical viewport fills the rotated root
+   *  exactly, so the camera centres on the full landscape frame (origin 0). When
+   *  un-rotated (desktop, or a landscape phone) this is the *visual* viewport —
+   *  the URL bar, a notch (`safe-area-inset`), and fullscreen transitions crop and
+   *  shift the visible region, so `visualViewport` plus the canvas client rect give
+   *  the visible size and its offset. Browsers without `visualViewport` fall back
+   *  to the whole canvas. */
   function readViewport(): Viewport {
+    if (transform.rotated) {
+      return { width: transform.logicalWidth, height: transform.logicalHeight, originX: 0, originY: 0 };
+    }
     const vv = window.visualViewport;
     if (vv) {
       const rect = app.canvas.getBoundingClientRect();
@@ -814,15 +900,6 @@ async function boot(): Promise<void> {
     return { width: app.screen.width, height: app.screen.height, originX: 0, originY: 0 };
   }
 
-  /** Show the ROTATE overlay only on a touch device that cannot lock landscape
-   *  (iOS Safari) while the viewport is portrait; hidden the moment it turns
-   *  landscape (mobile amendment §2). Dimensions read at the DOM edge here. */
-  function refreshOrientation(): void {
-    const show =
-      isTouch && shouldShowRotateOverlay(window.innerWidth, window.innerHeight, platform.canLockOrientation());
-    rotateOverlay.setShown(show);
-  }
-
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);
   // Mobile URL-bar show/hide and pinch reflow the *visual* viewport without a
@@ -831,7 +908,6 @@ async function boot(): Promise<void> {
   window.visualViewport?.addEventListener('resize', relayout);
   window.visualViewport?.addEventListener('scroll', relayout);
   document.addEventListener('fullscreenchange', relayout);
-  refreshOrientation();
 
   // --- First touch gesture: enter fullscreen + lock to landscape (Android
   //     path; best-effort, never throws). Fullscreen/lock require a user
@@ -1096,6 +1172,46 @@ interface MainMenuHandle {
   matchStarted(): void;
 }
 
+/** The landscape-lock context `boot()` hands the menu so it lays out in the same
+ *  logical (landscape) viewport the match does and remaps its own taps. */
+interface MenuContext {
+  /** The root container the menu attaches to (rotates under the landscape lock). */
+  readonly root: Container;
+  /** The current logical (landscape) viewport size, read live. */
+  logicalSize(): { w: number; h: number };
+  /** Physical `clientX/Y` → logical point (un-rotate a tap). */
+  toLogical(clientX: number, clientY: number): Vec2;
+  /** Logical point → physical canvas point (place a logical rect back on screen). */
+  toPhysical(lx: number, ly: number): Vec2;
+  /** Recompute + re-apply the root transform (orientation flip). */
+  recomputeTransform(): void;
+  /** Whether the root is currently rotated (portrait phone). */
+  isRotated(): boolean;
+}
+
+/** One menu control as the landscape-lock seam reports it: its logical rect (for
+ *  the "inside the logical viewport" assertion) and the physical point a tap must
+ *  land on to hit it (for the CDP touch-remap assertion). */
+interface MenuControlReport {
+  readonly kind: MainMenuOption;
+  readonly logical: Rect;
+  readonly physicalCenter: { x: number; y: number };
+}
+
+/** The read-only `window.__mainMenu` seam, extended for the landscape lock. */
+interface MainMenuSeam {
+  visible: boolean;
+  screen: 'menu' | 'settings';
+  matchStarted: boolean;
+  /** The LOGICAL (landscape) viewport the menu laid out against. */
+  logicalViewport: { width: number; height: number };
+  /** Whether the game root is rotated (portrait phone under the landscape lock). */
+  rotated: boolean;
+  /** The menu buttons, logical rect + physical tap point (see {@link MenuControlReport}). */
+  controls: readonly MenuControlReport[];
+  play(): void;
+}
+
 /**
  * The main menu (field report P1; GDD §4.6 M7). Shown on a clean boot only —
  * `boot()` skips it under `?debug=1`, which drops straight into a match so the
@@ -1115,6 +1231,7 @@ interface MainMenuHandle {
 function openMainMenu(
   app: Application,
   platform: ReturnType<typeof createBrowserPlatform>,
+  ctx: MenuContext,
 ): MainMenuHandle {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   let fireMode = readFireMode(platform, isTouch);
@@ -1122,17 +1239,27 @@ function openMainMenu(
   let screen: 'menu' | 'settings' = 'menu';
   let played = false;
 
-  const menuView = new MainMenuView(app.screen.width, app.screen.height, isTouch);
-  const settingsView = new SettingsView(app.screen.width, app.screen.height, isTouch);
-  app.stage.addChild(menuView, settingsView);
+  // Lay the menu out in the LOGICAL (landscape) viewport and hang it off the
+  // rotating game root — so a portrait phone gets a landscape menu that can never
+  // strand itself off-screen (the field-report bug), and re-layouts on every flip.
+  const menu0 = ctx.logicalSize();
+  const menuView = new MainMenuView(menu0.w, menu0.h, isTouch);
+  const settingsView = new SettingsView(menu0.w, menu0.h, isTouch);
+  ctx.root.addChild(menuView, settingsView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
-  // menu" assertion reads the truth, not a hopeful flag set on PLAY.
-  const seam: { visible: boolean; screen: 'menu' | 'settings'; matchStarted: boolean; play(): void } = {
+  // menu" assertion reads the truth, not a hopeful flag set on PLAY. It also
+  // reports the LOGICAL viewport + the buttons' logical rects and physical tap
+  // points, so the landscape-lock suite can assert the menu re-layouts on rotation
+  // and that a physical tap lands on the logical control (landscape-lock.spec.ts).
+  const seam: MainMenuSeam = {
     visible: true,
     screen,
     matchStarted: false,
+    logicalViewport: { width: menu0.w, height: menu0.h },
+    rotated: ctx.isRotated(),
+    controls: [],
     play: (): void => play(),
   };
 
@@ -1140,6 +1267,21 @@ function openMainMenu(
   const playPromise = new Promise<void>((resolve) => {
     resolvePlay = resolve;
   });
+
+  /** Refresh the seam's logical viewport, rotation flag, and per-button reports
+   *  (logical rect + physical tap point) from the live transform — the executable
+   *  form of "the menu lays out in landscape and a tap lands where it's drawn." */
+  function updateSeamLayout(): void {
+    const { w, h } = ctx.logicalSize();
+    const layout = mainMenuLayout({ width: w, height: h }, { isTouch });
+    seam.logicalViewport = { width: w, height: h };
+    seam.rotated = ctx.isRotated();
+    seam.controls = MAIN_MENU_ITEMS.map((item, i) => {
+      const r = layout.buttons[i] ?? { x: 0, y: 0, width: 0, height: 0 };
+      const center = ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
+      return { kind: item.kind, logical: { ...r }, physicalCenter: center };
+    });
+  }
 
   /** Redraw the live screen from current state. Static content, so this runs on
    *  a state change or a resize — Pixi's own ticker keeps painting between. */
@@ -1149,6 +1291,7 @@ function openMainMenu(
     if (menuView.visible) menuView.update(mainMenuModel());
     if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
     seam.screen = screen;
+    updateSeamLayout();
   }
 
   /** PLAY: tear the menu down and hand `boot()` the go-ahead to build the world. */
@@ -1193,9 +1336,10 @@ function openMainMenu(
   }
 
   function onPointerDown(e: PointerEvent): void {
-    const rect = app.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Un-rotate the physical tap into the logical space the menu is laid out in
+    // (landscape lock) — the remap that keeps a portrait tap on the button drawn
+    // under the thumb (the part that silently breaks; tested explicitly).
+    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (screen === 'menu') {
       const hit = menuView.hitTest(x, y);
       if (hit === 'play') play();
@@ -1218,8 +1362,13 @@ function openMainMenu(
   }
 
   function relayout(): void {
-    menuView.resize(app.screen.width, app.screen.height, isTouch);
-    settingsView.resize(app.screen.width, app.screen.height, isTouch);
+    // Landscape lock first: re-apply the root transform for the new canvas size,
+    // then re-lay the menu in the resulting logical (landscape) viewport — the
+    // re-layout the field report found missing (rotate → menu stranded).
+    ctx.recomputeTransform();
+    const { w, h } = ctx.logicalSize();
+    menuView.resize(w, h, isTouch);
+    settingsView.resize(w, h, isTouch);
     render();
   }
 
@@ -1227,8 +1376,9 @@ function openMainMenu(
     app.canvas.removeEventListener('pointerdown', onPointerDown);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
+    window.removeEventListener('orientationchange', relayout);
     window.visualViewport?.removeEventListener('resize', relayout);
-    app.stage.removeChild(menuView, settingsView);
+    ctx.root.removeChild(menuView, settingsView);
     menuView.destroy({ children: true });
     settingsView.destroy({ children: true });
   }
@@ -1236,6 +1386,7 @@ function openMainMenu(
   app.canvas.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);

@@ -18,18 +18,19 @@
  * Checks:
  *  - touch: FIRE button (Auto-aim default) + left ghost-stick zone render;
  *           the desktop controls strip is ABSENT;
- *  - portrait: ROTATE overlay covers the game; landscape: overlay gone;
+ *  - portrait: the game renders in LANDSCAPE (the ratified landscape lock —
+ *    field report v0.1.1 — replaces the old ROTATE overlay: a portrait phone is
+ *    rotated to landscape, never blacked out and asked to turn);
  *  - touch drag on the left half moves the ship (world-space truth, ?debug=1);
  *  - desktop: no touch affordances; controls strip PRESENT.
  *
  * ORIENTATION CONTRACT: the phone projects declare *portrait* viewports
- * (390×844 / 412×915) — the orientation the ROTATE overlay guards (m1-05). Any
- * test that asserts something about *play* (controls rendered, ship moving)
- * must boot in LANDSCAPE via {@link useLandscape}, because portrait is a
- * blocked, non-play state — the guard the overlay-visibility test exists to
- * cover. Portrait is reserved EXCLUSIVELY for that overlay-visibility case; a
- * gameplay assertion booted in portrait races the very guard it shares a suite
- * with. Landscape dims: 844×390 / 915×412.
+ * (390×844 / 412×915). Under the landscape lock the game is playable in BOTH
+ * orientations — a portrait phone is rotated to landscape, not blocked. Gameplay
+ * assertions that key off physical screen REGIONS (a corner, a bottom strip) still
+ * boot in LANDSCAPE via {@link useLandscape} so those regions map 1:1 to the
+ * logical layout without going through the rotation; the landscape-lock behaviour
+ * itself is covered by landscape-lock.spec.ts. Landscape dims: 844×390 / 915×412.
  */
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
 import {
@@ -43,7 +44,6 @@ import {
   REGION_STICK,
   REGION_STRIP_LEFT,
   REGION_STRIP_MID,
-  REGION_ORE_HUD,
   REGION_FULL,
   type Img,
 } from './pixels';
@@ -66,9 +66,11 @@ const ABSENT_MAX_PX = 40;
 /** The desktop controls strip is plasma+grey text at dpr1 — a lower px bar than
  *  the dpr2.6–3 mobile rings, still far above an empty band. */
 const STRIP_PRESENT_MIN_PX = 100;
-/** The overlay blacks out the field: almost nothing non-vacuum survives its
- *  opaque backdrop (only its own thin plasma glyph/label line-art). */
-const OVERLAY_MAX_NONVACUUM_RATIO = 0.1;
+/** "The field is drawn, not blacked out." The old ROTATE overlay left only its
+ *  thin plasma glyph (~1–2% non-vacuum); the ratified landscape lock renders the
+ *  real frozen space scene (~8–9%, mostly-vacuum by nature). This floor sits
+ *  between them — clear of a blackout, comfortably under real content. */
+const PORTRAIT_RENDERED_MIN_RATIO = 0.04;
 /** How much SIM time the drag is held for, in fixed ticks (60 Hz → 1.5 s of sim).
  *  Measured in *ticks*, never seconds: the window must be the same amount of
  *  simulation on every host (see {@link dragOverSimTicks}). Short enough that the
@@ -118,24 +120,6 @@ async function boot(page: Page): Promise<void> {
 /** Decode the current viewport screenshot into an {@link Img}. */
 async function shoot(page: Page): Promise<Img> {
   return decode(await page.screenshot());
-}
-
-/**
- * Emulate iOS Safari — the *only* environment the ROTATE overlay is designed
- * for. Chromium exposes `screen.orientation.lock`, so the app takes the Android
- * "lock to landscape" path and the overlay never shows. Removing `lock` makes
- * `platform.canLockOrientation()` false, driving the iOS overlay branch
- * (orientation.ts `shouldShowRotateOverlay`). Must run before the app boots.
- */
-async function emulateNoOrientationLock(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    try {
-      const o = window.screen?.orientation as { lock?: unknown } | undefined;
-      if (o) Object.defineProperty(o, 'lock', { configurable: true, value: undefined });
-    } catch {
-      /* best-effort — if it throws we just skip the emulation */
-    }
-  });
 }
 
 /** What one tick-bounded drag measured: world distance covered and the number of
@@ -267,40 +251,45 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
 });
 
 // ===========================================================================
-// Portrait handling (the M1 gap #2: unhandled portrait)
+// Portrait handling — the ratified landscape lock (field report v0.1.1)
 // ===========================================================================
 
-test('portrait shows the ROTATE overlay; landscape hides it', async ({ page }, testInfo) => {
+test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
-  await emulateNoOrientationLock(page);
-  await boot(page); // device default viewport is portrait (h > w)
-
-  // Overlay up: it covers the field almost entirely (opaque vacuum backdrop),
-  // so the ore HUD's signal-yellow "ORE" total in the top-left is hidden…
+  // Boot on the device default viewport, which is PORTRAIT (h > w). The ratified
+  // landscape lock rotates the whole game to landscape rather than blacking out the
+  // field behind a ROTATE overlay — so the game is fully rendered, not blocked.
+  await boot(page);
   const portrait = await shoot(page);
-  const oreCoveredPx = count(portrait, REGION_ORE_HUD, isYellow).matched;
-  expect(oreCoveredPx, 'ore-HUD yellow behind the overlay (portrait)').toBeLessThan(ABSENT_MAX_PX);
-  // …and almost nothing on screen is non-background (only the thin plasma glyph).
-  const portraitBusy = count(portrait, REGION_FULL, isNonVacuum).ratio;
-  expect(portraitBusy, 'non-vacuum fraction with overlay up (portrait)').toBeLessThan(
-    OVERLAY_MAX_NONVACUUM_RATIO,
+
+  // The HUD renders — the strongest "game is drawn, not overlaid" signal. The ore
+  // squares / banked total draw signal-yellow (which the old opaque ROTATE overlay
+  // hid entirely); it rides the rotated logical corner, so scan the whole frame.
+  const oreVisiblePx = count(portrait, REGION_FULL, isYellow).matched;
+  expect(oreVisiblePx, 'ore-HUD signal-yellow present (portrait, rotated to landscape)').toBeGreaterThan(
+    ABSENT_MAX_PX,
   );
 
-  // Rotate to landscape (swap the viewport) — fires resize/orientationchange,
-  // which re-runs relayout() and hides the overlay (orientation.ts).
+  // The field is drawn, not blacked out. The frozen space scene is mostly vacuum
+  // by nature, so this is a modest floor — well clear of the old overlay blackout
+  // (only its thin plasma glyph survived) yet comfortably below the real content.
+  const portraitBusy = count(portrait, REGION_FULL, isNonVacuum).ratio;
+  expect(portraitBusy, 'portrait renders the landscape game, not a blackout').toBeGreaterThan(
+    PORTRAIT_RENDERED_MIN_RATIO,
+  );
+
+  // Rotate to physical landscape — the game re-lays out and keeps rendering (no
+  // overlay to dismiss). Still showing the HUD's yellow, still drawing the field.
   const { width, height } = page.viewportSize() ?? { width: 390, height: 844 };
   await page.setViewportSize({ width: height, height: width });
   await page.waitForTimeout(900);
 
-  // Overlay gone: the game HUD is visible again — the ore yellow returns.
   const landscape = await shoot(page);
-  const oreVisiblePx = count(landscape, REGION_ORE_HUD, isYellow).matched;
-  expect(oreVisiblePx, 'ore-HUD yellow visible again (landscape)').toBeGreaterThan(ABSENT_MAX_PX);
+  const oreLandscapePx = count(landscape, REGION_FULL, isYellow).matched;
+  expect(oreLandscapePx, 'ore-HUD yellow still present (landscape)').toBeGreaterThan(ABSENT_MAX_PX);
   const landscapeBusy = count(landscape, REGION_FULL, isNonVacuum).ratio;
-  expect(landscapeBusy, 'landscape field busier than the blacked-out overlay').toBeGreaterThan(
-    portraitBusy,
-  );
+  expect(landscapeBusy, 'landscape still renders the game').toBeGreaterThan(PORTRAIT_RENDERED_MIN_RATIO);
 });
 
 // ===========================================================================
