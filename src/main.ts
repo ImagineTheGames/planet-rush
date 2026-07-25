@@ -105,6 +105,14 @@ import {
   mainMenuModel,
   mainMenuLayout,
   MAIN_MENU_ITEMS,
+  MapPickerView,
+  mapPickerModel,
+  mapPickerLayout,
+  mapIdAt,
+  normalizeMapId,
+  registryPlanets,
+  MAP_ORDER,
+  MAP_STORAGE_KEY,
   settingsModel,
   createSettings,
   toggleReduceVfx,
@@ -315,11 +323,21 @@ async function boot(): Promise<void> {
   // the old. `match`/`world` are `let`: every closure below reads the live binding,
   // so a rematch redirects the whole render/input path onto the new world at once.
   // The hull is the LOBBY's choice (#73) — rematches keep the class you picked.
+  // The arena the player picked on the PLAY screen (m8-02). Read once here so a
+  // rematch keeps the same map, exactly as it keeps the hull — the seed advances,
+  // the layout does not. `?debug=1` boots with the persisted-or-default map, so
+  // every existing harness keeps its `octagon` board unless a test opts out.
+  const chosenMapId = readMapId(platform);
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
     matchId += 1;
-    return bootOfflineMatch({ seed, localPlayer: LOCAL_PLAYER, shipClass: chosenShipClass });
+    return bootOfflineMatch({
+      seed,
+      localPlayer: LOCAL_PLAYER,
+      shipClass: chosenShipClass,
+      mapId: chosenMapId,
+    });
   }
   let match = bootMatch(matchSeed);
   let world = match.world;
@@ -328,6 +346,14 @@ async function boot(): Promise<void> {
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
+  // Hand the map-picker seam the arena the sim ACTUALLY built, read back off the
+  // world's own planets — the proof the picked map reached the sim (m8-02: "planet
+  // positions match that registry entry exactly"). A no-op under ?debug=1, where
+  // there was no menu.
+  mainMenu?.reportMatchMap(
+    chosenMapId,
+    world.planets.map((p) => ({ x: p.pos.x, y: p.pos.y })),
+  );
   // Hand the lobby seam the hull the sim ACTUALLY built the local ship with, read
   // back off the world — the assertion that the picked class reached the sim
   // (GDD §2.11; the M4 debug hook the live-stage spec reads). A no-op under
@@ -1639,6 +1665,14 @@ function readShipClass(platform: ReturnType<typeof createBrowserPlatform>): Ship
   return DEFAULT_SHIP_CLASS;
 }
 
+/** The arena the player last picked on the PLAY screen (m8-02), read through the
+ *  same platform storage seam as the hull and the fire mode so all three survive a
+ *  reload identically. `normalizeMapId` folds a stale or hand-edited value down to
+ *  the default (`octagon`), so a bad key can never reach the sim. */
+function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
+  return normalizeMapId(platform.storage.get(MAP_STORAGE_KEY));
+}
+
 /** Combine one device's control state into the accumulator: strongest thrust
  *  wins, latest aim wins, held states OR together (GDD §2.4 auto device-switch). */
 function mergeControl(dst: ControlState, src: ControlState): void {
@@ -1663,6 +1697,10 @@ interface MainMenuHandle {
   untilPlay(): Promise<void>;
   /** Mark the world as built (drives `window.__mainMenu.matchStarted`). */
   matchStarted(): void;
+  /** Report the arena the sim actually built and its home-planet positions —
+   *  drives `window.__mapPicker.worldMapId` / `.worldPlanets`, the proof the picked
+   *  map reached the sim (m8-02). Called by `boot()` once the world exists. */
+  reportMatchMap(mapId: string, planets: readonly { x: number; y: number }[]): void;
 }
 
 /** The landscape-lock context `boot()` hands the menu so it lays out in the same
@@ -1709,6 +1747,45 @@ interface MainMenuSeam {
   play(): void;
 }
 
+/** The read-only `window.__mapPicker` live-stage seam: the map picker as plain,
+ *  structured-cloneable truth, plus a `selectMap` a Playwright test presses as a
+ *  card tap would (tests/live-stage/map-picker.spec.ts). Present only on a clean
+ *  boot; absent under `?debug=1`, where the menu never runs. */
+interface MapPickerSeam {
+  /** The picker layer is up (true while the menu screen owns the display). */
+  visible: boolean;
+  /** Which front screen is live — `menu` shows the cards, `settings` hides them. */
+  screen: 'menu' | 'settings';
+  /** Number of cards drawn — the four ratified maps (GDD §2.1; registry m8-01). */
+  cardCount: number;
+  /** The map id currently selected — the card drawn as chosen. */
+  selectedId: string;
+  /** The onboarding default (`octagon`), so a test can pick anything *but* it. */
+  defaultId: string;
+  /** The map that carries the VETERAN tag (`diamond`). */
+  veteranId: string;
+  /** Card order, so a test maps a tile index to a map id the way the view does. */
+  order: readonly string[];
+  /** Laid out at thumb scale (the phone case). */
+  isTouch: boolean;
+  /** The card rects (logical, landscape space) — thumb-size assertion targets. */
+  cards: readonly Rect[];
+  /** The reserved band the cards were laid out inside. */
+  band: Rect;
+  /** The logical (landscape) viewport the picker laid out against. */
+  logicalViewport: { width: number; height: number };
+  /** Each map's registry planet positions, computed from the SAME bundled registry
+   *  the sim builds from — the expected board a booted match must match. */
+  expected: Readonly<Record<string, readonly { x: number; y: number }[]>>;
+  /** The arena the built world actually used, or null until the match boots. */
+  worldMapId: string | null;
+  /** The built world's home-planet positions, or null until the match boots — the
+   *  proof the picked map reached the sim (m8-02). */
+  worldPlanets: readonly { x: number; y: number }[] | null;
+  /** Select the card at `index` in {@link order} — a tap on a card. */
+  selectMap(index: number): void;
+}
+
 /**
  * The main menu (field report P1; GDD §4.6 M7). Shown on a clean boot only —
  * `boot()` skips it under `?debug=1`, which drops straight into a match so the
@@ -1735,6 +1812,11 @@ function openMainMenu(
   let settings: SettingsState = createSettings();
   let screen: 'menu' | 'settings' = 'menu';
   let played = false;
+  // The arena preselected on the picker: the player's last pick, or the default
+  // (`octagon`) the first time out (m8-02 — persist last choice, same seam as the
+  // fire mode). Selecting a card writes it straight back, so `boot()`'s `readMapId`
+  // reads it when the match boots.
+  let selectedMapId = readMapId(platform);
 
   // Lay the menu out in the LOGICAL (landscape) viewport and hang it off the
   // rotating game root — so a portrait phone gets a landscape menu that can never
@@ -1742,7 +1824,10 @@ function openMainMenu(
   const menu0 = ctx.logicalSize();
   const menuView = new MainMenuView(menu0.w, menu0.h, isTouch);
   const settingsView = new SettingsView(menu0.w, menu0.h, isTouch);
-  ctx.root.addChild(menuView, settingsView);
+  // The picker draws over the menu's backdrop (added after it) and under the
+  // settings screen (added before it) — it only ever shows on the menu screen.
+  const mapPickerView = new MapPickerView();
+  ctx.root.addChild(menuView, mapPickerView, settingsView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -1758,6 +1843,28 @@ function openMainMenu(
     rotated: ctx.isRotated(),
     controls: [],
     play: (): void => play(),
+  };
+
+  // The read-only map-picker seam (m8-02). Its layout facts are refreshed each
+  // render; `worldMapId`/`worldPlanets` stay null until `boot()` reports the built
+  // world through `handle.reportMatchMap`. `expected` is computed once from the
+  // bundled registry — the board a match must build for each map.
+  const mapSeam: MapPickerSeam = {
+    visible: true,
+    screen,
+    cardCount: MAP_ORDER.length,
+    selectedId: selectedMapId,
+    defaultId: normalizeMapId(''),
+    veteranId: 'diamond',
+    order: MAP_ORDER,
+    isTouch,
+    cards: [],
+    band: { x: 0, y: 0, width: 0, height: 0 },
+    logicalViewport: { width: menu0.w, height: menu0.h },
+    expected: Object.fromEntries(MAP_ORDER.map((id) => [id, registryPlanets(id)])),
+    worldMapId: null,
+    worldPlanets: null,
+    selectMap: (index: number): void => selectMapAt(index),
   };
 
   let resolvePlay: () => void = () => {};
@@ -1787,8 +1894,39 @@ function openMainMenu(
     settingsView.visible = screen === 'settings';
     if (menuView.visible) menuView.update(mainMenuModel());
     if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
+    renderPicker();
     seam.screen = screen;
     updateSeamLayout();
+  }
+
+  /** Lay the map picker out inside the band the menu reserves for it and draw the
+   *  cards — only on the menu screen. Refreshes the picker seam's layout facts. */
+  function renderPicker(): void {
+    const { w, h } = ctx.logicalSize();
+    const menuLayout = mainMenuLayout({ width: w, height: h }, { isTouch });
+    const pickerLayout = mapPickerLayout(menuLayout.mapBand, MAP_ORDER.length, isTouch);
+    mapPickerView.visible = screen === 'menu';
+    mapPickerView.setLayout(pickerLayout);
+    if (mapPickerView.visible) mapPickerView.update(mapPickerModel(selectedMapId));
+    mapSeam.visible = mapPickerView.visible;
+    mapSeam.screen = screen;
+    mapSeam.selectedId = selectedMapId;
+    mapSeam.isTouch = isTouch;
+    mapSeam.cards = pickerLayout.cards.map((r) => ({ ...r }));
+    mapSeam.band = { ...pickerLayout.band };
+    mapSeam.logicalViewport = { width: w, height: h };
+  }
+
+  /** Pick the map card at `index` (a tap on a card). Persists the choice at once,
+   *  so `boot()` reads it when the match boots and a reload finds it preselected
+   *  (m8-02). A no-op once PLAY has torn the menu down. */
+  function selectMapAt(index: number): void {
+    if (played) return;
+    const id = mapIdAt(index);
+    if (id === selectedMapId) return;
+    selectedMapId = id;
+    platform.storage.set(MAP_STORAGE_KEY, selectedMapId);
+    render();
   }
 
   /** PLAY: tear the menu down and hand `boot()` the go-ahead to build the world. */
@@ -1842,6 +1980,14 @@ function openMainMenu(
     // under the thumb (the part that silently breaks; tested explicitly).
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (screen === 'menu') {
+      // The picker band sits between the wordmark and the buttons; test it first,
+      // then the menu buttons. The two never overlap, so order is only a courtesy.
+      const card = mapPickerView.hitTest(x, y);
+      if (card !== null) {
+        selectMapAt(card);
+        e.preventDefault();
+        return;
+      }
       const hit = menuView.hitTest(x, y);
       if (hit === 'play') play();
       else if (hit === 'settings') openSettings();
@@ -1879,8 +2025,13 @@ function openMainMenu(
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
     window.visualViewport?.removeEventListener('resize', relayout);
-    ctx.root.removeChild(menuView, settingsView);
+    // The picker leaves the stage with the menu — but its seam persists on
+    // `window` (mutable fields), so `boot()` can still report the built world onto
+    // it after PLAY has torn the menu down.
+    mapPickerView.visible = false;
+    ctx.root.removeChild(menuView, mapPickerView, settingsView);
     menuView.destroy({ children: true });
+    mapPickerView.destroy({ children: true });
     settingsView.destroy({ children: true });
   }
 
@@ -1891,6 +2042,7 @@ function openMainMenu(
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);
+  installMapPickerSeam(mapSeam);
   render();
 
   return {
@@ -1898,7 +2050,27 @@ function openMainMenu(
     matchStarted: () => {
       seam.matchStarted = true;
     },
+    reportMatchMap: (mapId: string, planets: readonly { x: number; y: number }[]): void => {
+      mapSeam.worldMapId = mapId;
+      mapSeam.worldPlanets = planets.map((p) => ({ x: p.x, y: p.y }));
+    },
   };
+}
+
+/** Install the read-only `window.__mapPicker` live-stage seam (see
+ *  {@link openMainMenu}). Its fields are mutated in place as the picker runs and
+ *  after the match boots; the handle itself is fixed, like the menu seam. */
+function installMapPickerSeam(seam: object): void {
+  try {
+    Object.defineProperty(window, '__mapPicker', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
 }
 
 /** Install the read-only `window.__mainMenu` live-stage seam (see

@@ -496,6 +496,46 @@ export type {
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
 
+// --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
+//
+// Four cards on the PLAY flow, each a mini layout preview drawn from the
+// registry's own planet positions so the picture can never drift from the board.
+// `octagon` preselected; `diamond` carries a VETERAN tag. The chosen id is
+// persisted (same seam as the fire mode) and fed to `bootOfflineMatch(seed, mapId)`.
+// Same three-piece shape as every screen here: a pure model with co-located
+// geometry (`./map-picker`) and a thin Pixi view (`./map-picker-view`).
+
+export {
+  MAP_STORAGE_KEY,
+  MAP_PICKER_ID,
+  MAP_ORDER,
+  MAP_PREVIEW_SLOTS,
+  MAP_PREVIEW_SEED,
+  VETERAN_MAP_ID,
+  MAP_CARD_GAP,
+  MAP_CARD_MIN_WIDTH,
+  MAP_CARD_MAX_WIDTH,
+  MAP_CARD_MIN_HEIGHT,
+  MAP_CARD_MAX_HEIGHT,
+  mapPickerModel,
+  mapPickerLayout,
+  mapPickerHitTest,
+  mapPreview,
+  normalizeMapId,
+  mapIndexOf,
+  mapIdAt,
+  registryPlanets,
+} from './map-picker';
+export type {
+  MapCardModel,
+  MapCardShape,
+  MapPickerLayout,
+  MapPickerModel,
+  MapPreview,
+} from './map-picker';
+
+export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
+
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
 // Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
