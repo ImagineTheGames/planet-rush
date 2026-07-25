@@ -19,6 +19,7 @@ import type { Beam, PlayerId, ShipClass, Vec2 } from '@shared/types';
 import {
   CORE_HP,
   PLANET,
+  RESOURCE_FIELD,
   SHIELD,
   SHIP_RADIUS,
   SPAWN_PROTECTION_S,
@@ -28,7 +29,7 @@ import {
   WORLD_SIZE,
 } from './constants';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
-import { spawnWave } from './waves';
+import { spawnHomeFields, spawnWave } from './waves';
 
 // ---------------------------------------------------------------------------
 // Entities
@@ -100,6 +101,19 @@ export interface Asteroid {
   crackStage: number;
   /** Fractional ore mined but not yet emitted as a whole chunk. */
   mineBuffer: number;
+  /**
+   * Which field this rock belongs to (field rule v0.1.2, `RESOURCE_FIELD`): the
+   * owner slot of the home neighbourhood it was stamped for, or `null` for the
+   * contested commons. It is the fairness invariant made legible — the fairness
+   * test groups home fields by owner and sums the commons by `null`, and a
+   * renderer may tint "your neighbourhood" apart from the centre.
+   *
+   * Optional so the asteroid literals other agents build (net wire-decode, bot
+   * fixtures, render tests) keep compiling — a rock with no `home` field simply
+   * predates the tag; the sim's own spawners (`./waves`) always set it. Same
+   * backward-compatible discipline as `Turret.orbitAngle` / `Turret.muzzle`.
+   */
+  home?: PlayerId | null;
 }
 
 /** A drifting ore chunk, tractor-collected by proximity (GDD §2.3). */
@@ -482,20 +496,27 @@ export function createWorld(config: WorldConfig): World {
     time: 0,
     tick: 0,
     rngState: config.seed >>> 0,
-    nextEntityId: 0, // wave 1's rocks take ids [0, count); everything continues from there
+    // The home fields take the first ids, then wave 1's commons; everything else
+    // continues from there.
+    nextEntityId: 0,
     ships,
     asteroids: [],
     chunks: [],
     planets,
     projectiles: [],
     bounds,
-    fieldRadius: ringRadius * 0.7,
+    // The commons scatter disc — a fraction of the ring, kept clear of every
+    // home's measure radius so the two fields never overlap (`RESOURCE_FIELD`).
+    fieldRadius: ringRadius * RESOURCE_FIELD.commonsRadiusFraction,
     asteroidsPerWave: config.asteroidCount ?? WAVE.asteroidsPerWave,
     match: initialMatch(),
   };
 
-  // Wave 1 is the opening field — same spawner, same schedule, so the rock a
-  // player mines at t=0 and the rock that lands at t=600 come from one code path.
+  // The fair opening layout, before the fight begins (field rule v0.1.2): the
+  // identical per-planet home neighbourhoods first, then wave 1 of the contested
+  // commons. Waves 2..5 land on the metronome — the rock a player mines at t=0
+  // and the rock that lands at t=600 come from one code path (`./waves`).
+  spawnHomeFields(world);
   spawnWave(world);
   return world;
 }
