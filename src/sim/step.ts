@@ -578,7 +578,14 @@ function acquireNearest(world: World, ship: Ship): BeamHit | null {
   }
   for (let i = 0; i < world.ships.length; i++) {
     const t = world.ships[i]!;
-    if (t.id === ship.id || !t.alive) continue;
+    // A spawn-protected ship is not a target at all — the beam passes over it,
+    // exactly as it passes over a spawn-protected core (see `raycastBeam` and
+    // the planet loop). Acquiring it would engage an invulnerable hull, stopping
+    // the beam dead on a ship that takes zero damage with no visual tell (field
+    // report: "some ships would not take damage from me") — and worse, auto-aim
+    // would lock onto it instead of a live enemy standing right beside it. The
+    // turret and projectile paths already skip protection this way (GDD §2.1).
+    if (t.id === ship.id || !t.alive || t.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, t.pos);
     if (d2 < bestD2) {
       bestD2 = d2;
@@ -661,10 +668,14 @@ function raycastBeam(world: World, ship: Ship, hash: SpatialHash): { hit: BeamHi
     }
   }
 
-  // Enemy ships.
+  // Enemy ships. A ship inside spawn protection is skipped exactly like a
+  // protected core below: it is not a target, so the beam passes over it rather
+  // than clamping on an invulnerable hull that then absorbs zero damage — which
+  // read to a developer as "some ships would not take damage," and let a fresh
+  // spawn body-block a beam bound for a live enemy behind it (GDD §2.1).
   for (let i = 0; i < world.ships.length; i++) {
     const t = world.ships[i]!;
-    if (t.id === ship.id || !t.alive) continue;
+    if (t.id === ship.id || !t.alive || t.spawnProtect > 0) continue;
     const hitT = segCircle(ship.pos, dx, dy, t.pos, t.radius);
     if (hitT !== null && hitT < bestT) {
       bestT = hitT;
