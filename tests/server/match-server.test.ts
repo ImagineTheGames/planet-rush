@@ -332,8 +332,12 @@ describe('the authoritative match server', () => {
     // The same ship object, never removed, never respawned — only the hands on
     // it changed (GDD §4.2 "reclaim their ship, with all upgrades intact").
     expect(room.world!.ships[1]).toBe(ship);
-    expect(ship.cargo).toBe(4);
-    expect(ship.banked).toBe(17);
+    // The ship's WEALTH is intact across the reclaim — but the split can shift:
+    // while the substitute bot parks the seat at its own planet, the v0.1.2
+    // auto-deposit rule bleeds a little of the hold into the safe bank (field
+    // report ore-deposit). Reclaim preserves the ship, not a frozen hold/bank
+    // ledger, so assert the conserved total rather than the exact halves.
+    expect(ship.cargo + ship.banked).toBeCloseTo(21, 9);
     expect(ship.cargoCap).toBe(6);
     expect(ship.hull).toBe(31);
 

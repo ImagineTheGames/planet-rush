@@ -25,6 +25,7 @@ import {
   ASTEROID,
   WAVE_COUNT,
   WAVE_ORE,
+  clampToMargin,
   waveRadiusFraction,
   waveTime,
 } from './constants';
@@ -85,9 +86,15 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
     rng = r.state;
     drawnOre += ore;
 
+    // The disc is well inside the arena on the default map, but a wide field on
+    // a small QA world could scatter a rock into the wall margin — clamp so
+    // NOTHING spawns within `WORLD_EDGE_MARGIN` of the bounds (field report P1).
     spawned.push({
       id: world.nextEntityId++,
-      pos: { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius },
+      pos: {
+        x: clampToMargin(cx + Math.cos(angle) * radius, rockRadius, world.bounds.width),
+        y: clampToMargin(cy + Math.sin(angle) * radius, rockRadius, world.bounds.height),
+      },
       radius: rockRadius,
       ore,
       maxOre: ore,

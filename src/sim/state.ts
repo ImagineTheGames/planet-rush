@@ -24,6 +24,8 @@ import {
   SPAWN_PROTECTION_S,
   STARTING_ORE,
   WAVE,
+  WORLD_EDGE_MARGIN,
+  WORLD_SIZE,
 } from './constants';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnWave } from './waves';
@@ -108,6 +110,20 @@ export interface OreChunk {
   /** Ore value carried. */
   amount: number;
   radius: number;
+  /**
+   * Deposit-flight chunk (field report v0.1.2): a ship docked at its own planet
+   * spins these off as its hold drains into the bank, and they fly to `homeTo`
+   * and vanish on arrival. They are the *telegraph*, not the ore — the drain
+   * itself is authoritative on `Ship.cargo`/`banked`, so a flight chunk carries
+   * no economic weight: the tractor never grabs it, no ship ever collects it,
+   * and it is absorbed silently at the planet. Optional and unset on a normal
+   * mined chunk, so the renderer (which draws every chunk by `pos`) and the net
+   * codec keep working unchanged — the same backward-compatible discipline as
+   * `Turret.muzzle`.
+   */
+  deposit?: boolean;
+  /** Where a `deposit` flight is headed — its planet's centre. Unset otherwise. */
+  homeTo?: Vec2;
 }
 
 // --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
@@ -129,10 +145,45 @@ export interface Turret {
   /** Barrel facing, radians — turn-rate limited toward the tracked ship. Purely
    *  the visible telegraph: alignment never gates the shot (DPS is DPS). */
   angle: number;
+  /**
+   * Angular position of the turret **around its planet's rim**, radians (field
+   * report P1). A turret is no longer pinned to its build spot: it slides along
+   * the surface ring toward the point whose outward normal faces its target,
+   * capped at `TURRET.orbitSpeed` so it glides. `pos` is derived from this every
+   * tick (`turretOrbitPos`), so the sprite and beam origin track the slide.
+   *
+   * Starts at the turret's mount-slot home angle (`turretHomeAngle`), which is
+   * why a freshly built turret sits exactly on its reserved slot, and where it
+   * slides back to when no enemy is in range.
+   *
+   * Optional so the render tell / netcode-reconstruction / bot-fixture turret
+   * literals other agents build keep compiling — a turret with no `orbitAngle`
+   * simply does not slide (its `pos` is taken as authoritative), exactly the same
+   * backward-compatible discipline as `muzzle`. The sim's own turrets always
+   * carry it (`makeTurret` sets it).
+   */
+  orbitAngle?: number;
   /** Seconds until it may fire again. */
   cooldown: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
+  /**
+   * Muzzle geometry for the tick this turret actually loosed a shot, else
+   * `null` — the turret's answer to `Ship.beam` (GDD §2.6, §4.1). A turret's
+   * damage rides a pooled projectile, but its *tell* is the muzzle flash, and
+   * that tell has to come from sim combat state so **every** turret in the world
+   * flashes when it fires — not just the local player's. Origin at the barrel
+   * tip, direction at the tracked ship, `hitPoint`/`length` clamped to that
+   * ship's surface, so a renderer can draw a muzzle bloom or a tracer without
+   * re-deriving the shot. Set only on fire ticks (~twice a second), cleared
+   * every other tick, so it is a transient event, not a standing beam.
+   *
+   * Optional so this render tell can be added without breaking the turret
+   * literals other agents build (wire-event reconstruction, bot fixtures) — the
+   * sim's own turrets always carry it (`makeTurret` sets it), and a turret with
+   * no `muzzle` field simply is not flashing.
+   */
+  muzzle?: Beam | null;
 }
 
 /** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each
@@ -396,14 +447,19 @@ function initialMatch(): MatchState {
  * byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
-  const bounds: Bounds = config.bounds ?? { width: 1920, height: 1920 };
+  const bounds: Bounds = config.bounds ?? { width: WORLD_SIZE, height: WORLD_SIZE };
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
   const ringRadius = halfMin * 2 * PLANET.ringFraction;
-  // Planets sit outboard of the ship ring, clamped to stay wholly inside the
-  // arena on small maps (the QA harness runs cramped worlds on purpose).
-  const planetRing = Math.min(ringRadius + PLANET.orbitOffset, halfMin - PLANET.radius);
+  // Planets sit outboard of the ship ring, and NOTHING hugs the wall: the
+  // outermost planet point clears the bounds by `WORLD_EDGE_MARGIN` (field
+  // report P1). The clamp keeps the ring wholly inside the arena — with the
+  // margin — even on the cramped worlds the QA harness builds on purpose.
+  const planetRing = Math.min(
+    ringRadius + PLANET.orbitOffset,
+    halfMin - PLANET.radius - WORLD_EDGE_MARGIN,
+  );
 
   // Ships around the ring, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {

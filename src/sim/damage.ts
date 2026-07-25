@@ -12,7 +12,7 @@
  * it belongs to (`buildings.ts`).
  */
 
-import { CHUNK, DEATH_ORE_DROP_FRACTION, RESPAWN_S } from './constants';
+import { CHUNK, DEATH_ORE_DROP_FRACTION, RESPAWN_S, clampToMargin } from './constants';
 import type { Ship, World } from './state';
 
 /**
@@ -54,7 +54,10 @@ export function killShip(world: World, ship: Ship): void {
     const dy = Math.sin(theta);
     world.chunks.push({
       id: world.nextEntityId++,
-      pos: { x: ship.pos.x + dx * (ship.radius + CHUNK.radius), y: ship.pos.y + dy * (ship.radius + CHUNK.radius) },
+      pos: {
+        x: clampToMargin(ship.pos.x + dx * (ship.radius + CHUNK.radius), CHUNK.radius, world.bounds.width),
+        y: clampToMargin(ship.pos.y + dy * (ship.radius + CHUNK.radius), CHUNK.radius, world.bounds.height),
+      },
       vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
       amount,
       radius: CHUNK.radius,

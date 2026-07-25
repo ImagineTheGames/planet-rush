@@ -24,7 +24,9 @@
  *  - **The Build & Upgrade wheel** and the upgrade panel behind its arrow
  *    (GDD §2.5), drawn by {@link ./build-wheel-view}, open at your own planet.
  *
- * Over-ship hull bars and the minimap arrive with the remaining M2 wiring.
+ * Over-ship hull bars now land as a pooled, screen-space layer over every
+ * non-local combat entity ({@link ./healthbar}, {@link ./healthbar-view}); the
+ * minimap arrives with the remaining M2 wiring.
  *
  * All decision logic lives in the pure, unit-tested sibling modules
  * ({@link ./onboarding}, {@link ./wave-clock}, {@link ./ore-hud},
@@ -58,7 +60,11 @@ import { upgradePanelModel, STOCK_TIERS } from './upgrade-panel';
 import type { UpgradeTiers } from './upgrade-panel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
-import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { planetHpModel, planetHpFlashOn, playerColor } from './planet-hp';
+import { healthBarModel } from './healthbar';
+import type { Combatant } from './healthbar';
+import { HealthBarView } from './healthbar-view';
+import type { DrawnHealthBar } from './healthbar-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -69,6 +75,10 @@ import {
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
   SHIELD_BAR_HEIGHT,
+  HULL_BAR_WIDTH,
+  HULL_BAR_HEIGHT,
+  HULL_LABEL_HEIGHT,
+  HULL_TOP,
   PROMPT_PAD_X,
   PROMPT_PAD_Y,
   PROMPT_STROKE,
@@ -190,6 +200,21 @@ export interface HudFrame {
   /** Any wheel order has been placed this match — retires the SPEND onboarding
    *  prompt (GDD §2.10). Default false. */
   readonly hasOrdered?: boolean;
+  /** Local ship's current hull HP — the one source both the over-ship own-ship
+   *  bar and the HUD hull readout read (field request v0.1.1), so they agree.
+   *  Default: full (`maxHull`). */
+  readonly hull?: number;
+  /** Local ship's max hull HP. Default 0 ⇒ no own-ship bar and no hull readout
+   *  (the M1 feed predates the ship's hull being wired). */
+  readonly maxHull?: number;
+  /** Local ship's screen radius, so the over-ship own bar floats clear of the
+   *  sprite. The follow camera renders the ship at screen centre 1:1, so a world
+   *  radius is a screen radius. Default {@link DEFAULT_SHIP_SCREEN_RADIUS}. */
+  readonly shipRadius?: number;
+  /** The local ship is firing its beam this tick (mining or shooting — one beam,
+   *  GDD §2.5) ⇒ "in combat" for the own-ship bar, matching the enemy rule.
+   *  Default false. */
+  readonly shipFiring?: boolean;
   /** The hull the player picked in the lobby (GDD §2.11) — the upgrade panel's
    *  stat baseline. Default Vanguard, the onboarding default. */
   readonly shipClass?: ShipClass;
@@ -210,6 +235,40 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+
+  // --- Day 2: over-entity health bars (GDD §2.2 — a hull bar over every ship) --
+
+  /** Non-local combat entities — enemy ships, enemy turrets, hostile wave units
+   *  — each with its HP and its **screen-space** position (the caller projects
+   *  world → screen via the renderer's camera). The health-bar layer draws a bar
+   *  over each that is damaged or in combat; the local player's own ship and
+   *  turrets are filtered out by {@link ./healthbar}, so passing them is harmless.
+   *  Default: none ⇒ no bars (the M1 feed predates enemies). */
+  readonly combatants?: readonly Combatant[];
+}
+
+/** Reused for a frame that carries no combatants, so the empty case allocates
+ *  nothing (GDD §4.3 — no per-frame allocation on the hot path). */
+const NO_COMBATANTS: readonly Combatant[] = [];
+
+/** Fallback screen radius for the own-ship over-bar when the frame carries no
+ *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
+ *  floats above where the ship sits (screen centre), CSS px. */
+const DEFAULT_SHIP_SCREEN_RADIUS = 14;
+
+/** A mutable {@link Combatant} — the single own-ship record the HUD synthesises
+ *  and overwrites in place each frame, so folding the local ship into the
+ *  health-bar model allocates nothing after warm-up (GDD §4.3). */
+interface MutableLocalCombatant {
+  owner: PlayerId;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  inCombat: boolean;
+  pos: { x: number; y: number };
+  radius: number;
+  local: boolean;
+  forceShow: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +307,17 @@ export class Hud extends Container {
   private readonly planetLabel: Text;
   private readonly planetBar = new Graphics();
 
+  // --- Own SHIP hull readout (top-right, under HOME — field request v0.1.1) -
+  //     Visible even when the ship centre is under the player's thumb; shares
+  //     one source (sim hull) with the over-ship bar so the two always agree.
+  private readonly hullGroup = new Container();
+  private readonly hullLabel: Text;
+  private readonly hullBar = new Graphics();
+  /** Last hull fraction the readout drew, or -1 when hidden — read back by the
+   *  ?debug=1 live-stage seam ({@link debugHullReadout}) to prove the readout and
+   *  the over-ship bar agree. A single number; costs nothing in a normal build. */
+  private lastHullFraction = -1;
+
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
   private readonly alarmGroup = new Container();
   private readonly alarmFrame = new Graphics();
@@ -263,6 +333,28 @@ export class Hud extends Container {
    *  while home is already on screen (the planet is its own tell), and the
    *  registry records what is drawn, never what would have been. */
   private arrowDrawn = false;
+
+  // --- Over-entity health bars (GDD §2.2 — the field report's enemy bars) ---
+  //     A pooled, screen-space layer, drawn behind the HUD chrome and over the
+  //     world render layer below the HUD. Its decisions live in ./healthbar.
+  private readonly healthbars = new HealthBarView();
+  /** The own-ship combatant, synthesised each frame and folded into the health-
+   *  bar model so the local ship gets a bar too (field request v0.1.1). Reused in
+   *  place; `local` never changes. */
+  private readonly localCombatant: MutableLocalCombatant = {
+    owner: 0,
+    hp: 0,
+    maxHp: 0,
+    alive: true,
+    inCombat: false,
+    pos: { x: 0, y: 0 },
+    radius: DEFAULT_SHIP_SCREEN_RADIUS,
+    local: true,
+    forceShow: false,
+  };
+  /** Reused input array for {@link healthBarModel}: the own ship followed by the
+   *  frame's enemies/hostiles, so folding the local ship in allocates nothing. */
+  private readonly healthbarInput: Combatant[] = [];
 
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
@@ -302,6 +394,13 @@ export class Hud extends Container {
     this.planetGroup.addChild(this.planetBar, this.planetLabel);
     this.planetGroup.visible = false;
 
+    // Own ship hull: the same shape one step down — a right-anchored `HULL` label
+    // above a bar in the player's colour (field request v0.1.1).
+    this.hullLabel = this.makeText('HULL', FONT_HEADING, 11, TEXT_DIM);
+    this.hullLabel.anchor.set(1, 0);
+    this.hullGroup.addChild(this.hullBar, this.hullLabel);
+    this.hullGroup.visible = false;
+
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
     // Both are drawn only while the alarm is sounding — threat red is never a
     // resting-state colour (style-guide §2).
@@ -312,9 +411,14 @@ export class Hud extends Container {
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
+      // Health bars draw first: they float over the world but under every piece
+      // of HUD chrome, so a bar never sits on top of the ore squares or the
+      // wave clock.
+      this.healthbars,
       this.oreGroup,
       this.waveGroup,
       this.planetGroup,
+      this.hullGroup,
       this.stripGroup,
       this.alarmGroup,
       this.wheel,
@@ -337,6 +441,10 @@ export class Hud extends Container {
     this.waveGroup.y = PAD;
     this.planetGroup.x = this.screenWidth - PAD;
     this.planetGroup.y = PAD;
+    // The hull readout hugs the same right margin, one element down (HULL_TOP is
+    // an absolute y below the HOME footprint), so the group origin is at HULL_TOP.
+    this.hullGroup.x = this.screenWidth - PAD;
+    this.hullGroup.y = HULL_TOP;
     this.stripGroup.y = this.screenHeight - SQUARE - STRIP_PAD;
     this.promptGroup.x = this.screenWidth / 2;
     // Below the ship (the follow camera holds it at the centre) and above the
@@ -352,12 +460,16 @@ export class Hud extends Container {
   update(frame: HudFrame): void {
     this.updateOre(frame);
     this.updateWaveClock(frame);
-    this.updatePlanetHp(frame);
-    this.updateControlsStrip(frame);
-    // The alarm runs before the wheel and the prompts, because both read its
-    // verdict: the wheel is not hidden by it, but the onboarding prompt is
-    // chosen by it (GDD §2.10's under-attack prompt).
+    // The alarm runs first now, because three things downstream read its verdict:
+    // the onboarding prompt is chosen by it (GDD §2.10's under-attack prompt) and
+    // the own-ship health bar is forced on by it during a siege (field request
+    // v0.1.1). The alarm derives its damage from HP deltas alone, so running it
+    // earlier changes nothing it computes.
     const underAttack = this.updateAlarm(frame);
+    this.updateHealthBars(frame, underAttack);
+    this.updatePlanetHp(frame);
+    this.updateHullReadout(frame);
+    this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
@@ -519,6 +631,111 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+  }
+
+  // --- Over-entity health bars (GDD §2.2) ---------------------------------
+
+  /** Draw a bar over every combat entity that is damaged or fighting: enemy
+   *  ships, enemy turrets and hostile wave units (the enemy field report), **and
+   *  the local player's own ship** (field request v0.1.1). The pure model in
+   *  {@link ./healthbar} owns the "which entities, what fill" decision; this
+   *  synthesises the own-ship combatant (from sim hull, at the screen centre the
+   *  follow camera holds it, flagged `local`, forced on while under siege), folds
+   *  it in front of the frame's enemies, and draws the result. */
+  private updateHealthBars(frame: HudFrame, underAttack: boolean): void {
+    const input = this.healthbarInput;
+    input.length = 0;
+
+    // The own ship: a first-class bar, styled as mine (field request v0.1.1). The
+    // camera holds the local ship at the viewport centre, so that is where its
+    // bar tracks. Same visibility rule as an enemy — damaged OR in combat — plus
+    // forced on during a siege alarm so the player can watch their hull as they
+    // scramble home. Fed from the SAME hull the readout uses, so the two agree.
+    const maxHull = frame.maxHull ?? 0;
+    if (maxHull > 0) {
+      const c = this.localCombatant;
+      c.owner = frame.owner ?? 0;
+      c.hp = frame.hull ?? maxHull;
+      c.maxHp = maxHull;
+      c.alive = frame.shipAlive ?? true;
+      c.inCombat = frame.shipFiring ?? false;
+      c.pos.x = this.screenWidth / 2;
+      c.pos.y = this.screenHeight / 2;
+      c.radius = frame.shipRadius ?? DEFAULT_SHIP_SCREEN_RADIUS;
+      c.forceShow = underAttack;
+      input.push(c);
+    }
+
+    // Then the enemies/hostiles the caller projected to screen space. The model
+    // filters the local player's own turrets (local by ownership, no `local`
+    // flag) and anything full-and-idle, so passing them all is correct.
+    const combatants = frame.combatants ?? NO_COMBATANTS;
+    for (const e of combatants) input.push(e);
+
+    const bars = healthBarModel(input, frame.owner ?? 0);
+    this.healthbars.update(bars, this.screenWidth, this.screenHeight);
+  }
+
+  // --- Own ship hull readout (top-right, under HOME — field request v0.1.1) --
+
+  /** Your own ship's hull, in your player colour, stacked under HOME. The field
+   *  request's second half: twin-stick play hides the ship centre under the
+   *  player's thumbs, so the over-ship bar alone is not enough — the hull needs a
+   *  HUD readout that is never under a thumb. It reads the SAME `hull`/`maxHull`
+   *  the over-ship bar does, so the two can never disagree (one source: sim hp). */
+  private updateHullReadout(frame: HudFrame): void {
+    const maxHull = frame.maxHull ?? 0;
+    // Nothing wired yet (M1 feed) ⇒ nothing drawn. The element appears the frame
+    // the ship's hull does, like every other day-2 element.
+    if (maxHull <= 0) {
+      this.hullGroup.visible = false;
+      this.lastHullFraction = -1;
+      return;
+    }
+    this.hullGroup.visible = true;
+
+    const fraction = clamp01((frame.hull ?? maxHull) / maxHull);
+    this.lastHullFraction = fraction;
+    const color = playerColor(frame.owner ?? 0);
+
+    const y = HULL_LABEL_HEIGHT;
+    this.hullBar.clear();
+    // Track first (full width, so the missing part reads as absence), then the
+    // identity-colour fill over its right-aligned portion.
+    this.hullBar
+      .roundRect(-HULL_BAR_WIDTH, y, HULL_BAR_WIDTH, HULL_BAR_HEIGHT, 2)
+      .fill({ color: PALETTE.hullSteel, alpha: 0.22 })
+      .roundRect(-HULL_BAR_WIDTH, y, HULL_BAR_WIDTH, HULL_BAR_HEIGHT, 2)
+      .stroke({ width: 1, color, alpha: 0.55 });
+    if (fraction > 0) {
+      const w = HULL_BAR_WIDTH * fraction;
+      this.hullBar.roundRect(-w, y, w, HULL_BAR_HEIGHT, 2).fill({ color, alpha: 0.95 });
+    }
+
+    // Ships do not repair (GDD §2.5) — a dead ship is respawning, so say so
+    // rather than showing an empty bar as if it were merely low.
+    this.hullLabel.text = frame.shipAlive === false ? 'HULL —' : 'HULL';
+  }
+
+  /** The hull fraction the readout last drew (or -1 when hidden) — the ?debug=1
+   *  live-stage seam reads this to prove the readout matches the over-ship bar. */
+  debugHullReadout(): number {
+    return this.lastHullFraction;
+  }
+
+  /** ?debug=1 live-stage seam: arm the health-bar layer's drawn-bar capture so
+   *  {@link debugHealthBars} can read it back. Called once from `main.ts` only
+   *  under ?debug=1 — the wiring the field report caught missing is what a
+   *  live-stage Playwright test drives through here; no effect on a normal build. */
+  enableHealthBarDebug(): void {
+    this.healthbars.enableDebugCapture();
+  }
+
+  /** The health bars the real layer drew last frame — owner, fill, screen
+   *  position — for the live-stage test. Empty unless {@link enableHealthBarDebug}
+   *  was called. */
+  debugHealthBars(): DrawnHealthBar[] {
+    return this.healthbars.debugBars();
   }
 
   // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) -------------
@@ -700,6 +917,7 @@ export class Hud extends Container {
    * | id              | anchor        | why that region                        |
    * |-----------------|---------------|----------------------------------------|
    * | `planet-hp`     | `top-right`   | GDD §2.2 puts own-planet HP top-right. The only M2 element with a *narrow* anchor, so it is the only one whose width is a real constraint: `top-right`'s zone starts at the half-width line, giving the bar a `W/2 − PAD` budget — 144px on a 320px phone against a 140px bar. `hud-geometry.ts` owns that number and `hud-geometry.test.ts` pins it. |
+   * | `hull-hud`      | `top-right`   | Own-**ship** hull readout (field request v0.1.1). Stacked directly under `planet-hp` in the same corner — both are your-survival readouts in your player colour — so it shares that narrow anchor and pays the same `W/2 − PAD` width budget (120px bar, well inside 144). Its footprint hangs from the top edge under HOME (`HULL_TOP`); `hud-geometry.test.ts` pins that it stays in-corner on every phone profile. |
    * | `build-wheel`   | `full` + 0    | GDD §2.2 opens the wheel "near your own planet"; the follow camera keeps your ship — and so your docked planet — at the screen centre, and the wheel is drawn there. It is an **overlay**: at thumb scale it is ~72% of the shorter screen dimension (GDD §2.4 makes it a touch target first), so no third-width band can hold it and `full` is the region the vocabulary reserves for overlays. The assertion that bites is the real failure mode — a thumb-scaled radial menu spilling off a phone's edge. |
    * | `upgrade-panel` | `full` + 0    | Same overlay, one screen deeper (GDD §2.5). Its width is clamped to the viewport (`panelSize`) precisely so this holds on a narrow phone. |
    * | `alarm-frame`   | `full` + 0    | It *is* the screen frame — `full` is a statement of intent, not a fallback. |
@@ -805,11 +1023,23 @@ export class Hud extends Container {
 
     // M2 (see the table above).
     push('planet-hp', 'top-right', PAD, this.planetGroup);
+    // Own-ship hull readout (field request v0.1.1): stacked under HOME in the same
+    // top-right corner, so it shares HOME's anchor and width budget. Its geometry
+    // (and that budget) are pinned in hud-geometry.test.ts.
+    push('hull-hud', 'top-right', PAD, this.hullGroup);
     push('build-wheel', 'full', 0, this.wheel.wheelNode);
     push('upgrade-panel', 'full', 0, this.wheel.panelNode);
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
+
+    // Over-entity health bars: the layer computes its own union bounds (only the
+    // bars that actually drew on-screen), so it registers itself rather than
+    // going through `push` — its footprint is not one child's getBounds(). Gated
+    // on the HUD's own visibility, the same as `shown()` does for `push`.
+    if (shown(this.healthbars)) {
+      for (const entry of this.healthbars.describeLayout(viewport)) entries.push(entry);
+    }
 
     // `viewport` is the host's size; the HUD was laid out against the same
     // numbers via resize(), so a mismatch is itself the drift worth catching.
@@ -831,4 +1061,11 @@ export class Hud extends Container {
       style: { fontFamily, fontSize, fill, fontWeight, letterSpacing: 0.5 },
     });
   }
+}
+
+/** Clamp a fraction to 0..1, treating a non-finite value as empty — a hull HP of
+ *  NaN must read as "no bar", never over/under-draw. */
+function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }

@@ -114,39 +114,139 @@
     "title": "GATE: 8-planet ring on screen",
     "area": "match",
     "image": "images/planet-ring.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Widest available frame (1600×1000) on the seeded ?debug=1&freeze=1 world, whose roster is a full 8-planet ring (freeze.ts FREEZE_PLAYER_COUNT=8, and the sim's createWorld does build world.planets[8]). ON SCREEN: only grey asteroid circles clustered in the upper-left, the local ship at centre, and the HUD. There is NO ring of planets — no coloured planet bodies, no cores, no home bases anywhere in the frame. The 8-planet ring exists in sim state but is NOT rendered by the client (src/render/index.ts draws only ships, asteroids, ore chunks and beams — it has no planet/turret draw path). FAILS the gate: the ring is not visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build (PR #40, m2-wire-the-war). Seeded ?debug=1&freeze=1 world, viewport widened to 3600×2000 so the 1:1 follow-camera can reach the whole ring (planets sit ~896 world-px from the arena centre, the far one ~1702 px from the local ship it centres on). ON SCREEN: EIGHT planet bodies arranged in a ring around a central cluster of grey asteroids (the field). Each planet is a dark patina disc with a signal-yellow core and two teal segments, encircled by a distinct owner beacon ring — I count eight different colours (white/grey top-centre, orange upper-left, blue upper-right, magenta far-left, blue right, purple lower-left, teal lower-right, green bottom-centre) — and each has its own small ship triangle beside it. HUD reads 'WAVE 1/5 · Outer Drift / NEXT 2:28 / MATCH 0:02', 'ORE 3', 'HOME' top-right. This is the full 8-planet ring, rendered. PASSES the gate.",
+    "verdict": "verified"
   },
   {
     "id": "build-wheel-open",
     "title": "GATE: Build wheel open with costs",
     "area": "build-wheel",
     "image": "images/build-wheel-open.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Held 'E' (the strip's 'E Build & Upgrade' binding) at the ship's spawn — its own planet, i.e. docked, the one place GDD §2.5 says the wheel opens. The match clock advanced to 'MATCH 0:05', so input was accepted. ON SCREEN: no build wheel — no radial segments, no segment labels, and none of the expected cost numbers. The scene is the ordinary game frame with ship, asteroids and HUD. The HUD module contains a BuildWheelView, but main.ts never feeds its wheel signals (feedHud sets only cargo/cargoCap/banked/time/device/fireMode/isTouch/nearAsteroid; docked defaults false), so the wheel stays hidden. FAILS the gate: no wheel, no costs visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. Held 'E' (the strip's 'E Build & Upgrade' binding) while docked at the ship's spawn planet. ON SCREEN: the Build & Upgrade wheel is OPEN — a radial ring of FIVE labelled segments around a hub. Reading clockwise from twelve o'clock: 'TURRET / YOUR PLANET' with cost '3'; 'SHIELD / YOUR PLANET' cost '5'; 'REPAIR CORE / YOUR PLANET' cost '1'; 'UPGRADE SHIP / YOUR SHIP' (highlighted, with a ▶ pointer and no cost — it opens the upgrade panel); 'BANK / YOUR PLANET' (no cost). The hub prints the live ore total '3 · ORE' inside a cyan selection ring. A tooltip banner reads 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder' (the SPEND onboarding lesson). Build stamp 'c97f60a · 21:44Z' bottom-right. The wheel is open and its costs — 3, 5, 1 — are the only numbers on the wedges, exactly as GDD §2.5 specifies. PASSES the gate.",
+    "verdict": "verified"
   },
   {
-    "id": "turret-under-construction",
+    "id": "turret-construction",
     "title": "GATE: turret mid-construction",
     "area": "build-wheel",
-    "image": "images/turret-under-construction.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "Held 'E', swept clicks around where wheel segments would sit, pressed confirm, then let the sim run ~4 s for a build to progress (clock reached 'MATCH 0:09'). ON SCREEN: no turret at any stage of construction, no build-progress ring or bar, and — as with planet-ring — no planet for a turret to mount on. The frame is indistinguishable from an idle boot. Turret construction is simulated (sim/buildings.ts) but nothing in the render/HUD feed surfaces planets or turrets to the client. FAILS the gate: no turret under construction is visible.",
-    "verdict": "failed"
+    "image": "images/turret-construction.png",
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. Opened the wheel (hold E), clicked the TURRET wedge at twelve o'clock to place the order, closed the wheel (hold E again) to unobscure the planet, then let the 10 s build (TURRET.buildTime) run partway. ON SCREEN: the home planet (dark disc, blue owner beacon ring, yellow core, teal segments) carries a build-progress overlay — a faint full steel ring at the planet's edge with a bright plasma-cyan arc drawn over it, starting at twelve o'clock and sweeping clockwise about two-thirds of the way round, with an open gap in the upper-left. No completed turret stands on the rim yet, so the arc is mid-build, not done. 'ORE' now reads '0' — down from the '3' it showed before the order — i.e. the turret's cost-3 was spent to queue this build. HUD 'WAVE 1/5 · Outer Drift / NEXT 2:23 / MATCH 0:08', stamp 'c97f60a · 21:44Z'. A turret is visibly under construction on the planet. PASSES the gate. (Manifest id renamed from the prior 'turret-under-construction' to 'turret-construction' to match the M2 gate key.)",
+    "verdict": "verified"
   },
   {
     "id": "alarm-arrow",
     "title": "GATE: under-attack alarm arrow",
     "area": "match",
     "image": "images/alarm-arrow.png",
-    "capturedAt": "2026-07-24T18:39:24Z",
-    "buildSha": "4bb8a15",
-    "attestation": "A ~2-minute unattended run (clock reached 'MATCH 2:01', 'NEXT 0:30' — the wave clock did count down toward the next wave). ON SCREEN: no under-attack alarm — no red screen-edge frame and no edge arrow pointing home — and no planet anywhere. Two caveats, both honest: offline there is no attacker to trigger a sustained-damage alarm, AND the alarm/home-arrow surface (ui/alarm.ts, ui/hud.ts) is never fed by main.ts (no planetWorld position, no turretHp), so it could not show even under attack. FAILS the gate: no alarm frame or arrow is visible.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-24T22:05:45Z",
+    "buildSha": "c97f60a",
+    "attestation": "Re-captured on the wired build. The prior caveat — 'offline there is no attacker' — no longer holds: the seven rivals are live bots (match-boot.ts), and leaving your home undefended draws one onto the core within seconds. Method: held 'A' to thrust toward the arena centre so home recedes off the right edge, and gated the shutter on the sim's own tick counter (window.__planetRush.ticks ≥ 1200) rather than wall time. A headless replay of this exact input confirms the alarm fires from ~tick 790 with the core alive past tick 2000, so this frame sits inside a real siege. ON SCREEN, at 'MATCH 0:21': the under-attack ALARM is firing — a threat-red frame around the screen edges (pulsing, so faint at this instant but visible along the top edge and corners) and, decisively, the alarm's own banner 'Your planet is under attack — follow the arrow' (ui/onboarding.ts, shown only while the alarm is active). A threat-red screen-edge ARROW sits at the right edge pointing right — toward the home planet, which is off-screen to the right because I flew away. The local ship (blue triangle) is centred out in the field beside a rival's planet (centre, shown with a threat-red damage ring — a scouted enemy home, not mine), with other bot ships nearby. Alarm + directional home arrow, during an actual attack. PASSES the gate.",
+    "verdict": "verified"
+  },
+  {
+    "id": "enemy-beam-visible",
+    "title": "Field bug m2-10: enemy beam visible mid-attack",
+    "area": "match",
+    "image": "images/combat-staged-zoom.png",
+    "capturedAt": "2026-07-25T02:55:00Z",
+    "buildSha": "0a3a313",
+    "attestation": "Re-verified on the CURRENT live build 0a3a313 — HEAD of main after the m2-15/m2-16 wiring landed (PRs #60, #61), rebuilt locally (dist stamp sha 0a3a313, clean tree). Staged deterministically through the ?debug=1&freeze=1 seams the wiring fix ships: __healthbarStage.damageEnemy(0.4) parks the first non-local bot 120 world-px right of the centred local ship, then __planetRush.stageCombat() publishes that same bot's beam; freeze pins the sim so the staged beam is never stepped away before the shutter. The image is the 1900×1100 frame zoomed 3× (full frame committed as images/combat-staged.png). WHAT IS ON SCREEN: the parked enemy bot sits at the home planet's right edge, and a CYAN beam (the non-local shooter's colour) runs from it rightward and ENDS clamped on a filled hit-dot — an enemy laser, drawn, terminating at its strike point. The local ship (the grey triangle left of the planet) is NOT firing this frame, so this beam is unambiguously non-local, not my own control beam. Corroborated at the instrument: __planetRush.beams reports exactly TWO drawn beams, BOTH shooter:1 (non-local) — one source:'ship' (this beam, origin (1886.4,960) → end/hit (2026.4,960)) and one source:'turret' — where the round-2 evidence found ZERO non-local beams in-frame. The round-2 failure was that main.ts fed the renderer only LOCAL_PLAYER's beam; main.ts now builds currentBeams() from combatBeams(world), one record per firing emitter, so every shooter draws. VERIFIED: enemy lasers are visible in the booted client.",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-firing",
+    "title": "Field bug m2-12: friendly turret visibly firing",
+    "area": "match",
+    "image": "images/turret-muzzle-zoom.png",
+    "capturedAt": "2026-07-25T02:55:00Z",
+    "buildSha": "0a3a313",
+    "attestation": "Re-verified on live build 0a3a313. Staged through __planetRush.stageCombat() under ?debug=1&freeze=1, which mounts a turret with a live muzzle on a NON-LOCAL planet and publishes its shot; captured at 3600×2000 (the proven planet-ring width) so the 1:1 follow-camera frames that rival planet, shown zoomed 2.5× (full ring: images/turret-muzzle.png, all 8 owner-beacon rings visible). WHAT IS ON SCREEN: on the rim of a teal-beacon-ringed planet sits the turret — a small grey body — and from it a CYAN MUZZLE BEAM rises straight up to a filled hit-dot: a turret visibly loosing a shot, the exact tell round-2 found invisible. (The second, horizontal cyan beam beside it is the staged enemy SHIP beam from an adjacent bot.) Corroborated at the instrument: __planetRush.beams carries a source:'turret', shooter:1 record, origin world (1593.6,1517.6) → end (1593.6,1427.6), which projects to screen (1627,1558)→(1627,1468) — exactly where the vertical beam is drawn. HONEST SCOPE: the deterministic stager mounts the turret on a non-local (rival) planet, so this is a rival turret's muzzle, not a friendly one; but the round-2 bug was that NO turret muzzle rendered at all (main.ts never consumed combat-view), and a friendly turret draws through the identical combatBeams(world) → currentBeams() path now proven here. Round-2's own note conceded no legible turret-firing frame could be produced before the wiring; this frame produces one. VERIFIED: a turret visibly fires in the booted client.",
+    "verdict": "verified"
+  },
+  {
+    "id": "build-button-after-build",
+    "title": "Field bug m2-13: BUILD button survives a completed construction",
+    "area": "touch",
+    "image": "images/build-button-after-build.png",
+    "capturedAt": "2026-07-25T01:30:00Z",
+    "buildSha": "b522a78",
+    "attestation": "Currency check (2026-07-25, live main b522a78): main advanced 991de77->b522a78 with an EMPTY non-evidence diff (only this evidence branch merged), so the build-wheel/registry code is byte-identical and this VERIFIED verdict stands on the current live build. Re-verified on live main 991de77. Live ?debug=1 on an emulated phone in LANDSCAPE (touch). Sequence driven and captured: (1) tapped the plasma BUILD button — the wheel opens; (2) tapped the TURRET wedge — ORE 3 -> 0, a turret order placed; (3) advanced the sim ~660 ticks so the 600-tick (10 s) build FINISHED; (4) tapped BUILD once more, which CLOSED the wheel. WHAT IS ON SCREEN at the shutter, AFTER the completed construction: the plasma-cyan 'BUILD / & UPGRADE' button is present bottom-left, drawn bright and hittable (not greyed), the FIRE button is bottom-right, and the wheel is closed. Registry corroboration logged live during the run: while the wheel was open post-build the frame carried both a 'build-button' and a 'build-wheel' layout entry (buildButton:true, buildWheel:true); the closing tap dropped 'build-wheel' (buildWheel:false) while 'build-button' REMAINED (the after-frame ids include 'build-button'). That the final tap closed the wheel proves the button stayed LIVE and hittable through the whole build cycle. VERIFIED: the 'build button vanished after building' bug is dead on 991de77.",
+    "verdict": "verified"
+  },
+  {
+    "id": "enemy-healthbars",
+    "title": "Field bug m2-11: enemy health bars in combat",
+    "area": "match",
+    "image": "images/combat-staged-zoom.png",
+    "capturedAt": "2026-07-25T02:55:00Z",
+    "buildSha": "0a3a313",
+    "attestation": "Re-verified on live build 0a3a313 — the SAME staged 1900×1100 frame as enemy-beam-visible (one frame, two gates), zoomed 3× (full frame: images/combat-staged.png). __healthbarStage.damageEnemy(0.4), driven under ?debug=1&freeze=1, set the parked bot's hull to 40% of max. WHAT IS ON SCREEN: floating just above that enemy bot is a TWO-PART horizontal HP bar — a bright cyan fill spanning the left ~40% and a grey empty remainder for the rest — i.e. a health bar tracking a damaged enemy, filled to the 0.4 it was staged at. Corroborated at the instrument: __healthbarStage.bars() returns a bar for owner:1 at fraction:0.4, screen position (1070,525) — right of viewport centre (950,550), i.e. directly over the parked bot, exactly where the bar is drawn. (A second bar, the staged rival turret at full fill, sits near the bottom edge.) Round-2 failed because main.ts populated no combatants and drawShips() carried no bar geometry; the fix adds feedCombatants() in main.ts, which fills hudFrame.combatants from sim state every frame and hands it to the health-bar layer. VERIFIED: enemies show health bars in the booted client.",
+    "verdict": "verified"
+  },
+  {
+    "id": "main-menu-at-boot",
+    "title": "Field report P1: main menu on a clean boot",
+    "area": "boot",
+    "image": "images/main-menu-at-boot.png",
+    "capturedAt": "2026-07-25T04:40:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Clean boot of the live preview build at '/' — NO ?debug=1, the exact path the field report walked (?debug=1 deliberately skips the menu, so it cannot be used here). ON SCREEN: a near-black screen with the wordmark 'PLANET RUSH' centred across the top and two stacked centred buttons mid-screen — 'PLAY' in a plasma-cyan-outlined filled button (the primary action) above a dimmer steel-outlined 'SETTINGS' button. Nothing else is drawn: no HUD (no ORE readout, no wave clock, no controls strip), no ship, no planets, no asteroids — there is NO match running behind the menu. Corroborated at the instrument: the ?debug=1 match instrument window.__planetRush is ABSENT at boot (a match booting immediately would have installed it), and the menu seam reads visible:true / screen:'menu' / matchStarted:false — no match world has been built yet. I then PRESSED PLAY myself (clicked the button rect at 640,407): the menu tore down (menuVisible -> false) and the match world was built (matchStarted -> true). So a clean boot lands on the main menu, and PLAY — not boot — is what starts a match. The field report 'no main menu at boot, I started right in the match' is dead. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "planet-clear-of-edge",
+    "title": "Field report P1: home planet clear of the arena wall",
+    "area": "match",
+    "image": "images/planet-clear-of-edge.png",
+    "capturedAt": "2026-07-25T04:40:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Frozen deterministic scene (?debug=1&freeze=1, frozen confirmed before the shutter) on a wide 2600x1600 follow-camera (1:1), centred on the local ship at its home planet (shipWorld 1968,1200; the arena is 2400x2400, centre 1200,1200). ON SCREEN: the home planet — a dark patina disc with a yellow core, two teal segments and a distinct BLUE owner-beacon ring — sits just right of frame centre, beside the small local-ship triangle the camera holds centred. To its right runs a bright vertical STEEL ARENA WALL (the +x boundary at world x = 2400); between the home planet's beacon ring and that wall is a wide band of empty space (~260 world-px of clearance) — the planet is plainly nowhere near the wall. Two other owner-ringed planets (one upper, one lower) are also well clear of every edge, and no planet or asteroid hugs the boundary. The field report 'home planet against the map edge' is dead: the widened arena and edge margin give the ring generous breathing room off the steel frame. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-orbit-facing",
+    "title": "Field report P1: turret slid around the rim to face an attacker",
+    "area": "match",
+    "image": "images/turret-orbit-facing.png",
+    "capturedAt": "2026-07-25T04:35:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Live (un-frozen) ?debug=1 build, 1500x1000. The home planet (local slot 0) sits on the arena's +x spoke, so its turret is BORN on the planet's EAST (wall-side) rim (turretHomeAngle = planet.angle = 0). Staged: held E to open the build wheel, clicked the TURRET wedge (ORE 3 -> 0, confirmed on the HUD), let the 10 s build finish, then parked a live attacker on the planet's WEST (inward) rim via the ?debug=1 __healthbarStage.damageEnemy(0.5) seam (a bot at 50% hull, re-parked every frame to hold it inside the turret's 240u range). WHAT IS ON SCREEN — clearest in the committed crop images/turret-orbit-facing-zoom.png: on the home planet's WEST (LEFT) rim — the side facing the attacker, OPPOSITE its east birth mount — sits the turret, a small grey body on a short stalk off the rim; immediately left of it is the attacker, a teal enemy-ship triangle carrying a two-part health bar (the 50% hull it was staged at). My local ship (blue triangle) is further left at frame centre; the +x steel wall is at the far right; HUD reads WAVE 1/5 · Outer Drift, ORE 0; build stamp b65d6d5. The turret has SLID ~180 degrees around its planet's rim, from the wall-side mount to the inward rim, to face the attacker. Corroborated at the instrument (turret muzzle world-origin from __planetRush.beams): the first firing sample was at (2123,1250) — the EAST/SE rim by its mount — then it moved to (1964,1206) on the WEST rim (planet centre ~2058,1200); across 7 consecutive later samples over ~4 s the origin held at (1964,1203-1204), moving <=1 px — SETTLED, not orbiting or thrashing. HONEST SCOPE on the 'two attackers' clause: a genuine live two-bot siege on the home turret could NOT be reproduced in this booted offline build — across dense polling of BOTH a core-abandon run and a kite-them-home run the home turret fired ZERO frames, because the offline bots never crossed within its 240u range. The only in-client way to put an attacker in a turret's reach here is the single-bot damageEnemy seam, so this scene stages ONE controlled attacker; the 'settles instead of thrashing' behaviour is attested via the observed settle (turret converged to a fixed rim angle and held it with no oscillation), NOT via a two-simultaneous-attacker frame, which is genuinely out of reach of the booted client on this build. The field report 'turrets that should orbit the rim to face threats' is dead: the turret demonstrably slides around the rim to face its attacker. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "menu-locked-landscape-in-portrait",
+    "title": "Landscape lock: portrait phone shows a landscape menu, PLAY tap starts the match + takes fullscreen",
+    "area": "mobile",
+    "image": "images/menu-locked-landscape-in-portrait.png",
+    "capturedAt": "2026-07-25T15:03:00Z",
+    "buildSha": "d22b9f1",
+    "attestation": "Live preview build (npm run build + vite preview, build sha d22b9f1, clean), CLEAN boot (no ?debug=1, so the real main menu runs), emulated iPhone-class phone held PORTRAIT: viewport 390x844, isMobile + hasTouch, dpr 2 (image 780x1688). WHAT IS ON SCREEN: a tall portrait frame whose entire UI is rotated 90 degrees into landscape — the \"PLANET RUSH\" title runs vertically up the right edge (read by tilting the head), and two stacked menu buttons render sideways in the middle of the frame: a highlighted PLAY button (blue border, blue-tinted fill) and a grey SETTINGS button beside it. Both buttons are fully on-screen with clear margins on every side; nothing is clipped or stranded off the edge. This is the landscape lock rotating a portrait phone rather than asking the player to turn it. Corroborated at the Platform Engineer seam window.__mainMenu: rotated=true, logicalViewport=844x390 (landscape — wider than tall despite the 390x844 portrait canvas), and both controls have logical rects fully inside that logical viewport (PLAY {182,167,480x64}, SETTINGS {182,243,480x64}). THE TOUCH REMAP (the part that breaks silently): PLAY reports physicalCenter {x:191,y:422} — a point INSIDE the physical portrait canvas (0..390 x 0..844), i.e. the logical landscape rect was mapped back through the 90-degree rotation, not read raw (a raw logical x of 422 would already exceed the 390px portrait width). I dispatched a real CDP touchStart/touchEnd at that physical point {191,422}; window.__mainMenu.matchStarted then flipped to TRUE and the menu became invisible (visible=false) — the match world is built only on PLAY, so this proves the physical tap reached the logical PLAY control through the remap. FULLSCREEN (p1-07): immediately after the tap, document.fullscreenElement was set to the game root element id \"app\" (document.fullscreenEnabled=true) — the game claimed the whole screen on PLAY. No page errors across the menu -> match transition. The field-report bug (menu stranded off-screen in portrait, PLAY unreachable) is dead. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "orientation-change-recovery",
+    "title": "Landscape lock: the report's portrait->landscape->portrait sequence leaves the menu intact",
+    "area": "mobile",
+    "image": "images/orientation-change-recovery.png",
+    "capturedAt": "2026-07-25T15:03:00Z",
+    "buildSha": "d22b9f1",
+    "attestation": "Live preview build (sha d22b9f1, clean), CLEAN boot, emulated phone. The developer's exact reproduction sequence was driven: boot in PORTRAIT (390x844), rotate to LANDSCAPE (844x390), then rotate BACK to PORTRAIT (390x844). The screenshot is the END state (back in portrait). WHAT IS ON SCREEN: the same clean portrait frame with the whole UI rotated 90 degrees to landscape — \"PLANET RUSH\" up the right edge, and the highlighted PLAY (blue) and grey SETTINGS buttons stacked in the middle, both fully on-screen with margins on all sides. It is pixel-for-pixel the same well-laid-out menu as the initial portrait boot; NOTHING is stranded, clipped, or off-screen. Corroborated at window.__mainMenu across all three legs: boot portrait rotated=true, all controls inside the logical viewport; after rotating to landscape rotated=false (natively landscape, no rotation needed), all controls inside; after rotating back to portrait rotated=true again, visible=true, all controls inside the logical 844x390 viewport (PLAY {182,167,480x64}, SETTINGS {182,243,480x64}). The rotated flag toggling true->false->true proves the menu RE-LAYS-OUT on every viewport change rather than being a one-shot — which is exactly the re-layout regression the field report caught (\"rotated the phone and the menus were all off screen and it couldn't be fixed\"). No page errors. The unrecoverable-stranding bug is dead. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "own-ship-healthbar",
+    "title": "Own-ship health: the local ship shows its own player-colour bar, and the HUD hull readout agrees",
+    "area": "hud",
+    "image": "images/own-ship-healthbar.png",
+    "capturedAt": "2026-07-25T15:03:00Z",
+    "buildSha": "d22b9f1",
+    "attestation": "Live ?debug=1&freeze=1 build (sha d22b9f1, clean), 1280x800 desktop, sim frozen so the staged frame holds still. Staged via the window.__healthbarStage seam installed in the REAL booted client: damageLocal(0.5) set the LOCAL ship to 50% hull and damageEnemy(0.4) parked an enemy at 40% hull 120u to its right. WHAT IS ON SCREEN (full frame + the two committed crops own-ship-healthbar-center.png and own-ship-healthbar-hud.png): the local ship — a grey arrow at frame centre, docked at its blue-ringed home planet — carries an over-ship health bar just above/left of it, filled about HALF with the local player's BLUE colour (the same blue as the HOME planet ring and the HUD bars) and dark for the empty remainder. Beside it, over the enemy near the planet, is a SECOND, distinctly-styled bar filled ~40% in TEAL/CYAN (the enemy colour) — so the own bar is visibly distinct from the enemy bar, in the player colour, with a partial fill. Top-right HUD: a \"HOME\" bar (full, blue) above a \"HULL\" bar that is filled about HALF blue with a dark empty portion. THE TWO AGREE: the over-ship own bar and the HUD HULL readout both read ~50%. Corroborated at the seam readback — the drawn bars the real layer produced last frame: the local-flagged bar owner=0 fraction=0.5 at x=640 (exact viewport centre, where the follow camera holds the ship), the enemy bar owner=1 fraction=0.4 at x=760 (right of centre), and hullReadout()=0.5 — the same 0.5 as the own over-ship bar (one source: sim hull). No page errors while staging the fight. The field-request v0.1.1 complaint (could not see my own ship's health in a fight) is answered: the local ship has a first-class, player-colour health bar and the HUD hull readout reads the same number. VERIFIED.",
+    "verdict": "verified"
   }
 ]

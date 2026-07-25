@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:mobile": "playwright test",
     "test:live": "playwright test --config tests/live/playwright.live.config.ts",
+    "test:live-stage": "playwright test --config tests/live-stage/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

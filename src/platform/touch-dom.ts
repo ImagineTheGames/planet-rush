@@ -56,6 +56,18 @@ export interface BlurTarget {
 }
 
 /**
+ * Map a raw physical pointer coordinate (CSS px, `clientX/Y`) to the **logical**
+ * (landscape) point the sticks live in. On desktop / landscape this is the
+ * identity; on a portrait mobile viewport the game root is rotated 90° (the
+ * landscape lock, orientation.ts), so a physical tap must be un-rotated before it
+ * can reach the correct half-split — the part that silently breaks if skipped.
+ */
+export type PointMap = (clientX: number, clientY: number) => { x: number; y: number };
+
+/** The default: pass coordinates through unchanged (no rotation). */
+const IDENTITY_MAP: PointMap = (clientX, clientY) => ({ x: clientX, y: clientY });
+
+/**
  * Route a canvas's touch pointer events into the twin-stick controller. Returns
  * a disposer that detaches every listener (symmetry with `InputSource.dispose`).
  *
@@ -63,19 +75,24 @@ export interface BlurTarget {
  *                should be `none` so the browser never steals the drag).
  * @param touch   the controller to feed device-neutral samples into.
  * @param blurSrc where a focus-loss "release everything" comes from (window).
+ * @param mapPoint physical→logical remap for the landscape lock (orientation.ts).
+ *                Defaults to identity, so desktop / landscape are unchanged.
  */
 export function bindTouchControls(
   canvas: PointerTarget,
   touch: TouchController,
   blurSrc: BlurTarget,
+  mapPoint: PointMap = IDENTITY_MAP,
 ): () => void {
   const down = (e: PointerLike): void => {
     if (e.pointerType !== 'touch') return;
-    touch.onPointerDown({ id: e.pointerId, x: e.clientX, y: e.clientY });
+    const p = mapPoint(e.clientX, e.clientY);
+    touch.onPointerDown({ id: e.pointerId, x: p.x, y: p.y });
   };
   const move = (e: PointerLike): void => {
     if (e.pointerType !== 'touch') return;
-    touch.onPointerMove({ id: e.pointerId, x: e.clientX, y: e.clientY });
+    const p = mapPoint(e.clientX, e.clientY);
+    touch.onPointerMove({ id: e.pointerId, x: p.x, y: p.y });
   };
   const up = (e: PointerLike): void => {
     if (e.pointerType !== 'touch') return;

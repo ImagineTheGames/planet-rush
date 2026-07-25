@@ -71,6 +71,13 @@ export type {
 
 export { BuildWheelView } from './build-wheel-view';
 
+// --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
+//     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,
+//     its persistence rule + layout contract owned here.
+
+export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
+export type { BuildButtonSignals } from './build-button';
+
 // --- Upgrade panel — the only place ship stats appear (GDD §2.2, §2.5) -----
 
 export {
@@ -111,6 +118,35 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
+
+// --- Over-entity health bars — enemy bars + the own ship (GDD §2.2) ---------
+//
+// A pooled, screen-space layer that floats a hull/HP bar over every combat
+// entity that is damaged or in combat: enemy ships, enemy turrets, hostile wave
+// units — and, per field request v0.1.1, the local player's **own ship**, styled
+// distinctly (player colour, slightly larger) so it reads as mine. The own ship
+// is fed to the `Hud` via `hull`/`maxHull`/`shipRadius`/`shipFiring` on the
+// `HudFrame` (the HUD synthesises its `local` combatant at screen centre); the
+// enemies come on `combatants`, each with its HP and **screen-space** position
+// (project world → screen via `renderer.projectToScreen`), with `owner` set to
+// the local player's slot. The own player's *turrets* still get no bar (they read
+// off the HOME HP readout). The layer registers itself through
+// `Hud.describeLayout`, alongside the new `hull-hud` top-right readout.
+
+export {
+  combatantGetsBar,
+  healthBarModel,
+  isLocalCombatant,
+  HEALTHBAR_FULL_EPSILON,
+  HEALTHBAR_GAP,
+  HEALTHBAR_HEIGHT,
+  HEALTHBAR_WIDTH,
+  HEALTHBAR_LOCAL_HEIGHT,
+  HEALTHBAR_LOCAL_WIDTH,
+} from './healthbar';
+export type { Combatant, HealthBar } from './healthbar';
+
+export { HealthBarView, HEALTHBAR_ID, HEALTHBAR_ANCHOR } from './healthbar-view';
 
 // --- The 8-slot lobby (GDD §2.1, §2.11, §4.2) ------------------------------
 //
@@ -429,6 +465,36 @@ export type {
 
 export { ConnectionStatusView, CONNECTION_STATUS_ANCHOR } from './connection-status-view';
 
+// --- The main menu — the front door a clean boot opens on (GDD §4.6 M7) -----
+//
+// The screen the field report found missing: the Day-7 menus merged, but boot
+// dropped the player straight into a match, so the menu was never wired. PLAY is
+// the only door that builds a match world; SETTINGS reuses the screen above.
+// The gate that defers the world until PLAY lives in `src/main.ts` — this is the
+// same pure-model + Pixi-view pair as every other screen here.
+
+export {
+  MAIN_MENU_ID,
+  MAIN_MENU_ITEMS,
+  MAIN_MENU_TITLE,
+  MAIN_MENU_TITLE_HEIGHT,
+  MAIN_MENU_BUTTON_HEIGHT,
+  MAIN_MENU_BUTTON_HEIGHT_TOUCH,
+  mainMenuHitTest,
+  mainMenuLayout,
+  mainMenuModel,
+} from './main-menu';
+export type {
+  MainMenuButtonView,
+  MainMenuItem,
+  MainMenuLayout,
+  MainMenuLayoutOptions,
+  MainMenuModel,
+  MainMenuOption,
+} from './main-menu';
+
+export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
+
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
 // Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
@@ -444,6 +510,7 @@ export {
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
+  hullHudBounds,
   ARROW_SIZE,
   ALARM_FRAME_STROKE,
   ALARM_FRAME_INSET,
@@ -454,4 +521,7 @@ export {
   PANEL_EDGE_PAD,
   PANEL_CHROME_HEIGHT,
   PANEL_ROW_HEIGHT,
+  HULL_BAR_WIDTH,
+  HULL_BAR_HEIGHT,
+  HULL_TOP,
 } from './hud-geometry';

@@ -16,10 +16,20 @@
 export interface Platform {
   /** Request/exit fullscreen. */
   setFullscreen(on: boolean): Promise<void>;
-  /** Enter fullscreen — a named convenience over {@link setFullscreen}(true),
-   *  called on the first touch gesture on mobile (mobile amendment §2). Rejected
-   *  requests (no user gesture, iOS Safari) degrade to a no-op, never throw. */
-  requestFullscreen(): Promise<void>;
+  /** Enter fullscreen on `target` (default the document element), so the game
+   *  can take the whole screen from a user gesture — PLAY on mobile (field
+   *  request v0.1.1; GDD §4.1). Rejected requests (no user gesture, iOS Safari,
+   *  odd embeds) degrade to a no-op, never throw. */
+  requestFullscreen(target?: Element): Promise<void>;
+  /** Whether an element is currently fullscreen — the live truth the re-enter
+   *  affordance and the landscape lock read (a system gesture/ESC can drop it at
+   *  any time, so it is never assumed to stick). */
+  isFullscreen(): boolean;
+  /** Whether this platform can enter fullscreen at all. False on iPhone Safari,
+   *  where the Fullscreen API is absent — the caller then leans entirely on the
+   *  CSS-rotation landscape fallback and never offers a re-enter affordance
+   *  (field request v0.1.1). Feature-detected, no bare global in game code. */
+  canFullscreen(): boolean;
   /** Haptic feedback (no-op where unsupported, e.g. desktop). */
   vibrate(ms: number): void;
   /** Persistent key/value storage (settings, chosen fire mode, etc.). */
@@ -49,9 +59,12 @@ function orientationLock(): LockableOrientation | undefined {
  * an unsupported capability degrades to a no-op instead of throwing.
  */
 export function createBrowserPlatform(): Platform {
-  async function enterFullscreen(): Promise<void> {
+  async function enterFullscreen(target?: Element): Promise<void> {
     try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      const el = target ?? document.documentElement;
+      if (!document.fullscreenElement && typeof el.requestFullscreen === 'function') {
+        await el.requestFullscreen();
+      }
     } catch {
       /* Fullscreen can be rejected (no user gesture, iOS Safari) — never fatal. */
     }
@@ -71,6 +84,17 @@ export function createBrowserPlatform(): Platform {
     },
 
     requestFullscreen: enterFullscreen,
+
+    isFullscreen(): boolean {
+      return !!document.fullscreenElement;
+    },
+
+    canFullscreen(): boolean {
+      // `fullscreenEnabled` is false where the API is blocked (iframes without
+      // allowfullscreen) and absent on iPhone Safari; the element method is the
+      // second half of the feature test (GDD §4.1 — no bare global in game code).
+      return !!document.fullscreenEnabled && typeof document.documentElement.requestFullscreen === 'function';
+    },
 
     vibrate(ms: number): void {
       // navigator.vibrate is absent on desktop and iOS Safari — feature-detect.

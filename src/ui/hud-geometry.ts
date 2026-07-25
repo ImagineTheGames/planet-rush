@@ -154,6 +154,59 @@ export function planetHpBounds(viewportWidth: number, labelWidth = 0): Rect {
 }
 
 // ---------------------------------------------------------------------------
+// Your own ship's hull readout (field request v0.1.1 — top-right, under HOME)
+// ---------------------------------------------------------------------------
+//
+// The field request: "I need to be able to see my own ship's health." Twin-stick
+// play hides the ship centre under the player's thumbs, so the over-ship bar
+// alone is not enough — the hull also needs a HUD readout that is never under a
+// thumb. It lives in the top-right, stacked directly under the HOME planet-HP
+// element: both are your-survival readouts, both in your player colour, so they
+// pair. The over-ship bar and this readout share one source (sim hull), so they
+// always agree. The thumbs live in the bottom corners on touch, so top-right is
+// clear of them by construction.
+
+/** HULL bar length, CSS px. Narrower than the HOME bar so the pair reads as a
+ *  hierarchy (planet first, ship second) and both clear the top-right budget:
+ *  `HULL_BAR_WIDTH ≤ viewportWidth/2 − HUD_PAD` on the 320px profile ⇒ ≤ 144. */
+export const HULL_BAR_WIDTH = 120;
+/** HULL bar thickness, CSS px. */
+export const HULL_BAR_HEIGHT = 8;
+/** Height reserved for the `HULL` label above the bar, CSS px. */
+export const HULL_LABEL_HEIGHT = 14;
+/** Vertical gap between the HOME element's footprint and the HULL element. */
+export const HULL_STACK_GAP = 10;
+
+/** Absolute top edge of the HULL element, CSS px — below the HOME element, which
+ *  hangs from `HUD_PAD` and is `HP_BAR_TOP + HP_BAR_HEIGHT` tall. Kept as a
+ *  constant (not viewport-relative) because both elements hang from the top edge;
+ *  {@link hullHudBounds} depends on it and `hud.ts` lays the group out at it. */
+export const HULL_TOP = HUD_PAD + (HP_BAR_TOP + HP_BAR_HEIGHT) + HULL_STACK_GAP;
+
+/**
+ * The own-ship hull readout's drawn footprint: the right-aligned `HULL` label
+ * stacked over the hull bar, hugging the top-right corner beneath HOME
+ * (field request v0.1.1). Vertical placement hangs from the top edge, so the
+ * height is fixed and not a viewport parameter. `labelWidth` is the measured
+ * text width of `HULL`; the footprint is the union of the label and the bar,
+ * since the registry records what was actually drawn.
+ *
+ * **The width is not free**, for the same reason as `planet-hp`: the element
+ * registers under `top-right`, whose zone starts at the half-width line, so the
+ * bar must satisfy `HULL_BAR_WIDTH ≤ viewportWidth/2 − HUD_PAD`.
+ * `hud-geometry.test.ts` pins it against the 320px profile.
+ */
+export function hullHudBounds(viewportWidth: number, labelWidth = 0): Rect {
+  const width = Math.max(HULL_BAR_WIDTH, labelWidth);
+  return {
+    x: viewportWidth - HUD_PAD - width,
+    y: HULL_TOP,
+    width,
+    height: HULL_LABEL_HEIGHT + HULL_BAR_HEIGHT,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10)
 // ---------------------------------------------------------------------------
 

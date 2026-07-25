@@ -103,6 +103,31 @@ export const TURRET = {
   /** Rotation rate (rad/s) tracking its target — the "telegraph its threat while
    *  spinning" read (style-guide §5.5). Aim never gates the shot; DPS is DPS. */
   turnRate: 3.0,
+  /**
+   * How fast a turret *slides around its planet's rim* toward the point whose
+   * outward surface normal faces its target (field report P1). This is the whole
+   * turret moving, not just the barrel (`turnRate`), so it is deliberately slower:
+   * the turret **glides**, it never teleports. Because the target bearing is
+   * measured from the planet centre it does not depend on where the turret
+   * currently sits, so `turnToward` converges monotonically and then *stops* —
+   * the cap is what guarantees a glide with no oscillation (rad/s). TUNABLE
+   */
+  orbitSpeed: 1.2,
+  /**
+   * Minimum angular gap held between two turrets sliding toward the *same* target
+   * so they fan out around its facing-normal instead of stacking on one rim point
+   * (field report P1, §3). Turrets sharing a target are spread symmetrically about
+   * the bearing in steps of this size (radians). TUNABLE
+   */
+  orbitSeparation: 0.42,
+  /**
+   * Target stickiness (field report P1, §2). A turret keeps its current target
+   * until it dies, leaves range, or another enemy is closer by this factor — a
+   * newcomer must be within `hysteresis ×` the current target's distance (≈25%
+   * closer at 0.75) before the turret will switch, so equidistant enemies never
+   * make it flap. Unitless, in (0, 1]. TUNABLE
+   */
+  targetHysteresis: 0.75,
 } as const;
 
 /** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
@@ -139,6 +164,50 @@ export const REPAIR = {
   interruptedByDamage: true,
 } as const;
 
+/**
+ * Default arena side length (world units). The bounds are a square this big
+ * unless `WorldConfig.bounds` overrides them (the QA harness runs cramped
+ * worlds on purpose). Grown from the v0.1 1920 (field report P1: at 1920 the
+ * 8-planet ring sat hard against the wall) to give the ring generous breathing
+ * room — the arena should feel like space, not a box the planets touch. The
+ * ring is a *fraction* of the bounds (`PLANET.ringFraction`), so the ring scales
+ * with this; `WORLD_EDGE_MARGIN` is what actually guarantees the clearance. TUNABLE
+ */
+export const WORLD_SIZE: Tunable<number> = 2400;
+
+/**
+ * Breathing room between anything the sim spawns and the arena wall (world
+ * units). **Nothing** — planet, ship, asteroid, ore chunk, wreck debris — is
+ * placed within this distance of the bounds (field report P1). It is the hard
+ * clearance guarantee: `createWorld` clamps the planet ring so the outermost
+ * planet point clears the wall by this margin, and the spawners
+ * (`./waves`, wreck debris in `./match`) clamp every position through
+ * `clampToMargin` below. Comfortably larger than any entity's own radius plus a
+ * wreck's debris-ring reach (`WRECK.debrisRingOffset` + `CHUNK.radius`), so the
+ * clearance holds for debris that rings a home near the edge too. TUNABLE
+ */
+export const WORLD_EDGE_MARGIN: Tunable<number> = 220;
+
+/**
+ * Clamp one coordinate of a spawn position so the entity (centre ± `radius`)
+ * stays at least `margin` inside a bounds dimension of length `dimension`.
+ * Deterministic and RNG-free — the same seed still yields the same world
+ * (GDD §4.8): a draw is computed, then clamped, never re-rolled. On a bounds too
+ * small to hold the margin on both sides the entity is centred, which only
+ * happens on degenerate QA worlds, never the real arena.
+ */
+export function clampToMargin(
+  coord: number,
+  radius: number,
+  dimension: number,
+  margin: number = WORLD_EDGE_MARGIN,
+): number {
+  const lo = margin + radius;
+  const hi = dimension - margin - radius;
+  if (hi < lo) return dimension / 2;
+  return Math.min(Math.max(coord, lo), hi);
+}
+
 /** The home planet (GDD §2.1 ring layout, §2.5 "built at your own planet").
  *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
  *  on — but the sim cannot place a core without it. TUNABLE */
@@ -146,8 +215,12 @@ export const PLANET = {
   /** Core body radius: the collision/beam target and the mount ring for turrets. */
   radius: 64,
   /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
-   *  in a ring around the central asteroid field). */
-  ringFraction: 0.42,
+   *  in a ring around the central asteroid field). Lowered from the v0.1 0.42
+   *  (field report P1): at 0.42 the ring sat at 0.84×halfMin and, once the
+   *  planet radius was added, touched the wall. At 0.32 the ring clears the wall
+   *  by more than `WORLD_EDGE_MARGIN` on the default arena while staying outboard
+   *  of the ship ring. */
+  ringFraction: 0.32,
   /** How far outboard of the ship's spawn point the planet sits — the ship
    *  spawns *orbiting* its home planet, between the planet and the field
    *  (GDD §2.1). */
@@ -540,6 +613,52 @@ export const TRACTOR = {
   range: 120,
   /** Pull acceleration toward the ship (units/s²). */
   accel: 700,
+} as const;
+
+/**
+ * Auto-deposit at your own planet (field report v0.1.2; GDD §2.3 "fly home and
+ * convert ore … or bank it", §2.5).
+ *
+ * The developer flew home with a full hold and nothing happened: mining fills
+ * the hold, but the *only* thing that emptied it into the safe banked total was
+ * an explicit BANK wheel press, which a first-time player never finds. The rule:
+ * while a ship sits **docked at its own living planet**, its hold auto-transfers
+ * into the bank at a steady, readable, interruptible rate — undock and it stops.
+ * Not instant (that is what the BANK segment stays, for a one-tap dump): the
+ * drain is a beat the player watches, as ore chunks visibly fly ship→planet.
+ *
+ * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
+ * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
+ * the *telegraph*, pooled ore sprites emitted on a fixed cadence and reabsorbed
+ * at the planet — the same discipline as the beam tell, and they reuse the ore
+ * chunk the renderer already draws, so the visual needs no new render path.
+ *
+ * You unload when you **park**, not when you skim past: the drain only runs
+ * while the docked ship is also near rest (`parkSpeed`). That is what "dock"
+ * means — arriving and settling, the developer's own words ("fly to your own
+ * planet, dock") — and it keeps a ship that merely clips dock range at cruising
+ * speed on its way elsewhere from bleeding ore it never meant to drop. It also
+ * leaves the wheel's instant BANK press the winner on the arrival tick: a pilot
+ * (or bot) who taps BANK the moment they touch down banks the whole hold before
+ * they have slowed enough for the passive drain to take a bite. TUNABLE
+ */
+export const DEPOSIT = {
+  /** Ore per second moved hold→bank while docked and parked. At 2/s a base
+   *  2-slot hold empties in ~1 s — brisk enough not to be a chore, slow enough
+   *  to read the chunks fly and to cut short by pulling away. */
+  drainRate: 2,
+  /** Speed (units/s) at or below which a docked ship counts as parked and the
+   *  drain runs — well under the 260 base cruise, above the drift a coasting
+   *  ship settles to, so releasing thrust at home starts the deposit within a
+   *  tick or two while a fly-by never triggers it. */
+  parkSpeed: 40,
+  /** Seconds between deposit-flight chunks spun off for the visual. One every
+   *  ~0.15 s reads as a steady stream at the drain rate without flooding the
+   *  chunk pool; realised on the sim tick grid so it stays deterministic. */
+  flightInterval: 0.15,
+  /** Speed a deposit-flight chunk travels toward the planet (units/s) — fast
+   *  enough to arrive within the drain, so a chunk is a courier, not clutter. */
+  flightSpeed: 220,
 } as const;
 
 // ---------------------------------------------------------------------------

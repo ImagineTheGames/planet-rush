@@ -184,13 +184,17 @@ const SHOTS = [
   },
   {
     id: 'planet-ring',
-    device: { viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+    // The follow-camera renders 1:1 and holds the LOCAL ship (slot 0) centred, so
+    // the home planet is ~90 px off-centre and the seven others sit on a ring of
+    // radius ~896 world-px around the arena centre, which is itself ~806 px from
+    // the ship. To frame the whole ring in one shot the viewport must reach the
+    // far-side planet at x-offset ≈ -1702 and the top/bottom at y-offset ≈ ±896
+    // (planet radius 64): half-extents ≥ 1766 × 960 → 3600 × 2000. Big canvas,
+    // static frozen scene, so it composites fine headless.
+    device: { viewport: { width: 3600, height: 2000 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
     url: '/?debug=1&freeze=1',
-    // The widest frame we can ask for, on the deterministic seeded world whose
-    // roster is a full 8-planet ring (freeze.ts FREEZE_PLAYER_COUNT = 8). If the
-    // ring is drawn at all, this is the frame with the best chance of showing it.
     async run(page) {
-      await settle(page, { frozen: true, ms: 1500 });
+      await settle(page, { frozen: true, ms: 2000 });
     },
   },
   {
@@ -207,39 +211,289 @@ const SHOTS = [
     },
   },
   {
-    id: 'turret-under-construction',
+    id: 'turret-construction',
     device: DESKTOP,
     url: '/?debug=1',
-    // Hold E to request the wheel, then drive the confirm gestures a turret
-    // order would need (click the wheel area / press the confirm keys) and let
-    // the sim run long enough for a build to be visibly in progress.
+    // The wheel opens at your own planet (docked at spawn). E is a rising-edge
+    // TOGGLE (main.ts:434), and segment 0 — TURRET — sits at twelve o'clock
+    // (wheel-input.ts `segmentIndexAt`). So: tap E to open, click straight above
+    // centre to buy the turret (ORE 3 → 0), tap E again to CLOSE the wheel so the
+    // planet is unobscured, then let the 10 s build (TURRET.buildTime) run partway
+    // — the plasma construction arc grows around the home planet while it does.
     async run(page) {
       await settle(page, { ms: 2500 });
-      await page.keyboard.down('KeyE');
-      await page.waitForTimeout(800);
       const { width, height } = page.viewportSize();
-      // Sweep the ring where wheel segments would sit, clicking each.
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        await page.mouse.click(width / 2 + Math.cos(a) * 160, height / 2 + Math.sin(a) * 160);
-        await page.waitForTimeout(120);
-      }
-      await page.keyboard.press('Enter');
+      // HOLD E — a tapped key can fall entirely between two of this container's
+      // slow per-tick input samples, so the wheel's rising-edge toggle never sees
+      // it (a bare `press` left ORE untouched). A held-then-released key spans
+      // several frames and toggles reliably.
+      await page.keyboard.down('KeyE');
+      await page.waitForTimeout(700); // wheel opens on the rising edge
       await page.keyboard.up('KeyE');
-      await page.waitForTimeout(4000); // let any queued build progress
+      await page.waitForTimeout(300);
+      // TURRET wedge: twelve o'clock, between the hub (0.3 r) and the rim. The
+      // press is an event-driven canvas pointerdown, so it lands regardless of fps.
+      await page.mouse.click(width / 2, height / 2 - 140);
+      await page.waitForTimeout(600); // order placed, ORE 3 → 0, build queued
+      await page.keyboard.down('KeyE'); // toggle the wheel shut — reveal the planet
+      await page.waitForTimeout(500);
+      await page.keyboard.up('KeyE');
+      await page.waitForTimeout(2500); // partway into the 10 s build: arc clearly mid
     },
   },
   {
     id: 'alarm-arrow',
     device: DESKTOP,
     url: '/?debug=1',
-    // The under-attack alarm is a sustained-damage trigger on your own planet
-    // (GDD §2.2). Offline there is no attacker, so this shot documents the
-    // longest unattended run we can give it — if the alarm frame/arrow can
-    // appear in the shipped client at all, a two-minute idle match on the
-    // seeded 8-player ring is where.
+    // The under-attack alarm fires on SUSTAINED damage to your own planet, paired
+    // with a screen-edge arrow pointing home (GDD §2.2, ui/alarm.ts) — the "deep
+    // in the field and the alarm fires" moment. Offline the seven rivals are live
+    // bots (match-boot.ts), and abandoning your home draws an adjacent bot onto
+    // the undefended core within seconds. So: hold A to thrust toward the arena
+    // centre (home recedes off the right edge, arming the arrow), then wait —
+    // gated on the sim's own tick counter (window.__planetRush.ticks), not wall
+    // time, so a slow-fps host just takes longer rather than missing the window.
+    // A headless replay of this exact input (evidence/README notes the probe)
+    // puts the alarm firing from ~tick 790 with the core alive past tick 2000;
+    // tick 1200 sits squarely inside that siege, well before the core falls.
     async run(page) {
-      await settle(page, { ms: 120_000 });
+      await settle(page, { ms: 1500 });
+      await page.keyboard.down('KeyA'); // thrust toward centre — leave home behind
+      await page.waitForFunction(() => (window.__planetRush?.ticks ?? 0) >= 1200, undefined, {
+        timeout: 180_000,
+      });
+      // Hold the thrust through the shutter so the ship is still off-home (the
+      // arrow only draws while home is outside the viewport).
+    },
+  },
+
+  // === Evidence round 2 — the five field-reported combat bugs (m2-10..13) =====
+  // These four scenes drive a LIVE siege of the player's own home so the camera
+  // (which hard-follows the local ship) can frame enemy fire, a defending turret,
+  // and enemy hulls all at once — then LOOK for each fix on screen.
+
+  {
+    // A wide-viewport home siege used to inspect THREE gates in one frame:
+    // enemy-beam-visible, turret-firing, enemy-healthbars. Build a turret at
+    // spawn (docked), then fly out so the seven bots swarm the undefended core.
+    // The 2400×1350 viewport is wide enough that the 1:1 follow-camera still
+    // frames home (and the besieging bots + the turret) while the local ship is
+    // off to the side.
+    id: 'combat-siege',
+    device: { viewport: { width: 1900, height: 1100 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+    url: '/?debug=1',
+    async run(page) {
+      await settle(page, { ms: 2000 });
+      // Home ≈ the ship's spawn world position (it spawns docked at its planet).
+      const home = await page.evaluate(() => ({
+        x: window.__planetRush.shipWorld.x,
+        y: window.__planetRush.shipWorld.y,
+      }));
+      // --- Build a turret at the home planet (segment 0, twelve o'clock). ---
+      await page.keyboard.down('KeyE'); // hold — rising-edge toggle opens the wheel
+      await page.waitForTimeout(700);
+      await page.keyboard.up('KeyE');
+      await page.waitForTimeout(300);
+      // Click the TURRET wedge at the wheel's ACTUAL drawn geometry (read from
+      // the ?debug=1 layout registry) so the tap lands where it is really drawn.
+      const wheel = await page.evaluate(() => {
+        const pr = window.__planetRush;
+        const e = pr?.layout?.find((x) => x.id === 'build-wheel');
+        return e ? e.bounds : null;
+      });
+      const { width, height } = page.viewportSize();
+      if (wheel) {
+        const cx = wheel.x + wheel.width / 2;
+        const cy = wheel.y + wheel.height / 2;
+        await page.mouse.click(cx, cy - (wheel.width / 2) * 0.6);
+      } else {
+        await page.mouse.click(width / 2, height / 2 - 140); // fallback: above centre
+      }
+      await page.waitForTimeout(500); // ORE 3 → 0, turret build queued (10 s)
+      await page.keyboard.down('KeyE'); // toggle the wheel shut — unobscure the field
+      await page.waitForTimeout(500);
+      await page.keyboard.up('KeyE');
+      // --- KITE a hunter home. Sitting at home is safe by design (a docked ship
+      //     is "defended", low opportunity), so to draw a fight I must first get
+      //     EXPOSED: fly out into the field until a bot locks on and gives chase,
+      //     then run BACK to the home turret so the chaser follows into its 240u
+      //     range. All three combat tells then sit in one framed shot: the turret
+      //     firing at the bot, the bot firing back, and the bot's health bar. ---
+      // Out ~620u (exposed), linger so a bot commits to the chase, then back home.
+      await page.keyboard.down('KeyA');
+      await page.waitForFunction(
+        (h) => {
+          const s = window.__planetRush.shipWorld;
+          return (s.x - h.x) ** 2 + (s.y - h.y) ** 2 >= 620 * 620;
+        },
+        home,
+        { timeout: 60_000 },
+      );
+      await page.keyboard.up('KeyA');
+      await page.waitForTimeout(1800); // let a hunter lock on and close distance
+      await page.keyboard.down('KeyD');
+      await page.waitForFunction(
+        (h) => {
+          const s = window.__planetRush.shipWorld;
+          return (s.x - h.x) ** 2 + (s.y - h.y) ** 2 <= 150 * 150;
+        },
+        home,
+        { timeout: 60_000 },
+      );
+      await page.keyboard.up('KeyD');
+      // Let the chasers close on the doorstep (into turret range), then OPEN FIRE
+      // ourselves: KeyF switches to auto-aim so the local beam locks the nearest
+      // bot without mouse tracking, and holding Left mouse fires it. This forces a
+      // real exchange — our beam out, theirs (should be) back — and drags the bot
+      // into the home turret's 240u range. The local beam is the one beam the
+      // client is known to draw, so it is the control: whatever the enemy tell
+      // does or does not do sits right beside a beam that definitely rendered.
+      await page.waitForTimeout(1100);
+      await page.keyboard.press('KeyF'); // Manual → AutoAim
+      const { width: vw, height: vh } = page.viewportSize();
+      await page.mouse.move(vw / 2 + 60, vh / 2); // cursor onto the canvas
+      await page.mouse.down(); // hold Fire — auto-aim locks the nearest bot
+      await page.waitForTimeout(450); // shoot the shutter early, before the melee
+      const diag = await page.evaluate((h) => {
+        const s = window.__planetRush.shipWorld;
+        return {
+          ticks: window.__planetRush.ticks,
+          distFromHome: Math.round(Math.hypot(s.x - h.x, s.y - h.y)),
+        };
+      }, home);
+      console.log('combat-siege diag:', JSON.stringify(diag));
+    },
+  },
+
+  {
+    // A GENUINE core siege, framed. Abandon home far enough (~900u) that a bot
+    // commits to besieging the undefended core (stand-off ~175u from centre, well
+    // inside the home turret's 240u reach), but keep home inside this very wide
+    // follow-camera frame. On the tick a bot is beaming the core: the turret's
+    // red projectiles fly at it (turret-firing), the bot's own beam should cut
+    // the core (enemy-beam-visible), and the bot should carry a health bar
+    // (enemy-healthbars). One frame, three gates.
+    id: 'core-siege',
+    device: { viewport: { width: 2600, height: 1400 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+    url: '/?debug=1',
+    async run(page) {
+      await settle(page, { ms: 2000 });
+      const home = await page.evaluate(() => ({
+        x: window.__planetRush.shipWorld.x,
+        y: window.__planetRush.shipWorld.y,
+      }));
+      // Build a turret at home (segment 0, twelve o'clock).
+      await page.keyboard.down('KeyE');
+      await page.waitForTimeout(700);
+      await page.keyboard.up('KeyE');
+      await page.waitForTimeout(300);
+      const wheel = await page.evaluate(() => {
+        const e = window.__planetRush?.layout?.find((x) => x.id === 'build-wheel');
+        return e ? e.bounds : null;
+      });
+      const { width, height } = page.viewportSize();
+      if (wheel) {
+        await page.mouse.click(wheel.x + wheel.width / 2, wheel.y + wheel.height / 2 - (wheel.width / 2) * 0.6);
+      } else {
+        await page.mouse.click(width / 2, height / 2 - 140);
+      }
+      await page.waitForTimeout(500);
+      await page.keyboard.down('KeyE');
+      await page.waitForTimeout(500);
+      await page.keyboard.up('KeyE');
+      // Abandon home to ~900u (kept in the wide frame) and hold — long enough for
+      // a bot to notice the undefended core and lay siege inside turret range.
+      await page.keyboard.down('KeyA');
+      await page.waitForFunction(
+        (h) => {
+          const s = window.__planetRush.shipWorld;
+          return (s.x - h.x) ** 2 + (s.y - h.y) ** 2 >= 950 * 950;
+        },
+        home,
+        { timeout: 60_000 },
+      );
+      await page.keyboard.up('KeyA');
+      const gate = Number(process.env.SIEGE_TICK ?? 1900);
+      await page.waitForFunction((g) => (window.__planetRush?.ticks ?? 0) >= g, gate, {
+        timeout: 180_000,
+      });
+      const diag = await page.evaluate((h) => {
+        const s = window.__planetRush.shipWorld;
+        return { ticks: window.__planetRush.ticks, distFromHome: Math.round(Math.hypot(s.x - h.x, s.y - h.y)) };
+      }, home);
+      console.log('core-siege diag:', JSON.stringify(diag));
+    },
+  },
+
+  {
+    // build-button-after-build — the touch BUILD button (GDD §2.4) must survive
+    // a completed construction. Phone landscape (isTouch), open the wheel by
+    // tapping BUILD, order a turret, let the 10 s (600-tick) build finish, then
+    // shoot: the plasma BUILD button must still be on screen and hittable.
+    id: 'build-button-after-build',
+    device: PHONE_LANDSCAPE,
+    url: '/?debug=1',
+    async run(page) {
+      await settle(page, { ms: 1500 });
+      await page.waitForFunction(
+        () => {
+          const pr = window.__planetRush;
+          return !!pr && Array.isArray(pr.layout) && pr.layout.length > 0 && (pr.ticks ?? 0) > 3;
+        },
+        undefined,
+        { timeout: 20_000 },
+      );
+      // BUILD button centre (mirrors src/platform/touch-visuals.ts): above the
+      // left thrust stick, in the left thumb's reach.
+      const { width: w, height: h } = page.viewportSize();
+      const EDGE_MARGIN = 28;
+      const R_STICK = 64;
+      const BUILD_GAP = 18;
+      const R_BUILD = 38;
+      const bx = EDGE_MARGIN + R_STICK;
+      const by = h - EDGE_MARGIN - R_STICK - R_STICK - BUILD_GAP - R_BUILD;
+      await page.touchscreen.tap(bx, by); // open the wheel
+      await page.waitForTimeout(250);
+      // Tap the TURRET wedge at the wheel's real drawn radius (registry).
+      const wheel = await page.evaluate(() => {
+        const pr = window.__planetRush;
+        const e = pr?.layout?.find((x) => x.id === 'build-wheel');
+        return e ? e.bounds : null;
+      });
+      if (wheel) {
+        const cx = wheel.x + wheel.width / 2;
+        const cy = wheel.y + wheel.height / 2;
+        await page.touchscreen.tap(cx, cy - (wheel.width / 2) * 0.6);
+      }
+      await page.waitForTimeout(250);
+      // Let the 600-tick build fully complete, then a little past it.
+      await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const pr = window.__planetRush;
+            const t0 = pr.ticks;
+            const poll = () => {
+              if (pr.ticks - t0 >= 660) resolve();
+              else requestAnimationFrame(poll);
+            };
+            requestAnimationFrame(poll);
+          }),
+      );
+      const during = await page.evaluate(() => {
+        const ids = (window.__planetRush?.layout ?? []).map((e) => e.id);
+        return { ticks: window.__planetRush?.ticks, buildButton: ids.includes('build-button'), buildWheel: ids.includes('build-wheel') };
+      });
+      console.log('build-button-after-build DURING (wheel still open, build done):', JSON.stringify(during));
+      // Prove it is HITTABLE after the build: tap the BUILD button again — this
+      // must CLOSE the wheel, leaving the standalone button on screen (the exact
+      // thing the field report said vanished). Capture that resting frame.
+      await page.touchscreen.tap(bx, by);
+      await page.waitForTimeout(300);
+      const after = await page.evaluate(() => {
+        const ids = (window.__planetRush?.layout ?? []).map((e) => e.id);
+        return { ticks: window.__planetRush?.ticks, buildButton: ids.includes('build-button'), buildWheel: ids.includes('build-wheel'), ids };
+      });
+      console.log('build-button-after-build AFTER (tapped to close):', JSON.stringify(after));
     },
   },
 ];

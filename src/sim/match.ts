@@ -35,6 +35,7 @@ import {
   COLLAPSE_GRACE_S,
   WAVE_COUNT,
   WRECK,
+  clampToMargin,
   waveTime,
 } from './constants';
 import { killShip } from './damage';
@@ -155,9 +156,14 @@ function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
     const theta = (2 * Math.PI * i) / pieces;
     const dx = Math.cos(theta);
     const dy = Math.sin(theta);
+    // A wreck near the edge would otherwise ring debris into the wall margin —
+    // keep every chunk clear of the bounds (field report P1).
     world.chunks.push({
       id: world.nextEntityId++,
-      pos: { x: planet.pos.x + dx * ring, y: planet.pos.y + dy * ring },
+      pos: {
+        x: clampToMargin(planet.pos.x + dx * ring, CHUNK.radius, world.bounds.width),
+        y: clampToMargin(planet.pos.y + dy * ring, CHUNK.radius, world.bounds.height),
+      },
       vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
       amount: i < whole ? CHUNK.ore : remainder,
       radius: CHUNK.radius,

@@ -30,7 +30,7 @@
  * then the projectile pool), no RNG, every rate `* dt`.
  */
 
-import type { PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
+import type { Beam, PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
 import {
   PLANET,
   PROJECTILE,
@@ -124,12 +124,27 @@ function freeTurretSlot(planet: Planet): number {
   return -1;
 }
 
-/** Where a turret in `slot` sits: on the planet's surface ring, starting from
- *  the planet's outward angle so slot 0 always faces away from the field. */
-export function turretMountPos(planet: Planet, slot: number): { x: number; y: number } {
-  const theta = planet.angle + (2 * Math.PI * slot) / TURRET.capPerPlanet;
+/** The rim angle a turret in `slot` mounts at: the planet's outward angle plus
+ *  an even share of the ring, so slot 0 always starts facing away from the
+ *  field. This is the turret's *home* orbit angle — where it is born and where
+ *  it slides back to when nothing is in range (field report P1). */
+export function turretHomeAngle(planet: Planet, slot: number): number {
+  return planet.angle + (2 * Math.PI * slot) / TURRET.capPerPlanet;
+}
+
+/** The world position of a point at rim angle `angle` around a planet — the
+ *  turret's surface-ring orbit at that angle. A turret slides its `orbitAngle`
+ *  and its `pos` is this, recomputed every tick. */
+export function turretOrbitPos(planet: Planet, angle: number): { x: number; y: number } {
   const r = planet.radius + TURRET.mountOffset + TURRET.radius;
-  return { x: planet.pos.x + Math.cos(theta) * r, y: planet.pos.y + Math.sin(theta) * r };
+  return { x: planet.pos.x + Math.cos(angle) * r, y: planet.pos.y + Math.sin(angle) * r };
+}
+
+/** Where a turret in `slot` sits at rest: on the planet's surface ring, at its
+ *  mount-slot home angle. The build-spot position, and the orbit position of a
+ *  turret whose `orbitAngle` still equals its home angle. */
+export function turretMountPos(planet: Planet, slot: number): { x: number; y: number } {
+  return turretOrbitPos(planet, turretHomeAngle(planet, slot));
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +342,8 @@ function advanceConstruction(world: World, planet: Planet, dt: number): void {
 }
 
 function makeTurret(world: World, planet: Planet, slot: number): Turret {
-  const pos = turretMountPos(planet, slot);
+  const home = turretHomeAngle(planet, slot);
+  const pos = turretOrbitPos(planet, home);
   return {
     id: world.nextEntityId++,
     owner: planet.owner,
@@ -337,9 +353,13 @@ function makeTurret(world: World, planet: Planet, slot: number): Turret {
     hp: TURRET.hp,
     maxHp: TURRET.hp,
     // Barrel starts pointing outward, away from the planet it defends.
-    angle: planet.angle + (2 * Math.PI * slot) / TURRET.capPerPlanet,
+    angle: home,
+    // Born on its mount slot; it slides from here toward the threat (field
+    // report P1). Deriving `pos` from this keeps the two in lockstep.
+    orbitAngle: home,
     cooldown: 0,
     targetId: null,
+    muzzle: null,
   };
 }
 
@@ -473,21 +493,46 @@ export function sweepDeadTurrets(world: World): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Acquire, track, and shoot. Every turret picks the nearest enemy ship inside
- * `TURRET.range` (spawn-protected ships are not valid targets), turns its
- * barrel toward it at `TURRET.turnRate`, and fires every `TURRET.fireInterval`
- * seconds. Alignment deliberately does not gate the shot: `dps` is the design
- * number and a turn-rate-gated turret would quietly under-deliver it.
+ * Acquire, track, slide, and shoot. Each tick every turret (field report P1):
+ *
+ *  1. **picks a target** — its nearest enemy ship in range, but *sticky*: it
+ *     keeps the one it has until that ship dies, leaves range, or a newcomer is
+ *     `TURRET.targetHysteresis` closer, so it never flaps between equidistant
+ *     enemies (`acquireTarget`);
+ *  2. **slides around the rim** toward the point whose outward normal faces that
+ *     target, capped at `TURRET.orbitSpeed` — a glide, not a teleport
+ *     (`slideTurrets`);
+ *  3. **turns its barrel** toward the target at `TURRET.turnRate`; and
+ *  4. **fires** every `TURRET.fireInterval` seconds.
+ *
+ * Alignment deliberately does not gate the shot: `dps` is the design number and
+ * a turn-rate-gated turret would quietly under-deliver it. The slide runs before
+ * the barrel/fire, so both originate from the turret's position *this* tick.
  */
 export function updateTurrets(world: World, dt: number): void {
   for (const planet of world.planets) {
     if (!planet.alive) continue;
+
+    // 1. Resolve every turret's sticky target first, so the slide can fan
+    //    turrets that share one target and the barrel aims at a settled pick.
     for (const turret of planet.turrets) {
       if (turret.hp <= 0) continue; // killed this tick, swept at end of step
+      // The muzzle tell is a per-tick event: assume not firing, and only the
+      // branch that actually looses a shot below sets it. Cleared here so a
+      // renderer never draws a stale flash a tick after the shot left.
+      turret.muzzle = null;
       const target = acquireTarget(world, turret);
       turret.targetId = target ? target.id : null;
+    }
 
+    // 2. Slide each turret along the rim toward its target's facing normal.
+    slideTurrets(world, planet, dt);
+
+    // 3./4. Track the barrel and fire, from the position the slide left us at.
+    for (const turret of planet.turrets) {
+      if (turret.hp <= 0) continue;
       if (turret.cooldown > 0) turret.cooldown = Math.max(0, turret.cooldown - dt);
+      const target = turret.targetId !== null ? shipOf(world, turret.targetId) : null;
       if (!target) continue;
 
       const dx = target.pos.x - turret.pos.x;
@@ -497,18 +542,29 @@ export function updateTurrets(world: World, dt: number): void {
 
       if (turret.cooldown <= 0) {
         fireProjectile(world, turret, aim);
+        // Publish the muzzle flash from the same firing decision the projectile
+        // rode out on, so the tell can never disagree with the shot (GDD §2.6).
+        turret.muzzle = muzzleBeam(turret, target, aim);
         turret.cooldown = TURRET.fireInterval;
       }
     }
   }
 }
 
-/** Nearest enemy ship within turret range: alive, not the owner's, and not
- *  spawn-protected (a turret never wastes its cooldown on an invulnerable
- *  target, and never opens fire on a player who just respawned). */
+/**
+ * The enemy ship a turret engages this tick — **sticky**, the "don't go crazy"
+ * rule (field report P1, §2). A turret holds its current target as long as it is
+ * alive, not the owner's, not spawn-protected, and still inside `TURRET.range`.
+ * It only switches when it has no valid target, or when another enemy is closer
+ * by the `TURRET.targetHysteresis` factor (≈25% closer) — so two enemies at
+ * similar range never make it flap tick to tick.
+ */
 function acquireTarget(world: World, turret: Turret): Ship | null {
+  const range2 = TURRET.range * TURRET.range;
+
+  // Nearest valid enemy this tick — the switch candidate.
   let best: Ship | null = null;
-  let bestD2 = TURRET.range * TURRET.range;
+  let bestD2 = range2;
   for (const ship of world.ships) {
     if (!ship.alive || ship.id === turret.owner || ship.spawnProtect > 0) continue;
     const d2 = dist2(turret.pos, ship.pos);
@@ -517,7 +573,106 @@ function acquireTarget(world: World, turret: Turret): Ship | null {
       best = ship;
     }
   }
-  return best;
+
+  // Is the turret's current pick still a valid target it may keep?
+  const current = turret.targetId !== null ? shipOf(world, turret.targetId) : null;
+  const currentD2 = current ? dist2(turret.pos, current.pos) : Infinity;
+  const currentValid =
+    current !== null &&
+    current.alive &&
+    current.id !== turret.owner &&
+    current.spawnProtect <= 0 &&
+    currentD2 <= range2;
+
+  if (!currentValid) return best;
+  if (best === null || best.id === current!.id) return current;
+
+  // Both valid and different: only defect if the newcomer is meaningfully
+  // closer, i.e. within `hysteresis ×` the current target's distance.
+  const h = TURRET.targetHysteresis;
+  return bestD2 <= currentD2 * h * h ? best : current;
+}
+
+/**
+ * Slide each of a planet's turrets one tick toward the rim point whose outward
+ * surface normal faces its target (field report P1). The desired rim angle is
+ * simply the bearing from the planet centre to the target — which does *not*
+ * depend on where the turret currently sits, so `turnToward` converges and then
+ * halts, a glide with no orbiting. Turrets sharing one target fan out around
+ * that bearing so they never stack (§3); a turret with no target drifts back to
+ * its mount-slot home angle.
+ *
+ * Only turrets carrying an `orbitAngle` slide — a hand-built fixture without one
+ * keeps its authoritative `pos` (see the field's doc). Zero per-frame allocation:
+ * `pos` is written in place (GDD §4.3).
+ */
+function slideTurrets(world: World, planet: Planet, dt: number): void {
+  const turrets = planet.turrets;
+  const maxStep = TURRET.orbitSpeed * dt;
+  const r = planet.radius + TURRET.mountOffset + TURRET.radius;
+  for (let i = 0; i < turrets.length; i++) {
+    const turret = turrets[i]!;
+    if (turret.hp <= 0 || turret.orbitAngle === undefined) continue;
+    const desired = desiredOrbitAngle(world, planet, turrets, i);
+    turret.orbitAngle = turnToward(turret.orbitAngle, desired, maxStep);
+    turret.pos.x = planet.pos.x + Math.cos(turret.orbitAngle) * r;
+    turret.pos.y = planet.pos.y + Math.sin(turret.orbitAngle) * r;
+  }
+}
+
+/**
+ * The rim angle turret `i` wants this tick. With a target it is the bearing from
+ * the planet centre to that ship, plus a symmetric fan offset so turrets sharing
+ * the target spread apart instead of stacking (`TURRET.orbitSeparation`, §3).
+ * With no target it is the turret's mount-slot home angle. Fan rank is keyed on
+ * `slot` (a stable per-turret key), so the spread is deterministic (GDD §4.8).
+ */
+function desiredOrbitAngle(world: World, planet: Planet, turrets: Turret[], i: number): number {
+  const turret = turrets[i]!;
+  if (turret.targetId === null) return turretHomeAngle(planet, turret.slot);
+  const target = shipOf(world, turret.targetId);
+  if (target === null) return turretHomeAngle(planet, turret.slot);
+
+  const bearing = Math.atan2(target.pos.y - planet.pos.y, target.pos.x - planet.pos.x);
+
+  // Rank this turret among the sliders converging on the same target, ordered by
+  // slot (index breaks a tie), and offset it symmetrically about the bearing.
+  let count = 0;
+  let rank = 0;
+  for (let j = 0; j < turrets.length; j++) {
+    const other = turrets[j]!;
+    if (other.hp <= 0 || other.orbitAngle === undefined || other.targetId !== turret.targetId) continue;
+    count++;
+    if (other.slot < turret.slot || (other.slot === turret.slot && j < i)) rank++;
+  }
+  const offset = (rank - (count - 1) / 2) * TURRET.orbitSeparation;
+  return bearing + offset;
+}
+
+/**
+ * The muzzle-flash geometry for a shot leaving `turret` at `target` along `aim`
+ * (GDD §2.6, §4.1). Origin is the barrel tip — where the projectile is born, so
+ * the flash sits on the muzzle — and the segment runs to the tracked ship's
+ * near surface, clamped to it exactly the way `Ship.beam` is clamped to what it
+ * strikes. This is the *tell*, not the hit test: the projectile does the damage
+ * and can still miss a dodging ship; the flash only reports that the turret
+ * fired and where it aimed, which is all a renderer needs to make enemy turrets
+ * visibly shoot. Allocates only on fire ticks, like `spawnChunk` on a mine.
+ */
+function muzzleBeam(turret: Turret, target: Ship, aim: number): Beam {
+  const dx = Math.cos(aim);
+  const dy = Math.sin(aim);
+  const origin = { x: turret.pos.x + dx * turret.radius, y: turret.pos.y + dy * turret.radius };
+  const centerDist = Math.sqrt(dist2(turret.pos, target.pos));
+  // Barrel tip → target surface: total centre distance less both radii, floored
+  // at zero for the degenerate point-blank case.
+  const length = Math.max(0, centerDist - target.radius - turret.radius);
+  return {
+    origin,
+    dir: { x: dx, y: dy },
+    hitPoint: { x: origin.x + dx * length, y: origin.y + dy * length },
+    length,
+  };
 }
 
 /** Take a slot from the pool, or grow it once. Growth is the only allocation

@@ -19,6 +19,21 @@
       "milestone": 2,
       "title": "Milestone 2 — planets, turrets, war",
       "test_notes": "On your phone: fly home, open the Build wheel, buy a TURRET (10s construction) and a SHIELD, run the repair channel, then pick a fight - the alarm and screen-edge arrow should drag you home. Find a wreck, loot it. Match ends: last core standing. Non-blocking - whenever convenient."
+    },
+    "v0.2.1-m2": {
+      "milestone": 2,
+      "title": "Milestone 2 — planets, turrets, war (evidence-verified)",
+      "test_notes": "On your phone: fly home, open the Build wheel, buy a TURRET (10s construction) and a SHIELD, run the repair channel, then pick a fight - the alarm and screen-edge arrow should drag you home. Find a wreck, loot it. Match ends: last core standing. Non-blocking - whenever convenient. This re-tag shipped only after the QA Manager attested screenshots of the planet ring, open Build wheel, turret construction and alarm arrow on the LIVE build — see the EVIDENCE page."
+    },
+    "v0.1.1": {
+      "milestone": "v0.1 patch 1",
+      "title": "v0.1.1 — your three post-release reports, fixed and proven",
+      "test_notes": "On your phone: clean boot shows the MAIN MENU (PLAY starts the match). Your planet sits well clear of the arena wall - nothing spawns near the edge. Build a turret and pick a fight: it slides around the rim to face the attacker, and settles calmly with two enemies. Evidence on the EVIDENCE page."
+    },
+    "v0.1.2": {
+      "milestone": "v0.1 patch 2",
+      "title": "v0.1.2 — landscape lock, fullscreen, your own health",
+      "test_notes": "On your phone, hold it PORTRAIT on purpose: the menu renders landscape anyway, fully on screen. Tap PLAY - the browser bar disappears (fullscreen) and the game claims the whole display. Rotate back and forth mid-menu: nothing strands. In a fight, your own ship now wears its health bar (your colour) and it matches the HUD readout. Evidence on the EVIDENCE page."
     }
   },
   "days": [
@@ -44,7 +59,7 @@
       "day": 2,
       "title": "Planets, defenses, win/loss",
       "test_notes": "Build turrets, a shield, and run the repair channel at your planet; trigger the under-attack alarm. Win/loss and the last-to-die rule fire against do-nothing bots.",
-      "done": false
+      "done": true
     },
     {
       "day": 3,
@@ -74,7 +89,7 @@
       "day": 7,
       "title": "Classroom release",
       "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone.",
-      "done": false
+      "done": true
     }
   ]
 }
