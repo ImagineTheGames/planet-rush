@@ -24,6 +24,11 @@
       "milestone": 2,
       "title": "Milestone 2 — planets, turrets, war (evidence-verified)",
       "test_notes": "On your phone: fly home, open the Build wheel, buy a TURRET (10s construction) and a SHIELD, run the repair channel, then pick a fight - the alarm and screen-edge arrow should drag you home. Find a wreck, loot it. Match ends: last core standing. Non-blocking - whenever convenient. This re-tag shipped only after the QA Manager attested screenshots of the planet ring, open Build wheel, turret construction and alarm arrow on the LIVE build — see the EVIDENCE page."
+    },
+    "v0.1.1": {
+      "milestone": "v0.1 patch 1",
+      "title": "v0.1.1 — your three post-release reports, fixed and proven",
+      "test_notes": "On your phone: clean boot shows the MAIN MENU (PLAY starts the match). Your planet sits well clear of the arena wall - nothing spawns near the edge. Build a turret and pick a fight: it slides around the rim to face the attacker, and settles calmly with two enemies. Evidence on the EVIDENCE page."
     }
   },
   "days": [
