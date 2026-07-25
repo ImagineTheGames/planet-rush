@@ -225,13 +225,22 @@ function contractViolations(probe: Probe, declared: readonly Declared[], label: 
 // Touch profiles — both orientations (touch-only affordances + the local ship)
 // ===========================================================================
 
-test('layout contract: every registered element within its anchor — portrait', async ({ page }, testInfo) => {
+test('layout contract: portrait-held phone reports a landscape logical viewport, anchors hold', async ({
+  page,
+}, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only (portrait is the native touch orientation)');
 
-  const probe = await probeLayout(page); // touch projects boot portrait (h > w)
-  expect(probe.viewport.height, 'portrait viewport (h > w)').toBeGreaterThan(probe.viewport.width);
+  // Field report v0.1.1 (ratified, Platform Engineer): the game IS landscape on
+  // mobile, always. A phone held in portrait is rotated to landscape and the
+  // layout registry reports the LOGICAL (landscape) viewport — so even though the
+  // DEVICE booted portrait, the viewport the contract resolves against is landscape
+  // (w > h), and every registered element still sits inside its anchor.
+  const probe = await probeLayout(page); // touch projects boot portrait; the lock rotates them
+  expect(probe.viewport.width, 'logical viewport is landscape under the lock (w > h)').toBeGreaterThan(
+    probe.viewport.height,
+  );
 
-  const problems = contractViolations(probe, DECLARED_TOUCH, `${testInfo.project.name}/portrait`);
+  const problems = contractViolations(probe, DECLARED_TOUCH, `${testInfo.project.name}/portrait-locked`);
   expect(problems, problems.join('\n')).toEqual([]);
 });
 
