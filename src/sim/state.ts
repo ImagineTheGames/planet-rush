@@ -24,6 +24,8 @@ import {
   SPAWN_PROTECTION_S,
   STARTING_ORE,
   WAVE,
+  WORLD_EDGE_MARGIN,
+  WORLD_SIZE,
 } from './constants';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnWave } from './waves';
@@ -413,14 +415,19 @@ function initialMatch(): MatchState {
  * byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
-  const bounds: Bounds = config.bounds ?? { width: 1920, height: 1920 };
+  const bounds: Bounds = config.bounds ?? { width: WORLD_SIZE, height: WORLD_SIZE };
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
   const ringRadius = halfMin * 2 * PLANET.ringFraction;
-  // Planets sit outboard of the ship ring, clamped to stay wholly inside the
-  // arena on small maps (the QA harness runs cramped worlds on purpose).
-  const planetRing = Math.min(ringRadius + PLANET.orbitOffset, halfMin - PLANET.radius);
+  // Planets sit outboard of the ship ring, and NOTHING hugs the wall: the
+  // outermost planet point clears the bounds by `WORLD_EDGE_MARGIN` (field
+  // report P1). The clamp keeps the ring wholly inside the arena — with the
+  // margin — even on the cramped worlds the QA harness builds on purpose.
+  const planetRing = Math.min(
+    ringRadius + PLANET.orbitOffset,
+    halfMin - PLANET.radius - WORLD_EDGE_MARGIN,
+  );
 
   // Ships around the ring, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {

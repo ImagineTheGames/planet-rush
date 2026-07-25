@@ -139,6 +139,50 @@ export const REPAIR = {
   interruptedByDamage: true,
 } as const;
 
+/**
+ * Default arena side length (world units). The bounds are a square this big
+ * unless `WorldConfig.bounds` overrides them (the QA harness runs cramped
+ * worlds on purpose). Grown from the v0.1 1920 (field report P1: at 1920 the
+ * 8-planet ring sat hard against the wall) to give the ring generous breathing
+ * room — the arena should feel like space, not a box the planets touch. The
+ * ring is a *fraction* of the bounds (`PLANET.ringFraction`), so the ring scales
+ * with this; `WORLD_EDGE_MARGIN` is what actually guarantees the clearance. TUNABLE
+ */
+export const WORLD_SIZE: Tunable<number> = 2400;
+
+/**
+ * Breathing room between anything the sim spawns and the arena wall (world
+ * units). **Nothing** — planet, ship, asteroid, ore chunk, wreck debris — is
+ * placed within this distance of the bounds (field report P1). It is the hard
+ * clearance guarantee: `createWorld` clamps the planet ring so the outermost
+ * planet point clears the wall by this margin, and the spawners
+ * (`./waves`, wreck debris in `./match`) clamp every position through
+ * `clampToMargin` below. Comfortably larger than any entity's own radius plus a
+ * wreck's debris-ring reach (`WRECK.debrisRingOffset` + `CHUNK.radius`), so the
+ * clearance holds for debris that rings a home near the edge too. TUNABLE
+ */
+export const WORLD_EDGE_MARGIN: Tunable<number> = 220;
+
+/**
+ * Clamp one coordinate of a spawn position so the entity (centre ± `radius`)
+ * stays at least `margin` inside a bounds dimension of length `dimension`.
+ * Deterministic and RNG-free — the same seed still yields the same world
+ * (GDD §4.8): a draw is computed, then clamped, never re-rolled. On a bounds too
+ * small to hold the margin on both sides the entity is centred, which only
+ * happens on degenerate QA worlds, never the real arena.
+ */
+export function clampToMargin(
+  coord: number,
+  radius: number,
+  dimension: number,
+  margin: number = WORLD_EDGE_MARGIN,
+): number {
+  const lo = margin + radius;
+  const hi = dimension - margin - radius;
+  if (hi < lo) return dimension / 2;
+  return Math.min(Math.max(coord, lo), hi);
+}
+
 /** The home planet (GDD §2.1 ring layout, §2.5 "built at your own planet").
  *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
  *  on — but the sim cannot place a core without it. TUNABLE */
@@ -146,8 +190,12 @@ export const PLANET = {
   /** Core body radius: the collision/beam target and the mount ring for turrets. */
   radius: 64,
   /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
-   *  in a ring around the central asteroid field). */
-  ringFraction: 0.42,
+   *  in a ring around the central asteroid field). Lowered from the v0.1 0.42
+   *  (field report P1): at 0.42 the ring sat at 0.84×halfMin and, once the
+   *  planet radius was added, touched the wall. At 0.32 the ring clears the wall
+   *  by more than `WORLD_EDGE_MARGIN` on the default arena while staying outboard
+   *  of the ship ring. */
+  ringFraction: 0.32,
   /** How far outboard of the ship's spawn point the planet sits — the ship
    *  spawns *orbiting* its home planet, between the planet and the field
    *  (GDD §2.1). */
