@@ -48,6 +48,7 @@ import {
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
+  clampToMargin,
 } from './constants';
 import {
   buyUpgrade,
@@ -740,7 +741,10 @@ function spawnChunk(world: World, a: Asteroid, ship: Ship, amount: number): void
   const dir = normalize({ x: ship.pos.x - a.pos.x, y: ship.pos.y - a.pos.y });
   world.chunks.push({
     id: world.nextEntityId++,
-    pos: { x: a.pos.x + dir.x * (a.radius + CHUNK.radius), y: a.pos.y + dir.y * (a.radius + CHUNK.radius) },
+    pos: {
+      x: clampToMargin(a.pos.x + dir.x * (a.radius + CHUNK.radius), CHUNK.radius, world.bounds.width),
+      y: clampToMargin(a.pos.y + dir.y * (a.radius + CHUNK.radius), CHUNK.radius, world.bounds.height),
+    },
     vel: { x: dir.x * CHUNK.ejectSpeed, y: dir.y * CHUNK.ejectSpeed },
     amount,
     radius: CHUNK.radius,
