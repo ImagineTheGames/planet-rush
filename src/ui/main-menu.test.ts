@@ -71,6 +71,18 @@ describe('layout', () => {
     expect(touch.buttons[0]?.height).toBe(MAIN_MENU_BUTTON_HEIGHT_TOUCH);
   });
 
+  it('reserves a map-picker band between the title and the buttons', () => {
+    const layout = mainMenuLayout(VIEWPORT);
+    // The band sits below the title…
+    expect(layout.mapBand.y).toBeGreaterThanOrEqual(layout.title.y + layout.title.height);
+    expect(layout.mapBand.width).toBeGreaterThan(0);
+    expect(layout.mapBand.height).toBeGreaterThan(0);
+    // …and above the first button, inside the content box.
+    expect(layout.buttons[0]!.y).toBeGreaterThanOrEqual(layout.mapBand.y + layout.mapBand.height);
+    expect(layout.mapBand.x + layout.mapBand.width).toBeLessThanOrEqual(VIEWPORT.width);
+    expect(layout.mapBand.y + layout.mapBand.height).toBeLessThanOrEqual(VIEWPORT.height);
+  });
+
   it('insets the content by the safe area', () => {
     const insets = { top: 40, bottom: 20, left: 30, right: 30 };
     const layout = mainMenuLayout(VIEWPORT, { insets });
