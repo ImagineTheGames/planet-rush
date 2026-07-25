@@ -96,3 +96,41 @@ muzzle/shot ever appeared, while the local beam always did.
 
 **Three gates FAIL on `1c72d85`. The field bugs are not dead — the two
 one-function `main.ts` wiring gaps (beam feed, combatants feed) need to close.**
+
+## Evidence round 3 — re-verify after the wiring landed (build `0a3a313`)
+
+m2-15 / m2-16 closed the two `main.ts` wiring gaps (PRs #60, #61) and shipped
+deterministic `?debug=1&freeze=1` staging seams. I rebuilt HEAD of `main`
+(`0a3a313`, clean tree) and re-staged the three failures through those seams —
+`capture-round3.mjs`, not the flaky live-siege kite — then looked at every pixel
+and read the instrument back.
+
+| Field bug | Shot | Verdict |
+| --- | --- | --- |
+| Invisible enemy lasers | `enemy-beam-visible` | **verified** — a non-local beam draws, clamped to its hit |
+| Turret never visibly fired | `turret-firing` | **verified** — a turret muzzle beam rises from the turret to a hit-dot |
+| Missing enemy health bars | `enemy-healthbars` | **verified** — a two-part HP bar sits over a bot staged to 40% hull |
+
+What I saw and how it was staged:
+
+- **enemy-beam-visible / enemy-healthbars** — one 1900×1100 frame
+  (`combat-staged.png`, zoom `combat-staged-zoom.png`). `damageEnemy(0.4)` parks
+  a bot beside the centred local ship, `stageCombat()` gives that bot a beam.
+  On screen: a cyan (non-local) beam ending on a hit-dot, and a two-part HP bar
+  (~40% cyan fill + grey) above the bot. `__planetRush.beams` = two beams, both
+  `shooter:1`; `__healthbarStage.bars()` = a `fraction:0.4` bar for `owner:1`.
+  The local ship is not firing, so the beam is provably not mine.
+- **turret-firing** — `turret-muzzle.png` (full 8-planet ring at 3600×2000) /
+  `turret-muzzle-zoom.png`. `stageCombat()` mounts a live-muzzle turret on a
+  rival planet; the follow-camera frames it. On screen: a vertical cyan muzzle
+  beam from the turret body on the planet rim to a hit-dot. `__planetRush.beams`
+  carries the `source:'turret'` record whose projected endpoints match the drawn
+  beam. Honest scope: the staged turret is a rival's — but the bug was that *no*
+  turret muzzle rendered, and friendly turrets draw through the same
+  `combatBeams(world)` path now proven here.
+
+No page errors in any capture. `build-button-after-build` was already verified in
+round 2 and its `main.ts` path is unchanged, so it stands.
+
+**All three gates PASS on `0a3a313`. This is the final combat-visibility gate for
+the v0.1 classroom tag.**
