@@ -26,8 +26,10 @@ import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
 import {
   BEAM_RANGE,
   combatBeams,
+  destroyCore,
   isCollapsed,
   isDocked,
+  isOver,
   planetOf,
   shieldCount,
   shieldPool,
@@ -35,6 +37,7 @@ import {
 } from './sim';
 import type { CombatBeam, Planet, Turret, World } from './sim';
 import { bootOfflineMatch } from '@platform/match-boot';
+import type { MatchBoot } from '@platform/match-boot';
 import {
   createControlState,
   mapActions,
@@ -106,8 +109,19 @@ import {
   createSettings,
   toggleReduceVfx,
   adjustVolume,
+  EndOfMatchView,
+  endOfMatchModel,
 } from './ui';
-import type { HudFrame, Combatant, SettingsState, SettingsTarget, MainMenuOption } from './ui';
+import type {
+  HudFrame,
+  Combatant,
+  SettingsState,
+  SettingsTarget,
+  MainMenuOption,
+  EndButton,
+  MatchOutcome,
+  DeathCause,
+} from './ui';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -256,12 +270,21 @@ async function boot(): Promise<void> {
   //     "does the client actually assemble a match" is a headless test rather
   //     than something only a browser can answer — which is the exact gap this
   //     milestone was retracted for.
-  const match = bootOfflineMatch({
-    seed: MATCH_SEED,
-    localPlayer: LOCAL_PLAYER,
-    shipClass: LOCAL_SHIP_CLASS,
-  });
-  const world = match.world;
+  // Fresh matches are re-bootable, because REMATCH (below) tears the current one
+  // down and stands a new one up in place — "straight to a fresh match" (GDD
+  // §2.7). The seed advances each time so a rematch is a *different* arena, still
+  // deterministic (GDD §4.8). `matchId` counts every world this boot builds — the
+  // live-stage seam reads it to prove REMATCH constructed a new one, not re-showed
+  // the old. `match`/`world` are `let`: every closure below reads the live binding,
+  // so a rematch redirects the whole render/input path onto the new world at once.
+  let matchSeed = MATCH_SEED;
+  let matchId = 0;
+  function bootMatch(seed: number): MatchBoot {
+    matchId += 1;
+    return bootOfflineMatch({ seed, localPlayer: LOCAL_PLAYER, shipClass: LOCAL_SHIP_CLASS });
+  }
+  let match = bootMatch(matchSeed);
+  let world = match.world;
 
   // The match world now exists — flip the menu's test seam so a clean-boot
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
@@ -314,6 +337,7 @@ async function boot(): Promise<void> {
     hud.enableHealthBarDebug();
     installHealthbarStage();
     installOreDepositStage();
+    installEndScreenStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -341,6 +365,33 @@ async function boot(): Promise<void> {
   //     thumb can reach it. Hidden until `fullscreen.affordanceVisible()` says so.
   const fsAffordance = new FullscreenAffordance();
   gameRoot.addChild(fsAffordance);
+
+  // --- End-of-match / DEFEATED overlay (field report v0.1.2; GDD §2.7, §4.7).
+  //     The two ways a player's match can end, each with its own screen:
+  //       - Your core dies while the others fight on → the DEFEATED overlay,
+  //         with SPECTATE (free the camera, watch the rest) or REMATCH.
+  //       - The last core falls (you win, or you're a spectator when it does) →
+  //         the result screen: winner, and REMATCH / BACK TO MENU.
+  //     The screen the field report caught missing entirely: the developer's home
+  //     died and NOTHING happened, because these views (PR #45) were never wired
+  //     into the boot path. Topmost so its backdrop covers the live match under
+  //     it; hidden until `syncEndScreen()` (fed off `world.match`) says otherwise.
+  //     The UI decides presentation; the sim decides truth; this file only wires.
+  const endOverlay = new EndOfMatchView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  endOverlay.visible = false;
+  gameRoot.addChild(endOverlay);
+  /** Which end screen is up, if any — driven each frame from sim state. */
+  let endScreen: 'none' | 'defeated' | 'result' = 'none';
+  /** The player chose SPECTATE: suppress the DEFEATED overlay and let the live
+   *  match play on under a freed camera — until it ends and the result screen
+   *  takes over. Reset on rematch. */
+  let spectating = false;
+  /** The buttons the overlay is currently offering — the live-stage seam reads
+   *  these back to prove SPECTATE/REMATCH are present on the DEFEATED screen. */
+  let endButtonsShown: EndButton[] = [];
+  /** Who the camera follows. Your own ship until you're eliminated and SPECTATE
+   *  frees it onto a survivor (GDD §2.7 "watch the rest"). Reset on rematch. */
+  let cameraTarget: PlayerId = LOCAL_PLAYER;
 
   let fireMode = readFireMode(platform, isTouch);
   // The active input device drives the controls strip + prompt wording (GDD
@@ -417,6 +468,18 @@ async function boot(): Promise<void> {
     const lp = toLogical(e.clientX, e.clientY);
     pressPoint.x = lp.x;
     pressPoint.y = lp.y;
+
+    // The end-of-match / DEFEATED overlay owns the whole screen while it's up: a
+    // tap either lands on REMATCH / SPECTATE / BACK TO MENU or on nothing, but it
+    // NEVER falls through to fly a dead ship or open the wheel. First refusal,
+    // and it always consumes the event.
+    if (endOverlay.visible) {
+      const target = endOverlay.hitTest(lp.x, lp.y);
+      if (target) handleEndTarget(target.kind);
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
 
     // The re-enter-fullscreen affordance — present only after the player backed
     // out of fullscreen (field request v0.1.1). This tap IS a fresh user gesture,
@@ -532,7 +595,7 @@ async function boot(): Promise<void> {
       lastRenderMs = nowMs;
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
 
-      renderer.draw(world, { cameraTarget: LOCAL_PLAYER, beams: currentBeams() });
+      renderer.draw(world, { cameraTarget, beams: currentBeams() });
       feedHud();
       // Health bars over every non-local combat entity (GDD §2.2). Fed AFTER
       // renderer.draw so the camera transform is current: each combatant's world
@@ -552,6 +615,11 @@ async function boot(): Promise<void> {
       // and no longer are (field request v0.1.1). Corner it in logical space.
       fullscreen.sync();
       fsAffordance.update(fullscreen.affordanceVisible(), transform.logicalWidth, transform.logicalHeight);
+      // End-of-match / DEFEATED overlay: read the sim's own result off `world.match`
+      // and show the screen that fits — nothing, the DEFEATED overlay, or the final
+      // result. The whole "your planet died and nothing happened" fix (field report
+      // v0.1.2) lives on this one call, fed truth the sim decides.
+      syncEndScreen();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -577,6 +645,112 @@ async function boot(): Promise<void> {
       performance.now(),
       simTicks, // sim-time base: lets QA divide movement by ticks, not seconds
     );
+  }
+
+  /**
+   * Show the end screen the match's own state calls for — the presentation half
+   * of the win/loss the sim decides (`world.match`). Two distinct moments, two
+   * screens (GDD §2.7, §4.7):
+   *
+   *  - **The whole match is over** (`isOver`): the result screen — winner + the
+   *    d7-01 REMATCH / BACK TO MENU. Shown whether you won or were long since
+   *    eliminated and watching.
+   *  - **You're eliminated but the match goes on**: the DEFEATED overlay, unless
+   *    you chose SPECTATE (then it holds off until the match itself ends).
+   *
+   * Runs every rendered frame; cheap and idempotent — it only touches the view
+   * when the desired screen changes or its model does. The screen is derived, not
+   * latched, so a match that resolves while you're staring at DEFEATED rolls the
+   * overlay straight over to the result screen on its own.
+   */
+  function syncEndScreen(): void {
+    const over = isOver(world);
+    const eliminatedLocal = world.match.eliminated.includes(LOCAL_PLAYER);
+    const desired: typeof endScreen = over ? 'result' : eliminatedLocal && !spectating ? 'defeated' : 'none';
+
+    endScreen = desired;
+    if (desired === 'none') {
+      if (endOverlay.visible) endOverlay.visible = false;
+      if (endButtonsShown.length) endButtonsShown = [];
+      return;
+    }
+    if (!endOverlay.visible) endOverlay.visible = true;
+    const model = endOfMatchModel(currentOutcome(over));
+    endButtonsShown = model.buttons.map((b) => b.id);
+    endOverlay.update(model);
+  }
+
+  /**
+   * Read a plain {@link MatchOutcome} off the sim — truth in, presentation out.
+   * On an elimination it works out placement (first core to fall places last; the
+   * lone survivor is 1st, so a seat eliminated `k`-th of `N` places `N − k`) and a
+   * coarse cause of death: the collapse if the field had closed over the core by
+   * the time it fell, otherwise a rival destroyed it (the sim tracks no killer, so
+   * this is the honest limit of what it can say — field report v0.1.2).
+   */
+  function currentOutcome(over: boolean): MatchOutcome {
+    const total = world.planets.length;
+    if (over) return { you: LOCAL_PLAYER, winner: world.match.winner, matchOver: true };
+
+    const k = world.match.eliminated.indexOf(LOCAL_PLAYER);
+    const planet = planetOf(world, LOCAL_PLAYER);
+    const byCollapse =
+      isCollapsed(world) && planet !== null && planet.deathTime >= world.match.collapseTime;
+    const cause: DeathCause = byCollapse ? 'collapse' : 'destroyed';
+    const base: MatchOutcome = { you: LOCAL_PLAYER, winner: null, matchOver: false, totalPlayers: total, cause };
+    // First core to fall places last; the survivor is 1st — so `N − k`. Present
+    // only when we actually found the seat in the elimination order.
+    return k >= 0 ? { ...base, placement: total - k } : base;
+  }
+
+  /** Route a tap on the end overlay: REMATCH → a fresh match, SPECTATE → free the
+   *  camera onto the live match, BACK TO MENU → a clean boot (which lands back on
+   *  the main menu). */
+  function handleEndTarget(kind: EndButton): void {
+    if (kind === 'rematch') rematch();
+    else if (kind === 'spectate') startSpectate();
+    else if (kind === 'menu') window.location.reload();
+  }
+
+  /** SPECTATE (GDD §2.7 "spectate if they want to watch"): drop the DEFEATED
+   *  overlay and let the live match play on, camera freed onto a survivor so
+   *  there is something to watch. The sim never stopped — the loop keeps ticking
+   *  every seat — so this is purely a camera + overlay change. */
+  function startSpectate(): void {
+    spectating = true;
+    endOverlay.visible = false;
+    cameraTarget = firstSurvivor() ?? LOCAL_PLAYER;
+  }
+
+  /** A living opponent to watch after you're out — its ship if it's flying, else
+   *  any owner whose planet still stands. Null if nobody is left (the match is
+   *  about to end, and the result screen takes the camera's place anyway). */
+  function firstSurvivor(): PlayerId | null {
+    for (const s of world.ships) {
+      if (s.id !== LOCAL_PLAYER && !s.eliminated && s.alive) return s.id;
+    }
+    for (const p of world.planets) {
+      if (p.alive && p.owner !== LOCAL_PLAYER) return p.owner;
+    }
+    return null;
+  }
+
+  /** REMATCH (GDD §2.7 / §4.7): tear the current match down and stand a fresh one
+   *  up in place — straight to a new match, not back to the menu. Every render/
+   *  input closure reads the live `world`/`match` binding, so re-pointing them
+   *  here redirects the whole client onto the new world at once. */
+  function rematch(): void {
+    match.close();
+    matchSeed += 1;
+    match = bootMatch(matchSeed);
+    world = match.world;
+    spectating = false;
+    cameraTarget = LOCAL_PLAYER;
+    endScreen = 'none';
+    endButtonsShown = [];
+    endOverlay.visible = false;
+    hasOrdered = false;
+    if (buildWheel.open) buildWheel.toggle();
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -901,6 +1075,84 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__endScreenStage` — the ?debug=1 live-stage seam for the
+   * v0.1.2 end-screen field report ("there was no end match screen after my planet
+   * died"). The DEFEATED overlay and the result screen (PR #45) were merged and
+   * unit-green but never wired into boot; this seam lets a Playwright test prove
+   * they now show on a REAL boot, the same way `__healthbarStage` proved the bars.
+   *
+   * Like the ore-deposit seam it runs WITHOUT ?freeze=1, because SPECTATE must be
+   * watched letting the LIVE match play on. Methods stage the two moments through
+   * the sim's OWN elimination path (`destroyCore`, the exported rule) and read the
+   * wired screen state back — they never fake the UI, only the deaths that drive it:
+   *
+   *  - `eliminateLocal()` — destroy the LOCAL core while the others stand, so the
+   *    DEFEATED overlay must appear (match continues). Returns whether it staged.
+   *  - `endMatch()` — destroy every core but one non-local survivor, so the next
+   *    tick resolves a winner and the result screen must appear (you, a spectator,
+   *    watching someone else take the system). Returns whether it staged.
+   *  - `screen()` — which end screen the wiring has up this frame ('none' |
+   *    'defeated' | 'result'), read off the same `endScreen` the render loop sets.
+   *  - `buttons()` — the buttons that screen is offering, so the test asserts
+   *    SPECTATE + REMATCH on DEFEATED and REMATCH + BACK TO MENU on the result.
+   *  - `spectate()` / `rematch()` — drive those actions exactly as a tap would.
+   *  - `matchId()` — how many worlds this boot has built; REMATCH bumps it, which
+   *    is the proof a NEW world booted rather than the old one being re-shown.
+   *  - `ticks()` — the sim's own step count, so the test proves the match keeps
+   *    advancing while spectating (the loop never stopped ticking).
+   *
+   * It drives the sim's public `destroyCore` rather than faking screen state: the
+   * rule stays sim-owned (GDD §2.7), and this only stages the input to it. Behind
+   * ?debug=1, absent in every normal build.
+   */
+  function installEndScreenStage(): void {
+    const stage = {
+      eliminateLocal(): boolean {
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!planet || !planet.alive) return false;
+        destroyCore(world, planet); // the sim's own elimination path
+        return true;
+      },
+      endMatch(): boolean {
+        const survivor = world.planets.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
+        if (!survivor) return false;
+        for (const p of world.planets) {
+          if (p.owner !== survivor.owner && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
+      screen(): 'none' | 'defeated' | 'result' {
+        return endScreen;
+      },
+      buttons(): EndButton[] {
+        return endButtonsShown.slice();
+      },
+      spectate(): void {
+        startSpectate();
+      },
+      rematch(): void {
+        rematch();
+      },
+      matchId(): number {
+        return matchId;
+      },
+      ticks(): number {
+        return simTicks;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__endScreenStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -1016,6 +1268,7 @@ async function boot(): Promise<void> {
     renderer.setViewport(viewport);
     touch.setScreenWidth(w);
     hud.resize(w, h);
+    endOverlay.resize(w, h, isTouch);
   }
 
   /** The camera's LOGICAL (landscape) viewport, in the space the world is drawn
