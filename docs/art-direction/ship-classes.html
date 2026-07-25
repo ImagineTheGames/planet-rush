@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planet Rush — Ship Classes</title>
+<style>
+  :root{--vac:#0D1015;--steel:#7E8894;--signal:#F2D24B;--plasma:#4DC3FF;--bone:#C6CDD6;
+        --panel:#141922;--rule:#252D3A;--muted:#8B95A5}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--vac);color:var(--bone);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  header{padding:56px 0 30px}
+  h1{font-size:36px;margin:0 0 8px;color:var(--signal)}
+  .sub{color:var(--muted);margin:0;max-width:78ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;padding:26px 0}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:16px}
+  .card svg{display:block;width:100%;height:auto;border-radius:6px;background:var(--vac)}
+  .card h3{margin:12px 0 2px;font-size:17px;color:var(--signal);font-family:ui-monospace,Consolas,monospace}
+  .role{margin:0 0 12px;font-size:13.5px;color:var(--plasma)}
+  .stat{display:grid;grid-template-columns:64px 1fr 44px;gap:8px;align-items:center;margin:5px 0;font-size:12.5px;color:var(--muted)}
+  .bar{height:8px;background:#232B38;border-radius:4px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px;background:var(--plasma)}
+  .cargo{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .cargo b{color:var(--signal)}
+  .blurb{margin:12px 0 0;font-size:13.5px;color:var(--muted)}
+  .bench{border-top:1px solid var(--rule);padding:30px 0 20px}
+  .bench h2{font-size:20px;color:var(--plasma);margin:0 0 6px}
+  .bench p{color:var(--muted);font-size:15px;max-width:80ch;margin:0}
+  footer{border-top:1px solid var(--rule);padding:28px 0 56px;color:var(--muted);font-size:14px}
+  footer code{color:var(--signal)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Ship Classes — pick your hull, pick your playstyle</h1>
+  <p class="sub">Chosen in the lobby, locked for the match. Five attributes: <strong>speed · acceleration · turn · armor · beam damage</strong>
+  (beam = laser <em>and</em> mining — one beam, one stat). Upgrades multiply class bases, so classes stay distinct all match.
+  Numbers are day-1 baselines, QA-tunable. All values relative to the Vanguard (100%).</p>
+</header>
+
+<div class="grid">
+
+  <div class="card">
+    <svg viewBox="0 0 230 110">
+      <g transform="translate(115,55)" stroke="#262C34" stroke-width="2.5">
+        <path d="M40 0 L10 -8 L-20 -8 L-28 0 L-20 8 L10 8 Z" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M-4 -8 l-8 -18 12 0 6 18 z"/><path d="M-4 8 l-8 18 12 0 6 -18 z"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M-12 -26 l12 0 0 5 -12 0 z"/><path d="M-12 21 l12 0 0 5 -12 0 z"/></g>
+        <rect x="10" y="-5" width="16" height="10" rx="4" fill="#4DC3FF"/>
+        <circle cx="40" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+        <path d="M-28 -4 l-11 4 11 4" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+    </svg>
+    <h3>INTERCEPTOR — Quadfin (S8)</h3>
+    <p class="role">Scout · miner-hunter · first to every ore wave</p>
+    <div class="stat"><span>Speed</span><div class="bar"><i style="width:93%"></i></div><span>130%</span></div>
+    <div class="stat"><span>Accel</span><div class="bar"><i style="width:86%"></i></div><span>120%</span></div>
+    <div class="stat"><span>Turn</span><div class="bar"><i style="width:100%"></i></div><span>140%</span></div>
+    <div class="stat"><span>Armor</span><div class="bar"><i style="width:35%;background:#E24A3B"></i></div><span>35</span></div>
+    <div class="stat"><span>Beam</span><div class="bar"><i style="width:53%"></i></div><span>8</span></div>
+    <p class="cargo">Cargo base: <b>2</b></p>
+    <p class="blurb">Catches miners in the open, scouts enemy HP rings for free, wins every race to the wave. Melts if a turret so much as looks at it. Sieges? Not alone.</p>
+  </div>
+
+  <div class="card">
+    <svg viewBox="0 0 230 110">
+      <g transform="translate(115,55)" stroke="#262C34" stroke-width="2.5">
+        <path d="M30 -14 L44 0 L30 14 L-20 18 L-30 0 L-20 -18 Z" fill="#7E8894"/>
+        <path d="M30 -14 L44 0 L30 14 l-8 -14 z" fill="#8F99A6" stroke-width="0"/>
+        <rect x="2" y="-8" width="16" height="16" rx="3" fill="#4DC3FF"/>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M-20 -18 l30 4 -2 5 -28 -3z"/><path d="M-20 18 l30 -4 -2 -5 -28 3z"/></g>
+        <circle cx="44" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+        <path d="M-30 -4 l-11 4 11 4" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+    </svg>
+    <h3>VANGUARD — Anvil (S9)</h3>
+    <p class="role">All-rounder · onboarding default</p>
+    <div class="stat"><span>Speed</span><div class="bar"><i style="width:71%"></i></div><span>100%</span></div>
+    <div class="stat"><span>Accel</span><div class="bar"><i style="width:71%"></i></div><span>100%</span></div>
+    <div class="stat"><span>Turn</span><div class="bar"><i style="width:71%"></i></div><span>100%</span></div>
+    <div class="stat"><span>Armor</span><div class="bar"><i style="width:50%;background:#E24A3B"></i></div><span>50</span></div>
+    <div class="stat"><span>Beam</span><div class="bar"><i style="width:66%"></i></div><span>10</span></div>
+    <p class="cargo">Cargo base: <b>2</b></p>
+    <p class="blurb">Does everything second-best. The baseline every other class is measured against, and the hull new players spawn with in their first match.</p>
+  </div>
+
+  <div class="card">
+    <svg viewBox="0 0 230 110">
+      <g transform="translate(115,55)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M42 -20 l0 10 -6 1 0 -9 z"/><path d="M42 20 l0 -10 -6 -1 0 9 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <g fill="#5A6470"><rect x="-34" y="-8" width="8" height="6" rx="2"/><rect x="-34" y="2" width="8" height="6" rx="2"/></g>
+        <path d="M-34 -6 l-8 3 8 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+    </svg>
+    <h3>EXCAVATOR — Pincer (S7)</h3>
+    <p class="role">Mining engine · close-range bruiser</p>
+    <div class="stat"><span>Speed</span><div class="bar"><i style="width:64%"></i></div><span>90%</span></div>
+    <div class="stat"><span>Accel</span><div class="bar"><i style="width:71%"></i></div><span>100%</span></div>
+    <div class="stat"><span>Turn</span><div class="bar"><i style="width:57%"></i></div><span>80%</span></div>
+    <div class="stat"><span>Armor</span><div class="bar"><i style="width:55%;background:#E24A3B"></i></div><span>55</span></div>
+    <div class="stat"><span>Beam</span><div class="bar"><i style="width:86%"></i></div><span>13</span></div>
+    <p class="cargo">Cargo base: <b>2</b></p>
+    <p class="blurb">Out-earns everyone — chews asteroids 30% faster and hits like a wall in a knife fight. But it can't run, and it knows it. The economy engine that must be escorted or hidden.</p>
+  </div>
+
+  <div class="card">
+    <svg viewBox="0 0 230 110">
+      <g transform="translate(115,55)" stroke="#262C34" stroke-width="2.5">
+        <rect x="18" y="-26" width="14" height="52" rx="5" fill="#7E8894"/>
+        <rect x="-30" y="-11" width="50" height="22" rx="6" fill="#6E7987"/>
+        <circle cx="-2" cy="0" r="8" fill="#4DC3FF"/>
+        <g fill="#8F99A6"><rect x="-26" y="-24" width="22" height="10" rx="4"/><rect x="-26" y="14" width="22" height="10" rx="4"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><rect x="18" y="-26" width="14" height="5"/><rect x="18" y="21" width="14" height="5"/></g>
+        <path d="M-30 -5 l-13 5 13 5" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+    </svg>
+    <h3>HAULER — Hammerhead (S3)</h3>
+    <p class="role">Logistics · siege tank</p>
+    <div class="stat"><span>Speed</span><div class="bar"><i style="width:61%"></i></div><span>85%</span></div>
+    <div class="stat"><span>Accel</span><div class="bar"><i style="width:57%"></i></div><span>80%</span></div>
+    <div class="stat"><span>Turn</span><div class="bar"><i style="width:61%"></i></div><span>85%</span></div>
+    <div class="stat"><span>Armor</span><div class="bar"><i style="width:70%;background:#E24A3B"></i></div><span>70</span></div>
+    <div class="stat"><span>Beam</span><div class="bar"><i style="width:60%"></i></div><span>9</span></div>
+    <p class="cargo">Cargo base: <b>3</b> (side pods visibly fill)</p>
+    <p class="blurb">Hauls three ore per trip and soaks turret fire like it's weather. Arrives late to everything — but when it arrives, it stays. The siege anchor and the safest miner.</p>
+  </div>
+</div>
+
+<div class="bench">
+  <h2>The bench (post-week-one hulls)</h2>
+  <p>Wedge (S2), Manta (S5), and Prospector (S6) stay in the concept library as future classes — a glass-cannon duelist,
+  a stealth-leaning skirmisher, and a support/repair hull are natural slots. Not scheduled, not balanced, not in week one.</p>
+</div>
+
+<div class="bench">
+  <h2>Why this quartet works</h2>
+  <p>It's a rock-paper-scissors around the triangle: the <strong>Interceptor</strong> punishes greedy miners but loses to defended planets ·
+  the <strong>Excavator</strong> out-economies everyone but is prey in the open · the <strong>Hauler</strong> cracks sieges and hauls safely but can't chase ·
+  the <strong>Vanguard</strong> never gets countered and never counters. Bot personalities map onto hulls (Bolt/Sable → Interceptor, Foreman/Warden → Excavator,
+  Rusty/Patch → Hauler, Vulture → Vanguard), so reading a silhouette tells you who you're dealing with — silhouette IS information, which is why the hull stays steel and only the trim takes player color.</p>
+</div>
+
+<footer>
+  <p>Planet Rush · Ship class design · QA guardrail: no class exceeds <code>55%</code> win rate in mirror-vs-field harness runs.
+  Class picks happen in the lobby (day 4 milestone); the Vanguard is the pre-selected default so onboarding never blocks on the choice.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planet Rush — Concept Boards (Day 0)</title>
+<style>
+  :root{
+    --bg:#0D1117; --panel:#161C26; --text:#E6E4DE; --muted:#9AA3B2;
+    --rule:#2A3242; --accent:#8AB4FF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:17px;line-height:1.55}
+  .wrap{max-width:1050px;margin:0 auto;padding:0 28px}
+  header{padding:64px 0 40px}
+  h1{font-size:44px;margin:0 0 8px;color:var(--accent);letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0;max-width:70ch}
+  section{padding:48px 0;border-top:1px solid var(--rule)}
+  h2{font-size:26px;margin:0 0 4px}
+  .theme-tag{font-size:13px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+  .board{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px;margin:18px 0}
+  .board h3{margin:0 0 10px;font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  svg{display:block;width:100%;height:auto;border-radius:6px}
+  .palette{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .swatch{width:118px}
+  .chip{height:52px;border-radius:6px;border:1px solid rgba(255,255,255,.08)}
+  .swatch p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+  .swatch code{color:var(--text);font-size:12px}
+  .notes{color:var(--muted);font-size:15px;margin:14px 0 0;max-width:80ch}
+  .notes strong{color:var(--text)}
+  footer{border-top:1px solid var(--rule);padding:36px 0 64px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Planet Rush — Concept Boards</h1>
+  <p class="sub">Day-0 concept mode, per GDD §4.7. Ten visual directions, each rendering the <em>same scene</em>:
+  your ship mining under pressure while your planet sits defended, an enemy inbound. Judged against the tone
+  paragraph: <em>"Saturday-morning space brawl: fast, bright, a little cheeky — arcade on the surface, a small ache underneath."</em></p>
+</header>
+
+<!-- ============================================================ THEME A -->
+<section>
+  <p class="theme-tag">Theme A</p>
+  <h2>Neon Vector</h2>
+  <div class="board">
+    <h3>Scene — mining while the alarm is quiet</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glowA" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <radialGradient id="coreA" cx="50%" cy="50%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="45%" stop-color="#40F0D0"/><stop offset="100%" stop-color="#0A7A6A"/></radialGradient>
+      </defs>
+      <rect width="760" height="440" fill="#05060C"/>
+      <g fill="#2A3555"><circle cx="60" cy="50" r="1.4"/><circle cx="180" cy="30" r="1"/><circle cx="300" cy="70" r="1.6"/><circle cx="430" cy="25" r="1"/><circle cx="700" cy="60" r="1.3"/><circle cx="90" cy="380" r="1.2"/><circle cx="240" cy="410" r="1"/><circle cx="520" cy="400" r="1.5"/><circle cx="660" cy="360" r="1"/><circle cx="380" cy="330" r="1.2"/></g>
+      <!-- planet + defenses -->
+      <g filter="url(#glowA)">
+        <circle cx="610" cy="235" r="66" fill="none" stroke="#40F0D0" stroke-width="2.5"/>
+        <circle cx="610" cy="235" r="66" fill="#40F0D0" opacity="0.06"/>
+        <path d="M553 210 Q585 190 620 205 T668 215" fill="none" stroke="#40F0D0" stroke-width="1.2" opacity=".7"/>
+        <path d="M550 255 Q590 275 630 262 T672 248" fill="none" stroke="#40F0D0" stroke-width="1.2" opacity=".7"/>
+        <circle cx="610" cy="235" r="14" fill="url(#coreA)"/>
+        <!-- shield -->
+        <circle cx="610" cy="235" r="92" fill="none" stroke="#7BD4FF" stroke-width="1.6" stroke-dasharray="10 7" opacity=".85"/>
+        <!-- turrets -->
+        <g stroke="#FF5EA0" stroke-width="2.2" fill="none">
+          <path d="M563 180 l-10 -14 M556 172 l14 -3"/><circle cx="561" cy="181" r="6"/>
+          <path d="M662 275 l14 10 M668 288 l6 -13"/><circle cx="660" cy="277" r="6"/>
+        </g>
+      </g>
+      <!-- asteroids + ore -->
+      <g filter="url(#glowA)" stroke="#B8C2E0" fill="none" stroke-width="2">
+        <path d="M155 130 l26 -12 30 8 12 26 -14 24 -32 6 -22 -20 z"/>
+        <path d="M95 235 l20 -10 22 7 8 19 -11 17 -25 4 -16 -15 z"/>
+        <path d="M215 275 l16 -8 18 5 7 16 -9 14 -20 3 -13 -12 z"/>
+      </g>
+      <g filter="url(#glowA)" fill="#FFD25E">
+        <path d="M245 165 l6 -8 6 8 -6 8 z"/><path d="M270 195 l5 -7 5 7 -5 7 z"/><path d="M300 178 l5 -7 5 7 -5 7 z"/>
+      </g>
+      <!-- player ship + beam -->
+      <g filter="url(#glowA)">
+        <line x1="352" y1="212" x2="212" y2="152" stroke="#FFD25E" stroke-width="2.5" opacity=".9"/>
+        <path d="M370 220 l-34 -6 8 -18 z M338 226 l-16 6 10 -14 z" fill="none" stroke="#40F0D0" stroke-width="2.4"/>
+      </g>
+      <!-- enemy inbound -->
+      <g filter="url(#glowA)">
+        <path d="M560 78 l30 10 -22 12 z" fill="none" stroke="#FF5EA0" stroke-width="2.2"/>
+        <line x1="596" y1="92" x2="622" y2="118" stroke="#FF5EA0" stroke-width="1.4" stroke-dasharray="4 5" opacity=".8"/>
+      </g>
+      <!-- HUD -->
+      <g font-family="ui-monospace,Consolas,monospace" font-size="13">
+        <text x="18" y="28" fill="#FFD25E">HOLD 2/2 ▮▮</text><text x="18" y="47" fill="#7BD4FF">BANK 11</text>
+        <g text-anchor="end">
+          <text x="742" y="26" fill="#40F0D0">YOU ████████░░</text>
+          <text x="742" y="44" fill="#FF5EA0">VULTURE ██████░░░░</text>
+          <text x="742" y="62" fill="#B8C2E0">RUSTY █████████░</text>
+        </g>
+      </g>
+      <g transform="translate(672,352)"><rect x="0" y="0" width="70" height="70" rx="6" fill="none" stroke="#2A3555"/><circle cx="35" cy="35" r="26" fill="none" stroke="#40F0D0" stroke-width="1" opacity=".6"/><circle cx="35" cy="35" r="3" fill="#40F0D0"/><circle cx="52" cy="22" r="2.4" fill="#FF5EA0"/><circle cx="18" cy="48" r="2.4" fill="#B8C2E0"/></g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Prototype sprites — ship liveries · turret · shield · asteroid · ore · wreck</h3>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="120" fill="#05060C"/>
+      <g filter="url(#glowA)" fill="none" stroke-width="2.4">
+        <path d="M75 60 l-30 -8 10 -16 z M45 66 l-14 6 9 -13 z" stroke="#40F0D0"/>
+        <path d="M165 60 l-30 -8 10 -16 z M135 66 l-14 6 9 -13 z" stroke="#FF5EA0"/>
+        <path d="M255 60 l-30 -8 10 -16 z M225 66 l-14 6 9 -13 z" stroke="#FFD25E"/>
+        <g stroke="#FF5EA0"><circle cx="330" cy="66" r="10"/><path d="M330 56 l0 -18 M322 42 l16 -4"/></g>
+        <circle cx="420" cy="60" r="26" stroke="#7BD4FF" stroke-dasharray="8 6"/>
+        <path d="M490 46 l20 -9 23 6 9 20 -11 18 -25 5 -17 -16 z" stroke="#B8C2E0"/>
+        <path d="M585 52 l7 -10 7 10 -7 10 z" stroke="#FFD25E" fill="#FFD25E"/>
+        <g stroke="#5A6580"><path d="M650 75 a30 30 0 0 1 55 -12" /><path d="M665 78 l12 -20 M690 74 l8 -14"/></g>
+      </g>
+      <g font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#5A6580" text-anchor="middle">
+        <text x="60" y="105">SHIP·P1</text><text x="150" y="105">SHIP·HARD</text><text x="240" y="105">SHIP·EASY</text>
+        <text x="330" y="105">TURRET</text><text x="420" y="105">SHIELD</text><text x="510" y="105">ASTEROID</text><text x="590" y="105">ORE</text><text x="678" y="105">WRECK</text>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#05060C"></div><p>Space <code>#05060C</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#40F0D0"></div><p>Player/ally <code>#40F0D0</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FF5EA0"></div><p>Threat <code>#FF5EA0</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFD25E"></div><p>Ore/economy <code>#FFD25E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7BD4FF"></div><p>Shields/UI <code>#7BD4FF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#B8C2E0"></div><p>Neutral rock <code>#B8C2E0</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> fast and bright, yes — cheeky, less so; neon reads "arcade-intense" more than "Saturday-morning."
+  <strong>Cost:</strong> cheapest to generate procedurally (strokes + glow filter), instancing-friendly, best legibility of the three at small sizes.
+  <strong>Risk:</strong> most generic — reads as "another Geometry Wars-like."</p>
+</section>
+
+<!-- ============================================================ THEME B -->
+<section>
+  <p class="theme-tag">Theme B</p>
+  <h2>Saturday Cartoon</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="440" fill="#1B2B4D"/>
+      <g fill="#40598F"><circle cx="70" cy="55" r="2"/><circle cx="200" cy="35" r="1.5"/><circle cx="330" cy="80" r="2.2"/><circle cx="480" cy="30" r="1.5"/><circle cx="710" cy="70" r="2"/><circle cx="110" cy="390" r="1.8"/><circle cx="280" cy="415" r="1.5"/><circle cx="560" cy="405" r="2"/><circle cx="410" cy="340" r="1.6"/></g>
+      <g fill="#FFE9A8" opacity=".9"><path d="M148 46 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z"/><path d="M620 390 l2.4 5.6 5.6 2.4 -5.6 2.4 -2.4 5.6 -2.4 -5.6 -5.6 -2.4 5.6 -2.4 z"/></g>
+      <!-- planet -->
+      <g stroke="#101A30" stroke-width="4" stroke-linejoin="round">
+        <circle cx="608" cy="238" r="68" fill="#4FC978"/>
+        <path d="M560 210 q28 -18 55 -6 q22 10 42 2" fill="none" stroke-width="0" />
+        <path d="M556 260 q30 20 62 10 q20 -6 36 -14" fill="#3AA85F" stroke-width="0"/>
+        <ellipse cx="585" cy="215" rx="16" ry="10" fill="#7FE0A2" stroke-width="0"/>
+        <circle cx="608" cy="238" r="17" fill="#FFD84D"/>
+        <circle cx="608" cy="238" r="8" fill="#FFF3C4" stroke-width="0"/>
+        <!-- turrets: chunky -->
+        <g fill="#8FA6CC">
+          <g transform="translate(556,182) rotate(-38)"><rect x="-9" y="-8" width="18" height="14" rx="4"/><rect x="-3" y="-22" width="6" height="15" rx="2.5"/></g>
+          <g transform="translate(661,281) rotate(135)"><rect x="-9" y="-8" width="18" height="14" rx="4"/><rect x="-3" y="-22" width="6" height="15" rx="2.5"/></g>
+        </g>
+      </g>
+      <!-- shield: soap bubble -->
+      <circle cx="608" cy="238" r="95" fill="#66C7FF" opacity=".14"/>
+      <circle cx="608" cy="238" r="95" fill="none" stroke="#9ADCFF" stroke-width="3" opacity=".8"/>
+      <path d="M540 180 a95 95 0 0 1 55 -34" fill="none" stroke="#FFFFFF" stroke-width="4" opacity=".7" stroke-linecap="round"/>
+      <!-- asteroids -->
+      <g stroke="#101A30" stroke-width="4" stroke-linejoin="round" fill="#A9825D">
+        <path d="M150 128 l30 -14 34 9 13 29 -16 27 -36 7 -25 -23 z"/>
+        <path d="M92 238 l22 -11 25 8 9 21 -12 19 -28 5 -18 -17 z"/>
+        <path d="M212 280 l18 -9 20 6 8 18 -10 15 -22 4 -15 -14 z"/>
+        <circle cx="172" cy="146" r="6" fill="#8A6848" stroke-width="0"/>
+        <circle cx="118" cy="252" r="5" fill="#8A6848" stroke-width="0"/>
+      </g>
+      <!-- cracks on mined asteroid -->
+      <path d="M168 132 l10 14 -6 12" fill="none" stroke="#101A30" stroke-width="2.5"/>
+      <!-- ore nuggets -->
+      <g stroke="#101A30" stroke-width="3" fill="#FFD84D">
+        <path d="M247 168 l8 -6 8 6 -3 10 -10 0 z"/><path d="M275 196 l7 -5 7 5 -2 9 -9 0 z"/><path d="M303 178 l7 -5 7 5 -2 9 -9 0 z"/>
+      </g>
+      <!-- beam -->
+      <path d="M352 214 L214 152" stroke="#FF8A3D" stroke-width="7" stroke-linecap="round" opacity=".9"/>
+      <path d="M352 214 L214 152" stroke="#FFD84D" stroke-width="3" stroke-linecap="round"/>
+      <!-- player ship: chunky rocket -->
+      <g transform="translate(374,222) rotate(-155)" stroke="#101A30" stroke-width="4" stroke-linejoin="round">
+        <ellipse cx="0" cy="0" rx="26" ry="15" fill="#F25C54"/>
+        <ellipse cx="8" cy="-3" rx="8" ry="6" fill="#9ADCFF"/>
+        <path d="M-18 -12 l-12 -10 4 14 z" fill="#FFD84D"/>
+        <path d="M-18 12 l-12 10 4 -14 z" fill="#FFD84D"/>
+        <path d="M-26 -4 l-16 4 16 4" fill="#FF8A3D" stroke-width="3"/>
+      </g>
+      <!-- enemy ship -->
+      <g transform="translate(575,86) rotate(28)" stroke="#101A30" stroke-width="3.5" stroke-linejoin="round">
+        <ellipse cx="0" cy="0" rx="20" ry="11" fill="#8C64D9"/>
+        <ellipse cx="6" cy="-2" rx="6" ry="4.5" fill="#D8C9F5"/>
+        <path d="M-14 -9 l-9 -7 3 10 z" fill="#FFD84D"/>
+      </g>
+      <!-- HUD -->
+      <g font-family="'Comic Sans MS','Segoe UI',sans-serif" font-size="14" font-weight="700">
+        <rect x="12" y="10" rx="10" width="120" height="46" fill="#101A30" opacity=".75"/>
+        <text x="24" y="30" fill="#FFD84D">⬢ HOLD 2/2</text><text x="24" y="48" fill="#9ADCFF">🏦 BANK 11</text>
+        <g text-anchor="end">
+          <rect x="560" y="10" rx="10" width="188" height="64" fill="#101A30" opacity=".75"/>
+          <text x="736" y="28" fill="#4FC978">YOU ▰▰▰▰▰▰▰▰▱▱</text>
+          <text x="736" y="47" fill="#F25C54">VULTURE ▰▰▰▰▰▱▱▱▱▱</text>
+          <text x="736" y="66" fill="#C9D4E8">RUSTY ▰▰▰▰▰▰▰▰▰▱</text>
+        </g>
+      </g>
+      <g transform="translate(668,348)"><rect width="76" height="76" rx="12" fill="#101A30" opacity=".8" stroke="#40598F"/><circle cx="38" cy="38" r="27" fill="none" stroke="#4FC978" stroke-width="2" opacity=".7"/><circle cx="38" cy="38" r="4" fill="#4FC978"/><circle cx="56" cy="24" r="3.4" fill="#F25C54"/><circle cx="20" cy="52" r="3.4" fill="#C9D4E8"/></g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Prototype sprites</h3>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="120" fill="#1B2B4D"/>
+      <g stroke="#101A30" stroke-width="3.5" stroke-linejoin="round">
+        <g transform="translate(60,55)"><ellipse rx="24" ry="14" fill="#F25C54"/><ellipse cx="7" cy="-3" rx="7" ry="5" fill="#9ADCFF"/><path d="M-16 -11 l-11 -9 4 13 z" fill="#FFD84D"/><path d="M-16 11 l-11 9 4 -13 z" fill="#FFD84D"/></g>
+        <g transform="translate(150,55)"><ellipse rx="24" ry="14" fill="#8C64D9"/><ellipse cx="7" cy="-3" rx="7" ry="5" fill="#D8C9F5"/><path d="M-16 -11 l-11 -9 4 13 z" fill="#FFD84D"/><path d="M-16 11 l-11 9 4 -13 z" fill="#FFD84D"/></g>
+        <g transform="translate(240,55)"><ellipse rx="24" ry="14" fill="#57B8FF"/><ellipse cx="7" cy="-3" rx="7" ry="5" fill="#CDEBFF"/><path d="M-16 -11 l-11 -9 4 13 z" fill="#FFD84D"/><path d="M-16 11 l-11 9 4 -13 z" fill="#FFD84D"/></g>
+        <g transform="translate(330,58)" fill="#8FA6CC"><rect x="-11" y="-9" width="22" height="16" rx="5"/><rect x="-3.5" y="-26" width="7" height="18" rx="3"/></g>
+        <circle cx="420" cy="58" r="26" fill="#66C7FF" opacity=".18" stroke="#9ADCFF"/>
+        <path d="M488 44 l22 -10 26 7 10 22 -12 20 -28 5 -18 -18 z" fill="#A9825D"/>
+        <path d="M583 50 l9 -7 9 7 -3 12 -12 0 z" fill="#FFD84D"/>
+        <g transform="translate(678,58)" fill="#5F7396"><path d="M-28 14 a30 30 0 0 1 50 -20" fill="none"/><path d="M-12 16 l10 -22 M12 12 l8 -14" fill="none"/><circle cx="-2" cy="-2" r="7" fill="#42536F"/></g>
+      </g>
+      <g font-family="'Segoe UI',sans-serif" font-size="10" fill="#7C90B5" text-anchor="middle" font-weight="600">
+        <text x="60" y="105">SHIP·P1</text><text x="150" y="105">SHIP·HARD</text><text x="240" y="105">SHIP·EASY</text>
+        <text x="330" y="105">TURRET</text><text x="420" y="105">SHIELD</text><text x="510" y="105">ASTEROID</text><text x="592" y="105">ORE</text><text x="678" y="105">WRECK</text>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#1B2B4D"></div><p>Space <code>#1B2B4D</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F25C54"></div><p>Player red <code>#F25C54</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#4FC978"></div><p>Planet green <code>#4FC978</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFD84D"></div><p>Ore gold <code>#FFD84D</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#9ADCFF"></div><p>Shield blue <code>#9ADCFF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#101A30"></div><p>Outline ink <code>#101A30</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> the closest match — toy ships, fireworks explosions, bots that look like a cartoon cast; the "small ache" lands because the cheerful wreck stays on the map.
+  <strong>Cost:</strong> medium — thick-outline shapes are very achievable procedurally (SVG paths + flat fills), liveries are just palette swaps.
+  <strong>Risk:</strong> chunky outlines need care at small zoom; readability solved by silhouette, not detail.</p>
+</section>
+
+<!-- ============================================================ THEME C -->
+<section>
+  <p class="theme-tag">Theme C</p>
+  <h2>Retro Pulp</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="halftoneC" width="7" height="7" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.1" fill="#123A3E"/>
+        </pattern>
+      </defs>
+      <rect width="760" height="440" fill="#0E2A2E"/>
+      <rect width="760" height="440" fill="url(#halftoneC)" opacity=".5"/>
+      <g fill="#E8DCC2"><circle cx="80" cy="60" r="1.6"/><circle cx="220" cy="40" r="1.2"/><circle cx="350" cy="85" r="1.8"/><circle cx="500" cy="35" r="1.2"/><circle cx="720" cy="75" r="1.5"/><circle cx="130" cy="395" r="1.4"/><circle cx="300" cy="420" r="1.2"/><circle cx="580" cy="410" r="1.6"/></g>
+      <path d="M660 60 l4 12 12 4 -12 4 -4 12 -4 -12 -12 -4 12 -4 z" fill="#F2A03D"/>
+      <!-- planet: duotone with crater rings -->
+      <g>
+        <circle cx="606" cy="240" r="68" fill="#D96C3D"/>
+        <path d="M606 172 a68 68 0 0 1 0 136 a95 68 0 0 0 0 -136 z" fill="#A34527"/>
+        <circle cx="580" cy="222" r="12" fill="none" stroke="#7A2E18" stroke-width="3"/>
+        <circle cx="628" cy="268" r="8" fill="none" stroke="#7A2E18" stroke-width="2.5"/>
+        <circle cx="606" cy="240" r="16" fill="#F6D98A"/>
+        <circle cx="606" cy="240" r="7" fill="#FFF7DE"/>
+        <!-- ring -->
+        <ellipse cx="606" cy="240" rx="102" ry="26" fill="none" stroke="#E8DCC2" stroke-width="2.5" opacity=".5" transform="rotate(-16 606 240)"/>
+        <!-- turrets: ray-gun style -->
+        <g fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2">
+          <g transform="translate(552,190) rotate(-40)"><rect x="-8" y="-6" width="16" height="12" rx="6"/><rect x="-2.5" y="-20" width="5" height="14" rx="2.5"/><circle cx="0" cy="-20" r="4" fill="#F2A03D"/></g>
+          <g transform="translate(658,286) rotate(140)"><rect x="-8" y="-6" width="16" height="12" rx="6"/><rect x="-2.5" y="-20" width="5" height="14" rx="2.5"/><circle cx="0" cy="-20" r="4" fill="#F2A03D"/></g>
+        </g>
+      </g>
+      <!-- shield: art-deco arcs -->
+      <g fill="none" stroke="#7FC8B8" stroke-width="2.5" opacity=".85">
+        <path d="M514 232 a92 92 0 0 1 46 -72"/><path d="M698 250 a92 92 0 0 1 -46 72"/>
+        <path d="M560 148 a92 92 0 0 1 92 0" opacity=".5"/><path d="M560 332 a92 92 0 0 0 92 0" opacity=".5"/>
+      </g>
+      <!-- asteroids -->
+      <g fill="#3E5C55" stroke="#E8DCC2" stroke-width="2">
+        <path d="M152 130 l28 -13 32 8 12 27 -15 26 -34 6 -23 -21 z"/>
+        <path d="M94 240 l21 -10 24 7 8 20 -11 18 -27 5 -17 -16 z"/>
+        <path d="M214 282 l17 -9 19 6 8 17 -10 15 -21 3 -14 -13 z"/>
+      </g>
+      <!-- ore: faceted gems -->
+      <g fill="#F2A03D" stroke="#0E2A2E" stroke-width="2">
+        <path d="M250 168 l7 -9 7 9 -7 9 z"/><path d="M277 196 l6 -8 6 8 -6 8 z"/><path d="M305 179 l6 -8 6 8 -6 8 z"/>
+      </g>
+      <!-- beam: ray-gun zigzag -->
+      <path d="M352 216 L322 200 L300 192 L268 174 L240 164 L216 152" fill="none" stroke="#F2A03D" stroke-width="4" stroke-linecap="round"/>
+      <!-- player ship: finned rocket -->
+      <g transform="translate(378,224) rotate(-155)">
+        <ellipse cx="0" cy="0" rx="30" ry="12" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2.5"/>
+        <path d="M26 0 l14 0" stroke="#0E2A2E" stroke-width="0"/>
+        <path d="M-8 -10 l-14 -12 6 16 z" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2"/>
+        <path d="M-8 10 l-14 12 6 -16 z" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2"/>
+        <circle cx="10" cy="-2" r="5.5" fill="#7FC8B8" stroke="#0E2A2E" stroke-width="2"/>
+        <path d="M-30 -3 q-14 3 0 6" fill="#F2A03D"/>
+      </g>
+      <!-- enemy rocket -->
+      <g transform="translate(572,88) rotate(30)">
+        <ellipse cx="0" cy="0" rx="22" ry="9" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2"/>
+        <path d="M-6 -8 l-10 -9 4 12 z" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="1.5"/>
+        <circle cx="8" cy="-1.5" r="4" fill="#7FC8B8" stroke="#0E2A2E" stroke-width="1.5"/>
+      </g>
+      <!-- HUD: ticket-stub style -->
+      <g font-family="Georgia,'Times New Roman',serif" font-size="14">
+        <rect x="12" y="10" width="126" height="48" fill="#E8DCC2" rx="3"/>
+        <text x="22" y="30" fill="#A34527" font-weight="700">ORE HOLD 2/2</text><text x="22" y="48" fill="#0E2A2E">BANKED 11</text>
+        <g text-anchor="end">
+          <rect x="574" y="10" width="174" height="66" fill="#E8DCC2" rx="3"/>
+          <text x="738" y="28" fill="#2E6E5E" font-weight="700">YOU ▮▮▮▮▮▮▮▮▯▯</text>
+          <text x="738" y="47" fill="#C43B2E">VULTURE ▮▮▮▮▮▯▯▯▯▯</text>
+          <text x="738" y="66" fill="#57544A">RUSTY ▮▮▮▮▮▮▮▮▮▯</text>
+        </g>
+      </g>
+      <g transform="translate(666,346)"><rect width="80" height="80" rx="4" fill="#E8DCC2"/><circle cx="40" cy="40" r="28" fill="none" stroke="#A34527" stroke-width="2"/><circle cx="40" cy="40" r="4" fill="#A34527"/><circle cx="58" cy="26" r="3.5" fill="#C43B2E"/><circle cx="22" cy="54" r="3.5" fill="#3E5C55"/></g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Prototype sprites</h3>
+    <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="120" fill="#0E2A2E"/>
+      <rect width="760" height="120" fill="url(#halftoneC)" opacity=".4"/>
+      <g>
+        <g transform="translate(60,55)"><ellipse rx="27" ry="11" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2.5"/><path d="M-7 -9 l-13 -11 5 15 z" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2"/><path d="M-7 9 l-13 11 5 -15 z" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2"/><circle cx="9" cy="-2" r="5" fill="#7FC8B8" stroke="#0E2A2E" stroke-width="2"/></g>
+        <g transform="translate(150,55)"><ellipse rx="27" ry="11" fill="#C43B2E" stroke="#0E2A2E" stroke-width="2.5"/><path d="M-7 -9 l-13 -11 5 15 z" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><path d="M-7 9 l-13 11 5 -15 z" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><circle cx="9" cy="-2" r="5" fill="#7FC8B8" stroke="#0E2A2E" stroke-width="2"/></g>
+        <g transform="translate(240,55)"><ellipse rx="27" ry="11" fill="#7FC8B8" stroke="#0E2A2E" stroke-width="2.5"/><path d="M-7 -9 l-13 -11 5 15 z" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><path d="M-7 9 l-13 11 5 -15 z" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><circle cx="9" cy="-2" r="5" fill="#F2A03D" stroke="#0E2A2E" stroke-width="2"/></g>
+        <g transform="translate(330,60)"><rect x="-9" y="-7" width="18" height="13" rx="6.5" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><rect x="-3" y="-24" width="6" height="16" rx="3" fill="#E8DCC2" stroke="#0E2A2E" stroke-width="2"/><circle cx="0" cy="-24" r="4.5" fill="#F2A03D" stroke="#0E2A2E" stroke-width="1.5"/></g>
+        <g fill="none" stroke="#7FC8B8" stroke-width="2.5"><path d="M398 72 a26 26 0 0 1 13 -34"/><path d="M442 44 a26 26 0 0 1 -13 34"/></g>
+        <path d="M486 46 l23 -11 27 7 10 23 -13 21 -29 5 -18 -19 z" fill="#3E5C55" stroke="#E8DCC2" stroke-width="2"/>
+        <path d="M582 48 l8 -10 8 10 -8 10 z" fill="#F2A03D" stroke="#0E2A2E" stroke-width="2"/>
+        <g transform="translate(678,58)" stroke="#E8DCC2" stroke-width="2" fill="none"><path d="M-28 14 a30 30 0 0 1 50 -20"/><path d="M-12 16 l10 -22 M12 12 l8 -14"/><circle cx="-2" cy="-2" r="7" fill="#A34527" stroke-width="0"/></g>
+      </g>
+      <g font-family="Georgia,serif" font-size="10" fill="#9DB8AE" text-anchor="middle">
+        <text x="60" y="105">SHIP·P1</text><text x="150" y="105">SHIP·HARD</text><text x="240" y="105">SHIP·EASY</text>
+        <text x="330" y="105">TURRET</text><text x="420" y="105">SHIELD</text><text x="510" y="105">ASTEROID</text><text x="590" y="105">ORE</text><text x="678" y="105">WRECK</text>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#0E2A2E"></div><p>Space teal <code>#0E2A2E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#E8DCC2"></div><p>Cream <code>#E8DCC2</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#D96C3D"></div><p>Planet rust <code>#D96C3D</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F2A03D"></div><p>Ore amber <code>#F2A03D</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#C43B2E"></div><p>Threat red <code>#C43B2E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7FC8B8"></div><p>Shield jade <code>#7FC8B8</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> the most *personality* — finned rockets and ray-gun turrets are inherently cheeky, and the muted palette gives the planet-death beat its ache for free.
+  <strong>Cost:</strong> highest of the three — duotone shading, halftone patterns, and serif UI need more generation care and a custom font fallback plan.
+  <strong>Risk:</strong> lowest contrast; ore and threats pop less at speed than in A or B.</p>
+</section>
+
+<!-- ============================================================ THEME D -->
+<section>
+  <p class="theme-tag">Theme D</p>
+  <h2>Pixel Arcade</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg" style="shape-rendering:crispEdges">
+      <rect width="760" height="440" fill="#12122A"/>
+      <g fill="#3C3C6E"><rect x="70" y="50" width="4" height="4"/><rect x="210" y="30" width="4" height="4"/><rect x="340" y="80" width="4" height="4"/><rect x="500" y="40" width="4" height="4"/><rect x="700" y="70" width="4" height="4"/><rect x="120" y="380" width="4" height="4"/><rect x="300" y="410" width="4" height="4"/><rect x="560" y="390" width="4" height="4"/></g>
+      <!-- planet: pixel disc with dither band -->
+      <g>
+        <circle cx="608" cy="240" r="66" fill="#3FA24E"/>
+        <g fill="#2C7A3A"><rect x="560" y="256" width="96" height="8"/><rect x="552" y="240" width="8" height="8"/><rect x="568" y="248" width="8" height="8"/><rect x="600" y="264" width="8" height="8"/><rect x="632" y="256" width="8" height="8"/><rect x="648" y="248" width="8" height="8"/></g>
+        <rect x="592" y="224" width="32" height="32" fill="#FFDC44"/><rect x="600" y="232" width="16" height="16" fill="#FFF6C8"/>
+        <g fill="#9AA6D0"><rect x="548" y="176" width="16" height="12"/><rect x="552" y="164" width="8" height="12"/><rect x="652" y="284" width="16" height="12"/><rect x="656" y="272" width="8" height="12"/></g>
+        <rect x="512" y="144" width="192" height="192" fill="none" stroke="#5CD6FF" stroke-width="3" stroke-dasharray="12 8"/>
+      </g>
+      <!-- asteroids -->
+      <g fill="#8A7A5E"><rect x="150" y="122" width="56" height="44"/><rect x="166" y="110" width="28" height="12"/><rect x="94" y="232" width="44" height="36"/><rect x="212" y="276" width="40" height="32"/></g>
+      <g fill="#6B5E45"><rect x="162" y="134" width="12" height="12"/><rect x="186" y="150" width="12" height="12"/><rect x="106" y="244" width="10" height="10"/><rect x="224" y="288" width="10" height="10"/></g>
+      <!-- ore -->
+      <g fill="#FFDC44"><rect x="248" y="164" width="10" height="10"/><rect x="274" y="192" width="10" height="10"/><rect x="302" y="176" width="10" height="10"/></g>
+      <!-- beam: pixel dashes -->
+      <g fill="#FF7A3C"><rect x="330" y="204" width="16" height="6"/><rect x="304" y="194" width="16" height="6"/><rect x="278" y="184" width="16" height="6"/><rect x="252" y="174" width="16" height="6"/><rect x="226" y="164" width="16" height="6"/><rect x="204" y="156" width="14" height="6"/></g>
+      <!-- player ship -->
+      <g transform="translate(352,196)">
+        <g fill="#E84D4D"><rect x="0" y="8" width="36" height="12"/><rect x="8" y="2" width="20" height="6"/><rect x="8" y="20" width="20" height="6"/></g>
+        <rect x="8" y="10" width="10" height="8" fill="#5CD6FF"/>
+        <g fill="#FFDC44"><rect x="36" y="6" width="8" height="4"/><rect x="36" y="18" width="8" height="4"/></g>
+        <g fill="#FF7A3C"><rect x="44" y="10" width="10" height="8"/></g>
+      </g>
+      <!-- enemy ship -->
+      <g transform="translate(560,74)">
+        <g fill="#B05CFF"><rect x="0" y="6" width="30" height="10"/><rect x="6" y="0" width="16" height="6"/><rect x="6" y="16" width="16" height="6"/></g>
+        <rect x="6" y="8" width="8" height="6" fill="#F0E4FF"/>
+      </g>
+      <!-- HUD -->
+      <g font-family="ui-monospace,Consolas,monospace" font-size="14" font-weight="700">
+        <text x="16" y="28" fill="#FFDC44">HOLD 2/2</text><text x="16" y="48" fill="#5CD6FF">BANK 11</text>
+        <g text-anchor="end"><text x="744" y="26" fill="#3FA24E">YOU ████████░░</text><text x="744" y="45" fill="#E84D4D">VUL ██████░░░░</text><text x="744" y="64" fill="#9AA6D0">RUS █████████░</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#12122A"></div><p>Space <code>#12122A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#E84D4D"></div><p>Player <code>#E84D4D</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#3FA24E"></div><p>Planet <code>#3FA24E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFDC44"></div><p>Ore <code>#FFDC44</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#5CD6FF"></div><p>Shield/UI <code>#5CD6FF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#8A7A5E"></div><p>Rock <code>#8A7A5E</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> instantly playful and nostalgic; cheeky by default.
+  <strong>Cost:</strong> low-medium — pixel sprites are grids of rects, trivially procedural; crisp scaling needs integer-zoom discipline in the renderer.
+  <strong>Risk:</strong> pixel art at 8-player scale can get noisy; retro look may read "student project" rather than "shippable on Steam."</p>
+</section>
+
+<!-- ============================================================ THEME E -->
+<section>
+  <p class="theme-tag">Theme E</p>
+  <h2>Holo-Blueprint</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="gridE" width="38" height="38" patternUnits="userSpaceOnUse">
+          <path d="M38 0 H0 V38" fill="none" stroke="#1B4A66" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="760" height="440" fill="#082436"/>
+      <rect width="760" height="440" fill="url(#gridE)"/>
+      <!-- planet: schematic -->
+      <g fill="none" stroke="#7FE3FF" stroke-width="1.8">
+        <circle cx="608" cy="240" r="66"/>
+        <circle cx="608" cy="240" r="66" stroke-dasharray="2 5" stroke-width="4" opacity=".35"/>
+        <circle cx="608" cy="240" r="15"/><circle cx="608" cy="240" r="7" fill="#7FE3FF" opacity=".6"/>
+        <circle cx="608" cy="240" r="93" stroke="#B7FF5C" stroke-dasharray="12 8" opacity=".8"/>
+        <g transform="translate(554,186)"><circle r="7"/><line x1="0" y1="-7" x2="0" y2="-20"/></g>
+        <g transform="translate(660,290)"><circle r="7"/><line x1="5" y1="5" x2="14" y2="14"/></g>
+        <!-- callouts -->
+        <line x1="674" y1="240" x2="726" y2="222" stroke-width="1"/><text x="700" y="214" fill="#7FE3FF" font-family="ui-monospace,Consolas,monospace" font-size="11">CORE 100HP</text>
+        <line x1="608" y1="147" x2="608" y2="120" stroke-width="1" stroke="#B7FF5C"/><text x="576" y="112" fill="#B7FF5C" font-family="ui-monospace,Consolas,monospace" font-size="11">SHIELD 40</text>
+      </g>
+      <!-- asteroids -->
+      <g fill="none" stroke="#9FD4E8" stroke-width="1.6">
+        <path d="M152 128 l28 -13 32 8 12 27 -15 26 -34 6 -23 -21 z"/>
+        <path d="M152 128 l40 22 M182 115 l-7 35 M212 123 l-37 20" opacity=".45"/>
+        <path d="M96 238 l21 -10 24 7 8 20 -11 18 -27 5 -17 -16 z"/>
+        <path d="M214 280 l17 -9 19 6 8 17 -10 15 -21 3 -14 -13 z"/>
+      </g>
+      <g fill="none" stroke="#FFC145" stroke-width="1.8"><path d="M250 166 l7 -9 7 9 -7 9 z"/><path d="M277 194 l6 -8 6 8 -6 8 z"/><path d="M305 177 l6 -8 6 8 -6 8 z"/></g>
+      <!-- beam: dimension line -->
+      <g stroke="#FFC145" stroke-width="1.6"><line x1="352" y1="214" x2="214" y2="152"/><path d="M222 158 l-8 -6 10 -1 z" fill="#FFC145"/><path d="M344 208 l8 6 -10 1 z" fill="#FFC145"/></g>
+      <text x="258" y="172" fill="#FFC145" font-family="ui-monospace,Consolas,monospace" font-size="10" transform="rotate(24 258 172)">MINING 0.5/s</text>
+      <!-- player ship: cutaway schematic -->
+      <g fill="none" stroke="#7FE3FF" stroke-width="1.8" transform="translate(374,222) rotate(-155)">
+        <path d="M30 0 L-18 -14 L-10 0 L-18 14 Z"/>
+        <path d="M30 0 L-18 -14 M30 0 L-18 14 M-10 0 h34" opacity=".5"/>
+        <circle cx="6" cy="0" r="4"/>
+      </g>
+      <!-- enemy -->
+      <g fill="none" stroke="#FF6B81" stroke-width="1.8" transform="translate(572,86) rotate(28)">
+        <path d="M22 0 L-13 -10 L-7 0 L-13 10 Z"/><circle cx="4" cy="0" r="3"/>
+      </g>
+      <line x1="590" y1="98" x2="620" y2="126" stroke="#FF6B81" stroke-width="1" stroke-dasharray="3 4"/>
+      <!-- HUD -->
+      <g font-family="ui-monospace,Consolas,monospace" font-size="13">
+        <text x="16" y="26" fill="#FFC145">HOLD 2/2</text><text x="16" y="44" fill="#7FE3FF">BANK 11</text>
+        <g text-anchor="end"><text x="744" y="26" fill="#B7FF5C">YOU 82%</text><text x="744" y="44" fill="#FF6B81">VULTURE 55%</text><text x="744" y="62" fill="#9FD4E8">RUSTY 91%</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#082436"></div><p>Blueprint <code>#082436</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7FE3FF"></div><p>Holo cyan <code>#7FE3FF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#B7FF5C"></div><p>Shield lime <code>#B7FF5C</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFC145"></div><p>Ore amber <code>#FFC145</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FF6B81"></div><p>Threat <code>#FF6B81</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#9FD4E8"></div><p>Neutral <code>#9FD4E8</code></p></div>
+    </g>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> clever and readable, but cool-headed — engineering wit, not Saturday-morning cheek.
+  <strong>Cost:</strong> lowest of all ten — pure linework, and the callout labels double as onboarding UI for free.
+  <strong>Risk:</strong> emotionally flat; the planet-death "ache" is hard to land when everything already looks like a diagram.</p>
+</section>
+
+<!-- ============================================================ THEME F -->
+<section>
+  <p class="theme-tag">Theme F</p>
+  <h2>Paper Cutout</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs><filter id="dropF" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.45"/></filter></defs>
+      <rect width="760" height="440" fill="#232B3A"/>
+      <g fill="#3A4763"><path d="M76 52 l4 -6 4 6 -4 6 z"/><path d="M216 34 l3 -5 3 5 -3 5 z"/><path d="M348 82 l4 -6 4 6 -4 6 z"/><path d="M508 38 l3 -5 3 5 -3 5 z"/><path d="M706 72 l4 -6 4 6 -4 6 z"/></g>
+      <!-- planet: layered paper -->
+      <g filter="url(#dropF)">
+        <path d="M608 172 q52 6 62 62 q6 52 -54 70 q-58 14 -74 -44 q-12 -60 66 -88 z" fill="#5BBF7A"/>
+        <path d="M588 210 q34 -12 52 12 q14 22 -10 38 q-30 16 -48 -6 q-14 -24 6 -44 z" fill="#7ED99B"/>
+        <circle cx="608" cy="240" r="16" fill="#FFD269"/>
+        <g fill="#93A5C8"><path d="M548 190 l20 -4 -2 16 -16 2 z" transform="rotate(-20 556 196)"/><path d="M652 288 l20 -4 -2 16 -16 2 z" transform="rotate(150 662 294)"/></g>
+      </g>
+      <path d="M608 146 q76 18 74 96 q-4 74 -80 88" fill="none" stroke="#9AD7F5" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 14" opacity=".9"/>
+      <!-- asteroids: torn paper -->
+      <g filter="url(#dropF)" fill="#B08A62">
+        <path d="M150 126 l24 -14 32 4 18 22 -8 28 -34 10 -28 -18 z"/>
+        <path d="M94 236 l18 -12 24 4 12 18 -8 20 -26 6 -20 -14 z"/>
+        <path d="M212 278 l16 -10 20 4 10 15 -7 17 -22 5 -17 -12 z"/>
+      </g>
+      <g fill="#8F6C48"><path d="M166 140 l14 -6 8 10 -12 8 z"/><path d="M110 248 l10 -5 7 8 -9 6 z"/></g>
+      <!-- ore -->
+      <g filter="url(#dropF)" fill="#FFD269"><path d="M248 164 l9 -7 9 5 -2 11 -11 2 z"/><path d="M276 192 l8 -6 8 4 -2 10 -10 2 z"/><path d="M304 175 l8 -6 8 4 -2 10 -10 2 z"/></g>
+      <!-- beam: zigzag paper strip -->
+      <path d="M352 216 L318 202 L296 190 L266 178 L240 166 L216 154" fill="none" stroke="#FF9264" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity=".95" filter="url(#dropF)"/>
+      <!-- player ship -->
+      <g filter="url(#dropF)" transform="translate(376,224) rotate(-155)">
+        <path d="M28 0 L-14 -16 L-6 0 L-14 16 Z" fill="#F4715F"/>
+        <path d="M16 0 L-8 -9 L-4 0 L-8 9 Z" fill="#FFA491"/>
+        <circle cx="8" cy="0" r="5" fill="#9AD7F5"/>
+      </g>
+      <!-- enemy -->
+      <g filter="url(#dropF)" transform="translate(574,88) rotate(28)">
+        <path d="M20 0 L-11 -12 L-5 0 L-11 12 Z" fill="#9B7BD9"/><circle cx="5" cy="0" r="3.5" fill="#E7DCFA"/>
+      </g>
+      <!-- HUD: paper tags -->
+      <g font-family="'Segoe UI',sans-serif" font-weight="700" font-size="13">
+        <g filter="url(#dropF)"><rect x="12" y="12" width="112" height="44" rx="6" fill="#F2E9D8" transform="rotate(-2 68 34)"/></g>
+        <text x="24" y="30" fill="#B08A62">HOLD 2/2</text><text x="24" y="48" fill="#4A79A8">BANK 11</text>
+        <g text-anchor="end"><g filter="url(#dropF)"><rect x="586" y="10" width="162" height="62" rx="6" fill="#F2E9D8" transform="rotate(1.5 667 41)"/></g>
+        <text x="736" y="28" fill="#3E9D63">YOU ●●●●●●●●○○</text><text x="736" y="46" fill="#D9503F">VULTURE ●●●●●○○○○○</text><text x="736" y="64" fill="#6B7896">RUSTY ●●●●●●●●●○</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#232B3A"></div><p>Felt night <code>#232B3A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F4715F"></div><p>Player coral <code>#F4715F</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#5BBF7A"></div><p>Planet <code>#5BBF7A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFD269"></div><p>Ore <code>#FFD269</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#9AD7F5"></div><p>Shield <code>#9AD7F5</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F2E9D8"></div><p>Paper <code>#F2E9D8</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> warmest and most disarming of the ten; a paper planet tearing in half is a genuinely affecting death moment.
+  <strong>Cost:</strong> medium — torn-edge polygons and drop shadows are procedural-friendly, but "handmade wobble" needs a jitter pass to avoid looking accidentally sloppy.
+  <strong>Risk:</strong> drop shadows on hundreds of entities need cheap faking (baked offsets, not filters) to hold 60 fps.</p>
+</section>
+
+<!-- ============================================================ THEME G -->
+<section>
+  <p class="theme-tag">Theme G</p>
+  <h2>Synthwave</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#12062E"/><stop offset="70%" stop-color="#2A0A4A"/><stop offset="100%" stop-color="#4A1060"/></linearGradient>
+        <linearGradient id="planetG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FF7AC8"/><stop offset="50%" stop-color="#B44AE0"/><stop offset="100%" stop-color="#3A1E8A"/></linearGradient>
+        <filter id="glowG" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect width="760" height="440" fill="url(#skyG)"/>
+      <g stroke="#FF3E9A" stroke-width="1" opacity=".35">
+        <line x1="0" y1="360" x2="760" y2="360"/><line x1="0" y1="380" x2="760" y2="380"/><line x1="0" y1="404" x2="760" y2="404"/><line x1="0" y1="432" x2="760" y2="432"/>
+        <line x1="80" y1="350" x2="20" y2="440"/><line x1="230" y1="350" x2="200" y2="440"/><line x1="380" y1="350" x2="380" y2="440"/><line x1="530" y1="350" x2="560" y2="440"/><line x1="680" y1="350" x2="740" y2="440"/>
+      </g>
+      <g fill="#EDA1FF" opacity=".8"><circle cx="90" cy="58" r="1.4"/><circle cx="230" cy="36" r="1.1"/><circle cx="360" cy="86" r="1.6"/><circle cx="520" cy="40" r="1.1"/><circle cx="712" cy="76" r="1.4"/></g>
+      <!-- planet -->
+      <g filter="url(#glowG)">
+        <circle cx="608" cy="234" r="66" fill="url(#planetG)"/>
+        <g stroke="#12062E" stroke-width="4" opacity=".55"><line x1="548" y1="252" x2="668" y2="252"/><line x1="552" y1="266" x2="664" y2="266"/><line x1="560" y1="280" x2="656" y2="280"/></g>
+        <circle cx="608" cy="234" r="15" fill="#FFF06B"/>
+        <circle cx="608" cy="234" r="92" fill="none" stroke="#5CF2E8" stroke-width="2" stroke-dasharray="14 9"/>
+        <g fill="#EDA1FF" stroke="#12062E" stroke-width="1.5">
+          <g transform="translate(554,182) rotate(-38)"><rect x="-8" y="-7" width="16" height="12" rx="3"/><rect x="-2.5" y="-20" width="5" height="14"/></g>
+          <g transform="translate(660,286) rotate(140)"><rect x="-8" y="-7" width="16" height="12" rx="3"/><rect x="-2.5" y="-20" width="5" height="14"/></g>
+        </g>
+      </g>
+      <!-- asteroids: chrome wireframe -->
+      <g filter="url(#glowG)" fill="#1B0F3E" stroke="#B44AE0" stroke-width="2">
+        <path d="M152 126 l28 -13 32 8 12 27 -15 26 -34 6 -23 -21 z"/>
+        <path d="M96 236 l21 -10 24 7 8 20 -11 18 -27 5 -17 -16 z"/>
+        <path d="M214 278 l17 -9 19 6 8 17 -10 15 -21 3 -14 -13 z"/>
+      </g>
+      <g filter="url(#glowG)" fill="#FFF06B"><path d="M250 166 l7 -9 7 9 -7 9 z"/><path d="M277 194 l6 -8 6 8 -6 8 z"/><path d="M305 177 l6 -8 6 8 -6 8 z"/></g>
+      <line x1="352" y1="214" x2="214" y2="152" stroke="#FF3E9A" stroke-width="4" stroke-linecap="round" filter="url(#glowG)"/>
+      <!-- player ship: chrome dart -->
+      <g filter="url(#glowG)" transform="translate(374,222) rotate(-155)">
+        <path d="M30 0 L-16 -13 L-8 0 L-16 13 Z" fill="#5CF2E8" stroke="#12062E" stroke-width="1.5"/>
+        <path d="M30 0 L-16 -13 L-8 0 Z" fill="#B0FFF8" opacity=".7"/>
+      </g>
+      <!-- enemy -->
+      <g filter="url(#glowG)" transform="translate(572,84) rotate(28)">
+        <path d="M22 0 L-12 -10 L-6 0 L-12 10 Z" fill="#FF3E9A" stroke="#12062E" stroke-width="1.2"/>
+      </g>
+      <!-- HUD -->
+      <g font-family="ui-monospace,Consolas,monospace" font-size="13" filter="url(#glowG)">
+        <text x="16" y="26" fill="#FFF06B">HOLD 2/2</text><text x="16" y="44" fill="#5CF2E8">BANK 11</text>
+        <g text-anchor="end"><text x="744" y="26" fill="#5CF2E8">YOU ▰▰▰▰▰▰▰▰▱▱</text><text x="744" y="44" fill="#FF3E9A">VULTURE ▰▰▰▰▰▱▱▱▱▱</text><text x="744" y="62" fill="#EDA1FF">RUSTY ▰▰▰▰▰▰▰▰▰▱</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#12062E"></div><p>Void <code>#12062E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FF3E9A"></div><p>Hot pink <code>#FF3E9A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#B44AE0"></div><p>Violet <code>#B44AE0</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#5CF2E8"></div><p>Chrome teal <code>#5CF2E8</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFF06B"></div><p>Sun yellow <code>#FFF06B</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#EDA1FF"></div><p>Haze <code>#EDA1FF</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> stylish and energetic; cheeky in a sunglasses way, not a cartoon way.
+  <strong>Cost:</strong> medium — gradients and glow everywhere; needs discipline so the ore/threat colors stay distinct inside all that pink.
+  <strong>Risk:</strong> the most "trend-dated" of the ten; heavy glow fights small-sprite legibility, same trap as Theme A.</p>
+</section>
+
+<!-- ============================================================ THEME H -->
+<section>
+  <p class="theme-tag">Theme H</p>
+  <h2>Soft Flat / Minimal</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="440" fill="#20242E"/>
+      <g fill="#39404F"><circle cx="80" cy="56" r="2"/><circle cx="222" cy="36" r="1.5"/><circle cx="352" cy="84" r="2.2"/><circle cx="512" cy="38" r="1.5"/><circle cx="708" cy="74" r="2"/><circle cx="130" cy="392" r="1.8"/><circle cx="560" cy="404" r="2"/></g>
+      <!-- planet -->
+      <circle cx="608" cy="240" r="66" fill="#6FCF97"/>
+      <path d="M608 174 a66 66 0 0 1 0 132 z" fill="#57B87F"/>
+      <circle cx="608" cy="240" r="15" fill="#F2C94C"/>
+      <circle cx="608" cy="240" r="92" fill="none" stroke="#56CCF2" stroke-width="3" opacity=".65"/>
+      <g fill="#A7B2C8"><g transform="translate(554,186) rotate(-38)"><rect x="-8" y="-7" width="16" height="12" rx="6"/><rect x="-2.5" y="-19" width="5" height="12" rx="2.5"/></g><g transform="translate(660,290) rotate(140)"><rect x="-8" y="-7" width="16" height="12" rx="6"/><rect x="-2.5" y="-19" width="5" height="12" rx="2.5"/></g></g>
+      <!-- asteroids -->
+      <g fill="#8D99AE"><path d="M154 128 q16 -18 38 -10 q20 8 18 30 q-4 22 -28 24 q-24 0 -30 -20 q-4 -14 2 -24 z"/><path d="M98 238 q12 -14 28 -8 q15 6 13 22 q-3 16 -21 18 q-18 0 -22 -15 q-3 -10 2 -17 z"/><path d="M216 280 q10 -11 23 -6 q12 5 11 18 q-3 13 -17 14 q-15 0 -18 -12 q-2 -8 1 -14 z"/></g>
+      <g fill="#6E7A90"><circle cx="176" cy="146" r="7"/><circle cx="118" cy="252" r="5"/></g>
+      <!-- ore -->
+      <g fill="#F2C94C"><circle cx="254" cy="170" r="6"/><circle cx="281" cy="197" r="5.4"/><circle cx="309" cy="181" r="5.4"/></g>
+      <!-- beam -->
+      <line x1="352" y1="214" x2="216" y2="154" stroke="#F2994A" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <!-- player ship -->
+      <g transform="translate(374,222) rotate(-155)">
+        <path d="M28 0 Q6 -14 -16 -11 Q-8 0 -16 11 Q6 14 28 0 z" fill="#EB5757"/>
+        <circle cx="6" cy="0" r="5" fill="#D7E4F5"/>
+        <path d="M-16 -4 q-10 4 0 8" fill="#F2994A"/>
+      </g>
+      <!-- enemy -->
+      <g transform="translate(572,86) rotate(28)">
+        <path d="M20 0 Q4 -10 -12 -8 Q-6 0 -12 8 Q4 10 20 0 z" fill="#BB6BD9"/><circle cx="4" cy="0" r="3.5" fill="#F0E4FA"/>
+      </g>
+      <!-- HUD: pill chips -->
+      <g font-family="'Segoe UI',system-ui,sans-serif" font-size="13" font-weight="600">
+        <rect x="12" y="12" width="104" height="24" rx="12" fill="#2C313D"/><text x="26" y="29" fill="#F2C94C">⬤ 2/2 hold</text>
+        <rect x="12" y="42" width="104" height="24" rx="12" fill="#2C313D"/><text x="26" y="59" fill="#56CCF2">⬤ 11 bank</text>
+        <g text-anchor="end">
+          <rect x="592" y="12" width="156" height="66" rx="12" fill="#2C313D"/>
+          <text x="736" y="31" fill="#6FCF97">you ▬▬▬▬▬▬▬▬▭▭</text><text x="736" y="49" fill="#EB5757">vulture ▬▬▬▬▬▭▭▭▭▭</text><text x="736" y="67" fill="#A7B2C8">rusty ▬▬▬▬▬▬▬▬▬▭</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#20242E"></div><p>Slate <code>#20242E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#EB5757"></div><p>Player <code>#EB5757</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#6FCF97"></div><p>Planet <code>#6FCF97</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F2C94C"></div><p>Ore <code>#F2C94C</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#56CCF2"></div><p>Shield <code>#56CCF2</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#8D99AE"></div><p>Rock <code>#8D99AE</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> calm, modern, friendly — more "beautiful mobile game" than "brawl"; cheek would have to come from animation and bot barks, not the art.
+  <strong>Cost:</strong> very low — pure flat shapes, zero filters, the easiest to keep consistent across seven agents' output.
+  <strong>Risk:</strong> can feel sterile; without outlines or glow, combat chaos reads worse than A/B at high entity counts.</p>
+</section>
+
+<!-- ============================================================ THEME I -->
+<section>
+  <p class="theme-tag">Theme I</p>
+  <h2>Salvage-Punk</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="440" fill="#171512"/>
+      <g fill="#39342C"><circle cx="84" cy="58" r="1.6"/><circle cx="226" cy="38" r="1.2"/><circle cx="356" cy="86" r="1.8"/><circle cx="516" cy="40" r="1.2"/><circle cx="704" cy="76" r="1.5"/></g>
+      <!-- planet: rusty industrial -->
+      <g>
+        <circle cx="608" cy="240" r="66" fill="#7A4A2B"/>
+        <path d="M549 214 q30 -16 60 -6 t56 4" fill="none" stroke="#5C3620" stroke-width="8" opacity=".8"/>
+        <path d="M552 266 q34 18 68 8 t46 -8" fill="none" stroke="#8F5C36" stroke-width="7" opacity=".7"/>
+        <circle cx="608" cy="240" r="17" fill="#FFB02E"/><circle cx="608" cy="240" r="8" fill="#FFE08A"/>
+        <!-- scaffold turrets -->
+        <g stroke="#C9BFAF" stroke-width="3" fill="#403A30">
+          <g transform="translate(552,188) rotate(-38)"><rect x="-9" y="-8" width="18" height="14"/><line x1="0" y1="-8" x2="0" y2="-24"/><line x1="-6" y1="-24" x2="6" y2="-24"/></g>
+          <g transform="translate(662,290) rotate(140)"><rect x="-9" y="-8" width="18" height="14"/><line x1="0" y1="-8" x2="0" y2="-24"/><line x1="-6" y1="-24" x2="6" y2="-24"/></g>
+        </g>
+        <!-- hazard ring shield -->
+        <g><circle cx="608" cy="240" r="93" fill="none" stroke="#FFB02E" stroke-width="5" stroke-dasharray="16 12"/><circle cx="608" cy="240" r="93" fill="none" stroke="#171512" stroke-width="5" stroke-dasharray="12 16" stroke-dashoffset="-14" opacity=".9"/></g>
+      </g>
+      <!-- asteroids: ore-veined -->
+      <g fill="#4A4238" stroke="#2B261F" stroke-width="3">
+        <path d="M152 126 l28 -13 32 8 12 27 -15 26 -34 6 -23 -21 z"/>
+        <path d="M96 236 l21 -10 24 7 8 20 -11 18 -27 5 -17 -16 z"/>
+        <path d="M214 278 l17 -9 19 6 8 17 -10 15 -21 3 -14 -13 z"/>
+      </g>
+      <g stroke="#FFB02E" stroke-width="2.5" fill="none"><path d="M164 138 l16 10 8 14"/><path d="M108 246 l12 8"/><path d="M224 288 l10 7"/></g>
+      <g fill="#FFB02E"><path d="M250 166 l7 -9 7 9 -7 9 z"/><path d="M277 194 l6 -8 6 8 -6 8 z"/><path d="M305 177 l6 -8 6 8 -6 8 z"/></g>
+      <!-- beam: cutting torch -->
+      <line x1="352" y1="214" x2="216" y2="154" stroke="#FF5A1F" stroke-width="5" stroke-linecap="round"/>
+      <line x1="352" y1="214" x2="216" y2="154" stroke="#FFE08A" stroke-width="2" stroke-linecap="round"/>
+      <!-- player ship: riveted tug -->
+      <g transform="translate(376,224) rotate(-155)" stroke="#2B261F" stroke-width="2.5">
+        <path d="M26 0 L10 -12 L-16 -12 L-10 0 L-16 12 L10 12 Z" fill="#8C8577"/>
+        <rect x="-4" y="-5" width="12" height="10" fill="#5A80A8"/>
+        <g fill="#FFB02E" stroke-width="0"><rect x="-16" y="-12" width="6" height="4"/><rect x="-16" y="8" width="6" height="4"/></g>
+        <g fill="#2B261F" stroke-width="0"><circle cx="14" cy="-6" r="1.4"/><circle cx="14" cy="6" r="1.4"/><circle cx="-8" cy="-8" r="1.4"/><circle cx="-8" cy="8" r="1.4"/></g>
+        <path d="M-16 -4 l-10 4 10 4" fill="#FF5A1F" stroke-width="0"/>
+      </g>
+      <!-- enemy -->
+      <g transform="translate(572,86) rotate(28)" stroke="#2B261F" stroke-width="2">
+        <path d="M20 0 L8 -9 L-12 -9 L-7 0 L-12 9 L8 9 Z" fill="#A8412E"/><rect x="-2" y="-4" width="9" height="8" fill="#D9CDBA"/>
+      </g>
+      <!-- HUD: stencil -->
+      <g font-family="ui-monospace,Consolas,monospace" font-size="13" font-weight="700">
+        <text x="16" y="26" fill="#FFB02E">[HOLD 2/2]</text><text x="16" y="44" fill="#C9BFAF">[BANK 11]</text>
+        <g text-anchor="end"><text x="744" y="26" fill="#9BB56E">YOU ▮▮▮▮▮▮▮▮__</text><text x="744" y="44" fill="#FF5A1F">VULTURE ▮▮▮▮▮_____</text><text x="744" y="62" fill="#C9BFAF">RUSTY ▮▮▮▮▮▮▮▮▮_</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#171512"></div><p>Soot <code>#171512</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#8C8577"></div><p>Hull grey <code>#8C8577</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7A4A2B"></div><p>Rust <code>#7A4A2B</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFB02E"></div><p>Hazard amber <code>#FFB02E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FF5A1F"></div><p>Torch <code>#FF5A1F</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#C9BFAF"></div><p>Bone <code>#C9BFAF</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> the deliberate counter-option — grubby, funny in a junkyard way, and the mining fantasy (cutting torches, hazard stripes, ore veins) is strongest here. Furthest from "Saturday-morning."
+  <strong>Cost:</strong> medium-high — texture detail (rivets, rust bands) multiplies across every sprite.
+  <strong>Risk:</strong> mud — brown-on-brown at speed; needs the amber/torch colors to carry all gameplay signals.</p>
+</section>
+
+<!-- ============================================================ THEME J -->
+<section>
+  <p class="theme-tag">Theme J</p>
+  <h2>Bioluminescent Deep</h2>
+  <div class="board">
+    <h3>Scene — same moment, same content</h3>
+    <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="glowJ1" cx="50%" cy="50%"><stop offset="0%" stop-color="#3EE6C0" stop-opacity=".9"/><stop offset="100%" stop-color="#3EE6C0" stop-opacity="0"/></radialGradient>
+        <radialGradient id="planetJ" cx="42%" cy="38%"><stop offset="0%" stop-color="#2E7D8C"/><stop offset="100%" stop-color="#123240"/></radialGradient>
+        <filter id="softJ" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect width="760" height="440" fill="#080D1E"/>
+      <g fill="#22304F"><circle cx="86" cy="56" r="1.6"/><circle cx="228" cy="36" r="1.2"/><circle cx="358" cy="84" r="1.8"/><circle cx="518" cy="38" r="1.2"/><circle cx="702" cy="74" r="1.5"/><circle cx="140" cy="390" r="1.4"/><circle cx="570" cy="402" r="1.6"/></g>
+      <!-- drifting spores -->
+      <g fill="#3EE6C0" opacity=".5"><circle cx="320" cy="300" r="2"/><circle cx="420" cy="120" r="2.4"/><circle cx="180" cy="350" r="1.8"/><circle cx="480" cy="330" r="2"/></g>
+      <!-- planet: living reef -->
+      <g filter="url(#softJ)">
+        <circle cx="608" cy="240" r="66" fill="url(#planetJ)"/>
+        <g stroke="#3EE6C0" stroke-width="2" fill="none" opacity=".85">
+          <path d="M560 208 q10 -14 22 -4 M586 194 q8 -12 18 -4 M630 196 q10 -10 18 0 M652 216 q12 -6 16 6"/>
+          <path d="M556 268 q12 12 24 4 M588 284 q10 10 20 2 M630 282 q10 8 18 -2"/>
+        </g>
+        <circle cx="608" cy="240" r="15" fill="#B7FFE9"/>
+        <circle cx="608" cy="240" r="26" fill="url(#glowJ1)"/>
+        <!-- anemone turrets -->
+        <g stroke="#FF7ED4" stroke-width="2.4" fill="none">
+          <g transform="translate(552,188)"><path d="M0 6 q-6 -14 -8 -22 M0 6 q0 -16 2 -24 M0 6 q8 -12 12 -18"/></g>
+          <g transform="translate(662,292)"><path d="M0 -4 q-6 14 -8 20 M0 -4 q0 14 2 22 M0 -4 q8 12 12 16"/></g>
+        </g>
+        <circle cx="608" cy="240" r="93" fill="none" stroke="#7BA7FF" stroke-width="2" opacity=".7" stroke-dasharray="1 10" stroke-linecap="round"/>
+      </g>
+      <!-- asteroids: coral rocks -->
+      <g fill="#1C2A45" stroke="#7BA7FF" stroke-width="1.8" filter="url(#softJ)">
+        <path d="M152 126 l28 -13 32 8 12 27 -15 26 -34 6 -23 -21 z"/>
+        <path d="M96 236 l21 -10 24 7 8 20 -11 18 -27 5 -17 -16 z"/>
+        <path d="M214 278 l17 -9 19 6 8 17 -10 15 -21 3 -14 -13 z"/>
+      </g>
+      <g fill="#3EE6C0" opacity=".9"><circle cx="176" cy="142" r="3"/><circle cx="190" cy="156" r="2.2"/><circle cx="116" cy="250" r="2.6"/><circle cx="230" cy="290" r="2.2"/></g>
+      <g filter="url(#softJ)" fill="#FFDE7A"><circle cx="254" cy="170" r="5.5"/><circle cx="281" cy="197" r="5"/><circle cx="309" cy="181" r="5"/></g>
+      <!-- beam: light tendril -->
+      <path d="M352 214 C 310 190 260 180 216 154" fill="none" stroke="#3EE6C0" stroke-width="4" stroke-linecap="round" filter="url(#softJ)"/>
+      <path d="M352 214 C 310 190 260 180 216 154" fill="none" stroke="#B7FFE9" stroke-width="1.6" stroke-linecap="round"/>
+      <!-- player ship: manta -->
+      <g filter="url(#softJ)" transform="translate(376,224) rotate(-155)">
+        <path d="M26 0 Q4 -20 -18 -10 Q-8 -2 -18 0 Q-8 2 -18 10 Q4 20 26 0 z" fill="#155E70" stroke="#3EE6C0" stroke-width="2"/>
+        <circle cx="6" cy="0" r="4" fill="#B7FFE9"/>
+        <g fill="#3EE6C0"><circle cx="-4" cy="-6" r="1.4"/><circle cx="-4" cy="6" r="1.4"/><circle cx="-11" cy="0" r="1.4"/></g>
+      </g>
+      <!-- enemy: angler -->
+      <g filter="url(#softJ)" transform="translate(572,86) rotate(28)">
+        <path d="M18 0 Q2 -13 -13 -6 Q-6 0 -13 6 Q2 13 18 0 z" fill="#4A1E4E" stroke="#FF7ED4" stroke-width="1.8"/>
+        <path d="M14 -3 q6 -8 10 -4" stroke="#FF7ED4" stroke-width="1.5" fill="none"/><circle cx="25" cy="-8" r="2.4" fill="#FF7ED4"/>
+      </g>
+      <!-- HUD -->
+      <g font-family="'Segoe UI',system-ui,sans-serif" font-size="13" font-weight="600">
+        <text x="16" y="26" fill="#FFDE7A">◉ hold 2/2</text><text x="16" y="44" fill="#7BA7FF">◉ bank 11</text>
+        <g text-anchor="end"><text x="744" y="26" fill="#3EE6C0">you ⣿⣿⣿⣿⣿⣿⣿⣿⣀⣀</text><text x="744" y="44" fill="#FF7ED4">vulture ⣿⣿⣿⣿⣿⣀⣀⣀⣀⣀</text><text x="744" y="62" fill="#7BA7FF">rusty ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣀</text></g>
+      </g>
+    </svg>
+  </div>
+  <div class="board">
+    <h3>Palette</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#080D1E"></div><p>Abyss <code>#080D1E</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#3EE6C0"></div><p>Bio teal <code>#3EE6C0</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FF7ED4"></div><p>Threat pink <code>#FF7ED4</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#FFDE7A"></div><p>Ore <code>#FFDE7A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7BA7FF"></div><p>Shield <code>#7BA7FF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#2E7D8C"></div><p>Reef <code>#2E7D8C</code></p></div>
+    </div>
+  </div>
+  <p class="notes"><strong>Read on tone:</strong> the most beautiful and the most melancholy — planets as living reefs makes destroying one genuinely sting; "cheeky" would live in creature animation.
+  <strong>Cost:</strong> high — organic curves and soft glows are the hardest to generate consistently across agents.
+  <strong>Risk:</strong> mood drifts serious; may fight the "fireworks" half of the tone paragraph.</p>
+</section>
+
+<footer>
+  <p>Planet Rush · Day-0 concept boards · Ten directions (A–J), generated by the Art &amp; Audio agent workflow (GDD §4.7).
+  Pick a direction (or a mix — e.g., B's shapes with C's palette). One revision round, then the winner is frozen into <code>style-guide.md</code>.
+  Full sprite lineups exist for A–C; the winning theme gets its full sprite pass next.</p>
+</footer>
+</div>
+</body>
+</html>

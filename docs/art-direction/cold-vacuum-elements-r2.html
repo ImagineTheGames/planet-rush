@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planet Rush — Cold Vacuum: Element Studies, Round 2</title>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@500;800&family=Audiowide&family=Syncopate:wght@400;700&family=Zen+Dots&family=Russo+One&family=Oxanium:wght@500;800&family=Chakra+Petch:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --vac:#0D1015; --steel:#7E8894; --patina:#4FA08B; --signal:#F2D24B;
+    --plasma:#4DC3FF; --bone:#C6CDD6; --ink:#262C34;
+    --panel:#141922; --rule:#252D3A; --muted:#8B95A5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--vac);color:var(--bone);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.55}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  header{padding:60px 0 34px}
+  h1{font-size:34px;margin:0 0 8px;color:var(--signal);font-family:'Audiowide',sans-serif;font-weight:400}
+  h2{font-family:'Audiowide',sans-serif;font-weight:400}
+  .sub{color:var(--muted);margin:0;max-width:78ch}
+  section{padding:44px 0;border-top:1px solid var(--rule)}
+  h2{font-size:24px;margin:0 0 4px;color:var(--plasma)}
+  .hint{color:var(--muted);font-size:15px;margin:0 0 22px;max-width:80ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px}
+  .card svg{display:block;width:100%;height:auto;border-radius:6px;background:var(--vac)}
+  .card h3{margin:10px 0 4px;font-size:15px;color:var(--signal);font-family:ui-monospace,Consolas,monospace}
+  .card p{margin:0;font-size:13.5px;color:var(--muted)}
+  .wide{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;margin-top:16px}
+  .wide svg{display:block;width:100%;height:auto;border-radius:6px;background:var(--vac)}
+  .wide h3{margin:10px 0 4px;font-size:15px;color:var(--signal);font-family:ui-monospace,Consolas,monospace}
+  .wide p{margin:0;font-size:13.5px;color:var(--muted)}
+  .palette{display:flex;gap:10px;flex-wrap:wrap}
+  .swatch{width:112px}
+  .chip{height:52px;border-radius:6px;border:1px solid rgba(255,255,255,.08)}
+  .swatch p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+  .swatch code{color:var(--bone);font-size:12px}
+  footer{border-top:1px solid var(--rule);padding:34px 0 60px;color:var(--muted);font-size:14px}
+  footer code{color:var(--signal)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Cold Vacuum — Element Studies · Round 2</h1>
+  <p class="sub">Per your notes: 8 unique player colors (humans and bots) with livery previews on the hulls ·
+  new ship options (S1 and S4 dropped) · earthlike planets · turrets that read as cannons (T1 redone, dome de-rodded) ·
+  player-colored planet HP bar.</p>
+</header>
+
+<!-- ======================= PLAYER COLORS ======================= -->
+<section>
+  <h2>Player color roster (8)</h2>
+  <p class="hint">Rules: hulls stay steel — player color lives on wings, stripes, engine flame, beam tint, shield tint,
+  planet beacon ring, and the HP bar. Signal yellow stays reserved for ore/hazard UI, so the gold player is deeper and
+  outlined; every ship also carries its player number as a hull decal so no one depends on color alone (colorblind-safe).</p>
+  <div class="palette">
+    <div class="swatch"><div class="chip" style="background:#4DC3FF"></div><p>C1 Cyan <code>#4DC3FF</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#E24A3B"></div><p>C2 Red <code>#E24A3B</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#7ED957"></div><p>C3 Lime <code>#7ED957</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#FFC93E"></div><p>C4 Gold <code>#FFC93E</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#E858B8"></div><p>C5 Magenta <code>#E858B8</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#9D6BFF"></div><p>C6 Violet <code>#9D6BFF</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#3EDBB6"></div><p>C7 Mint <code>#3EDBB6</code></p></div>
+    <div class="swatch"><div class="chip" style="background:#E8ECF2"></div><p>C8 Silver <code>#E8ECF2</code></p></div>
+  </div>
+</section>
+
+<!-- ======================= NEW SHIPS ======================= -->
+<section>
+  <h2>Ships — new options (S2 Wedge and S3 Hammerhead still on the table)</h2>
+  <p class="hint">All shown in C1 cyan livery. Nose points right; the beam always fires from the marked emitter.</p>
+  <div class="grid">
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,65)" stroke="#262C34" stroke-width="2.5">
+          <path d="M38 0 Q18 -6 2 -22 Q-14 -34 -30 -26 Q-18 -14 -22 0 Q-18 14 -30 26 Q-14 34 2 22 Q18 6 38 0 z" fill="#7E8894"/>
+          <path d="M2 -22 Q-14 -34 -30 -26 Q-18 -14 -22 0 l10 0 Q-8 -12 2 -22z" fill="#8F99A6" stroke-width="0"/>
+          <circle cx="10" cy="0" r="7" fill="#4DC3FF"/>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M-26 -25 l10 4 -6 6 z"/><path d="M-26 25 l10 -4 -6 -6 z"/></g>
+          <circle cx="38" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+          <path d="M-22 -4 l-12 4 12 4" fill="#4DC3FF" stroke-width="0"/>
+          <text x="-8" y="4" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+      </svg>
+      <h3>S5 — Manta</h3>
+      <p>Swept crescent wings, emitter on the nose tip. Sleek but still heavy-shouldered; wings take the player color cleanly.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,65)" stroke="#262C34" stroke-width="2.5">
+          <g fill="#7E8894"><path d="M34 -4 l14 0 0 8 -14 0 z" stroke-width="2"/><path d="M34 -14 l12 -6 0 10 M34 14 l12 6 0 -10" fill="#6E7987"/></g>
+          <rect x="-24" y="-14" width="58" height="28" rx="9" fill="#7E8894"/>
+          <rect x="4" y="-7" width="18" height="14" rx="4" fill="#4DC3FF"/>
+          <g fill="#4DC3FF" stroke-width="0"><rect x="-24" y="-14" width="34" height="5"/><rect x="-24" y="9" width="34" height="5"/></g>
+          <g fill="#5A6470"><rect x="-32" y="-10" width="8" height="8" rx="2"/><rect x="-32" y="2" width="8" height="8" rx="2"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M-32 -8 l-9 4 9 3z"/><path d="M-32 4 l-9 4 9 3z"/></g>
+          <circle cx="48" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+          <text x="-12" y="4" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+      </svg>
+      <h3>S6 — Prospector</h3>
+      <p>Rounded work-pod with a forward drill-mast emitter and twin engines. The "honest tradesman" hull — friendly, sturdy, zero menace.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,65)" stroke="#262C34" stroke-width="2.5">
+          <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M42 -20 l0 10 -6 1 0 -9 z"/><path d="M42 20 l0 -10 -6 -1 0 9 z"/></g>
+          <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+          <g fill="#5A6470"><rect x="-34" y="-8" width="8" height="6" rx="2"/><rect x="-34" y="2" width="8" height="6" rx="2"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M-34 -6 l-8 3 8 3z"/><path d="M-34 4 l-8 3 8 3z"/></g>
+          <circle cx="47" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5" transform="translate(0,0)"/>
+          <text x="-14" y="4" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+      </svg>
+      <h3>S7 — Pincer</h3>
+      <p>Forked prongs frame the beam like a claw — mining and combat both visibly happen *between the prongs*. Strongest tool-as-weapon read.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,65)" stroke="#262C34" stroke-width="2.5">
+          <path d="M40 0 L10 -8 L-20 -8 L-28 0 L-20 8 L10 8 Z" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M-4 -8 l-8 -18 12 0 6 18 z"/><path d="M-4 8 l-8 18 12 0 6 -18 z"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M-12 -26 l12 0 0 5 -12 0 z"/><path d="M-12 21 l12 0 0 5 -12 0 z"/></g>
+          <rect x="10" y="-5" width="16" height="10" rx="4" fill="#4DC3FF"/>
+          <circle cx="40" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+          <path d="M-28 -4 l-11 4 11 4" fill="#4DC3FF" stroke-width="0"/>
+          <text x="-14" y="4" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+      </svg>
+      <h3>S8 — Quadfin</h3>
+      <p>Slim fuselage with four canted fins — classic starfighter silhouette, industrial detailing. Most "pilot fantasy" of the set.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,65)" stroke="#262C34" stroke-width="2.5">
+          <path d="M30 -14 L44 0 L30 14 L-20 18 L-30 0 L-20 -18 Z" fill="#7E8894"/>
+          <path d="M30 -14 L44 0 L30 14 l-8 -14 z" fill="#8F99A6" stroke-width="0"/>
+          <rect x="2" y="-8" width="16" height="16" rx="3" fill="#4DC3FF"/>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M-20 -18 l30 4 -2 5 -28 -3z"/><path d="M-20 18 l30 -4 -2 -5 -28 3z"/></g>
+          <g fill="#262C34" stroke-width="0"><circle cx="34" cy="0" r="1.8"/><circle cx="-8" cy="-12" r="1.8"/><circle cx="-8" cy="12" r="1.8"/></g>
+          <circle cx="44" cy="0" r="3.5" fill="#4DC3FF" stroke-width="1.5"/>
+          <path d="M-30 -4 l-11 4 11 4" fill="#4DC3FF" stroke-width="0"/>
+          <text x="-12" y="4" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+      </svg>
+      <h3>S9 — Anvil</h3>
+      <p>Faceted arrowhead brick — heavy, blunt, dependable. Reads equally miner and brawler; the easiest silhouette at 24 px.</p>
+    </div>
+  </div>
+
+  <div class="wide">
+    <h3>Livery preview — S7 Pincer in all 8 player colors</h3>
+    <svg viewBox="0 0 1040 120">
+      <rect width="1040" height="120" fill="#0D1015"/>
+      <g id="row">
+        <g transform="translate(70,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#4DC3FF"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#4DC3FF" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">1</text>
+        </g>
+        <g transform="translate(200,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#E24A3B" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#E24A3B"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#E24A3B" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">2</text>
+        </g>
+        <g transform="translate(330,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#7ED957" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#7ED957"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#7ED957" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">3</text>
+        </g>
+        <g transform="translate(460,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#FFC93E" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#FFC93E"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#FFC93E" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">4</text>
+        </g>
+        <g transform="translate(590,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#E858B8" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#E858B8"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#E858B8" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">5</text>
+        </g>
+        <g transform="translate(720,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#9D6BFF" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#9D6BFF"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#9D6BFF" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">6</text>
+        </g>
+        <g transform="translate(850,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#3EDBB6" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#3EDBB6"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#3EDBB6" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">7</text>
+        </g>
+        <g transform="translate(980,60)" stroke="#262C34" stroke-width="2.2">
+          <rect x="-22" y="-10" width="38" height="20" rx="5" fill="#7E8894"/>
+          <g fill="#6E7987"><path d="M16 -10 l18 -7 0 9 -18 3 z"/><path d="M16 10 l18 7 0 -9 -18 -3 z"/></g>
+          <g fill="#E8ECF2" stroke-width="0"><path d="M34 -17 l0 9 -5 1 0 -8 z"/><path d="M34 17 l0 -9 -5 -1 0 8 z"/></g>
+          <circle cx="-2" cy="0" r="6.5" fill="#E8ECF2"/>
+          <path d="M-28 -3 l-8 3 8 3" fill="#E8ECF2" stroke-width="0"/>
+          <text x="-13" y="4" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#262C34" font-weight="700" text-anchor="middle">8</text>
+        </g>
+      </g>
+    </svg>
+    <p>Steel hull constant; player color on prong tips, cockpit, engine flame, hull number. The same recolor rule applies to whichever hull wins.</p>
+  </div>
+</section>
+
+<!-- ======================= EARTHLIKE PLANETS ======================= -->
+<section>
+  <h2>Planets — earthlike (oceans, continents, clouds)</h2>
+  <p class="hint">Ocean is steel-blue and continents patina-green, so "Earth" still lives inside the Cold Vacuum palette.
+  Ownership is a player-color beacon ring at the planet's base (shown in cyan and red below); the shield sits outside it.</p>
+  <div class="grid">
+    <div class="card">
+      <svg viewBox="0 0 230 150">
+        <g transform="translate(115,75)">
+          <defs><clipPath id="pc5"><circle r="54"/></clipPath></defs>
+          <circle r="54" fill="#2E6E9E"/>
+          <g clip-path="url(#pc5)" fill="#4FA08B">
+            <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+            <path d="M-16 2 L-12 14 L-20 22 L-26 12 z"/>
+            <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+            <circle cx="-34" cy="28" r="3"/><circle cx="-24" cy="34" r="2"/><circle cx="44" cy="-8" r="2.4"/><circle cx="-44" cy="16" r="2"/>
+          </g>
+          <circle r="13" fill="#F2D24B" stroke="#262C34" stroke-width="2"/><circle r="6" fill="#FFF6C8"/>
+          <circle r="60" fill="none" stroke="#4DC3FF" stroke-width="3.5" opacity=".9"/>
+        </g>
+      </svg>
+      <h3>P5 — Blue Marble</h3>
+      <p>Clean earthlike: steel-blue ocean, patina continents, exposed core. Beacon ring shown in C1 cyan.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 150">
+        <g transform="translate(115,75)">
+          <defs><clipPath id="pc6"><circle r="54"/></clipPath></defs>
+          <circle r="54" fill="#2E6E9E"/>
+          <g clip-path="url(#pc6)" fill="#4FA08B" transform="rotate(18)">
+            <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+            <path d="M-16 2 L-12 14 L-20 22 L-26 12 z"/>
+            <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+            <circle cx="-34" cy="28" r="3"/><circle cx="44" cy="-8" r="2.4"/>
+          </g>
+          <g fill="#E8ECF2" opacity=".85">
+            <path d="M-44 6 q10 -6 22 -2 q10 4 20 0 q6 -2 10 2 q-8 6 -22 4 q-14 0 -30 -4 z"/>
+            <path d="M2 -34 q10 -4 20 0 q8 4 16 2 q-6 6 -18 4 q-12 0 -18 -6 z"/>
+          </g>
+          <circle r="13" fill="#F2D24B" stroke="#262C34" stroke-width="2"/><circle r="6" fill="#FFF6C8"/>
+          <circle r="60" fill="none" stroke="#E24A3B" stroke-width="3.5" opacity=".9"/>
+        </g>
+      </svg>
+      <h3>P6 — Blue Marble + Clouds</h3>
+      <p>Same body with drifting cloud wisps (slow parallax layer). Softest, most alive. Beacon ring shown in C2 red.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 150">
+        <g transform="translate(115,75)">
+          <defs><clipPath id="pc7"><circle r="54"/></clipPath></defs>
+          <circle r="54" fill="#2E6E9E"/>
+          <g clip-path="url(#pc7)" fill="#4FA08B" transform="rotate(-24)">
+            <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+            <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+            <circle cx="-30" cy="24" r="2.6"/><circle cx="-40" cy="14" r="2"/>
+          </g>
+          <g fill="#E8ECF2"><path d="M-16 -50 a54 54 0 0 1 32 0 q-6 8 -16 8 q-10 0 -16 -8 z"/><path d="M-16 50 a54 54 0 0 0 32 0 q-6 -8 -16 -8 q-10 0 -16 8 z"/></g>
+          <circle r="13" fill="#F2D24B" stroke="#262C34" stroke-width="2"/><circle r="6" fill="#FFF6C8"/>
+          <circle r="60" fill="none" stroke="#7ED957" stroke-width="3.5" opacity=".9"/>
+        </g>
+      </svg>
+      <h3>P7 — Polar Marble</h3>
+      <p>Earthlike with ice caps top and bottom — caps double as damage UI (they gray and crack as core HP drops). Ring in C3 lime.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 150">
+        <g transform="translate(115,75)">
+          <defs><clipPath id="pc8"><circle r="54"/></clipPath></defs>
+          <circle r="54" fill="#2E6E9E"/>
+          <g clip-path="url(#pc8)" fill="#4FA08B" transform="rotate(150)">
+            <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+            <path d="M-16 2 L-12 14 L-20 22 L-26 12 z"/>
+            <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+            <circle cx="-34" cy="28" r="3"/><circle cx="44" cy="-8" r="2.4"/>
+          </g>
+          <path d="M54 0 a54 54 0 0 1 -54 54 l0 -12 a42 42 0 0 0 42 -42 z" fill="#0D1015" opacity=".55"/>
+          <g fill="#F2D24B" opacity=".9"><circle cx="30" cy="26" r="1.6"/><circle cx="22" cy="36" r="1.4"/><circle cx="36" cy="14" r="1.4"/><circle cx="14" cy="42" r="1.3"/></g>
+          <circle r="13" fill="#F2D24B" stroke="#262C34" stroke-width="2"/><circle r="6" fill="#FFF6C8"/>
+          <circle r="60" fill="none" stroke="#9D6BFF" stroke-width="3.5" opacity=".9"/>
+        </g>
+      </svg>
+      <h3>P8 — Night-Side Marble</h3>
+      <p>Earthlike with a shaded night hemisphere and city lights — the settlement you're defending, made visible. Ring in C6 violet.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= TURRETS REDONE ======================= -->
+<section>
+  <h2>Turrets — redone (must read "cannon")</h2>
+  <p class="hint">T1 retired. Dome de-rodded per your note. All barrels track targets; muzzle flash is player-colored.</p>
+  <div class="grid">
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,76)" stroke="#262C34" stroke-width="2.5">
+          <path d="M-26 12 l8 -16 36 0 8 16 z" fill="#5A6470"/>
+          <circle cx="0" cy="-6" r="13" fill="#7E8894"/>
+          <g fill="#6E7987"><rect x="8" y="-12" width="30" height="12" rx="3"/><rect x="38" y="-14" width="7" height="16" rx="2"/></g>
+          <rect x="-14" y="-12" width="10" height="12" rx="2" fill="#6E7987"/>
+          <g fill="#F2D24B" stroke-width="0"><rect x="-26" y="8" width="10" height="4"/><rect x="16" y="8" width="10" height="4"/></g>
+          <circle cx="0" cy="-6" r="4" fill="#4DC3FF" stroke-width="0"/>
+        </g>
+      </svg>
+      <h3>T5 — Breech Cannon</h3>
+      <p>Rotating drum on a skirted base, thick barrel with muzzle brake, counterweight breech behind. Unambiguously a cannon.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,78)" stroke="#262C34" stroke-width="2.5">
+          <path d="M-28 10 a28 22 0 0 1 56 0 z" fill="#7E8894"/>
+          <path d="M-18 -4 a18 14 0 0 1 36 0 l-6 4 -24 0 z" fill="#8F99A6"/>
+          <rect x="-5" y="-9" width="10" height="6" rx="3" fill="#4DC3FF"/>
+          <g fill="#262C34" stroke-width="0"><circle cx="-18" cy="4" r="1.7"/><circle cx="18" cy="4" r="1.7"/><circle cx="0" cy="-2" r="0" /></g>
+          <g fill="#F2D24B" stroke-width="0"><rect x="-28" y="6" width="9" height="4"/><rect x="19" y="6" width="9" height="4"/></g>
+        </g>
+      </svg>
+      <h3>T6 — Dome Bunker mk2</h3>
+      <p>Pure dome, no rod — just a recessed lens slit that glows and tracks. Fires from the slit. Menacing in a quiet way.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,76)" stroke="#262C34" stroke-width="2.5">
+          <path d="M-24 12 l6 -14 36 0 6 14 z" fill="#5A6470"/>
+          <circle cx="0" cy="-4" r="11" fill="#7E8894"/>
+          <g fill="#6E7987"><rect x="6" y="-13" width="34" height="7" rx="3"/><rect x="6" y="-2" width="34" height="7" rx="3"/></g>
+          <g fill="#4DC3FF" stroke-width="0"><rect x="40" y="-12" width="5" height="5"/><rect x="40" y="-1" width="5" height="5"/></g>
+          <g fill="#F2D24B" stroke-width="0"><rect x="-24" y="8" width="9" height="4"/><rect x="15" y="8" width="9" height="4"/></g>
+        </g>
+      </svg>
+      <h3>T7 — Twin Cannon</h3>
+      <p>Paired stacked barrels on the same drum — alternating fire, satisfying rhythm. The "more dakka" upgrade read.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 130">
+        <g transform="translate(115,78)" stroke="#262C34" stroke-width="2.5">
+          <path d="M-16 10 L0 -4 L16 10 z" fill="#5A6470"/>
+          <g transform="rotate(-32)"><rect x="-3" y="-46" width="7" height="42" rx="2" fill="#C6CDD6" stroke-width="2"/><g fill="#4DC3FF" stroke-width="0"><rect x="-2" y="-45" width="5" height="6"/><rect x="-1.5" y="-30" width="4" height="4"/><rect x="-1.5" y="-18" width="4" height="4"/></g></g>
+          <circle cx="0" cy="0" r="5" fill="#7E8894"/>
+          <g fill="#F2D24B" stroke-width="0"><path d="M-16 10 l6 -5 4 5 z"/></g>
+        </g>
+      </svg>
+      <h3>T3b — Rail Spike (kept, angled)</h3>
+      <p>Your Round-1 railgun, now visibly aimed — charge lights climb the rail before each shot. Long range, slow, telegraphed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= HP BAR ======================= -->
+<section>
+  <h2>Player-colored planet HP bar</h2>
+  <p class="hint">Confirmed: the HP bar (HUD top-right and the over-planet mirror) renders in the owner's player color. Samples:</p>
+  <div class="wide">
+    <svg viewBox="0 0 1040 150">
+      <rect width="1040" height="150" fill="#0D1015"/>
+      <g font-family="ui-monospace,Consolas,monospace" font-size="15" font-weight="700">
+        <text x="40" y="40" fill="#4DC3FF">MY PLANET</text>
+        <rect x="180" y="26" width="240" height="16" fill="none" stroke="#4DC3FF" stroke-width="1.6"/><rect x="183" y="29" width="186" height="10" fill="#4DC3FF"/>
+        <text x="40" y="85" fill="#E858B8">MY PLANET</text>
+        <rect x="180" y="71" width="240" height="16" fill="none" stroke="#E858B8" stroke-width="1.6"/><rect x="183" y="74" width="120" height="10" fill="#E858B8"/>
+        <text x="40" y="130" fill="#FFC93E">MY PLANET</text>
+        <rect x="180" y="116" width="240" height="16" fill="none" stroke="#FFC93E" stroke-width="1.6"/><rect x="183" y="119" width="60" height="10" fill="#FFC93E"/>
+        <text x="480" y="40" fill="#8B95A5" font-size="12">100% — calm</text>
+        <text x="480" y="85" fill="#8B95A5" font-size="12">50% — bar pulses slowly</text>
+        <text x="480" y="130" fill="#8B95A5" font-size="12">25% — pulses fast + edge glow (alarm state)</text>
+      </g>
+      <g transform="translate(760,20)">
+        <circle cx="120" cy="55" r="46" fill="#2E6E9E"/>
+        <path d="M92 40 q12 -12 28 -6 q10 4 6 14 q-6 8 -18 6 q-12 -2 -16 -14 z" fill="#4FA08B"/>
+        <circle cx="120" cy="55" r="11" fill="#F2D24B" stroke="#262C34" stroke-width="2"/>
+        <circle cx="120" cy="55" r="52" fill="none" stroke="#E858B8" stroke-width="3"/>
+        <rect x="80" y="-8" width="80" height="9" rx="4.5" fill="none" stroke="#E858B8" stroke-width="1.4"/><rect x="83" y="-5" width="40" height="3.5" rx="1.5" fill="#E858B8"/>
+      </g>
+    </svg>
+    <p>Right: the over-planet mirror bar and beacon ring in the owner's color (C5 magenta at 50%).</p>
+  </div>
+</section>
+
+<!-- ======================= ASTEROIDS ======================= -->
+<section>
+  <h2>Asteroids — the exploration you were owed</h2>
+  <p class="hint">The economy object: it must read "shootable rock," crack visibly in three stages, and its ore payout must be
+  legible before you commit beam time. Six options.</p>
+  <div class="grid">
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="3">
+          <path d="M-40 -6 l22 -26 34 -4 24 18 -6 30 -32 16 -34 -12 z" fill="#454E59"/>
+          <path d="M-18 -30 l8 18 -12 14" fill="none" stroke="#F2D24B" stroke-width="2.5"/>
+          <path d="M18 12 l12 -8" fill="none" stroke="#F2D24B" stroke-width="2.5"/>
+        </g>
+      </svg>
+      <h3>A1 — Shard</h3>
+      <p>Hard angular chunk, yellow ore veins along fracture lines; mining widens the veins until it splits. Cleanest read.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="3">
+          <path d="M-38 0 q-6 -26 20 -34 q26 -8 40 10 q14 18 2 34 q-12 16 -34 12 q-24 -4 -28 -22 z" fill="#4A5563"/>
+          <g stroke="#4DC3FF" stroke-width="2.5" fill="none"><path d="M-20 -14 q10 8 4 22"/><path d="M8 -22 q12 10 8 26"/></g>
+          <g fill="#F2D24B" stroke-width="0"><circle cx="-4" cy="4" r="4"/><circle cx="18" cy="-2" r="3"/></g>
+        </g>
+      </svg>
+      <h3>A2 — Ice-Veined Boulder</h3>
+      <p>Rounded body, glowing frost veins that brighten as it nears breaking, embedded nuggets. Prettiest; softest read.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="2.5">
+          <path d="M-34 -8 l16 -18 24 -2 14 14 -6 20 -24 10 -22 -10 z" fill="#454E59"/>
+          <path d="M28 -22 l10 -8 12 4 2 12 -10 8 -12 -4 z" fill="#3E4750"/>
+          <path d="M-40 18 l8 -8 12 2 4 10 -8 8 -12 -2 z" fill="#3E4750"/>
+          <g fill="#F2D24B" stroke-width="0"><circle cx="-6" cy="0" r="3.5"/><circle cx="36" cy="-16" r="2.5"/><circle cx="-30" cy="24" r="2.5"/></g>
+        </g>
+      </svg>
+      <h3>A3 — Rubble Cluster</h3>
+      <p>Parent rock + satellite pebbles: pebbles pop first for fast small payouts, then the core. Best moment-to-moment feedback.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="3">
+          <path d="M-38 -4 l20 -24 32 -4 22 16 -4 26 -30 16 -32 -10 z" fill="#454E59"/>
+          <path d="M-14 -22 l10 12 -6 10 10 12" fill="none" stroke="#262C34" stroke-width="3"/>
+          <path d="M2 -14 a14 14 0 1 0 14 18" fill="#0D1015" stroke="#F2D24B" stroke-width="2.5"/>
+          <circle cx="9" cy="-2" r="4.5" fill="#F2D24B" stroke-width="0"/>
+        </g>
+      </svg>
+      <h3>A4 — Hollow Husk</h3>
+      <p>Half-mined already: a yellow-rimmed cavity with one fat nugget. Storytelling rock — someone was here before you.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="3">
+          <path d="M-36 -8 l18 -22 30 -6 22 14 0 26 -26 18 -34 -8 z" fill="#3A424D"/>
+          <g fill="#F2D24B" stroke="#262C34" stroke-width="2"><path d="M-8 -14 l7 -9 7 9 -7 9 z"/><path d="M10 2 l6 -8 6 8 -6 8 z"/><path d="M-22 6 l5 -7 5 7 -5 7 z"/></g>
+          <g stroke="#5A6470" stroke-width="2" fill="none"><path d="M-30 -14 l12 8 M4 -26 l6 10 M22 14 l-8 6"/></g>
+        </g>
+      </svg>
+      <h3>A5 — Geode Cluster</h3>
+      <p>Dark rock studded with exposed ore crystals — the payout is countable before you shoot (three crystals = three ore). Most strategic read.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 230 140">
+        <g transform="translate(115,70)" stroke="#262C34" stroke-width="3">
+          <path d="M-40 -2 l14 -20 26 -10 28 6 12 20 -10 22 -34 12 -30 -12 z" fill="#454E59"/>
+          <path d="M-26 -14 q14 -8 30 -4 q16 4 22 14" fill="none" stroke="#4FA08B" stroke-width="4" opacity=".8"/>
+          <path d="M-30 8 q18 10 40 4" fill="none" stroke="#4FA08B" stroke-width="3" opacity=".6"/>
+          <g fill="#F2D24B" stroke-width="0"><circle cx="0" cy="0" r="3.5"/><circle cx="-16" cy="-8" r="2.5"/></g>
+        </g>
+      </svg>
+      <h3>A6 — Patina Drifter</h3>
+      <p>Weathered rock with teal oxidation bands matching the planets — the "old solar system" look. Ties world and economy together visually.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FONTS: SCI-FI EXPANSION ======================= -->
+<section>
+  <h2>Typography — sci-fi display options (Y4 direction)</h2>
+  <p class="hint">You liked Michroma (Y4). Here it is with six more in the same wide/techno-future family — all Google Fonts,
+  all OFL (self-hostable in the repo, license-clean). Big line = wordmark; small line = HUD sample. HUD body text would
+  stay Chakra Petch or a mono; these are display faces.</p>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Michroma',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y4 — Michroma (your current favorite)</p>
+    <p style="font-size:30px;margin:0 0 6px;color:var(--bone)">PLANET RUSH</p>
+    <p style="font-size:14px;color:var(--plasma);margin:0 0 6px">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Wide, quiet, NASA-worm heritage. The benchmark.</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Orbitron',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y6 — Orbitron</p>
+    <p style="font-size:30px;margin:0 0 6px;color:var(--bone);font-weight:800">PLANET RUSH</p>
+    <p style="font-size:14px;color:var(--plasma);margin:0 0 6px;font-weight:500">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">The definitive geometric sci-fi face. Multiple weights — could carry wordmark AND HUD alone. Slightly "expected."</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Audiowide',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y7 — Audiowide</p>
+    <p style="font-size:30px;margin:0 0 6px;color:var(--bone)">PLANET RUSH</p>
+    <p style="font-size:14px;color:var(--plasma);margin:0 0 6px">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Rounded techno — retro-future with warmth. The friendliest of the set; suits the arcade half of the tone.</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Syncopate',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y8 — Syncopate</p>
+    <p style="font-size:26px;margin:0 0 6px;color:var(--bone);font-weight:700;letter-spacing:.06em">PLANET RUSH</p>
+    <p style="font-size:13px;color:var(--plasma);margin:0 0 6px">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Ultra-wide spaced caps — closest sibling to Michroma, colder and more editorial. Wordmark only.</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Zen Dots',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y9 — Zen Dots</p>
+    <p style="font-size:28px;margin:0 0 6px;color:var(--bone)">PLANET RUSH</p>
+    <p style="font-size:13px;color:var(--plasma);margin:0 0 6px">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Chunky, gasketed, almost mecha. The most "video game" of the set — great logo, too heavy for HUD.</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Russo One',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y10 — Russo One</p>
+    <p style="font-size:30px;margin:0 0 6px;color:var(--bone)">PLANET RUSH</p>
+    <p style="font-size:14px;color:var(--plasma);margin:0 0 6px">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Bold constructivist techno — reads "esports title." Punchy at every size, including small HUD labels.</p>
+  </div>
+
+  <div style="background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:14px;font-family:'Oxanium',sans-serif">
+    <p style="font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--signal);margin:0 0 8px">Y11 — Oxanium</p>
+    <p style="font-size:30px;margin:0 0 6px;color:var(--bone);font-weight:800">PLANET RUSH</p>
+    <p style="font-size:14px;color:var(--plasma);margin:0 0 6px;font-weight:500">HOLD 2/2 · BANK 11 · MY PLANET ▮▮▮▮▮▮▮▮▯▯</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0">Designed *for* game HUDs — beveled corners, many weights, excellent at 12 px. The practical pick to pair with any wordmark above.</p>
+  </div>
+
+  <p class="hint" style="margin-top:14px">Pairings that work: <strong>Y4 or Y8 wordmark + Y11 HUD</strong> (cold, precise — most on-theme) ·
+  <strong>Y9 wordmark + Y6 HUD</strong> (maximum video game) · <strong>Y7 everywhere</strong> (friendliest single-font option).</p>
+</section>
+
+<footer>
+  <p>Planet Rush · Cold Vacuum element studies, Round 2 · Ships S2/S3 remain candidates alongside S5–S9; T3b/T4–T7 are the turret pool; planets P5–P8.
+  Reply with picks, e.g. <code>S9 · P6 · T5 · A1 · W1 · Y4+Y1 · colors OK</code> — then I freeze <code>style-guide.md</code> and fold Art Direction into the GDD.</p>
+</footer>
+</div>
+</body>
+</html>
