@@ -1641,6 +1641,12 @@ interface LobbySeam {
   seatHeight: number;
   /** RUSH!'s height — likewise. */
   rushHeight: number;
+  /** The RUSH! control's logical rect + the physical point a tap must land on to
+   *  hit it (through the landscape-lock rotation) — the twin of the menu seam's
+   *  control reports. Lets the mobile landscape-lock suite prove a *physical* touch
+   *  on RUSH remaps to the logical control, rather than only driving rush()
+   *  programmatically (tests/mobile/landscape-lock.spec.ts). */
+  rushControl: { logical: Rect; physicalCenter: { x: number; y: number } };
   /** True while the RUSH! countdown is running. */
   counting: boolean;
   /** The hull the built world gave the local ship, or null until the match boots
@@ -1702,6 +1708,7 @@ function openLobby(
     content: { x: 0, y: 0, width: 0, height: 0 },
     seatHeight: 0,
     rushHeight: 0,
+    rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
     selectClass: (index: number): void => selectClassAt(index),
@@ -1727,6 +1734,14 @@ function openLobby(
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
     seam.rushHeight = layout.rushButton.height;
+    // The RUSH! rect in logical (landscape) space and the physical tap point it
+    // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
+    // uses, so the landscape-lock suite can tap RUSH physically (see LobbySeam).
+    const rush = layout.rushButton;
+    seam.rushControl = {
+      logical: { ...rush },
+      physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
+    };
     seam.counting = model.countdown.active;
   }
 
