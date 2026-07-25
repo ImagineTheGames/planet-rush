@@ -52,3 +52,47 @@ Notes on the two that needed real work to *see*:
   siege with home off-screen and the arrow pointing to it.
 
 **All four gates pass on `c97f60a`. They no longer block the M2 re-tag.**
+
+## Evidence round 2 — the five field-reported combat bugs (build `1c72d85`)
+
+The developer played build `5254cfe` and reported five bugs; fix briefs m2-10..13
+were meant to kill them. I captured four proof shots on the **live** `1c72d85`
+preview and looked at every pixel. **Only one of the four is dead.**
+
+| Field bug | Shot | Verdict |
+| --- | --- | --- |
+| Invisible enemy lasers | `enemy-beam-visible` | **failed** — no enemy beam ever draws, even point-blank |
+| Turret never visibly fired | `turret-firing` | **failed** — no muzzle flash / projectile; turret never seen to engage |
+| Build button vanished after building | `build-button-after-build` | **verified** — button survives the whole cycle, still hittable |
+| Missing enemy health bars | `enemy-healthbars` | **failed** — no HP bar over any non-local ship, even one taking damage |
+
+**Headline: three of the four "fixes" are green in unit tests but were never
+wired into the shipped client (`src/main.ts`), so they do not reach the screen.**
+The sim/UI machinery is correct and unit-tested; the last one-function wiring
+step in each was left as a "handoff to Platform" that never landed. What I saw:
+
+- **enemy-beam-visible / turret-firing** — the client's beam feed
+  (`main.ts` `currentBeams()`) draws **only the local player's** beam; the
+  `combatBeams(world)` selector that would surface every ship's and turret's
+  beam is never consumed. In the shot, my *own* ship's beam renders perfectly
+  (blue line, clamped to its hit, cyan impact glow) right beside enemy ships in
+  a live firefight that draw **nothing** — the render path works; it is simply
+  never fed enemy shots. The turret's muzzle flash rides that same dead feed.
+- **enemy-healthbars** — the HUD's health-bar layer exists but `main.ts`
+  `feedHud()` never fills `hudFrame.combatants`, so it is permanently starved.
+  In the shot a bot is being cut by my beam (unmistakably in combat) with no bar.
+- **build-button-after-build** — genuinely fixed: on a landscape phone the
+  plasma BUILD button is still present and hittable after a turret finishes
+  building (tapping it closes the wheel; the layout registry keeps its
+  `build-button` entry through the whole cycle).
+
+Staging note: these are emergent live-combat scenes, not frozen goldens. The
+`combat-siege` / `core-siege` shots in `capture.mjs` drive a real siege — build a
+turret, fly out to draw a bot chase back to home, open fire — under a wide
+follow-camera frame; the four committed images are the clearest crops of those
+runs. Re-running will vary in detail (live bots) but not in the verdict: across
+~16 captured frames at many ticks, no enemy beam, enemy health bar, or turret
+muzzle/shot ever appeared, while the local beam always did.
+
+**Three gates FAIL on `1c72d85`. The field bugs are not dead — the two
+one-function `main.ts` wiring gaps (beam feed, combatants feed) need to close.**
