@@ -348,5 +348,95 @@
     "buildSha": "88d36be",
     "verdict": "verified",
     "attestation": "Same run as defeat-screen.png, immediately after pressing SPECTATE. WHAT IS ON SCREEN: NO overlay — the camera has moved onto a surviving player and the match is visibly running: multiple ships (arrows) with active cyan/magenta beam and thrust trails, ore chunks (yellow), a defended planet bottom-right and another top-right. Top-right HUD reads 'HOME LOST' (the local player is out) with 'HULL —', and the MATCH clock reads 0:04 — ADVANCED from the 0:03 shown on the DEFEATED overlay. Confirms SPECTATE keeps the match visibly running: the sim never stopped (tick count climbed +94 across the same interval). Supporting proof for defeat-screen.png. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-picker",
+    "area": "boot",
+    "image": "images/map-picker.png",
+    "title": "PLAY screen map picker — four cards, The Ring preselected, Double Diamond VETERAN (phone landscape)",
+    "attestation": "Clean boot of the live preview bundle (no ?debug, so the front-door menu is reached) on an emulated iPhone-class device held LANDSCAPE (844x390 logical, dpr 3, touch). WHAT IS ON SCREEN: the 'PLANET RUSH' wordmark, then a ROW OF FOUR map cards, then a primary 'PLAY' button (plasma-filled, focused) above a secondary 'SETTINGS' button. The four cards, left to right: (1) 'The Ring' — a glyph of 8 dots evenly spaced around a circle; blurb 'Eight planets, one circle, equal gaps — fair by construction.'; this card wears a bright CYAN SELECTION BORDER (preselected). (2) 'The Compass' — a glyph of 8 dots as a 3x3 grid minus the centre (4 corners + 4 edge-midpoints); blurb 'Corners for cover, edges for lanes — every gap the same.' (3) 'The Oval' — 8 dots around a wide ellipse; blurb 'A wide ellipse, eight equal strides around the rim.' (4) 'Double Diamond' — a glyph of an outer diamond (4 dots N/E/S/W) plus an inner diamond (4 dots), and a small 'VETERAN' tag in its top-right corner; blurb 'Outer wall-backs and exposed inner homes — for veterans.' All four maps A/B/C/D are present, the octagon (The Ring) is the preselected default, and only Double Diamond carries the VETERAN tag. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-octagon",
+    "area": "match",
+    "image": "images/map-octagon.png",
+    "title": "Octagon (The Ring, card A) in-match — square arena, 8 planets at 45° hugging the margin",
+    "attestation": "Live ?debug=1&freeze=1 build (sha a5dd0b0, clean, frozen at the seeded tick) with the octagon map selected via localStorage (planet-rush:mapId), an oversized square viewport so the whole arena is on-canvas; cropped wall-to-wall. Self-check: the local planet implied by the live shipWorld matches a shipped-registry (src/sim/maps.ts) planet to 0.0 units, so the on-screen board IS the ratified octagon. WHAT IS ON SCREEN: a SQUARE arena with a thin steel wall frame. EIGHT home planets sit on ONE circle, one at each of N/NE/E/SE/S/SW/W/NW — i.e. exact 45° spacing — each ringed in its own player colour with its ship (small triangle) parked inboard. The eight clear the wall by a uniform gap (hugging the spawn margin), none touching it. At the centre is the contested commons: a compact cluster of grey asteroids in visible 8-fold rotational symmetry. This matches the ratified octagon layout (card A): eight planets, one circle, equal 45° gaps. The per-planet home-field fairness invariant is shown in the companion crop map-octagon-fields.png. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-octagon-fields",
+    "area": "match",
+    "image": "images/map-octagon-fields.png",
+    "title": "Octagon home-field invariant (p1-09) — 8 congruent field clusters in 8-fold symmetry",
+    "attestation": "Same frozen octagon frame as map-octagon.png, cropped tight on the arena centre out to just past the home-field band. WHAT IS ON SCREEN: EIGHT home-field asteroid clusters arranged in a ring, one per planet spoke, each a small group of ~3 grey rocks in the same two-lobe arrangement. The eight clusters are congruent ROTATED COPIES of one pattern — rotating the image by 45° maps each cluster onto the next (exact 8-fold rotational symmetry). This is the p1-09 resource-fairness invariant made visible: every player's home field is identical by construction. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-compass",
+    "area": "match",
+    "image": "images/map-compass.png",
+    "title": "Compass (card B) in-match — square arena, 4 corner + 4 edge-midpoint planets",
+    "attestation": "Live ?debug=1&freeze=1 build (sha a5dd0b0, clean, frozen), compass map selected via localStorage, cropped wall-to-wall. Self-check: local planet matches the shipped registry to 0.0 units. WHAT IS ON SCREEN: a SQUARE arena. EIGHT home planets in a compass layout — FOUR at the corners of an inner square (upper-left, upper-right, lower-left, lower-right), sitting farther out and hugging the wall margin, and FOUR at the edge midpoints (top-centre, bottom-centre, left-centre, right-centre), sitting a step closer in. Each is player-coloured with its ship parked inboard. The centre holds a symmetric commons asteroid cluster. A first-match onboarding hint ('Hold Left mouse on the asteroid — your beam mines it') is drawn near the lower-right over empty space — a live UI element, not part of the layout. This matches the ratified compass layout (card B): corners for cover, edges for lanes. Home-field fairness is shown in map-compass-fields.png. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-compass-fields",
+    "area": "match",
+    "image": "images/map-compass-fields.png",
+    "title": "Compass home-field invariant — two planets, congruent inboard fields",
+    "attestation": "Same frozen compass frame, cropped on the two TOP planets (a corner home and an edge-midpoint home) with the space inboard of each. WHAT IS ON SCREEN: two player-coloured planets, and below/inboard of EACH a small cluster of grey asteroids of the same character (a tight two-lobe group). Though one planet is a corner (farther from centre) and the other an edge-midpoint (closer in), each carries the same small home field stamped inboard toward the centre — congruent by construction (p1-09), matching what map-octagon-fields.png shows in full 8-fold symmetry. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-oval",
+    "area": "match",
+    "image": "images/map-oval.png",
+    "title": "Oval (card C) in-match — wide arena, 8 planets on an equal-chord ellipse rim",
+    "attestation": "Live ?debug=1&freeze=1 build (sha a5dd0b0, clean, frozen), oval map selected via localStorage, an oversized viewport so the wide arena is fully on-canvas; cropped wall-to-wall. Self-check: local planet matches the shipped registry to 0.0 units. WHAT IS ON SCREEN: a WIDE (landscape) arena with a steel wall frame. EIGHT home planets sit on the rim of an ELLIPSE — one at top-centre, one at bottom-centre, one at the left extreme and one at the right extreme (these last two reaching out to hug the left/right walls along the long axis), plus four on the diagonals. The neighbour strides around the rim read as roughly equal (the equal-chord solve). Each planet is player-coloured with its ship inboard; a symmetric commons cluster fills the centre. This matches the ratified oval layout (card C): a wide ellipse, eight equal strides around the rim. Home-field fairness is shown in map-oval-fields.png. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-oval-fields",
+    "area": "match",
+    "image": "images/map-oval-fields.png",
+    "title": "Oval home-field invariant — two rim planets, congruent inboard fields",
+    "attestation": "Same frozen oval frame, cropped on two adjacent rim planets with the space inboard of each. WHAT IS ON SCREEN: two player-coloured planets sitting at DIFFERENT distances from the arena centre (an ellipse rim is not equidistant), and inboard of EACH the same small cluster of grey asteroids. The home field is stamped in each planet's own frame, so the local ore is identical even though the planet positions are not — the p1-09 invariant holding on a varying-radius map. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-diamond",
+    "area": "match",
+    "image": "images/map-diamond.png",
+    "title": "Double Diamond (card D, VETERAN) in-match — outer + inner diamonds, local on an OUTER home",
+    "attestation": "Live ?debug=1&freeze=1 build (sha a5dd0b0, clean, frozen), diamond map selected via localStorage, cropped wall-to-wall. Self-check: local planet matches the shipped registry to 0.0 units; the live local ship sits at world (1600,380), due NORTH of the arena centre (1600,1000). WHAT IS ON SCREEN: a WIDE arena. EIGHT home planets forming TWO nested diamonds — an OUTER diamond of four planets at the cardinals (top-centre/N, right-centre/E, bottom-centre/S, left-centre/W) hugging the wall margin, and an INNER diamond of four planets on the diagonals (NE/SE/SW/NW) sitting closer to the centre. The layout is deliberately asymmetric in ground (outer homes have a wall at their back, inner homes are exposed). The LOCAL player's planet — the one the follow-camera centres, at the top (N) with its ship arrow just below it — is on the OUTER diamond, confirming the local player spawned on an OUTER home. A live onboarding hint is drawn near the centre over empty space. This matches the ratified diamond layout (card D). Home-field fairness is shown in map-diamond-fields.png. VERIFIED."
+  },
+  {
+    "buildSha": "a5dd0b0",
+    "capturedAt": "2026-07-25T22:17:00Z",
+    "verdict": "verified",
+    "id": "map-diamond-fields",
+    "area": "match",
+    "image": "images/map-diamond-fields.png",
+    "title": "Diamond home-field invariant — an OUTER and an INNER planet with congruent fields",
+    "attestation": "Same frozen diamond frame, cropped on the local OUTER-N planet and the adjacent INNER-NE planet with the space inboard of each. WHAT IS ON SCREEN: two player-coloured planets at clearly DIFFERENT distances from the centre (one outer, one inner), and inboard of EACH a small cluster of grey asteroids of the same tight two-lobe character. Despite the asymmetric ground, each home carries the same field stamped inboard toward the commons — the p1-09 resource-fairness invariant holding even on the deliberately unfair-in-position veteran map (unfair in ground, never in ore). VERIFIED."
   }
 ]

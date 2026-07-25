@@ -183,3 +183,31 @@ two-simultaneous-attacker frame, which is out of reach of the booted client here
 
 **All three v0.1 field reports are dead on `b65d6d5`.** No page errors in any
 capture.
+
+---
+
+## Round 7 — the four maps and the picker, on the live build (`a5dd0b0`)
+
+`capture-round7.mjs` — the map update (v0.2 gate). Five verified items, all on
+the LIVE preview bundle at build `a5dd0b0` (clean, no page errors):
+
+- **map-picker** — a CLEAN boot (no `?debug`, so the front-door menu is reached)
+  on an emulated landscape phone (844×390, dpr 3, touch). All four map cards on
+  the PLAY screen: **The Ring** preselected (cyan border), **The Compass**, **The
+  Oval**, **Double Diamond** wearing its **VETERAN** tag. Each card's glyph
+  matches its layout.
+- **map-octagon / map-compass / map-oval / map-diamond** — one in-match wide shot
+  per map under `?debug=1&freeze=1`, the map chosen the way the game chooses it
+  (the picker's `planet-rush:mapId` localStorage key, seeded before boot). Each is
+  cropped wall-to-wall from an oversized viewport; the on-screen planets match the
+  shipped registry (`src/sim/maps.ts`) to **0.0 units** (logged self-check), so the
+  live board IS the ratified layout. Octagon: 8 planets, one circle, exact 45°
+  gaps. Compass: 4 corners + 4 edge midpoints. Oval: 8 on a wide equal-chord
+  ellipse rim. Diamond: outer + inner diamonds, local player on an OUTER home.
+- The **p1-09 home-field invariant** rides in a companion `*-fields.png` crop per
+  map: octagon's shows all 8 field clusters in exact 8-fold rotational symmetry;
+  the varying-radius maps show two planets at different centre-distances each
+  carrying the same inboard field — congruent by construction, unfair in ground
+  (diamond) but never in ore.
+
+No page errors in any capture.
