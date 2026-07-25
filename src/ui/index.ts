@@ -44,6 +44,27 @@ export type { WaveClock } from './wave-clock';
 export { oreHudModel, oreFlashOn } from './ore-hud';
 export type { OreHudModel } from './ore-hud';
 
+// --- Ore split (field rule): banked TOTAL top-left, HELD hold under the ship ---
+//
+// The held-ore squares that used to sit top-left move under the local ship as a
+// compact, pooled, screen-space indicator (same discipline as the health bar),
+// leaving the top-left to show only the banked TOTAL — so the two ore numbers can
+// never be confused. `ore-hold` is the pure model + geometry; `ore-hold-view` is
+// the thin Pixi layer, which the `Hud` owns and registers under `full`.
+export {
+  holdShown,
+  oreHoldModel,
+  oreHoldRowWidth,
+  oreHoldBounds,
+  ORE_HOLD_PIP,
+  ORE_HOLD_PIP_GAP,
+  ORE_HOLD_SHIP_GAP,
+} from './ore-hold';
+export type { OreHold } from './ore-hold';
+
+export { OreHoldView, ORE_HOLD_ID, ORE_HOLD_ANCHOR } from './ore-hold-view';
+export type { DrawnOreHold } from './ore-hold-view';
+
 export { controlsStripRows, showControlsStrip } from './controls-strip';
 
 // --- Build & Upgrade wheel (GDD §2.5) --------------------------------------

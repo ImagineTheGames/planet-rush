@@ -1,17 +1,26 @@
 /**
  * src/ui/ore-hud.ts — "ore at a glance" model. OWNER: UI Engineer.
  *
- * Top-left HUD (GDD §2.2): filled squares for what's in your hold, **one square
- * per cargo slot so upgrades visibly widen it**, flashing when full, above the
- * banked ORE total. Held ore is not safe; banked ore is (GDD §2.3) — the two
- * numbers are shown separately for exactly that reason.
+ * The one slot/fill/bank rule both ore readouts read, so they can never disagree.
+ * Per the field rule (*"show ore held on ship under the ship, not top left — top
+ * left is to show total ore"*), the two halves of GDD §2.2's "ore at a glance"
+ * now live in two places, each from this one model:
  *
- * Signal yellow is ORE (style-guide §2, RESERVED) — the ore squares and the
- * banked total are among the few things allowed to be yellow, and the reason
- * the rule exists is so this element can be trusted at a glance.
+ *  - **`banked`** feeds the **top-left TOTAL** — the safe bank the Build wheel
+ *    spends ({@link ./hud}).
+ *  - **`slots` / `filled` / `full`** feed the **under-ship hold indicator** —
+ *    one pip per cargo slot, so upgrades visibly widen it, flashing when full
+ *    ({@link ./ore-hold}, {@link ./ore-hold-view}).
  *
- * Pure and DOM-free so it unit-tests headless; the Pixi view in {@link ./hud}
- * draws the squares and the total from this model.
+ * Held ore is not safe; banked ore is (GDD §2.3) — and now they are shown in two
+ * clearly different places and forms (a labelled total vs. pips under the ship)
+ * so the two numbers can never be confused.
+ *
+ * Signal yellow is ORE (style-guide §2, RESERVED) — the hold pips and the banked
+ * total are among the few things allowed to be yellow, and the reason the rule
+ * exists is so both can be trusted at a glance.
+ *
+ * Pure and DOM-free so it unit-tests headless; the Pixi views draw from this.
  */
 
 /** The ore HUD's per-frame model: how many squares, how many filled, and the
