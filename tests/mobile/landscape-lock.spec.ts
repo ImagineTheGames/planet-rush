@@ -271,6 +271,12 @@ test('two physical taps remap through the rotation: PLAY → lobby, RUSH! → ma
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the touch remap only rotates on mobile');
+  // This is the longest journey any mobile test takes (portrait boot ->
+  // rotation -> menu tap -> lobby tap -> full match assembly) and CI's
+  // software-GL runners spend most of a default 60s budget on the preamble
+  // alone — it flaked #71 four times and then main itself. Budget the whole
+  // journey, not just the waits.
+  test.setTimeout(180_000);
 
   const vp = page.viewportSize()!;
   /** A remapped tap point must sit inside the PHYSICAL portrait canvas — proof the
