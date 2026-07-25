@@ -294,6 +294,19 @@ export const RESOURCE_FIELD = {
    *  core stays clear of every home's measure radius — the two fields never
    *  overlap, which is what lets the home totals be EXACTLY equal. TUNABLE */
   commonsRadiusFraction: 0.4,
+  /** The commons is a coned RING: rocks avoid the inner this-fraction of each
+   *  wave's disc, leaving a clear central eye — and, crucially, a clear straight
+   *  spoke for a ship to launch down (field report P1; see the note in `./waves`).
+   *  Each wave is still a shrinking ring closer to the core than the last (GDD
+   *  §2.3 "Outer Drift"), so the concentric rings close in over the match. Sized
+   *  with `commonsSpokeGap` so the innermost ring rock clears a launching ship's
+   *  path by more than a ship+rock radius. TUNABLE */
+  commonsHoleFraction: 0.75,
+  /** Angular clearance (radians) kept around every planet spoke WITHIN the
+   *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
+   *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
+   *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
+  commonsSpokeGap: 0.33,
   /** Canonical rocks per home field (before `N`-fold stamping). TUNABLE */
   homeCount: 3,
   /**

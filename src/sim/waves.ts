@@ -273,15 +273,33 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   const sectorRocks = count <= 0 ? 0 : Math.max(1, Math.round(count / sectors));
   const sectorWidth = (2 * Math.PI) / sectors;
 
+  // The commons is a coned RING, not a filled disc (field report P1). Two shapes,
+  // one reason — keep every player's launch corridor clear:
+  //   • a clear eye: rocks avoid the inner `commonsHoleFraction` of the wave's
+  //     disc, so the very centre — and the straight spoke a ship launches down —
+  //     is open. Each wave still lands closer in than the last (the "Outer Drift"
+  //     that closes to the core, GDD §2.3): they are concentric shrinking rings.
+  //   • a spoke gap: rocks sit only in `[gap, sectorWidth − gap]` of their sector,
+  //     so no rock lands ON a spoke where a launching ship would ram it. Under a
+  //     slow renderer the drag test's gesture ramp flies the ship most of the way
+  //     to the centre before its window even opens, so the whole spoke must be
+  //     clear, not just a pocket. Sized so the innermost ring rock clears a ship's
+  //     straight path by more than a ship+rock radius (`inner·sin(gap)` ≈ 74 u).
+  // Both are pure `N`-fold-symmetric reshapes of one drawn sector, so the commons
+  // stays symmetric and carries the same `WAVE_ORE` — the fairness invariant is
+  // untouched (`resource-fairness.test.ts`).
+  const gap = Math.min(RESOURCE_FIELD.commonsSpokeGap, sectorWidth * 0.45);
+  const innerRadius = discRadius * RESOURCE_FIELD.commonsHoleFraction;
+
   // Each of the `sectors` stamps carries a copy of the sector's ore, so the
   // wave total is `WAVE_ORE`; the per-sector budget is `WAVE_ORE / sectors`.
   const { rocks, rng } = drawCanon(
     world.rngState,
     sectorRocks,
-    0,
+    innerRadius,
     discRadius,
-    0,
-    sectorWidth,
+    gap,
+    sectorWidth - gap,
     WAVE_ORE / sectors,
   );
   world.rngState = rng;
