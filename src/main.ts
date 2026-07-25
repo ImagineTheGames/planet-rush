@@ -648,6 +648,15 @@ async function boot(): Promise<void> {
     hudFrame.shipClass = ship.shipClass;
     hudFrame.upgradeTiers = ship.tiers;
     hudFrame.shipPos = ship.pos;
+    // Own-ship health (field request v0.1.1): the HUD floats a bar over the local
+    // ship (at screen centre, where the follow camera holds it) and shows a HUD
+    // hull readout, both from this one hull value so they agree. `shipFiring` is
+    // the same beam signal the enemy bars use for "in combat" (mining or firing —
+    // one beam, GDD §2.5). `radius` matches the projected 1:1 world radius.
+    hudFrame.hull = ship.hull;
+    hudFrame.maxHull = ship.maxHull;
+    hudFrame.shipRadius = ship.radius;
+    hudFrame.shipFiring = ship.beam !== null;
   }
 
   /**
@@ -715,8 +724,7 @@ async function boot(): Promise<void> {
 
   /**
    * Install `window.__healthbarStage` — the ?debug=1 live-stage seam a Playwright
-   * test drives to prove the enemy health bars are wired on a real boot. Two
-   * methods:
+   * test drives to prove the health bars are wired on a real boot. Methods:
    *
    *  - `damageEnemy(fraction)` — park a live enemy ship a fixed offset from the
    *    local ship and set its hull to `fraction` of max, so the health-bar model
@@ -724,8 +732,15 @@ async function boot(): Promise<void> {
    *    which pins the sim so the staged frame holds still. Returns the staged
    *    enemy's slot and the exact fill it was left at, or null if there is no
    *    enemy to stage.
+   *  - `damageLocal(fraction)` — the field-request v0.1.1 counterpart: set the
+   *    LOCAL ship's hull to `fraction` of max so its own over-ship bar must draw
+   *    (and the HUD hull readout drop to match). The camera holds it centred, so
+   *    no repositioning is needed. Returns its slot and exact fill, or null.
    *  - `bars()` — the bars the real layer actually drew last frame (owner, fill,
-   *    screen position), read back so the test can assert one tracks the enemy.
+   *    `local` flag, screen position), read back so the test can assert one
+   *    tracks the staged ship.
+   *  - `hullReadout()` — the hull fraction the HUD readout last drew, so the test
+   *    can assert the over-ship own bar and the readout agree (one source).
    *
    * Mutating `hull`/`pos` here is a debug-only staging affordance, not gameplay:
    * it writes the same plain sim data the render loop already reads every frame,
@@ -746,8 +761,25 @@ async function boot(): Promise<void> {
         enemy.hull = f * enemy.maxHull;
         return { owner: enemy.id, fraction: enemy.hull / enemy.maxHull };
       },
+      // Field request v0.1.1: damage the LOCAL ship so its own over-ship bar must
+      // appear (damaged ⇒ a bar), and the HUD hull readout drops to match. The
+      // ship is already at screen centre (the camera follows it), so the bar is
+      // un-culled. Returns the slot and exact fill it was left at.
+      damageLocal(fraction: number): { owner: PlayerId; fraction: number } | null {
+        const local = world.ships.find(isLocalShip);
+        if (!local) return null;
+        local.alive = true;
+        const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+        local.hull = f * local.maxHull;
+        return { owner: local.id, fraction: local.hull / local.maxHull };
+      },
       bars(): ReturnType<typeof hud.debugHealthBars> {
         return hud.debugHealthBars();
+      },
+      // The hull fraction the HUD readout last drew — so a test can assert the
+      // over-ship bar and the readout agree (one source: sim hull).
+      hullReadout(): number {
+        return hud.debugHullReadout();
       },
     };
     try {
