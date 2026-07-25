@@ -333,15 +333,18 @@ test('two physical taps remap through the rotation: PLAY → lobby, RUSH! → ma
   // the world is assembled, so this proves the second tap landed on the logical
   // RUSH! control. And the world's local ship IS the hull picked here: the chosen
   // class threaded through the rotation-remapped lobby all the way into the sim.
+  // 60s, not 20s: CI's software-GL runners assemble the match world slowly, and
+  // the tight wait flaked PR #71 three times on an unrelated red (it flakes on
+  // main too). Same lesson as the drag test: never race the wall clock in CI.
   await page.waitForFunction(
     () => (window as unknown as { __mainMenu?: MenuSeam }).__mainMenu?.matchStarted === true,
     undefined,
-    { timeout: 20_000 },
+    { timeout: 60_000 },
   );
   await page.waitForFunction(
     (cls) => (window as unknown as { __lobby?: LobbySeam }).__lobby?.localShipClass === cls,
     chosen,
-    { timeout: 20_000 },
+    { timeout: 60_000 },
   );
 });
 
