@@ -13,9 +13,11 @@
  * the worker. The cache is versioned; bump CACHE_VERSION to evict on deploy.
  */
 
-const CACHE_VERSION = 'planet-rush-v2';
+const CACHE_VERSION = 'planet-rush-v3';
 // The shell entry points; hashed asset chunks are cached lazily on first fetch.
-const SHELL = ['./', './index.html', './manifest.webmanifest'];
+// The manifest + icon are precached so an offline first-launch is still
+// installable (GDD §4.1) — they are the install criteria the browser reads.
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

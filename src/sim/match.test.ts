@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 import {
   createWorld,
   damagePlanet,
@@ -25,14 +25,13 @@ import {
   type Inputs,
 } from './index';
 import {
-  CARGO_BASE,
+  COLLAPSE_CORE_DECAY,
   CORE_HP,
   FIELD_YIELD,
   PLANET,
   RESPAWN_S,
   SHIELD,
   SHIP_RADIUS,
-  SHIP_STATS,
   SPAWN_PROTECTION_S,
   TICK_DT,
   TURRET,
@@ -40,6 +39,7 @@ import {
   WRECK,
   waveRadiusFraction,
 } from './constants';
+import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
 import type { MatchState, Planet, Ship, World } from './state';
 
 // --- builders --------------------------------------------------------------
@@ -55,18 +55,22 @@ const at = (x: number, y: number) => ({ x: ORIGIN + x, y: ORIGIN + y });
 
 function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   const cls = over.shipClass ?? ShipClass.Vanguard;
-  const stats = SHIP_STATS[cls];
+  // A fixture's stats come from the same derived-stat path a real ship's do —
+  // GDD §2.11 class base × the §2.5 tier ladder — so a test that hands over
+  // `tiers` gets a correctly-equipped hull without restating the arithmetic.
+  const loadout = { shipClass: cls, tiers: over.tiers ?? stockTiers() };
   return {
     id: over.id,
     shipClass: cls,
+    tiers: loadout.tiers,
     pos: over.pos ?? at(0, 0),
     vel: over.vel ?? { x: 0, y: 0 },
     home: over.home ?? at(0, 0),
     angle: over.angle ?? 0,
-    hull: over.hull ?? stats.hull,
-    maxHull: over.maxHull ?? stats.hull,
+    hull: over.hull ?? shipMaxHull(loadout),
+    maxHull: over.maxHull ?? shipMaxHull(loadout),
     cargo: over.cargo ?? 0,
-    cargoCap: over.cargoCap ?? Math.max(CARGO_BASE, stats.cargo),
+    cargoCap: over.cargoCap ?? shipCargoCap(loadout),
     banked: over.banked ?? 0,
     alive: over.alive ?? true,
     respawnTimer: over.respawnTimer ?? 0,
@@ -321,21 +325,25 @@ describe('elimination and the wreck (GDD §2.7)', () => {
 
 describe('death and respawn (GDD §2.7)', () => {
   it('respawns in 5 s with upgrades intact, having dropped half the hold', () => {
-    // A player who has bought hull and cargo tiers: the upgrade state lives in
-    // `maxHull` / `cargoCap`, and respawn must not touch either (GDD §2.5).
-    const upgradedHull = 80;
-    const upgradedCargo = 6;
+    // A player who has bought a hull tier and a cargo tier. The upgrade state is
+    // `tiers`, and respawn *re-derives* the ceilings from it rather than trusting
+    // the stored numbers — which is what makes "upgrades intact" structural
+    // instead of a promise this path merely doesn't break (GDD §2.5, §2.7).
     const ship = makeShip({
       id: 0,
       pos: at(400, 0),
       home: at(0, 0),
       hull: 4,
-      maxHull: upgradedHull,
       cargo: 4,
-      cargoCap: upgradedCargo,
       banked: 7,
       shipClass: ShipClass.Hauler,
+      tiers: { ...stockTiers(), [UpgradeTrack.Cargo]: 1, [UpgradeTrack.Hull]: 1 },
     });
+    // Hauler 70 hull × the first hull tier's 1.2, and its 3-slot hold + 2.
+    const upgradedHull = shipMaxHull(ship);
+    const upgradedCargo = shipCargoCap(ship);
+    expect(upgradedHull).toBeCloseTo(84, 9);
+    expect(upgradedCargo).toBe(5);
     const world = makeWorld({ ships: [ship] });
 
     damageShip(world, ship, 4);
@@ -351,8 +359,8 @@ describe('death and respawn (GDD §2.7)', () => {
     step(world, []);
 
     expect(ship.alive).toBe(true);
-    expect(ship.hull).toBe(upgradedHull);
-    expect(ship.maxHull).toBe(upgradedHull);
+    expect(ship.hull).toBeCloseTo(upgradedHull, 9);
+    expect(ship.maxHull).toBeCloseTo(upgradedHull, 9);
     expect(ship.cargoCap).toBe(upgradedCargo);
     expect(ship.shipClass).toBe(ShipClass.Hauler);
     expect(ship.banked).toBe(7);
@@ -403,7 +411,7 @@ describe('asteroid waves (GDD §2.3)', () => {
     for (let i = 1; i < reach.length; i++) expect(reach[i]!).toBeLessThan(reach[i - 1]!);
   });
 
-  it('delivers the whole field yield, and not one wave more', () => {
+  it('delivers the whole field yield, and the idle field then resolves itself', () => {
     const world = createWorld({
       seed: 11,
       players: [
@@ -414,9 +422,22 @@ describe('asteroid waves (GDD §2.3)', () => {
     expect(world.match.wavesSpawned).toBe(1); // wave 1 is the opening field
     expect(oreInWorld(world)).toBeCloseTo(FIELD_YIELD / WAVE_COUNT, 6);
 
-    for (let t = 0; t < 900; t++) step(world, [], 1);
+    // Run the whole wave schedule out. Nobody mines, so the field closes on the
+    // collapse deadline (GDD §2.3) rather than by exhaustion — the moment it
+    // does, every wave is in and the field is shut, so the loose ore is exactly
+    // the yield: not one wave more. Measured here, before entropy kills a core
+    // and scatters wreck debris that would inflate the count.
+    while (!isCollapsed(world)) step(world, [], 1);
     expect(world.match.wavesSpawned).toBe(WAVE_COUNT);
     expect(oreInWorld(world)).toBeCloseTo(FIELD_YIELD, 6);
+
+    // New truth (M5, COLLAPSE_CORE_DECAY = 1, GDD §1/§2.3): a full-turtle field
+    // no longer stalemates — entropy finishes both idle homes and the match
+    // resolves. Were decay ever silently zeroed, these two untouched cores would
+    // never die and this loop would run to the ceiling with no winner declared.
+    while (world.match.phase !== 'ended' && world.time < 20 * 60) step(world, [], 1);
+    expect(world.match.phase).toBe('ended');
+    expect(world.match.winner).not.toBeNull();
   });
 
   it('two runs of the whole wave schedule deep-equal (GDD §4.8)', () => {
@@ -503,15 +524,22 @@ describe('collapse (GDD §2.3)', () => {
     expect(live.planet.coreHp).toBeCloseTo(52, 6);
 
     // Collapse: an open channel closes, and a fresh order is refused outright.
+    // No repair pushes the core back up — and with COLLAPSE_CORE_DECAY = 1 (M5)
+    // entropy now pulls it *down*: the core decays by exactly the decay rate,
+    // spending no ore to do it.
     const { world, ship, planet } = endgame();
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
     step(world, []); // collapse opens at the end of this tick
     const coreHp = planet.coreHp;
     const banked = ship.banked;
-    for (let t = 0; t < 300; t++) step(world, []);
+    const steps = 300; // × TICK_DT = 5 s of collapse; a 50-HP core survives it
+    for (let t = 0; t < steps; t++) step(world, []);
 
     expect(planet.repairing).toBe(false);
-    expect(planet.coreHp).toBe(coreHp);
+    // Entropy only: down by exactly the decay, never a drop of repair back up.
+    // Zeroing decay would hold the core flat and fail the strict checks below.
+    expect(planet.coreHp).toBeCloseTo(coreHp - COLLAPSE_CORE_DECAY * steps * TICK_DT, 6);
+    expect(planet.coreHp).toBeLessThan(coreHp);
     expect(ship.banked).toBe(banked);
     expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
   });

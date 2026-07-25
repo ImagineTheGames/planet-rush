@@ -15,8 +15,70 @@ npx tsc --noEmit                 # the whole spike type-checks under the strict 
 ```
 
 The measured code lives in `src/net/spike/` (`snapshot.ts` wire layout +
-`sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface
-sketch is in `src/net/transport.ts` (types only, no implementation yet).
+`sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface is in
+`src/net/transport.ts`.
+
+**Status since (prediction):** the client no longer waits for the wire. It runs
+the same `step()` the server runs on its own input the moment that input is sent,
+and reconciles the result against every snapshot — rewind to the snapshot's tick,
+write authority over it, replay everything past `ackSeq`
+(`src/net/prediction.ts`, GDD §4.2). Three things this document should record,
+because they are measurements rather than intentions:
+
+- **The replay is bounded by the round trip, not by a constant.** Pending input
+  is exactly what the server has not yet simulated, so a client replays ~RTT
+  ticks per snapshot: at the 100 ms link in `src/net/prediction.test.ts` that is
+  ~6 steps, 30 times a second — ~180 extra sim steps/s against the 0.0146 ms/step
+  measured below, i.e. **~2.6 ms of CPU per second**, 0.26% of one core.
+- **The client's lead is emergent.** Nothing configures how far ahead of the
+  server a client runs: replaying every unacknowledged input on top of each
+  snapshot lands it exactly one round trip ahead, which is the lead that makes
+  its input arrive *for* the tick it names. The tests watch late arrivals stop.
+- **`ackSeq` had to change meaning.** It now names input the world has *run*, not
+  input the server has *received*. Acknowledging on arrival tells a predicting
+  client to retire a press whose effect has not happened yet.
+
+**Status since (day 3):** `Transport` now has its first implementation —
+`LocalLoopback` (`src/net/loopback.ts`), which runs the authoritative sim
+in-process for offline play and speaks the protocol below with the wire
+removed. The measured wire layout is promoted to `src/net/snapshot.ts` and
+encodes the *real* `World` rather than the stand-in; `src/net/snapshot.test.ts`
+pins it to the same 510-byte worst case measured here, so the bandwidth numbers
+in this document cannot silently drift. Two spike items remain open and are
+called out below rather than quietly closed: the **TCP head-of-line measurement
+still needs a real lossy network**, which arrives with `WebSocketTransport`, and
+the tick-rate headroom is still measured against the stand-in workload, not the
+real sim plus server-side bot AI plus 8-socket fan-out.
+
+**Status since (day 3, the server):** the decisions in this document are now
+running code rather than a plan.
+
+- **The 30 Hz broadcast decision is implemented as the room's snapshot divisor**
+  (`server/room.ts`, one snapshot every 2 ticks of the 60 Hz sim), and static
+  entities are diffed and sent as events at 10 Hz — they cost nothing per tick,
+  exactly as §4.2 of the GDD assumes and this document's bandwidth table bills.
+- **The wire layout measured here is what actually goes over the socket**, inside
+  a 10-byte frame header (kind, version, tick, ackSeq — `src/net/wire.ts`). Frame
+  overhead is therefore 10 B on top of the 510 B worst case, not the ~44 B
+  transport overhead already billed above; the per-client numbers stand.
+- **Control traffic is JSON, deliberately.** Join/lobby/events/match-end are a
+  handful of messages per match, and input is the only frequent one — the
+  measurement above says upstream is never the bottleneck, so a binary input
+  encoding is recorded as a follow-up rather than done on spec.
+- **The host decision is honoured by construction.** The server is a plain
+  Dockerized Node process (`server/Dockerfile`) with a **dependency-free**
+  RFC 6455 endpoint (`server/ws.ts`), so the runtime image is `node` plus one
+  bundled file: nothing native to rebuild for the chosen ARM Ampere core, and
+  nothing vendor-specific to port. Oracle Always Free → the €4 VPS remains an
+  afternoon, which was the whole point (risk 1).
+
+**Still open, and still stated rather than quietly closed:** the TCP
+head-of-line measurement needs a real lossy network with eight real clients —
+the transport and the server that make that test possible now both exist, so it
+is a test to run, not a thing to build. The tick-rate headroom is still measured
+against the stand-in, not the real sim plus seven server-side bots plus the
+8-socket fan-out; the honest place to close that is the M5 integration gate,
+against the real bot trees rather than today's do-nothing baseline.
 
 ---
 
@@ -113,6 +175,16 @@ interpolation target, not desync. HoL risk at 8 players is therefore **low but
 unmeasured**; flagged for the day-3 real-network test. If it bites, geckos.io
 (UDP over WebRTC) drops in behind the same `Transport` interface — transport
 work, not a rewrite.
+
+**Update, and the honest half of it.** Two clients now play a real match over a
+real socket (`tests/net/online-2p.test.ts`) — TCP, handshake, framing, the lot —
+so the *stack* is measured end to end. Loopback TCP does not drop packets, so
+risk 3 itself is **still unmeasured**, and this document will keep saying so
+until it is run over a lossy link. What did change is the cost of a stall:
+prediction means a client whose snapshot is late keeps flying its own ship at
+60 Hz on its own input, and the snapshot that eventually arrives is corrected
+against rather than waited for. A head-of-line stall is now a *stale rival* for
+its duration, not a frozen game.
 
 ### Host candidates (GDD §4.2 criteria)
 

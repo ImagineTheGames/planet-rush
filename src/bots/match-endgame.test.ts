@@ -48,15 +48,25 @@ vi.mock('../sim/constants', async (importOriginal) => {
 });
 
 import { createWorld, type World } from '../sim';
-import { botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harness';
-import type { Bot } from './bot';
+import { botLobby, fillEmptySlots, runHeadlessMatch } from './harness';
+import { createDoNothingBot, type Bot } from './bot';
 
-/** The offline match a solo player gets: eight planets, a full cast, no humans
- *  (GDD §3.3) — with a small field, because nobody is going to mine it. */
+/**
+ * The offline match a solo player gets: eight planets, a full cast, no humans
+ * (GDD §3.3) — with a small field, because nobody is going to mine it.
+ *
+ * **The cast runs the do-nothing baseline on purpose** (`./bot`). Day 4 gave the
+ * seven characters real Easy/Medium/Hard trees, and a match of those ends too
+ * (`./trees.test.ts` asserts it) — but it ends partly because the bots did
+ * something to each other, which is a *weaker* claim than the one this file
+ * makes. Eight players who never touch a control are the strongest possible test
+ * that the ending is structural: waves land, the field closes, collapse arrives,
+ * a winner is declared, and none of it needed a player.
+ */
 function accelerated(seed = 42): { world: World; bots: Bot[] } {
   const seats = fillEmptySlots();
   const world = createWorld({ seed, players: botLobby(seats), asteroidCount: 6 });
-  return { world, bots: createBots(seats, { seed }) };
+  return { world, bots: seats.map((seat) => createDoNothingBot(seat, { seed })) };
 }
 
 describe('an eight-slot bot match reaches a win state', () => {

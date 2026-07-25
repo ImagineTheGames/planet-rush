@@ -1,12 +1,12 @@
 /**
- * src/net/transport.ts — the `Transport` interface SKETCH.
+ * src/net/transport.ts — the `Transport` interface.
  *
- * OWNER: Netcode Engineer (GDD §3.5, §4.2). Day-0 spike deliverable: **types
- * only, no implementation yet**. The two implementations land mid-week —
- * `LocalLoopback` (solo / offline) and `WebSocketTransport` (online). The
- * simulation consumes ordered input ticks and never knows which transport it is
- * talking to (GDD §4.2); everything the sim needs from the network crosses this
- * one seam.
+ * OWNER: Netcode Engineer (GDD §3.5, §4.2). Written as a day-0 spike
+ * deliverable and unchanged since: `LocalLoopback` (solo / offline, in
+ * `./loopback.ts`) implements it as written, and `WebSocketTransport` (online)
+ * lands behind the same shape. The simulation consumes ordered input ticks and
+ * never knows which transport it is talking to (GDD §4.2); everything the sim
+ * needs from the network crosses this one seam.
  *
  * "Host" is a lobby word, not a network role (GDD §4.2): every client — the
  * room creator included — speaks this same interface. The server holds all
@@ -23,6 +23,14 @@
  * behavior — it is the contract the implementations and the Director review
  * against, not code that runs.
  */
+// Implementation notes, recorded where the contract is read:
+//   • `Transport` says nothing about who owns the world, because that differs
+//     by implementation: `LocalLoopback` holds the authoritative sim in-process
+//     and exposes it through `LocalAuthority` (./loopback.ts), while an online
+//     client will keep a predicted world and reconcile it against `snapshot`.
+//   • Message *ordering* is the transport's promise; message *tick order* is
+//     not. Late, duplicate, and far-future input is filed and judged by the
+//     shared `InputQueue` (./input-queue.ts) on the authoritative side.
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
 
@@ -63,6 +71,14 @@ export interface JoinMessage {
   room: RoomCode;
   /** Present when rejoining mid-match to reclaim a slot (reconnect grace). */
   reclaim?: PlayerId;
+  /**
+   * The opaque token this client was issued in its `welcome` (see
+   * {@link WelcomeMessage.reclaimToken}), presented to prove it is the same
+   * player coming back. A room code is shared by design — it is printed on
+   * screen for the whole classroom — so the code alone must not be enough to
+   * take over a slot that is merely inside its grace window (GDD §4.2).
+   */
+  reclaimToken?: string;
 }
 
 /** Lobby choices before RUSH!: ship class and, for the creator, bot difficulty. */
@@ -110,6 +126,12 @@ export interface WelcomeMessage {
   room: RoomCode;
   /** Server tick the client should predict from. */
   tick: Tick;
+  /**
+   * A per-slot secret to present as {@link JoinMessage.reclaimToken} when
+   * rejoining inside the grace window (GDD §4.2). Absent from `LocalLoopback`,
+   * which has no connection to lose and nothing to prove.
+   */
+  reclaimToken?: string;
 }
 
 /** One slot's public lobby state (GDD §2.1 lobby; §5.2 player colors). */
@@ -127,11 +149,33 @@ export interface LobbyStateMessage {
   slots: readonly LobbySlot[];
 }
 
-/** RUSH! — the match countdown resolved; the sim is now live. */
+/**
+ * RUSH! — the match countdown resolved; the sim is now live.
+ *
+ * This message is the client's **world constructor call**. Prediction is only
+ * "available because the sim is deterministic and the client runs the same code
+ * the server does" (GDD §4.2), and running the same code means being handed the
+ * same arguments: the seed, the seated roster in slot order, and the two world
+ * dimensions a room may override. A client that guessed any of them would build
+ * a different arena and reconcile against it forever.
+ */
 export interface MatchStartMessage {
   type: 'matchStart';
   tick: Tick;
   seed: number; // shared RNG seed so prediction matches authority (GDD §4.1)
+  /** Every seat as the server seated it — humans and bots alike, in slot order,
+   *  each with the hull the lobby locked in (GDD §2.11). */
+  slots: readonly MatchStartSlot[];
+  /** Play bounds, when the room overrode the sim default. */
+  bounds?: { width: number; height: number };
+  /** Asteroids per wave, when the room overrode the sim default. */
+  asteroidCount?: number;
+}
+
+/** One seat at RUSH!, as the world was built from it. */
+export interface MatchStartSlot {
+  player: PlayerId;
+  shipClass: ShipClass;
 }
 
 /**

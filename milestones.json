@@ -14,6 +14,11 @@
       "milestone": 1,
       "title": "Milestone 1 — the ship, in your hands",
       "test_notes": "On your PHONE: twin sticks fly the ship (nose banks into motion), hold-to-FIRE mines an asteroid, ore HUD fills, chunks stay put when your hold is full, the beam stops at what it hits, landscape behaves, and the corner badge tells you exactly which build this is. Two minutes. Your thumbs-up closes M1 and opens M2: planets, turrets, war."
+    },
+    "v0.2.0-m2": {
+      "milestone": 2,
+      "title": "Milestone 2 — planets, turrets, war",
+      "test_notes": "On your phone: fly home, open the Build wheel, buy a TURRET (10s construction) and a SHIELD, run the repair channel, then pick a fight - the alarm and screen-edge arrow should drag you home. Find a wreck, loot it. Match ends: last core standing. Non-blocking - whenever convenient."
     }
   },
   "days": [

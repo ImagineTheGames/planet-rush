@@ -76,6 +76,33 @@ export enum ShipClass {
 }
 
 // ---------------------------------------------------------------------------
+// Ship upgrades (GDD §2.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * The four things ore can buy on a ship (GDD §2.5): "beam power (mining speed
+ * and weapon damage — one beam, one stat), engine speed, cargo capacity …, hull
+ * HP."
+ *
+ * `Beam` is deliberately one track and not two — mining speed and weapon damage
+ * are the same number, which is the inversion the whole game turns on. Tiers
+ * *multiply* the class base stats (GDD §2.5, §2.11), so a maxed Interceptor is
+ * still the fastest thing on the map and a maxed Hauler still the toughest.
+ *
+ * The ladder itself — steps, escalating costs, max tier — is simulation tuning
+ * and lives in `src/sim/constants.ts` (TUNABLE, GDD §2.8). This union is only
+ * the *name* of a track, because it crosses the agent boundary: the sim owns the
+ * numbers, the UI's upgrade panel labels the rows, and bots buy through the same
+ * action a human does.
+ */
+export enum UpgradeTrack {
+  Beam = 'beam',
+  Engine = 'engine',
+  Cargo = 'cargo',
+  Hull = 'hull',
+}
+
+// ---------------------------------------------------------------------------
 // Abstract actions (GDD §2.4)
 // ---------------------------------------------------------------------------
 //
@@ -123,10 +150,14 @@ export interface BuildAction {
 }
 
 /**
- * What a Build & Upgrade wheel segment buys (GDD §2.5). Four of the five
- * segments are simulated from day 2; `UPGRADE SHIP` joins this union when ship
- * upgrades land, because it opens a second screen rather than spending on the
- * spot.
+ * What a Build & Upgrade wheel segment buys **on the spot** (GDD §2.5). Four of
+ * the five segments; `UPGRADE SHIP` is deliberately *not* here, and stays out.
+ *
+ * It is the one segment that "opens a second screen rather than spending on the
+ * spot" (GDD §2.5), and the press that actually spends happens on a *row* of
+ * that screen — so the order has to name which of the four tracks was bought.
+ * A `BuildItem` cannot carry that, so the panel's purchase is its own verb:
+ * {@link UpgradeOrderAction}.
  *
  * - `turret` / `shield` — pay the cost now, construction takes time.
  * - `repair`  — open the repair channel on your own core (a channel, not a
@@ -151,6 +182,25 @@ export interface BuildOrderAction {
   item: BuildItem;
 }
 
+/**
+ * Buy one tier on one ship-upgrade track (GDD §2.5) — the press on a row of the
+ * upgrade panel, the screen behind the wheel's UPGRADE SHIP arrow.
+ *
+ * A sibling of {@link BuildOrderAction} and one-shot for the same reason: it is
+ * acted on for the tick it appears in and never held, so a row press can never
+ * double-charge by being latched. The simulation validates it exactly as it
+ * validates a wheel order — own planet, docked, alive, affordable, not already
+ * at max tier — and never trusts the sender for any of it (GDD §2.9).
+ *
+ * There is no "sell" and no tier argument: a tier is bought one step at a time,
+ * from wherever the player currently is, so the escalating cost is always the
+ * cost of the *next* step.
+ */
+export interface UpgradeOrderAction {
+  type: 'upgradeOrder';
+  track: UpgradeTrack;
+}
+
 /** Boost (GDD §2.4). Held state. */
 export interface BoostAction {
   type: 'boost';
@@ -164,9 +214,9 @@ export interface PingAction {
 }
 
 /**
- * The abstract action union (GDD §2.4). Seven verbs: thrust, aim, fire, build,
- * buildOrder, boost, ping. This is the contract every input device targets and
- * the simulation consumes.
+ * The abstract action union (GDD §2.4). Eight verbs: thrust, aim, fire, build,
+ * buildOrder, upgradeOrder, boost, ping. This is the contract every input device
+ * targets and the simulation consumes.
  */
 export type Action =
   | ThrustAction
@@ -174,6 +224,7 @@ export type Action =
   | FireAction
   | BuildAction
   | BuildOrderAction
+  | UpgradeOrderAction
   | BoostAction
   | PingAction;
 

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Action, AimAction, FireAction, ThrustAction } from '@shared/types';
+import { UpgradeTrack } from '@shared/types';
 import {
   FireMode,
   defaultFireMode,
@@ -114,9 +115,57 @@ describe('resetControlState', () => {
     s.thrust.x = 1;
     s.aim = { x: 1, y: 1 };
     s.fire = s.boost = s.build = true;
+    s.order = 'turret';
+    s.upgrade = UpgradeTrack.Beam;
     s.ping = { x: 1, y: 1 };
     resetControlState(s);
-    expect(s).toEqual({ thrust: { x: 0, y: 0 }, aim: null, fire: false, boost: false, build: false, ping: null });
+    expect(s).toEqual({
+      thrust: { x: 0, y: 0 },
+      aim: null,
+      fire: false,
+      boost: false,
+      build: false,
+      order: null,
+      upgrade: null,
+      ping: null,
+    });
+  });
+});
+
+describe('mapActions — the wheel presses that spend (GDD §2.5)', () => {
+  it('emits nothing extra on the overwhelming majority of frames', () => {
+    const s = createControlState();
+    const types = mapActions(s, FireMode.Manual).map((a) => a.type);
+    expect(types).not.toContain('buildOrder');
+    expect(types).not.toContain('upgradeOrder');
+  });
+
+  it('carries a confirmed segment through as a one-shot buildOrder', () => {
+    const s = createControlState();
+    s.order = 'turret';
+    const order = pick(mapActions(s, FireMode.Manual), 'buildOrder');
+    expect(order?.item).toBe('turret');
+    // One-shot: the next frame's reset clears it, so the sim is never charged
+    // twice for one press.
+    resetControlState(s);
+    expect(pick(mapActions(s, FireMode.Manual), 'buildOrder')).toBeUndefined();
+  });
+
+  it('carries a confirmed panel row through as an upgradeOrder', () => {
+    const s = createControlState();
+    s.upgrade = UpgradeTrack.Cargo;
+    const order = pick(mapActions(s, FireMode.AutoAim), 'upgradeOrder');
+    expect(order?.track).toBe(UpgradeTrack.Cargo);
+  });
+
+  it('is device- and fire-mode-agnostic: the same press maps the same way', () => {
+    const manual = createControlState();
+    const auto = createControlState();
+    manual.order = 'shield';
+    auto.order = 'shield';
+    expect(pick(mapActions(manual, FireMode.Manual), 'buildOrder')).toEqual(
+      pick(mapActions(auto, FireMode.AutoAim), 'buildOrder'),
+    );
   });
 });
 

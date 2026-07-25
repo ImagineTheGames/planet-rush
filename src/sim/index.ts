@@ -12,11 +12,16 @@
  * (waves, collapse, winner). Building is driven entirely through the action
  * stream (`buildOrder`), so a caller never has to reach into `./buildings` to
  * play the game — the exports there are for the renderer, the bots, and the
- * tests (caps, costs, docking range, mount geometry). Every tuning value lives
- * in `./constants` (GDD §2.8, TUNABLE — QA owns it from day 2).
+ * tests (caps, costs, docking range, mount geometry). Ship upgrades work the
+ * same way: buy through the action stream (`upgradeOrder`), and read what a hull
+ * actually does through `./upgrades`, which resolves the GDD §2.11 class base
+ * against the GDD §2.5 tier ladder. Every tuning value lives in `./constants`
+ * (GDD §2.8, TUNABLE — QA owns it from day 2).
  */
 
 export * from './constants';
+// Class bases × upgrade tiers — every derived ship stat (GDD §2.5, §2.11).
+export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
 export * from './state';
 export * from './waves';

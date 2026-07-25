@@ -1,0 +1,38 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 625df01..1cbd7d5 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -39,6 +39,33 @@ jobs:
+       - name: Unit tests
+         run: npx vitest run
+ 
++      # GDD §4.1/§4.8: "determinism is asserted per build by a CI replay test
++      # (same inputs, same final state hash)". It runs inside `vitest run` above
++      # as tests/determinism.test.ts; this step runs it AGAIN, alone and named,
++      # for two reasons a bundled run cannot give: a determinism failure shows
++      # up as its own red step instead of one line inside 698 tests, and it is
++      # the step the netcode's table-based-math fallback would be triggered by.
++      - name: Determinism replay test (same inputs, same final state hash)
++        run: npx vitest run tests/determinism.test.ts
++
++      # GDD §4.8: "a headless bot-vs-bot smoke match (with timeout) — a commit
++      # that breaks or hangs the game cannot merge." The harness owns the
++      # timeout, so a hung match fails this step in seconds rather than sitting
++      # on a runner until GitHub kills the job. `timeout-minutes` is the belt to
++      # the harness's braces.
++      - name: Headless bot-vs-bot smoke match (enforced timeout)
++        timeout-minutes: 5
++        run: npx vite-node harness/cli.ts smoke
++
++      # The simulation's half of the GDD §4.3 performance budget: the full
++      # entity-count scene, stepped, timed, and asserted against the sim's share
++      # of a 60 fps frame. Runs headless, so it is meaningful on a runner with no
++      # GPU — the renderer's half needs real hardware and lives in
++      # tests/perf/frame-time.spec.ts (PERF_GATE=1, not CI).
++      - name: Sim performance gate (entity-count stress scene)
++        timeout-minutes: 5
++        run: npx vitest run tests/harness/perf.test.ts
++
+       - name: Build
+         run: npx vite build
+ 

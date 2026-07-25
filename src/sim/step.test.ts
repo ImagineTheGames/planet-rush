@@ -16,7 +16,6 @@ import { createWorld, step, type Inputs, type Ship, type Asteroid, type World } 
 import {
   BASE_TURN_RATE,
   BEAM_RANGE,
-  CARGO_BASE,
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   MINING_RATE,
@@ -24,23 +23,28 @@ import {
   SHIP_STATS,
   TICK_DT,
 } from './constants';
+import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
 
 // --- builders --------------------------------------------------------------
 
 function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   const cls = over.shipClass ?? ShipClass.Vanguard;
-  const stats = SHIP_STATS[cls];
+  // A fixture's stats come from the same derived-stat path a real ship's do —
+  // GDD §2.11 class base × the §2.5 tier ladder — so a test that hands over
+  // `tiers` gets a correctly-equipped hull without restating the arithmetic.
+  const loadout = { shipClass: cls, tiers: over.tiers ?? stockTiers() };
   return {
     id: over.id,
     shipClass: cls,
+    tiers: loadout.tiers,
     pos: over.pos ?? { x: 0, y: 0 },
     vel: over.vel ?? { x: 0, y: 0 },
     home: over.home ?? { x: 0, y: 0 },
     angle: over.angle ?? 0,
-    hull: over.hull ?? stats.hull,
-    maxHull: over.maxHull ?? stats.hull,
+    hull: over.hull ?? shipMaxHull(loadout),
+    maxHull: over.maxHull ?? shipMaxHull(loadout),
     cargo: over.cargo ?? 0,
-    cargoCap: over.cargoCap ?? Math.max(CARGO_BASE, stats.cargo),
+    cargoCap: over.cargoCap ?? shipCargoCap(loadout),
     banked: over.banked ?? 0,
     alive: over.alive ?? true,
     respawnTimer: over.respawnTimer ?? 0,

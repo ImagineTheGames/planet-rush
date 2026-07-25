@@ -45,6 +45,11 @@ const R_STICK = 64;
 const R_KNOB = 26;
 /** FIRE button radius. Diameter = 84px (≥72px thumb-scale requirement). */
 const R_FIRE = 42;
+/** BUILD button radius — the touch E-equivalent (GDD §2.4). Thumb-scale like
+ *  FIRE, a little smaller because it is contextual rather than held. */
+const R_BUILD = 38;
+/** Vertical gap between the left stick's zone and the BUILD button above it. */
+const BUILD_GAP = 18;
 /** Margin from the screen edges to a control's centre. */
 const EDGE_MARGIN = 28;
 
@@ -196,6 +201,33 @@ function assign(r: Rect | null, x: number, y: number, width: number, height: num
   return { x, y, width, height };
 }
 
+/**
+ * The BUILD button's screen rect, or `null` when it is not on screen.
+ *
+ * GDD §2.4 gives touch "a dedicated BUILD button near the player's own planet
+ * (the E-equivalent)", and §2.5 opens the wheel at your own planet and nowhere
+ * else — so `docked` is the whole visibility rule, and it is the sim's own
+ * `isDocked` answer rather than a distance this layer re-derives.
+ *
+ * Kept out of {@link TouchAffordanceRects} on purpose: that shape is the always-
+ * present twin-stick affordances the layout registry asserts against, and the
+ * BUILD button is contextual — a null-most-of-the-time entry there would read as
+ * a missing control rather than an absent one.
+ */
+export function buildButtonRect(isTouch: boolean, docked: boolean, w: number, h: number): Rect | null {
+  if (!isTouch || !docked) return null;
+  const { x, y } = buildButtonCenter(w, h);
+  return { x: x - R_BUILD, y: y - R_BUILD, width: 2 * R_BUILD, height: 2 * R_BUILD };
+}
+
+/** Where the BUILD button sits: directly above the left stick's zone, so it is
+ *  reachable by the thumb that is already on that side of the screen. */
+function buildButtonCenter(w: number, h: number): { x: number; y: number } {
+  void w;
+  const bottom = h - EDGE_MARGIN - R_STICK;
+  return { x: EDGE_MARGIN + R_STICK, y: bottom - R_STICK - BUILD_GAP - R_BUILD };
+}
+
 /** Allocating convenience over {@link writeAffordanceRects} — tests/one-off use. */
 export function affordanceRects(isTouch: boolean, mode: FireMode, w: number, h: number): TouchAffordanceRects {
   return writeAffordanceRects(isTouch, mode, w, h, { leftStickZone: null, aimZone: null, fireButton: null });
@@ -240,6 +272,9 @@ export class TouchVisuals extends Container {
   private readonly fireFill = new Graphics();
   private readonly fireRing = new Graphics();
 
+  // BUILD button — the touch E-equivalent, shown only at your own planet.
+  private readonly buildGroup = new Container();
+
   /** Reused visibility scratch — the frame path allocates nothing. */
   private readonly vis: AffordanceVisibility = {
     leftStickZone: false,
@@ -271,7 +306,31 @@ export class TouchVisuals extends Container {
     label.anchor.set(0.5);
     this.fireGroup.addChild(this.fireFill, this.fireRing, label);
 
-    // Back-to-front: ghosts, live bases, knobs, FIRE button.
+    // BUILD button: same plasma vocabulary as FIRE, and named in full —
+    // "BUILD & UPGRADE" is what the strip says on desktop (GDD §2.5: a player
+    // who doesn't know upgrades exist will never look for them), so the button
+    // carries the second word as a subtitle rather than dropping it.
+    this.buildGroup.label = 'build-button';
+    const buildFill = new Graphics();
+    buildFill.circle(0, 0, R_BUILD).fill({ color: PALETTE.plasma, alpha: 0.16 });
+    const buildRing = new Graphics();
+    buildRing.circle(0, 0, R_BUILD).stroke({ width: 3, color: PALETTE.plasma, alpha: 0.85 });
+    const buildLabel = new Text({
+      text: 'BUILD',
+      style: { fontFamily: FIRE_LABEL, fontSize: 15, fill: PALETTE.plasma, fontWeight: 'bold', letterSpacing: 1 },
+    });
+    buildLabel.anchor.set(0.5);
+    buildLabel.y = -8;
+    const buildSub = new Text({
+      text: '& UPGRADE',
+      style: { fontFamily: FIRE_LABEL, fontSize: 8, fill: PALETTE.plasma, letterSpacing: 0.5 },
+    });
+    buildSub.anchor.set(0.5);
+    buildSub.y = 9;
+    this.buildGroup.addChild(buildFill, buildRing, buildLabel, buildSub);
+    this.buildGroup.visible = false;
+
+    // Back-to-front: ghosts, live bases, knobs, FIRE button, BUILD button.
     this.addChild(
       this.leftGhost,
       this.aimGhost,
@@ -280,6 +339,7 @@ export class TouchVisuals extends Container {
       this.leftKnob,
       this.rightKnob,
       this.fireGroup,
+      this.buildGroup,
     );
   }
 
@@ -288,7 +348,7 @@ export class TouchVisuals extends Container {
    * `isTouch` gates the whole layer off on desktop; `w`/`h` anchor the idle
    * affordances and the FIRE button to the screen corners.
    */
-  update(touch: TouchReadout, isTouch: boolean, w: number, h: number): void {
+  update(touch: TouchReadout, isTouch: boolean, w: number, h: number, docked = false): void {
     const mode = touch.getFireMode();
     writeAffordanceVisibility(isTouch, mode, this.vis);
 
@@ -330,6 +390,13 @@ export class TouchVisuals extends Container {
     // Pressed state via alpha + a small "give" — no geometry rebuild.
     this.fireFill.alpha = pressed ? FIRE_PRESSED_FILL : FIRE_IDLE_FILL;
     this.fireGroup.scale.set(pressed ? 0.94 : 1);
+
+    // --- BUILD button: contextual, at your own planet and nowhere else. ------
+    this.buildGroup.visible = docked;
+    if (docked) {
+      const c = buildButtonCenter(w, h);
+      this.buildGroup.position.set(c.x, c.y);
+    }
   }
 }
 

@@ -12,6 +12,7 @@ import {
   affordanceVisibility,
   writeAffordanceVisibility,
   affordanceRects,
+  buildButtonRect,
   type TouchReadout,
 } from './touch-visuals';
 import { FireMode } from './actions';
@@ -166,5 +167,45 @@ describe('affordanceRects — anchored home rects for the layout registry', () =
     // Left zone in the left half, aim zone in the right half.
     expect(r.leftStickZone!.x).toBeLessThan(1280 / 2);
     expect(r.aimZone!.x).toBeGreaterThan(1280 / 2 - r.aimZone!.width);
+  });
+});
+
+describe('the BUILD button — the touch E-equivalent (GDD §2.4, §2.5)', () => {
+  it('is absent on desktop, where the key is the binding', () => {
+    expect(buildButtonRect(false, true, 1280, 720)).toBeNull();
+  });
+
+  it('appears only at your own planet — docked is the whole rule (GDD §2.5)', () => {
+    expect(buildButtonRect(true, false, 1280, 720)).toBeNull();
+    expect(buildButtonRect(true, true, 1280, 720)).not.toBeNull();
+  });
+
+  it('is thumb-scale (≥72px across) and stays on screen', () => {
+    const r = buildButtonRect(true, true, 390, 720)!;
+    expect(r.width).toBeGreaterThanOrEqual(72);
+    expect(r.height).toBeGreaterThanOrEqual(72);
+    expect(r.x).toBeGreaterThanOrEqual(0);
+    expect(r.y).toBeGreaterThanOrEqual(0);
+    expect(r.x + r.width).toBeLessThanOrEqual(390);
+    expect(r.y + r.height).toBeLessThanOrEqual(720);
+  });
+
+  it('sits clear of the left stick zone it stands above', () => {
+    const build = buildButtonRect(true, true, 1280, 720)!;
+    const stick = affordanceRects(true, FireMode.AutoAim, 1280, 720).leftStickZone!;
+    expect(build.y + build.height).toBeLessThanOrEqual(stick.y);
+  });
+
+  it('the Pixi layer shows it only while docked, and where the rect says', () => {
+    const v = new TouchVisuals();
+    v.update(readout({ mode: FireMode.AutoAim }), true, 1280, 720, /* docked */ false);
+    expect(shown(v, 'build-button')).toBe(false);
+
+    v.update(readout({ mode: FireMode.AutoAim }), true, 1280, 720, /* docked */ true);
+    expect(shown(v, 'build-button')).toBe(true);
+    const node = v.getChildByLabel('build-button')!;
+    const rect = buildButtonRect(true, true, 1280, 720)!;
+    expect(node.x).toBeCloseTo(rect.x + rect.width / 2);
+    expect(node.y).toBeCloseTo(rect.y + rect.height / 2);
   });
 });

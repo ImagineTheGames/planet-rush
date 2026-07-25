@@ -15,19 +15,17 @@
  * below steps it with the ratified mulberry32 algorithm (`@shared/types`).
  */
 
-import type { Beam, PlayerId, Vec2 } from '@shared/types';
-import { ShipClass } from '@shared/types';
+import type { Beam, PlayerId, ShipClass, Vec2 } from '@shared/types';
 import {
-  CARGO_BASE,
   CORE_HP,
   PLANET,
   SHIELD,
   SHIP_RADIUS,
-  SHIP_STATS,
   SPAWN_PROTECTION_S,
   STARTING_ORE,
   WAVE,
 } from './constants';
+import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnWave } from './waves';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +35,16 @@ import { spawnWave } from './waves';
 /** A player's ship. One per slot (GDD §2.1); humans and bots share the shape. */
 export interface Ship {
   readonly id: PlayerId;
+  /** The lobby choice, locked for the match (GDD §2.11). Sets every base stat;
+   *  `tiers` scales them. */
   readonly shipClass: ShipClass;
+  /**
+   * Tiers bought on the four upgrade tracks (GDD §2.5). Match-lifetime state:
+   * upgrades persist through respawn, so nothing on the respawn path clears it —
+   * and because the ladder *multiplies* the class base, a maxed Interceptor is
+   * still the fastest hull on the map (`./upgrades`).
+   */
+  tiers: UpgradeTiers;
   pos: Vec2;
   vel: Vec2;
   /** Home spawn point — where the player's planet sits; respawn returns here
@@ -49,11 +56,14 @@ export interface Ship {
   angle: number;
   /** Current hull HP. Ships are cheap and not repairable (GDD §2.5). */
   hull: number;
-  /** Max hull for this class+upgrades; respawn restores to it. */
+  /** Max hull for this class+upgrades; respawn restores to it. Stored rather than
+   *  derived per read (the renderer's hull bar and the netcode both want it);
+   *  written only by `./upgrades`, so it can never disagree with `tiers`. */
   maxHull: number;
   /** Ore currently held. Lost (half) on death; capped by `cargoCap` (GDD §2.3). */
   cargo: number;
-  /** Hold capacity in ore. Base 2, +2 per upgrade tier (GDD §2.8). */
+  /** Hold capacity in ore. Class base, +2 per upgrade tier, cap 8 (GDD §2.8).
+   *  Stored on the same terms as `maxHull`. */
   cargoCap: number;
   /** Banked ore — safe, never lost to ship death (GDD §2.3). */
   banked: number;
@@ -313,20 +323,25 @@ export interface WorldConfig {
   readonly asteroidCount?: number;
 }
 
-/** Build a ship at a spawn point with class-derived stats (GDD §2.11, §2.8). */
+/** Build a ship at a spawn point with class-derived stats (GDD §2.11, §2.8).
+ *  Every ship starts stock: hull and hold come from the same derived-stat
+ *  functions a purchase runs through (`./upgrades`), so tier 0 is not a special
+ *  case in the code any more than it is in the design. */
 function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
-  const stats = SHIP_STATS[spec.shipClass];
+  const loadout = { shipClass: spec.shipClass, tiers: stockTiers() };
+  const maxHull = shipMaxHull(loadout);
   return {
     id: spec.id,
     shipClass: spec.shipClass,
+    tiers: loadout.tiers,
     pos: { x: pos.x, y: pos.y },
     vel: { x: 0, y: 0 },
     home: { x: pos.x, y: pos.y },
     angle: 0,
-    hull: stats.hull,
-    maxHull: stats.hull,
+    hull: maxHull,
+    maxHull,
     cargo: 0,
-    cargoCap: Math.max(CARGO_BASE, stats.cargo),
+    cargoCap: shipCargoCap(loadout),
     banked: STARTING_ORE,
     alive: true,
     respawnTimer: 0,

@@ -17,7 +17,7 @@
  * a device; neither does this funnel's core).
  */
 
-import type { Action, Vec2 } from '@shared/types';
+import type { Action, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 
 // ---------------------------------------------------------------------------
 // Fire mode (GDD §2.4)
@@ -66,6 +66,18 @@ export interface ControlState {
   boost: boolean;
   /** Build & Upgrade wheel requested near own planet (GDD §2.5). */
   build: boolean;
+  /**
+   * A **confirmed** wheel segment this frame — the press that spends, as opposed
+   * to `build`, which only asks for the wheel (GDD §2.5). One-shot: written by
+   * whichever device confirmed, read once by {@link mapActions}, and cleared by
+   * {@link resetControlState} on the next frame, so a wheel press can never latch
+   * and double-charge. `null` on every other frame, which is nearly all of them.
+   */
+  order: BuildItem | null;
+  /** A confirmed upgrade-panel row — the fifth segment's purchase, which names a
+   *  track rather than an item (GDD §2.5). One-shot on the same terms as
+   *  {@link ControlState.order}. */
+  upgrade: UpgradeTrack | null;
   /** Minimap ping target in map space, consumed once then cleared, or `null`. */
   ping: Vec2 | null;
 }
@@ -78,6 +90,8 @@ export function createControlState(): ControlState {
     fire: false,
     boost: false,
     build: false,
+    order: null,
+    upgrade: null,
     ping: null,
   };
 }
@@ -90,6 +104,8 @@ export function resetControlState(state: ControlState): void {
   state.fire = false;
   state.boost = false;
   state.build = false;
+  state.order = null;
+  state.upgrade = null;
   state.ping = null;
 }
 
@@ -124,6 +140,13 @@ export function mapActions(state: ControlState, mode: FireMode): Action[] {
   actions.push({ type: 'fire', active: state.fire, auto });
   actions.push({ type: 'boost', active: state.boost });
   actions.push({ type: 'build', active: state.build });
+
+  // The two purchases (GDD §2.5). They ride the same funnel every other verb
+  // does — the sim cannot tell a thumb's tap on a wedge from a mouse click on
+  // one from a bot's decision — and they appear only on the tick they were
+  // confirmed, because `order`/`upgrade` are one-shot fields.
+  if (state.order) actions.push({ type: 'buildOrder', item: state.order });
+  if (state.upgrade) actions.push({ type: 'upgradeOrder', track: state.upgrade });
 
   if (state.ping) {
     actions.push({ type: 'ping', at: { x: state.ping.x, y: state.ping.y } });
