@@ -18,7 +18,10 @@
  *     the same count, the same total ore, the same size mix, and the same
  *     positions *relative to its planet* — the per-player totals are equal
  *     EXACTLY, no tolerance. Each field sits inboard of its planet (between it
- *     and the ring midline), OUTSIDE turret range, and clear of the wall margin.
+ *     and the ring midline), OUTSIDE turret range, clear of the wall margin, and
+ *     beyond the `SPAWN_CLEAR_POCKET` launch pocket kept empty around every home
+ *     (field report P1) — because the pocket is part of the per-planet stamp it
+ *     is automatically identical for everyone and costs the invariant nothing.
  *  2. **The commons — contested centre.** Each wave's rocks are generated in one
  *     `2π / N` sector and stamped at all `N` rotations, so the central field is
  *     `N`-fold symmetric too — mid-map expansion is worth fighting for but
@@ -57,6 +60,7 @@ import type { PlayerId } from '@shared/types';
 import {
   ASTEROID,
   RESOURCE_FIELD,
+  SPAWN_CLEAR_POCKET,
   WAVE_COUNT,
   WAVE_ORE,
   clampToMargin,
@@ -192,8 +196,19 @@ export function spawnHomeFields(world: World): void {
   // The ring radius, read off a planet — the field is a fraction of it, so the
   // layout scales with the arena and stays layout-agnostic (any ring order).
   const ringR = Math.hypot(planets[0]!.pos.x - cx, planets[0]!.pos.y - cy);
-  const innerR = ringR * RESOURCE_FIELD.homeInnerFraction;
-  const outerR = ringR * RESOURCE_FIELD.homeOuterFraction;
+
+  // The launch pocket (field report P1): no rock's BODY may sit within
+  // `SPAWN_CLEAR_POCKET` of a planet, so a ship can leave spawn and manoeuvre in
+  // open space. The band fractions below already place the whole field well
+  // inside this, but clamp the outer edge to the pocket so the guarantee is
+  // structural — it survives a retune of `homeOuterFraction`. `maxRadius` keeps
+  // the whole rock out of the pocket, not just its centre; the outer rock is the
+  // one nearest its planet, so this is the only edge the pocket can bind.
+  const pocketOuterR = ringR - ringR * SPAWN_CLEAR_POCKET - ASTEROID.maxRadius;
+  const outerR = Math.min(ringR * RESOURCE_FIELD.homeOuterFraction, pocketOuterR);
+  // Keep the band ordered if a large pocket ever clamps `outerR` below the inner
+  // fraction (degenerate tuning only — never on the shipped numbers).
+  const innerR = Math.min(ringR * RESOURCE_FIELD.homeInnerFraction, outerR);
 
   // Draw the shared pattern ONCE and advance the world RNG by it; the stamping
   // that follows is pure trig, so every field is identical and the RNG advance

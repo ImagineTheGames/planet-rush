@@ -28,6 +28,7 @@ import {
   spawnWave,
   FIELD_YIELD,
   RESOURCE_FIELD,
+  SPAWN_CLEAR_POCKET,
   TURRET,
   WAVE_COUNT,
   WORLD_EDGE_MARGIN,
@@ -71,6 +72,11 @@ function ringRadius(w: World): number {
  *  enclose one home field and nothing else (`RESOURCE_FIELD`). */
 function measureRadius(w: World): number {
   return ringRadius(w) * RESOURCE_FIELD.homeMeasureFraction;
+}
+/** The spawn-clear pocket radius around a home — a fraction of the ring, kept
+ *  empty so a ship can launch and manoeuvre freely (`SPAWN_CLEAR_POCKET`). */
+function pocketRadius(w: World): number {
+  return ringRadius(w) * SPAWN_CLEAR_POCKET;
 }
 /** Deliver the whole commons schedule so the full field is on the map. */
 function fullField(seed: number, n: number): World {
@@ -253,6 +259,54 @@ describe('the fair field respects the world rules (field rule §4)', () => {
               `seed ${seed} × ${n}: planet ${p.id} home rock inside turret range`,
             ).toBeGreaterThan(TURRET.range);
           }
+        }
+      }
+    }
+  });
+
+  it('keeps a clear launch pocket around every home — no rock inside SPAWN_CLEAR_POCKET', () => {
+    // Field report P1: the stamped home field sat close enough to crowd the spawn,
+    // so a ship leaving its planet bumped rock (the mobile drag test caught it). The
+    // pocket is the fix — NO asteroid body may intrude within `SPAWN_CLEAR_POCKET`
+    // of ANY planet. Checked on the full field (home fields AND the whole commons)
+    // and for every seed and lobby size: because the pocket is part of the rotated
+    // per-planet stamp it is identical for everyone, so it holds universally.
+    for (const seed of SEEDS) {
+      for (const n of COUNTS) {
+        const w = fullField(seed, n);
+        const pocket = pocketRadius(w);
+        for (const p of w.planets) {
+          for (const a of w.asteroids) {
+            // Nearest rock surface (`dist − radius`) must clear the pocket, so no
+            // part of any rock lies inside a home's launch space.
+            expect(
+              dist(a.pos, p.pos) - a.radius,
+              `seed ${seed} × ${n}: rock ${a.id} intrudes into planet ${p.id}'s spawn pocket`,
+            ).toBeGreaterThanOrEqual(pocket - 1e-6);
+          }
+        }
+      }
+    }
+  });
+
+  it('the pocket is generous — the launch lane from spawn to the first rock is wide', () => {
+    // "Generous, not minimal" (brief): a ship spawns orbiting its planet, so the
+    // pocket must clear well past the spawn point. Assert the pocket comfortably
+    // exceeds the spawn's offset from the planet, i.e. the ship itself sits inside
+    // the clear pocket with room to move before the field begins.
+    for (const seed of [1, 42, 20260725]) {
+      for (const n of COUNTS) {
+        const w = fullField(seed, n);
+        const pocket = pocketRadius(w);
+        // Ship spawn radius from its planet — the ship rings its planet inboard by
+        // `PLANET.orbitOffset`, so this is that gap, read straight off the world.
+        for (const s of w.ships) {
+          const home = w.planets.find((p) => p.owner === s.id)!;
+          const spawnToPlanet = dist(s.home, home.pos);
+          expect(
+            pocket,
+            `seed ${seed} × ${n}: pocket must clear past ship ${s.id}'s spawn`,
+          ).toBeGreaterThan(spawnToPlanet);
         }
       }
     }

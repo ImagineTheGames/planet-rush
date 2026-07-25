@@ -296,22 +296,51 @@ export const RESOURCE_FIELD = {
   commonsRadiusFraction: 0.4,
   /** Canonical rocks per home field (before `N`-fold stamping). TUNABLE */
   homeCount: 3,
-  /** Home-field centre-radius band, as fractions of the planet ring radius:
-   *  inboard of the planet (between it and the ring midline) and far enough in
-   *  that the nearest rock still clears turret range. TUNABLE */
-  homeInnerFraction: 0.52,
-  homeOuterFraction: 0.64,
+  /**
+   * Home-field centre-radius band, as fractions of the planet ring radius:
+   * inboard of the planet (between it and the ring midline). Pulled in from the
+   * v0.1.2 0.52–0.64 (field report P1: at 0.64 the nearest rock sat only ~215 u
+   * from the ship's spawn point, so a ship leaving spawn bumped rock — the mobile
+   * drag test measured 0.6–0.8 u/tick where open flight is expected). At
+   * 0.42–0.47 the whole field sits well inboard of `SPAWN_CLEAR_POCKET`, opening
+   * a ~360 u launch lane between the spawn and the first rock, while the outermost
+   * rock (~458 u from its planet) still clears turret range and the innermost
+   * still fits inside the measure radius `R`. TUNABLE
+   */
+  homeInnerFraction: 0.42,
+  homeOuterFraction: 0.47,
   /** Angular half-spread of a home field around its planet's spoke (radians) —
    *  small, so a home field reads as a tight cluster by its own planet and stays
    *  well isolated from its neighbours' fields. TUNABLE */
   homeAngularSpread: 0.16,
   /** Radius R around a home within which its local ore is measured for the
    *  fairness invariant, as a fraction of the planet ring radius. Sized to
-   *  enclose the whole home field yet exclude both the commons and any
-   *  neighbour's field, so "ore within R of each home" is exactly one home
-   *  field per planet — all `N` equal. TUNABLE */
-  homeMeasureFraction: 0.55,
+   *  enclose the whole (now more-inboard) home field yet exclude both the commons
+   *  and any neighbour's field, so "ore within R of each home" is exactly one home
+   *  field per planet — all `N` equal. Raised with the field (0.55 → 0.615): the
+   *  window is (max home-rock dist ≈ 509 u, min commons dist 557 u), R ≈ 531 u
+   *  sits between them with room on both sides. TUNABLE */
+  homeMeasureFraction: 0.615,
 } as const;
+
+/**
+ * SPAWN_CLEAR_POCKET — the launch pocket kept clear around every home planet, as
+ * a fraction of the planet ring radius (field report P1). **No asteroid body is
+ * stamped within this radius of a planet centre**, so a ship can leave its spawn
+ * (which orbits its planet by `PLANET.orbitOffset`) and manoeuvre in open space
+ * before it reaches the first rock — the drag test's "open flight," and what a
+ * real player feels launching out of a home that is no longer a rock garden.
+ *
+ * The home field is placed comfortably *beyond* the pocket: its nearest rock's
+ * centre sits at `ringRadius × (1 - homeOuterFraction)` ≈ 0.53 of the ring from
+ * the planet, well outside this 0.44, so the pocket is empty by construction and
+ * `./waves` additionally clamps the field's outer edge to it as a structural
+ * floor (the invariant survives a retune of the band fractions). Because the
+ * pocket is part of the per-planet stamp — a rigid rotation of one pattern — it
+ * is automatically identical for every home, so it costs the fairness invariant
+ * nothing (`resource-fairness.test.ts`). TUNABLE
+ */
+export const SPAWN_CLEAR_POCKET: Tunable<number> = 0.44;
 
 /** Ore delivered by one asteroid wave — the commons, divided evenly across the
  *  `WAVE_COUNT` waves (GDD §2.3). The home neighbourhoods carry the remaining
