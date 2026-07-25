@@ -26,7 +26,13 @@ import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_WIDTH } from './healthbar';
+import {
+  HEALTHBAR_GAP,
+  HEALTHBAR_HEIGHT,
+  HEALTHBAR_LOCAL_HEIGHT,
+  HEALTHBAR_LOCAL_WIDTH,
+  HEALTHBAR_WIDTH,
+} from './healthbar';
 import type { HealthBar } from './healthbar';
 
 /** Layout-registry id for the health-bar layer (one entry, the union of bars). */
@@ -53,6 +59,9 @@ export interface DrawnHealthBar {
   x: number;
   /** Bar-top y in screen space, CSS px. */
   y: number;
+  /** True for the local player's own-ship bar (drawn in the distinct style) —
+   *  so a live-stage test can assert the own ship's bar is the one styled mine. */
+  local: boolean;
 }
 
 export class HealthBarView extends Container {
@@ -82,13 +91,17 @@ export class HealthBarView extends Container {
     let maxY = -Infinity;
 
     for (const bar of bars) {
-      const left = bar.x - HEALTHBAR_WIDTH / 2;
+      // The local (own-ship) bar is drawn slightly larger so it reads as "mine"
+      // at a glance (field request v0.1.1); everyone else keeps the narrow bar.
+      const width = bar.local ? HEALTHBAR_LOCAL_WIDTH : HEALTHBAR_WIDTH;
+      const height = bar.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
+      const left = bar.x - width / 2;
       const bottom = bar.y - bar.radius - HEALTHBAR_GAP;
-      const top = bottom - HEALTHBAR_HEIGHT;
+      const top = bottom - height;
 
       // Cull anything that would spill off the canvas: an edge enemy is barely
       // visible anyway, and a partial bar would break the `full` contract.
-      if (left < 0 || top < 0 || left + HEALTHBAR_WIDTH > viewportWidth || top + HEALTHBAR_HEIGHT > viewportHeight) {
+      if (left < 0 || top < 0 || left + width > viewportWidth || top + height > viewportHeight) {
         continue;
       }
 
@@ -96,19 +109,25 @@ export class HealthBarView extends Container {
       const g = this.slot(drawn++);
       g.clear();
       // Track first, then the owner-colour fill over its left portion.
-      g.roundRect(left, top, HEALTHBAR_WIDTH, HEALTHBAR_HEIGHT, 1).fill({
+      g.roundRect(left, top, width, height, 1).fill({
         color: PALETTE.hullSteel,
         alpha: TRACK_ALPHA,
       });
-      const fillW = HEALTHBAR_WIDTH * bar.fraction;
+      const fillW = width * bar.fraction;
       if (fillW > 0) {
-        g.roundRect(left, top, fillW, HEALTHBAR_HEIGHT, 1).fill({ color: bar.color, alpha: 0.95 });
+        g.roundRect(left, top, fillW, height, 1).fill({ color: bar.color, alpha: 0.95 });
+      }
+      // The own ship's bar carries an identity-colour outline — the second half
+      // of "reads as mine" (larger + framed), so it stands out from the field of
+      // enemy bars without borrowing a reserved colour (style-guide §2 / §3).
+      if (bar.local) {
+        g.roundRect(left, top, width, height, 1).stroke({ width: 1, color: bar.color, alpha: 0.9 });
       }
 
       if (left < minX) minX = left;
       if (top < minY) minY = top;
-      if (left + HEALTHBAR_WIDTH > maxX) maxX = left + HEALTHBAR_WIDTH;
-      if (top + HEALTHBAR_HEIGHT > maxY) maxY = top + HEALTHBAR_HEIGHT;
+      if (left + width > maxX) maxX = left + width;
+      if (top + height > maxY) maxY = top + height;
     }
 
     this.hideFrom(drawn);
@@ -138,7 +157,7 @@ export class HealthBarView extends Container {
   private recordDebug(i: number, bar: HealthBar, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: bar.owner, fraction: bar.fraction, x: bar.x, y: top };
+      d = { owner: bar.owner, fraction: bar.fraction, x: bar.x, y: top, local: bar.local };
       this.debugDrawn[i] = d;
       return;
     }
@@ -146,6 +165,7 @@ export class HealthBarView extends Container {
     d.fraction = bar.fraction;
     d.x = bar.x;
     d.y = top;
+    d.local = bar.local;
   }
 
   /** The layer's registry entry — the union of the bars that drew, or nothing

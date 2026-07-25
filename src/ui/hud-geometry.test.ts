@@ -27,6 +27,7 @@ import {
   panelBounds,
   panelSize,
   planetHpBounds,
+  hullHudBounds,
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
@@ -36,7 +37,10 @@ import {
   HUD_PAD,
   HP_BAR_WIDTH,
   HP_BAR_TOP,
+  HP_BAR_HEIGHT,
   SHIELD_BAR_HEIGHT,
+  HULL_BAR_WIDTH,
+  HULL_TOP,
   promptBounds,
   promptWrapWidth,
   PROMPT_CENTER_Y,
@@ -194,6 +198,45 @@ describe('planet-hp placement', () => {
     // edge; that has to stay below the label, i.e. inside the element's own
     // footprint rather than poking out above y = HUD_PAD.
     expect(SHIELD_BAR_HEIGHT + 2).toBeLessThanOrEqual(HP_BAR_TOP);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Your own ship's hull readout (field request v0.1.1) — top-right, margin HUD_PAD
+// ---------------------------------------------------------------------------
+
+describe('hull-hud placement', () => {
+  const TOP_RIGHT: AnchorSpec = { region: 'top-right', margin: HUD_PAD };
+  /** Widest label the element draws ("HULL —" at 11px Audiowide ≈ 55px). Generous
+   *  so the assertion survives a font swap; the footprint unions label and bar. */
+  const LABEL_WIDTH = 80;
+
+  for (const { name, vp } of PROFILES) {
+    it(`stays in the top-right corner at ${name}`, () => {
+      expectWithin(hullHudBounds(vp.width, LABEL_WIDTH), TOP_RIGHT, vp, 'hull-hud');
+    });
+  }
+
+  it('hugs the right margin exactly — a corner element, stacked under HOME', () => {
+    for (const { name, vp } of PROFILES) {
+      const b = hullHudBounds(vp.width, LABEL_WIDTH);
+      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
+    }
+  });
+
+  it('sits below the HOME planet-HP element, not overlapping it', () => {
+    // HOME hangs from HUD_PAD and is HP_BAR_TOP + HP_BAR_HEIGHT tall; the hull
+    // readout must start below that footprint so the two stack rather than clash.
+    const homeBottom = HUD_PAD + HP_BAR_TOP + HP_BAR_HEIGHT;
+    expect(HULL_TOP).toBeGreaterThanOrEqual(homeBottom);
+  });
+
+  it('never crosses the half-width line into the left half — the width budget', () => {
+    // Same constraint that makes HP_BAR_WIDTH a decision: `top-right`'s zone
+    // starts at W/2, so the bar's budget is W/2 − HUD_PAD (144px on the 320px
+    // profile). A wider hull bar would silently leave its anchor.
+    const narrowest = Math.min(...PROFILES.map((p) => p.vp.width));
+    expect(HULL_BAR_WIDTH).toBeLessThanOrEqual(narrowest / 2 - HUD_PAD);
   });
 });
 
