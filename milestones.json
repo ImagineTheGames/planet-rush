@@ -34,6 +34,11 @@
       "milestone": "v0.1 patch 2",
       "title": "v0.1.2 — landscape lock, fullscreen, your own health",
       "test_notes": "On your phone, hold it PORTRAIT on purpose: the menu renders landscape anyway, fully on screen. Tap PLAY - the browser bar disappears (fullscreen) and the game claims the whole display. Rotate back and forth mid-menu: nothing strands. In a fight, your own ship now wears its health bar (your colour) and it matches the HUD readout. Evidence on the EVIDENCE page."
+    },
+    "v0.1.3": {
+      "milestone": "v0.1 patch 3",
+      "title": "v0.1.3 — fair ore, real deposits, a proper defeat",
+      "test_notes": "On your phone: every home planet has the SAME asteroid field (compare two - rotated copies), a clear pocket to launch from, and a richer contested commons at the center. Dock with a full hold: ore visibly flies to your planet and banks. Lose your core on purpose: the DEFEATED screen appears instantly with SPECTATE and REMATCH. Also in this build: the lobby (pick your hull before RUSH!). Evidence on the EVIDENCE page."
     }
   },
   "days": [
