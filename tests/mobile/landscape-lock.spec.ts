@@ -55,6 +55,26 @@ interface DebugState {
   readonly viewport: { readonly w: number; readonly h: number };
 }
 
+/** The `window.__lobby` seam this suite reads (src/main.ts `LobbySeam`). PLAY now
+ *  opens the LOBBY before the match (GDD §2.1), so the remap must be proven a
+ *  second time here — a physical tap on RUSH!, whose logical rect + physical tap
+ *  point the seam reports the same way the menu reports its buttons. */
+interface LobbySeam {
+  readonly visible: boolean;
+  readonly slotCount: number;
+  readonly online: boolean;
+  readonly selectedClass: string;
+  readonly defaultClass: string;
+  readonly classOrder: readonly string[];
+  readonly logicalViewport: { readonly width: number; readonly height: number };
+  readonly content: Rect;
+  readonly rushControl: {
+    readonly logical: Rect;
+    readonly physicalCenter: { readonly x: number; readonly y: number };
+  };
+  readonly localShipClass: string | null;
+}
+
 const CENTER_TOL = 0.05; // within 5% of centre — the M1 phone-report gate
 
 // --- Fixtures ---------------------------------------------------------------
@@ -103,6 +123,57 @@ async function readMenu(page: Page): Promise<MenuSeam> {
   });
   expect(m, '__mainMenu present on a clean boot').not.toBeNull();
   return m as MenuSeam;
+}
+
+/** Wait until the lobby seam is live and laid out (via the layout registry), then
+ *  snapshot it (structured-cloned, so the live object can't shift under the test). */
+async function readLobby(page: Page): Promise<LobbySeam> {
+  await page.waitForFunction(
+    () => {
+      const s = (window as unknown as { __lobby?: LobbySeam }).__lobby;
+      return !!s && s.visible && s.slotCount > 0 && s.logicalViewport.width > 0;
+    },
+    undefined,
+    // Generous: CI boots the dev server cold and mobile runs on software WebGL, so
+    // the menu-boot → PLAY → lobby-install chain is slow under parallel projects.
+    { timeout: 30_000 },
+  );
+  const s = await page.evaluate(() => {
+    const l = (window as unknown as { __lobby?: LobbySeam }).__lobby;
+    if (!l) return null;
+    return {
+      visible: l.visible,
+      slotCount: l.slotCount,
+      online: l.online,
+      selectedClass: l.selectedClass,
+      defaultClass: l.defaultClass,
+      classOrder: [...l.classOrder],
+      logicalViewport: { width: l.logicalViewport.width, height: l.logicalViewport.height },
+      content: { ...l.content },
+      rushControl: {
+        logical: { ...l.rushControl.logical },
+        physicalCenter: { x: l.rushControl.physicalCenter.x, y: l.rushControl.physicalCenter.y },
+      },
+      localShipClass: l.localShipClass,
+    } satisfies LobbySeam;
+  });
+  expect(s, '__lobby present after PLAY on a clean boot').not.toBeNull();
+  return s as LobbySeam;
+}
+
+/** Dispatch a physical single-tap at a raw canvas coordinate through CDP — the
+ *  same touch a finger makes, un-rotated by the DOM edge into logical space. */
+async function physicalTap(page: Page, x: number, y: number): Promise<void> {
+  const client: CDPSession = await page.context().newCDPSession(page);
+  try {
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(x), y: Math.round(y) }],
+    });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally {
+    await client.detach();
+  }
 }
 
 /** Assert a rect sits entirely inside the logical viewport (1px slop for rounding). */
@@ -185,59 +256,92 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
 });
 
 // ===========================================================================
-// 3. CDP touch at a physical portrait coordinate lands on the logical PLAY button
+// 3. Two physical portrait taps, remapped through the rotation: PLAY opens the
+//    LOBBY, then RUSH! boots the match with the hull picked there (GDD §2.1).
 // ===========================================================================
+//
+// Since M4, PLAY no longer builds the match directly — it opens the LOBBY, and
+// RUSH! is the door that boots the world. So the landscape-lock remap must hold
+// for BOTH doors, not just PLAY: a physical portrait tap has to land on the
+// logical PLAY control (→ lobby renders) AND, a screen later, on the logical
+// RUSH! control (→ match boots with the chosen hull). Two remapped touches, each
+// proven against the owning screen's own layout-registry seam — no pixel-hunting.
 
-test('a physical touch lands on the logical PLAY control (touch remapped through rotation)', async ({
+test('two physical taps remap through the rotation: PLAY → lobby, RUSH! → match with the chosen hull', async ({
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the touch remap only rotates on mobile');
+
+  const vp = page.viewportSize()!;
+  /** A remapped tap point must sit inside the PHYSICAL portrait canvas — proof the
+   *  logical (landscape) rect was mapped back through the rotation, not read raw
+   *  (a raw logical x would exceed the portrait width). */
+  const assertInsidePhysical = (p: { x: number; y: number }, tag: string): void => {
+    expect(p.x, `${tag}: physical x ≥ 0`).toBeGreaterThanOrEqual(0);
+    expect(p.x, `${tag}: physical x ≤ vp.width (${vp.width})`).toBeLessThanOrEqual(vp.width);
+    expect(p.y, `${tag}: physical y ≥ 0`).toBeGreaterThanOrEqual(0);
+    expect(p.y, `${tag}: physical y ≤ vp.height (${vp.height})`).toBeLessThanOrEqual(vp.height);
+  };
 
   await setOrientation(page, 'portrait');
   await bootMenu(page);
   const m = await readMenu(page);
   expect(m.rotated).toBe(true);
 
+  // --- Tap 1: PLAY. The physical spot the logical PLAY button occupies. -------
   const play = m.controls.find((c) => c.kind === 'play');
   expect(play, 'PLAY control present in the layout registry').toBeTruthy();
-  const target = play!.physicalCenter;
+  assertInsidePhysical(play!.physicalCenter, 'PLAY');
+  await physicalTap(page, play!.physicalCenter.x, play!.physicalCenter.y);
 
-  // The physical tap point sits inside the physical portrait canvas — proof the
-  // logical (landscape) rect was mapped back through the rotation, not read raw
-  // (the raw logical x would exceed the portrait width).
-  const vp = page.viewportSize()!;
-  expect(target.x).toBeGreaterThanOrEqual(0);
-  expect(target.x).toBeLessThanOrEqual(vp.width);
-  expect(target.y).toBeGreaterThanOrEqual(0);
-  expect(target.y).toBeLessThanOrEqual(vp.height);
+  // The lobby seam appearing — laid out via its own layout registry (eight seats,
+  // a content box inside the logical viewport) — is proof the PLAY tap un-rotated
+  // onto the logical control. PLAY builds NO match; it opens this screen.
+  const lobby = await readLobby(page);
+  expect(lobby.visible, 'lobby is up after the PLAY tap').toBe(true);
+  expect(lobby.slotCount, 'lobby laid out its eight seats (GDD §2.1)').toBe(8);
+  expect(lobby.online, 'offline solo-vs-bots lobby').toBe(false);
+  expect(lobby.localShipClass, 'no match world built yet — PLAY only opens the lobby').toBeNull();
+  assertInside(lobby.content, lobby.logicalViewport, 'lobby content box');
 
-  // Tap the physical spot the logical PLAY button occupies. The DOM edge un-rotates
-  // it back to the logical PLAY rect, hit-tests PLAY, and opens the lobby.
-  const client: CDPSession = await page.context().newCDPSession(page);
-  try {
-    await client.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: Math.round(target.x), y: Math.round(target.y) }],
-    });
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  } finally {
-    await client.detach();
-  }
-
-  // Since M4, PLAY opens the LOBBY between the menu and the match (GDD §2.1). The
-  // lobby seam appearing proves the tap landed on PLAY — the un-rotation worked —
-  // and RUSH! through it then builds the match world (matchStarted flips true),
-  // which is the end of the same chain this test was always asserting.
+  // --- Pick a NON-default hull, so "boots with the chosen hull" is meaningful. -
+  const pickIndex = lobby.classOrder.findIndex((c) => c !== lobby.defaultClass);
+  expect(pickIndex, 'a hull other than the default exists to pick').toBeGreaterThanOrEqual(0);
+  const chosen = lobby.classOrder[pickIndex];
+  await page.evaluate(
+    (i) => (window as unknown as { __lobby: { selectClass(i: number): void } }).__lobby.selectClass(i),
+    pickIndex,
+  );
   await page.waitForFunction(
-    () => typeof (window as unknown as { __lobby?: { rush(): void } }).__lobby?.rush === 'function',
-    undefined,
+    (cls) => (window as unknown as { __lobby?: LobbySeam }).__lobby?.selectedClass === cls,
+    chosen,
     { timeout: 15_000 },
   );
-  await page.evaluate(() => (window as unknown as { __lobby: { rush(): void } }).__lobby.rush());
+
+  // --- Tap 2: RUSH!. Re-read the seam so the RUSH rect reflects the current
+  //     layout, then tap the physical spot the logical RUSH! button occupies. ---
+  const withPick = await readLobby(page);
+  expect(withPick.selectedClass, 'the non-default hull is the selected one').toBe(chosen);
+  expect(withPick.selectedClass, 'and it is not the onboarding default').not.toBe(withPick.defaultClass);
+
+  const rush = withPick.rushControl;
+  assertInside(rush.logical, withPick.logicalViewport, 'RUSH! control'); // not stranded off-screen
+  assertInsidePhysical(rush.physicalCenter, 'RUSH!'); // remapped back into the portrait canvas
+  await physicalTap(page, rush.physicalCenter.x, rush.physicalCenter.y);
+
+  // RUSH! is the one door that builds a match world — matchStarted flips only after
+  // the world is assembled, so this proves the second tap landed on the logical
+  // RUSH! control. And the world's local ship IS the hull picked here: the chosen
+  // class threaded through the rotation-remapped lobby all the way into the sim.
   await page.waitForFunction(
     () => (window as unknown as { __mainMenu?: MenuSeam }).__mainMenu?.matchStarted === true,
     undefined,
-    { timeout: 15_000 },
+    { timeout: 20_000 },
+  );
+  await page.waitForFunction(
+    (cls) => (window as unknown as { __lobby?: LobbySeam }).__lobby?.localShipClass === cls,
+    chosen,
+    { timeout: 20_000 },
   );
 });
 
