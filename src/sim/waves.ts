@@ -212,17 +212,32 @@ export function spawnHomeFields(world: World): void {
 
   // Draw the shared pattern ONCE and advance the world RNG by it; the stamping
   // that follows is pure trig, so every field is identical and the RNG advance
-  // does not depend on `n`.
+  // does not depend on `n`. The raw angular draw spans the full cone
+  // `±homeConeOuter`; it is then folded OUT of the launch corridor (below).
   const { rocks, rng } = drawCanon(
     world.rngState,
     RESOURCE_FIELD.homeCount,
     innerR,
     outerR,
-    -RESOURCE_FIELD.homeAngularSpread,
-    RESOURCE_FIELD.homeAngularSpread,
+    -RESOURCE_FIELD.homeConeOuter,
+    RESOURCE_FIELD.homeConeOuter,
     homeFieldOre(n),
   );
   world.rngState = rng;
+
+  // Fold each rock's angular offset out of the clear wedge along the spoke: keep
+  // its side, but map the magnitude from `[0, homeConeOuter]` onto
+  // `[homeConeInner, homeConeOuter]`. This is a deterministic transform of an
+  // already-drawn value (no extra RNG draw, determinism preserved, GDD §4.8), so
+  // the field becomes two lobes straddling a clear launch corridor while every
+  // home field stays a rigid rotation of this one pattern — the fairness
+  // invariant is untouched (field report P1; see `homeConeInner` in constants).
+  const { homeConeInner: cIn, homeConeOuter: cOut } = RESOURCE_FIELD;
+  const span = cOut - cIn;
+  for (const rock of rocks) {
+    const side = rock.delta < 0 ? -1 : 1;
+    rock.delta = side * (cIn + (span * Math.abs(rock.delta)) / cOut);
+  }
 
   for (const planet of planets) {
     for (const rock of rocks) {

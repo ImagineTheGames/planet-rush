@@ -302,25 +302,40 @@ export const RESOURCE_FIELD = {
    * v0.1.2 0.52–0.64 (field report P1: at 0.64 the nearest rock sat only ~215 u
    * from the ship's spawn point, so a ship leaving spawn bumped rock — the mobile
    * drag test measured 0.6–0.8 u/tick where open flight is expected). At
-   * 0.42–0.47 the whole field sits well inboard of `SPAWN_CLEAR_POCKET`, opening
-   * a ~360 u launch lane between the spawn and the first rock, while the outermost
-   * rock (~458 u from its planet) still clears turret range and the innermost
-   * still fits inside the measure radius `R`. TUNABLE
+   * 0.44–0.47 the field sits well inboard of `SPAWN_CLEAR_POCKET`, and — with the
+   * angular cone below — off the launch spoke entirely, so the outermost rock
+   * (~473 u from its planet) still clears turret range and the innermost still
+   * fits inside the measure radius `R`. TUNABLE
    */
-  homeInnerFraction: 0.42,
+  homeInnerFraction: 0.44,
   homeOuterFraction: 0.47,
-  /** Angular half-spread of a home field around its planet's spoke (radians) —
-   *  small, so a home field reads as a tight cluster by its own planet and stays
-   *  well isolated from its neighbours' fields. TUNABLE */
-  homeAngularSpread: 0.16,
+  /**
+   * The home field is a two-lobe cone straddling its planet's spoke, NOT a blob
+   * centred on it: every rock's angular offset from the spoke has magnitude in
+   * `[homeConeInner, homeConeOuter]` radians (drawn per side), leaving a clear
+   * wedge of half-angle `homeConeInner` along the spoke itself. That wedge is the
+   * launch corridor (field report P1): a ship spawns orbiting its planet and, on
+   * the drag test, thrusts straight inboard *along its spoke* toward the centre —
+   * so a rock sitting ON the spoke is one the launching ship rams. Under a slow
+   * renderer (the CI software-WebGL profile) the test's gesture ramp alone flies
+   * the ship a few hundred units before the measured window even opens, so the
+   * spoke must be clear well past the field, not merely a pocket around the
+   * planet. `homeConeInner` is sized so the nearest lobe rock clears the ship's
+   * straight path by more than a ship+rock radius at the field's radius
+   * (`homeInnerFraction × ring × sin(homeConeInner)` ≈ 75 u > ~62 u). The cone is
+   * still symmetric about the spoke, so the field stays equidistant from both
+   * neighbours and the fairness invariant is untouched. TUNABLE
+   */
+  homeConeInner: 0.2,
+  homeConeOuter: 0.3,
   /** Radius R around a home within which its local ore is measured for the
    *  fairness invariant, as a fraction of the planet ring radius. Sized to
-   *  enclose the whole (now more-inboard) home field yet exclude both the commons
-   *  and any neighbour's field, so "ore within R of each home" is exactly one home
-   *  field per planet — all `N` equal. Raised with the field (0.55 → 0.615): the
-   *  window is (max home-rock dist ≈ 509 u, min commons dist 557 u), R ≈ 531 u
-   *  sits between them with room on both sides. TUNABLE */
-  homeMeasureFraction: 0.615,
+   *  enclose the whole (now more-inboard, off-spoke) home field yet exclude both
+   *  the commons and any neighbour's field, so "ore within R of each home" is
+   *  exactly one home field per planet — all `N` equal. The window is (max
+   *  home-rock dist ≈ 513 u, min commons dist 557 u, min N=8 neighbour dist
+   *  ≈ 539 u); R ≈ 527 u sits inside all three with room. TUNABLE */
+  homeMeasureFraction: 0.61,
 } as const;
 
 /**
