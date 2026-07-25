@@ -79,7 +79,7 @@
       "day": 7,
       "title": "Classroom release",
       "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone.",
-      "done": false
+      "done": true
     }
   ]
 }
