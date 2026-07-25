@@ -22,9 +22,10 @@
  */
 import { Application } from 'pixi.js';
 import { ShipClass } from '@shared/types';
-import type { Action, PlayerId, Vec2 } from '@shared/types';
+import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
 import {
   BEAM_RANGE,
+  combatBeams,
   isCollapsed,
   isDocked,
   planetOf,
@@ -32,7 +33,7 @@ import {
   shieldPool,
   turretCount,
 } from './sim';
-import type { Planet } from './sim';
+import type { CombatBeam, Planet, Turret, World } from './sim';
 import { bootOfflineMatch } from '@platform/match-boot';
 import {
   createControlState,
@@ -64,6 +65,7 @@ import {
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook } from '@platform/debug-hook';
+import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
 import { describeBootFailure, showBootError } from '@platform/boot-error';
@@ -166,6 +168,13 @@ async function boot(): Promise<void> {
   //     (and skipped in the render loop) otherwise.
   const debug = installDebugHook(window.location.search);
   const shipScreenScratch: Vec2 = { x: 0, y: 0 };
+
+  // --- Combat-visuals instrument (combat-debug.ts): only when ?debug=1. Exposes
+  //     window.__planetRush.beams (the beam set actually drawn this frame, one per
+  //     firing emitter) and .stageCombat() so a live-boot suite can prove the
+  //     enemy/turret beam WIRING the m2-11 unit suite cannot reach. Inert otherwise.
+  const combatDebug = installCombatDebug(window.location.search);
+  if (combatDebug.enabled) combatDebug.setStager(() => stageCombatFor(world));
 
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
@@ -725,24 +734,22 @@ async function boot(): Promise<void> {
     return false;
   }
 
-  /** The local ship's beam segment this frame, read from the sim's published
-   *  beam geometry (m2-00): the line ends at `hitPoint` (or full range when the
-   *  beam misses) so it never draws through what it strikes, and the impact
-   *  glow rides the same hit point. Mutates one reusable scratch beam/array — no
-   *  per-frame allocation while fire is held (mirrors EMPTY_BEAMS for the idle
-   *  case; GDD §4.3b risk 5). */
-  function currentBeams(): BeamView[] {
-    const ship = world.ships.find((s) => s.id === LOCAL_PLAYER);
-    const beam = ship?.beam;
-    if (!beam) return EMPTY_BEAMS; // sim clears `beam` unless the ship fired this tick
-    SCRATCH_BEAM.from = beam.origin;
-    // `length` is clamped to the first hit (or full range on a miss), so the
-    // endpoint is the hit point when there is one — never through the object.
-    SCRATCH_BEAM_TO.x = beam.origin.x + beam.dir.x * beam.length;
-    SCRATCH_BEAM_TO.y = beam.origin.y + beam.dir.y * beam.length;
-    SCRATCH_BEAM.hit = beam.hitPoint; // null on a clean miss → no impact glow
-    SCRATCH_BEAM.color = PLAYER_COLORS[LOCAL_PLAYER] ?? 0x4dc3ff;
-    return SCRATCH_BEAMS;
+  /** Every combat beam to draw this frame — read from the sim's published combat
+   *  state for EVERY shooter, never from local fire input. `combatBeams` walks the
+   *  world and emits one record per firing emitter: each live ship with a `beam`
+   *  (local, bot, remote alike) and each turret with a `muzzle` this tick (GDD §2.3,
+   *  §2.6). This is the round-2 field fix: the old path handed the renderer only
+   *  `LOCAL_PLAYER`'s beam, so an enemy carving your core and a turret spitting fire
+   *  were both invisible. Now each beam draws in its shooter's colour (style-guide
+   *  §3), ending at the same clamp-to-hit endpoint the sim publishes. The bounded
+   *  `combatBeams` array (≤ ships + turrets, GDD §4.3) is the sim's blessed render
+   *  helper; the BeamView mapping is pooled so it adds no per-frame allocation. */
+  function currentBeams(): readonly BeamView[] {
+    const combat = combatBeams(world);
+    // Reflect the drawn set for the live-boot suite (?debug=1 only, else a no-op).
+    if (combatDebug.enabled) combatDebug.update(combat);
+    if (combat.length === 0) return EMPTY_BEAMS;
+    return fillBeamViews(combat);
   }
 
   // --- Viewport: keep renderer, touch halves, HUD, and overlay in sync with the
@@ -872,18 +879,124 @@ interface MutCombatant {
 
 const EMPTY_BEAMS: BeamView[] = [];
 
-// Reusable scratch beam for the firing case: mutated in place each frame so the
-// hot render path allocates nothing while fire is held (GDD §4.3b risk 5). The
-// `to` endpoint and `from`/`color` fields are overwritten per frame in
-// currentBeams(); typed mutable here (BeamView's fields are readonly to callers).
-const SCRATCH_BEAM_TO: Vec2 = { x: 0, y: 0 };
-const SCRATCH_BEAM: { from: Vec2; to: Vec2; color: number; hit: Vec2 | null } = {
-  from: SCRATCH_BEAM_TO,
-  to: SCRATCH_BEAM_TO,
-  color: 0x4dc3ff,
-  hit: null,
-};
-const SCRATCH_BEAMS: BeamView[] = [SCRATCH_BEAM];
+/** A mutable BeamView the pool owns and overwrites each frame — its fields are
+ *  readonly only to the renderer (which treats a BeamView as a value). */
+interface MutableBeamView {
+  from: Vec2;
+  to: Vec2;
+  color: number;
+  hit: Vec2 | null;
+}
+
+// A grow-once pool: one scratch BeamView per concurrent beam. Bounded by the sim's
+// entity caps (≤ ships + turrets), so after the busiest frame this never allocates
+// again — the render hot path stays allocation-free (GDD §4.3b risk 5). `beamViewList`
+// is the array handed to the renderer; its length is set to the live beam count.
+const beamViewPool: MutableBeamView[] = [];
+const beamViewList: BeamView[] = [];
+
+/** Map every combat beam this tick into the pooled BeamView list the renderer
+ *  draws. Endpoint `to` = origin + dir·length (the sim's clamp to the first hit,
+ *  or full range on a miss); colour is the shooter's identity hue (style-guide §3),
+ *  so an enemy's beam and a rival turret's muzzle each read in their own colour. */
+function fillBeamViews(combat: readonly CombatBeam[]): readonly BeamView[] {
+  const n = combat.length;
+  for (let i = 0; i < n; i++) {
+    const b = combat[i]!;
+    let v = beamViewPool[i];
+    if (!v) {
+      v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null };
+      beamViewPool[i] = v;
+    }
+    v.from = b.origin; // alias the sim's origin (read synchronously this frame)
+    v.to.x = b.origin.x + b.dir.x * b.length;
+    v.to.y = b.origin.y + b.dir.y * b.length;
+    v.hit = b.hitPoint; // null on a clean miss → no impact glow
+    v.color = PLAYER_COLORS[b.shooter % PLAYER_COLORS.length] ?? 0x4dc3ff;
+    beamViewList[i] = v;
+  }
+  beamViewList.length = n; // reuse the objects; just retract the tail
+  return beamViewList;
+}
+
+/** One staged emitter as the live-boot suite reads it back: identity + the same
+ *  clamped world-space geometry {@link fillBeamViews} draws from. */
+interface StagedBeam {
+  readonly shooter: number;
+  readonly source: 'ship' | 'turret';
+  readonly origin: { x: number; y: number };
+  readonly end: { x: number; y: number };
+  readonly hit: { x: number; y: number } | null;
+}
+
+/** What `__planetRush.stageCombat()` hands the test: the two NON-LOCAL emitters it
+ *  staged, so the test can assert the client actually drew both of them. */
+export interface StagedCombat {
+  readonly ship: StagedBeam;
+  readonly turret: StagedBeam;
+}
+
+const STAGE_BEAM_LEN = 140;
+const STAGE_MUZZLE_LEN = 90;
+
+/** Debug-only (`?debug=1`) deterministic firefight, driven by the live-boot suite
+ *  under `?freeze=1` so the sim never steps to clear it: publish a `beam` on a
+ *  non-local ship (an enemy laser) and a `muzzle` on a fresh turret owned by a
+ *  non-local planet (a rival turret firing) — the two combat tells the round-2
+ *  field report found invisible. Returns both so the test asserts the client put
+ *  them on stage. Touches only render-tell fields the sim itself publishes each
+ *  tick; it changes no sim logic and runs only behind the debug flag. */
+function stageCombatFor(world: World): StagedCombat {
+  // A non-local, living ship carries the enemy beam (the offline match seats the
+  // local player + seven bots), so its `shooter` is provably not LOCAL_PLAYER.
+  const botShip = world.ships.find((s) => s.id !== LOCAL_PLAYER && s.alive) ?? world.ships[0]!;
+  const botBeam: Beam = {
+    origin: { x: botShip.pos.x, y: botShip.pos.y },
+    dir: { x: 1, y: 0 },
+    hitPoint: { x: botShip.pos.x + STAGE_BEAM_LEN, y: botShip.pos.y },
+    length: STAGE_BEAM_LEN,
+  };
+  botShip.beam = botBeam;
+
+  // A turret with a live muzzle, mounted on a non-local planet so its owner (the
+  // beam's shooter) is also non-local — a rival turret loosing a shot.
+  const planet = world.planets.find((p) => p.owner !== LOCAL_PLAYER) ?? world.planets[0]!;
+  const muzzleBeam: Beam = {
+    origin: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 },
+    dir: { x: 0, y: -1 },
+    hitPoint: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 - STAGE_MUZZLE_LEN },
+    length: STAGE_MUZZLE_LEN,
+  };
+  const turret: Turret = {
+    id: world.nextEntityId++,
+    owner: planet.owner,
+    slot: planet.turrets.length,
+    pos: { x: muzzleBeam.origin.x, y: muzzleBeam.origin.y },
+    radius: 6,
+    hp: 10,
+    maxHp: 10,
+    angle: -Math.PI / 2,
+    cooldown: 0,
+    targetId: null,
+    muzzle: muzzleBeam,
+  };
+  planet.turrets.push(turret);
+
+  return {
+    ship: describeStaged(botShip.id, 'ship', botBeam),
+    turret: describeStaged(turret.owner, 'turret', muzzleBeam),
+  };
+}
+
+function describeStaged(shooter: number, source: 'ship' | 'turret', beam: Beam): StagedBeam {
+  return {
+    shooter,
+    source,
+    origin: { x: beam.origin.x, y: beam.origin.y },
+    end: { x: beam.origin.x + beam.dir.x * beam.length, y: beam.origin.y + beam.dir.y * beam.length },
+    hit: beam.hitPoint ? { x: beam.hitPoint.x, y: beam.hitPoint.y } : null,
+  };
+}
 
 /** A control state carries a real intent this frame — used to pick the active
  *  device for the HUD. Mouse aim is excluded: it moves constantly and would peg
