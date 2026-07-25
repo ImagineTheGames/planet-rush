@@ -39,6 +39,11 @@
       "milestone": "v0.1 patch 3",
       "title": "v0.1.3 — fair ore, real deposits, a proper defeat",
       "test_notes": "On your phone: every home planet has the SAME asteroid field (compare two - rotated copies), a clear pocket to launch from, and a richer contested commons at the center. Dock with a full hold: ore visibly flies to your planet and banks. Lose your core on purpose: the DEFEATED screen appears instantly with SPECTATE and REMATCH. Also in this build: the lobby (pick your hull before RUSH!). Evidence on the EVIDENCE page."
+    },
+    "v0.2": {
+      "milestone": 8,
+      "title": "v0.2 — four arenas and the choice is yours",
+      "test_notes": "On your phone: PLAY now offers four maps - The Ring (default, square arena, perfect spread), The Compass (corner strongholds vs open gates), The Oval (widescreen equal-chord ring), and Double Diamond (veteran - inner spawns risk it for the commons). Pick each one once; your last choice sticks. Every map keeps the identical home fields + clear launch pocket. Evidence for all four on the EVIDENCE page."
     }
   },
   "days": [
@@ -100,7 +105,7 @@
       "day": 8,
       "title": "Maps — four arenas + the picker (v0.2)",
       "test_notes": "Pick each map from the PLAY screen; octagon default. Equal spacing on A/B/C, veteran diamond. Evidence round 7 gates the tag.",
-      "done": false
+      "done": true
     },
     {
       "day": 9,
