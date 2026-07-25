@@ -148,5 +148,45 @@
     "buildSha": "c97f60a",
     "attestation": "Re-captured on the wired build. The prior caveat — 'offline there is no attacker' — no longer holds: the seven rivals are live bots (match-boot.ts), and leaving your home undefended draws one onto the core within seconds. Method: held 'A' to thrust toward the arena centre so home recedes off the right edge, and gated the shutter on the sim's own tick counter (window.__planetRush.ticks ≥ 1200) rather than wall time. A headless replay of this exact input confirms the alarm fires from ~tick 790 with the core alive past tick 2000, so this frame sits inside a real siege. ON SCREEN, at 'MATCH 0:21': the under-attack ALARM is firing — a threat-red frame around the screen edges (pulsing, so faint at this instant but visible along the top edge and corners) and, decisively, the alarm's own banner 'Your planet is under attack — follow the arrow' (ui/onboarding.ts, shown only while the alarm is active). A threat-red screen-edge ARROW sits at the right edge pointing right — toward the home planet, which is off-screen to the right because I flew away. The local ship (blue triangle) is centred out in the field beside a rival's planet (centre, shown with a threat-red damage ring — a scouted enemy home, not mine), with other bot ships nearby. Alarm + directional home arrow, during an actual attack. PASSES the gate.",
     "verdict": "verified"
+  },
+  {
+    "id": "enemy-beam-visible",
+    "title": "Field bug m2-10: enemy beam visible mid-attack",
+    "area": "match",
+    "image": "images/enemy-beam-visible.png",
+    "capturedAt": "2026-07-25T01:20:00Z",
+    "buildSha": "1c72d85",
+    "attestation": "Live ?debug=1 build (stamp '1c72d85'), a real firefight staged by flying out to get 'exposed', drawing bot hunters back to my home, then opening fire on the nearest one (auto-aim, held Left mouse). WHAT IS ON SCREEN: my own ship, centred, fires a single blue (azure, my player colour) beam up-left that ENDS in a bright cyan plasma impact glow clamped exactly on the struck bot's hull — so the beam+impact render path plainly works, and the clamp-to-hit is correct. THREE enemy bot ships are in frame in a live engagement (the top one is being cut by my beam this instant; a chalk-cockpit bot sits lower-left; a third is up by the wall). NOT ONE of them draws a beam of its own — there is no enemy laser anywhere in the frame, at any range, including the bot sitting point-blank under my beam. FAILED: the field-reported 'invisible enemy lasers' is NOT dead — only the local player's beam is ever drawn; enemy/bot beams do not render. Diagnosis (not visible, offered as cause): src/main.ts currentBeams() feeds the renderer only LOCAL_PLAYER's ship.beam; the combatBeams(world) selector that would surface every shooter's beam is never consumed — the fix's own commit message flagged this main.ts wiring as a 'handoff to Platform' that never landed.",
+    "verdict": "failed"
+  },
+  {
+    "id": "turret-firing",
+    "title": "Field bug m2-12: friendly turret visibly firing",
+    "area": "match",
+    "image": "images/turret-firing.png",
+    "capturedAt": "2026-07-25T01:20:00Z",
+    "buildSha": "1c72d85",
+    "attestation": "Live ?debug=1. I built a turret at my home (ORE 3→0, and the completed steel mount + barrel is visible on the planet's rim), then abandoned the core so the bots would besiege it. WHAT IS ON SCREEN in this crop: my home planet (blue beacon) with its turret; the screen-edge UNDER-ATTACK alarm is firing (the threat-red border down the right edge), so the core is under active attack RIGHT NOW; a bot ship loiters near the wall just off the planet. The turret's barrel sits AT REST pointing outward — it is not tracked onto the bot — and there is NO muzzle flash and NO projectile leaving it. I swept the shutter across the whole siege (ticks ~1100–2300) and never once caught the turret loose a visible shot; the besieging bot consistently held ~250 px out, just past the turret's reach. FAILED: 'a turret that never visibly fired' is NOT convincingly fixed — no muzzle-flash tell is ever drawn and I could not capture the turret visibly engaging. Diagnosis (cause, not visible): the turret's muzzle-flash tell rides the same unfed beam path as the enemy beams above (main.ts never maps combatBeams → the renderer); only the pre-existing red projectiles could render, and only if a bot came inside the 240u turret range, which an attacker avoids by design since beam range (260) out-ranges the turret (240).",
+    "verdict": "failed"
+  },
+  {
+    "id": "build-button-after-build",
+    "title": "Field bug m2-13: BUILD button survives a completed construction",
+    "area": "touch",
+    "image": "images/build-button-after-build.png",
+    "capturedAt": "2026-07-25T01:20:00Z",
+    "buildSha": "1c72d85",
+    "attestation": "Live ?debug=1 on an emulated phone in LANDSCAPE (touch). Sequence driven and captured: (1) tapped the plasma BUILD button to open the wheel; (2) tapped the TURRET wedge — ORE 3→0, a turret order placed; (3) advanced the sim ~660 ticks so the 10 s (600-tick) build FINISHED — the completed turret (steel mount + barrel) is now on the home planet's right rim; (4) tapped BUILD once more, which CLOSED the wheel. WHAT IS ON SCREEN at the shutter, AFTER the completed construction: the plasma-cyan 'BUILD / & UPGRADE' button is present bottom-left, drawn as the bright hittable affordance (not greyed), with the FIRE button bottom-right and the wheel closed. That the final tap closed the wheel proves the button is still LIVE and hittable after building. Registry corroboration logged during the run: post-build the frame carried a 'build-button' layout entry (buildButton:true); the closing tap removed 'build-wheel' (buildWheel:false) while 'build-button' remained. VERIFIED: the 'build button vanished after building' bug is dead — the button survives the whole cycle.",
+    "verdict": "verified"
+  },
+  {
+    "id": "enemy-healthbars",
+    "title": "Field bug m2-11: enemy health bars in combat",
+    "area": "match",
+    "image": "images/enemy-healthbars.png",
+    "capturedAt": "2026-07-25T01:20:00Z",
+    "buildSha": "1c72d85",
+    "attestation": "Live ?debug=1, a zoom into the same firefight as enemy-beam-visible. WHAT IS ON SCREEN: my centred ship fires a blue beam that lands a cyan impact glow on a bot at the top of the frame — that bot is unambiguously IN COMBAT and taking damage this instant. A second bot (chalk cockpit) sits lower-left. NEITHER enemy ship carries a health bar: there is no narrow two-part bar floating above the bot being cut, none above the second bot, and — across every combat frame I captured — no bar over any non-local ship at all, damaged or not. FAILED: 'enemies don't show health bars' is NOT dead — non-local combat entities render no HP bar. Diagnosis (cause, not visible): the HUD owns a health-bar layer (ui/healthbar-view.ts) but the client never feeds it — src/main.ts feedHud() never populates hudFrame.combatants, so healthBarModel() always receives an empty list and the layer draws nothing. The healthbar fix's commit said 'no main.ts change beyond filling the frame'; that fill never happened.",
+    "verdict": "failed"
   }
 ]
