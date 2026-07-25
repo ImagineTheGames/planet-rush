@@ -99,9 +99,16 @@ const DRAG_MIN_UNITS_PER_TICK = 1.0;
 
 // --- Fixtures / helpers -----------------------------------------------------
 
-/** Load the game and let the Pixi app boot + render a few frames. */
+/** Load the game and let the Pixi app boot + render a few frames.
+ *
+ *  `?debug=1` boots STRAIGHT into a match (main.ts), skipping the main menu a
+ *  clean boot now opens on (the P1 main-menu wiring — a clean boot lands on PLAY/
+ *  SETTINGS, not the match). These affordance/overlay tests assert the IN-MATCH
+ *  HUD, so they take the same immediate-match harness every other debug test
+ *  uses; the flag adds only invisible instruments, so the pixels under assertion
+ *  are unchanged. (Flagged by the UI Engineer for QA in the main-menu-wiring PR.) */
 async function boot(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   // Let the fixed-timestep loop run out a few frames and fonts settle so the
   // HUD/affordances are on-screen before we sample.

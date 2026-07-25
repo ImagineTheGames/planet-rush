@@ -83,8 +83,15 @@ import {
   buildButtonVisible,
   BUILD_BUTTON_ID,
   BUILD_BUTTON_ANCHOR,
+  MainMenuView,
+  SettingsView,
+  mainMenuModel,
+  settingsModel,
+  createSettings,
+  toggleReduceVfx,
+  adjustVolume,
 } from './ui';
-import type { HudFrame, Combatant } from './ui';
+import type { HudFrame, Combatant, SettingsState, SettingsTarget } from './ui';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -132,6 +139,18 @@ async function boot(): Promise<void> {
   if (mount) mount.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none'; // sticks own the gestures (amendment §2)
 
+  // --- Main menu (field report P1; GDD §4.6 M7). A clean boot opens the MAIN
+  //     MENU and builds NO match world until the player presses PLAY — the bug
+  //     the field report caught was that boot dropped the player straight into a
+  //     match, the merged menus never wired into the boot path. `?debug=1` skips
+  //     the menu and boots straight into a match exactly as before, so every
+  //     existing live / live-stage / mobile harness and the frozen goldens keep
+  //     the immediate-match boot they assert against (field report §3, §5). PLAY
+  //     is the only path here that reaches `bootOfflineMatch`; SETTINGS reuses
+  //     the Day-7 settings screen. The whole screen is `src/ui`'s; this awaits it.
+  const mainMenu = flags.debug ? null : openMainMenu(app, platform);
+  if (mainMenu) await mainMenu.untilPlay();
+
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
   //     and the seven empty seats are filled by the cast (`src/bots`), each
   //     bringing its character's hull. The bots are an *action source*, not a
@@ -150,6 +169,11 @@ async function boot(): Promise<void> {
     shipClass: LOCAL_SHIP_CLASS,
   });
   const world = match.world;
+
+  // The match world now exists — flip the menu's test seam so a clean-boot
+  // live-stage run can prove it did NOT exist a moment ago, while the menu was up
+  // (a no-op under ?debug=1, where there is no menu and this is null).
+  mainMenu?.matchStarted();
 
   // --- Renderer. The camera centres on the *visual* viewport (URL-bar / notch /
   //     fullscreen aware), not the raw canvas — see camera.ts and readViewport().
@@ -1060,6 +1084,185 @@ function mergeControl(dst: ControlState, src: ControlState): void {
   dst.boost = dst.boost || src.boost;
   dst.build = dst.build || src.build;
   if (!dst.ping && src.ping) dst.ping = src.ping;
+}
+
+/** What `boot()` holds the main menu by: a promise that resolves when the player
+ *  presses PLAY, and a one-shot `matchStarted()` the boot path calls once the
+ *  world is actually built (it flips the live-stage test seam). */
+interface MainMenuHandle {
+  /** Resolves the moment PLAY is pressed — `boot()` builds the world only after. */
+  untilPlay(): Promise<void>;
+  /** Mark the world as built (drives `window.__mainMenu.matchStarted`). */
+  matchStarted(): void;
+}
+
+/**
+ * The main menu (field report P1; GDD §4.6 M7). Shown on a clean boot only —
+ * `boot()` skips it under `?debug=1`, which drops straight into a match so the
+ * live / live-stage / mobile harnesses keep the world they assert against.
+ *
+ * The match world is built only when PLAY is pressed: `untilPlay()` resolves
+ * then, and `boot()` calls `bootOfflineMatch` *after* it. Until then no world
+ * exists — the whole point of the fix. SETTINGS reuses the Day-7 settings screen
+ * ({@link SettingsView}); a fire-mode change is persisted to the same key
+ * `readFireMode` reads when the match boots, so the choice carries into the game.
+ *
+ * A read-only `window.__mainMenu` seam lets the live-stage suite drive PLAY and
+ * observe that the world is built only after it
+ * (tests/live-stage/main-menu.spec.ts). The screen models/views are `src/ui`'s;
+ * this function is the *wiring* — screen state, input routing, and teardown.
+ */
+function openMainMenu(
+  app: Application,
+  platform: ReturnType<typeof createBrowserPlatform>,
+): MainMenuHandle {
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  let fireMode = readFireMode(platform, isTouch);
+  let settings: SettingsState = createSettings();
+  let screen: 'menu' | 'settings' = 'menu';
+  let played = false;
+
+  const menuView = new MainMenuView(app.screen.width, app.screen.height, isTouch);
+  const settingsView = new SettingsView(app.screen.width, app.screen.height, isTouch);
+  app.stage.addChild(menuView, settingsView);
+
+  // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
+  // once the real world is built, never here — so the suite's "no sim on the
+  // menu" assertion reads the truth, not a hopeful flag set on PLAY.
+  const seam: { visible: boolean; screen: 'menu' | 'settings'; matchStarted: boolean; play(): void } = {
+    visible: true,
+    screen,
+    matchStarted: false,
+    play: (): void => play(),
+  };
+
+  let resolvePlay: () => void = () => {};
+  const playPromise = new Promise<void>((resolve) => {
+    resolvePlay = resolve;
+  });
+
+  /** Redraw the live screen from current state. Static content, so this runs on
+   *  a state change or a resize — Pixi's own ticker keeps painting between. */
+  function render(): void {
+    menuView.visible = screen === 'menu';
+    settingsView.visible = screen === 'settings';
+    if (menuView.visible) menuView.update(mainMenuModel());
+    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
+    seam.screen = screen;
+  }
+
+  /** PLAY: tear the menu down and hand `boot()` the go-ahead to build the world. */
+  function play(): void {
+    if (played) return;
+    played = true;
+    teardown();
+    seam.visible = false;
+    resolvePlay();
+  }
+
+  function openSettings(): void {
+    screen = 'settings';
+    render();
+  }
+
+  function closeSettings(): void {
+    screen = 'menu';
+    render();
+  }
+
+  /** Apply a tap on the settings screen — the same targets `flowTapSettings`
+   *  routes, but pre-match there is no lobby or renderer to tell, so each change
+   *  just folds into local state (and fire mode is persisted for the match). */
+  function applySettings(target: SettingsTarget): void {
+    switch (target.kind) {
+      case 'back':
+        closeSettings();
+        return;
+      case 'fireMode':
+        fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
+        platform.storage.set(FIRE_MODE_KEY, fireMode);
+        break;
+      case 'reduceVfx':
+        settings = toggleReduceVfx(settings);
+        break;
+      case 'volume':
+        settings = adjustVolume(settings, target.channel, target.dir);
+        break;
+    }
+    render();
+  }
+
+  function onPointerDown(e: PointerEvent): void {
+    const rect = app.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (screen === 'menu') {
+      const hit = menuView.hitTest(x, y);
+      if (hit === 'play') play();
+      else if (hit === 'settings') openSettings();
+    } else {
+      const hit = settingsView.hitTest(x, y);
+      if (hit) applySettings(hit);
+    }
+    e.preventDefault();
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (screen === 'settings') {
+      if (e.code === 'Escape') closeSettings();
+      return;
+    }
+    // On the menu, Enter or Space is PLAY — a keyboard player never has to reach
+    // for the mouse to start a match.
+    if (e.code === 'Enter' || e.code === 'Space') play();
+  }
+
+  function relayout(): void {
+    menuView.resize(app.screen.width, app.screen.height, isTouch);
+    settingsView.resize(app.screen.width, app.screen.height, isTouch);
+    render();
+  }
+
+  function teardown(): void {
+    app.canvas.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('resize', relayout);
+    window.visualViewport?.removeEventListener('resize', relayout);
+    app.stage.removeChild(menuView, settingsView);
+    menuView.destroy({ children: true });
+    settingsView.destroy({ children: true });
+  }
+
+  app.canvas.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('resize', relayout);
+  window.visualViewport?.addEventListener('resize', relayout);
+
+  installMainMenuSeam(seam);
+  render();
+
+  return {
+    untilPlay: () => playPromise,
+    matchStarted: () => {
+      seam.matchStarted = true;
+    },
+  };
+}
+
+/** Install the read-only `window.__mainMenu` live-stage seam (see
+ *  {@link openMainMenu}). Present only on a clean boot; absent under `?debug=1`,
+ *  where the menu never runs — which is itself what that spec asserts. */
+function installMainMenuSeam(seam: object): void {
+  try {
+    Object.defineProperty(window, '__mainMenu', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
 }
 
 /**
