@@ -38,6 +38,10 @@ export interface MatchBootConfig {
   readonly localPlayer: PlayerId;
   /** The hull picked in the lobby (GDD §2.11). */
   readonly shipClass: ShipClass;
+  /** Which ratified arena to build (`src/sim/maps`) — the map the player picked
+   *  on the PLAY screen (m8-02). Omitted, the sim's default (`octagon`) is used;
+   *  an unknown id falls back to it, so a stale saved key can never crash boot. */
+  readonly mapId?: string;
   /** Slots in the match. Defaults to the design's eight (GDD §2.1). */
   readonly slots?: number;
   /** Fixed timestep. Defaults to the sim's canonical 60 Hz tick. */
@@ -79,7 +83,14 @@ export function bootOfflineMatch(config: MatchBootConfig): MatchBoot {
   roster.sort((a, b) => a.id - b.id);
 
   const transport = new LocalLoopback({
-    match: { seed: config.seed, players: roster },
+    match: {
+      seed: config.seed,
+      players: roster,
+      // The arena the player picked (m8-02). `WorldConfig.mapId` threads straight
+      // through `LocalLoopback.startMatch` → `createWorld`, which builds the layout
+      // (or falls back to the default for an unknown id).
+      ...(config.mapId !== undefined ? { mapId: config.mapId } : {}),
+    },
     localPlayer: config.localPlayer,
     dt,
     // Offline the client reads the authoritative world directly, so the binary
