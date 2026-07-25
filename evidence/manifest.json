@@ -248,5 +248,95 @@
     "buildSha": "d22b9f1",
     "attestation": "Live ?debug=1&freeze=1 build (sha d22b9f1, clean), 1280x800 desktop, sim frozen so the staged frame holds still. Staged via the window.__healthbarStage seam installed in the REAL booted client: damageLocal(0.5) set the LOCAL ship to 50% hull and damageEnemy(0.4) parked an enemy at 40% hull 120u to its right. WHAT IS ON SCREEN (full frame + the two committed crops own-ship-healthbar-center.png and own-ship-healthbar-hud.png): the local ship — a grey arrow at frame centre, docked at its blue-ringed home planet — carries an over-ship health bar just above/left of it, filled about HALF with the local player's BLUE colour (the same blue as the HOME planet ring and the HUD bars) and dark for the empty remainder. Beside it, over the enemy near the planet, is a SECOND, distinctly-styled bar filled ~40% in TEAL/CYAN (the enemy colour) — so the own bar is visibly distinct from the enemy bar, in the player colour, with a partial fill. Top-right HUD: a \"HOME\" bar (full, blue) above a \"HULL\" bar that is filled about HALF blue with a dark empty portion. THE TWO AGREE: the over-ship own bar and the HUD HULL readout both read ~50%. Corroborated at the seam readback — the drawn bars the real layer produced last frame: the local-flagged bar owner=0 fraction=0.5 at x=640 (exact viewport centre, where the follow camera holds the ship), the enemy bar owner=1 fraction=0.4 at x=760 (right of centre), and hullReadout()=0.5 — the same 0.5 as the own over-ship bar (one source: sim hull). No page errors while staging the fight. The field-request v0.1.1 complaint (could not see my own ship's health in a fight) is answered: the local ship has a first-class, player-colour health bar and the HUD hull readout reads the same number. VERIFIED.",
     "verdict": "verified"
+  },
+  {
+    "id": "fair-home-resources",
+    "title": "Resource fairness — three home planets, one symmetric field (identical home neighbourhoods)",
+    "area": "match",
+    "image": "images/fair-home-resources.png",
+    "capturedAt": "2026-07-25T21:06:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Live ?debug=1&freeze=1 build (sha 88d36be, clean). The follow-camera holds the local ship centred and the world is drawn 1:1 (never zoomed), so to see more than one home at once I opened an OVERSIZED 3600x3600 square viewport — big enough to hold the whole 2400-unit arena in one static frame — and let the sim pin at the seeded freeze tick. The local ship sat un-driven at its spawn (read back live at world 1968,1200). This is the TOP HALF of that frame. WHAT IS ON SCREEN: three home planets across the top — left with an ORANGE beacon ring, centre WHITE, right BLUE — each an identical dark disc (teal blob + yellow core) with a small grey ship parked in orbit pointing INWARD toward the arena centre. Below them, pulled inboard toward the centre, is the shared asteroid field, and it is LEFT-RIGHT MIRROR-SYMMETRIC about the vertical line through the centre (white) planet: every rock cluster on the left has a congruent partner at the mirrored position on the right — same count, same sizes, same arrangement. Comparing the ORANGE planet's local neighbourhood (lower-left) against the BLUE planet's (lower-right) with my own eyes, each is the same group of asteroids, one the rotated/mirrored copy of the other. This is the p1-09 fairness invariant SEEN, not assumed — identical home fields stamped (rotated) around every planet. See field-map.png for all eight planets and central-field-wide.png for the full eight-fold symmetry. VERIFIED."
+  },
+  {
+    "id": "fair-home-detail",
+    "title": "Resource fairness — closeup: adjacent home fields are congruent rotated copies",
+    "area": "match",
+    "image": "images/fair-home-detail.png",
+    "capturedAt": "2026-07-25T21:06:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Same frozen frame (sha 88d36be), a tighter 1040x470 crop of the field's upper arc (no planets in view). WHAT IS ON SCREEN: asteroid clusters straddling clear radial spokes, the whole arrangement mirror-symmetric about the vertical. The two home-neighbourhood clusters flanking the top spoke are congruent three-rock groups — one the mirror/rotated copy of the other — sitting on the outer part of the field; the commons rocks sit just inboard of them. Confirms at close range that adjacent homes receive identical fields. Supporting detail for fair-home-resources.png. VERIFIED."
+  },
+  {
+    "id": "central-commons",
+    "title": "The contested commons — symmetric central field with the collapse centre in its clear eye",
+    "area": "match",
+    "image": "images/central-commons.png",
+    "capturedAt": "2026-07-25T21:06:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Same frozen frame (sha 88d36be), a 780x780 crop centred exactly on the arena's geometric centre (world 1200,1200) — the collapse centre the field closes toward (GDD §2.3). WHAT IS ON SCREEN: the central contested field, a ring of asteroid clusters that is invariant under 45deg rotation about its centre (rotate the image an eighth-turn and the clusters map onto themselves — eight-fold symmetric, favouring nobody). At the very centre is a CLEAR EYE of open space with no rock, in which the collapse centre sits; this doubles as the launch corridor kept clear on every spoke. This central concentration is the densest asteroid field on the board — the rest of the 2400-unit arena (see field-map.png) is empty — the contested prize at the heart of the map. The HUD reads WAVE 1/5, so this is the opening state: the first of five commons waves is down and, by design, more close inward over the match. Symmetric, central, collapse-centre inside, and the richest concentration in the arena. VERIFIED."
+  },
+  {
+    "id": "central-field-wide",
+    "title": "The whole central field — eight-fold rotational symmetry (context)",
+    "area": "match",
+    "image": "images/central-field-wide.png",
+    "capturedAt": "2026-07-25T21:06:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Same frozen frame (sha 88d36be), a wider 1000x1000 crop of the whole central field about the arena centre. WHAT IS ON SCREEN: the full symmetric field — eight repetitions of one canonical sector arranged around the clear central eye, an outer ring (the eight home neighbourhoods, one per planet, further from centre) and an inner ring (the commons wave, closer in). Rotating the image by 45deg maps it onto itself. The single clearest view that every planet faces the same field. Context for fair-home-resources.png and central-commons.png. VERIFIED."
+  },
+  {
+    "id": "field-map",
+    "title": "Full arena — eight homes, one central field, no stray ore (context)",
+    "area": "match",
+    "image": "images/field-map.png",
+    "capturedAt": "2026-07-25T21:06:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Live ?debug=1&freeze=1 build (sha 88d36be, clean), the FULL 3600x3600 oversized-viewport frame in one shot. WHAT IS ON SCREEN: all EIGHT home planets on a ring, each with a differently-coloured beacon (white, orange, navy, magenta, purple, teal, green, blue) and a ship parked at it pointing inward; the square arena wall; and a SINGLE symmetric asteroid field concentrated at the centre. There is NO stray ore anywhere else in the arena — the only asteroids are the central field (the eight home neighbourhoods plus the commons), exactly as p1-09 claims (placement is an invariant, not scatter). HUD: ORE 3, WAVE 1/5 · Outer Drift, MATCH 0:02, build stamp bottom-right. The source frame the fairness/commons crops are cut from. VERIFIED."
+  },
+  {
+    "id": "ore-deposit-flight",
+    "title": "Ore deposit — a docked ship banks its hold, ore flying ship→planet, counters in lockstep",
+    "area": "match",
+    "image": "images/ore-deposit-flight.png",
+    "capturedAt": "2026-07-25T21:03:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Live ?debug=1 build (sha 88d36be, clean, NO freeze so the drain actually runs), 1280x800 desktop. Staged through the window.__oreDepositStage seam in the REAL booted client: stage(6) parked the LOCAL ship at rest inside dock range of its own planet with 6 ore in the hold (bank started at 3), then no input was given. WHAT IS ON SCREEN at the mid-drain frame: the local ship (grey arrow) sits just right of its blue-ringed home planet, pointing at it, and a YELLOW ORE COURIER is in flight in the gap BETWEEN the ship and the planet (travelling ship->planet). Top-left HUD (see ore-deposit-flight-hud.png): FIVE filled yellow cargo squares + one empty — the hold, about 5 of 6 — above 'ORE 3', the bank. THE TWO COUNTERS MOVE TOGETHER: the seam read hold 5.77 / bank 3.23 at this instant (from the staged 6 / 3 — the 0.23 that left the hold had arrived in the bank; the sum is conserved). Watched through to the end in the same run (ore-deposit-flight-end.png): the hold drained to EXACTLY 0 and the bank rose to 9 (= 3 + the whole staged 6). The v0.1.2 field report ('ore just stays on my ship') is answered — a docked ship auto-banks its hold, the ore visibly flying to the planet, hold and bank ticking in lockstep. VERIFIED."
+  },
+  {
+    "id": "ore-deposit-flight-end",
+    "title": "Ore deposit — end of drain: hold empty, bank risen by the full amount",
+    "area": "match",
+    "image": "images/ore-deposit-flight-end.png",
+    "capturedAt": "2026-07-25T21:03:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Same run as ore-deposit-flight.png, at the end of the drain. WHAT IS ON SCREEN: the same ship parked at its planet; the cargo squares top-left are now ALL EMPTY (hold = 0) and the bank reads 'ORE 8', risen from the starting 3, with one last courier still crossing to the planet (the final unit in flight, banked to 9 a moment later — the seam read hold 0 / bank 9.0). Proves the hold reaches zero and the bank rose by the full staged 6. Supporting evidence for ore-deposit-flight.png. VERIFIED."
+  },
+  {
+    "id": "defeat-screen",
+    "title": "DEFEATED overlay — placement shown, SPECTATE + REMATCH present, match live behind it",
+    "area": "match",
+    "image": "images/defeat-screen.png",
+    "capturedAt": "2026-07-25T21:03:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Live ?debug=1 build (sha 88d36be, clean, NO freeze), 1280x800 desktop. After letting the live match run a beat, the local core was destroyed through the sim's OWN elimination path (window.__endScreenStage.eliminateLocal() -> destroyCore — the rule, not a faked screen). WHAT IS ON SCREEN: the DEFEATED overlay — 'ELIMINATED' in large red, and beneath it '8th of 8 — your core was destroyed.' (placement plus cause of death; the local player fell first of eight). Two buttons stacked at centre: 'REMATCH' (focused, cyan outline) above 'SPECTATE' — both present and drawn as hittable buttons. Behind the semi-transparent overlay the LIVE match world shows through: dimmed asteroids, the HUD (WAVE 1/5 · Outer Drift, MATCH 0:03), faint ship trails — the match did not stop. I then pressed SPECTATE (its wired action fired): the overlay dropped and the match kept running (defeat-screen-spectate.png), with the sim tick count climbing +94 (129->223) and no overlay up. The v0.1.2 report ('no end screen after my planet died') is answered. VERIFIED."
+  },
+  {
+    "id": "defeat-screen-spectate",
+    "title": "SPECTATE keeps the match visibly running (the sim never stopped)",
+    "area": "match",
+    "image": "images/defeat-screen-spectate.png",
+    "capturedAt": "2026-07-25T21:03:00Z",
+    "buildSha": "88d36be",
+    "verdict": "verified",
+    "attestation": "Same run as defeat-screen.png, immediately after pressing SPECTATE. WHAT IS ON SCREEN: NO overlay — the camera has moved onto a surviving player and the match is visibly running: multiple ships (arrows) with active cyan/magenta beam and thrust trails, ore chunks (yellow), a defended planet bottom-right and another top-right. Top-right HUD reads 'HOME LOST' (the local player is out) with 'HULL —', and the MATCH clock reads 0:04 — ADVANCED from the 0:03 shown on the DEFEATED overlay. Confirms SPECTATE keeps the match visibly running: the sim never stopped (tick count climbed +94 across the same interval). Supporting proof for defeat-screen.png. VERIFIED."
   }
 ]
