@@ -248,11 +248,12 @@ export const WAVE_INTERVAL_S: Tunable<number> = 150;
  * wave *yield* is `FIELD_YIELD / WAVE_COUNT`; this is where they land. TUNABLE
  */
 export const WAVE = {
-  /** Asteroids delivered per wave. `WAVE_COUNT × this` is the whole match's
-   *  rock count — 5 × 20 = 100, half the ~200-asteroid performance budget
-   *  (GDD §4.3) even if nobody mines a thing. At `WAVE_ORE` = 80 that is ~4 ore
-   *  a rock: eight seconds of Vanguard beam time, two round trips for a base
-   *  2-slot hold — small enough that "how full do I run?" is asked often. */
+  /** Asteroids delivered per wave (a target — the spawner rounds it to the
+   *  nearest multiple of the player count so the wave is `N`-fold symmetric,
+   *  `RESOURCE_FIELD`). `WAVE_COUNT × this` plus the home fields is the whole
+   *  match's rock count — roughly 5 × 20 + 3 × N ≈ 124 at 8 players, well under
+   *  the ~200-asteroid performance budget (GDD §4.3) even if nobody mines a
+   *  thing. Rocks stay small enough that "how full do I run?" is asked often. */
   asteroidsPerWave: 20,
   /** Wave 1's scatter disc, as a fraction of the base field radius. */
   firstRadiusFraction: 1.0,
@@ -261,8 +262,71 @@ export const WAVE = {
   lastRadiusFraction: 0.25,
 } as const;
 
-/** Ore delivered by one wave — the finite field, divided evenly (GDD §2.3). */
-export const WAVE_ORE: Tunable<number> = FIELD_YIELD / WAVE_COUNT;
+/**
+ * Fair resource layout (developer field rule v0.1.2: "equally located resources
+ * for every planet, before the fight begins — with neighbor resources and
+ * central ones as well"). Resource placement is a **fairness invariant**, not
+ * scatter: the whole asteroid field is invariant under rotation by `2π / N`
+ * about the arena centre, where `N` is the player count. See the invariant note
+ * in `./waves`. Every value TUNABLE.
+ *
+ *  - **Home fields** are the per-planet "neighbour resources": one seeded
+ *    canonical pattern, stamped around each planet rotated by that planet's ring
+ *    angle, so all `N` home fields are IDENTICAL by construction — equal totals
+ *    need no tolerance. They sit inboard of the planet (between it and the ring
+ *    midline), OUTSIDE turret range, and clear of `WORLD_EDGE_MARGIN`.
+ *  - **The commons** is the contested centre: a richer central field delivered
+ *    by the asteroid waves, itself `N`-fold symmetric so mid-map favours nobody.
+ */
+export const RESOURCE_FIELD = {
+  /** Share of `FIELD_YIELD` delivered as the contested central commons — the
+   *  rest (`1 - commonsShare`) funds the equal home neighbourhoods, split evenly
+   *  across the `N` planets. The commons holds this whole share; each home holds
+   *  `(1 - commonsShare) / N`, so the commons is richer than any single home
+   *  field by construction. TUNABLE */
+  commonsShare: 0.6,
+  /** The fairness test's floor: the commons must hold at least this fraction of
+   *  all world ore, so the centre is always worth fighting for (GDD §2.3). The
+   *  actual `commonsShare` sits comfortably above it. TUNABLE */
+  commonsMinShare: 0.5,
+  /** Commons scatter disc for wave 1, as a fraction of `ringRadius` (waves 2..5
+   *  shrink from it, `waveRadiusFraction`). Kept small enough that the commons
+   *  core stays clear of every home's measure radius — the two fields never
+   *  overlap, which is what lets the home totals be EXACTLY equal. TUNABLE */
+  commonsRadiusFraction: 0.4,
+  /** Canonical rocks per home field (before `N`-fold stamping). TUNABLE */
+  homeCount: 3,
+  /** Home-field centre-radius band, as fractions of the planet ring radius:
+   *  inboard of the planet (between it and the ring midline) and far enough in
+   *  that the nearest rock still clears turret range. TUNABLE */
+  homeInnerFraction: 0.52,
+  homeOuterFraction: 0.64,
+  /** Angular half-spread of a home field around its planet's spoke (radians) —
+   *  small, so a home field reads as a tight cluster by its own planet and stays
+   *  well isolated from its neighbours' fields. TUNABLE */
+  homeAngularSpread: 0.16,
+  /** Radius R around a home within which its local ore is measured for the
+   *  fairness invariant, as a fraction of the planet ring radius. Sized to
+   *  enclose the whole home field yet exclude both the commons and any
+   *  neighbour's field, so "ore within R of each home" is exactly one home
+   *  field per planet — all `N` equal. TUNABLE */
+  homeMeasureFraction: 0.55,
+} as const;
+
+/** Ore delivered by one asteroid wave — the commons, divided evenly across the
+ *  `WAVE_COUNT` waves (GDD §2.3). The home neighbourhoods carry the remaining
+ *  `1 - commonsShare` of `FIELD_YIELD`, placed at construction, so the whole
+ *  match still yields exactly `FIELD_YIELD` (`RESOURCE_FIELD`). */
+export const WAVE_ORE: Tunable<number> =
+  (FIELD_YIELD * RESOURCE_FIELD.commonsShare) / WAVE_COUNT;
+
+/** Ore in one home neighbourhood — `(1 - commonsShare)` of `FIELD_YIELD`, split
+ *  evenly across the `N` planets. All `N` home fields carry exactly this (the
+ *  fairness invariant, `RESOURCE_FIELD`). */
+export function homeFieldOre(playerCount: number): number {
+  const n = Math.max(1, playerCount);
+  return (FIELD_YIELD * (1 - RESOURCE_FIELD.commonsShare)) / n;
+}
 
 /**
  * Sim time (seconds) at which wave `n` (1-based) arrives. Wave 1 is present at

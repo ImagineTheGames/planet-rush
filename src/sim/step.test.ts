@@ -19,6 +19,7 @@ import {
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   MINING_RATE,
+  RESOURCE_FIELD,
   SHIP_RADIUS,
   SHIP_STATS,
   TICK_DT,
@@ -602,7 +603,7 @@ describe('ship physics (GDD §2.11, §4.1)', () => {
     expect(Math.hypot(world.ships[0]!.vel.x, world.ships[0]!.vel.y)).toBeLessThan(1);
   });
 
-  it('createWorld spawns one ship per slot and a central field', () => {
+  it('createWorld spawns one ship per slot, home fields, and a central field', () => {
     const world = createWorld({
       seed: 99,
       players: [
@@ -612,7 +613,13 @@ describe('ship physics (GDD §2.11, §4.1)', () => {
       asteroidCount: 12,
     });
     expect(world.ships).toHaveLength(2);
-    expect(world.asteroids).toHaveLength(12);
+    // The field is now two parts (field rule v0.1.2, `RESOURCE_FIELD`): an
+    // identical home neighbourhood per planet (tagged by owner) and the
+    // contested commons (`home == null`).
+    const home = world.asteroids.filter((a) => a.home != null);
+    const commons = world.asteroids.filter((a) => a.home == null);
+    expect(home).toHaveLength(RESOURCE_FIELD.homeCount * 2);
+    expect(commons.length).toBeGreaterThan(0);
     // Hauler carries 3 cargo slots by class (GDD §2.11).
     expect(world.ships[1]!.cargoCap).toBe(3);
   });

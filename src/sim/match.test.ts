@@ -29,6 +29,7 @@ import {
   CORE_HP,
   FIELD_YIELD,
   PLANET,
+  RESOURCE_FIELD,
   RESPAWN_S,
   SHIELD,
   SHIP_RADIUS,
@@ -36,6 +37,7 @@ import {
   TICK_DT,
   TURRET,
   WAVE_COUNT,
+  WAVE_ORE,
   WRECK,
   waveRadiusFraction,
 } from './constants';
@@ -395,7 +397,10 @@ describe('asteroid waves (GDD §2.3)', () => {
     // nothing but the metronome moves.
     for (let n = 1; n <= WAVE_COUNT; n++) {
       while (world.match.wavesSpawned < n) step(world, [], 1);
-      const fresh = world.asteroids.filter((a) => !seen.has(a.id));
+      // Only the commons (`home == null`) is a "wave"; the home neighbourhoods
+      // sit out by the planets and were placed at construction, not on the
+      // shrinking-disc metronome (field rule v0.1.2, `RESOURCE_FIELD`).
+      const fresh = world.asteroids.filter((a) => !seen.has(a.id) && a.home == null);
       expect(fresh.length).toBeGreaterThan(0);
       let far = 0;
       for (const a of fresh) {
@@ -419,8 +424,12 @@ describe('asteroid waves (GDD §2.3)', () => {
         { id: 1, shipClass: ShipClass.Vanguard },
       ],
     });
-    expect(world.match.wavesSpawned).toBe(1); // wave 1 is the opening field
-    expect(oreInWorld(world)).toBeCloseTo(FIELD_YIELD / WAVE_COUNT, 6);
+    expect(world.match.wavesSpawned).toBe(1); // wave 1 of the commons is present
+    // At construction the field holds the home neighbourhoods (the whole
+    // `1 - commonsShare` of the yield, placed once) plus wave 1 of the commons
+    // (`WAVE_ORE`) — field rule v0.1.2, `RESOURCE_FIELD`.
+    const homeTotal = FIELD_YIELD * (1 - RESOURCE_FIELD.commonsShare);
+    expect(oreInWorld(world)).toBeCloseTo(homeTotal + WAVE_ORE, 6);
 
     // Run the whole wave schedule out. Nobody mines, so the field closes on the
     // collapse deadline (GDD §2.3) rather than by exhaustion — the moment it
