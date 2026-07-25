@@ -188,5 +188,35 @@
     "buildSha": "0a3a313",
     "attestation": "Re-verified on live build 0a3a313 — the SAME staged 1900×1100 frame as enemy-beam-visible (one frame, two gates), zoomed 3× (full frame: images/combat-staged.png). __healthbarStage.damageEnemy(0.4), driven under ?debug=1&freeze=1, set the parked bot's hull to 40% of max. WHAT IS ON SCREEN: floating just above that enemy bot is a TWO-PART horizontal HP bar — a bright cyan fill spanning the left ~40% and a grey empty remainder for the rest — i.e. a health bar tracking a damaged enemy, filled to the 0.4 it was staged at. Corroborated at the instrument: __healthbarStage.bars() returns a bar for owner:1 at fraction:0.4, screen position (1070,525) — right of viewport centre (950,550), i.e. directly over the parked bot, exactly where the bar is drawn. (A second bar, the staged rival turret at full fill, sits near the bottom edge.) Round-2 failed because main.ts populated no combatants and drawShips() carried no bar geometry; the fix adds feedCombatants() in main.ts, which fills hudFrame.combatants from sim state every frame and hands it to the health-bar layer. VERIFIED: enemies show health bars in the booted client.",
     "verdict": "verified"
+  },
+  {
+    "id": "main-menu-at-boot",
+    "title": "Field report P1: main menu on a clean boot",
+    "area": "boot",
+    "image": "images/main-menu-at-boot.png",
+    "capturedAt": "2026-07-25T04:40:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Clean boot of the live preview build at '/' — NO ?debug=1, the exact path the field report walked (?debug=1 deliberately skips the menu, so it cannot be used here). ON SCREEN: a near-black screen with the wordmark 'PLANET RUSH' centred across the top and two stacked centred buttons mid-screen — 'PLAY' in a plasma-cyan-outlined filled button (the primary action) above a dimmer steel-outlined 'SETTINGS' button. Nothing else is drawn: no HUD (no ORE readout, no wave clock, no controls strip), no ship, no planets, no asteroids — there is NO match running behind the menu. Corroborated at the instrument: the ?debug=1 match instrument window.__planetRush is ABSENT at boot (a match booting immediately would have installed it), and the menu seam reads visible:true / screen:'menu' / matchStarted:false — no match world has been built yet. I then PRESSED PLAY myself (clicked the button rect at 640,407): the menu tore down (menuVisible -> false) and the match world was built (matchStarted -> true). So a clean boot lands on the main menu, and PLAY — not boot — is what starts a match. The field report 'no main menu at boot, I started right in the match' is dead. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "planet-clear-of-edge",
+    "title": "Field report P1: home planet clear of the arena wall",
+    "area": "match",
+    "image": "images/planet-clear-of-edge.png",
+    "capturedAt": "2026-07-25T04:40:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Frozen deterministic scene (?debug=1&freeze=1, frozen confirmed before the shutter) on a wide 2600x1600 follow-camera (1:1), centred on the local ship at its home planet (shipWorld 1968,1200; the arena is 2400x2400, centre 1200,1200). ON SCREEN: the home planet — a dark patina disc with a yellow core, two teal segments and a distinct BLUE owner-beacon ring — sits just right of frame centre, beside the small local-ship triangle the camera holds centred. To its right runs a bright vertical STEEL ARENA WALL (the +x boundary at world x = 2400); between the home planet's beacon ring and that wall is a wide band of empty space (~260 world-px of clearance) — the planet is plainly nowhere near the wall. Two other owner-ringed planets (one upper, one lower) are also well clear of every edge, and no planet or asteroid hugs the boundary. The field report 'home planet against the map edge' is dead: the widened arena and edge margin give the ring generous breathing room off the steel frame. VERIFIED.",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-orbit-facing",
+    "title": "Field report P1: turret slid around the rim to face an attacker",
+    "area": "match",
+    "image": "images/turret-orbit-facing.png",
+    "capturedAt": "2026-07-25T04:35:00Z",
+    "buildSha": "b65d6d5",
+    "attestation": "Live (un-frozen) ?debug=1 build, 1500x1000. The home planet (local slot 0) sits on the arena's +x spoke, so its turret is BORN on the planet's EAST (wall-side) rim (turretHomeAngle = planet.angle = 0). Staged: held E to open the build wheel, clicked the TURRET wedge (ORE 3 -> 0, confirmed on the HUD), let the 10 s build finish, then parked a live attacker on the planet's WEST (inward) rim via the ?debug=1 __healthbarStage.damageEnemy(0.5) seam (a bot at 50% hull, re-parked every frame to hold it inside the turret's 240u range). WHAT IS ON SCREEN — clearest in the committed crop images/turret-orbit-facing-zoom.png: on the home planet's WEST (LEFT) rim — the side facing the attacker, OPPOSITE its east birth mount — sits the turret, a small grey body on a short stalk off the rim; immediately left of it is the attacker, a teal enemy-ship triangle carrying a two-part health bar (the 50% hull it was staged at). My local ship (blue triangle) is further left at frame centre; the +x steel wall is at the far right; HUD reads WAVE 1/5 · Outer Drift, ORE 0; build stamp b65d6d5. The turret has SLID ~180 degrees around its planet's rim, from the wall-side mount to the inward rim, to face the attacker. Corroborated at the instrument (turret muzzle world-origin from __planetRush.beams): the first firing sample was at (2123,1250) — the EAST/SE rim by its mount — then it moved to (1964,1206) on the WEST rim (planet centre ~2058,1200); across 7 consecutive later samples over ~4 s the origin held at (1964,1203-1204), moving <=1 px — SETTLED, not orbiting or thrashing. HONEST SCOPE on the 'two attackers' clause: a genuine live two-bot siege on the home turret could NOT be reproduced in this booted offline build — across dense polling of BOTH a core-abandon run and a kite-them-home run the home turret fired ZERO frames, because the offline bots never crossed within its 240u range. The only in-client way to put an attacker in a turret's reach here is the single-bot damageEnemy seam, so this scene stages ONE controlled attacker; the 'settles instead of thrashing' behaviour is attested via the observed settle (turret converged to a fixed rim angle and held it with no oscillation), NOT via a two-simultaneous-attacker frame, which is genuinely out of reach of the booted client on this build. The field report 'turrets that should orbit the rim to face threats' is dead: the turret demonstrably slides around the rim to face its attacker. VERIFIED.",
+    "verdict": "verified"
   }
 ]

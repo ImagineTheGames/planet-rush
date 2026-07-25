@@ -134,3 +134,52 @@ round 2 and its `main.ts` path is unchanged, so it stands.
 
 **All three gates PASS on `0a3a313`. This is the final combat-visibility gate for
 the v0.1 classroom tag.**
+
+## Evidence round 4 — the three v0.1 field reports (build `b65d6d5`)
+
+The developer played v0.1 and reported three faults: the home planet against the
+map edge, no main menu at boot, and turrets that should orbit the rim to face
+threats. p1-01..03 (PRs #63 world-margin, #64 main-menu-wiring, #65 turret-orbit)
+fix them. I rebuilt HEAD of `main` (`b65d6d5`, clean tree) and staged each tell on
+the **live** preview — `capture-round4.mjs` — then looked at every pixel and read
+the instrument back.
+
+| Field report | Shot | Verdict |
+| --- | --- | --- |
+| No main menu at boot | `main-menu-at-boot` | **verified** — a CLEAN boot lands on the PLANET RUSH menu; PLAY builds the match |
+| Home planet against the edge | `planet-clear-of-edge` | **verified** — ~260u of clear space between the home ring and the steel wall |
+| Turrets don't face threats | `turret-orbit-facing` | **verified** — the turret slid ~180° around the rim to face its attacker, then settled |
+
+What I saw and how it was staged:
+
+- **main-menu-at-boot** — a clean boot at `/` (NO `?debug=1`, which would skip the
+  menu). On screen: the `PLANET RUSH` wordmark over a plasma `PLAY` and a steel
+  `SETTINGS` button, and **no match behind it** — no HUD, ship, or planets. The
+  `?debug=1` match instrument `__planetRush` is absent and the menu seam reads
+  `matchStarted:false`. I then pressed PLAY myself: the menu tore down and
+  `matchStarted` flipped true — PLAY, not boot, starts the match.
+- **planet-clear-of-edge** — `?debug=1&freeze=1`, a wide 2600×1600 follow-camera on
+  the home planet (blue beacon ring, world 1968,1200). A bright vertical steel
+  arena wall (the +x boundary at world x≈2400) runs down the right with a wide
+  empty band between it and the ring — the planet is nowhere near the wall, and
+  nothing hugs the boundary.
+- **turret-orbit-facing** — live `?debug=1`. The home turret is born on the planet's
+  EAST (wall-side) mount. Built it (ORE 3→0), then parked a live attacker on the
+  WEST rim via `__healthbarStage.damageEnemy(0.5)`, held in the 240u range. On
+  screen (crop `turret-orbit-facing-zoom.png`): the turret has slid to the planet's
+  WEST rim, beside the attacker (teal ship + a 50% health bar), facing it. The
+  muzzle world-origin read back moved from the east mount `(2123,1250)` to the west
+  rim `(1964,1206)` and then held `(1964,1203-1204)` across 7 samples — settled, not
+  thrashing.
+
+Honest scope on the **two-attacker** clause: a genuine live two-bot siege on the
+home turret could not be reproduced — across dense polling of a core-abandon run
+AND a kite-them-home run the home turret fired **zero** frames, because the offline
+bots never crossed within its 240u range. The one-bot `damageEnemy` seam is the
+only in-client way to put an attacker in reach, so the shot stages one controlled
+attacker; the "settles instead of thrashing" property is attested via the observed
+single-target settle (a fixed rim angle held with no oscillation), not a
+two-simultaneous-attacker frame, which is out of reach of the booted client here.
+
+**All three v0.1 field reports are dead on `b65d6d5`.** No page errors in any
+capture.
