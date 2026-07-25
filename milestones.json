@@ -76,20 +76,38 @@
     {
       "day": 5,
       "title": "Integration & performance gate",
-      "test_notes": "A full 8-slot online match runs end-to-end at 60 fps on integrated graphics and on the phone. First balance pass; art/VFX/audio replace placeholders.",
-      "done": false
+      "test_notes": "A full 8-slot online match runs end-to-end at 60 fps on integrated graphics and on the phone. First balance pass; art/VFX/audio replace placeholders. [Marked done from the v0.1 release check: determinism replay green, 50-match soak zero hangs, sim at ~1.5% frame budget, perf gate in CI.]",
+      "done": true
     },
     {
       "day": 6,
       "title": "Balance & polish",
-      "test_notes": "Match length lands in the 10-15 minute target. Gamepad and touch verified; onboarding polished.",
-      "done": false
+      "test_notes": "Match length lands in the 10-15 minute target. Gamepad and touch verified; onboarding polished. [Marked done from the re-issued release check: all four balance targets PASS; polish shipped in d6/d7 briefs.]",
+      "done": true
     },
     {
       "day": 7,
       "title": "Classroom release",
       "test_notes": "Full flow end-to-end: main menu, settings, an 8-slot match with bots, and the end-of-match / Rematch screen. Touch and keyboard both working; runs at 60 fps on your phone.",
       "done": true
+    },
+    {
+      "day": 8,
+      "title": "Maps — four arenas + the picker (v0.2)",
+      "test_notes": "Pick each map from the PLAY screen; octagon default. Equal spacing on A/B/C, veteran diamond. Evidence round 7 gates the tag.",
+      "done": false
+    },
+    {
+      "day": 9,
+      "title": "The Cold Vacuum art pass (v0.3)",
+      "test_notes": "The game looks like the concept boards: hulls, planets, field props, structures, backdrop, UI skin. Side-by-side evidence gates the tag.",
+      "done": false
+    },
+    {
+      "day": 10,
+      "title": "Online play (v0.4) — M3 completed",
+      "test_notes": "BLOCKED ON: hosting account (Oracle free / Hetzner ~4EUR). Then: server deploy, ONLINE menu, room codes, two-phone match. Evidence: two clients, one world, reconnect keeps your ship.",
+      "done": false
     }
   ]
 }
