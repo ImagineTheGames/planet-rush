@@ -119,16 +119,19 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
 
-// --- Over-entity health bars — the field report's enemy bars (GDD §2.2) ----
+// --- Over-entity health bars — enemy bars + the own ship (GDD §2.2) ---------
 //
-// A pooled, screen-space layer that floats a hull/HP bar over every *non-local*
-// combat entity (enemy ships, enemy turrets, hostile wave units) that is damaged
-// or in combat — never over the local player's own ship (they read their hull
-// from the HUD). Folded into the `Hud`: pass `combatants` on the `HudFrame` with
-// each entity's HP and **screen-space** position (project world → screen via
-// `renderer.projectToScreen`), and set `owner` to the local player's slot. The
-// layer registers itself through `Hud.describeLayout`, so no `main.ts` change is
-// needed beyond filling the frame.
+// A pooled, screen-space layer that floats a hull/HP bar over every combat
+// entity that is damaged or in combat: enemy ships, enemy turrets, hostile wave
+// units — and, per field request v0.1.1, the local player's **own ship**, styled
+// distinctly (player colour, slightly larger) so it reads as mine. The own ship
+// is fed to the `Hud` via `hull`/`maxHull`/`shipRadius`/`shipFiring` on the
+// `HudFrame` (the HUD synthesises its `local` combatant at screen centre); the
+// enemies come on `combatants`, each with its HP and **screen-space** position
+// (project world → screen via `renderer.projectToScreen`), with `owner` set to
+// the local player's slot. The own player's *turrets* still get no bar (they read
+// off the HOME HP readout). The layer registers itself through
+// `Hud.describeLayout`, alongside the new `hull-hud` top-right readout.
 
 export {
   combatantGetsBar,
@@ -138,6 +141,8 @@ export {
   HEALTHBAR_GAP,
   HEALTHBAR_HEIGHT,
   HEALTHBAR_WIDTH,
+  HEALTHBAR_LOCAL_HEIGHT,
+  HEALTHBAR_LOCAL_WIDTH,
 } from './healthbar';
 export type { Combatant, HealthBar } from './healthbar';
 
@@ -505,6 +510,7 @@ export {
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
+  hullHudBounds,
   ARROW_SIZE,
   ALARM_FRAME_STROKE,
   ALARM_FRAME_INSET,
@@ -515,4 +521,7 @@ export {
   PANEL_EDGE_PAD,
   PANEL_CHROME_HEIGHT,
   PANEL_ROW_HEIGHT,
+  HULL_BAR_WIDTH,
+  HULL_BAR_HEIGHT,
+  HULL_TOP,
 } from './hud-geometry';
