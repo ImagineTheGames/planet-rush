@@ -135,6 +135,47 @@ function stampRock(
   });
 }
 
+/**
+ * Stamp a canonical home rock **in a planet's own frame** rather than the
+ * arena's — for maps whose planets do not share one ring (`compass`, `oval`,
+ * `diamond`). The canonical rock lives in the polar frame of a reference planet
+ * sitting on the +x spoke at radius `refR`; its offset from that planet is
+ * rotated by the real planet's spoke angle and dropped at the real planet's
+ * centre. Because the offset is the SAME for every planet, all `N` home fields
+ * are a rigid rotation-plus-translation of one pattern — congruent, so the
+ * per-player local ore is identical by construction even when the planets are
+ * not (the fairness invariant, `resource-fairness.test.ts`), exactly as the
+ * single-ring `stampRock` gives for `octagon`. Positions still clamp to the wall
+ * margin (a no-op on the shipped maps, where the field sits well inboard).
+ */
+function stampRockLocal(
+  world: World,
+  refR: number,
+  planet: { pos: { x: number; y: number }; angle: number },
+  rock: CanonRock,
+  home: PlayerId | null,
+): void {
+  // Canonical rock at (r, delta) in the reference planet's polar frame; its
+  // offset from that planet (which sits at (refR, 0) in that frame).
+  const ox = rock.r * Math.cos(rock.delta) - refR;
+  const oy = rock.r * Math.sin(rock.delta);
+  const ca = Math.cos(planet.angle);
+  const sa = Math.sin(planet.angle);
+  world.asteroids.push({
+    id: world.nextEntityId++,
+    pos: {
+      x: clampToMargin(planet.pos.x + (ox * ca - oy * sa), rock.radius, world.bounds.width),
+      y: clampToMargin(planet.pos.y + (ox * sa + oy * ca), rock.radius, world.bounds.height),
+    },
+    radius: rock.radius,
+    ore: rock.ore,
+    maxOre: rock.ore,
+    crackStage: 0,
+    mineBuffer: 0,
+    home,
+  });
+}
+
 /** Draw `count` canonical rocks and scale their ore so the whole pattern totals
  *  `oreBudget`. Advances and returns the RNG state. Radii/angles vary with the
  *  seed (GDD §5.5 — a payout a player can judge); the total does not. */
@@ -193,9 +234,19 @@ export function spawnHomeFields(world: World): void {
 
   const cx = world.bounds.width / 2;
   const cy = world.bounds.height / 2;
-  // The ring radius, read off a planet — the field is a fraction of it, so the
-  // layout scales with the arena and stays layout-agnostic (any ring order).
-  const ringR = Math.hypot(planets[0]!.pos.x - cx, planets[0]!.pos.y - cy);
+  // Each planet's own distance from the centre. On a single-ring map (`octagon`
+  // and the historical default) these are all equal; on `compass`/`oval`/
+  // `diamond` they are not, and the field is stamped per-planet so it stays
+  // inboard of each home wherever the home sits.
+  const radii = planets.map((p) => Math.hypot(p.pos.x - cx, p.pos.y - cy));
+  const ref = radii[0]!;
+  const singleRing = radii.every((r) => Math.abs(r - ref) <= 1e-9);
+  // The field-band reference: the ring radius on a single-ring map (identical to
+  // the historical `ringR`, so that path stays byte-for-byte unchanged), else
+  // the SMALLEST planet radius, so the shared pattern fits inboard of even the
+  // closest-in home (the `diamond` inner ring). The field is a fraction of it,
+  // so the layout scales with the arena and stays layout-agnostic.
+  const ringR = singleRing ? ref : Math.min(...radii);
 
   // The launch pocket (field report P1): no rock's BODY may sit within
   // `SPAWN_CLEAR_POCKET` of a planet, so a ship can leave spawn and manoeuvre in
@@ -241,7 +292,15 @@ export function spawnHomeFields(world: World): void {
 
   for (const planet of planets) {
     for (const rock of rocks) {
-      stampRock(world, cx, cy, planet.angle, rock, planet.owner);
+      // Single-ring maps take the original arena-frame stamp unchanged (the
+      // `octagon`/default board is byte-for-byte what it always was); varying-
+      // radius maps stamp the same pattern in each planet's own frame, keeping
+      // every home field congruent.
+      if (singleRing) {
+        stampRock(world, cx, cy, planet.angle, rock, planet.owner);
+      } else {
+        stampRockLocal(world, ringR, planet, rock, planet.owner);
+      }
     }
   }
 }

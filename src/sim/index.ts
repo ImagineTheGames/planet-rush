@@ -20,6 +20,8 @@
  */
 
 export * from './constants';
+// The ratified map registry: arena bounds + home placements per layout.
+export * from './maps';
 // Class bases × upgrade tiers — every derived ship stat (GDD §2.5, §2.11).
 export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
