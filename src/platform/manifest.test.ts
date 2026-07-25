@@ -18,9 +18,14 @@ interface Manifest {
   start_url?: string;
   scope?: string;
   display?: string;
+  display_override?: string[];
   orientation?: string;
   icons?: { src: string; sizes: string; type: string; purpose?: string }[];
 }
+
+/** The install-route display modes that give a chrome-free window (no title bar,
+ *  no URL bar) — the permanent answer to the v0.1.1 field request. */
+const CHROME_FREE = ['fullscreen', 'standalone'];
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest;
 
@@ -35,6 +40,17 @@ describe('PWA manifest — installability contract (GDD §4.1)', () => {
   it('runs fullscreen and locks to landscape (a landscape game, GDD §2.2)', () => {
     expect(manifest.display).toBe('fullscreen');
     expect(manifest.orientation).toBe('landscape');
+  });
+
+  it('the installed app has a chrome-free window — the permanent title-bar answer (field request v0.1.1)', () => {
+    // The primary display mode gives the installed app no browser chrome...
+    expect(CHROME_FREE).toContain(manifest.display);
+    // ...and every fallback in display_override does too, so an installer that
+    // can't honour `fullscreen` still lands on `standalone`, never a tab.
+    expect((manifest.display_override?.length ?? 0)).toBeGreaterThan(0);
+    for (const mode of manifest.display_override ?? []) {
+      expect(CHROME_FREE, `display_override "${mode}" must be chrome-free`).toContain(mode);
+    }
   });
 
   it('declares at least one icon so the browser can offer install', () => {

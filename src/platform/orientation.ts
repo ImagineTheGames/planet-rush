@@ -135,15 +135,18 @@ export function logicalToPhysical(lx: number, ly: number, t: RootTransform): Vec
 // ---------------------------------------------------------------------------
 
 /**
- * On the first touch gesture: enter fullscreen, then lock to landscape. Both go
- * through the platform seam and swallow their own rejections, so this never
- * throws into the gesture handler (mobile amendment §2). Fire-and-forget — where
- * the native lock is unavailable (iOS Safari) it is a no-op and the CSS rotation
- * fallback ({@link computeRootTransform}) carries the landscape lock instead.
+ * On a user gesture (PLAY on mobile — field request v0.1.1): enter fullscreen on
+ * `target` (the game root), then lock to landscape. Fullscreen is what makes the
+ * native `screen.orientation.lock` legal, so the lock is attempted only after the
+ * fullscreen request. Both go through the platform seam and swallow their own
+ * rejections, so this never throws into the gesture handler (mobile amendment §2).
+ * Fire-and-forget — where the native lock is unavailable (iPhone Safari) it is a
+ * no-op and the CSS rotation fallback ({@link computeRootTransform}) carries the
+ * landscape lock instead.
  */
-export function requestLandscape(platform: Platform): void {
+export function requestLandscape(platform: Platform, target?: Element): void {
   void platform
-    .requestFullscreen()
+    .requestFullscreen(target)
     .then(() => platform.lockOrientation('landscape'))
     .catch(() => {
       /* both calls already degrade to no-ops; this guards the chain itself */

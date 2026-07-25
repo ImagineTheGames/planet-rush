@@ -52,7 +52,6 @@ import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
 import { WheelInput, writeWheelOrders } from '@platform/wheel-input';
 import {
-  requestLandscape,
   computeRootTransform,
   applyRootTransform,
   physicalToLogical,
@@ -60,6 +59,7 @@ import {
 } from '@platform/orientation';
 import type { RootTransform } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
+import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
 import type { TouchAffordanceRects } from '@platform/touch-visuals';
@@ -68,6 +68,8 @@ import {
   installLayoutHook,
   parseDebugFlags,
   isLayoutContributor,
+  resolveAnchor,
+  rectContains,
 } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
@@ -78,6 +80,11 @@ import { requireWebGl, probeWebGl } from '@platform/gl-probe';
 import { describeBootFailure, showBootError } from '@platform/boot-error';
 import type { Viewport } from '@platform/camera';
 import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
+import {
+  FullscreenAffordance,
+  FS_AFFORDANCE_ID,
+  FS_AFFORDANCE_ANCHOR,
+} from '@render/fullscreen-affordance';
 import { Renderer, PLAYER_COLORS } from '@render/index';
 import type { BeamView } from '@render/index';
 import {
@@ -144,6 +151,9 @@ async function boot(): Promise<void> {
     autoDensity: true,
   });
 
+  // The game root DOM element — the #app mount, which the canvas lives inside. It
+  // is what we make fullscreen on PLAY (field request v0.1.1), so the whole game
+  // takes the screen and the browser chrome (title bar) disappears.
   const mount = document.getElementById('app');
   if (mount) mount.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none'; // sticks own the gestures (amendment §2)
@@ -151,6 +161,14 @@ async function boot(): Promise<void> {
   // Touch device? Drives the fire-mode default, the visible controls, AND the
   // landscape lock: a portrait mobile viewport is rotated to landscape (below).
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // --- Fullscreen lifecycle (field request v0.1.1; fullscreen.ts). On PLAY (a
+  //     user gesture) on mobile, enter fullscreen on the game root and take the
+  //     native landscape lock; handle the whole lifecycle after — a system-gesture
+  //     exit keeps the game running and offers a re-enter affordance, a rejection
+  //     (iPhone Safari) falls silently back to today's behaviour, and desktop is
+  //     never auto-fullscreened. Reads/writes only through the platform seam.
+  const fullscreen = new FullscreenLifecycle(platform, isTouch, mount ?? undefined);
 
   // --- The landscape lock (field report v0.1.1; orientation.ts). Planet Rush IS
   //     landscape on mobile, always: the whole game draws into ONE root container
@@ -220,6 +238,9 @@ async function boot(): Promise<void> {
         toPhysical: (lx, ly) => logicalToPhysical(lx, ly, transform),
         recomputeTransform,
         isRotated: () => transform.rotated,
+        // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
+        // native landscape lock here. A no-op on desktop and where unsupported.
+        enterImmersive: () => fullscreen.enter(),
       });
   if (mainMenu) await mainMenu.untilPlay();
 
@@ -312,6 +333,14 @@ async function boot(): Promise<void> {
   buildBadge.visible = !flags.freeze;
   gameRoot.addChild(buildBadge);
 
+  // --- Re-enter-fullscreen affordance (fullscreen-affordance.ts): the small
+  //     top-right button that appears only when the player has backed out of
+  //     fullscreen on a device that can re-enter (field request v0.1.1). On
+  //     gameRoot so it rides the landscape-lock rotation; above the HUD so a
+  //     thumb can reach it. Hidden until `fullscreen.affordanceVisible()` says so.
+  const fsAffordance = new FullscreenAffordance();
+  gameRoot.addChild(fsAffordance);
+
   let fireMode = readFireMode(platform, isTouch);
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
@@ -387,6 +416,17 @@ async function boot(): Promise<void> {
     const lp = toLogical(e.clientX, e.clientY);
     pressPoint.x = lp.x;
     pressPoint.y = lp.y;
+
+    // The re-enter-fullscreen affordance — present only after the player backed
+    // out of fullscreen (field request v0.1.1). This tap IS a fresh user gesture,
+    // so re-entering fullscreen from here is legal. Consumes the event so the tap
+    // doesn't also engage a stick under it.
+    if (fsAffordance.visible && fsAffordance.hitTest(lp.x, lp.y, w, h)) {
+      fullscreen.enter();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
 
     // The touch BUILD button — the E-equivalent, on screen only at your own
     // planet (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
@@ -506,6 +546,11 @@ async function boot(): Promise<void> {
       touchVisuals.update(touch, isTouch, transform.logicalWidth, transform.logicalHeight, buildVisible);
       // Keep the build stamp cornered (logical bottom-right) as the viewport changes.
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
+      // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
+      // any frame) and show the re-enter affordance only once we've been fullscreen
+      // and no longer are (field request v0.1.1). Corner it in logical space.
+      fullscreen.sync();
+      fsAffordance.update(fullscreen.affordanceVisible(), transform.logicalWidth, transform.logicalHeight);
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -811,6 +856,12 @@ async function boot(): Promise<void> {
     // actually drawn, never what would have been).
     if (buildBadge.visible) reg.register(BADGE_ID, BADGE_ANCHOR, buildBadge.layoutBounds(w, h));
 
+    // Re-enter-fullscreen affordance: declared top-right, actual rect measured
+    // from the same corner math that draws it — so "no dead corners" (field
+    // request v0.1.1) is a placement assertion, not a hope. Registered only while
+    // it is actually on screen (the player has backed out of fullscreen).
+    if (fsAffordance.visible) reg.register(FS_AFFORDANCE_ID, FS_AFFORDANCE_ANCHOR, fsAffordance.layoutBounds(w, h));
+
     // HUD-owned elements (ore HUD, banked total, wave clock, controls strip,
     // onboarding prompt): registered via the Hud's public describeLayout() seam
     // if present. Not implemented at M1 — see PR notes; no src/ui internals are
@@ -907,21 +958,60 @@ async function boot(): Promise<void> {
   // route through relayout so the camera re-centres on what's actually visible.
   window.visualViewport?.addEventListener('resize', relayout);
   window.visualViewport?.addEventListener('scroll', relayout);
+  // Fullscreen enter/exit reshapes the visual viewport too — relayout re-centres
+  // the camera, and the render loop's `fullscreen.sync()` folds the new state in.
   document.addEventListener('fullscreenchange', relayout);
 
-  // --- First touch gesture: enter fullscreen + lock to landscape (Android
-  //     path; best-effort, never throws). Fullscreen/lock require a user
-  //     gesture, so this fires once on the first touch (mobile amendment §2).
-  if (isTouch) {
-    app.canvas.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (e.pointerType !== 'touch') return;
-        requestLandscape(platform);
-      },
-      { once: true },
-    );
-  }
+  // Entering fullscreen + the native landscape lock now fires on PLAY (a valid
+  // user gesture — see the menu's `enterImmersive`) rather than on the first
+  // touch anywhere, so the request is tied to the moment the player commits to a
+  // match and desktop keyboard/mouse boots are never auto-fullscreened (field
+  // request v0.1.1 requirements 1 & 3). Mid-match re-entry is the affordance's job.
+
+  // --- Read-only `window.__fullscreen` live-stage seam: the whole fullscreen
+  //     lifecycle as plain, structured-cloneable truth, so the live-stage suite
+  //     can prove PLAY entered fullscreen, that a system-gesture exit keeps the
+  //     game running with the re-enter affordance at its registered anchor, and
+  //     that a rejection boots normally — none of which a headless unit test can
+  //     reach. Always installed (both boots); mutates nothing.
+  installFullscreenSeam({
+    get supported(): boolean {
+      return fullscreen.supported;
+    },
+    get active(): boolean {
+      return fullscreen.active;
+    },
+    get everEntered(): boolean {
+      return fullscreen.everEntered;
+    },
+    get affordanceVisible(): boolean {
+      return fullscreen.affordanceVisible();
+    },
+    // The DOM element actually fullscreen right now, by id — 'app' (the game root)
+    // once PLAY's request is granted, null otherwise. Lets the suite assert
+    // `document.fullscreenElement` is the game root without a brittle ref compare.
+    get activeElementId(): string | null {
+      const el = document.fullscreenElement;
+      return el ? el.id || null : null;
+    },
+    // The game root we target for fullscreen — the assertion that survives even a
+    // headless browser that won't actually grant it.
+    rootId: mount?.id ?? null,
+    anchor: { region: FS_AFFORDANCE_ANCHOR.region, margin: FS_AFFORDANCE_ANCHOR.margin ?? 0 },
+    get bounds(): Rect | null {
+      if (!fullscreen.affordanceVisible()) return null;
+      const b = fsAffordance.layoutBounds(transform.logicalWidth, transform.logicalHeight);
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    },
+    // Does the affordance's actual rect sit inside its declared anchor zone? The
+    // "no dead corners" contract, checkable on a clean boot without ?debug=1.
+    get withinAnchor(): boolean {
+      if (!fullscreen.affordanceVisible()) return false;
+      const vp = { width: transform.logicalWidth, height: transform.logicalHeight };
+      const zone = resolveAnchor(FS_AFFORDANCE_ANCHOR, vp);
+      return rectContains(zone, fsAffordance.layoutBounds(vp.width, vp.height));
+    },
+  });
 
   // --- Fire-mode toggle: single key for day-1 (UI owns the settings screen).
   window.addEventListener('keydown', (e) => {
@@ -1187,6 +1277,10 @@ interface MenuContext {
   recomputeTransform(): void;
   /** Whether the root is currently rotated (portrait phone). */
   isRotated(): boolean;
+  /** Enter fullscreen + native landscape lock — called on PLAY, the user gesture
+   *  that makes both legal (field request v0.1.1). No-op on desktop / where
+   *  unsupported, so the menu can call it unconditionally. */
+  enterImmersive(): void;
 }
 
 /** One menu control as the landscape-lock seam reports it: its logical rect (for
@@ -1298,6 +1392,10 @@ function openMainMenu(
   function play(): void {
     if (played) return;
     played = true;
+    // PLAY is a valid user gesture: take fullscreen + the native landscape lock
+    // now, synchronously within the gesture, before anything else (field request
+    // v0.1.1). Fire-and-forget and self-gating — a no-op on desktop / iPhone.
+    ctx.enterImmersive();
     teardown();
     seam.visible = false;
     resolvePlay();
@@ -1406,6 +1504,44 @@ function openMainMenu(
 function installMainMenuSeam(seam: object): void {
   try {
     Object.defineProperty(window, '__mainMenu', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
+}
+
+/** The read-only `window.__fullscreen` live-stage seam: the fullscreen lifecycle
+ *  as plain, structured-cloneable truth (see the install site in `boot()`). */
+interface FullscreenSeam {
+  /** Can this platform enter fullscreen at all (false on iPhone Safari). */
+  readonly supported: boolean;
+  /** Is the game fullscreen right now. */
+  readonly active: boolean;
+  /** Has the game been fullscreen at least once this boot. */
+  readonly everEntered: boolean;
+  /** Is the re-enter affordance on screen (backed out of fullscreen). */
+  readonly affordanceVisible: boolean;
+  /** The id of the element that is fullscreen now, or null. */
+  readonly activeElementId: string | null;
+  /** The id of the game-root element we target for fullscreen. */
+  readonly rootId: string | null;
+  /** The affordance's declared layout anchor. */
+  readonly anchor: { readonly region: string; readonly margin: number };
+  /** The affordance's actual rendered rect, or null when hidden. */
+  readonly bounds: Rect | null;
+  /** Does the affordance sit inside its declared anchor zone ("no dead corners"). */
+  readonly withinAnchor: boolean;
+}
+
+/** Install the read-only `window.__fullscreen` seam. Best-effort, like the menu
+ *  seam — a double install (HMR) leaves the first in place. */
+function installFullscreenSeam(seam: FullscreenSeam): void {
+  try {
+    Object.defineProperty(window, '__fullscreen', {
       value: seam,
       writable: false,
       configurable: false,

@@ -20,6 +20,8 @@ function fakePlatform(over: Partial<Platform>): Platform {
   return {
     setFullscreen: () => Promise.resolve(),
     requestFullscreen: () => Promise.resolve(),
+    isFullscreen: () => false,
+    canFullscreen: () => false,
     vibrate: () => {},
     storage: { get: () => null, set: () => {} },
     lockOrientation: () => Promise.resolve(),
