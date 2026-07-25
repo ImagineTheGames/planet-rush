@@ -36,6 +36,7 @@
 import type { PlayerId, Rng } from '@shared/types';
 import { mulberry32 } from '@shared/types';
 import type { ClientMessage, RoomCode } from '../src/net/transport';
+import { makeRoomCode } from '../src/net/room-code';
 import { parseClientMessage, parseRoomCode } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
 import type { Bounds } from '../src/sim';
@@ -49,16 +50,11 @@ export { MatchRoom } from './room';
 // Room codes
 // ---------------------------------------------------------------------------
 
-/**
- * The alphabet room codes are drawn from. No `O`/`0`, no `I`/`1`: a code is
- * read off one player's screen and typed into another's phone, so the letters
- * that are ambiguous in that game of telephone are simply not in the deck.
- */
-export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-/** Room code length. 32^4 ≈ 1M codes — far more than a classroom needs, short
- *  enough to read aloud. */
-export const CODE_LENGTH = 4;
+// The room-code rules (alphabet, length, generation) live in `src/net/room-code.ts`
+// so the allocator in front of several match servers can mint codes without a
+// second copy of them. Re-exported here because they were part of this module's
+// surface before the move.
+export { CODE_ALPHABET, CODE_LENGTH } from '../src/net/room-code';
 
 /** Bytes of entropy in a reclaim token (hex-encoded, so twice this in chars). */
 const TOKEN_BYTES = 12;
@@ -190,10 +186,7 @@ export class MatchServer {
     // collision is a curiosity, not a scenario — but an unbounded loop is a
     // hang, so it gives up and lets the caller refuse rather than spin.
     for (let attempt = 0; attempt < 64; attempt++) {
-      let code = '';
-      for (let i = 0; i < CODE_LENGTH; i++) {
-        code += CODE_ALPHABET[Math.floor(this.rng.next() * CODE_ALPHABET.length)];
-      }
+      const code = makeRoomCode(this.rng);
       if (!this.rooms.has(code)) return code;
     }
     return '';
