@@ -615,6 +615,52 @@ export const TRACTOR = {
   accel: 700,
 } as const;
 
+/**
+ * Auto-deposit at your own planet (field report v0.1.2; GDD §2.3 "fly home and
+ * convert ore … or bank it", §2.5).
+ *
+ * The developer flew home with a full hold and nothing happened: mining fills
+ * the hold, but the *only* thing that emptied it into the safe banked total was
+ * an explicit BANK wheel press, which a first-time player never finds. The rule:
+ * while a ship sits **docked at its own living planet**, its hold auto-transfers
+ * into the bank at a steady, readable, interruptible rate — undock and it stops.
+ * Not instant (that is what the BANK segment stays, for a one-tap dump): the
+ * drain is a beat the player watches, as ore chunks visibly fly ship→planet.
+ *
+ * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
+ * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
+ * the *telegraph*, pooled ore sprites emitted on a fixed cadence and reabsorbed
+ * at the planet — the same discipline as the beam tell, and they reuse the ore
+ * chunk the renderer already draws, so the visual needs no new render path.
+ *
+ * You unload when you **park**, not when you skim past: the drain only runs
+ * while the docked ship is also near rest (`parkSpeed`). That is what "dock"
+ * means — arriving and settling, the developer's own words ("fly to your own
+ * planet, dock") — and it keeps a ship that merely clips dock range at cruising
+ * speed on its way elsewhere from bleeding ore it never meant to drop. It also
+ * leaves the wheel's instant BANK press the winner on the arrival tick: a pilot
+ * (or bot) who taps BANK the moment they touch down banks the whole hold before
+ * they have slowed enough for the passive drain to take a bite. TUNABLE
+ */
+export const DEPOSIT = {
+  /** Ore per second moved hold→bank while docked and parked. At 2/s a base
+   *  2-slot hold empties in ~1 s — brisk enough not to be a chore, slow enough
+   *  to read the chunks fly and to cut short by pulling away. */
+  drainRate: 2,
+  /** Speed (units/s) at or below which a docked ship counts as parked and the
+   *  drain runs — well under the 260 base cruise, above the drift a coasting
+   *  ship settles to, so releasing thrust at home starts the deposit within a
+   *  tick or two while a fly-by never triggers it. */
+  parkSpeed: 40,
+  /** Seconds between deposit-flight chunks spun off for the visual. One every
+   *  ~0.15 s reads as a steady stream at the drain rate without flooding the
+   *  chunk pool; realised on the sim tick grid so it stays deterministic. */
+  flightInterval: 0.15,
+  /** Speed a deposit-flight chunk travels toward the planet (units/s) — fast
+   *  enough to arrive within the drain, so a chunk is a courier, not clutter. */
+  flightSpeed: 220,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Collision broad phase (GDD §4.1 — uniform-grid spatial hash)
 // ---------------------------------------------------------------------------

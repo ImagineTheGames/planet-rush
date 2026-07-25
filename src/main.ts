@@ -313,6 +313,7 @@ async function boot(): Promise<void> {
   if (flags.debug) {
     hud.enableHealthBarDebug();
     installHealthbarStage();
+    installOreDepositStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -829,6 +830,67 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__healthbarStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__oreDepositStage` — the ?debug=1 live-stage seam for the
+   * v0.1.2 ore-deposit field report ("there's no way to deposit ore … it just
+   * stays on my ship"). The sim now auto-transfers a docked, parked ship's hold
+   * into the bank and flies ore couriers ship→planet to show it; this seam lets
+   * a Playwright test prove that on a REAL boot, the same way `__healthbarStage`
+   * proved the bars. Unlike that one it runs WITHOUT ?freeze=1, because the whole
+   * point is to watch the live sim drain the hold over a second or so. Methods:
+   *
+   *  - `stage(ore)` — park the LOCAL ship at rest at its own planet with `ore` in
+   *    the hold (widening the bay if needed), so the deposit drain starts. Returns
+   *    the staged hold/bank, or null if there is no local ship/planet.
+   *  - `readout()` — the live hold and bank the sim holds this frame: the two
+   *    numbers the HUD ticks down/up. The test watches the hold fall and the bank
+   *    rise off the same source.
+   *  - `flights()` — how many ore-flight couriers are in the world this frame. The
+   *    renderer draws every chunk by position, so these deposit couriers ARE drawn
+   *    flight sprites — reusing the already-wired chunk layer, no new render path.
+   *
+   * Like its sibling it mutates only the plain sim data the boot path already
+   * reads every frame, lives entirely behind ?debug=1, and does not reach into
+   * src/sim (the rule itself is sim-owned; this only stages inputs to it).
+   */
+  function installOreDepositStage(): void {
+    const stage = {
+      stage(ore: number): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        // Settle clear of the planet's collider, at rest, inside dock range.
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        if (ore > ship.cargoCap) ship.cargoCap = ore; // widen the bay to fit the stage
+        ship.cargo = ore;
+        return { cargo: ship.cargo, banked: ship.banked };
+      },
+      readout(): { cargo: number; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        return ship ? { cargo: ship.cargo, banked: ship.banked } : null;
+      },
+      flights(): number {
+        let n = 0;
+        for (const c of world.chunks) if (c.deposit) n++;
+        return n;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__oreDepositStage', {
         value: stage,
         writable: false,
         configurable: false,
