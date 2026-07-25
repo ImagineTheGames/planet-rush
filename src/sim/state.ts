@@ -25,9 +25,8 @@ import {
   SPAWN_PROTECTION_S,
   STARTING_ORE,
   WAVE,
-  WORLD_EDGE_MARGIN,
-  WORLD_SIZE,
 } from './constants';
+import { getMap } from './maps';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
 
@@ -379,7 +378,15 @@ export interface PlayerSpec {
 export interface WorldConfig {
   readonly seed: number;
   readonly players: readonly PlayerSpec[];
-  /** Play bounds (world units). */
+  /**
+   * Which ratified layout to build (`./maps`) — the arena bounds and where the
+   * home planets sit. Defaults to `octagon` ("The Ring"), the hardwired default
+   * until the picker (m8-02) lands. An unknown id falls back to the default, so
+   * a stale saved key can never crash boot.
+   */
+  readonly mapId?: string;
+  /** Play bounds (world units). Overrides the map's own bounds — the QA harness
+   *  runs deliberately cramped worlds. */
   readonly bounds?: Bounds;
   /** Asteroids per wave, overriding `WAVE.asteroidsPerWave`. Wave 1 is placed
    *  at construction, so this is also the opening field's rock count; the
@@ -461,24 +468,28 @@ function initialMatch(): MatchState {
  * byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
-  const bounds: Bounds = config.bounds ?? { width: WORLD_SIZE, height: WORLD_SIZE };
+  // The layout owns the arena and where the homes sit (`./maps`); everything
+  // downstream is the same code for every map. A caller may override the map's
+  // own bounds (the QA harness runs cramped worlds).
+  const map = getMap(config.mapId);
+  const bounds: Bounds = config.bounds ?? map.bounds;
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
+  // The commons scatter radius is a fraction of the arena, independent of the
+  // map's planet arrangement — mid-map is the centre for every layout.
   const ringRadius = halfMin * 2 * PLANET.ringFraction;
-  // Planets sit outboard of the ship ring, and NOTHING hugs the wall: the
-  // outermost planet point clears the bounds by `WORLD_EDGE_MARGIN` (field
-  // report P1). The clamp keeps the ring wholly inside the arena — with the
-  // margin — even on the cramped worlds the QA harness builds on purpose.
-  const planetRing = Math.min(
-    ringRadius + PLANET.orbitOffset,
-    halfMin - PLANET.radius - WORLD_EDGE_MARGIN,
-  );
 
-  // Ships around the ring, one per lobby slot — deterministic, no RNG.
+  // The map's per-slot placements: planet centre, inboard ship spawn, spoke
+  // angle. Deterministic geometry (no RNG); the seed threads into the asteroid
+  // scatter below, not the layout. NOTHING hugs the wall — each map sizes its
+  // outermost planets to clear the bounds by `WORLD_EDGE_MARGIN` (field report
+  // P1), and the spawners clamp everything else through the same margin.
+  const placements = map.planets(config.seed, config.players.length, bounds);
+
+  // Ships spawn orbiting their planet, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {
-    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
-    const pos = { x: cx + Math.cos(theta) * ringRadius, y: cy + Math.sin(theta) * ringRadius };
+    const pos = placements[i]!.ship;
     const ship = makeShip(spec, pos);
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
@@ -487,9 +498,8 @@ export function createWorld(config: WorldConfig): World {
 
   // One home planet per slot, on the same spoke as its ship, outboard of it.
   const planets: Planet[] = config.players.map((spec, i) => {
-    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
-    const pos = { x: cx + Math.cos(theta) * planetRing, y: cy + Math.sin(theta) * planetRing };
-    return makePlanet(spec, i, pos, theta);
+    const place = placements[i]!;
+    return makePlanet(spec, i, place.planet, place.angle);
   });
 
   const world: World = {
