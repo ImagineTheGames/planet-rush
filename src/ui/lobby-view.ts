@@ -175,6 +175,14 @@ export class LobbyView extends Container {
     this.wordmark.x = title.x;
     this.wordmark.y = title.y + (title.height - this.wordmark.height) / 2;
 
+    // The room code is the number a classroom reads off one screen and types into
+    // another (GDD §4.2) — so it exists only when there is a wire to join over.
+    // Offline (solo-vs-bots, M4) there is none, so ROOM and the code are hidden
+    // rather than showing a code nobody can act on.
+    this.roomLabel.visible = model.online;
+    this.roomCode.visible = model.online;
+    if (!model.online) return;
+
     const right = roomCode.x + roomCode.width;
     this.roomLabel.x = right;
     this.roomLabel.y = roomCode.y + 2;

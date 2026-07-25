@@ -291,6 +291,15 @@ export interface LobbyState {
   readonly shipClass: ShipClass;
   /** Seconds left on the RUSH countdown; 0 outside `counting`. */
   readonly countdown: number;
+  /**
+   * Whether this room can be joined over the wire. Online lobbies show the room
+   * code and mark empty seats OPEN (someone can still claim them, GDD §4.2);
+   * an **offline** lobby (solo-vs-bots, M4) shows neither, because there is no
+   * transport for a second player to arrive on — the empty seats are the bot
+   * cast and nothing else. Defaults true, so every existing online path is
+   * unchanged; the offline boot in `main.ts` opts out.
+   */
+  readonly online: boolean;
 }
 
 /** Options for {@link createLobby}. Everything has a defensible default so an
@@ -305,6 +314,9 @@ export interface LobbyOptions {
   readonly slots?: number;
   /** Your hull. Default {@link DEFAULT_SHIP_CLASS} — the Vanguard (GDD §2.11). */
   readonly shipClass?: ShipClass;
+  /** Joinable over the wire? Default true (online). The offline solo-vs-bots
+   *  boot passes false, which hides the room code and the OPEN seat markers. */
+  readonly online?: boolean;
 }
 
 /**
@@ -340,6 +352,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
     seats,
     shipClass,
     countdown: 0,
+    online: options.online ?? true,
   });
 }
 
@@ -592,6 +605,9 @@ export interface LobbyModel {
   /** Seats with a person in them, and seats that will be (or are) bots. */
   readonly humanCount: number;
   readonly botCount: number;
+  /** Whether the room is joinable over the wire — drives whether the view draws
+   *  the room code at all (offline solo-vs-bots draws none, M4). */
+  readonly online: boolean;
 }
 
 /** Build the frame model. Pure: the view draws exactly this and decides nothing. */
@@ -614,6 +630,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     hostControls: state.you === state.host,
     humanCount,
     botCount: seats.length - humanCount,
+    online: state.online,
   };
 }
 
@@ -636,8 +653,10 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isYou: seat.player === state.you,
     isHost: seat.player === state.host && seat.occupant === 'human',
     // An open seat stops being claimable the moment the match starts; a seat the
-    // server has already seated a bot in was never claimable to begin with.
-    openToJoin: seat.occupant === 'open' && state.phase !== 'started',
+    // server has already seated a bot in was never claimable to begin with; and
+    // offline there is no wire for a second player to arrive on, so nothing is
+    // ever "claimable by room code" (the empty seats are simply the bot cast).
+    openToJoin: seat.occupant === 'open' && state.phase !== 'started' && state.online,
     ...(isBot ? { botDifficulty: seat.difficulty } : {}),
   };
 }
