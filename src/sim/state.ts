@@ -131,6 +131,24 @@ export interface Turret {
   /** Barrel facing, radians — turn-rate limited toward the tracked ship. Purely
    *  the visible telegraph: alignment never gates the shot (DPS is DPS). */
   angle: number;
+  /**
+   * Angular position of the turret **around its planet's rim**, radians (field
+   * report P1). A turret is no longer pinned to its build spot: it slides along
+   * the surface ring toward the point whose outward normal faces its target,
+   * capped at `TURRET.orbitSpeed` so it glides. `pos` is derived from this every
+   * tick (`turretOrbitPos`), so the sprite and beam origin track the slide.
+   *
+   * Starts at the turret's mount-slot home angle (`turretHomeAngle`), which is
+   * why a freshly built turret sits exactly on its reserved slot, and where it
+   * slides back to when no enemy is in range.
+   *
+   * Optional so the render tell / netcode-reconstruction / bot-fixture turret
+   * literals other agents build keep compiling — a turret with no `orbitAngle`
+   * simply does not slide (its `pos` is taken as authoritative), exactly the same
+   * backward-compatible discipline as `muzzle`. The sim's own turrets always
+   * carry it (`makeTurret` sets it).
+   */
+  orbitAngle?: number;
   /** Seconds until it may fire again. */
   cooldown: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */

@@ -103,6 +103,31 @@ export const TURRET = {
   /** Rotation rate (rad/s) tracking its target — the "telegraph its threat while
    *  spinning" read (style-guide §5.5). Aim never gates the shot; DPS is DPS. */
   turnRate: 3.0,
+  /**
+   * How fast a turret *slides around its planet's rim* toward the point whose
+   * outward surface normal faces its target (field report P1). This is the whole
+   * turret moving, not just the barrel (`turnRate`), so it is deliberately slower:
+   * the turret **glides**, it never teleports. Because the target bearing is
+   * measured from the planet centre it does not depend on where the turret
+   * currently sits, so `turnToward` converges monotonically and then *stops* —
+   * the cap is what guarantees a glide with no oscillation (rad/s). TUNABLE
+   */
+  orbitSpeed: 1.2,
+  /**
+   * Minimum angular gap held between two turrets sliding toward the *same* target
+   * so they fan out around its facing-normal instead of stacking on one rim point
+   * (field report P1, §3). Turrets sharing a target are spread symmetrically about
+   * the bearing in steps of this size (radians). TUNABLE
+   */
+  orbitSeparation: 0.42,
+  /**
+   * Target stickiness (field report P1, §2). A turret keeps its current target
+   * until it dies, leaves range, or another enemy is closer by this factor — a
+   * newcomer must be within `hysteresis ×` the current target's distance (≈25%
+   * closer at 0.75) before the turret will switch, so equidistant enemies never
+   * make it flap. Unitless, in (0, 1]. TUNABLE
+   */
+  targetHysteresis: 0.75,
 } as const;
 
 /** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
