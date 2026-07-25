@@ -64,6 +64,7 @@ import { planetHpModel, planetHpFlashOn } from './planet-hp';
 import { healthBarModel } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
+import type { DrawnHealthBar } from './healthbar-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -560,6 +561,21 @@ export class Hud extends Container {
   private updateHealthBars(frame: HudFrame): void {
     const bars = healthBarModel(frame.combatants ?? NO_COMBATANTS, frame.owner ?? 0);
     this.healthbars.update(bars, this.screenWidth, this.screenHeight);
+  }
+
+  /** ?debug=1 live-stage seam: arm the health-bar layer's drawn-bar capture so
+   *  {@link debugHealthBars} can read it back. Called once from `main.ts` only
+   *  under ?debug=1 — the wiring the field report caught missing is what a
+   *  live-stage Playwright test drives through here; no effect on a normal build. */
+  enableHealthBarDebug(): void {
+    this.healthbars.enableDebugCapture();
+  }
+
+  /** The health bars the real layer drew last frame — owner, fill, screen
+   *  position — for the live-stage test. Empty unless {@link enableHealthBarDebug}
+   *  was called. */
+  debugHealthBars(): DrawnHealthBar[] {
+    return this.healthbars.debugBars();
   }
 
   // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) -------------
