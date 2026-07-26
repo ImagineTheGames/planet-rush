@@ -16,10 +16,22 @@
  * see their own health.* So the own ship now gets a first-class bar too — same
  * sim-driven fill, but styled distinctly (player colour, slightly larger, an
  * identity outline) so it reads as "mine" at a glance. It is marked with the
- * {@link Combatant.local} flag by the caller, which is what separates it from the
- * player's *turrets*: those still get no bar (their planet's aggregate HP is the
- * top-right HOME readout, [[planet-hp]]). So "local, no bar" is now specifically
- * "a local entity that is **not** the flagged own ship."
+ * {@link Combatant.local} flag by the caller, which is what separates its
+ * *larger* style from every other bar — including the player's own **turrets**.
+ *
+ * **Turrets show health when damaged (field request v0.2.2).** The first cut had
+ * the player's own turrets read off the planet's aggregate HOME HP readout and so
+ * carry no bar. Playing a live build overruled that: *a turret taking fire is a
+ * fight, and a turret is a thing you defend* — you want to see which of your
+ * defences is nearly dead, not just an aggregate. So now **every** turret, yours
+ * and the enemy's, gets a bar by the same damaged-or-in-combat rule as a ship,
+ * flagged {@link Combatant.turret} by the caller. An enemy turret already read as
+ * an enemy combatant; the change is that a *local* turret is no longer suppressed
+ * by ownership. Its bar is the enemy-sized narrow bar in the **owner's colour**
+ * (so a local turret is your player colour, smaller than the own-ship bar), never
+ * the larger `local` own-ship style. And because a turret now slides around its
+ * planet's rim (sim orbit, P1), the caller projects the turret's live orbit
+ * position each frame, so the bar rides along with it.
  *
  * **What gets a bar** (the decision this module owns and unit-tests):
  *
@@ -27,14 +39,19 @@
  *    currently in combat**, and hidden when it is full *and* out of combat — so
  *    the field stays clean (GDD §2.2: the HUD "shows only what the player acts
  *    on") and a bar always means "this is a fight." This holds for the own ship
- *    exactly as for enemies — a pristine, idle own ship shows nothing.
+ *    and for every turret exactly as for enemy ships — a pristine, idle entity
+ *    shows nothing.
  *  - {@link Combatant.forceShow} overrides that for the own ship during a siege
  *    alarm: while your home is under attack you get to watch your hull even at
  *    full idle, because you are about to fly into that fight (GDD §2.2 — the
  *    alarm is the moment the whole design turns on).
- *  - **A local entity that is not the own ship gets no bar** — the player's own
- *    turrets read off the HOME HP readout ([[planet-hp]]), so ownership-by-local
- *    still suppresses them; only the `local`-flagged ship is exempt.
+ *  - **Every turret gets a bar when damaged or in combat** — yours and the
+ *    enemy's (field request v0.2.2), flagged {@link Combatant.turret}. A local
+ *    turret is drawn in your player colour at the narrow enemy size, distinct
+ *    from the larger own-ship `local` style.
+ *  - **A local entity that is neither the own ship nor a turret gets no bar** —
+ *    ownership-by-local still suppresses any such entity; only the `local`-flagged
+ *    ship and `turret`-flagged turrets are exempt.
  *  - Dead entities and degenerate `maxHp <= 0` entities never get a bar.
  *
  * **Colour** is the owner's identity colour (style-guide §3 rule 2 — hull/HP bars
@@ -117,10 +134,18 @@ export interface Combatant {
   /** Entity radius in screen space, CSS px — the bar hangs above by this. */
   readonly radius: number;
   /** True **only** for the camera-followed player's own ship (field request
-   *  v0.1.1) — the one local-owned entity that now gets a bar, styled as "mine".
-   *  Its own turrets are local by ownership but carry no `local` flag, so they
-   *  stay bar-free. Absent/false for every enemy and hostile. */
+   *  v0.1.1) — the one entity drawn in the larger "mine" style. A local turret is
+   *  local by ownership but carries no `local` flag, so it gets the narrow bar in
+   *  the player colour, not the own-ship style. Absent/false for every enemy and
+   *  hostile. */
   readonly local?: boolean;
+  /** True for a turret — a planet-mounted defence, yours or an enemy's (field
+   *  request v0.2.2). A turret gets a bar by the same damaged-or-in-combat rule as
+   *  a ship; the flag is what lifts a *local* turret out of the ownership
+   *  suppression (own turrets used to read off the HOME HP readout and show
+   *  nothing). Absent/false for ships. The caller projects the turret's live orbit
+   *  position into {@link pos} each frame, so the bar tracks the sliding turret. */
+  readonly turret?: boolean;
   /** Force the bar on regardless of the damaged-or-in-combat rule. Set only for
    *  the own ship during a siege alarm, so the player can watch their hull as
    *  they scramble home even at full idle. Never set for enemies. */
@@ -151,9 +176,10 @@ export interface HealthBar {
 // ---------------------------------------------------------------------------
 
 /** Whether `e` belongs to the local (camera-followed) player. Ownership, so the
- *  player's ship *and* turrets both answer true — but only the `local`-flagged
- *  ship is exempt from the no-bar rule (field request v0.1.1); their turrets read
- *  off the HOME HP readout ([[planet-hp]]) and stay bar-free. */
+ *  player's ship *and* turrets both answer true — the `local`-flagged ship gets
+ *  the larger own-ship bar and (field request v0.2.2) a `turret`-flagged local
+ *  turret gets the narrow player-colour bar; only a local entity that is neither
+ *  is suppressed. */
 export function isLocalCombatant(e: { readonly owner: PlayerId }, localPlayer: PlayerId): boolean {
   return e.owner === localPlayer;
 }
@@ -163,16 +189,17 @@ export function isLocalCombatant(e: { readonly owner: PlayerId }, localPlayer: P
  * place so it can be unit-tested: alive, has HP, not a bar-suppressed local
  * entity, and either forced on (siege), damaged, or in combat.
  *
- * The own ship (`local`) now passes the local check and is judged by the same
- * damaged-or-in-combat rule as an enemy, plus `forceShow` for the siege alarm; a
- * local entity that is *not* the flagged ship (the player's own turrets) still
- * gets nothing.
+ * The own ship (`local`) and every turret (`turret`, field request v0.2.2) pass
+ * the local check and are judged by the same damaged-or-in-combat rule as an
+ * enemy, plus `forceShow` for the own ship's siege alarm; only a local entity
+ * that is neither the flagged ship nor a turret still gets nothing.
  */
 export function combatantGetsBar(e: Combatant, localPlayer: PlayerId): boolean {
   if (!e.alive) return false;
   if (e.maxHp <= 0) return false;
-  // A local-owned entity gets a bar only if it is the flagged own ship.
-  if (isLocalCombatant(e, localPlayer) && !e.local) return false;
+  // A local-owned entity gets a bar only if it is the flagged own ship or a
+  // turret (field request v0.2.2 — all turrets show health when damaged).
+  if (isLocalCombatant(e, localPlayer) && !e.local && !e.turret) return false;
   if (e.forceShow) return true;
   const fraction = clamp01(e.hp / e.maxHp);
   return fraction < 1 - HEALTHBAR_FULL_EPSILON || e.inCombat;

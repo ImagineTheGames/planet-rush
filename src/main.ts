@@ -1273,7 +1273,9 @@ async function boot(): Promise<void> {
   function feedCombatants(): void {
     let n = 0;
     for (const ship of world.ships) {
-      if (ship.id === LOCAL_PLAYER) continue; // the local ship never gets a bar
+      // The local ship's over-bar is synthesised by the HUD from the sim hull (at
+      // the centred camera position), not fed here — so skip it in the enemy feed.
+      if (ship.id === LOCAL_PLAYER) continue;
       const c = combatantSlot(n++);
       c.owner = ship.id;
       c.hp = ship.hull;
@@ -1282,18 +1284,24 @@ async function boot(): Promise<void> {
       c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
+      c.turret = false;
     }
     for (const planet of world.planets) {
       for (const turret of planet.turrets) {
-        if (turret.owner === LOCAL_PLAYER) continue; // own turrets: read off HOME HP
+        // Field request v0.2.2: EVERY turret gets a bar when damaged, the local
+        // player's own included (they used to read off the HOME HP readout). The
+        // model still hides a full, idle turret, so passing them all is correct.
         const c = combatantSlot(n++);
         c.owner = turret.owner;
         c.hp = turret.hp;
         c.maxHp = turret.maxHp;
         c.alive = turret.hp > 0;
         c.inCombat = turret.muzzle != null; // loosing a shot this tick
+        // `turret.pos` is derived from the orbit angle each tick, so the bar rides
+        // along as the turret slides around its planet's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
         c.radius = turret.radius;
+        c.turret = true;
       }
     }
     combatantFrame.length = 0;
@@ -1306,7 +1314,7 @@ async function boot(): Promise<void> {
   function combatantSlot(i: number): MutCombatant {
     let c = combatantPool[i];
     if (!c) {
-      c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0 };
+      c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0, turret: false };
       combatantPool[i] = c;
     }
     return c;
@@ -1383,6 +1391,12 @@ async function boot(): Promise<void> {
    *    LOCAL ship's hull to `fraction` of max so its own over-ship bar must draw
    *    (and the HUD hull readout drop to match). The camera holds it centred, so
    *    no repositioning is needed. Returns its slot and exact fill, or null.
+   *  - `damageTurret(fraction)` — the field-request v0.2.2 counterpart: park a
+   *    turret (preferring one of the LOCAL player's, to prove own turrets now show
+   *    a bar) beside the centred local ship so it is on-screen and un-culled, and
+   *    set its hp to `fraction` of max. Its `pos` IS its orbit position (P1), so
+   *    the drawn bar must track it. Returns the turret's owner slot, exact fill,
+   *    and the screen position its orbit projects to, or null if none exists.
    *  - `bars()` — the bars the real layer actually drew last frame (owner, fill,
    *    `local` flag, screen position), read back so the test can assert one
    *    tracks the staged ship.
@@ -1419,6 +1433,31 @@ async function boot(): Promise<void> {
         const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
         local.hull = f * local.maxHull;
         return { owner: local.id, fraction: local.hull / local.maxHull };
+      },
+      // Field request v0.2.2: damage a turret so its bar must draw (damaged ⇒ a
+      // bar), proving own turrets are no longer suppressed. Prefer a LOCAL-owned
+      // turret; park it beside the centred local ship so it is on-screen (its
+      // planet may be off-frame at spawn) and un-culled. `turret.pos` is its orbit
+      // position — the same value feedCombatants projects — so the bar rides it.
+      damageTurret(fraction: number): { owner: PlayerId; fraction: number; x: number; y: number } | null {
+        const local = world.ships.find(isLocalShip);
+        if (!local) return null;
+        let target: (typeof world.planets)[number]['turrets'][number] | null = null;
+        for (const planet of world.planets) {
+          for (const t of planet.turrets) {
+            if (t.owner === LOCAL_PLAYER) { target = t; break; }
+            if (!target) target = t; // remember any turret as a fallback
+          }
+          if (target && target.owner === LOCAL_PLAYER) break;
+        }
+        if (!target) return null;
+        target.pos.x = local.pos.x + 120;
+        target.pos.y = local.pos.y;
+        const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+        target.hp = f * target.maxHp;
+        const at: Vec2 = { x: 0, y: 0 };
+        renderer.projectToScreen(target.pos, at);
+        return { owner: target.owner, fraction: target.hp / target.maxHp, x: at.x, y: at.y };
       },
       bars(): ReturnType<typeof hud.debugHealthBars> {
         return hud.debugHealthBars();
@@ -2155,6 +2194,9 @@ interface MutCombatant {
   inCombat: boolean;
   pos: Vec2;
   radius: number;
+  /** True for a turret record (field request v0.2.2), so the model draws a bar
+   *  over the local player's own turrets too — a ship record leaves it false. */
+  turret: boolean;
 }
 
 /** A mutable {@link Nameable} — the pooled records `feedNameplates()` overwrites
