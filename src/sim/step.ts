@@ -62,6 +62,7 @@ import {
   updatePlanets,
   updateTurrets,
 } from './buildings';
+import { areEnemies } from './allegiance';
 import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
 import { SpatialHash } from './spatial-hash';
@@ -575,7 +576,7 @@ function acquireNearest(world: World, ship: Ship): AimTarget | null {
     // hull that takes zero damage with no tell (field report: "some ships would
     // not take damage from me"), and worse, auto-aim would lock onto it instead
     // of a live enemy standing right beside it.
-    if (t.id === ship.id || !t.alive || t.spawnProtect > 0) continue;
+    if (!areEnemies(world, ship.id, t.id) || !t.alive || t.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, t.pos);
     if (d2 < bestD2) {
       bestD2 = d2;
@@ -584,7 +585,7 @@ function acquireNearest(world: World, ship: Ship): AimTarget | null {
   }
   for (let p = 0; p < world.planets.length; p++) {
     const planet = world.planets[p]!;
-    if (planet.owner === ship.id) continue;
+    if (!areEnemies(world, ship.id, planet.owner)) continue;
     for (let i = 0; i < planet.turrets.length; i++) {
       const turret = planet.turrets[i]!;
       if (turret.hp <= 0) continue;

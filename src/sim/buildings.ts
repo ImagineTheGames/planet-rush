@@ -38,6 +38,7 @@ import {
   SHIELD,
   TURRET,
 } from './constants';
+import { areEnemies } from './allegiance';
 import { destroyCore, isCollapsed } from './match';
 import { fireTurretProjectile } from './projectiles';
 import type { Planet, Ship, Shield, Turret, World } from './state';
@@ -670,7 +671,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
   let bestAtk = false;
   let bestD2 = Infinity;
   for (const ship of world.ships) {
-    if (!ship.alive || ship.id === planet.owner || ship.spawnProtect > 0) continue;
+    if (!ship.alive || !areEnemies(world, planet.owner, ship.id) || ship.spawnProtect > 0) continue;
     const d2 = dist2(ref, ship.pos);
     if (d2 > reach2) continue;
     const atk = isAttackingPlanet(world, planet, ship);
@@ -686,7 +687,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
   const currentValid =
     current !== null &&
     current.alive &&
-    current.id !== planet.owner &&
+    areEnemies(world, planet.owner, current.id) &&
     current.spawnProtect <= 0 &&
     dist2(ref, current.pos) <= reach2;
 
@@ -724,7 +725,7 @@ function splitThreats(world: World, planet: Planet): void {
 
   const threats: Ship[] = [];
   for (const ship of world.ships) {
-    if (!ship.alive || ship.id === planet.owner || ship.spawnProtect > 0) continue;
+    if (!ship.alive || !areEnemies(world, planet.owner, ship.id) || ship.spawnProtect > 0) continue;
     if (dist2(planet.pos, ship.pos) <= reach2) threats.push(ship);
   }
   if (threats.length < 2) return; // nothing to spread across
