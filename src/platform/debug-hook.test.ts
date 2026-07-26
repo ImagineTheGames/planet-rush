@@ -6,7 +6,15 @@
  * centring against this shape, so its stability is itself under test.
  */
 import { describe, it, expect } from 'vitest';
-import { installDebugHook, isDebugEnabled, DEBUG_GLOBAL_KEY, type DebugState } from './debug-hook';
+import {
+  installDebugHook,
+  installDebugStage,
+  isDebugEnabled,
+  DEBUG_GLOBAL_KEY,
+  type DebugState,
+  type DebugSimBridge,
+  type DebugWriteAction,
+} from './debug-hook';
 import type { BuildInfo } from './build-info';
 
 /** A known build stamp, so the shape assertion doesn't depend on the real git
@@ -158,5 +166,158 @@ describe('installDebugHook — armed path (?debug=1)', () => {
     hook.update(0, 0, 10, 10, 0, 0, 400, 3); // dt < 0 → skipped
     expect(Number.isNaN(state.fps)).toBe(false);
     expect(state.fps).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Write seams — the round-9 QA unblock (damageShip / damageCore / coreHp)
+// ---------------------------------------------------------------------------
+
+/** The three write-seam methods merged onto __planetRush under ?debug=1. */
+interface StageSurface {
+  damageShip(owner: number, amount: number): DebugWriteAction;
+  damageCore(player: number, amount: number): DebugWriteAction;
+  coreHp(player: number): number | null;
+}
+
+/** Read the write-seam surface back off the shared handle, typed. */
+function stageOf(target: Record<string, unknown>): StageSurface | undefined {
+  return target[DEBUG_GLOBAL_KEY] as StageSurface | undefined;
+}
+
+/** A recording bridge: proves the seams route through it, in order, and only on
+ *  drain — never as a direct poke from the window call. */
+function recordingBridge(cores: Record<number, number> = {}): DebugSimBridge & {
+  calls: string[];
+} {
+  const calls: string[] = [];
+  return {
+    calls,
+    damageShip(owner, amount): void {
+      calls.push(`ship:${owner}:${amount}`);
+    },
+    damageCore(player, amount): void {
+      calls.push(`core:${player}:${amount}`);
+      const cur = cores[player];
+      if (cur !== undefined) cores[player] = cur - amount;
+    },
+    coreHp(player): number | null {
+      return player in cores ? cores[player]! : null;
+    },
+  };
+}
+
+describe('installDebugStage — off path (no ?debug=1)', () => {
+  it('installs nothing on the target and returns an inert hook', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('', win);
+    expect(hook.enabled).toBe(false);
+    expect(DEBUG_GLOBAL_KEY in win).toBe(false);
+    // setBridge / drain are safe no-ops.
+    expect(() => hook.setBridge(recordingBridge())).not.toThrow();
+    expect(() => hook.drain()).not.toThrow();
+    expect(DEBUG_GLOBAL_KEY in win).toBe(false);
+  });
+});
+
+describe('installDebugStage — armed path (?debug=1)', () => {
+  it('exposes the three seams on the shared handle', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    expect(hook.enabled).toBe(true);
+    const stage = stageOf(win)!;
+    expect(typeof stage.damageShip).toBe('function');
+    expect(typeof stage.damageCore).toBe('function');
+    expect(typeof stage.coreHp).toBe('function');
+  });
+
+  it('QUEUES writes and routes them through the bridge only on drain — never a direct poke', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    const bridge = recordingBridge();
+    hook.setBridge(bridge);
+    const stage = stageOf(win)!;
+
+    // The window call returns the queued verb and does NOT touch the sim yet —
+    // that is what "routes through the ordered-input path" buys over a poke.
+    const verb = stage.damageCore(3, 250);
+    expect(verb).toEqual({ op: 'damageCore', player: 3, amount: 250 });
+    expect(bridge.calls, 'no sim write happens on the window call').toEqual([]);
+
+    // The effect lands only when the loop drains, on a tick boundary.
+    hook.drain();
+    expect(bridge.calls).toEqual(['core:3:250']);
+  });
+
+  it('applies queued writes in FIFO order on drain, then clears', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    const bridge = recordingBridge();
+    hook.setBridge(bridge);
+    const stage = stageOf(win)!;
+
+    stage.damageShip(1, 10);
+    stage.damageCore(2, 20);
+    stage.damageShip(1, 30);
+    hook.drain();
+    expect(bridge.calls).toEqual(['ship:1:10', 'core:2:20', 'ship:1:30']);
+
+    // Queue cleared: a second drain with no new writes does nothing.
+    hook.drain();
+    expect(bridge.calls).toEqual(['ship:1:10', 'core:2:20', 'ship:1:30']);
+  });
+
+  it('reads core HP through the bridge immediately (read-only, like bank)', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    hook.setBridge(recordingBridge({ 0: 1000, 5: 400 }));
+    const stage = stageOf(win)!;
+    expect(stage.coreHp(0)).toBe(1000);
+    expect(stage.coreHp(5)).toBe(400);
+    expect(stage.coreHp(7), 'null for a player with no planet').toBeNull();
+  });
+
+  it('applied write and read agree: a drained damageCore drops the core HP the read reports', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    hook.setBridge(recordingBridge({ 0: 1000 }));
+    const stage = stageOf(win)!;
+    expect(stage.coreHp(0)).toBe(1000);
+    stage.damageCore(0, 300);
+    expect(stage.coreHp(0), 'still full before the tick drains the write').toBe(1000);
+    hook.drain();
+    expect(stage.coreHp(0), 'core HP dropped once the write landed on the tick boundary').toBe(700);
+  });
+
+  it('coreHp is null and drain is a safe no-op before a bridge is registered (queue preserved)', () => {
+    const win = fakeWindow();
+    const hook = installDebugStage('?debug=1', win);
+    const stage = stageOf(win)!;
+    expect(stage.coreHp(0)).toBeNull();
+
+    // A write filed before the loop wired the bridge is not lost: drain no-ops now
+    // and applies it once the bridge arrives.
+    stage.damageCore(0, 50);
+    expect(() => hook.drain()).not.toThrow();
+    const bridge = recordingBridge();
+    hook.setBridge(bridge);
+    hook.drain();
+    expect(bridge.calls).toEqual(['core:0:50']);
+  });
+
+  it('merges onto an existing __planetRush without clobbering the co-tenant (shared handle)', () => {
+    const win = fakeWindow();
+    // The camera instrument installs the read-only handle first.
+    installDebugHook('?debug=1', win, STAMP);
+    // Then the write seams merge onto the SAME handle.
+    installDebugStage('?debug=1', win);
+
+    const handle = win[DEBUG_GLOBAL_KEY] as DebugState & StageSurface;
+    // Co-tenant's read-only fields survive…
+    expect(handle.build).toEqual(STAMP);
+    expect(handle.viewport).toEqual({ w: 0, h: 0, width: 0, height: 0 });
+    // …alongside the new write seams on one object.
+    expect(typeof handle.damageShip).toBe('function');
+    expect(typeof handle.coreHp).toBe('function');
   });
 });

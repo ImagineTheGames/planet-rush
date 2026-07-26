@@ -1,23 +1,36 @@
 /**
- * src/ui/build-wheel-view.ts — the Pixi view for the wheel + panel. OWNER: UI.
+ * src/ui/build-wheel-view.ts — the Pixi view for BOTH wheels. OWNER: UI.
  *
  * The drawing half of GDD §2.5. All the decisions live in the pure, unit-tested
- * models ({@link ./build-wheel}, {@link ./upgrade-panel}); this file only turns
- * them into Graphics and Text, and holds the one piece of view state the models
- * deliberately don't: **which screen is on top** — the wheel, or the panel
- * behind its UPGRADE SHIP arrow.
+ * models ({@link ./build-wheel}, {@link ./upgrade-wheel}); this file only turns
+ * them into Graphics and Text, and holds the two pieces of view state the models
+ * deliberately don't: **which wheel is on top** — the Build wheel, or the Upgrade
+ * wheel behind its UPGRADE SHIP arrow — and **the shared open/close pop**.
  *
- * Two rules from the contract are enforced here, in the drawing code, because
- * this is where they could be broken:
+ * ── ONE COMPONENT, TWO WHEELS (the field report) ────────────────────────────
+ * A developer reported the upgrade screen *"should be a wheel menu as well."* So
+ * it is: the Upgrade screen is now drawn by the **same wedge routine** the Build
+ * wheel uses ({@link drawWedge}) — same arc geometry, same label/cost typography,
+ * same dimmed-with-a-reason states. A wedge is a wedge; only the copy on it
+ * differs (a build target vs. a stat's current→next value). New upgrade tracks
+ * (p2-03) arrive as extra wedges with no view change, because the view draws
+ * however many wedges the model hands it.
  *
- *  1. **The only number on a segment is its cost** (GDD §2.5). The segment
- *     draws `label`, and `cost` when the model gives one. There is no third
- *     text field on a segment, and no way to add one without changing the model.
- *  2. **Cost numerals are signal yellow** `#F2D24B` — one of the explicitly
- *     allowed uses of the RESERVED colour (style-guide §2, "cost numerals on the
- *     build wheel"). Everything else on the wheel is neutral or plasma; a dimmed
- *     segment loses its yellow rather than recolouring it, so yellow always
- *     means "this is ore."
+ * ── THE SHARED POP, AND WHY IT CAN'T LATCH (the field report) ───────────────
+ * A developer also reported breaking the menu by opening and closing it fast
+ * until it *"wouldn't open anymore."* The open/close transition is a single
+ * {@link WheelToggle} shared by both wheels — a pure, leak-safe machine that can
+ * never wedge (see its file). The view only *reads* its `progress` to scale/fade
+ * the wheel; it holds no open/close flag of its own, so it cannot reintroduce the
+ * latch. Both wheels get the fix because both are this one view.
+ *
+ * Two rules from the contract are still enforced here, in the drawing code:
+ *  1. **The only number on a wedge is its cost** (plus the stat value it upgrades,
+ *     on the upgrade wheel — this being the one screen stats appear on). There is
+ *     no way to add a third number without changing a model.
+ *  2. **Cost numerals are signal yellow** `#F2D24B` — an explicitly allowed use
+ *     of the RESERVED colour (style-guide §2). A dimmed wedge loses its yellow
+ *     rather than recolouring it, so yellow always means "this is ore."
  *
  * Sizing is thumb-scale aware: {@link BuildWheelView.resize} scales the whole
  * wheel to the smaller viewport dimension so it stays reachable on a phone and
@@ -29,8 +42,22 @@ import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import { SEGMENT_ARC } from './build-wheel';
 import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel';
-import type { UpgradePanelModel, UpgradeRow } from './upgrade-panel';
-import { wheelRadius, panelSize, PANEL_ROW_HEIGHT, WHEEL_MIN_RADIUS } from './hud-geometry';
+import { upgradeWedgeArc } from './upgrade-wheel';
+import type { UpgradeWheelModel, UpgradeWedge, UpgradeWedgeState } from './upgrade-wheel';
+import { WheelToggle } from './wheel-toggle';
+import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
+
+/** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
+ *  (a bought tier must re-render its wedge here). */
+export interface DrawnUpgradeWedge {
+  readonly track: UpgradeWedge['track'];
+  readonly label: string;
+  readonly tier: number;
+  readonly current: string;
+  readonly next: string | null;
+  readonly cost: number | null;
+  readonly state: UpgradeWedgeState;
+}
 
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §5.6 — shared with the HUD)
@@ -51,50 +78,60 @@ const TEXT_DIM = PALETTE.hullSteel;
  *  with the viewport instead of being pinned to desktop pixels. */
 const HUB_RADIUS = 0.22;
 const INNER_RADIUS = 0.30;
-/** Where a segment's words sit, between the inner ring and the outer edge. */
+/** Where a wedge's words sit, between the inner ring and the outer edge. */
 const LABEL_RADIUS = 0.60;
 
-// Wheel and panel sizing live in the pure ./hud-geometry module, so the exact
-// rects these draw at are unit-tested against the layout registry's resolver
-// without booting PixiJS (the golden scene never opens a wheel).
-
-// ---------------------------------------------------------------------------
-// Per-state tinting
-// ---------------------------------------------------------------------------
-
-/** How opaque a segment's body is, by state. A refused segment is *dark*, not
- *  hidden: the player still learns the segment exists and what it costs. */
-function bodyAlpha(state: SegmentState): number {
-  return state === 'ready' ? 0.9 : 0.45;
-}
-
-/** Colour of a segment's words, by state. */
-function labelColor(state: SegmentState): number {
-  return state === 'ready' ? TEXT_PRIMARY : TEXT_DIM;
-}
-
-/**
- * Colour of a segment's cost numeral. Signal yellow when the ore is there —
- * that is what yellow means. When it isn't, the numeral goes grey rather than
- * dim-yellow: a half-lit yellow still reads as "ore is here" at a glance, and
- * spending that trust on a segment you cannot afford is exactly the misuse
- * style-guide §2 forbids.
- */
-function costColor(state: SegmentState): number {
-  return state === 'ready' ? PALETTE.signalYellow : TEXT_DIM;
+/** Ease the raw 0→1 pop progress so it settles rather than arriving linearly —
+ *  a small overshoot-free ease-out reads as a wheel "snapping" into place. */
+function easePop(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  return 1 - (1 - c) * (1 - c);
 }
 
 // ---------------------------------------------------------------------------
-// One segment's children
+// Per-state tinting (shared by both wheels — a dimmed wedge is a dimmed wedge)
 // ---------------------------------------------------------------------------
 
-interface SegmentNodes {
+/** Whether a wedge is drawn bright (pressable) or dark (refused, with a reason).
+ *  Unifies the Build wheel's {@link SegmentState} and the Upgrade wheel's
+ *  {@link UpgradeWedgeState}: `ready` is bright, everything else is dark. */
+function wedgeReady(state: SegmentState | UpgradeWedgeState): boolean {
+  return state === 'ready';
+}
+
+/** How opaque a wedge's body is. A refused wedge is *dark*, not hidden: the
+ *  player still learns the wedge exists and what it costs. */
+function bodyAlpha(ready: boolean): number {
+  return ready ? 0.9 : 0.45;
+}
+
+// ---------------------------------------------------------------------------
+// One wedge's children (shared shape for both wheels)
+// ---------------------------------------------------------------------------
+
+interface WedgeNodes {
   readonly body: Graphics;
   readonly label: Text;
-  readonly target: Text;
+  /** The second line: a build target ("YOUR PLANET") or a stat value ("10 → 13"). */
+  readonly sub: Text;
   readonly cost: Text;
   /** The arrow that marks UPGRADE SHIP as the one that opens a screen. */
   readonly arrow: Graphics;
+}
+
+/** The normalised descriptor {@link BuildWheelView.drawWedge} draws — the one
+ *  shape both wheels reduce to, so the drawing code is written once. */
+interface WedgeDraw {
+  readonly angle: number;
+  readonly label: string;
+  readonly sub: string;
+  readonly cost: number | null;
+  /** Bright vs. dark (dimmed-with-a-reason). */
+  readonly ready: boolean;
+  /** Whether the cost numeral is payable — drives its yellow-vs-grey. */
+  readonly costReady: boolean;
+  /** Draw the "opens a screen" arrow (UPGRADE SHIP on the Build wheel only). */
+  readonly arrow: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,63 +139,61 @@ interface SegmentNodes {
 // ---------------------------------------------------------------------------
 
 /**
- * The Build & Upgrade wheel and the upgrade panel behind it. Add once to the
- * HUD; call {@link update} each frame with the two models. The container hides
- * itself entirely when the wheel is closed, so away from your own planet it
- * costs one boolean per frame.
+ * The Build wheel and the Upgrade wheel behind its arrow. Add once to the HUD;
+ * call {@link update} each frame with the two models and the frame time. The
+ * container hides itself entirely once the wheel is fully closed, so away from
+ * your own planet it costs one boolean per frame.
  */
 export class BuildWheelView extends Container {
-  private readonly wheelGroup = new Container();
-  private readonly panelGroup = new Container();
+  private readonly buildGroup = new Container();
+  private readonly upgradeGroup = new Container();
 
-  // --- Wheel ---------------------------------------------------------------
-  private readonly rings = new Graphics();
-  private readonly segments: SegmentNodes[] = [];
-  private readonly hubOre: Text;
-  private readonly hubLabel: Text;
+  /** The shared, leak-safe open/close transition (the field bug's fix). */
+  private readonly toggle = new WheelToggle();
+  /** Last frame time seen, for deriving the transition's `dt`. */
+  private lastTime = -1;
 
-  // --- Upgrade panel -------------------------------------------------------
-  private readonly panelBg = new Graphics();
-  private readonly panelTitle: Text;
-  private readonly panelHint: Text;
-  private readonly panelHeader: Text[] = [];
-  private readonly panelRows: {
-    readonly label: Text;
-    readonly current: Text;
-    readonly next: Text;
-    readonly cost: Text;
-  }[] = [];
+  // --- Build wheel ---------------------------------------------------------
+  private readonly buildRings = new Graphics();
+  private readonly buildWedges: WedgeNodes[] = [];
+  private readonly buildHubOre: Text;
+  private readonly buildHubLabel: Text;
+
+  // --- Upgrade wheel -------------------------------------------------------
+  private readonly upgradeRings = new Graphics();
+  private readonly upgradeWedges: WedgeNodes[] = [];
+  private readonly upgradeHubOre: Text;
+  private readonly upgradeHubLabel: Text;
 
   /** Outer ring radius in CSS px, recomputed on resize. */
   private radius = WHEEL_MIN_RADIUS;
-  /** Live viewport, CSS px — the panel is clamped to it (see {@link panelSize}). */
-  private viewWidth = 0;
-  private viewHeight = 0;
+
+  /** ?debug=1 live-stage capture: the upgrade wedges the view actually drew last
+   *  frame (or empty when the upgrade wheel is not up), so a Playwright test can
+   *  assert a bought tier re-rendered. Costs nothing in a normal build. */
+  private lastUpgradeWedges: DrawnUpgradeWedge[] = [];
+  private lastUpgradeDrawn = false;
 
   constructor(screenWidth: number, screenHeight: number) {
     super();
 
-    // Hub: the live ore total (GDD §2.5, "with your live ore total in the hub").
-    // Signal yellow — it is ore, the one thing the colour is for.
-    this.hubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
-    this.hubOre.anchor.set(0.5, 0.5);
-    this.hubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_DIM);
-    this.hubLabel.anchor.set(0.5, 0);
-    this.wheelGroup.addChild(this.rings, this.hubOre, this.hubLabel);
+    // Build wheel hub: the live ore total (GDD §2.5) in signal yellow.
+    this.buildHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
+    this.buildHubOre.anchor.set(0.5, 0.5);
+    this.buildHubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_DIM);
+    this.buildHubLabel.anchor.set(0.5, 0);
+    this.buildGroup.addChild(this.buildRings, this.buildHubOre, this.buildHubLabel);
 
-    // Upgrade panel: title, column headers, four rows, and the way back out.
-    this.panelTitle = makeText('', FONT_HEADING, 18, TEXT_PRIMARY);
-    this.panelTitle.anchor.set(0.5, 0);
-    this.panelHint = makeText('', FONT_HEADING, 11, TEXT_DIM);
-    this.panelHint.anchor.set(0.5, 0);
-    this.panelGroup.addChild(this.panelBg, this.panelTitle, this.panelHint);
-    for (const heading of ['', 'NOW', 'NEXT', 'ORE']) {
-      const t = makeText(heading, FONT_HEADING, 10, TEXT_DIM);
-      this.panelHeader.push(t);
-      this.panelGroup.addChild(t);
-    }
+    // Upgrade wheel hub: the same ore total (one purchase draws on the same ore),
+    // labelled with the hull whose stats these are — the class is locked at the
+    // lobby, so it names whose ship you are spending on.
+    this.upgradeHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
+    this.upgradeHubOre.anchor.set(0.5, 0.5);
+    this.upgradeHubLabel = makeText('', FONT_HEADING, 10, TEXT_DIM);
+    this.upgradeHubLabel.anchor.set(0.5, 0);
+    this.upgradeGroup.addChild(this.upgradeRings, this.upgradeHubOre, this.upgradeHubLabel);
 
-    this.addChild(this.wheelGroup, this.panelGroup);
+    this.addChild(this.buildGroup, this.upgradeGroup);
     this.visible = false;
     this.resize(screenWidth, screenHeight);
   }
@@ -166,58 +201,151 @@ export class BuildWheelView extends Container {
   /** Re-centre and re-scale for a new viewport. Thumb-scale on a phone, sane on
    *  a desktop — the wheel is a touch target first (GDD §2.4 BUILD button). */
   resize(width: number, height: number): void {
-    this.viewWidth = width;
-    this.viewHeight = height;
     this.radius = wheelRadius(width, height);
-    this.wheelGroup.x = width / 2;
-    this.wheelGroup.y = height / 2;
-    this.panelGroup.x = width / 2;
-    this.panelGroup.y = height / 2;
+    this.buildGroup.x = width / 2;
+    this.buildGroup.y = height / 2;
+    this.upgradeGroup.x = width / 2;
+    this.upgradeGroup.y = height / 2;
   }
 
-  /** The wheel's drawn container — the layout registry's `build-wheel` entry
-   *  (GDD §2.2: the wheel appears "when near your own planet", which the follow
-   *  camera puts at the screen centre). Exposed so the HUD can register what was
-   *  really drawn without reaching into this view's internals. */
+  /** The Build wheel's drawn container — the layout registry's `build-wheel`
+   *  entry. Exposed so the HUD can register what was really drawn without
+   *  reaching into this view's internals. */
   get wheelNode(): Container {
-    return this.wheelGroup;
+    return this.buildGroup;
   }
 
-  /** The upgrade panel's drawn container — the registry's `upgrade-panel`. */
+  /** The Upgrade wheel's drawn container — the registry's `upgrade-wheel`. */
   get panelNode(): Container {
-    return this.panelGroup;
+    return this.upgradeGroup;
   }
 
   /**
    * Draw one frame.
    *
-   * @param wheel The wheel model — `open: false` hides everything.
-   * @param panel The upgrade panel model — `open: true` puts it in front of the
-   *              wheel, which is what the UPGRADE SHIP arrow means (GDD §2.5).
+   * @param wheel   The Build wheel model — `open: false` closes everything (with
+   *                a pop, via the shared transition).
+   * @param upgrade The Upgrade wheel model — `open: true` puts it in front of the
+   *                Build wheel, which is what the UPGRADE SHIP arrow means.
+   * @param time    The frame's match time (`world.time`), for the pop's `dt`.
    */
-  update(wheel: BuildWheelModel, panel: UpgradePanelModel): void {
-    this.visible = wheel.open;
-    if (!wheel.open) return;
+  update(wheel: BuildWheelModel, upgrade: UpgradeWheelModel, time: number): void {
+    const dt = this.lastTime < 0 ? 0 : Math.max(0, time - this.lastTime);
+    this.lastTime = time;
 
-    const showPanel = panel.open;
-    this.wheelGroup.visible = !showPanel;
-    this.panelGroup.visible = showPanel;
+    // The player wants the wheel up iff the model is open; the shared toggle turns
+    // that target into a pop and — critically — can never latch shut on it.
+    this.toggle.update(wheel.open, dt);
+    // With no time to animate across (a frozen frame, or the very first update),
+    // land on the target rather than sitting at scale 0 — the pop needs a clock.
+    if (dt <= 0) this.toggle.settle();
+    this.visible = this.toggle.visible;
+    if (!this.visible) {
+      this.lastUpgradeDrawn = false;
+      return;
+    }
 
-    if (showPanel) this.drawPanel(panel);
-    else this.drawWheel(wheel);
+    // Pop from the screen centre: scale/fade each group about its own local
+    // origin (which the resize() above pins at the viewport centre).
+    const p = easePop(this.toggle.progress);
+    this.buildGroup.scale.set(p);
+    this.upgradeGroup.scale.set(p);
+    this.buildGroup.alpha = p;
+    this.upgradeGroup.alpha = p;
+
+    const showUpgrade = upgrade.open;
+    this.buildGroup.visible = !showUpgrade;
+    this.upgradeGroup.visible = showUpgrade;
+
+    if (showUpgrade) this.drawUpgradeWheel(upgrade);
+    else this.drawBuildWheel(wheel);
   }
 
-  // --- Wheel ---------------------------------------------------------------
+  // --- Build wheel ---------------------------------------------------------
 
-  private drawWheel(model: BuildWheelModel): void {
+  private drawBuildWheel(model: BuildWheelModel): void {
+    this.lastUpgradeDrawn = false; // the upgrade wheel is not the one on top
     const r = this.radius;
     const inner = r * INNER_RADIUS;
     const hub = r * HUB_RADIUS;
 
-    // Backing disc + hub ring. Redrawn per frame: it is one Graphics and the
-    // wheel is open for seconds at a time, not for the whole match.
-    this.rings.clear();
-    this.rings
+    this.drawRings(this.buildRings, r, hub);
+
+    for (let i = 0; i < model.segments.length; i++) {
+      const seg = model.segments[i];
+      if (!seg) continue;
+      const nodes = this.wedgeNodes(this.buildGroup, this.buildWedges, i);
+      this.drawWedge(nodes, buildSegmentDraw(seg), inner, r, SEGMENT_ARC);
+    }
+    // Any pooled wedges beyond this model's segment count stay hidden.
+    this.hideWedgesFrom(this.buildWedges, model.segments.length);
+
+    this.buildHubOre.text = `${model.ore}`;
+    this.buildHubOre.y = -4;
+    this.buildHubLabel.y = this.buildHubOre.y + 12;
+    this.buildHubLabel.text = 'ORE';
+  }
+
+  // --- Upgrade wheel -------------------------------------------------------
+
+  /** The one screen where ship stats appear (GDD §2.2, §2.5), now a wheel: one
+   *  wedge per track, each giving current value → next tier → ore cost. */
+  private drawUpgradeWheel(model: UpgradeWheelModel): void {
+    const r = this.radius;
+    const inner = r * INNER_RADIUS;
+    const hub = r * HUB_RADIUS;
+    const arc = upgradeWedgeArc(model.wedges.length);
+
+    this.drawRings(this.upgradeRings, r, hub);
+
+    for (let i = 0; i < model.wedges.length; i++) {
+      const wedge = model.wedges[i];
+      if (!wedge) continue;
+      const nodes = this.wedgeNodes(this.upgradeGroup, this.upgradeWedges, i);
+      this.drawWedge(nodes, upgradeWedgeDraw(wedge), inner, r, arc);
+    }
+    this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
+
+    this.upgradeHubOre.text = `${model.ore}`;
+    this.upgradeHubOre.y = -4;
+    this.upgradeHubLabel.y = this.upgradeHubOre.y + 12;
+    // Name the hull whose stats these are — the class is the lobby choice.
+    this.upgradeHubLabel.text = model.className;
+
+    // Capture what was drawn for the ?debug=1 live-stage seam (a bought tier must
+    // re-render here). Rebuilt from the model the view just drew from.
+    this.lastUpgradeDrawn = true;
+    this.lastUpgradeWedges = model.wedges.map((w) => ({
+      track: w.track,
+      label: w.label,
+      tier: w.tier,
+      current: w.current,
+      next: w.next,
+      cost: w.cost,
+      state: w.state,
+    }));
+  }
+
+  // --- ?debug=1 live-stage seam --------------------------------------------
+
+  /** Whether the wheel accepts input this frame — the leak-fix's verdict, read by
+   *  the cycle live-stage test to prove it still opens after rapid mashing. */
+  debugInteractive(): boolean {
+    return this.visible && this.toggle.interactive;
+  }
+
+  /** The upgrade wedges the view actually drew last frame (empty when the upgrade
+   *  wheel is not up), so a test can assert a bought tier re-rendered its wedge. */
+  debugUpgradeWedges(): DrawnUpgradeWedge[] {
+    return this.lastUpgradeDrawn ? this.lastUpgradeWedges : [];
+  }
+
+  // --- Shared wedge drawing (the field report's "same component family") ----
+
+  private drawRings(rings: Graphics, r: number, hub: number): void {
+    // Backing disc + hub ring. Redrawn per frame: one Graphics, open for seconds.
+    rings.clear();
+    rings
       .circle(0, 0, r)
       .fill({ color: PALETTE.vacuum, alpha: 0.88 })
       .circle(0, 0, r)
@@ -226,26 +354,22 @@ export class BuildWheelView extends Container {
       .fill({ color: PALETTE.vacuum, alpha: 0.95 })
       .circle(0, 0, hub)
       .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.6 });
-
-    for (let i = 0; i < model.segments.length; i++) {
-      const seg = model.segments[i];
-      if (!seg) continue;
-      const nodes = this.segmentNodes(i);
-      this.drawSegment(nodes, seg, inner, r);
-    }
-
-    this.hubOre.text = `${model.ore}`;
-    this.hubOre.y = -4;
-    this.hubLabel.y = this.hubOre.y + 12;
   }
 
-  /** Draw one wedge: the body, the words, the target, and the cost — and
-   *  nothing else (GDD §2.5, "the only number on a segment is its cost"). */
-  private drawSegment(nodes: SegmentNodes, seg: WheelSegment, inner: number, outer: number): void {
-    const half = SEGMENT_ARC / 2;
-    const a0 = seg.angle - half;
-    const a1 = seg.angle + half;
+  /** Draw one wedge: the body, the words, the second line, and the cost — and
+   *  nothing else (GDD §2.5). Written once, used by both wheels. */
+  private drawWedge(
+    nodes: WedgeNodes,
+    d: WedgeDraw,
+    inner: number,
+    outer: number,
+    arc: number,
+  ): void {
+    const half = arc / 2;
+    const a0 = d.angle - half;
+    const a1 = d.angle + half;
 
+    nodes.body.visible = true;
     nodes.body.clear();
     nodes.body
       .moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner)
@@ -253,157 +377,112 @@ export class BuildWheelView extends Container {
       .lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner)
       .arc(0, 0, inner, a1, a0, true)
       .closePath()
-      .fill({ color: PALETTE.hullSteel, alpha: bodyAlpha(seg.state) * 0.16 })
-      .stroke({ width: 1, color: PALETTE.hullSteel, alpha: bodyAlpha(seg.state) * 0.5 });
+      .fill({ color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.16 })
+      .stroke({ width: 1, color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.5 });
 
-    const lx = Math.cos(seg.angle) * outer * LABEL_RADIUS;
-    const ly = Math.sin(seg.angle) * outer * LABEL_RADIUS;
+    const lx = Math.cos(d.angle) * outer * LABEL_RADIUS;
+    const ly = Math.sin(d.angle) * outer * LABEL_RADIUS;
 
-    nodes.label.text = seg.label;
-    nodes.label.style.fill = labelColor(seg.state);
+    nodes.label.visible = true;
+    nodes.label.text = d.label;
+    nodes.label.style.fill = d.ready ? TEXT_PRIMARY : TEXT_DIM;
     nodes.label.x = lx;
     nodes.label.y = ly - 16;
 
-    // "Every label names which" — planet or ship (GDD §2.5). Words, not a number.
-    nodes.target.text = seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR PLANET';
-    nodes.target.x = lx;
-    nodes.target.y = ly - 2;
+    nodes.sub.visible = true;
+    nodes.sub.text = d.sub;
+    nodes.sub.x = lx;
+    nodes.sub.y = ly - 2;
 
-    if (seg.cost !== null) {
+    if (d.cost !== null) {
       nodes.cost.visible = true;
-      nodes.cost.text = `${seg.cost}`;
-      nodes.cost.style.fill = costColor(seg.state);
+      nodes.cost.text = `${d.cost}`;
+      // Yellow only when payable — a half-lit yellow still reads as "ore is here"
+      // at a glance, and that trust is what style-guide §2 forbids spending.
+      nodes.cost.style.fill = d.costReady ? PALETTE.signalYellow : TEXT_DIM;
       nodes.cost.x = lx;
       nodes.cost.y = ly + 12;
     } else {
       nodes.cost.visible = false;
     }
 
-    // The arrow: this segment opens a second screen. Without it a player who
-    // doesn't know upgrades exist never looks for them (GDD §2.5).
-    nodes.arrow.visible = seg.opensPanel;
-    if (seg.opensPanel) {
+    nodes.arrow.visible = d.arrow;
+    if (d.arrow) {
       nodes.arrow.clear();
       nodes.arrow
         .poly([0, -5, 8, 0, 0, 5])
-        .fill({ color: PALETTE.plasma, alpha: seg.state === 'ready' ? 0.95 : 0.5 });
+        .fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
       nodes.arrow.x = lx + nodes.label.width / 2 + 10;
       nodes.arrow.y = ly - 9;
     }
   }
 
-  /** Lazily create (and then reuse) one segment's children. */
-  private segmentNodes(index: number): SegmentNodes {
-    const existing = this.segments[index];
+  /** Lazily create (and then reuse) one wedge's children, parented to `group`. */
+  private wedgeNodes(group: Container, pool: WedgeNodes[], index: number): WedgeNodes {
+    const existing = pool[index];
     if (existing) return existing;
 
     const body = new Graphics();
     const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
-    const target = makeText('', FONT_HEADING, 9, TEXT_DIM);
+    const sub = makeText('', FONT_HEADING, 9, TEXT_DIM);
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
     const arrow = new Graphics();
-    for (const t of [label, target, cost]) t.anchor.set(0.5, 0);
-    this.wheelGroup.addChild(body);
-    this.wheelGroup.addChild(label, target, cost, arrow);
+    for (const t of [label, sub, cost]) t.anchor.set(0.5, 0);
+    group.addChild(body);
+    group.addChild(label, sub, cost, arrow);
 
-    const nodes: SegmentNodes = { body, label, target, cost, arrow };
-    this.segments[index] = nodes;
+    const nodes: WedgeNodes = { body, label, sub, cost, arrow };
+    pool[index] = nodes;
     return nodes;
   }
 
-  // --- Upgrade panel -------------------------------------------------------
-
-  /** The one screen where ship stats appear (GDD §2.2, §2.5): one row per
-   *  track, each giving current value → next tier → ore cost. */
-  private drawPanel(model: UpgradePanelModel): void {
-    const size = panelSize(this.viewWidth, this.viewHeight, model.rows.length);
-    const w = size.width;
-    const rowH = PANEL_ROW_HEIGHT;
-    const h = size.height;
-    const x0 = -w / 2;
-    const y0 = -h / 2;
-
-    this.panelBg.clear();
-    this.panelBg
-      .roundRect(x0, y0, w, h, 10)
-      .fill({ color: PALETTE.vacuum, alpha: 0.94 })
-      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.55 });
-
-    this.panelTitle.text = `UPGRADE SHIP · ${model.className}`;
-    this.panelTitle.y = y0 + 14;
-
-    // Column x positions: label left, then the three numbers right-aligned.
-    const colCurrent = x0 + w * 0.56;
-    const colNext = x0 + w * 0.76;
-    const colCost = x0 + w * 0.94;
-    const headerY = y0 + 46;
-    const cols = [x0 + 18, colCurrent, colNext, colCost];
-    for (let i = 0; i < this.panelHeader.length; i++) {
-      const t = this.panelHeader[i];
-      if (!t) continue;
-      t.x = cols[i] ?? 0;
-      t.y = headerY;
-      t.anchor.set(i === 0 ? 0 : 1, 0);
+  /** Hide any pooled wedges the current model didn't fill — so a wheel that
+   *  shrank (fewer tracks) never leaves a stale wedge drawn. */
+  private hideWedgesFrom(pool: WedgeNodes[], from: number): void {
+    for (let i = from; i < pool.length; i++) {
+      const n = pool[i];
+      if (!n) continue;
+      n.body.visible = false;
+      n.label.visible = false;
+      n.sub.visible = false;
+      n.cost.visible = false;
+      n.arrow.visible = false;
     }
-
-    for (let i = 0; i < model.rows.length; i++) {
-      const row = model.rows[i];
-      if (!row) continue;
-      const nodes = this.panelRowNodes(i);
-      const y = headerY + 18 + i * rowH;
-      this.drawPanelRow(nodes, row, cols, y);
-    }
-
-    // The ore total, echoed from the wheel's hub so the trade is visible on the
-    // screen where it is made: rows on the left, what you can pay on the right.
-    this.panelHint.text = `ORE ${model.ore}`;
-    this.panelHint.y = y0 + h - 24;
   }
+}
 
-  private drawPanelRow(
-    nodes: { label: Text; current: Text; next: Text; cost: Text },
-    row: UpgradeRow,
-    cols: readonly number[],
-    y: number,
-  ): void {
-    const maxed = row.state === 'maxed';
-    nodes.label.text = row.label;
-    nodes.label.style.fill = maxed ? TEXT_DIM : TEXT_PRIMARY;
-    nodes.label.x = cols[0] ?? 0;
-    nodes.label.y = y;
+// ---------------------------------------------------------------------------
+// Model → wedge descriptor (the only place the two wheels differ)
+// ---------------------------------------------------------------------------
 
-    nodes.current.text = row.current;
-    nodes.current.x = cols[1] ?? 0;
-    nodes.current.y = y;
+/** A Build-wheel segment as a wedge: label, its target, its cost. */
+function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
+  return {
+    angle: seg.angle,
+    label: seg.label,
+    // "Every label names which" — planet or ship (GDD §2.5). Words, not a number.
+    sub: seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR PLANET',
+    cost: seg.cost,
+    ready: wedgeReady(seg.state),
+    costReady: seg.state === 'ready',
+    arrow: seg.opensPanel,
+  };
+}
 
-    nodes.next.text = maxed ? 'MAX' : (row.next ?? '');
-    nodes.next.style.fill = maxed ? TEXT_DIM : PALETTE.plasma;
-    nodes.next.x = cols[2] ?? 0;
-    nodes.next.y = y;
-
-    // Cost is the one yellow on this screen, and only when it is payable —
-    // same rule as the wheel's numerals (style-guide §2).
-    nodes.cost.text = row.cost === null ? '—' : `${row.cost}`;
-    nodes.cost.style.fill = row.state === 'ready' ? PALETTE.signalYellow : TEXT_DIM;
-    nodes.cost.x = cols[3] ?? 0;
-    nodes.cost.y = y;
-  }
-
-  private panelRowNodes(index: number): { label: Text; current: Text; next: Text; cost: Text } {
-    const existing = this.panelRows[index];
-    if (existing) return existing;
-
-    const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
-    const current = makeText('', FONT_NUMERAL, 15, TEXT_PRIMARY);
-    const next = makeText('', FONT_NUMERAL, 15, PALETTE.plasma);
-    const cost = makeText('', FONT_NUMERAL, 15, PALETTE.signalYellow, 'bold');
-    for (const t of [current, next, cost]) t.anchor.set(1, 0);
-    this.panelGroup.addChild(label, current, next, cost);
-
-    const nodes = { label, current, next, cost };
-    this.panelRows[index] = nodes;
-    return nodes;
-  }
+/** An Upgrade-wheel wedge: label, its current → next stat value, its cost. This
+ *  screen is the one place a stat value ever shows, so the second line carries
+ *  it (GDD §2.5): `10 → 13`, or `MAX` on a finished ladder. */
+function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
+  const sub = wedge.state === 'maxed' ? `${wedge.current} · MAX` : `${wedge.current} → ${wedge.next}`;
+  return {
+    angle: wedge.angle,
+    label: wedge.label,
+    sub,
+    cost: wedge.cost,
+    ready: wedgeReady(wedge.state),
+    costReady: wedge.state === 'ready',
+    arrow: false,
+  };
 }
 
 // ---------------------------------------------------------------------------

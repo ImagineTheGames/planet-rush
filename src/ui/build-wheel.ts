@@ -16,7 +16,7 @@
  * *state* — and no other number. The wheel says what a thing costs and what it
  * acts on; the game teaches what it's worth. **UPGRADE SHIP** carries an arrow
  * instead of a number ({@link WheelSegment.opensPanel}): it is the one segment
- * that opens a second screen, the upgrade panel ({@link ./upgrade-panel}), which
+ * that opens a second screen, the upgrade wheel ({@link ./upgrade-wheel}), which
  * is the only place ship stats are ever shown.
  *
  * **The wheel opens at your own planet, and only there** (GDD §2.5, §2.4 "E

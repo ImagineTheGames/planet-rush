@@ -438,5 +438,105 @@
     "image": "images/map-diamond-fields.png",
     "title": "Diamond home-field invariant — an OUTER and an INNER planet with congruent fields",
     "attestation": "Same frozen diamond frame, cropped on the local OUTER-N planet and the adjacent INNER-NE planet with the space inboard of each. WHAT IS ON SCREEN: two player-coloured planets at clearly DIFFERENT distances from the centre (one outer, one inner), and inboard of EACH a small cluster of grey asteroids of the same tight two-lobe character. Despite the asymmetric ground, each home carries the same field stamped inboard toward the commons — the p1-09 resource-fairness invariant holding even on the deliberately unfair-in-position veteran map (unfair in ground, never in ore). VERIFIED."
+  },
+  {
+    "id": "ore-hud-under-ship",
+    "title": "Ore HUD split — held ore UNDER the ship, TOTAL top-left (mining)",
+    "area": "hud",
+    "image": "images/ore-hud-mine.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Live desktop boot (?debug=1, 1280x800). The local steel-triangle ship sits at screen centre (the follow camera holds it there). Directly UNDER the ship is a compact row of FIVE filled yellow squares — the held-ore indicator, moving with the ship, not in the corner. Top-left reads the label 'TOTAL' with a yellow '3' beside the home minimap. The two numbers are DISTINCT (5 held under the ship vs 3 banked top-left) and both match the sim read back through window.__oreHudStage this same frame: mine(5) staged cargo=5/banked=3; the HUD drew hold {filled:5, slots:5, x:640 = viewport centre, y:423 = below the ship}; total()=3; readout {cargo:5, banked:3}. A 'Hold full — fly home and press E' hint shows bottom-right. This proves the field rule on a REAL boot: ore held on the ship is drawn under the ship; the top-left is the banked TOTAL. Corroborated by the full-frame capture images/ore-hud-mine-full.png (whole 1280x800 viewport, one shot: 'TOTAL 3' top-left beside the minimap AND the five filled held squares under the centre ship).",
+    "verdict": "verified"
+  },
+  {
+    "id": "ore-hud-deposit",
+    "title": "Ore HUD split — hold drains under the ship while the TOTAL rises (docking)",
+    "area": "hud",
+    "image": "images/ore-hud-dock.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Same live boot, moments later: the ship has docked at its home planet (dark-blue disc, blue shield ring, green+yellow core) and the sim is auto-draining the hold into the bank. Beside/under the ship the indicator now shows ONE filled yellow square followed by five empty outlined slots — the hold drained from 6 toward 0 — and a single yellow ore-courier dot is in flight between ship and planet. Top-left now reads 'TOTAL 7' (up from 3). The two numbers are distinct and both track the live sim: dock(6) staged cargo=6/banked=3; the captured mid-drain frame read hold {filled:1, slots:6}, total()=7, readout {cargo:1.97, banked:7.03}. This proves the second half of the rule — the under-ship held count DRAINS while the top-left TOTAL RISES by the deposited ore, two independent numbers from one sim source. Corroborated by the full-frame capture images/ore-hud-dock-full.png (whole viewport, one shot: 'TOTAL 7' top-left AND the drained under-ship indicator with a courier dot in flight to the planet).",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-far-side-engage",
+    "title": "Turret slides around the planet to engage a FAR-SIDE attacker",
+    "area": "match",
+    "image": "images/turret-far-side-engage.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Live boot (?debug=1, unfrozen). A turret was built on the LOCAL home planet — mount slot 0, which is the EAST rim (turretHomeAngle = planet.angle = 0; planet centre world x=2058, east mount x≈2146). An attacker was then parked on the planet's WEST side (world x≈1888, due west of centre) via __healthbarStage.damageEnemy — the FAR side, opposite the mount, outside beam range of the east spot but inside the planet-centric threat radius. In the crop the grey turret disc has SLID ~180° around the planet body and now sits on the WEST rim (grey circle at the planet's left edge), directly between the planet and the west attacker (teal triangle with a cyan health bar just to its left); my own ship is far left. The window.__planetRush.beams instrument, sampled through the slide, confirms the muzzle: it starts near the east/NE mount (origin x≈2080) and SETTLES on the west rim (origin x=1964, ≈ the west-rim ring at 1970) with its endpoint further WEST (x≈1907) at the attacker — a beam lying entirely west of the planet's west edge (x=1994), i.e. CLEAN of the planet body. The settled origin held to 1–2 distinct positions (a glide that stops, no thrash) and a home-turret muzzle recurred across many frames (fire interval 0.5s — no idle gap). This proves the field-report root cause is fixed: a threat on the OTHER SIDE of the planet is now reached and engaged, the beam clamped clear of the core. HONEST BOUNDARY: no debug seam parks TWO simultaneous attackers around one turreted planet, so the two-attacker priority SPLIT (a core-attacker outranking a loiterer; two turrets covering two threats one-each) is NOT reproducible as live pixels — it is proven by the pure-sim suite tests/sim/turret-coverage.test.ts. What THIS shot verifies with pixels + instrument is the far-side reach-and-fire, the exact behaviour the developer reported missing.",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-far-side-context",
+    "title": "Turret far-side engage — full-frame context (under-attack alarm)",
+    "area": "match",
+    "image": "images/turret-far-side-full.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "The wide frame behind the turret-far-side-engage crop. The red screen-edge vignette and the banner 'Your planet is under attack — follow the arrow' confirm the parked bot is a REAL registered threat to the home planet. Top-right shows the HOME and HULL bars for the local planet; top-left reads 'TOTAL 0' (the 3 boot ore was spent building the turret). The grey turret disc sits on the home planet's west rim with the teal attacker just west of it; a separate roaming-bot firefight (orange and blue ship beams) plays out to the north-west and is unrelated to the home turret — the home turret's own muzzle is the short west-pointing beam at the rim, a single-tick flash not frozen in this particular frame (see the instrument geometry cited in turret-far-side-engage). Build stamp 'dc7e2ac · 00:00Z' bottom-right.",
+    "verdict": "verified"
+  },
+  {
+    "id": "projectile-dodge",
+    "title": "Projectile in flight + a ship evading it; mining is still a beam",
+    "area": "match",
+    "image": "images/projectile-dodge.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "Three real frames from one LIVE (un-frozen) session, past the 10 s spawn-protection window, composited left-to-right. LEFT (in flight): the local ship (blue-cockpit steel triangle) sits at screen centre over its home planet (yellow core, teal shield) firing due east; a single red projectile dot hangs in the GAP between the ship and a stationary enemy ship (steel triangle carrying a teal hull bar) ~110 px further east — the shot is partway across, not a hitscan line touching both ends. Ship-vs-ship fire draws NO beam, so a red dot mid-gap IS a projectile with travel time. MIDDLE (evaded): the enemy has left the eastward shot line and a red projectile flies on east into empty space — a clean miss. RIGHT (mining): the local ship (at right) emits a solid BLUE mining beam drawn as a continuous LINE to a grey asteroid it strikes — visually distinct from the traveling combat dot, so mining is STILL a beam. Readback backs each: across the burst ~88 of 90 frames carried a projectile at an intermediate position (travel, not hitscan); a STILL target took damage under fire while the RELEASED, moving target barely lost hull across ~70 shots (a traveling shot cannot catch a mover — dodging is real); and __planetRush.beams reported the mining shot as source:'ship' with origin -> hit geometry. Note in passing: top-right carries only the HOME core-HP bar — no ship-hull readout.",
+    "verdict": "verified"
+  },
+  {
+    "id": "upgrade-wheel",
+    "title": "The new UPGRADE wheel — tiers + costs, same language as the Build wheel",
+    "area": "build-wheel",
+    "image": "images/upgrade-wheel.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "?debug=1&freeze=1, the Upgrade wheel opened via __upgradeWheelStage.openUpgrade(999). A radial WHEEL of four wedges around a central hub: BEAM (10 -> 13, cost 4), ENGINE (100% -> 115%, cost 3), CARGO (2 -> 4, cost 2), HULL (50 -> 60, cost 3) — the tier-0 current value, the next value, and the ore cost under each, read back verbatim from the drawn wedges. The hub reads '999 / VANGUARD' (spendable ore + hull class). Caption bar: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder'. It speaks the SAME language as the Build wheel (see images/build-wheel-language.png: TURRET / SHIELD / REPAIR CORE / UPGRADE SHIP (with a right-arrow to this wheel) / BANK around a '999 ORE' hub, same shape, same words-plus-cost wedges). Top-right shows ONLY the HOME core-HP bar — there is no ship-hull percentage readout there (the top-right hull readout is gone).",
+    "verdict": "verified"
+  },
+  {
+    "id": "wheel-cycle-robust",
+    "title": "Both wheels open/close 16x each and still work (the field bug)",
+    "area": "build-wheel",
+    "image": "images/wheel-cycle-robust.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "?debug=1&freeze=1. The Build wheel was opened AND closed 16 times and the Upgrade wheel opened and closed 16 times — 32 open/close cycles in all — driving the exact gesture the field bug wedged shut. After every single cycle the freshly-opened wheel read back interactive() === true: 0 build failures, 0 upgrade failures (measured with a two-rendered-frame sync after each open so the interactive read reflects what the HUD actually drew, not a pre-render stale value). The image is the proof frame AFTER all the cycling: the Build wheel is open and fully drawn — TURRET (3), SHIELD (5), REPAIR CORE (1), UPGRADE SHIP (with arrow), BANK around the '999 ORE' hub — and finalInteractive was true. The open/close path does not leak or wedge.",
+    "verdict": "verified"
+  },
+  {
+    "id": "map-in-lobby",
+    "title": "Lobby: slots + class select + map row in one screen, no separate picker",
+    "area": "mobile",
+    "image": "images/map-in-lobby.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "CLEAN boot (no ?debug=1): main menu -> PLAY -> the lobby, captured in one 1280x800 frame. Title 'PLANET RUSH'. LEFT: eight roster slots — P1 'YOU (star)' VANGUARD - AZURE, then the seven-bot cast, each with class - colour and a difficulty tag (P2 Rusty HAULER - CYAN EASY, P3 Bolt INTERCEPTOR - SPRING EASY, P4 Foreman EXCAVATOR - VIOLET MEDIUM, P5 Patch HAULER - MAGENTA MEDIUM, P6 Vulture VANGUARD - ORANGE HARD, P7 Warden EXCAVATOR - CHALK HARD, P8 Sable INTERCEPTOR - SLATE-BLUE HARD). RIGHT: the hull picker — INTERCEPTOR/Quadfin, VANGUARD/Anvil (selected, boxed), EXCAVATOR/Pincer, HAULER/Hammerhead, each with a one-line blurb. BOTTOM: the ARENA row — four cards, 'The Ring' (selected/boxed), 'The Compass', 'The Oval', 'Double Diamond' tagged VETERAN — then the RUSH! button and '1 PLAYING - 7 BOTS'. Roster slots, class select AND the map row are all on this one screen; there is no separate map-picker step. Readback: slotCount 8, classOrder [interceptor,vanguard,excavator,hauler], mapOrder [octagon,compass,oval,diamond], mapCards 4, veteranMapId 'diamond'.",
+    "verdict": "verified"
+  },
+  {
+    "id": "damage-all-classes",
+    "title": "Player fire damages an enemy hull bar — but only ONE class reachable",
+    "area": "match",
+    "image": "images/damage-all-classes.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "PARTIAL — see limitation. Re-verified with my own eyes on live build de2fa64 (2026-07-26, preview served de2fa64 clean). VISIBLE, before/after crop of the local ship's OWN projectiles landing on a staged enemy (owner 1, the Hauler): the enemy's teal hull bar falls from ~0.98 to ~0.78 under continuous player fire (a red projectile is visible striking the enemy in the 'after' panel), tracked frame-by-frame 0.98 -> 0.93 -> 0.88 -> 0.83 -> 0.78. That proves the player's projectile weapon deals hull damage and the bar moves — no ignored hit — FOR THE HAULER. HONEST LIMITATION, why this is NOT verified as 'every class': (1) the only ?debug=1 player-fire staging seam, __healthbarStage.damageEnemy, always targets owner 1 (Hauler) — find(s=>s.id!==LOCAL && !s.eliminated) — and force-sets its alive flag, so the other three classes (Interceptor/Excavator/Vanguard, fixed at owners 2/3/6 by the bot roster src/bots/personalities.ts) cannot be brought under the player's fire deterministically. (2) I confirmed the live path is inadequate: a 120-frame live melee (fly into the arena past spawn-protection, hold fire, sweep aim, read __healthbarStage.bars() every frame) surfaced a genuinely damaged bar for only ONE non-local owner (owner 2 at fraction 0.87); and because bots also fire on each other in a live melee, a dropped bar cannot be honestly attributed to the PLAYER's fire. (3) Every ship is the same placeholder triangle (cockpit = player colour, not class), so class is not distinguishable in pixels regardless of which owner is hit. Only one of four classes can be shown taking player damage, and 'class' is not itself visible on placeholder art. Proving 'every ship class VISIBLY takes damage from the player' needs BOTH a seam to bring an arbitrary-owner enemy under player fire AND class-distinct ship art.",
+    "verdict": "inconclusive"
+  },
+  {
+    "id": "repair-core-works",
+    "title": "REPAIR CORE wedge is present but cannot be exercised on this build",
+    "area": "build-wheel",
+    "image": "images/repair-core.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "PARTIAL — see limitation. Re-verified with my own eyes on live build de2fa64 (2026-07-26). ?debug=1&freeze=1, Build wheel open. VISIBLE: the REPAIR CORE wedge is present in the wheel (labelled 'REPAIR CORE / YOUR PLANET', entry cost '1') — but drawn GREYED/inactive, because the frozen core is undamaged (the HOME bar top-right is a full blue core-HP bar; the hub reads '3 ORE'; TOTAL 3 top-left). HONEST LIMITATION, why this is NOT verified — the client build de2fa64 ships no way to exercise or read the repair channel end-to-end, confirmed THREE ways on a real boot: (1) Runtime enumeration of every window.__* seam lists __planetRush / __healthbarStage / __oreDepositStage / __oreHudStage / __endScreenStage / __upgradeWheelStage / __fullscreen — NONE exposes coreHp, a core-damage stager, or a repair trigger (__endScreenStage.eliminateLocal only FULLY destroys the core; there is no partial). So the 'captioned numbers from the debug hook' the gate asks for (HP rising) cannot be read: coreHp has no readback anywhere on the debug surface. (2) A live siege is not reliably inducible: booting live and fleeing home (hold W) for ~1750 sim ticks left the top-right HOME core bar pinned at full — pixel-measured fill fraction 0.993 on every 0.4 s sample. (3) Even parking a LIVE enemy at 0.6 hull right beside the docked core via __healthbarStage.damageEnemy, then fleeing for ~1450 ticks, left the core bar at full 0.993 — the bot pursues its own AI goals, it does not run a scripted core siege. So a damaged core cannot be staged, the repair channel cannot be driven, and core HP cannot be read on a real boot of this build. The mechanic EXISTS (the REPAIR CORE control is drawn; the sim's repair channel is unit-tested — PR #85 'repair-channel pins — REPAIR reaches the sim and heals') but cannot be exercised or numerically verified as 'HP rising / bank falling' on the CLIENT of de2fa64. UNBLOCK: a ?debug=1 core-damage seam PLUS a coreHp readback (bank IS already readable via __oreDepositStage.readout()).",
+    "verdict": "inconclusive"
   }
 ]

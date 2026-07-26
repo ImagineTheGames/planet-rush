@@ -44,6 +44,11 @@
       "milestone": 8,
       "title": "v0.2 — four arenas and the choice is yours",
       "test_notes": "On your phone: PLAY now offers four maps - The Ring (default, square arena, perfect spread), The Compass (corner strongholds vs open gates), The Oval (widescreen equal-chord ring), and Double Diamond (veteran - inner spawns risk it for the commons). Pick each one once; your last choice sticks. Every map keeps the identical home fields + clear launch pocket. Evidence for all four on the EVIDENCE page."
+    },
+    "v0.2.1": {
+      "milestone": "v0.2 patch 1",
+      "title": "v0.2.1 — ore where it belongs, turrets that cover the whole planet",
+      "test_notes": "On your phone: mine - your held ore now counts UNDER your ship; top-left is the planet TOTAL. Build a turret and get attacked from two sides: it slides around the rim and covers the far side. Also in this build (evidence coming in round 9): the zero-damage spawn-protection bug is fixed and REPAIR actually repairs."
     }
   },
   "days": [

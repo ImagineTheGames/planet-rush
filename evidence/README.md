@@ -211,3 +211,96 @@ the LIVE preview bundle at build `a5dd0b0` (clean, no page errors):
   (diamond) but never in ore.
 
 No page errors in any capture.
+
+---
+
+## Round 8 — ore HUD split + far-side turret coverage, on the live build (`dc7e2ac`)
+
+`capture-round8.mjs` — the two v0.1.3 field reports, gating the patch after v0.2.
+All items on the LIVE preview bundle at build `dc7e2ac` (clean, no page errors):
+
+- **ore-hud-under-ship / ore-hud-deposit** — the split ore HUD on a desktop boot
+  (`?debug=1`, 1280×800), driven through `window.__oreHudStage`. MINING: `mine(5)`
+  while the boot bank is 3 → FIVE filled yellow squares drawn **under the ship**
+  (screen centre, `y=423` below the ship) and the top-left reading **`TOTAL 3`** —
+  two DISTINCT numbers, both matching the sim readout (`hold.filled=5`, `total()=3`).
+  DOCKING: `dock(6)` at home → the sim auto-drains the hold; the captured mid-frame
+  shows **one** filled square + five empties under the ship with an ore courier in
+  flight, and the top-left risen to **`TOTAL 7`** (`hold.filled=1`, `total()=7`,
+  `readout cargo≈1.97 / banked≈7.03`). The held count DRAINS while the TOTAL RISES:
+  the field rule, on a real boot.
+- **turret-far-side-engage / turret-far-side-context** — a turret built on the home
+  planet's EAST mount (slot 0), then an attacker parked due WEST (the FAR side) via
+  `__healthbarStage.damageEnemy`. The turret SLID ~180° around the planet body to
+  the WEST rim and sits on the attacker there (grey disc at the planet's left edge,
+  teal attacker just left of it). `window.__planetRush.beams` confirms the muzzle
+  settling from the east/NE mount (`origin x≈2080`) to the west rim (`origin x=1964`)
+  with its endpoint further west (`x≈1907`) — a beam **entirely west of the planet's
+  west edge (`x=1994`), clean of the core** — held to 1–2 distinct rim positions
+  (no thrash) and recurring across frames (fire interval 0.5 s, no idle gap). The
+  planet's red under-attack alarm confirms the threat is real.
+  - **Honest boundary:** no debug seam parks TWO simultaneous attackers around one
+    turreted planet, so the two-attacker priority SPLIT (§3/§4 of the fix) is NOT
+    reproducible as live pixels — it is proven by `tests/sim/turret-coverage.test.ts`.
+    This round verifies with pixels + instrument the far-side reach-and-fire, the
+    exact behaviour the developer reported missing.
+
+No page errors in any capture.
+
+---
+
+## Round 9 — the projectile era, v0.2 report wave, on the live build (`de2fa64`)
+
+`capture-round9.mjs` — the six v0.2 gates. All on the LIVE preview bundle at
+build `de2fa64` (clean, no page errors). **4 of 6 verified; 2 inconclusive
+because the instrumentation this build ships cannot exercise them — the tag
+should wait on those two.**
+
+_Re-verification pass (2026-07-26):_ every gate re-checked with my own eyes on the
+running `de2fa64` preview. The four verified frames hold exactly as attested
+(incl. the top-right hull readout being gone). For the two inconclusive gates I
+re-confirmed the blocker is structural, not effort, three ways — see the bullets.
+
+**Verified:**
+- **projectile-dodge** — LIVE, past the 10 s spawn-protection window. A three-frame
+  composite: a red projectile MID-GAP between the ship and a still enemy (travel
+  time, not hitscan; ship-vs-ship fire draws no beam); a red shot flying east into
+  empty space the enemy has left (a miss); and the local ship's BLUE mining beam
+  drawn as a line to a rock it strikes (`__planetRush.beams` source `ship`,
+  origin→hit) — mining is STILL a beam. Data: a still target loses hull under fire
+  while a moving target barely does across ~70 shots — dodging is real.
+- **upgrade-wheel** — the radial UPGRADE wheel (`__upgradeWheelStage.openUpgrade`):
+  BEAM 10→13 (4), ENGINE 100%→115% (3), CARGO 2→4 (2), HULL 50→60 (3) around a
+  `999 / VANGUARD` hub — same wheel language as the Build wheel.
+- **wheel-cycle-robust** — Build ×16 + Upgrade ×16 open/close cycles, `interactive()`
+  true after every one (0 failures, frame-synced), wheel still opens fully after.
+- **map-in-lobby** — clean-boot lobby in one screen: 8 roster slots + the hull
+  picker + the arena row (Ring / Compass / Oval / Double Diamond·VETERAN) + RUSH!.
+  No separate picker step.
+
+Also confirmed in passing: the **top-right hull readout is gone** — top-right now
+carries only the HOME core-HP bar.
+
+**Inconclusive (instrumentation gaps — not defects):**
+- **damage-all-classes** — the player's own projectiles are shown dropping an enemy
+  hull bar 0.98→0.78, so hits register — but only for owner 1 (the Hauler). The
+  `__healthbarStage.damageEnemy` seam always targets owner 1 and force-revives it,
+  so the other three classes cannot be brought under player fire. Confirmed the live
+  path is inadequate too: a 120-frame live melee surfaced a genuinely damaged bar for
+  only ONE non-local owner (owner 2 @ 0.87), and since bots fire on each other a
+  dropped bar can't be attributed to the player. Placeholder ships are identical
+  triangles (class not pixel-readable) regardless. Needs a seam to damage an
+  arbitrary-owner enemy AND class-distinct art.
+- **repair-core-works** — the REPAIR CORE wedge is present in the Build wheel but
+  greyed on a full (frozen) core. The blocker is structural, confirmed three ways:
+  (1) runtime enumeration of every `window.__*` seam exposes no `coreHp` readback,
+  no core-damage stager, no repair trigger (`__endScreenStage.eliminateLocal` only
+  fully destroys the core); (2) fleeing home live for ~1750 ticks left the HOME core
+  bar pinned at full (pixel fraction 0.993); (3) parking a live enemy at 0.6 hull
+  beside the docked core then fleeing ~1450 ticks also left it at full — the bot
+  follows its own AI, not a scripted siege. So the core can't be damaged, the repair
+  channel can't be driven, and HP can't be read on a real client boot. The mechanic
+  exists (control drawn; sim repair unit-tested, PR #85). Needs a core-damage seam +
+  a `coreHp` readback (bank is already readable via `__oreDepositStage.readout()`).
+
+No page errors in any capture.

@@ -61,7 +61,8 @@ import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bot
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
 import { playerColor } from './planet-hp';
-import { CLASS_NAMES } from './upgrade-panel';
+import { CLASS_NAMES } from './upgrade-wheel';
+import { normalizeMapId } from './map-picker';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -289,6 +290,13 @@ export interface LobbyState {
   readonly seats: readonly LobbySeat[];
   /** Your hull pick. Mirrored onto your seat; locked once counting starts. */
   readonly shipClass: ShipClass;
+  /**
+   * The arena picked for this match (`../sim/maps` MapDef id) — moved off the
+   * PLAY flow into the lobby (p2 field rule). One arena for the whole room,
+   * offline the host's (your) pick; locked at RUSH! like the hull. Always a real
+   * id ({@link normalizeMapId}), so a stale saved key can never reach the sim.
+   */
+  readonly mapId: string;
   /** Seconds left on the RUSH countdown; 0 outside `counting`. */
   readonly countdown: number;
   /**
@@ -314,6 +322,9 @@ export interface LobbyOptions {
   readonly slots?: number;
   /** Your hull. Default {@link DEFAULT_SHIP_CLASS} — the Vanguard (GDD §2.11). */
   readonly shipClass?: ShipClass;
+  /** The arena. Default the registry default (`octagon`, "The Ring"); a stale or
+   *  hand-edited value is folded down to it ({@link normalizeMapId}). */
+  readonly mapId?: string;
   /** Joinable over the wire? Default true (online). The offline solo-vs-bots
    *  boot passes false, which hides the room code and the OPEN seat markers. */
   readonly online?: boolean;
@@ -332,6 +343,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
   const you = clampSlot(options.you ?? 0, count);
   const host = clampSlot(options.host ?? you, count);
   const shipClass = options.shipClass ?? DEFAULT_SHIP_CLASS;
+  const mapId = normalizeMapId(options.mapId);
   const seats: LobbySeat[] = [];
   let emptyIndex = 0;
   for (let player = 0; player < count; player++) {
@@ -351,6 +363,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
     phase: 'gathering',
     seats,
     shipClass,
+    mapId,
     countdown: 0,
     online: options.online ?? true,
   });
@@ -432,6 +445,20 @@ export function selectShipClass(state: LobbyState, shipClass: ShipClass): LobbyS
       seat.player === state.you ? { ...seat, shipClass } : seat,
     ),
   };
+}
+
+/**
+ * Pick the arena (a tap on a map card). Refused once the lobby is counting down,
+ * exactly like the hull ({@link classLocked}): the countdown is the start of the
+ * match, and an arena that changed after RUSH! would be an arena the world was
+ * not built from. Folds the id to a real one, so a stray index can never select a
+ * map that does not exist.
+ */
+export function selectMap(state: LobbyState, mapId: string): LobbyState {
+  if (classLocked(state)) return state;
+  const next = normalizeMapId(mapId);
+  if (state.mapId === next) return state;
+  return { ...state, mapId: next };
 }
 
 /** Whether this client may set bot difficulties — the host, before RUSH!
@@ -598,6 +625,8 @@ export interface LobbyModel {
   readonly classOptions: readonly ShipClassOption[];
   /** Your hull — the tile drawn as selected. */
   readonly shipClass: ShipClass;
+  /** The arena — the map card drawn as selected (`../sim/maps` id). */
+  readonly mapId: string;
   readonly classLocked: boolean;
   readonly countdown: { readonly active: boolean; readonly label: string; readonly seconds: number };
   readonly canStart: boolean;
@@ -620,6 +649,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     seats,
     classOptions: CLASS_OPTIONS,
     shipClass: state.shipClass,
+    mapId: state.mapId,
     classLocked: classLocked(state),
     countdown: {
       active: state.phase === 'counting',

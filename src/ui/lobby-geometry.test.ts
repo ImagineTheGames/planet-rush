@@ -26,11 +26,13 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { CLASS_ORDER, LOBBY_SLOTS } from './lobby';
+import { MAP_ORDER } from './map-picker';
 import {
+  CLASS_TILE_COMPACT,
   CLASS_TILE_MIN,
+  LOBBY_MAP_COUNT,
   LOBBY_PAD,
   RUSH_HEIGHT,
-  SEAT_ROW_LEGIBLE,
   SEAT_ROW_MAX,
   SEAT_ROW_MAX_TOUCH,
   TWO_COLUMN_MIN_WIDTH,
@@ -79,6 +81,7 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
     { label: 'roomCode', rect: layout.roomCode },
     ...layout.seats.map((rect, i) => ({ label: `seat[${i}]`, rect })),
     ...layout.classOptions.map((rect, i) => ({ label: `class[${i}]`, rect })),
+    ...layout.maps.map((rect, i) => ({ label: `map[${i}]`, rect })),
     { label: 'rushButton', rect: layout.rushButton },
   ];
 }
@@ -162,6 +165,9 @@ describe('the roster and the hull tiles', () => {
       const layout = lobbyLayout(vp, { isTouch: touch });
       expect(layout.seats).toHaveLength(LOBBY_SLOTS);
       expect(layout.classOptions).toHaveLength(CLASS_ORDER.length);
+      // The arena row: one card per ratified map (p2 field rule; `MAP_ORDER`).
+      expect(layout.maps).toHaveLength(LOBBY_MAP_COUNT);
+      expect(LOBBY_MAP_COUNT).toBe(MAP_ORDER.length);
 
       const rects = allRects(layout).filter((r) => r.label !== 'title');
       for (let i = 0; i < rects.length; i++) {
@@ -227,32 +233,54 @@ describe('the roster and the hull tiles', () => {
 describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
   for (const { name, vp, touch } of PROFILES) {
     if (!touch) continue;
-    it(`keeps the hull tiles readable and RUSH! thumb-sized — ${name}`, () => {
+    it(`keeps the hull tiles, the arena cards and RUSH! thumb-sized — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: true, insets: insetsFor(vp) });
-      // The blurb is the point of the tile (GDD §2.11); the view hides it below
-      // 64px, so the tile defends that height even on the smallest phone.
+      // Both the hull tiles and the arena cards are thumb *choices*: once the map
+      // row joined the roster and the tiles in one band, the tiles compress to a
+      // thumb floor (the view drops the blurb, keeping the name + hull) rather than
+      // vanishing — but they never go below a fingertip (p2 fit rule).
       expect(
         layout.classOptions[0]!.height,
-        `hull tile too short to carry its role blurb on ${name}`,
-      ).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
+        `hull tile untappable on ${name}`,
+      ).toBeGreaterThanOrEqual(CLASS_TILE_COMPACT);
+      for (let i = 0; i < layout.maps.length; i++) {
+        expect(layout.maps[i]!.width, `arena card ${i} untappable wide on ${name}`).toBeGreaterThanOrEqual(44);
+        expect(layout.maps[i]!.height, `arena card ${i} untappable tall on ${name}`).toBeGreaterThanOrEqual(44);
+      }
       expect(layout.rushButton.height).toBeGreaterThanOrEqual(RUSH_HEIGHT);
       expect(layout.rushButton.width).toBeGreaterThanOrEqual(200);
     });
   }
 
-  it('keeps the roster legible on a phone in LANDSCAPE — the primary mobile case', () => {
-    // Planet Rush is a landscape game (src/platform/orientation.ts), so this is
-    // the layout a phone player actually meets. Both halves have to hold at
-    // once: four legible rows per column, and tiles tall enough to blurb.
-    for (const { name, vp } of PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height)) {
-      const layout = lobbyLayout(vp, { isTouch: true, insets: LANDSCAPE_INSETS });
-      expect(layout.seats[0]!.height, `roster row on ${name}`).toBeGreaterThanOrEqual(
-        SEAT_ROW_LEGIBLE,
-      );
-      expect(layout.classOptions[0]!.height, `hull tile on ${name}`).toBeGreaterThanOrEqual(
+  it('keeps the hull tiles at blurb height on a roomy screen (GDD §2.11)', () => {
+    // The blurb is the point of the tile; on any device with real room — a desktop
+    // and a comfortable phone in portrait — the tile keeps its full 64px so the
+    // role text shows. The concession is only the tightest handsets (below).
+    for (const { name, vp, touch } of PROFILES.filter(
+      (p) => p.name === 'desktop' || p.name === 'iphone/portrait' || p.name === 'ipad/portrait',
+    )) {
+      const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      expect(layout.classOptions[0]!.height, `hull tile blurb height on ${name}`).toBeGreaterThanOrEqual(
         CLASS_TILE_MIN,
       );
+    }
+  });
+
+  it('keeps the roster in two columns and everything tappable on a phone in LANDSCAPE', () => {
+    // Planet Rush is a landscape game (src/platform/orientation.ts), so this is
+    // the layout a phone player actually meets. With the arena row now sharing the
+    // band, the roster — a list — compresses (its rows can dip below the legible
+    // ceiling, the view drops the detail line), while the tiles and the map cards,
+    // both thumb choices, stay tappable. The roster still splits into two columns
+    // of four, so slot order reads down each column.
+    for (const { name, vp } of PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height)) {
+      const layout = lobbyLayout(vp, { isTouch: true, insets: LANDSCAPE_INSETS });
       expect(layout.seatColumns, `roster columns on ${name}`).toBe(2);
+      expect(layout.seats[0]!.height, `roster row on ${name}`).toBeGreaterThan(0);
+      expect(layout.classOptions[0]!.height, `hull tile on ${name}`).toBeGreaterThanOrEqual(
+        CLASS_TILE_COMPACT,
+      );
+      expect(layout.maps[0]!.height, `arena card on ${name}`).toBeGreaterThanOrEqual(44);
     }
   });
 
@@ -271,7 +299,10 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
   });
 
   it('grows the roster rows on touch, up to the touch cap', () => {
-    const vp: Viewport = { width: 412, height: 915 };
+    // A tall portrait window, so the roster band has room for the rows to reach
+    // their cap even with the arena row now sharing the middle — otherwise the
+    // rows compress below both caps and the cap, not the device, stops binding.
+    const vp: Viewport = { width: 412, height: 1400 };
     const desktop = lobbyLayout(vp);
     const thumb = lobbyLayout(vp, { isTouch: true });
     expect(desktop.seats[0]!.height).toBeLessThanOrEqual(SEAT_ROW_MAX);
@@ -308,6 +339,13 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
         const p = center(layout.classOptions[i]!);
         expect(lobbyHitTest(layout, p.x, p.y), `class[${i}] on ${name}`).toEqual({
           kind: 'class',
+          index: i,
+        });
+      }
+      for (let i = 0; i < layout.maps.length; i++) {
+        const p = center(layout.maps[i]!);
+        expect(lobbyHitTest(layout, p.x, p.y), `map[${i}] on ${name}`).toEqual({
+          kind: 'map',
           index: i,
         });
       }

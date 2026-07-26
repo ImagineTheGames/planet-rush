@@ -85,11 +85,13 @@ import {
   cycleBotDifficulty,
   pressRush,
   seatLocalPlayer,
+  selectMap,
   selectShipClass,
   startLobbyMatch,
   tickLobby,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import { mapIdAt } from './map-picker';
 
 // ---------------------------------------------------------------------------
 // The state
@@ -389,6 +391,12 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
     }
     case 'seat':
       return withLobby(state, cycleBotDifficulty(lobby, target.index));
+    case 'map':
+      // The arena picker moved into the lobby (p2). Folded in like the hull; a
+      // refusal (locked after RUSH!) returns the identical lobby, so `withLobby`
+      // sends nothing. The arena is not yet in the wire protocol, so an online
+      // room ignores the re-sent choice — offline is where the pick has teeth.
+      return withLobby(state, selectMap(lobby, mapIdAt(target.index)));
     case 'rush': {
       // No message yet — the countdown has to run first (rule 2). A guest's
       // press is refused by `pressRush`, which returns the identical lobby, and
