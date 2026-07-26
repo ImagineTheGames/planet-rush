@@ -2,49 +2,49 @@
  * tests/combat-visibility.test.ts — every shooter is seen (GDD §2.3, §2.6, §4.1).
  *
  * Field report against build 5254cfe: "another enemy attacking my planet but I
- * didn't see his laser… I also don't think my turret was firing." Two shooters
- * the player could not see: a rival ship's beam, and a friendly turret's fire.
+ * didn't see his shots… I also don't think my turret was firing." Two shooters
+ * the player could not see: a rival ship's fire, and a friendly turret's fire.
  *
- * The root is a rendering one, but the fix is anchored in the sim: beam visuals
+ * The root is a rendering one, but the fix is anchored in the sim: combat visuals
  * must be driven from **combat state**, not from the local player's fire input.
- * The sim already publishes `Ship.beam` for every firing ship in the world, and
- * now publishes `Turret.muzzle` for every turret that looses a shot; the
- * `combatBeams` read model (src/sim/combat-view.ts) is the single source a
- * renderer draws from, so an enemy ship, a bot, a remote player, and a turret
- * all show up exactly the way the local player's own beam does.
+ * A ship's shots stream as pooled projectiles (drawn from the shot pool since the
+ * v0.3 laser funeral), and the sim publishes `Turret.muzzle` for every turret that
+ * looses a shot; the `muzzleFlashes` read model (src/sim/combat-view.ts) is the
+ * single source a renderer draws turret flashes from, so an enemy ship, a bot, a
+ * remote player, and a turret all show up regardless of who the camera follows.
  *
  * This test steps a world where (a) an enemy ship fires at a planet and (b) a
  * friendly turret engages an in-range enemy, and asserts that the sim reports
- * both shots and that the render layer registers an active beam visual for
- * BOTH — sourced from sim state, origin at the shooter, end clamped to the hit
- * target. It drives the real `Renderer` headlessly (Pixi builds Graphics
- * geometry with no WebGL), the same way src/render/beam.test.ts does.
+ * both shots and that the render layer registers both — the ship as a projectile,
+ * the turret as a muzzle flash sourced from sim state, origin at the barrel, end
+ * clamped to the hit target. It drives the real `Renderer` headlessly (Pixi builds
+ * Graphics geometry with no WebGL), the same way src/render/muzzle.test.ts does.
  */
 
 import { describe, it, expect } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import { ShipClass } from '@shared/types';
-import { Renderer, PLAYER_COLORS, type BeamView } from '../src/render/index';
+import { Renderer, PLAYER_COLORS, type MuzzleView } from '../src/render/index';
 import {
   CORE_HP,
   PLANET,
   TURRET,
-  combatBeams,
+  muzzleFlashes,
   createWorld,
   step,
-  type CombatBeam,
+  type MuzzleFlash,
   type Turret,
   type World,
 } from '../src/sim';
 
 // ---------------------------------------------------------------------------
 // Fixture: one world holding both shooters at once, in two separate corners so
-// their beams never interfere. Positions are overwritten after construction —
+// their shots never interfere. Positions are overwritten after construction —
 // the ring layout is irrelevant to what this test measures.
 // ---------------------------------------------------------------------------
 
-/** How far short of the planet the attacker parks: comfortably inside beam
- *  range, so the ray reaches the core surface (planet radius + this < range). */
+/** How far short of the planet the attacker parks: comfortably inside weapon
+ *  range, so the shot reaches the core surface (planet radius + this < range). */
 const ATTACK_STANDOFF = 100;
 /** How far the turret's prey sits from the muzzle — well inside `TURRET.range`. */
 const TURRET_STANDOFF = 150;
@@ -68,8 +68,8 @@ function combatFixture(): Fixture {
     bounds: { width: 4000, height: 4000 },
   });
   // Hand-built siege fixture: clear the field so the only thing the attacker's
-  // beam can strike is the planet it is aimed at (a stray rock scattered in the
-  // central disc would otherwise intercept the ray and steal the hit).
+  // shot can strike is the planet it is aimed at (a stray rock scattered in the
+  // central disc would otherwise intercept the shot and steal the hit).
   world.asteroids = [];
 
   const attacker = world.ships[0]!;
@@ -117,21 +117,21 @@ function combatFixture(): Fixture {
 /** The attacker holds fire in Manual mode; nobody else sends input. */
 const ATTACKER_FIRES = [{ id: 0, actions: [{ type: 'fire' as const, active: true, auto: false }] }];
 
-/** Map one sim combat beam to the render layer's `BeamView` — exactly the tiny
+/** Map one sim muzzle flash to the render layer's `MuzzleView` — exactly the tiny
  *  adaptation the client does each frame: geometry from sim state, colour from
  *  the shooter's player slot (style-guide §3). */
-function toBeamView(b: CombatBeam): BeamView {
+function toMuzzleView(m: MuzzleFlash): MuzzleView {
   return {
-    from: b.origin,
-    to: { x: b.origin.x + b.dir.x * b.length, y: b.origin.y + b.dir.y * b.length },
-    color: PLAYER_COLORS[b.shooter] ?? 0x4dc3ff,
-    hit: b.hitPoint,
+    from: m.origin,
+    to: { x: m.origin.x + m.dir.x * m.length, y: m.origin.y + m.dir.y * m.length },
+    color: PLAYER_COLORS[m.shooter] ?? 0x4dc3ff,
+    hit: m.hitPoint,
   };
 }
 
-function beamLayer(stage: Container): Container {
-  const layer = stage.getChildByLabel('beams', true);
-  if (!layer) throw new Error('beams layer missing');
+function muzzleLayer(stage: Container): Container {
+  const layer = stage.getChildByLabel('muzzles', true);
+  if (!layer) throw new Error('muzzles layer missing');
   return layer as Container;
 }
 
@@ -162,7 +162,7 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     const { world, attackerPos } = combatFixture();
     step(world, ATTACKER_FIRES);
 
-    // Combat is a projectile now (design amendment v0.2), not the mining beam:
+    // Combat is a projectile now (design amendment v0.2), not a hitscan ray:
     // the attacker fired a ship-kind shot owned by the NON-local shooter — the
     // whole point of the original bug. It is born at the attacker's muzzle,
     // heading +x straight at the planet.
@@ -176,7 +176,7 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     // different player (the attacker is not the local slot).
     const stage = new Container();
     const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
-    renderer.draw(world, { cameraTarget: 1, beams: [] });
+    renderer.draw(world, { cameraTarget: 1, muzzles: [] });
     expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(1);
 
     // And it is a real attack, not a light show: the shot reaches and bites the core.
@@ -184,7 +184,7 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     expect(world.planets[2]!.coreHp).toBeLessThan(CORE_HP);
   });
 
-  it('a friendly turret engaging an in-range enemy fires, deals damage, and publishes a muzzle beam', () => {
+  it('a friendly turret engaging an in-range enemy fires, deals damage, and publishes a muzzle flash', () => {
     const { world, turret, preyPos } = combatFixture();
 
     // First tick: the loaded turret looses a shot at the prey.
@@ -207,30 +207,29 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     expect(prey.hull).toBeLessThan(startHull);
   });
 
-  it('both shooters are seen from sim state — the turret as a muzzle beam, the ship as a projectile', () => {
+  it('both shooters are seen from sim state — the turret as a muzzle flash, the ship as a projectile', () => {
     const { world } = combatFixture();
     step(world, ATTACKER_FIRES);
 
-    // The turret's shot still publishes a muzzle beam (unchanged, GDD §2.6); the
-    // attacking ship's weapon is a projectile now, not a beam — so combatBeams
-    // carries exactly the one turret muzzle, and the ship shows in the shot pool.
-    const beams = combatBeams(world);
-    expect(beams).toHaveLength(1);
-    expect(beams[0]!.source).toBe('turret');
-    expect(beams[0]!.shooter).toBe(1);
+    // The turret's shot publishes a muzzle flash (GDD §2.6); the attacking ship's
+    // weapon is a projectile now, not a line — so `muzzleFlashes` carries exactly
+    // the one turret muzzle, and the ship shows in the shot pool.
+    const flashes = muzzleFlashes(world);
+    expect(flashes).toHaveLength(1);
+    expect(flashes[0]!.shooter).toBe(1); // the turret owner, a non-local slot
 
     const shipShots = world.projectiles.filter((p) => p.active && p.owner === 0 && p.kind === 'ship');
     expect(shipShots).toHaveLength(1);
 
     // Drive the real renderer headlessly with the sim-sourced views. The turret's
-    // beam draws in the beams layer; every active shot (ship + turret) draws in
+    // flash draws in the muzzles layer; every active shot (ship + turret) draws in
     // the shots layer — so neither shooter is invisible, whoever the camera follows.
     const stage = new Container();
     const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
-    const views = beams.map(toBeamView);
-    renderer.draw(world, { cameraTarget: 2, beams: views });
+    const views = flashes.map(toMuzzleView);
+    renderer.draw(world, { cameraTarget: 2, muzzles: views });
 
-    expect(visibleChildren(beamLayer(stage))).toHaveLength(1); // turret muzzle
+    expect(visibleChildren(muzzleLayer(stage))).toHaveLength(1); // turret muzzle
     expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(2); // ship + turret shots
     // The turret's shot strikes its prey, so a pooled impact glow rides its hit point.
     const glows = visibleChildren(impactLayer(stage));

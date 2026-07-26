@@ -49,14 +49,20 @@ import {
   isJoinableRoomCode,
   lobbyModel,
   makeRoomCode,
+  nameFor,
+  normalizePlayerName,
   normalizeRoomCode,
+  playerNameTable,
   pressRush,
   seatLocalPlayer,
   selectMap,
   selectShipClass,
+  setPlayerName,
   startLobbyMatch,
   tickLobby,
   typeRoomCode,
+  DEFAULT_PLAYER_NAME,
+  PLAYER_NAME_MAX_CHARS,
 } from './lobby';
 import type { LobbyState } from './lobby';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
@@ -278,6 +284,61 @@ describe('arena select and the lock at start (p2 — the map picker moved into t
   it('stays locked once the match has started', () => {
     const started = startLobbyMatch(selectMap(lobby(), 'oval'));
     expect(selectMap(started, 'diamond').mapId).toBe('oval');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. Player name (field request v0.2.1 — names over ships and planets)
+// ---------------------------------------------------------------------------
+
+describe('player name (field request v0.2.1 — the local name over ship + planet)', () => {
+  it('defaults a fresh lobby to "YOU"', () => {
+    expect(lobby().name).toBe(DEFAULT_PLAYER_NAME);
+    expect(lobbyModel(lobby()).name).toBe(DEFAULT_PLAYER_NAME);
+  });
+
+  it('takes a name from the options, trimmed', () => {
+    expect(lobby({ name: '  Reinaldo  ' }).name).toBe('Reinaldo');
+  });
+
+  it('setPlayerName folds a raw name (trim + clamp + non-empty)', () => {
+    const s = setPlayerName(lobby(), '  Ace  ');
+    expect(s.name).toBe('Ace');
+    // Blank falls back to the default, never a nameless seat.
+    expect(setPlayerName(s, '   ').name).toBe(DEFAULT_PLAYER_NAME);
+    // Over-long is clamped.
+    const long = normalizePlayerName('A'.repeat(PLAYER_NAME_MAX_CHARS + 5));
+    expect(long.length).toBe(PLAYER_NAME_MAX_CHARS);
+  });
+
+  it('setPlayerName returns the same state when nothing changed (stable reducer)', () => {
+    const s = setPlayerName(lobby(), 'Ace');
+    expect(setPlayerName(s, 'Ace')).toBe(s);
+  });
+
+  it('mirrors the name onto the local roster row', () => {
+    const s = setPlayerName(lobby({ you: 0 }), 'Ace');
+    const you = lobbyModel(s).seats.find((row) => row.isYou);
+    expect(you?.name).toBe('Ace');
+  });
+
+  it('nameFor: the local seat shows the lobby name, bot seats their character', () => {
+    const s = setPlayerName(lobby({ you: 0 }), 'Ace');
+    expect(nameFor(s, 0)).toBe('Ace');
+    // Slot 1 is the first bot in roster order — its personality name (GDD §2.9).
+    const firstBot = s.seats[1]!;
+    expect(firstBot.personality).not.toBeNull();
+    expect(nameFor(s, 1)).toBe(PERSONALITIES[firstBot.personality!].name);
+  });
+
+  it('playerNameTable: one entry per slot, local name + the whole bot cast', () => {
+    const s = setPlayerName(lobby({ you: 0 }), 'Ace');
+    const table = playerNameTable(s);
+    expect(table).toHaveLength(LOBBY_SLOTS);
+    expect(table[0]).toBe('Ace');
+    for (let slot = 1; slot < LOBBY_SLOTS; slot++) {
+      expect(table[slot]).toBe(PERSONALITIES[s.seats[slot]!.personality!].name);
+    }
   });
 });
 

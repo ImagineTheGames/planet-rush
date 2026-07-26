@@ -103,7 +103,7 @@ function worldWithEveryCollidable(): World {
 function render(world: World): Container {
   const stage = new Container();
   const r = new Renderer(stage, VIEW);
-  r.draw(world, { cameraTarget: 0, beams: [] });
+  r.draw(world, { cameraTarget: 0, muzzles: [] });
   return stage;
 }
 
@@ -183,7 +183,7 @@ describe('sim/render parity — every collidable entity type is drawn to size', 
     }
   });
 
-  it('turrets (GDD §2.6 — a beam target in its own right)', () => {
+  it('turrets (GDD §2.6 — a shot target in its own right)', () => {
     const world = worldWithEveryCollidable();
     const turrets = layer(render(world), 'turrets');
     let count = 0;
@@ -244,11 +244,11 @@ describe('sim/render parity — the arena boundary is a drawn wall, not an invis
     const world = worldWithEveryCollidable();
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     const boundaryLayer = layer(stage, 'boundary');
     const after = boundaryLayer.children.length;
-    r.draw(world, { cameraTarget: 0, beams: [] });
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     expect(boundaryLayer.children.length).toBe(after);
   });
 });

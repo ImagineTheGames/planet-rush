@@ -47,7 +47,7 @@
  */
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
-import { BEAM_RANGE, PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, step } from '../sim';
+import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, step } from '../sim';
 import type { World } from '../sim';
 import { applyEntityEvent } from './entity-events';
 import { MAX_PROJECTILES, SHIP_FLAG, dequantizeAngle } from './snapshot';
@@ -274,11 +274,11 @@ export class PredictedMatch {
       this.checkpoint();
     }
 
-    // Remote beams are the one thing the replay cannot produce: a ship the
+    // Remote firing is the one thing the replay cannot produce: a ship the
     // client has no input for never fires, so the flag on the wire is the only
-    // evidence the beam is on. Painted after the replay, because `step()` clears
-    // it every tick (`src/sim/step.ts`).
-    paintRemoteBeams(this.world, snapshot, this.local);
+    // evidence its trigger is down. Painted after the replay, because `step()`
+    // clears it every tick (`src/sim/step.ts`).
+    paintRemoteFiring(this.world, snapshot, this.local);
 
     this.absorb(before);
     return {
@@ -459,30 +459,19 @@ function poolSlot(world: World, index: number): World['projectiles'][number] | n
 }
 
 /**
- * Give every ship but the local one its beam back from the wire.
+ * Give every ship but the local one its firing tell back from the wire.
  *
- * The snapshot spends two bytes saying "firing" and "pointing this way"; it does
- * not spend twelve more on where the beam stops, because the client can see the
- * whole world and the renderer's own hit is cosmetic (GDD §4.2 — only ships and
- * projectiles stream). So the beam is reconstructed at full range with no hit
- * point, and the *local* ship is left alone: its beam came out of the real
- * raycast during replay, hit point and all.
+ * The snapshot spends one flag bit on "firing"; there is no geometry to
+ * reconstruct any more (the laser retired to a projectile — the client sees a
+ * remote ship's shots in the streamed projectile pool, GDD §4.2). So this just
+ * copies the flag onto `Ship.firing` for each remote ship. The *local* ship is
+ * left alone: its `firing` came out of the real fire step during replay.
  */
-function paintRemoteBeams(world: World, snapshot: DecodedSnapshot, local: PlayerId): void {
+function paintRemoteFiring(world: World, snapshot: DecodedSnapshot, local: PlayerId): void {
   for (const snap of snapshot.ships) {
     if (snap.id === local) continue;
     const ship = world.ships.find((s) => s.id === snap.id);
     if (!ship) continue;
-    if ((snap.flags & SHIP_FLAG.firing) === 0) {
-      ship.beam = null;
-      continue;
-    }
-    const aim = dequantizeAngle(snap.aim);
-    ship.beam = {
-      origin: { x: ship.pos.x, y: ship.pos.y },
-      dir: { x: Math.cos(aim), y: Math.sin(aim) },
-      hitPoint: null,
-      length: BEAM_RANGE,
-    };
+    ship.firing = (snap.flags & SHIP_FLAG.firing) !== 0;
   }
 }

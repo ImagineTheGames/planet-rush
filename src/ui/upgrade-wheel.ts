@@ -4,7 +4,7 @@
  * The second screen behind the Build wheel's UPGRADE SHIP arrow (GDD §2.5), and
  * **the only place ship stats are ever shown**:
  *
- * > Ship stats — beam, engine, cargo, hull tiers — are deliberately *not* on the
+ * > Ship stats — power, engine, cargo, hull tiers — are deliberately *not* on the
  * > HUD. They appear only in the upgrade screen, where they are a spending
  * > decision rather than clutter. (GDD §2.2, §2.5)
  *
@@ -48,21 +48,21 @@ import { CARGO_CAP_MAX, CARGO_PER_TIER, SHIP_STATS } from '../sim/constants';
 // ---------------------------------------------------------------------------
 
 /**
- * The four things ore can buy on a ship (GDD §2.5). `beam` is deliberately one
- * track and not two: mining speed and weapon damage are **one beam, one stat**,
+ * The four things ore can buy on a ship (GDD §2.5). `power` is deliberately one
+ * track and not two: mining speed and weapon damage are **one weapon, one stat**,
  * which is the inversion the whole game turns on.
  */
 export enum UpgradeTrack {
-  Beam = 'beam',
+  Power = 'power',
   Engine = 'engine',
   Cargo = 'cargo',
   Hull = 'hull',
 }
 
-/** Iteration order of the panel's rows, top to bottom. Beam leads because it is
+/** Iteration order of the panel's rows, top to bottom. Power leads because it is
  *  the stat that pays for itself twice (mine faster *and* hit harder). */
 export const TRACK_ORDER: readonly UpgradeTrack[] = [
-  UpgradeTrack.Beam,
+  UpgradeTrack.Power,
   UpgradeTrack.Engine,
   UpgradeTrack.Cargo,
   UpgradeTrack.Hull,
@@ -74,7 +74,7 @@ export type UpgradeTiers = Readonly<Record<UpgradeTrack, number>>;
 
 /** A fresh, un-upgraded ship. */
 export const STOCK_TIERS: UpgradeTiers = {
-  [UpgradeTrack.Beam]: 0,
+  [UpgradeTrack.Power]: 0,
   [UpgradeTrack.Engine]: 0,
   [UpgradeTrack.Cargo]: 0,
   [UpgradeTrack.Hull]: 0,
@@ -115,11 +115,11 @@ export type UpgradeLadder = Readonly<Record<UpgradeTrack, UpgradeTrackSpec>>;
  * Every number here is TUNABLE and hands over to QA with the constants table.
  */
 export const UPGRADE_LADDER: UpgradeLadder = {
-  // Beam: mining speed *and* weapon damage — one stat (GDD §2.5). Multiplies
-  // the class beam, so the Excavator stays the mining engine at every tier.
-  [UpgradeTrack.Beam]: {
-    track: UpgradeTrack.Beam,
-    label: 'BEAM',
+  // Power: mining speed *and* weapon damage — one stat (GDD §2.5). Multiplies
+  // the class power, so the Excavator stays the mining engine at every tier.
+  [UpgradeTrack.Power]: {
+    track: UpgradeTrack.Power,
+    label: 'POWER',
     steps: [1, 1.25, 1.5, 1.8],
     costs: [4, 8, 14], // TUNABLE
     mode: 'multiply',
@@ -179,8 +179,8 @@ export const CLASS_NAMES: Readonly<Record<ShipClass, string>> = {
 export function trackBase(shipClass: ShipClass, track: UpgradeTrack): number {
   const stats = SHIP_STATS[shipClass];
   switch (track) {
-    case UpgradeTrack.Beam:
-      return stats.beam;
+    case UpgradeTrack.Power:
+      return stats.power;
     case UpgradeTrack.Engine:
       return stats.speedMul * 100;
     case UpgradeTrack.Cargo:

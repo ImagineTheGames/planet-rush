@@ -30,7 +30,7 @@
  * ```
  *
  * A stray shot is a single small deposit against a constant leak: it never
- * reaches {@link ENGAGE}. A beam held on your core deposits every tick it
+ * reaches {@link ENGAGE}. Sustained fire on your core deposits every tick it
  * damages, outruns the leak in well under a second, and fires. That is the
  * design sentence, as arithmetic.
  *

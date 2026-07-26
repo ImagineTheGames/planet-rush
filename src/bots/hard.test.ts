@@ -156,13 +156,13 @@ describe('Hard — threat', () => {
     expect(atMyHouse).toBeGreaterThan(outThere);
   });
 
-  it('rises for a lit beam — the loudest tell in the game (GDD §2.2)', () => {
+  it('rises for a firing ship — the loudest tell in the game (GDD §2.2)', () => {
     const world = board();
     world.ships[0]!.pos = { x: 2000, y: 2000 };
     world.ships[1]!.pos = { x: 2200, y: 2000 };
 
     const quiet = scoreShip(ctxOf(world), seen(ctxOf(world), 1)).threat;
-    world.ships[1]!.beam = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: null, length: 260 };
+    world.ships[1]!.firing = true;
     const firing = scoreShip(ctxOf(world), seen(ctxOf(world), 1)).threat;
 
     expect(firing).toBeGreaterThan(quiet);
@@ -177,7 +177,7 @@ describe('Hard — the fog holds inside the scoring function', () => {
     world.ships[0]!.pos = { x: target.pos.x + 700, y: target.pos.y };
 
     const healthy = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
-    target.coreHp = 3; // one beam-second from dead, and invisible from here
+    target.coreHp = 3; // one weapon-second from dead, and invisible from here
     const dying = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
 
     expect(dying).toEqual(healthy);

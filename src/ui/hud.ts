@@ -73,6 +73,10 @@ import { healthBarModel } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
+import { nameplateModel } from './nameplates';
+import type { Nameable, NameTable } from './nameplates';
+import { NameplateView } from './nameplates-view';
+import type { DrawnNameplate } from './nameplates-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -150,7 +154,7 @@ export interface HudFrame {
   readonly fireMode: FireMode;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
-  /** An asteroid is within beam range — the mine prompt's trigger (GDD §2.10). */
+  /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
   // --- Day 2: your own planet (GDD §2.2 — your own only, never a rival's) ---
@@ -202,7 +206,7 @@ export interface HudFrame {
    *  sprite. The follow camera renders the ship at screen centre 1:1, so a world
    *  radius is a screen radius. Default {@link DEFAULT_SHIP_SCREEN_RADIUS}. */
   readonly shipRadius?: number;
-  /** The local ship is firing its beam this tick (mining or shooting — one beam,
+  /** The local ship is firing its weapon this tick (mining or shooting — one weapon,
    *  GDD §2.5) ⇒ "in combat" for the own-ship bar, matching the enemy rule.
    *  Default false. */
   readonly shipFiring?: boolean;
@@ -236,11 +240,30 @@ export interface HudFrame {
    *  turrets are filtered out by {@link ./healthbar}, so passing them is harmless.
    *  Default: none ⇒ no bars (the M1 feed predates enemies). */
   readonly combatants?: readonly Combatant[];
+
+  // --- Field request v0.2.1: name labels over ships and owned planets --------
+
+  /** Label-bearing entities — every ship and every owned planet — each with its
+   *  owner slot, kind, liveness and **screen-space** position (the caller projects
+   *  world → screen). The nameplate layer draws a name over each; the local ship's
+   *  own label is filtered unless {@link showOwnShipLabel}. Default: none ⇒ no
+   *  labels (the feed predates nameplates). */
+  readonly nameables?: readonly Nameable[];
+  /** Per-slot name table (from the lobby's slot state — local name + bot cast).
+   *  Default: none ⇒ every label falls back to its `P{n}` identity tag. */
+  readonly names?: NameTable;
+  /** Show the local player's OWN ship label. Default false — see
+   *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
+  readonly showOwnShipLabel?: boolean;
 }
 
 /** Reused for a frame that carries no combatants, so the empty case allocates
  *  nothing (GDD §4.3 — no per-frame allocation on the hot path). */
 const NO_COMBATANTS: readonly Combatant[] = [];
+
+/** Reused empties for the nameplate feed, same zero-allocation discipline. */
+const NO_NAMEABLES: readonly Nameable[] = [];
+const NO_NAMES: NameTable = [];
 
 /** Fallback screen radius for the own-ship over-bar when the frame carries no
  *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
@@ -351,6 +374,11 @@ export class Hud extends Container {
    *  live-stage seam reads this ({@link debugHullReadout}) off the same source. */
   private lastLocalHullFraction = -1;
 
+  // --- Player-name labels (field request v0.2.1) -------------------------
+  //     A pooled, screen-space layer stacked with the health bars: name on top,
+  //     bar under it, ship under that. Its decisions live in ./nameplates.
+  private readonly nameplates = new NameplateView();
+
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
@@ -409,6 +437,9 @@ export class Hud extends Container {
       // of the ore total or the wave clock. Both track the local ship in screen
       // space, bracketing it — bar above, hold below — as one status cluster.
       this.healthbars,
+      // Name labels float over the world with the bars, stacked just above each
+      // entity's bar cluster (field request v0.2.1) — under all HUD chrome.
+      this.nameplates,
       this.oreHold,
       this.oreGroup,
       this.waveGroup,
@@ -457,6 +488,7 @@ export class Hud extends Container {
     // earlier changes nothing it computes.
     const underAttack = this.updateAlarm(frame);
     this.updateHealthBars(frame, underAttack);
+    this.updateNameplates(frame);
     this.updatePlanetHp(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
@@ -667,6 +699,35 @@ export class Hud extends Container {
     this.healthbars.update(bars, this.screenWidth, this.screenHeight);
   }
 
+  // --- Player-name labels (field request v0.2.1) --------------------------
+
+  /** Draw a name label over every ship and every owned planet (field request
+   *  v0.2.1). The pure model in {@link ./nameplates} owns "who, what text, which
+   *  colour, how faded"; this hands it the frame's already-projected entities and
+   *  the lobby's per-slot name table, and draws the result in the screen-space
+   *  layer stacked above the health bars. */
+  private updateNameplates(frame: HudFrame): void {
+    const entities = frame.nameables ?? NO_NAMEABLES;
+    const plates = nameplateModel(entities, frame.names ?? NO_NAMES, {
+      showOwnShipLabel: frame.showOwnShipLabel ?? false,
+    });
+    this.nameplates.update(plates, this.screenWidth, this.screenHeight);
+  }
+
+  /** ?debug=1 live-stage seam: arm the nameplate layer's drawn-label capture so
+   *  {@link debugNameplates} can read it back. Called once from `main.ts` under
+   *  ?debug=1; no effect on a normal build. */
+  enableNameplateDebug(): void {
+    this.nameplates.enableDebugCapture();
+  }
+
+  /** The name labels the layer actually drew last frame — owner, text, colour,
+   *  kind, position — for the live-stage test. Empty unless
+   *  {@link enableNameplateDebug} was called. */
+  debugNameplates(): DrawnNameplate[] {
+    return this.nameplates.debugPlates();
+  }
+
   /**
    * The own ship's hull fraction the over-ship bar drew last frame (or -1 when it
    * has none) — the ?debug=1 live-stage seam reads this. The dedicated top-right
@@ -837,7 +898,7 @@ export class Hud extends Container {
     // Input-agnostic wording via the action layer (GDD §2.10).
     this.promptText.text = resolvePromptText(active, frame.device, frame.fireMode);
     // Thumb-scale: wrap rather than run off the side of a phone. "Hold the FIRE
-    // button on the asteroid — your beam mines it" is ~440 px on one line, which
+    // button on the asteroid — your shots chip the rock" is ~440 px on one line, which
     // is wider than a 390 px portrait screen; a prompt the player can't read is a
     // prompt that didn't fire (GDD §2.10, style-guide §9 "reads at a glance").
     this.promptText.style.wordWrap = true;
@@ -855,7 +916,7 @@ export class Hud extends Container {
       .roundRect(-w / 2, -h / 2, w, h, 8)
       .fill({ color: PALETTE.vacuum, alpha: 0.82 })
       .stroke({ width: PROMPT_STROKE, color: PALETTE.plasma, alpha: 0.6 });
-    // Plasma accent bar on the left — the beam is plasma (style-guide §1).
+    // Plasma accent bar on the left — the weapon is plasma (style-guide §1).
     this.promptAccent.clear();
     this.promptAccent.rect(-w / 2, -h / 2, 4, h).fill({ color: PALETTE.plasma });
     // The accent is drawn on the panel's left edge and is narrower than it, so
@@ -902,7 +963,7 @@ export class Hud extends Container {
    *
    * **Why `onboarding` is `full` and not a band.** A prompt is a *sentence*, and
    * every interior region in the vocabulary is one third of the viewport wide.
-   * "Hold the FIRE button on the asteroid — your beam mines it" is ~440 px on one
+   * "Hold the FIRE button on the asteroid — your shots chip the rock" is ~440 px on one
    * line — wider than a 390 px portrait phone, let alone its 98 px `center` zone
    * — so no band can hold it at any type size the style guide permits. The prompt
    * therefore takes the screen and signs the stronger promise it *can* keep: it
@@ -1014,6 +1075,13 @@ export class Hud extends Container {
     // on the HUD's own visibility, the same as `shown()` does for `push`.
     if (shown(this.healthbars)) {
       for (const entry of this.healthbars.describeLayout(viewport)) entries.push(entry);
+    }
+
+    // Name labels: same self-registering, screen-space discipline as the health
+    // bars — the union of the labels that actually drew on-screen (culled off the
+    // edge), so its `full` anchor stays honest, or nothing when nothing is named.
+    if (shown(this.nameplates)) {
+      for (const entry of this.nameplates.describeLayout(viewport)) entries.push(entry);
     }
 
     // Under-ship ore-hold indicator: the same self-registering, screen-space

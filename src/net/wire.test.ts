@@ -36,7 +36,6 @@ function ship(id: number): ShipSnap {
     velX: -12 * id || 0, // `|| 0` so slot zero is 0 rather than -0 on the wire
     velY: 7 * id,
     heading: (id * 8191) & 0xffff,
-    aim: (id * 1237) & 0xffff,
     hull: 50 - id,
     flags: 0b0111,
   };

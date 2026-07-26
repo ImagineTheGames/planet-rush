@@ -7,16 +7,16 @@
  * turret didn't engage." A turret fought one attacker and ignored a second on
  * the planet's far side. Root cause against the p1-03 orbit rules — threat
  * detection was measured from the turret's *current* rim spot, so anything
- * outside beam range of where it happened to be sitting was invisible, even
+ * outside weapon range of where it happened to be sitting was invisible, even
  * though the whole point of orbiting is to slide around and reach it.
  *
  * These pins hold the fix, one field-report clause each:
  *   §1 detection is PLANET-centric — a far-side enemy inside the planet's threat
- *      radius is a target even outside beam range of the turret's current spot;
+ *      radius is a target even outside weapon range of the turret's current spot;
  *   §2 the turret slides to the facing-normal point (clear line of sight) and the
  *      damage actually lands — the exact field scenario, end to end;
  *   §3 retarget is immediate (zero idle ticks after a target dies), and an enemy
- *      actively beaming the core outranks a merely-closer loiterer;
+ *      actively shooting the core outranks a merely-closer loiterer;
  *   §4 two turrets, two attackers on opposite sides → one turret each, not both
  *      stacking on one;
  *   plus determinism, and the p1-03 no-thrash stability guarantee still green.
@@ -25,7 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
-  BEAM_RANGE,
+  WEAPON_RANGE,
   PLANET,
   SHIP_RADIUS,
   TICK_DT,
@@ -111,7 +111,7 @@ function enemyAt(id: number, x: number, y: number): Ship {
     spawnProtect: 0,
     eliminated: false,
     radius: SHIP_RADIUS,
-    beam: null,
+    firing: false,
   };
 }
 
@@ -155,14 +155,14 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 describe('a far-side attacker is engaged: slides, clears the planet, damage lands', () => {
   it('detects a threat inside the planet radius even outside the turret spot range (§1)', () => {
     // Turret born on slot 0's home (the +x rim). Enemy on the FAR side (−x), well
-    // inside the planet threat radius but beyond beam range of where the turret
+    // inside the planet threat radius but beyond weapon range of where the turret
     // currently sits — the turret-centric scan the field report indicts would
     // never see it.
     const turret = makeTurret(1, 0);
     const enemy = enemyAt(1, -250, 0);
     const world = makeWorld([turret], [enemy]);
 
-    // Precondition: the enemy really is out of beam range of the turret's spot…
+    // Precondition: the enemy really is out of weapon range of the turret's spot…
     expect(dist(turret.pos, enemy.pos)).toBeGreaterThan(TURRET.range);
     // …yet inside the planet's threat radius, which is what a turret can slide to.
     expect(dist(planetOf(world).pos, enemy.pos)).toBeLessThan(planetThreatRadius(planetOf(world)));
@@ -212,17 +212,17 @@ describe('retarget is immediate and threat-ranked (§3)', () => {
     expect(turretsOf(world)[0]!.targetId).toBe(2);
   });
 
-  it('prioritises an enemy beaming the core over a closer loiterer', () => {
+  it('prioritises an enemy shooting the core over a closer loiterer', () => {
     // Loiterer parked close on the +x side (100 out). Attacker farther out on the
-    // −x side (200 out) but actively auto-beaming the core. Threat beats distance.
+    // −x side (200 out) but actively auto-firing on the core. Threat beats distance.
     const turret = makeTurret(10, 0);
     const loiterer = enemyAt(2, 100, 0);
     const attacker = enemyAt(1, -200, 0);
     const world = makeWorld([turret], [attacker, loiterer]);
 
-    // The attacker is inside beam range of the core and the core is its nearest
-    // target, so auto-aim puts its beam on the core.
-    expect(dist(attacker.pos, planetOf(world).pos)).toBeLessThan(BEAM_RANGE);
+    // The attacker is inside weapon range of the core and the core is its nearest
+    // target, so auto-aim puts its shots on the core.
+    expect(dist(attacker.pos, planetOf(world).pos)).toBeLessThan(WEAPON_RANGE);
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: true }] }];
     step(world, fire);

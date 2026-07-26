@@ -73,7 +73,7 @@ export interface OreHold {
  * Whether the under-ship indicator shows this frame: visible **whenever the hold
  * has ore OR the ship is actively mining** (field rule item 1). Mining with an
  * empty hold still shows the (all-ghost) row so a first-time player sees their
- * capacity fill as the beam chips ore. Hidden entirely once the hold is empty and
+ * capacity fill as the shots chip ore. Hidden entirely once the hold is empty and
  * the ship is idle, so the field stays clean (GDD §2.2 — the HUD "shows only what
  * the player acts on"), the same rule the health bar follows.
  */

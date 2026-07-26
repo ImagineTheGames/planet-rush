@@ -26,7 +26,7 @@ import type { Action, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 /**
  * Manual or Auto-aim — a player setting on every platform, not a touch-only
  * concession (GDD §2.4). In Manual the player aims (mouse / right stick / touch
- * aim stick) and the beam fires along that facing; in Auto-aim the beam engages
+ * aim stick) and the weapon fires along that facing; in Auto-aim the weapon engages
  * the nearest valid target across the full 360° and the player only decides
  * *when* to fire.
  */
@@ -60,7 +60,7 @@ export interface ControlState {
   /** Manual aim direction, or `null` when the player isn't aiming this frame.
    *  Ignored by the mapper in Auto-aim. */
   aim: Vec2 | null;
-  /** Fire / Mine held (GDD §2.3 — one beam mines and shoots). */
+  /** Fire / Mine held (GDD §2.3 — one weapon mines and shoots). */
   fire: boolean;
   /** Boost held (GDD §2.4). */
   boost: boolean;

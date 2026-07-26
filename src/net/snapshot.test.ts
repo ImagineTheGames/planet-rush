@@ -2,9 +2,11 @@
  * src/net/snapshot.test.ts — the wire format, against the real sim
  * (GDD §4.2; docs/netcode-spike.md).
  *
- * Two things are being defended here. First, that the layout the day-0 spike
- * *measured* is the layout production actually ships — the 510-byte worst case
- * is a number the bandwidth budget is billed against, so it must not drift.
+ * Two things are being defended here. First, that the spike layout and the
+ * production layout still agree byte-for-byte — the worst case is a number the
+ * bandwidth budget is billed against, so it must not silently drift. (It is now
+ * 494 B, down from the day-0 measured 510 B: the v0.3 laser funeral retired the
+ * ship `aim` field — see docs/design-amendments.md and docs/netcode-spike.md.)
  * Second, that a snapshot encoded from a real `World` decodes back to what the
  * server saw, at wire precision: quantization is allowed to lose sub-unit
  * detail, it is not allowed to lose a ship.
@@ -44,8 +46,9 @@ function world() {
 describe('snapshot wire layout', () => {
   it('still costs exactly what the spike measured', () => {
     expect(WORST_CASE_BYTES).toBe(HEADER_BYTES + MAX_SHIPS * SHIP_BYTES + MAX_PROJECTILES * PROJECTILE_BYTES);
-    // The number docs/netcode-spike.md bills bandwidth against.
-    expect(WORST_CASE_BYTES).toBe(510);
+    // The number docs/netcode-spike.md bills bandwidth against (494 B after the
+    // v0.3 laser funeral dropped the ship `aim` field, was 510 B).
+    expect(WORST_CASE_BYTES).toBe(494);
     expect(WORST_CASE_BYTES).toBe(SPIKE_WORST_CASE);
   });
 
@@ -139,7 +142,7 @@ describe('encode → decode against the sim', () => {
     expect(projIsShipShot(ship!.meta)).toBe(true);
     expect(projOwner(turret!.meta)).toBe(5);
     expect(projIsShipShot(turret!.meta)).toBe(false);
-    // And the layout is still exactly the measured worst case.
-    expect(WORST_CASE_BYTES).toBe(510);
+    // And the layout is still exactly the post-funeral worst case.
+    expect(WORST_CASE_BYTES).toBe(494);
   });
 });

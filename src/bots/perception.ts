@@ -131,7 +131,7 @@ export interface PerceivedShip {
    *  game does not draw it, so a bot may not know it. */
   readonly hull: number | null;
   readonly maxHull: number;
-  /** Firing this tick — the beam is the loudest tell in the game. */
+  /** Firing this tick — gunfire is the loudest tell in the game. */
   readonly firing: boolean;
   /** Untouchable right now (GDD §2.1 spawn protection), if close enough to read
    *  the glow. */
@@ -160,7 +160,7 @@ export interface PerceivedPlanet {
 }
 
 /** A rock, as seen: its size and its crack stage — enough to judge a payout
- *  before committing beam time (GDD §5.5), never the exact ore inside. */
+ *  before committing weapon time (GDD §5.5), never the exact ore inside. */
 export interface PerceivedAsteroid {
   readonly id: number;
   readonly pos: Vec2;
@@ -307,7 +307,7 @@ function perceiveShip(ship: Ship, from: Vec2, env: Perception): PerceivedShip {
     distance: d,
     hull: seen ? ship.hull : null,
     maxHull: ship.maxHull,
-    firing: seen && ship.beam !== null,
+    firing: seen && ship.firing,
     spawnProtected: seen ? ship.spawnProtect > 0 : null,
   };
 }

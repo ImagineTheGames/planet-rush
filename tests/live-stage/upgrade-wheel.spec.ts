@@ -59,9 +59,9 @@ interface StageWindow {
 }
 declare const window: Window & StageWindow;
 
-/** BEAM leads TRACK_ORDER, so wedge index 0 is BEAM on the Vanguard: current 10,
+/** POWER leads TRACK_ORDER, so wedge index 0 is POWER on the Vanguard: current 10,
  *  first tier 13 (10 × 1.25), cost 4. */
-const BEAM = 0;
+const POWER = 0;
 
 async function boot(page: import('@playwright/test').Page): Promise<string[]> {
   const pageErrors: string[] = [];
@@ -116,36 +116,36 @@ test('opening the upgrade wheel draws a wedge per track, buying a tier re-render
     .then((h) => h.jsonValue());
 
   expect(before!.length, 'one wedge per upgrade track').toBeGreaterThanOrEqual(4);
-  const beamBefore = before!.find((w) => w.label === 'BEAM')!;
-  expect(beamBefore, 'a BEAM wedge is drawn').toBeDefined();
-  expect(beamBefore.tier, 'stock ship starts at tier 0').toBe(0);
-  expect(beamBefore.current, 'Vanguard beam reads 10 at stock').toBe('10');
-  expect(beamBefore.next, 'next tier previews the value, not the delta').toBe('13');
-  expect(beamBefore.state, 'affordable with ore banked').toBe('ready');
+  const powerBefore = before!.find((w) => w.label === 'POWER')!;
+  expect(powerBefore, 'a POWER wedge is drawn').toBeDefined();
+  expect(powerBefore.tier, 'stock ship starts at tier 0').toBe(0);
+  expect(powerBefore.current, 'Vanguard power reads 10 at stock').toBe('10');
+  expect(powerBefore.next, 'next tier previews the value, not the delta').toBe('13');
+  expect(powerBefore.state, 'affordable with ore banked').toBe('ready');
 
   // The upgrade wheel is registered as a drawn overlay.
   const openIds = await page.evaluate(() => window.__planetRush!.layout.map((e) => e.id));
   expect(openIds, 'the upgrade wheel registers its drawn footprint').toContain('upgrade-wheel');
 
   // Buy one tier through the sim's real validated purchase.
-  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), BEAM);
+  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
   expect(bought, 'the purchase went through the sim').not.toBeNull();
   expect(bought!.result, 'buyUpgrade accepted it').toBe('ok');
-  expect(bought!.tier, 'the ship is now one tier up on BEAM').toBe(1);
+  expect(bought!.tier, 'the ship is now one tier up on POWER').toBe(1);
 
   // The wedge must re-render the new tier — the whole point of report #1.
-  const beamAfter = await page
+  const powerAfter = await page
     .waitForFunction(
       () => {
-        const w = window.__upgradeWheelStage!.wedges().find((x) => x.label === 'BEAM');
+        const w = window.__upgradeWheelStage!.wedges().find((x) => x.label === 'POWER');
         return w && w.tier === 1 ? w : null;
       },
       undefined,
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(beamAfter!.tier, 'the drawn BEAM wedge advanced a tier').toBe(1);
-  expect(beamAfter!.current, 'its current value re-rendered to the new tier (10 → 13)').toBe('13');
+  expect(powerAfter!.tier, 'the drawn POWER wedge advanced a tier').toBe(1);
+  expect(powerAfter!.current, 'its current value re-rendered to the new tier (10 → 13)').toBe('13');
 
   expect(pageErrors, 'no page errors staging the upgrade wheel').toEqual([]);
 });
@@ -167,9 +167,9 @@ test('an unaffordable wedge dims with a reason (field report #1)', async ({ page
     )
     .then((h) => h.jsonValue());
 
-  const beam = wedges!.find((w) => w.label === 'BEAM')!;
-  expect(beam.state, 'a broke player sees BEAM dimmed *because* unaffordable').toBe('unaffordable');
-  expect(beam.cost, 'the cost is still shown — the trade stays legible').not.toBeNull();
+  const power = wedges!.find((w) => w.label === 'POWER')!;
+  expect(power.state, 'a broke player sees POWER dimmed *because* unaffordable').toBe('unaffordable');
+  expect(power.cost, 'the cost is still shown — the trade stays legible').not.toBeNull();
 
   expect(pageErrors, 'no page errors staging an unaffordable wedge').toEqual([]);
 });

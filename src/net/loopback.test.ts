@@ -26,7 +26,7 @@ import { decodeSnapshot, SHIP_FLAG } from './snapshot';
 import type { InputMessage, ServerMessage, SnapshotMessage } from './transport';
 
 // A four-slot match on a small field: enough ships, rocks, and planets for the
-// beam, the tractor, and the build economy to all be in play, small enough that
+// weapon, the tractor, and the build economy to all be in play, small enough that
 // a full deep-equal of two worlds is cheap.
 const MATCH: WorldConfig = {
   seed: 0x51ce,

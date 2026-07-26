@@ -112,9 +112,18 @@ Wire layout (`src/net/spike/snapshot.ts`, little-endian, hand-packed):
 | Section | Fields | Bytes |
 |---|---|---|
 | Header | `tick u32` · `shipCount u8` · `projCount u8` | 6 |
-| Ship × 8 | `id u8` · `posX/posY i16` · `velX/velY i16` · `heading u16` · `aim u16` · `hull u8` · `flags u8` = 15 ea | 120 |
+| Ship × 8 | `id u8` · `posX/posY i16` · `velX/velY i16` · `heading u16` · `hull u8` · `flags u8` = 13 ea | 104 |
 | Projectile × 64 | `id u8` · `posX/posY i16` · `meta u8` = 6 ea | 384 |
-| **Worst case** | 8 ships + 64 projectiles (GDD entity caps) | **510** |
+| **Worst case** | 8 ships + 64 projectiles (GDD entity caps) | **494** |
+
+> **Amendment (v0.3 laser funeral).** The ship record was 15 B / worst case
+> **510 B** as originally measured, with a `heading u16` **and** an `aim u16`.
+> When mining and combat became pooled projectiles the `aim` field (the old
+> firing-ray direction) had nothing left to say — a ship points at `heading` and
+> its shots stream in the projectile pool — so it was retired. Dropping 2 B × 8
+> ships takes the ship record to 13 B and the worst case to **494 B**. The
+> numbers below are the original day-0 measurement; the 16 B reduction only makes
+> the bandwidth argument stronger. See `docs/design-amendments.md`.
 
 Only ships and projectiles stream as binary; static entities (asteroids,
 turrets, shields, wrecks) are events on join/change (GDD §4.2), so they cost

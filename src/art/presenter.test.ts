@@ -95,7 +95,7 @@ describe('ArtPresenter — one object, two calls a frame', () => {
     art.observe(world, 1 / 60);
 
     const home = world.planets.find((p) => p.owner === 0)!;
-    // A beam held on the core: sustained, not a taunt-tap.
+    // Sustained fire held on the core: sustained, not a taunt-tap.
     for (let tick = 0; tick < 120; tick++) {
       home.coreHp -= 0.1;
       art.observe(world, 1 / 60);

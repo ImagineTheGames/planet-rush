@@ -22,10 +22,10 @@
  */
 import { Application, Container } from 'pixi.js';
 import { ShipClass } from '@shared/types';
-import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
+import type { Action, Muzzle, PlayerId, Vec2 } from '@shared/types';
 import {
-  BEAM_RANGE,
-  combatBeams,
+  WEAPON_RANGE,
+  muzzleFlashes,
   damagePlanet,
   damageShip,
   destroyCore,
@@ -37,7 +37,7 @@ import {
   shieldPool,
   turretCount,
 } from './sim';
-import type { CombatBeam, Planet, Turret, World } from './sim';
+import type { MuzzleFlash, Planet, Turret, World } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
 import { buyUpgrade } from './sim/buildings';
@@ -94,7 +94,7 @@ import {
   FS_AFFORDANCE_ANCHOR,
 } from '@render/fullscreen-affordance';
 import { Renderer, PLAYER_COLORS } from '@render/index';
-import type { BeamView } from '@render/index';
+import type { MuzzleView } from '@render/index';
 import {
   Hud,
   PANEL_ROW_HEIGHT,
@@ -133,10 +133,13 @@ import {
   cycleBotDifficulty,
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
+  normalizePlayerName,
 } from './ui';
 import type {
   HudFrame,
   Combatant,
+  Nameable,
+  NameTable,
   SettingsState,
   SettingsTarget,
   MainMenuOption,
@@ -146,6 +149,7 @@ import type {
   LobbyState,
 } from './ui';
 import { OFFLINE_ROOM } from './net';
+import { personality } from './bots';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -153,6 +157,10 @@ const FIRE_MODE_KEY = 'planet-rush:fireMode';
  *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
  *  storage seam as the fire mode, so both survive a reload identically. */
 const SHIP_CLASS_KEY = 'planet-rush:shipClass';
+/** Where the local player's name is remembered (field request v0.2.1) — the same
+ *  storage seam as the hull and fire mode, so a returning player finds their
+ *  callsign over their ship and planet. */
+const PLAYER_NAME_KEY = 'planet-rush:playerName';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
  *  arena, which is also what makes a bug report reproducible. */
@@ -312,13 +320,17 @@ async function boot(): Promise<void> {
   // is no lobby, so both fall back to the persisted-or-default values.
   const chosen = lobby
     ? await lobby.untilRush()
-    : { shipClass: readShipClass(platform), mapId: readMapId(platform) };
+    : { shipClass: readShipClass(platform), mapId: readMapId(platform), name: readPlayerName(platform) };
   const chosenShipClass = chosen.shipClass;
-  // Persist both picks so a returning player finds them pre-selected (GDD §2.11;
-  // p2 — the arena persists the same way, same storage seam as the fire mode).
+  // The name shown over the local ship and planet (field request v0.2.1) — the
+  // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
+  const chosenName = normalizePlayerName(chosen.name);
+  // Persist all three picks so a returning player finds them pre-selected (GDD
+  // §2.11; p2 + field request v0.2.1 — same storage seam as the fire mode).
   if (lobby) {
     platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
     platform.storage.set(MAP_STORAGE_KEY, chosen.mapId);
+    platform.storage.set(PLAYER_NAME_KEY, chosenName);
   }
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
@@ -396,9 +408,9 @@ async function boot(): Promise<void> {
   const shipScreenScratch: Vec2 = { x: 0, y: 0 };
 
   // --- Combat-visuals instrument (combat-debug.ts): only when ?debug=1. Exposes
-  //     window.__planetRush.beams (the beam set actually drawn this frame, one per
-  //     firing emitter) and .stageCombat() so a live-boot suite can prove the
-  //     enemy/turret beam WIRING the m2-11 unit suite cannot reach. Inert otherwise.
+  //     window.__planetRush.muzzles (the muzzle-flash set actually drawn this frame,
+  //     one per firing turret) and .stageCombat() so a live-boot suite can prove the
+  //     non-local turret WIRING the m2-11 unit suite cannot reach. Inert otherwise.
   const combatDebug = installCombatDebug(window.location.search);
   if (combatDebug.enabled) combatDebug.setStager(() => stageCombatFor(world));
 
@@ -446,7 +458,9 @@ async function boot(): Promise<void> {
   //     into src/sim.
   if (flags.debug) {
     hud.enableHealthBarDebug();
+    hud.enableNameplateDebug();
     installHealthbarStage();
+    installNameplateStage();
     installOreDepositStage();
     installOreHudStage();
     installEndScreenStage();
@@ -658,6 +672,26 @@ async function boot(): Promise<void> {
   const combatantPool: MutCombatant[] = [];
   const combatantFrame: Combatant[] = [];
 
+  // --- Name-label feed (field request v0.2.1): the per-slot name table and a
+  //     reused pool of mutable label-bearing entities `feedNameplates()` fills
+  //     each render, so labelling every ship + owned planet allocates nothing
+  //     after warm-up (GDD §4.3). The table is (re)built from the match's own
+  //     seated cast each boot — local name + each bot's personality name.
+  const nameablePool: MutNameable[] = [];
+  const nameableFrame: Nameable[] = [];
+  let playerNames: NameTable = [];
+  /** Rebuild the per-slot name table from the live match: the local player's
+   *  chosen name (from the lobby, or persisted default under ?debug=1) plus each
+   *  seated bot's personality name (GDD §2.9). Data-driven — when online lands
+   *  (m9) the room's remote names populate this same table with no other change. */
+  function rebuildNameTable(): void {
+    const table: string[] = [];
+    table[LOCAL_PLAYER] = chosenName;
+    for (const bot of match.bots) table[bot.seat.id] = personality(bot.seat.personality).name;
+    playerNames = table;
+  }
+  rebuildNameTable();
+
   // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
   //     tick, then hold it there so screenshots are deterministic across boots
   //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
@@ -713,7 +747,7 @@ async function boot(): Promise<void> {
       lastRenderMs = nowMs;
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
 
-      renderer.draw(world, { cameraTarget, beams: currentBeams() });
+      renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
       feedHud();
       // Health bars over every non-local combat entity (GDD §2.2). Fed AFTER
       // renderer.draw so the camera transform is current: each combatant's world
@@ -721,6 +755,10 @@ async function boot(): Promise<void> {
       // the wiring the M2 field report caught missing — the model and the layer
       // were both right, but nothing ever handed the layer the enemies.
       feedCombatants();
+      // Name labels over every ship + owned planet (field request v0.2.1), fed
+      // AFTER renderer.draw so the camera transform is current — projected to the
+      // same screen space the labels draw in, stacked above the health bars.
+      feedNameplates();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
@@ -862,6 +900,7 @@ async function boot(): Promise<void> {
     matchSeed += 1;
     match = bootMatch(matchSeed);
     world = match.world;
+    rebuildNameTable();
     spectating = false;
     cameraTarget = LOCAL_PLAYER;
     endScreen = 'none';
@@ -946,7 +985,7 @@ async function boot(): Promise<void> {
    *  - **Own-planet HP** comes off the real core, with the shield pool over it.
    *  - **The under-attack alarm** derives its damage from the fall in
    *    core + shields + turrets between frames, so a turret being picked off at
-   *    the edge of its range rings it exactly as a beam on the core does — and a
+   *    the edge of its range rings it exactly as a shot on the core does — and a
    *    single stray shot does not (the sustained-damage trigger is `src/ui`'s).
    *  - **The wave clock and the collapse state** are `world.time` and the sim's
    *    own `isCollapsed`, so the clock on screen is the clock the match runs on.
@@ -989,12 +1028,12 @@ async function boot(): Promise<void> {
     // Own-ship health (field request v0.1.1): the HUD floats a bar over the local
     // ship (at screen centre, where the follow camera holds it) and shows a HUD
     // hull readout, both from this one hull value so they agree. `shipFiring` is
-    // the same beam signal the enemy bars use for "in combat" (mining or firing —
-    // one beam, GDD §2.5). `radius` matches the projected 1:1 world radius.
+    // the same firing signal the enemy bars use for "in combat" (mining or fighting —
+    // one weapon, GDD §2.5). `radius` matches the projected 1:1 world radius.
     hudFrame.hull = ship.hull;
     hudFrame.maxHull = ship.maxHull;
     hudFrame.shipRadius = ship.radius;
-    hudFrame.shipFiring = ship.beam !== null;
+    hudFrame.shipFiring = ship.firing;
   }
 
   /**
@@ -1027,7 +1066,7 @@ async function boot(): Promise<void> {
       c.hp = ship.hull;
       c.maxHp = ship.maxHull;
       c.alive = ship.alive;
-      c.inCombat = ship.beam !== null; // firing this tick (sim publishes the beam)
+      c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
     }
@@ -1056,6 +1095,63 @@ async function boot(): Promise<void> {
     if (!c) {
       c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0 };
       combatantPool[i] = c;
+    }
+    return c;
+  }
+
+  /**
+   * Build this frame's name-label feed and hand it to the HUD (field request
+   * v0.2.1): a label over **every ship** and **every owned planet**, tinted the
+   * owner's identity colour and captioned from {@link playerNames}. The pure model
+   * ({@link ./ui} `nameplateModel`) decides who is labelled (a dead ship, a
+   * destroyed planet — a wreck — and the local ship's own label are all dropped)
+   * and fades a label under combat clutter; here we only project world → screen
+   * (via the same camera transform the bars use, after `renderer.draw`) and pass
+   * the sim liveness/combat facts through. Planets carry no HP/combat signal, so a
+   * rival planet's label never leaks its scouted-only HP (GDD §2.2).
+   *
+   * Allocation-free after warm-up (GDD §4.3): the records are pooled and the frame
+   * array reused, bounded by the entity caps (≤8 ships, ≤8 planets).
+   */
+  function feedNameplates(): void {
+    let n = 0;
+    for (const ship of world.ships) {
+      const c = nameableSlot(n++);
+      c.owner = ship.id;
+      c.kind = 'ship';
+      c.alive = ship.alive && !ship.eliminated;
+      c.local = ship.id === LOCAL_PLAYER;
+      c.inCombat = ship.firing;
+      c.hpFraction = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
+      renderer.projectToScreen(ship.pos, c.pos);
+      c.radius = ship.radius;
+    }
+    for (const planet of world.planets) {
+      const c = nameableSlot(n++);
+      c.owner = planet.owner;
+      c.kind = 'planet';
+      // A standing (owned) planet is labelled; a wreck (`alive` false) is not.
+      c.alive = planet.alive;
+      c.local = false;
+      // No combat signal on a planet: a rival's HP is scouted only (GDD §2.2), so
+      // the fade never becomes a back-door HP readout. Full alpha, always.
+      c.inCombat = false;
+      c.hpFraction = 1;
+      renderer.projectToScreen(planet.pos, c.pos);
+      c.radius = planet.radius;
+    }
+    nameableFrame.length = 0;
+    for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
+    hudFrame.nameables = nameableFrame;
+    hudFrame.names = playerNames;
+  }
+
+  /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
+  function nameableSlot(i: number): MutNameable {
+    let c = nameablePool[i];
+    if (!c) {
+      c = { owner: 0, kind: 'ship', alive: false, local: false, inCombat: false, hpFraction: 1, pos: { x: 0, y: 0 }, radius: 0 };
+      nameablePool[i] = c;
     }
     return c;
   }
@@ -1122,6 +1218,61 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__healthbarStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__nameplateStage` — the ?debug=1 live-stage seam a Playwright
+   * test drives to prove the player-name labels are wired on a real boot (field
+   * request v0.2.1), the same discipline as `__healthbarStage`. Methods:
+   *
+   *  - `stageBot()` — park the first bot's SHIP and its HOME PLANET on-screen
+   *    beside the centred local ship, so both must draw a label (a full-ring-away
+   *    rival is off-screen and culled in the frozen frame). Returns the bot's slot
+   *    and the name the table resolved for it, or null if there is no bot.
+   *  - `plates()` — the labels the real layer actually drew last frame (owner,
+   *    text, colour, kind, position), so the test can assert a drawn label with the
+   *    lobby's name tracks that bot's ship and planet.
+   *  - `names()` — the per-slot name table the match built, so the test can match a
+   *    drawn label's text against the data-driven source.
+   *
+   * Mutating `pos` here is a debug-only staging affordance (identical to the
+   * health-bar stage), not gameplay: it writes the plain sim data the render loop
+   * already reads every frame, entirely behind ?debug=1.
+   */
+  function installNameplateStage(): void {
+    const stage = {
+      stageBot(): { owner: PlayerId; name: string } | null {
+        const local = world.ships.find(isLocalShip);
+        const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
+        if (!local || !bot) return null;
+        const planet = world.planets.find((p) => p.owner === bot.id);
+        // Beside the centred local ship so both labels are on-screen and un-culled.
+        bot.pos.x = local.pos.x + 120;
+        bot.pos.y = local.pos.y - 120;
+        bot.alive = true;
+        if (planet) {
+          planet.pos.x = local.pos.x + 120;
+          planet.pos.y = local.pos.y + 140;
+        }
+        return { owner: bot.id, name: playerNames[bot.id] ?? `P${bot.id + 1}` };
+      },
+      plates(): ReturnType<typeof hud.debugNameplates> {
+        return hud.debugNameplates();
+      },
+      names(): readonly (string | undefined)[] {
+        return playerNames.slice();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__nameplateStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -1532,34 +1683,34 @@ async function boot(): Promise<void> {
     }
   }
 
-  /** True if any asteroid is within beam reach of `pos` — the mine prompt's
+  /** True if any asteroid is within weapon reach of `pos` — the mine prompt's
    *  trigger (GDD §2.10). Plain loop; allocates nothing. */
   function nearAsteroid(pos: Vec2): boolean {
     for (const a of world.asteroids) {
       const dx = a.pos.x - pos.x;
       const dy = a.pos.y - pos.y;
-      const reach = BEAM_RANGE + a.radius;
+      const reach = WEAPON_RANGE + a.radius;
       if (dx * dx + dy * dy <= reach * reach) return true;
     }
     return false;
   }
 
-  /** Every combat beam to draw this frame — read from the sim's published combat
-   *  state for EVERY shooter, never from local fire input. `combatBeams` walks the
-   *  world and emits one record per firing emitter: each live ship with a `beam`
-   *  (local, bot, remote alike) and each turret with a `muzzle` this tick (GDD §2.3,
-   *  §2.6). This is the round-2 field fix: the old path handed the renderer only
-   *  `LOCAL_PLAYER`'s beam, so an enemy carving your core and a turret spitting fire
-   *  were both invisible. Now each beam draws in its shooter's colour (style-guide
-   *  §3), ending at the same clamp-to-hit endpoint the sim publishes. The bounded
-   *  `combatBeams` array (≤ ships + turrets, GDD §4.3) is the sim's blessed render
-   *  helper; the BeamView mapping is pooled so it adds no per-frame allocation. */
-  function currentBeams(): readonly BeamView[] {
-    const combat = combatBeams(world);
+  /** Every muzzle flash to draw this frame — read from the sim's published combat
+   *  state for EVERY turret, never from local fire input. `muzzleFlashes` walks the
+   *  world and emits one record per turret firing this tick (GDD §2.6). This is the
+   *  round-2 field fix: the old path handed the renderer only the local player's
+   *  fire, so a rival turret spitting shots was invisible. Now each flash draws in
+   *  its owner's colour (style-guide §3), ending at the same clamp-to-hit endpoint
+   *  the sim publishes. (A ship's shots are pooled projectiles drawn from the shot
+   *  pool since the v0.3 laser funeral, so they are not muzzle flashes.) The bounded
+   *  `muzzleFlashes` array (≤ turrets, GDD §4.3) is the sim's blessed render helper;
+   *  the MuzzleView mapping is pooled so it adds no per-frame allocation. */
+  function currentMuzzles(): readonly MuzzleView[] {
+    const flashes = muzzleFlashes(world);
     // Reflect the drawn set for the live-boot suite (?debug=1 only, else a no-op).
-    if (combatDebug.enabled) combatDebug.update(combat);
-    if (combat.length === 0) return EMPTY_BEAMS;
-    return fillBeamViews(combat);
+    if (combatDebug.enabled) combatDebug.update(flashes);
+    if (flashes.length === 0) return EMPTY_MUZZLES;
+    return fillMuzzleViews(flashes);
   }
 
   // --- Viewport: keep renderer, touch halves, HUD, and overlay in sync with the
@@ -1723,91 +1874,100 @@ interface MutCombatant {
   radius: number;
 }
 
-const EMPTY_BEAMS: BeamView[] = [];
+/** A mutable {@link Nameable} — the pooled records `feedNameplates()` overwrites
+ *  in place each frame (field request v0.2.1), handed over as `Nameable`. */
+interface MutNameable {
+  owner: PlayerId;
+  kind: 'ship' | 'planet';
+  alive: boolean;
+  local: boolean;
+  inCombat: boolean;
+  hpFraction: number;
+  pos: Vec2;
+  radius: number;
+}
 
-/** A mutable BeamView the pool owns and overwrites each frame — its fields are
- *  readonly only to the renderer (which treats a BeamView as a value). */
-interface MutableBeamView {
+const EMPTY_MUZZLES: MuzzleView[] = [];
+
+/** A mutable MuzzleView the pool owns and overwrites each frame — its fields are
+ *  readonly only to the renderer (which treats a MuzzleView as a value). */
+interface MutableMuzzleView {
   from: Vec2;
   to: Vec2;
   color: number;
   hit: Vec2 | null;
 }
 
-// A grow-once pool: one scratch BeamView per concurrent beam. Bounded by the sim's
-// entity caps (≤ ships + turrets), so after the busiest frame this never allocates
-// again — the render hot path stays allocation-free (GDD §4.3b risk 5). `beamViewList`
-// is the array handed to the renderer; its length is set to the live beam count.
-const beamViewPool: MutableBeamView[] = [];
-const beamViewList: BeamView[] = [];
+// A grow-once pool: one scratch MuzzleView per concurrent flash. Bounded by the
+// sim's entity caps (≤ turrets), so after the busiest frame this never allocates
+// again — the render hot path stays allocation-free (GDD §4.3b risk 5).
+// `muzzleViewList` is the array handed to the renderer; its length is set to the
+// live flash count.
+const muzzleViewPool: MutableMuzzleView[] = [];
+const muzzleViewList: MuzzleView[] = [];
 
-/** Map every combat beam this tick into the pooled BeamView list the renderer
- *  draws. Endpoint `to` = origin + dir·length (the sim's clamp to the first hit,
- *  or full range on a miss); colour is the shooter's identity hue (style-guide §3),
- *  so an enemy's beam and a rival turret's muzzle each read in their own colour. */
-function fillBeamViews(combat: readonly CombatBeam[]): readonly BeamView[] {
-  const n = combat.length;
+/** Map every muzzle flash this tick into the pooled MuzzleView list the renderer
+ *  draws. Endpoint `to` = origin + dir·length (the sim's clamp to what the shot is
+ *  aimed at, or full range on a miss); colour is the owner's identity hue
+ *  (style-guide §3), so each rival turret's flash reads in its own colour. */
+function fillMuzzleViews(flashes: readonly MuzzleFlash[]): readonly MuzzleView[] {
+  const n = flashes.length;
   for (let i = 0; i < n; i++) {
-    const b = combat[i]!;
-    let v = beamViewPool[i];
+    const m = flashes[i]!;
+    let v = muzzleViewPool[i];
     if (!v) {
       v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null };
-      beamViewPool[i] = v;
+      muzzleViewPool[i] = v;
     }
-    v.from = b.origin; // alias the sim's origin (read synchronously this frame)
-    v.to.x = b.origin.x + b.dir.x * b.length;
-    v.to.y = b.origin.y + b.dir.y * b.length;
-    v.hit = b.hitPoint; // null on a clean miss → no impact glow
-    v.color = PLAYER_COLORS[b.shooter % PLAYER_COLORS.length] ?? 0x4dc3ff;
-    beamViewList[i] = v;
+    v.from = m.origin; // alias the sim's origin (read synchronously this frame)
+    v.to.x = m.origin.x + m.dir.x * m.length;
+    v.to.y = m.origin.y + m.dir.y * m.length;
+    v.hit = m.hitPoint; // null on a clean miss → no impact glow
+    v.color = PLAYER_COLORS[m.shooter % PLAYER_COLORS.length] ?? 0x4dc3ff;
+    muzzleViewList[i] = v;
   }
-  beamViewList.length = n; // reuse the objects; just retract the tail
-  return beamViewList;
+  muzzleViewList.length = n; // reuse the objects; just retract the tail
+  return muzzleViewList;
 }
 
-/** One staged emitter as the live-boot suite reads it back: identity + the same
- *  clamped world-space geometry {@link fillBeamViews} draws from. */
-interface StagedBeam {
+/** One staged muzzle flash as the live-boot suite reads it back: identity + the
+ *  same clamped world-space geometry {@link fillMuzzleViews} draws from. */
+interface StagedMuzzle {
   readonly shooter: number;
-  readonly source: 'ship' | 'turret';
   readonly origin: { x: number; y: number };
   readonly end: { x: number; y: number };
   readonly hit: { x: number; y: number } | null;
 }
 
-/** What `__planetRush.stageCombat()` hands the test: the two NON-LOCAL emitters it
- *  staged, so the test can assert the client actually drew both of them. */
+/** What `__planetRush.stageCombat()` hands the test: the NON-LOCAL turret muzzle
+ *  flash it staged (so the test can assert the client drew it), plus the non-local
+ *  ship whose firing flag it set. */
 export interface StagedCombat {
-  readonly ship: StagedBeam;
-  readonly turret: StagedBeam;
+  readonly firingShip: number;
+  readonly turret: StagedMuzzle;
 }
 
-const STAGE_BEAM_LEN = 140;
 const STAGE_MUZZLE_LEN = 90;
 
 /** Debug-only (`?debug=1`) deterministic firefight, driven by the live-boot suite
- *  under `?freeze=1` so the sim never steps to clear it: publish a `beam` on a
- *  non-local ship (an enemy laser) and a `muzzle` on a fresh turret owned by a
- *  non-local planet (a rival turret firing) — the two combat tells the round-2
- *  field report found invisible. Returns both so the test asserts the client put
- *  them on stage. Touches only render-tell fields the sim itself publishes each
- *  tick; it changes no sim logic and runs only behind the debug flag. */
+ *  under `?freeze=1` so the sim never steps to clear it: set the firing flag on a
+ *  non-local ship (an enemy trigger down) and publish a `muzzle` on a fresh turret
+ *  owned by a non-local planet (a rival turret firing) — the combat tells the
+ *  round-2 field report found invisible. Since the v0.3 laser funeral a ship has no
+ *  shot geometry to stage (its shots stream from the projectile pool), so only the
+ *  turret contributes a muzzle flash. Returns what it staged so the test can assert
+ *  the client put it on stage. Touches only render-tell fields the sim itself
+ *  publishes each tick; it changes no sim logic and runs only behind the debug flag. */
 function stageCombatFor(world: World): StagedCombat {
-  // A non-local, living ship carries the enemy beam (the offline match seats the
-  // local player + seven bots), so its `shooter` is provably not LOCAL_PLAYER.
+  // A non-local, living ship gets its firing flag set (the offline match seats the
+  // local player + seven bots), so its id is provably not LOCAL_PLAYER.
   const botShip = world.ships.find((s) => s.id !== LOCAL_PLAYER && s.alive) ?? world.ships[0]!;
-  const botBeam: Beam = {
-    origin: { x: botShip.pos.x, y: botShip.pos.y },
-    dir: { x: 1, y: 0 },
-    hitPoint: { x: botShip.pos.x + STAGE_BEAM_LEN, y: botShip.pos.y },
-    length: STAGE_BEAM_LEN,
-  };
-  botShip.beam = botBeam;
+  botShip.firing = true;
 
-  // A turret with a live muzzle, mounted on a non-local planet so its owner (the
-  // beam's shooter) is also non-local — a rival turret loosing a shot.
+  // A turret with a live muzzle, mounted on a non-local planet so its owner is
+  // non-local — a rival turret loosing a shot.
   const planet = world.planets.find((p) => p.owner !== LOCAL_PLAYER) ?? world.planets[0]!;
-  const muzzleBeam: Beam = {
+  const muzzle: Muzzle = {
     origin: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 },
     dir: { x: 0, y: -1 },
     hitPoint: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 - STAGE_MUZZLE_LEN },
@@ -1817,30 +1977,29 @@ function stageCombatFor(world: World): StagedCombat {
     id: world.nextEntityId++,
     owner: planet.owner,
     slot: planet.turrets.length,
-    pos: { x: muzzleBeam.origin.x, y: muzzleBeam.origin.y },
+    pos: { x: muzzle.origin.x, y: muzzle.origin.y },
     radius: 6,
     hp: 10,
     maxHp: 10,
     angle: -Math.PI / 2,
     cooldown: 0,
     targetId: null,
-    muzzle: muzzleBeam,
+    muzzle,
   };
   planet.turrets.push(turret);
 
   return {
-    ship: describeStaged(botShip.id, 'ship', botBeam),
-    turret: describeStaged(turret.owner, 'turret', muzzleBeam),
+    firingShip: botShip.id,
+    turret: describeStaged(turret.owner, muzzle),
   };
 }
 
-function describeStaged(shooter: number, source: 'ship' | 'turret', beam: Beam): StagedBeam {
+function describeStaged(shooter: number, muzzle: Muzzle): StagedMuzzle {
   return {
     shooter,
-    source,
-    origin: { x: beam.origin.x, y: beam.origin.y },
-    end: { x: beam.origin.x + beam.dir.x * beam.length, y: beam.origin.y + beam.dir.y * beam.length },
-    hit: beam.hitPoint ? { x: beam.hitPoint.x, y: beam.hitPoint.y } : null,
+    origin: { x: muzzle.origin.x, y: muzzle.origin.y },
+    end: { x: muzzle.origin.x + muzzle.dir.x * muzzle.length, y: muzzle.origin.y + muzzle.dir.y * muzzle.length },
+    hit: muzzle.hitPoint ? { x: muzzle.hitPoint.x, y: muzzle.hitPoint.y } : null,
   };
 }
 
@@ -1903,6 +2062,14 @@ function readShipClass(platform: ReturnType<typeof createBrowserPlatform>): Ship
     return stored as ShipClass;
   }
   return DEFAULT_SHIP_CLASS;
+}
+
+/** The local player's name to pre-fill the lobby with: the last one they set, or
+ *  {@link DEFAULT_PLAYER_NAME} ("YOU") the first time out (field request v0.2.1 —
+ *  "persisted like ship class, default YOU"). Folded through `normalizePlayerName`
+ *  so a stale/over-long stored value is always a safe nameplate. */
+function readPlayerName(platform: ReturnType<typeof createBrowserPlatform>): string {
+  return normalizePlayerName(platform.storage.get(PLAYER_NAME_KEY) ?? undefined);
 }
 
 /** The arena the player last picked on the PLAY screen (m8-02), read through the
@@ -2191,10 +2358,12 @@ function installMainMenuSeam(seam: object): void {
   }
 }
 
-/** The two choices the player locks in at RUSH! — the hull AND the arena (p2). */
+/** The choices the player locks in at RUSH! — the hull, the arena (p2), and the
+ *  name shown over their ship and planet (field request v0.2.1). */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
+  readonly name: string;
 }
 
 /** What `boot()` holds the lobby by: a promise resolving with the hull and the
@@ -2318,6 +2487,7 @@ function openLobby(
     you: LOCAL_PLAYER,
     host: LOCAL_PLAYER,
     shipClass: readShipClass(platform),
+    name: readPlayerName(platform),
     mapId: readMapId(platform),
     online: false,
   });
@@ -2430,7 +2600,7 @@ function openLobby(
     render();
     if (state.phase === 'started' && !resolved) {
       resolved = true;
-      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId };
+      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId, name: state.name };
       teardown();
       seam.visible = false;
       resolveRush(chosen);

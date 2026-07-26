@@ -16,7 +16,7 @@
  * on a touch phone without this module ever knowing which device is present.
  *
  * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers):
- *   1. "Hold {fire} on the asteroid — your beam mines it"      (teaches mining)
+ *   1. "Hold {fire} on the asteroid — your shots chip the rock" (teaches mining)
  *   2. "Hold full — fly home and press {build}"                (teaches the haul)
  *   3. "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
  *   4. "Your planet is under attack — follow the arrow"
@@ -41,7 +41,7 @@ import type { DeviceKind } from '@platform/actions';
 
 /** The onboarding prompts (GDD §2.10, §4.6 — M1 ships the first two, M2 all four). */
 export enum PromptId {
-  /** "Hold {fire} on the asteroid — your beam mines it." Teaches that the gun
+  /** "Hold {fire} on the asteroid — your shots chip the rock." Teaches that the gun
    *  is the mining tool — the inversion the whole game turns on (GDD §2.10). */
   Mine = 'mine',
   /** "Hold full — fly home and press {build}." Teaches that held ore is not safe
@@ -71,7 +71,7 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // via the action layer (GDD §2.10), so it reads correctly on key, pad, touch.
   [PromptId.Mine]: {
     id: PromptId.Mine,
-    template: 'Hold {fire} on the asteroid — your beam mines it',
+    template: 'Hold {fire} on the asteroid — your shots chip the rock',
   },
   // `{build}` resolves to the Build & Upgrade binding — "E" on a keyboard, the
   // BUILD button on touch. GDD §2.10 quotes this prompt as "fly home and press
@@ -143,7 +143,7 @@ export function resolvePromptText(id: PromptId, device: DeviceKind, mode: FireMo
  * asteroid field each tick, so this module tests headless.
  */
 export interface OnboardingSignals {
-  /** An asteroid is within beam range of the local ship — a mine is possible
+  /** An asteroid is within weapon range of the local ship — a mine is possible
    *  right now (GDD §2.3: "hold fire on an asteroid"). */
   readonly nearAsteroid: boolean;
   /** Ore currently held in the ship's hold. */

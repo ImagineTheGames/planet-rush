@@ -27,7 +27,7 @@
  *
  * Deliberately sized for CI: 60 sim-seconds of a full eight-slot match (~3 600
  * ticks) runs in well under a second and exercises every subsystem — waves,
- * beams, mining, chunks, construction, turret fire, and elimination.
+ * weapon fire, mining, chunks, construction, turret fire, and elimination.
  */
 
 import { describe, it, expect } from 'vitest';

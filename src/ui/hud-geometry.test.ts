@@ -65,7 +65,7 @@ const PROFILES: readonly Profile[] = [
   { name: 'small/portrait', vp: { width: 320, height: 568 } },
 ];
 
-/** The four upgrade tracks (GDD §2.5: beam, engine, cargo, hull). */
+/** The four upgrade tracks (GDD §2.5: power, engine, cargo, hull). */
 const UPGRADE_ROWS = 4;
 
 const FULL: AnchorSpec = { region: 'full', margin: 0 };

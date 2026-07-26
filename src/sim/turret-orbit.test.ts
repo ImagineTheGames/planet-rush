@@ -13,7 +13,7 @@
  *   4. the slide speed cap is never exceeded;
  *   5. determinism — same seed / same fixture, same trajectory;
  *   plus: multiple turrets on one planet keep an angular separation, and the
- *   turret's `pos` (sprite + beam origin) tracks the orbit angle.
+ *   turret's `pos` (sprite + muzzle origin) tracks the orbit angle.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -94,7 +94,7 @@ function enemyAt(id: number, x: number, y: number): Ship {
     spawnProtect: 0,
     eliminated: false,
     radius: SHIP_RADIUS,
-    beam: null,
+    firing: false,
   };
 }
 
@@ -146,7 +146,7 @@ describe('single enemy: the turret slides to the facing-normal point', () => {
     expect(Math.abs(angleDiff(turretOf(world).orbitAngle!, bearing))).toBeLessThan(1e-6);
   });
 
-  it("the turret's pos (sprite + beam origin) tracks the orbit angle onto the rim", () => {
+  it("the turret's pos (sprite + muzzle origin) tracks the orbit angle onto the rim", () => {
     const turret = makeTurret(1, 0);
     const world = makeWorld([turret], [enemyAt(1, 0, 200)]);
     for (let t = 0; t < Math.round(4 / TICK_DT); t++) step(world, NO_INPUT);

@@ -9,7 +9,7 @@
  *     range (GDD §2.2, "scouted, not broadcast"); your own home always shows.
  *  3. **A wreck stays on the map** and reads as one (GDD §2.7).
  *
- * Headless, like the beam tests: Pixi builds Graphics geometry with no WebGL, so
+ * Headless, like the muzzle tests: Pixi builds Graphics geometry with no WebGL, so
  * the assertions are about the container tree the renderer maintains.
  */
 import { describe, it, expect } from 'vitest';
@@ -48,7 +48,7 @@ describe('planets are on screen at all (the M2 integration gap)', () => {
     const r = new Renderer(stage, VIEW);
     const world = arena();
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     for (let i = 0; i < 8; i++) {
       expect(drewSomething(stage, `planet-${i}`)).toBe(true);
@@ -60,10 +60,10 @@ describe('planets are on screen at all (the M2 integration gap)', () => {
     const r = new Renderer(stage, VIEW);
     const world = arena();
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     const after = planetLayer(stage).children.length;
-    r.draw(world, { cameraTarget: 0, beams: [] });
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     expect(planetLayer(stage).children.length).toBe(after);
   });
@@ -73,7 +73,7 @@ describe('planets are on screen at all (the M2 integration gap)', () => {
     const r = new Renderer(stage, VIEW);
     const world = arena();
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     const body = stage.getChildByLabel('planet-3', true) as Graphics;
     expect(body.x).toBe(world.planets[3]!.pos.x);
@@ -91,14 +91,14 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     damagePlanet(world, rival, 40);
 
     // Viewer parked at its own home, half the map away: nothing to read.
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     expect(drewSomething(stage, 'planet-overlay-4')).toBe(false);
 
     // Fly to it — the ring is information you earn by scouting.
     const viewer = world.ships[0]!;
     viewer.pos.x = rival.pos.x;
     viewer.pos.y = rival.pos.y - (SENSOR_RANGE + rival.radius) * 0.5;
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     expect(drewSomething(stage, 'planet-overlay-4')).toBe(true);
   });
 
@@ -113,7 +113,7 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     world.ships[0]!.pos.x = world.bounds.width / 2;
     world.ships[0]!.pos.y = world.bounds.height / 2;
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     expect(drewSomething(stage, 'planet-overlay-0')).toBe(true);
   });
@@ -122,7 +122,7 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
 
-    r.draw(arena(), { cameraTarget: 0, beams: [] });
+    r.draw(arena(), { cameraTarget: 0, muzzles: [] });
 
     expect(drewSomething(stage, 'planet-overlay-0')).toBe(false);
   });
@@ -135,7 +135,7 @@ describe('construction is visible (GDD §2.5)', () => {
     const world = arena();
     expect(placeOrder(world, world.ships[0]!, 'turret')).toBe('ok');
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     expect(drewSomething(stage, 'planet-overlay-0')).toBe(true);
     expect(world.planets[0]!.builds).toHaveLength(1);
@@ -149,14 +149,14 @@ describe('a wreck stays on the map (GDD §2.7)', () => {
     const world = arena();
     const doomed = world.planets[2]!;
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
     const before = planetLayer(stage).children.length;
 
     doomed.spawnProtect = 0;
     damagePlanet(world, doomed, doomed.maxCoreHp);
     expect(doomed.alive).toBe(false);
 
-    r.draw(world, { cameraTarget: 0, beams: [] });
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     // Still drawn, still the same pooled child — the wreck does not leave.
     expect(drewSomething(stage, 'planet-2')).toBe(true);

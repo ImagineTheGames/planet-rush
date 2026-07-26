@@ -52,8 +52,8 @@ export interface PointView {
   readonly y: number;
 }
 
-/** The public beam geometry for the tick a ship is firing (`Beam`, @shared/types). */
-export interface BeamView {
+/** The public muzzle geometry for the tick a turret fires (`Muzzle`, @shared/types). */
+export interface MuzzleView {
   readonly origin: PointView;
   readonly dir: PointView;
   readonly hitPoint: PointView | null;
@@ -62,7 +62,7 @@ export interface BeamView {
 
 /** Upgrade tiers, by track name (`UpgradeTiers`). */
 export interface TiersView {
-  readonly beam: number;
+  readonly power: number;
   readonly engine: number;
   readonly cargo: number;
   readonly hull: number;
@@ -83,7 +83,7 @@ export interface ShipView {
   readonly banked: number;
   readonly spawnProtect: number;
   readonly tiers: TiersView;
-  readonly beam: BeamView | null;
+  readonly firing: boolean;
 }
 
 /** What the observer reads off an asteroid. */
@@ -103,6 +103,8 @@ export interface TurretView {
   readonly angle: number;
   readonly cooldown: number;
   readonly hp: number;
+  /** The muzzle geometry for the tick this turret fires, else null/absent. */
+  readonly muzzle?: MuzzleView | null;
 }
 
 /** What the observer reads off a shield generator's bubble. */
@@ -182,8 +184,15 @@ export const SPAWN_PULSE_S = 0.5;
 /** Seconds between repair-channel pulses while the channel is held (GDD §2.5). */
 export const REPAIR_PULSE_S = 0.45;
 
-/** How close a beam hit must be to a hull-ish target to sound like hull, not rock. */
+/** How close a shot hit must be to a hull-ish target to sound like hull, not rock. */
 const HULL_HIT_SLOP = 6;
+
+/**
+ * Firing power a turret muzzle reads as, 0..1 — turrets carry no upgrade tier, so
+ * the two firing voices ride a fixed reference rather than a per-shooter stat.
+ * TUNABLE.
+ */
+const MUZZLE_POWER = 0.7;
 
 /** Ore in one bank run that reads as "a full haul" — normalises `bankOre`. */
 const BANK_REFERENCE = 8;
@@ -337,6 +346,7 @@ export class WorldObserver {
     this.observeShips(world, step, out, silent, pulse);
     this.observeRocks(world, out, silent);
     this.observePlanets(world, step, out, silent);
+    this.observeMuzzles(world, out, silent);
     this.observeShots(world, step, out, silent);
     this.observeMatch(world, out, silent);
 
@@ -355,7 +365,7 @@ export class WorldObserver {
     pulse: boolean,
   ): void {
     for (const ship of world.ships) {
-      const tierSum = ship.tiers.beam + ship.tiers.engine + ship.tiers.cargo + ship.tiers.hull;
+      const tierSum = ship.tiers.power + ship.tiers.engine + ship.tiers.cargo + ship.tiers.hull;
       let memo = this.ships.get(ship.id);
       if (!memo) {
         memo = {
@@ -417,7 +427,6 @@ export class WorldObserver {
             );
           }
 
-          this.observeBeam(world, ship, out);
           this.observeThrust(ship, memo, dt, out);
 
           if (pulse && ship.spawnProtect > 0) {
@@ -438,25 +447,31 @@ export class WorldObserver {
   }
 
   /**
-   * The two beam voices (GDD §3.6: "the distinct rock-vs-hull beam sounds").
+   * The two firing voices (GDD §3.6: "the distinct rock-vs-hull firing sounds").
    *
-   * The sim publishes *where* the beam struck but not *what* — `Beam.hitPoint`
-   * is geometry, and the sim has no reason to carry an art-facing target kind
-   * (`@shared/types`). So the observer classifies: hull-ish targets are few (≤8
-   * ships, ≤32 turrets, ≤16 shields, 8 cores) and rocks are the default, which
-   * makes the check a short scan over the small set rather than over ~200 rocks.
+   * Since the laser retired to a projectile (amendment v0.3), the geometry that
+   * classifies a shot as rock- or hull-biting is the turret muzzle (`Muzzle`,
+   * `@shared/types`) — the one thing that still publishes *where* a shot struck.
+   * The sim carries no art-facing target kind, so the observer classifies: hull-
+   * ish targets are few (≤8 ships, ≤32 turrets, ≤16 shields, 8 cores) and rocks
+   * are the default, which makes the check a short scan over the small set rather
+   * than over ~200 rocks.
    */
-  private observeBeam(world: WorldView, ship: ShipView, out: TellQueue): void {
-    const beam = ship.beam;
-    if (!beam || !beam.hitPoint) return;
-    const hx = beam.hitPoint.x;
-    const hy = beam.hitPoint.y;
-    const dir = Math.atan2(beam.dir.y, beam.dir.x);
-    // Beam power reads as mining speed and weapon damage alike — one beam, one
-    // stat (GDD §2.5), so one number scales both the spark burst and the gain.
-    const power = clamp01(0.55 + 0.15 * ship.tiers.beam);
-    const kind = hitsHull(world, ship.id, hx, hy) ? TELL.beamHull : TELL.beamRock;
-    out.push(kind, hx, hy, dir, power, ship.id);
+  private observeMuzzles(world: WorldView, out: TellQueue, silent: boolean): void {
+    if (silent) return;
+    for (const planet of world.planets) {
+      for (const turret of planet.turrets) {
+        const muzzle = turret.muzzle;
+        if (!muzzle || !muzzle.hitPoint || turret.hp <= 0) continue;
+        const hx = muzzle.hitPoint.x;
+        const hy = muzzle.hitPoint.y;
+        const dir = Math.atan2(muzzle.dir.y, muzzle.dir.x);
+        // Firing power reads as mining speed and weapon damage alike — one stat
+        // (GDD §2.5), so one number scales both the spark burst and the gain.
+        const kind = hitsHull(world, -1, hx, hy) ? TELL.weaponHit : TELL.mineHit;
+        out.push(kind, hx, hy, dir, MUZZLE_POWER, planet.owner);
+      }
+    }
   }
 
   /**
@@ -755,9 +770,9 @@ function clamp01(n: number): number {
 }
 
 /**
- * Did this beam land on something with a hull? Ships (other than the firer),
+ * Did this shot land on something with a hull? Ships (other than the firer),
  * turrets, shield bubbles and planet cores all sound like metal; everything
- * else in beam range is rock.
+ * else in weapon range is rock.
  */
 function hitsHull(world: WorldView, firerId: number, x: number, y: number): boolean {
   for (const ship of world.ships) {

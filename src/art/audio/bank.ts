@@ -19,14 +19,14 @@
  * the only one in the bank with a tail longer than a second, and the only one
  * that is followed by nothing at all (`../vfx/death-moment`).
  *
- * ## The rock-vs-hull beam voices
+ * ## The rock-vs-hull firing voices
  *
- * GDD §3.6 asks for *"the distinct rock-vs-hull beam sounds"* by name, because
- * the beam is the game's central inversion — the same trigger mines and kills —
+ * GDD §3.6 asks for *"the distinct rock-vs-hull firing sounds"* by name, because
+ * firing is the game's central inversion — the same trigger mines and kills —
  * and the player needs to know which one they are doing without looking. They
- * are the two entries here that **loop**: a beam is a held state, not an event,
+ * are the two entries here that **loop**: firing is a held state, not an event,
  * so retriggering a one-shot per firing tick would be a machine-gun rattle at
- * 60 Hz. `./beams.ts` sustains them and crossfades between them.
+ * 60 Hz. `./weapons.ts` sustains them and crossfades between them.
  *
  *  - **Rock** is low, grainy, band-limited — a grinder chewing stone.
  *  - **Hull** is bright, thin and rude — a cutting torch on plate.
@@ -84,15 +84,15 @@ export function loops(spec: SoundSpec): boolean {
 /**
  * Every sound, by name. Keys are the vocabulary the engine and the tests speak;
  * most map 1:1 to a {@link TELL}, and the rest ({@link SOUND.alarm},
- * {@link SOUND.beamRockLoop}, {@link SOUND.beamHullLoop}, {@link SOUND.thruster})
+ * {@link SOUND.mineLoop}, {@link SOUND.weaponLoop}, {@link SOUND.thruster})
  * are held states rather than moments.
  */
 export const SOUND = {
   // --- Mine ---------------------------------------------------------------
-  /** Beam on rock, held. Low, grainy: a grinder chewing stone. */
-  beamRockLoop: 'beamRockLoop',
-  /** Beam on hull, held. Bright and rude: a cutting torch on plate. */
-  beamHullLoop: 'beamHullLoop',
+  /** A shot on rock, held. Low, grainy: a grinder chewing stone. */
+  mineLoop: 'mineLoop',
+  /** A shot on hull, held. Bright and rude: a cutting torch on plate. */
+  weaponLoop: 'weaponLoop',
   /** A crack stage advancing — rock giving way, one step of three. */
   rockCrack: 'rockCrack',
   /** The rock coming apart and paying out. */
@@ -154,14 +154,14 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   // Rock: pitched noise low in the spectrum with the top rolled off, so it
   // reads as *material* being removed rather than as energy being spent.
-  [SOUND.beamRockLoop]: {
-    name: 'beamRockLoop',
+  [SOUND.mineLoop]: {
+    name: 'mineLoop',
     loop: true,
     crossfade: LOOP_CROSSFADE,
     layers: [
       {
         spec: {
-          name: 'beamRockLoop.grind',
+          name: 'mineLoop.grind',
           wave: 'noise',
           attack: 0,
           hold: 0.5,
@@ -178,7 +178,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       {
         // A little body under the grit, so it has a pitch and not just a hiss.
         spec: {
-          name: 'beamRockLoop.body',
+          name: 'mineLoop.body',
           wave: 'saw',
           attack: 0,
           hold: 0.5,
@@ -196,14 +196,14 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   // Hull: the same held state, an octave and a half up, thin and buzzy. A
   // player who has hit a ship by accident knows it in about 80 ms.
-  [SOUND.beamHullLoop]: {
-    name: 'beamHullLoop',
+  [SOUND.weaponLoop]: {
+    name: 'weaponLoop',
     loop: true,
     crossfade: LOOP_CROSSFADE,
     layers: [
       {
         spec: {
-          name: 'beamHullLoop.torch',
+          name: 'weaponLoop.torch',
           wave: 'saw',
           attack: 0,
           hold: 0.5,
@@ -219,7 +219,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       },
       {
         spec: {
-          name: 'beamHullLoop.spit',
+          name: 'weaponLoop.spit',
           wave: 'noise',
           attack: 0,
           hold: 0.5,
@@ -1113,12 +1113,12 @@ export const SOUND_NAMES: readonly SoundName[] = Object.keys(SPECS) as SoundName
  * gap — every one of them is a held state whose sound is sustained elsewhere,
  * because retriggering a one-shot every tick is a rattle, not a tell:
  *
- *  - `beamRock` / `beamHull` → the two looping beam voices (`./beams`).
+ *  - `mineHit` / `weaponHit` → the two looping firing voices (`./weapons`).
  *  - `thrust` → the thruster loop, on the local ship (`./engine`).
  */
 export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
-  [TELL.beamRock]: null,
-  [TELL.beamHull]: null,
+  [TELL.mineHit]: null,
+  [TELL.weaponHit]: null,
   [TELL.rockCrack]: SOUND.rockCrack,
   [TELL.rockBurst]: SOUND.rockBurst,
   [TELL.oreCollect]: SOUND.oreCollect,
@@ -1149,4 +1149,4 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
  * coverage test can assert that a `null` in {@link TELL_SOUND} is one of these
  * three and never a mechanic somebody forgot.
  */
-export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.beamRock, TELL.beamHull, TELL.thrust];
+export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.mineHit, TELL.weaponHit, TELL.thrust];

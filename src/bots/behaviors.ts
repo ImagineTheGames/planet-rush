@@ -14,7 +14,7 @@
  */
 
 import type { Action, BuildItem, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { BEAM_RANGE, PLANET, SHIELD, TURRET } from '../sim';
+import { WEAPON_RANGE, PLANET, SHIELD, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
@@ -43,10 +43,10 @@ import type { BotCtx } from './tree';
 // Distances the trees fly at. All TUNABLE, all owned by this agent.
 // ---------------------------------------------------------------------------
 
-/** How far off a rock a bot parks to mine it. Inside beam range with margin,
+/** How far off a rock a bot parks to mine it. Inside weapon range with margin,
  *  and inside tractor range of the chunks it cracks loose, so the ore drifts to
  *  the miner instead of being left for whoever passes (GDD §2.3). TUNABLE */
-export const MINE_STANDOFF = BEAM_RANGE * 0.45;
+export const MINE_STANDOFF = WEAPON_RANGE * 0.45;
 
 /** The ring a defender holds around its own planet: outside the core body,
  *  comfortably inside its turrets' range, so ship and turrets focus the same
@@ -57,15 +57,15 @@ export const GUARD_RADIUS = PLANET.radius + 70;
  *  so the wheel stays live and a repair channel is not broken by drift. TUNABLE */
 export const DOCK_RADIUS = PLANET.radius + 45;
 
-/** Stand-off for picking a turret apart: past its range (240), inside the beam's
- *  (260). That twenty-unit window *is* GDD §2.6's "a patient attacker can pick
- *  off turrets from the edge of their range" — it only exists because the beam
- *  out-ranges the turret, and flying it is a skill a Hard bot has. TUNABLE */
-export const TURRET_STANDOFF = (TURRET.range + BEAM_RANGE) / 2;
+/** Stand-off for picking a turret apart: past its range (240), inside the
+ *  weapon's (260). That twenty-unit window *is* GDD §2.6's "a patient attacker
+ *  can pick off turrets from the edge of their range" — it only exists because
+ *  the weapon out-ranges the turret, and flying it is a skill a Hard bot has. TUNABLE */
+export const TURRET_STANDOFF = (TURRET.range + WEAPON_RANGE) / 2;
 
-/** Stand-off for beaming a core or shield bubble. Measured centre-to-centre, so
- *  it must clear the bubble (90) and stay inside beam range. TUNABLE */
-export const SIEGE_STANDOFF = (SHIELD.radius + BEAM_RANGE) / 2;
+/** Stand-off for shooting a core or shield bubble. Measured centre-to-centre, so
+ *  it must clear the bubble (90) and stay inside weapon range. TUNABLE */
+export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
 
 /** Speed at which a bot chasing something leans on the boost button. TUNABLE */
 export const BOOST_CHASE_DISTANCE = 320;
@@ -229,11 +229,11 @@ export function wantsToHaul(ctx: BotCtx): boolean {
 
 /**
  * Work the nearest worthwhile rock: park at {@link MINE_STANDOFF}, point the
- * beam at it, and hold the trigger only while the shot would actually land.
+ * weapon at it, and hold the trigger only while the shot would actually land.
  *
  * The tier's `aimJitter` is what makes "Easy mines slowly" true without a
  * separate slow-mining knob: a wobbling nose crosses the rock intermittently, so
- * an Easy bot's beam is on target a fraction of the time a Hard bot's is. One
+ * an Easy bot's weapon is on target a fraction of the time a Hard bot's is. One
  * mechanism, visible competence, no cheat in either direction (GDD §2.9).
  */
 export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number } | null): readonly Action[] | null {
@@ -250,7 +250,7 @@ export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number 
 // Haul and bank (GDD §2.3, §2.5)
 // ---------------------------------------------------------------------------
 
-/** Fly home with a load. Trigger up: a hauling bot lighting its beam is a bot
+/** Fly home with a load. Trigger up: a hauling bot opening fire is a bot
  *  advertising a full hold (GDD §2.2). */
 export function haulHome(ctx: BotCtx): readonly Action[] | null {
   const planet = ctx.self.planet;
@@ -274,7 +274,7 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
   if (!planet) return null;
   const intruder = homeIntruder(ctx);
   if (!intruder) return [go(ctx, orbit(ctx.self, planet.pos, GUARD_RADIUS)), fire(false)];
-  return engage(ctx, intruder.pos, 16, BEAM_RANGE * 0.6, intruder.vel);
+  return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,10 +282,10 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Close to `range`, point the beam, and fire only when the shot lands. The
+ * Close to `range`, point the weapon, and fire only when the shot lands. The
  * stand-off is the whole tactic: against a ship it is a knife fight, against a
  * turret it is {@link TURRET_STANDOFF} — outside the turret's reach and inside
- * the beam's (GDD §2.6).
+ * the weapon's (GDD §2.6).
  */
 export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, targetVel?: Vec2): readonly Action[] {
   const d = dist(ctx.self.pos, pos);
@@ -307,7 +307,7 @@ export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, ta
 export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
   // A ship moves, so lead it (`target.vel`); a home does not, so the lead is a
   // straight shot (design amendment v0.2).
-  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, BEAM_RANGE * 0.6, target.vel);
+  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel);
   return engage(ctx, target.pos, target.radius, SIEGE_STANDOFF);
 }
 
@@ -337,7 +337,7 @@ export function suppressTurrets(ctx: BotCtx, target: TargetScore): readonly Acti
  * running into it and the bot simply puts distance between them.
  *
  * The trigger stays up on the way out. A retreating bot that keeps firing is a
- * bot that keeps its beam pointed at the thing it is fleeing, and never gets
+ * bot that keeps its gun trained on the thing it is fleeing, and never gets
  * home.
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
@@ -353,7 +353,7 @@ export function incomingThreat(ctx: BotCtx): PerceivedShip | null {
   let best: PerceivedShip | null = null;
   for (const ship of ctx.view.ships) {
     if (!isEngageable(ship)) continue;
-    if (ship.distance > BEAM_RANGE * 1.6) continue;
+    if (ship.distance > WEAPON_RANGE * 1.6) continue;
     if (best === null || ship.distance < best.distance) best = ship;
   }
   return best;

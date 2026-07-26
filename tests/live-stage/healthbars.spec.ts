@@ -3,7 +3,7 @@
  * booted client. OWNER: UI Engineer (GDD §2.2).
  *
  * QA reported `enemy-healthbars` FAILED twice (rounds 1 and 2): a bot mid-fight,
- * visibly taking beam damage, with no health bar. The model tests were green —
+ * visibly taking weapon damage, with no health bar. The model tests were green —
  * `src/ui/healthbar` decides correctly — but the layer was never fed on a real
  * boot: `main.ts` populated no `combatants`, so the pooled `HealthBarView` sat
  * on the stage drawing nothing. A headless unit test cannot catch that; only

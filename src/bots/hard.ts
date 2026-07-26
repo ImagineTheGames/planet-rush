@@ -67,13 +67,13 @@ export const HARD_SHIELD_TARGET = 1;
 export const HARD_REPAIR_AT = 0.75;
 
 /**
- * The ladder a Hard bot climbs, in order (GDD §2.5). Beam leads because it is
- * the one stat that pays twice — "mining speed and weapon damage — one beam, one
- * stat" — so every tier of it shortens both the trip to a full hold and the time
- * to kill whoever interrupts it. TUNABLE
+ * The ladder a Hard bot climbs, in order (GDD §2.5). Power leads because it is
+ * the one stat that pays twice — "mining speed and weapon damage — one stat" —
+ * so every tier of it shortens both the trip to a full hold and the time to kill
+ * whoever interrupts it. TUNABLE
  */
 export const HARD_UPGRADE_ORDER: readonly UpgradeTrack[] = [
-  UpgradeTrack.Beam,
+  UpgradeTrack.Power,
   UpgradeTrack.Cargo,
   UpgradeTrack.Engine,
   UpgradeTrack.Hull,

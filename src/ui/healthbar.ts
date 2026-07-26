@@ -109,7 +109,7 @@ export interface Combatant {
   /** False while dead / awaiting respawn / eliminated — a corpse gets no bar. */
   readonly alive: boolean;
   /** True while the entity is actively fighting this tick (a ship firing its
-   *  beam, a turret tracking or loosing a shot). Shows a bar even at full HP, so
+   *  weapon, a turret tracking or loosing a shot). Shows a bar even at full HP, so
    *  a fresh attacker is not invisible until it takes a hit. */
   readonly inCombat: boolean;
   /** Entity centre in screen space (already projected by the caller), CSS px. */
