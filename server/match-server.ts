@@ -37,6 +37,8 @@ import type { PlayerId, Rng } from '@shared/types';
 import { mulberry32 } from '@shared/types';
 import type { ClientMessage, RoomCode } from '../src/net/transport';
 import { makeRoomCode } from '../src/net/room-code';
+import { verifyTicket } from '../src/net/ticket';
+import type { MachineId } from '../src/net/ticket';
 import { parseClientMessage, parseRoomCode } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
 import type { Bounds } from '../src/sim';
@@ -83,7 +85,7 @@ export interface Connection {
 /** Why the server refused a connection's join, as sent back to the client. */
 export interface JoinErrorMessage {
   type: 'joinError';
-  reason: JoinRejection | 'bad-room-code';
+  reason: JoinRejection | 'bad-room-code' | 'bad-ticket';
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +111,21 @@ export interface MatchServerConfig {
   /** Ceiling on concurrent rooms, so one enthusiastic client cannot spend the
    *  host's memory creating empty lobbies. */
   readonly maxRooms?: number;
+  /**
+   * The allocator↔Machine shared key (`src/net/ticket.ts`). Its **presence is the
+   * only switch** for ticket enforcement (M9 fleet membership): set, and every
+   * join must carry a ticket the allocator signed for *this* Machine and *this*
+   * room; unset — the solo/offline path, or a self-hosted single server — and
+   * joins are admitted with no ceremony, because with one Machine there is no
+   * routing decision to sign. Supplied from `TICKET_SECRET` by `server/index.ts`.
+   */
+  readonly ticketSecret?: string;
+  /**
+   * This Machine's id (`MACHINE_ID`, falling back to `FLY_MACHINE_ID`), the value
+   * the allocator names in a ticket. When enforcing, a ticket signed for a
+   * *different* Machine is refused — one Machine will not honour another's ticket.
+   */
+  readonly machineId?: MachineId;
 }
 
 /** Default room ceiling. Eight players × this is comfortably inside a free-tier
@@ -123,6 +140,8 @@ export class MatchServer {
   private readonly rooms = new Map<RoomCode, MatchRoom>();
   private readonly rng: Rng;
   private readonly maxRooms: number;
+  private readonly ticketSecret: string | undefined;
+  private readonly machineId: MachineId | undefined;
   /** The last clock reading {@link update} was given. Joins arrive *between*
    *  updates and the grace window is measured in real seconds, so this is the
    *  server's notion of "now" — never a clock this module read itself. */
@@ -131,11 +150,63 @@ export class MatchServer {
   constructor(private readonly config: MatchServerConfig) {
     this.rng = mulberry32(config.seed >>> 0);
     this.maxRooms = config.maxRooms ?? DEFAULT_MAX_ROOMS;
+    this.ticketSecret = config.ticketSecret;
+    this.machineId = config.machineId;
   }
 
   /** Rooms currently alive in this process. */
   get roomCount(): number {
     return this.rooms.size;
+  }
+
+  /** The most rooms this process will host — the ceiling a heartbeat reports as
+   *  its capacity so the allocator places under it (M9). */
+  get capacity(): number {
+    return this.maxRooms;
+  }
+
+  /** True when this Machine is enforcing tickets — i.e. a `TICKET_SECRET` is set
+   *  and it is part of a fleet behind an allocator. */
+  get enforcingTickets(): boolean {
+    return this.ticketSecret !== undefined;
+  }
+
+  /**
+   * Every room this process hosts and how many humans are in it — the room list a
+   * heartbeat carries so the allocator can locate rooms and read load (M9).
+   */
+  roomLoads(): { code: RoomCode; players: number }[] {
+    const loads: { code: RoomCode; players: number }[] = [];
+    for (const [code, room] of this.rooms) loads.push({ code, players: room.humanCount });
+    return loads;
+  }
+
+  /**
+   * Does this Machine admit a join for `code` bearing `ticket`? The **presence of
+   * a ticket secret is the only switch** (M9 fleet membership):
+   *
+   *  - No secret → admit unconditionally. A solo/offline client never reaches
+   *    this server, and a self-hosted single Machine has no allocator to sign a
+   *    ticket, so demanding one would refuse every honest join.
+   *  - Secret set → the join must carry a ticket the allocator signed, still
+   *    inside its window, naming *this* room and (when known) *this* Machine.
+   *    Anything else — missing, forged, tampered, expired, or issued for a
+   *    different room or Machine — is refused. It **fails closed**: a doubt is a
+   *    refusal, never an admission.
+   *
+   * Expiry is judged against {@link MatchServer.now}, the server's own injected
+   * clock, so a test controls the window exactly.
+   */
+  admitsJoin(code: RoomCode, ticket: string | undefined): boolean {
+    if (this.ticketSecret === undefined) return true;
+    if (ticket === undefined) return false;
+    const claims = verifyTicket(ticket, this.ticketSecret, this.now);
+    if (claims === null) return false;
+    if (claims.room !== code) return false;
+    // A ticket names the Machine it was minted for; one Machine will not honour
+    // another's. Skip only when this process was not told its own id.
+    if (this.machineId !== undefined && claims.machine !== this.machineId) return false;
+    return true;
   }
 
   /** The server's clock: the last reading {@link update} was handed. */
@@ -282,6 +353,14 @@ class ServerConnection implements Connection {
     const code = parseRoomCode(message.room);
     if (code === null) {
       this.refuse('bad-room-code');
+      return;
+    }
+
+    // The ticket gate comes *before* the room is touched: a join this Machine was
+    // never sent must not even be able to create a room (M9 fleet membership). On
+    // a Machine that is not enforcing, this admits everything and costs nothing.
+    if (!this.server.admitsJoin(code, message.ticket)) {
+      this.refuse('bad-ticket');
       return;
     }
 
