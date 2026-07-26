@@ -114,6 +114,15 @@ export interface AllocatorConfig {
   readonly ticketTtlMs?: number;
   /** Code-mint retry bound; defaults to {@link DEFAULT_MAX_CODE_ATTEMPTS}. */
   readonly maxCodeAttempts?: number;
+  /**
+   * The cordon placement seam. When set, a Machine for which this returns `true`
+   * is excluded from *new-room* placement — it is draining (fleet-controller.ts)
+   * and must not take on more matches on its way out. Only {@link Allocator.allocate}
+   * consults it; {@link Allocator.join} never does, so a client re-joining an
+   * existing room still routes to a cordoned Machine and a drain never strands a
+   * live match. Unset (the default), no Machine is ever cordoned.
+   */
+  readonly excludeMachine?: (machine: MachineId) => boolean;
 }
 
 /** What a room needs to be placed: an optional preferred region. */
@@ -132,6 +141,7 @@ export class Allocator {
   private readonly secret: string;
   private readonly ticketTtlMs: number;
   private readonly maxCodeAttempts: number;
+  private readonly excludeMachine: (machine: MachineId) => boolean;
 
   constructor(config: AllocatorConfig) {
     this.registry = config.registry;
@@ -139,6 +149,7 @@ export class Allocator {
     this.secret = config.secret;
     this.ticketTtlMs = config.ticketTtlMs ?? DEFAULT_TICKET_TTL_MS;
     this.maxCodeAttempts = config.maxCodeAttempts ?? DEFAULT_MAX_CODE_ATTEMPTS;
+    this.excludeMachine = config.excludeMachine ?? (() => false);
   }
 
   /**
@@ -212,7 +223,9 @@ export class Allocator {
     const leases = this.registry.reservations(now);
     const withFree = this.registry
       .machines(now)
-      .filter((m) => this.loadOf(m, leases) < m.capacity);
+      // A draining (cordoned) Machine still heartbeats free slots, but must take
+      // no *new* room — exclude it from placement so its matches can end.
+      .filter((m) => !this.excludeMachine(m.machine) && this.loadOf(m, leases) < m.capacity);
     if (withFree.length === 0) return null;
 
     // Prefer the requested region, but only if it actually has a free slot —

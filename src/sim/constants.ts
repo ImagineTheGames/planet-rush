@@ -142,6 +142,84 @@ export const PROJECTILE = {
 } as const;
 
 /**
+ * The **turret tier ladder** (parity field report v0.2.2). The enemy fields
+ * turrets; so can the player — and once a turret stands, the player can make it
+ * *better* (GDD §2.5 "built at your own planet", §2.6 "turrets deter"). Each
+ * `Mk` is a fuller combat profile than the last: tankier (`hp`), harder-hitting
+ * (`dps`, and so per-shot `dps × fireInterval`), faster (`fireInterval`), and
+ * with a touch more reach (`range`).
+ *
+ * **Mk I is the baseline turret, byte-for-byte** — it reads the shipped `TURRET`
+ * values, so a freshly built (tier-0) turret behaves *exactly* as it did before
+ * this ladder existed and every pre-tier turret test is unchanged. Higher tiers
+ * are the buyable steps.
+ *
+ * The one balance rail the ladder must not break: GDD §2.6's pick-off skill —
+ * "a patient attacker can pick off turrets from the edge of their range … only
+ * exists as a skill if the ship out-ranges the turret." So **every tier's
+ * `range` stays under `WEAPON_RANGE` (260)**; the top Mk (250) still leaves a
+ * 10-unit band a ship can shoot from and the turret cannot answer, the same
+ * skill expression Mk I's 20-unit band gives. Everything here is `TUNABLE` and
+ * owned by QA from M2 on (GDD §2.8); a balance pass may widen or flatten the
+ * ladder, but the range rail is a design invariant, not a tuning knob.
+ *
+ * `upgradeCost` is the ore price of stepping *into* this tier from the one below
+ * — `null` for Mk I, which is *built* (`TURRET.cost`), never upgraded into.
+ * `label` is the art agent's key for a distinct visual tell per tier (its
+ * follow-up); the sim only needs it to be a stable per-tier name.
+ */
+export interface TurretTierSpec {
+  /** Standing HP at this tier — the shot target's toughness (GDD §2.6). */
+  readonly hp: number;
+  /** Design DPS at this tier; per-shot damage is derived (`dps × fireInterval`),
+   *  so `dps` stays the single balance number exactly as on the base `TURRET`. */
+  readonly dps: number;
+  /** Engagement radius — strictly under `WEAPON_RANGE` at every tier (see doc). */
+  readonly range: number;
+  /** Seconds between shots. Per-shot damage = `dps × fireInterval`. */
+  readonly fireInterval: number;
+  /** Ore to step into this tier from the one below; `null` for the built base. */
+  readonly upgradeCost: number | null;
+  /** Stable per-tier name — the art agent's key for a distinct tell. */
+  readonly label: string;
+}
+
+/**
+ * The ladder itself: index `i` is tier `i`, Mk `i+1`. Mk I mirrors `TURRET`
+ * (built, `upgradeCost: null`); Mk II and Mk III are the buyable steps. The
+ * whole climb of one turret costs `4 + 7 = 11` ore on top of its `3` to build —
+ * so a fully-Mk III ring of four is `4 × 14 = 56` ore, most of a player's share
+ * of the field (GDD §2.8 ~400 ⁄ 8 ≈ 50), which is the point: a turtle spends the
+ * stockpile that collapse then takes (GDD §2.6 "the economy is the siege engine
+ * of last resort"). All `TUNABLE`. TUNABLE
+ */
+export const TURRET_TIERS: readonly TurretTierSpec[] = [
+  { hp: TURRET.hp, dps: TURRET.dps, range: TURRET.range, fireInterval: TURRET.fireInterval, upgradeCost: null, label: 'Mk I' },
+  { hp: 45, dps: 6, range: 245, fireInterval: 0.45, upgradeCost: 4, label: 'Mk II' },
+  { hp: 60, dps: 8, range: 250, fireInterval: 0.4, upgradeCost: 7, label: 'Mk III' },
+] as const;
+
+/** Highest turret tier index — the top of the ladder (`Mk III` at length-1). */
+export const TURRET_MAX_TIER: number = TURRET_TIERS.length - 1;
+
+/** The tier spec for a tier index, clamped into the ladder — the sim never
+ *  trusts a tier it did not write, mirroring `tierOf` for ship upgrades. A
+ *  turret with no/`NaN`/out-of-range tier reads as Mk I (tier 0). */
+export function turretTierSpec(tier: number): TurretTierSpec {
+  if (!Number.isFinite(tier)) return TURRET_TIERS[0]!;
+  const i = Math.max(0, Math.min(Math.floor(tier), TURRET_MAX_TIER));
+  return TURRET_TIERS[i]!;
+}
+
+/** Per-shot turret damage at a tier — `dps × fireInterval`, derived exactly like
+ *  `PROJECTILE.damage` derives the Mk I value, so retuning a tier's `dps`
+ *  retunes its bite and nothing drifts. */
+export function turretTierShotDamage(tier: number): number {
+  const s = turretTierSpec(tier);
+  return s.dps * s.fireInterval;
+}
+
+/**
  * Ship weapon — **everything a ship does with its trigger is a projectile now**
  * (design amendments v0.2 and v0.3, `docs/design-amendments.md`). v0.2 moved
  * ship-vs-ship / ship-vs-structure combat off hitscan; v0.3 finished the job by

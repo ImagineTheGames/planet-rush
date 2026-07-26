@@ -224,3 +224,49 @@ describe('Allocator.regions — the capacity summary a region picker reads', () 
     expect(alloc.regions(1000)).toEqual([]);
   });
 });
+
+describe('Allocator.allocate — the cordon placement seam', () => {
+  it('never places a new room on a cordoned (draining) Machine', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('drain', 'iad', [], 8), 1000);
+    reg.observe(beat('keep', 'iad', [], 8), 1000);
+    // 'drain' is cordoned — it heartbeats free slots but is on its way out.
+    const alloc = new Allocator({
+      registry: reg,
+      rng: mulberry32(1),
+      secret: SECRET,
+      excludeMachine: (m) => m === 'drain',
+    });
+
+    // Every placement lands on the one un-cordoned Machine (each reservation
+    // counts against its capacity, so stay under the 8-slot ceiling).
+    for (let i = 0; i < 5; i++) {
+      expect(alloc.allocate({}, 1000).machine).toBe('keep');
+    }
+  });
+
+  it('refuses with no-capacity when the only Machine is cordoned', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('drain', 'iad', [], 8), 1000);
+    const alloc = new Allocator({
+      registry: reg,
+      rng: mulberry32(1),
+      secret: SECRET,
+      excludeMachine: () => true,
+    });
+    expect(reasonOf(() => alloc.allocate({}, 1000))).toBe('no-capacity');
+  });
+
+  it('still JOINS an existing room on a cordoned Machine — a drain never strands a match', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('drain', 'iad', ['WXYZ'], 8), 1000);
+    const alloc = new Allocator({
+      registry: reg,
+      rng: mulberry32(1),
+      secret: SECRET,
+      excludeMachine: () => true,
+    });
+    // join ignores the cordon: the live match on 'drain' is still reachable.
+    expect(alloc.join('WXYZ', 1000).machine).toBe('drain');
+  });
+});

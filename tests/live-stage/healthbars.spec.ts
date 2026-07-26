@@ -36,6 +36,10 @@ interface HealthbarStage {
   /** Field request v0.1.1: set the LOCAL ship's hull to `fraction` of max (it is
    *  already centred by the follow camera); returns its slot and exact fill. */
   damageLocal(fraction: number): { owner: number; fraction: number } | null;
+  /** Field request v0.2.2: park a turret (preferring a LOCAL-owned one) beside the
+   *  centred local ship and set its hp to `fraction` of max; returns its owner
+   *  slot, exact fill, and the screen position its orbit projects to. */
+  damageTurret(fraction: number): { owner: number; fraction: number; x: number; y: number } | null;
   /** The bars the real layer drew last frame — owner, fill, `local` flag, pos. */
   bars(): Array<{ owner: number; fraction: number; x: number; y: number; local: boolean }>;
   /** The hull fraction the HUD readout last drew (or -1 when hidden). */
@@ -168,6 +172,60 @@ test('the local player’s own ship gets its own bar when it takes damage (v0.1.
   expect(readout, 'the HUD hull readout matches the over-ship bar fill').toBeCloseTo(0.35, 2);
 
   expect(pageErrors, 'no page errors while staging own-ship damage').toEqual([]);
+});
+
+test('a turret gets a health bar when damaged, tracking its orbit position (v0.2.2)', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+  await page.goto('/?debug=1&freeze=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+
+  await page.waitForFunction(
+    () => typeof window.__healthbarStage?.damageTurret === 'function',
+    undefined,
+    { timeout: 20_000 },
+  );
+
+  // Baseline: at the frozen spawn frame every turret is full and idle, so — the
+  // same "keep the field clean" rule as a ship — no turret shows a bar.
+  const before = await page.evaluate(() => window.__healthbarStage!.bars());
+  expect(before, 'no bars before a turret is staged into the frame').toEqual([]);
+
+  // Park a turret (preferring one of the local player's, to prove own turrets now
+  // show) beside the centred ship and drop it to 50% hp.
+  const staged = await page.evaluate(() => window.__healthbarStage!.damageTurret(0.5));
+  expect(staged, 'a turret was available to stage').not.toBeNull();
+
+  // Read back the bar the real layer drew for that turret — owner + fill matching,
+  // and NOT the larger own-ship `local` style (a turret is a narrow bar).
+  const bars = await page
+    .waitForFunction(
+      () => {
+        const b = window.__healthbarStage!.bars();
+        return b.some((x) => !x.local) ? b : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+
+  const bar = bars!.find((b) => b.owner === staged!.owner && !b.local);
+  expect(bar, 'a drawn health bar, narrow (non-local) style, tracks the staged turret').toBeDefined();
+  expect(bar!.fraction, 'the bar fill matches the staged turret hp fraction').toBeCloseTo(0.5, 2);
+
+  // It TRACKS the turret's ORBIT position: it was parked to the right of the
+  // centred local ship, so its bar sits right of centre, at the projected orbit x.
+  const viewport = await page.evaluate(() => window.__planetRush!.viewport);
+  expect(bar!.x, 'the turret bar sits right of the centred local ship').toBeGreaterThan(
+    viewport.width / 2,
+  );
+  expect(bar!.x, 'the bar tracks the turret orbit position the seam reported').toBeCloseTo(
+    staged!.x,
+    0,
+  );
+
+  expect(pageErrors, 'no page errors while staging turret damage').toEqual([]);
 });
 
 test('the round-9 write seams damage a core / ship and read core HP back through ordered input', async ({

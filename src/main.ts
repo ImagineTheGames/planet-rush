@@ -53,12 +53,13 @@ import {
 import type { ControlState, DeviceKind } from '@platform/actions';
 import { GameLoop } from '@platform/loop';
 import { VfxAutoQuality } from '@platform/vfx-quality';
-import { KeyboardMouseSource, GamepadSource } from '@platform/input';
+import { KeyboardMouseSource, GamepadSource, PING_DIR_DISTANCE } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
+import { TouchButtons } from '@platform/touch-buttons';
 import { bindTouchControls } from '@platform/touch-dom';
-import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
-import { WheelInput, writeWheelOrders } from '@platform/wheel-input';
+import { TouchVisuals, buildButtonRect, boostButtonRect, pingButtonRect } from '@platform/touch-visuals';
+import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
 import {
   computeRootTransform,
   applyRootTransform,
@@ -82,7 +83,7 @@ import {
 } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
-import { installDebugHook, installDebugStage } from '@platform/debug-hook';
+import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
@@ -428,6 +429,13 @@ async function boot(): Promise<void> {
   const debug = installDebugHook(window.location.search);
   const shipScreenScratch: Vec2 = { x: 0, y: 0 };
 
+  // --- Input probe (debug-hook.ts `installInputProbe`): only when ?debug=1.
+  //     Exposes window.__planetRush.input — the abstract actions the sim received
+  //     this frame — so the input-parity live-stage suite can fire each control via
+  //     CDP touch and prove it crossed into the sim (esp. `ping`, which has no
+  //     render side yet). Inert otherwise.
+  const inputProbe = installInputProbe(window.location.search);
+
   // --- Combat-visuals instrument (combat-debug.ts): only when ?debug=1. Exposes
   //     window.__planetRush.muzzles (the muzzle-flash set actually drawn this frame,
   //     one per firing turret) and .stageCombat() so a live-boot suite can prove the
@@ -486,6 +494,7 @@ async function boot(): Promise<void> {
     installOreHudStage();
     installEndScreenStage();
     installUpgradeWheelStage();
+    installPressStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -553,7 +562,13 @@ async function boot(): Promise<void> {
       state: createControlState(),
       device: 'keyboard',
     },
-    { source: new GamepadSource(), state: createControlState(), device: 'gamepad' },
+    {
+      // The gamepad D-pad pings a direction anchored on the local ship, so its
+      // ping is a world point like every other device's (docs/input-parity.md).
+      source: new GamepadSource(undefined, null, () => localShipPos()),
+      state: createControlState(),
+      device: 'gamepad',
+    },
   ];
 
   // Gamepad connect/disconnect are logged so the end-to-end verification pass can
@@ -569,6 +584,21 @@ async function boot(): Promise<void> {
   const touch = new TouchController({ screenWidth: transform.logicalWidth });
   touch.setFireMode(fireMode);
   const touchState = createControlState();
+  // The contextual touch buttons (BOOST hold, PING tap/drag) — the v0.2.2
+  // input-parity fills (docs/input-parity.md). Pure geometry/state; `main.ts`
+  // anchors its PING gesture on the local ship and folds BOOST into `touchState`.
+  const touchButtons = new TouchButtons();
+  /** Whether touch boost was engaged last frame — so the haptic `tap` fires once
+   *  on the rising edge of a boost (double-tap-hold OR the BOOST button), not every
+   *  frame it is held. */
+  let touchBoostWasActive = false;
+
+  /** The local ship's world position, or the origin when it isn't alive — the
+   *  anchor a directional ping (D-pad, touch drag) is offset from. */
+  function localShipPos(): Vec2 {
+    const ship = world.ships.find(isLocalShip);
+    return ship ? { x: ship.pos.x, y: ship.pos.y } : { x: 0, y: 0 };
+  }
   // --- The Build & Upgrade wheel (GDD §2.5). `buildWheel` holds the two bits of
   //     screen state the pure UI models deliberately don't — is it up, is the
   //     upgrade panel in front of it — and turns a press into a segment. What
@@ -673,6 +703,19 @@ async function boot(): Promise<void> {
       return;
     }
 
+    // The contextual touch buttons — BOOST (hold) and PING (tap/drag). Claimed
+    // before the twin sticks so a press on one never also engages a stick under
+    // it. The rects are the same ones the view draws, so a tap can only land on a
+    // button that is actually on screen (null and un-pressable off-touch).
+    touchButtons.setRects(boostButtonRect(isTouch, w, h), pingButtonRect(isTouch, w, h));
+    const claimed = touchButtons.tryPress({ id: e.pointerId, x: pressPoint.x, y: pressPoint.y });
+    if (claimed) {
+      haptics.haptic('tap'); // a finger landed on a button
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
     buildWheelLayout.centerX = w / 2;
     buildWheelLayout.centerY = h / 2;
     buildWheelLayout.radius = wheelRadius(w, h);
@@ -681,6 +724,18 @@ async function boot(): Promise<void> {
     panelLayout.centerY = h / 2;
     panelLayout.width = size.width;
     panelLayout.height = size.height;
+
+    // Pressed-state tell (field report v0.2.2): before the press is consumed,
+    // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
+    // pressed (scale + glow) or rejected (shake + red flash) visual. The HUD
+    // decides which from the wedge's own drawn state. Build wheel only here — the
+    // upgrade surface is still hit-tested as a panel by `WheelInput` (@platform),
+    // so its pressed-visual lights up once that is reconciled; its CONFIRMATION
+    // feedback already works, being derived from sim state in the HUD.
+    if (buildWheel.open && !buildWheel.panelOpen) {
+      const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
+      if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
+    }
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
@@ -695,6 +750,24 @@ async function boot(): Promise<void> {
   // the controller as the rotated logical point — the half-split, sticks and
   // FIRE button all live in logical (landscape) space.
   bindTouchControls(app.canvas, touch, window, toLogical);
+
+  // The contextual buttons track their own pointer (a PING drag, a BOOST hold)
+  // past the initial press. Their `pointerdown` is claimed in the wheel-first
+  // listener above (which consumes it before the sticks); these carry the rest of
+  // the gesture. Touch-only and remapped through the landscape lock, exactly like
+  // the sticks. A window blur releases everything so nothing sticks held.
+  app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    const p = toLogical(e.clientX, e.clientY);
+    touchButtons.onMove({ id: e.pointerId, x: p.x, y: p.y });
+  });
+  const releaseButton = (e: PointerEvent): void => {
+    if (e.pointerType !== 'touch') return;
+    touchButtons.onUp(e.pointerId);
+  };
+  app.canvas.addEventListener('pointerup', releaseButton);
+  app.canvas.addEventListener('pointercancel', releaseButton);
+  window.addEventListener('blur', () => touchButtons.clear());
 
   // --- HUD feed: one reusable mutable HudFrame, overwritten in place every frame
   //     so the feed path allocates nothing (GDD §4.3). All fields are primitives.
@@ -810,7 +883,15 @@ async function boot(): Promise<void> {
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
       // idle affordances and FIRE button track resize/orientation flips.
-      touchVisuals.update(touch, isTouch, transform.logicalWidth, transform.logicalHeight, buildVisible);
+      touchVisuals.update(
+        touch,
+        isTouch,
+        transform.logicalWidth,
+        transform.logicalHeight,
+        buildVisible,
+        touch.boostEngaged || touchButtons.boostHeld,
+        touchButtons.pingPressed,
+      );
       // Keep the build stamp cornered (logical bottom-right) as the viewport changes.
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
@@ -967,6 +1048,22 @@ async function boot(): Promise<void> {
     }
     resetControlState(touchState);
     touch.writeInto(touchState);
+    // Fold the contextual touch buttons into the same neutral state the sticks
+    // wrote: BOOST OR-s with the left-stick double-tap-and-hold; a resolved PING
+    // gesture becomes a world-space ping anchored on the local ship — a tap pings
+    // the ship's own position, a drag pings a point offset in the pointed direction.
+    touchState.boost = touchState.boost || touchButtons.boostHeld;
+    const ping = touchButtons.takePing();
+    if (ping) {
+      const anchor = localShipPos();
+      touchState.ping = ping.tap
+        ? anchor
+        : { x: anchor.x + ping.dir.x * PING_DIR_DISTANCE, y: anchor.y + ping.dir.y * PING_DIR_DISTANCE };
+      haptics.haptic('confirm'); // a ping committed
+    }
+    // Haptic `tap` on the rising edge of touch boost (double-tap-hold OR button).
+    if (touchState.boost && !touchBoostWasActive) haptics.haptic('tap');
+    touchBoostWasActive = touchState.boost;
     if (controlActive(touchState)) activeDevice = 'touch';
 
     resetControlState(merged);
@@ -974,7 +1071,9 @@ async function boot(): Promise<void> {
     mergeControl(merged, touchState);
 
     updateBuildWheel();
-    return mapActions(merged, fireMode);
+    const actions = mapActions(merged, fireMode);
+    if (inputProbe.enabled) inputProbe.update(actions); // ?debug=1 parity seam
+    return actions;
   }
 
   /**
@@ -1174,7 +1273,9 @@ async function boot(): Promise<void> {
   function feedCombatants(): void {
     let n = 0;
     for (const ship of world.ships) {
-      if (ship.id === LOCAL_PLAYER) continue; // the local ship never gets a bar
+      // The local ship's over-bar is synthesised by the HUD from the sim hull (at
+      // the centred camera position), not fed here — so skip it in the enemy feed.
+      if (ship.id === LOCAL_PLAYER) continue;
       const c = combatantSlot(n++);
       c.owner = ship.id;
       c.hp = ship.hull;
@@ -1183,18 +1284,24 @@ async function boot(): Promise<void> {
       c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
+      c.turret = false;
     }
     for (const planet of world.planets) {
       for (const turret of planet.turrets) {
-        if (turret.owner === LOCAL_PLAYER) continue; // own turrets: read off HOME HP
+        // Field request v0.2.2: EVERY turret gets a bar when damaged, the local
+        // player's own included (they used to read off the HOME HP readout). The
+        // model still hides a full, idle turret, so passing them all is correct.
         const c = combatantSlot(n++);
         c.owner = turret.owner;
         c.hp = turret.hp;
         c.maxHp = turret.maxHp;
         c.alive = turret.hp > 0;
         c.inCombat = turret.muzzle != null; // loosing a shot this tick
+        // `turret.pos` is derived from the orbit angle each tick, so the bar rides
+        // along as the turret slides around its planet's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
         c.radius = turret.radius;
+        c.turret = true;
       }
     }
     combatantFrame.length = 0;
@@ -1207,7 +1314,7 @@ async function boot(): Promise<void> {
   function combatantSlot(i: number): MutCombatant {
     let c = combatantPool[i];
     if (!c) {
-      c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0 };
+      c = { owner: 0, hp: 0, maxHp: 0, alive: false, inCombat: false, pos: { x: 0, y: 0 }, radius: 0, turret: false };
       combatantPool[i] = c;
     }
     return c;
@@ -1284,6 +1391,12 @@ async function boot(): Promise<void> {
    *    LOCAL ship's hull to `fraction` of max so its own over-ship bar must draw
    *    (and the HUD hull readout drop to match). The camera holds it centred, so
    *    no repositioning is needed. Returns its slot and exact fill, or null.
+   *  - `damageTurret(fraction)` — the field-request v0.2.2 counterpart: park a
+   *    turret (preferring one of the LOCAL player's, to prove own turrets now show
+   *    a bar) beside the centred local ship so it is on-screen and un-culled, and
+   *    set its hp to `fraction` of max. Its `pos` IS its orbit position (P1), so
+   *    the drawn bar must track it. Returns the turret's owner slot, exact fill,
+   *    and the screen position its orbit projects to, or null if none exists.
    *  - `bars()` — the bars the real layer actually drew last frame (owner, fill,
    *    `local` flag, screen position), read back so the test can assert one
    *    tracks the staged ship.
@@ -1320,6 +1433,31 @@ async function boot(): Promise<void> {
         const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
         local.hull = f * local.maxHull;
         return { owner: local.id, fraction: local.hull / local.maxHull };
+      },
+      // Field request v0.2.2: damage a turret so its bar must draw (damaged ⇒ a
+      // bar), proving own turrets are no longer suppressed. Prefer a LOCAL-owned
+      // turret; park it beside the centred local ship so it is on-screen (its
+      // planet may be off-frame at spawn) and un-culled. `turret.pos` is its orbit
+      // position — the same value feedCombatants projects — so the bar rides it.
+      damageTurret(fraction: number): { owner: PlayerId; fraction: number; x: number; y: number } | null {
+        const local = world.ships.find(isLocalShip);
+        if (!local) return null;
+        let target: (typeof world.planets)[number]['turrets'][number] | null = null;
+        for (const planet of world.planets) {
+          for (const t of planet.turrets) {
+            if (t.owner === LOCAL_PLAYER) { target = t; break; }
+            if (!target) target = t; // remember any turret as a fallback
+          }
+          if (target && target.owner === LOCAL_PLAYER) break;
+        }
+        if (!target) return null;
+        target.pos.x = local.pos.x + 120;
+        target.pos.y = local.pos.y;
+        const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+        target.hp = f * target.maxHp;
+        const at: Vec2 = { x: 0, y: 0 };
+        renderer.projectToScreen(target.pos, at);
+        return { owner: target.owner, fraction: target.hp / target.maxHp, x: at.x, y: at.y };
       },
       bars(): ReturnType<typeof hud.debugHealthBars> {
         return hud.debugHealthBars();
@@ -1727,6 +1865,67 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__pressStage` — the ?debug=1 live-stage seam for the press &
+   * action feedback (field report v0.2.2), the same discipline as
+   * {@link installUpgradeWheelStage}. It opens the Build wheel at the planet, then
+   * drives the HUD's own press/confirm seams and reads the motion back, so a
+   * Playwright test can prove the pressed / rejected / confirmed tells are wired
+   * and drawn on the REAL booted client (the derivation itself is unit-tested in
+   * `src/ui/press-feedback.test.ts`). Behind ?debug=1, never in a normal build.
+   */
+  function installPressStage(): void {
+    const stage = {
+      /** Park the ship docked, fund the bank, and open the Build wheel so its
+       *  wedges draw and can be pressed. */
+      openBuild(ore = 999): { open: boolean; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        ship.cargo = 0;
+        ship.banked = ore;
+        docked = true; // ?freeze skips updateBuildWheel, so state the staged pose
+        if (!buildWheel.open) buildWheel.toggle();
+        buildWheel.closePanel();
+        return { open: buildWheel.open, banked: ship.banked };
+      },
+      press(surface: 'build' | 'upgrade', index: number): void {
+        hud.debugPressWedge(surface, index);
+      },
+      confirm(surface: 'build' | 'upgrade', index: number, amount: number, deposit = false, core = false): void {
+        hud.debugConfirmWedge(surface, index, amount, deposit, core);
+      },
+      feedback(surface: 'build' | 'upgrade', index: number): ReturnType<typeof hud.debugWedgeFeedback> {
+        return hud.debugWedgeFeedback(surface, index);
+      },
+      floats(): ReturnType<typeof hud.debugCostFloats> {
+        return hud.debugCostFloats();
+      },
+      coreShimmer(): number {
+        return hud.debugCoreShimmer();
+      },
+      bank(): number | null {
+        const ship = world.ships.find(isLocalShip);
+        return ship ? ship.banked : null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__pressStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -1757,6 +1956,15 @@ async function boot(): Promise<void> {
     if (touchRects.leftStickZone) reg.register('touch-left-stick', LEFT_STICK_ANCHOR, touchRects.leftStickZone);
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
+
+    // The contextual touch buttons — BOOST (left/movement side) and PING (right
+    // side) — the v0.2.2 input-parity fills. Always present on touch, so a phone
+    // profile can assert they are placed in their declared halves; null (and so
+    // unregistered) off-touch. Same rects the view draws and the hit test uses.
+    const boostBtn = boostButtonRect(isTouch, w, h);
+    if (boostBtn) reg.register('touch-boost-button', LEFT_STICK_ANCHOR, boostBtn);
+    const pingBtn = pingButtonRect(isTouch, w, h);
+    if (pingBtn) reg.register('touch-ping-button', RIGHT_STICK_ANCHOR, pingBtn);
 
     // The open-build-wheel button — a permanent HUD fixture at your own planet
     // (GDD §2.2, §2.4). Registered from the SAME `buildVisible`/`buildButtonRect`
@@ -1986,6 +2194,9 @@ interface MutCombatant {
   inCombat: boolean;
   pos: Vec2;
   radius: number;
+  /** True for a turret record (field request v0.2.2), so the model draws a bar
+   *  over the local player's own turrets too — a ship record leaves it false. */
+  turret: boolean;
 }
 
 /** A mutable {@link Nameable} — the pooled records `feedNameplates()` overwrites

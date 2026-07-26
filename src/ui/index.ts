@@ -44,6 +44,10 @@ export type { WaveClock } from './wave-clock';
 export { oreHudModel, oreFlashOn } from './ore-hud';
 export type { OreHudModel } from './ore-hud';
 
+// The one affordability boundary the Build wheel and the Upgrade wheel share, so
+// "bank == cost is buyable" is decided in exactly one place (field report v0.2.2).
+export { affordable, AFFORD_EPSILON } from './affordability';
+
 // --- Ore split (field rule): banked TOTAL top-left, HELD hold under the ship ---
 //
 // The held-ore squares that used to sit top-left move under the local ship as a
@@ -136,6 +140,46 @@ export type {
 
 export { WheelToggle, WHEEL_TRANSITION_SECONDS } from './wheel-toggle';
 export type { WheelPhase } from './wheel-toggle';
+
+// --- Shared press & action feedback (field report v0.2.2) ------------------
+//
+// The ONE place press/confirm feel is implemented: an immediate pressed tell
+// (scale + glow) on touch-down, a rejected shake/flash for a disabled control,
+// and — driven from the sim's real state change, not the press — a confirmation
+// pulse + cost-float + repair shimmer. The wheel view samples the `PressFeedback`
+// driver per wedge; confirmations are derived by `detectConfirmations` from the
+// same sim numbers the HUD already reads (press-feedback.ts).
+
+export {
+  PressFeedback,
+  detectConfirmations,
+  buildSegmentIndex,
+  pressPulse,
+  rejectPulse,
+  confirmPulse,
+  NEUTRAL_FEEDBACK,
+  PRESS_FLASH_SECONDS,
+  PRESS_SCALE,
+  PRESS_GLOW,
+  REJECT_SECONDS,
+  REJECT_SHAKE_PX,
+  REJECT_FLASH,
+  CONFIRM_SECONDS,
+  CONFIRM_PULSE,
+  CONFIRM_SHIMMER,
+  CONFIRM_REPEAT_GAP,
+  COST_FLOAT_RISE,
+} from './press-feedback';
+export type {
+  PressSurface,
+  PressPulse,
+  RejectPulse,
+  ConfirmPulse,
+  CostFloat,
+  Confirmation,
+  ControlFeedback,
+  WheelSnapshot,
+} from './press-feedback';
 
 // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) ----------------
 

@@ -53,11 +53,42 @@ interface LayoutEntry {
   anchor: { region: string; margin: number };
   bounds: { x: number; y: number; width: number; height: number };
 }
+/** The `?debug=1`-only press-feedback seam (field report v0.2.2), mirrors
+ *  `installPressStage` in `src/main.ts`. */
+interface ControlFeedback {
+  scale: number;
+  glow: number;
+  shakeX: number;
+  reject: number;
+  shimmer: number;
+}
+interface CostFloat {
+  surface: 'build' | 'upgrade';
+  index: number;
+  amount: number;
+  progress: number;
+  alpha: number;
+  deposit: boolean;
+}
+interface PressStage {
+  openBuild(ore?: number): { open: boolean; banked: number } | null;
+  press(surface: 'build' | 'upgrade', index: number): void;
+  confirm(surface: 'build' | 'upgrade', index: number, amount: number, deposit?: boolean, core?: boolean): void;
+  feedback(surface: 'build' | 'upgrade', index: number): ControlFeedback;
+  floats(): CostFloat[];
+  coreShimmer(): number;
+  bank(): number | null;
+}
 interface StageWindow {
   __upgradeWheelStage?: UpgradeWheelStage;
+  __pressStage?: PressStage;
   __planetRush?: { layout: readonly LayoutEntry[] };
 }
 declare const window: Window & StageWindow;
+
+/** Build-wheel wedge indices, from WHEEL_ORDER [turret, shield, repair, upgrade, bank]. */
+const TURRET_WEDGE = 0;
+const REPAIR_WEDGE = 2;
 
 /** POWER leads TRACK_ORDER, so wedge index 0 is POWER on the Vanguard: current 10,
  *  first tier 13 (10 × 1.25), cost 4. */
@@ -174,6 +205,134 @@ test('an unaffordable wedge dims with a reason (field report #1)', async ({ page
   expect(pageErrors, 'no page errors staging an unaffordable wedge').toEqual([]);
 });
 
+// --- The exact-cost boundary (field report v0.2.2) -------------------------
+//
+// "TOTAL says 4, POWER costs 4, can't buy." The boundary rule, proved on the
+// REAL booted client through the sim's own `buyUpgrade`: a bank that *equals*
+// the cost buys (and the bank hits zero); a bank one ore short dims the wedge
+// *with the cost still shown*, so the shortfall reads. Both wheels now share one
+// affordability helper (src/ui/affordability.ts) — this pins the upgrade wheel,
+// the build-wheel test below pins the other half of that same helper.
+
+test('exact-cost boundary: bank == cost buys and empties the bank; bank == cost-1 dims with the cost shown (field report v0.2.2)', async ({
+  page,
+}) => {
+  const pageErrors = await boot(page);
+  // The bank read-back lives on the sibling press seam (same local ship, same
+  // world); both are installed at boot, so wait for it before reading.
+  await page.waitForFunction(() => typeof window.__pressStage?.bank === 'function', undefined, {
+    timeout: 20_000,
+  });
+
+  // Read POWER's real cost off the DRAWN wheel — the screenshot's "4" — rather
+  // than hard-coding it, so a retune of the ladder cannot silently rot this test.
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  const cost = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.cost != null ? p.cost : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(cost, 'the POWER wedge prints a cost').toBeGreaterThan(0);
+
+  // --- bank == cost - 1: one ore short. The wedge must dim WITH its cost, and
+  //     the sim's real purchase must refuse it, spending nothing. ---
+  await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c - 1), cost!);
+  const short = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.state === 'unaffordable' ? p : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(short!.state, 'bank == cost-1 → the wedge is dimmed unaffordable').toBe('unaffordable');
+  expect(short!.cost, 'the cost stays on the dimmed wedge so the shortfall reads').toBe(cost);
+
+  const refused = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  expect(refused!.result, 'the sim refuses a bank one ore short').toBe('cannot-afford');
+  expect(refused!.tier, 'a refused purchase advances no tier').toBe(0);
+  expect(await page.evaluate(() => window.__pressStage!.bank()), 'a refused purchase spends nothing').toBe(
+    cost! - 1,
+  );
+
+  // --- bank == cost exactly: the developer's screenshot, refuted. The wedge is
+  //     ready, the purchase succeeds, and the bank hits zero. ---
+  await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c), cost!);
+  const ready = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.state === 'ready' ? p : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(ready!.state, 'bank == cost → the wedge is purchasable, not dimmed').toBe('ready');
+
+  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  expect(bought!.result, 'the exact-cost purchase went through the sim').toBe('ok');
+  expect(bought!.tier, 'the ship advanced one tier on POWER').toBe(1);
+  expect(await page.evaluate(() => window.__pressStage!.bank()), 'the last ore spent — the bank hit zero').toBe(
+    0,
+  );
+
+  expect(pageErrors, 'no page errors staging the exact-cost boundary').toEqual([]);
+});
+
+test('the build wheel shares the same exact-cost boundary: TURRET buys at exactly its cost, refuses one ore short (field report v0.2.2)', async ({
+  page,
+}) => {
+  const pageErrors = await bootPress(page);
+
+  // TURRET costs 3 ore (GDD §2.8; sim `TURRET.cost`) — the same boundary helper
+  // the upgrade wheel above obeys, verified through the drawn build wheel.
+  const TURRET_COST = 3;
+
+  // bank == cost: the wedge is live, so a press reads as an ACCEPTED press
+  // (glow, scale-down) and never the red rejection tell.
+  const opened = await page.evaluate((c) => window.__pressStage!.openBuild(c), TURRET_COST);
+  expect(opened?.banked, 'the bank was staged to exactly the turret cost').toBe(TURRET_COST);
+  const accepted = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.glow > 0 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(accepted!.glow, 'a press at exactly the cost is accepted (glows)').toBeGreaterThan(0);
+  expect(accepted!.reject, 'an exactly-affordable press never red-flashes').toBe(0);
+
+  // bank == cost - 1: one ore short. The same press must read as a REJECTION.
+  await page.evaluate((c) => window.__pressStage!.openBuild(c - 1), TURRET_COST);
+  const rejected = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.reject > 0 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(rejected!.reject, 'a press one ore short is rejected (red-flashes)').toBeGreaterThan(0);
+  expect(rejected!.glow, 'a rejected press never glows like an accepted one').toBe(0);
+
+  expect(pageErrors, 'no page errors staging the build-wheel boundary').toEqual([]);
+});
+
 test('mashing each wheel open/closed 15× still opens and stays interactive (field report #2)', async ({
   page,
 }) => {
@@ -211,4 +370,123 @@ test('mashing each wheel open/closed 15× still opens and stays interactive (fie
   await cycle('openUpgrade', 'upgrade-wheel');
 
   expect(pageErrors, 'no page errors while mashing the wheels').toEqual([]);
+});
+
+// --- Press & action feedback (field report v0.2.2) -------------------------
+//
+// "UI needs visual feedback when it's clicked; when going to repair core it's
+// tough to know it did anything." These drive the HUD's own press/confirm seams
+// on the REAL booted client and read the motion back — the derivation of a
+// confirmation from sim state is unit-tested headless (press-feedback.test.ts);
+// what a boot proves is that it is wired to the drawn wheel.
+
+async function bootPress(page: import('@playwright/test').Page): Promise<string[]> {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+  await page.goto('/?debug=1&freeze=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(() => typeof window.__pressStage?.openBuild === 'function', undefined, {
+    timeout: 20_000,
+  });
+  return pageErrors;
+}
+
+test('pressing an affordable wedge shows the pressed tell on the real client (report #1)', async ({
+  page,
+}) => {
+  const pageErrors = await bootPress(page);
+
+  // Open the Build wheel with ore to spend, so TURRET is a live wedge.
+  const opened = await page.evaluate(() => window.__pressStage!.openBuild(999));
+  expect(opened?.open, 'the Build wheel opened at the planet').toBe(true);
+
+  // Press the wedge and read the motion back — a live press scales it down and
+  // glows it, and never red-flashes it (that is the rejected tell).
+  const f = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.glow > 0 && fb.scale < 1 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+
+  expect(f!.scale, 'the pressed wedge scaled down').toBeLessThan(1);
+  expect(f!.glow, 'the pressed wedge glowed').toBeGreaterThan(0);
+  expect(f!.reject, 'an affordable press never red-flashes').toBe(0);
+
+  await page.screenshot({ path: 'tests/live-stage/press-feedback-evidence.png' });
+  expect(pageErrors, 'no page errors while pressing a wedge').toEqual([]);
+});
+
+test('a REPAIR confirmation floats a cost and shimmers the core (report #2 — the flagship)', async ({
+  page,
+}) => {
+  const pageErrors = await bootPress(page);
+
+  await page.evaluate(() => window.__pressStage!.openBuild(50));
+
+  // Inject the confirmation the sim's real repair channel produces (core healing
+  // for 1 ore), then read back that the cost floated and the core shimmered — the
+  // "tough to know it did anything" report, refuted on the drawn client.
+  await page.evaluate((i) => window.__pressStage!.confirm('build', i, 1, false, true), REPAIR_WEDGE);
+
+  const floats = await page
+    .waitForFunction(
+      () => {
+        const fs = window.__pressStage!.floats();
+        return fs.length > 0 ? fs : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+
+  const repairFloat = floats!.find((f) => f.index === REPAIR_WEDGE);
+  expect(repairFloat, 'a cost floated off the REPAIR wedge').toBeDefined();
+  expect(repairFloat!.amount, 'it floats the repair entry cost').toBe(1);
+  expect(repairFloat!.alpha, 'the float is visible').toBeGreaterThan(0);
+
+  const shimmer = await page.evaluate(() => window.__pressStage!.coreShimmer());
+  expect(shimmer, 'the core shimmered as it healed').toBeGreaterThan(0);
+
+  // The wedge itself pulses/shimmers on confirm.
+  const fb = await page.evaluate((i) => window.__pressStage!.feedback('build', i), REPAIR_WEDGE);
+  expect(fb.shimmer, 'the REPAIR wedge shimmered on confirm').toBeGreaterThan(0);
+
+  expect(pageErrors, 'no page errors while confirming a repair').toEqual([]);
+});
+
+test('a disabled wedge press red-flashes and changes no sim state (report #3)', async ({ page }) => {
+  const pageErrors = await bootPress(page);
+
+  // Open the wheel with NO ore, so TURRET is unaffordable — a press must read as a
+  // rejection, not a dead press.
+  const opened = await page.evaluate(() => window.__pressStage!.openBuild(0));
+  expect(opened?.banked, 'the bank was drained so the wedge is disabled').toBe(0);
+
+  const f = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.reject > 0 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+
+  expect(f!.reject, 'the disabled wedge red-flashed').toBeGreaterThan(0);
+  expect(f!.glow, 'a rejected press never glows like an accepted one').toBe(0);
+
+  // "Nothing happened" made checkable: the visual fired, but the bank did not move
+  // — a press tell is not a purchase.
+  const bank = await page.evaluate(() => window.__pressStage!.bank());
+  expect(bank, 'a rejected press spends nothing').toBe(0);
+
+  expect(pageErrors, 'no page errors while pressing a disabled wedge').toEqual([]);
 });
