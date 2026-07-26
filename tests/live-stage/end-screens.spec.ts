@@ -51,9 +51,27 @@ interface EndScreenStage {
   matchId(): number;
   /** The sim's own step count — climbs while the match runs. */
   ticks(): number;
+
+  // --- Respawn countdown (field request v0.2.2) --------------------------
+  /** Kill the LOCAL ship while its core stands — a *respawnable* death, driven
+   *  through the sim's own `killShip`. Returns whether it staged. */
+  killLocalShip(): boolean;
+  /** The local ship's liveness — false while dead, true again after respawn. */
+  shipAlive(): boolean;
+  /** The sim's own respawn clock for the local ship (seconds; 0 when alive). */
+  respawnTimer(): number;
+  /** The respawn countdown the HUD actually DREW this frame. */
+  respawnCountdown(): { show: boolean; seconds: number; text: string };
 }
 interface StageWindow {
   __endScreenStage?: EndScreenStage;
+  /** The upgrade-wheel seam — reused here for the p4-16 tie-in (buy an upgrade
+   *  immediately after respawn and assert it applies). */
+  __upgradeWheelStage?: {
+    setOre(ore: number): { banked: number } | null;
+    buyTier(i: number): { result: string; tier: number } | null;
+    tierOf(i: number): number | null;
+  };
 }
 declare const window: Window & StageWindow;
 
@@ -155,4 +173,91 @@ test('a dead core raises the DEFEATED overlay, spectate keeps the match live, ma
   );
 
   expect(pageErrors, 'no page errors across the whole end-screen flow').toEqual([]);
+});
+
+test('a ship death with the core alive raises the RESPAWNING countdown, it decrements on sim ticks, clears at respawn, and an upgrade bought right after applies (field request v0.2.2 + p4-16)', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+  // Live sim (no ?freeze): the countdown must be watched running down on the
+  // sim's OWN respawn clock, which a pinned frame cannot show.
+  await page.goto('/?debug=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(() => typeof window.__endScreenStage?.killLocalShip === 'function', undefined, {
+    timeout: 20_000,
+  });
+  await page.waitForFunction(() => typeof window.__upgradeWheelStage?.buyTier === 'function', undefined, {
+    timeout: 20_000,
+  });
+
+  // The upgrade the developer bought after respawning — record the tier before
+  // any of this, so the p4-16 assertion at the end is a genuine +1.
+  const tierBefore = await page.evaluate(() => window.__upgradeWheelStage!.tierOf(0));
+  expect(tierBefore, 'a stock tier to upgrade from').not.toBeNull();
+
+  // --- Kill the ship while the core stands → the RESPAWNING countdown. ---
+  const killed = await page.evaluate(() => window.__endScreenStage!.killLocalShip());
+  expect(killed, 'the local ship was alive to kill (core still standing)').toBe(true);
+
+  await page.waitForFunction(() => window.__endScreenStage!.respawnCountdown().show === true, undefined, {
+    timeout: 20_000,
+  });
+  const dead = await page.evaluate(() => ({
+    countdown: window.__endScreenStage!.respawnCountdown(),
+    screen: window.__endScreenStage!.screen(),
+    shipAlive: window.__endScreenStage!.shipAlive(),
+  }));
+  expect(dead.countdown.show, 'the RESPAWNING countdown is up while dead-and-respawning').toBe(true);
+  expect(dead.countdown.text, 'it reads RESPAWNING with the seconds').toMatch(/RESPAWNING\s+\d/i);
+  expect(dead.countdown.seconds, 'it counts whole seconds off the sim clock').toBeGreaterThan(0);
+  // Distinct from ELIMINATION: the core is alive, so the DEFEATED flow never
+  // takes the screen — this is a respawn, not a defeat (GDD §2.7).
+  expect(dead.screen, 'no DEFEATED overlay — the core is alive, this death is not final').toBe('none');
+  expect(dead.shipAlive, 'the ship is dead while the countdown runs').toBe(false);
+
+  // Screenshot the countdown for the PR body.
+  await page.screenshot({ path: 'tests/live-stage/end-screens-respawn-evidence.png' });
+
+  // --- It decrements on the sim's OWN ticks (never a UI-side timer). ---
+  const startSeconds = dead.countdown.seconds;
+  const decremented = await page
+    .waitForFunction(
+      (start) => {
+        const c = window.__endScreenStage!.respawnCountdown();
+        // Still counting (show), but a whole second lower — the ceiling of the
+        // sim timer fell, so the number is the sim's, not the UI's.
+        return c.show && c.seconds < start && c.seconds > 0 ? { seconds: c.seconds } : null;
+      },
+      startSeconds,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(decremented!.seconds, 'the countdown ticked down as the sim clock fell').toBeLessThan(startSeconds);
+
+  // --- It clears the instant the ship exists again, and controls return. ---
+  const respawned = await page
+    .waitForFunction(
+      () => {
+        const s = window.__endScreenStage!;
+        return s.shipAlive() && s.respawnCountdown().show === false ? { alive: true } : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(respawned!.alive, 'the ship respawned and the countdown vanished').toBe(true);
+
+  // --- The p4-16 tie-in: buy an upgrade IMMEDIATELY after respawn — it applies. ---
+  // The developer's exact report was that an upgrade bought right after respawn
+  // did nothing. Give the fresh ship ore and buy a tier through the sim's own
+  // validated purchase; the tier must climb.
+  await page.evaluate(() => window.__upgradeWheelStage!.setOre(999));
+  const bought = await page.evaluate(() => window.__upgradeWheelStage!.buyTier(0));
+  expect(bought, 'the buy resolved').not.toBeNull();
+  expect(bought!.result, 'the upgrade applied right after respawn (p4-16 regression)').toBe('ok');
+  expect(bought!.tier, 'the tier climbed by one — the upgrade actually took').toBe((tierBefore ?? 0) + 1);
+
+  expect(pageErrors, 'no page errors across the whole respawn-countdown flow').toEqual([]);
 });

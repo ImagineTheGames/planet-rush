@@ -28,6 +28,7 @@ import {
   muzzleFlashes,
   damagePlanet,
   damageShip,
+  killShip,
   destroyCore,
   isCollapsed,
   isDocked,
@@ -59,7 +60,7 @@ import { TouchController } from '@platform/touch';
 import { TouchButtons } from '@platform/touch-buttons';
 import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect, boostButtonRect, pingButtonRect } from '@platform/touch-visuals';
-import { WheelInput, writeWheelOrders, hitWheel, hitPanel } from '@platform/wheel-input';
+import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
 import {
   computeRootTransform,
   applyRootTransform,
@@ -103,8 +104,8 @@ import {
   TRACK_ORDER,
   UpgradeTrack,
   upgradeWheelSlots,
+  upgradeWedgeAngle,
   WHEEL_ORDER,
-  panelSize,
   wheelRadius,
   buildButtonVisible,
   BUILD_BUTTON_ID,
@@ -627,6 +628,15 @@ async function boot(): Promise<void> {
    *  it lives with the other UI wiring and feeds the HUD. Reset whenever the
    *  upgrade panel closes, so re-opening always lands on the main wheel. */
   let weaponWheelOpen = false;
+  /** A track wedge pressed on the OPEN upgrade wheel this frame, latched here for
+   *  one tick and drained into the input funnel by `updateBuildWheel` (RATIFIED
+   *  v0.2.2 fix). The upgrade wheel is drawn as a RADIAL wheel; a press is
+   *  hit-tested radially in the pointer handler (like the Build wheel), never as a
+   *  row panel — the mismatch that silently bought the wrong track, or nothing
+   *  (field report v0.2.2: "most of the ship upgrades weren't working"). Nav wedges
+   *  (WEAPON, BACK) set no track — they flip `weaponWheelOpen` instead. `null` on
+   *  every other frame. */
+  let pendingUpgrade: UpgradeTrack | null = null;
 
   // --- Haptics event detection (field request v0.2.2). `feedHaptics` derives the
   //     three combat vibrations — you-were-hit, base-under-attack, core-lost — from
@@ -648,6 +658,10 @@ async function boot(): Promise<void> {
   // targets are computed from the very functions `src/ui` draws the wheel and
   // the panel with, so a press lands on the wedge the player actually sees.
   const buildWheelLayout = { centerX: 0, centerY: 0, radius: 0, segments: WHEEL_ORDER.length };
+  // The open upgrade wheel's hit target — same geometry as the Build wheel, but
+  // its slot count changes with the level (main wheel vs. WEAPON sub-wheel), so
+  // `segments` is set per press. Hit-tested radially, like the Build wheel.
+  const upgradeWheelLayout = { centerX: 0, centerY: 0, radius: 0, segments: TRACK_ORDER.length };
   const panelLayout = {
     centerX: 0,
     centerY: 0,
@@ -727,41 +741,58 @@ async function boot(): Promise<void> {
     buildWheelLayout.centerX = w / 2;
     buildWheelLayout.centerY = h / 2;
     buildWheelLayout.radius = wheelRadius(w, h);
-    // The upgrade surface is hit-tested per its CURRENT level: the main wheel and
-    // the WEAPON sub-wheel have different slot counts, so a press lands on the
-    // wedge actually drawn (RATIFIED v0.2.2).
-    const upgradeSlots = upgradeWheelSlots(weaponWheelOpen);
-    const size = panelSize(w, h, upgradeSlots.length);
-    panelLayout.centerX = w / 2;
-    panelLayout.centerY = h / 2;
-    panelLayout.width = size.width;
-    panelLayout.height = size.height;
-    panelLayout.rows = upgradeSlots.length;
 
-    // A press on the WEAPON or BACK wedge navigates between the two levels rather
-    // than buying — consume it here, before the row reaches `WheelInput` as an
-    // upgrade order. Track wedges fall through to the normal press below.
+    // --- The OPEN upgrade wheel is a RADIAL wheel, not a row panel -----------
+    // It is drawn by the SAME wedge routine as the Build wheel (one wedge per
+    // slot, clockwise from twelve o'clock), so a press must be hit-tested the
+    // SAME way — radially, against the drawn wedge — and NEVER against a stack of
+    // panel rows. Mapping a radial wedge onto a vertical row index is what bought
+    // the wrong track (or nothing) and made "most of the ship upgrades weren't
+    // working" (field report v0.2.2). Its slot count changes with the level (the
+    // main wheel vs. the WEAPON sub-wheel), so the hit target is built per press.
     if (buildWheel.open && buildWheel.panelOpen) {
-      const hit = hitPanel(pressPoint.x, pressPoint.y, panelLayout);
-      if (hit.kind === 'row') {
+      const upgradeSlots = upgradeWheelSlots(weaponWheelOpen);
+      upgradeWheelLayout.centerX = w / 2;
+      upgradeWheelLayout.centerY = h / 2;
+      upgradeWheelLayout.radius = wheelRadius(w, h);
+      upgradeWheelLayout.segments = upgradeSlots.length;
+
+      const hit = hitWheel(pressPoint.x, pressPoint.y, upgradeWheelLayout);
+      if (hit.kind === 'outside') {
+        // A tap off the wheel backs out of the upgrade wheel to the Build wheel —
+        // the same "outside dismisses this level" gesture the Build wheel obeys.
+        buildWheel.closePanel();
+        weaponWheelOpen = false;
+      } else if (hit.kind === 'segment') {
         const slot = upgradeSlots[hit.index];
-        if (slot?.kind === 'weapon' || slot?.kind === 'back') {
-          weaponWheelOpen = slot.kind === 'weapon';
-          haptics.haptic('tap'); // a wedge was pressed — the lightest press tell
-          e.stopImmediatePropagation();
-          e.preventDefault();
-          return;
+        if (slot?.kind === 'weapon') {
+          // Open the nested WEAPON sub-wheel — it must OPEN, not fall through and
+          // close the upgrade wheel back to the Build wheel (field report v0.2.2).
+          weaponWheelOpen = true;
+          hud.pressWheelSegment('upgrade', hit.index);
+        } else if (slot?.kind === 'back') {
+          weaponWheelOpen = false;
+          hud.pressWheelSegment('upgrade', hit.index);
+        } else if (slot?.kind === 'track') {
+          // Latch the pressed track; `updateBuildWheel` drains it into the funnel
+          // as an `upgradeOrder` on the next tick, exactly like a Build segment.
+          pendingUpgrade = slot.track;
+          hud.pressWheelSegment('upgrade', hit.index);
         }
+        // A press in the hub / inner gap buys nothing — a miss on the open wheel.
       }
+      // The open wheel consumes every press, so a tap on it never also flies the
+      // ship or opens a stick under it.
+      haptics.haptic('tap');
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
     }
 
     // Pressed-state tell (field report v0.2.2): before the press is consumed,
     // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
     // pressed (scale + glow) or rejected (shake + red flash) visual. The HUD
-    // decides which from the wedge's own drawn state. Build wheel only here — the
-    // upgrade surface is still hit-tested as a panel by `WheelInput` (@platform),
-    // so its pressed-visual lights up once that is reconciled; its CONFIRMATION
-    // feedback already works, being derived from sim state in the HUD.
+    // decides which from the wedge's own drawn state.
     if (buildWheel.open && !buildWheel.panelOpen) {
       const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
       if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
@@ -1152,7 +1183,23 @@ async function boot(): Promise<void> {
     const rowTracks = upgradeWheelSlots(weaponWheelOpen).map((s) =>
       s.kind === 'track' ? s.track : UpgradeTrack.Power,
     );
-    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, rowTracks)) {
+    let ordered = writeWheelOrders(buildWheel, merged, WHEEL_ORDER, rowTracks);
+
+    // Drain a track pressed on the open upgrade wheel this frame (radial hit-test
+    // in the pointer handler). It rides the SAME funnel as a Build segment — the
+    // sim validates docking, affordability and max tier again and refuses on its
+    // own terms — and appears only on the tick it was pressed (`merged.upgrade` is
+    // one-shot). Drained unconditionally so a stale latch never re-fires: it only
+    // becomes an order while the upgrade wheel is actually up.
+    if (pendingUpgrade !== null) {
+      if (buildWheel.panelOpen) {
+        merged.upgrade = pendingUpgrade;
+        ordered = true;
+      }
+      pendingUpgrade = null;
+    }
+
+    if (ordered) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
     }
@@ -1210,6 +1257,12 @@ async function boot(): Promise<void> {
     hudFrame.banked = ship.banked;
     hudFrame.nearAsteroid = nearAsteroid(ship.pos);
     hudFrame.shipAlive = ship.alive;
+    // Respawn countdown (field request v0.2.2): the HUD renders the ceiling of
+    // this timer while the ship is dead — unless the seat is eliminated, where
+    // the DEFEATED flow owns the screen and the countdown stands down. Both come
+    // straight off the sim, so the number on screen is the one the sim counts.
+    hudFrame.respawnTimer = ship.respawnTimer;
+    hudFrame.eliminated = ship.eliminated;
     hudFrame.shipClass = ship.shipClass;
     hudFrame.upgradeTiers = ship.tiers;
     hudFrame.shipPos = ship.pos;
@@ -1761,6 +1814,36 @@ async function boot(): Promise<void> {
         destroyCore(world, planet); // the sim's own elimination path
         return true;
       },
+      /** Kill the LOCAL ship while its core still stands — a *respawnable* death,
+       *  so the "RESPAWNING N…" countdown must appear and the sim's own respawn
+       *  clock runs it down (field request v0.2.2). Drives the sim's own
+       *  `killShip` (the exact path a fatal hit takes: alive=false, respawnTimer
+       *  set, half the hold dropped) rather than faking the UI. Returns whether it
+       *  staged. */
+      killLocalShip(): boolean {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !ship.alive || ship.eliminated || !planet || !planet.alive) return false;
+        killShip(world, ship);
+        return true;
+      },
+      /** The local ship's liveness — the test asserts controls return once it is
+       *  true again after a respawn. */
+      shipAlive(): boolean {
+        return world.ships.find(isLocalShip)?.alive ?? false;
+      },
+      /** The sim's own respawn clock for the local ship (seconds; 0 when alive) —
+       *  the source the countdown renders the ceiling of. */
+      respawnTimer(): number {
+        return world.ships.find(isLocalShip)?.respawnTimer ?? 0;
+      },
+      /** The respawn countdown the HUD actually DREW this frame — show flag, the
+       *  ceiling seconds, and the text — so the test proves it appears, decrements
+       *  on sim ticks, and clears the instant the ship respawns. */
+      respawnCountdown(): { show: boolean; seconds: number; text: string } {
+        const m = hud.debugRespawnCountdown();
+        return { show: m.show, seconds: m.seconds, text: m.text };
+      },
       endMatch(): boolean {
         const survivor = world.planets.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
         if (!survivor) return false;
@@ -1917,6 +2000,29 @@ async function boot(): Promise<void> {
       },
       wedges(): ReturnType<typeof hud.debugUpgradeWedges> {
         return hud.debugUpgradeWedges();
+      },
+      wedgePoint(i: number): { x: number; y: number } | null {
+        // The LOGICAL screen point at the centre of wedge `i` on the CURRENT
+        // upgrade level — the exact geometry the pointer handler hit-tests against
+        // ({@link upgradeWheelLayout}). A real-input test dispatches a synthesized
+        // pointerdown here to press the wedge through the actual door.
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const slots = upgradeWheelSlots(weaponWheelOpen);
+        if (i < 0 || i >= slots.length) return null;
+        const radius = wheelRadius(w, h);
+        const angle = upgradeWedgeAngle(i, slots.length);
+        // 0.6 of the outer radius sits inside the segment ring (0.3‥1.0), where the
+        // wedge's words are drawn — the honest middle of the pressable wedge.
+        return {
+          x: w / 2 + Math.cos(angle) * radius * 0.6,
+          y: h / 2 + Math.sin(angle) * radius * 0.6,
+        };
+      },
+      legend(): ReturnType<typeof hud.debugControlsStrip> {
+        // The controls-strip rows the HUD resolved this frame — read by a
+        // live-stage test to prove the PC Build legend is contextual on docking.
+        return hud.debugControlsStrip();
       },
     };
     try {

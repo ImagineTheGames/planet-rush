@@ -69,7 +69,8 @@ export type { OreHold } from './ore-hold';
 export { OreHoldView, ORE_HOLD_ID, ORE_HOLD_ANCHOR } from './ore-hold-view';
 export type { DrawnOreHold } from './ore-hold-view';
 
-export { controlsStripRows, showControlsStrip } from './controls-strip';
+export { controlsStripRows, controlsStripView, showControlsStrip, BUILD_AWAY_HINT } from './controls-strip';
+export type { StripRow } from './controls-strip';
 
 // --- Build & Upgrade wheel (GDD §2.5) --------------------------------------
 
@@ -204,6 +205,18 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
+
+// --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) --------------
+//
+// While the local ship is dead and a respawn is coming, a centred "RESPAWNING N…"
+// overlay in the player's colour counts down the CEILING of the sim's respawn
+// timer (never a UI-side clock). It is fed via `respawnTimer`/`eliminated` on the
+// `HudFrame`; a *final* death stands it down so the DEFEATED flow (p1-12) owns the
+// screen alone. Decision in ./respawn-countdown, geometry in ./hud-geometry, and
+// the layer registers itself through `Hud.describeLayout`.
+
+export { respawnCountdownModel } from './respawn-countdown';
+export type { RespawnCountdownModel, RespawnCountdownInput } from './respawn-countdown';
 
 // --- Over-entity health bars — enemy bars + the own ship (GDD §2.2) ---------
 //

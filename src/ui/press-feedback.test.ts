@@ -33,7 +33,6 @@ import { SHIELD, TURRET } from '../sim/constants';
 const REPAIR = buildSegmentIndex('repair');
 const TURRET_I = buildSegmentIndex('turret');
 const SHIELD_I = buildSegmentIndex('shield');
-const BANK_I = buildSegmentIndex('bank');
 
 /** A neutral base snapshot; each test perturbs one number. */
 function snap(over: Partial<WheelSnapshot> = {}): WheelSnapshot {
@@ -121,17 +120,15 @@ describe('detectConfirmations — sim change → what to celebrate', () => {
     expect(s[0]).toMatchObject({ index: SHIELD_I, amount: SHIELD.cost });
   });
 
-  it('reads a deposit as bank-up-while-hold-down, marked as a deposit', () => {
-    const out = detectConfirmations(snap({ banked: 10, cargo: 3 }), snap({ banked: 13, cargo: 0 }));
-    expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ index: BANK_I, amount: 3, deposit: true });
-  });
-
-  it('never mistakes a spend (bank falling) for a deposit', () => {
-    // A turret purchase: bank drops, no count given here — nothing should read as
-    // a deposit even though the bank moved.
-    const out = detectConfirmations(snap({ banked: 10, cargo: 0 }), snap({ banked: 7, cargo: 0 }));
-    expect(out).toEqual([]);
+  it('does not celebrate a deposit — banking is ambient in the atmosphere now', () => {
+    // Bank up while the hold falls is exactly an auto-deposit (p4-11). It has no
+    // wheel wedge to launch a float from and is told by the atmosphere halo, not
+    // the wheel — so `detectConfirmations` stays silent on it.
+    const deposited = detectConfirmations(snap({ banked: 10, cargo: 3 }), snap({ banked: 13, cargo: 0 }));
+    expect(deposited).toEqual([]);
+    // And a spend (bank falling) was never a deposit either.
+    const spent = detectConfirmations(snap({ banked: 10, cargo: 0 }), snap({ banked: 7, cargo: 0 }));
+    expect(spent).toEqual([]);
   });
 
   it('floats a main-wheel tier off its drawn wedge', () => {
