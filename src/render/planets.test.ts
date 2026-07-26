@@ -128,6 +128,60 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
   });
 });
 
+describe('the atmosphere halo is the deposit affordance (p4-12, GDD §2.3)', () => {
+  const haloFor = (stage: Container, index: number): Graphics | null =>
+    stage.getChildByLabel(`atmosphere-${index}`, true) as Graphics | null;
+
+  it('rings your OWN home and no rival — the halo is where you can deposit', () => {
+    const stage = new Container();
+    const r = new Renderer(stage, VIEW);
+
+    r.draw(arena(), { cameraTarget: 0, muzzles: [] });
+
+    // Own planet has a visible halo; every rival planet has none drawn.
+    const own = haloFor(stage, 0);
+    expect(own).not.toBeNull();
+    expect(own!.visible).toBe(true);
+    for (let i = 1; i < 8; i++) expect(haloFor(stage, i)).toBeNull();
+  });
+
+  it('is pooled: a second frame reuses the same halo child', () => {
+    const stage = new Container();
+    const r = new Renderer(stage, VIEW);
+    const world = arena();
+
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    const first = haloFor(stage, 0);
+    const layer = stage.getChildByLabel('atmosphere', true) as Container;
+    const before = layer.children.length;
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+
+    expect(haloFor(stage, 0)).toBe(first); // same instance, not rebuilt
+    expect(layer.children.length).toBe(before);
+  });
+
+  it('brightens while ore is actually flowing home', () => {
+    const stage = new Container();
+    const r = new Renderer(stage, VIEW);
+    const world = arena();
+    const home = world.planets[0]!;
+    const ship = world.ships[0]!;
+    // Park the ship inside its own atmosphere so `world.time` is the only thing
+    // differing between the two frames — the brighten must come from the cargo.
+    ship.pos = { x: home.pos.x, y: home.pos.y };
+
+    ship.cargo = 0;
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    const idle = haloFor(stage, 0)!.alpha;
+
+    ship.cargo = 5;
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    const flowing = haloFor(stage, 0)!.alpha;
+
+    expect(flowing).toBeGreaterThan(idle);
+  });
+});
+
 describe('construction is visible (GDD §2.5)', () => {
   it('draws a progress arc while a turret assembles', () => {
     const stage = new Container();

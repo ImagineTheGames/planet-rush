@@ -46,7 +46,7 @@
 import { REPAIR_ENTRY_ORE, WHEEL_ORDER } from './build-wheel';
 import type { WheelSegmentId } from './build-wheel';
 import { SHIELD, TURRET } from '../sim/constants';
-import { UPGRADE_LADDER, UPGRADE_WHEEL_ORDER, UpgradeTrack } from './upgrade-wheel';
+import { UPGRADE_LADDER, UPGRADE_WHEEL_ORDER, upgradeWheelSlots } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
 
 // ---------------------------------------------------------------------------
@@ -225,6 +225,10 @@ export interface WheelSnapshot {
   readonly turrets: number;
   readonly shields: number;
   readonly tiers: UpgradeTiers;
+  /** Which upgrade-wheel level is drawn — a bought tier's cost float lands on the
+   *  wedge that is actually on screen (a weapon track's wedge only exists while
+   *  the sub-wheel is drilled in). Optional; default is the main wheel. */
+  readonly weaponOpen?: boolean;
 }
 
 /** One confirmed action the view should celebrate. */
@@ -275,16 +279,20 @@ export function detectConfirmations(prev: WheelSnapshot, next: WheelSnapshot): C
     if (amount > 0) out.push({ surface: 'build', index: BANK_INDEX, amount, deposit: true, core: false });
   }
 
-  // An upgrade tier was bought — float that tier's ladder cost.
-  for (let i = 0; i < UPGRADE_WHEEL_ORDER.length; i++) {
-    const track = UPGRADE_WHEEL_ORDER[i] as UpgradeTrack;
+  // An upgrade tier was bought — float that tier's ladder cost off the wedge that
+  // is actually drawn on the current level. The weapon tracks (DAMAGE, SPEED) live
+  // on the sub-wheel and the rest on the main wheel, so the float's index is the
+  // track's position in the drawn slots, not a fixed order (RATIFIED v0.2.2).
+  const slots = upgradeWheelSlots(next.weaponOpen ?? false);
+  for (const track of UPGRADE_WHEEL_ORDER) {
     const before = prev.tiers[track] ?? 0;
     const after = next.tiers[track] ?? 0;
-    if (after > before) {
-      // The cost of the tier just crossed (buying tier `before+1` costs costs[before]).
-      const cost = UPGRADE_LADDER[track].costs[before] ?? 0;
-      out.push({ surface: 'upgrade', index: i, amount: cost, deposit: false, core: false });
-    }
+    if (after <= before) continue;
+    const index = slots.findIndex((s) => s.kind === 'track' && s.track === track);
+    if (index < 0) continue; // the bought track's wedge isn't on this level — no float
+    // The cost of the tier just crossed (buying tier `before+1` costs costs[before]).
+    const cost = UPGRADE_LADDER[track].costs[before] ?? 0;
+    out.push({ surface: 'upgrade', index, amount: cost, deposit: false, core: false });
   }
 
   return out;

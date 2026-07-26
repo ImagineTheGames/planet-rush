@@ -113,6 +113,8 @@ export type { BuildButtonSignals } from './build-button';
 
 export {
   upgradeWheelModel,
+  upgradeWheelSlots,
+  weaponSummary,
   upgradeWedge,
   upgradeWedgeAngle,
   upgradeWedgeArc,
@@ -121,6 +123,8 @@ export {
   formatTrackValue,
   UpgradeTrack,
   UPGRADE_WHEEL_ORDER,
+  WHEEL_TRACK_ORDER,
+  WEAPON_GROUP,
   TRACK_ORDER,
   STOCK_TIERS,
   UPGRADE_LADDER,
@@ -130,7 +134,10 @@ export type {
   UpgradeWheelModel,
   UpgradeWheelSignals,
   UpgradeWedge,
+  UpgradeWedgeKind,
   UpgradeWedgeState,
+  UpgradeSlot,
+  UpgradeSummaryPip,
   UpgradeTiers,
   UpgradeLadder,
   UpgradeTrackSpec,

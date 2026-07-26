@@ -26,6 +26,10 @@ export * from './maps';
 export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
 export * from './state';
+// The one match-config model (mode + slots) and its dense compaction to a roster.
+export * from './match-config';
+// The one friend/foe predicate every targeting/collision/siege site routes through.
+export * from './allegiance';
 export * from './waves';
 export * from './match';
 export * from './step';

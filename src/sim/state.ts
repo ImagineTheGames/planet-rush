@@ -41,6 +41,18 @@ export interface Ship {
    *  `tiers` scales them. */
   readonly shipClass: ShipClass;
   /**
+   * The side this ship fights for (variable-slots Task A2), a plain
+   * hash/snapshot-safe int fixed at match start. FFA sets it to the ship's own
+   * id (teams-of-one); TEAMS shares one `team` across allies. `areEnemies`
+   * (`./allegiance`) is the ONLY reader — everything friend/foe routes through it.
+   *
+   * Optional so the `Ship` literals other agents build (net decode, bot/render
+   * fixtures) keep compiling; an absent team reads as the ship's own id, i.e.
+   * FFA — same discipline as `weaponCooldown`. It must NOT ride the per-tick
+   * snapshot (allegiance is static config; it rides matchStart — spike Trap 7).
+   */
+  team?: number;
+  /**
    * Tiers bought on the four upgrade tracks (GDD §2.5). Match-lifetime state:
    * upgrades persist through respawn, so nothing on the respawn path clears it —
    * and because the ladder *multiplies* the class base, a maxed Interceptor is
@@ -260,6 +272,14 @@ export interface BuildJob {
 export interface Planet {
   readonly id: number;
   readonly owner: PlayerId;
+  /**
+   * The side this planet belongs to (variable-slots Task A2) — matches its
+   * owner's ship `team`, so a shot never sieges an ally's home. FFA sets it to
+   * the owner id (teams-of-one). Optional, same backward-compatible reasoning as
+   * `Ship.team`: `Planet` literals other agents build without a team read as
+   * FFA. Static config, never on the per-tick snapshot (spike Trap 7).
+   */
+  team?: number;
   /** Static — planets do not move. */
   pos: Vec2;
   radius: number;
@@ -427,6 +447,16 @@ export type { RngDraw } from './rng';
 export interface PlayerSpec {
   readonly id: PlayerId;
   readonly shipClass: ShipClass;
+  /**
+   * The side this player fights for (variable-slots Task A2). Optional so every
+   * `PlayerSpec` literal other agents build (bots, harness, platform boot) keeps
+   * compiling — an absent team defaults to the player's own id at world-build,
+   * i.e. **FFA teams-of-one** (the same backward-compatible discipline as
+   * `Ship.weaponCooldown`). TEAMS supplies it explicitly; `configToPlayers`
+   * (`./match-config`) fills it from the lobby config. `areEnemies`
+   * (`./allegiance`) only ever compares two teams for equality.
+   */
+  readonly team?: number;
 }
 
 /** Match-creation parameters. All deterministic given `seed`. */
@@ -460,6 +490,8 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
   return {
     id: spec.id,
     shipClass: spec.shipClass,
+    // FFA teams-of-one: an unassigned spec fights as its own team (Task A2).
+    team: spec.team ?? spec.id,
     tiers: loadout.tiers,
     pos: { x: pos.x, y: pos.y },
     vel: { x: 0, y: 0 },
@@ -485,6 +517,8 @@ function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): 
   return {
     id: index,
     owner: spec.id,
+    // Same side as its owner's ship — FFA teams-of-one defaults to the owner id.
+    team: spec.team ?? spec.id,
     pos: { x: pos.x, y: pos.y },
     radius: PLANET.radius,
     coreHp: CORE_HP,

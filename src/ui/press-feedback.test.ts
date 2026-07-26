@@ -27,7 +27,7 @@ import {
 } from './press-feedback';
 import type { WheelSnapshot } from './press-feedback';
 import { REPAIR_ENTRY_ORE } from './build-wheel';
-import { STOCK_TIERS, TRACK_ORDER, UPGRADE_LADDER, UpgradeTrack } from './upgrade-wheel';
+import { STOCK_TIERS, UPGRADE_LADDER, UpgradeTrack, upgradeWheelSlots } from './upgrade-wheel';
 import { SHIELD, TURRET } from '../sim/constants';
 
 const REPAIR = buildSegmentIndex('repair');
@@ -134,16 +134,40 @@ describe('detectConfirmations — sim change → what to celebrate', () => {
     expect(out).toEqual([]);
   });
 
-  it('reads an upgrade tier as bought, floating that tier ladder cost', () => {
-    const power = UpgradeTrack.Power;
+  it('floats a main-wheel tier off its drawn wedge', () => {
+    // CARGO is drawn on the main wheel at slot 2 (WEAPON, ENGINE, CARGO, HULL).
+    const cargo = UpgradeTrack.Cargo;
     const before = snap({ tiers: { ...STOCK_TIERS } });
-    const after = snap({ tiers: { ...STOCK_TIERS, [power]: 1 } });
+    const after = snap({ tiers: { ...STOCK_TIERS, [cargo]: 1 } });
     const out = detectConfirmations(before, after);
     expect(out).toHaveLength(1);
     expect(out[0]!.surface).toBe('upgrade');
-    expect(out[0]!.index).toBe(TRACK_ORDER.indexOf(power));
-    expect(out[0]!.amount).toBe(UPGRADE_LADDER[power].costs[0]);
+    const slots = upgradeWheelSlots(false);
+    expect(out[0]!.index).toBe(slots.findIndex((s) => s.kind === 'track' && s.track === cargo));
+    expect(out[0]!.amount).toBe(UPGRADE_LADDER[cargo].costs[0]);
     expect(out[0]!.deposit).toBe(false);
+  });
+
+  it('floats a weapon-track tier off its sub-wheel wedge (weaponOpen)', () => {
+    // A weapon track is only bought with the sub-wheel drilled in; the float must
+    // land on the DAMAGE/SPEED wedge that is actually on screen, not a fixed slot.
+    const power = UpgradeTrack.Power;
+    const before = snap({ tiers: { ...STOCK_TIERS }, weaponOpen: true });
+    const after = snap({ tiers: { ...STOCK_TIERS, [power]: 1 }, weaponOpen: true });
+    const out = detectConfirmations(before, after);
+    expect(out).toHaveLength(1);
+    const slots = upgradeWheelSlots(true);
+    expect(out[0]!.index).toBe(slots.findIndex((s) => s.kind === 'track' && s.track === power));
+    expect(out[0]!.amount).toBe(UPGRADE_LADDER[power].costs[0]);
+  });
+
+  it('does not float a weapon-track buy while the main wheel is showing', () => {
+    // Its wedge isn't drawn (it's collapsed into WEAPON), so there is nowhere to
+    // float it — better silent than on the wrong wedge.
+    const power = UpgradeTrack.Power;
+    const before = snap({ tiers: { ...STOCK_TIERS }, weaponOpen: false });
+    const after = snap({ tiers: { ...STOCK_TIERS, [power]: 1 }, weaponOpen: false });
+    expect(detectConfirmations(before, after)).toEqual([]);
   });
 });
 

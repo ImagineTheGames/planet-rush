@@ -473,9 +473,19 @@ ship FFA-at-N; D–E add Teams as a layer; F is fleet-density hardening.
 
 ---
 
-## QUESTIONS FOR THE DEVELOPER
+## QUESTIONS FOR THE DEVELOPER — RATIFIED 2026-07-26
 
-Only a human can ratify these; the Director takes the doc from here.
+The developer answered all four (every recommendation accepted):
+1. **Hybrid**: octagon/oval regenerate as true N-planet arenas; compass/diamond
+   always place 8 with the extras as derelicts.
+1b. **Derelicts are LOOTABLE** — a home ore field anyone can scavenge.
+2. **Any team split allowed** — the lobby shows team counts, never blocks.
+3. **Friendly fire OFF** in Teams (the single `areEnemies` predicate).
+4. **Keep the 8 identity colours** + team underline/beacon motif (default,
+   veto-able — style-guide touch via Director/Art).
+Secondary defaults stand: min 2 to start, >=1 per team, host assigns bot teams.
+
+Original questions preserved below for the record.
 
 1. **Per-layout: empty derelicts, regenerate, or per-N variants?** octagon regenerates
    cleanly (equal gaps at any N) and oval is a one-line generalisation. compass and
