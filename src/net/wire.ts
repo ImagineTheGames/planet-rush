@@ -66,6 +66,15 @@ export type WireFrame = string | ArrayBuffer;
 /** Longest room code the server will even look at (codes are 4 chars). */
 export const MAX_ROOM_CODE_LENGTH = 8;
 
+/**
+ * Longest signed ticket the server will even look at (`src/net/ticket.ts`). A
+ * ticket is `base64url(payloadJSON).base64url(hmac)`: the payload is a three-field
+ * claims object and the signature a fixed 43-char base64url SHA-256, so a real
+ * ticket is a couple hundred bytes. This ceiling is generous headroom and still a
+ * hard bound on what an unauthenticated join can make the verifier hash.
+ */
+export const MAX_TICKET_LENGTH = 512;
+
 /** Most actions one input message may carry. The action union has seven verbs
  *  and a tick sensibly carries at most one of each; anything past that is a
  *  client trying to make the server do arithmetic on its behalf. */
@@ -110,16 +119,27 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       if (room === null) return null;
       const reclaim = raw['reclaim'];
       const token = raw['reclaimToken'];
+      const ticket = raw['ticket'];
       // A malformed reclaim is refused outright rather than quietly demoted to
       // a plain join: a client asking for a seat it cannot name must not be
       // handed a *different* seat instead (GDD §4.2 reconnect grace).
       if (reclaim !== undefined && !isSlot(reclaim)) return null;
       if (token !== undefined && (typeof token !== 'string' || token.length > 64)) return null;
+      // The ticket is bounded like every other field on this hostile-input
+      // surface, then carried through verbatim. It MUST be rebuilt here: this
+      // parser drops any field it does not name, so a ticket the parser ignores
+      // never reaches the Machine — and a Machine that fails closed then refuses
+      // every join (M9 fleet membership). The signature is checked later, on the
+      // Machine, by `verifyTicket`; here we only bound its size.
+      if (ticket !== undefined && (typeof ticket !== 'string' || ticket.length > MAX_TICKET_LENGTH)) {
+        return null;
+      }
       return {
         type: 'join',
         room,
         ...(isSlot(reclaim) ? { reclaim } : {}),
         ...(typeof token === 'string' ? { reclaimToken: token } : {}),
+        ...(typeof ticket === 'string' ? { ticket } : {}),
       };
     }
     case 'lobbyChoice': {
