@@ -28,7 +28,9 @@ import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
 import { SENSOR_RANGE } from '../sim/constants';
+import { inAtmosphere } from '../sim/buildings';
 import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
+import { atmosphereHaloSprite } from '../art/planets';
 import { shipSprite } from '../art/ships';
 import { spriteGraphics } from '../art/textures';
 
@@ -137,6 +139,11 @@ function makeUnitChunk(): Graphics {
 // so it reads as a torch bite, not an explosion (style-guide §8 "bright, punchy").
 const IMPACT_RADIUS = 7;
 
+// The atmosphere halo's breath (radians/sec). Keyed to sim time, not the wall
+// clock, so the frozen golden stays deterministic (goldens.spec.ts). ~4.5s
+// period — slow enough to read as breathing air, not a pulsing UI ring.
+const ATMOSPHERE_BREATH_RATE = 1.4;
+
 function makeImpactGlow(): Graphics {
   // Plasma cutting-torch impact (style-guide §1 Plasma, RESERVED energy hue).
   // Soft outer halo + a bright core, drawn once at unit radius and scaled per
@@ -213,6 +220,9 @@ export class Renderer {
    *  drawn like one: without it the play-field edge is an invisible wall a
    *  player crashes into "beside their planet" (which sits right on it). */
   private readonly boundaryLayer = new Container();
+  /** The atmosphere halos — behind the planets they ring, so a home's air sits
+   *  under its own furniture (body, turrets, overlay). Only own planets fill it. */
+  private readonly atmosphereLayer = new Container();
   private readonly planetLayer = new Container();
   private readonly turretLayer = new Container();
   private readonly asteroidLayer = new Container();
@@ -241,6 +251,12 @@ export class Renderer {
    *  One Graphics per planet, redrawn per frame — eight of them, and every one
    *  is a handful of arcs. */
   private readonly planetOverlay: Graphics[] = [];
+  /** A planet's atmosphere halo, keyed by planet index. Only the viewer's OWN
+   *  planet gets one (the halo is the deposit affordance — you cannot deposit at
+   *  a rival's). Built once from the art pipeline, then only positioned and faded
+   *  per frame; the owner it was built for is remembered so it is never rebuilt. */
+  private readonly planetHalo: (Graphics | null)[] = [];
+  private readonly planetHaloOwner: PlayerId[] = [];
   /** The arena boundary, drawn once. Static — the play bounds never move — so it
    *  is redrawn only if the bounds themselves change (they don't mid-match). */
   private boundaryGfx: Graphics | null = null;
@@ -263,11 +279,13 @@ export class Renderer {
   constructor(stage: Container, viewport: Viewport) {
     this.viewport = viewport;
 
-    // Back to front: planets (the map's furniture — big, static, and behind
+    // Back to front: your home's atmosphere halo (behind its own planet),
+    // planets (the map's furniture — big, static, and behind
     // everything that moves over them), turrets mounted on them, rocks, chunks,
     // muzzle flashes, impact glows (over the flash end), ships, turret shots.
     // Labels aid the layout registry + render tests.
     this.boundaryLayer.label = 'boundary';
+    this.atmosphereLayer.label = 'atmosphere';
     this.planetLayer.label = 'planets';
     this.turretLayer.label = 'turrets';
     this.asteroidLayer.label = 'asteroids';
@@ -278,6 +296,7 @@ export class Renderer {
     this.shotLayer.label = 'shots';
     this.worldRoot.addChild(
       this.boundaryLayer, // behind everything: the wall the arena is drawn inside
+      this.atmosphereLayer, // your home's air, under its planet furniture
       this.planetLayer,
       this.turretLayer,
       this.asteroidLayer,
@@ -395,6 +414,7 @@ export class Renderer {
 
     for (let i = 0; i < world.planets.length; i++) {
       const planet = world.planets[i]!;
+      this.drawAtmosphere(i, planet, viewerId, viewer, world.time);
       this.planetBody(i, planet);
 
       const overlay = this.overlayFor(i);
@@ -426,6 +446,54 @@ export class Renderer {
     }
 
     this.turretPool.hideFrom(turrets);
+  }
+
+  /**
+   * The atmosphere halo (GDD §2.3, p4-12): the deposit range, made visible. A
+   * soft, low-opacity air-glow at exactly `DEPOSIT_RANGE`, drawn only around the
+   * viewer's OWN living planet — the halo *is* the affordance, so a rival's world
+   * (where you cannot deposit) gets none. The radius derives from `DEPOSIT_RANGE`
+   * inside the sprite (`atmosphereHaloSprite`), so the air and the rule are one
+   * number; here we only place and fade it.
+   *
+   * Static-render discipline (GDD §4.3): the geometry is built once per owner and
+   * reused — a home's owner never changes mid-match, so this is one build all
+   * game. Per frame the halo only moves and fades: a gentle breath keyed to sim
+   * time (deterministic, so the frozen golden holds still), lifted toward full
+   * while a deposit is actually flowing — the viewer carrying ore inside its own
+   * atmosphere, the same predicate the sim drains on (`inAtmosphere`). Idle it is
+   * a hush; depositing it brightens, pairing with the ore-flight couriers.
+   */
+  private drawAtmosphere(
+    index: number,
+    planet: Planet,
+    viewerId: PlayerId,
+    viewer: Ship | undefined,
+    time: number,
+  ): void {
+    const own = planet.alive && planet.owner === viewerId;
+    let g = this.planetHalo[index];
+    if (!own) {
+      if (g) g.visible = false;
+      return;
+    }
+    if (!g || this.planetHaloOwner[index] !== planet.owner) {
+      g?.destroy();
+      g = spriteGraphics(atmosphereHaloSprite(planet.owner), planet.radius);
+      g.label = `atmosphere-${index}`;
+      this.planetHalo[index] = g;
+      this.planetHaloOwner[index] = planet.owner;
+      this.atmosphereLayer.addChild(g);
+    }
+    g.visible = true;
+    g.x = planet.pos.x;
+    g.y = planet.pos.y;
+    // 0..1 breath; flowing lifts the whole band up toward full opacity.
+    const breath = 0.5 + 0.5 * Math.sin(time * ATMOSPHERE_BREATH_RATE);
+    const flowing = viewer !== undefined && viewer.cargo > 1e-6 && inAtmosphere(viewer, planet);
+    const lo = flowing ? 0.82 : 0.42;
+    const hi = flowing ? 1 : 0.56;
+    g.alpha = lo + (hi - lo) * breath;
   }
 
   /** A planet's static body, drawn once — and again the one time it becomes a

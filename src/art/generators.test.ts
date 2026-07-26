@@ -21,14 +21,17 @@ import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite } from 
 import { ALL_SPRITES } from './catalogue';
 import { decalDigit, decalStrokes } from './decals';
 import {
+  atmosphereHaloSprite,
   beaconRingSprite,
   continentPolygons,
   damageRingSprite,
   planetSprite,
   planetVariantFor,
   repairAuraSprite,
+  ATMOSPHERE_HALO_RADIUS,
   PLANET_VARIANT_COUNT,
 } from './planets';
+import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
 import { shipSprite } from './ships';
 import { spriteKey, type SpriteDef } from './shapes';
 import { debrisFieldSprite, planetWreckSprite } from './wrecks';
@@ -47,6 +50,7 @@ const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => buildProgressSprite(0.4),
   () => planetWreckSprite(1),
   () => debrisFieldSprite(2),
+  () => atmosphereHaloSprite(0),
 ];
 
 describe('determinism (GDD §4.1)', () => {
@@ -156,6 +160,33 @@ describe('planets — four variants, arrangement only (style-guide §5)', () => 
     expect(planetVariantFor(0)).toBe(0);
     expect(planetVariantFor(4)).toBe(0);
     expect(planetVariantFor(-1)).toBe(3);
+  });
+
+  it('draws the atmosphere halo at exactly DEPOSIT_RANGE — visual and rule never drift (p4-12)', () => {
+    // The unit-space edge is DEPOSIT_RANGE / PLANET.radius and nothing else, so
+    // the halo is the sim constant, expressed as art.
+    expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / PLANET.radius);
+
+    const def = atmosphereHaloSprite(0);
+    // The outermost disc *is* the atmosphere edge; scaled by the planet radius
+    // (how the renderer draws it) it lands on DEPOSIT_RANGE world units exactly.
+    const outerUnit = Math.max(
+      ...def.shapes.map((s) => (s.path.kind === 'circle' ? s.path.r : 0)),
+    );
+    expect(outerUnit).toBe(ATMOSPHERE_HALO_RADIUS);
+    expect(outerUnit * PLANET.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
+    // The sprite's own square is sized to the halo, not clipped to the planet.
+    expect(def.extent).toBe(ATMOSPHERE_HALO_RADIUS);
+  });
+
+  it('paints the halo only in the player colour — air is identity trim, never a material (§3)', () => {
+    for (const slot of [0, 3, 7]) {
+      const def = atmosphereHaloSprite(slot);
+      expect(def.shapes.length).toBeGreaterThan(0);
+      expect(def.shapes.every((s) => s.role === 'identity')).toBe(true);
+    }
+    // Distinct owners ⇒ distinct halos (colour and cache key both move).
+    expect(atmosphereHaloSprite(0)).not.toEqual(atmosphereHaloSprite(1));
   });
 
   it('scales the damage ring by remaining core HP, quantised so the pool holds', () => {

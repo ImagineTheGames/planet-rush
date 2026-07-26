@@ -23,6 +23,7 @@
  */
 
 import { mulberry32 } from '@shared/types';
+import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
 import { DERIVED, PALETTE, playerColor } from './palette';
 import {
   annulusPoints,
@@ -227,4 +228,63 @@ export function repairAuraSprite(): SpriteDef {
       ),
     ),
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// The atmosphere halo (p4-12) — the deposit range, made visible
+// ---------------------------------------------------------------------------
+
+/**
+ * The halo's outer edge, in **unit space** (planet radius = 1) — derived from
+ * the sim's `DEPOSIT_RANGE` and nothing else, so the air the player sees and the
+ * radius the rule uses are one number. The renderer draws the sprite scaled by
+ * the planet radius (`spriteGraphics(def, planet.radius)`), which lands this edge
+ * on exactly `DEPOSIT_RANGE` world units; `generators.test.ts` asserts the
+ * product, and the `DEPOSIT_RANGE` doc-comment (sim) promises the same. Change
+ * the sim constant and the halo follows — the two can never drift apart.
+ *
+ * `PLANET.radius` is the same unit the sim measures `DEPOSIT_RANGE` in (both are
+ * centre-to-centre world units), so the ratio is exact for a home world.
+ */
+export const ATMOSPHERE_HALO_RADIUS = DEPOSIT_RANGE / PLANET.radius;
+
+/**
+ * The atmosphere halo (p4-12; GDD §2.3): a soft, low-opacity air-glow around a
+ * player's **own** planet, reaching to exactly `DEPOSIT_RANGE` — the radius
+ * inside which a ship's hold auto-deposits (ratified p4: "just be in that
+ * atmosphere"). The halo *is* the affordance: enemy planets get none, because
+ * you cannot deposit there, so a ring of your own colour is the visible answer
+ * to "where do I unload?".
+ *
+ * It reads as air, not a UI circle (the brief): concentric discs in the player's
+ * colour, densest at the planet limb and thinning to nothing at the atmosphere
+ * edge — a radial gradient approximated in the flat-fill IR. Drawn behind the
+ * planet, so only the outward glow past the limb is seen; the dense inner discs
+ * fall behind the ocean body. Player colour ⇒ role `identity` (style-guide §3),
+ * the same channel the beacon ring wears.
+ *
+ * The alpha here is the **bright, ore-flowing** density. The renderer breathes it
+ * gently on `world.time` and, while a deposit is actually flowing, holds it near
+ * full — an idle halo is dimmed to a hush, a depositing one brightens (pairs with
+ * the ore-flight couriers). Static-render discipline: built once per owner, then
+ * only faded per frame.
+ */
+export function atmosphereHaloSprite(playerId: number): SpriteDef {
+  const color = playerColor(playerId);
+  const r = ATMOSPHERE_HALO_RADIUS;
+  // [fraction of the halo radius, fill alpha] — largest/faintest first so the
+  // discs stack back-to-front into a limb-bright, edge-faint gradient. The
+  // outermost disc sits at the full radius: the atmosphere edge is DEPOSIT_RANGE.
+  const stops: readonly (readonly [number, number])[] = [
+    [1.0, 0.035], // the atmosphere edge — exactly DEPOSIT_RANGE
+    [0.8, 0.05],
+    [0.6, 0.065],
+    [0.4, 0.08],
+    [0.26, 0.1], // 0.26·4 ≈ r 1.04: laps just over the planet limb, no seam
+  ];
+  return sprite(
+    `planet/atmosphere/p${playerId}`,
+    round(r),
+    stops.map(([frac, alpha]) => circle(0, 0, round(r * frac), fill(color, 'identity', alpha))),
+  );
 }
