@@ -28,31 +28,35 @@ export interface Vec2 {
 /**
  * The public geometry of a turret's muzzle flash for the tick it looses a shot
  * (GDD §2.6). A turret's damage rides a pooled projectile, but its *tell* is the
- * flash at the barrel; the sim clamps the flash to the tracked ship's surface so
- * the renderer draws a muzzle bloom or short tracer stopping at what the shot is
- * aimed at instead of running full length through it.
+ * flash at the barrel — a short flare off the muzzle, **never a line to the
+ * target**. The mining/attack laser retired to a projectile (ratified amendment
+ * v0.3, docs/design-amendments.md); the shot is the pooled projectile, so this
+ * record only reports "this turret fired, aimed this way", and a renderer draws a
+ * burst at the muzzle from it.
  *
  * Present (non-null on `Turret.muzzle`) only on ticks the turret actually fires;
  * `null` otherwise. Plain data, so it serializes for snapshots and compares
  * cleanly under the determinism replay (GDD §4.8).
  *
- * (Ships no longer carry one: the mining/attack laser retired to a projectile —
- * ratified amendment v0.3, docs/design-amendments.md — so a ship's shots are
- * drawn from the projectile pool, not a standing line.)
+ * (Ships never carried one either — same amendment: a ship's shots are drawn from
+ * the projectile pool, not a standing line.)
  */
 export interface Muzzle {
   /** Flash origin — the firing turret's barrel tip this tick. */
   origin: Vec2;
-  /** Unit direction the shot travels (cos/sin of the barrel's facing). */
+  /** Unit direction of the barrel this tick (cos/sin of its facing). */
   dir: Vec2;
   /**
-   * World-space point the shot is aimed at (the tracked ship's near surface), or
-   * `null` when it reaches full range unobstructed.
+   * Retained for wire/serialization compatibility, but the sim always emits
+   * `null`: the flash carries no target-side impact point — the projectile owns
+   * the impact. A renderer draws no glow out at the ship from the flash.
    */
   hitPoint: Vec2 | null;
   /**
-   * Distance from `origin` to `hitPoint`, clamped to max range. Equals the range
-   * when nothing is hit.
+   * Length of the muzzle *flare* off `origin` along `dir` (world units) — a short
+   * fixed stub (`TURRET.muzzleFlashLength`), the burst at the barrel. NOT the
+   * distance to the target: it must never reach the ship the turret fired at
+   * (v0.2.2 field report — the "turrets still flash a mining laser" regression).
    */
   length: number;
 }
