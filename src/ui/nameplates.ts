@@ -118,6 +118,13 @@ export interface Nameplate {
   readonly kind: NameplateKind;
   /** The resolved, length-clamped label text. */
   readonly text: string;
+  /** The owner's **bot difficulty** as a recessive metadata suffix — `(EASY)` /
+   *  `(MEDIUM)` / `(HARD)` (field request v0.2.2) — or `''` for a HUMAN seat (they
+   *  never carry one) and any slot the difficulty table does not name. The view
+   *  draws it dimmer than the name so it reads as metadata, not identity. Kept
+   *  separate from {@link text} precisely so the two can be weighted differently;
+   *  it flows through the SAME per-slot seam the name does ({@link resolveDifficultySuffix}). */
+  readonly suffix: string;
   /** The owner's identity colour (style-guide §3), from the ratified roster. */
   readonly color: number;
   /** Entity centre, screen px — the view centres the label here and offsets it up. */
@@ -140,6 +147,17 @@ export interface Nameplate {
  * populate the exact same array with no change to this module.
  */
 export type NameTable = readonly (string | undefined)[];
+
+/**
+ * The per-slot **difficulty** table, the exact mirror of {@link NameTable} and
+ * fed through the same seam (field request v0.2.2). Indexed by {@link PlayerId};
+ * a bot seat carries its tier word (`'easy' | 'medium' | 'hard'`, or any label —
+ * the resolver upper-cases and wraps it), and a **human seat is left empty** so it
+ * never shows a suffix. Offline it is built from the lobby's per-seat difficulty
+ * picks alongside the name table; when online lands (m9) the room's slot
+ * difficulties populate the same array with no change to this module.
+ */
+export type DifficultyTable = readonly (string | undefined)[];
 
 /** Tunable knobs for {@link nameplateModel}. All optional; the defaults are the
  *  field-request calls (own-ship label off, the two alpha levels above). */
@@ -184,6 +202,21 @@ export function fallbackName(owner: PlayerId): string {
 }
 
 /**
+ * Resolve a slot's **difficulty suffix** from the difficulty table (field request
+ * v0.2.2): a bot seat's tier becomes the recessive metadata token `(EASY)` /
+ * `(MEDIUM)` / `(HARD)`, upper-cased and parenthesised so it reads as metadata;
+ * a human/absent/blank slot resolves to `''` (no suffix — humans never carry one).
+ * The exact counterpart of {@link resolveName}, so the same per-slot seam that
+ * decides "what name" decides "what difficulty tag."
+ */
+export function resolveDifficultySuffix(difficulties: DifficultyTable, owner: PlayerId): string {
+  if (!isOwnedSlot(owner)) return '';
+  const raw = difficulties[Math.floor(owner)];
+  const tier = typeof raw === 'string' ? raw.trim() : '';
+  return tier.length > 0 ? `(${tier.toUpperCase()})` : '';
+}
+
+/**
  * Whether this entity gets a label this frame, in one place so it can be
  * unit-tested: owned, alive, and — for the local ship only — not suppressed.
  */
@@ -198,13 +231,15 @@ export function nameplateGetsLabel(e: Nameable, opts: NameplateOptions = {}): bo
 
 /**
  * Turn a frame's label-bearing entities into the labels to draw. Pure: it filters
- * by {@link nameplateGetsLabel}, resolves text + colour + fade, and passes screen
- * position through untouched. Output order follows input, all a pooled view needs.
+ * by {@link nameplateGetsLabel}, resolves text + difficulty suffix + colour + fade,
+ * and passes screen position through untouched. Output order follows input, all a
+ * pooled view needs.
  */
 export function nameplateModel(
   entities: readonly Nameable[],
   names: NameTable,
   opts: NameplateOptions = {},
+  difficulties: DifficultyTable = [],
 ): Nameplate[] {
   const full = opts.fullAlpha ?? NAMEPLATE_FULL_ALPHA;
   const fade = opts.fadeAlpha ?? NAMEPLATE_FADE_ALPHA;
@@ -215,6 +250,7 @@ export function nameplateModel(
       owner: e.owner,
       kind: e.kind,
       text: resolveName(names, e.owner),
+      suffix: resolveDifficultySuffix(difficulties, e.owner),
       color: playerColor(e.owner),
       x: e.pos.x,
       y: e.pos.y,

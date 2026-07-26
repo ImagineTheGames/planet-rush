@@ -57,6 +57,14 @@ export const NAMEPLATE_SHIP_GAP = 3;
 /** Clearance above a planet's screen radius (its HP pin) to the label, CSS px. */
 export const NAMEPLATE_PLANET_GAP = 8;
 
+/** Horizontal gap between the name and its difficulty suffix, CSS px — enough to
+ *  read "SABLE (HARD)" as name-then-metadata, not one run-on word. */
+export const NAMEPLATE_SUFFIX_GAP = 3;
+/** How much dimmer the difficulty suffix is than the name it trails — the "dimmer
+ *  weight than the name" the field request asks for (v0.2.2), applied as a factor
+ *  on the name's own alpha so it recedes in step through the combat fade too. */
+export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
+
 /**
  * One label the layer actually drew this frame (post-cull), captured only when
  * {@link NameplateView.enableDebugCapture} has been called — the ?debug=1
@@ -68,8 +76,11 @@ export const NAMEPLATE_PLANET_GAP = 8;
 export interface DrawnNameplate {
   owner: PlayerId;
   kind: NameplateKind;
-  /** The text drawn. */
+  /** The name text drawn. */
   text: string;
+  /** The recessive difficulty suffix drawn beside the name — `(HARD)` etc., or
+   *  `''` for a human seat (field request v0.2.2). */
+  suffix: string;
   /** The tint (owner identity colour) applied. */
   color: number;
   /** Label centre-x in screen space, CSS px (the entity it tracks). */
@@ -82,6 +93,9 @@ export interface DrawnNameplate {
 
 export class NameplateView extends Container {
   private readonly labels: Text[] = [];
+  /** Parallel pool for the recessive difficulty suffix, one per name slot; a name
+   *  with no suffix (a human, or an unfed difficulty table) hides its entry. */
+  private readonly suffixes: Text[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew. */
   private drawnBounds: Rect | null = null;
 
@@ -110,28 +124,48 @@ export class NameplateView extends Container {
       t.tint = plate.color;
       t.alpha = plate.alpha;
 
+      // The recessive difficulty suffix (field request v0.2.2), trailing the name
+      // in the owner colour but a step dimmer, so it reads as metadata not identity.
+      const st = this.suffixSlot(drawn);
+      if (st.text !== plate.suffix) st.text = plate.suffix;
+      const hasSuffix = plate.suffix.length > 0;
+      const suffixWidth = hasSuffix ? NAMEPLATE_SUFFIX_GAP + st.width : 0;
+
       // Bottom-centre anchor: position the label's baseline just above the
       // entity's status cluster, so it grows upward and never into the bar/ship.
       const bottom = plate.y - this.clusterClearance(plate);
       const width = t.width;
       const height = t.height;
       const left = plate.x - width / 2;
+      // The suffix hangs off the name's right edge, so the drawn unit runs a touch
+      // wider than the name alone — cull and bounds must count it as one piece.
+      const right = left + width + suffixWidth;
       const top = bottom - height;
 
       // Cull anything that would spill off the canvas: a partial label reads worse
       // than none, and a clipped rect would break the `full` contract.
-      if (left < 0 || top < 0 || left + width > viewportWidth || top + height > viewportHeight) {
+      if (left < 0 || top < 0 || right > viewportWidth || top + height > viewportHeight) {
+        st.visible = false;
         continue;
       }
 
       t.visible = true;
       t.position.set(plate.x, bottom);
+      if (hasSuffix) {
+        st.visible = true;
+        st.tint = plate.color;
+        st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
+        // Left-anchored just past the name's right edge, sharing its baseline.
+        st.position.set(left + width + NAMEPLATE_SUFFIX_GAP, bottom);
+      } else {
+        st.visible = false;
+      }
       if (this.debugCapture) this.recordDebug(drawn, plate, top);
       drawn++;
 
       if (left < minX) minX = left;
       if (top < minY) minY = top;
-      if (left + width > maxX) maxX = left + width;
+      if (right > maxX) maxX = right;
       if (top + height > maxY) maxY = top + height;
     }
 
@@ -172,13 +206,14 @@ export class NameplateView extends Container {
   private recordDebug(i: number, plate: Nameplate, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, color: plate.color, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, color: plate.color, x: plate.x, y: top, local: plate.local };
       this.debugDrawn[i] = d;
       return;
     }
     d.owner = plate.owner;
     d.kind = plate.kind;
     d.text = plate.text;
+    d.suffix = plate.suffix;
     d.color = plate.color;
     d.x = plate.x;
     d.y = top;
@@ -222,9 +257,29 @@ export class NameplateView extends Container {
     return t;
   }
 
+  /** The pooled suffix Text for name slot `i` — left-anchored so it hangs off the
+   *  right edge of the centred name, on the same baseline (field request v0.2.2). */
+  private suffixSlot(i: number): Text {
+    let t = this.suffixes[i];
+    if (!t) {
+      t = new Text({
+        text: '',
+        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: 0.5 },
+      });
+      t.anchor.set(0, 1); // bottom-left: sits just past the name, same baseline
+      this.suffixes[i] = t;
+      this.addChild(t);
+    }
+    return t;
+  }
+
   private hideFrom(count: number): void {
     for (let i = count; i < this.labels.length; i++) {
       const t = this.labels[i];
+      if (t) t.visible = false;
+    }
+    for (let i = count; i < this.suffixes.length; i++) {
+      const t = this.suffixes[i];
       if (t) t.visible = false;
     }
   }

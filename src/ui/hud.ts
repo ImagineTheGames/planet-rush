@@ -79,7 +79,7 @@ import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
 import { nameplateModel } from './nameplates';
-import type { Nameable, NameTable } from './nameplates';
+import type { DifficultyTable, Nameable, NameTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
 import type { DrawnNameplate } from './nameplates-view';
 import {
@@ -278,6 +278,10 @@ export interface HudFrame {
   /** Per-slot name table (from the lobby's slot state — local name + bot cast).
    *  Default: none ⇒ every label falls back to its `P{n}` identity tag. */
   readonly names?: NameTable;
+  /** Per-slot difficulty table, mirroring {@link names} (field request v0.2.2): a
+   *  bot seat's tier becomes a recessive `(EASY)`/`(MEDIUM)`/`(HARD)` suffix, a
+   *  human seat is left empty so it shows none. Default: none ⇒ no suffixes. */
+  readonly difficulties?: DifficultyTable;
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
@@ -290,6 +294,7 @@ const NO_COMBATANTS: readonly Combatant[] = [];
 /** Reused empties for the nameplate feed, same zero-allocation discipline. */
 const NO_NAMEABLES: readonly Nameable[] = [];
 const NO_NAMES: NameTable = [];
+const NO_DIFFICULTIES: DifficultyTable = [];
 
 /** Fallback screen radius for the own-ship over-bar when the frame carries no
  *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
@@ -882,9 +887,12 @@ export class Hud extends Container {
    *  layer stacked above the health bars. */
   private updateNameplates(frame: HudFrame): void {
     const entities = frame.nameables ?? NO_NAMEABLES;
-    const plates = nameplateModel(entities, frame.names ?? NO_NAMES, {
-      showOwnShipLabel: frame.showOwnShipLabel ?? false,
-    });
+    const plates = nameplateModel(
+      entities,
+      frame.names ?? NO_NAMES,
+      { showOwnShipLabel: frame.showOwnShipLabel ?? false },
+      frame.difficulties ?? NO_DIFFICULTIES,
+    );
     this.nameplates.update(plates, this.screenWidth, this.screenHeight);
   }
 
