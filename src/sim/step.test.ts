@@ -3,10 +3,11 @@
  *
  * The four contract checks from the brief:
  *   1. determinism — two runs, same inputs, deep-equal states;
- *   2. the beam mines at 0.5 ore/s (Vanguard baseline);
+ *   2. mining chips an asteroid at ~0.5 ore/s (Vanguard baseline) — a projectile
+ *      now, not a beam (ratified amendment v0.3);
  *   3. the hold caps at capacity;
  *   4. a ship reflects off an asteroid.
- * Plus a few guards around world construction and the beam raycast.
+ * Plus a few guards around world construction and the one weapon system.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -150,19 +151,57 @@ describe('determinism (GDD §4.8)', () => {
   });
 });
 
-// --- 2. beam mines at 0.5 ore/s -------------------------------------------
+// --- 2. mining is shooting: a projectile chips ~0.5 ore/s (amendment v0.3) ----
 
-describe('beam mining (GDD §2.3, §2.8)', () => {
-  it('a Vanguard mines an asteroid at 0.5 ore/s', () => {
+describe('projectile mining (ratified amendment v0.3 — mining is shooting)', () => {
+  it('a Vanguard mines an asteroid by shooting it, at ~0.5 ore/s at the face', () => {
+    // Point-blank-ish manual fire straight at a rock. Shots land one fire
+    // interval apart (the weapon is a pipeline), so ore per second at the mining
+    // face is yield ⁄ fireInterval = MINING_RATE — the same rate the old beam
+    // cut at (a touch under, by the one-off shot-travel latency).
     const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 }); // faces +x
-    const rock = makeAsteroid({ id: 0, pos: { x: 300, y: 100 }, radius: 30, ore: 20 });
+    const rock = makeAsteroid({ id: 0, pos: { x: 250, y: 100 }, radius: 30, ore: 40 });
     const world = emptyWorld({ ships: [ship], asteroids: [rock] });
 
+    const SECONDS = 12;
     const inputs: Inputs = [{ id: 0, actions: [fire()] }]; // manual, straight ahead
-    for (let t = 0; t < 60; t++) step(world, inputs); // 60 ticks ≈ 1 s
+    for (let t = 0; t < 60 * SECONDS; t++) step(world, inputs);
 
     const oreMined = rock.maxOre - world.asteroids[0]!.ore;
-    expect(oreMined).toBeCloseTo(MINING_RATE, 6); // 0.5 ore in one second
+    const rate = oreMined / SECONDS;
+    expect(oreMined).toBeGreaterThan(0); // it is actually mining
+    // Within ~15% of the beam's old rate, and never above it (a shot cannot chip
+    // more than one fire-interval's yield per interval).
+    expect(rate).toBeGreaterThan(MINING_RATE * 0.85);
+    expect(rate).toBeLessThanOrEqual(MINING_RATE + 1e-6);
+  });
+
+  it('mined ore drifts into the hold — the tractor rule is unchanged (GDD §2.3)', () => {
+    // A ship mines a rock right in front of it; the chunks it chips off tractor
+    // back and fill its hold (cap 2 for a Vanguard). Sited mid-arena, clear of the
+    // edge margin that (correctly) keeps real spawns off the wall.
+    const ship = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0 });
+    const rock = makeAsteroid({ id: 0, pos: { x: 1130, y: 1000 }, radius: 30, ore: 40 });
+    const world = emptyWorld({ ships: [ship], asteroids: [rock] });
+
+    const inputs: Inputs = [{ id: 0, actions: [fire()] }];
+    for (let t = 0; t < 60 * 30; t++) step(world, inputs);
+    expect(world.ships[0]!.cargo).toBe(world.ships[0]!.cargoCap); // filled to the cap
+  });
+
+  it('a shot cannot pass through a rock to a ship behind it ("you cannot shoot through things")', () => {
+    // The retired clamp-to-hit guarantee, now enforced by projectile collision:
+    // a rock in the line eats the shot (and is mined) before it reaches the enemy.
+    const shooter = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 }); // faces +x
+    const rock = makeAsteroid({ id: 0, pos: { x: 220, y: 100 }, radius: 30, ore: 40 });
+    const enemy = makeShip({ id: 1, pos: { x: 500, y: 100 }, spawnProtect: 0 });
+    const world = emptyWorld({ ships: [shooter, enemy], asteroids: [rock] });
+
+    const inputs: Inputs = [{ id: 0, actions: [fire()] }];
+    for (let t = 0; t < 120; t++) step(world, inputs);
+
+    expect(world.ships[1]!.hull).toBe(enemy.maxHull); // never reached — the rock blocked it
+    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and the rock was mined
   });
 
   it('the weapon fires projectiles that damage an enemy ship (one beam, one stat)', () => {
@@ -201,30 +240,9 @@ describe('beam mining (GDD §2.3, §2.8)', () => {
   });
 });
 
-// --- beam hit geometry (GDD §4.1) -----------------------------------------
+// --- weapon projectile geometry (GDD §4.1, amendment v0.3) -----------------
 
-describe('beam hit geometry (GDD §4.1)', () => {
-  it('hitPoint sits on the mined asteroid and length is the distance to it', () => {
-    const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 }); // faces +x
-    const rock = makeAsteroid({ id: 0, pos: { x: 300, y: 100 }, radius: 30, ore: 20 });
-    const world = emptyWorld({ ships: [ship], asteroids: [rock] });
-
-    step(world, [{ id: 0, actions: [fire()] }]);
-
-    const beam = world.ships[0]!.beam!;
-    expect(beam).not.toBeNull();
-    // Nearest intersection is at centerDist(200) - radius(30) = 170.
-    expect(beam.length).toBeCloseTo(170, 6);
-    expect(beam.hitPoint).not.toBeNull();
-    expect(beam.hitPoint!.x).toBeCloseTo(270, 6);
-    expect(beam.hitPoint!.y).toBeCloseTo(100, 6);
-    // hitPoint matches the damage target: it lies on that asteroid's surface,
-    // and that asteroid is the one losing ore.
-    const hp = beam.hitPoint!;
-    expect(Math.hypot(hp.x - rock.pos.x, hp.y - rock.pos.y)).toBeCloseTo(rock.radius, 6);
-    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre);
-  });
-
+describe('weapon projectile geometry (GDD §4.1)', () => {
   it('a weapon shot flies from the muzzle toward the ship it damages', () => {
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: 0 });
@@ -233,8 +251,8 @@ describe('beam hit geometry (GDD §4.1)', () => {
     const before = target.hull;
     step(world, [{ id: 0, actions: [fire()] }]);
 
-    // No mining beam for a weapon shot; a ship-kind projectile is born at the
-    // muzzle heading +x toward the target (design amendment v0.2).
+    // No mining beam (retired, amendment v0.3); a ship-kind projectile is born
+    // at the muzzle heading +x toward the target.
     expect(world.ships[0]!.beam).toBeNull();
     const shots = activeProjectilesOf(world, 0);
     expect(shots).toHaveLength(1);
@@ -261,17 +279,15 @@ describe('beam hit geometry (GDD §4.1)', () => {
     expect(shots[0]!.vel.y).toBeCloseTo(0, 6);
   });
 
-  it('nearest of several targets wins', () => {
+  it('the nearer of two aligned rocks is mined; the one behind it is untouched', () => {
     const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 }); // +x
     const near = makeAsteroid({ id: 0, pos: { x: 700, y: 500 }, radius: 30, ore: 20 });
     const far = makeAsteroid({ id: 1, pos: { x: 900, y: 500 }, radius: 30, ore: 20 });
     const world = emptyWorld({ ships: [ship], asteroids: [near, far] });
 
-    step(world, [{ id: 0, actions: [fire()] }]);
+    for (let t = 0; t < 120; t++) step(world, [{ id: 0, actions: [fire()] }]);
 
-    const beam = world.ships[0]!.beam!;
-    expect(beam.length).toBeCloseTo(170, 6); // 200 - 30, the near rock
-    // Only the near rock is mined; the far one is occluded and untouched.
+    // Every shot dies on the near rock; the far one is occluded and untouched.
     expect(world.asteroids[0]!.ore).toBeLessThan(near.maxOre);
     expect(world.asteroids[1]!.ore).toBe(far.maxOre);
   });
@@ -296,16 +312,28 @@ describe('beam hit geometry (GDD §4.1)', () => {
     expect(world.ships[1]!.hull).toBeLessThan(before);
   });
 
-  it('beam clears to null on the tick the ship stops firing', () => {
-    const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 });
-    const rock = makeAsteroid({ id: 0, pos: { x: 300, y: 100 }, radius: 30, ore: 20 });
+  it('Ship.beam is a mining indicator only — set while mining, null while fighting', () => {
+    // The beam is retired as a mechanism (a projectile does the mining and the
+    // damage); Ship.beam survives as a pure tell the netcode firing bit reads —
+    // non-null on a tick the ship is mining a rock, null when it shoots an enemy.
+    const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+    const rock = makeAsteroid({ id: 0, pos: { x: 700, y: 500 }, radius: 30, ore: 20 });
     const world = emptyWorld({ ships: [ship], asteroids: [rock] });
 
+    // Mining a rock ahead: the tell is published, but a projectile does the work.
     step(world, [{ id: 0, actions: [fire()] }]);
     expect(world.ships[0]!.beam).not.toBeNull();
+    expect(world.projectiles.some((p) => p.kind === 'ship')).toBe(true); // shot, not ray
+    for (let t = 0; t < 40; t++) step(world, [{ id: 0, actions: [fire()] }]);
+    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and it is chipping
 
-    step(world, [{ id: 0, actions: [] }]); // no fire this tick
-    expect(world.ships[0]!.beam).toBeNull();
+    // Shooting an enemy (a ship at +y, no rock ahead): the tell stays null — the
+    // beam is not a combat tell (combat is a projectile the renderer draws itself).
+    const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: Math.PI / 2 });
+    const enemy = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
+    const combat = emptyWorld({ ships: [shooter, enemy] });
+    step(combat, [{ id: 0, actions: [fire()] }]);
+    expect(combat.ships[0]!.beam).toBeNull();
   });
 });
 

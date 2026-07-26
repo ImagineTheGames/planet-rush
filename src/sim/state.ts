@@ -52,9 +52,9 @@ export interface Ship {
   /** Home spawn point — where the player's planet sits; respawn returns here
    *  (GDD §2.7). Day 1 has no planets, so this is just the ring spawn. */
   home: Vec2;
-  /** Facing, radians. The manual beam fires along this. Resolved once per tick
-   *  by the facing ladder (aim input → auto-aim target → velocity → hold) and
-   *  always turn-rate limited — it never snaps (see `resolveFacing`). */
+  /** Facing, radians. A manual weapon shot fires along this. Resolved once per
+   *  tick by the facing ladder (aim input → auto-aim target → velocity → hold)
+   *  and always turn-rate limited — it never snaps (see `resolveFacing`). */
   angle: number;
   /** Current hull HP. Ships are cheap and not repairable (GDD §2.5). */
   hull: number;
@@ -81,12 +81,18 @@ export interface Ship {
   eliminated: boolean;
   /** Collision radius. */
   radius: number;
-  /** Public **mining**-beam geometry for the tick it is cutting a rock, else
-   *  `null` (GDD §4.1, design amendment v0.2). The sim's raycast finds the
-   *  nearest asteroid for mining; this exposes it so the renderer stops the beam
-   *  at the rock it strikes. Ship-vs-ship/structure *weapon* fire no longer rides
-   *  this beam — it is a pooled projectile now (`./projectiles`) — so `beam` is a
-   *  pure mining tell: non-null only when this ship is actually mining. */
+  /**
+   * **Mining indicator tell** — retired as a *mechanism* (ratified amendment v0.3:
+   * "the mining laser goes away, it should be a projectile"). No ray mines or
+   * damages any more — a pooled projectile chips rock and bites hulls
+   * (`./projectiles`). What survives is a pure tell: non-null only on a tick this
+   * ship is **mining** a rock (origin → rock surface), `null` while it shoots an
+   * enemy or empty space. It carries no damage and does no mining; it is the
+   * signal the netcode "firing" bit (`src/net/snapshot.ts`) and the renderer read
+   * across the agent-ownership boundary, so the sim keeps publishing it exactly
+   * where the retired beam did. Its full removal (and the beam VFX retirement) is
+   * a coordinated render/net follow-up the sim cannot make unilaterally.
+   */
   beam: Beam | null;
   /** Seconds until the ship's weapon may loose its next projectile (0 = ready).
    *  The weapon fires on `SHIP_WEAPON.fireInterval`, the projectile analogue of
@@ -288,6 +294,17 @@ export interface Projectile {
   radius: number;
   /** Seconds of flight left before it despawns. */
   life: number;
+  /**
+   * Ore this shot chips if it strikes an asteroid — mining is shooting now
+   * (ratified amendment v0.3). One projectile carries two payloads: `damage` for
+   * a hull/structure, `mineYield` for a rock, and what it hits first decides
+   * which applies. Set on every ship weapon shot (`fireShipProjectile` =
+   * `shipMineYield`); absent on a turret shot (turrets do not mine) and on a
+   * wire-decoded shot, where it reads as `0` — the authoritative server already
+   * chipped the ore, so a predicted/decoded shot must not chip it twice. Same
+   * backward-compatible optional discipline as `kind` / `Turret.muzzle`.
+   */
+  mineYield?: number;
   /**
    * What fired this shot (design amendment v0.2): a `'ship'` weapon projectile or
    * a `'turret'` defensive shot. Both fly and die the same way; the difference is

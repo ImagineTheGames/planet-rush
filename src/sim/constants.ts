@@ -196,6 +196,28 @@ export const SHIP_WEAPON = {
  */
 export const PROJECTILE_CORE_FACTOR: Tunable<number> = BEAM_DPS_CORE / BEAM_DPS_SHIP;
 
+/**
+ * Ore chipped from an asteroid by ONE weapon projectile that strikes it —
+ * **mining is shooting now** (ratified amendment v0.3, `docs/design-amendments.md`:
+ * "the mining laser should go away, it should be a projectile as well"). The
+ * segment-vs-circle mining beam is gone; a projectile hit chips ore chunks, and
+ * the tractor rules (GDD §2.3) are unchanged — only the chipping mechanism did.
+ *
+ * This is the Vanguard baseline; a class's actual per-hit yield scales by its
+ * beam stat (`shipMineYield`), exactly as the old continuous mining rate did —
+ * one beam, one stat (GDD §2.5).
+ *
+ * Sized so a ship holding fire at the mining face extracts ore at the SAME rate
+ * the old beam did. Shots land one `SHIP_WEAPON.fireInterval` apart (the weapon
+ * is a pipeline — travel time is a one-off latency, not a rate cap), so ore per
+ * second at contact = yield ⁄ fireInterval = `MINING_RATE`. It is *derived* from
+ * the two constants it balances between rather than typed loose, so a retune of
+ * either keeps the per-hit chip and the continuous rate it targets in lockstep,
+ * and total-ore-per-asteroid stays exactly as ratified (each chip draws down the
+ * rock's finite `ore`). TUNABLE
+ */
+export const MINING_YIELD_PER_HIT: Tunable<number> = MINING_RATE * SHIP_WEAPON.fireInterval;
+
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
  *  hit (s) · build time (s) · per-planet cap. Regenerates only after
  *  `regenDelay` undamaged seconds (GDD §2.6 "pressure beats regeneration"). TUNABLE */
@@ -742,11 +764,18 @@ export const SHIP_RADIUS: Tunable<number> = 16;
 export const SHIP_ASTEROID_RESTITUTION: Tunable<number> = 0.8;
 
 // ---------------------------------------------------------------------------
-// Beam geometry (GDD §4.1 — segment-vs-circle raycast, one beam mine + weapon)
+// Weapon acquisition range (GDD §2.4 — auto-aim engagement radius)
 // ---------------------------------------------------------------------------
 
-/** Beam reach (world units). The raycast segment length; also the auto-aim
- *  acquisition radius. TUNABLE */
+/**
+ * Engagement reach (world units): the radius within which auto-aim acquires the
+ * nearest valid target (asteroid, enemy ship, turret, core) across the full 360°
+ * (GDD §2.4), and the standoff distance the bots and QA probes mine and fight
+ * from. Named `BEAM_RANGE` for continuity — it was the mining beam's segment
+ * length before the beam retired (amendment v0.3) — and kept because the bot
+ * behaviour trees, the netcode, and the QA harness all size their standoffs from
+ * it; it is the one weapon system's reach, whether the shot lands on rock or
+ * hull. TUNABLE */
 export const BEAM_RANGE: Tunable<number> = 260;
 
 // ---------------------------------------------------------------------------
