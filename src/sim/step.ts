@@ -55,7 +55,7 @@ import {
 } from './constants';
 import {
   buyUpgrade,
-  isDocked,
+  inAtmosphere,
   placeOrder,
   planetOf,
   sweepDeadTurrets,
@@ -689,15 +689,18 @@ function updateChunks(world: World, dt: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-deposit at your own planet (field report v0.1.2; GDD §2.3, §2.5)
+// Auto-deposit inside your own planet's atmosphere
+// (field report v0.1.2; GDD §2.3, §2.5; ratified p4)
 // ---------------------------------------------------------------------------
 
 /**
- * While a ship sits docked at its own living planet, drain its hold into the
- * safe banked total at `DEPOSIT.drainRate` and, on a fixed tick cadence, spin
- * off a courier chunk that flies ship→planet to show it. Undock (or empty the
- * hold, or lose the planet) and the drain simply stops the next tick — the
- * transfer is readable and interruptible, exactly as the field report asks.
+ * While a ship is inside its own living planet's atmosphere (`DEPOSIT_RANGE`),
+ * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, on a
+ * fixed tick cadence, spin off a courier chunk that flies ship→planet to show
+ * it. Leave the atmosphere (or empty the hold, or lose the planet) and the drain
+ * simply stops the next tick — the transfer is readable and interruptible,
+ * exactly as the field report asks. There is no dock or park gate any more
+ * (ratified p4: "just be in that atmosphere").
  *
  * The transfer is authoritative here (hold and bank are the truth the HUD ticks
  * off); the couriers are cosmetic and carry no ore, so this can never bank more
@@ -709,14 +712,13 @@ function updateDeposits(world: World, dt: number): void {
   // whatever `dt` a caller steps at (part of the determinism contract).
   const flightEvery = Math.max(1, Math.round(DEPOSIT.flightInterval / TICK_DT));
   const emitThisTick = world.tick % flightEvery === 0;
-  const parkSpeed2 = DEPOSIT.parkSpeed * DEPOSIT.parkSpeed;
   for (const ship of world.ships) {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
-    // Parked, not skimming: you unload when you settle at your planet, not when
-    // you clip dock range at cruise on the way somewhere else.
-    if (ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y > parkSpeed2) continue;
+    // Ratified p4: just be in the atmosphere. No dock and no park gate — the
+    // drain runs the tick a ship crosses into `DEPOSIT_RANGE` at its own living
+    // planet and stops the tick it crosses back out (interruptible as before).
     const planet = planetOf(world, ship.id);
-    if (!planet || !planet.alive || !isDocked(ship, planet)) continue;
+    if (!planet || !planet.alive || !inAtmosphere(ship, planet)) continue;
 
     // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
     const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);

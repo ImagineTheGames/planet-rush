@@ -187,15 +187,27 @@ function upgradePress(order: readonly UpgradeTrack[], n: number): Action {
  *  right; if it always is, the field is too rich (GDD §2.3). */
 function miner(): (view: BotView) => readonly Action[] {
   let presses = 0;
+  // A committed home trip, latched until the ship actually docks. The deposit
+  // *atmosphere* (`DEPOSIT_RANGE`, ratified p4) now drains a full hold into the
+  // bank the moment the ship enters it — well before it reaches `dockRange` — so
+  // `cargoFull` flips false mid-approach. Latching the trip keeps the probe
+  // flying home to *dock and upgrade* instead of turning back to the field the
+  // instant the atmosphere empties its hold; without it the miner never docks
+  // and the economy sweep never sees an `upgradeOrder`.
+  let goingHome = false;
   return (view) => {
     const self = view.self;
-    if (!self.alive) return IDLE;
+    if (!self.alive) {
+      goingHome = false;
+      return IDLE;
+    }
 
     const home = self.planet;
-    const goHome = self.cargoFull || (view.collapsed && self.cargo > 0);
+    if (self.cargoFull || (view.collapsed && self.cargo > 0)) goingHome = true;
 
-    if (goHome && home) {
+    if (goingHome && home) {
       if (self.docked) {
+        goingHome = false; // trip done: bank/upgrade this tick, then back to the field
         presses++;
         return [
           ...bankAndSpend(view, [upgradePress([UpgradeTrack.Cargo, UpgradeTrack.Power, UpgradeTrack.Engine], presses)]),
