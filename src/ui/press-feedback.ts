@@ -16,8 +16,8 @@
  *     the same silence. This fires on touch-DOWN, from the input, and covers the
  *     finger.
  *  2. **The action tell** — *did the thing actually happen?* When the SIM confirms
- *     a spend — a turret queued, a tier bought, ore banked, or the core ticking
- *     back up under a repair channel — the control pulses, the ore cost floats off
+ *     a spend — a turret queued, a tier bought, or the core ticking back up under
+ *     a repair channel — the control pulses, the ore cost floats off
  *     toward the bank readout, and (for repair) the core shimmers
  *     ({@link confirmPulse}, {@link CostFloat}). This fires on the sim's real state
  *     change, never on the press, so a rejected or no-op press produces no false
@@ -107,7 +107,6 @@ export function buildSegmentIndex(id: WheelSegmentId): number {
 const REPAIR_INDEX = buildSegmentIndex('repair');
 const TURRET_INDEX = buildSegmentIndex('turret');
 const SHIELD_INDEX = buildSegmentIndex('shield');
-const BANK_INDEX = buildSegmentIndex('bank');
 
 // ---------------------------------------------------------------------------
 // Pure per-visual functions — one control's motion as a function of elapsed
@@ -206,8 +205,10 @@ export interface CostFloat {
   readonly progress: number;
   /** Alpha, 1 → 0 across the travel. */
   readonly alpha: number;
-  /** A BANK deposit: ore moving INTO the bank, drawn as `+n` rather than a spend.
-   *  A spend (turret/shield/repair/upgrade) draws the bare cost. */
+  /** A deposit: ore moving INTO the bank, drawn as `+n` rather than a spend. No
+   *  production path sets this now (banking is ambient, in the atmosphere), but
+   *  the render flag is kept for the ?debug=1 press seam. A spend
+   *  (turret/shield/repair/upgrade) draws the bare cost. */
   readonly deposit: boolean;
 }
 
@@ -251,11 +252,13 @@ export interface Confirmation {
  *    shield regen raises shield HP, a different number). Shimmer the core.
  *  - **turret / shield count rose** ⇒ one was queued (the count includes
  *    under-construction, so it ticks the instant the order lands).
- *  - **bank rose while the hold fell** ⇒ a deposit (nothing else raises the bank).
  *  - **an upgrade tier rose** ⇒ that track was bought; the float is its ladder cost.
  *
- * A spend lowers the bank (or hold) and so can never be mistaken for a deposit,
- * and a rejected press moves nothing — which is the whole point.
+ * Only spends are celebrated on the wheel. Banking is no longer one of them: ore
+ * auto-deposits in the atmosphere (p4-11), an ambient event whose tell is the
+ * planet's atmosphere halo brightening and the top-left TOTAL climbing — not a
+ * wheel float, which would have nowhere to launch from now the BANK wedge is gone.
+ * A rejected press moves nothing, which is the whole point.
  */
 export function detectConfirmations(prev: WheelSnapshot, next: WheelSnapshot): Confirmation[] {
   const out: Confirmation[] = [];
@@ -271,12 +274,6 @@ export function detectConfirmations(prev: WheelSnapshot, next: WheelSnapshot): C
   }
   if (next.shields > prev.shields) {
     out.push({ surface: 'build', index: SHIELD_INDEX, amount: SHIELD.cost, deposit: false, core: false });
-  }
-
-  // A deposit: the only thing that RAISES the bank, paired with the hold falling.
-  if (next.banked > prev.banked + EPSILON && next.cargo < prev.cargo - EPSILON) {
-    const amount = Math.round(next.banked - prev.banked);
-    if (amount > 0) out.push({ surface: 'build', index: BANK_INDEX, amount, deposit: true, core: false });
   }
 
   // An upgrade tier was bought — float that tier's ladder cost off the wedge that

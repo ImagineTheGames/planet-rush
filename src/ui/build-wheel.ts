@@ -1,11 +1,16 @@
 /**
  * src/ui/build-wheel.ts — the Build & Upgrade wheel model. OWNER: UI Engineer.
  *
- * "Everything is bought from one place" (GDD §2.5). **Five segments**, each
+ * "Everything is bought from one place" (GDD §2.5). **Four segments**, each
  * labeled in words and each naming its target — TURRET, SHIELD, REPAIR CORE,
- * UPGRADE SHIP, BANK — with the player's live ore total in the hub. Four spend
+ * UPGRADE SHIP — with the player's live ore total in the hub. Three spend
  * on the **planet**, one on the **ship**; the economy is the choice between
  * those two, so every label names which.
+ *
+ * There is no manual "bank" segment: ore auto-deposits the instant a ship enters
+ * its own planet's atmosphere (p4-11), so a deposit verb on the wheel would name
+ * an action the player never has to take. The atmosphere does the banking; the
+ * wheel is purely for *spending* the safe total.
  *
  * The rule this file exists to enforce:
  *
@@ -44,12 +49,16 @@ import { affordable } from './affordability';
 // ---------------------------------------------------------------------------
 
 /**
- * The five wheel segments (GDD §2.5). Four are {@link BuildItem}s the sim
- * spends on the spot; `upgrade` is the fifth and is deliberately *not* a
+ * The four wheel segments (GDD §2.5). Three are {@link BuildItem}s the sim
+ * spends on the spot; `upgrade` is the fourth and is deliberately *not* a
  * `BuildItem` — it opens the upgrade panel rather than placing an order, which
  * is exactly why the shared contract does not include it.
+ *
+ * `bank` is a {@link BuildItem} the sim still honours (bots deposit through it),
+ * but the wheel does **not** expose it: ore auto-deposits in the atmosphere, so
+ * a manual bank verb is obsolete. It is excluded here on purpose.
  */
-export type WheelSegmentId = BuildItem | 'upgrade';
+export type WheelSegmentId = Exclude<BuildItem, 'bank'> | 'upgrade';
 
 /** What a segment spends on: your planet, or your ship (GDD §2.5 — "every label
  *  names which", because the economy *is* the choice between the two). */
@@ -63,9 +72,9 @@ export type SegmentTarget = 'planet' | 'ship';
  * - `capped`       — the per-planet cap is reached: 4 turrets, 2 shields
  *                    (GDD §2.5 — "design rules, not renderer limits"). Queued
  *                    construction counts, so a player cannot buy past the cap.
- * - `inactive`     — the press would be a no-op: BANK with an empty hold, or
- *                    REPAIR CORE on a core that is already full *or* after the
- *                    collapse phase has shut repair off for good (GDD §2.3).
+ * - `inactive`     — the press would be a no-op: REPAIR CORE on a core that is
+ *                    already full *or* after the collapse phase has shut repair
+ *                    off for good (GDD §2.3).
  *                    The sim distinguishes those two (`core-full` vs
  *                    `collapsed`); the wheel does not, because the player-facing
  *                    answer is the same — this button does nothing now.
@@ -90,7 +99,7 @@ export type SegmentState = 'ready' | 'unaffordable' | 'capped' | 'inactive';
 export const REPAIR_ENTRY_ORE = 1;
 
 /** Cost printed under a segment, or `null` where a segment has no price:
- *  BANK is a deposit, UPGRADE SHIP prices its rows in the panel (GDD §2.5). */
+ *  UPGRADE SHIP prices its rows in the panel (GDD §2.5). */
 export function segmentCost(id: WheelSegmentId): number | null {
   switch (id) {
     case 'turret':
@@ -99,14 +108,13 @@ export function segmentCost(id: WheelSegmentId): number | null {
       return SHIELD.cost;
     case 'repair':
       return REPAIR_ENTRY_ORE;
-    case 'bank':
     case 'upgrade':
       return null;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Layout — five segments, clockwise from twelve o'clock
+// Layout — four segments, clockwise from twelve o'clock
 // ---------------------------------------------------------------------------
 
 /** Segment order around the wheel, clockwise from the top. Matches the order
@@ -116,10 +124,9 @@ export const WHEEL_ORDER: readonly WheelSegmentId[] = [
   'shield',
   'repair',
   'upgrade',
-  'bank',
 ];
 
-/** Angular width of one segment (radians). Five segments fill the circle. */
+/** Angular width of one segment (radians). Four segments fill the circle. */
 export const SEGMENT_ARC = (2 * Math.PI) / WHEEL_ORDER.length;
 
 /** Screen-space angle of a segment's centre (radians, y-down: `-π/2` is up).
@@ -218,7 +225,7 @@ export interface BuildWheelModel {
   /** Live ore total shown in the hub (GDD §2.5): everything a press can draw on,
    *  floored to whole ore because costs are whole ore. */
   readonly ore: number;
-  /** The five segments, clockwise from twelve o'clock. Always all five, even
+  /** The four segments, clockwise from twelve o'clock. Always all four, even
    *  when the wheel is closed, so the view can pool its children once. */
   readonly segments: readonly WheelSegment[];
 }
@@ -232,7 +239,6 @@ const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: Seg
   repair: { label: 'REPAIR CORE', target: 'planet' },
   // The one segment that spends on the ship, and the one that opens a screen.
   upgrade: { label: 'UPGRADE SHIP', target: 'ship' },
-  bank: { label: 'BANK', target: 'planet' },
 };
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's
@@ -297,10 +303,6 @@ export function segmentState(
       // sim answers `core-full`. Ore only matters once there is damage to undo.
       if (signals.coreHp >= signals.maxCoreHp - 1e-9) return 'inactive';
       return affordable(ore, REPAIR_ENTRY_ORE) ? 'ready' : 'unaffordable';
-    case 'bank':
-      // BANK moves held ore to safety; with an empty hold there is nothing to
-      // move (the sim answers `nothing-to-bank`). It never costs anything.
-      return signals.cargo > 1e-9 ? 'ready' : 'inactive';
     case 'upgrade':
       // UPGRADE SHIP spends nothing on the wheel — it opens the panel, where
       // each row carries its own cost. It is therefore always pressable; a
