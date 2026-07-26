@@ -26,6 +26,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { buttonStyle } from './button-theme';
 import type { EntryCodeCell, EntryDoorView, EntryModel } from './lobby-entry';
 import { entryHitTest, entryLayout } from './lobby-geometry';
 import type { EntryLayout, EntryTarget, Insets } from './lobby-geometry';
@@ -221,29 +222,26 @@ export class LobbyEntryView extends Container {
    * (GDD §4.8 risk 6).
    */
   private drawDoor(nodes: DoorNodes, door: EntryDoorView, rect: Rect): void {
-    const primary = !door.needsNetwork;
-    const alpha = door.enabled ? 1 : 0.35;
-
+    // The offline door is PRIMARY (it always works — risk 6); the online door is
+    // STANDARD, equally active. A door the player can't take yet is DISABLED and
+    // its `hint` is the reason (p4-03). One contract, no ad-hoc gray.
+    const style = buttonStyle(door.needsNetwork ? 'standard' : 'primary', !door.enabled);
     nodes.body.clear();
     nodes.body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: primary ? PALETTE.plasma : PALETTE.hullSteel, alpha: primary ? 0.18 : 0.1 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({
-        width: primary ? 2 : 1,
-        color: primary ? PALETTE.plasma : PALETTE.hullSteel,
-        alpha: (primary ? 0.9 : 0.5) * alpha,
-      });
-    nodes.body.alpha = alpha;
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
 
     nodes.label.text = door.label;
-    nodes.label.alpha = alpha;
+    nodes.label.style.fill = style.label;
+    nodes.label.alpha = style.labelAlpha;
     nodes.label.x = rect.x + rect.width / 2;
     nodes.label.y = rect.y + rect.height / 2;
     nodes.label.visible = rect.height > 0;
 
     nodes.hint.text = door.hint;
-    nodes.hint.alpha = alpha * 0.9;
+    nodes.hint.alpha = 0.9;
     nodes.hint.x = rect.x + rect.width / 2;
     nodes.hint.y = rect.y + rect.height + 3;
   }
@@ -335,18 +333,18 @@ export class LobbyEntryView extends Container {
   // --- BACK / ERASE / JOIN --------------------------------------------------
 
   private drawButton(nodes: ButtonNodes, rect: Rect, enabled: boolean, primary: boolean): void {
-    const alpha = enabled ? 1 : 0.3;
-    const tint = primary ? PALETTE.plasma : PALETTE.hullSteel;
+    // JOIN is PRIMARY, BACK/ERASE STANDARD. A disabled JOIN (code not yet full)
+    // gets the shared dim look — its reason is the incomplete code above it.
+    const style = buttonStyle(primary ? 'primary' : 'standard', !enabled);
     nodes.body.clear();
     nodes.body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-      .fill({ color: tint, alpha: primary ? 0.18 : 0.09 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-      .stroke({ width: primary && enabled ? 2 : 1, color: tint, alpha: 0.8 * alpha });
-    nodes.body.alpha = alpha;
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
 
-    nodes.label.alpha = alpha;
-    nodes.label.style.fill = enabled ? TEXT_PRIMARY : TEXT_DIM;
+    nodes.label.style.fill = style.label;
+    nodes.label.alpha = style.labelAlpha;
     nodes.label.x = rect.x + rect.width / 2;
     nodes.label.y = rect.y + rect.height / 2;
   }
