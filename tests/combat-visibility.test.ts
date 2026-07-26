@@ -16,9 +16,11 @@
  * This test steps a world where (a) an enemy ship fires at a planet and (b) a
  * friendly turret engages an in-range enemy, and asserts that the sim reports
  * both shots and that the render layer registers both — the ship as a projectile,
- * the turret as a muzzle flash sourced from sim state, origin at the barrel, end
- * clamped to the hit target. It drives the real `Renderer` headlessly (Pixi builds
- * Graphics geometry with no WebGL), the same way src/render/muzzle.test.ts does.
+ * the turret as a muzzle flash sourced from sim state, origin at the barrel and a
+ * short flare off the muzzle: a burst, **never a line to the target** (the mining
+ * laser retired to a projectile — v0.2.2 field report). It drives the real
+ * `Renderer` headlessly (Pixi builds Graphics geometry with no WebGL), the same
+ * way src/render/muzzle.test.ts does.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -193,12 +195,17 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     expect(world.projectiles.some((p) => p.active && p.owner === 1)).toBe(true);
 
     // Its muzzle tell is published from sim combat state, origin at the barrel,
-    // end clamped to the prey's surface (GDD §2.6).
+    // and a short flare off the muzzle — NOT a line to the prey (GDD §2.6). The
+    // projectile owns the shot and its impact, so the flash carries no hit point.
     expect(turret.muzzle).not.toBeNull();
     const m = turret.muzzle!;
     expect(dist(m.origin, turret.pos)).toBeCloseTo(TURRET.radius, 4);
-    expect(m.hitPoint).not.toBeNull();
-    expect(dist(m.hitPoint!, preyPos)).toBeCloseTo(world.ships[2]!.radius, 4);
+    expect(m.hitPoint).toBeNull();
+    expect(m.length).toBe(TURRET.muzzleFlashLength);
+    // The flare's far end stays right at the barrel — it covers only a sliver of
+    // the gap, leaving well over half the standoff still between it and the prey.
+    const flareEnd = { x: m.origin.x + m.dir.x * m.length, y: m.origin.y + m.dir.y * m.length };
+    expect(dist(flareEnd, preyPos)).toBeGreaterThan(TURRET_STANDOFF / 2);
 
     // And the shot deals damage: step until the projectile reaches the prey.
     const prey = world.ships[2]!;
@@ -231,8 +238,10 @@ describe('combat visibility — every shooter is seen from sim state', () => {
 
     expect(visibleChildren(muzzleLayer(stage))).toHaveLength(1); // turret muzzle
     expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(2); // ship + turret shots
-    // The turret's shot strikes its prey, so a pooled impact glow rides its hit point.
+    // The flash is a burst at the muzzle, not a beam to the prey: it publishes no
+    // hit point, so the renderer paints NO impact glow out at the target from it
+    // (the projectile owns the impact now — v0.2.2 field report).
     const glows = visibleChildren(impactLayer(stage));
-    expect(glows.length).toBeGreaterThanOrEqual(1);
+    expect(glows).toHaveLength(0);
   });
 });

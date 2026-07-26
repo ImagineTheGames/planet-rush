@@ -674,7 +674,7 @@ export function updateTurrets(world: World, dt: number): void {
         fireTurretProjectile(world, turret, aim);
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
-        turret.muzzle = makeMuzzle(turret, target, aim);
+        turret.muzzle = makeMuzzle(turret, aim);
         turret.cooldown = turretFireInterval(turret);
       }
     }
@@ -945,28 +945,30 @@ function desiredOrbitAngle(world: World, planet: Planet, turrets: Turret[], i: n
 }
 
 /**
- * The muzzle-flash geometry for a shot leaving `turret` at `target` along `aim`
- * (GDD §2.6, §4.1). Origin is the barrel tip — where the projectile is born, so
- * the flash sits on the muzzle — and the segment runs to the tracked ship's
- * near surface, clamped to what it is aimed at. This is the *tell*, not the hit
- * test: the projectile does the damage and can still miss a dodging ship; the
- * flash only reports that the turret fired and where it aimed, which is all a
- * renderer needs to make enemy turrets visibly shoot. Allocates only on fire
- * ticks, like `spawnChunk` on a mine.
+ * The muzzle-flash geometry for a shot leaving `turret` along `aim` (GDD §2.6,
+ * §4.1). A muzzle flash is a FLASH at the barrel — a short flare off the muzzle
+ * tip — **never a line to the target**. The turret's damage rides a pooled
+ * projectile (design amendment v0.3, the laser retired); this record is only the
+ * fire *tell*, so a renderer draws a burst at the muzzle to make enemy turrets
+ * visibly shoot. It does not reach the ship and carries no impact point: the
+ * projectile owns the shot and its impact.
+ *
+ * Regression fix (v0.2.2 field report "turrets still flash a mining laser at
+ * me"): the flare used to run the full barrel-tip → target-surface distance,
+ * with `hitPoint` out at the ship — beam-era geometry the renderer stroked as a
+ * line all the way to you. Now `length` is the short `TURRET.muzzleFlashLength`
+ * flare and `hitPoint` is `null`, so no primitive is drawn between turret and
+ * target. Allocates only on fire ticks, like `spawnChunk` on a mine.
  */
-function makeMuzzle(turret: Turret, target: Ship, aim: number): Muzzle {
+function makeMuzzle(turret: Turret, aim: number): Muzzle {
   const dx = Math.cos(aim);
   const dy = Math.sin(aim);
   const origin = { x: turret.pos.x + dx * turret.radius, y: turret.pos.y + dy * turret.radius };
-  const centerDist = Math.sqrt(dist2(turret.pos, target.pos));
-  // Barrel tip → target surface: total centre distance less both radii, floored
-  // at zero for the degenerate point-blank case.
-  const length = Math.max(0, centerDist - target.radius - turret.radius);
   return {
     origin,
     dir: { x: dx, y: dy },
-    hitPoint: { x: origin.x + dx * length, y: origin.y + dy * length },
-    length,
+    hitPoint: null, // the projectile owns impact — no glow out at the target
+    length: TURRET.muzzleFlashLength, // a flare off the muzzle, not a beam to the ship
   };
 }
 

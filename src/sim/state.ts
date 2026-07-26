@@ -228,10 +228,12 @@ export interface Turret {
    * `null` (GDD §2.6, §4.1). A turret's damage rides a pooled projectile, but its
    * *tell* is the flash at the barrel, and that tell has to come from sim combat
    * state so **every** turret in the world flashes when it fires — not just the
-   * local player's. Origin at the barrel tip, direction at the tracked ship,
-   * `hitPoint`/`length` clamped to that ship's surface, so a renderer can draw a
-   * muzzle bloom or a tracer without re-deriving the shot. Set only on fire ticks
-   * (~twice a second), cleared every other tick, so it is a transient event.
+   * local player's. Origin at the barrel tip, direction along the barrel, and a
+   * short `length` flare off the muzzle (`TURRET.muzzleFlashLength`) with a `null`
+   * `hitPoint`: a burst at the muzzle, **never a line to the target** — the
+   * projectile owns the shot and its impact (see `makeMuzzle`, v0.2.2 field
+   * report). Set only on fire ticks (~twice a second), cleared every other tick,
+   * so it is a transient event.
    *
    * Optional so this render tell can be added without breaking the turret
    * literals other agents build (wire-event reconstruction, bot fixtures) — the

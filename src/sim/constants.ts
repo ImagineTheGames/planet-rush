@@ -128,6 +128,17 @@ export const TURRET = {
    * make it flap. Unitless, in (0, 1]. TUNABLE
    */
   targetHysteresis: 0.75,
+  /**
+   * Length (world units) of the muzzle *flash* — a short flare off the barrel
+   * tip, NOT a line to the target. Since the laser retired to a projectile
+   * (design amendment v0.3) a turret's shot is the pooled projectile; the
+   * muzzle record is only the fire *tell*, a burst at the muzzle. This stub is
+   * kept short — a flare, not a beam — so a renderer never strokes a line
+   * reaching the ship it fired at (v0.2.2 field report: "turrets still flash a
+   * mining laser at me"). A hair past the barrel radius so the flare clears the
+   * mount. TUNABLE
+   */
+  muzzleFlashLength: 16,
 } as const;
 
 /** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
