@@ -1,6 +1,7 @@
 /**
  * Build & Upgrade wheel model tests (GDD §2.5). The load-bearing contracts:
- *  - **five** segments, each naming its target, in the order the GDD names them;
+ *  - **four** segments, each naming its target, in the order the GDD names them
+ *    (the manual BANK segment is gone — ore auto-deposits in the atmosphere);
  *  - **the only number on a segment is its cost** — and the costs are the sim's;
  *  - affordability, caps, and no-op presses are shown honestly, so the wheel
  *    never dangles a segment `placeOrder` would refuse;
@@ -45,10 +46,15 @@ function stateOf(id: WheelSegmentId, over: Partial<BuildWheelSignals> = {}) {
   return segmentState(id, sig(over));
 }
 
-describe('the wheel itself (GDD §2.5 — five segments, words + target)', () => {
-  it('has exactly five segments, in the order the GDD names them', () => {
-    expect(WHEEL_ORDER).toEqual(['turret', 'shield', 'repair', 'upgrade', 'bank']);
-    expect(buildWheelModel(sig()).segments).toHaveLength(5);
+describe('the wheel itself (GDD §2.5 — four segments, words + target)', () => {
+  it('has exactly four segments, in the order the GDD names them', () => {
+    expect(WHEEL_ORDER).toEqual(['turret', 'shield', 'repair', 'upgrade']);
+    expect(buildWheelModel(sig()).segments).toHaveLength(4);
+  });
+
+  it('no longer carries a manual BANK segment (ore auto-deposits — p4-11)', () => {
+    const ids = buildWheelModel(sig()).segments.map((s) => s.id);
+    expect(ids).not.toContain('bank');
   });
 
   it('labels every segment in words, and names which target it spends on', () => {
@@ -58,12 +64,11 @@ describe('the wheel itself (GDD §2.5 — five segments, words + target)', () =>
     // Named in full — it repairs the planet's core, never the ship (GDD §2.5).
     expect(byId.get('repair')?.label).toBe('REPAIR CORE');
     expect(byId.get('upgrade')?.label).toBe('UPGRADE SHIP');
-    expect(byId.get('bank')?.label).toBe('BANK');
 
-    // "Four spend on your planet, one on your ship" (GDD §2.5).
+    // "Three spend on your planet, one on your ship" (GDD §2.5).
     const planetSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'planet');
     const shipSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'ship');
-    expect(planetSegments).toHaveLength(4);
+    expect(planetSegments).toHaveLength(3);
     expect(shipSegments).toHaveLength(1);
     expect(shipSegments[0]?.id).toBe('upgrade');
   });
@@ -88,9 +93,8 @@ describe('costs — the only number on a segment (GDD §2.5)', () => {
     expect(REPAIR_ENTRY_ORE).toBe(1);
   });
 
-  it('gives BANK and UPGRADE SHIP no price at all', () => {
-    // BANK is a deposit; UPGRADE SHIP prices its rows in the panel (GDD §2.5).
-    expect(segmentCost('bank')).toBeNull();
+  it('gives UPGRADE SHIP no price at all', () => {
+    // UPGRADE SHIP prices its rows in the panel, not on the wheel (GDD §2.5).
     expect(segmentCost('upgrade')).toBeNull();
   });
 
@@ -151,11 +155,6 @@ describe('per-planet caps (GDD §2.5 — 4 turrets, 2 shields)', () => {
 });
 
 describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)', () => {
-  it('marks BANK inactive with an empty hold — banked ore is already safe', () => {
-    expect(stateOf('bank', { cargo: 0, banked: 40 })).toBe('inactive');
-    expect(stateOf('bank', { cargo: 1 })).toBe('ready');
-  });
-
   it('marks REPAIR CORE inactive on a full core, whatever the ore', () => {
     expect(stateOf('repair', { banked: 99, coreHp: 100, maxCoreHp: 100 })).toBe('inactive');
     expect(stateOf('repair', { banked: 99, coreHp: 60, maxCoreHp: 100 })).toBe('ready');
@@ -174,13 +173,12 @@ describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)'
     expect(stateOf('repair', { banked: 99, coreHp: 10, collapsed: true })).toBe('inactive');
   });
 
-  it('leaves turrets, shields and BANK buyable under collapse', () => {
+  it('leaves turrets and shields buyable under collapse', () => {
     // GDD §2.3 names exactly three collapse rules — no shield regeneration, no
     // repair, no new ore. Buying a shield that will never regenerate is still a
     // legal (and sometimes correct) way to spend a doomed stockpile.
     expect(stateOf('turret', { banked: 99, collapsed: true })).toBe('ready');
     expect(stateOf('shield', { banked: 99, collapsed: true })).toBe('ready');
-    expect(stateOf('bank', { cargo: 2, collapsed: true })).toBe('ready');
   });
 });
 
@@ -202,10 +200,10 @@ describe('the wheel opens at your own planet and nowhere else (GDD §2.5, §2.4)
     expect(canOpenWheel(sig({ planetAlive: false }))).toBe(false);
   });
 
-  it('still describes all five segments while closed, so the view pools once', () => {
+  it('still describes all four segments while closed, so the view pools once', () => {
     const closed = buildWheelModel(sig({ docked: false }));
     expect(closed.open).toBe(false);
-    expect(closed.segments).toHaveLength(5);
+    expect(closed.segments).toHaveLength(4);
   });
 });
 
@@ -221,7 +219,7 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
   it('puts segment 0 at twelve o\'clock and runs clockwise', () => {
     expect(segmentAngle(0)).toBeCloseTo(-Math.PI / 2);
     expect(segmentAngle(1)).toBeCloseTo(-Math.PI / 2 + SEGMENT_ARC);
-    expect(SEGMENT_ARC).toBeCloseTo((2 * Math.PI) / 5);
+    expect(SEGMENT_ARC).toBeCloseTo((2 * Math.PI) / 4);
   });
 
   it('selects the segment a stick or pointer direction is aimed at', () => {
@@ -247,6 +245,6 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
       expect(id).not.toBeNull();
       seen.add(id!);
     }
-    expect(seen.size).toBe(5);
+    expect(seen.size).toBe(4);
   });
 });
