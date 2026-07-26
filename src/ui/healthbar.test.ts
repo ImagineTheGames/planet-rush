@@ -6,8 +6,11 @@
  *    and hidden when it is full *and* idle — the field stays clean;
  *  - **field request v0.1.1:** the local player's own **ship** now GETS a bar
  *    under the same conditions (plus forced on during a siege), carrying the
- *    distinct `local` style flag — but the player's own **turrets** still get
- *    nothing (they read off the HOME HP readout);
+ *    distinct `local` style flag;
+ *  - **field request v0.2.2:** every **turret** — yours and the enemy's — now
+ *    GETS a bar when damaged or in combat (a local turret no longer reads off the
+ *    HOME HP readout), flagged `turret`; a local turret draws in the player colour
+ *    at the narrow enemy size, never the larger own-ship `local` style;
  *  - the fill is the true HP fraction, clamped, and the colour is the owner's
  *    identity colour from the ratified roster — never threat red (reserved for
  *    *your* danger, style-guide §2).
@@ -39,6 +42,11 @@ function enemy(over: Partial<Combatant> = {}): Combatant {
 
 const LOCAL = 0;
 
+/** A turret (field request v0.2.2) — same baseline as {@link enemy} but flagged
+ *  `turret`, so a local one is no longer suppressed by ownership. Defaults to an
+ *  enemy-owned turret; pass `owner: LOCAL` for one of yours. */
+const turret = (over: Partial<Combatant> = {}): Combatant => enemy({ turret: true, ...over });
+
 describe('which entities get a bar (the field report)', () => {
   it('draws over a damaged enemy', () => {
     expect(combatantGetsBar(enemy({ hp: 30 }), LOCAL)).toBe(true);
@@ -53,9 +61,9 @@ describe('which entities get a bar (the field report)', () => {
     expect(combatantGetsBar(enemy(), LOCAL)).toBe(false);
   });
 
-  it('never draws over the local player’s own turret (local by ownership, no ship flag)', () => {
-    // The player's own turrets read off the HOME HP readout, so they stay
-    // bar-free even damaged — ownership, not kind, and no `local` flag.
+  it('never draws over a local entity that is neither the own ship nor a turret', () => {
+    // Ownership still suppresses a bare local entity (no `local`, no `turret`
+    // flag) — only the flagged own ship and turrets are exempt.
     expect(combatantGetsBar(enemy({ owner: LOCAL, hp: 5 }), LOCAL)).toBe(false);
     expect(isLocalCombatant({ owner: LOCAL }, LOCAL)).toBe(true);
     expect(isLocalCombatant({ owner: 3 }, LOCAL)).toBe(false);
@@ -104,8 +112,9 @@ describe('the local player’s own ship (field request v0.1.1)', () => {
     expect(combatantGetsBar(own({ hp: 50, forceShow: true }), LOCAL)).toBe(true);
   });
 
-  it('still hides the own TURRET — local, but not the flagged ship', () => {
-    // The distinction the flag exists for: same owner, no `local`, no bar.
+  it('does not force a bare local entity on via forceShow — the flag is own-ship only', () => {
+    // forceShow is the siege affordance for the own ship; a local entity that is
+    // neither the flagged ship nor a turret is still suppressed by ownership.
     expect(combatantGetsBar(enemy({ owner: LOCAL, hp: 5, forceShow: true }), LOCAL)).toBe(false);
   });
 
@@ -123,15 +132,59 @@ describe('the local player’s own ship (field request v0.1.1)', () => {
     expect(bar?.color).not.toBe(PALETTE.threatRed);
   });
 
-  it('emits the own ship alongside enemies, own ship first, in input order', () => {
+  it('emits the own ship alongside a damaged own turret and enemies, in input order', () => {
     const frame: Combatant[] = [
-      own({ hp: 20, pos: { x: 400, y: 300 } }), // damaged own ship — bar
-      enemy({ owner: LOCAL, hp: 5 }), // own turret — no bar
+      own({ hp: 20, pos: { x: 400, y: 300 } }), // damaged own ship — bar (local style)
+      turret({ owner: LOCAL, hp: 5 }), // damaged own turret — bar now (v0.2.2), NOT local style
       enemy({ owner: 2, hp: 40, maxHp: 50 }), // damaged enemy — bar
     ];
     const bars = healthBarModel(frame, LOCAL);
-    expect(bars.map((b) => b.owner)).toEqual([LOCAL, 2]);
-    expect(bars.map((b) => b.local)).toEqual([true, false]);
+    expect(bars.map((b) => b.owner)).toEqual([LOCAL, LOCAL, 2]);
+    // Only the own SHIP carries the larger `local` style — the own turret is a
+    // narrow player-colour bar, and the enemy is a narrow enemy bar.
+    expect(bars.map((b) => b.local)).toEqual([true, false, false]);
+  });
+});
+
+describe('turrets show health when damaged (field request v0.2.2)', () => {
+  it('draws over a damaged OWN turret — no longer suppressed by ownership', () => {
+    expect(combatantGetsBar(turret({ owner: LOCAL, hp: 5 }), LOCAL)).toBe(true);
+  });
+
+  it('draws over a damaged ENEMY turret', () => {
+    expect(combatantGetsBar(turret({ owner: 3, hp: 5 }), LOCAL)).toBe(true);
+  });
+
+  it('draws over a full turret that is in combat (loosing a shot)', () => {
+    expect(combatantGetsBar(turret({ owner: LOCAL, hp: 50, inCombat: true }), LOCAL)).toBe(true);
+    expect(combatantGetsBar(turret({ owner: 3, hp: 50, inCombat: true }), LOCAL)).toBe(true);
+  });
+
+  it('hides over a full, idle turret — own or enemy — the field stays clean', () => {
+    expect(combatantGetsBar(turret({ owner: LOCAL, hp: 50 }), LOCAL)).toBe(false);
+    expect(combatantGetsBar(turret({ owner: 3, hp: 50 }), LOCAL)).toBe(false);
+  });
+
+  it('never draws over a dead turret (hp gone, alive false)', () => {
+    expect(combatantGetsBar(turret({ owner: LOCAL, hp: 0, alive: false }), LOCAL)).toBe(false);
+  });
+
+  it('paints an own turret in the player colour, at the narrow (non-local) size', () => {
+    const [bar] = healthBarModel([turret({ owner: LOCAL, hp: 5, pos: { x: 250, y: 180 } })], LOCAL);
+    expect(bar?.owner).toBe(LOCAL);
+    expect(bar?.color).toBe(PLAYER_COLORS[LOCAL]);
+    // NOT the larger own-ship style — a turret is never `local`-flagged, so the
+    // view draws it at the narrow enemy size (just in the player colour).
+    expect(bar?.local).toBe(false);
+    // The bar tracks the turret's (orbit) position the caller projected.
+    expect(bar?.x).toBe(250);
+    expect(bar?.y).toBe(180);
+  });
+
+  it('paints an enemy turret in the enemy colour, narrow style', () => {
+    const [bar] = healthBarModel([turret({ owner: 4, hp: 5 })], LOCAL);
+    expect(bar?.color).toBe(PLAYER_COLORS[4]);
+    expect(bar?.local).toBe(false);
   });
 });
 
@@ -173,7 +226,7 @@ describe('the bar colour (style-guide §2 / §3 — owner identity, never red)',
 describe('healthBarModel over a whole frame', () => {
   it('emits exactly the bars that should draw, in input order, position passed through', () => {
     const frame: Combatant[] = [
-      enemy({ owner: LOCAL, hp: 10, inCombat: true }), // local ship — no bar
+      enemy({ owner: LOCAL, hp: 10, inCombat: true }), // bare local entity (no flag) — no bar
       enemy({ owner: 1, hp: 40, maxHp: 50, pos: { x: 200, y: 150 }, radius: 12 }), // damaged — bar
       enemy({ owner: 2, hp: 50, maxHp: 50 }), // full + idle — no bar
       enemy({ owner: 4, hp: 50, maxHp: 50, inCombat: true, pos: { x: 10, y: 20 } }), // fighting — bar

@@ -701,8 +701,9 @@ export class Hud extends Container {
   // --- Over-entity health bars (GDD §2.2) ---------------------------------
 
   /** Draw a bar over every combat entity that is damaged or fighting: enemy
-   *  ships, enemy turrets and hostile wave units (the enemy field report), **and
-   *  the local player's own ship** (field request v0.1.1). The pure model in
+   *  ships, hostile wave units (the enemy field report), **the local player's own
+   *  ship** (field request v0.1.1), and **every turret, yours and the enemy's**
+   *  (field request v0.2.2). The pure model in
    *  {@link ./healthbar} owns the "which entities, what fill" decision; this
    *  synthesises the own-ship combatant (from sim hull, at the screen centre the
    *  follow camera holds it, flagged `local`, forced on while under siege), folds
@@ -736,9 +737,10 @@ export class Hud extends Container {
       this.lastLocalHullFraction = -1;
     }
 
-    // Then the enemies/hostiles the caller projected to screen space. The model
-    // filters the local player's own turrets (local by ownership, no `local`
-    // flag) and anything full-and-idle, so passing them all is correct.
+    // Then the enemies/hostiles AND every turret the caller projected to screen
+    // space — including the local player's own turrets, which now get a bar when
+    // damaged (field request v0.2.2). The model filters anything full-and-idle (and
+    // any bare local entity), so passing them all is correct.
     const combatants = frame.combatants ?? NO_COMBATANTS;
     for (const e of combatants) input.push(e);
 
