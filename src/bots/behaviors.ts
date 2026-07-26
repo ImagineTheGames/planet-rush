@@ -13,11 +13,12 @@
  * reads nothing but its {@link BotCtx}. There is no path from here to the world.
  */
 
-import type { Action, BuildItem, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
+import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
 import { WEAPON_RANGE, PLANET, SHIELD, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
+  aimAndFire,
   aimAt,
   arrive,
   boost,
@@ -69,6 +70,34 @@ export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
 
 /** Speed at which a bot chasing something leans on the boost button. TUNABLE */
 export const BOOST_CHASE_DISTANCE = 320;
+
+// ---------------------------------------------------------------------------
+// The aim-error model, per character (v0.2.2 field report). The tier owns the
+// band (`DifficultyTuning`); a personality's `aimScale` leans inside it.
+// ---------------------------------------------------------------------------
+
+/** This character's aim modulation, clamped so it can never cross tiers
+ *  (`PersonalityWeights.aimScale`). The floor is deliberately higher than the
+ *  ceiling is far: a Hard gun snaps back toward the aimbot once its lead-lag
+ *  drops under ~0.16 s (`docs/bot-aim-error-p5.md`), so the tight end is capped
+ *  tighter than the loose end to keep every character a clear margin above that
+ *  cliff. */
+function aimScaleOf(ctx: BotCtx): number {
+  const s = ctx.weights.aimScale ?? 1;
+  return s < 0.85 ? 0.85 : s > 1.4 ? 1.4 : s;
+}
+
+/** Angular spread this bot fires with — the tier's `aimJitter`, leaned by the
+ *  character. */
+export function combatSpread(ctx: BotCtx): number {
+  return ctx.tuning.aimJitter * aimScaleOf(ctx);
+}
+
+/** Seconds before this bot re-solves its lead — the tier's `aimLatency`, leaned
+ *  by the character. */
+export function combatLatency(ctx: BotCtx): number {
+  return ctx.tuning.aimLatency * aimScaleOf(ctx);
+}
 
 // ---------------------------------------------------------------------------
 // Navigation
@@ -274,7 +303,7 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
   if (!planet) return null;
   const intruder = homeIntruder(ctx);
   if (!intruder) return [go(ctx, orbit(ctx.self, planet.pos, GUARD_RADIUS)), fire(false)];
-  return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel);
+  return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,16 +316,33 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
  * turret it is {@link TURRET_STANDOFF} — outside the turret's reach and inside
  * the weapon's (GDD §2.6).
  */
-export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, targetVel?: Vec2): readonly Action[] {
+export function engage(
+  ctx: BotCtx,
+  pos: Vec2,
+  radius: number,
+  range: number,
+  targetVel?: Vec2,
+  targetId?: PlayerId,
+): readonly Action[] {
   const d = dist(ctx.self.pos, pos);
-  const actions: Action[] = [
-    go(ctx, standOff(ctx.self, pos, range)),
-    // Lead a moving target so the projectile intercepts it (design amendment
-    // v0.2); a still target (a turret, a core) has no velocity and the aim is
-    // straight.
-    aimAt(ctx.self, pos, ctx.tuning.aimJitter, ctx.rng, targetVel),
-    fire(canHit(ctx.self, pos, radius, 0, targetVel)),
-  ];
+  // A ship moves, so lead it with the tier's reaction lag on top (`targetId`
+  // carries the bot's aim track — design amendment v0.2 + the v0.2.2 aim-error
+  // model). A still target (a turret, a core) has no velocity, so `track` is null
+  // and the aim is a straight bearing with only the spread.
+  const track = targetId !== undefined ? ctx.brain.aim : null;
+  const { aim, fire: fireAction } = aimAndFire(
+    ctx.self,
+    pos,
+    radius,
+    targetVel,
+    combatSpread(ctx),
+    ctx.rng,
+    track,
+    targetId ?? -1,
+    ctx.view.time,
+    combatLatency(ctx),
+  );
+  const actions: Action[] = [go(ctx, standOff(ctx.self, pos, range)), aim, fireAction];
   // A bold character burns the boost closing the gap; a cautious one saves it
   // for the trip home. `caution` > 1 means "breaks off early" (`./personalities`).
   if (d > BOOST_CHASE_DISTANCE && ctx.weights.caution < 1) actions.push(boost(true));
@@ -305,9 +351,12 @@ export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, ta
 
 /** Attack a scored target at the stand-off its kind deserves. */
 export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
-  // A ship moves, so lead it (`target.vel`); a home does not, so the lead is a
-  // straight shot (design amendment v0.2).
-  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel);
+  // A ship moves, so lead it (`target.vel`, with the reaction lag keyed on
+  // `target.id`); a home does not, so the lead is a straight shot (design
+  // amendment v0.2).
+  if (target.kind === 'ship') {
+    return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel, target.id);
+  }
   return engage(ctx, target.pos, target.radius, SIEGE_STANDOFF);
 }
 
