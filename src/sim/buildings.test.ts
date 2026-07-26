@@ -542,6 +542,39 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
     expect(dealt).toBeLessThanOrEqual(TURRET.dps * seconds + PROJECTILE.damage);
   });
 
+  it('flashes a short flare at the muzzle, never a line to the target (v0.2.2 field report)', () => {
+    // A turret firing at a ship far across its range. The muzzle record is the
+    // fire *tell* — a burst at the barrel — not the mining-laser beam the funeral
+    // retired: it must not carry geometry that reaches the target.
+    const targetX = TURRET.range - 20;
+    const { turret, enemy, world } = turretWorld({ x: targetX, y: 0 });
+
+    // Step until the turret actually looses a shot (muzzle set on that tick only).
+    stepUntil(world, () => turret.muzzle != null, 200);
+    const muzzle = turret.muzzle!;
+    expect(muzzle).not.toBeNull();
+
+    // The flare is the short, fixed muzzle-flash stub — NOT the barrel→ship
+    // distance. That distance is well over 200 units; the flare is 16.
+    expect(muzzle.length).toBe(TURRET.muzzleFlashLength);
+    const barrelToTarget = Math.hypot(enemy.pos.x - muzzle.origin.x, enemy.pos.y - muzzle.origin.y);
+    expect(muzzle.length).toBeLessThan(barrelToTarget / 4);
+
+    // Its far endpoint (what a renderer would stroke to) stays right at the
+    // muzzle — nowhere near the ship. No stroked primitive spans turret→target.
+    const endX = muzzle.origin.x + muzzle.dir.x * muzzle.length;
+    const endY = muzzle.origin.y + muzzle.dir.y * muzzle.length;
+    const endToTarget = Math.hypot(enemy.pos.x - endX, enemy.pos.y - endY);
+    expect(endToTarget).toBeGreaterThan(barrelToTarget - muzzle.length - 1e-6);
+
+    // No impact point out at the ship (the projectile owns the impact now), so a
+    // renderer draws no glow at the target from the flash.
+    expect(muzzle.hitPoint).toBeNull();
+
+    // The shot itself still stays: a live projectile is on its way to the ship.
+    expect(live(world).length).toBeGreaterThan(0);
+  });
+
   it('pools its projectiles — the array stops growing once shots recycle', () => {
     const { world } = turretWorld({ x: 200, y: 0 });
     for (let t = 0; t < Math.round(2 / TICK_DT); t++) step(world, []);
