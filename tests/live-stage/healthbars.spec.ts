@@ -41,9 +41,23 @@ interface HealthbarStage {
   /** The hull fraction the HUD readout last drew (or -1 when hidden). */
   hullReadout(): number;
 }
+/** The queued verb a `?debug=1` write seam returns (debug-hook.ts
+ *  `DebugWriteAction`) — a platform-local debug Action kind, off the net wire. */
+type DebugWriteAction =
+  | { op: 'damageShip'; owner: number; amount: number }
+  | { op: 'damageCore'; player: number; amount: number };
+/** The round-9 write seams merged onto `window.__planetRush` (debug-hook.ts
+ *  `installDebugStage`): damage any owner's ship, any player's core, read a core. */
+interface DebugStageSurface {
+  viewport: { width: number; height: number };
+  ticks: number;
+  damageShip(owner: number, amount: number): DebugWriteAction;
+  damageCore(player: number, amount: number): DebugWriteAction;
+  coreHp(player: number): number | null;
+}
 interface StageWindow {
   __healthbarStage?: HealthbarStage;
-  __planetRush?: { viewport: { width: number; height: number } };
+  __planetRush?: DebugStageSurface;
 }
 declare const window: Window & StageWindow;
 
@@ -154,4 +168,63 @@ test('the local player’s own ship gets its own bar when it takes damage (v0.1.
   expect(readout, 'the HUD hull readout matches the over-ship bar fill').toBeCloseTo(0.35, 2);
 
   expect(pageErrors, 'no page errors while staging own-ship damage').toEqual([]);
+});
+
+test('the round-9 write seams damage a core / ship and read core HP back through ordered input', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+  // LIVE sim (no ?freeze): these seams QUEUE a debug Action kind that main.ts
+  // drains once per fixed step, so the sim must actually be stepping for a write
+  // to land — a pinned frame never would.
+  await page.goto('/?debug=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+
+  await page.waitForFunction(() => typeof window.__planetRush?.coreHp === 'function', undefined, {
+    timeout: 20_000,
+  });
+
+  // READ seam: a core reads a positive HP immediately, off the live world — the
+  // core-HP counterpart to the already-readable bank the round-9 gate asked for.
+  const hpAtSpawn = await page.evaluate(() => window.__planetRush!.coreHp(0));
+  expect(hpAtSpawn, 'the local core reports a positive HP').toBeGreaterThan(0);
+
+  // WRITE seams ROUTE through the ordered queue: each returns the queued verb (a
+  // platform-local debug Action kind), it does not poke world state on the call.
+  const verbs = await page.evaluate(() => ({
+    core: window.__planetRush!.damageCore(0, 1),
+    ship: window.__planetRush!.damageShip(1, 1),
+  }));
+  expect(verbs.core).toEqual({ op: 'damageCore', player: 0, amount: 1 });
+  expect(verbs.ship).toEqual({ op: 'damageShip', owner: 1, amount: 1 });
+
+  // Spawn protection (10 s, GDD §2.1) blocks damage — real input and these seams
+  // alike — so wait it out before a write can actually land on the core.
+  await page.waitForFunction(() => (window.__planetRush?.ticks ?? 0) >= 700, undefined, {
+    timeout: 40_000,
+  });
+
+  // A fresh home has no shields, so damageCore lands straight on the core. Fire a
+  // big hit and watch the SAME read seam report the drop — the full write→read
+  // loop, proving the write applied on a tick boundary (not a mid-frame poke).
+  const full = await page.evaluate(() => window.__planetRush!.coreHp(0));
+  expect(full, 'core is un-sieged and full before we damage it').toBeGreaterThan(0);
+  const HIT = Math.max(1, Math.floor(full! / 4));
+  await page.evaluate((hit) => window.__planetRush!.damageCore(0, hit), HIT);
+
+  const dropped = await page
+    .waitForFunction(
+      (before) => {
+        const hp = window.__planetRush!.coreHp(0);
+        return hp !== null && hp < before ? hp : null;
+      },
+      full!,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(dropped, 'the drained damageCore drove the core HP down').toBeLessThan(full!);
+
+  expect(pageErrors, 'no page errors while driving the write seams').toEqual([]);
 });

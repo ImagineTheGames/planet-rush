@@ -26,6 +26,8 @@ import type { Action, Beam, PlayerId, Vec2 } from '@shared/types';
 import {
   BEAM_RANGE,
   combatBeams,
+  damagePlanet,
+  damageShip,
   destroyCore,
   isCollapsed,
   isDocked,
@@ -79,7 +81,7 @@ import {
 } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
-import { installDebugHook } from '@platform/debug-hook';
+import { installDebugHook, installDebugStage } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
@@ -400,6 +402,33 @@ async function boot(): Promise<void> {
   const combatDebug = installCombatDebug(window.location.search);
   if (combatDebug.enabled) combatDebug.setStager(() => stageCombatFor(world));
 
+  // --- Debug WRITE seams (debug-hook.ts `installDebugStage`): only when ?debug=1.
+  //     The round-9 QA unblock — damage any owner's ship, damage any player's core,
+  //     read any core's HP — merged onto the same window.__planetRush handle. The
+  //     two damage seams do NOT poke world state: they queue a debug Action kind
+  //     that `debugStage.drain()` applies once per fixed step (below), on a tick
+  //     boundary, through the sim's OWN damage functions. So the write rides the
+  //     same ordered pulse real input does — determinism and the net wire intact.
+  //     The bridge holds the sim-touching logic here (main.ts owns `world`), the
+  //     way combat-debug's stager does. Inert (and never drained) otherwise.
+  const debugStage = installDebugStage(window.location.search);
+  if (debugStage.enabled) {
+    debugStage.setBridge({
+      damageShip(owner: PlayerId, amount: number): void {
+        const ship = world.ships.find((s) => s.id === owner);
+        if (ship) damageShip(world, ship, amount);
+      },
+      damageCore(player: PlayerId, amount: number): void {
+        const planet = planetOf(world, player);
+        if (planet) damagePlanet(world, planet, amount);
+      },
+      coreHp(player: PlayerId): number | null {
+        const planet = planetOf(world, player);
+        return planet ? planet.coreHp : null;
+      },
+    });
+  }
+
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
   const hud = new Hud(transform.logicalWidth, transform.logicalHeight);
@@ -669,6 +698,11 @@ async function boot(): Promise<void> {
       // client's input advances the authoritative sim (GDD §4.2, §2.9).
       match.tick(sampleInput());
       simTicks++;
+      // Apply any queued ?debug=1 write-seam actions (damageShip/damageCore) for
+      // this tick, in FIFO order — a no-op in a normal build. Drained HERE, right
+      // after the authoritative step, so a debug write lands on a tick boundary
+      // like real input rather than mid-frame (debug-hook.ts `installDebugStage`).
+      if (debugStage.enabled) debugStage.drain();
     },
     render: () => {
       // Measure this real frame and let the auto-reducer decide VFX quality. In
