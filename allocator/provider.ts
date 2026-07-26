@@ -31,6 +31,27 @@ import type { MachineId } from '../src/net/ticket';
  */
 export type MachineState = 'created' | 'started' | 'stopped' | 'destroyed';
 
+/**
+ * The provider has no room to place a new host *right now* — a region is out of
+ * capacity. This is a **fact to record, not a crash**: the fleet controller
+ * catches it, notes the region is full this pass, and tries again next tick or
+ * in another region. It is deliberately vendor-neutral (it lives on the seam,
+ * not in the Fly adapter) so every caller handles "no capacity" the same way
+ * regardless of which cloud is behind {@link MachineProvider}. The real Fly
+ * adapter maps an HTTP 422 onto this; the in-memory fake never runs out and so
+ * never raises it.
+ */
+export class CapacityError extends Error {
+  constructor(
+    /** The region that had no room — recorded so an operator sees *where* it filled. */
+    readonly region: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CapacityError';
+  }
+}
+
 /** The infrastructure view of one host: an id and where it is in its lifecycle. */
 export interface Machine {
   /** Provider-assigned id; the same id a ticket routes a room to (src/net/ticket.ts). */
