@@ -49,6 +49,11 @@
       "milestone": "v0.2 patch 1",
       "title": "v0.2.1 — ore where it belongs, turrets that cover the whole planet",
       "test_notes": "On your phone: mine - your held ore now counts UNDER your ship; top-left is the planet TOTAL. Build a turret and get attacked from two sides: it slides around the rim and covers the far side. Also in this build (evidence coming in round 9): the zero-damage spawn-protection bug is fixed and REPAIR actually repairs."
+    },
+    "v0.2.2": {
+      "milestone": "v0.2 patch 2 - the projectile era",
+      "title": "v0.2.2 — one weapon, dodgeable, everywhere",
+      "test_notes": "On your phone: everything is projectiles now - dodge enemy fire, lead your shots, mine by shooting the rock (no more laser, anywhere). Repair your core (it works, and refunds honesty: greyed when it should be). Upgrade via the new WHEEL. Names over every ship and planet. Turrets engage real invaders - shooting forfeits spawn protection. Ten evidence gates on the EVIDENCE page, including the natural-siege turret sequence."
     }
   },
   "days": [
