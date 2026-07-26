@@ -130,6 +130,30 @@ export const CLASS_ORDER: readonly ShipClass[] = [
 export const DEFAULT_SHIP_CLASS = ShipClass.Vanguard;
 
 /**
+ * The name the local player shows over their ship and planet until they set one
+ * (field request v0.2.1). "YOU" is the same word the roster row already uses for
+ * the local seat, so a fresh player sees one consistent identity everywhere.
+ */
+export const DEFAULT_PLAYER_NAME = 'YOU';
+
+/** Longest player name kept, in characters — a nameplate is a quick read over a
+ *  24px ship, not a sentence. Clamped on entry ({@link normalizePlayerName}) and
+ *  again, defensively, by the nameplate model ([[nameplates]] `NAMEPLATE_MAX_CHARS`). */
+export const PLAYER_NAME_MAX_CHARS = 12;
+
+/**
+ * Fold a raw name to the stored value: trim surrounding space and clamp length; a
+ * name that is empty (or only whitespace) falls back to {@link DEFAULT_PLAYER_NAME},
+ * so the local seat is never nameless. Persisted like the hull, so a returning
+ * player finds their callsign (the storage seam lives in `main.ts`).
+ */
+export function normalizePlayerName(raw: string | undefined): string {
+  const trimmed = (raw ?? '').trim();
+  if (trimmed.length === 0) return DEFAULT_PLAYER_NAME;
+  return trimmed.length > PLAYER_NAME_MAX_CHARS ? trimmed.slice(0, PLAYER_NAME_MAX_CHARS) : trimmed;
+}
+
+/**
  * One hull tile. A name, a hull, a role — **and no number**. This type is the
  * enforcement of GDD §2.5's "ship stats … appear only in the upgrade panel":
  * the view cannot print a stat here because the model never carries one.
@@ -291,6 +315,13 @@ export interface LobbyState {
   /** Your hull pick. Mirrored onto your seat; locked once counting starts. */
   readonly shipClass: ShipClass;
   /**
+   * The local player's name, shown over their ship and planet (field request
+   * v0.2.1). Persisted like the hull; defaults to {@link DEFAULT_PLAYER_NAME}.
+   * When online lands (m9) each *remote* seat's name arrives via the same slot
+   * seam ({@link playerNameTable}) — this field is only ever the LOCAL name.
+   */
+  readonly name: string;
+  /**
    * The arena picked for this match (`../sim/maps` MapDef id) — moved off the
    * PLAY flow into the lobby (p2 field rule). One arena for the whole room,
    * offline the host's (your) pick; locked at RUSH! like the hull. Always a real
@@ -322,6 +353,9 @@ export interface LobbyOptions {
   readonly slots?: number;
   /** Your hull. Default {@link DEFAULT_SHIP_CLASS} — the Vanguard (GDD §2.11). */
   readonly shipClass?: ShipClass;
+  /** Your name. Default {@link DEFAULT_PLAYER_NAME}; folded through
+   *  {@link normalizePlayerName} so a stale/over-long stored value is safe. */
+  readonly name?: string;
   /** The arena. Default the registry default (`octagon`, "The Ring"); a stale or
    *  hand-edited value is folded down to it ({@link normalizeMapId}). */
   readonly mapId?: string;
@@ -343,6 +377,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
   const you = clampSlot(options.you ?? 0, count);
   const host = clampSlot(options.host ?? you, count);
   const shipClass = options.shipClass ?? DEFAULT_SHIP_CLASS;
+  const name = normalizePlayerName(options.name);
   const mapId = normalizeMapId(options.mapId);
   const seats: LobbySeat[] = [];
   let emptyIndex = 0;
@@ -363,6 +398,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
     phase: 'gathering',
     seats,
     shipClass,
+    name,
     mapId,
     countdown: 0,
     online: options.online ?? true,
@@ -459,6 +495,50 @@ export function selectMap(state: LobbyState, mapId: string): LobbyState {
   const next = normalizeMapId(mapId);
   if (state.mapId === next) return state;
   return { ...state, mapId: next };
+}
+
+/**
+ * Set the local player's name (field request v0.2.1). Folded through
+ * {@link normalizePlayerName} (trim + clamp + non-empty), so the stored value is
+ * always a safe nameplate. Cosmetic, so — unlike the hull and arena — it is not
+ * refused during the countdown; whatever it is at RUSH! is the name the match
+ * reads. Returns the same state when nothing changed, so a reducer/replay is stable.
+ */
+export function setPlayerName(state: LobbyState, name: string): LobbyState {
+  const next = normalizePlayerName(name);
+  if (state.name === next) return state;
+  return { ...state, name: next };
+}
+
+/**
+ * The display name for one slot — the seam the nameplates read, and the same
+ * mapping the roster row shows: a **bot** seat shows its character's personality
+ * name (GDD §2.9), the **local** seat shows the lobby's {@link LobbyState.name},
+ * and any other human seat shows its slot tag (until online carries real remote
+ * names, m9). Never empty — identity always resolves to something.
+ */
+export function nameFor(state: LobbyState, slot: PlayerId): string {
+  const seat = state.seats.find((s) => s.player === slot);
+  if (!seat) return `P${Math.floor(slot) + 1}`;
+  if (seat.occupant !== 'human') {
+    const character = seat.personality ? PERSONALITIES[seat.personality] : null;
+    return character?.name ?? `P${slot + 1}`;
+  }
+  if (seat.player === state.you) return state.name;
+  return `PLAYER ${seat.player + 1}`;
+}
+
+/**
+ * The per-slot name table the nameplate layer consumes ([[nameplates]]
+ * `NameTable`) — one entry per seat, indexed by slot, built from the lobby's own
+ * state. This is the single data-driven seam: offline it carries the local name
+ * and the bot cast's personality names; when online lands (m9) the server's room
+ * names populate the exact same array, with no change to the nameplate model.
+ */
+export function playerNameTable(state: LobbyState): string[] {
+  const table: string[] = [];
+  for (const seat of state.seats) table[seat.player] = nameFor(state, seat.player);
+  return table;
 }
 
 /** Whether this client may set bot difficulties — the host, before RUSH!
@@ -625,6 +705,9 @@ export interface LobbyModel {
   readonly classOptions: readonly ShipClassOption[];
   /** Your hull — the tile drawn as selected. */
   readonly shipClass: ShipClass;
+  /** Your name (field request v0.2.1) — shown on your roster row and over your
+   *  ship and planet in the match. */
+  readonly name: string;
   /** The arena — the map card drawn as selected (`../sim/maps` id). */
   readonly mapId: string;
   readonly classLocked: boolean;
@@ -649,6 +732,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     seats,
     classOptions: CLASS_OPTIONS,
     shipClass: state.shipClass,
+    name: state.name,
     mapId: state.mapId,
     classLocked: classLocked(state),
     countdown: {
@@ -670,7 +754,7 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
   const name = isBot
     ? (character?.name ?? 'BOT')
     : seat.player === state.you
-      ? 'YOU'
+      ? state.name
       : `PLAYER ${seat.player + 1}`;
   return {
     player: seat.player,
