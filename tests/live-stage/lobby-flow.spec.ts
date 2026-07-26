@@ -15,14 +15,18 @@
  * — the primary mobile layout of this screen (GDD §4.3) — and walks the whole
  * front of a match through the read-only `window.__lobby` seam `main.ts` installs:
  *
- *   MAIN MENU → PLAY → LOBBY (8 slots, thumb-sized, inside the safe viewport) →
- *   pick a NON-default hull → RUSH! → the booted world's local ship IS that hull.
+ *   MAIN MENU → PLAY → LOBBY (8 slots, four hull tiles, four ARENA cards, all
+ *   thumb-sized inside the safe viewport) → pick a NON-default hull AND a
+ *   NON-default arena → RUSH! → the booted world's local ship IS that hull AND its
+ *   home planets ARE that arena's registry layout.
  *
- * The last step is the one that matters: `localShipClass` is read back off the
- * *actual* sim world `bootOfflineMatch` built, so a lobby that looked right but
- * never reached the sim would fail here (GDD §2.11 — "the ship you fly IS the hull
- * you picked"). A second test asserts `?debug=1` skips the lobby exactly as it
- * skips the menu (the harness contract).
+ * The last steps are the ones that matter: `localShipClass` and `worldPlanets` are
+ * read back off the *actual* sim world `bootOfflineMatch` built, so a lobby that
+ * looked right but never reached the sim would fail here (GDD §2.11 — "the ship you
+ * fly IS the hull you picked"; p2 — the arena moved off the PLAY flow into this one
+ * pre-match room, and the booted board must match the picked registry entry). A
+ * second test asserts `?debug=1` skips the lobby exactly as it skips the menu (the
+ * harness contract).
  */
 import { test, expect } from '@playwright/test';
 
@@ -44,6 +48,16 @@ interface LobbySeam {
   localShipClass: string | null;
   selectClass(index: number): void;
   rush(): void;
+  // The arena picker, now IN the lobby (p2 field rule — no separate picker step).
+  selectedMapId: string;
+  defaultMapId: string;
+  veteranMapId: string;
+  mapOrder: readonly string[];
+  mapCards: readonly { x: number; y: number; width: number; height: number }[];
+  expectedPlanets: Record<string, { x: number; y: number }[]>;
+  worldMapId: string | null;
+  worldPlanets: { x: number; y: number }[] | null;
+  selectMap(index: number): void;
 }
 interface MainMenuSeam {
   play(): void;
@@ -66,7 +80,7 @@ test.use({
   deviceScaleFactor: 2,
 });
 
-test('PLAY → lobby → pick a non-default hull → RUSH → the sim flies that hull', async ({
+test('PLAY → lobby → pick a non-default hull AND arena → RUSH → the sim flies that hull on that map', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -104,6 +118,11 @@ test('PLAY → lobby → pick a non-default hull → RUSH → the sim flies that
       defaultClass: l.defaultClass,
       classOrder: l.classOrder,
       selectedClass: l.selectedClass,
+      defaultMapId: l.defaultMapId,
+      veteranMapId: l.veteranMapId,
+      mapOrder: l.mapOrder,
+      mapCards: l.mapCards,
+      selectedMapId: l.selectedMapId,
     };
   });
 
@@ -140,18 +159,84 @@ test('PLAY → lobby → pick a non-default hull → RUSH → the sim flies that
   expect(afterPick, 'the tile the finger landed on is now selected').toBe(picked);
   expect(afterPick, 'and it is not the default').not.toBe(opened.defaultClass);
 
+  // The ARENA cards are here in the LOBBY now (p2), not on a separate step: four
+  // cards, octagon preselected, diamond the VETERAN, all thumb-sized inside the
+  // safe viewport.
+  expect(opened.mapOrder, 'four arena cards, in registry order').toEqual([
+    'octagon',
+    'compass',
+    'oval',
+    'diamond',
+  ]);
+  expect(opened.mapCards, 'one rect per arena card').toHaveLength(4);
+  expect(opened.selectedMapId, 'opens on the default arena (octagon)').toBe(opened.defaultMapId);
+  expect(opened.defaultMapId).toBe('octagon');
+  expect(opened.veteranMapId).toBe('diamond');
+  for (const card of opened.mapCards) {
+    expect(card.width, 'arena card is a thumb target wide').toBeGreaterThanOrEqual(44);
+    expect(card.height, 'arena card is a thumb target tall').toBeGreaterThanOrEqual(44);
+    expect(card.x, 'arena card starts inside the viewport').toBeGreaterThanOrEqual(0);
+    expect(card.y).toBeGreaterThanOrEqual(0);
+    expect(card.x + card.width, 'arena card never runs past the right edge').toBeLessThanOrEqual(
+      opened.viewport.width + 0.5,
+    );
+    expect(card.y + card.height, 'arena card never runs past the bottom edge').toBeLessThanOrEqual(
+      opened.viewport.height + 0.5,
+    );
+  }
+
+  // Pick a NON-default ARENA — the choice that must actually reach the sim (p2).
+  const mapPick = opened.mapOrder.findIndex((m) => m !== opened.defaultMapId);
+  expect(mapPick, 'there is a non-default arena to pick').toBeGreaterThanOrEqual(0);
+  const pickedMap = opened.mapOrder[mapPick]!;
+  await page.evaluate((i) => window.__lobby!.selectMap(i), mapPick);
+  const afterMap = await page.evaluate(() => window.__lobby!.selectedMapId);
+  expect(afterMap, 'the arena card the finger landed on is now selected').toBe(pickedMap);
+  expect(afterMap, 'and it is not the default arena').not.toBe(opened.defaultMapId);
+
+  // Evidence for the PR body — the whole lobby: roster, hull tiles, arena row, RUSH!.
+  await page.screenshot({ path: 'tests/live-stage/lobby-map-evidence.png' });
+
   // RUSH! — starts the countdown that boots the match.
   await page.evaluate(() => window.__lobby!.rush());
   await page.waitForFunction(() => window.__lobby?.counting === true, undefined, { timeout: 5_000 });
 
-  // The countdown runs, the world is built, and — the assertion the milestone
-  // turns on — the local ship the sim built IS the hull that was picked. Read back
-  // off the actual booted world, not the lobby's own belief.
+  // The countdown runs, the world is built, and — the assertions the milestone
+  // turns on — the local ship the sim built IS the hull that was picked, and the
+  // home planets ARE the arena that was picked. Read back off the actual booted
+  // world, not the lobby's own belief.
   await page.waitForFunction(() => window.__lobby?.localShipClass != null, undefined, {
     timeout: 20_000,
   });
-  const flown = await page.evaluate(() => window.__lobby!.localShipClass);
-  expect(flown, 'the ship the sim flies IS the hull the player picked (GDD §2.11)').toBe(picked);
+  await page.waitForFunction(() => window.__lobby?.worldPlanets != null, undefined, {
+    timeout: 20_000,
+  });
+  const built = await page.evaluate(() => ({
+    flown: window.__lobby!.localShipClass,
+    worldMapId: window.__lobby!.worldMapId,
+    worldPlanets: window.__lobby!.worldPlanets,
+    expectedPlanets: window.__lobby!.expectedPlanets,
+  }));
+  expect(built.flown, 'the ship the sim flies IS the hull the player picked (GDD §2.11)').toBe(picked);
+
+  // The arena the sim built IS the one that was picked, and every home planet sits
+  // exactly where that map's registry entry places it (p2 — "the booted world
+  // matches that registry entry via the debug hook").
+  expect(built.worldMapId, `the sim built the picked arena (${pickedMap})`).toBe(pickedMap);
+  const registry = built.expectedPlanets[pickedMap]!;
+  const worldPlanets = built.worldPlanets!;
+  expect(worldPlanets, 'one home planet per slot (GDD §2.1)').toHaveLength(registry.length);
+  for (let i = 0; i < registry.length; i++) {
+    expect(worldPlanets[i]!.x, `${pickedMap} planet ${i} x`).toBeCloseTo(registry[i]!.x, 3);
+    expect(worldPlanets[i]!.y, `${pickedMap} planet ${i} y`).toBeCloseTo(registry[i]!.y, 3);
+  }
+  // The anti-fallback guard: a non-default arena must NOT have quietly booted the
+  // default octagon board (the exact bug a missing mapId wire would cause).
+  const octagon = built.expectedPlanets['octagon']!;
+  const bootedDefault = worldPlanets.every(
+    (p, i) => Math.abs(p.x - octagon[i]!.x) < 1 && Math.abs(p.y - octagon[i]!.y) < 1,
+  );
+  expect(bootedDefault, `${pickedMap} did not silently boot the default octagon board`).toBe(false);
 
   // The lobby has handed the screen to the match.
   const dismissed = await page.evaluate(() => window.__lobby!.visible);

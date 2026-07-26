@@ -52,12 +52,14 @@ import {
   normalizeRoomCode,
   pressRush,
   seatLocalPlayer,
+  selectMap,
   selectShipClass,
   startLobbyMatch,
   tickLobby,
   typeRoomCode,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
 
 const ROOM = 'K7QM';
 
@@ -237,6 +239,45 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
     const picked = selectShipClass(lobby(), ShipClass.Hauler);
     const echoed = applyLobbySlots(picked, wireSlots(['human', 'open', 'open', 'open', 'open', 'open', 'open', 'open']));
     expect(echoed.seats[0]?.shipClass).toBe(ShipClass.Hauler);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. Arena select and the lock at start (p2 field rule — the picker moved here)
+// ---------------------------------------------------------------------------
+
+describe('arena select and the lock at start (p2 — the map picker moved into the lobby)', () => {
+  it('pre-selects the registry default (octagon) the first time out', () => {
+    const model = lobbyModel(lobby());
+    expect(model.mapId).toBe(DEFAULT_MAP_ID);
+    expect(DEFAULT_MAP_ID).toBe('octagon');
+  });
+
+  it('opens on the arena it is handed, folding a stale id down to the default', () => {
+    expect(lobby({ mapId: 'diamond' }).mapId).toBe('diamond');
+    // A hand-edited / removed storage key can never seat a map the sim lacks.
+    expect(lobby({ mapId: 'atlantis' }).mapId).toBe(DEFAULT_MAP_ID);
+  });
+
+  it('takes a pick while gathering and folds an unknown one to the default', () => {
+    const state = selectMap(lobby(), 'oval');
+    expect(state.mapId).toBe('oval');
+    expect(lobbyModel(state).mapId).toBe('oval');
+    expect(selectMap(state, 'nowhere').mapId).toBe(DEFAULT_MAP_ID);
+    // Every ratified map is selectable.
+    for (const map of MAPS) expect(selectMap(lobby(), map.id).mapId).toBe(map.id);
+  });
+
+  it('LOCKS the arena the moment RUSH! is pressed, exactly like the hull', () => {
+    const picked = selectMap(lobby(), 'compass');
+    const counting = pressRush(picked);
+    expect(picked.mapId).toBe('compass');
+    expect(selectMap(counting, 'diamond').mapId).toBe('compass');
+  });
+
+  it('stays locked once the match has started', () => {
+    const started = startLobbyMatch(selectMap(lobby(), 'oval'));
+    expect(selectMap(started, 'diamond').mapId).toBe('oval');
   });
 });
 

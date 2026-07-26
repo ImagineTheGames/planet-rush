@@ -105,12 +105,10 @@ import {
   mainMenuModel,
   mainMenuLayout,
   MAIN_MENU_ITEMS,
-  MapPickerView,
-  mapPickerModel,
-  mapPickerLayout,
   mapIdAt,
   normalizeMapId,
   registryPlanets,
+  VETERAN_MAP_ID,
   MAP_ORDER,
   MAP_STORAGE_KEY,
   settingsModel,
@@ -126,6 +124,7 @@ import {
   tickLobby,
   pressRush,
   selectShipClass,
+  selectMap,
   cycleBotDifficulty,
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
@@ -285,23 +284,37 @@ async function boot(): Promise<void> {
 
   // --- The lobby (GDD §2.1, §2.11; M4). PLAY lands here, not in the match: the
   //     8-slot roster (your seat plus the seven-character bot cast, hulls and
-  //     personalities visible), the four hull tiles, and RUSH!. The hull you pick
-  //     here is the hull you fly — it is threaded into `bootOfflineMatch` below,
-  //     so the ship the sim builds IS the choice, not a hardcoded default (the M4
-  //     dark-matter bug: the lobby merged in #39 and PLAY never reached it).
+  //     personalities visible), the four hull tiles, the four ARENA cards, and
+  //     RUSH!. The hull you pick here is the hull you fly and the arena you pick is
+  //     the arena the sim builds — both are threaded into `bootOfflineMatch` below,
+  //     so the world IS the choice, not a hardcoded default (the M4 dark-matter
+  //     bug: the lobby merged in #39 and PLAY never reached it).
   //
   //     Offline flavour: the room-code UI is hidden (`online: false`) until the
   //     WebSocket lobby is wired (M3/online) — the empty seats are the bot cast,
-  //     not seats a second player can join. The map picker (m8-02) drops into this
-  //     same screen once it lands; there is a clear seam for it here.
+  //     not seats a second player can join. The arena picker used to be its own
+  //     step on the PLAY flow (m8-02); the p2 field rule moved it into this one
+  //     pre-match room — pick hull AND map here, then RUSH!.
   //
   //     `?debug=1` skips the lobby exactly as it skips the menu (harness
-  //     contract): the match boots straight in with the persisted-or-default hull,
-  //     so the frozen goldens and every existing harness keep their immediate boot.
+  //     contract): the match boots straight in with the persisted-or-default hull
+  //     and map, so the frozen goldens and every existing harness keep their
+  //     immediate boot on the default `octagon` board.
   const lobby = flags.debug ? null : openLobby(app, platform, frontCtx);
-  const chosenShipClass = lobby ? await lobby.untilRush() : readShipClass(platform);
-  // Persist the pick so a returning player finds it pre-selected (GDD §2.11).
-  if (lobby) platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
+  // The lobby resolves with BOTH choices the player locked in at RUSH!: the hull
+  // AND the arena (p2 field rule — the map picker moved into the lobby, so PLAY
+  // goes menu → LOBBY → RUSH! with no separate picker step). Under ?debug=1 there
+  // is no lobby, so both fall back to the persisted-or-default values.
+  const chosen = lobby
+    ? await lobby.untilRush()
+    : { shipClass: readShipClass(platform), mapId: readMapId(platform) };
+  const chosenShipClass = chosen.shipClass;
+  // Persist both picks so a returning player finds them pre-selected (GDD §2.11;
+  // p2 — the arena persists the same way, same storage seam as the fire mode).
+  if (lobby) {
+    platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
+    platform.storage.set(MAP_STORAGE_KEY, chosen.mapId);
+  }
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
   //     and the seven empty seats are filled by the cast (`src/bots`), each
@@ -322,12 +335,11 @@ async function boot(): Promise<void> {
   // live-stage seam reads it to prove REMATCH constructed a new one, not re-showed
   // the old. `match`/`world` are `let`: every closure below reads the live binding,
   // so a rematch redirects the whole render/input path onto the new world at once.
-  // The hull is the LOBBY's choice (#73) — rematches keep the class you picked.
-  // The arena the player picked on the PLAY screen (m8-02). Read once here so a
-  // rematch keeps the same map, exactly as it keeps the hull — the seed advances,
-  // the layout does not. `?debug=1` boots with the persisted-or-default map, so
-  // every existing harness keeps its `octagon` board unless a test opts out.
-  const chosenMapId = readMapId(platform);
+  // The hull AND the arena are the LOBBY's choices (p2) — rematches keep both the
+  // class and the map you picked; the seed advances, the layout does not. Under
+  // `?debug=1` there is no lobby, so this is the persisted-or-default map and every
+  // existing harness keeps its `octagon` board unless a test opts out.
+  const chosenMapId = chosen.mapId;
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
@@ -346,19 +358,17 @@ async function boot(): Promise<void> {
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
-  // Hand the map-picker seam the arena the sim ACTUALLY built, read back off the
-  // world's own planets — the proof the picked map reached the sim (m8-02: "planet
-  // positions match that registry entry exactly"). A no-op under ?debug=1, where
-  // there was no menu.
-  mainMenu?.reportMatchMap(
+  // Hand the lobby seam the hull AND the arena the sim ACTUALLY built, read back
+  // off the world itself — the hull off the local ship, the arena off the world's
+  // own home-planet positions. This is the proof BOTH lobby picks reached the sim
+  // (GDD §2.11 "the ship you fly IS the hull you picked"; p2 "the booted world
+  // matches that registry entry" — the live-stage spec compares these planets to
+  // the bundled registry). A no-op under ?debug=1, where there was no lobby.
+  lobby?.matchStarted(
+    world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass,
     chosenMapId,
     world.planets.map((p) => ({ x: p.pos.x, y: p.pos.y })),
   );
-  // Hand the lobby seam the hull the sim ACTUALLY built the local ship with, read
-  // back off the world — the assertion that the picked class reached the sim
-  // (GDD §2.11; the M4 debug hook the live-stage spec reads). A no-op under
-  // ?debug=1, where there was no lobby.
-  lobby?.matchStarted(world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass);
 
   // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
   //     with everything else under the landscape lock. The camera centres on the
@@ -1785,10 +1795,6 @@ interface MainMenuHandle {
   untilPlay(): Promise<void>;
   /** Mark the world as built (drives `window.__mainMenu.matchStarted`). */
   matchStarted(): void;
-  /** Report the arena the sim actually built and its home-planet positions —
-   *  drives `window.__mapPicker.worldMapId` / `.worldPlanets`, the proof the picked
-   *  map reached the sim (m8-02). Called by `boot()` once the world exists. */
-  reportMatchMap(mapId: string, planets: readonly { x: number; y: number }[]): void;
 }
 
 /** The landscape-lock context `boot()` hands the menu so it lays out in the same
@@ -1835,45 +1841,6 @@ interface MainMenuSeam {
   play(): void;
 }
 
-/** The read-only `window.__mapPicker` live-stage seam: the map picker as plain,
- *  structured-cloneable truth, plus a `selectMap` a Playwright test presses as a
- *  card tap would (tests/live-stage/map-picker.spec.ts). Present only on a clean
- *  boot; absent under `?debug=1`, where the menu never runs. */
-interface MapPickerSeam {
-  /** The picker layer is up (true while the menu screen owns the display). */
-  visible: boolean;
-  /** Which front screen is live — `menu` shows the cards, `settings` hides them. */
-  screen: 'menu' | 'settings';
-  /** Number of cards drawn — the four ratified maps (GDD §2.1; registry m8-01). */
-  cardCount: number;
-  /** The map id currently selected — the card drawn as chosen. */
-  selectedId: string;
-  /** The onboarding default (`octagon`), so a test can pick anything *but* it. */
-  defaultId: string;
-  /** The map that carries the VETERAN tag (`diamond`). */
-  veteranId: string;
-  /** Card order, so a test maps a tile index to a map id the way the view does. */
-  order: readonly string[];
-  /** Laid out at thumb scale (the phone case). */
-  isTouch: boolean;
-  /** The card rects (logical, landscape space) — thumb-size assertion targets. */
-  cards: readonly Rect[];
-  /** The reserved band the cards were laid out inside. */
-  band: Rect;
-  /** The logical (landscape) viewport the picker laid out against. */
-  logicalViewport: { width: number; height: number };
-  /** Each map's registry planet positions, computed from the SAME bundled registry
-   *  the sim builds from — the expected board a booted match must match. */
-  expected: Readonly<Record<string, readonly { x: number; y: number }[]>>;
-  /** The arena the built world actually used, or null until the match boots. */
-  worldMapId: string | null;
-  /** The built world's home-planet positions, or null until the match boots — the
-   *  proof the picked map reached the sim (m8-02). */
-  worldPlanets: readonly { x: number; y: number }[] | null;
-  /** Select the card at `index` in {@link order} — a tap on a card. */
-  selectMap(index: number): void;
-}
-
 /**
  * The main menu (field report P1; GDD §4.6 M7). Shown on a clean boot only —
  * `boot()` skips it under `?debug=1`, which drops straight into a match so the
@@ -1900,11 +1867,6 @@ function openMainMenu(
   let settings: SettingsState = createSettings();
   let screen: 'menu' | 'settings' = 'menu';
   let played = false;
-  // The arena preselected on the picker: the player's last pick, or the default
-  // (`octagon`) the first time out (m8-02 — persist last choice, same seam as the
-  // fire mode). Selecting a card writes it straight back, so `boot()`'s `readMapId`
-  // reads it when the match boots.
-  let selectedMapId = readMapId(platform);
 
   // Lay the menu out in the LOGICAL (landscape) viewport and hang it off the
   // rotating game root — so a portrait phone gets a landscape menu that can never
@@ -1912,10 +1874,7 @@ function openMainMenu(
   const menu0 = ctx.logicalSize();
   const menuView = new MainMenuView(menu0.w, menu0.h, isTouch);
   const settingsView = new SettingsView(menu0.w, menu0.h, isTouch);
-  // The picker draws over the menu's backdrop (added after it) and under the
-  // settings screen (added before it) — it only ever shows on the menu screen.
-  const mapPickerView = new MapPickerView();
-  ctx.root.addChild(menuView, mapPickerView, settingsView);
+  ctx.root.addChild(menuView, settingsView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -1931,28 +1890,6 @@ function openMainMenu(
     rotated: ctx.isRotated(),
     controls: [],
     play: (): void => play(),
-  };
-
-  // The read-only map-picker seam (m8-02). Its layout facts are refreshed each
-  // render; `worldMapId`/`worldPlanets` stay null until `boot()` reports the built
-  // world through `handle.reportMatchMap`. `expected` is computed once from the
-  // bundled registry — the board a match must build for each map.
-  const mapSeam: MapPickerSeam = {
-    visible: true,
-    screen,
-    cardCount: MAP_ORDER.length,
-    selectedId: selectedMapId,
-    defaultId: normalizeMapId(''),
-    veteranId: 'diamond',
-    order: MAP_ORDER,
-    isTouch,
-    cards: [],
-    band: { x: 0, y: 0, width: 0, height: 0 },
-    logicalViewport: { width: menu0.w, height: menu0.h },
-    expected: Object.fromEntries(MAP_ORDER.map((id) => [id, registryPlanets(id)])),
-    worldMapId: null,
-    worldPlanets: null,
-    selectMap: (index: number): void => selectMapAt(index),
   };
 
   let resolvePlay: () => void = () => {};
@@ -1982,39 +1919,8 @@ function openMainMenu(
     settingsView.visible = screen === 'settings';
     if (menuView.visible) menuView.update(mainMenuModel());
     if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
-    renderPicker();
     seam.screen = screen;
     updateSeamLayout();
-  }
-
-  /** Lay the map picker out inside the band the menu reserves for it and draw the
-   *  cards — only on the menu screen. Refreshes the picker seam's layout facts. */
-  function renderPicker(): void {
-    const { w, h } = ctx.logicalSize();
-    const menuLayout = mainMenuLayout({ width: w, height: h }, { isTouch });
-    const pickerLayout = mapPickerLayout(menuLayout.mapBand, MAP_ORDER.length, isTouch);
-    mapPickerView.visible = screen === 'menu';
-    mapPickerView.setLayout(pickerLayout);
-    if (mapPickerView.visible) mapPickerView.update(mapPickerModel(selectedMapId));
-    mapSeam.visible = mapPickerView.visible;
-    mapSeam.screen = screen;
-    mapSeam.selectedId = selectedMapId;
-    mapSeam.isTouch = isTouch;
-    mapSeam.cards = pickerLayout.cards.map((r) => ({ ...r }));
-    mapSeam.band = { ...pickerLayout.band };
-    mapSeam.logicalViewport = { width: w, height: h };
-  }
-
-  /** Pick the map card at `index` (a tap on a card). Persists the choice at once,
-   *  so `boot()` reads it when the match boots and a reload finds it preselected
-   *  (m8-02). A no-op once PLAY has torn the menu down. */
-  function selectMapAt(index: number): void {
-    if (played) return;
-    const id = mapIdAt(index);
-    if (id === selectedMapId) return;
-    selectedMapId = id;
-    platform.storage.set(MAP_STORAGE_KEY, selectedMapId);
-    render();
   }
 
   /** PLAY: tear the menu down and hand `boot()` the go-ahead to build the world. */
@@ -2068,14 +1974,6 @@ function openMainMenu(
     // under the thumb (the part that silently breaks; tested explicitly).
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (screen === 'menu') {
-      // The picker band sits between the wordmark and the buttons; test it first,
-      // then the menu buttons. The two never overlap, so order is only a courtesy.
-      const card = mapPickerView.hitTest(x, y);
-      if (card !== null) {
-        selectMapAt(card);
-        e.preventDefault();
-        return;
-      }
       const hit = menuView.hitTest(x, y);
       if (hit === 'play') play();
       else if (hit === 'settings') openSettings();
@@ -2113,13 +2011,8 @@ function openMainMenu(
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
     window.visualViewport?.removeEventListener('resize', relayout);
-    // The picker leaves the stage with the menu — but its seam persists on
-    // `window` (mutable fields), so `boot()` can still report the built world onto
-    // it after PLAY has torn the menu down.
-    mapPickerView.visible = false;
-    ctx.root.removeChild(menuView, mapPickerView, settingsView);
+    ctx.root.removeChild(menuView, settingsView);
     menuView.destroy({ children: true });
-    mapPickerView.destroy({ children: true });
     settingsView.destroy({ children: true });
   }
 
@@ -2130,7 +2023,6 @@ function openMainMenu(
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);
-  installMapPickerSeam(mapSeam);
   render();
 
   return {
@@ -2138,27 +2030,7 @@ function openMainMenu(
     matchStarted: () => {
       seam.matchStarted = true;
     },
-    reportMatchMap: (mapId: string, planets: readonly { x: number; y: number }[]): void => {
-      mapSeam.worldMapId = mapId;
-      mapSeam.worldPlanets = planets.map((p) => ({ x: p.x, y: p.y }));
-    },
   };
-}
-
-/** Install the read-only `window.__mapPicker` live-stage seam (see
- *  {@link openMainMenu}). Its fields are mutated in place as the picker runs and
- *  after the match boots; the handle itself is fixed, like the menu seam. */
-function installMapPickerSeam(seam: object): void {
-  try {
-    Object.defineProperty(window, '__mapPicker', {
-      value: seam,
-      writable: false,
-      configurable: false,
-      enumerable: true,
-    });
-  } catch {
-    // Already defined (double install / HMR) — leave the existing one in place.
-  }
 }
 
 /** Install the read-only `window.__mainMenu` live-stage seam (see
@@ -2177,16 +2049,27 @@ function installMainMenuSeam(seam: object): void {
   }
 }
 
-/** What `boot()` holds the lobby by: a promise resolving with the hull the
- *  player locked in at RUSH!, and a one-shot `matchStarted()` the boot path calls
- *  once the world is built, to hand the seam the class the sim actually flew. */
+/** The two choices the player locks in at RUSH! — the hull AND the arena (p2). */
+interface LobbyChoice {
+  readonly shipClass: ShipClass;
+  readonly mapId: string;
+}
+
+/** What `boot()` holds the lobby by: a promise resolving with the hull and the
+ *  arena the player locked in at RUSH!, and a one-shot `matchStarted()` the boot
+ *  path calls once the world is built, to hand the seam what the sim actually made. */
 interface LobbyHandle {
-  /** Resolves the moment the RUSH! countdown reaches zero, with the chosen hull —
-   *  `boot()` builds the world with it (GDD §2.11). */
-  untilRush(): Promise<ShipClass>;
-  /** Report the hull the built world gave the local ship — the proof the picked
-   *  class reached the sim (drives `window.__lobby.localShipClass`). */
-  matchStarted(worldShipClass: ShipClass): void;
+  /** Resolves the moment the RUSH! countdown reaches zero, with the chosen hull
+   *  and arena — `boot()` builds the world with both (GDD §2.11; p2). */
+  untilRush(): Promise<LobbyChoice>;
+  /** Report what the built world actually made: the hull the local ship flies and
+   *  the arena's home-planet positions — the proof both picks reached the sim
+   *  (drives `window.__lobby.localShipClass` / `.worldMapId` / `.worldPlanets`). */
+  matchStarted(
+    worldShipClass: ShipClass,
+    worldMapId: string,
+    worldPlanets: readonly { x: number; y: number }[],
+  ): void;
 }
 
 /** The read-only `window.__lobby` live-stage seam: the lobby as plain,
@@ -2233,6 +2116,28 @@ interface LobbySeam {
   selectClass(index: number): void;
   /** Press RUSH! — starts the countdown that boots the match. */
   rush(): void;
+
+  // --- The arena picker, now in the lobby (p2 field rule) ------------------
+  /** The arena currently selected — the map card drawn as chosen. */
+  selectedMapId: string;
+  /** The onboarding default (`octagon`, "The Ring"), so a test can pick any *other*. */
+  defaultMapId: string;
+  /** The map that carries the VETERAN tag (`diamond`). */
+  veteranMapId: string;
+  /** Card order, so a test maps a card index to a map id the way the view does. */
+  mapOrder: readonly string[];
+  /** The arena card rects (logical, landscape space) — thumb-size assertion targets. */
+  mapCards: readonly Rect[];
+  /** Each map's registry planet positions, from the SAME bundled registry the sim
+   *  builds from — the expected board a booted match must match (p2). */
+  expectedPlanets: Readonly<Record<string, readonly { x: number; y: number }[]>>;
+  /** The arena the built world actually used, or null until the match boots. */
+  worldMapId: string | null;
+  /** The built world's home-planet positions, or null until the match boots — the
+   *  proof the picked arena reached the sim (p2). */
+  worldPlanets: readonly { x: number; y: number }[] | null;
+  /** Select the arena card at `index` in {@link mapOrder} — a tap on a card. */
+  selectMap(index: number): void;
 }
 
 /**
@@ -2243,14 +2148,19 @@ interface LobbySeam {
  * Offline flavour: opened with `online: false`, so the room-code UI is hidden and
  * the empty seats read as the bot cast rather than joinable slots — there is no
  * transport for a second player to arrive on until the WebSocket lobby is wired.
- * The local player is seat 0 and the host, so hull selection, per-seat difficulty
- * cycling, and RUSH! are all live.
+ * The local player is seat 0 and the host, so hull selection, ARENA selection,
+ * per-seat difficulty cycling, and RUSH! are all live.
+ *
+ * The arena picker lives here now (p2 field rule): one pre-match room where you
+ * pick your hull AND your map, then RUSH! — no separate picker step on the PLAY
+ * flow. Both picks are persisted (same storage seam as the fire mode) and both are
+ * resolved to `boot()` at RUSH!.
  *
  * The pure model/geometry/view are `src/ui`'s ({@link LobbyView}, `lobbyModel`,
  * `lobbyLayout`); this function is the *wiring* — screen state, input routing,
  * the countdown clock off Pixi's ticker, and teardown. A read-only
  * `window.__lobby` seam lets the live-stage suite drive it and read back the hull
- * the sim ended up flying.
+ * and the arena the sim ended up building.
  */
 function openLobby(
   app: Application,
@@ -2259,12 +2169,14 @@ function openLobby(
 ): LobbyHandle {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   // Offline solo-vs-bots: seat 0 is you and the host; the room code is hidden
-  // (`online: false`); the pre-selected hull is your last pick (GDD §2.11).
+  // (`online: false`); the pre-selected hull and arena are your last picks
+  // (GDD §2.11; p2 — same storage seam as the fire mode).
   let state: LobbyState = createLobby({
     room: OFFLINE_ROOM,
     you: LOCAL_PLAYER,
     host: LOCAL_PLAYER,
     shipClass: readShipClass(platform),
+    mapId: readMapId(platform),
     online: false,
   });
   let resolved = false;
@@ -2290,10 +2202,23 @@ function openLobby(
     localShipClass: null,
     selectClass: (index: number): void => selectClassAt(index),
     rush: (): void => rush(),
+    // The arena picker (p2), computed once from the bundled registry — the same
+    // board the sim builds from, so `expectedPlanets` is the truth a booted match
+    // must match. Layout facts are refreshed each render; `worldMapId`/
+    // `worldPlanets` stay null until `boot()` reports the built world.
+    selectedMapId: state.mapId,
+    defaultMapId: normalizeMapId(''),
+    veteranMapId: VETERAN_MAP_ID,
+    mapOrder: MAP_ORDER,
+    mapCards: [],
+    expectedPlanets: Object.fromEntries(MAP_ORDER.map((id) => [id, registryPlanets(id)])),
+    worldMapId: null,
+    worldPlanets: null,
+    selectMap: (index: number): void => selectMapAt(index),
   };
 
-  let resolveRush: (cls: ShipClass) => void = () => {};
-  const rushPromise = new Promise<ShipClass>((resolve) => {
+  let resolveRush: (choice: LobbyChoice) => void = () => {};
+  const rushPromise = new Promise<LobbyChoice>((resolve) => {
     resolveRush = resolve;
   });
 
@@ -2307,6 +2232,8 @@ function openLobby(
     seam.slotCount = layout.seats.length;
     seam.online = model.online;
     seam.selectedClass = state.shipClass;
+    seam.selectedMapId = state.mapId;
+    seam.mapCards = layout.maps.map((r) => ({ ...r }));
     seam.logicalViewport = { width: w, height: h };
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
@@ -2332,6 +2259,16 @@ function openLobby(
     render();
   }
 
+  /** Pick the arena card at `index` (a tap on a card). Persists the choice at once,
+   *  so a reload finds it preselected and `boot()` reads it at RUSH! (p2). Refused
+   *  after RUSH!, where {@link selectMap} locks the arena with the hull. */
+  function selectMapAt(index: number): void {
+    if (resolved) return;
+    state = selectMap(state, mapIdAt(index));
+    platform.storage.set(MAP_STORAGE_KEY, state.mapId);
+    render();
+  }
+
   /** Press RUSH! — starts the countdown (offline you are the host, so it always
    *  takes). A no-op once counting or once the match has been handed the screen. */
   function rush(): void {
@@ -2351,7 +2288,7 @@ function openLobby(
     render();
     if (state.phase === 'started' && !resolved) {
       resolved = true;
-      const chosen = state.shipClass;
+      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId };
       teardown();
       seam.visible = false;
       resolveRush(chosen);
@@ -2367,6 +2304,9 @@ function openLobby(
     switch (hit.kind) {
       case 'class':
         selectClassAt(hit.index);
+        break;
+      case 'map':
+        selectMapAt(hit.index);
         break;
       case 'seat':
         // Host taps a bot row to cycle its difficulty (GDD §2.1). A no-op on your
@@ -2419,8 +2359,14 @@ function openLobby(
 
   return {
     untilRush: () => rushPromise,
-    matchStarted: (worldShipClass: ShipClass): void => {
+    matchStarted: (
+      worldShipClass: ShipClass,
+      worldMapId: string,
+      worldPlanets: readonly { x: number; y: number }[],
+    ): void => {
       seam.localShipClass = worldShipClass;
+      seam.worldMapId = worldMapId;
+      seam.worldPlanets = worldPlanets.map((p) => ({ x: p.x, y: p.y }));
     },
   };
 }
