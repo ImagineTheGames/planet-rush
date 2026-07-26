@@ -1,0 +1,26 @@
+{
+  // Typecheck gate for the allocator's container build (allocator/Dockerfile).
+  // OWNER: Netcode Engineer. The root tsconfig's `include` covers src/server/
+  // tests but not allocator/, and the Docker build stage copies only src/ and
+  // allocator/ (not tests/) — so the root config would leave the allocator's own
+  // code unchecked in the image build. This config inherits every strict option
+  // from the root and points `include` at exactly what the build stage has:
+  // src/ (for the imported ticket/room-code/@shared code) and allocator/.
+  //
+  //   npx tsc --noEmit -p allocator/tsconfig.json
+  //
+  // The repo-wide `npx tsc --noEmit` (root config) still checks the allocator too
+  // — the allocator's tests import its modules, pulling them into that program.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // baseUrl relative to this file (the repo root) so the aliases resolve the
+    // same way they do from the root config.
+    "baseUrl": "..",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@platform/*": ["src/platform/*"],
+      "@render/*": ["src/render/*"]
+    }
+  },
+  "include": ["../src", "../allocator"]
+}
