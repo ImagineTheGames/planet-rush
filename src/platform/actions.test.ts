@@ -190,4 +190,23 @@ describe('describeBindings — the controls strip reads from the map (GDD §2.4)
     const build = describeBindings('keyboard', FireMode.Manual).find((r) => r.action === 'build');
     expect(build?.label).toBe('Build & Upgrade');
   });
+
+  it('every row has a real binding on every device — no phantom labels (input-parity)', () => {
+    // The gamepad "D-pad" ping row once named a binding the code never wired; the
+    // legend must never advertise a control that does not exist.
+    for (const device of ['keyboard', 'gamepad', 'touch'] as const) {
+      for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+        for (const row of describeBindings(device, mode)) {
+          expect(row.binding.trim().length, `${device}/${mode} ${row.action}`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('touch advertises the real boost + ping affordances (not vague placeholders)', () => {
+    const rows = describeBindings('touch', FireMode.AutoAim);
+    expect(rows.find((r) => r.action === 'boost')?.binding).toBe('Double-tap stick / BOOST');
+    expect(rows.find((r) => r.action === 'ping')?.binding).toBe('PING button');
+    expect(describeBindings('gamepad', FireMode.AutoAim).find((r) => r.action === 'ping')?.binding).toBe('D-pad');
+  });
 });

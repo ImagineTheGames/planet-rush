@@ -100,6 +100,7 @@
 
 import { BUILD_INFO } from './build-info';
 import type { BuildInfo } from './build-info';
+import type { Action } from '@shared/types';
 
 /** The frozen shape of `window.__planetRush` (see the contract above). */
 export interface DebugState {
@@ -383,4 +384,129 @@ export function installDebugStage(
   }
 
   return hook;
+}
+
+// ---------------------------------------------------------------------------
+// Input probe — the parity table's live-stage READ seam
+// ---------------------------------------------------------------------------
+
+/**
+ * The abstract input the sim was handed this frame, exposed READ-ONLY at
+ * `window.__planetRush.input`. The input-parity live-stage suite (tests/live-stage/
+ * input-parity.spec.ts) fires each action via CDP touch and asserts it shows up
+ * here — proof the whole funnel (device → ControlState → Action) crossed into the
+ * sim, which matters most for `ping`, whose effect is not (yet) rendered and so is
+ * otherwise unobservable.
+ */
+export interface InputProbeReadout {
+  /** Fixed-tick frames the probe has recorded — a liveness counter for the poller. */
+  frame: number;
+  /** The `Action.type`s the sim received this frame (deduped, order-insensitive). */
+  readonly types: string[];
+  /** Convenience mirrors of the merged control state, so a test asserts intent
+   *  without re-parsing `types`. */
+  boost: boolean;
+  fire: boolean;
+  build: boolean;
+  /** Whether an `aim` action was emitted this frame (Manual fire mode only). */
+  aim: boolean;
+  /** The thrust vector this frame — its magnitude proves a stick drag crossed in. */
+  readonly thrust: { x: number; y: number };
+  /** The ping target (world space) this frame, or `null`. The one action with no
+   *  render side yet, so this seam is the only way to prove it landed. */
+  ping: { x: number; y: number } | null;
+  /** Monotonic count of pings seen since boot, and the last target. Because a ping
+   *  is one-shot (present for a single frame), a live poller races the per-frame
+   *  `ping`; the counter and latched `lastPing` are what a CDP test reads instead. */
+  pingCount: number;
+  lastPing: { x: number; y: number } | null;
+}
+
+/** What `main.ts` drives each frame with the action list it hands the sim. */
+export interface InputProbe {
+  readonly enabled: boolean;
+  update(actions: readonly Action[]): void;
+}
+
+const NOOP_INPUT_PROBE: InputProbe = { enabled: false, update: () => {} };
+
+/**
+ * Install the read-only `window.__planetRush.input` seam iff `?debug=1`, merged
+ * additively onto the shared handle exactly like {@link installDebugStage}. The
+ * readout object is overwritten in place each frame (its `types` array is cleared
+ * and refilled), so the per-frame path allocates nothing after warm-up.
+ */
+export function installInputProbe(
+  search: string,
+  target: StageTarget = globalThis as unknown as StageTarget,
+): InputProbe {
+  if (!isDebugEnabled(search)) return NOOP_INPUT_PROBE;
+
+  const readout: InputProbeReadout = {
+    frame: 0,
+    types: [],
+    boost: false,
+    fire: false,
+    build: false,
+    aim: false,
+    thrust: { x: 0, y: 0 },
+    ping: null,
+    pingCount: 0,
+    lastPing: null,
+  };
+
+  const probe: InputProbe = {
+    enabled: true,
+    update(actions): void {
+      readout.frame++;
+      readout.types.length = 0;
+      readout.boost = false;
+      readout.fire = false;
+      readout.build = false;
+      readout.aim = false;
+      readout.thrust.x = 0;
+      readout.thrust.y = 0;
+      readout.ping = null;
+      for (const a of actions) {
+        if (!readout.types.includes(a.type)) readout.types.push(a.type);
+        if (a.type === 'boost') readout.boost = a.active;
+        else if (a.type === 'fire') readout.fire = a.active;
+        else if (a.type === 'build') readout.build = a.active;
+        else if (a.type === 'aim') readout.aim = true;
+        else if (a.type === 'thrust') {
+          readout.thrust.x = a.dir.x;
+          readout.thrust.y = a.dir.y;
+        } else if (a.type === 'ping') {
+          readout.ping = { x: a.at.x, y: a.at.y };
+          readout.lastPing = readout.ping;
+          readout.pingCount++;
+        }
+      }
+    },
+  };
+
+  // Additive install onto the shared handle (same discipline as installDebugStage).
+  const existing = target[DEBUG_GLOBAL_KEY] as Record<string, unknown> | undefined;
+  const host = existing ?? {};
+  if (!Object.prototype.hasOwnProperty.call(host, 'input')) {
+    try {
+      Object.defineProperty(host, 'input', { value: readout, writable: false, configurable: false, enumerable: true });
+    } catch {
+      /* co-tenant owns 'input' or the host is non-extensible — leave it be */
+    }
+  }
+  if (!existing) {
+    try {
+      Object.defineProperty(target, DEBUG_GLOBAL_KEY, {
+        value: host,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      target[DEBUG_GLOBAL_KEY] = host;
+    }
+  }
+
+  return probe;
 }

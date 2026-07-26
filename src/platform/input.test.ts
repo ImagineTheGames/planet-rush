@@ -52,6 +52,10 @@ function pads(...list: (Gamepad | null)[]): GamepadProvider {
 const BTN_Y = 3;
 const BTN_LT = 6;
 const BTN_RT = 7;
+const DPAD_UP = 12;
+const DPAD_DOWN = 13;
+const DPAD_LEFT = 14;
+const DPAD_RIGHT = 15;
 
 describe('GamepadSource — folds a standard pad into ControlState (GDD §2.4)', () => {
   it('maps the left stick to thrust and the right stick to aim', () => {
@@ -120,6 +124,53 @@ describe('GamepadSource — folds a standard pad into ControlState (GDD §2.4)',
     const state = createControlState();
     src.update(state);
     expect(state.thrust).toEqual({ x: -1, y: 0 });
+  });
+
+  // The D-pad ping — the binding the controls strip always advertised but the code
+  // never wired (docs/input-parity.md gap #3). Anchored on the ship so the ping is a
+  // world point; rising-edge so a held D-pad pings once.
+  describe('D-pad → a ship-anchored directional ping (GDD §2.4)', () => {
+    const anchor = { x: 1000, y: 2000 };
+
+    it('pings offset from the ship in the D-pad direction (up = −y)', () => {
+      const src = new GamepadSource(pads(fakePad({ buttons: { [DPAD_UP]: 1 } })), null, () => anchor, 600);
+      const state = createControlState();
+      src.update(state);
+      expect(state.ping).toEqual({ x: 1000, y: 2000 - 600 });
+    });
+
+    it('normalises a diagonal so a corner ping is the same distance as a cardinal', () => {
+      const src = new GamepadSource(
+        pads(fakePad({ buttons: { [DPAD_DOWN]: 1, [DPAD_RIGHT]: 1 } })),
+        null,
+        () => anchor,
+        600,
+      );
+      const state = createControlState();
+      src.update(state);
+      const inv = 1 / Math.SQRT2;
+      expect(state.ping!.x).toBeCloseTo(1000 + 600 * inv, 4);
+      expect(state.ping!.y).toBeCloseTo(2000 + 600 * inv, 4);
+    });
+
+    it('is rising-edge: a held D-pad pings once, not every frame', () => {
+      const pad = fakePad({ buttons: { [DPAD_LEFT]: 1 } });
+      const src = new GamepadSource(pads(pad), null, () => anchor, 600);
+      const first = createControlState();
+      src.update(first);
+      expect(first.ping).not.toBeNull(); // fired on the press
+
+      const second = createControlState(); // fresh frame, ping cleared by the caller
+      src.update(second); // same pad still held
+      expect(second.ping).toBeNull(); // no re-fire while held
+    });
+
+    it('does not ping when no D-pad direction is pressed', () => {
+      const src = new GamepadSource(pads(fakePad({ buttons: { [BTN_RT]: 1 } })), null, () => anchor, 600);
+      const state = createControlState();
+      src.update(state);
+      expect(state.ping).toBeNull();
+    });
   });
 });
 

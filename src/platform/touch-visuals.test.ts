@@ -13,6 +13,8 @@ import {
   writeAffordanceVisibility,
   affordanceRects,
   buildButtonRect,
+  boostButtonRect,
+  pingButtonRect,
   type TouchReadout,
 } from './touch-visuals';
 import { FireMode } from './actions';
@@ -207,5 +209,68 @@ describe('the BUILD button — the touch E-equivalent (GDD §2.4, §2.5)', () =>
     const rect = buildButtonRect(true, true, 1280, 720)!;
     expect(node.x).toBeCloseTo(rect.x + rect.width / 2);
     expect(node.y).toBeCloseTo(rect.y + rect.height / 2);
+  });
+});
+
+describe('the BOOST + PING buttons — the v0.2.2 parity fills (GDD §2.4)', () => {
+  it('are null on desktop and present on touch', () => {
+    expect(boostButtonRect(false, 1280, 720)).toBeNull();
+    expect(pingButtonRect(false, 1280, 720)).toBeNull();
+    expect(boostButtonRect(true, 1280, 720)).not.toBeNull();
+    expect(pingButtonRect(true, 1280, 720)).not.toBeNull();
+  });
+
+  it('are thumb-scale (≥72px diameter, parity requirement 3)', () => {
+    const boost = boostButtonRect(true, 1280, 720)!;
+    const ping = pingButtonRect(true, 1280, 720)!;
+    expect(boost.width).toBeGreaterThanOrEqual(72);
+    expect(boost.height).toBeGreaterThanOrEqual(72);
+    expect(ping.width).toBeGreaterThanOrEqual(72);
+    expect(ping.height).toBeGreaterThanOrEqual(72);
+  });
+
+  it('sit in their declared halves and inside the viewport', () => {
+    const w = 1280;
+    const boost = boostButtonRect(true, w, 720)!;
+    const ping = pingButtonRect(true, w, 720)!;
+    // BOOST on the movement (left) side, PING on the right — matching the layout
+    // registry anchors (main.ts LEFT_STICK_ANCHOR / RIGHT_STICK_ANCHOR).
+    expect(boost.x).toBeLessThan(w / 2);
+    expect(ping.x).toBeGreaterThan(w / 2);
+    for (const r of [boost, ping]) {
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.width).toBeLessThanOrEqual(w);
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.y + r.height).toBeLessThanOrEqual(720);
+    }
+  });
+
+  it('BOOST clears the left stick zone; PING clears the FIRE button', () => {
+    const boost = boostButtonRect(true, 1280, 720)!;
+    const stick = affordanceRects(true, FireMode.AutoAim, 1280, 720).leftStickZone!;
+    // BOOST sits inboard of the stick — its left edge is past the stick's right edge.
+    expect(boost.x).toBeGreaterThanOrEqual(stick.x + stick.width);
+
+    const ping = pingButtonRect(true, 1280, 720)!;
+    const fire = affordanceRects(true, FireMode.AutoAim, 1280, 720).fireButton!;
+    // PING stacks above FIRE — its bottom edge is above the FIRE button's top.
+    expect(ping.y + ping.height).toBeLessThanOrEqual(fire.y);
+  });
+
+  it('the Pixi layer draws both on touch, at their rects, with a pressed state', () => {
+    const v = new TouchVisuals();
+    v.update(readout({ mode: FireMode.AutoAim }), false, 1280, 720); // desktop
+    expect(shown(v, 'boost-button')).toBe(false);
+    expect(shown(v, 'ping-button')).toBe(false);
+
+    v.update(readout({ mode: FireMode.AutoAim }), true, 1280, 720, false, /* boost */ true, /* ping */ true);
+    expect(shown(v, 'boost-button')).toBe(true);
+    expect(shown(v, 'ping-button')).toBe(true);
+    const boostNode = v.getChildByLabel('boost-button')!;
+    const boostRect = boostButtonRect(true, 1280, 720)!;
+    expect(boostNode.x).toBeCloseTo(boostRect.x + boostRect.width / 2);
+    expect(boostNode.y).toBeCloseTo(boostRect.y + boostRect.height / 2);
+    // Pressed state is a small "give" in scale — visible, transform-cheap.
+    expect(boostNode.scale.x).toBeLessThan(1);
   });
 });
