@@ -257,6 +257,10 @@ export class Renderer {
    *  per frame; the owner it was built for is remembered so it is never rebuilt. */
   private readonly planetHalo: (Graphics | null)[] = [];
   private readonly planetHaloOwner: PlayerId[] = [];
+  /** The VFX tier each halo was baked at (0 full, 1 reduced), so a flip of
+   *  {@link reduceVfx} rebuilds it into the other look (full gradient ⇄ simpler
+   *  ring) instead of leaving a stale texture. `undefined` = never built. */
+  private readonly planetHaloReduced: number[] = [];
   /** The arena boundary, drawn once. Static — the play bounds never move — so it
    *  is redrawn only if the bounds themselves change (they don't mid-match). */
   private boundaryGfx: Graphics | null = null;
@@ -457,12 +461,27 @@ export class Renderer {
    * number; here we only place and fade it.
    *
    * Static-render discipline (GDD §4.3): the geometry is built once per owner and
-   * reused — a home's owner never changes mid-match, so this is one build all
-   * game. Per frame the halo only moves and fades: a gentle breath keyed to sim
-   * time (deterministic, so the frozen golden holds still), lifted toward full
-   * while a deposit is actually flowing — the viewer carrying ore inside its own
+   * then **baked to a single texture** (`cacheAsTexture`), so per frame the halo
+   * is one textured quad the GPU blits — not five stacked translucent discs it
+   * re-blends every frame. That overdraw (five large alpha fills at the atmosphere
+   * radius) was the mobile frame-budget cost this VFX was tuned to shed: on the
+   * software-GL profile it dropped the frame rate below the boot-path budget until
+   * it was baked. The bake survives every per-frame change we make — position (the
+   * camera pan) and alpha (the breath) are display properties applied to the quad,
+   * never a re-rasterise of the gradient.
+   *
+   * Per frame the halo only moves and fades: a gentle breath keyed to sim time
+   * (deterministic, so the frozen golden holds still), lifted toward full while a
+   * deposit is actually flowing — the viewer carrying ore inside its own
    * atmosphere, the same predicate the sim drains on (`inAtmosphere`). Idle it is
    * a hush; depositing it brightens, pairing with the ore-flight couriers.
+   *
+   * VfxAutoQuality tier (GDD §4.3 risk 5): when the auto-reducer has throttled a
+   * struggling device (`reduceVfx`), even the one baked quad's full-disc fill is
+   * too dear, so the halo is rebuilt as the **simpler ring** — a thin edge band at
+   * `DEPOSIT_RANGE` that blends only its own annulus, not a full disc. It is left
+   * un-baked on purpose: a cached quad would blit the whole bounding box (the
+   * transparent centre included), which is the very cost the ring exists to dodge.
    */
   private drawAtmosphere(
     index: number,
@@ -477,12 +496,17 @@ export class Renderer {
       if (g) g.visible = false;
       return;
     }
-    if (!g || this.planetHaloOwner[index] !== planet.owner) {
+    const reduced = this.reduceVfx ? 1 : 0;
+    if (!g || this.planetHaloOwner[index] !== planet.owner || this.planetHaloReduced[index] !== reduced) {
       g?.destroy();
-      g = spriteGraphics(atmosphereHaloSprite(planet.owner), planet.radius);
+      g = spriteGraphics(atmosphereHaloSprite(planet.owner, reduced === 1), planet.radius);
       g.label = `atmosphere-${index}`;
+      // Full gradient: bake it to one texture so the five discs blend once, ever.
+      // The ring tier stays vector — its thin band is cheaper drawn than blitted.
+      if (reduced === 0) g.cacheAsTexture(true);
       this.planetHalo[index] = g;
       this.planetHaloOwner[index] = planet.owner;
+      this.planetHaloReduced[index] = reduced;
       this.atmosphereLayer.addChild(g);
     }
     g.visible = true;

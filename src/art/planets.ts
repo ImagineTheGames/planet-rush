@@ -266,12 +266,31 @@ export const ATMOSPHERE_HALO_RADIUS = DEPOSIT_RANGE / PLANET.radius;
  * The alpha here is the **bright, ore-flowing** density. The renderer breathes it
  * gently on `world.time` and, while a deposit is actually flowing, holds it near
  * full — an idle halo is dimmed to a hush, a depositing one brightens (pairs with
- * the ore-flight couriers). Static-render discipline: built once per owner, then
- * only faded per frame.
+ * the ore-flight couriers). Static-render discipline: the renderer bakes this to a
+ * single texture once per owner (`cacheAsTexture`) and thereafter only fades the
+ * one quad — the gradient is never re-rasterised, and the five stacked translucent
+ * discs never re-blend per frame (that overdraw was the mobile frame-budget cost
+ * this VFX was tuned to shed, GDD §4.3 risk 5).
+ *
+ * On a device the auto-reducer has throttled (`reduced`), the full gradient's
+ * fill is too dear even baked, so the halo drops to the **simpler ring** the tier
+ * promises: one thin edge band at `DEPOSIT_RANGE`, in the same identity colour.
+ * A thin annulus blends only its own band, not a full-disc quad, so the slow
+ * profile buys its frame time back while the affordance — "your air reaches to
+ * here" — still reads.
  */
-export function atmosphereHaloSprite(playerId: number): SpriteDef {
+export function atmosphereHaloSprite(playerId: number, reduced = false): SpriteDef {
   const color = playerColor(playerId);
   const r = ATMOSPHERE_HALO_RADIUS;
+  if (reduced) {
+    // The reduced tier: a soft double band hugging the atmosphere edge, marking
+    // exactly where the deposit range ends. Two thin annuli (not a filled disc)
+    // so the fill is a hair of the gradient's — the whole point of the tier.
+    return sprite(`planet/atmosphere/p${playerId}/reduced`, round(r), [
+      poly(annulusPoints(0, 0, round(r), round(r * 0.9), 0, Math.PI * 2, 44), fill(color, 'identity', 0.09)),
+      poly(annulusPoints(0, 0, round(r * 0.88), round(r * 0.82), 0, Math.PI * 2, 44), fill(color, 'identity', 0.06)),
+    ]);
+  }
   // [fraction of the halo radius, fill alpha] — largest/faintest first so the
   // discs stack back-to-front into a limb-bright, edge-faint gradient. The
   // outermost disc sits at the full radius: the atmosphere edge is DEPOSIT_RANGE.
