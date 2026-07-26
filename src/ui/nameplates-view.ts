@@ -185,11 +185,27 @@ export class NameplateView extends Container {
     d.local = plate.local;
   }
 
-  /** The layer's registry entry — the union of the labels that drew, or nothing
-   *  when no entity is on screen to name. */
+  /**
+   * The layer's registry entry — the union of the labels that drew, or nothing
+   * when no entity is on screen to name.
+   *
+   * The bounds are reported in GLOBAL (physical) space via {@link getBounds},
+   * exactly as the HUD's other elements do through `Hud.describeLayout`'s `push`
+   * helper: the layout host reads a `describeLayout` seam as physical Pixi bounds
+   * and un-rotates them into the logical viewport itself (`physicalBoundsToLogical`
+   * in main.ts). The labels draw as children of the rotating game root, so their
+   * on-screen union IS `getBounds()`. Returning the layer's *own-space*
+   * `drawnBounds` instead — which is already logical — double-counts the landscape
+   * lock's 90° rotation: under a portrait-held phone the host re-rotates an
+   * already-logical rect clean off the screen, so the label registers in a
+   * different space than it drew in. That is PR #93. `drawnBounds` stays purely
+   * the "did anything draw this frame" sentinel; the health-bar layer registers
+   * the same way, so the two space handlings are identical.
+   */
   describeLayout(_viewport: Viewport): LayoutEntry[] {
     if (!this.visible || !this.drawnBounds) return [];
-    return [{ id: NAMEPLATE_ID, anchor: NAMEPLATE_ANCHOR, bounds: { ...this.drawnBounds } }];
+    const b = this.getBounds();
+    return [{ id: NAMEPLATE_ID, anchor: NAMEPLATE_ANCHOR, bounds: { x: b.x, y: b.y, width: b.width, height: b.height } }];
   }
 
   private slot(i: number): Text {

@@ -168,11 +168,27 @@ export class HealthBarView extends Container {
     d.local = bar.local;
   }
 
-  /** The layer's registry entry — the union of the bars that drew, or nothing
-   *  when the field is clean (every enemy full and idle). */
+  /**
+   * The layer's registry entry — the union of the bars that drew, or nothing
+   * when the field is clean (every enemy full and idle).
+   *
+   * The bounds are reported in GLOBAL (physical) space via {@link getBounds}, the
+   * same discipline the HUD's other elements use through `Hud.describeLayout`'s
+   * `push` helper: the layout host reads a `describeLayout` seam as physical Pixi
+   * bounds and un-rotates them into the logical viewport itself
+   * (`physicalBoundsToLogical` in main.ts). The bars draw as children of the
+   * rotating game root, so their on-screen union IS `getBounds()`. Returning the
+   * layer's own-space `drawnBounds` (already logical) would double-count the
+   * landscape lock's 90° rotation and register a portrait-held bar off-screen —
+   * the same space mismatch PR #93 fixed for the nameplate layer, which this
+   * mirrors exactly. `drawnBounds` stays the "did any bar draw" sentinel. (In the
+   * frozen-scene layout contract no enemy is on screen and no own-ship bar draws,
+   * so this path never registered under rotation before — the bug was latent.)
+   */
   describeLayout(_viewport: Viewport): LayoutEntry[] {
     if (!this.visible || !this.drawnBounds) return [];
-    return [{ id: HEALTHBAR_ID, anchor: HEALTHBAR_ANCHOR, bounds: { ...this.drawnBounds } }];
+    const b = this.getBounds();
+    return [{ id: HEALTHBAR_ID, anchor: HEALTHBAR_ANCHOR, bounds: { x: b.x, y: b.y, width: b.width, height: b.height } }];
   }
 
   private slot(i: number): Graphics {
