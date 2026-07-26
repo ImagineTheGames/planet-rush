@@ -59,7 +59,7 @@ import { TouchController } from '@platform/touch';
 import { TouchButtons } from '@platform/touch-buttons';
 import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect, boostButtonRect, pingButtonRect } from '@platform/touch-visuals';
-import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
+import { WheelInput, writeWheelOrders, hitWheel, hitPanel } from '@platform/wheel-input';
 import {
   computeRootTransform,
   applyRootTransform,
@@ -101,6 +101,8 @@ import {
   Hud,
   PANEL_ROW_HEIGHT,
   TRACK_ORDER,
+  UpgradeTrack,
+  upgradeWheelSlots,
   WHEEL_ORDER,
   panelSize,
   wheelRadius,
@@ -619,6 +621,12 @@ async function boot(): Promise<void> {
   let fireHeld = false;
   /** Any wheel order placed this match — retires the SPEND onboarding prompt. */
   let hasOrdered = false;
+  /** The upgrade wheel has drilled into the WEAPON sub-wheel (RATIFIED v0.2.2).
+   *  Held here — the two bits of wheel screen state (`up`, `panel`) live in
+   *  `WheelInput`; the third level (the nested weapon wheel) is UI navigation, so
+   *  it lives with the other UI wiring and feeds the HUD. Reset whenever the
+   *  upgrade panel closes, so re-opening always lands on the main wheel. */
+  let weaponWheelOpen = false;
 
   // --- Haptics event detection (field request v0.2.2). `feedHaptics` derives the
   //     three combat vibrations — you-were-hit, base-under-attack, core-lost — from
@@ -719,11 +727,33 @@ async function boot(): Promise<void> {
     buildWheelLayout.centerX = w / 2;
     buildWheelLayout.centerY = h / 2;
     buildWheelLayout.radius = wheelRadius(w, h);
-    const size = panelSize(w, h, TRACK_ORDER.length);
+    // The upgrade surface is hit-tested per its CURRENT level: the main wheel and
+    // the WEAPON sub-wheel have different slot counts, so a press lands on the
+    // wedge actually drawn (RATIFIED v0.2.2).
+    const upgradeSlots = upgradeWheelSlots(weaponWheelOpen);
+    const size = panelSize(w, h, upgradeSlots.length);
     panelLayout.centerX = w / 2;
     panelLayout.centerY = h / 2;
     panelLayout.width = size.width;
     panelLayout.height = size.height;
+    panelLayout.rows = upgradeSlots.length;
+
+    // A press on the WEAPON or BACK wedge navigates between the two levels rather
+    // than buying — consume it here, before the row reaches `WheelInput` as an
+    // upgrade order. Track wedges fall through to the normal press below.
+    if (buildWheel.open && buildWheel.panelOpen) {
+      const hit = hitPanel(pressPoint.x, pressPoint.y, panelLayout);
+      if (hit.kind === 'row') {
+        const slot = upgradeSlots[hit.index];
+        if (slot?.kind === 'weapon' || slot?.kind === 'back') {
+          weaponWheelOpen = slot.kind === 'weapon';
+          haptics.haptic('tap'); // a wedge was pressed — the lightest press tell
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return;
+        }
+      }
+    }
 
     // Pressed-state tell (field report v0.2.2): before the press is consumed,
     // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
@@ -1116,8 +1146,13 @@ async function boot(): Promise<void> {
 
     // Four segments spend on the spot; the fifth opened a screen and never
     // reaches here (GDD §2.5). The sim validates every one of them again —
-    // ownership, docking, cost, caps — and refuses on its own terms.
-    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, TRACK_ORDER)) {
+    // ownership, docking, cost, caps — and refuses on its own terms. The upgrade
+    // rows map to the CURRENT level's tracks; the WEAPON/BACK nav wedges never set
+    // a row (consumed at press), so their positions are never drained as a buy.
+    const rowTracks = upgradeWheelSlots(weaponWheelOpen).map((s) =>
+      s.kind === 'track' ? s.track : UpgradeTrack.Power,
+    );
+    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, rowTracks)) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
     }
@@ -1148,6 +1183,10 @@ async function boot(): Promise<void> {
     hudFrame.collapsed = isCollapsed(world);
     hudFrame.buildRequested = buildWheel.open;
     hudFrame.upgradePanelOpen = buildWheel.panelOpen;
+    // The nested weapon wheel only exists inside the open upgrade panel; drop it
+    // the instant the panel closes, so re-opening always lands on the main wheel.
+    if (!buildWheel.panelOpen) weaponWheelOpen = false;
+    hudFrame.weaponWheelOpen = weaponWheelOpen;
     hudFrame.hasOrdered = hasOrdered;
     hudFrame.docked = docked;
 
@@ -1822,10 +1861,26 @@ async function boot(): Promise<void> {
         ship.banked = ore;
         if (!buildWheel.open) buildWheel.toggle();
         buildWheel.openPanel();
+        weaponWheelOpen = false; // always land on the main wheel
         return { open: buildWheel.panelOpen };
+      },
+      openWeapon(): { weaponOpen: boolean } | null {
+        // Drill into the WEAPON sub-wheel — the "tap WEAPON" of the field flow.
+        const ship = parkDocked();
+        if (!ship) return null;
+        if (!buildWheel.open) buildWheel.toggle();
+        buildWheel.openPanel();
+        weaponWheelOpen = true;
+        return { weaponOpen: weaponWheelOpen };
+      },
+      back(): { weaponOpen: boolean } {
+        // Back out of the sub-wheel to the main wheel (the BACK wedge).
+        weaponWheelOpen = false;
+        return { weaponOpen: weaponWheelOpen };
       },
       close(): void {
         buildWheel.close();
+        weaponWheelOpen = false;
       },
       interactive(): boolean {
         return hud.debugWheelInteractive();
@@ -1836,6 +1891,17 @@ async function boot(): Promise<void> {
         if (!ship || track === undefined) return null;
         const result = buyUpgrade(world, ship, track);
         return { result, tier: ship.tiers[track] };
+      },
+      buyByTrack(track: string): { result: string; tier: number } | null {
+        // Buy a tier on a named track — the sub-wheel test reads the track off the
+        // drawn SPEED wedge and buys it through the sim's real, validated purchase.
+        const ship = parkDocked();
+        const key = (Object.values(UpgradeTrack) as string[]).includes(track)
+          ? (track as UpgradeTrack)
+          : null;
+        if (!ship || key === null) return null;
+        const result = buyUpgrade(world, ship, key);
+        return { result, tier: ship.tiers[key] };
       },
       tierOf(i: number): number | null {
         const ship = world.ships.find(isLocalShip);

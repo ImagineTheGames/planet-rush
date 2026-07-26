@@ -1,30 +1,40 @@
 /**
  * Upgrade WHEEL tests (GDD §2.5, §2.2). The load-bearing contracts:
- *  - **every wedge gives current value → next tier → ore cost** — that triple is
- *    what makes upgrading an explicit trade against turrets and repair;
- *  - this is the **only** place ship stats appear, so all four tracks are
- *    present at every tier, including finished ones;
+ *  - the main wheel is about the SHIP — HULL, ENGINE, CARGO and a WEAPON wedge
+ *    that OPENS a nested weapon sub-wheel (RATIFIED v0.2.2), so a bare SPEED
+ *    wedge never reads as ship speed next to ENGINE;
+ *  - the WEAPON sub-wheel renders every ladder track with `group: 'weapon'`
+ *    (DAMAGE, SPEED today, more for free) plus a BACK wedge home;
+ *  - the WEAPON wedge summarises its tracks as tier pips, so the main wheel still
+ *    says the weapon tiers at a glance;
+ *  - **every track wedge gives current value → next tier → ore cost** — that
+ *    triple is what makes upgrading an explicit trade against turrets and repair;
+ *  - this is the **only** place ship stats appear, so a finished track still shows
+ *    what it finished at;
  *  - **upgrades multiply the class base** (GDD §2.5, §2.11), so a maxed
  *    Interceptor is still the fastest thing on the map;
  *  - cargo obeys the ratified "+2 per tier, cap 8" (GDD §2.8);
- *  - the wedges lay out clockwise from twelve o'clock, and the wheel is
- *    data-driven off the ladder so a longer ladder grows the wheel for free.
+ *  - the wedges lay out clockwise from twelve o'clock, data-driven off the ladder.
  */
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
   upgradeWheelModel,
+  upgradeWheelSlots,
+  weaponSummary,
   upgradeWedgeAngle,
   trackBase,
   trackValue,
   formatTrackValue,
   UpgradeTrack,
   UPGRADE_WHEEL_ORDER,
+  WHEEL_TRACK_ORDER,
+  WEAPON_GROUP,
   TRACK_ORDER,
   STOCK_TIERS,
   UPGRADE_LADDER,
 } from './upgrade-wheel';
-import type { UpgradeWheelSignals, UpgradeTiers, UpgradeLadder } from './upgrade-wheel';
+import type { UpgradeWheelSignals, UpgradeTiers } from './upgrade-wheel';
 import { CARGO_CAP_MAX, SHIP_STATS } from '../sim/constants';
 
 function tiers(over: Partial<Record<UpgradeTrack, number>> = {}): UpgradeTiers {
@@ -34,6 +44,7 @@ function tiers(over: Partial<Record<UpgradeTrack, number>> = {}): UpgradeTiers {
 function sig(over: Partial<UpgradeWheelSignals> = {}): UpgradeWheelSignals {
   return {
     open: true,
+    weaponOpen: false,
     shipClass: ShipClass.Vanguard,
     tiers: STOCK_TIERS,
     ore: 0,
@@ -41,18 +52,38 @@ function sig(over: Partial<UpgradeWheelSignals> = {}): UpgradeWheelSignals {
   };
 }
 
-/** The wedge for one track. */
-function wedgeOf(track: UpgradeTrack, over: Partial<UpgradeWheelSignals> = {}) {
-  const wedge = upgradeWheelModel(sig(over)).wedges.find((w) => w.track === track);
-  expect(wedge).toBeDefined();
+/** The wedge carrying `label` on whichever level `over` selects. */
+function wedgeOf(label: string, over: Partial<UpgradeWheelSignals> = {}) {
+  const wedge = upgradeWheelModel(sig(over)).wedges.find((w) => w.label === label);
+  expect(wedge, `a ${label} wedge is drawn`).toBeDefined();
   return wedge!;
 }
 
-describe('the wheel is the one place ship stats appear (GDD §2.2, §2.5)', () => {
-  it('shows a wedge for each of the four upgrade tracks', () => {
+describe('the main wheel is about the SHIP (RATIFIED v0.2.2)', () => {
+  it('shows HULL, ENGINE, CARGO and a WEAPON wedge — the weapon group collapsed', () => {
     const wedges = upgradeWheelModel(sig()).wedges;
-    expect(wedges.map((w) => w.track)).toEqual([...TRACK_ORDER]);
-    expect(wedges.map((w) => w.label)).toEqual(['POWER', 'ENGINE', 'CARGO', 'HULL']);
+    expect(wedges.map((w) => w.label)).toEqual(['WEAPON', 'ENGINE', 'CARGO', 'HULL']);
+    // The WEAPON wedge opens a screen; the other three buy a track directly.
+    expect(wedges[0]!.kind).toBe('weapon');
+    expect(wedges[0]!.track).toBeNull();
+    expect(wedges.slice(1).map((w) => w.kind)).toEqual(['track', 'track', 'track']);
+  });
+
+  it('never shows a bare SPEED or DAMAGE wedge on the main wheel', () => {
+    // The whole point of the sub-wheel: a weapon track next to ENGINE would read
+    // as ship speed. Neither weapon track appears until WEAPON is pressed.
+    const labels = upgradeWheelModel(sig()).wedges.map((w) => w.label);
+    expect(labels).not.toContain('SPEED');
+    expect(labels).not.toContain('DAMAGE');
+  });
+
+  it('summarises the weapon tiers as pips on the WEAPON wedge (item 3)', () => {
+    const weapon = wedgeOf('WEAPON', { tiers: tiers({ [UpgradeTrack.Power]: 2, [UpgradeTrack.Speed]: 1 }) });
+    expect(weapon.summary).not.toBeNull();
+    expect(weapon.summary!.map((p) => p.label)).toEqual(['DAMAGE', 'SPEED']);
+    expect(weapon.summary!.map((p) => p.tier)).toEqual([2, 1]);
+    // Max tiers come off the ladder (DAMAGE has 3 buyable tiers, SPEED 2).
+    expect(weapon.summary!.map((p) => p.maxTier)).toEqual([3, 2]);
   });
 
   it('names the hull being upgraded — locked at the lobby (GDD §2.11)', () => {
@@ -66,63 +97,96 @@ describe('the wheel is the one place ship stats appear (GDD §2.2, §2.5)', () =
     expect(upgradeWheelModel(sig({ open: false })).open).toBe(false);
     expect(upgradeWheelModel(sig({ open: true })).open).toBe(true);
   });
+});
 
-  it('keeps power as ONE track: mining speed and weapon damage are one stat', () => {
-    // GDD §2.5 — "weapon power (mining speed and weapon damage — one weapon, one
-    // stat)". Two wedges here would be two stats, and the inversion the game
-    // turns on would stop reading.
-    const powerWedges = upgradeWheelModel(sig()).wedges.filter((w) => w.track === UpgradeTrack.Power);
-    expect(powerWedges).toHaveLength(1);
+describe('the WEAPON sub-wheel (RATIFIED v0.2.2)', () => {
+  it('drills into every group:weapon track plus a BACK wedge', () => {
+    const wedges = upgradeWheelModel(sig({ weaponOpen: true })).wedges;
+    expect(wedges.map((w) => w.label)).toEqual(['DAMAGE', 'SPEED', 'BACK']);
+    expect(wedges.map((w) => w.kind)).toEqual(['track', 'track', 'back']);
+    // Both are really the weapon group off the ladder.
+    expect(UPGRADE_LADDER[UpgradeTrack.Power].group).toBe(WEAPON_GROUP);
+    expect(UPGRADE_LADDER[UpgradeTrack.Speed].group).toBe(WEAPON_GROUP);
+  });
+
+  it('keeps DAMAGE (the Power track) a single wedge — mining and damage are one stat', () => {
+    // GDD §2.5 — the Power track resolves both, and the wedge reads DAMAGE.
+    const damage = upgradeWheelModel(sig({ weaponOpen: true })).wedges.filter(
+      (w) => w.track === UpgradeTrack.Power,
+    );
+    expect(damage).toHaveLength(1);
+    expect(damage[0]!.label).toBe('DAMAGE');
+  });
+
+  it('the BACK wedge navigates, never buys', () => {
+    const back = wedgeOf('BACK', { weaponOpen: true });
+    expect(back.kind).toBe('back');
+    expect(back.track).toBeNull();
+    expect(back.cost).toBeNull();
+  });
+
+  it('is data-driven: a track tagged weapon appears in the sub-wheel for free', () => {
+    // upgradeWheelSlots walks the ladder's group metadata — the sub-wheel is
+    // exactly the group:weapon tracks (in order) plus BACK.
+    const weaponTracks = WHEEL_TRACK_ORDER.filter(
+      (t) => UPGRADE_LADDER[t].group === WEAPON_GROUP,
+    );
+    const slots = upgradeWheelSlots(true);
+    expect(slots.slice(0, -1)).toEqual(weaponTracks.map((track) => ({ kind: 'track', track })));
+    expect(slots[slots.length - 1]).toEqual({ kind: 'back' });
   });
 });
 
 describe('the wedges lay out as a wheel, clockwise from the top (field report)', () => {
-  it('places wedge 0 at twelve o\'clock and runs clockwise', () => {
-    const wedges = upgradeWheelModel(sig()).wedges;
-    const count = wedges.length;
-    // Twelve o'clock is -π/2 in y-down screen space, exactly the Build wheel.
-    expect(wedges[0]!.angle).toBeCloseTo(-Math.PI / 2, 6);
-    for (let i = 0; i < count; i++) {
-      expect(wedges[i]!.angle).toBeCloseTo(upgradeWedgeAngle(i, count), 6);
+  it('places wedge 0 at twelve o\'clock and runs clockwise on both levels', () => {
+    for (const weaponOpen of [false, true]) {
+      const wedges = upgradeWheelModel(sig({ weaponOpen })).wedges;
+      const count = wedges.length;
+      // Twelve o'clock is -π/2 in y-down screen space, exactly the Build wheel.
+      expect(wedges[0]!.angle).toBeCloseTo(-Math.PI / 2, 6);
+      for (let i = 0; i < count; i++) {
+        expect(wedges[i]!.angle).toBeCloseTo(upgradeWedgeAngle(i, count), 6);
+      }
+      const arc = (2 * Math.PI) / count;
+      expect(wedges[1]!.angle - wedges[0]!.angle).toBeCloseTo(arc, 6);
     }
-    // Evenly spaced by the full arc / count.
-    const arc = (2 * Math.PI) / count;
-    expect(wedges[1]!.angle - wedges[0]!.angle).toBeCloseTo(arc, 6);
   });
 
-  it('is data-driven: a longer ladder lays out more wedges for free (p2-03)', () => {
-    // Simulate p2-03 landing a projectile track by extending the order the wheel
-    // walks — no change to the model, just a longer order and ladder.
-    const extraTrack = UpgradeTrack.Power; // reuse a real spec so the ladder resolves
-    const longer = [...UPGRADE_WHEEL_ORDER, extraTrack];
-    const model = upgradeWheelModel(sig(), UPGRADE_LADDER as UpgradeLadder, longer);
-    expect(model.wedges).toHaveLength(longer.length);
-    // The wheel re-spaced itself around the new count.
-    const arc = (2 * Math.PI) / longer.length;
-    expect(model.wedges[1]!.angle - model.wedges[0]!.angle).toBeCloseTo(arc, 6);
+  it('re-spaces each level around its own wedge count', () => {
+    const main = upgradeWheelModel(sig({ weaponOpen: false })).wedges;
+    const sub = upgradeWheelModel(sig({ weaponOpen: true })).wedges;
+    expect(main).toHaveLength(4); // WEAPON, ENGINE, CARGO, HULL
+    expect(sub).toHaveLength(3); // DAMAGE, SPEED, BACK
+    expect(main[1]!.angle - main[0]!.angle).toBeCloseTo((2 * Math.PI) / 4, 6);
+    expect(sub[1]!.angle - sub[0]!.angle).toBeCloseTo((2 * Math.PI) / 3, 6);
   });
 });
 
-describe('every wedge gives current → next → cost (GDD §2.5)', () => {
+describe('every track wedge gives current → next → cost (GDD §2.5)', () => {
   it('prints the stock value as "current" on a fresh ship', () => {
     // The Vanguard is the balance reference: power 10, hull 50, cargo 2, 100%.
-    expect(wedgeOf(UpgradeTrack.Power).current).toBe('10');
-    expect(wedgeOf(UpgradeTrack.Hull).current).toBe('50');
-    expect(wedgeOf(UpgradeTrack.Cargo).current).toBe('2');
-    expect(wedgeOf(UpgradeTrack.Engine).current).toBe('100%');
+    expect(wedgeOf('DAMAGE', { weaponOpen: true }).current).toBe('10');
+    expect(wedgeOf('HULL').current).toBe('50');
+    expect(wedgeOf('CARGO').current).toBe('2');
+    expect(wedgeOf('ENGINE').current).toBe('100%');
+    expect(wedgeOf('SPEED', { weaponOpen: true }).current).toBe('100%');
   });
 
   it('prints the next tier\'s value, not the delta', () => {
-    const power = wedgeOf(UpgradeTrack.Power);
-    // Base 10 × the first step (1.25) = 13 (rounded) — the value the player
+    // Base 10 × the first DAMAGE step (1.25) = 13 (rounded) — the value the player
     // will have, so the trade is legible without arithmetic.
-    expect(power.next).toBe('13');
-    expect(wedgeOf(UpgradeTrack.Cargo).next).toBe('4'); // +2 per tier (GDD §2.8)
+    expect(wedgeOf('DAMAGE', { weaponOpen: true }).next).toBe('13');
+    expect(wedgeOf('CARGO').next).toBe('4'); // +2 per tier (GDD §2.8)
   });
 
   it('prints an ore cost on every buyable wedge, and the costs escalate', () => {
-    for (const track of TRACK_ORDER) {
-      const wedge = wedgeOf(track);
+    for (const label of ['ENGINE', 'CARGO', 'HULL']) {
+      const wedge = wedgeOf(label);
+      expect(wedge.cost).not.toBeNull();
+      expect(wedge.cost).toBeGreaterThan(0);
+    }
+    for (const label of ['DAMAGE', 'SPEED']) {
+      const wedge = wedgeOf(label, { weaponOpen: true });
       expect(wedge.cost).not.toBeNull();
       expect(wedge.cost).toBeGreaterThan(0);
     }
@@ -135,7 +199,7 @@ describe('every wedge gives current → next → cost (GDD §2.5)', () => {
   });
 
   it('advances current and next together as tiers are bought', () => {
-    const t1 = wedgeOf(UpgradeTrack.Cargo, { tiers: tiers({ [UpgradeTrack.Cargo]: 1 }) });
+    const t1 = wedgeOf('CARGO', { tiers: tiers({ [UpgradeTrack.Cargo]: 1 }) });
     expect(t1.tier).toBe(1);
     expect(t1.current).toBe('4');
     expect(t1.next).toBe('6');
@@ -145,9 +209,16 @@ describe('every wedge gives current → next → cost (GDD §2.5)', () => {
 
 describe('affordability — dimmed with a reason (the field report)', () => {
   it('marks a wedge ready only when the ore is actually there', () => {
-    const cost = UPGRADE_LADDER[UpgradeTrack.Power].costs[0]!;
-    expect(wedgeOf(UpgradeTrack.Power, { ore: cost - 1 }).state).toBe('unaffordable');
-    expect(wedgeOf(UpgradeTrack.Power, { ore: cost }).state).toBe('ready');
+    const cost = UPGRADE_LADDER[UpgradeTrack.Speed].costs[0]!;
+    expect(wedgeOf('SPEED', { weaponOpen: true, ore: cost - 1 }).state).toBe('unaffordable');
+    expect(wedgeOf('SPEED', { weaponOpen: true, ore: cost }).state).toBe('ready');
+  });
+
+  it('leaves the navigation wedges always pressable — a broke player still explores', () => {
+    // WEAPON and BACK open/close a screen; a broke player must still find the
+    // weapon tracks exist (same rule as the Build wheel's UPGRADE SHIP).
+    expect(wedgeOf('WEAPON', { ore: 0 }).state).toBe('ready');
+    expect(wedgeOf('BACK', { weaponOpen: true, ore: 0 }).state).toBe('ready');
   });
 
   it('echoes the same whole-ore total the Build wheel\'s hub shows', () => {
@@ -159,7 +230,8 @@ describe('affordability — dimmed with a reason (the field report)', () => {
 describe('a finished ladder (GDD §2.5 — stats live here, maxed or not)', () => {
   it('still shows the current value at max tier, with no next and no cost', () => {
     const maxTier = UPGRADE_LADDER[UpgradeTrack.Power].steps.length - 1;
-    const wedge = wedgeOf(UpgradeTrack.Power, {
+    const wedge = wedgeOf('DAMAGE', {
+      weaponOpen: true,
       tiers: tiers({ [UpgradeTrack.Power]: maxTier }),
       ore: 999,
     });
@@ -170,7 +242,7 @@ describe('a finished ladder (GDD §2.5 — stats live here, maxed or not)', () =
   });
 
   it('clamps a tier beyond the ladder rather than reading past its end', () => {
-    const wedge = wedgeOf(UpgradeTrack.Hull, { tiers: tiers({ [UpgradeTrack.Hull]: 99 }) });
+    const wedge = wedgeOf('HULL', { tiers: tiers({ [UpgradeTrack.Hull]: 99 }) });
     expect(wedge.tier).toBe(wedge.maxTier);
     expect(wedge.state).toBe('maxed');
     expect(Number.isFinite(Number(wedge.current))).toBe(true);
@@ -184,7 +256,6 @@ describe('upgrades multiply the class base (GDD §2.5, §2.11)', () => {
     const hauler = trackValue(ShipClass.Hauler, spec, maxTier);
     const interceptor = trackValue(ShipClass.Interceptor, spec, maxTier);
     expect(hauler).toBeGreaterThan(interceptor);
-    // ...and at stock, and at every tier in between.
     for (let t = 0; t <= maxTier; t++) {
       expect(trackValue(ShipClass.Hauler, spec, t)).toBeGreaterThan(
         trackValue(ShipClass.Interceptor, spec, t),
@@ -223,9 +294,31 @@ describe('cargo obeys the ratified table (GDD §2.8 — +2 per tier, cap 8)', ()
 
   it('never exceeds the hard cap of 8, even from the Hauler\'s bigger hold', () => {
     const spec = UPGRADE_LADDER[UpgradeTrack.Cargo];
-    // The Hauler starts at 3, so an uncapped ladder would put it at 9.
     expect(SHIP_STATS[ShipClass.Hauler].cargo).toBe(3);
     expect(trackValue(ShipClass.Hauler, spec, 3)).toBe(CARGO_CAP_MAX);
+  });
+});
+
+describe('the flat funnel order is unchanged — the platform input contract holds', () => {
+  it('TRACK_ORDER stays the four flat tracks (no SPEED — it is a sub-wheel track)', () => {
+    // match-boot.test.ts maps panel rows onto exactly these four; SPEED reaches
+    // the sim through the weapon sub-wheel, never a flat row.
+    expect([...TRACK_ORDER]).toEqual([
+      UpgradeTrack.Power,
+      UpgradeTrack.Engine,
+      UpgradeTrack.Cargo,
+      UpgradeTrack.Hull,
+    ]);
+    expect(TRACK_ORDER).not.toContain(UpgradeTrack.Speed);
+  });
+
+  it('the wheel walks the FULL order so SPEED lays out in the sub-wheel', () => {
+    expect(UPGRADE_WHEEL_ORDER).toContain(UpgradeTrack.Speed);
+    // weaponSummary is derived from the same full order.
+    expect(weaponSummary(sig()).map((p) => p.track)).toEqual([
+      UpgradeTrack.Power,
+      UpgradeTrack.Speed,
+    ]);
   });
 });
 

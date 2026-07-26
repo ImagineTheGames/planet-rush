@@ -195,6 +195,11 @@ export interface HudFrame {
   /** The player has UPGRADE SHIP selected — the panel is in front of the wheel
    *  (GDD §2.5). Default false. */
   readonly upgradePanelOpen?: boolean;
+  /** The player has drilled into the WEAPON sub-wheel (RATIFIED v0.2.2) — the
+   *  upgrade wheel then shows the weapon-group tracks (DAMAGE, SPEED) and a BACK
+   *  wedge instead of the main-wheel set. Only meaningful while
+   *  {@link upgradePanelOpen}. Default false. */
+  readonly weaponWheelOpen?: boolean;
   /** Any wheel order has been placed this match — retires the SPEND onboarding
    *  prompt (GDD §2.10). Default false. */
   readonly hasOrdered?: boolean;
@@ -954,6 +959,8 @@ export class Hud extends Container {
     const upgrade = upgradeWheelModel({
       // The upgrade wheel only exists behind the Build wheel's arrow (GDD §2.5).
       open: wheel.open && (frame.upgradePanelOpen ?? false),
+      // ...and the WEAPON sub-wheel only inside that (RATIFIED v0.2.2).
+      weaponOpen: (frame.upgradePanelOpen ?? false) && (frame.weaponWheelOpen ?? false),
       shipClass: frame.shipClass ?? ShipClass.Vanguard,
       tiers: frame.upgradeTiers ?? STOCK_TIERS,
       ore: wheel.ore,
@@ -971,6 +978,9 @@ export class Hud extends Container {
       turrets: frame.turrets ?? 0,
       shields: frame.shields ?? 0,
       tiers: { ...tiers },
+      // The wheel level a bought tier's cost float should land on (a weapon-track
+      // buy only happens with the sub-wheel drilled in).
+      weaponOpen: upgrade.weaponOpen,
       open: wheel.open,
     };
     const prev = this.prevSnapshot;
