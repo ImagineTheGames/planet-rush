@@ -53,8 +53,8 @@ import {
 } from './context';
 import { DEFAULT_SAMPLE_RATE, renderLayered, renderVoice, seamless } from './synth';
 
-/** The three buses. */
-export type Bus = 'sfx' | 'alarm' | 'ambient';
+/** The four buses. */
+export type Bus = 'sfx' | 'alarm' | 'ambient' | 'music';
 
 /** Options for {@link AudioGraph}. */
 export interface MixOptions {
@@ -63,6 +63,8 @@ export interface MixOptions {
   readonly sfx?: number;
   readonly alarm?: number;
   readonly ambient?: number;
+  /** The adaptive soundtrack's own level — its slider (GDD §4.9 item 3). */
+  readonly music?: number;
   /** Concurrent one-shots. Beyond this, new ones are refused, not queued. */
   readonly maxVoices?: number;
   /** Minimum seconds between two plays of the *same* sound. */
@@ -77,6 +79,7 @@ export const MIX_DEFAULTS = {
   sfx: 1,
   alarm: 0.9,
   ambient: 0.35,
+  music: 0.5,
   maxVoices: 24,
   repeatGap: 0.035,
 } as const;
@@ -124,6 +127,15 @@ export class AudioGraph {
   private live = true;
   private refusals = 0;
 
+  /**
+   * A bus's gain is `base × duck`: the player/settings level, times the alarm's
+   * ducking multiplier. They are tracked apart so ducking under the alarm and
+   * releasing after it can never overwrite the player's slider — the release
+   * restores the *base*, not a hard-coded 1 (`./engine` syncAlarm).
+   */
+  private readonly base: Record<Bus, number>;
+  private readonly busDuck: Record<Bus, number> = { sfx: 1, alarm: 1, ambient: 1, music: 1 };
+
   constructor(ctx: AudioContextLike, options: MixOptions = {}) {
     this.ctx = ctx;
     this.maxVoices = Math.max(1, options.maxVoices ?? MIX_DEFAULTS.maxVoices);
@@ -138,10 +150,17 @@ export class AudioGraph {
     this.master.gain.value = clamp01(options.master ?? MIX_DEFAULTS.master);
     this.master.connect(this.duck);
 
+    this.base = {
+      sfx: clamp01(options.sfx ?? MIX_DEFAULTS.sfx),
+      alarm: clamp01(options.alarm ?? MIX_DEFAULTS.alarm),
+      ambient: clamp01(options.ambient ?? MIX_DEFAULTS.ambient),
+      music: clamp01(options.music ?? MIX_DEFAULTS.music),
+    };
     this.buses = {
-      sfx: this.bus(clamp01(options.sfx ?? MIX_DEFAULTS.sfx)),
-      alarm: this.bus(clamp01(options.alarm ?? MIX_DEFAULTS.alarm)),
-      ambient: this.bus(clamp01(options.ambient ?? MIX_DEFAULTS.ambient)),
+      sfx: this.bus(this.base.sfx),
+      alarm: this.bus(this.base.alarm),
+      ambient: this.bus(this.base.ambient),
+      music: this.bus(this.base.music),
     };
   }
 
@@ -183,9 +202,29 @@ export class AudioGraph {
     ramp(this.master.gain, clamp01(value), this.ctx.currentTime, seconds);
   }
 
-  /** A bus trim, 0..1 — the ambient slider, the alarm's headroom. */
+  /**
+   * A bus's base level, 0..1 — the player's setting: the music slider, the
+   * ambient trim. Kept apart from the alarm duck ({@link setBusDuck}) so the two
+   * multiply rather than clobber each other.
+   */
   setBus(bus: Bus, value: number, seconds = 0.05): void {
-    ramp(this.buses[bus].gain, clamp01(value), this.ctx.currentTime, seconds);
+    this.base[bus] = clamp01(value);
+    ramp(this.buses[bus].gain, this.base[bus] * this.busDuck[bus], this.ctx.currentTime, seconds);
+  }
+
+  /**
+   * A bus's alarm-duck multiplier, 0..1 — how far under the alarm it is pulled.
+   * 1 is unducked. The gain rides `base × duck`, so releasing to 1 restores the
+   * player's level, whatever they set it to (`./engine` syncAlarm, GDD §2.2).
+   */
+  setBusDuck(bus: Bus, factor: number, seconds = 0.3): void {
+    this.busDuck[bus] = clamp01(factor);
+    ramp(this.buses[bus].gain, this.base[bus] * this.busDuck[bus], this.ctx.currentTime, seconds);
+  }
+
+  /** A bus's current base (player) level, before the alarm duck. */
+  busLevel(bus: Bus): number {
+    return this.base[bus];
   }
 
   /**
