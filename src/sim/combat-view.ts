@@ -6,14 +6,20 @@
  * now, and where does their beam go?** It reads the world; it never writes it.
  *
  * This exists because of a real field bug (build 5254cfe): enemy lasers and
- * turret fire were invisible. The sim was already right — `fireBeam` publishes
- * `Ship.beam` for *every* firing ship (enemy, bot, remote, local alike), and
- * `updateTurrets` now publishes `Turret.muzzle` for every turret that looses a
- * shot — but the client was building its beam visuals from the local player's
- * *input* instead of from that sim state, so only your own beam ever drew. The
- * fix is to drive beam visuals from combat state, and this selector is the
- * single source every consumer reads: walk the world, emit one {@link CombatBeam}
- * per shooter. Miss nobody, invent nobody.
+ * turret fire were invisible. The client was building its beam visuals from the
+ * local player's *input* instead of from sim combat state, so only your own
+ * shot ever drew. The fix is to drive visuals from combat state, and this
+ * selector is the single source every consumer reads: walk the world, emit one
+ * {@link CombatBeam} per shooter. Miss nobody, invent nobody.
+ *
+ * Since the ratified amendment v0.3 (mining is a projectile, the beam retired as
+ * a mechanism) `Ship.beam` is a pure **mining indicator** — non-null only while a
+ * ship is cutting a rock, never on a combat shot (combat is a pooled projectile
+ * the renderer draws from the shot pool). So the ship loop below emits a
+ * `CombatBeam` only for *miners*; a ship shooting an enemy contributes nothing
+ * here. Alongside it, the **turret muzzle** flash (`Turret.muzzle`, still a
+ * `Beam`) is emitted for every turret that looses a shot, whoever the camera
+ * follows.
  *
  * The result is deliberately render-agnostic — plain `Beam` geometry plus who
  * fired it and what kind of emitter it was. Colour, pooling, and Pixi geometry
