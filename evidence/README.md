@@ -256,6 +256,11 @@ build `de2fa64` (clean, no page errors). **4 of 6 verified; 2 inconclusive
 because the instrumentation this build ships cannot exercise them — the tag
 should wait on those two.**
 
+_Re-verification pass (2026-07-26):_ every gate re-checked with my own eyes on the
+running `de2fa64` preview. The four verified frames hold exactly as attested
+(incl. the top-right hull readout being gone). For the two inconclusive gates I
+re-confirmed the blocker is structural, not effort, three ways — see the bullets.
+
 **Verified:**
 - **projectile-dodge** — LIVE, past the 10 s spawn-protection window. A three-frame
   composite: a red projectile MID-GAP between the ship and a still enemy (travel
@@ -280,12 +285,22 @@ carries only the HOME core-HP bar.
 - **damage-all-classes** — the player's own projectiles are shown dropping an enemy
   hull bar 0.98→0.78, so hits register — but only for owner 1 (the Hauler). The
   `__healthbarStage.damageEnemy` seam always targets owner 1 and force-revives it,
-  so the other three classes cannot be brought under player fire, and placeholder
-  ships are identical triangles (class not pixel-readable). Needs a seam to damage
-  an arbitrary-owner enemy (and/or class-distinct art).
+  so the other three classes cannot be brought under player fire. Confirmed the live
+  path is inadequate too: a 120-frame live melee surfaced a genuinely damaged bar for
+  only ONE non-local owner (owner 2 @ 0.87), and since bots fire on each other a
+  dropped bar can't be attributed to the player. Placeholder ships are identical
+  triangles (class not pixel-readable) regardless. Needs a seam to damage an
+  arbitrary-owner enemy AND class-distinct art.
 - **repair-core-works** — the REPAIR CORE wedge is present in the Build wheel but
-  greyed on a full (frozen) core. No debug seam damages the local core, and there
-  is NO coreHp readback for the "captioned numbers" (HP rising) the gate asks for.
-  Needs a core-damage seam + a coreHp readback.
+  greyed on a full (frozen) core. The blocker is structural, confirmed three ways:
+  (1) runtime enumeration of every `window.__*` seam exposes no `coreHp` readback,
+  no core-damage stager, no repair trigger (`__endScreenStage.eliminateLocal` only
+  fully destroys the core); (2) fleeing home live for ~1750 ticks left the HOME core
+  bar pinned at full (pixel fraction 0.993); (3) parking a live enemy at 0.6 hull
+  beside the docked core then fleeing ~1450 ticks also left it at full — the bot
+  follows its own AI, not a scripted siege. So the core can't be damaged, the repair
+  channel can't be driven, and HP can't be read on a real client boot. The mechanic
+  exists (control drawn; sim repair unit-tested, PR #85). Needs a core-damage seam +
+  a `coreHp` readback (bank is already readable via `__oreDepositStage.readout()`).
 
 No page errors in any capture.
