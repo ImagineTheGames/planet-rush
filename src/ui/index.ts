@@ -185,6 +185,36 @@ export type { Combatant, HealthBar } from './healthbar';
 
 export { HealthBarView, HEALTHBAR_ID, HEALTHBAR_ANCHOR } from './healthbar-view';
 
+// --- Player-name labels over ships and owned planets (field request v0.2.1) --
+//
+// The same pure-model / pooled-view split as the health bars, stacked with them
+// so a ship's name, bar and hull read as one unit ([[nameplates]] rule 1): the
+// pure `nameplateModel` decides who gets a label, its text (from a per-slot
+// `NameTable`) and its identity colour; `NameplateView` paints and self-registers
+// under `full`. The label-bearing entities are fed to the `Hud` on `nameables`
+// (ships + owned planets, screen-space) with a `names` table off the lobby
+// (`playerNameTable`); the local ship's own label is optional-off (default off).
+
+export {
+  nameplateModel,
+  nameplateGetsLabel,
+  resolveName,
+  fallbackName,
+  NAMEPLATE_MAX_CHARS,
+  NAMEPLATE_FULL_ALPHA,
+  NAMEPLATE_FADE_ALPHA,
+} from './nameplates';
+export type { Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
+
+export {
+  NameplateView,
+  NAMEPLATE_ID,
+  NAMEPLATE_ANCHOR,
+  NAMEPLATE_SHIP_GAP,
+  NAMEPLATE_PLANET_GAP,
+} from './nameplates-view';
+export type { DrawnNameplate } from './nameplates-view';
+
 // --- The 8-slot lobby (GDD §2.1, §2.11, §4.2) ------------------------------
 //
 // The same three-piece shape as everything else here: a pure model
@@ -215,6 +245,8 @@ export {
   CLASS_ORDER,
   COLOR_NAMES,
   DEFAULT_SHIP_CLASS,
+  DEFAULT_PLAYER_NAME,
+  PLAYER_NAME_MAX_CHARS,
   DIFFICULTY_CYCLE,
   DIFFICULTY_LABELS,
   LOBBY_SLOTS,
@@ -237,11 +269,15 @@ export {
   isJoinableRoomCode,
   lobbyModel,
   makeRoomCode,
+  nameFor,
+  normalizePlayerName,
   normalizeRoomCode,
+  playerNameTable,
   pressRush,
   seatLocalPlayer,
   selectMap,
   selectShipClass,
+  setPlayerName,
   startLobbyMatch,
   tickLobby,
   typeRoomCode,

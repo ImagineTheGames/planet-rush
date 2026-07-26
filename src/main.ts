@@ -133,10 +133,13 @@ import {
   cycleBotDifficulty,
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
+  normalizePlayerName,
 } from './ui';
 import type {
   HudFrame,
   Combatant,
+  Nameable,
+  NameTable,
   SettingsState,
   SettingsTarget,
   MainMenuOption,
@@ -146,6 +149,7 @@ import type {
   LobbyState,
 } from './ui';
 import { OFFLINE_ROOM } from './net';
+import { personality } from './bots';
 
 const LOCAL_PLAYER = 0;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
@@ -153,6 +157,10 @@ const FIRE_MODE_KEY = 'planet-rush:fireMode';
  *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
  *  storage seam as the fire mode, so both survive a reload identically. */
 const SHIP_CLASS_KEY = 'planet-rush:shipClass';
+/** Where the local player's name is remembered (field request v0.2.1) — the same
+ *  storage seam as the hull and fire mode, so a returning player finds their
+ *  callsign over their ship and planet. */
+const PLAYER_NAME_KEY = 'planet-rush:playerName';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
  *  arena, which is also what makes a bug report reproducible. */
@@ -312,13 +320,17 @@ async function boot(): Promise<void> {
   // is no lobby, so both fall back to the persisted-or-default values.
   const chosen = lobby
     ? await lobby.untilRush()
-    : { shipClass: readShipClass(platform), mapId: readMapId(platform) };
+    : { shipClass: readShipClass(platform), mapId: readMapId(platform), name: readPlayerName(platform) };
   const chosenShipClass = chosen.shipClass;
-  // Persist both picks so a returning player finds them pre-selected (GDD §2.11;
-  // p2 — the arena persists the same way, same storage seam as the fire mode).
+  // The name shown over the local ship and planet (field request v0.2.1) — the
+  // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
+  const chosenName = normalizePlayerName(chosen.name);
+  // Persist all three picks so a returning player finds them pre-selected (GDD
+  // §2.11; p2 + field request v0.2.1 — same storage seam as the fire mode).
   if (lobby) {
     platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
     platform.storage.set(MAP_STORAGE_KEY, chosen.mapId);
+    platform.storage.set(PLAYER_NAME_KEY, chosenName);
   }
 
   // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
@@ -446,7 +458,9 @@ async function boot(): Promise<void> {
   //     into src/sim.
   if (flags.debug) {
     hud.enableHealthBarDebug();
+    hud.enableNameplateDebug();
     installHealthbarStage();
+    installNameplateStage();
     installOreDepositStage();
     installOreHudStage();
     installEndScreenStage();
@@ -658,6 +672,26 @@ async function boot(): Promise<void> {
   const combatantPool: MutCombatant[] = [];
   const combatantFrame: Combatant[] = [];
 
+  // --- Name-label feed (field request v0.2.1): the per-slot name table and a
+  //     reused pool of mutable label-bearing entities `feedNameplates()` fills
+  //     each render, so labelling every ship + owned planet allocates nothing
+  //     after warm-up (GDD §4.3). The table is (re)built from the match's own
+  //     seated cast each boot — local name + each bot's personality name.
+  const nameablePool: MutNameable[] = [];
+  const nameableFrame: Nameable[] = [];
+  let playerNames: NameTable = [];
+  /** Rebuild the per-slot name table from the live match: the local player's
+   *  chosen name (from the lobby, or persisted default under ?debug=1) plus each
+   *  seated bot's personality name (GDD §2.9). Data-driven — when online lands
+   *  (m9) the room's remote names populate this same table with no other change. */
+  function rebuildNameTable(): void {
+    const table: string[] = [];
+    table[LOCAL_PLAYER] = chosenName;
+    for (const bot of match.bots) table[bot.seat.id] = personality(bot.seat.personality).name;
+    playerNames = table;
+  }
+  rebuildNameTable();
+
   // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
   //     tick, then hold it there so screenshots are deterministic across boots
   //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
@@ -721,6 +755,10 @@ async function boot(): Promise<void> {
       // the wiring the M2 field report caught missing — the model and the layer
       // were both right, but nothing ever handed the layer the enemies.
       feedCombatants();
+      // Name labels over every ship + owned planet (field request v0.2.1), fed
+      // AFTER renderer.draw so the camera transform is current — projected to the
+      // same screen space the labels draw in, stacked above the health bars.
+      feedNameplates();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
@@ -862,6 +900,7 @@ async function boot(): Promise<void> {
     matchSeed += 1;
     match = bootMatch(matchSeed);
     world = match.world;
+    rebuildNameTable();
     spectating = false;
     cameraTarget = LOCAL_PLAYER;
     endScreen = 'none';
@@ -1061,6 +1100,63 @@ async function boot(): Promise<void> {
   }
 
   /**
+   * Build this frame's name-label feed and hand it to the HUD (field request
+   * v0.2.1): a label over **every ship** and **every owned planet**, tinted the
+   * owner's identity colour and captioned from {@link playerNames}. The pure model
+   * ({@link ./ui} `nameplateModel`) decides who is labelled (a dead ship, a
+   * destroyed planet — a wreck — and the local ship's own label are all dropped)
+   * and fades a label under combat clutter; here we only project world → screen
+   * (via the same camera transform the bars use, after `renderer.draw`) and pass
+   * the sim liveness/combat facts through. Planets carry no HP/combat signal, so a
+   * rival planet's label never leaks its scouted-only HP (GDD §2.2).
+   *
+   * Allocation-free after warm-up (GDD §4.3): the records are pooled and the frame
+   * array reused, bounded by the entity caps (≤8 ships, ≤8 planets).
+   */
+  function feedNameplates(): void {
+    let n = 0;
+    for (const ship of world.ships) {
+      const c = nameableSlot(n++);
+      c.owner = ship.id;
+      c.kind = 'ship';
+      c.alive = ship.alive && !ship.eliminated;
+      c.local = ship.id === LOCAL_PLAYER;
+      c.inCombat = ship.beam !== null;
+      c.hpFraction = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
+      renderer.projectToScreen(ship.pos, c.pos);
+      c.radius = ship.radius;
+    }
+    for (const planet of world.planets) {
+      const c = nameableSlot(n++);
+      c.owner = planet.owner;
+      c.kind = 'planet';
+      // A standing (owned) planet is labelled; a wreck (`alive` false) is not.
+      c.alive = planet.alive;
+      c.local = false;
+      // No combat signal on a planet: a rival's HP is scouted only (GDD §2.2), so
+      // the fade never becomes a back-door HP readout. Full alpha, always.
+      c.inCombat = false;
+      c.hpFraction = 1;
+      renderer.projectToScreen(planet.pos, c.pos);
+      c.radius = planet.radius;
+    }
+    nameableFrame.length = 0;
+    for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
+    hudFrame.nameables = nameableFrame;
+    hudFrame.names = playerNames;
+  }
+
+  /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
+  function nameableSlot(i: number): MutNameable {
+    let c = nameablePool[i];
+    if (!c) {
+      c = { owner: 0, kind: 'ship', alive: false, local: false, inCombat: false, hpFraction: 1, pos: { x: 0, y: 0 }, radius: 0 };
+      nameablePool[i] = c;
+    }
+    return c;
+  }
+
+  /**
    * Install `window.__healthbarStage` — the ?debug=1 live-stage seam a Playwright
    * test drives to prove the health bars are wired on a real boot. Methods:
    *
@@ -1122,6 +1218,61 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__healthbarStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__nameplateStage` — the ?debug=1 live-stage seam a Playwright
+   * test drives to prove the player-name labels are wired on a real boot (field
+   * request v0.2.1), the same discipline as `__healthbarStage`. Methods:
+   *
+   *  - `stageBot()` — park the first bot's SHIP and its HOME PLANET on-screen
+   *    beside the centred local ship, so both must draw a label (a full-ring-away
+   *    rival is off-screen and culled in the frozen frame). Returns the bot's slot
+   *    and the name the table resolved for it, or null if there is no bot.
+   *  - `plates()` — the labels the real layer actually drew last frame (owner,
+   *    text, colour, kind, position), so the test can assert a drawn label with the
+   *    lobby's name tracks that bot's ship and planet.
+   *  - `names()` — the per-slot name table the match built, so the test can match a
+   *    drawn label's text against the data-driven source.
+   *
+   * Mutating `pos` here is a debug-only staging affordance (identical to the
+   * health-bar stage), not gameplay: it writes the plain sim data the render loop
+   * already reads every frame, entirely behind ?debug=1.
+   */
+  function installNameplateStage(): void {
+    const stage = {
+      stageBot(): { owner: PlayerId; name: string } | null {
+        const local = world.ships.find(isLocalShip);
+        const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
+        if (!local || !bot) return null;
+        const planet = world.planets.find((p) => p.owner === bot.id);
+        // Beside the centred local ship so both labels are on-screen and un-culled.
+        bot.pos.x = local.pos.x + 120;
+        bot.pos.y = local.pos.y - 120;
+        bot.alive = true;
+        if (planet) {
+          planet.pos.x = local.pos.x + 120;
+          planet.pos.y = local.pos.y + 140;
+        }
+        return { owner: bot.id, name: playerNames[bot.id] ?? `P${bot.id + 1}` };
+      },
+      plates(): ReturnType<typeof hud.debugNameplates> {
+        return hud.debugNameplates();
+      },
+      names(): readonly (string | undefined)[] {
+        return playerNames.slice();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__nameplateStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -1723,6 +1874,19 @@ interface MutCombatant {
   radius: number;
 }
 
+/** A mutable {@link Nameable} — the pooled records `feedNameplates()` overwrites
+ *  in place each frame (field request v0.2.1), handed over as `Nameable`. */
+interface MutNameable {
+  owner: PlayerId;
+  kind: 'ship' | 'planet';
+  alive: boolean;
+  local: boolean;
+  inCombat: boolean;
+  hpFraction: number;
+  pos: Vec2;
+  radius: number;
+}
+
 const EMPTY_BEAMS: BeamView[] = [];
 
 /** A mutable BeamView the pool owns and overwrites each frame — its fields are
@@ -1903,6 +2067,14 @@ function readShipClass(platform: ReturnType<typeof createBrowserPlatform>): Ship
     return stored as ShipClass;
   }
   return DEFAULT_SHIP_CLASS;
+}
+
+/** The local player's name to pre-fill the lobby with: the last one they set, or
+ *  {@link DEFAULT_PLAYER_NAME} ("YOU") the first time out (field request v0.2.1 —
+ *  "persisted like ship class, default YOU"). Folded through `normalizePlayerName`
+ *  so a stale/over-long stored value is always a safe nameplate. */
+function readPlayerName(platform: ReturnType<typeof createBrowserPlatform>): string {
+  return normalizePlayerName(platform.storage.get(PLAYER_NAME_KEY) ?? undefined);
 }
 
 /** The arena the player last picked on the PLAY screen (m8-02), read through the
@@ -2191,10 +2363,12 @@ function installMainMenuSeam(seam: object): void {
   }
 }
 
-/** The two choices the player locks in at RUSH! — the hull AND the arena (p2). */
+/** The choices the player locks in at RUSH! — the hull, the arena (p2), and the
+ *  name shown over their ship and planet (field request v0.2.1). */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
+  readonly name: string;
 }
 
 /** What `boot()` holds the lobby by: a promise resolving with the hull and the
@@ -2318,6 +2492,7 @@ function openLobby(
     you: LOCAL_PLAYER,
     host: LOCAL_PLAYER,
     shipClass: readShipClass(platform),
+    name: readPlayerName(platform),
     mapId: readMapId(platform),
     online: false,
   });
@@ -2430,7 +2605,7 @@ function openLobby(
     render();
     if (state.phase === 'started' && !resolved) {
       resolved = true;
-      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId };
+      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId, name: state.name };
       teardown();
       seam.visible = false;
       resolveRush(chosen);
