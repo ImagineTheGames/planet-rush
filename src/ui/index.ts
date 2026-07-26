@@ -44,6 +44,10 @@ export type { WaveClock } from './wave-clock';
 export { oreHudModel, oreFlashOn } from './ore-hud';
 export type { OreHudModel } from './ore-hud';
 
+// The one affordability boundary the Build wheel and the Upgrade wheel share, so
+// "bank == cost is buyable" is decided in exactly one place (field report v0.2.2).
+export { affordable, AFFORD_EPSILON } from './affordability';
+
 // --- Ore split (field rule): banked TOTAL top-left, HELD hold under the ship ---
 //
 // The held-ore squares that used to sit top-left move under the local ship as a

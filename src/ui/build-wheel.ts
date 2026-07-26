@@ -37,6 +37,7 @@
 
 import type { BuildItem } from '@shared/types';
 import { SHIELD, TURRET } from '../sim/constants';
+import { affordable } from './affordability';
 
 // ---------------------------------------------------------------------------
 // Segment identity
@@ -284,10 +285,10 @@ export function segmentState(
   switch (id) {
     case 'turret':
       if (signals.turrets >= TURRET.capPerPlanet) return 'capped';
-      return ore + 1e-9 >= TURRET.cost ? 'ready' : 'unaffordable';
+      return affordable(ore, TURRET.cost) ? 'ready' : 'unaffordable';
     case 'shield':
       if (signals.shields >= SHIELD.capPerPlanet) return 'capped';
-      return ore + 1e-9 >= SHIELD.cost ? 'ready' : 'unaffordable';
+      return affordable(ore, SHIELD.cost) ? 'ready' : 'unaffordable';
     case 'repair':
       // Collapse shuts repair off for the rest of the match (GDD §2.3) — the
       // sim answers `collapsed`, and the wheel must not keep offering it.
@@ -295,7 +296,7 @@ export function segmentState(
       // A full core has nothing to repair — the press would be a no-op, and the
       // sim answers `core-full`. Ore only matters once there is damage to undo.
       if (signals.coreHp >= signals.maxCoreHp - 1e-9) return 'inactive';
-      return ore + 1e-9 >= REPAIR_ENTRY_ORE ? 'ready' : 'unaffordable';
+      return affordable(ore, REPAIR_ENTRY_ORE) ? 'ready' : 'unaffordable';
     case 'bank':
       // BANK moves held ore to safety; with an empty hold there is nothing to
       // move (the sim answers `nothing-to-bank`). It never costs anything.
