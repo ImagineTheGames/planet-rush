@@ -71,6 +71,8 @@ import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { respawnCountdownModel } from './respawn-countdown';
+import type { RespawnCountdownModel } from './respawn-countdown';
 import { healthBarModel } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
@@ -94,6 +96,11 @@ import {
   PROMPT_STROKE,
   PROMPT_CENTER_Y,
   promptWrapWidth,
+  RESPAWN_PAD_X,
+  RESPAWN_PAD_Y,
+  RESPAWN_STROKE,
+  RESPAWN_CENTER_Y,
+  respawnWrapWidth,
   wheelRadius,
 } from './hud-geometry';
 
@@ -183,6 +190,16 @@ export interface HudFrame {
 
   /** The local ship is alive. Default true. */
   readonly shipAlive?: boolean;
+  /** Seconds until the local ship respawns, straight off the sim's
+   *  `Ship.respawnTimer` (0 when alive). Drives the "RESPAWNING 3…" countdown —
+   *  the HUD renders the *ceiling* of this and never runs its own clock (field
+   *  request v0.2.2). Default 0 ⇒ no countdown. */
+  readonly respawnTimer?: number;
+  /** The local seat is eliminated — a *final* death (its core is gone, GDD §2.7).
+   *  The DEFEATED flow (p1-12) owns the screen, so the respawn countdown stands
+   *  down entirely; the sim answers which death this is, the UI never guesses.
+   *  Default false. */
+  readonly eliminated?: boolean;
   /** The ship is within `PLANET.dockRange` of its own planet — the sim's
    *  `isDocked`. The wheel opens here and nowhere else. Default false. */
   readonly docked?: boolean;
@@ -334,6 +351,19 @@ export class Hud extends Container {
   private readonly promptAccent = new Graphics();
   private readonly promptText: Text;
 
+  // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) ----------
+  //     A centred overlay in the player's colour while the local ship is dead and
+  //     a respawn is pending; hidden the instant the ship exists again, and never
+  //     shown for a final death (the DEFEATED flow owns that). Decisions live in
+  //     ./respawn-countdown; this file just draws the verdict.
+  private readonly respawnGroup = new Container();
+  private readonly respawnPanel = new Graphics();
+  private readonly respawnText: Text;
+  /** The countdown model the overlay drew last frame — read back by the ?debug=1
+   *  live-stage seam to prove the number decrements on sim ticks and clears at
+   *  respawn. */
+  private lastRespawn: RespawnCountdownModel = { show: false, seconds: 0, text: '', color: 0 };
+
   // --- Own planet HP (top-right, player colour — GDD §2.2) ----------------
   private readonly planetGroup = new Container();
   private readonly planetLabel: Text;
@@ -452,6 +482,14 @@ export class Hud extends Container {
     this.promptGroup.addChild(this.promptPanel, this.promptAccent, this.promptText);
     this.promptGroup.visible = false;
 
+    // Respawn countdown: a prominent centre-anchored line over a dim backing
+    // panel, hidden until the local ship is dead with a respawn pending. The fill
+    // is set per frame to the player's colour (field request v0.2.2).
+    this.respawnText = this.makeText('', FONT_HEADING, 24, TEXT_PRIMARY, 'bold');
+    this.respawnText.anchor.set(0.5, 0.5);
+    this.respawnGroup.addChild(this.respawnPanel, this.respawnText);
+    this.respawnGroup.visible = false;
+
     // Own planet HP: a right-anchored label above a bar in the player's colour.
     this.planetLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
     this.planetLabel.anchor.set(1, 0);
@@ -487,6 +525,11 @@ export class Hud extends Container {
       // to the top-left bank readout, so they sit over the wheel but under the
       // onboarding prompt.
       this.floatsGroup,
+      // The respawn countdown draws over the death scene while the ship is gone;
+      // it never coexists with an open wheel (a dead ship cannot dock/build) or a
+      // fresh prompt, so its order relative to those is moot — it sits under the
+      // onboarding prompt for consistency with the rest of the chrome.
+      this.respawnGroup,
       // The onboarding prompt draws last: the SPEND prompt fires *while the
       // wheel is open* (GDD §2.10), so it has to sit on top of it.
       this.promptGroup,
@@ -514,6 +557,10 @@ export class Hud extends Container {
     // geometry, so `describeLayout`'s registered rect is computed from the same
     // number this draws with.
     this.promptGroup.y = this.screenHeight * PROMPT_CENTER_Y;
+    // Respawn countdown: dead centre — the ship exploded here and the camera
+    // stays on it (field request v0.2.2).
+    this.respawnGroup.x = this.screenWidth / 2;
+    this.respawnGroup.y = this.screenHeight * RESPAWN_CENTER_Y;
     this.wheel.resize(this.screenWidth, this.screenHeight);
   }
 
@@ -531,6 +578,7 @@ export class Hud extends Container {
     this.updateHealthBars(frame, underAttack);
     this.updateNameplates(frame);
     this.updatePlanetHp(frame);
+    this.updateRespawn(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
     this.updateCostFloats(frame);
@@ -701,6 +749,61 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+  }
+
+  // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) -----------
+
+  /**
+   * Draw the respawn countdown while the local ship is dead with a respawn
+   * pending — a centred "RESPAWNING N…" in the player's own colour. The number is
+   * the CEILING of the sim's respawn timer, computed in {@link
+   * ./respawn-countdown}; this file only draws the verdict, so the HUD never runs
+   * a clock that could drift from the sim's (field request).
+   *
+   * Hidden the instant the ship exists again, and never shown for a *final* death
+   * — an eliminated seat's screen belongs to the DEFEATED flow (p1-12, GDD §2.7),
+   * and the model returns `show: false` for it.
+   */
+  private updateRespawn(frame: HudFrame): void {
+    const model = respawnCountdownModel({
+      shipAlive: frame.shipAlive ?? true,
+      eliminated: frame.eliminated ?? false,
+      respawnTimer: frame.respawnTimer ?? 0,
+      owner: frame.owner ?? 0,
+    });
+    this.lastRespawn = model;
+
+    if (!model.show) {
+      this.respawnGroup.visible = false;
+      return;
+    }
+
+    // Wrap like the prompt does, so a prominent line never runs off a narrow
+    // phone — the wrap is what lets the overlay honestly claim `full` + PAD.
+    this.respawnText.text = model.text;
+    this.respawnText.style.fill = model.color; // the player's own colour (§5.2)
+    this.respawnText.style.wordWrap = true;
+    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.screenWidth);
+    this.respawnText.style.align = 'center';
+
+    // A dim backing panel sized to the text, so the countdown reads over the
+    // death scene; a thin outline in the player's colour ties it to the number.
+    const w = this.respawnText.width + RESPAWN_PAD_X;
+    const h = this.respawnText.height + RESPAWN_PAD_Y;
+    this.respawnPanel.clear();
+    this.respawnPanel
+      .roundRect(-w / 2, -h / 2, w, h, 8)
+      .fill({ color: PALETTE.vacuum, alpha: 0.72 })
+      .stroke({ width: RESPAWN_STROKE, color: model.color, alpha: 0.6 });
+
+    this.respawnGroup.visible = true;
+  }
+
+  /** The respawn countdown the overlay drew last frame (or the hidden model) —
+   *  the ?debug=1 live-stage seam reads this to prove the number decrements on sim
+   *  ticks and clears the instant the ship respawns. */
+  debugRespawnCountdown(): RespawnCountdownModel {
+    return this.lastRespawn;
   }
 
   // --- Over-entity health bars (GDD §2.2) ---------------------------------
@@ -1256,6 +1359,11 @@ export class Hud extends Container {
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
+    // Respawn countdown: a centred overlay wider than any third-width band (a
+    // prominent line), so it registers `full` + PAD on the same reasoning as the
+    // prompt — wrapped to stay inside the HUD margin (see respawnWrapWidth). Only
+    // drawn while dead-and-respawning, so `shown()` omits it the rest of the time.
+    push('respawn-countdown', 'full', PAD, this.respawnGroup);
 
     // Over-entity health bars: the layer computes its own union bounds (only the
     // bars that actually drew on-screen), so it registers itself rather than

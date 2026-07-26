@@ -28,6 +28,7 @@ import {
   muzzleFlashes,
   damagePlanet,
   damageShip,
+  killShip,
   destroyCore,
   isCollapsed,
   isDocked,
@@ -1210,6 +1211,12 @@ async function boot(): Promise<void> {
     hudFrame.banked = ship.banked;
     hudFrame.nearAsteroid = nearAsteroid(ship.pos);
     hudFrame.shipAlive = ship.alive;
+    // Respawn countdown (field request v0.2.2): the HUD renders the ceiling of
+    // this timer while the ship is dead — unless the seat is eliminated, where
+    // the DEFEATED flow owns the screen and the countdown stands down. Both come
+    // straight off the sim, so the number on screen is the one the sim counts.
+    hudFrame.respawnTimer = ship.respawnTimer;
+    hudFrame.eliminated = ship.eliminated;
     hudFrame.shipClass = ship.shipClass;
     hudFrame.upgradeTiers = ship.tiers;
     hudFrame.shipPos = ship.pos;
@@ -1760,6 +1767,36 @@ async function boot(): Promise<void> {
         if (!planet || !planet.alive) return false;
         destroyCore(world, planet); // the sim's own elimination path
         return true;
+      },
+      /** Kill the LOCAL ship while its core still stands — a *respawnable* death,
+       *  so the "RESPAWNING N…" countdown must appear and the sim's own respawn
+       *  clock runs it down (field request v0.2.2). Drives the sim's own
+       *  `killShip` (the exact path a fatal hit takes: alive=false, respawnTimer
+       *  set, half the hold dropped) rather than faking the UI. Returns whether it
+       *  staged. */
+      killLocalShip(): boolean {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !ship.alive || ship.eliminated || !planet || !planet.alive) return false;
+        killShip(world, ship);
+        return true;
+      },
+      /** The local ship's liveness — the test asserts controls return once it is
+       *  true again after a respawn. */
+      shipAlive(): boolean {
+        return world.ships.find(isLocalShip)?.alive ?? false;
+      },
+      /** The sim's own respawn clock for the local ship (seconds; 0 when alive) —
+       *  the source the countdown renders the ceiling of. */
+      respawnTimer(): number {
+        return world.ships.find(isLocalShip)?.respawnTimer ?? 0;
+      },
+      /** The respawn countdown the HUD actually DREW this frame — show flag, the
+       *  ceiling seconds, and the text — so the test proves it appears, decrements
+       *  on sim ticks, and clears the instant the ship respawns. */
+      respawnCountdown(): { show: boolean; seconds: number; text: string } {
+        const m = hud.debugRespawnCountdown();
+        return { show: m.show, seconds: m.seconds, text: m.text };
       },
       endMatch(): boolean {
         const survivor = world.planets.find((p) => p.owner !== LOCAL_PLAYER && p.alive);

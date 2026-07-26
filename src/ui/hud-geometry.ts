@@ -229,6 +229,66 @@ export function promptBounds(
 }
 
 // ---------------------------------------------------------------------------
+// The respawn countdown overlay ("RESPAWNING 3…", field request v0.2.2)
+// ---------------------------------------------------------------------------
+
+/** Horizontal padding inside the countdown panel, CSS px (text box edge to panel
+ *  edge on each side is half of this). */
+export const RESPAWN_PAD_X = 36;
+/** Vertical padding inside the countdown panel, CSS px. */
+export const RESPAWN_PAD_Y = 18;
+/** The panel's 1px outline — part of the drawn footprint (`getBounds()` reports
+ *  it), so the wrap budget has to pay for it, exactly like the prompt's. */
+export const RESPAWN_STROKE = 1;
+/** The countdown's vertical centre, as a fraction of viewport height. Dead centre
+ *  — where the ship exploded and the camera stays (field request), and clear
+ *  because a dead ship draws nothing under it. */
+export const RESPAWN_CENTER_Y = 0.5;
+/** Wrap floor, so a comically narrow viewport still wraps rather than clamping to
+ *  zero. */
+export const RESPAWN_MIN_TEXT_WIDTH = 80;
+
+/**
+ * The width the countdown's text box wraps at, CSS px — the same discipline as
+ * {@link promptWrapWidth}. "RESPAWNING 3..." at a prominent type size is wider
+ * than a third-width band, so the overlay takes the screen and signs the weaker,
+ * keepable promise instead: it never leaves the HUD margin (`full` + {@link
+ * HUD_PAD}, see `Hud.describeLayout`). Wrapping at
+ * `W − 2·HUD_PAD − RESPAWN_PAD_X − RESPAWN_STROKE` makes the *stroked* panel land
+ * exactly on that margin in the worst case and inside it otherwise.
+ */
+export function respawnWrapWidth(viewportWidth: number): number {
+  return Math.max(
+    RESPAWN_MIN_TEXT_WIDTH,
+    viewportWidth - 2 * HUD_PAD - RESPAWN_PAD_X - RESPAWN_STROKE,
+  );
+}
+
+/**
+ * The respawn countdown's drawn footprint: a panel sized to its (already wrapped)
+ * text box, centred horizontally and on {@link RESPAWN_CENTER_Y}.
+ *
+ * `textWidth`/`textHeight` are the measured metrics of the drawn text — the
+ * registry records what was actually drawn — so the caller passes real numbers;
+ * feed {@link respawnWrapWidth} to get the worst case.
+ */
+export function respawnBounds(
+  viewportWidth: number,
+  viewportHeight: number,
+  textWidth: number,
+  textHeight: number,
+): Rect {
+  const width = textWidth + RESPAWN_PAD_X + RESPAWN_STROKE;
+  const height = textHeight + RESPAWN_PAD_Y + RESPAWN_STROKE;
+  return {
+    x: viewportWidth / 2 - width / 2,
+    y: viewportHeight * RESPAWN_CENTER_Y - height / 2,
+    width,
+    height,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The under-attack alarm (GDD §2.2 — a mechanic, not polish)
 // ---------------------------------------------------------------------------
 
