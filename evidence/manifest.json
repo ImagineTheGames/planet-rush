@@ -478,5 +478,65 @@
     "buildSha": "dc7e2ac",
     "attestation": "The wide frame behind the turret-far-side-engage crop. The red screen-edge vignette and the banner 'Your planet is under attack — follow the arrow' confirm the parked bot is a REAL registered threat to the home planet. Top-right shows the HOME and HULL bars for the local planet; top-left reads 'TOTAL 0' (the 3 boot ore was spent building the turret). The grey turret disc sits on the home planet's west rim with the teal attacker just west of it; a separate roaming-bot firefight (orange and blue ship beams) plays out to the north-west and is unrelated to the home turret — the home turret's own muzzle is the short west-pointing beam at the rim, a single-tick flash not frozen in this particular frame (see the instrument geometry cited in turret-far-side-engage). Build stamp 'dc7e2ac · 00:00Z' bottom-right.",
     "verdict": "verified"
+  },
+  {
+    "id": "projectile-dodge",
+    "title": "Projectile in flight + a ship evading it; mining is still a beam",
+    "area": "match",
+    "image": "images/projectile-dodge.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "Three real frames from one LIVE (un-frozen) session, past the 10 s spawn-protection window, composited left-to-right. LEFT (in flight): the local ship (blue-cockpit steel triangle) sits at screen centre over its home planet (yellow core, teal shield) firing due east; a single red projectile dot hangs in the GAP between the ship and a stationary enemy ship (steel triangle carrying a teal hull bar) ~110 px further east — the shot is partway across, not a hitscan line touching both ends. Ship-vs-ship fire draws NO beam, so a red dot mid-gap IS a projectile with travel time. MIDDLE (evaded): the enemy has left the eastward shot line and a red projectile flies on east into empty space — a clean miss. RIGHT (mining): the local ship (at right) emits a solid BLUE mining beam drawn as a continuous LINE to a grey asteroid it strikes — visually distinct from the traveling combat dot, so mining is STILL a beam. Readback backs each: across the burst ~88 of 90 frames carried a projectile at an intermediate position (travel, not hitscan); a STILL target took damage under fire while the RELEASED, moving target barely lost hull across ~70 shots (a traveling shot cannot catch a mover — dodging is real); and __planetRush.beams reported the mining shot as source:'ship' with origin -> hit geometry. Note in passing: top-right carries only the HOME core-HP bar — no ship-hull readout.",
+    "verdict": "verified"
+  },
+  {
+    "id": "upgrade-wheel",
+    "title": "The new UPGRADE wheel — tiers + costs, same language as the Build wheel",
+    "area": "build-wheel",
+    "image": "images/upgrade-wheel.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "?debug=1&freeze=1, the Upgrade wheel opened via __upgradeWheelStage.openUpgrade(999). A radial WHEEL of four wedges around a central hub: BEAM (10 -> 13, cost 4), ENGINE (100% -> 115%, cost 3), CARGO (2 -> 4, cost 2), HULL (50 -> 60, cost 3) — the tier-0 current value, the next value, and the ore cost under each, read back verbatim from the drawn wedges. The hub reads '999 / VANGUARD' (spendable ore + hull class). Caption bar: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder'. It speaks the SAME language as the Build wheel (see images/build-wheel-language.png: TURRET / SHIELD / REPAIR CORE / UPGRADE SHIP (with a right-arrow to this wheel) / BANK around a '999 ORE' hub, same shape, same words-plus-cost wedges). Top-right shows ONLY the HOME core-HP bar — there is no ship-hull percentage readout there (the top-right hull readout is gone).",
+    "verdict": "verified"
+  },
+  {
+    "id": "wheel-cycle-robust",
+    "title": "Both wheels open/close 16x each and still work (the field bug)",
+    "area": "build-wheel",
+    "image": "images/wheel-cycle-robust.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "?debug=1&freeze=1. The Build wheel was opened AND closed 16 times and the Upgrade wheel opened and closed 16 times — 32 open/close cycles in all — driving the exact gesture the field bug wedged shut. After every single cycle the freshly-opened wheel read back interactive() === true: 0 build failures, 0 upgrade failures (measured with a two-rendered-frame sync after each open so the interactive read reflects what the HUD actually drew, not a pre-render stale value). The image is the proof frame AFTER all the cycling: the Build wheel is open and fully drawn — TURRET (3), SHIELD (5), REPAIR CORE (1), UPGRADE SHIP (with arrow), BANK around the '999 ORE' hub — and finalInteractive was true. The open/close path does not leak or wedge.",
+    "verdict": "verified"
+  },
+  {
+    "id": "map-in-lobby",
+    "title": "Lobby: slots + class select + map row in one screen, no separate picker",
+    "area": "mobile",
+    "image": "images/map-in-lobby.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "CLEAN boot (no ?debug=1): main menu -> PLAY -> the lobby, captured in one 1280x800 frame. Title 'PLANET RUSH'. LEFT: eight roster slots — P1 'YOU (star)' VANGUARD - AZURE, then the seven-bot cast, each with class - colour and a difficulty tag (P2 Rusty HAULER - CYAN EASY, P3 Bolt INTERCEPTOR - SPRING EASY, P4 Foreman EXCAVATOR - VIOLET MEDIUM, P5 Patch HAULER - MAGENTA MEDIUM, P6 Vulture VANGUARD - ORANGE HARD, P7 Warden EXCAVATOR - CHALK HARD, P8 Sable INTERCEPTOR - SLATE-BLUE HARD). RIGHT: the hull picker — INTERCEPTOR/Quadfin, VANGUARD/Anvil (selected, boxed), EXCAVATOR/Pincer, HAULER/Hammerhead, each with a one-line blurb. BOTTOM: the ARENA row — four cards, 'The Ring' (selected/boxed), 'The Compass', 'The Oval', 'Double Diamond' tagged VETERAN — then the RUSH! button and '1 PLAYING - 7 BOTS'. Roster slots, class select AND the map row are all on this one screen; there is no separate map-picker step. Readback: slotCount 8, classOrder [interceptor,vanguard,excavator,hauler], mapOrder [octagon,compass,oval,diamond], mapCards 4, veteranMapId 'diamond'.",
+    "verdict": "verified"
+  },
+  {
+    "id": "damage-all-classes",
+    "title": "Player fire damages an enemy hull bar — but only ONE class reachable",
+    "area": "match",
+    "image": "images/damage-all-classes.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "PARTIAL — see limitation. LIVE, past spawn protection. Before/after crop of the local ship's OWN projectiles landing on a staged enemy (owner 1, the Hauler): the enemy's teal hull bar falls from 0.98 to 0.78 under continuous player fire (a red shot is visible at the moment of impact in the 'after' panel), tracked frame-by-frame 0.98 -> 0.93 -> 0.88 -> 0.83 -> 0.78. That proves the player's projectile weapon deals hull damage and the bar moves — no ignored hit — FOR THE HAULER. HONEST LIMITATION, why this is NOT verified: the only ?debug=1 damage seam (__healthbarStage.damageEnemy) always targets owner 1 and force-sets its alive flag, so the other three classes (Interceptor / Excavator / Vanguard, fixed at owners 2 / 3 / 6 by the bot roster) cannot be brought under the player's fire on this build; and every ship is the same placeholder triangle (cockpit = player colour, not class), so class is not distinguishable in pixels regardless. Only one of four classes is shown taking player damage. Proving 'every ship class' needs a seam to damage an arbitrary-owner enemy (and/or class-distinct ship art).",
+    "verdict": "inconclusive"
+  },
+  {
+    "id": "repair-core-works",
+    "title": "REPAIR CORE wedge is present but cannot be exercised on this build",
+    "area": "build-wheel",
+    "image": "images/repair-core.png",
+    "capturedAt": "2026-07-26T02:45:00Z",
+    "buildSha": "de2fa64",
+    "attestation": "PARTIAL — see limitation. ?debug=1&freeze=1, Build wheel open. The REPAIR CORE wedge is present in the wheel (labelled 'REPAIR CORE / YOUR PLANET', entry cost '1') — but it is drawn GREYED/inactive, because the frozen core is undamaged (the HOME bar top-right is a full blue core-HP bar, and the hub reads '3 ORE'). HONEST LIMITATION, why this is NOT verified: there is NO ?debug=1 seam that damages the local core (the enemy-staging seam parks the enemy beside your SHIP, which is always the nearer target, so a bot will not reliably siege the core), and there is NO coreHp readback anywhere on the debug surface — so the 'captioned numbers from the debug hook' the gate asks for (HP rising) cannot be read, and a damaged core cannot be staged to drive the channel. Bank IS readable (ore total), but HP is not, and the core cannot be damaged. The mechanic's control exists; it cannot be exercised or numerically verified on build de2fa64. Proving HP-rising / bank-falling needs a core-damage seam plus a coreHp readback.",
+    "verdict": "inconclusive"
   }
 ]
