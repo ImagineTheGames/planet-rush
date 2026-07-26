@@ -66,9 +66,35 @@
  * Four fields, one source, written together: neither contract is weakened and both
  * are readable at once.
  *
+ * ── WRITE SEAMS (round-9 QA unblock: damageShip / damageCore / coreHp) ──────
+ * The readouts above are the original instrument: read-only, updated per frame.
+ * The QA Manager proved two round-9 gates unverifiable — nothing could stage
+ * damage against an arbitrary owner, and nothing could damage or read a core.
+ * {@link installDebugStage} closes that, merging three more keys onto the same
+ * `?debug=1` `window.__planetRush` handle (additively, exactly as the combat and
+ * layout co-tenants do — the handle is installed read-only/non-configurable, but
+ * co-tenants EXTEND it with their own keys; none is ever clobbered):
+ *
+ *   window.__planetRush.damageShip(owner, amount): DebugWriteAction   // WRITE
+ *   window.__planetRush.damageCore(player, amount): DebugWriteAction  // WRITE
+ *   window.__planetRush.coreHp(player): number | null                // READ-ONLY
+ *
+ * `coreHp` is a pure read — the core-HP counterpart to the already-readable bank —
+ * and answers immediately off the live world. The two `damage*` calls are the new
+ * part: they WRITE to the sim. To keep determinism and the net protocol intact
+ * they do NOT poke world state; they QUEUE a {@link DebugWriteAction} (a
+ * platform-local "debug Action kind", deliberately NOT a `@shared/types` `Action`
+ * so it never rides the net wire nor needs a sim-side reducer case) and return the
+ * queued verb. `main.ts` drains the queue once per fixed step
+ * ({@link DebugStageHook.drain}) and applies each write through the sim's OWN
+ * ratified damage functions, so the effect lands only on a tick boundary, in FIFO
+ * order, attributed to the local player — the same ordered pulse real input rides,
+ * replay-deterministic and off the wire.
+ *
  * Without `?debug=1` this module is inert: it installs nothing, attaches nothing
- * to `window`, and its `update` is a no-op. It is an instrument only — no game
- * code reads `__planetRush`, and this file exposes nothing else on the global.
+ * to `window`, `update` is a no-op, and {@link installDebugStage} returns a no-op
+ * hook that touches neither `window` nor the sim. It is an instrument only — no
+ * game code reads `__planetRush` or these seams; they exist for the QA suite.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
@@ -202,4 +228,159 @@ export function installDebugHook(
       hasLast = true;
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Write seams — the round-9 QA unblock (damageShip / damageCore / coreHp)
+// ---------------------------------------------------------------------------
+
+/**
+ * The debug "Action kind": a staging verb the QA suite files to make the sim DO
+ * something, as opposed to the read-only readouts of {@link DebugState}. Two
+ * writes today — damage an arbitrary owner's ship, damage an arbitrary player's
+ * core.
+ *
+ * Deliberately a PLATFORM-LOCAL type and NOT a `@shared/types` `Action`:
+ *  - it must never ride the net wire (`InputMessage.actions`), where a real
+ *    server would neither expect nor trust it — that would corrupt the protocol;
+ *  - it needs no `case` in the sim's action reducer, so nothing in `src/sim`
+ *    changes and no exhaustive switch there is broken.
+ * Instead it rides the SAME ordered pulse real input does: queued on the call,
+ * drained by `main.ts` once per fixed step ({@link DebugStageHook.drain}), and
+ * applied through the sim's own ratified damage functions via a bridge `main.ts`
+ * registers (it owns `world`). So a write lands only on a tick boundary, in FIFO
+ * order, attributed to the local player — replay-deterministic, never poked into
+ * world state between ticks.
+ */
+export type DebugWriteAction =
+  | { readonly op: 'damageShip'; readonly owner: number; readonly amount: number }
+  | { readonly op: 'damageCore'; readonly player: number; readonly amount: number };
+
+/**
+ * The world-facing bridge `main.ts` registers via {@link DebugStageHook.setBridge}.
+ * It holds `world`, so the sim-touching apply/read stays there (the same division
+ * of labour as combat-debug's `setStager`); this module only queues and forwards.
+ */
+export interface DebugSimBridge {
+  /** Apply `amount` sim damage to `owner`'s ship. The sim tracks no killer, so
+   *  "attributed to the local player" is nominal today — this is the same code
+   *  path a real hit uses, spawn protection included. */
+  damageShip(owner: number, amount: number): void;
+  /** Apply `amount` sim damage to `player`'s planet (shields first, then core —
+   *  the sim's real rule; a fresh home has no shields, so it hits the core). */
+  damageCore(player: number, amount: number): void;
+  /** Read `player`'s current core HP, or null if they have no planet. */
+  coreHp(player: number): number | null;
+}
+
+/** What `main.ts` drives for the write seams: register the world bridge, and
+ *  drain the queued writes once per fixed step so they land on a tick boundary. */
+export interface DebugStageHook {
+  readonly enabled: boolean;
+  /** Register the world-facing bridge (main.ts owns `world`). */
+  setBridge(bridge: DebugSimBridge): void;
+  /** Apply every queued {@link DebugWriteAction} in FIFO order, then clear. A
+   *  no-op until a bridge is registered — the queue is preserved until then, so
+   *  a write filed before the loop wired the bridge is not lost. */
+  drain(): void;
+}
+
+/** A shared do-nothing write hook for the (common) debug-off path. */
+const NOOP_STAGE_HOOK: DebugStageHook = {
+  enabled: false,
+  setBridge: () => {},
+  drain: () => {},
+};
+
+/** Anything with a settable/extensible `__planetRush` — a `Window` or a test double. */
+type StageTarget = Record<string, unknown>;
+
+/**
+ * Install the `?debug=1` WRITE seams — `damageShip`, `damageCore`, `coreHp` —
+ * onto the shared `window.__planetRush` handle, or return an inert no-op hook
+ * when the URL does not opt in. Additive-merge discipline (see
+ * {@link installCombatDebug} in combat-debug.ts for the full rationale): the
+ * camera instrument installs the handle read-only first, so we merge our keys
+ * onto whatever co-tenant already owns it rather than reassigning, never
+ * clobbering a key it holds.
+ *
+ * The two damage methods QUEUE a {@link DebugWriteAction} and return the queued
+ * verb (frozen) — the effect lands when `main.ts` next {@link DebugStageHook.drain}s
+ * the queue, on a fixed-tick boundary, so the write is ordered like real input
+ * and never a mid-frame poke. `coreHp` is a pure read and answers now, off the
+ * bridge's live world (null before the bridge is registered).
+ */
+export function installDebugStage(
+  search: string,
+  target: StageTarget = globalThis as unknown as StageTarget,
+): DebugStageHook {
+  if (!isDebugEnabled(search)) return NOOP_STAGE_HOOK;
+
+  const queue: DebugWriteAction[] = [];
+  let bridge: DebugSimBridge | null = null;
+
+  const hook: DebugStageHook = {
+    enabled: true,
+    setBridge(b): void {
+      bridge = b;
+    },
+    drain(): void {
+      if (!bridge || queue.length === 0) return;
+      // Take this tick's batch off the queue first, then apply — so nothing an
+      // apply might enqueue (there is none today) is dropped or double-run.
+      const batch = queue.splice(0, queue.length);
+      for (const a of batch) {
+        if (a.op === 'damageShip') bridge.damageShip(a.owner, a.amount);
+        else bridge.damageCore(a.player, a.amount);
+      }
+    },
+  };
+
+  // The write/read surface merged onto __planetRush. The two writers only QUEUE —
+  // they do not touch the sim here — so the effect is deferred to the ordered
+  // drain; `coreHp` reads through the bridge immediately (read-only, like `bars`).
+  const surface = {
+    damageShip(owner: number, amount: number): DebugWriteAction {
+      const action = Object.freeze({ op: 'damageShip', owner, amount } as const);
+      queue.push(action);
+      return action;
+    },
+    damageCore(player: number, amount: number): DebugWriteAction {
+      const action = Object.freeze({ op: 'damageCore', player, amount } as const);
+      queue.push(action);
+      return action;
+    },
+    coreHp(player: number): number | null {
+      return bridge ? bridge.coreHp(player) : null;
+    },
+  };
+
+  // Additive install onto the shared handle (identical discipline to
+  // installCombatDebug): merge our keys onto whatever co-tenant already owns the
+  // handle, never clobbering a key it holds; best-effort per key.
+  const existing = target[DEBUG_GLOBAL_KEY] as Record<string, unknown> | undefined;
+  const host = existing ?? {};
+  const descriptors = Object.getOwnPropertyDescriptors(surface);
+  for (const key of Object.keys(descriptors)) {
+    if (Object.prototype.hasOwnProperty.call(host, key)) continue;
+    try {
+      Object.defineProperty(host, key, descriptors[key]!);
+    } catch {
+      /* co-tenant owns this key or is non-extensible — skip it, keep the rest */
+    }
+  }
+  if (!existing) {
+    try {
+      Object.defineProperty(target, DEBUG_GLOBAL_KEY, {
+        value: host,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      target[DEBUG_GLOBAL_KEY] = host;
+    }
+  }
+
+  return hook;
 }
