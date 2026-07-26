@@ -40,6 +40,9 @@ import {
   promptBounds,
   promptWrapWidth,
   PROMPT_CENTER_Y,
+  respawnBounds,
+  respawnWrapWidth,
+  RESPAWN_CENTER_Y,
 } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
@@ -279,6 +282,51 @@ describe('onboarding placement', () => {
       const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 20);
       const centerZone = resolveAnchor({ region: 'center', margin: HUD_PAD }, vp);
       expect(b.width, name).toBeGreaterThan(centerZone.width);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The respawn countdown overlay (field request v0.2.2) — `full`, margin PAD
+// ---------------------------------------------------------------------------
+
+describe('respawn-countdown placement', () => {
+  const FULL_PAD: AnchorSpec = { region: 'full', margin: HUD_PAD };
+
+  /** A worst-case countdown: text wrapped to the widest line the wrap allows,
+   *  over enough lines to cover "RESPAWNING N..." breaking on a narrow phone.
+   *  Line box ≈ 30px at the countdown's 24px heading type. */
+  const worstCase = (vp: Viewport, lines: number): { w: number; h: number } => ({
+    w: respawnWrapWidth(vp.width),
+    h: lines * 30,
+  });
+
+  for (const { name, vp } of PROFILES) {
+    it(`stays on screen and inside the HUD margin at ${name}`, () => {
+      const { w, h } = worstCase(vp, 2);
+      expectWithin(respawnBounds(vp.width, vp.height, w, h), FULL_PAD, vp, 'respawn-countdown');
+    });
+  }
+
+  it('lands exactly on the HUD margin at the wrap ceiling — the assertion that earns its keep', () => {
+    // Same load-bearing check the prompt gets: if the wrap budget ever stops
+    // paying for RESPAWN_PAD_X and the stroke, a countdown at the ceiling
+    // registers wider than its own anchor zone on the narrowest phone.
+    for (const { name, vp } of PROFILES) {
+      const b = respawnBounds(vp.width, vp.height, respawnWrapWidth(vp.width), 30);
+      expect(b.x, name).toBeCloseTo(HUD_PAD, 6);
+      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
+    }
+  });
+
+  it('sits dead centre — the death location the camera stays on (field request)', () => {
+    // The ship exploded here; a dead ship draws nothing under it, so centre is
+    // clear and the overlay owns it.
+    expect(RESPAWN_CENTER_Y).toBeCloseTo(0.5, 6);
+    for (const { name, vp } of PROFILES) {
+      const b = respawnBounds(vp.width, vp.height, 200, 30);
+      const cy = b.y + b.height / 2;
+      expect(cy, name).toBeCloseTo(vp.height / 2, 6);
     }
   });
 });
