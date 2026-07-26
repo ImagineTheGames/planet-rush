@@ -22,7 +22,7 @@ import type { Texture } from 'pixi.js';
 import { asteroidSprite, oreChunkSprite } from './asteroids';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite, type TurretState } from './buildings';
 import { beaconRingSprite, damageRingSprite, planetSprite, planetVariantFor } from './planets';
-import { shipSprite } from './ships';
+import { damageStateFor, shipSprite } from './ships';
 import type { SpriteTextureCache } from './textures';
 import { planetWreckSprite } from './wrecks';
 
@@ -32,6 +32,10 @@ export interface ShipLike {
   readonly shipClass: string;
   /** Seconds of spawn protection left; > 0 swaps in the shell (GDD §2.1). */
   readonly spawnProtect?: number;
+  /** Current hull HP; banded against `maxHull` into a damage state (GDD §2.11). */
+  readonly hull?: number;
+  /** Full hull for this class+upgrades. Absent ⇒ the ship reads as undamaged. */
+  readonly maxHull?: number;
 }
 
 /** What the atlas needs from an asteroid. An `Asteroid` satisfies it. */
@@ -63,13 +67,16 @@ function richnessBand(ore: number, maxOre: number): number {
   return Math.round(Math.max(0, Math.min(1, ore / maxOre)) * 3) / 3;
 }
 
-/** The ship's livery — hull class, player slot, spawn-protection state. */
+/** The ship's livery — hull class, player slot, spawn-protection and damage state. */
 export function shipTexture(cache: SpriteTextureCache, ship: ShipLike, size: number): Texture {
   const protectedNow = (ship.spawnProtect ?? 0) > 0;
   const shipClass = ship.shipClass as Parameters<typeof shipSprite>[0]['shipClass'];
+  // Band hull HP into three states so a field of ships shares a small pool
+  // (class × slot × 3 bands), not a texture per HP point (GDD §4.3).
+  const damage = damageStateFor(ship.maxHull && ship.maxHull > 0 ? (ship.hull ?? ship.maxHull) / ship.maxHull : 1);
   return cache.getBy(
-    `ship:${ship.shipClass}:${ship.id}:${protectedNow ? 'p' : 'n'}:${size}`,
-    () => shipSprite({ shipClass, playerId: ship.id, spawnProtected: protectedNow }),
+    `ship:${ship.shipClass}:${ship.id}:${protectedNow ? 'p' : 'n'}:${damage}:${size}`,
+    () => shipSprite({ shipClass, playerId: ship.id, spawnProtected: protectedNow, damage }),
     size,
   );
 }
