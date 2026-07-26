@@ -26,6 +26,7 @@ import {
   spendOre,
   turretCount,
   turretMountPos,
+  turretTier,
 } from './buildings';
 import {
   CORE_HP,
@@ -293,7 +294,13 @@ describe('per-planet caps are design rules (GDD §2.5)', () => {
 
     stepUntil(world, () => planet.builds.length === 0, 2000);
     expect(planet.turrets).toHaveLength(TURRET.capPerPlanet);
-    expect(placeOrder(world, ship, 'turret')).toBe('cap-reached');
+    // The cap still binds — the ring never grows past four — but a built-out ring
+    // does not dead-end the wedge: the same TURRET order now UPGRADES the weakest
+    // turret one Mk (parity field report v0.2.2), so it answers 'ok', the count
+    // holds at four, and a turret has climbed off Mk I.
+    expect(placeOrder(world, ship, 'turret')).toBe('ok');
+    expect(turretCount(planet)).toBe(TURRET.capPerPlanet);
+    expect(Math.max(...planet.turrets.map(turretTier))).toBe(1);
   });
 
   it('stops at 2 shields ("stacks to two")', () => {
@@ -318,7 +325,11 @@ describe('per-planet caps are design rules (GDD §2.5)', () => {
     });
     const world = makeWorld({ ships: [ship], planets: [planet] });
 
-    expect(placeOrder(world, ship, 'turret')).toBe('cap-reached');
+    // A full standing ring builds no fifth turret — the order upgrades instead
+    // ('ok', count unchanged). Killing a turret frees its slot, and the very next
+    // order goes back to BUILDING (a free slot always builds before it upgrades).
+    expect(placeOrder(world, ship, 'turret')).toBe('ok');
+    expect(turretCount(planet)).toBe(TURRET.capPerPlanet);
     planet.turrets[2]!.hp = 0;
     step(world, []); // end-of-tick sweep removes it
     expect(planet.turrets).toHaveLength(3);

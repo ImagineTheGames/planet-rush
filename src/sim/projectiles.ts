@@ -38,8 +38,9 @@ import {
   SHIP_WEAPON,
   TURRET,
   clampToMargin,
+  turretTierShotDamage,
 } from './constants';
-import { damagePlanet, damageTurret, planetTargetRadius } from './buildings';
+import { damagePlanet, damageTurret, planetTargetRadius, turretRange, turretTier } from './buildings';
 import { damageShip } from './damage';
 import type { SpatialHash } from './spatial-hash';
 import type { Asteroid, Projectile, Ship, Turret, World } from './state';
@@ -108,10 +109,15 @@ export function fireShipProjectile(world: World, ship: Ship, dir: Vec2): void {
 }
 
 /**
- * Loose one **turret** projectile along bearing `aim` (radians). Unchanged from
- * the p1-14 turret gun that used to live in `./buildings`, only relocated so it
- * shares the pool and the stepping with the ship weapon: same design DPS, same
- * `TURRET.projectileSpeed`, same short lifetime clamped to turret range.
+ * Loose one **turret** projectile along bearing `aim` (radians). Relocated from
+ * the p1-14 turret gun so it shares the pool and stepping with the ship weapon;
+ * since the parity field report (v0.2.2) its bite and reach read from the
+ * turret's *tier* rather than the flat `PROJECTILE` constants — a Mk III shot
+ * hits harder (`turretTierShotDamage`) and flies the turret's longer tier range
+ * (`turretRange`). Muzzle speed stays `TURRET.projectileSpeed` across tiers (the
+ * ladder buys damage/rate/reach, not velocity), and a Mk I turret is byte-for-
+ * byte the pre-ladder gun: `turretTierShotDamage(0)` = `PROJECTILE.damage`, and
+ * `turretRange(Mk I)/speed` = `PROJECTILE.life`.
  */
 export function fireTurretProjectile(world: World, turret: Turret, aim: number): void {
   const dx = Math.cos(aim);
@@ -123,13 +129,16 @@ export function fireTurretProjectile(world: World, turret: Turret, aim: number):
   slot.pos.y = turret.pos.y + dy * turret.radius;
   slot.vel.x = dx * TURRET.projectileSpeed;
   slot.vel.y = dy * TURRET.projectileSpeed;
-  slot.damage = PROJECTILE.damage;
+  slot.damage = turretTierShotDamage(turretTier(turret));
   // A turret does not mine; zero the recycled slot's yield so a reused ship-shot
   // slot never carries a stale chip value (turret shots never reach a rock, but
   // the field is part of the serialized/hashed state — keep it clean).
   slot.mineYield = 0;
   slot.radius = PROJECTILE.radius;
-  slot.life = PROJECTILE.life;
+  // Lifetime is exactly this turret's tier reach — a shot dies at the edge of the
+  // range that acquired the target, so a turret can never out-reach its own
+  // engagement, at any Mk (`PROJECTILE.life` is the Mk I value of this).
+  slot.life = turretRange(turret) / TURRET.projectileSpeed;
   slot.kind = 'turret';
   slot.active = true;
 }

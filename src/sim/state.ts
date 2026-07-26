@@ -195,6 +195,20 @@ export interface Turret {
   orbitAngle?: number;
   /** Seconds until it may fire again. */
   cooldown: number;
+  /**
+   * Turret tier — the `Mk` on the ladder (`TURRET_TIERS`; parity field report
+   * v0.2.2). Tier 0 is Mk I, the built baseline; the TURRET wedge upgrades a
+   * standing turret one step at a time (`upgradeTurret`), and this is where the
+   * step lands. Every combat number the turret uses — HP, per-shot damage, fire
+   * rate, range — is read from `turretTierSpec(tier)`, so a tier bump is the one
+   * field that makes the turret better and nothing else has to change.
+   *
+   * Optional so the turret literals other agents build (render tells, netcode
+   * reconstruction, bot fixtures) keep compiling — a turret with no `tier` reads
+   * as Mk I (0), the exact pre-ladder turret. Same backward-compatible discipline
+   * as `orbitAngle` / `muzzle`. The sim's own turrets always carry it
+   * (`makeTurret` sets it). */
+  tier?: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
   /**

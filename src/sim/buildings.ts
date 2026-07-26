@@ -37,6 +37,8 @@ import {
   REPAIR,
   SHIELD,
   TURRET,
+  TURRET_MAX_TIER,
+  turretTierSpec,
 } from './constants';
 import { destroyCore, isCollapsed } from './match';
 import { fireTurretProjectile } from './projectiles';
@@ -134,6 +136,77 @@ function freeTurretSlot(planet: Planet): number {
   return -1;
 }
 
+// ---------------------------------------------------------------------------
+// Turret tiers — a standing turret's Mk on the ladder (parity field report v0.2.2)
+// ---------------------------------------------------------------------------
+
+/** A turret's tier, clamped into the ladder — the sim never trusts a tier it did
+ *  not write, and a turret with no `tier` (an other-agent literal) reads as Mk I.
+ *  Mirrors `tierOf` for ship upgrades. */
+export function turretTier(turret: Turret): number {
+  const raw = turret.tier ?? 0;
+  if (!Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.min(Math.floor(raw), TURRET_MAX_TIER));
+}
+
+/** Engagement radius of this turret at its tier (`turretTierSpec`). Under
+ *  `WEAPON_RANGE` at every tier by design (GDD §2.6 pick-off skill). */
+export function turretRange(turret: Turret): number {
+  return turretTierSpec(turretTier(turret)).range;
+}
+
+/** Seconds between this turret's shots at its tier. */
+export function turretFireInterval(turret: Turret): number {
+  return turretTierSpec(turretTier(turret)).fireInterval;
+}
+
+/**
+ * The standing turret a TURRET-wedge *upgrade* press acts on: the lowest-tier
+ * live turret not already maxed, ties broken by lowest mount slot — a
+ * deterministic "improve your weakest turret first" pick (breadth of Mk before
+ * depth, GDD §4.8). `null` when the ring has nothing left to climb (no turret, or
+ * every one already Mk III). The UI reads this to know the wedge is in its
+ * upgrade state and which turret it targets (parity field report v0.2.2).
+ */
+export function turretUpgradeTarget(planet: Planet): Turret | null {
+  let best: Turret | null = null;
+  for (const t of planet.turrets) {
+    if (t.hp <= 0 || turretTier(t) >= TURRET_MAX_TIER) continue;
+    const tt = turretTier(t);
+    if (best === null || tt < turretTier(best) || (tt === turretTier(best) && t.slot < best.slot)) {
+      best = t;
+    }
+  }
+  return best;
+}
+
+/** Ore price of the next TURRET-wedge upgrade on a planet — stepping its
+ *  {@link turretUpgradeTarget} one Mk up — or `null` when nothing can be
+ *  upgraded. The UI prices the wedge's upgrade state from this. */
+export function turretUpgradeCost(planet: Planet): number | null {
+  const target = turretUpgradeTarget(planet);
+  if (target === null) return null;
+  return turretTierSpec(turretTier(target) + 1).upgradeCost;
+}
+
+/**
+ * Apply a tier to a standing turret, granting the new plate immediately —
+ * mirroring `applyPurchasedStats` for ship hull (`./upgrades`): `maxHp` rises to
+ * the tier's HP and the *difference* is added to current `hp`, so an upgrade is
+ * new armor, never a heal — a Mk I at 10/30 that reaches Mk II is 25/45, still
+ * carrying 20 HP of damage. Damage, fire rate and range are read live from
+ * `turretTierSpec(tier)` every tick, so `hp`/`maxHp` are all this writes.
+ */
+export function applyTurretTier(turret: Turret, tier: number): void {
+  const clamped = Math.max(0, Math.min(Math.floor(tier), TURRET_MAX_TIER));
+  const before = turret.maxHp;
+  turret.tier = clamped;
+  turret.maxHp = turretTierSpec(clamped).hp;
+  const gained = turret.maxHp - before;
+  if (gained > 0) turret.hp += gained;
+  if (turret.hp > turret.maxHp) turret.hp = turret.maxHp;
+}
+
 /** The rim angle a turret in `slot` mounts at: the planet's outward angle plus
  *  an even share of the ring, so slot 0 always starts facing away from the
  *  field. This is the turret's *home* orbit angle — where it is born and where
@@ -221,17 +294,31 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       return 'ok';
     }
     case 'turret': {
-      if (turretCount(planet) >= TURRET.capPerPlanet) return 'cap-reached';
       const slot = freeTurretSlot(planet);
-      if (slot < 0) return 'cap-reached';
-      if (!spendOre(ship, TURRET.cost)) return 'cannot-afford';
-      planet.builds.push({
-        id: world.nextEntityId++,
-        kind: 'turret',
-        slot,
-        remaining: TURRET.buildTime,
-        total: TURRET.buildTime,
-      });
+      if (slot >= 0) {
+        // A mount is free: BUILD a new Mk I turret. Construction takes time, so
+        // the defense is bought before the attack, not during it (GDD §2.5).
+        if (!spendOre(ship, TURRET.cost)) return 'cannot-afford';
+        planet.builds.push({
+          id: world.nextEntityId++,
+          kind: 'turret',
+          slot,
+          remaining: TURRET.buildTime,
+          total: TURRET.buildTime,
+        });
+        return 'ok';
+      }
+      // The ring is full — the TURRET wedge is in its UPGRADE state (parity field
+      // report v0.2.2): step the weakest standing turret one Mk up. Instant, like
+      // a ship upgrade (`buyUpgrade`): the defense already stands, so the
+      // build-time gate — which exists to stop a *new* defense appearing
+      // mid-attack — does not apply. Ore is drawn hold-first then bank, as ever.
+      const target = turretUpgradeTarget(planet);
+      if (target === null) return 'cap-reached'; // full ring, every turret maxed
+      const cost = turretTierSpec(turretTier(target) + 1).upgradeCost;
+      if (cost === null) return 'cap-reached';
+      if (!spendOre(ship, cost)) return 'cannot-afford';
+      applyTurretTier(target, turretTier(target) + 1);
       return 'ok';
     }
     case 'shield': {
@@ -376,14 +463,19 @@ function advanceConstruction(world: World, planet: Planet, dt: number): void {
 function makeTurret(world: World, planet: Planet, slot: number): Turret {
   const home = turretHomeAngle(planet, slot);
   const pos = turretOrbitPos(planet, home);
+  // Built at Mk I. `turretTierSpec(0).hp` is `TURRET.hp` by construction, so a
+  // fresh turret is byte-for-byte the pre-ladder turret — the upgrade path is
+  // the only thing that ever moves it off tier 0.
+  const spec = turretTierSpec(0);
   return {
     id: world.nextEntityId++,
     owner: planet.owner,
     slot,
     pos: { x: pos.x, y: pos.y },
     radius: TURRET.radius,
-    hp: TURRET.hp,
-    maxHp: TURRET.hp,
+    hp: spec.hp,
+    maxHp: spec.hp,
+    tier: 0,
     // Barrel starts pointing outward, away from the planet it defends.
     angle: home,
     // Born on its mount slot; it slides from here toward the threat (field
@@ -582,7 +674,7 @@ export function updateTurrets(world: World, dt: number): void {
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
         turret.muzzle = makeMuzzle(turret, target, aim);
-        turret.cooldown = TURRET.fireInterval;
+        turret.cooldown = turretFireInterval(turret);
       }
     }
   }
@@ -598,7 +690,24 @@ export function updateTurrets(world: World, dt: number): void {
  * facing-normal point it has line of sight and closes to `range` (§2).
  */
 export function planetThreatRadius(planet: Planet): number {
-  return planet.radius + TURRET.mountOffset + TURRET.radius + TURRET.range;
+  // The planet's overall threat envelope is its *longest-reaching* live turret,
+  // so a mixed-tier ring gathers every threat any of its turrets could engage
+  // (the per-turret reach still gates each turret's own acquire — `acquireTarget`
+  // — and the projectile's finite life caps where a shot actually lands). A ring
+  // with nothing standing falls back to the Mk I base reach.
+  let range: number = TURRET.range;
+  for (const t of planet.turrets) {
+    if (t.hp > 0) range = Math.max(range, turretRange(t));
+  }
+  return planet.radius + TURRET.mountOffset + TURRET.radius + range;
+}
+
+/** The reach of ONE sliding turret from its planet's centre — the rim orbit
+ *  radius plus this turret's own tier range. A sliding turret is engaged against
+ *  a threat inside this even when the threat sits outside firing range of where
+ *  it currently sits, because it slides to close the gap (field report P1). */
+export function turretThreatRadius(planet: Planet, turret: Turret): number {
+  return planet.radius + TURRET.mountOffset + TURRET.radius + turretRange(turret);
 }
 
 /**
@@ -662,7 +771,10 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
   // `orbitAngle`) from itself, since it cannot slide to close the gap.
   const sliding = turret.orbitAngle !== undefined;
   const ref = sliding ? planet.pos : turret.pos;
-  const reach2 = sliding ? planetThreatRadius(planet) ** 2 : TURRET.range * TURRET.range;
+  // Reach is this turret's own tier range (GDD §2.6): a sliding turret measures
+  // it from the planet centre (it slides to close), a fixed one from itself.
+  const reach = sliding ? turretThreatRadius(planet, turret) : turretRange(turret);
+  const reach2 = reach * reach;
 
   // Best valid enemy this tick — attacker-first, then nearest — the switch
   // candidate against the sticky current pick below.
