@@ -246,3 +246,46 @@ All items on the LIVE preview bundle at build `dc7e2ac` (clean, no page errors):
     exact behaviour the developer reported missing.
 
 No page errors in any capture.
+
+---
+
+## Round 9 — the projectile era, v0.2 report wave, on the live build (`de2fa64`)
+
+`capture-round9.mjs` — the six v0.2 gates. All on the LIVE preview bundle at
+build `de2fa64` (clean, no page errors). **4 of 6 verified; 2 inconclusive
+because the instrumentation this build ships cannot exercise them — the tag
+should wait on those two.**
+
+**Verified:**
+- **projectile-dodge** — LIVE, past the 10 s spawn-protection window. A three-frame
+  composite: a red projectile MID-GAP between the ship and a still enemy (travel
+  time, not hitscan; ship-vs-ship fire draws no beam); a red shot flying east into
+  empty space the enemy has left (a miss); and the local ship's BLUE mining beam
+  drawn as a line to a rock it strikes (`__planetRush.beams` source `ship`,
+  origin→hit) — mining is STILL a beam. Data: a still target loses hull under fire
+  while a moving target barely does across ~70 shots — dodging is real.
+- **upgrade-wheel** — the radial UPGRADE wheel (`__upgradeWheelStage.openUpgrade`):
+  BEAM 10→13 (4), ENGINE 100%→115% (3), CARGO 2→4 (2), HULL 50→60 (3) around a
+  `999 / VANGUARD` hub — same wheel language as the Build wheel.
+- **wheel-cycle-robust** — Build ×16 + Upgrade ×16 open/close cycles, `interactive()`
+  true after every one (0 failures, frame-synced), wheel still opens fully after.
+- **map-in-lobby** — clean-boot lobby in one screen: 8 roster slots + the hull
+  picker + the arena row (Ring / Compass / Oval / Double Diamond·VETERAN) + RUSH!.
+  No separate picker step.
+
+Also confirmed in passing: the **top-right hull readout is gone** — top-right now
+carries only the HOME core-HP bar.
+
+**Inconclusive (instrumentation gaps — not defects):**
+- **damage-all-classes** — the player's own projectiles are shown dropping an enemy
+  hull bar 0.98→0.78, so hits register — but only for owner 1 (the Hauler). The
+  `__healthbarStage.damageEnemy` seam always targets owner 1 and force-revives it,
+  so the other three classes cannot be brought under player fire, and placeholder
+  ships are identical triangles (class not pixel-readable). Needs a seam to damage
+  an arbitrary-owner enemy (and/or class-distinct art).
+- **repair-core-works** — the REPAIR CORE wedge is present in the Build wheel but
+  greyed on a full (frozen) core. No debug seam damages the local core, and there
+  is NO coreHp readback for the "captioned numbers" (HP rising) the gate asks for.
+  Needs a core-damage seam + a coreHp readback.
+
+No page errors in any capture.
