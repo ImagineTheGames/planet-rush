@@ -39,6 +39,18 @@
  *   FLY_REGION       this allocator's region (Fly sets it)       (fly router only)
  *   MATCH_APP        the match servers' Fly app, if separate     (fly router only)
  *   MATCH_URL_TEMPLATE  direct connect URL, '{machine}' expanded (default ws://{machine}:8080/)
+ *
+ * The fleet controller (allocator/fleet-controller.ts) is wired here but **ships
+ * off** — it acts only when `FLEET_AUTOSCALE=on`, so turning it on is a config
+ * change, not a code change. Its cordon is fed to the {@link Allocator} as
+ * `excludeMachine`, so a drain stops new placement the moment it is armed:
+ *
+ *   FLEET_AUTOSCALE  'on' arms the autoscale loop                (default off)
+ *   FLEET_INTERVAL_MS  reconcile cadence when armed              (default 15000)
+ *   FLEET_IMAGE      match-server image a new spare boots        (default 'planet-rush:latest')
+ *   FLEET_REGION     region new spares are created in            (default FLY_REGION or 'iad')
+ *   FLY_API_TOKEN    Fly token → real provider; unset = in-memory fake (offline dev)
+ *   FLY_APP          the match Machines' Fly app (real provider)
  */
 
 import { randomBytes } from 'node:crypto';
@@ -49,6 +61,9 @@ import { mulberry32 } from '@shared/types';
 import { Allocator, AllocatorError } from './allocator';
 import { InMemoryRoomRegistry, type Heartbeat, type RoomRegistry } from './registry';
 import { DirectRouter, FlyReplayRouter, type Router } from './router';
+import { InMemoryMachineProvider, type MachineProvider } from './provider';
+import { FlyMachineProvider } from './provider-fly';
+import { FleetController, type FleetSignal } from './fleet-controller';
 
 /** What the process wires together; injected so the server is testable. */
 export interface AllocatorServerDeps {
@@ -272,6 +287,36 @@ function readBody(request: IncomingMessage): Promise<string> {
 // Bootstrap — runs only when this module is the process entry.
 // ---------------------------------------------------------------------------
 
+/**
+ * Choose the machine provider: the real Fly adapter when a token and app are
+ * present, else the in-memory fake so offline dev needs no cloud account. The
+ * fake never provisions anything real — a fleet controller pointed at it simply
+ * scales an imaginary fleet, which is all a laptop run needs.
+ */
+function providerFromEnv(): MachineProvider {
+  const env = process.env;
+  if (env['FLY_API_TOKEN'] && env['FLY_APP']) {
+    return new FlyMachineProvider({ appName: env['FLY_APP'], token: env['FLY_API_TOKEN'] });
+  }
+  return new InMemoryMachineProvider();
+}
+
+/**
+ * Build the fleet controller from the environment. It is always constructed (so
+ * its cordon can be wired into the allocator), but only *acts* when
+ * `FLEET_AUTOSCALE=on` — the honest off-by-default setting.
+ */
+function fleetControllerFromEnv(provider: MachineProvider, registry: RoomRegistry): FleetController {
+  const env = process.env;
+  return new FleetController({
+    provider,
+    registry,
+    enabled: (env['FLEET_AUTOSCALE'] ?? 'off') === 'on',
+    region: env['FLEET_REGION'] ?? env['FLY_REGION'] ?? 'iad',
+    image: env['FLEET_IMAGE'] ?? 'planet-rush:latest',
+  });
+}
+
 /** Choose the Router from the environment: Fly at the edge, direct everywhere else. */
 function routerFromEnv(): Router {
   const env = process.env;
@@ -299,16 +344,44 @@ function main(): void {
     : randomBytes(4).readUInt32LE(0);
 
   const registry = new InMemoryRoomRegistry();
-  const allocator = new Allocator({ registry, rng: mulberry32(seed), secret });
+  // The fleet controller is built first so its cordon can gate placement: a
+  // draining Machine is excluded from new rooms the instant it is cordoned.
+  const provider = providerFromEnv();
+  const fleet = fleetControllerFromEnv(provider, registry);
+  const allocator = new Allocator({
+    registry,
+    rng: mulberry32(seed),
+    secret,
+    excludeMachine: (machine) => fleet.isCordoned(machine),
+  });
   const server = createAllocatorServer({ allocator, registry, router: routerFromEnv(), now: Date.now });
 
+  // The autoscale loop. It ships OFF (FleetController.enabled is false unless
+  // FLEET_AUTOSCALE=on), so this timer fires a no-op reconcile by default and
+  // arming it is purely a config change. The primary scale-up signal — per-Machine
+  // event-loop lag — is not yet reported over the heartbeat, so until that lands
+  // the armed loop scales on the free-slot floor alone; that limit is stated,
+  // not hidden. `loopLagMs: 0` is the honest placeholder for the missing signal.
+  const interval = Number(env['FLEET_INTERVAL_MS'] ?? 15_000);
+  const fleetSignal: FleetSignal = { loopLagMs: 0 };
+  const reconcile = setInterval(() => {
+    fleet.reconcile(fleetSignal, Date.now()).catch((e: unknown) => {
+      console.error('[planet-rush] fleet reconcile failed', e);
+    });
+  }, interval);
+  reconcile.unref(); // never hold the process open on the autoscale timer alone
+
   server.listen(port, host, () => {
-    console.log(`[planet-rush] allocator listening on ${host}:${port} (seed ${seed})`);
+    console.log(
+      `[planet-rush] allocator listening on ${host}:${port} (seed ${seed}) ` +
+        `autoscale=${(env['FLEET_AUTOSCALE'] ?? 'off') === 'on' ? 'on' : 'off'}`,
+    );
   });
 
   /** Docker sends SIGTERM; a terminal sends SIGINT. Both stop the listener and exit. */
   const shutdown = (signal: string): void => {
     console.log(`[planet-rush] ${signal} — shutting down`);
+    clearInterval(reconcile);
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5_000).unref();
   };
