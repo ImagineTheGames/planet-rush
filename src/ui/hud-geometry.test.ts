@@ -27,7 +27,6 @@ import {
   panelBounds,
   panelSize,
   planetHpBounds,
-  hullHudBounds,
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
@@ -37,10 +36,7 @@ import {
   HUD_PAD,
   HP_BAR_WIDTH,
   HP_BAR_TOP,
-  HP_BAR_HEIGHT,
   SHIELD_BAR_HEIGHT,
-  HULL_BAR_WIDTH,
-  HULL_TOP,
   promptBounds,
   promptWrapWidth,
   PROMPT_CENTER_Y,
@@ -126,10 +122,37 @@ describe('build-wheel placement', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The upgrade panel (GDD §2.5) — registered `full`, margin 0
+// The upgrade WHEEL (GDD §2.5) — registered `full`, margin 0
 // ---------------------------------------------------------------------------
+//
+// The upgrade screen was rebuilt from a table-panel into a radial wheel (field
+// report v0.2), drawn by the same view as the Build wheel and so occupying the
+// same centred `2r` square. Its DRAWN, registry-registered footprint is therefore
+// `wheelBounds`, tested here as `upgrade-wheel`.
 
-describe('upgrade-panel placement', () => {
+describe('upgrade-wheel placement', () => {
+  for (const { name, vp } of PROFILES) {
+    it(`stays on screen at ${name}`, () => {
+      expectWithin(wheelBounds(vp.width, vp.height), FULL, vp, 'upgrade-wheel');
+    });
+  }
+
+  it('shares the Build wheel\'s centred footprint — same component, same square', () => {
+    for (const { name, vp } of PROFILES) {
+      const b = wheelBounds(vp.width, vp.height);
+      expect(b.x + b.width / 2, name).toBeCloseTo(vp.width / 2, 6);
+      expect(b.y + b.height / 2, name).toBeCloseTo(vp.height / 2, 6);
+    }
+  });
+});
+
+// The old table-panel geometry (`panelSize`/`panelBounds`/`PANEL_ROW_HEIGHT`)
+// still backs the platform pointer hit-test for the upgrade screen
+// (`@platform/wheel-input`'s `hitPanel`), pending its companion migration to
+// angular `hitWheel` selection now that the screen is radial. It no longer
+// describes anything DRAWN, so it is exercised as a plain geometry contract
+// rather than a placement one.
+describe('upgrade hit-region geometry (legacy panel — platform hit-test)', () => {
   for (const { name, vp } of PROFILES) {
     it(`stays on screen at ${name}`, () => {
       expectWithin(panelBounds(vp.width, vp.height, UPGRADE_ROWS), FULL, vp, 'upgrade-panel');
@@ -137,9 +160,6 @@ describe('upgrade-panel placement', () => {
   }
 
   it('clamps its width to a narrow phone instead of running off the side', () => {
-    // A fixed 360px stat table is wider than a 320px phone. The panel is the
-    // ONLY place ship stats appear (GDD §2.5) — a row the player cannot read is
-    // a spending decision they cannot make.
     const narrow = panelSize(320, 568, UPGRADE_ROWS);
     expect(narrow.width).toBe(320 - 2 * PANEL_EDGE_PAD);
     expect(narrow.width).toBeLessThan(PANEL_MAX_WIDTH);
@@ -201,44 +221,9 @@ describe('planet-hp placement', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Your own ship's hull readout (field request v0.1.1) — top-right, margin HUD_PAD
-// ---------------------------------------------------------------------------
-
-describe('hull-hud placement', () => {
-  const TOP_RIGHT: AnchorSpec = { region: 'top-right', margin: HUD_PAD };
-  /** Widest label the element draws ("HULL —" at 11px Audiowide ≈ 55px). Generous
-   *  so the assertion survives a font swap; the footprint unions label and bar. */
-  const LABEL_WIDTH = 80;
-
-  for (const { name, vp } of PROFILES) {
-    it(`stays in the top-right corner at ${name}`, () => {
-      expectWithin(hullHudBounds(vp.width, LABEL_WIDTH), TOP_RIGHT, vp, 'hull-hud');
-    });
-  }
-
-  it('hugs the right margin exactly — a corner element, stacked under HOME', () => {
-    for (const { name, vp } of PROFILES) {
-      const b = hullHudBounds(vp.width, LABEL_WIDTH);
-      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
-    }
-  });
-
-  it('sits below the HOME planet-HP element, not overlapping it', () => {
-    // HOME hangs from HUD_PAD and is HP_BAR_TOP + HP_BAR_HEIGHT tall; the hull
-    // readout must start below that footprint so the two stack rather than clash.
-    const homeBottom = HUD_PAD + HP_BAR_TOP + HP_BAR_HEIGHT;
-    expect(HULL_TOP).toBeGreaterThanOrEqual(homeBottom);
-  });
-
-  it('never crosses the half-width line into the left half — the width budget', () => {
-    // Same constraint that makes HP_BAR_WIDTH a decision: `top-right`'s zone
-    // starts at W/2, so the bar's budget is W/2 − HUD_PAD (144px on the 320px
-    // profile). A wider hull bar would silently leave its anchor.
-    const narrowest = Math.min(...PROFILES.map((p) => p.vp.width));
-    expect(HULL_BAR_WIDTH).toBeLessThanOrEqual(narrowest / 2 - HUD_PAD);
-  });
-});
+// The own-ship HULL readout that used to stack under HOME was removed (field
+// report v0.2 — the over-ship bar is the truth now), so its top-right placement
+// block went with it. The corner now carries only `planet-hp`, tested above.
 
 // ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10) — registered `full`, margin HUD_PAD

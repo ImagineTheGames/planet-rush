@@ -99,29 +99,42 @@ export { BuildWheelView } from './build-wheel-view';
 export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
 export type { BuildButtonSignals } from './build-button';
 
-// --- Upgrade panel — the only place ship stats appear (GDD §2.2, §2.5) -----
+// --- Upgrade WHEEL — the only place ship stats appear (GDD §2.2, §2.5) ------
+//
+// Rebuilt from a table-panel into a radial wheel (field report v0.2 — "it should
+// be a wheel menu as well"), drawn by the same view as the Build wheel. One wedge
+// per track, data-driven off the ladder so p2-03's projectile tracks appear for
+// free.
 
 export {
-  upgradePanelModel,
-  upgradeRow,
+  upgradeWheelModel,
+  upgradeWedge,
+  upgradeWedgeAngle,
+  upgradeWedgeArc,
   trackBase,
   trackValue,
   formatTrackValue,
   UpgradeTrack,
+  UPGRADE_WHEEL_ORDER,
   TRACK_ORDER,
   STOCK_TIERS,
   UPGRADE_LADDER,
   CLASS_NAMES,
-} from './upgrade-panel';
+} from './upgrade-wheel';
 export type {
-  UpgradePanelModel,
-  UpgradePanelSignals,
-  UpgradeRow,
-  UpgradeRowState,
+  UpgradeWheelModel,
+  UpgradeWheelSignals,
+  UpgradeWedge,
+  UpgradeWedgeState,
   UpgradeTiers,
   UpgradeLadder,
   UpgradeTrackSpec,
-} from './upgrade-panel';
+} from './upgrade-wheel';
+
+// --- Shared wheel open/close transition (the leak-safe fix — field report v0.2) --
+
+export { WheelToggle, WHEEL_TRANSITION_SECONDS } from './wheel-toggle';
+export type { WheelPhase } from './wheel-toggle';
 
 // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) ----------------
 
@@ -152,7 +165,9 @@ export type { PlanetHpModel } from './planet-hp';
 // (project world → screen via `renderer.projectToScreen`), with `owner` set to
 // the local player's slot. The own player's *turrets* still get no bar (they read
 // off the HOME HP readout). The layer registers itself through
-// `Hud.describeLayout`, alongside the new `hull-hud` top-right readout.
+// `Hud.describeLayout`. It is the single truth for own-ship hull now: the
+// top-right `hull-hud` readout was removed (field report v0.2 — "it's already
+// appearing on my ship").
 
 export {
   combatantGetsBar,
@@ -573,7 +588,6 @@ export {
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
-  hullHudBounds,
   ARROW_SIZE,
   ALARM_FRAME_STROKE,
   ALARM_FRAME_INSET,
@@ -584,7 +598,4 @@ export {
   PANEL_EDGE_PAD,
   PANEL_CHROME_HEIGHT,
   PANEL_ROW_HEIGHT,
-  HULL_BAR_WIDTH,
-  HULL_BAR_HEIGHT,
-  HULL_TOP,
 } from './hud-geometry';
