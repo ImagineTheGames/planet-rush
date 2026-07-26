@@ -35,7 +35,8 @@ import {
   thrust,
   toward,
 } from './steering';
-import { homeIntruder, isEngageable } from './targeting';
+import { commit, release } from './commitment';
+import { homeIntruder, isEngageable, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -377,35 +378,157 @@ export function suppressTurrets(ctx: BotCtx, target: TargetScore): readonly Acti
 }
 
 // ---------------------------------------------------------------------------
-// Break off (GDD §2.9)
+// Break off, with commitment (GDD §2.9; v0.2.2 field report — decision
+// hysteresis on the flee/fight pair)
 // ---------------------------------------------------------------------------
 
+/** How close an engageable ship must be to count as an active threat this bot
+ *  breaks off *from* — the enter side of the flee band. Just past knife-fight
+ *  range, so a bot reacts to a duel, not to a dot on the far edge of vision. TUNABLE */
+export const THREAT_RANGE = WEAPON_RANGE * 1.6;
+
 /**
- * Get out. Home is the destination — it is where the turrets are — unless the
- * thing that hurt this bot is *already* at home, in which case running there is
- * running into it and the bot simply puts distance between them.
+ * The wider ring a committed retreat must open before it counts as *escaped* —
+ * the exit side of the band, and the spatial half of the hysteresis. It is
+ * deliberately past {@link THREAT_RANGE}: a bot backing off must not re-read a
+ * pursuer that has only just left knife range as "gone" and wheel back into it,
+ * which is precisely the flap the field report photographed. The gap between the
+ * two ranges is the distance a retreat is allowed to commit to. TUNABLE
+ */
+export const RETREAT_CLEAR_RANGE = WEAPON_RANGE * 2.6;
+
+/**
+ * Hull margin above the tier's break-off point at which a *committed* retreat
+ * releases on health alone — the hull half of the dual threshold, meaningfully
+ * above the enter point so the two never coincide. In this sim a ship's hull
+ * does not regenerate mid-life (GDD §2.5: "Ship hull is not repairable at all"),
+ * so this fires almost entirely on a respawn-to-full — but it is the honest
+ * second threshold, and it is here for the day hull repair exists. TUNABLE
+ */
+export const RETREAT_RECOVER_MARGIN = 0.15;
+
+/** Core fraction below which self-preservation yields to home defence — the
+ *  priority exception the field report names ("your core under final assault
+ *  outranks self-preservation"). A bot this close to losing its home stops
+ *  saving its cheap, respawnable hull and fights for the thing that is not
+ *  cheap (GDD §1, §2.7). TUNABLE */
+export const CORE_FINAL_ASSAULT = 0.3;
+
+/** The nearest engageable ship within `range` — the thing that could be shooting
+ *  at this bot. The break-off band reads it at two ranges (enter/exit), so the
+ *  range is a parameter rather than a constant. */
+export function nearestThreat(ctx: BotCtx, range: number): PerceivedShip | null {
+  let best: PerceivedShip | null = null;
+  for (const ship of ctx.view.ships) {
+    if (!isEngageable(ship)) continue;
+    if (ship.distance > range) continue;
+    if (best === null || ship.distance < best.distance) best = ship;
+  }
+  return best;
+}
+
+/** The nearest thing that could be shooting at this bot right now — the enter-side
+ *  read of the break-off band. */
+export function incomingThreat(ctx: BotCtx): PerceivedShip | null {
+  return nearestThreat(ctx, THREAT_RANGE);
+}
+
+/** The hull fraction a committed retreat must climb back above to release on
+ *  health — the tier's break-off point plus {@link RETREAT_RECOVER_MARGIN},
+ *  capped short of full so a respawn always clears it. */
+export function retreatRecoverFraction(ctx: BotCtx): number {
+  return Math.min(0.95, retreatThreshold(ctx.tuning, ctx.weights) + RETREAT_RECOVER_MARGIN);
+}
+
+/** Is this bot's own core under final assault — the strictly-higher priority that
+ *  pre-empts fleeing (see {@link CORE_FINAL_ASSAULT})? False in collapse, where a
+ *  core cannot be repaired and defending it is a losing trade (`./hard`). */
+export function coreUnderFinalAssault(ctx: BotCtx): boolean {
+  const planet = ctx.self.planet;
+  if (!planet || !planet.alive || ctx.view.collapsed) return false;
+  return planet.underAttack && planet.coreHp < planet.maxCoreHp * CORE_FINAL_ASSAULT;
+}
+
+/**
+ * Does this bot want to be breaking off *right now*? The flee half of the
+ * flee/fight pair, latched so it cannot flap (`./commitment`; v0.2.2 field
+ * report).
  *
- * The trigger stays up on the way out. A retreating bot that keeps firing is a
- * bot that keeps its gun trained on the thing it is fleeing, and never gets
- * home.
+ *  - **Enter** when the hull is under the tier's nerve ({@link retreatThreshold})
+ *    and something engageable is inside {@link THREAT_RANGE}.
+ *  - **Exit** when the bot has *arrived somewhere* — cleared {@link
+ *    RETREAT_CLEAR_RANGE} of every threat — or its hull is whole again
+ *    ({@link retreatRecoverFraction}), i.e. it respawned.
+ *
+ * Between those two it holds: a committed retreat keeps fleeing even on the
+ * decisions where backing off has already nudged the nearest threat past
+ * {@link THREAT_RANGE}, so the tree does not fall through to `attack`/`mine` and
+ * drive the wounded ship straight back into the fight it was leaving. Collapse
+ * cancels the whole thing — there is no hold worth saving and a respawn is free
+ * (GDD §2.3, §2.7) — and releases the latch so the endgame reads cleanly.
+ */
+export function wantsRetreat(ctx: BotCtx): boolean {
+  const latch = ctx.brain.fleeing;
+  if (ctx.view.collapsed || !ctx.self.alive) {
+    release(latch);
+    return false;
+  }
+  const wounded = ctx.self.hullFraction < retreatThreshold(ctx.tuning, ctx.weights);
+  const enter = wounded && incomingThreat(ctx) !== null;
+  const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
+  const escaped = nearestThreat(ctx, RETREAT_CLEAR_RANGE) === null;
+  return commit(latch, enter, recovered || escaped);
+}
+
+/**
+ * Get out, and go *somewhere* — a committed retreat that never twitches in place
+ * (v0.2.2 field report point 2). Home is the destination, because home is where
+ * the turrets are and a bot's territorial identity is to retreat *into* its
+ * defences (GDD §2.6) — **unless** the thing that hurt it is already at home, in
+ * which case running there is running into the siege, and the bot puts flat
+ * distance between itself and the threat instead. Either way the flee vector has
+ * a positive component away from the threat, so a low-HP bot's distance from it
+ * increases every decision rather than oscillating (the screenshot scenario).
+ *
+ * The per-character read this produces (all one function, leaned by the tree's
+ * priority order and `caution`):
+ *
+ *  - **Warden / Patch** (homebody): jumped in the field, they run for their own
+ *    turret cover and turn to fight there; sieged at home, they break contact to
+ *    regroup rather than die on a core the {@link coreUnderFinalAssault} branch
+ *    has not yet flagged as worth dying for.
+ *  - **Sable / Bolt** (aggressive, low `caution`): a higher nerve floor means
+ *    they enter this later and leave it sooner, so they flee shallower.
+ *  - **Rusty** (timid, high `caution`): enters earliest, runs straight home.
+ *
+ * The trigger stays up on the way out only when there is no threat to flee (a
+ * fleeing bot that keeps firing keeps its gun trained on what it is running from
+ * and never leaves); with a live threat the weapon is off — a retreating bot
+ * does not advertise (GDD §2.2).
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
   const planet = ctx.self.planet;
-  const threatAtHome = planet !== null && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
-  if (planet && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
+  const threatAtHome =
+    planet !== null && planet.alive && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
+  if (planet && planet.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
   if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false), boost(true)];
   return [thrust({ x: 0, y: 0 }), fire(false)];
 }
 
-/** The nearest thing that could be shooting at this bot right now. */
-export function incomingThreat(ctx: BotCtx): PerceivedShip | null {
-  let best: PerceivedShip | null = null;
-  for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
-    if (ship.distance > WEAPON_RANGE * 1.6) continue;
-    if (best === null || ship.distance < best.distance) best = ship;
-  }
-  return best;
+/**
+ * The priority exception (v0.2.2 field report point 1): a core under final
+ * assault outranks self-preservation. Meet the attacker at home
+ * ({@link defendHome}) and **drop any flee commitment**, so a bot that was
+ * mid-retreat abandons it for the last stand and — once the assault lifts —
+ * re-decides its nerve from scratch rather than silently resuming the run.
+ *
+ * The trees place this *above* {@link wantsRetreat}: it is the one thing allowed
+ * to interrupt a committed retreat, which is exactly what a strictly-higher
+ * priority in a hysteresis pair is for.
+ */
+export function lastStandDefend(ctx: BotCtx): readonly Action[] | null {
+  release(ctx.brain.fleeing);
+  return defendHome(ctx);
 }
 
 // ---------------------------------------------------------------------------

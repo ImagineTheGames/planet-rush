@@ -27,18 +27,22 @@ import { UpgradeTrack } from '@shared/types';
 import { SHIELD, TURRET, nextUpgradeCost } from '../sim';
 import type { Purchase } from './behaviors';
 import {
+  RETREAT_CLEAR_RANGE,
   attack,
+  coreUnderFinalAssault,
   defendHome,
   haulHome,
   hunt,
-  incomingThreat,
+  lastStandDefend,
   mine,
+  nearestThreat,
   order,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   upgrade,
+  wantsRetreat,
   wantsToHaul,
 } from './behaviors';
 import { NEUTRAL } from './steering';
@@ -147,12 +151,18 @@ export function mediumWillFight(ctx: BotCtx): boolean {
 export const mediumTree: Node = selector('medium', [
   when('dead', (ctx) => !ctx.self.alive, () => NEUTRAL),
 
-  // Breaks off wounded — until the field is spent, when there is no hold left to
-  // save and a respawn is free (GDD §2.3, §2.7). See `./hard` for the same rule.
+  // A core under final assault outranks self-preservation (v0.2.2 field report):
+  // above the retreat, and the one thing that interrupts a committed one.
+  when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // Breaks off wounded, and *stays* broken off — the retreat is latched so it
+  // cannot flap between fleeing and re-engaging (`./commitment`; v0.2.2 field
+  // report). Until the field is spent, when there is no hold left to save and a
+  // respawn is free (GDD §2.3, §2.7) and `wantsRetreat` switches off. See `./hard`.
   when(
     'retreat',
-    (ctx) => !ctx.view.collapsed && isWounded(ctx) && incomingThreat(ctx) !== null,
-    (ctx) => retreat(ctx, incomingThreat(ctx)),
+    (ctx) => wantsRetreat(ctx),
+    (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
 
   // Answers the alarm — until collapse, when guarding a core that can no longer
