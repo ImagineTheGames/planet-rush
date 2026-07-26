@@ -688,5 +688,55 @@
     "title": "Ore truth — the under-ship hold across the whole cycle (4-up strip)",
     "image": "images/ore-truth-strip.png",
     "attestation": "A vertical strip of four ship-centred crops from the one natural run, top to bottom: (1) MINED — two filled hold pips (full 2/2); (2) MID-DRAIN — one filled pip with a yellow courier in flight and the planet edge at right (docked, depositing); (3) INTERRUPT — one filled pip and NO planet nearby (undocked, deposit paused, hold frozen); (4) EMPTY — no pips at all with the planet edge and a last courier (docked, hold banked). The under-ship count steps 2 -> 1 -> 1 -> 0 exactly as floor(sim hold) does across mine/deposit/interrupt/finish; the frozen third crop still shows its whole pip because the interrupted hold (1.333) never drained while undocked. Read alongside the per-phase full frames for the matching top-left TOTAL and the seam numbers. VERIFIED."
+  },
+  {
+    "id": "press-feedback",
+    "title": "Press feedback — an affordable wedge caught pressed (plasma glow)",
+    "area": "build-wheel",
+    "image": "images/press-feedback-pressed.png",
+    "capturedAt": "2026-07-26T15:59:00Z",
+    "buildSha": "1be25f2",
+    "verdict": "verified",
+    "attestation": "Desktop 1280x800 at ?debug=1&freeze=1, the Build wheel open at the planet with 999 ORE banked (top-left 'TOTAL 999', centre '999 ORE'). Five wedges: TURRET (cost 3), SHIELD (5), REPAIR CORE (1), UPGRADE SHIP (with a cyan submenu chevron), BANK. The TURRET wedge (top) is pressed through the client's own press seam and is drawn LIT — a bright plasma-cyan outline and a noticeably brighter fill than the four dim grey wedges around it, i.e. the pressed 'your finger landed' tell. It is cyan, not red: an affordable press glows, it does not reject. The seam reads this exact frame back as scale 0.9 (scaled down under the finger), glow 0.6 (plasma glow up), reject 0 (no red flash). Freeze pins frame.time so the pressed value holds at peak for the still. Contrast the rejected state in press-feedback-rejected. HAPTICS NOTE (cannot be photographed): the live-stage haptics spy test PASSES on this shipped build — 'tapping an open wheel fires the tap pattern through the real navigator.vibrate' (tests/live-stage/haptics.spec.ts, 1 passed) — so a wheel tap reaches haptic('tap') and drives navigator.vibrate. However the Vibration TOGGLE the brief expected in Settings is ABSENT from the shipped settings UI; see settings-vibration-absent. VERIFIED (the pressed tell is drawn)."
+  },
+  {
+    "id": "press-feedback-rejected",
+    "title": "Press feedback — a disabled wedge mid-rejection (threat-red flash)",
+    "area": "build-wheel",
+    "image": "images/press-feedback-rejected.png",
+    "capturedAt": "2026-07-26T15:59:00Z",
+    "buildSha": "1be25f2",
+    "verdict": "verified",
+    "attestation": "The SAME Build wheel and viewport as press-feedback, but opened with the bank DRAINED to zero (top-left 'TOTAL 0', centre '0 ORE'), so TURRET (cost 3) is unaffordable. Pressing the TURRET wedge now draws it in THREAT RED — a dark red fill with a red outline — the 'not allowed' rejection tell, unmistakably different from the plasma-cyan glow of the affordable press in press-feedback. The other four wedges stay dim grey. The seam reads this frame as reject 0.7 (red flash up), glow 0 (an affordable-press glow never fires on a rejection), and the bank stays 0 (a press tell is not a purchase). Two states, unmistakably different from idle and from each other. VERIFIED."
+  },
+  {
+    "id": "repair-confirmation",
+    "title": "Repair confirmation — the cost floats toward the bank, the core pip washes (the flagship)",
+    "area": "build-wheel",
+    "image": "images/repair-confirmation.png",
+    "capturedAt": "2026-07-26T15:59:00Z",
+    "buildSha": "1be25f2",
+    "verdict": "verified",
+    "attestation": "The LIVE booted client (?debug=1, no freeze so the sim runs and the cost can travel), Build wheel open at the planet with 50 ORE banked ('TOTAL 50' top-left, '50 ORE' centre; REPAIR CORE wedge bottom-right, cost 1 = REPAIR_ENTRY_ORE). A REPAIR is confirmed through the wheel's OWN confirm seam, then the frame is shot at once. Out in open space in the upper-left quadrant, isolated against the dark, sits a bright signal-yellow numeral '1' — the ore cost, caught mid-arc on its travel from the REPAIR CORE wedge (bottom-right) toward the top-left bank/TOTAL readout. It is a NOVEL element: a pixel scan finds a warm-yellow cluster at roughly (400,283) that is absent from an identical no-confirm baseline, so it is the launched cost, not a static readout. The seam reads the float back as amount 1, alpha ~0.36 at capture (still visible, fading as it nears the bank). The core-pip tell is present too but subtle: on confirm the HOME core HP bar takes a patina (repair-tint) wash whose mean colour measurably shifts from rgb(58,115,236) to rgb(67,134,187) — teal creeping over the blue — the shipped 'core healing' cue (faint on a full bar). See repair-confirmation-detail for the launch + wedge pulse up close. This proves the field-report v0.2.2 complaint ('no visual feedback... tough to know it did anything') is refuted: the confirmation is DRAWN on the real client. (The sim's real repair channel that actually spends ore and heals HP is unit-green in tests/sim/repair-channel.test.ts; this frame attests the on-screen feedback, not a re-simulated heal — the bank readout is unchanged because the debug seam injects the confirmation visual the real channel produces.) VERIFIED."
+  },
+  {
+    "id": "repair-confirmation-detail",
+    "title": "Repair confirmation (close-up) — the yellow cost launched off the pulsed REPAIR wedge",
+    "area": "build-wheel",
+    "image": "images/repair-confirmation-detail.png",
+    "capturedAt": "2026-07-26T15:59:00Z",
+    "buildSha": "1be25f2",
+    "verdict": "verified",
+    "attestation": "A DSF-3 close-up of the REPAIR CORE wedge at the instant of confirm (?debug=1&freeze=1, which pins the cost float at progress 0 — right on its launch point — so it reads large). The wedge is PULSED to plasma-cyan (a brighter blue fill than its idle grey), and a big signal-yellow '1' sits on the wedge's label line — the cost float at the very start of its arc toward the bank. It is plainly distinct from the smaller GREY '1' printed below as the wedge's static cost: two 1's, one yellow (the launched cost) and one grey (the price tag). A control comparison (press vs confirm) confirms the yellow '1' appears ONLY on confirm — pressing the same wedge with a full core draws a red rejection and no yellow numeral — so the yellow '1' is the confirmation float, not a highlighted price. Seam: float amount 1 at full alpha, wedge shimmer 0.85. VERIFIED."
+  },
+  {
+    "id": "settings-vibration-absent",
+    "title": "Settings screen — the Vibration toggle the brief expected is ABSENT",
+    "area": "mobile",
+    "image": "images/settings-vibration-absent.png",
+    "capturedAt": "2026-07-26T15:59:00Z",
+    "buildSha": "1be25f2",
+    "verdict": "failed",
+    "attestation": "The SETTINGS screen on a clean boot (no ?debug=1; navigated by clicking through the main menu). Crucially it was captured with a recording navigator.vibrate defined BEFORE any page script ran, so the haptics service feature-detects a motor and haptics.isSupported() reports TRUE — meaning a motor-gated Vibration toggle WOULD render if one existed. It does not. The screen shows exactly five rows under the 'SETTINGS' title: FIRE MODE (MANUAL), REDUCE VFX (OFF), MASTER VOLUME (stepped bar), SFX VOLUME (stepped bar), MUSIC VOLUME (stepped bar), and a 'DONE' button. There is NO Vibration/Haptics row or toggle anywhere. This matches the source: SETTINGS_ROWS (src/ui/settings.ts) lists only fireMode, reduceVfx and the volume channels, and no UI reads haptics.isSupported() (the main.ts comment describing a hidden-where-unsupported toggle is not implemented). The haptics SERVICE itself is wired and works (see the haptics note on press-feedback: the live-stage spy test passes), but the player has no on-screen control to turn vibration off. FAILED for the 'Vibration toggle appears in settings' claim — reported plainly with the settings screen as proof of the absence."
   }
 ]
