@@ -260,6 +260,12 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
  */
 export type UpgradeResult =
   | 'ok'
+  /** The ship is dead, waiting on the respawn clock — a purchase is an action a
+   *  live hull takes at its planet, and a wreck between lives takes none (GDD
+   *  §2.5, §2.7). The refusal is loud (not a misleading `not-docked`) so the
+   *  upgrade screen can say "respawning" rather than "fly to your planet". The
+   *  order is refused, never queued — see the `!ship.alive` decision below. */
+  | 'dead'
   | 'no-planet'
   | 'planet-dead'
   | 'not-docked'
@@ -283,8 +289,24 @@ export type UpgradeResult =
  * Cost is drawn hold-first then bank, like every other purchase ({@link spendOre}),
  * and the derived stats are written back through `./upgrades` so `maxHull` and
  * `cargoCap` can never disagree with the tiers that produced them.
+ *
+ * **Upgrades are the player's, not the hull's** (v0.2.2 field report, ratified):
+ * `ship.id` — a stable {@link PlayerId} — keys the planet lookup, and `ship.tiers`
+ * is match-lifetime state the respawn path never clears (`./step` `respawn`). So a
+ * purchase resolves the same before a death and after a respawn: the same wallet,
+ * the same ladder, no reference to a "previous" hull, because the sim mutates one
+ * ship in place across a life rather than swapping instances. A fresh track and
+ * the next tier of a pre-death track are both buyable the instant the ship is back.
+ *
+ * The one life-state gate is `alive`: a dead ship (between lives) is refused
+ * `'dead'` *before* the docking check, so the reason is the true one — you are a
+ * wreck on the respawn clock, not merely out of dock range. The order is refused,
+ * never queued: a purchase is a live action, and the ship reaches its planet again
+ * on respawn to buy for real (`isDocked` also short-circuits on `alive`, but the
+ * explicit gate makes the documented precondition legible and refactor-proof).
  */
 export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): UpgradeResult {
+  if (!ship.alive) return 'dead';
   const planet = planetOf(world, ship.id);
   if (!planet) return 'no-planet';
   if (!planet.alive) return 'planet-dead';
