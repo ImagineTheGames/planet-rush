@@ -117,9 +117,49 @@ export const TWO_ROSTER_MIN_WIDTH = 360;
  *  changing the tiles' *arrangement* before their height (see {@link TileShape}). */
 export const CLASS_TILE_MIN = 64;
 export const CLASS_TILE_MAX = 108;
+/** The floor a tile keeps even when the band cannot spare the full blurb height:
+ *  a thumb target (GDD §2.4). The view drops the blurb below {@link CLASS_TILE_MIN}
+ *  and shows just the name + hull, so a compact tile is still a legible, tappable
+ *  choice. This is the concession the lobby makes on the smallest LANDSCAPE phone
+ *  once the map row (below) joins the roster and the tiles in one short band — the
+ *  file header's rule: the tiles and the arena are both thumb *choices*, so they
+ *  compress to a floor rather than vanishing, while the roster (a list) compresses
+ *  freely. */
+export const CLASS_TILE_COMPACT = 44;
 /** Narrower than this a tile cannot carry a name over a wrapped blurb, so an
  *  arrangement that would produce one is rejected in favour of a taller shape. */
 export const CLASS_TILE_MIN_WIDTH = 150;
+
+// ---------------------------------------------------------------------------
+// The arena (map) row — the four map cards, moved off the PLAY flow into the
+// lobby (p2 field rule: one pre-match room where you pick your HULL and your
+// ARENA, then RUSH!). A row of four registry-preview cards along the bottom of
+// the middle band, above RUSH! — a thumb choice, so it keeps a floor height and
+// compresses the roster (a list) rather than itself.
+// ---------------------------------------------------------------------------
+
+/** Map cards in the row — the four ratified maps (`../sim/maps` MAPS, and
+ *  `./map-picker` MAP_ORDER, asserted equal in the tests). Mirrored rather than
+ *  imported so the geometry stays free of the model, exactly like
+ *  {@link LOBBY_SLOT_ROWS}. */
+export const LOBBY_MAP_COUNT = 4;
+/** Map card height ceiling — cards are capped here (a tall desktop/portrait band
+ *  does not blow the cards up into banners) and compress below it on a short
+ *  landscape band. */
+export const LOBBY_MAP_ROW_MAX = 108;
+/** The height the map band aims to keep so a card can show its preview over its
+ *  name — the row's equivalent of the tile's blurb height. Defended down to what
+ *  the middle band can actually spare on the tightest landscape phone. */
+export const LOBBY_MAP_ROW_MIN = 52;
+/** Share of the middle band the arena row takes off the bottom before the roster
+ *  and the hull tiles divide the rest. */
+export const LOBBY_MAP_BAND_FRACTION = 0.26;
+/** Below this per-card width a row of four would be too pinched, so the arena row
+ *  drops to a 2×2 (only the narrowest portrait windows, all behind the ROTATE
+ *  overlay). Low, because a preview + a name reads fine on a slim card. */
+export const LOBBY_MAP_MIN_WIDTH = 60;
+/** Cards don't sprawl on a wide desktop. */
+export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;
@@ -205,6 +245,15 @@ export interface LobbyLayout {
   readonly seats: readonly Rect[];
   /** The four hull tiles, in `CLASS_ORDER`. */
   readonly classOptions: readonly Rect[];
+  /** The four arena cards, in `MAP_ORDER` (`./map-picker`). A row along the
+   *  bottom of the middle band; the view draws them through the shared
+   *  `MapPickerView`, so the registry-drawn previews come for free. */
+  readonly maps: readonly Rect[];
+  /** The band the arena cards were laid out inside — handed to the map view as
+   *  its `MapPickerLayout.band`. */
+  readonly mapBand: Rect;
+  /** Columns the arena cards fell into — 4 (a row) or 2 (a narrow 2×2). */
+  readonly mapColumns: number;
   /** RUSH! / the countdown. */
   readonly rushButton: Rect;
   /** Whether this layout was built at thumb scale. */
@@ -224,6 +273,7 @@ export interface LobbyLayout {
 export type LobbyTarget =
   | { readonly kind: 'seat'; readonly index: number }
   | { readonly kind: 'class'; readonly index: number }
+  | { readonly kind: 'map'; readonly index: number }
   | { readonly kind: 'rush' }
   | { readonly kind: 'roomCode' };
 
@@ -274,41 +324,58 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: Math.max(0, rushButton.y - BLOCK_GAP - (title.y + titleHeight + BLOCK_GAP)),
   };
 
+  // The arena row, hung off the BOTTOM of the middle band (above RUSH!). It is a
+  // thumb *choice* (like the hull tiles), so it keeps a floor height and the
+  // roster — a list — gives back the space; on a wide/tall screen it is capped so
+  // it never balloons. The roster and the tiles then divide what is left (`upper`).
+  const mapWanted = Math.max(middle.height * LOBBY_MAP_BAND_FRACTION, Math.min(LOBBY_MAP_ROW_MIN, middle.height / 2));
+  const mapHeight = Math.max(0, Math.min(mapWanted, LOBBY_MAP_ROW_MAX, middle.height));
+  const upperHeight = Math.max(0, middle.height - mapHeight - (mapHeight > 0 ? BLOCK_GAP : 0));
+  const upper: Rect = { x: middle.x, y: middle.y, width: middle.width, height: upperHeight };
+  const mapBand: Rect = {
+    x: middle.x,
+    y: middle.y + upperHeight + (mapHeight > 0 ? BLOCK_GAP : 0),
+    width: middle.width,
+    height: mapHeight,
+  };
+
   const seats: Rect[] = [];
   const classOptions: Rect[] = [];
+  const maps: Rect[] = [];
   let tileShape: TileShape;
   let rosterBox: Rect;
 
   if (twoColumn) {
-    // Roster left, tiles right, both spanning the whole band.
-    const rosterWidth = Math.max(0, middle.width * ROSTER_COLUMN_FRACTION - BLOCK_GAP / 2);
-    const tilesX = middle.x + rosterWidth + BLOCK_GAP;
-    const tilesWidth = Math.max(0, middle.x + middle.width - tilesX);
-    rosterBox = { x: middle.x, y: middle.y, width: rosterWidth, height: middle.height };
-    tileShape = placeTiles(classOptions, tilesX, middle.y, tilesWidth, middle.height, 'stack');
+    // Roster left, tiles right, both spanning the upper band.
+    const rosterWidth = Math.max(0, upper.width * ROSTER_COLUMN_FRACTION - BLOCK_GAP / 2);
+    const tilesX = upper.x + rosterWidth + BLOCK_GAP;
+    const tilesWidth = Math.max(0, upper.x + upper.width - tilesX);
+    rosterBox = { x: upper.x, y: upper.y, width: rosterWidth, height: upper.height };
+    tileShape = placeTiles(classOptions, tilesX, upper.y, tilesWidth, upper.height, 'stack');
   } else {
-    // One column: the tiles take a band off the bottom, the roster the rest.
-    // The tiles' band is at least tall enough for a 2×2 of blurb-height tiles
-    // whenever half the band can spare it — below that {@link placeTiles}
-    // switches to a single row rather than handing back four strips.
+    // One column: the tiles take a band off the bottom of the upper band, the
+    // roster the rest. The tiles' band is at least tall enough for a 2×2 of
+    // blurb-height tiles whenever half the band can spare it — below that
+    // {@link placeTiles} switches to a single row rather than four strips.
     const wanted = Math.max(
-      middle.height * CLASS_BLOCK_FRACTION,
-      Math.min(2 * CLASS_TILE_MIN + ROW_GAP, middle.height / 2),
+      upper.height * CLASS_BLOCK_FRACTION,
+      Math.min(2 * CLASS_TILE_MIN + ROW_GAP, upper.height / 2),
     );
-    const tilesHeight = Math.max(0, Math.min(wanted, 2 * CLASS_TILE_MAX + ROW_GAP, middle.height));
-    const rosterHeight = Math.max(0, middle.height - tilesHeight - BLOCK_GAP);
-    rosterBox = { x: middle.x, y: middle.y, width: middle.width, height: rosterHeight };
+    const tilesHeight = Math.max(0, Math.min(wanted, 2 * CLASS_TILE_MAX + ROW_GAP, upper.height));
+    const rosterHeight = Math.max(0, upper.height - tilesHeight - BLOCK_GAP);
+    rosterBox = { x: upper.x, y: upper.y, width: upper.width, height: rosterHeight };
     tileShape = placeTiles(
       classOptions,
-      middle.x,
-      middle.y + rosterHeight + BLOCK_GAP,
-      middle.width,
+      upper.x,
+      upper.y + rosterHeight + BLOCK_GAP,
+      upper.width,
       tilesHeight,
       'grid',
     );
   }
 
   const seatColumns = placeSeats(seats, rosterBox, seatRowMax(isTouch));
+  const mapColumns = placeMaps(maps, mapBand);
 
   return {
     content,
@@ -316,6 +383,9 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     roomCode,
     seats,
     classOptions,
+    maps,
+    mapBand,
+    mapColumns,
     rushButton,
     isTouch,
     twoColumn,
@@ -338,6 +408,10 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   for (let i = 0; i < layout.classOptions.length; i++) {
     const rect = layout.classOptions[i];
     if (rect && hit(rect, x, y)) return { kind: 'class', index: i };
+  }
+  for (let i = 0; i < layout.maps.length; i++) {
+    const rect = layout.maps[i];
+    if (rect && hit(rect, x, y)) return { kind: 'map', index: i };
   }
   for (let i = 0; i < layout.seats.length; i++) {
     const rect = layout.seats[i];
@@ -690,6 +764,41 @@ function placeTiles(
     });
   }
   return shape;
+}
+
+/**
+ * Lay the four arena cards out inside `band`: a single row of four where each
+ * card is wide enough to read (desktop, phone-landscape, most portraits), a 2×2
+ * only on the narrowest portrait windows (all behind the ROTATE overlay). Cards
+ * are *capped* in width and *centred*, so the block never escapes the band —
+ * the same discipline {@link placeTiles} keeps. Returns the column count.
+ */
+function placeMaps(out: Rect[], band: Rect): number {
+  const n = LOBBY_MAP_COUNT;
+  if (band.width <= 0 || band.height <= 0) {
+    for (let i = 0; i < n; i++) out.push({ x: band.x, y: band.y, width: 0, height: 0 });
+    return 0;
+  }
+  const rowWidth = (band.width - (n - 1) * ROW_GAP) / n;
+  const columns = rowWidth >= LOBBY_MAP_MIN_WIDTH ? n : 2;
+  const rows = Math.ceil(n / columns);
+  const cardWidth = Math.min((band.width - (columns - 1) * ROW_GAP) / columns, LOBBY_MAP_CARD_MAX_WIDTH);
+  const cardHeight = Math.min(rowHeight(band.height, rows, ROW_GAP, LOBBY_MAP_ROW_MAX), band.height);
+  const blockWidth = columns * cardWidth + (columns - 1) * ROW_GAP;
+  const blockHeight = rows * cardHeight + (rows - 1) * ROW_GAP;
+  const originX = band.x + Math.max(0, (band.width - blockWidth) / 2);
+  const originY = band.y + Math.max(0, (band.height - blockHeight) / 2);
+  for (let i = 0; i < n; i++) {
+    const column = i % columns;
+    const row = Math.floor(i / columns);
+    out.push({
+      x: originX + column * (cardWidth + ROW_GAP),
+      y: originY + row * (cardHeight + ROW_GAP),
+      width: cardWidth,
+      height: cardHeight,
+    });
+  }
+  return columns;
 }
 
 /** The height of one of `count` equal rows in a band, capped at `max`. The

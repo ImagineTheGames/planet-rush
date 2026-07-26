@@ -224,6 +224,7 @@ export {
   normalizeRoomCode,
   pressRush,
   seatLocalPlayer,
+  selectMap,
   selectShipClass,
   startLobbyMatch,
   tickLobby,

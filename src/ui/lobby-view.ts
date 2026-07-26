@@ -35,6 +35,9 @@ import { DIFFICULTY_LABELS, RUSH_LABEL } from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
+import { MapPickerView } from './map-picker-view';
+import { mapPickerModel } from './map-picker';
+import type { MapPickerLayout } from './map-picker';
 
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §7 — shared with the HUD and the wheel)
@@ -93,6 +96,11 @@ export class LobbyView extends Container {
   private readonly roomCode: Text;
   private readonly seatNodes: SeatNodes[] = [];
   private readonly classNodes: ClassNodes[] = [];
+  /** The arena row (p2 field rule): the four map cards, drawn by the SHARED map
+   *  view, so the registry previews, the VETERAN tag and the plasma selection all
+   *  come for free — no ship stats, no yellow, exactly the frozen contract the
+   *  standalone picker kept. Fed the lobby's own card rects each frame. */
+  private readonly mapPicker = new MapPickerView();
   private readonly rushBody = new Graphics();
   private readonly rushText: Text;
   private readonly rushHint: Text;
@@ -118,6 +126,7 @@ export class LobbyView extends Container {
     this.rushHint.anchor.set(0.5, 0);
 
     this.addChild(this.backdrop, this.wordmark, this.roomLabel, this.roomCode);
+    this.addChild(this.mapPicker);
     this.addChild(this.rushBody, this.rushText, this.rushHint);
     this.visible = false;
   }
@@ -165,7 +174,27 @@ export class LobbyView extends Container {
       if (!option || !rect) continue;
       this.drawClassTile(this.classSlot(i), option, rect, model);
     }
+    this.drawMaps(model);
     this.drawRush(model);
+  }
+
+  /**
+   * The arena row. The rects are the lobby's own ({@link LobbyLayout.maps}); the
+   * drawing is the shared {@link MapPickerView}'s, fed a {@link MapPickerLayout}
+   * built from those rects and the model for the currently-selected arena — so
+   * the card previews, names, VETERAN tag and plasma selection are pixel-for-pixel
+   * what the standalone picker drew, with none of it duplicated here.
+   */
+  private drawMaps(model: LobbyModel): void {
+    const mapLayout: MapPickerLayout = {
+      band: this.layout.mapBand,
+      cards: this.layout.maps,
+      columns: this.layout.mapColumns,
+      shape: this.layout.mapColumns >= this.layout.maps.length ? 'row' : 'grid',
+    };
+    this.mapPicker.setLayout(mapLayout);
+    this.mapPicker.visible = true;
+    this.mapPicker.update(mapPickerModel(model.mapId));
   }
 
   // --- Title ---------------------------------------------------------------
