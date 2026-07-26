@@ -58,7 +58,7 @@ import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
 import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
-import { WheelInput, writeWheelOrders } from '@platform/wheel-input';
+import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
 import {
   computeRootTransform,
   applyRootTransform,
@@ -486,6 +486,7 @@ async function boot(): Promise<void> {
     installOreHudStage();
     installEndScreenStage();
     installUpgradeWheelStage();
+    installPressStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -681,6 +682,18 @@ async function boot(): Promise<void> {
     panelLayout.centerY = h / 2;
     panelLayout.width = size.width;
     panelLayout.height = size.height;
+
+    // Pressed-state tell (field report v0.2.2): before the press is consumed,
+    // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
+    // pressed (scale + glow) or rejected (shake + red flash) visual. The HUD
+    // decides which from the wedge's own drawn state. Build wheel only here — the
+    // upgrade surface is still hit-tested as a panel by `WheelInput` (@platform),
+    // so its pressed-visual lights up once that is reconciled; its CONFIRMATION
+    // feedback already works, being derived from sim state in the HUD.
+    if (buildWheel.open && !buildWheel.panelOpen) {
+      const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
+      if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
+    }
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
@@ -1717,6 +1730,67 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__upgradeWheelStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__pressStage` — the ?debug=1 live-stage seam for the press &
+   * action feedback (field report v0.2.2), the same discipline as
+   * {@link installUpgradeWheelStage}. It opens the Build wheel at the planet, then
+   * drives the HUD's own press/confirm seams and reads the motion back, so a
+   * Playwright test can prove the pressed / rejected / confirmed tells are wired
+   * and drawn on the REAL booted client (the derivation itself is unit-tested in
+   * `src/ui/press-feedback.test.ts`). Behind ?debug=1, never in a normal build.
+   */
+  function installPressStage(): void {
+    const stage = {
+      /** Park the ship docked, fund the bank, and open the Build wheel so its
+       *  wedges draw and can be pressed. */
+      openBuild(ore = 999): { open: boolean; banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        ship.alive = true;
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        ship.cargo = 0;
+        ship.banked = ore;
+        docked = true; // ?freeze skips updateBuildWheel, so state the staged pose
+        if (!buildWheel.open) buildWheel.toggle();
+        buildWheel.closePanel();
+        return { open: buildWheel.open, banked: ship.banked };
+      },
+      press(surface: 'build' | 'upgrade', index: number): void {
+        hud.debugPressWedge(surface, index);
+      },
+      confirm(surface: 'build' | 'upgrade', index: number, amount: number, deposit = false, core = false): void {
+        hud.debugConfirmWedge(surface, index, amount, deposit, core);
+      },
+      feedback(surface: 'build' | 'upgrade', index: number): ReturnType<typeof hud.debugWedgeFeedback> {
+        return hud.debugWedgeFeedback(surface, index);
+      },
+      floats(): ReturnType<typeof hud.debugCostFloats> {
+        return hud.debugCostFloats();
+      },
+      coreShimmer(): number {
+        return hud.debugCoreShimmer();
+      },
+      bank(): number | null {
+        const ship = world.ships.find(isLocalShip);
+        return ship ? ship.banked : null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__pressStage', {
         value: stage,
         writable: false,
         configurable: false,
