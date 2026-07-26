@@ -29,9 +29,10 @@ import type { World } from './state';
 
 /**
  * One turret's muzzle flash this tick: the shared `Muzzle` geometry (origin, unit
- * direction, clamped hit point and length) plus the slot that fired it. `shooter`
- * is the turret owner's player slot, so a renderer can tint the flash in that
- * player's colour (style-guide §3) and the fog/audio layers can attribute the
+ * direction, and a short flare `length` off the barrel with a `null` hit point —
+ * a burst at the muzzle, never a line to the target) plus the slot that fired it.
+ * `shooter` is the turret owner's player slot, so a renderer can tint the flash in
+ * that player's colour (style-guide §3) and the fog/audio layers can attribute the
  * shot.
  */
 export interface MuzzleFlash extends Muzzle {
