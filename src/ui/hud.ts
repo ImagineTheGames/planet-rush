@@ -49,7 +49,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
-import type { DeviceKind, FireMode, BindingLabel } from '@platform/actions';
+import type { DeviceKind, FireMode } from '@platform/actions';
 import type { LayoutEntry, Viewport } from '@platform/layout-registry';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
@@ -59,7 +59,8 @@ import { oreHudModel, oreFlashOn } from './ore-hud';
 import { oreHoldModel } from './ore-hold';
 import { OreHoldView } from './ore-hold-view';
 import type { DrawnOreHold } from './ore-hold-view';
-import { controlsStripRows, showControlsStrip } from './controls-strip';
+import { controlsStripView, showControlsStrip } from './controls-strip';
+import type { StripRow } from './controls-strip';
 import { buildWheelModel, segmentAngle } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
@@ -344,6 +345,9 @@ export class Hud extends Container {
   private readonly stripGroup = new Container();
   private readonly stripLabels: Text[] = [];
   private stripSignature = ''; // rebuild only when device/mode/visibility change
+  /** The strip rows resolved for this frame — captured for the ?debug=1 live-stage
+   *  seam so a test can assert the contextual Build legend on the real client. */
+  private lastStripRows: readonly StripRow[] = [];
 
   // --- Onboarding prompt (lower-center) -----------------------------------
   private readonly promptGroup = new Container();
@@ -655,33 +659,46 @@ export class Hud extends Container {
     this.stripGroup.visible = show;
     if (!show) return;
 
-    const rows = controlsStripRows(frame.device, frame.fireMode, frame.isTouch);
-    // Rebuild the label objects only when the binding set changes, not per frame.
-    const signature = `${frame.device}:${frame.fireMode}:${rows.map((r) => r.binding).join(',')}`;
+    // The Build & Upgrade row is contextual on docking (field report v0.2.2): its
+    // live key shows only at your own planet, matching the touch BUILD button.
+    const rows = controlsStripView(frame.device, frame.fireMode, frame.isTouch, frame.docked ?? false);
+    this.lastStripRows = rows; // captured for the ?debug=1 legend seam
+    // Rebuild the label objects only when the binding set changes, not per frame —
+    // and docking flips the Build row, so it rides the signature too.
+    const signature = `${frame.device}:${frame.fireMode}:${rows
+      .map((r) => `${r.binding ?? '·'}/${r.label}`)
+      .join(',')}`;
     if (signature !== this.stripSignature) {
       this.rebuildStrip(rows);
       this.stripSignature = signature;
     }
   }
 
-  private rebuildStrip(rows: readonly BindingLabel[]): void {
+  private rebuildStrip(rows: readonly StripRow[]): void {
     for (const t of this.stripLabels) t.destroy();
     this.stripLabels.length = 0;
 
     // Lay out "KEY action" pairs left→right along the bottom. Keys in plasma,
     // actions in grey — NOT yellow (style-guide §2 overrides GDD §2.4 prose;
-    // see ./controls-strip for the reconciliation).
+    // see ./controls-strip for the reconciliation). A dimmed row (an affordance
+    // you can't use here — e.g. Build away from your planet) drops its key
+    // entirely, so the legend never prints a dead one, and draws at reduced alpha.
+    const DIM_ALPHA = 0.5;
     let x = STRIP_PAD;
     for (const row of rows) {
-      const key = this.makeText(row.binding, FONT_NUMERAL, 13, PALETTE.plasma, 'bold');
-      key.x = x;
-      this.stripGroup.addChild(key);
-      this.stripLabels.push(key);
-      x += key.width + 6;
+      if (row.binding !== null) {
+        const key = this.makeText(row.binding, FONT_NUMERAL, 13, PALETTE.plasma, 'bold');
+        key.x = x;
+        key.alpha = row.dimmed ? DIM_ALPHA : 1;
+        this.stripGroup.addChild(key);
+        this.stripLabels.push(key);
+        x += key.width + 6;
+      }
 
       const label = this.makeText(row.label, FONT_HEADING, 12, TEXT_DIM);
       label.x = x;
       label.y = 1;
+      label.alpha = row.dimmed ? DIM_ALPHA : 1;
       this.stripGroup.addChild(label);
       this.stripLabels.push(label);
       x += label.width + 18;
@@ -910,6 +927,14 @@ export class Hud extends Container {
    *  not up), so the live-stage test can assert a bought tier re-rendered. */
   debugUpgradeWedges(): DrawnUpgradeWedge[] {
     return this.wheel.debugUpgradeWedges();
+  }
+
+  /** The controls-strip rows resolved for this frame (empty on touch), so a
+   *  live-stage test can prove the Build & Upgrade legend is contextual on the
+   *  real client — a live key at your planet, a dimmed hint (never a dead key)
+   *  away from it (field report v0.2.2). */
+  debugControlsStrip(): readonly StripRow[] {
+    return this.lastStripRows;
   }
 
   // --- Press-feedback ?debug=1 live-stage seam (field report v0.2.2) --------
