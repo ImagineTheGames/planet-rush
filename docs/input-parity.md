@@ -46,6 +46,51 @@ Source modules: keyboard/mouse + gamepad = `src/platform/input.ts`; touch =
 Every cell is filled. No N/A cells remain: all eight verbs are reachable from all
 three sources.
 
+## Tap Commander — the alternate scheme (a new row set, added p6)
+
+The developer ratified an **optional** control scheme: *touching a location moves
+there, and touching a target attacks it* — both PC (click) and mobile (touch),
+mining included ("a rock is just a target"). The other schemes are untouched and
+**default**; Tap Commander is a scheme selected in settings ("CONTROLS: Sticks /
+Tap Commander"), persisted like the fire mode (`planet-rush:controlScheme`).
+
+It is **not a fourth device** and it is **not a new action** — it is a *local
+pilot* (`src/platform/tap-pilot.ts`) that turns the player's standing **order** (a
+waypoint, or a locked target) into the SAME `thrust` / `aim` / `fire` the sticks
+produce, and writes them into the same device-neutral `ControlState`. It files
+input the way a bot does; the sim and the wire are untouched. Because it aims
+explicitly at the *locked* target, the pilot's state is mapped in **Manual** fire
+mode regardless of the player's fire-mode setting (an Auto-aim map would let the
+sim pick the nearest target, not the one the player tapped).
+
+So the eight-verb contract is unchanged — every verb still reaches the sim — but
+**how** the movement/fire verbs are produced differs when the scheme is active:
+
+| Action         | Under Tap Commander (the pilot) | Under Sticks (unchanged, default) |
+|----------------|---------------------------------|-----------------------------------|
+| `thrust`       | Pilot steers toward the waypoint / locked target, with arrival + range damping | The device's stick / WASD |
+| `aim`          | Pilot aims at the locked target (Manual-mapped) | Mouse / right stick / aim stick |
+| `fire`         | Pilot fires while a hostile lock is in range (mining a rock too) | Held fire binding |
+| `build`        | **Unchanged** — E / Y / BUILD button | E / Y / BUILD button |
+| `buildOrder`   | **Unchanged** — the wheel (device-agnostic) | The wheel |
+| `upgradeOrder` | **Unchanged** — the upgrade wheel | The upgrade wheel |
+| `boost`        | **Unchanged** — Space / LT / BOOST button | Space / LT / BOOST button |
+| `ping`         | **Unchanged** — middle click / D-pad / PING button | middle click / D-pad / PING button |
+
+**Tap semantics:** tap empty space = move there (a waypoint marker until arrival or
+the next order); tap an entity = LOCK it (enemy ship / turret / core = attack, an
+asteroid = mine, your own planet = fly to its atmosphere); a new order replaces the
+old; a lock clears on target death or an explicit empty-space move. The lock-on
+**reticle** and **waypoint marker** are world-tracking screen affordances the UI
+seam draws (p6-02); the platform lane owns their state and registers their layout
+contract (`tap-lock-reticle`, `tap-waypoint-marker`; `full` anchor).
+
+The pilot's convergence, range-hold, arrival damping, and lock-clear-on-death are
+unit-tested headless (`src/platform/tap-pilot.test.ts`); the shipped wiring — a tap
+becomes an order that flies the ship and fires on a lock — is proven on the real
+booted client by `tests/live-stage/tap-commander.spec.ts` (the `?debug=1`
+`__tapCommanderStage` seam).
+
 ## Gaps this audit found (and closed)
 
 The field report named two. The audit surfaced a third — a legend that lied.
