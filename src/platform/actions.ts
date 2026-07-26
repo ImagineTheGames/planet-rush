@@ -211,12 +211,15 @@ export function describeBindings(device: DeviceKind, mode: FireMode): BindingLab
   const boost: Record<DeviceKind, string> = {
     keyboard: 'Space / Shift',
     gamepad: 'Left trigger',
-    touch: 'Boost',
+    // Double-tap-and-hold the movement stick (thumb never leaves it), or the
+    // discoverable BOOST button (touch.ts / touch-buttons.ts, GDD §2.4).
+    touch: 'Double-tap stick / BOOST',
   };
   const ping: Record<DeviceKind, string> = {
     keyboard: 'Middle click',
     gamepad: 'D-pad',
-    touch: 'Tap minimap',
+    // Tap pings your position, drag pings a direction (touch-buttons.ts, GDD §2.4).
+    touch: 'PING button',
   };
 
   rows.push({ action: 'thrust', label: 'Thrust', binding: thrust[device] });

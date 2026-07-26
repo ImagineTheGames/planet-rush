@@ -48,8 +48,17 @@ const R_FIRE = 42;
 /** BUILD button radius — the touch E-equivalent (GDD §2.4). Thumb-scale like
  *  FIRE, a little smaller because it is contextual rather than held. */
 const R_BUILD = 38;
+/** BOOST button radius. Diameter = 72px (the thumb-scale floor, parity req 3). The
+ *  discoverable alternative to the left-stick double-tap-and-hold (docs/input-parity). */
+const R_BOOST = 36;
+/** PING button radius. Diameter = 72px, thumb-scale. */
+const R_PING = 36;
 /** Vertical gap between the left stick's zone and the BUILD button above it. */
 const BUILD_GAP = 18;
+/** Horizontal gap between the left stick zone and the BOOST button inboard of it. */
+const BOOST_GAP = 22;
+/** Vertical gap between the FIRE button and the PING button stacked above it. */
+const PING_GAP = 16;
 /** Margin from the screen edges to a control's centre. */
 const EDGE_MARGIN = 28;
 
@@ -228,6 +237,42 @@ function buildButtonCenter(w: number, h: number): { x: number; y: number } {
   return { x: EDGE_MARGIN + R_STICK, y: bottom - R_STICK - BUILD_GAP - R_BUILD };
 }
 
+/**
+ * The BOOST button's screen rect (always present on touch, `null` on desktop). It
+ * is the discoverable alternative to the left-stick double-tap-and-hold — a small
+ * button inboard of the left stick, on the movement side, so the same thumb can
+ * reach it (docs/input-parity.md, field report v0.2.2).
+ */
+export function boostButtonRect(isTouch: boolean, w: number, h: number): Rect | null {
+  if (!isTouch) return null;
+  const c = boostButtonCenter(w, h);
+  return { x: c.x - R_BOOST, y: c.y - R_BOOST, width: 2 * R_BOOST, height: 2 * R_BOOST };
+}
+
+/** BOOST sits inboard of (to the right of) the left stick zone, sharing its
+ *  bottom row so the movement thumb reaches it without travelling. */
+function boostButtonCenter(w: number, h: number): { x: number; y: number } {
+  void w;
+  return { x: EDGE_MARGIN + 2 * R_STICK + BOOST_GAP + R_BOOST, y: h - EDGE_MARGIN - R_STICK };
+}
+
+/**
+ * The PING button's screen rect (always present on touch, `null` on desktop). It
+ * stacks just above the FIRE button on the right edge — in Auto-aim (the touch
+ * default) the right side is a fixed FIRE button, not an aim surface, so a button
+ * above it holes nothing; a tap pings your position, a drag pings a direction.
+ */
+export function pingButtonRect(isTouch: boolean, w: number, h: number): Rect | null {
+  if (!isTouch) return null;
+  const c = pingButtonCenter(w, h);
+  return { x: c.x - R_PING, y: c.y - R_PING, width: 2 * R_PING, height: 2 * R_PING };
+}
+
+/** PING sits above the FIRE button, aligned to the right edge. */
+function pingButtonCenter(w: number, h: number): { x: number; y: number } {
+  return { x: w - EDGE_MARGIN - R_PING, y: h - EDGE_MARGIN - 2 * R_FIRE - PING_GAP - R_PING };
+}
+
 /** Allocating convenience over {@link writeAffordanceRects} — tests/one-off use. */
 export function affordanceRects(isTouch: boolean, mode: FireMode, w: number, h: number): TouchAffordanceRects {
   return writeAffordanceRects(isTouch, mode, w, h, { leftStickZone: null, aimZone: null, fireButton: null });
@@ -274,6 +319,13 @@ export class TouchVisuals extends Container {
 
   // BUILD button — the touch E-equivalent, shown only at your own planet.
   private readonly buildGroup = new Container();
+
+  // BOOST button — the discoverable alternative to the double-tap-and-hold, and
+  // PING button — tap/drag to ping. Both always present on touch (parity gaps).
+  private readonly boostGroup = new Container();
+  private readonly boostFill = new Graphics();
+  private readonly pingGroup = new Container();
+  private readonly pingFill = new Graphics();
 
   /** Reused visibility scratch — the frame path allocates nothing. */
   private readonly vis: AffordanceVisibility = {
@@ -330,7 +382,19 @@ export class TouchVisuals extends Container {
     this.buildGroup.addChild(buildFill, buildRing, buildLabel, buildSub);
     this.buildGroup.visible = false;
 
-    // Back-to-front: ghosts, live bases, knobs, FIRE button, BUILD button.
+    // BOOST + PING buttons: the same plasma vocabulary as FIRE/BUILD, each a fill
+    // whose alpha carries the pressed state (a transform-cheap change, no rebuild).
+    this.boostGroup.label = 'boost-button';
+    buildAuxButton(this.boostGroup, this.boostFill, R_BOOST, 'BOOST', 14);
+    this.pingGroup.label = 'ping-button';
+    buildAuxButton(this.pingGroup, this.pingFill, R_PING, 'PING', 15);
+    // Hidden until the first touch frame turns them on — so on desktop, where
+    // `update()` returns before the touch path, they never read as visible even
+    // though the whole layer is gated off (mirrors the BUILD group).
+    this.boostGroup.visible = false;
+    this.pingGroup.visible = false;
+
+    // Back-to-front: ghosts, live bases, knobs, FIRE, BUILD, BOOST, PING.
     this.addChild(
       this.leftGhost,
       this.aimGhost,
@@ -340,6 +404,8 @@ export class TouchVisuals extends Container {
       this.rightKnob,
       this.fireGroup,
       this.buildGroup,
+      this.boostGroup,
+      this.pingGroup,
     );
   }
 
@@ -348,7 +414,15 @@ export class TouchVisuals extends Container {
    * `isTouch` gates the whole layer off on desktop; `w`/`h` anchor the idle
    * affordances and the FIRE button to the screen corners.
    */
-  update(touch: TouchReadout, isTouch: boolean, w: number, h: number, docked = false): void {
+  update(
+    touch: TouchReadout,
+    isTouch: boolean,
+    w: number,
+    h: number,
+    docked = false,
+    boostActive = false,
+    pingPressed = false,
+  ): void {
     const mode = touch.getFireMode();
     writeAffordanceVisibility(isTouch, mode, this.vis);
 
@@ -397,7 +471,38 @@ export class TouchVisuals extends Container {
       const c = buildButtonCenter(w, h);
       this.buildGroup.position.set(c.x, c.y);
     }
+
+    // --- BOOST + PING buttons: always present on touch, pressed via fill alpha. -
+    const bc = boostButtonCenter(w, h);
+    this.boostGroup.visible = true;
+    this.boostGroup.position.set(bc.x, bc.y);
+    this.boostFill.alpha = boostActive ? FIRE_PRESSED_FILL : FIRE_IDLE_FILL;
+    this.boostGroup.scale.set(boostActive ? 0.94 : 1);
+
+    const pc = pingButtonCenter(w, h);
+    this.pingGroup.visible = true;
+    this.pingGroup.position.set(pc.x, pc.y);
+    this.pingFill.alpha = pingPressed ? FIRE_PRESSED_FILL : FIRE_IDLE_FILL;
+    this.pingGroup.scale.set(pingPressed ? 0.94 : 1);
   }
+}
+
+/**
+ * Build one small plasma button (BOOST / PING) into `group`: a fill whose alpha
+ * carries the pressed state over a plasma ring, with a centred label. Mirrors the
+ * FIRE button's construction so the whole touch surface reads as one vocabulary.
+ */
+function buildAuxButton(group: Container, fill: Graphics, r: number, text: string, fontSize: number): void {
+  fill.circle(0, 0, r).fill({ color: PALETTE.plasma, alpha: 1 });
+  fill.alpha = FIRE_IDLE_FILL;
+  const ringG = new Graphics();
+  ringG.circle(0, 0, r).stroke({ width: 3, color: PALETTE.plasma, alpha: 0.85 });
+  const label = new Text({
+    text,
+    style: { fontFamily: FIRE_LABEL, fontSize, fill: PALETTE.plasma, fontWeight: 'bold', letterSpacing: 1 },
+  });
+  label.anchor.set(0.5);
+  group.addChild(fill, ringG, label);
 }
 
 // ---------------------------------------------------------------------------
