@@ -82,6 +82,9 @@ import { nameplateModel } from './nameplates';
 import type { DifficultyTable, Nameable, NameTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
 import type { DrawnNameplate } from './nameplates-view';
+import { tapMarkersModel } from './tap-markers';
+import { TapMarkerView } from './tap-markers-view';
+import type { DrawnTapMarkers } from './tap-markers-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -285,6 +288,20 @@ export interface HudFrame {
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
+
+  // --- Tap Commander order markers (developer §4; the optional scheme) --------
+
+  /** The waypoint marker's **screen-space** position (the tapped point the pilot
+   *  is flying to), or absent when there is no move order / not in the tap scheme.
+   *  The caller projects world → screen; the layer draws the fading pulse. */
+  readonly tapWaypoint?: { readonly x: number; readonly y: number };
+  /** The lock-on reticle's **screen-space** target centre + screen radius, or
+   *  absent when nothing is locked. Rides the target (already projected by the
+   *  caller), so the reticle tracks a moving ship / shrinking rock. */
+  readonly tapLock?: { readonly x: number; readonly y: number; readonly radius: number };
+  /** The pilot is firing on its lock this tick → the line of intent from ship to
+   *  target draws. Only meaningful with {@link tapLock} present. Default false. */
+  readonly tapFiring?: boolean;
 }
 
 /** Reused for a frame that carries no combatants, so the empty case allocates
@@ -426,6 +443,13 @@ export class Hud extends Container {
   //     bar under it, ship under that. Its decisions live in ./nameplates.
   private readonly nameplates = new NameplateView();
 
+  // --- Tap Commander order markers (developer §4) ------------------------
+  //     The lock-on reticle, line-of-intent and waypoint pulse, in screen space.
+  //     Added FIRST below (bottom of the HUD), so it sits over the world but under
+  //     every piece of HUD chrome — the health bars and nameplates included — and
+  //     can never occlude them (p6-01 §3). Its decisions live in ./tap-markers.
+  private readonly tapMarkers = new TapMarkerView();
+
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
@@ -515,6 +539,11 @@ export class Hud extends Container {
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
+      // Tap Commander order markers draw at the very bottom of the HUD: over the
+      // world render, but UNDER every other HUD layer including the health bars and
+      // nameplates, so a reticle riding a target's rim can never sit on top of that
+      // target's bar or name (p6-01 §3 — never occludes them).
+      this.tapMarkers,
       // Health bars and the under-ship hold indicator draw first: they float over
       // the world but under every piece of HUD chrome, so neither ever sits on top
       // of the ore total or the wave clock. Both track the local ship in screen
@@ -586,6 +615,7 @@ export class Hud extends Container {
     const underAttack = this.updateAlarm(frame);
     this.updateHealthBars(frame, underAttack);
     this.updateNameplates(frame);
+    this.updateTapMarkers(frame);
     this.updatePlanetHp(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
@@ -908,6 +938,42 @@ export class Hud extends Container {
    *  {@link enableNameplateDebug} was called. */
   debugNameplates(): DrawnNameplate[] {
     return this.nameplates.debugPlates();
+  }
+
+  // --- Tap Commander order markers (developer §4) -------------------------
+
+  /** Draw the lock-on reticle, line-of-intent and waypoint pulse (developer §4).
+   *  The pure model in {@link ./tap-markers} decides which markers exist and their
+   *  identity colour from the pilot's standing order (already re-resolved and
+   *  projected to screen by the caller); this hands it the frame's marker fields
+   *  and draws the animated result in the bottom screen-space layer. The line of
+   *  intent's origin is the viewport centre — the follow camera holds the local
+   *  ship there, the same anchor the own-ship health bar uses. */
+  private updateTapMarkers(frame: HudFrame): void {
+    const markers = tapMarkersModel({
+      owner: frame.owner ?? 0,
+      waypoint: frame.tapWaypoint ?? null,
+      lock: frame.tapLock ?? null,
+      firing: frame.tapFiring ?? false,
+      shipX: this.screenWidth / 2,
+      shipY: this.screenHeight / 2,
+    });
+    this.tapMarkers.update(markers, frame.time);
+  }
+
+  /** ?debug=1 live-stage seam: arm the tap-marker layer's drawn-marker capture so
+   *  {@link debugTapMarkers} can read it back. Called once from `main.ts` under
+   *  ?debug=1; no effect on a normal build. */
+  enableTapMarkerDebug(): void {
+    this.tapMarkers.enableDebugCapture();
+  }
+
+  /** The order markers the layer actually drew last frame — the reticle (with the
+   *  target it rides), the waypoint pulse (and whether it is fading on arrival),
+   *  and whether the line of intent drew — for the live-stage test. Empty unless
+   *  {@link enableTapMarkerDebug} was called. */
+  debugTapMarkers(): DrawnTapMarkers {
+    return this.tapMarkers.debugMarkers();
   }
 
   /**
