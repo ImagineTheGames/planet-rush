@@ -205,6 +205,134 @@ test('an unaffordable wedge dims with a reason (field report #1)', async ({ page
   expect(pageErrors, 'no page errors staging an unaffordable wedge').toEqual([]);
 });
 
+// --- The exact-cost boundary (field report v0.2.2) -------------------------
+//
+// "TOTAL says 4, POWER costs 4, can't buy." The boundary rule, proved on the
+// REAL booted client through the sim's own `buyUpgrade`: a bank that *equals*
+// the cost buys (and the bank hits zero); a bank one ore short dims the wedge
+// *with the cost still shown*, so the shortfall reads. Both wheels now share one
+// affordability helper (src/ui/affordability.ts) — this pins the upgrade wheel,
+// the build-wheel test below pins the other half of that same helper.
+
+test('exact-cost boundary: bank == cost buys and empties the bank; bank == cost-1 dims with the cost shown (field report v0.2.2)', async ({
+  page,
+}) => {
+  const pageErrors = await boot(page);
+  // The bank read-back lives on the sibling press seam (same local ship, same
+  // world); both are installed at boot, so wait for it before reading.
+  await page.waitForFunction(() => typeof window.__pressStage?.bank === 'function', undefined, {
+    timeout: 20_000,
+  });
+
+  // Read POWER's real cost off the DRAWN wheel — the screenshot's "4" — rather
+  // than hard-coding it, so a retune of the ladder cannot silently rot this test.
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  const cost = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.cost != null ? p.cost : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(cost, 'the POWER wedge prints a cost').toBeGreaterThan(0);
+
+  // --- bank == cost - 1: one ore short. The wedge must dim WITH its cost, and
+  //     the sim's real purchase must refuse it, spending nothing. ---
+  await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c - 1), cost!);
+  const short = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.state === 'unaffordable' ? p : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(short!.state, 'bank == cost-1 → the wedge is dimmed unaffordable').toBe('unaffordable');
+  expect(short!.cost, 'the cost stays on the dimmed wedge so the shortfall reads').toBe(cost);
+
+  const refused = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  expect(refused!.result, 'the sim refuses a bank one ore short').toBe('cannot-afford');
+  expect(refused!.tier, 'a refused purchase advances no tier').toBe(0);
+  expect(await page.evaluate(() => window.__pressStage!.bank()), 'a refused purchase spends nothing').toBe(
+    cost! - 1,
+  );
+
+  // --- bank == cost exactly: the developer's screenshot, refuted. The wedge is
+  //     ready, the purchase succeeds, and the bank hits zero. ---
+  await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c), cost!);
+  const ready = await page
+    .waitForFunction(
+      () => {
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        return p && p.state === 'ready' ? p : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(ready!.state, 'bank == cost → the wedge is purchasable, not dimmed').toBe('ready');
+
+  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  expect(bought!.result, 'the exact-cost purchase went through the sim').toBe('ok');
+  expect(bought!.tier, 'the ship advanced one tier on POWER').toBe(1);
+  expect(await page.evaluate(() => window.__pressStage!.bank()), 'the last ore spent — the bank hit zero').toBe(
+    0,
+  );
+
+  expect(pageErrors, 'no page errors staging the exact-cost boundary').toEqual([]);
+});
+
+test('the build wheel shares the same exact-cost boundary: TURRET buys at exactly its cost, refuses one ore short (field report v0.2.2)', async ({
+  page,
+}) => {
+  const pageErrors = await bootPress(page);
+
+  // TURRET costs 3 ore (GDD §2.8; sim `TURRET.cost`) — the same boundary helper
+  // the upgrade wheel above obeys, verified through the drawn build wheel.
+  const TURRET_COST = 3;
+
+  // bank == cost: the wedge is live, so a press reads as an ACCEPTED press
+  // (glow, scale-down) and never the red rejection tell.
+  const opened = await page.evaluate((c) => window.__pressStage!.openBuild(c), TURRET_COST);
+  expect(opened?.banked, 'the bank was staged to exactly the turret cost').toBe(TURRET_COST);
+  const accepted = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.glow > 0 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(accepted!.glow, 'a press at exactly the cost is accepted (glows)').toBeGreaterThan(0);
+  expect(accepted!.reject, 'an exactly-affordable press never red-flashes').toBe(0);
+
+  // bank == cost - 1: one ore short. The same press must read as a REJECTION.
+  await page.evaluate((c) => window.__pressStage!.openBuild(c - 1), TURRET_COST);
+  const rejected = await page
+    .waitForFunction(
+      (i) => {
+        window.__pressStage!.press('build', i);
+        const fb = window.__pressStage!.feedback('build', i);
+        return fb && fb.reject > 0 ? fb : null;
+      },
+      TURRET_WEDGE,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(rejected!.reject, 'a press one ore short is rejected (red-flashes)').toBeGreaterThan(0);
+  expect(rejected!.glow, 'a rejected press never glows like an accepted one').toBe(0);
+
+  expect(pageErrors, 'no page errors staging the build-wheel boundary').toEqual([]);
+});
+
 test('mashing each wheel open/closed 15× still opens and stays interactive (field report #2)', async ({
   page,
 }) => {

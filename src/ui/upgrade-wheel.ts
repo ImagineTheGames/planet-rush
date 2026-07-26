@@ -42,6 +42,7 @@
 
 import { ShipClass } from '@shared/types';
 import { CARGO_CAP_MAX, CARGO_PER_TIER, SHIP_STATS } from '../sim/constants';
+import { affordable } from './affordability';
 
 // ---------------------------------------------------------------------------
 // The four upgrade tracks (GDD §2.5)
@@ -369,7 +370,7 @@ export function upgradeWedge(
     current,
     next,
     cost,
-    state: cost !== null && signals.ore + 1e-9 >= cost ? 'ready' : 'unaffordable',
+    state: cost !== null && affordable(signals.ore, cost) ? 'ready' : 'unaffordable',
     angle,
   };
 }
