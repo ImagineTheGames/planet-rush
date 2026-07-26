@@ -548,5 +548,35 @@
     "buildSha": "884bca1",
     "attestation": "VERIFIED on live build 884bca1 (?debug=1, no freeze). Three panels (repair-core-works.png), Build wheel open over the docked home in each. (A) FULL core: the top-right HOME core-HP bar is full, the hub reads 'ORE 26', and the REPAIR CORE wedge is drawn GREY/inactive — its label is dim and its cost '1' is grey. (B) after damageCore(0, 70) put damage on the player's OWN core: the top-right HOME bar drops to ~30%, the 'Your planet is under attack — follow the arrow' alarm fires, and the REPAIR CORE wedge UN-GREYS — the label brightens and the '1' turns signal-yellow (the ready state). Side by side with (A) this IS the 'wedge un-greys when damage exists' behaviour. (C) after pressing REPAIR through the REAL pointer path (a click landing on the repair segment, screen (724,515)): coreHp rises while the bank falls TOGETHER — the top-left 'TOTAL' ore ticks 26 → 22 and the HOME core bar regrows. Numbers from the debug readouts in the same run: coreHp(0) = 100 (full) → 30.0 (damaged) → 47.5 (repairing); banked = 26.0 → 22.5 while it heals (1 ore per 5 HP, 2 HP/s — the GDD §2.5 repair channel, driven by the sim's own runRepairChannel, not a poke). Round-9's gap — no core-damage seam, no coreHp readback — is closed by damageCore + coreHp.",
     "verdict": "verified"
+  },
+  {
+    "id": "mining-by-projectile",
+    "title": "Mining is by projectile — but a mining BEAM is still rendered (retirement incomplete)",
+    "area": "match",
+    "image": "images/mining-by-projectile.png",
+    "capturedAt": "2026-07-26T05:04:00Z",
+    "buildSha": "325fe1d",
+    "attestation": "Captured on the LIVE build 325fe1d (?debug=1, no freeze) by flying the local ship into its home asteroid field and holding Left mouse to mine. What is VISIBLE (mining-by-projectile.png): the local ship (steel triangle, centre-right, a blue hull bar floated above it) with a SOLID BLUE PLASMA BEAM LINE running from its nose down-left to a grey asteroid at screen ~(525,530); several THREAT-RED projectile dots are in flight in the scene (near (578,401),(460,425),(468,218)); a coach banner reads 'Hold Left mouse on the asteroid — your beam mines it'; the bottom strip reads 'Left mouse Fire / Mine'. Read back in the same frame, window.__planetRush.beams carried [{shooter:0, source:'ship'}, {shooter:7, source:'turret'}] and 304 red projectile pixels were measured — so a real ship-source beam was on stage AND projectiles were flying. CONCLUSION: the projectile IS the shot (red dots travel and strike), which is the amendment's mechanic, BUT the mining beam is STILL DRAWN — the sim keeps Ship.beam as a mining 'tell' and the renderer strokes it as a plasma line, and the in-game coach copy still calls it 'your beam'. The gate's required condition, 'NO beam rendered anywhere in the scene', is therefore NOT met on this build: the beam VFX has not been retired. FAILED — this blocks the beam's retirement in the next tag until the render/coach beam is removed.",
+    "verdict": "failed"
+  },
+  {
+    "id": "mining-beam-still-drawn",
+    "title": "Zoom: the mining-beam plasma line drawn ship → asteroid (why mining-by-projectile fails)",
+    "area": "match",
+    "image": "images/mining-by-projectile-crop.png",
+    "capturedAt": "2026-07-26T05:04:00Z",
+    "buildSha": "325fe1d",
+    "attestation": "Zoom crop of the same frame (mining-by-projectile-crop.png). A single unbroken BLUE PLASMA LINE runs from the ship's nose to the near surface of the grey asteroid at bottom-left, ending in a small bright impact point on the rock; two red projectile shots hang in flight to the left; the ship's blue hull bar sits above it and two small dark squares (the empty hold indicator) sit below. The blue line is the rendered Ship.beam mining tell — its geometry matches the window.__planetRush.beams readback exactly (shooter 0, source 'ship', origin at the ship, end on the asteroid). It is drawn separately from, and in addition to, the red projectiles. This is the beam whose presence fails the 'no beam anywhere' condition. FAILED.",
+    "verdict": "failed"
+  },
+  {
+    "id": "tractor-rules-hold",
+    "title": "Tractor rule survives (GDD 2.3): hold-with-room pulls chunks in; a FULL hold leaves them",
+    "area": "match",
+    "image": "images/tractor-rules-hold.png",
+    "capturedAt": "2026-07-26T05:04:00Z",
+    "buildSha": "325fe1d",
+    "attestation": "Two panels cropped from one LIVE AutoAim mining run on build 325fe1d (?debug=1, no freeze): the same local ship pinned on a home-field asteroid, hold capacity 2 slots. LEFT — HOLD HAS ROOM: the under-ship hold indicator shows ONE filled yellow pip beside one empty square (1/2), and a signal-yellow ore chunk sits BETWEEN the asteroid (upper-left, at the far end of the ship's mining beam) and the ship, on the ship side of the gap — it is being tractor-pulled IN. RIGHT — HOLD FULL: the under-ship indicator shows TWO filled pips (2/2), the coach banner reads 'Hold full — fly home and press E', and a signal-yellow ore chunk sits OUT at the asteroid, NOT drawn toward the ship. Numbers read back live during the run (window.__oreDepositStage.readout / __oreHudStage.hold): cargo climbed 0 -> 1 -> 2 while mining with room (chunks tractored and collected), then held PINNED at 2/2 (full) while mining continued and fresh chunks chipped off (they were left, cargo never rose past 2). Across consecutive full-hold frames the free chunk stayed at the asteroid in world space while the ship flew away from it — it is not attracted. The sacred GDD §2.3 tractor rule is intact through the projectile-mining change. VERIFIED.",
+    "verdict": "verified"
   }
 ]
