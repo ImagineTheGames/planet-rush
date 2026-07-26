@@ -23,7 +23,7 @@
  *     a beginner can beat.
  */
 
-import type { Action, AimAction, BoostAction, FireAction, Rng, ThrustAction, Vec2 } from '@shared/types';
+import type { Action, AimAction, BoostAction, FireAction, PlayerId, Rng, ThrustAction, Vec2 } from '@shared/types';
 import { BASE_SPEED, WEAPON_RANGE, leadAim, SHIP_RADIUS, SHIP_STATS, shipProjectileSpeed } from '../sim';
 import type { SelfView } from './perception';
 
@@ -268,7 +268,7 @@ export function aimAt(self: SelfView, target: Vec2, jitter: number, rng: Rng, ta
 
 /** The unit aim direction at a target: a straight bearing at a still one, an
  *  intercept lead at a mover (using this hull's actual muzzle speed). */
-function aimDir(self: SelfView, target: Vec2, targetVel?: Vec2): Vec2 {
+export function aimDir(self: SelfView, target: Vec2, targetVel?: Vec2): Vec2 {
   const fallback = { x: Math.cos(self.angle), y: Math.sin(self.angle) };
   if (!targetVel || (targetVel.x === 0 && targetVel.y === 0)) {
     return toward(self.pos, target, fallback);
@@ -300,15 +300,130 @@ export function canHit(
   extraTolerance = 0,
   targetVel?: Vec2,
 ): boolean {
+  // Fire when the hull points at the *intercept* bearing, not the raw target
+  // bearing — a leading shot only lands if the nose is on the lead (amendment v0.2).
+  return canHitDir(self, target, aimDir(self, target, targetVel), targetRadius, extraTolerance);
+}
+
+/**
+ * The same range-and-facing gate as {@link canHit}, but against an explicit aim
+ * direction rather than the clean bearing at the target.
+ *
+ * Combat uses this so the fire gate is consistent with the *jittered* aim the
+ * bot committed to ({@link aimAndFire}): the trigger comes up when the hull is
+ * on the direction the bot is actually pointing, so a shot goes out along that
+ * jittered line and lands off-target by the spread. If the gate checked the
+ * clean bearing instead, `aimJitter` would only throttle the fire rate — the
+ * hull would wobble but still fire only when it happened to cross dead-centre —
+ * and wider spread would not mean a wider miss. Making spread behave as spread
+ * is the difference (`tests/sim/aim-error.test.ts`). Mining keeps the
+ * clean-bearing {@link canHit}, where the wobble is the point (slow mining).
+ */
+export function canHitDir(
+  self: SelfView,
+  target: Vec2,
+  aimDirection: Vec2,
+  targetRadius: number,
+  extraTolerance = 0,
+): boolean {
   const d = dist(self.pos, target);
   if (d > WEAPON_RANGE) return false;
   if (d < 1e-6) return true;
-  // Fire when the hull points at the *intercept* bearing, not the raw target
-  // bearing — a leading shot only lands if the nose is on the lead (amendment v0.2).
-  const lead = aimDir(self, target, targetVel);
-  const want = Math.atan2(lead.y, lead.x);
+  const want = Math.atan2(aimDirection.y, aimDirection.x);
   const halfWidth = Math.atan2(targetRadius, d);
   return Math.abs(angleDelta(self.angle, want)) <= halfWidth + FIRE_TOLERANCE + extraTolerance;
+}
+
+// ---------------------------------------------------------------------------
+// Reaction latency — the aim-error model's second half (v0.2.2 field report)
+// ---------------------------------------------------------------------------
+
+/**
+ * A bot's memory of the lead it is currently shooting with: whose velocity it
+ * committed to, that velocity, and the sim time it adopted it. One per bot,
+ * lives on the {@link Brain} (`./tree`). Mutable in place — it is the bot's own
+ * scratch, never the world's.
+ */
+export interface AimTrack {
+  /** Slot the committed velocity belongs to; `-1` when the bot is not leading
+   *  anything. A change here re-acquires immediately (see {@link trackAimVelocity}). */
+  targetId: PlayerId;
+  /** The (possibly stale) velocity the intercept lead is solved from. */
+  vel: Vec2;
+  /** Sim time `vel` was adopted. */
+  since: number;
+}
+
+/** A fresh, un-committed aim track. */
+export function newAimTrack(): AimTrack {
+  return { targetId: -1, vel: { x: 0, y: 0 }, since: 0 };
+}
+
+/**
+ * The velocity a bot should solve its intercept lead from *right now* — which is
+ * **not** the target's current velocity the instant it changes course. The bot
+ * re-samples the target's velocity only once every `latency` seconds; between
+ * samples it keeps the one it committed to. So a target that reverses inside the
+ * window is led *where it was going*, and the shot goes wide — the reaction lag
+ * that makes strafing work (GDD §2.9; `DifficultyTuning.aimLatency`).
+ *
+ * A brand-new target is acquired immediately (you read a new threat's motion the
+ * moment you turn to it); the lag is specifically on *staying* on a target that
+ * keeps juking. `latency <= 0` degenerates to perfect tracking — the old aimbot
+ * — which is exactly why the tier table never sets it there. Deterministic:
+ * pure arithmetic against `now`, no clock, no RNG. Mutates and returns `track`.
+ */
+export function trackAimVelocity(
+  track: AimTrack,
+  targetId: PlayerId,
+  currentVel: Vec2,
+  now: number,
+  latency: number,
+): Vec2 {
+  const acquired = track.targetId !== targetId;
+  if (acquired || now - track.since >= latency) {
+    track.targetId = targetId;
+    track.vel = { x: currentVel.x, y: currentVel.y };
+    track.since = now;
+  }
+  return track.vel;
+}
+
+/**
+ * How a bot shoots at one target, as the `aim` + `fire` pair — the single source
+ * of truth `./behaviors` `engage` wraps with movement and the aim-error harness
+ * measures directly (`tests/sim/aim-error.test.ts`).
+ *
+ * The lead is the latency-delayed velocity ({@link trackAimVelocity}), the tier's
+ * angular `spread` rides on top ({@link aimAt}), and the trigger is gated by
+ * {@link canHit} against that *same* delayed lead — so a bot fires confidently at
+ * where it *thinks* the target will be, and misses when it was wrong. Pass
+ * `track: null` for a still target (a turret, a core): no velocity, no lead, no
+ * lag, just the spread.
+ */
+export function aimAndFire(
+  self: SelfView,
+  targetPos: Vec2,
+  targetRadius: number,
+  targetVel: Vec2 | undefined,
+  spread: number,
+  rng: Rng,
+  track: AimTrack | null,
+  targetId: PlayerId,
+  now: number,
+  latency: number,
+): { aim: AimAction; fire: FireAction } {
+  const moving = targetVel !== undefined && (targetVel.x !== 0 || targetVel.y !== 0);
+  const leadVel = track && moving ? trackAimVelocity(track, targetId, targetVel, now, latency) : targetVel;
+  // One committed direction: the (latency-delayed) intercept lead, rotated by the
+  // spread draw. The hull turns toward it and the trigger comes up when the hull
+  // reaches it — so the shot flies along this line, spread and all.
+  const clean = aimDir(self, targetPos, leadVel);
+  const committed = spread > 0 ? rotate(clean, (rng.next() * 2 - 1) * spread) : clean;
+  return {
+    aim: aim(committed),
+    fire: fire(canHitDir(self, targetPos, committed, targetRadius)),
+  };
 }
 
 /** Weapon reach, re-exported so trees plan trips in the units they shoot in. */

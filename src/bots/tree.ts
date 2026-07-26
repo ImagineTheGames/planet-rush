@@ -27,7 +27,8 @@ import { BotMemory } from './memory';
 import type { BotView, SelfView } from './perception';
 import type { DifficultyTuning, Personality, PersonalityWeights } from './personalities';
 import { tuningFor } from './personalities';
-import { NEUTRAL } from './steering';
+import type { AimTrack } from './steering';
+import { NEUTRAL, newAimTrack } from './steering';
 
 // ---------------------------------------------------------------------------
 // The brain: everything about a bot that is not the view
@@ -72,6 +73,14 @@ export interface Brain {
   /** The committed escape heading while `escapeUntil` is in the future. */
   escapeDir: Vec2;
   /**
+   * The reaction-latency state for combat aim: the lead velocity this bot last
+   * committed to and when (`./steering` `trackAimVelocity`,
+   * `DifficultyTuning.aimLatency`). Carried on the brain so the lag persists
+   * across decisions — a target that juked two decisions ago is still being led
+   * where it was going. Reset the moment the bot turns to a different target.
+   */
+  readonly aim: AimTrack;
+  /**
    * Spendable ore that was already aboard when this bot first took the controls
    * — ore it did not earn, and will not spend (`./behaviors`'s `spendAtHome`).
    *
@@ -99,6 +108,7 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     lastThrust: 0,
     escapeUntil: -1,
     escapeDir: { x: 0, y: 0 },
+    aim: newAimTrack(),
     endowment: -1,
   };
 }

@@ -58,10 +58,31 @@ export interface DifficultyTuning {
    */
   readonly reactionInterval: number;
   /**
-   * Maximum aim error, radians, applied to a manual aim vector. Easy bots miss;
-   * Hard bots don't. Never negative, never zero for Easy. TUNABLE
+   * The aim-error model is two named tunables (v0.2.2 field report — "enemies'
+   * aim is too accurate"). The intercept solve (`leadAim`) is deterministically
+   * perfect, which turned every bot into an aimbot and deleted the dodge that is
+   * the whole point of a projectile. `aimJitter` and {@link aimLatency} put the
+   * error back, scaled by tier so difficulty is *visible competence* (GDD §2.9):
+   *
+   * `aimJitter` — maximum angular error, radians, drawn from the bot's seeded RNG
+   * and added to the aim bearing every decision. The *spread*: how far off a
+   * straight-flying target a shot can land. Easy bots miss; Hard bots barely do.
+   * Never negative, never zero for Easy. TUNABLE
    */
   readonly aimJitter: number;
+  /**
+   * Reaction latency, seconds, before the bot re-solves its intercept lead on a
+   * target that changed course. The bot re-samples the target's *velocity* only
+   * this often; between samples it keeps leading with the stale one, so a target
+   * that juked inside the window is led *where it was going*, not where it went
+   * — and the shot misses (`./steering` `trackAimVelocity`). This is the knob
+   * that rewards dodging: a strafing player who reverses faster than a tier's
+   * latency evades it, while a straight-line flyer is tracked cleanly. It stacks
+   * on top of {@link reactionInterval} (which gates *re-aiming at all*); latency
+   * is specifically the lag on the predictive lead. Zero would restore the
+   * aimbot. TUNABLE
+   */
+  readonly aimLatency: number;
   /**
    * Hull fraction at which the tier disengages (GDD §2.9: Easy "retreats at half
    * hull"). Personality `caution` scales this. TUNABLE
@@ -80,19 +101,30 @@ export interface DifficultyTuning {
 export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> = {
   [Difficulty.Easy]: {
     reactionInterval: 1 / 6,
-    aimJitter: 0.22,
+    aimJitter: 0.32,
+    aimLatency: 0.6,
     retreatHullFraction: 0.5,
     memorySeconds: 6,
   },
   [Difficulty.Medium]: {
     reactionInterval: 1 / 12,
-    aimJitter: 0.09,
+    aimJitter: 0.13,
+    aimLatency: 0.32,
     retreatHullFraction: 0.35,
     memorySeconds: 12,
   },
   [Difficulty.Hard]: {
+    // Tuned *down* from v0.2.2's perfection (aimJitter 0.02, no latency): the
+    // developer, a competent player, found the old Hard oppressive. 0.05 rad of
+    // spread and a 0.20 s lead-lag keep it strong but genuinely beatable — a
+    // player who strafes and juke-reverses shakes ~two thirds of a Hard bot's
+    // shots (34% land vs a perfect gun's 43%), which was impossible against the
+    // aimbot. The lag sits above the ~0.13 s cliff where a Hard gun starts
+    // snapping back into aimbot territory, so `aimScale` can lean it without ever
+    // crossing that line. Measured in `docs/bot-aim-error-p5.md`.
     reactionInterval: 1 / 20,
-    aimJitter: 0.02,
+    aimJitter: 0.05,
+    aimLatency: 0.2,
     retreatHullFraction: 0.2,
     memorySeconds: 20,
   },
@@ -134,6 +166,26 @@ export interface PersonalityWeights {
   /** Tendency to pile onto whoever is already losing or already the leader
    *  (GDD §2.9: Medium "gangs up on the current leader"). */
   readonly opportunism: number;
+  /**
+   * Optional character-level modulation of the tier's aim-error model, within
+   * the band (GDD §2.9: "personalities may modulate within their difficulty
+   * band"). A multiplier on **both** `aimJitter` and `aimLatency`: `< 1` is a
+   * steadier, sniper-ish shot (tighter spread, faster re-lead), `> 1` a sprayer.
+   * Absent means 1 — the tier value unchanged, which is every character but
+   * **Bolt**, the wild rusher who fires from the hip (`> 1`).
+   *
+   * It can never cross tiers: clamped to [0.85, 1.4] so an Easy character can
+   * never snipe like a Hard one, nor a Hard one spray like an Easy one —
+   * difficulty owns the band, personality only leans inside it. The clamp is
+   * asymmetric on purpose: a Hard gun snaps back toward the aimbot once its
+   * lead-lag drops under ~0.16 s (`docs/bot-aim-error-p5.md`), so the tight-end
+   * floor is held close to 1 to keep a clear margin above that cliff, while the
+   * loose end has room to spray. The tight end is left unused anyway: the harness
+   * shows a Hard gun is already at its turn-rate/geometry floor, so tightening a
+   * Hard character is imperceptible in landed shots — the measurable lean lives
+   * at the loose end, on Bolt.
+   */
+  readonly aimScale?: number;
 }
 
 /** One member of the cast. */
@@ -203,6 +255,9 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
       scavenge: 0.3,
       homebody: 0.1,
       opportunism: 0.3,
+      // Fires from the hip on the way in — the sprayer end of the Easy band, so
+      // charging Bolt is even easier to strafe than a cautious Easy bot. TUNABLE
+      aimScale: 1.25,
     },
   },
   foreman: {
@@ -248,6 +303,13 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
       scavenge: 0.5,
       homebody: 0.2,
       opportunism: 0.9,
+      // Sable reads as the marksman of the cast, and it *is* the tight end of the
+      // Hard band — but that is the tier's aim, unmodulated: the harness shows a
+      // Hard gun already sits at its turn-rate floor, so a lower `aimScale` here
+      // would change nothing a player could feel or a test could measure
+      // (`docs/bot-aim-error-p5.md`). Left neutral rather than shipping a knob
+      // that does nothing. Its raider threat is timing (opportunism 0.9), not a
+      // sniper's aim the model cannot actually give it.
     },
   },
   vulture: {

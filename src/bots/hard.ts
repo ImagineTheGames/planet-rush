@@ -15,9 +15,10 @@
  *  - It sees exactly what Easy sees. Same `BotView`, same `SENSOR_RANGE`, same
  *    `null` where a core has not been scouted. A Hard bot that knows you are
  *    wounded flew over and looked.
- *  - It decides more often (`reactionInterval` 1/20 s), aims straighter
- *    (`aimJitter` 0.02), holds its nerve longer (`retreatHullFraction` 0.2), and
- *    forgets more slowly (`memorySeconds` 20). Four competence knobs, no
+ *  - It decides more often (`reactionInterval` 1/20 s), aims straighter (tightest
+ *    spread `aimJitter` 0.05 and shortest lead-lag `aimLatency` 0.20 s — beatable,
+ *    not an aimbot, since v0.2.2), holds its nerve longer (`retreatHullFraction`
+ *    0.2), and forgets more slowly (`memorySeconds` 20). Competence knobs, no
  *    information knobs.
  *  - The *only* thing it does that the other tiers do not is **think about the
  *    whole board**: it compares a wounded miner against an unguarded core
