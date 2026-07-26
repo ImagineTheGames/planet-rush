@@ -58,6 +58,8 @@ import { KeyboardMouseSource, GamepadSource, PING_DIR_DISTANCE } from '@platform
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
 import { TouchButtons } from '@platform/touch-buttons';
+import { TapPilot, pickTapTarget } from '@platform/tap-pilot';
+import type { TapCandidate, ResolvedTarget, TargetKind } from '@platform/tap-pilot';
 import { bindTouchControls } from '@platform/touch-dom';
 import { TouchVisuals, buildButtonRect, boostButtonRect, pingButtonRect } from '@platform/touch-visuals';
 import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
@@ -89,6 +91,7 @@ import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
 import { describeBootFailure, showBootError } from '@platform/boot-error';
+import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
 import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
 import {
@@ -171,6 +174,33 @@ const HAPTIC_ALARM_TRIGGER = 40;
 const HAPTIC_ALARM_REARM_MS = 2500;
 
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
+/** Where the chosen control scheme is remembered (developer's ratified
+ *  tap/click-to-move scheme). Same storage seam as the fire mode, so both survive
+ *  a reload identically. `'sticks'` (the existing twin-stick / keyboard / gamepad
+ *  scheme) is the default; `'tap'` is Tap Commander. The existing schemes are
+ *  untouched and default — Tap Commander is an OPTIONAL layer. */
+const CONTROL_SCHEME_KEY = 'planet-rush:controlScheme';
+/** The two control schemes (developer ratification §3). Sticks is default. */
+type ControlScheme = 'sticks' | 'tap';
+/** Surface-gap standoff (world units) the Tap Commander pilot holds a fly-to at
+ *  its OWN planet — the "fly to atmosphere" order (developer §2). Sits the ship in
+ *  its home's atmosphere, near docking range (PLANET.dockRange), without slamming
+ *  the core. TUNABLE feel value; not a sim constant. */
+const PLANET_STANDOFF = 60;
+/** The Tap Commander order markers (developer §4) — the waypoint marker and the
+ *  lock-on reticle. The UI seam (p6-02) owns the DRAWN visual; the Platform lane
+ *  owns the state and this registered layout contract: a stable id + anchor + the
+ *  projected screen rect, so the affordance the pilot adds is a first-class,
+ *  placement-checkable element like every other on-screen affordance. They track a
+ *  WORLD position (the waypoint, the locked entity), so their anchor is `full` —
+ *  there is no fixed corner to hug. */
+const TAP_WAYPOINT_ID = 'tap-waypoint-marker';
+const TAP_RETICLE_ID = 'tap-lock-reticle';
+const TAP_MARKER_ANCHOR: AnchorSpec = { region: 'full' };
+/** Waypoint marker box side (logical px). */
+const TAP_MARKER_SIZE = 28;
+/** Extra diameter the reticle box adds around the locked entity (logical px). */
+const TAP_RETICLE_PAD = 20;
 /** Where the last hull picked in the lobby is remembered, so a returning player
  *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
  *  storage seam as the fire mode, so both survive a reload identically. */
@@ -499,6 +529,7 @@ async function boot(): Promise<void> {
     installEndScreenStage();
     installUpgradeWheelStage();
     installPressStage();
+    installTapCommanderStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -555,6 +586,12 @@ async function boot(): Promise<void> {
   let cameraTarget: PlayerId = LOCAL_PLAYER;
 
   let fireMode = readFireMode(platform, isTouch);
+  // The active control scheme (developer §3): the twin-stick/keyboard/gamepad
+  // 'sticks' scheme (default, untouched) or 'tap' — Tap Commander, where a
+  // tap/click places a move or a lock and the local pilot flies the ship. Read
+  // through the same storage seam as the fire mode; a stale value folds to
+  // 'sticks', so nothing a player ever saved can seat an unknown scheme.
+  let controlScheme = readControlScheme(platform);
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
@@ -596,6 +633,36 @@ async function boot(): Promise<void> {
    *  on the rising edge of a boost (double-tap-hold OR the BOOST button), not every
    *  frame it is held. */
   let touchBoostWasActive = false;
+
+  // --- Tap Commander (developer's ratified tap/click-to-move, tap/click-to-attack
+  //     scheme). A LOCAL PILOT, not a new protocol: it writes the SAME thrust/aim/
+  //     fire the sticks do into a scratch control state, from the player's standing
+  //     order (a waypoint, or a locked target). It fires no new Action and touches
+  //     no sim/wire — it files input the way a bot does. Firing range is fed from
+  //     the sim's own `WEAPON_RANGE` so the pilot carries no sim constant; it holds
+  //     comfortably inside range (`fireRange`) and closes to a standoff (`engageRange`).
+  const tapPilot = new TapPilot({
+    fireRange: WEAPON_RANGE * 0.82,
+    engageRange: WEAPON_RANGE * 0.5,
+  });
+  const pilotState = createControlState();
+  /** Reused per-frame resolved-target record, so re-resolving a lock allocates
+   *  nothing on the input path (GDD §4.3). */
+  const resolvedTarget: { pos: Vec2; radius: number; hostile: boolean; standoff?: number } = {
+    pos: { x: 0, y: 0 },
+    radius: 0,
+    hostile: false,
+  };
+  /** Reused per-frame ship kinematics handed to the pilot (zero-alloc). */
+  const pilotShip: { pos: Vec2; radius: number } = { pos: { x: 0, y: 0 }, radius: 0 };
+  /** Reused candidate list + records for tap hit-testing, grown once and refilled
+   *  on each tap (a tap is rare; this still avoids per-tap garbage). */
+  const tapCandidatePool: MutTapCandidate[] = [];
+  const tapCandidates: TapCandidate[] = [];
+  const worldTapPoint: Vec2 = { x: 0, y: 0 };
+  /** Camera-inverse scratch (screen → world for a tap), reused per tap. */
+  const camTargetScratch: Vec2 = { x: 0, y: 0 };
+  const camOffsetScratch: Vec2 = { x: 0, y: 0 };
 
   /** The local ship's world position, or the origin when it isn't alive — the
    *  anchor a directional ping (D-pad, touch drag) is offset from. */
@@ -803,6 +870,25 @@ async function boot(): Promise<void> {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
       e.stopImmediatePropagation();
       e.preventDefault();
+      return;
+    }
+
+    // --- Tap Commander (developer §1–2): a primary tap no affordance claimed places
+    //     the ship's next order. Empty space → move there; an entity → LOCK it —
+    //     attack a rival ship / turret / core, mine an asteroid ("a rock is just a
+    //     target"), or fly to your own planet's atmosphere. `pressPoint` is already
+    //     un-rotated into logical space (the landscape lock); project it back to
+    //     WORLD space through the live camera and hit-test the world. Consumes the
+    //     event so the same tap never also engages a stick under it. A no-op in the
+    //     default 'sticks' scheme, so that path is byte-for-byte unchanged.
+    if (controlScheme === 'tap' && e.button === 0) {
+      logicalToWorld(pressPoint, worldTapPoint);
+      const hit = pickTapTarget(buildTapCandidates(), worldTapPoint);
+      if (hit) tapPilot.lockTarget({ kind: hit.kind, id: hit.id });
+      else tapPilot.orderMove({ x: worldTapPoint.x, y: worldTapPoint.y });
+      haptics.haptic('tap');
+      e.stopImmediatePropagation();
+      e.preventDefault();
     }
   });
 
@@ -894,6 +980,10 @@ async function boot(): Promise<void> {
   const registry = flags.debug ? new LayoutRegistry() : null;
   const touchRects: TouchAffordanceRects = { leftStickZone: null, aimZone: null, fireButton: null };
   const shipRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  // Tap Commander order-marker rects + a projection scratch, reused each frame.
+  const waypointRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  const reticleRect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  const markerScreen: Vec2 = { x: 0, y: 0 };
   if (registry) {
     installLayoutHook({
       registry,
@@ -1107,6 +1197,7 @@ async function boot(): Promise<void> {
     endButtonsShown = [];
     endOverlay.visible = false;
     hasOrdered = false;
+    tapPilot.clear(); // a fresh match has no standing order (developer §2)
     if (buildWheel.open) buildWheel.toggle();
   }
 
@@ -1142,10 +1233,181 @@ async function boot(): Promise<void> {
     for (const s of sources) mergeControl(merged, s.state);
     mergeControl(merged, touchState);
 
+    // Tap Commander (developer §1–2): the pilot REPLACES the sticks. In this scheme
+    // the human devices no longer thrust/aim/fire — the pilot flies the ship from
+    // the standing order — but BUILD, BOOST and PING stay on their own affordances,
+    // so `merged.build/boost/ping` are left as the devices wrote them. The wheel is
+    // tap-operated here (its taps are claimed before the sticks), so while it is
+    // open the ship holds and the pilot stands down; `updateBuildWheel` zeroes
+    // thrust/fire for the wheel's own aim/confirm exactly as it does for the sticks.
+    const tap = controlScheme === 'tap';
+    if (tap) {
+      merged.thrust.x = 0;
+      merged.thrust.y = 0;
+      merged.aim = null;
+      merged.fire = false;
+      if (!buildWheel.open) {
+        resetControlState(pilotState);
+        const ship = world.ships.find(isLocalShip);
+        if (ship && ship.alive) {
+          pilotShip.pos = ship.pos;
+          pilotShip.radius = ship.radius;
+          tapPilot.writeInto(pilotState, pilotShip, resolvePilotTarget());
+          merged.thrust.x = pilotState.thrust.x;
+          merged.thrust.y = pilotState.thrust.y;
+          merged.aim = pilotState.aim;
+          merged.fire = pilotState.fire;
+          // The pilot is not a device: it never claims `activeDevice`, so the HUD
+          // controls strip keeps naming whatever real device last acted.
+        } else {
+          // No living ship to fly (dead / respawning): drop the order so a fresh
+          // tap after respawn starts clean, and coast.
+          tapPilot.clear();
+        }
+      }
+    }
+
     updateBuildWheel();
-    const actions = mapActions(merged, fireMode);
+    // The pilot aims explicitly at the locked target, so its state is mapped in
+    // Manual — an Auto-aim map would let the sim pick the nearest target instead of
+    // the one the player tapped. The sticks scheme keeps the player's fire-mode.
+    const actions = mapActions(merged, tap ? FireMode.Manual : fireMode);
     if (inputProbe.enabled) inputProbe.update(actions); // ?debug=1 parity seam
     return actions;
+  }
+
+  /**
+   * Re-resolve the pilot's locked target to its live position each frame (developer
+   * §1–2). The lock is a stable `{kind,id}` handle; here we find the entity it names
+   * in the live world and fill the reused {@link resolvedTarget} with its current
+   * centre, radius, and hostility — a moving ship tracks, a besieged core tracks,
+   * a mined-out rock vanishes. Returns `null` when the order is a waypoint (no
+   * target) or the entity is gone (dead ship, destroyed core, exhausted rock),
+   * which is exactly what tells the pilot to drop the lock. Own planet resolves as
+   * a friendly fly-to that holds at its atmosphere and never fires.
+   */
+  function resolvePilotTarget(): ResolvedTarget | null {
+    const ref = tapPilot.lockedRef;
+    if (!ref) return null;
+    switch (ref.kind) {
+      case 'ship': {
+        const s = world.ships.find((sh) => sh.id === ref.id);
+        if (!s || !s.alive) return null;
+        return fillResolved(s.pos, s.radius, true);
+      }
+      case 'asteroid': {
+        const a = world.asteroids.find((r) => r.id === ref.id);
+        if (!a) return null; // mined out → the rock is gone, drop the lock
+        return fillResolved(a.pos, a.radius, true);
+      }
+      case 'turret': {
+        for (const p of world.planets) {
+          const t = p.turrets.find((tt) => tt.id === ref.id);
+          if (t) return t.hp > 0 ? fillResolved(t.pos, t.radius, true) : null;
+        }
+        return null;
+      }
+      case 'core':
+      case 'planet': {
+        const p = world.planets.find((pl) => pl.id === ref.id);
+        if (!p || !p.alive) return null;
+        // The player's own planet is a friendly fly-to (hold at atmosphere, no
+        // fire); a rival's core is an attack.
+        const own = p.owner === LOCAL_PLAYER;
+        return fillResolved(p.pos, p.radius, !own, own ? PLANET_STANDOFF : undefined);
+      }
+    }
+  }
+
+  /** Fill the reused resolved-target record (zero-alloc) and return it. */
+  function fillResolved(pos: Vec2, radius: number, hostile: boolean, standoff?: number): ResolvedTarget {
+    resolvedTarget.pos = pos;
+    resolvedTarget.radius = radius;
+    resolvedTarget.hostile = hostile;
+    // exactOptionalPropertyTypes: an own-planet fly-to sets a standoff, every other
+    // target omits it (the pilot then uses its config engage range).
+    if (standoff === undefined) delete resolvedTarget.standoff;
+    else resolvedTarget.standoff = standoff;
+    return resolvedTarget;
+  }
+
+  /**
+   * Project a LOGICAL (landscape) screen point back to WORLD space — the inverse
+   * of the renderer's world→screen. The renderer centres the camera target on the
+   * viewport by offsetting its world root (`writeCameraOffset`, camera.ts); this
+   * recomputes the SAME offset from the live camera target + viewport and subtracts
+   * it, so a tap lands on the world point under the thumb. Reuses `worldTapPoint`
+   * via `out` (zero-alloc). Mirrors the renderer's own `?? world.ships[0]` fallback
+   * so a spectating camera and the render agree on centre.
+   */
+  function logicalToWorld(logical: Vec2, out: Vec2): Vec2 {
+    const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
+    camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
+    camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
+    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport);
+    out.x = logical.x - camOffsetScratch.x;
+    out.y = logical.y - camOffsetScratch.y;
+    return out;
+  }
+
+  /**
+   * Build the tap hit-test candidate list from the live world (developer §2): every
+   * enemy ship, every asteroid (mine), every enemy turret, every standing core, and
+   * the player's own planet (a friendly fly-to). The local ship and the player's own
+   * turrets are not lock targets, and a wreck (dead planet) is neither attackable nor
+   * fly-to-able. Pooled records overwritten in place, so a tap allocates nothing.
+   */
+  function buildTapCandidates(): TapCandidate[] {
+    let n = 0;
+    for (const s of world.ships) {
+      if (s.id === LOCAL_PLAYER || !s.alive) continue;
+      const c = tapCandidateSlot(n++);
+      c.kind = 'ship';
+      c.id = s.id;
+      c.pos = s.pos;
+      c.radius = s.radius;
+      c.hostile = true;
+    }
+    for (const a of world.asteroids) {
+      const c = tapCandidateSlot(n++);
+      c.kind = 'asteroid';
+      c.id = a.id;
+      c.pos = a.pos;
+      c.radius = a.radius;
+      c.hostile = true;
+    }
+    for (const p of world.planets) {
+      for (const t of p.turrets) {
+        if (t.hp <= 0 || t.owner === LOCAL_PLAYER) continue; // own turrets aren't targets
+        const c = tapCandidateSlot(n++);
+        c.kind = 'turret';
+        c.id = t.id;
+        c.pos = t.pos;
+        c.radius = t.radius;
+        c.hostile = true;
+      }
+      if (!p.alive) continue; // a wreck is not a lock target
+      const own = p.owner === LOCAL_PLAYER;
+      const c = tapCandidateSlot(n++);
+      c.kind = own ? 'planet' : 'core';
+      c.id = p.id;
+      c.pos = p.pos;
+      c.radius = p.radius;
+      c.hostile = !own; // your own planet is a friendly fly-to, a rival's is an attack
+    }
+    tapCandidates.length = 0;
+    for (let i = 0; i < n; i++) tapCandidates.push(tapCandidatePool[i]!);
+    return tapCandidates;
+  }
+
+  /** Pooled candidate record `i`, grown to fit and reused across taps (GDD §4.3). */
+  function tapCandidateSlot(i: number): MutTapCandidate {
+    let c = tapCandidatePool[i];
+    if (!c) {
+      c = { kind: 'ship', id: 0, pos: { x: 0, y: 0 }, radius: 0, hostile: false };
+      tapCandidatePool[i] = c;
+    }
+    return c;
   }
 
   /**
@@ -2120,6 +2382,97 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__tapCommanderStage` — the ?debug=1 live-stage seam that proves
+   * Tap Commander is wired on the REAL booted client (developer §5), the same
+   * discipline as {@link installPressStage}. The pilot's geometry is unit-tested
+   * (tap-pilot.test.ts); what a unit test cannot reach is that the shipped bundle
+   * turns a tap into an order that flies the ship and fires on a lock through the
+   * client's own input funnel. This stages that: switch to the tap scheme, park the
+   * local ship with one bot parked in weapon range, place an order exactly as a tap
+   * does (`buildTapCandidates` → `pickTapTarget` → the pilot), and read back the
+   * live sim — the ship moves to a waypoint, locks and fires on a bot, and drops the
+   * lock when a fresh empty-space order replaces it. Behind ?debug=1, never in a
+   * normal build; it mutates only the plain sim data the boot path already reads.
+   */
+  function installTapCommanderStage(): void {
+    const stage = {
+      /** Switch schemes (persisted like the settings row would). */
+      setScheme(scheme: 'sticks' | 'tap'): void {
+        controlScheme = scheme;
+        tapPilot.clear();
+        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+      },
+      /** Park the local ship at the arena centre with one bot a short hop away in
+       *  weapon range, both out of spawn protection, and clear the asteroid field so
+       *  a tap on empty space is unambiguous. Switches to the tap scheme. Returns the
+       *  staged world positions, or null if there is no local ship / no bot. */
+      stage(): { ship: Vec2; bot: Vec2; botId: PlayerId } | null {
+        const ship = world.ships.find(isLocalShip);
+        const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER);
+        if (!ship || !bot) return null;
+        const cx = world.bounds.width / 2;
+        const cy = world.bounds.height / 2;
+        world.asteroids.length = 0; // empty space is genuinely empty for the move test
+        ship.pos.x = cx;
+        ship.pos.y = cy;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        ship.alive = true;
+        ship.spawnProtect = 0;
+        bot.pos.x = cx + 140;
+        bot.pos.y = cy;
+        bot.vel.x = 0;
+        bot.vel.y = 0;
+        bot.alive = true;
+        bot.spawnProtect = 0;
+        controlScheme = 'tap';
+        tapPilot.clear();
+        return { ship: { x: cx, y: cy }, bot: { x: cx + 140, y: cy }, botId: bot.id };
+      },
+      /** Place an order at a WORLD point exactly as a tap does — resolve the world
+       *  hit-test through the client's own candidate list + picker and hand the pilot
+       *  the order. Returns what it locked onto (`null` kind = an empty-space move). */
+      tapWorld(x: number, y: number): { locked: boolean; kind: TargetKind | null; id: number | null } {
+        const hit = pickTapTarget(buildTapCandidates(), { x, y });
+        if (hit) {
+          tapPilot.lockTarget({ kind: hit.kind, id: hit.id });
+          return { locked: true, kind: hit.kind, id: hit.id };
+        }
+        tapPilot.orderMove({ x, y });
+        return { locked: false, kind: null, id: null };
+      },
+      /** The pilot's current standing order, as plain data. */
+      order(): { kind: 'waypoint' | 'target' | 'none'; at: Vec2 | null; ref: { kind: TargetKind; id: number } | null } {
+        const o = tapPilot.currentOrder;
+        if (!o) return { kind: 'none', at: null, ref: null };
+        if (o.kind === 'waypoint') return { kind: 'waypoint', at: { x: o.at.x, y: o.at.y }, ref: null };
+        return { kind: 'target', at: null, ref: { kind: o.ref.kind, id: o.ref.id } };
+      },
+      /** Live readout: the local ship's position, its firing tell (the sim's own
+       *  `firing`, set on any tick its weapon loosed), and the active scheme. */
+      readout(): { scheme: 'sticks' | 'tap'; shipPos: Vec2 | null; firing: boolean; alive: boolean } {
+        const ship = world.ships.find(isLocalShip);
+        return {
+          scheme: controlScheme,
+          shipPos: ship ? { x: ship.pos.x, y: ship.pos.y } : null,
+          firing: ship?.firing ?? false,
+          alive: ship?.alive ?? false,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__tapCommanderStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -2142,6 +2495,28 @@ async function boot(): Promise<void> {
       shipRect.width = 2 * r;
       shipRect.height = 2 * r;
       reg.register('ship-local', SHIP_ANCHOR, shipRect);
+    }
+
+    // Tap Commander order markers (developer §4): the waypoint marker and lock-on
+    // reticle, world-tracking affordances the ui seam (p6-02) draws. We register
+    // the STATE + placement contract — the projected rect the marker occupies —
+    // so a live-stage / phone profile can prove the affordance is on screen where
+    // the order is. Present only while an order stands, in the tap scheme. Uses the
+    // renderer's ACTUAL world-root transform (projectToScreen, after draw), so the
+    // rect is exactly where the marker would draw.
+    if (controlScheme === 'tap') {
+      const wp = tapPilot.waypoint;
+      if (wp) {
+        renderer.projectToScreen(wp, markerScreen);
+        centerRect(waypointRect, markerScreen, TAP_MARKER_SIZE);
+        reg.register(TAP_WAYPOINT_ID, TAP_MARKER_ANCHOR, waypointRect);
+      }
+      const locked = resolvePilotTarget();
+      if (locked) {
+        renderer.projectToScreen(locked.pos, markerScreen);
+        centerRect(reticleRect, markerScreen, locked.radius * 2 + TAP_RETICLE_PAD);
+        reg.register(TAP_RETICLE_ID, TAP_MARKER_ANCHOR, reticleRect);
+      }
     }
 
     // Touch controls: anchored home rects from the same constants that draw them
@@ -2343,6 +2718,16 @@ async function boot(): Promise<void> {
       touch.setFireMode(fireMode);
       platform.storage.set(FIRE_MODE_KEY, fireMode);
     }
+    // Control-scheme toggle: single key for day-1, mirroring the fire-mode key
+    // (developer §3 puts the picker in settings — UI owns that screen; this is the
+    // reachable-from-boot equivalent, persisted to the same seam the settings row
+    // would use). Sticks ⇄ Tap Commander; clears any standing order on the switch
+    // so the new scheme starts clean.
+    if (e.code === 'KeyC') {
+      controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
+      tapPilot.clear();
+      platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+    }
   });
 
   loop.start();
@@ -2404,6 +2789,16 @@ interface MutNameable {
   hpFraction: number;
   pos: Vec2;
   radius: number;
+}
+
+/** A mutable {@link TapCandidate} — the pooled records the Tap Commander hit-test
+ *  overwrites in place each tap, handed to `pickTapTarget` as `TapCandidate`. */
+interface MutTapCandidate {
+  kind: TargetKind;
+  id: number;
+  pos: Vec2;
+  radius: number;
+  hostile: boolean;
 }
 
 const EMPTY_MUZZLES: MuzzleView[] = [];
@@ -2546,6 +2941,15 @@ function inRect(p: Vec2, r: { x: number; y: number; width: number; height: numbe
   return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
 }
 
+/** Write a `size`×`size` rect centred on `c` into `out` (zero-alloc). */
+function centerRect(out: Rect, c: Vec2, size: number): Rect {
+  out.x = c.x - size / 2;
+  out.y = c.y - size / 2;
+  out.width = size;
+  out.height = size;
+  return out;
+}
+
 /** Shield HP at full over a planet's core — 0 with no generator built, so the
  *  HUD's shield overbar appears the frame the first one finishes (GDD §2.5).
  *  The sim publishes the *current* pool (`shieldPool`); this is its ceiling. */
@@ -2568,6 +2972,14 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
   const stored = platform.storage.get(FIRE_MODE_KEY);
   if (stored === FireMode.Manual || stored === FireMode.AutoAim) return stored;
   return defaultFireMode(isTouch);
+}
+
+/** Read the persisted control scheme (developer §3). Anything other than the
+ *  explicit `'tap'` — an absent key, a stale value — folds to `'sticks'`, so the
+ *  existing schemes stay the untouched default and a bad key can never seat an
+ *  unknown scheme. Read through the same platform seam as the fire mode. */
+function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): ControlScheme {
+  return platform.storage.get(CONTROL_SCHEME_KEY) === 'tap' ? 'tap' : 'sticks';
 }
 
 /** The hull to pre-select in the lobby: the last one this player chose, or the
