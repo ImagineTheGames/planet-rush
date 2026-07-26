@@ -551,23 +551,23 @@
   },
   {
     "id": "mining-by-projectile",
-    "title": "Mining is by projectile — but a mining BEAM is still rendered (retirement incomplete)",
+    "title": "Mining is by projectile and the mining BEAM is fully retired — seam gone, no line drawn, coach says \"shots\"",
     "area": "match",
     "image": "images/mining-by-projectile.png",
-    "capturedAt": "2026-07-26T05:18:00Z",
-    "buildSha": "7e3b237",
-    "attestation": "Re-captured on the CURRENT HEAD build 7e3b237 (rebuilt from source; version.json sha=7e3b237, dirty=false), ?debug=1 no freeze, by flying the local ship up-left into its home asteroid field and holding Left mouse to mine. What is VISIBLE (mining-by-projectile.png / -crop.png): the local ship (steel triangle, centre-right, a blue hull bar floated above it, two EMPTY dark hold squares beneath it) with a SOLID BLUE PLASMA BEAM LINE running from its nose down-left to a grey asteroid at screen ~(525,530); several THREAT-RED projectile dots are in flight in the arena (a cluster near (516,300) plus dots around (462,213),(488,236),(567,404)); a coach banner reads 'Hold Left mouse on the asteroid — your beam mines it'; the bottom strip reads 'Left mouse Fire / Mine'; build stamp '7e3b237 · 05:13Z' bottom-right. Read back live in the best frame: window.__planetRush.beams carried [{shooter:0, source:'ship'}] (ownBeamCount 1) AND 303 red projectile pixels were measured at the same time — a real ship-source beam on stage WHILE projectiles fly. CONCLUSION: the projectile IS the shot (red dots travel and strike, and mining does progress — the tractor run climbs cargo), which is the amendment's mechanic; BUT the mining beam is STILL DRAWN. The sim keeps Ship.beam as a mining 'tell' (src/sim/combat-view.ts builds a per-ship beam render record from Ship.beam), the renderer strokes it as a plasma line, and the in-game coach copy still says 'your beam'. The gate's required condition — 'NO beam rendered anywhere in the scene' — is therefore NOT met on the current HEAD build: the beam VFX has not been retired. FAILED — this blocks the beam's retirement in the next tag until the render/coach beam is removed. (Same finding as at 325fe1d; the nameplate commits that landed since do not touch mining or the beam.)",
-    "verdict": "failed"
+    "capturedAt": "2026-07-26T08:25:00Z",
+    "buildSha": "7dd220f",
+    "attestation": "Re-run of the p2-07 capture on the CURRENT HEAD build 7dd220f (rebuilt from source; version.json sha=7dd220f, dirty=false) after the beam funeral (PR #101), via evidence/capture-beam-gone.mjs: ?debug=1 no freeze, the same up-left flight into the local home asteroid field, holding Fire. SEAM PROBE (run before any input): window.__planetRush has keys [build, coreHp, damageCore, damageShip, fps, freezeTick, frozen, layout, muzzles, placement, resolveAnchor, shipScreen, shipWorld, stageCombat, ticks, viewport, worldHash] — there is NO \"beams\" key at all (\"beams\" in pr === false, typeof pr.beams === \"undefined\"); its replacement pr.muzzles EXISTS as an array. The retired seam does not merely read empty, it is GONE. What is VISIBLE (mining-by-projectile.png): the local ship (light-blue triangle at screen centre, the camera follows it) with a blue hull bar floated above it and TWO EMPTY dark hold squares beneath it; the coach banner reads \"Hold Left mouse on the asteroid — your shots chip the rock\" — the word is SHOTS, there is no \"beam\"; several red projectile dots hang in flight (one directly below the ship at ~(638,455), more below-left toward ~(672,527) and ~(634,550)); a grey home asteroid field fills the left of the arena; the bottom controls strip reads \"Left mouse Fire / Mine\"; build stamp \"7dd220f · 08:16Z\" bottom-right. There is NO plasma line ANYWHERE — the ship nose is clean, no beam runs from ship to any rock. The coach close-up (mining-coach-shots.png) shows that prompt in full and legibly. READBACK across the whole 60+24-frame flight: window.__planetRush.muzzles carried ZERO ship-source (shooter 0) records on every single frame (anyShipMuzzleEver=false); the only muzzle flashes seen at all belonged to a NON-LOCAL turret (shooter 2). A ship draws no muzzle and no line while mining — its shot is a pooled projectile and nothing else. CONCLUSION: the projectile IS the shot, and the mining beam is fully retired in three ways at once — the seam no longer exists, no line is drawn in the scene, and the coach copy speaks of shots. The gate condition \"no beam rendered anywhere\" is MET on HEAD 7dd220f. This REVERSES the earlier FAILED finding (at 7e3b237 / 325fe1d, where Ship.beam still stroked a plasma line and the coach said \"your beam\"). VERIFIED.",
+    "verdict": "verified"
   },
   {
-    "id": "mining-beam-still-drawn",
-    "title": "Zoom: the mining-beam plasma line drawn ship → asteroid (why mining-by-projectile fails)",
+    "id": "mining-beam-retired",
+    "title": "Zoom (RESOLVED): the mining beam is GONE — clean ship nose, no ship→asteroid plasma line",
     "area": "match",
     "image": "images/mining-by-projectile-crop.png",
-    "capturedAt": "2026-07-26T05:04:00Z",
-    "buildSha": "325fe1d",
-    "attestation": "Zoom crop of the same frame (mining-by-projectile-crop.png). A single unbroken BLUE PLASMA LINE runs from the ship's nose to the near surface of the grey asteroid at bottom-left, ending in a small bright impact point on the rock; two red projectile shots hang in flight to the left; the ship's blue hull bar sits above it and two small dark squares (the empty hold indicator) sit below. The blue line is the rendered Ship.beam mining tell — its geometry matches the window.__planetRush.beams readback exactly (shooter 0, source 'ship', origin at the ship, end on the asteroid). It is drawn separately from, and in addition to, the red projectiles. This is the beam whose presence fails the 'no beam anywhere' condition. FAILED.",
-    "verdict": "failed"
+    "capturedAt": "2026-07-26T08:25:00Z",
+    "buildSha": "7dd220f",
+    "attestation": "Zoom crop of the same HEAD-build 7dd220f frame (mining-by-projectile-crop.png). What is VISIBLE: the local ship (light-blue triangle, centre) with its blue hull bar above it and two small dark squares — the EMPTY hold indicator — below it; a red projectile shot dot sits directly beneath the ship, with more red dots below-left; the grey home field is off to the upper-left. There is NO blue plasma line from the ship nose to any rock: the single unbroken ship→asteroid beam that THIS entry documented at 325fe1d is absent. That matches the seam readback — \"beams\" in window.__planetRush === false, so the old Ship.beam render record no longer exists to be drawn. The mining-beam plasma line is retired. This entry previously FAILED the \"no beam\" gate at 325fe1d; on HEAD it is resolved. VERIFIED.",
+    "verdict": "verified"
   },
   {
     "id": "tractor-rules-hold",
