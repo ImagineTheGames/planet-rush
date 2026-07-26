@@ -21,12 +21,15 @@ import { test, expect } from '@playwright/test';
  *  installed in `src/main.ts`: `installNameplateStage`, and the layout hook). */
 interface NameplateStage {
   /** Park the first bot's ship + home planet on-screen beside the local ship;
-   *  returns the bot's slot and the name the table resolved for it, or null. */
-  stageBot(): { owner: number; name: string } | null;
-  /** The labels the real layer drew last frame — owner, kind, text, colour, pos. */
-  plates(): Array<{ owner: number; kind: 'ship' | 'planet'; text: string; color: number; x: number; y: number; local: boolean }>;
+   *  returns the bot's slot, the name the table resolved, and its difficulty tier,
+   *  or null. */
+  stageBot(): { owner: number; name: string; difficulty: string | undefined } | null;
+  /** The labels the real layer drew last frame — owner, kind, text, suffix, colour, pos. */
+  plates(): Array<{ owner: number; kind: 'ship' | 'planet'; text: string; suffix: string; color: number; x: number; y: number; local: boolean }>;
   /** The per-slot name table the match built (data-driven source of the labels). */
   names(): Array<string | undefined>;
+  /** The per-slot difficulty table (mirror of `names`), source of the suffixes. */
+  difficulties(): Array<string | undefined>;
 }
 interface StageWindow {
   __nameplateStage?: NameplateStage;
@@ -89,6 +92,25 @@ test('name labels render over a bot ship and its planet in the real booted clien
   expect(shipLabel!.text, 'the ship label matches the slot name').toBe(staged!.name);
   expect(planetLabel!.text, 'the planet label matches the slot name').toBe(staged!.name);
   expect(names[staged!.owner], 'the name table is the source of the label text').toBe(staged!.name);
+
+  // The bot's difficulty rides along as a recessive suffix — `(EASY|MEDIUM|HARD)`
+  // — on BOTH its ship and its planet, sourced from the mirror difficulty table
+  // (field request v0.2.2). Human seats never carry one (asserted below).
+  const difficulties = await page.evaluate(() => window.__nameplateStage!.difficulties());
+  const tier = (staged!.difficulty ?? '').toUpperCase();
+  expect(tier, 'the staged bot resolved to a difficulty tier').toBeTruthy();
+  const expectedSuffix = `(${tier})`;
+  expect(shipLabel!.suffix, 'the ship label carries the bot difficulty suffix').toBe(expectedSuffix);
+  expect(planetLabel!.suffix, 'the planet label carries the bot difficulty suffix').toBe(expectedSuffix);
+  expect(
+    (difficulties[staged!.owner] ?? '').toUpperCase(),
+    'the difficulty table is the source of the suffix',
+  ).toBe(tier);
+
+  // The local (human) player carries NO difficulty suffix on any drawn label.
+  for (const p of plates!.filter((x) => x.owner === 0)) {
+    expect(p.suffix, 'a human seat never shows a difficulty suffix').toBe('');
+  }
 
   // Both are tinted the same owner identity colour (ship trim, bar and name agree).
   expect(planetLabel!.color, 'ship and planet labels share the owner colour').toBe(shipLabel!.color);

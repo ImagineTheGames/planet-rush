@@ -20,12 +20,13 @@ import {
   nameplateModel,
   nameplateGetsLabel,
   resolveName,
+  resolveDifficultySuffix,
   fallbackName,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
   NAMEPLATE_MAX_CHARS,
 } from './nameplates';
-import type { Nameable, NameTable } from './nameplates';
+import type { DifficultyTable, Nameable, NameTable } from './nameplates';
 
 /** A live enemy SHIP at owner 3 — the labelled baseline each test perturbs. */
 function ship(over: Partial<Nameable> = {}): Nameable {
@@ -38,6 +39,10 @@ function planet(over: Partial<Nameable> = {}): Nameable {
 
 /** Names indexed by slot — local player 0 named "YOU", a couple of bots named. */
 const NAMES: NameTable = ['YOU', 'Rusty', 'Bolt', 'Warden'];
+
+/** Difficulty table mirroring {@link NAMES}: slot 0 is the HUMAN (left empty, no
+ *  suffix), the bot seats each carry their tier. */
+const DIFFS: DifficultyTable = [undefined, 'easy', 'medium', 'hard'];
 
 describe('who gets a label', () => {
   it('labels a live enemy ship', () => {
@@ -98,6 +103,45 @@ describe('what text (the name table)', () => {
     const shown = resolveName([long], 0);
     expect(shown.length).toBe(NAMEPLATE_MAX_CHARS);
     expect(shown.endsWith('…')).toBe(true);
+  });
+});
+
+describe('difficulty suffix (field request v0.2.2)', () => {
+  it('shows a bot’s tier as a parenthesised, upper-cased metadata suffix', () => {
+    expect(resolveDifficultySuffix(DIFFS, 1)).toBe('(EASY)');
+    expect(resolveDifficultySuffix(DIFFS, 2)).toBe('(MEDIUM)');
+    expect(resolveDifficultySuffix(DIFFS, 3)).toBe('(HARD)');
+  });
+
+  it('gives a HUMAN seat no suffix (slot left empty in the table)', () => {
+    expect(resolveDifficultySuffix(DIFFS, 0)).toBe('');
+  });
+
+  it('gives a slot the table doesn’t name no suffix', () => {
+    expect(resolveDifficultySuffix(DIFFS, 5)).toBe('');
+    expect(resolveDifficultySuffix([], 1)).toBe('');
+    expect(resolveDifficultySuffix(['  '], 0)).toBe('');
+  });
+
+  it('never suffixes an un-owned hostile', () => {
+    expect(resolveDifficultySuffix(DIFFS, -1)).toBe('');
+  });
+
+  it('carries the suffix onto a bot’s SHIP and its PLANET plate, per difficulty', () => {
+    const [botShip] = nameplateModel([ship({ owner: 3 })], NAMES, {}, DIFFS);
+    const [botPlanet] = nameplateModel([planet({ owner: 1 })], NAMES, {}, DIFFS);
+    expect(botShip!.suffix).toBe('(HARD)');
+    expect(botPlanet!.suffix).toBe('(EASY)');
+  });
+
+  it('never suffixes a human’s own PLANET label', () => {
+    const [humanPlanet] = nameplateModel([planet({ owner: 0 })], NAMES, {}, DIFFS);
+    expect(humanPlanet!.suffix).toBe('');
+  });
+
+  it('emits an empty suffix when no difficulty table is fed (back-compat)', () => {
+    const [plate] = nameplateModel([ship({ owner: 3 })], NAMES);
+    expect(plate!.suffix).toBe('');
   });
 });
 

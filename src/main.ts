@@ -143,6 +143,7 @@ import {
 import type {
   HudFrame,
   Combatant,
+  DifficultyTable,
   Nameable,
   NameTable,
   SettingsState,
@@ -857,15 +858,25 @@ async function boot(): Promise<void> {
   const nameablePool: MutNameable[] = [];
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
-  /** Rebuild the per-slot name table from the live match: the local player's
-   *  chosen name (from the lobby, or persisted default under ?debug=1) plus each
-   *  seated bot's personality name (GDD §2.9). Data-driven — when online lands
-   *  (m9) the room's remote names populate this same table with no other change. */
+  let playerDifficulties: DifficultyTable = [];
+  /** Rebuild the per-slot name table (and its mirror difficulty table) from the
+   *  live match: the local player's chosen name (from the lobby, or persisted
+   *  default under ?debug=1) plus each seated bot's personality name (GDD §2.9),
+   *  and each bot seat's difficulty tier (field request v0.2.2 — shown as a
+   *  recessive nameplate suffix). The local (human) seat is left out of the
+   *  difficulty table so it never shows a tag. Data-driven — when online lands
+   *  (m9) the room's remote names/difficulties populate these same tables with no
+   *  other change. */
   function rebuildNameTable(): void {
     const table: string[] = [];
+    const tiers: (string | undefined)[] = [];
     table[LOCAL_PLAYER] = chosenName;
-    for (const bot of match.bots) table[bot.seat.id] = personality(bot.seat.personality).name;
+    for (const bot of match.bots) {
+      table[bot.seat.id] = personality(bot.seat.personality).name;
+      tiers[bot.seat.id] = bot.difficulty;
+    }
     playerNames = table;
+    playerDifficulties = tiers;
   }
   rebuildNameTable();
 
@@ -1457,6 +1468,7 @@ async function boot(): Promise<void> {
     for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
     hudFrame.nameables = nameableFrame;
     hudFrame.names = playerNames;
+    hudFrame.difficulties = playerDifficulties;
   }
 
   /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
@@ -1579,13 +1591,16 @@ async function boot(): Promise<void> {
    *
    *  - `stageBot()` — park the first bot's SHIP and its HOME PLANET on-screen
    *    beside the centred local ship, so both must draw a label (a full-ring-away
-   *    rival is off-screen and culled in the frozen frame). Returns the bot's slot
-   *    and the name the table resolved for it, or null if there is no bot.
+   *    rival is off-screen and culled in the frozen frame). Returns the bot's slot,
+   *    the name the table resolved for it, and its difficulty tier (v0.2.2), or
+   *    null if there is no bot.
    *  - `plates()` — the labels the real layer actually drew last frame (owner,
-   *    text, colour, kind, position), so the test can assert a drawn label with the
-   *    lobby's name tracks that bot's ship and planet.
+   *    text, suffix, colour, kind, position), so the test can assert a drawn label
+   *    with the lobby's name and difficulty suffix tracks that bot's ship and planet.
    *  - `names()` — the per-slot name table the match built, so the test can match a
    *    drawn label's text against the data-driven source.
+   *  - `difficulties()` — the per-slot difficulty table (its mirror), so the test
+   *    can match a bot's drawn suffix against the same data seam.
    *
    * Mutating `pos` here is a debug-only staging affordance (identical to the
    * health-bar stage), not gameplay: it writes the plain sim data the render loop
@@ -1593,7 +1608,7 @@ async function boot(): Promise<void> {
    */
   function installNameplateStage(): void {
     const stage = {
-      stageBot(): { owner: PlayerId; name: string } | null {
+      stageBot(): { owner: PlayerId; name: string; difficulty: string | undefined } | null {
         const local = world.ships.find(isLocalShip);
         const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
         if (!local || !bot) return null;
@@ -1606,13 +1621,20 @@ async function boot(): Promise<void> {
           planet.pos.x = local.pos.x + 120;
           planet.pos.y = local.pos.y + 140;
         }
-        return { owner: bot.id, name: playerNames[bot.id] ?? `P${bot.id + 1}` };
+        return {
+          owner: bot.id,
+          name: playerNames[bot.id] ?? `P${bot.id + 1}`,
+          difficulty: playerDifficulties[bot.id],
+        };
       },
       plates(): ReturnType<typeof hud.debugNameplates> {
         return hud.debugNameplates();
       },
       names(): readonly (string | undefined)[] {
         return playerNames.slice();
+      },
+      difficulties(): readonly (string | undefined)[] {
+        return playerDifficulties.slice();
       },
     };
     try {

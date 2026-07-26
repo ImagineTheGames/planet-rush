@@ -263,12 +263,13 @@ export {
   nameplateModel,
   nameplateGetsLabel,
   resolveName,
+  resolveDifficultySuffix,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
 } from './nameplates';
-export type { Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
+export type { DifficultyTable, Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
 
 export {
   NameplateView,
