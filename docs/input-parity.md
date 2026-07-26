@@ -115,6 +115,39 @@ The field report named two. The audit surfaced a third — a legend that lied.
    Closed by wiring the D-pad (buttons 12–15) to a directional ping in
    `GamepadSource`, rising-edge so a held D-pad pings once rather than every frame.
 
+## Minimap toggle — a UI control, not a sim verb (added p6)
+
+The minimap (GDD §2.2; field request v0.2.2) toggles between a small bottom-right
+corner square and a centred overlay. This is a **HUD control, not one of the eight
+abstract actions** — the simulation never sees it (it changes nothing on the
+`ControlState` / `Action` union; it flips a `src/ui` view state). So it is *not* a
+row in the parity table above and *not* pinned in `input-parity.test.ts`, for the
+same reason Tap Commander is "not a new action": the sim contract is unchanged.
+
+But it carries the same *reachability* obligation the table exists to enforce — a
+control that "only exists on PC" is the bug this document was written for — so it
+is recorded here and backed by its own CI test:
+
+| Control          | Keyboard / Mouse            | Gamepad                          | Touch |
+|------------------|-----------------------------|----------------------------------|-------|
+| Minimap toggle   | Click the map · **`M` key** | Click via the pointer (as PC)    | Tap the map |
+
+- **One code path, both platforms.** A PC click and a mobile tap both route to
+  `Hud.minimapTap` → `Minimap.tap` (`src/ui/minimap.ts`), the *same* pure hit test
+  — the two platforms cannot diverge. `main.ts` routes the canvas `pointerdown` to
+  it (mouse and touch alike) before the sticks, so a press on the map never also
+  flies the ship.
+- **`M` on PC** is the desktop keyboard convenience over the click, mirroring the
+  `F` (fire mode) and `C` (control scheme) shortcuts — `MINIMAP_TOGGLE_KEY` in
+  `src/ui/minimap.ts`, wired in `main.ts`'s keydown handler.
+- **Its CI test** is `src/ui/minimap.test.ts` (runs under `npm test`): it asserts
+  click (PC) and tap (mobile) reach the same toggle, and that the shortcut is `M`.
+  `tests/live-stage/minimap.spec.ts` proves the toggle under REAL input on the
+  booted client (the p1a rule).
+- **No ping here.** Pings are cut from the game (p7-01/02), so the minimap draws no
+  ping markers and tapping it is a toggle, not a ping — distinct from the `ping`
+  rows above, which predate the cut.
+
 ## Known follow-ups for gameplay / render (flagged, not invented)
 
 Per the brief, the platform wires against the interface; it does not invent sim

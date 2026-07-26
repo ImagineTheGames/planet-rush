@@ -85,6 +85,10 @@ import type { DrawnNameplate } from './nameplates-view';
 import { tapMarkersModel } from './tap-markers';
 import { TapMarkerView } from './tap-markers-view';
 import type { DrawnTapMarkers } from './tap-markers-view';
+import { Minimap } from './minimap';
+import type { MinimapFrame, MinimapInsets } from './minimap';
+import { MinimapView } from './minimap-view';
+import type { DrawnMinimap } from './minimap-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -302,6 +306,21 @@ export interface HudFrame {
   /** The pilot is firing on its lock this tick → the line of intent from ship to
    *  target draws. Only meaningful with {@link tapLock} present. Default false. */
   readonly tapFiring?: boolean;
+
+  // --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
+
+  /** The minimap's content in **map (world) space** — arena bounds, planets,
+   *  ships, the collapse ring, ore hints. Absent before the world exists (the M1
+   *  feed) ⇒ the minimap hides entirely; present ⇒ it draws. Unlike the rest of
+   *  the HUD this is NOT pre-projected to screen: the minimap does its own fit
+   *  ({@link ./minimap}). Default: none. */
+  readonly minimap?: MinimapFrame;
+  /** Safe-area / thumb insets for the minimap's corner + overlay placement
+   *  (mobile amendment §2). Default: none ⇒ plain edges. */
+  readonly minimapInsets?: MinimapInsets;
+  /** The sim tick, driving the minimap's low-frequency content redraw
+   *  ({@link ./minimap} `MINIMAP_REDRAW_TICKS}). Default: derived from `time`. */
+  readonly tick?: number;
 }
 
 /** Reused for a frame that carries no combatants, so the empty case allocates
@@ -450,6 +469,18 @@ export class Hud extends Container {
   //     can never occlude them (p6-01 §3). Its decisions live in ./tap-markers.
   private readonly tapMarkers = new TapMarkerView();
 
+  // --- Minimap (GDD §2.2; field request v0.2.2) --------------------------
+  //     Two states (a bottom-right corner square / a centred overlay), toggled by
+  //     the same click/tap on both platforms and the `M` key on PC. The pure model
+  //     holds the toggle + geometry + fit; the view draws the sim-driven dots to a
+  //     throttled cached texture. Decisions live in ./minimap.
+  private readonly minimapModel = new Minimap();
+  private readonly minimap = new MinimapView();
+  /** The last frame's touch flag + insets, so a pointer event arriving between
+   *  frames hit-tests the minimap against the geometry it actually drew with. */
+  private minimapIsTouch = false;
+  private minimapInsets: MinimapInsets = {};
+
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
@@ -557,6 +588,11 @@ export class Hud extends Container {
       this.waveGroup,
       this.planetGroup,
       this.stripGroup,
+      // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
+      // the collapse frame and the danger tells must read over it, and the wheel
+      // is what the player acts on when docked. Its expanded overlay lets the
+      // match play on behind it, so it deliberately does not claim the top.
+      this.minimap,
       this.alarmGroup,
       this.wheel,
       // Cost floats ride above the wheel (they launch off its wedges) and travel
@@ -616,6 +652,7 @@ export class Hud extends Container {
     this.updateHealthBars(frame, underAttack);
     this.updateNameplates(frame);
     this.updateTapMarkers(frame);
+    this.updateMinimap(frame);
     this.updatePlanetHp(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
@@ -974,6 +1011,76 @@ export class Hud extends Container {
    *  {@link enableTapMarkerDebug} was called. */
   debugTapMarkers(): DrawnTapMarkers {
     return this.tapMarkers.debugMarkers();
+  }
+
+  // --- Minimap (GDD §2.2; field request v0.2.2) ---------------------------
+
+  /** Draw the minimap from this frame's map-space content (or hide it when the
+   *  world isn't wired yet). The pure model in {@link ./minimap} holds the toggle
+   *  state and the fit; this hands the view the frame, the current state, and the
+   *  viewport/touch/insets it lays out against, plus the sim tick that throttles
+   *  the content redraw. The touch flag + insets are stashed so a pointer event
+   *  between frames ({@link minimapTap}) hit-tests the same geometry. */
+  private updateMinimap(frame: HudFrame): void {
+    this.minimapIsTouch = frame.isTouch;
+    this.minimapInsets = frame.minimapInsets ?? {};
+    const tick = frame.tick ?? Math.floor(frame.time * 60);
+    this.minimap.update(
+      frame.minimap ?? null,
+      this.minimapModel.state,
+      { width: this.screenWidth, height: this.screenHeight },
+      this.minimapIsTouch,
+      this.minimapInsets,
+      tick,
+    );
+  }
+
+  /**
+   * Route a click/tap at a screen point to the minimap. If it lands on the active
+   * surface (the corner square, or the whole overlay when expanded) the model
+   * toggles and this returns `true` — the caller then consumes the event so the
+   * same press never also flies the ship or engages a stick under it. Returns
+   * `false` (leaving the event to fall through) when the minimap isn't showing or
+   * the point missed. The ONE entry point PC clicks and mobile taps share, so the
+   * two platforms can never diverge (docs/input-parity.md; ./minimap.test.ts).
+   */
+  minimapTap(x: number, y: number): boolean {
+    if (!this.minimap.visible) return false;
+    return this.minimapModel.tap(
+      x,
+      y,
+      { width: this.screenWidth, height: this.screenHeight },
+      this.minimapIsTouch,
+      this.minimapInsets,
+    );
+  }
+
+  /** Toggle the minimap (the `M` keyboard shortcut on PC — {@link
+   *  ./minimap} `MINIMAP_TOGGLE_KEY}). No-op-safe when the minimap is hidden: the
+   *  state flips regardless, and the view stays hidden until a frame is fed. */
+  toggleMinimap(): void {
+    this.minimapModel.toggle();
+  }
+
+  /** Whether the minimap overlay is open — for a caller that wants to know (e.g.
+   *  to suppress a conflicting overlay). */
+  minimapExpanded(): boolean {
+    return this.minimapModel.expanded;
+  }
+
+  /** ?debug=1 live-stage seam: arm the minimap layer's drawn-state capture so
+   *  {@link debugMinimap} can read it back. Called once from `main.ts` under
+   *  ?debug=1; no effect on a normal build. */
+  enableMinimapDebug(): void {
+    this.minimap.enableDebugCapture();
+  }
+
+  /** The minimap state the layer actually drew last frame — the active rect (where
+   *  a live-stage test taps to toggle), the toggle state, and the own-ship dot
+   *  position (which the test watches track the ship's motion). Empty until
+   *  {@link enableMinimapDebug} is called. */
+  debugMinimap(): DrawnMinimap {
+    return this.minimap.debugMinimap();
   }
 
   /**
@@ -1486,6 +1593,14 @@ export class Hud extends Container {
     // getBounds(), so it registers itself the same way.
     if (shown(this.oreHold)) {
       for (const entry of this.oreHold.describeLayout(viewport)) entries.push(entry);
+    }
+
+    // Minimap: registers its corner rect when collapsed and its overlay rect when
+    // expanded (one at a time — the state it drew), through the same self-computed
+    // getBounds() discipline as the health bars. So "it appears where it's supposed
+    // to" is a test on BOTH states and BOTH phone profiles (field request rule 3).
+    if (shown(this.minimap)) {
+      for (const entry of this.minimap.describeLayout(viewport)) entries.push(entry);
     }
 
     // `viewport` is the host's size; the HUD was laid out against the same
