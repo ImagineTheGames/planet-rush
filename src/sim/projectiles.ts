@@ -238,6 +238,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
     const rr = ship.radius + p.radius;
     if (dist2(p.pos, ship.pos) > rr * rr) continue;
     damageShip(world, ship, p.damage);
+    if (p.kind === 'ship') forfeitProtection(world, p.owner);
     return true;
   }
 
@@ -263,6 +264,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       const rr = turret.radius + p.radius;
       if (dist2(p.pos, turret.pos) > rr * rr) continue;
       damageTurret(turret, p.damage);
+      forfeitProtection(world, p.owner);
       return true;
     }
     // A dead or spawn-protected core is not a target — the shot flies over it,
@@ -276,10 +278,25 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
     // projectile carries its ship-damage, scaled down here the way the beam's
     // core DPS was scaled from its ship DPS.
     damagePlanet(world, planet, p.damage * PROJECTILE_CORE_FACTOR);
+    forfeitProtection(world, p.owner);
     return true;
   }
 
   return false;
+}
+
+/**
+ * Spend `owner`'s spawn protection because it just landed an offensive hit
+ * (field report v0.2.1). Idempotent and cheap: a shooter that was never
+ * protected (the common case) is untouched, and once cleared it stays cleared
+ * for the rest of that life. Called only from the enemy-damage branches of
+ * {@link resolveHit} for a ship weapon shot — never on a mined rock — so the
+ * opening grace survives mining but ends the moment you draw first blood on an
+ * enemy ship, turret, or core (GDD §2.1 grace is to fly, not to siege).
+ */
+function forfeitProtection(world: World, owner: PlayerId): void {
+  const ship = ownerShip(world, owner);
+  if (ship && ship.spawnProtect > 0) ship.spawnProtect = 0;
 }
 
 /** Live shots owned by `owner` — a small helper for tests and any read model
