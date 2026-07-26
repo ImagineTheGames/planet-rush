@@ -137,6 +137,46 @@ export type {
 export { WheelToggle, WHEEL_TRANSITION_SECONDS } from './wheel-toggle';
 export type { WheelPhase } from './wheel-toggle';
 
+// --- Shared press & action feedback (field report v0.2.2) ------------------
+//
+// The ONE place press/confirm feel is implemented: an immediate pressed tell
+// (scale + glow) on touch-down, a rejected shake/flash for a disabled control,
+// and — driven from the sim's real state change, not the press — a confirmation
+// pulse + cost-float + repair shimmer. The wheel view samples the `PressFeedback`
+// driver per wedge; confirmations are derived by `detectConfirmations` from the
+// same sim numbers the HUD already reads (press-feedback.ts).
+
+export {
+  PressFeedback,
+  detectConfirmations,
+  buildSegmentIndex,
+  pressPulse,
+  rejectPulse,
+  confirmPulse,
+  NEUTRAL_FEEDBACK,
+  PRESS_FLASH_SECONDS,
+  PRESS_SCALE,
+  PRESS_GLOW,
+  REJECT_SECONDS,
+  REJECT_SHAKE_PX,
+  REJECT_FLASH,
+  CONFIRM_SECONDS,
+  CONFIRM_PULSE,
+  CONFIRM_SHIMMER,
+  CONFIRM_REPEAT_GAP,
+  COST_FLOAT_RISE,
+} from './press-feedback';
+export type {
+  PressSurface,
+  PressPulse,
+  RejectPulse,
+  ConfirmPulse,
+  CostFloat,
+  Confirmation,
+  ControlFeedback,
+  WheelSnapshot,
+} from './press-feedback';
+
 // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) ----------------
 
 export {
