@@ -203,10 +203,25 @@ export function shipBeamCoreDps(loadout: ShipLoadout): number {
   return shipBeam(loadout) * (BEAM_DPS_CORE / BEAM_DPS_SHIP);
 }
 
-/** Ore per second of beam-on-asteroid — `MINING_RATE` scaled by this ship's beam
- *  against the Vanguard baseline, so a stock Vanguard mines exactly 0.5/s. */
+/** Ore per second at the mining face — `MINING_RATE` scaled by this ship's beam
+ *  against the Vanguard baseline, so a stock Vanguard mines exactly 0.5/s. Since
+ *  mining is a projectile now (amendment v0.3), this is the *target* steady-state
+ *  rate the per-hit chip (`shipMineYield`) is sized to hit, not a per-tick draw. */
 export function shipMiningRate(loadout: ShipLoadout): number {
   return MINING_RATE * (shipBeam(loadout) / VANGUARD_BEAM);
+}
+
+/**
+ * Ore chipped by one of this ship's weapon projectiles when it strikes an
+ * asteroid — mining is shooting now (ratified amendment v0.3). It is the ship's
+ * continuous mining rate spread over one fire interval, so a ship holding fire at
+ * the mining face extracts ore at exactly `shipMiningRate` (shots land one
+ * `SHIP_WEAPON.fireInterval` apart), and the chip still rides the one beam stat —
+ * mining speed and weapon damage move together (GDD §2.5). `MINING_YIELD_PER_HIT`
+ * is the Vanguard baseline this scales from.
+ */
+export function shipMineYield(loadout: ShipLoadout): number {
+  return shipMiningRate(loadout) * SHIP_WEAPON.fireInterval;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,19 @@
 /**
- * src/sim/projectiles.ts — pooled combat projectiles. OWNER: Gameplay Engineer.
+ * src/sim/projectiles.ts — the ONE weapon system. OWNER: Gameplay Engineer.
  *
- * The ratified design amendment v0.2 (`docs/design-amendments.md`) splits the
- * one shared beam: **mining stays a beam** (segment-vs-circle raycast vs
- * asteroids, untouched in `./step`), but **ship-vs-ship and ship-vs-structure
- * combat is a projectile** — "if we switch to a projectile there's a chance to
- * dodge and it becomes a lot funner." Turrets already fired projectiles (GDD
- * §2.6, §4.1); this module is the single pooled system both shooters now share,
- * so a ship shot and a turret shot fly, expire, collide and snapshot the same
- * way.
+ * Ratified amendment v0.3 (`docs/design-amendments.md`): **"the mining laser
+ * should go away, it should be a projectile as well… that way we don't have
+ * laser + projectile, just projectile."** There is now one pooled shot for
+ * everything a ship or turret fires. A ship's shot carries two payloads and what
+ * it strikes first decides which applies:
+ *  - it hits an **asteroid** ⇒ it chips ore chunks (`mineYield`), and the tractor
+ *    rules (GDD §2.3) collect them exactly as before — only the chipping
+ *    mechanism changed, the beam is gone;
+ *  - it hits an enemy **ship / turret / shield / core** ⇒ it deals `damage`
+ *    (GDD §2.4 target list).
+ * Because collision decides, "you cannot shoot through things" is free: a rock
+ * between you and an enemy eats the shot (and gets mined). A `'turret'` shot is
+ * unchanged from p1-14 — it hits only enemy ships, never rock or structures.
  *
  * Pooled (GDD §4.3): `world.projectiles` is a dense array of reusable slots and
  * `active` marks a live shot, so a firefight allocates nothing per frame beyond
@@ -16,31 +21,29 @@
  * `active === false` slots.
  *
  * Determinism (GDD §4.8): fixed iteration order (pool order for stepping;
- * ships, then planets' turrets, then cores for collision), no RNG, every rate
- * `* dt`, one sqrt only where a true magnitude is needed (the lead solve).
+ * ships, then asteroids, then turrets, then cores for collision), no RNG, every
+ * rate `* dt`, one sqrt only where a true magnitude is needed (the lead solve).
  *
- * The target list is the shot's `kind`:
- *  - a `'ship'` weapon shot is siege-capable — it collides with enemy ships,
- *    turrets, shields and cores (GDD §2.4 target list, minus asteroids: shots
- *    fly over rock, mining is the beam's job);
- *  - a `'turret'` shot hits only enemy ships, keeping p1-14's turret behaviour
- *    exactly as it was.
  * A shot never hits its owner's own fleet (`owner` exclusion), and it passes
  * *over* anything under spawn protection rather than dying on it (GDD §2.1) —
- * the same "not a target, so the shot continues" rule the beam used.
+ * asteroids have no owner and no protection, so any ship shot mines any rock.
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import {
+  ASTEROID,
+  CHUNK,
   PROJECTILE,
   PROJECTILE_CORE_FACTOR,
   SHIP_WEAPON,
   TURRET,
+  clampToMargin,
 } from './constants';
 import { damagePlanet, damageTurret, planetTargetRadius } from './buildings';
 import { damageShip } from './damage';
-import type { Projectile, Ship, Turret, World } from './state';
-import { shipProjectileLife, shipProjectileSpeed, shipWeaponDamage } from './upgrades';
+import type { SpatialHash } from './spatial-hash';
+import type { Asteroid, Projectile, Ship, Turret, World } from './state';
+import { shipMineYield, shipProjectileLife, shipProjectileSpeed, shipWeaponDamage } from './upgrades';
 import { dist2, normalize } from './vec';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +67,7 @@ export function takeProjectile(world: World): Projectile {
     pos: { x: 0, y: 0 },
     vel: { x: 0, y: 0 },
     damage: 0,
+    mineYield: 0,
     radius: PROJECTILE.radius,
     life: 0,
   };
@@ -76,12 +80,13 @@ export function takeProjectile(world: World): Projectile {
 // ---------------------------------------------------------------------------
 
 /**
- * Loose one **ship weapon** projectile along the unit vector `dir` (design
- * amendment v0.2). Speed, damage and lifetime all read from the ship's upgrade
- * state through `./upgrades` — one beam, one stat (GDD §2.5): the beam ladder
- * that speeds mining also speeds and hardens the shot ("make them faster,
- * stronger"). Born at the hull's surface so the muzzle sits on the ship, not
- * inside it. `dir` must be unit length; the callers (`./step`) normalise.
+ * Loose one **ship weapon** projectile along the unit vector `dir` — the single
+ * shot that both mines and fights (ratified amendment v0.3). Speed, damage,
+ * mining yield and lifetime all read from the ship's upgrade state through
+ * `./upgrades` — one beam, one stat (GDD §2.5): the beam ladder that speeds
+ * mining also speeds and hardens the shot ("make them faster, stronger"). Born
+ * at the hull's surface so the muzzle sits on the ship, not inside it. `dir` must
+ * be unit length; the callers (`./step`) normalise.
  */
 export function fireShipProjectile(world: World, ship: Ship, dir: Vec2): void {
   const speed = shipProjectileSpeed(ship);
@@ -95,6 +100,7 @@ export function fireShipProjectile(world: World, ship: Ship, dir: Vec2): void {
   slot.vel.x = dir.x * speed;
   slot.vel.y = dir.y * speed;
   slot.damage = shipWeaponDamage(ship);
+  slot.mineYield = shipMineYield(ship);
   slot.radius = SHIP_WEAPON.radius;
   slot.life = shipProjectileLife(ship);
   slot.kind = 'ship';
@@ -118,6 +124,10 @@ export function fireTurretProjectile(world: World, turret: Turret, aim: number):
   slot.vel.x = dx * TURRET.projectileSpeed;
   slot.vel.y = dy * TURRET.projectileSpeed;
   slot.damage = PROJECTILE.damage;
+  // A turret does not mine; zero the recycled slot's yield so a reused ship-shot
+  // slot never carries a stale chip value (turret shots never reach a rock, but
+  // the field is part of the serialized/hashed state — keep it clean).
+  slot.mineYield = 0;
   slot.radius = PROJECTILE.radius;
   slot.life = PROJECTILE.life;
   slot.kind = 'turret';
@@ -184,11 +194,11 @@ export function leadAim(origin: Vec2, targetPos: Vec2, targetVel: Vec2, speed: n
  * Fly every live shot, expire it, and test it against its target list — the same
  * circle test as everything else (GDD §4.1). A projectile despawns on the first
  * body it strikes, on expiry, or on leaving the arena; the slot returns to the
- * pool. Runs after the beam so a structure killed by a beam this tick is already
- * gone (`./step` order), and the shot moves *then* tests, so a point-blank shot
- * still lands the tick it is fired.
+ * pool. The shot moves *then* tests, so a point-blank shot still lands the tick
+ * it is fired. `hash` is the tick's asteroid broad phase (`./step`), reused here
+ * so a ship shot narrows its rock candidates instead of scanning the whole field.
  */
-export function updateProjectiles(world: World, dt: number): void {
+export function updateProjectiles(world: World, hash: SpatialHash, dt: number): void {
   for (const p of world.projectiles) {
     if (!p.active) continue;
 
@@ -206,18 +216,22 @@ export function updateProjectiles(world: World, dt: number): void {
       continue;
     }
 
-    if (resolveHit(world, p)) p.active = false;
+    if (resolveHit(world, hash, p)) p.active = false;
   }
 }
 
 /**
- * The first body a shot strikes this tick, applying its damage, or `false` if it
+ * The first body a shot strikes this tick, applying its effect, or `false` if it
  * passed cleanly. Ships first (every shot can hit a hull), then — for a ship
- * weapon shot only — enemy turrets, shields and cores. A turret shot hits only
- * ships, so p1-14's turret behaviour is untouched. Spawn-protected bodies and
- * the shot owner's own fleet are skipped (the shot flies over them, GDD §2.1).
+ * weapon shot only — **asteroids** (chip ore, mining is shooting now, amendment
+ * v0.3), then enemy turrets, shields and cores. A turret shot hits only ships, so
+ * p1-14's turret behaviour is untouched (it never reaches the rock or structure
+ * branches). Spawn-protected bodies and the shot owner's own fleet are skipped
+ * (the shot flies over them, GDD §2.1); a rock has neither, so any ship shot
+ * mines any rock — and a rock in the line eats a shot bound for an enemy behind
+ * it, which is "you cannot shoot through things" for free.
  */
-function resolveHit(world: World, p: Projectile): boolean {
+function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
     if (!ship.alive || ship.id === p.owner || ship.spawnProtect > 0) continue;
@@ -227,8 +241,18 @@ function resolveHit(world: World, p: Projectile): boolean {
     return true;
   }
 
-  // Only a ship weapon shot besieges structures (design amendment v0.2, item 2).
+  // Only a ship weapon shot mines rock or besieges structures.
   if (p.kind !== 'ship') return false;
+
+  // Asteroids: a ship shot chips any rock it reaches (mining is shooting).
+  for (const idx of hash.query(p.pos, p.radius + ASTEROID.maxRadius)) {
+    const a = world.asteroids[idx];
+    if (!a) continue;
+    const rr = a.radius + p.radius;
+    if (dist2(p.pos, a.pos) > rr * rr) continue;
+    chipAsteroid(world, a, ownerShip(world, p.owner), p.mineYield ?? 0);
+    return true;
+  }
 
   for (let pi = 0; pi < world.planets.length; pi++) {
     const planet = world.planets[pi]!;
@@ -262,4 +286,69 @@ function resolveHit(world: World, p: Projectile): boolean {
  *  that wants a shooter's shots without walking the sparse pool by hand. */
 export function activeProjectilesOf(world: World, owner: PlayerId): Projectile[] {
   return world.projectiles.filter((p) => p.active && p.owner === owner);
+}
+
+// ---------------------------------------------------------------------------
+// Mining — chipping a rock with a shot (ratified amendment v0.3)
+// ---------------------------------------------------------------------------
+
+/** The ship that fired a shot, so mined chunks can drift toward it (the tractor
+ *  then collects them, GDD §2.3). Ships never leave the array, so a shot always
+ *  finds its owner even after it died; a `null` guards the degenerate case. */
+function ownerShip(world: World, owner: PlayerId): Ship | null {
+  for (const s of world.ships) {
+    if (s.id === owner) return s;
+  }
+  return null;
+}
+
+/**
+ * Chip `yieldAmount` ore out of asteroid `a` — one weapon projectile's mining
+ * hit (amendment v0.3). Identical bookkeeping to the retired continuous beam:
+ * ore is drawn down (never below zero, so total-ore-per-asteroid is exactly the
+ * ratified `ore`), the crack stage advances across its three thresholds
+ * (GDD §5.5), and whole chunks are emitted from a fractional buffer, drifting
+ * toward the miner. The rock is removed at end of step by `./step` once its ore
+ * hits zero — collision indices stay stable within the tick (GDD §4.8).
+ */
+function chipAsteroid(world: World, a: Asteroid, toward: Ship | null, yieldAmount: number): void {
+  const amount = Math.min(yieldAmount, a.ore);
+  a.ore -= amount;
+  a.mineBuffer += amount;
+
+  const frac = a.ore / a.maxOre;
+  a.crackStage = frac > ASTEROID.crackThresholds[0] ? 0 : frac > ASTEROID.crackThresholds[1] ? 1 : 2;
+
+  while (a.mineBuffer >= CHUNK.ore) {
+    spawnMinedChunk(world, a, toward, CHUNK.ore);
+    a.mineBuffer -= CHUNK.ore;
+  }
+
+  if (a.ore <= 1e-9) {
+    a.ore = 0;
+    if (a.mineBuffer > 1e-9) {
+      spawnMinedChunk(world, a, toward, a.mineBuffer);
+      a.mineBuffer = 0;
+    }
+  }
+}
+
+/** Spawn one ore chunk at the asteroid's surface, drifting toward the miner
+ *  `toward` (or straight out along +x if the owner is somehow gone). Pooled into
+ *  the same chunk array (and the same renderer/tractor) mined ore always used;
+ *  the drift heading is pure geometry, no RNG (GDD §4.8). */
+function spawnMinedChunk(world: World, a: Asteroid, toward: Ship | null, amount: number): void {
+  const dir = toward
+    ? normalize({ x: toward.pos.x - a.pos.x, y: toward.pos.y - a.pos.y }, { x: 1, y: 0 })
+    : { x: 1, y: 0 };
+  world.chunks.push({
+    id: world.nextEntityId++,
+    pos: {
+      x: clampToMargin(a.pos.x + dir.x * (a.radius + CHUNK.radius), CHUNK.radius, world.bounds.width),
+      y: clampToMargin(a.pos.y + dir.y * (a.radius + CHUNK.radius), CHUNK.radius, world.bounds.height),
+    },
+    vel: { x: dir.x * CHUNK.ejectSpeed, y: dir.y * CHUNK.ejectSpeed },
+    amount,
+    radius: CHUNK.radius,
+  });
 }

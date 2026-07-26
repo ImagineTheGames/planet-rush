@@ -283,13 +283,18 @@ describe('the class stat table (GDD §2.11)', () => {
 
   it('gives each class the mining rate it says it has, in the running sim', () => {
     for (const cls of ALL_CLASSES) {
-      const ship = makeShip({ id: 0, pos: at(0, 0), shipClass: cls, cargoCap: 999 });
-      const rock = makeAsteroid({ id: 1, pos: at(120, 0), ore: 500 });
+      const ship = makeShip({ id: 0, pos: at(0, 0), shipClass: cls, cargoCap: 999, angle: 0 });
+      const rock = makeAsteroid({ id: 1, pos: at(120, 0), ore: 1000 });
       const world = makeWorld({ ships: [ship], asteroids: [rock] });
       const before = rock.ore;
-      const ticks = 120;
-      for (let t = 0; t < ticks; t++) step(world, [{ id: 0, actions: [fire()] }]);
-      expect((before - rock.ore) / (ticks * TICK_DT)).toBeCloseTo(shipMiningRate(ship), 6);
+      const SECONDS = 15;
+      for (let t = 0; t < 60 * SECONDS; t++) step(world, [{ id: 0, actions: [fire()] }]);
+      const rate = (before - rock.ore) / SECONDS;
+      // Mining is a projectile now (amendment v0.3): shots land one fire-interval
+      // apart, so the running-sim rate is the class's `shipMiningRate`, a hair
+      // under by the one-off shot-travel latency. Within ~15%, and never above.
+      expect(rate).toBeGreaterThan(shipMiningRate(ship) * 0.85);
+      expect(rate).toBeLessThanOrEqual(shipMiningRate(ship) + 1e-6);
     }
   });
 });
@@ -603,18 +608,26 @@ describe('the upgradeOrder action (GDD §2.4, §2.9)', () => {
   it('makes a bought beam tier mine faster and hit harder', () => {
     const spec = UPGRADES[UpgradeTrack.Beam];
     const { world, ship } = dockedWorld(ShipClass.Vanguard, 100);
-    ship.cargoCap = 999;
     step(world, buy(0, UpgradeTrack.Beam));
     expect(ship.tiers[UpgradeTrack.Beam]).toBe(1);
 
-    // Mining: measured ore/s off a rock parked within beam range of home.
-    const rock = makeAsteroid({ id: 7, pos: at(120, 0), ore: 500 });
-    world.asteroids.push(rock);
-    const before = rock.ore;
-    const ticks = 120;
-    for (let t = 0; t < ticks; t++) step(world, [{ id: 0, actions: [fire()] }]);
-    const rate = (before - rock.ore) / (ticks * TICK_DT);
-    expect(rate).toBeCloseTo(MINING_RATE * spec.steps[1]!, 6);
+    // Mining faster: mining is a projectile now (amendment v0.3), so compare the
+    // upgraded ship's ore/s against a stock control over the same window and
+    // standoff rather than pin an exact continuous rate. The chip rides the beam
+    // multiplier, so the ratio is the beam tier's step.
+    const measure = (tiers: UpgradeTiers): number => {
+      const shooter = makeShip({ id: 0, pos: at(0, 0), angle: 0, cargoCap: 999, tiers });
+      const rock = makeAsteroid({ id: 7, pos: at(120, 0), ore: 1000 });
+      const w = makeWorld({ ships: [shooter], asteroids: [rock] });
+      const before = rock.ore;
+      const SECONDS = 12;
+      for (let t = 0; t < 60 * SECONDS; t++) step(w, [{ id: 0, actions: [fire()] }]);
+      return (before - rock.ore) / SECONDS;
+    };
+    const upgraded = measure(ship.tiers);
+    const stock = measure(stockTiers());
+    expect(upgraded).toBeGreaterThan(stock); // the bought beam tier mines faster
+    expect(upgraded / stock).toBeCloseTo(spec.steps[1]!, 1); // ×1.25, the beam step
 
     // Weapon: the same tier, the same multiplier, against an enemy core.
     expect(shipBeamShipDps(ship)).toBeCloseTo(BEAM_DPS_SHIP * spec.steps[1]!, 9);

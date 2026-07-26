@@ -259,6 +259,54 @@ describe('a ship shot besieges structures; a turret shot hits only ships', () =>
   });
 });
 
+// --- mining is shooting (ratified amendment v0.3) --------------------------
+
+describe('a ship shot chips a rock — mining is shooting (amendment v0.3)', () => {
+  it('a single shot that strikes an asteroid chips its ore and dies on the rock', () => {
+    const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0 });
+    const rock = {
+      id: 7, pos: { x: 1120, y: 1000 }, radius: 30, ore: 40, maxOre: 40, crackStage: 0, mineBuffer: 0,
+    };
+    const world = makeWorld({ ships: [shooter], asteroids: [rock] });
+
+    fireShipProjectile(world, shooter, normalize({ x: 1, y: 0 })); // straight at the rock
+    for (let t = 0; t < 20 && rock.ore === rock.maxOre; t++) step(world, []);
+
+    expect(rock.ore).toBeLessThan(rock.maxOre); // it was chipped
+    expect(world.projectiles.some((p) => p.active && p.owner === 0)).toBe(false); // the shot died on the rock
+  });
+
+  it('sustained fire breaks whole ore chunks off the rock (GDD §2.3)', () => {
+    const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0 });
+    const rock = {
+      id: 7, pos: { x: 1120, y: 1000 }, radius: 30, ore: 40, maxOre: 40, crackStage: 0, mineBuffer: 0,
+    };
+    const world = makeWorld({ ships: [shooter], asteroids: [rock] });
+
+    // Hold auto-fire: enough hits fill the fractional buffer past one whole chunk.
+    const inputs: Inputs = [{ id: 0, actions: [{ type: 'fire', active: true, auto: true }] }];
+    for (let t = 0; t < 60 * 5 && world.chunks.length === 0; t++) step(world, inputs);
+    expect(world.chunks.length).toBeGreaterThan(0);
+  });
+
+  it('conserves total ore: chipping a rock out yields exactly its ore, no more', () => {
+    // A big hold so every chunk is collected; hold auto-fire until the rock is
+    // gone, then the whole rock's ore is accounted for on the ship + loose chunks.
+    const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0, cargoCap: 100 });
+    const rock = {
+      id: 7, pos: { x: 1120, y: 1000 }, radius: 30, ore: 5, maxOre: 5, crackStage: 0, mineBuffer: 0,
+    };
+    const world = makeWorld({ ships: [shooter], asteroids: [rock] });
+
+    const inputs: Inputs = [{ id: 0, actions: [{ type: 'fire', active: true, auto: true }] }];
+    for (let t = 0; t < 60 * 20 && world.asteroids.length > 0; t++) step(world, inputs);
+
+    expect(world.asteroids).toHaveLength(0); // fully mined out
+    const looseOre = world.chunks.reduce((n, c) => n + c.amount, 0);
+    expect(world.ships[0]!.cargo + looseOre).toBeCloseTo(5, 6); // exactly the rock's ore
+  });
+});
+
 // --- the pool ---------------------------------------------------------------
 
 describe('the shared projectile pool (GDD §4.3)', () => {
