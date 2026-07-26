@@ -34,7 +34,7 @@
 import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { UpgradeTrack } from '@shared/types';
 import type { BotView, PerceivedAsteroid, PerceivedPlanet, PerceivedShip } from '../src/bots';
-import { BEAM_RANGE, PLANET, SPAWN_PROTECTION_S, TURRET, SHIELD } from '../src/sim';
+import { WEAPON_RANGE, PLANET, SPAWN_PROTECTION_S, TURRET, SHIELD } from '../src/sim';
 
 // ---------------------------------------------------------------------------
 // The strategy contract
@@ -198,23 +198,23 @@ function miner(): (view: BotView) => readonly Action[] {
       if (self.docked) {
         presses++;
         return [
-          ...bankAndSpend(view, [upgradePress([UpgradeTrack.Cargo, UpgradeTrack.Beam, UpgradeTrack.Engine], presses)]),
+          ...bankAndSpend(view, [upgradePress([UpgradeTrack.Cargo, UpgradeTrack.Power, UpgradeTrack.Engine], presses)]),
           HOLD_FIRE,
         ];
       }
       return [approach(view, home.pos, PLANET.dockRange * 0.6), HOLD_FIRE];
     }
 
-    // Loose chunks are free ore and closer than a rock's worth of beam time.
+    // Loose chunks are free ore and closer than a rock's worth of weapon time.
     const chunk = view.chunks[0];
     const rock = nearestAsteroid(view);
     if (chunk && (!rock || chunk.distance < rock.distance * 0.5)) {
       return [approach(view, chunk.pos, 0), HOLD_FIRE];
     }
     if (!rock) return [approach(view, view.center, 0), HOLD_FIRE];
-    // Stand off inside beam range and hold the trigger: mining is a beam, not a
+    // Stand off inside weapon range and hold the trigger: mining is a shot, not a
     // ram (GDD §2.3).
-    return [approach(view, rock.pos, BEAM_RANGE * 0.7), rock.distance < BEAM_RANGE ? FIRE : HOLD_FIRE];
+    return [approach(view, rock.pos, WEAPON_RANGE * 0.7), rock.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE];
   };
 }
 
@@ -249,7 +249,7 @@ function turtle(): (view: BotView) => readonly Action[] {
 
     if (self.docked && hasBusiness) {
       const enemy = nearestEnemyShip(view);
-      const fire = enemy && enemy.distance < BEAM_RANGE ? FIRE : HOLD_FIRE;
+      const fire = enemy && enemy.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE;
       return [...bankAndSpend(view, wants), { type: 'thrust', dir: { x: 0, y: 0 } }, fire];
     }
 
@@ -259,13 +259,13 @@ function turtle(): (view: BotView) => readonly Action[] {
     // that chases the field is not a turtle.
     const rock = nearestAsteroid(view);
     if (rock && dist(rock.pos, home.pos) < view.perception.visualRange) {
-      return [approach(view, rock.pos, BEAM_RANGE * 0.7), rock.distance < BEAM_RANGE ? FIRE : HOLD_FIRE];
+      return [approach(view, rock.pos, WEAPON_RANGE * 0.7), rock.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE];
     }
     return [approach(view, home.pos, PLANET.dockRange * 0.6), HOLD_FIRE];
   };
 }
 
-/** Fly at the nearest surviving enemy home and hold the beam on it, forever.
+/** Fly at the nearest surviving enemy home and hold the trigger on it, forever.
  *  The siege hypothesis (GDD §2.6) at its crudest: a lone attacker against
  *  whatever the defender built. It mines only while spawn protection is up,
  *  because there is nothing else to do in the first ten seconds. */
@@ -277,7 +277,7 @@ function rusher(): (view: BotView) => readonly Action[] {
     if (opening(view)) {
       const rock = nearestAsteroid(view);
       if (rock) {
-        return [approach(view, rock.pos, BEAM_RANGE * 0.7), rock.distance < BEAM_RANGE ? FIRE : HOLD_FIRE];
+        return [approach(view, rock.pos, WEAPON_RANGE * 0.7), rock.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE];
       }
       return [approach(view, view.center, 0), HOLD_FIRE];
     }
@@ -285,10 +285,10 @@ function rusher(): (view: BotView) => readonly Action[] {
     const target = nearestEnemyPlanet(view);
     if (!target) return [approach(view, view.center, 0), HOLD_FIRE];
 
-    // Park at the edge of beam range: outside turret range (240 < 260) is the
+    // Park at the edge of weapon range: outside turret range (240 < 260) is the
     // skill GDD §2.6 names, and standing off is how it is expressed.
-    const standoff = target.radius + BEAM_RANGE * 0.75;
-    return [approach(view, target.pos, standoff), target.distance < BEAM_RANGE + target.radius ? FIRE : HOLD_FIRE];
+    const standoff = target.radius + WEAPON_RANGE * 0.75;
+    return [approach(view, target.pos, standoff), target.distance < WEAPON_RANGE + target.radius ? FIRE : HOLD_FIRE];
   };
 }
 
@@ -309,10 +309,10 @@ function raider(): (view: BotView) => readonly Action[] {
       if (self.cargoFull || self.cargo > 0) return mine(view);
       return [approach(view, view.center, 0), HOLD_FIRE];
     }
-    // Close to inside beam range and hold the trigger. Auto-aim engages the
-    // nearest valid target, so a rock between them eats the beam — that is the
+    // Close to inside weapon range and hold the trigger. Auto-aim engages the
+    // nearest valid target, so a rock between them eats the shot — that is the
     // honest cost of hunting inside the field, not a bug to code around.
-    return [approach(view, prey.pos, BEAM_RANGE * 0.6), prey.distance < BEAM_RANGE ? FIRE : HOLD_FIRE];
+    return [approach(view, prey.pos, WEAPON_RANGE * 0.6), prey.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE];
   };
 }
 

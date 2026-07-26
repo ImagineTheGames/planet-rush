@@ -54,7 +54,7 @@ describe('WorldObserver — the sim shape it reads', () => {
     // rename that still typechecks structurally on a partially-shared shape.
     const world = newWorld();
     const ship = world.ships[0]!;
-    for (const key of ['id', 'pos', 'vel', 'angle', 'radius', 'alive', 'hull', 'maxHull', 'cargo', 'cargoCap', 'banked', 'spawnProtect', 'tiers', 'beam']) {
+    for (const key of ['id', 'pos', 'vel', 'angle', 'radius', 'alive', 'hull', 'maxHull', 'cargo', 'cargoCap', 'banked', 'spawnProtect', 'tiers', 'firing']) {
       expect(ship, `Ship.${key}`).toHaveProperty(key);
     }
     const planet = world.planets[0]!;
@@ -115,8 +115,8 @@ function ship(over: Record<string, unknown> = {}): unknown {
     cargoCap: 2,
     banked: 0,
     spawnProtect: 0,
-    tiers: { beam: 0, engine: 0, cargo: 0, hull: 0 },
-    beam: null,
+    tiers: { power: 0, engine: 0, cargo: 0, hull: 0 },
+    firing: false,
     ...over,
   };
 }
@@ -191,8 +191,11 @@ describe('WorldObserver — deriving the moments', () => {
     expect(burst.x[burst.indexOf(TELL.rockBurst)]).toBe(10); // its last known place
   });
 
-  it('splits the beam into rock and hull voices (GDD §3.6)', () => {
-    const beam = (hit: { x: number; y: number }) => ({
+  const firingTurret = (m: unknown, over: Record<string, unknown> = {}) =>
+    planet({ turrets: [{ id: 5, pos: { x: 0, y: 0 }, radius: 8, angle: 0, cooldown: 0, hp: 30, muzzle: m }], ...over });
+
+  it('splits the muzzle flash into rock and hull voices (GDD §3.6)', () => {
+    const muzzle = (hit: { x: number; y: number }) => ({
       origin: { x: 0, y: 0 },
       dir: { x: 1, y: 0 },
       hitPoint: hit,
@@ -201,35 +204,35 @@ describe('WorldObserver — deriving the moments', () => {
     const target = ship({ id: 1, pos: { x: 300, y: 100 } });
 
     const onRock = diff(
-      world({ ships: [ship(), target] }),
-      world({ ships: [ship({ beam: beam({ x: 200, y: 100 }) }), target] }),
+      world({ ships: [target], planets: [firingTurret(null)] }),
+      world({ ships: [target], planets: [firingTurret(muzzle({ x: 200, y: 100 }))] }),
     );
-    expect(onRock.has(TELL.beamRock)).toBe(true);
-    expect(onRock.has(TELL.beamHull)).toBe(false);
+    expect(onRock.has(TELL.mineHit)).toBe(true);
+    expect(onRock.has(TELL.weaponHit)).toBe(false);
 
     const onHull = diff(
-      world({ ships: [ship(), target] }),
-      world({ ships: [ship({ beam: beam({ x: 300, y: 100 }) }), target] }),
+      world({ ships: [target], planets: [firingTurret(null)] }),
+      world({ ships: [target], planets: [firingTurret(muzzle({ x: 300, y: 100 }))] }),
     );
-    expect(onHull.has(TELL.beamHull)).toBe(true);
-    expect(onHull.has(TELL.beamRock)).toBe(false);
+    expect(onHull.has(TELL.weaponHit)).toBe(true);
+    expect(onHull.has(TELL.mineHit)).toBe(false);
   });
 
-  it('does not hear its own hull when a beam starts inside the firer', () => {
-    const b = { origin: { x: 100, y: 100 }, dir: { x: 1, y: 0 }, hitPoint: { x: 104, y: 100 }, length: 4 };
-    const tells = diff(world({ ships: [ship()] }), world({ ships: [ship({ beam: b })] }));
-    expect(tells.has(TELL.beamRock)).toBe(true);
-    expect(tells.has(TELL.beamHull)).toBe(false);
+  it('says nothing for a muzzle flash that reaches full range unobstructed', () => {
+    const clear = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: null, length: 400 };
+    const tells = diff(world({ planets: [firingTurret(null)] }), world({ planets: [firingTurret(clear)] }));
+    expect(tells.has(TELL.mineHit)).toBe(false);
+    expect(tells.has(TELL.weaponHit)).toBe(false);
   });
 
-  it('scales beam power with the beam tier — one beam, one stat (GDD §2.5)', () => {
-    const b = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: { x: 200, y: 100 }, length: 200 };
-    const stock = diff(world({ ships: [ship()] }), world({ ships: [ship({ beam: b })] }));
-    const upgraded = diff(
-      world({ ships: [ship({ tiers: { beam: 3, engine: 0, cargo: 0, hull: 0 } })] }),
-      world({ ships: [ship({ tiers: { beam: 3, engine: 0, cargo: 0, hull: 0 }, beam: b })] }),
+  it('carries the firing power and the turret owner on the muzzle voice (GDD §2.5)', () => {
+    const m = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: { x: 200, y: 100 }, length: 200 };
+    const tells = diff(
+      world({ planets: [firingTurret(null, { owner: 2 })] }),
+      world({ planets: [firingTurret(m, { owner: 2 })] }),
     );
-    expect(magnitudeOf(upgraded, TELL.beamRock)).toBeGreaterThan(magnitudeOf(stock, TELL.beamRock));
+    expect(magnitudeOf(tells, TELL.mineHit)).toBeGreaterThan(0);
+    expect(tells.player[tells.indexOf(TELL.mineHit)]).toBe(2); // the turret owner
   });
 
   it('fires the hold-full tell once, on the transition (GDD §2.2)', () => {

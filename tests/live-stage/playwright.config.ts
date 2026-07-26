@@ -4,7 +4,7 @@
  * A test class the unit suite cannot fake: it boots the REAL preview bundle (the
  * same artifact the classroom loads, GDD §4.6) and asserts what the booted client
  * puts on the PixiJS stage — not the render MODEL a unit test constructs in memory.
- * It exists for the round-2 field bug (enemy beams and turret fire invisible in the
+ * It exists for the round-2 field bug (enemy fire and turret fire invisible in the
  * real client while m2-11's model-level unit tests stayed green): the wiring from
  * sim combat state to the render layer lived nowhere a unit test could reach.
  *

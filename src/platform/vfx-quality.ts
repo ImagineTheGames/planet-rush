@@ -6,7 +6,7 @@
  * "reduce VFX" setting** (GDD §4.3, risk 5). This module is that trigger: it
  * watches per-frame times and flips a single `reduced` flag the render layer
  * reads to shed the non-load-bearing VFX (impact glows, spawn shimmer) while
- * keeping the readable tells (the beam line, ship, ore) intact.
+ * keeping the readable tells (muzzle flashes, ship, ore) intact.
  *
  * Two rules keep the flag from **flapping** — the whole reason this is a state
  * machine and not a threshold:

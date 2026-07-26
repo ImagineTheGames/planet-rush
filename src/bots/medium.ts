@@ -67,7 +67,7 @@ export const WAVE_CONTEST_LEAD = 14;
 
 /**
  * The balanced wallet. Defence first but *bounded*, then the two upgrades that
- * pay for themselves inside one match — hold size and beam — then the bank.
+ * pay for themselves inside one match — hold size and power — then the bank.
  *
  * The order is the triangle: a bot that never buys a turret dies at home, and a
  * bot that only buys turrets arrives at the collapse phase with a fortress, a
@@ -98,7 +98,7 @@ export function mediumSpendPlan(ctx: BotCtx): Purchase | null {
   }
 
   // The ship half of the economy. Cargo first — the cheapest tier in the ladder
-  // and the one a miner feels immediately (GDD §2.5) — then beam, which is both
+  // and the one a miner feels immediately (GDD §2.5) — then power, which is both
   // mining speed and weapon damage, so it pays on two sides of the triangle.
   for (const track of MEDIUM_UPGRADE_ORDER) {
     const cost = nextUpgradeCost(ctx.self, track);
@@ -115,7 +115,7 @@ export const MEDIUM_REPAIR_AT = 0.7;
 /** The ladder a Medium bot climbs, in order (GDD §2.5). TUNABLE */
 export const MEDIUM_UPGRADE_ORDER: readonly UpgradeTrack[] = [
   UpgradeTrack.Cargo,
-  UpgradeTrack.Beam,
+  UpgradeTrack.Power,
   UpgradeTrack.Engine,
 ];
 

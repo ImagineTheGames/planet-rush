@@ -19,10 +19,10 @@ import {
   ALARM_THRESHOLD_HP,
   ARROW_EDGE_INSET,
 } from './alarm';
-import { BEAM_DPS_CORE, TICK_DT } from '../sim/constants';
+import { WEAPON_DPS_CORE, TICK_DT } from '../sim/constants';
 
 /** Run `seconds` of sim ticks, dealing `dps` damage per second. */
-function beam(alarm: UnderAttackAlarm, seconds: number, dps: number): boolean {
+function fire(alarm: UnderAttackAlarm, seconds: number, dps: number): boolean {
   let firing = false;
   const ticks = Math.round(seconds / TICK_DT);
   for (let i = 0; i < ticks; i++) firing = alarm.update(TICK_DT, dps * TICK_DT);
@@ -31,7 +31,7 @@ function beam(alarm: UnderAttackAlarm, seconds: number, dps: number): boolean {
 
 /** Run `seconds` of quiet ticks. */
 function quiet(alarm: UnderAttackAlarm, seconds: number): boolean {
-  return beam(alarm, seconds, 0);
+  return fire(alarm, seconds, 0);
 }
 
 describe('the trigger — sustained damage, not a stray shot (GDD §2.2)', () => {
@@ -46,42 +46,42 @@ describe('the trigger — sustained damage, not a stray shot (GDD §2.2)', () =>
   it('stays silent through a taunt-tap: a graze, a pause, another graze', () => {
     const alarm = new UnderAttackAlarm();
     for (let i = 0; i < 6; i++) {
-      // Half a second of beam on the core, then two seconds of nothing.
-      expect(beam(alarm, 0.5, BEAM_DPS_CORE)).toBe(false);
+      // Half a second of fire on the core, then two seconds of nothing.
+      expect(fire(alarm, 0.5, WEAPON_DPS_CORE)).toBe(false);
       expect(quiet(alarm, 2)).toBe(false);
     }
     expect(alarm.active).toBe(false);
   });
 
-  it('fires under a real siege — a beam held on the core', () => {
+  it('fires under a real siege — fire held on the core', () => {
     const alarm = new UnderAttackAlarm();
-    // GDD §2.8's baseline beam-vs-core DPS. It must trip the alarm quickly
+    // GDD §2.8's baseline weapon-vs-core DPS. It must trip the alarm quickly
     // enough to be worth flying home for — inside a couple of seconds.
-    expect(beam(alarm, 2.5, BEAM_DPS_CORE)).toBe(true);
+    expect(fire(alarm, 2.5, WEAPON_DPS_CORE)).toBe(true);
     expect(alarm.active).toBe(true);
   });
 
   it('needs the damage to out-pace the drain — anything slower is noise', () => {
     const alarm = new UnderAttackAlarm();
     // Exactly at the drain rate: pressure never builds, however long it runs.
-    expect(beam(alarm, 30, ALARM_DRAIN_HP_PER_S)).toBe(false);
+    expect(fire(alarm, 30, ALARM_DRAIN_HP_PER_S)).toBe(false);
     // A hair above it does build, given long enough.
     const faster = new UnderAttackAlarm();
-    expect(beam(faster, 30, ALARM_DRAIN_HP_PER_S * 2)).toBe(true);
+    expect(fire(faster, 30, ALARM_DRAIN_HP_PER_S * 2)).toBe(true);
   });
 
   it('counts damage to shields and turrets the same as damage to the core', () => {
     // The trigger takes one number — HP lost off the planet this tick — because
     // "your core, shield, or turrets" are all the same event to a defender.
     const alarm = new UnderAttackAlarm();
-    expect(beam(alarm, 2, 10)).toBe(true);
+    expect(fire(alarm, 2, 10)).toBe(true);
   });
 });
 
 describe('the latch — an alarm that flickers is one players learn to ignore', () => {
   it('holds after the attacker stops, then falls silent', () => {
     const alarm = new UnderAttackAlarm();
-    expect(beam(alarm, 3, BEAM_DPS_CORE)).toBe(true);
+    expect(fire(alarm, 3, WEAPON_DPS_CORE)).toBe(true);
     // Still sounding a moment after the last hit...
     expect(quiet(alarm, ALARM_HOLD_S * 0.5)).toBe(true);
     // ...and silent once the hold runs out.
@@ -90,11 +90,11 @@ describe('the latch — an alarm that flickers is one players learn to ignore', 
 
   it('stays up continuously through the gaps in an attacker\'s pressure', () => {
     const alarm = new UnderAttackAlarm();
-    expect(beam(alarm, 3, BEAM_DPS_CORE)).toBe(true);
+    expect(fire(alarm, 3, WEAPON_DPS_CORE)).toBe(true);
     for (let i = 0; i < 5; i++) {
       // Attacker circles for a second, comes back — the alarm never drops.
       expect(quiet(alarm, 1)).toBe(true);
-      expect(beam(alarm, 1, BEAM_DPS_CORE)).toBe(true);
+      expect(fire(alarm, 1, WEAPON_DPS_CORE)).toBe(true);
     }
   });
 
@@ -102,14 +102,14 @@ describe('the latch — an alarm that flickers is one players learn to ignore', 
     // The bucket is capped at the threshold, so a 30-second siege leaves no
     // longer a tail than a 3-second one — the alarm always means "right now".
     const long = new UnderAttackAlarm();
-    expect(beam(long, 30, BEAM_DPS_CORE)).toBe(true);
+    expect(fire(long, 30, WEAPON_DPS_CORE)).toBe(true);
     expect(quiet(long, ALARM_HOLD_S * 0.8)).toBe(true);
     expect(quiet(long, ALARM_HOLD_S)).toBe(false);
   });
 
   it('starts the next siege from silence, not from leftover pressure', () => {
     const alarm = new UnderAttackAlarm();
-    beam(alarm, 3, BEAM_DPS_CORE);
+    fire(alarm, 3, WEAPON_DPS_CORE);
     quiet(alarm, ALARM_HOLD_S + 1);
     expect(alarm.active).toBe(false);
     expect(alarm.pressure).toBe(0);
@@ -119,7 +119,7 @@ describe('the latch — an alarm that flickers is one players learn to ignore', 
 
   it('resets completely on demand (fresh match, or a planet that just died)', () => {
     const alarm = new UnderAttackAlarm();
-    beam(alarm, 3, BEAM_DPS_CORE);
+    fire(alarm, 3, WEAPON_DPS_CORE);
     expect(alarm.active).toBe(true);
     alarm.reset();
     expect(alarm.active).toBe(false);
@@ -147,10 +147,10 @@ describe('dt-independence — the threshold means the same at any timestep', () 
   it('fires on the same total damage whether fed at 60 Hz or 20 Hz', () => {
     const fast = new UnderAttackAlarm();
     const slow = new UnderAttackAlarm();
-    expect(beam(fast, 2.5, BEAM_DPS_CORE)).toBe(true);
+    expect(fire(fast, 2.5, WEAPON_DPS_CORE)).toBe(true);
     // Server-tick-sized steps (20 Hz), same DPS, same verdict.
     let firing = false;
-    for (let i = 0; i < 50; i++) firing = slow.update(0.05, BEAM_DPS_CORE * 0.05);
+    for (let i = 0; i < 50; i++) firing = slow.update(0.05, WEAPON_DPS_CORE * 0.05);
     expect(firing).toBe(true);
   });
 });

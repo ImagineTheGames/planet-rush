@@ -5,7 +5,7 @@
  * The developer's ask: "hide the browser's title bar — it takes up so much game
  * space." The answer is the Fullscreen API entered on the PLAY gesture, plus the
  * native landscape lock it makes legal. The trap this class of test exists for
- * (like the enemy-beam and main-menu field bugs before it): a lifecycle that is
+ * (like the enemy-fire and main-menu field bugs before it): a lifecycle that is
  * component-green but never actually WIRED into the booted client. Only booting
  * the shipped bundle and driving the real menu → match → fullscreen path can
  * prove the wire.

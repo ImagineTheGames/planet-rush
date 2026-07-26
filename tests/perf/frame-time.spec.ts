@@ -175,7 +175,7 @@ test.describe('frame-time capture (GDD §4.3 performance budget)', () => {
 
   test('frame time under a held input', async ({ page }, testInfo) => {
     await boot(page);
-    // Thrust + fire held: the beam raycasts, the thruster trail emits, and the
+    // Thrust + fire held: the shots fly, the thruster trail emits, and the
     // camera moves — the frame the player actually spends most of a match in.
     await page.keyboard.down('w');
     await page.mouse.move(400, 200);

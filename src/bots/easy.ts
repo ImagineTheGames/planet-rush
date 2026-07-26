@@ -16,7 +16,7 @@
  *    way an Easy bot shoots a player is if that player came to it, or (for a
  *    character with a real attack weight, i.e. Bolt) wandered into plain sight.
  *  - **mines slowly** — no slow-mining knob: the tier's fat `aimJitter` wobbles
- *    the beam across the rock, so the trigger is on target a fraction of the
+ *    the weapon across the rock, so the trigger is on target a fraction of the
  *    time a Hard bot's is (`./behaviors`).
  *
  * What this adds up to for a first-time player: an opponent that fills a slot,
@@ -40,7 +40,7 @@ import {
   upgrade,
   wantsToHaul,
 } from './behaviors';
-import { BEAM_RANGE, NEUTRAL } from './steering';
+import { WEAPON_RANGE, NEUTRAL } from './steering';
 import { bestRock, homeIntruder, isWounded, nearestEnemy } from './targeting';
 import type { BotCtx, Node } from './tree';
 import { selector, when } from './tree';
@@ -130,7 +130,7 @@ export const easyTree: Node = selector('easy', [
       nearestEnemy(ctx) !== null,
     (ctx) => {
       const target = nearestEnemy(ctx);
-      return target ? engage(ctx, target.pos, 16, BEAM_RANGE * 0.6) : null;
+      return target ? engage(ctx, target.pos, 16, WEAPON_RANGE * 0.6) : null;
     },
   ),
 

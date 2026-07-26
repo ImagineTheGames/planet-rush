@@ -26,7 +26,7 @@
  *    they cannot be optimised away by someone tidying the mixer.
  *  - **The alarm** (`./alarm`), fed only by damage against the local player's
  *    own home — a mechanic, not a notification (GDD §2.2).
- *  - **The held voices** (`./beams`): the two beam voices and the thruster,
+ *  - **The held voices** (`./weapons`): the two firing voices and the thruster,
  *    which are states rather than moments.
  *  - **Earshot.** Sounds fall off with distance from the camera, so a siege on
  *    the far side of the map is background and the rock you are actually cutting
@@ -47,7 +47,7 @@ import { DeathMoment } from '../vfx/death-moment';
 import { TELL, type TellKind, type TellQueue } from '../tells';
 import { UnderAttackAlarm, type AlarmOptions } from './alarm';
 import { SOUND, TELL_SOUND, type SoundName } from './bank';
-import { BeamVoices, SustainedVoice } from './beams';
+import { WeaponVoices, SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
 import { AudioGraph, type LoopHandle, type MixOptions } from './graph';
 
@@ -94,7 +94,7 @@ export class AudioEngine {
   /** The mix, or `null` when running silent. */
   readonly graph: AudioGraph | null;
 
-  private readonly beams: BeamVoices | null;
+  private readonly weapons: WeaponVoices | null;
   private readonly thruster: SustainedVoice | null;
   private readonly ownsDeath: boolean;
   private readonly wantsAmbient: boolean;
@@ -112,7 +112,7 @@ export class AudioEngine {
   constructor(options: AudioEngineOptions = {}) {
     const ctx = options.context ?? null;
     this.graph = ctx ? new AudioGraph(ctx, options.mix ?? {}) : null;
-    this.beams = this.graph ? new BeamVoices(this.graph) : null;
+    this.weapons = this.graph ? new WeaponVoices(this.graph) : null;
     this.thruster = this.graph
       ? new SustainedVoice(this.graph, SOUND.thruster, { maxGain: 0.45, release: 0.14, attack: 0.05 })
       : null;
@@ -206,11 +206,11 @@ export class AudioEngine {
 
       switch (kind) {
         // --- Held states: a voice, not a hit --------------------------------
-        case TELL.beamRock:
-          this.beams?.onBeam(false, magnitude);
+        case TELL.mineHit:
+          this.weapons?.onHit(false, magnitude);
           break;
-        case TELL.beamHull:
-          this.beams?.onBeam(true, magnitude);
+        case TELL.weaponHit:
+          this.weapons?.onHit(true, magnitude);
           break;
         case TELL.thrust:
           // Your own engine, and only yours: eight thruster loops is a drone,
@@ -225,7 +225,7 @@ export class AudioEngine {
           this.oneShot(SOUND.planetDeath, x, y, 1);
           if (this.ownsDeath) this.death.trigger();
           if (player === this.local) this.alarm.silence();
-          this.beams?.stop();
+          this.weapons?.stop();
           break;
 
         // --- Everything else -----------------------------------------------
@@ -241,7 +241,7 @@ export class AudioEngine {
     const step = dt > 0 ? dt : 0;
     this.alarm.update(step);
     if (this.ownsDeath) this.death.update(step);
-    this.beams?.update(step);
+    this.weapons?.update(step);
     this.thruster?.update(step);
     this.graph?.setDuck(this.death.gain);
     this.syncAlarm();
@@ -249,7 +249,7 @@ export class AudioEngine {
 
   /** Stop everything and drop the graph. A match teardown, or a page unload. */
   dispose(): void {
-    this.beams?.stop();
+    this.weapons?.stop();
     this.thruster?.stop();
     this.ambientLoop?.stop(0.2);
     this.ambientLoop = null;
@@ -263,7 +263,7 @@ export class AudioEngine {
   reset(): void {
     this.alarm.reset();
     if (this.ownsDeath) this.death.reset();
-    this.beams?.stop();
+    this.weapons?.stop();
     this.thruster?.stop();
   }
 

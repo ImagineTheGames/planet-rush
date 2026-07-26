@@ -70,7 +70,7 @@ class Fnv {
 function mixShip(f: Fnv, s: Ship): void {
   f.num(s.id);
   f.str(s.shipClass);
-  f.num(s.tiers.beam);
+  f.num(s.tiers.power);
   f.num(s.tiers.engine);
   f.num(s.tiers.cargo);
   f.num(s.tiers.hull);
@@ -88,10 +88,9 @@ function mixShip(f: Fnv, s: Ship): void {
   f.num(s.respawnTimer);
   f.num(s.spawnProtect);
   f.flag(s.eliminated);
-  // The beam is per-tick geometry, but it is *state the renderer and the
-  // snapshot both read*, so a replay that fires on a different tick must fail.
-  f.flag(s.beam !== null);
-  if (s.beam) f.num(s.beam.length);
+  // The firing tell is per-tick, but it is *state the renderer and the snapshot
+  // both read*, so a replay that fires on a different tick must fail.
+  f.flag(s.firing);
 }
 
 /** Fold one planet, its defenses, and everything under construction. */

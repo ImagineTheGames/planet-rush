@@ -116,7 +116,7 @@ describe('resetControlState', () => {
     s.aim = { x: 1, y: 1 };
     s.fire = s.boost = s.build = true;
     s.order = 'turret';
-    s.upgrade = UpgradeTrack.Beam;
+    s.upgrade = UpgradeTrack.Power;
     s.ping = { x: 1, y: 1 };
     resetControlState(s);
     expect(s).toEqual({

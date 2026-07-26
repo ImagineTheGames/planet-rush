@@ -3,7 +3,7 @@
  *
  * The Art & Audio mandate in one line (GDD §3.6): *"Every mechanic in section 2
  * has a visible and audible tell."* This file is that sentence as a type. A
- * **tell** is one moment worth showing and hearing — a beam biting a rock, a
+ * **tell** is one moment worth showing and hearing — a shot biting a rock, a
  * shield shrugging off a hit, a core taking damage, a home dying — and the same
  * queue of tells feeds both halves: `src/art/vfx/` draws them, `src/art/audio/`
  * sounds them. One vocabulary, so a mechanic can never be visible but silent.
@@ -50,10 +50,10 @@
  */
 export const TELL = {
   // --- Mine (GDD §2.3) -----------------------------------------------------
-  /** Beam biting rock. Sustained: re-emitted every firing tick. */
-  beamRock: 0,
-  /** Beam biting hull, turret, shield or core — the *other* beam voice (§3.6). */
-  beamHull: 1,
+  /** A shot biting rock. Sustained: re-emitted every firing tick. */
+  mineHit: 0,
+  /** A shot biting hull, turret, shield or core — the *other* firing voice (§3.6). */
+  weaponHit: 1,
   /** A rock's crack stage advanced (§5.5, three stages). */
   rockCrack: 2,
   /** A rock mined out: crack-and-burst into ore chunks. */
@@ -140,8 +140,8 @@ export interface PayloadNote {
  * this is a test: every kind has an entry, and every entry names its units.
  */
 export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
-  [TELL.beamRock]: { at: 'the beam hit point', angle: 'beam direction', magnitude: 'beam power 0..1' },
-  [TELL.beamHull]: { at: 'the beam hit point', angle: 'beam direction', magnitude: 'beam power 0..1' },
+  [TELL.mineHit]: { at: 'the shot hit point', angle: 'shot direction', magnitude: 'weapon power 0..1' },
+  [TELL.weaponHit]: { at: 'the shot hit point', angle: 'shot direction', magnitude: 'weapon power 0..1' },
   [TELL.rockCrack]: { at: 'rock centre', angle: 'unused (0)', magnitude: 'new crack stage / 2' },
   [TELL.rockBurst]: { at: 'rock centre', angle: 'unused (0)', magnitude: 'rock radius / 24, clamped' },
   [TELL.oreCollect]: { at: 'the collecting ship', angle: 'chunk → ship direction', magnitude: 'hold fullness 0..1' },

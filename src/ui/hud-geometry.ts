@@ -185,8 +185,8 @@ export const PROMPT_MIN_TEXT_WIDTH = 80;
  *
  * **This is the whole reason the prompt can claim an anchor at all.** The prompt
  * is a sentence, and a sentence is intrinsically wider than any third-width band
- * in the anchor vocabulary — "Hold the FIRE button on the asteroid — your beam
- * mines it" is ~440 px on one line, wider than a 390 px portrait phone. So the
+ * in the anchor vocabulary — "Hold the FIRE button on the asteroid — your shots
+ * chip the rock" is ~440 px on one line, wider than a 390 px portrait phone. So the
  * prompt does not get a band; it gets the screen, and the contract it signs is
  * that it *never leaves* it (`full` + {@link HUD_PAD}, see `Hud.describeLayout`).
  *

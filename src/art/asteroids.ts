@@ -4,10 +4,10 @@
  * Style-guide §6 gives asteroids two jobs, and both are mechanical:
  *
  * > **Asteroids are the economy, so they crack visibly across three stages**
- * > and let a player judge a payout before committing beam time. Ore veins are
+ * > and let a player judge a payout before committing mining time. Ore veins are
  * > the only yellow on an asteroid; the rock body is neutral steel-grey mineral.
  *
- * The second half is the one people forget. Beam time is the scarcest thing in
+ * The second half is the one people forget. Mining time is the scarcest thing in
  * the game (GDD §2.3 — a minute mining is a minute not defending), so a player
  * standing off a rock must be able to *see the payout* before spending it. That
  * is why vein count scales with ore richness here: a fat rock is visibly veined,
@@ -53,7 +53,7 @@ export interface AsteroidSpriteOptions {
   readonly crackStage: number;
   /**
    * Ore remaining as a fraction of what it spawned with, 0..1. Drives vein
-   * count, which is how a player judges a payout before committing beam time.
+   * count, which is how a player judges a payout before committing mining time.
    */
   readonly richness?: number;
 }
@@ -67,7 +67,7 @@ function rockRng(seed: number, salt: number) {
  *
  * **Normalised to fit inside the unit circle.** The unit radius is the sim's
  * collision radius, and a rock whose art bulges past it would show mineral the
- * beam raycast passes straight through — "why didn't that hit?" is a bug the
+ * mining shot passes straight through — "why didn't that hit?" is a bug the
  * art can cause on its own, so the art doesn't claim mass the sim won't back.
  */
 export function asteroidOutline(seed: number): number[] {
@@ -226,7 +226,7 @@ export function asteroidSprite(options: AsteroidSpriteOptions): SpriteDef {
 }
 
 /**
- * A loose ore chunk (GDD §2.3): the thing your beam knocks out of a rock and
+ * A loose ore chunk (GDD §2.3): the thing your mining shot knocks out of a rock and
  * your tractor pulls in. Unambiguously ore — signal yellow, no other colour on
  * it — because it is the payoff the whole triangle turns on.
  */

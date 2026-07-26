@@ -106,7 +106,7 @@ describe('Easy — retreats at half hull (GDD §2.9)', () => {
     expect(fine.bot.brain.lastBehavior).not.toBe('retreat');
   });
 
-  it('runs for home with the beam off — a fleeing bot does not advertise', () => {
+  it('runs for home with the weapon off — a fleeing bot does not advertise', () => {
     const threshold = retreatThreshold(DIFFICULTY_TUNING[Difficulty.Easy], PERSONALITIES.rusty.weights);
     const { world, actions } = standoff(threshold - 0.2, 'rusty');
 

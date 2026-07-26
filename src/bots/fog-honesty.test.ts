@@ -88,7 +88,7 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
     // Never drawn for anyone, at any range (GDD §2.2).
     ship.cargo = noise(rng, ship.cargoCap);
     ship.banked = noise(rng, 50);
-    ship.tiers = { beam: 3, engine: 3, cargo: 0, hull: 0 };
+    ship.tiers = { power: 3, engine: 3, cargo: 0, hull: 0 };
     if (dist(eye, ship.pos) > DEFAULT_PERCEPTION.visualRange) {
       // Off screen: even the hull bar is gone.
       ship.hull = 1 + noise(rng, ship.maxHull - 1);

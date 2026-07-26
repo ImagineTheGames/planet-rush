@@ -1,13 +1,13 @@
 /**
  * src/art/vfx/emitters.ts — the specified VFX set. OWNER: Art & Audio Agent.
  *
- * GDD §3.6 does not ask for "some effects", it names them: *"beam impacts,
+ * GDD §3.6 does not ask for "some effects", it names them: *"shot impacts,
  * asteroid crack-and-burst, shield shimmer, turret muzzle flashes, explosions,
  * thruster trails, spawn-protection glow, and the planet-death moment."* Each
  * one is a function here, each writes into the fixed-capacity pool
  * (`./particles`), and each is judged against the tone contract (style-guide §8):
  *
- * > *Arcade on the surface:* beam impacts, muzzle flashes, thruster trails and
+ * > *Arcade on the surface:* shot impacts, muzzle flashes, thruster trails and
  * > spawn glow lean **fun and readable** — bright, punchy, generous.
  * > *A small ache underneath:* the planet-death moment is the exception, and it
  * > is deliberately **not** a firework. See {@link planetDeath}.
@@ -32,8 +32,8 @@
  * ## Budget
  *
  * The costly bursts, at `quality = 1`: explosion ≈ 34, planet death ≈ 96,
- * asteroid burst ≈ 20, muzzle flash ≈ 5, beam impact ≈ 4 per firing tick. Eight
- * ships beaming, four turrets firing and two rocks bursting on the same frame is
+ * asteroid burst ≈ 20, muzzle flash ≈ 5, shot impact ≈ 4 per firing tick. Eight
+ * ships firing, four turrets firing and two rocks bursting on the same frame is
  * ≈ 120 particles against a 1600 capacity, so the pool only starts recycling in
  * genuinely extraordinary moments — which is exactly when nobody can tell.
  */
@@ -68,7 +68,7 @@ function budget(base: number, quality: number): number {
  *
  * Kinds declaring `tint: 'fixed'` keep their own palette colour no matter what
  * a caller passes; only the two looks the style guide puts on the identity list
- * — engine flame and beam tint — accept a player's colour (`./kinds`). The rule
+ * — engine flame and weapon tint — accept a player's colour (`./kinds`). The rule
  * is enforced here rather than trusted, because "pass the right colour" is
  * exactly the kind of discipline that fails on the tenth call site.
  */
@@ -78,23 +78,23 @@ export function tintFor(kind: ParticleKind, requested: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Mine — the beam, the rock, the payout
+// Mine — the shot, the rock, the payout
 // ---------------------------------------------------------------------------
 
 /**
- * **Beam impact** (GDD §3.6). The cutting torch biting something: a spray of
- * plasma sparks back along the beam, plus the debris of whatever it is chewing —
+ * **Shot impact** (GDD §3.6). The cutting torch biting something: a spray of
+ * plasma sparks back along the shot, plus the debris of whatever it is chewing —
  * rock chips off an asteroid, red flecks off a hull.
  *
  * The two variants are the visible half of the same split the audio makes with
- * its two beam voices (`../audio/beams`), so a player looking away still knows
- * from the sound what a looking player knows from the sparks.
+ * its two firing voices (`../audio/weapons`), so a player looking away still
+ * knows from the sound what a looking player knows from the sparks.
  *
- * @param power  Beam power 0..1 — mining speed and weapon damage are one stat.
- * @param tint   The firing player's colour (beams take player tint, §3).
- * @param onHull True when the beam is on hull/turret/shield/core, not rock.
+ * @param power  Weapon power 0..1 — mining speed and weapon damage are one stat.
+ * @param tint   The firing player's colour (shots take player tint, §3).
+ * @param onHull True when the shot is on hull/turret/shield/core, not rock.
  */
-export function beamImpact(
+export function weaponImpact(
   pool: ParticlePool,
   rng: Rng,
   x: number,
@@ -171,7 +171,7 @@ export function beamImpact(
 
 /**
  * **Asteroid crack** (GDD §3.6, §5.5). A rock advancing through one of its three
- * crack stages throws a handful of chips: the player's confirmation that beam
+ * crack stages throws a handful of chips: the player's confirmation that mining
  * time is turning into a payout, on top of the sprite swap the atlas does.
  *
  * @param stage The new crack stage, 0..2 — later stages throw more.
@@ -404,7 +404,7 @@ export function muzzleFlash(
   }
 }
 
-/** **Turret shot landing**: a small bite, distinct from the beam's. */
+/** **Turret shot landing**: a small bite, distinct from a firing impact's. */
 export function shotImpact(
   pool: ParticlePool,
   rng: Rng,
@@ -703,7 +703,7 @@ export function thrusterTrail(
 /**
  * **Spawn-protection glow** (GDD §3.6, §2.1). A ship arriving under ten seconds
  * of protection: one bright ring outward, so a player knows their own respawn
- * landed and an attacker knows not to waste a beam on it.
+ * landed and an attacker knows not to waste a shot on it.
  */
 export function spawnGlow(
   pool: ParticlePool,

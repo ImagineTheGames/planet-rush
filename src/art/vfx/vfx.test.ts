@@ -26,7 +26,6 @@ import { DeathMoment, HUSH_CUT_S, HUSH_RETURN_S, HUSH_S } from './death-moment';
 import {
   asteroidBurst,
   asteroidCrack,
-  beamImpact,
   explosion,
   muzzleFlash,
   planetDeath,
@@ -34,6 +33,7 @@ import {
   spawnGlow,
   thrusterTrail,
   tintFor,
+  weaponImpact,
 } from './emitters';
 import { VfxField } from './field';
 import { fadeAt, PARTICLE, PARTICLE_KINDS, PARTICLE_SPRITES, particleKind, particleSprite } from './kinds';
@@ -78,7 +78,7 @@ describe('particle kinds (style-guide §1, §2, §3)', () => {
 
   it('only lets the two identity looks take a player colour', () => {
     // Style-guide §3 rule 2 lists exactly where identity colour may live; of
-    // that list, particles cover engine flame and beam tint.
+    // that list, particles cover engine flame and weapon tint.
     const identity = PARTICLE_KINDS.filter((k) => k.tint === 'identity').map((k) => k.name);
     expect(identity.sort()).toEqual(['flare', 'spark', 'trail']);
   });
@@ -120,7 +120,7 @@ describe('emitters (GDD §3.6 — the set, by name)', () => {
   it('draws every named effect', () => {
     // The brief lists them; this is that list, as a test.
     const named: [string, (p: ParticlePool) => void][] = [
-      ['beam impact', (p) => beamImpact(p, mulberry32(1), 0, 0, 0, 1, playerColor(0), false)],
+      ['shot impact', (p) => weaponImpact(p, mulberry32(1), 0, 0, 0, 1, playerColor(0), false)],
       ['crack', (p) => asteroidCrack(p, mulberry32(1), 0, 0, 14, 2)],
       ['burst', (p) => asteroidBurst(p, mulberry32(1), 0, 0, 14)],
       ['shield shimmer', (p) => shieldShimmer(p, mulberry32(1), 0, 0, 80, 0.5)],
@@ -165,11 +165,11 @@ describe('emitters (GDD §3.6 — the set, by name)', () => {
     expect(thin.count).toBeLessThan(full.count);
   });
 
-  it('splits rock from hull the way the two beam voices do', () => {
+  it('splits rock from hull the way the two firing voices do', () => {
     const rock = pool();
     const hull = pool();
-    beamImpact(rock, mulberry32(2), 0, 0, 0, 1, playerColor(0), false);
-    beamImpact(hull, mulberry32(2), 0, 0, 0, 1, playerColor(0), true);
+    weaponImpact(rock, mulberry32(2), 0, 0, 0, 1, playerColor(0), false);
+    weaponImpact(hull, mulberry32(2), 0, 0, 0, 1, playerColor(0), true);
     const kinds = (p: ParticlePool) => new Set([...p.kind.subarray(0, p.count)]);
     expect(kinds(rock).has(PARTICLE.chip)).toBe(true);
     expect(kinds(rock).has(PARTICLE.fleck)).toBe(false);
@@ -245,10 +245,10 @@ describe('VfxField — the routing table', () => {
     }
   });
 
-  it('throttles a held beam instead of spending the pool on it', () => {
+  it('throttles held fire instead of spending the pool on it', () => {
     const field = new VfxField({ seed: 1 });
     const tells = new TellQueue(8);
-    tells.push(TELL.beamRock, 0, 0, 0, 1, 0);
+    tells.push(TELL.mineHit, 0, 0, 0, 1, 0);
 
     field.consume(tells); // first tick bursts
     const first = field.count;
@@ -261,11 +261,11 @@ describe('VfxField — the routing table', () => {
     expect(field.count).toBeGreaterThan(first);
   });
 
-  it('throttles each beam on its own clock, per player', () => {
+  it('throttles each shooter on its own clock, per player', () => {
     const field = new VfxField({ seed: 1 });
     const tells = new TellQueue(8);
-    tells.push(TELL.beamRock, 0, 0, 0, 1, 0);
-    tells.push(TELL.beamRock, 0, 0, 0, 1, 1);
+    tells.push(TELL.mineHit, 0, 0, 0, 1, 0);
+    tells.push(TELL.mineHit, 0, 0, 0, 1, 1);
     field.consume(tells);
     // Two ships mining is two bursts, not one ship shadowing the other.
     expect(field.count).toBeGreaterThan(0);

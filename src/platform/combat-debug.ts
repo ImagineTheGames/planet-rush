@@ -5,38 +5,39 @@
  * A companion to src/platform/debug-hook.ts and src/platform/layout-registry.ts:
  * under `?debug=1` only, it merges two keys onto the shared `window.__planetRush`
  * surface so a live-boot Playwright suite can assert what the REAL client puts on
- * stage — not the render MODEL a unit test can fake, but the beams the booted
- * client actually drew this frame:
+ * stage — not the render MODEL a unit test can fake, but the muzzle flashes the
+ * booted client actually drew this frame:
  *
- *   window.__planetRush.beams: ReadonlyArray<{
- *     shooter: number,               // player slot that fired (turret: owner)
- *     source:  'ship' | 'turret',    // emitter kind
- *     origin:  { x, y },             // muzzle / emitter, WORLD units
+ *   window.__planetRush.muzzles: ReadonlyArray<{
+ *     shooter: number,               // player slot that fired (turret owner)
+ *     origin:  { x, y },             // muzzle / barrel tip, WORLD units
  *     end:     { x, y },             // clamped endpoint (origin + dir·length)
- *     hit:     { x, y } | null,      // first-strike point, or null on a clean miss
+ *     hit:     { x, y } | null,      // aimed-at point, or null on a clean miss
  *   }>
  *   window.__planetRush.stageCombat(): unknown   // deterministically stage a
- *                                                // non-local firefight (a bot
- *                                                // beam + a turret muzzle) into
- *                                                // the live world, for the test.
+ *                                                // non-local turret muzzle flash
+ *                                                // into the live world, for the test.
  *
  * WHY THIS EXISTS. The field bug (builds 5254cfe…b522a78) was that main.ts built
- * its beam visuals from the LOCAL player's fire, so only your own beam ever drew;
- * every bot beam and every turret muzzle was invisible. m2-11's unit suite stayed
- * green because it tests the render model (combat-view.ts `combatBeams`), not what
- * the booted client wires onto the Pixi stage. `beams` closes that gap: it reflects
- * exactly the beam set the renderer was handed this frame — one record per FIRING
- * EMITTER, sourced from sim combat state for EVERY shooter — so a test that boots
- * the real client and finds a non-local shooter's beam here proves the wiring the
- * unit suite cannot reach. If main.ts regresses to feeding only the local beam,
- * `beams` carries only `shooter === 0` and the guard fails.
+ * its combat visuals from the LOCAL player's fire, so only your own shot ever drew;
+ * every non-local turret muzzle was invisible. m2-11's unit suite stayed green
+ * because it tests the render model (combat-view.ts `muzzleFlashes`), not what the
+ * booted client wires onto the Pixi stage. `muzzles` closes that gap: it reflects
+ * exactly the flash set the renderer was handed this frame — one record per FIRING
+ * turret, sourced from sim combat state for EVERY owner — so a test that boots the
+ * real client and finds a non-local turret's flash here proves the wiring the unit
+ * suite cannot reach. If main.ts regresses to feeding only the local shooter,
+ * `muzzles` carries only `shooter === 0` and the guard fails.
+ *
+ * (Ships no longer contribute here at all: since the v0.3 laser funeral a ship's
+ * shots are pooled projectiles drawn from the shot pool, not a standing line — so
+ * the only muzzle flashes are turrets'.)
  *
  * `stageCombat` is the deterministic stager. main.ts (which owns `world`) registers
  * the closure via {@link CombatDebugHook.setStager}; this module only forwards the
  * call, so the sim-touching logic stays with the module that legitimately holds the
  * world. It is expected to be driven under `?freeze=1`, where the sim does not step
- * and therefore cannot clear the staged `Ship.beam` / `Turret.muzzle` out from under
- * the shutter.
+ * and therefore cannot clear the staged `Turret.muzzle` out from under the shutter.
  *
  * Without `?debug=1` this module is inert: it installs nothing and `update` is a
  * no-op. It is an instrument only — no game code reads these fields.
@@ -46,23 +47,22 @@
 import type { Vec2 } from '@shared/types';
 import { DEBUG_GLOBAL_KEY, isDebugEnabled } from './debug-hook';
 
-/** The structural slice of a `CombatBeam` (src/sim/combat-view.ts) this instrument
+/** The structural slice of a `MuzzleFlash` (src/sim/combat-view.ts) this instrument
  *  reads. Declared locally so the platform layer needn't import the sim; main.ts
- *  passes the concrete `combatBeams(world)` records, which satisfy this shape. */
-export interface CombatBeamLike {
+ *  passes the concrete `muzzleFlashes(world)` records, which satisfy this shape. */
+export interface MuzzleFlashLike {
   readonly shooter: number;
-  readonly source: 'ship' | 'turret';
   readonly origin: Readonly<Vec2>;
   readonly dir: Readonly<Vec2>;
   readonly hitPoint: Readonly<Vec2> | null;
   readonly length: number;
 }
 
-/** One beam as the test reads it: emitter identity plus world-space geometry,
- *  with the clamped endpoint pre-computed so the assertion needn't re-derive it. */
-export interface CombatBeamReadout {
+/** One muzzle flash as the test reads it: emitter identity plus world-space
+ *  geometry, with the clamped endpoint pre-computed so the assertion needn't
+ *  re-derive it. */
+export interface MuzzleFlashReadout {
   readonly shooter: number;
-  readonly source: 'ship' | 'turret';
   readonly origin: { readonly x: number; readonly y: number };
   readonly end: { readonly x: number; readonly y: number };
   readonly hit: { readonly x: number; readonly y: number } | null;
@@ -73,13 +73,13 @@ export interface CombatBeamReadout {
 export type CombatStager = () => unknown;
 
 /** What `main.ts` drives: a live `enabled` flag (skip the work when debug is off),
- *  a per-frame `update` that records the drawn beam set, and `setStager` to register
+ *  a per-frame `update` that records the drawn flash set, and `setStager` to register
  *  the deterministic firefight stager. */
 export interface CombatDebugHook {
   readonly enabled: boolean;
-  /** Record the beam set the renderer was handed this frame. Stores the reference
-   *  only — zero per-frame allocation on the hot path (GDD §4.3). */
-  update(beams: readonly CombatBeamLike[]): void;
+  /** Record the muzzle-flash set the renderer was handed this frame. Stores the
+   *  reference only — zero per-frame allocation on the hot path (GDD §4.3). */
+  update(muzzles: readonly MuzzleFlashLike[]): void;
   /** Register the world-staging closure (main.ts owns `world`). */
   setStager(fn: CombatStager): void;
 }
@@ -94,16 +94,15 @@ const NOOP_HOOK: CombatDebugHook = {
 /** Anything with a settable/extensible `__planetRush` — a `Window` or a test double. */
 type HookTarget = Record<string, unknown>;
 
-/** Project one sim-state beam into the readout shape the test asserts against. */
-function readout(b: CombatBeamLike): CombatBeamReadout {
+/** Project one sim-state muzzle flash into the readout shape the test asserts against. */
+function readout(m: MuzzleFlashLike): MuzzleFlashReadout {
   return Object.freeze({
-    shooter: b.shooter,
-    source: b.source,
-    origin: Object.freeze({ x: b.origin.x, y: b.origin.y }),
-    // `length` is the sim's clamp to the first hit (or full range on a miss), so
-    // the endpoint IS the hit point when there is one — never drawn through it.
-    end: Object.freeze({ x: b.origin.x + b.dir.x * b.length, y: b.origin.y + b.dir.y * b.length }),
-    hit: b.hitPoint ? Object.freeze({ x: b.hitPoint.x, y: b.hitPoint.y }) : null,
+    shooter: m.shooter,
+    origin: Object.freeze({ x: m.origin.x, y: m.origin.y }),
+    // `length` is the sim's clamp to what the shot is aimed at (or full range on a
+    // miss), so the endpoint IS the hit point when there is one — never drawn through it.
+    end: Object.freeze({ x: m.origin.x + m.dir.x * m.length, y: m.origin.y + m.dir.y * m.length }),
+    hit: m.hitPoint ? Object.freeze({ x: m.hitPoint.x, y: m.hitPoint.y }) : null,
   });
 }
 
@@ -122,13 +121,13 @@ export function installCombatDebug(
 ): CombatDebugHook {
   if (!isDebugEnabled(search)) return NOOP_HOOK;
 
-  let latest: readonly CombatBeamLike[] = [];
+  let latest: readonly MuzzleFlashLike[] = [];
   let stager: CombatStager | null = null;
 
   const hook: CombatDebugHook = {
     enabled: true,
-    update(beams): void {
-      latest = beams; // reference only — no copy on the per-frame path
+    update(muzzles): void {
+      latest = muzzles; // reference only — no copy on the per-frame path
     },
     setStager(fn): void {
       stager = fn;
@@ -138,7 +137,7 @@ export function installCombatDebug(
   // The read/act surface merged onto __planetRush. Getters snapshot on read (only
   // the test reads them), so the per-frame `update` stays allocation-free.
   const surface = {
-    get beams(): readonly CombatBeamReadout[] {
+    get muzzles(): readonly MuzzleFlashReadout[] {
       return Object.freeze(latest.map(readout));
     },
     stageCombat(): unknown {

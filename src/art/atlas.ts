@@ -53,7 +53,7 @@ export interface PlanetLike {
 
 /**
  * Ore richness banded to thirds — rich, half, nearly bare, empty. Vein count is
- * a *judgement aid* ("is this rock worth my beam time?"), not a gauge, so
+ * a *judgement aid* ("is this rock worth my mining time?"), not a gauge, so
  * coarse banding costs the player nothing and it is what keeps the rock pool
  * bounded: bands multiply against seeds and crack stages, so a band too many is
  * a texture budget too big (GDD §4.3).

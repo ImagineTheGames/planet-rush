@@ -45,7 +45,7 @@ import { mulberry32 } from '@shared/types';
 export type Wave =
   /** Hollow and arcade — the default voice of a toy (tone contract, §8). */
   | 'square'
-  /** Bright and rude: beams, alarms. */
+  /** Bright and rude: firing voices, alarms. */
   | 'saw'
   /** Soft: ambience, the mote-quiet end of the set. */
   | 'sine'
@@ -256,7 +256,7 @@ export function renderVoice(
 /**
  * Join a rendered signal's tail onto its head so it loops without a seam.
  *
- * The ambient bed, the two beam voices and the alarm all run as looping buffer
+ * The ambient bed, the two firing voices and the alarm all run as looping buffer
  * sources, and a loop point is the one place a click is guaranteed rather than
  * merely likely: the player hears it once per lap, forever. Crossfading the last
  * `crossfade` seconds over the first and dropping them from the end makes the

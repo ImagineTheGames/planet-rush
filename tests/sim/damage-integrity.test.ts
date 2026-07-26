@@ -5,15 +5,15 @@
  *
  * The most serious kind of bug is the one where a shot plays the hit and the sim
  * quietly applies nothing. This file is the standing proof that it does not.
- * Combat is a PROJECTILE now (design amendment v0.2 — the mining beam vs
+ * Combat is a PROJECTILE now (design amendment v0.2 — the projectile weapon vs
  * asteroids is untouched), so the accounting became "whole shots landed × the
- * beam stat per shot" where it used to be continuous DPS; the invariants are the
+ * power stat per shot" where it used to be continuous DPS; the invariants are the
  * same, delivered by a shot that can miss instead of a ray that cannot:
  *
  *  §A  THE DAMAGE MATRIX — for EVERY ship class attacking EVERY ship class, the
  *      weapon fired at a stationary point-blank target for N ticks removes a
  *      whole number of shots' worth of hull, both manual and auto-aim. No
- *      attacker/target pair may zero out. Per-shot damage is the attacker's beam
+ *      attacker/target pair may zero out. Per-shot damage is the attacker's power
  *      stat and hull class is armour *total*, never damage resistance, so the
  *      delta depends on the shooter and never on the victim.
  *
@@ -46,8 +46,8 @@ import {
   TICK_DT,
   PLANET,
   CORE_HP,
-  beamShipDps,
-  beamCoreDps,
+  classWeaponDps,
+  classCoreDps,
   createWorld,
   shipCargoCap,
   shipMaxHull,
@@ -72,7 +72,7 @@ const CLASSES = [
 // --- builders --------------------------------------------------------------
 //
 // Hand-built fixtures so a pair is exactly two ships and nothing else — no waves
-// dropping rocks in front of a beam, no third body to occlude it. Ship stats come
+// dropping rocks in front of a shot, no third body to occlude it. Ship stats come
 // from the same derived-stat path a real hull's do, so the matrix measures the
 // shipped numbers, not restated ones.
 
@@ -97,7 +97,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
   };
 }
 
@@ -117,7 +117,7 @@ function makePlanet(owner: number, x: number, y: number, shields: Shield[] = [])
     spawnProtect: 0,
     angle: 0,
     // Freshly damaged, so shield regen (8 s undamaged) never opens in these runs
-    // and the pool only ever moves under the beam we are measuring.
+    // and the pool only ever moves under the shots we are measuring.
     sinceDamage: 0,
     repairing: false,
     turrets: [],
@@ -197,12 +197,12 @@ describe('§A damage matrix — every class × every class, no pair zeroes (GDD 
 
     describe(`${label} fire`, () => {
       for (const atk of CLASSES) {
-        // Per-shot weapon damage is the attacker's beam stat over one fire
-        // interval — one beam, one stat (GDD §2.5) — so the delta is a whole
+        // Per-shot weapon damage is the attacker's power stat over one fire
+        // interval — one weapon, one stat (GDD §2.5) — so the delta is a whole
         // number of these, the same whichever hull is on the receiving end.
-        const perShot = beamShipDps(atk) * SHIP_WEAPON.fireInterval;
+        const perShot = classWeaponDps(atk) * SHIP_WEAPON.fireInterval;
 
-        it(`${atk} lands its beam DPS (${beamShipDps(atk)}/s) as shots on every target class, never zero`, () => {
+        it(`${atk} lands its weapon DPS (${classWeaponDps(atk)}/s) as shots on every target class, never zero`, () => {
           const deltas = CLASSES.map((tgt) => hullLostOverWeapon(atk, tgt, N, mode));
 
           // The load-bearing assertion: real hits, a whole number of them, on
@@ -218,11 +218,11 @@ describe('§A damage matrix — every class × every class, no pair zeroes (GDD 
   }
 
   it('the four attacker rates are distinct and ordered (Excavator > Vanguard > Hauler > Interceptor)', () => {
-    // A sanity net under the matrix: if a retune ever flattened the beam stats,
+    // A sanity net under the matrix: if a retune ever flattened the power stats,
     // the per-pair checks would still pass while class identity had been lost.
-    expect(beamShipDps(ShipClass.Excavator)).toBeGreaterThan(beamShipDps(ShipClass.Vanguard));
-    expect(beamShipDps(ShipClass.Vanguard)).toBeGreaterThan(beamShipDps(ShipClass.Hauler));
-    expect(beamShipDps(ShipClass.Hauler)).toBeGreaterThan(beamShipDps(ShipClass.Interceptor));
+    expect(classWeaponDps(ShipClass.Excavator)).toBeGreaterThan(classWeaponDps(ShipClass.Vanguard));
+    expect(classWeaponDps(ShipClass.Vanguard)).toBeGreaterThan(classWeaponDps(ShipClass.Hauler));
+    expect(classWeaponDps(ShipClass.Hauler)).toBeGreaterThan(classWeaponDps(ShipClass.Interceptor));
   });
 });
 
@@ -246,12 +246,12 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
   }
 
   for (const atk of CLASSES) {
-    it(`${atk} strips shield HP at its core rate (${beamCoreDps(atk)}/s) and leaves the core untouched`, () => {
+    it(`${atk} strips shield HP at its core rate (${classCoreDps(atk)}/s) and leaves the core untouched`, () => {
       const shield = makeShield(1);
       const before = shield.hp;
       // Core rate, not ship rate: a shot on a shield or core is scaled by the
       // core:ship ratio (GDD §2.8). Kept short so the 40 HP bubble never breaks.
-      const perShot = beamCoreDps(atk) * SHIP_WEAPON.fireInterval;
+      const perShot = classCoreDps(atk) * SHIP_WEAPON.fireInterval;
 
       const planet = weaponPlanet(atk, [shield], N);
       const drop = before - shieldPool(planet);
@@ -266,7 +266,7 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
   it('a naked core (no shield) takes the same core-rate damage the shield would have', () => {
     for (const atk of CLASSES) {
       const planet = weaponPlanet(atk, [], N); // no shield: core is the surface
-      const perShot = beamCoreDps(atk) * SHIP_WEAPON.fireInterval;
+      const perShot = classCoreDps(atk) * SHIP_WEAPON.fireInterval;
       expectWholeShots(CORE_HP - planet.coreHp, perShot);
     }
   });
@@ -292,7 +292,7 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
     expect(p.shields[0]!.hp).toBe(0);
     expect(p.shields[1]!.hp).toBeLessThan(SHIELD.hp);
     expect(p.shields[1]!.hp).toBeGreaterThan(0); // not yet through to the core
-    expectWholeShots(totalDrop, beamCoreDps(ShipClass.Excavator) * SHIP_WEAPON.fireInterval);
+    expectWholeShots(totalDrop, classCoreDps(ShipClass.Excavator) * SHIP_WEAPON.fireInterval);
     expect(p.coreHp).toBe(CORE_HP);
   });
 });
@@ -383,7 +383,7 @@ describe('§D determinism — a four-class firefight replays byte-for-byte', () 
       asteroidCount: 24,
     } as const;
 
-    // Everyone thrusts on a per-slot orbit and holds auto-fire, so beams sweep
+    // Everyone thrusts on a per-slot orbit and holds auto-fire, so shots sweep
     // over ships and asteroids alike — the damage path runs every tick.
     const inputsAt = (tick: number): Inputs =>
       cfg.players.map((p) => ({

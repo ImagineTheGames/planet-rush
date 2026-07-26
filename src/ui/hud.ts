@@ -154,7 +154,7 @@ export interface HudFrame {
   readonly fireMode: FireMode;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
-  /** An asteroid is within beam range — the mine prompt's trigger (GDD §2.10). */
+  /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
   // --- Day 2: your own planet (GDD §2.2 — your own only, never a rival's) ---
@@ -206,7 +206,7 @@ export interface HudFrame {
    *  sprite. The follow camera renders the ship at screen centre 1:1, so a world
    *  radius is a screen radius. Default {@link DEFAULT_SHIP_SCREEN_RADIUS}. */
   readonly shipRadius?: number;
-  /** The local ship is firing its beam this tick (mining or shooting — one beam,
+  /** The local ship is firing its weapon this tick (mining or shooting — one weapon,
    *  GDD §2.5) ⇒ "in combat" for the own-ship bar, matching the enemy rule.
    *  Default false. */
   readonly shipFiring?: boolean;
@@ -898,7 +898,7 @@ export class Hud extends Container {
     // Input-agnostic wording via the action layer (GDD §2.10).
     this.promptText.text = resolvePromptText(active, frame.device, frame.fireMode);
     // Thumb-scale: wrap rather than run off the side of a phone. "Hold the FIRE
-    // button on the asteroid — your beam mines it" is ~440 px on one line, which
+    // button on the asteroid — your shots chip the rock" is ~440 px on one line, which
     // is wider than a 390 px portrait screen; a prompt the player can't read is a
     // prompt that didn't fire (GDD §2.10, style-guide §9 "reads at a glance").
     this.promptText.style.wordWrap = true;
@@ -916,7 +916,7 @@ export class Hud extends Container {
       .roundRect(-w / 2, -h / 2, w, h, 8)
       .fill({ color: PALETTE.vacuum, alpha: 0.82 })
       .stroke({ width: PROMPT_STROKE, color: PALETTE.plasma, alpha: 0.6 });
-    // Plasma accent bar on the left — the beam is plasma (style-guide §1).
+    // Plasma accent bar on the left — the weapon is plasma (style-guide §1).
     this.promptAccent.clear();
     this.promptAccent.rect(-w / 2, -h / 2, 4, h).fill({ color: PALETTE.plasma });
     // The accent is drawn on the panel's left edge and is narrower than it, so
@@ -963,7 +963,7 @@ export class Hud extends Container {
    *
    * **Why `onboarding` is `full` and not a band.** A prompt is a *sentence*, and
    * every interior region in the vocabulary is one third of the viewport wide.
-   * "Hold the FIRE button on the asteroid — your beam mines it" is ~440 px on one
+   * "Hold the FIRE button on the asteroid — your shots chip the rock" is ~440 px on one
    * line — wider than a 390 px portrait phone, let alone its 98 px `center` zone
    * — so no band can hold it at any type size the style guide permits. The prompt
    * therefore takes the screen and signs the stronger promise it *can* keep: it

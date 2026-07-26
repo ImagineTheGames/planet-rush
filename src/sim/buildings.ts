@@ -30,7 +30,7 @@
  * then the projectile pool), no RNG, every rate `* dt`.
  */
 
-import type { Beam, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
+import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   PLANET,
   REPAIR,
@@ -297,7 +297,7 @@ export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): Upgra
  * construction timers, shield regeneration, and the repair channel — in that
  * order, which is part of the determinism contract.
  *
- * Runs *before* this tick's beams and projectiles, so damage dealt now takes
+ * Runs *before* this tick's projectiles, so damage dealt now takes
  * effect on the next tick's regen/repair decision, never retroactively.
  *
  * Under collapse, two of those five stop happening for the rest of the match
@@ -419,7 +419,7 @@ function runRepairChannel(world: World, planet: Planet, dt: number): void {
 // Damage routing — shields stand in front of the core
 // ---------------------------------------------------------------------------
 
-/** The radius an attacker's beam or shot actually strikes: the shield bubble
+/** The radius an attacker's shot actually strikes: the shield bubble
  *  while any shield is up, the planet body once they are all down. */
 export function planetTargetRadius(planet: Planet): number {
   for (const s of planet.shields) {
@@ -466,8 +466,8 @@ export function damagePlanet(world: World, planet: Planet, amount: number): bool
 /**
  * Apply `amount` damage to a turret. A turret at zero HP is *dead but still in
  * the array* until {@link sweepDeadTurrets} runs at the end of the tick: two
- * ships can be beaming the same planet in one tick, and removing an entry
- * mid-tick would shift the indices the other ship's beam already resolved.
+ * ships can be shooting the same planet in one tick, and removing an entry
+ * mid-tick would shift the indices the other ship's shot already resolved.
  * Same discipline as asteroids, which are also filtered only at end of step.
  */
 export function damageTurret(turret: Turret, amount: number): boolean {
@@ -548,7 +548,7 @@ export function updateTurrets(world: World, dt: number): void {
         fireTurretProjectile(world, turret, aim);
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
-        turret.muzzle = muzzleBeam(turret, target, aim);
+        turret.muzzle = makeMuzzle(turret, target, aim);
         turret.cooldown = TURRET.fireInterval;
       }
     }
@@ -556,13 +556,13 @@ export function updateTurrets(world: World, dt: number): void {
 }
 
 /**
- * The far edge of the ring a **sliding** turret can bring a beam onto: the orbit
+ * The far edge of the ring a **sliding** turret can bring a shot onto: the orbit
  * radius plus `TURRET.range` (field report P1, §1). Threat detection is measured
  * from the *planet centre*, not the turret's current rim spot — the whole point
  * of orbiting is to slide around and reach a far-side attacker, so a threat this
- * close to the core is engageable even when it sits outside beam range of where
+ * close to the core is engageable even when it sits outside firing range of where
  * the turret happens to be sitting *right now*. Once the turret slides to the
- * facing-normal point its beam has line of sight and closes to `range` (§2).
+ * facing-normal point it has line of sight and closes to `range` (§2).
  */
 export function planetThreatRadius(planet: Planet): number {
   return planet.radius + TURRET.mountOffset + TURRET.radius + TURRET.range;
@@ -575,9 +575,9 @@ export function planetThreatRadius(planet: Planet): number {
  * a mere loiterer: a ship putting shots on the core is a threat to answer even
  * from the far side, ahead of one just drifting close.
  *
- * Read from the projectile pool now, not `Ship.beam`: since combat became a
- * projectile the beam is a *mining* tell, so an attacker carving the core no
- * longer carries a beam pointed at it — its shots do. A shot lives longer than
+ * Read from the projectile pool, not `Ship.firing`: `firing` is only a bare
+ * "trigger held" tell with no geometry, so an attacker carving the core is known
+ * by the shots it has in flight, not a flag. A shot lives longer than
  * the fire interval, so a continuously-firing attacker always has one in flight,
  * and the detection never blinks between shots. `updateTurrets` runs after the
  * ship fire step, so this tick's fresh shots are already visible here.
@@ -612,11 +612,11 @@ function segmentHitsCircle(o: Vec2, dir: Vec2, len: number, c: Vec2, r: number):
  * are visible (§1) and ranked so a core-attacker outranks a loiterer (§3).
  *
  * Detection is planet-centric for a sliding turret — a threat inside
- * `planetThreatRadius` is a valid target even outside beam range of the turret's
+ * `planetThreatRadius` is a valid target even outside firing range of the turret's
  * current rim spot, because the turret slides to reach it. A hand-built turret
  * with no `orbitAngle` can't slide, so it keeps the old turret-centric `range`.
  *
- * The pick, in order: (1) a ship actively beaming the core outranks any loiterer
+ * The pick, in order: (1) a ship actively shooting the core outranks any loiterer
  * regardless of distance; (2) within the same class the nearest wins; and (3)
  * stickiness holds the current target until a same-class newcomer is closer by
  * the `TURRET.targetHysteresis` factor (≈25%) — so equidistant enemies never
@@ -802,13 +802,13 @@ function desiredOrbitAngle(world: World, planet: Planet, turrets: Turret[], i: n
  * The muzzle-flash geometry for a shot leaving `turret` at `target` along `aim`
  * (GDD §2.6, §4.1). Origin is the barrel tip — where the projectile is born, so
  * the flash sits on the muzzle — and the segment runs to the tracked ship's
- * near surface, clamped to it exactly the way `Ship.beam` is clamped to what it
- * strikes. This is the *tell*, not the hit test: the projectile does the damage
- * and can still miss a dodging ship; the flash only reports that the turret
- * fired and where it aimed, which is all a renderer needs to make enemy turrets
- * visibly shoot. Allocates only on fire ticks, like `spawnChunk` on a mine.
+ * near surface, clamped to what it is aimed at. This is the *tell*, not the hit
+ * test: the projectile does the damage and can still miss a dodging ship; the
+ * flash only reports that the turret fired and where it aimed, which is all a
+ * renderer needs to make enemy turrets visibly shoot. Allocates only on fire
+ * ticks, like `spawnChunk` on a mine.
  */
-function muzzleBeam(turret: Turret, target: Ship, aim: number): Beam {
+function makeMuzzle(turret: Turret, target: Ship, aim: number): Muzzle {
   const dx = Math.cos(aim);
   const dy = Math.sin(aim);
   const origin = { x: turret.pos.x + dx * turret.radius, y: turret.pos.y + dy * turret.radius };

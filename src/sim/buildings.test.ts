@@ -8,7 +8,7 @@
  *   3. the shield regen window — nothing for 8 s, then 2 HP/s;
  *   4. turret target acquisition — nearest enemy in range, and nobody else;
  *   5. per-planet caps — 4 turrets, 2 shields, queued jobs included.
- * Plus the economy around them (cost, docking, banking), the beam's new
+ * Plus the economy around them (cost, docking, banking), the weapon's new
  * targets, turret DPS end to end, and determinism with all of it running.
  */
 
@@ -78,7 +78,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
   };
 }
 
@@ -561,7 +561,7 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
   });
 });
 
-// --- 7. the beam's day-2 targets -------------------------------------------
+// --- 7. the weapon's day-2 targets -----------------------------------------
 
 describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)', () => {
   it('a shot strips the shield before the core, at the core rate', () => {
@@ -580,8 +580,8 @@ describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)
     const drained = SHIELD.hp - shieldPool(planet);
     expect(drained).toBeGreaterThan(0);
     expect(drained / perShot).toBeCloseTo(Math.round(drained / perShot), 6); // whole shots
-    // The weapon is a projectile: no mining beam is published for it.
-    expect(attacker.beam).toBeNull();
+    // The trigger is held against the bubble, so the firing tell is set.
+    expect(attacker.firing).toBe(true);
   });
 
   it('a shot kills a turret at the ship rate and leaves the core alone', () => {
@@ -612,7 +612,7 @@ describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)
     expect(turret.hp).toBe(TURRET.hp);
     expect(planet.coreHp).toBe(CORE_HP);
     // Auto-aim found no valid enemy target, so nothing was mined or fired.
-    expect(owner.beam).toBeNull();
+    expect(owner.firing).toBe(false);
     expect(live(world)).toHaveLength(0);
   });
 

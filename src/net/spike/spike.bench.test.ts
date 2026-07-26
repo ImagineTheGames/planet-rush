@@ -35,7 +35,7 @@ describe('binary snapshot layout', () => {
 
   it('round-trips ship and projectile records through the wire format', () => {
     const ships = [
-      { id: 3, posX: 1200, posY: -800, velX: 90, velY: -40, heading: 40000, aim: 12345, hull: 61, flags: 0b101 },
+      { id: 3, posX: 1200, posY: -800, velX: 90, velY: -40, heading: 40000, hull: 61, flags: 0b101 },
     ];
     const projectiles = [
       { id: 7, posX: -300, posY: 250, meta: (5 & 0x7) | (2 << 3) },

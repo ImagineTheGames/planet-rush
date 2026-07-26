@@ -1,33 +1,33 @@
 /**
- * src/art/audio/beams.ts — held sounds. OWNER: Art & Audio Agent.
+ * src/art/audio/weapons.ts — held sounds. OWNER: Art & Audio Agent.
  *
  * Most tells are moments: a rock cracks, a turret fires, a shield pops. Three
- * are not — the beam on rock, the beam on hull, and the engine — and those three
+ * are not — a shot on rock, a shot on hull, and the engine — and those three
  * are *states* that persist for as long as a player holds a control down.
  *
  * Retriggering a one-shot per firing tick would play a sound 60 times a second.
- * That is not a beam; it is a machine gun, and worse, it is the sound of a
- * synthesized game giving itself away. So held states get a looping voice whose
+ * That is not sustained fire; it is a machine gun, and worse, it is the sound of
+ * a synthesized game giving itself away. So held states get a looping voice whose
  * gain follows the state, which is what {@link SustainedVoice} is.
  *
- * ## The two beam voices (GDD §3.6)
+ * ## The two firing voices (GDD §3.6)
  *
- * The brief names *"the distinct rock-vs-hull beam sounds"* specifically,
- * because the beam is the inversion the whole game turns on: the same trigger
+ * The brief names *"the distinct rock-vs-hull firing sounds"* specifically,
+ * because firing is the inversion the whole game turns on: the same trigger
  * mines and kills. A player mid-fight needs to know which one they are currently
  * doing without taking their eyes off where they are flying — so the two voices
  * are as far apart as the bank can put them (low grinding stone vs. bright
- * cutting torch, `./bank`), and {@link BeamVoices} crossfades rather than
- * switching, so a beam sweeping off a rock and onto a hull *slides*.
+ * cutting torch, `./bank`), and {@link WeaponVoices} crossfades rather than
+ * switching, so a shot sweeping off a rock and onto a hull *slides*.
  *
  * ## One voice per material, not one per ship
  *
- * Eight ships could be beaming at once, and eight loops of the same grind is
+ * Eight ships could be firing at once, and eight loops of the same grind is
  * eight copies of one sound phase-cancelling into mush — it does not sound like
  * eight miners, it sounds like a fault. So the mix keeps **one** rock voice and
- * **one** hull voice, driven by the strongest beam currently on that material.
- * The information a player needs from the beam is *what is being cut*, and that
- * survives the collapse intact.
+ * **one** hull voice, driven by the strongest shot currently on that material.
+ * The information a player needs is *what is being cut*, and that survives the
+ * collapse intact.
  */
 
 import type { AudioGraph, Bus, LoopHandle } from './graph';
@@ -41,7 +41,7 @@ export interface SustainedOptions {
   readonly bus?: Bus;
   /** Seconds to fall to a lower level once the state stops feeding it. */
   readonly release?: number;
-  /** Seconds to rise. Fast: a beam that fades *in* feels like input lag. */
+  /** Seconds to rise. Fast: a shot that fades *in* feels like input lag. */
   readonly attack?: number;
   /** Ceiling on the voice's gain, 0..1. */
   readonly maxGain?: number;
@@ -143,45 +143,45 @@ export class SustainedVoice {
   }
 }
 
-/** Options for {@link BeamVoices}. */
-export interface BeamVoiceOptions {
-  /** Ceiling on either beam voice, 0..1. */
+/** Options for {@link WeaponVoices}. */
+export interface WeaponVoiceOptions {
+  /** Ceiling on either firing voice, 0..1. */
   readonly maxGain?: number;
   /**
-   * How much beam power moves the pitch. A tier-4 beam is a heavier tool and
+   * How much weapon power moves the pitch. A tier-4 weapon is a heavier tool and
    * sounds like one — the same number that scales the spark burst (`../vfx/`).
    */
   readonly rateSpread?: number;
 }
 
 /**
- * The two beam voices, and the crossfade between them.
+ * The two firing voices, and the crossfade between them.
  *
  * ```ts
  * // per frame, over the same TellQueue the VFX field reads:
- * beams.onBeam(kind === TELL.beamHull, power);
- * beams.update(dt);
+ * weapons.onHit(kind === TELL.weaponHit, power);
+ * weapons.update(dt);
  * ```
  */
-export class BeamVoices {
+export class WeaponVoices {
   private readonly rock: SustainedVoice;
   private readonly hull: SustainedVoice;
   private readonly rateSpread: number;
 
-  constructor(graph: AudioGraph, options: BeamVoiceOptions = {}) {
+  constructor(graph: AudioGraph, options: WeaponVoiceOptions = {}) {
     const maxGain = clamp01(options.maxGain ?? 0.7);
     // A slower release on rock than on hull: mining is a steady activity and
-    // should not flutter when the beam clips the edge of a tumbling rock, while
-    // a beam coming off a ship should stop sounding like a hit immediately.
-    this.rock = new SustainedVoice(graph, SOUND.beamRockLoop, { maxGain, release: 0.11, attack: 0.02 });
-    this.hull = new SustainedVoice(graph, SOUND.beamHullLoop, { maxGain, release: 0.07, attack: 0.012 });
+    // should not flutter when a shot clips the edge of a tumbling rock, while
+    // a shot coming off a ship should stop sounding like a hit immediately.
+    this.rock = new SustainedVoice(graph, SOUND.mineLoop, { maxGain, release: 0.11, attack: 0.02 });
+    this.hull = new SustainedVoice(graph, SOUND.weaponLoop, { maxGain, release: 0.07, attack: 0.012 });
     this.rateSpread = options.rateSpread ?? 0.25;
   }
 
-  /** One beam tell: hull or rock, at this power (0..1). */
-  onBeam(onHull: boolean, power: number): void {
+  /** One firing tell: hull or rock, at this power (0..1). */
+  onHit(onHull: boolean, power: number): void {
     const p = clamp01(power);
-    // Level tracks power with a floor, so even a tier-0 beam is clearly audible:
+    // Level tracks power with a floor, so even a tier-0 weapon is clearly audible:
     // this is the sound that tells a player their trigger is doing something.
     const level = 0.55 + 0.45 * p;
     const rate = 1 + (p - 0.5) * this.rateSpread;

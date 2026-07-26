@@ -234,7 +234,7 @@ describe('the match runs its own clock to an ending (GDD §2.3)', () => {
 
   it('every upgrade track is reachable from the panel order', () => {
     expect([...TRACK_ORDER].sort()).toEqual(
-      [UpgradeTrack.Beam, UpgradeTrack.Engine, UpgradeTrack.Cargo, UpgradeTrack.Hull].sort(),
+      [UpgradeTrack.Power, UpgradeTrack.Engine, UpgradeTrack.Cargo, UpgradeTrack.Hull].sort(),
     );
   });
 

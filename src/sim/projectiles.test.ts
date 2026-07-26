@@ -56,7 +56,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
     weaponCooldown: over.weaponCooldown ?? 0,
   };
 }
@@ -122,8 +122,8 @@ function makeWorld(over: Partial<World> = {}): World {
   };
 }
 
-/** The engagement range the dodge is designed around (roughly the beam range the
- *  weapon replaced). */
+/** The engagement range the dodge is designed around (roughly the hitscan reach
+ *  the projectile weapon replaced). */
 const COMBAT_RANGE = 260;
 
 // --- the dodge (the entire point) ------------------------------------------

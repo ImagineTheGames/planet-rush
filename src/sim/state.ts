@@ -15,7 +15,7 @@
  * below steps it with the ratified mulberry32 algorithm (`@shared/types`).
  */
 
-import type { Beam, PlayerId, ShipClass, Vec2 } from '@shared/types';
+import type { Muzzle, PlayerId, ShipClass, Vec2 } from '@shared/types';
 import {
   CORE_HP,
   PLANET,
@@ -82,21 +82,19 @@ export interface Ship {
   /** Collision radius. */
   radius: number;
   /**
-   * **Mining indicator tell** — retired as a *mechanism* (ratified amendment v0.3:
-   * "the mining laser goes away, it should be a projectile"). No ray mines or
-   * damages any more — a pooled projectile chips rock and bites hulls
-   * (`./projectiles`). What survives is a pure tell: non-null only on a tick this
-   * ship is **mining** a rock (origin → rock surface), `null` while it shoots an
-   * enemy or empty space. It carries no damage and does no mining; it is the
-   * signal the netcode "firing" bit (`src/net/snapshot.ts`) and the renderer read
-   * across the agent-ownership boundary, so the sim keeps publishing it exactly
-   * where the retired beam did. Its full removal (and the beam VFX retirement) is
-   * a coordinated render/net follow-up the sim cannot make unilaterally.
+   * **Firing tell** — true on any tick this ship's weapon is active (holding the
+   * trigger with a shot loosing, whether it lands on rock or hull). The mining /
+   * attack laser retired to a projectile (ratified amendment v0.3: "the mining
+   * laser goes away, it should be a projectile"), so there is no shot geometry to
+   * publish any more — a ship's shots are drawn from the projectile pool. This
+   * boolean is all that survives: the signal the netcode "firing" bit
+   * (`src/net/snapshot.ts`), the bots' threat read, and the renderer's in-combat
+   * glow key off. Reset to `false` every tick before the fire step decides it.
    */
-  beam: Beam | null;
+  firing: boolean;
   /** Seconds until the ship's weapon may loose its next projectile (0 = ready).
    *  The weapon fires on `SHIP_WEAPON.fireInterval`, the projectile analogue of
-   *  the old continuous beam's per-tick damage (design amendment v0.2). Match
+   *  the old hitscan's per-tick damage (design amendment v0.2). Match
    *  state like everything else; reset to 0 on respawn.
    *
    *  Optional so the `Ship` literals other agents build (bot/render/net/harness
@@ -161,7 +159,7 @@ export interface OreChunk {
 // --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
 
 /** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
- *  the ship defends"). Cheap, killable, and a beam target in its own right. */
+ *  the ship defends"). Cheap, killable, and a shot target in its own right. */
 export interface Turret {
   readonly id: number;
   /** The planet owner's slot — turrets never shoot their own fleet. */
@@ -182,7 +180,7 @@ export interface Turret {
    * report P1). A turret is no longer pinned to its build spot: it slides along
    * the surface ring toward the point whose outward normal faces its target,
    * capped at `TURRET.orbitSpeed` so it glides. `pos` is derived from this every
-   * tick (`turretOrbitPos`), so the sprite and beam origin track the slide.
+   * tick (`turretOrbitPos`), so the sprite and muzzle origin track the slide.
    *
    * Starts at the turret's mount-slot home angle (`turretHomeAngle`), which is
    * why a freshly built turret sits exactly on its reserved slot, and where it
@@ -200,22 +198,21 @@ export interface Turret {
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
   /**
-   * Muzzle geometry for the tick this turret actually loosed a shot, else
-   * `null` — the turret's answer to `Ship.beam` (GDD §2.6, §4.1). A turret's
-   * damage rides a pooled projectile, but its *tell* is the muzzle flash, and
-   * that tell has to come from sim combat state so **every** turret in the world
-   * flashes when it fires — not just the local player's. Origin at the barrel
-   * tip, direction at the tracked ship, `hitPoint`/`length` clamped to that
-   * ship's surface, so a renderer can draw a muzzle bloom or a tracer without
-   * re-deriving the shot. Set only on fire ticks (~twice a second), cleared
-   * every other tick, so it is a transient event, not a standing beam.
+   * Muzzle-flash geometry for the tick this turret actually loosed a shot, else
+   * `null` (GDD §2.6, §4.1). A turret's damage rides a pooled projectile, but its
+   * *tell* is the flash at the barrel, and that tell has to come from sim combat
+   * state so **every** turret in the world flashes when it fires — not just the
+   * local player's. Origin at the barrel tip, direction at the tracked ship,
+   * `hitPoint`/`length` clamped to that ship's surface, so a renderer can draw a
+   * muzzle bloom or a tracer without re-deriving the shot. Set only on fire ticks
+   * (~twice a second), cleared every other tick, so it is a transient event.
    *
    * Optional so this render tell can be added without breaking the turret
    * literals other agents build (wire-event reconstruction, bot fixtures) — the
    * sim's own turrets always carry it (`makeTurret` sets it), and a turret with
    * no `muzzle` field simply is not flashing.
    */
-  muzzle?: Beam | null;
+  muzzle?: Muzzle | null;
 }
 
 /** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each
@@ -225,7 +222,7 @@ export interface Shield {
   readonly id: number;
   hp: number;
   maxHp: number;
-  /** Bubble radius — the beam target that stands in front of the core. */
+  /** Bubble radius — the shot target that stands in front of the core. */
   radius: number;
 }
 
@@ -464,7 +461,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     spawnProtect: SPAWN_PROTECTION_S,
     eliminated: false,
     radius: SHIP_RADIUS,
-    beam: null,
+    firing: false,
     weaponCooldown: 0,
   };
 }
