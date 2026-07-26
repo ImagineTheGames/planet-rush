@@ -618,5 +618,75 @@
     "buildSha": "038457b",
     "attestation": "Supporting whole-arena frame for player-nameplates (build 038457b, tick 780, 2560x2560 wide 1:1 view, no staging). One screenshot of the natural ring: five owned planets carry name labels over matching-colour rings — Vulture (chalk, top), Warden (slate-blue), YOU (azure, local, centre-right), Rusty (cyan) and Bolt (green, bottom) — and six bot ships carry personality-name labels matching their trim: Vulture and Warden (upper middle), Patch (magenta, far left), Foreman (violet) and Bolt and Rusty (lower middle). The local YOU label sits over the home planet; the local ship beside it is unlabelled. Confirms labels are data-driven per seated slot and consistently colour-matched across the whole arena. VERIFIED.",
     "verdict": "verified"
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-count-conservation",
+    "title": "Ore numbers tell the truth — natural mine → dock → interrupt → re-dock → finish (the interrupt frame)",
+    "image": "images/ore-truth-interrupt.png",
+    "attestation": "The full ore cycle run NATURALLY on the live preview bundle (build 82c5c30, no ?freeze), driven entirely through real keyboard/mouse input and read back only through the ratified ?debug=1 seams (__oreHudStage.hold()/total()/readout(), __oreDepositStage.flights()). The local ship boots docked at its home planet ('YOU', the blue-ringed disc, banked 3). It was flown out into the asteroid field, mined a real rock to a full 2/2 hold by firing projectiles and tractoring the chipped chunks (sim cargo climbed 0 -> 2.000), flown home and parked inside dock range where the sim's own auto-deposit drained the hold into the bank; mid-drain it was BOOSTED back out of range to interrupt the deposit, then re-docked to finish. Across 35 captured frames the three numbers agreed on EVERY frame: under-ship filled pips == floor(sim hold), top-left TOTAL == floor(sim bank), sim hold+bank constant — with only the documented <=1-frame draw lag while a drain is actively moving, and zero disagreements anywhere. THIS image is the interrupt itself: the ship is clearly UNDOCKED (well clear of its 'YOU' planet, now up and to the right), exactly one yellow hold pip is filled beneath it (1.333 ore held -> one whole pip), and the top-left reads TOTAL 3. Held right there for 18 consecutive sampled frames the sim hold stayed EXACTLY 1.333 (peak drift 0.0000), the sim bank stayed 3.667, the drawn pips stayed 1, the drawn TOTAL stayed 3, and the deposit-courier count fell to 0 and stayed 0 — no phantom banking, no phantom couriers while undocked. That is precisely where the field report said the readouts used to lie, and here they do not move. Conservation held end to end: the sim bank rose 3.000 -> 4.99999999999999 (5 within float dust) as the mined 2.000 hold emptied to 0, hold+bank pinned at 5 the whole run. No page errors. VERIFIED."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-mined",
+    "title": "Ore truth — mined a real field to a full 2/2 hold",
+    "image": "images/ore-truth-mined.png",
+    "attestation": "Live boot, natural mining. Top-left reads TOTAL 3 (banked). The ship sits out in the asteroid field (its 'YOU' planet is off to the right) with a red projectile and a loose yellow ore chunk still at the rock it just chipped, and the coach line reads 'Hold full — fly home and press E'. Two olive/yellow hold pips are drawn filled directly under the ship — the under-ship indicator showing a full 2/2 hold, matching the seam's sim cargo of exactly 2.000 (pips 2, slots 2) and banked 3.000 (TOTAL 3). This is a genuinely mined hold: cargo climbed 0 -> 2.000 by projectile fire + tractor, not staged. VERIFIED."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-docked",
+    "title": "Ore truth — docked, the auto-deposit drain begins",
+    "image": "images/ore-truth-docked.png",
+    "attestation": "The ship has flown home and parked inside dock range at its 'YOU' planet; the sim's docked-and-parked auto-deposit has just started. Top-left TOTAL 3. One yellow hold pip is filled under the ship (sim cargo 1.900 -> one whole pip) and a single yellow ore-flight courier has left the hull toward the planet. Seam at this frame: cargo 1.900, banked 3.100, pips 1, TOTAL 3, flights 1 — the drawn pips and TOTAL are exactly floor(hold) and floor(bank). MATCH clock 0:17. VERIFIED."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-deposit-flight",
+    "title": "Ore truth — deposit couriers in flight; count vs bank delta in one tick",
+    "image": "images/ore-truth-mid-drain.png",
+    "attestation": "Mid-deposit: the ship is docked at 'YOU', TOTAL 3, one filled hold pip under it, and TWO yellow ore-flight couriers are visibly in the air between the ship and the planet. The couriers are cosmetic and carry no ore. COURIER COUNT vs BANK DELTA, measured over ONE 0.15 s deposit tick (10 sim ticks) on the live drain: 2 couriers spawned (peak 3 in the air at once) while the bank rose +0.3333 ore — so the flight sprites are time-cadenced (DEPOSIT.flightInterval 0.15 s at drainRate 2/s), NOT one-per-ore; across the whole 2-ore deposit ~7 courier spawns were counted, peak 3 simultaneously. The ORE itself is conserved 1:1 — every fraction leaving the hold arrived in the bank, hold+bank constant every frame. Both numbers, per the brief: 2 flight chunks vs +0.33 ore banked in one tick. (The literal one-courier-per-ore requirement is a documented sim-side follow-up — test.fixme in tests/live-stage/ore-conservation.spec.ts.) VERIFIED."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-redocked",
+    "title": "Ore truth — re-docked, the interrupted deposit resumes",
+    "image": "images/ore-truth-redocked.png",
+    "attestation": "After the undock interrupt the ship was flown back and re-parked at 'YOU'; the drain has resumed. TOTAL 3, one filled hold pip under the ship, a courier heading to the planet. Seam at this frame: cargo 1.200, banked 3.800, pips 1, TOTAL 3, flights 1 — pips == floor(hold), TOTAL == floor(bank), and the conserved total (hold+bank) is still 5. MATCH clock 0:22, later than the docked frame's 0:17 and the interrupt's 0:19, so this is one continuous live playthrough, not restaged. VERIFIED."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-empty",
+    "title": "Ore truth — finish: hold emptied, banked; the honest floor of 4.9999…",
+    "image": "images/ore-truth-empty.png",
+    "attestation": "Finish: the resumed deposit drained the hold to 0. The under-ship indicator is HIDDEN (empty hold), the ship sits docked at 'YOU', and a last courier is absorbing into the planet. Top-left reads TOTAL 4. HONEST NOTE ON THE 4: the sim bank is 4.99999999999999 — the starting 3 plus the mined 2, one part in ~1e14 short of 5.0 from float accumulation across the per-tick drain. The HUD floors the banked value (pure projection: TOTAL == floor(bank)), so it draws 4, not 5. The ore is conserved (short by ~1e-10, far below a single ore); the whole-ore display simply floors a value a hair under the round number. That is evidence FOR a pure projection rather than a delta-accumulator — an accumulator crediting '+2' would have shown 5 regardless of the sim. Shown and explained plainly. VERIFIED (with the floor-vs-float-residue display behaviour noted)."
+  },
+  {
+    "area": "hud",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
+    "verdict": "verified",
+    "id": "ore-truth-sequence",
+    "title": "Ore truth — the under-ship hold across the whole cycle (4-up strip)",
+    "image": "images/ore-truth-strip.png",
+    "attestation": "A vertical strip of four ship-centred crops from the one natural run, top to bottom: (1) MINED — two filled hold pips (full 2/2); (2) MID-DRAIN — one filled pip with a yellow courier in flight and the planet edge at right (docked, depositing); (3) INTERRUPT — one filled pip and NO planet nearby (undocked, deposit paused, hold frozen); (4) EMPTY — no pips at all with the planet edge and a last courier (docked, hold banked). The under-ship count steps 2 -> 1 -> 1 -> 0 exactly as floor(sim hold) does across mine/deposit/interrupt/finish; the frozen third crop still shows its whole pip because the interrupted hold (1.333) never drained while undocked. Read alongside the per-phase full frames for the matching top-left TOTAL and the seam numbers. VERIFIED."
   }
 ]

@@ -67,13 +67,19 @@ export const HARD_SHIELD_TARGET = 1;
 export const HARD_REPAIR_AT = 0.75;
 
 /**
- * The ladder a Hard bot climbs, in order (GDD §2.5). Power leads because it is
- * the one stat that pays twice — "mining speed and weapon damage — one stat" —
- * so every tier of it shortens both the trip to a full hold and the time to kill
- * whoever interrupts it. TUNABLE
+ * The ladder a Hard bot climbs, in order (GDD §2.5). DAMAGE (`Power`) leads
+ * because it is the one stat that pays twice — "mining speed and weapon damage —
+ * one stat" — so every tier of it shortens both the trip to a full hold and the
+ * time to kill whoever interrupts it. SPEED comes second, ahead of the economy
+ * tracks: a Hard bot plays like a good human (GDD §2.9), and a good human buys
+ * muzzle velocity early because a faster shot lands the damage it already has on
+ * a strafing target the stock shot would miss (v0.2.2 field report — SPEED is
+ * how a Hard bot "actually uses" the counterplay the projectile weapon created).
+ * TUNABLE
  */
 export const HARD_UPGRADE_ORDER: readonly UpgradeTrack[] = [
   UpgradeTrack.Power,
+  UpgradeTrack.Speed,
   UpgradeTrack.Cargo,
   UpgradeTrack.Engine,
   UpgradeTrack.Hull,

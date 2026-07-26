@@ -172,8 +172,10 @@ export const SHIP_WEAPON = {
    * (260 u/s) slides ~130 u sideways — far past a ship+shot radius, so the dodge
    * is real (`projectiles.test.ts`). Fast enough that a committed attacker who
    * closes the range still lands hits; slow enough that a boosting ship outruns a
-   * stale shot. Scaled up by the power upgrade ladder (`shipProjectileSpeed`) —
-   * "add upgrades to make them faster, stronger" (amendment v0.2). TUNABLE
+   * stale shot. Scaled up by the dedicated SPEED upgrade track
+   * (`SHOT_SPEED_STEPS`, read through `shipProjectileSpeed`) — "add upgrades to
+   * make them faster, stronger" split into its two ratified tracks: SPEED buys
+   * this velocity, DAMAGE buys the bite (v0.2.2 field report). TUNABLE
    */
   projectileSpeed: 520,
   /** How far a base shot travels before it despawns (world units) — the ship's
@@ -186,6 +188,32 @@ export const SHIP_WEAPON = {
    *  ship weapon reads as the heavier gun. */
   radius: 5,
 } as const;
+
+/**
+ * SPEED upgrade track — projectile muzzle-velocity multipliers over
+ * `SHIP_WEAPON.projectileSpeed`, one per tier (`steps[0]` = 1 = stock). The
+ * developer's ratified example: **base → +15% → +30%** (v0.2.2 field report,
+ * "upgrades to make them faster"). A faster shot is a shot that is harder to
+ * dodge, which is the whole counterplay economy the projectile switch created:
+ * DAMAGE makes a shot bite harder *if* it lands, SPEED makes it land more often.
+ * Only the upgrade multiplier, never the class base — so every hull's stock shot
+ * shares the same dodgeable base velocity and this track alone buys "harder to
+ * dodge" (class identity stays in DAMAGE, not velocity). These are the named
+ * tunables `UPGRADES[UpgradeTrack.Speed].steps` reads from. TUNABLE
+ */
+export const SHOT_SPEED_STEPS: readonly Tunable<number>[] = [1, 1.15, 1.3];
+
+/**
+ * SPEED tier costs — the ore price of each muzzle-velocity step. Deliberately a
+ * **tier above DAMAGE** at every rung (DAMAGE costs `[4, 8, 14]`; SPEED starts
+ * where DAMAGE's *second* tier does): speed is the stronger buy, because a faster
+ * shot beats a stronger one — it lands the DAMAGE you already have more often
+ * instead of adding damage to shots that miss. Pricing it up a rung keeps "raw
+ * damage first, then learn to make it connect" the natural climb and stops SPEED
+ * from being a strictly-dominant first purchase. `costs.length` is
+ * `SHOT_SPEED_STEPS.length - 1` (two buyable tiers). TUNABLE
+ */
+export const SHOT_SPEED_COSTS: readonly Tunable<number>[] = [8, 14];
 
 /**
  * How much of a projectile's ship-damage a shield or core actually takes — the
@@ -648,6 +676,27 @@ export interface UpgradeTrackSpec {
   readonly costs: readonly number[];
   /** Hard ceiling on the resulting value (GDD §2.8 cargo "cap 8"), or `null`. */
   readonly max: number | null;
+  /**
+   * The player-facing wedge name (v0.2.2 field report: "every wedge shows WHAT it
+   * upgrades unambiguously"). This is where the DAMAGE relabel of the `Power`
+   * track lives — the enum key stays `Power`, the wedge reads `label`. The UI's
+   * upgrade wheel prints this, so a rename is a data edit here, never UI code.
+   */
+  readonly label: string;
+  /**
+   * The unit the wedge's delta is measured in — `'%'` for a multiplier track,
+   * `'/hit'` for per-shot damage, `''` for unitless slots or absolute HP. The
+   * field report's item 4: a wedge shows "label + delta with units", and the
+   * units (`%`, `/hit`) come from here so what a wedge reports is data, not layout.
+   */
+  readonly unit: string;
+  /**
+   * Tracks the UI draws together as one nested sub-wheel (RATIFIED v0.2.2: DAMAGE
+   * and SPEED are the **WEAPON** group). `undefined` is a standalone wedge. The
+   * grouping is metadata the sim owns; the p4-10 UI renders it, so grouping is
+   * data, not layout.
+   */
+  readonly group?: string;
 }
 
 /**
@@ -669,15 +718,35 @@ export interface UpgradeTrackSpec {
  * between what a player is shown and what they are sold. All TUNABLE.
  */
 export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
-  // Power: mining speed *and* weapon damage, one stat (GDD §2.5). Multiplies the
-  // class power, so the Excavator stays the mining engine at every tier — and the
-  // track pays for itself twice, which is why it is the dearest.
+  // DAMAGE (enum key `Power`): mining speed *and* weapon damage-per-hit, one stat
+  // (GDD §2.5). Multiplies the class power, so the Excavator stays the mining
+  // engine at every tier. Since v0.2.2 it no longer moves projectile *speed* —
+  // that split off to its own SPEED track below — so this wedge means exactly one
+  // thing to a player: how hard each shot bites (`/hit`). WEAPON group.
   [UpgradeTrack.Power]: {
     track: UpgradeTrack.Power,
     mode: 'multiply',
     steps: [1, 1.25, 1.5, 1.8],
     costs: [4, 8, 14], // TUNABLE
     max: null,
+    label: 'DAMAGE',
+    unit: '/hit',
+    group: 'weapon',
+  },
+  // SPEED: projectile muzzle velocity only (v0.2.2 field report). Faster shots are
+  // harder to dodge — the counterplay the projectile weapon was built for. Priced
+  // a tier above DAMAGE (`SHOT_SPEED_COSTS`), because it is the stronger buy: it
+  // makes the damage you already have connect, so it must not be the strictly-best
+  // first purchase. WEAPON group — drawn with DAMAGE as one nested sub-wheel.
+  [UpgradeTrack.Speed]: {
+    track: UpgradeTrack.Speed,
+    mode: 'multiply',
+    steps: SHOT_SPEED_STEPS,
+    costs: SHOT_SPEED_COSTS, // TUNABLE — a tier above DAMAGE at each rung
+    max: null,
+    label: 'SPEED',
+    unit: '%',
+    group: 'weapon',
   },
   // Engine: top speed *and* acceleration — an engine is thrust, and a hull that
   // gained a ceiling it takes twice as long to reach would feel like a downgrade.
@@ -689,6 +758,8 @@ export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
     steps: [1, 1.15, 1.3, 1.45],
     costs: [3, 7, 12], // TUNABLE
     max: null,
+    label: 'ENGINE',
+    unit: '%',
   },
   // Cargo: "+2 per tier" with a hard cap of 8 — both ratified numbers, read from
   // the table above rather than typed twice (GDD §2.8). The cheapest first tier
@@ -700,6 +771,8 @@ export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
     steps: [0, CARGO_PER_TIER, CARGO_PER_TIER * 2, CARGO_PER_TIER * 3],
     costs: [2, 6, 12], // TUNABLE
     max: CARGO_CAP_MAX,
+    label: 'CARGO',
+    unit: '', // slots — a bare count, no unit suffix
   },
   // Hull: ships are cheap, respawn free, and hull is not repairable at all
   // (GDD §2.5) — so this track buys time inside one fight and never a heal.
@@ -709,14 +782,18 @@ export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
     steps: [1, 1.2, 1.4, 1.6],
     costs: [3, 7, 12], // TUNABLE
     max: null,
+    label: 'HULL',
+    unit: '', // absolute HP — a bare number, no unit suffix
   },
 };
 
-/** Iteration order over the four tracks. Fixed, because anything that walks all
- *  four inside the sim must walk them in one order (GDD §4.8). Power leads: it is
- *  the stat that pays for itself twice, and the upgrade panel lists it first. */
+/** Iteration order over the tracks. Fixed, because anything that walks them all
+ *  inside the sim must walk them in one order (GDD §4.8). DAMAGE leads and SPEED
+ *  follows it, so the WEAPON group is contiguous for any consumer that lays out
+ *  from this order; the rest keep their historical order. */
 export const TRACK_ORDER: readonly UpgradeTrack[] = [
   UpgradeTrack.Power,
+  UpgradeTrack.Speed,
   UpgradeTrack.Engine,
   UpgradeTrack.Cargo,
   UpgradeTrack.Hull,
@@ -821,16 +898,37 @@ export const TRACTOR = {
 } as const;
 
 /**
- * Auto-deposit at your own planet (field report v0.1.2; GDD §2.3 "fly home and
- * convert ore … or bank it", §2.5).
+ * DEPOSIT_RANGE — the atmosphere radius (world units, centre-to-centre) inside
+ * which a ship auto-deposits its hold at its OWN living planet. Ratified p4
+ * (developer): "You shouldn't need to touch your planet to deposit — just be in
+ * that atmosphere." A generous **planet-radius multiple** (4× ⇒ 256 u),
+ * comfortably larger than `PLANET.dockRange` (160): a ship orbiting its home
+ * sits inside the atmosphere without having to close to docking distance, so
+ * orbiting comfortably inside it is easy — depositing costs no precision.
+ *
+ * The drain runs whenever the ship is inside this radius at its own living
+ * planet, with **no dock and no park gate** (`updateDeposits`): cross in and it
+ * starts the same tick, cross out and it stops — interruptible exactly as
+ * before, the boundary counting as inside (`≤`). Docking (`PLANET.dockRange`)
+ * still gates the build/upgrade/repair wheel and, being the tighter radius,
+ * trivially implies being in the atmosphere. The render layer draws the
+ * atmosphere halo from this exact radius (p4-12 asserts the drawn radius equals
+ * the sim radius), so the visual tell and the rule can never drift. TUNABLE
+ */
+export const DEPOSIT_RANGE: Tunable<number> = PLANET.radius * 4;
+
+/**
+ * Auto-deposit inside your own planet's atmosphere (field report v0.1.2; GDD
+ * §2.3 "fly home and convert ore … or bank it", §2.5; ratified p4).
  *
  * The developer flew home with a full hold and nothing happened: mining fills
  * the hold, but the *only* thing that emptied it into the safe banked total was
  * an explicit BANK wheel press, which a first-time player never finds. The rule:
- * while a ship sits **docked at its own living planet**, its hold auto-transfers
- * into the bank at a steady, readable, interruptible rate — undock and it stops.
- * Not instant (that is what the BANK segment stays, for a one-tap dump): the
- * drain is a beat the player watches, as ore chunks visibly fly ship→planet.
+ * while a ship is inside its own living planet's **atmosphere** (`DEPOSIT_RANGE`),
+ * its hold auto-transfers into the bank at a steady, readable, interruptible
+ * rate — leave the atmosphere and it stops. Not instant (that is what the BANK
+ * segment stays, for a one-tap dump): the drain is a beat the player watches, as
+ * ore chunks visibly fly ship→planet.
  *
  * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
  * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
@@ -838,25 +936,17 @@ export const TRACTOR = {
  * at the planet — the same discipline as the firing tell, and they reuse the ore
  * chunk the renderer already draws, so the visual needs no new render path.
  *
- * You unload when you **park**, not when you skim past: the drain only runs
- * while the docked ship is also near rest (`parkSpeed`). That is what "dock"
- * means — arriving and settling, the developer's own words ("fly to your own
- * planet, dock") — and it keeps a ship that merely clips dock range at cruising
- * speed on its way elsewhere from bleeding ore it never meant to drop. It also
- * leaves the wheel's instant BANK press the winner on the arrival tick: a pilot
- * (or bot) who taps BANK the moment they touch down banks the whole hold before
- * they have slowed enough for the passive drain to take a bite. TUNABLE
+ * You deposit by **being in the atmosphere**, not by touching down: no dock,
+ * no park requirement (ratified p4 — the old dock+park gate is retired). The
+ * wheel's instant BANK press still wins the arrival tick for a one-tap dump, but
+ * a pilot who simply orbits home unloads without ever having to settle onto the
+ * planet. TUNABLE
  */
 export const DEPOSIT = {
-  /** Ore per second moved hold→bank while docked and parked. At 2/s a base
+  /** Ore per second moved hold→bank while inside the atmosphere. At 2/s a base
    *  2-slot hold empties in ~1 s — brisk enough not to be a chore, slow enough
    *  to read the chunks fly and to cut short by pulling away. */
   drainRate: 2,
-  /** Speed (units/s) at or below which a docked ship counts as parked and the
-   *  drain runs — well under the 260 base cruise, above the drift a coasting
-   *  ship settles to, so releasing thrust at home starts the deposit within a
-   *  tick or two while a fly-by never triggers it. */
-  parkSpeed: 40,
   /** Seconds between deposit-flight chunks spun off for the visual. One every
    *  ~0.15 s reads as a steady stream at the drain rate without flooding the
    *  chunk pool; realised on the sim tick grid so it stays deterministic. */

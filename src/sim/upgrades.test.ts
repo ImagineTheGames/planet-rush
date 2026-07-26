@@ -33,6 +33,8 @@ import {
   SHIELD,
   SHIP_RADIUS,
   SHIP_STATS,
+  SHIP_WEAPON,
+  SHOT_SPEED_STEPS,
   TICK_DT,
   TRACK_ORDER,
   UPGRADES,
@@ -45,11 +47,16 @@ import {
   shipPower,
   shipCoreDps,
   shipWeaponDps,
+  shipWeaponDamage,
+  shipProjectileSpeed,
+  shipProjectileLife,
   shipCargoCap,
   shipMaxHull,
   shipMiningRate,
   shipTopSpeed,
   shipTurnRate,
+  shotDamage,
+  shotSpeed,
   stockTiers,
   tierOf,
   type ShipLoadout,
@@ -304,18 +311,38 @@ describe('the class stat table (GDD §2.11)', () => {
 // ---------------------------------------------------------------------------
 
 describe('the upgrade ladder (GDD §2.5, §2.8)', () => {
-  it('offers three buyable tiers per track, priced cheap-first and escalating', () => {
+  it('offers buyable tiers per track, priced cheap-first and escalating', () => {
     for (const track of TRACK_ORDER) {
       const spec = UPGRADES[track];
+      // `costs` is always one shorter than `steps` — one price per step up.
       expect(spec.costs.length).toBe(spec.steps.length - 1);
-      expect(maxTier(track)).toBe(3);
+      expect(maxTier(track)).toBe(spec.steps.length - 1);
+      // Every track has at least one buyable tier, and each is dearer than the
+      // last (GDD §2.5 escalating cost).
+      expect(maxTier(track)).toBeGreaterThanOrEqual(1);
       for (let i = 1; i < spec.costs.length; i++) {
         expect(spec.costs[i]!).toBeGreaterThan(spec.costs[i - 1]!);
       }
-      // "first tier cheap" (GDD §2.8) — cheaper than a shield, and never free.
+      // Never free.
       expect(spec.costs[0]!).toBeGreaterThan(0);
-      expect(spec.costs[0]!).toBeLessThanOrEqual(SHIELD.cost);
+      // "first tier cheap" (GDD §2.8) — cheaper than a shield — holds for the
+      // four §2.5 tracks. SPEED is the deliberate exception: it is priced a tier
+      // above DAMAGE (the stronger buy, v0.2.2 field report), so its first tier
+      // sits above a shield's cost on purpose.
+      if (track !== UpgradeTrack.Speed) {
+        expect(spec.costs[0]!).toBeLessThanOrEqual(SHIELD.cost);
+      }
     }
+    // SPEED's opening tier is dearer than a shield — and a tier above DAMAGE's.
+    expect(UPGRADES[UpgradeTrack.Speed].costs[0]!).toBeGreaterThan(SHIELD.cost);
+    expect(UPGRADES[UpgradeTrack.Speed].costs[0]!).toBe(UPGRADES[UpgradeTrack.Power].costs[1]!);
+    // The four §2.5 tracks each offer three tiers; SPEED is the ratified
+    // two-tier ladder (base → +15% → +30%, v0.2.2 field report).
+    expect(maxTier(UpgradeTrack.Power)).toBe(3);
+    expect(maxTier(UpgradeTrack.Engine)).toBe(3);
+    expect(maxTier(UpgradeTrack.Cargo)).toBe(3);
+    expect(maxTier(UpgradeTrack.Hull)).toBe(3);
+    expect(maxTier(UpgradeTrack.Speed)).toBe(2);
   });
 
   it('prices the next step and only the next step', () => {
@@ -451,6 +478,122 @@ describe('class identity at every tier (GDD §2.5, §2.11)', () => {
         expect(shipMiningRate(loadout(cls, tier))).toBeLessThan(excavator);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. The WEAPON group — DAMAGE and SPEED are two tracks (v0.2.2 field report)
+// ---------------------------------------------------------------------------
+//
+// The developer's projectile design is "upgrades to make them faster, stronger"
+// — two separate buys. DAMAGE (`UpgradeTrack.Power`) is how hard a shot bites;
+// SPEED (`UpgradeTrack.Speed`) is muzzle velocity, and nothing else. The two are
+// a WEAPON group in the ladder metadata, and they move independently.
+
+describe('the WEAPON group — DAMAGE and SPEED (v0.2.2 field report)', () => {
+  it('carries wedge metadata: label, unit, and the weapon group tag', () => {
+    const damage = UPGRADES[UpgradeTrack.Power];
+    const speed = UPGRADES[UpgradeTrack.Speed];
+    // DAMAGE reads "DAMAGE /hit"; the enum key stays `Power` but the wedge label
+    // is the relabel the field report asked for.
+    expect(damage.label).toBe('DAMAGE');
+    expect(damage.unit).toBe('/hit');
+    expect(damage.group).toBe('weapon');
+    // SPEED reads "SPEED %".
+    expect(speed.label).toBe('SPEED');
+    expect(speed.unit).toBe('%');
+    expect(speed.group).toBe('weapon');
+    // Every wedge names what it upgrades and carries a unit string — no bare,
+    // ambiguous number (field report item 4).
+    for (const track of TRACK_ORDER) {
+      const spec = UPGRADES[track];
+      expect(spec.label.length).toBeGreaterThan(0);
+      expect(typeof spec.unit).toBe('string');
+    }
+    // DAMAGE and SPEED are the only members of the weapon group, and they are
+    // contiguous in the iteration order so the sub-wheel reads as one unit.
+    const weapon = TRACK_ORDER.filter((t) => UPGRADES[t].group === 'weapon');
+    expect(weapon).toEqual([UpgradeTrack.Power, UpgradeTrack.Speed]);
+  });
+
+  it('SPEED tiers scale muzzle velocity — base → +15% → +30% — and nothing else', () => {
+    const base = SHIP_WEAPON.projectileSpeed;
+    for (const cls of ALL_CLASSES) {
+      const stock: ShipLoadout = { shipClass: cls, tiers: stockTiers() };
+      // Every hull's stock shot shares one dodgeable base velocity — class
+      // identity lives in DAMAGE, never in speed.
+      expect(shipProjectileSpeed(stock)).toBeCloseTo(base, 9);
+      for (let tier = 1; tier <= maxTier(UpgradeTrack.Speed); tier++) {
+        const kitted: ShipLoadout = {
+          shipClass: cls,
+          tiers: { ...stockTiers(), [UpgradeTrack.Speed]: tier },
+        };
+        expect(shipProjectileSpeed(kitted)).toBeCloseTo(base * SHOT_SPEED_STEPS[tier]!, 9);
+        // A SPEED buy leaves per-hit damage untouched — the split is real.
+        expect(shipWeaponDamage(kitted)).toBeCloseTo(shipWeaponDamage(stock), 9);
+        // A faster shot reaches the SAME range, not further (life = range / speed).
+        expect(shipProjectileLife(kitted)).toBeCloseTo(
+          SHIP_WEAPON.range / shipProjectileSpeed(kitted),
+          9,
+        );
+      }
+    }
+    // The ratified deltas, spelled out: +15% then +30% over base.
+    expect(SHOT_SPEED_STEPS[1]! / SHOT_SPEED_STEPS[0]!).toBeCloseTo(1.15, 9);
+    expect(SHOT_SPEED_STEPS[2]! / SHOT_SPEED_STEPS[0]!).toBeCloseTo(1.3, 9);
+  });
+
+  it('DAMAGE tiers scale per-hit damage and leave muzzle velocity alone', () => {
+    for (const cls of ALL_CLASSES) {
+      const stock: ShipLoadout = { shipClass: cls, tiers: stockTiers() };
+      for (let tier = 1; tier <= maxTier(UpgradeTrack.Power); tier++) {
+        const kitted: ShipLoadout = {
+          shipClass: cls,
+          tiers: { ...stockTiers(), [UpgradeTrack.Power]: tier },
+        };
+        const step = UPGRADES[UpgradeTrack.Power].steps[tier]!;
+        expect(shipWeaponDamage(kitted)).toBeCloseTo(shipWeaponDamage(stock) * step, 9);
+        // Buying DAMAGE never speeds the shot up — that is SPEED's job alone.
+        expect(shipProjectileSpeed(kitted)).toBeCloseTo(shipProjectileSpeed(stock), 9);
+      }
+    }
+  });
+
+  it('shotDamage / shotSpeed are the canonical WEAPON-group accessors', () => {
+    for (const cls of ALL_CLASSES) {
+      for (let tier = 0; tier <= 2; tier++) {
+        const load: ShipLoadout = {
+          shipClass: cls,
+          tiers: {
+            ...stockTiers(),
+            [UpgradeTrack.Power]: tier,
+            [UpgradeTrack.Speed]: Math.min(tier, maxTier(UpgradeTrack.Speed)),
+          },
+        };
+        expect(shotDamage(load)).toBe(shipWeaponDamage(load));
+        expect(shotSpeed(load)).toBe(shipProjectileSpeed(load));
+      }
+    }
+  });
+
+  it("charges SPEED's escalating cost — a tier above DAMAGE — one step at a time", () => {
+    const spec = UPGRADES[UpgradeTrack.Speed];
+    const total = spec.costs.reduce((n, c) => n + c, 0);
+    const { world, ship } = dockedWorld(ShipClass.Vanguard, total);
+    for (let tier = 0; tier < maxTier(UpgradeTrack.Speed); tier++) {
+      const before = spendableOre(ship);
+      const beforeSpeed = shipProjectileSpeed(ship);
+      expect(buyUpgrade(world, ship, UpgradeTrack.Speed)).toBe('ok');
+      expect(ship.tiers[UpgradeTrack.Speed]).toBe(tier + 1);
+      expect(before - spendableOre(ship)).toBeCloseTo(spec.costs[tier]!, 9);
+      // The purchase actually made the shot faster.
+      expect(shipProjectileSpeed(ship)).toBeGreaterThan(beforeSpeed);
+    }
+    expect(spendableOre(ship)).toBeCloseTo(0, 9);
+    // Priced a tier above DAMAGE at each rung — speed is the stronger buy.
+    const damage = UPGRADES[UpgradeTrack.Power];
+    expect(spec.costs[0]!).toBe(damage.costs[1]!);
+    expect(spec.costs[1]!).toBe(damage.costs[2]!);
   });
 });
 

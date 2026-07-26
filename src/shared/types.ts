@@ -84,25 +84,44 @@ export enum ShipClass {
 // ---------------------------------------------------------------------------
 
 /**
- * The four things ore can buy on a ship (GDD §2.5): "power (mining speed and
- * weapon damage — one stat), engine speed, cargo capacity …, hull HP."
- *
- * `Power` is deliberately one track and not two — mining speed and weapon damage
- * are the same number, which is the inversion the whole game turns on. Tiers
+ * The things ore can buy on a ship (GDD §2.5): "power (mining speed and weapon
+ * damage — one stat), engine speed, cargo capacity …, hull HP" — plus the
+ * projectile SPEED track added by the v0.2.2 field report (see below). Tiers
  * *multiply* the class base stats (GDD §2.5, §2.11), so a maxed Interceptor is
  * still the fastest thing on the map and a maxed Hauler still the toughest.
  *
- * The ladder itself — steps, escalating costs, max tier — is simulation tuning
- * and lives in `src/sim/constants.ts` (TUNABLE, GDD §2.8). This union is only
- * the *name* of a track, because it crosses the agent boundary: the sim owns the
- * numbers, the UI's upgrade panel labels the rows, and bots buy through the same
- * action a human does.
+ * ── DAMAGE and SPEED are two tracks, not one (v0.2.2 field report) ───────────
+ * The developer's ratified projectile design is "upgrades to make them faster,
+ * stronger" — two separate buys. `Power` still resolves mining speed AND weapon
+ * damage-per-hit (one stat, GDD §2.5) and its wedge now reads **DAMAGE**; the new
+ * `Speed` track buys only projectile muzzle velocity — faster shots are harder to
+ * dodge, the exact counterplay economy the projectile switch was for. The two are
+ * a **WEAPON group** (RATIFIED): the sim's ladder tags both `group: 'weapon'` and
+ * the UI renders them as one nested sub-wheel; the grouping is data, not layout.
+ *
+ * The enum *key* stays `Power` (value `'power'`) on purpose: it is the wire/replay
+ * identity every agent already speaks (net encoding, the determinism hash, the
+ * platform action tests), and the underlying ship attribute it multiplies is still
+ * `SHIP_STATS[cls].power`. Renaming the key would break that contract for no
+ * mechanical gain — the DAMAGE relabel is a `label`, carried by the ladder
+ * metadata in `src/sim/constants.ts`, not a rename here.
+ *
+ * The ladder itself — steps, escalating costs, max tier, labels/units/group — is
+ * simulation tuning and lives in `src/sim/constants.ts` (TUNABLE, GDD §2.8). This
+ * union is only the *name* of a track, because it crosses the agent boundary: the
+ * sim owns the numbers, the UI's upgrade wheel labels the wedges off the ladder
+ * metadata, and bots buy through the same action a human does.
  */
 export enum UpgradeTrack {
+  /** DAMAGE (wedge label) — mining speed *and* weapon damage-per-hit, one stat
+   *  (GDD §2.5). Key kept as `Power` for wire/replay stability; see above. */
   Power = 'power',
   Engine = 'engine',
   Cargo = 'cargo',
   Hull = 'hull',
+  /** SPEED — projectile muzzle velocity only (v0.2.2 field report). Grouped with
+   *  DAMAGE as the WEAPON sub-wheel via the ladder's `group: 'weapon'` metadata. */
+  Speed = 'speed',
 }
 
 // ---------------------------------------------------------------------------

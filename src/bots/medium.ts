@@ -116,6 +116,7 @@ export const MEDIUM_REPAIR_AT = 0.7;
 export const MEDIUM_UPGRADE_ORDER: readonly UpgradeTrack[] = [
   UpgradeTrack.Cargo,
   UpgradeTrack.Power,
+  UpgradeTrack.Speed,
   UpgradeTrack.Engine,
 ];
 
