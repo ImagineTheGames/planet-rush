@@ -51,7 +51,18 @@ export interface Brain {
   /** Name of the leaf that won the last decision. Written by the tree, read by
    *  tests, the QA harness, and a future debug overlay — never by a branch. */
   lastBehavior: string;
-  /** Where the ship was at the previous decision, for {@link Brain.stuckFor}. */
+  /**
+   * The **progress anchor**: the position net movement is measured from, for
+   * {@link Brain.stuckFor}. It is *not* last decision's position — it is the last
+   * place the bot demonstrably got *away* from. It moves forward only when the
+   * ship clears {@link STUCK_PROGRESS} of it (real headway) or stops asking to
+   * travel (legitimate station-keeping); a bot that keeps thrusting but only
+   * jitters inside that radius leaves the anchor where it is, and `stuckFor`
+   * climbs. Measuring net progress rather than per-decision steps is what catches
+   * the wedge the field report photographed: a hull grinding against a body slides
+   * a few units each decision — enough to look like motion tick-to-tick, never
+   * enough to go anywhere.
+   */
   lastPos: Vec2 | null;
   /**
    * Consecutive decisions this bot has asked to move and barely moved — the
@@ -143,11 +154,21 @@ export interface BotCtx {
 }
 
 /**
- * Distance a bot must cover between decisions to count as "moving". Well under
- * the ~20 units even a slow hull travels in one Medium reaction interval, so
- * only a ship that is genuinely pinned trips it. TUNABLE
+ * Net distance a bot must put between itself and its {@link Brain.lastPos}
+ * anchor to count as having *gone somewhere* — the threshold that re-anchors the
+ * wedged counter and resets it to zero.
+ *
+ * Deliberately **not** a per-decision step: a hull pinned against a body slides a
+ * few units each decision as the collision response trades its inward velocity
+ * for a little sideways drift, so a per-step check reads that jitter as motion
+ * and never fires (it is exactly why the field-report bot sat wedged for two
+ * minutes at full throttle). This is measured against a persistent anchor, so a
+ * bot only clears it by actually leaving the spot — comfortably above the
+ * observed grind-jitter amplitude (~10 u) and far below the hundreds of units a
+ * genuinely travelling hull covers across {@link STUCK_DECISIONS} decisions, so
+ * neither a wobble nor a slow thread-through trips a false escape. TUNABLE
  */
-export const STUCK_MOVE = 3;
+export const STUCK_PROGRESS = 24;
 
 /** Throttle a decision must have asked for before a stationary result counts as
  *  wedged rather than as station-keeping. TUNABLE */
@@ -191,20 +212,43 @@ export function context(view: BotView, brain: Brain): BotCtx {
 // Nodes
 // ---------------------------------------------------------------------------
 
-/** Count consecutive decisions spent going nowhere (see {@link Brain.stuckFor}). */
+/**
+ * Count consecutive decisions the bot asked to travel and made no net headway
+ * (see {@link Brain.stuckFor}). Net headway, not per-decision steps: the anchor
+ * ({@link Brain.lastPos}) only moves when the ship clears {@link STUCK_PROGRESS}
+ * of it, so a hull grinding against a body — which slides a few units each
+ * decision but goes nowhere — accrues `stuckFor` instead of resetting it every
+ * time the jitter clears an old per-step threshold. That reset-on-jitter is the
+ * defect the field report caught (`./behaviors` reads `stuckFor` to escape).
+ */
 function trackStuck(view: BotView, brain: Brain): void {
   const pos = view.self.pos;
-  const last = brain.lastPos;
-  if (last === null) {
+  const anchor = brain.lastPos;
+  if (anchor === null) {
     brain.lastPos = { x: pos.x, y: pos.y };
     return;
   }
-  const dx = pos.x - last.x;
-  const dy = pos.y - last.y;
-  const pinned = brain.lastThrust >= STUCK_THROTTLE && Math.sqrt(dx * dx + dy * dy) < STUCK_MOVE;
-  brain.stuckFor = pinned ? brain.stuckFor + 1 : 0;
-  last.x = pos.x;
-  last.y = pos.y;
+  // Not asking to travel is station-keeping, not being stuck (a miner parked at
+  // its rock, a bot orbiting home with the wheel open): re-anchor here so a later
+  // real departure measures from where the bot actually sat.
+  if (brain.lastThrust < STUCK_THROTTLE) {
+    brain.stuckFor = 0;
+    anchor.x = pos.x;
+    anchor.y = pos.y;
+    return;
+  }
+  const dx = pos.x - anchor.x;
+  const dy = pos.y - anchor.y;
+  if (dx * dx + dy * dy >= STUCK_PROGRESS * STUCK_PROGRESS) {
+    // Real headway since the anchor: not wedged. Advance the anchor to here and
+    // start measuring the next leg from a clean slate.
+    brain.stuckFor = 0;
+    anchor.x = pos.x;
+    anchor.y = pos.y;
+    return;
+  }
+  // Thrusting, but still inside the progress ring: wedged this decision.
+  brain.stuckFor += 1;
 }
 
 /** A node returns the tick's actions, or null to let the next sibling try. */
