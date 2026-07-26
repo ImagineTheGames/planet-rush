@@ -81,10 +81,23 @@ export interface Ship {
   eliminated: boolean;
   /** Collision radius. */
   radius: number;
-  /** Public beam geometry for the tick it is firing, else `null` (GDD §4.1).
-   *  The sim's raycast already finds the nearest hit for damage/mining; this
-   *  exposes it so the renderer stops the beam at what it strikes. */
+  /** Public **mining**-beam geometry for the tick it is cutting a rock, else
+   *  `null` (GDD §4.1, design amendment v0.2). The sim's raycast finds the
+   *  nearest asteroid for mining; this exposes it so the renderer stops the beam
+   *  at the rock it strikes. Ship-vs-ship/structure *weapon* fire no longer rides
+   *  this beam — it is a pooled projectile now (`./projectiles`) — so `beam` is a
+   *  pure mining tell: non-null only when this ship is actually mining. */
   beam: Beam | null;
+  /** Seconds until the ship's weapon may loose its next projectile (0 = ready).
+   *  The weapon fires on `SHIP_WEAPON.fireInterval`, the projectile analogue of
+   *  the old continuous beam's per-tick damage (design amendment v0.2). Match
+   *  state like everything else; reset to 0 on respawn.
+   *
+   *  Optional so the `Ship` literals other agents build (bot/render/net/harness
+   *  fixtures) keep compiling — an absent cooldown reads as ready-to-fire (0), the
+   *  same backward-compatible discipline as `Turret.muzzle`. The sim's own ships
+   *  always carry it (`makeShip` sets it). */
+  weaponCooldown?: number;
 }
 
 /** A minable asteroid — the economy (GDD §2.3, §5.5). */
@@ -275,6 +288,20 @@ export interface Projectile {
   radius: number;
   /** Seconds of flight left before it despawns. */
   life: number;
+  /**
+   * What fired this shot (design amendment v0.2): a `'ship'` weapon projectile or
+   * a `'turret'` defensive shot. Both fly and die the same way; the difference is
+   * the target list — a ship shot is siege-capable (it collides with enemy ships,
+   * turrets, shields and cores), a turret shot hits only enemy ships, keeping
+   * p1-14's turret behaviour intact. It also lets the snapshot tint the two shots
+   * apart in the reserved `meta` bits, and the renderer size them differently.
+   *
+   * Optional so the pooled `Projectile` literals other code builds (net wire
+   * fixtures, the perf harness's `topUpProjectiles`) keep compiling — an
+   * untagged shot is treated as a `'turret'` shot, exactly the pre-amendment
+   * behaviour, the same backward-compatible discipline as `Turret.muzzle`.
+   */
+  kind?: 'ship' | 'turret';
 }
 
 // ---------------------------------------------------------------------------
@@ -421,6 +448,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     eliminated: false,
     radius: SHIP_RADIUS,
     beam: null,
+    weaponCooldown: 0,
   };
 }
 

@@ -3,31 +3,35 @@
  * OWNER: Gameplay Engineer (field report v0.2: "some ships would not take damage
  * from me"; GDD §2.1, §2.4, §2.6, §2.8, §4.8).
  *
- * The most serious kind of bug is the one where a beam plays the hit and the sim
- * quietly applies nothing. This file is the standing proof that it does not:
+ * The most serious kind of bug is the one where a shot plays the hit and the sim
+ * quietly applies nothing. This file is the standing proof that it does not.
+ * Combat is a PROJECTILE now (design amendment v0.2 — the mining beam vs
+ * asteroids is untouched), so the accounting became "whole shots landed × the
+ * beam stat per shot" where it used to be continuous DPS; the invariants are the
+ * same, delivered by a shot that can miss instead of a ray that cannot:
  *
- *  §A  THE DAMAGE MATRIX — for EVERY ship class attacking EVERY ship class, a
- *      beam held on the target for N ticks removes the EXACT expected hull, both
- *      manual and auto-aim. No attacker/target pair may zero out. Weapon DPS is
- *      the attacker's beam stat and hull class is armour *total*, never damage
- *      resistance, so the delta depends on the shooter and never on the victim.
+ *  §A  THE DAMAGE MATRIX — for EVERY ship class attacking EVERY ship class, the
+ *      weapon fired at a stationary point-blank target for N ticks removes a
+ *      whole number of shots' worth of hull, both manual and auto-aim. No
+ *      attacker/target pair may zero out. Per-shot damage is the attacker's beam
+ *      stat and hull class is armour *total*, never damage resistance, so the
+ *      delta depends on the shooter and never on the victim.
  *
  *  §B  SHIELDED TARGETS bleed their pool by the same accounting: a planet's shield
  *      loses exactly the core-rate damage dealt before the core takes a scratch,
  *      for every attacker class — the "shields stand in front of the core" rule
  *      measured HP-for-HP (GDD §2.6).
  *
- *  §C  THE FIX for the field report — a spawn-protected ship is not a beam target:
- *      it takes zero damage (GDD §2.1) AND, crucially, does not *block* the beam.
- *      Before the fix a fresh spawn (10 s of protection at match start) clamped
- *      the beam on an invulnerable hull with no visual tell — the exact "would
- *      not take damage" report — and body-blocked a live enemy standing behind
- *      it. Ships now behave like protected cores/turrets: the beam passes over.
+ *  §C  THE SPAWN-PROTECTION RULE (field report v0.2) — a protected ship is not a
+ *      shot target: it takes zero damage (GDD §2.1) AND does not *block* the
+ *      weapon. A shot flies OVER a protected hull to a live enemy behind it, and
+ *      protection is honoured at the moment of impact, not at fire time. Ships
+ *      behave like protected cores/turrets: the shot passes over.
  *
  *  §D  DETERMINISM — a full four-class firefight replays byte-for-byte (GDD §4.8).
  *
  * VISUAL GAP filed to the UI agent in the PR body: a spawn-protected ship has no
- * on-screen tell, so a beam sweeping over one now (correctly) doing nothing still
+ * on-screen tell, so a shot sailing over one now (correctly) doing nothing still
  * has nothing that says "invulnerable." The sim is right; the read needs a shield
  * shimmer / protection ring on ships, the same tell the core wants.
  */
@@ -36,6 +40,7 @@ import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
   SHIP_RADIUS,
+  SHIP_WEAPON,
   SHIELD,
   SPAWN_PROTECTION_S,
   TICK_DT,
@@ -46,6 +51,7 @@ import {
   createWorld,
   shipCargoCap,
   shipMaxHull,
+  shipWeaponDamage,
   shieldPool,
   step,
   stockTiers,
@@ -152,44 +158,56 @@ function makeWorld(over: Partial<World> = {}): World {
 
 const fire = (auto = false): Inputs[number]['actions'][number] => ({ type: 'fire', active: true, auto });
 
-/** Beam `attacker` onto a stationary `target` directly ahead (+x) for `ticks`,
- *  and return the hull it lost. The target holds still and never fires. */
-function hullLostOverBeam(attacker: ShipClass, target: ShipClass, ticks: number, auto: boolean): number {
+/** Fire `attacker`'s weapon at a stationary `target` directly ahead (+x) for
+ *  `fireTicks`, then drain a few ticks so the last in-flight shots land, and
+ *  return the hull it lost. Combat is a projectile now (design amendment v0.2):
+ *  the target holds still in the open, so every shot fired lands, and the
+ *  delivered damage is a whole number of shots. */
+function hullLostOverWeapon(attacker: ShipClass, target: ShipClass, fireTicks: number, auto: boolean): number {
   const shooter = makeShip({ id: 0, shipClass: attacker, pos: { x: 500, y: 500 }, angle: 0 });
   const victim = makeShip({ id: 1, shipClass: target, pos: { x: 620, y: 500 } });
   const world = makeWorld({ ships: [shooter, victim] });
   const before = victim.hull;
-  const inputs: Inputs = [{ id: 0, actions: [fire(auto)] }];
-  for (let t = 0; t < ticks; t++) step(world, inputs);
+  const firing: Inputs = [{ id: 0, actions: [fire(auto)] }];
+  for (let t = 0; t < fireTicks; t++) step(world, firing);
+  // Let the last shots cross the ~120-unit gap and land (≈15 ticks at base speed).
+  for (let t = 0; t < 30; t++) step(world, []);
   return before - world.ships[1]!.hull;
+}
+
+/** Assert `delta` is a positive whole number of `perShot` hits — the projectile
+ *  accounting the old continuous-DPS asserts became (design amendment v0.2). */
+function expectWholeShots(delta: number, perShot: number): void {
+  expect(delta).toBeGreaterThan(0); // no pair silently zeroes out
+  const shots = delta / perShot;
+  expect(shots).toBeCloseTo(Math.round(shots), 6);
+  expect(Math.round(shots)).toBeGreaterThanOrEqual(1);
 }
 
 // --- §A. the damage matrix -------------------------------------------------
 
 describe('§A damage matrix — every class × every class, no pair zeroes (GDD §2.4, §2.8)', () => {
-  // Short enough that even the frailest hull (Interceptor, 35) survives the
-  // hardest hitter (Excavator, 13 DPS): 13 × 30/60 = 6.5 HP ≪ 35, so no target
-  // ever dies mid-run and the delta is pure applied damage.
-  const N = 30;
+  // Fire long enough for a few shots, short enough that even the frailest hull
+  // (Interceptor, 35) survives the hardest hitter: 3 shots × 4.55 ≈ 14 ≪ 35, so
+  // no target dies mid-run and the delta is pure applied damage.
+  const N = 63;
 
   for (const mode of [false, true] as const) {
     const label = mode ? 'auto-aim' : 'manual';
 
     describe(`${label} fire`, () => {
       for (const atk of CLASSES) {
-        // Weapon DPS is the attacker's beam stat (one beam, one stat), so the
-        // expected hull delta is the same whichever hull is on the receiving end.
-        const expected = beamShipDps(atk) * TICK_DT * N;
+        // Per-shot weapon damage is the attacker's beam stat over one fire
+        // interval — one beam, one stat (GDD §2.5) — so the delta is a whole
+        // number of these, the same whichever hull is on the receiving end.
+        const perShot = beamShipDps(atk) * SHIP_WEAPON.fireInterval;
 
-        it(`${atk} deals its beam DPS (${beamShipDps(atk)}/s) to every target class, and never zero`, () => {
-          const deltas = CLASSES.map((tgt) => hullLostOverBeam(atk, tgt, N, mode));
+        it(`${atk} lands its beam DPS (${beamShipDps(atk)}/s) as shots on every target class, never zero`, () => {
+          const deltas = CLASSES.map((tgt) => hullLostOverWeapon(atk, tgt, N, mode));
 
-          for (let i = 0; i < CLASSES.length; i++) {
-            const delta = deltas[i]!;
-            // The load-bearing assertion: a real hit, exactly the expected size.
-            expect(delta).toBeGreaterThan(0); // no pair silently zeroes out
-            expect(delta).toBeCloseTo(expected, 8);
-          }
+          // The load-bearing assertion: real hits, a whole number of them, on
+          // every pair — no attacker/target combination silently fails to hurt.
+          for (const delta of deltas) expectWholeShots(delta, perShot);
 
           // Hull class is armour TOTAL, not damage resistance: the same shooter
           // strips the same HP from all four targets to the last bit.
@@ -211,18 +229,19 @@ describe('§A damage matrix — every class × every class, no pair zeroes (GDD 
 // --- §B. shielded targets lose the pool by the same accounting -------------
 
 describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
-  const N = 30;
+  const N = 63;
 
-  /** Beam `attacker` at a planet (with `shields`) directly ahead for `ticks`. */
-  function beamPlanet(attacker: ShipClass, shields: Shield[], ticks: number) {
-    // Shooter faces +x at 300; planet centre at 500 (owner slot 1, not the
-    // shooter). centre gap 200, shield bubble r=90 → beam bites the bubble at
-    // 110 u, well inside BEAM_RANGE.
+  /** Fire `attacker`'s weapon at a planet (with `shields`) directly ahead for
+   *  `fireTicks`, then drain so the last shots land. */
+  function weaponPlanet(attacker: ShipClass, shields: Shield[], fireTicks: number) {
+    // Shooter faces +x at 300; planet centre at 500 (owner slot 1). Centre gap
+    // 200, shield bubble r=90 → shots bite the bubble at 110 u, well in range.
     const shooter = makeShip({ id: 0, shipClass: attacker, pos: { x: 300, y: 500 }, angle: 0 });
     const planet = makePlanet(1, 500, 500, shields);
     const world = makeWorld({ ships: [shooter], planets: [planet] });
-    const inputs: Inputs = [{ id: 0, actions: [fire()] }];
-    for (let t = 0; t < ticks; t++) step(world, inputs);
+    const firing: Inputs = [{ id: 0, actions: [fire()] }];
+    for (let t = 0; t < fireTicks; t++) step(world, firing);
+    for (let t = 0; t < 30; t++) step(world, []);
     return world.planets[0]!;
   }
 
@@ -230,77 +249,70 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
     it(`${atk} strips shield HP at its core rate (${beamCoreDps(atk)}/s) and leaves the core untouched`, () => {
       const shield = makeShield(1);
       const before = shield.hp;
-      // Core rate, not ship rate: shields and cores take the beam at the core
-      // stat (GDD §2.8). Kept short so the 40 HP bubble never breaks.
-      const expected = beamCoreDps(atk) * TICK_DT * N;
-      expect(expected).toBeLessThan(SHIELD.hp); // precondition: the bubble holds
+      // Core rate, not ship rate: a shot on a shield or core is scaled by the
+      // core:ship ratio (GDD §2.8). Kept short so the 40 HP bubble never breaks.
+      const perShot = beamCoreDps(atk) * SHIP_WEAPON.fireInterval;
 
-      const planet = beamPlanet(atk, [shield], N);
+      const planet = weaponPlanet(atk, [shield], N);
       const drop = before - shieldPool(planet);
 
-      expect(drop).toBeGreaterThan(0);
-      expect(drop).toBeCloseTo(expected, 8);
+      expectWholeShots(drop, perShot);
+      expect(drop).toBeLessThan(SHIELD.hp); // the bubble held
       // Not a single point leaked past the bubble to the core.
       expect(planet.coreHp).toBe(CORE_HP);
     });
   }
 
   it('a naked core (no shield) takes the same core-rate damage the shield would have', () => {
-    const N2 = 30;
     for (const atk of CLASSES) {
-      const shooter = makeShip({ id: 0, shipClass: atk, pos: { x: 300, y: 500 }, angle: 0 });
-      const planet = makePlanet(1, 500, 500, []); // no shield: core is the surface
-      const world = makeWorld({ ships: [shooter], planets: [planet] });
-      const inputs: Inputs = [{ id: 0, actions: [fire()] }];
-      for (let t = 0; t < N2; t++) step(world, inputs);
-
-      const expected = beamCoreDps(atk) * TICK_DT * N2;
-      expect(CORE_HP - world.planets[0]!.coreHp).toBeCloseTo(expected, 8);
+      const planet = weaponPlanet(atk, [], N); // no shield: core is the surface
+      const perShot = beamCoreDps(atk) * SHIP_WEAPON.fireInterval;
+      expectWholeShots(CORE_HP - planet.coreHp, perShot);
     }
   });
 
   it('two stacked shields drain in build order, second only after the first is gone', () => {
-    // Enough beam time to empty the first 40 HP bubble and bite into the second.
-    // Excavator core DPS 6.5 → 40 HP in ~6.15 s; run 8 s.
+    // Enough shots to empty the first 40 HP bubble and bite into the second.
+    // Excavator core DPS 6.5 → 40 HP in ~6.15 s of landed shots; run 8 s.
     const first = makeShield(1);
     const second = makeShield(2);
-    const N3 = 8 * 60;
     const shooter = makeShip({ id: 0, shipClass: ShipClass.Excavator, pos: { x: 300, y: 500 }, angle: 0 });
     const planet = makePlanet(1, 500, 500, [first, second]);
     const world = makeWorld({ ships: [shooter], planets: [planet] });
-    const inputs: Inputs = [{ id: 0, actions: [fire()] }];
+    const firing: Inputs = [{ id: 0, actions: [fire()] }];
 
     const startPool = shieldPool(planet);
-    for (let t = 0; t < N3; t++) step(world, inputs);
+    for (let t = 0; t < 8 * 60; t++) step(world, firing);
+    for (let t = 0; t < 30; t++) step(world, []);
 
     const p = world.planets[0]!;
     const totalDrop = startPool - shieldPool(p);
     // All damage went into the pool, none skipped a bubble: the first is empty,
-    // the second has taken the overflow, and the accounting is exact.
+    // the second has taken the overflow, and the accounting is a whole shot count.
     expect(p.shields[0]!.hp).toBe(0);
     expect(p.shields[1]!.hp).toBeLessThan(SHIELD.hp);
     expect(p.shields[1]!.hp).toBeGreaterThan(0); // not yet through to the core
-    expect(totalDrop).toBeCloseTo(beamCoreDps(ShipClass.Excavator) * TICK_DT * N3, 6);
+    expectWholeShots(totalDrop, beamCoreDps(ShipClass.Excavator) * SHIP_WEAPON.fireInterval);
     expect(p.coreHp).toBe(CORE_HP);
   });
 });
 
-// --- §C. the spawn-protection fix (field report v0.2) ----------------------
+// --- §C. spawn protection vs a projectile (field report v0.2, amendment v0.2) ---
 
-describe('§C a spawn-protected ship is not a beam target — no zero-damage wall (GDD §2.1)', () => {
-  const N = 30;
+describe('§C a spawn-protected ship is not a shot target — no zero-damage wall (GDD §2.1)', () => {
+  const N = 63;
 
   it('takes zero damage while protected (the protection itself still holds)', () => {
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: SPAWN_PROTECTION_S });
     const world = makeWorld({ ships: [shooter, target] });
-    for (let t = 0; t < N; t++) step(world, [{ id: 0, actions: [fire()] }]);
-    expect(world.ships[1]!.hull).toBe(target.maxHull);
+    for (let t = 0; t < N + 30; t++) step(world, [{ id: 0, actions: [fire()] }]);
+    expect(world.ships[1]!.hull).toBe(target.maxHull); // every shot flew over it
   });
 
-  it('does NOT block the manual beam: a live enemy directly behind it takes full damage', () => {
-    // shooter → [protected @620] → [live @760], all on the +x axis. Before the
-    // fix the beam clamped on the protected hull and the live enemy took nothing.
+  it('does NOT block the weapon: a live enemy directly behind a protected one is hit', () => {
+    // shooter → [protected @620] → [live @760], all on the +x axis. The shot
+    // flies OVER the protected hull (it is not a target) and bites the live one.
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const guard = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: SPAWN_PROTECTION_S });
     const behind = makeShip({ id: 2, pos: { x: 760, y: 500 } });
@@ -308,18 +320,15 @@ describe('§C a spawn-protected ship is not a beam target — no zero-damage wal
 
     const before = behind.hull;
     for (let t = 0; t < N; t++) step(world, [{ id: 0, actions: [fire()] }]);
+    for (let t = 0; t < 30; t++) step(world, []);
 
-    // The protected shield ship is untouched; the beam passed over it and the
-    // live enemy behind bled the shooter's full ship DPS.
-    expect(world.ships[1]!.hull).toBe(guard.maxHull);
-    expect(before - world.ships[2]!.hull).toBeCloseTo(beamShipDps(ShipClass.Vanguard) * TICK_DT * N, 8);
-    // And the beam reached the far ship's surface rather than stopping short.
-    expect(world.ships[0]!.beam!.length).toBeCloseTo(760 - 500 - SHIP_RADIUS, 6);
+    expect(world.ships[1]!.hull).toBe(guard.maxHull); // protected one untouched
+    expectWholeShots(before - world.ships[2]!.hull, shipWeaponDamage(shooter));
   });
 
-  it('auto-aim skips a nearer protected ship and engages the live enemy', () => {
+  it('auto-aim skips a nearer protected ship and shoots the live enemy', () => {
     // Protected enemy is the CLOSEST body; a live enemy sits farther off-axis.
-    // Auto-aim must ignore the invulnerable one and lock the one it can hurt.
+    // Auto-aim ignores the invulnerable one and locks the one it can hurt.
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const near = makeShip({ id: 1, pos: { x: 560, y: 500 }, spawnProtect: SPAWN_PROTECTION_S });
     const live = makeShip({ id: 2, pos: { x: 500, y: 640 } }); // 140 u away, perpendicular
@@ -327,29 +336,35 @@ describe('§C a spawn-protected ship is not a beam target — no zero-damage wal
 
     const before = live.hull;
     for (let t = 0; t < N; t++) step(world, [{ id: 0, actions: [fire(true)] }]);
+    for (let t = 0; t < 30; t++) step(world, []);
 
     expect(world.ships[1]!.hull).toBe(near.maxHull); // protected one ignored
-    expect(before - world.ships[2]!.hull).toBeCloseTo(beamShipDps(ShipClass.Vanguard) * TICK_DT * N, 8);
+    expectWholeShots(before - world.ships[2]!.hull, shipWeaponDamage(shooter));
   });
 
-  it('protection wearing off mid-beam starts damage exactly when it expires', () => {
-    // Protection is spent at the top of the tick, before the beam (step phase 1):
-    // a ship with 2·dt left is guarded on tick 1 (2·dt → dt, beam sees dt > 0),
-    // then vulnerable on tick 2 (dt → 0, the beam that tick already lands). No
-    // lingering immunity, no lost hit — damage begins the tick protection hits 0.
-    const dps = beamShipDps(ShipClass.Vanguard);
-    const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
-    const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: 2 * TICK_DT });
-    const world = makeWorld({ ships: [shooter, target] });
-
-    step(world, [{ id: 0, actions: [fire()] }]); // protect 2·dt → dt: guarded
-    expect(world.ships[1]!.hull).toBe(target.maxHull);
-
-    step(world, [{ id: 0, actions: [fire()] }]); // protect dt → 0: first tick of damage
-    expect(world.ships[1]!.hull).toBeCloseTo(target.maxHull - dps * TICK_DT, 8);
-
-    step(world, [{ id: 0, actions: [fire()] }]); // second tick of damage, and counting
-    expect(world.ships[1]!.hull).toBeCloseTo(target.maxHull - 2 * dps * TICK_DT, 8);
+  it('protection is honoured at the moment of impact, not at fire time', () => {
+    // A projectile checks protection when it *lands*, not when it is fired.
+    // Case 1: the target stays protected through the whole flight → the shot
+    // passes over and nothing lands.
+    {
+      const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+      const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: SPAWN_PROTECTION_S });
+      const world = makeWorld({ ships: [shooter, target] });
+      step(world, [{ id: 0, actions: [fire()] }]); // one shot
+      for (let t = 0; t < 30; t++) step(world, []); // let it cross
+      expect(world.ships[1]!.hull).toBe(target.maxHull);
+    }
+    // Case 2: protection lapses (2·dt) before the shot arrives → it lands, for
+    // exactly one shot's worth of damage.
+    {
+      const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
+      const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: 2 * TICK_DT });
+      const world = makeWorld({ ships: [shooter, target] });
+      const before = target.hull;
+      step(world, [{ id: 0, actions: [fire()] }]); // fire one shot while protected
+      for (let t = 0; t < 30; t++) step(world, []); // protection lapses, shot lands
+      expect(before - world.ships[1]!.hull).toBeCloseTo(shipWeaponDamage(shooter), 6);
+    }
   });
 });
 

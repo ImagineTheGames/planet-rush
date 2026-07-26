@@ -141,6 +141,61 @@ export const PROJECTILE = {
   life: TURRET.range / TURRET.projectileSpeed,
 } as const;
 
+/**
+ * Ship weapon — **ship-vs-ship and ship-vs-structure combat is a projectile now**
+ * (design amendment v0.2, `docs/design-amendments.md`). The mining laser vs
+ * asteroids/ore is untouched (that stays the segment-vs-circle beam, GDD §4.1);
+ * only the *weapon* half of "one beam, one stat" left hitscan. The reason is the
+ * developer's: "It's too easy right now to kill each other and there's no way to
+ * dodge. If we switch to a projectile there's a chance to dodge and it becomes a
+ * lot funner." Travel time is the mechanic — a ship at combat range strafing at
+ * full speed can evade a shot, which is pinned by a test (`projectiles.test.ts`).
+ *
+ * "One beam, one stat" survives the split: per-shot damage is still the beam stat
+ * (`shipWeaponDamage` = `shipBeamShipDps × fireInterval`) and mining still scales
+ * off the same beam, so mining speed and weapon damage move together exactly as
+ * GDD §2.5 requires. What changed is only that the weapon's damage is *delivered*
+ * by a pooled projectile that can miss, not by an instant ray that cannot. TUNABLE
+ */
+export const SHIP_WEAPON = {
+  /** Seconds between shots while fire is held. Base weapon DPS (if every shot
+   *  lands) equals the old beam DPS: per-shot damage = `shipBeamShipDps ×
+   *  fireInterval`, so a stock Vanguard still deals `BEAM_DPS_SHIP` = 10 to a
+   *  target it never lets dodge. Missing is the new skill floor. */
+  fireInterval: 0.35,
+  /**
+   * Base muzzle speed (world units/s) at beam tier 0 — the design's "chance to
+   * dodge" lives in this number against `BASE_SPEED`. At 520 a shot crosses the
+   * 260-unit combat range in 0.5 s, in which a Vanguard strafing at full speed
+   * (260 u/s) slides ~130 u sideways — far past a ship+shot radius, so the dodge
+   * is real (`projectiles.test.ts`). Fast enough that a committed attacker who
+   * closes the range still lands hits; slow enough that a boosting ship outruns a
+   * stale shot. Scaled up by the beam upgrade ladder (`shipProjectileSpeed`) —
+   * "add upgrades to make them faster, stronger" (amendment v0.2). TUNABLE
+   */
+  projectileSpeed: 520,
+  /** How far a base shot travels before it despawns (world units) — the ship's
+   *  effective weapon reach, a touch past `BEAM_RANGE` so a projectile weapon is
+   *  not shorter-ranged than the mining beam it replaced for combat. Lifetime is
+   *  `range / speed`, and scales with muzzle speed so a faster shot reaches the
+   *  same distance (`shipProjectileLife`). */
+  range: 300,
+  /** Collision radius (world units) — a hair larger than a turret shot so the
+   *  ship weapon reads as the heavier gun. */
+  radius: 5,
+} as const;
+
+/**
+ * How much of a projectile's ship-damage a shield or core actually takes — the
+ * core:ship ratio (`BEAM_DPS_CORE / BEAM_DPS_SHIP` = 5:10) the beam already
+ * applied (`shipBeamCoreDps`). A projectile carries one `damage` number (its
+ * ship/turret value); this scales it down when it lands on a shield or a core,
+ * so a stock Vanguard shot deals `BEAM_DPS_SHIP × fireInterval` to a hull and
+ * `BEAM_DPS_CORE × fireInterval` to a core — the §2.8 balance, unchanged by the
+ * switch to projectiles. TUNABLE
+ */
+export const PROJECTILE_CORE_FACTOR: Tunable<number> = BEAM_DPS_CORE / BEAM_DPS_SHIP;
+
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
  *  hit (s) · build time (s) · per-planet cap. Regenerates only after
  *  `regenDelay` undamaged seconds (GDD §2.6 "pressure beats regeneration"). TUNABLE */

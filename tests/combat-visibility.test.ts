@@ -26,7 +26,6 @@ import { Container, Graphics } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import { Renderer, PLAYER_COLORS, type BeamView } from '../src/render/index';
 import {
-  BEAM_RANGE,
   CORE_HP,
   PLANET,
   TURRET,
@@ -142,6 +141,12 @@ function impactLayer(stage: Container): Container {
   return layer as Container;
 }
 
+function shotLayer(stage: Container): Container {
+  const layer = stage.getChildByLabel('shots', true);
+  if (!layer) throw new Error('shots layer missing');
+  return layer as Container;
+}
+
 function visibleChildren(layer: Container): Graphics[] {
   return layer.children.filter((c) => c.visible) as Graphics[];
 }
@@ -152,31 +157,31 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }): number 
 
 // ---------------------------------------------------------------------------
 
-describe('combat visibility — every shooter drives a beam visual from sim state', () => {
-  it('an enemy ship firing at a planet publishes a beam from itself to the core surface', () => {
-    const { world, attackerPos, planetPos } = combatFixture();
+describe('combat visibility — every shooter is seen from sim state', () => {
+  it('an enemy ship attacking a planet is seen — its weapon fire streams as a projectile', () => {
+    const { world, attackerPos } = combatFixture();
     step(world, ATTACKER_FIRES);
 
-    // Sim: the attacker (a rival of the planet's owner) published beam geometry.
-    const attacker = world.ships[0]!;
-    expect(attacker.beam).not.toBeNull();
-    const beam = attacker.beam!;
-    // Origin at the shooter; hit clamped to the struck core's surface, not run
-    // through it (GDD §4.1); length inside beam range.
-    expect(beam.origin.x).toBeCloseTo(attackerPos.x, 6);
-    expect(beam.origin.y).toBeCloseTo(attackerPos.y, 6);
-    expect(beam.hitPoint).not.toBeNull();
-    expect(dist(beam.hitPoint!, planetPos)).toBeCloseTo(PLANET.radius, 4);
-    expect(beam.length).toBeLessThanOrEqual(BEAM_RANGE);
-    // And it actually bit the core (this is an attack, not a light show).
-    expect(world.planets[2]!.coreHp).toBeLessThan(CORE_HP);
+    // Combat is a projectile now (design amendment v0.2), not the mining beam:
+    // the attacker fired a ship-kind shot owned by the NON-local shooter — the
+    // whole point of the original bug. It is born at the attacker's muzzle,
+    // heading +x straight at the planet.
+    const shots = world.projectiles.filter((p) => p.active && p.owner === 0 && p.kind === 'ship');
+    expect(shots).toHaveLength(1);
+    expect(dist(shots[0]!.pos, attackerPos)).toBeLessThan(30);
+    expect(shots[0]!.vel.x).toBeGreaterThan(0);
 
-    // Render model: the read model surfaces this shooter (it is NOT the local
-    // player — the whole point of the bug) with a ship-sourced beam.
-    const beams = combatBeams(world);
-    const shipBeam = beams.find((b) => b.source === 'ship' && b.shooter === 0);
-    expect(shipBeam).toBeDefined();
-    expect(shipBeam!.hitPoint).not.toBeNull();
+    // The renderer draws it from sim state — `drawShots` pools every active shot,
+    // ship and turret alike — so it is visible even though the camera follows a
+    // different player (the attacker is not the local slot).
+    const stage = new Container();
+    const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
+    renderer.draw(world, { cameraTarget: 1, beams: [] });
+    expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(1);
+
+    // And it is a real attack, not a light show: the shot reaches and bites the core.
+    for (let t = 0; t < 40 && world.planets[2]!.coreHp >= CORE_HP; t++) step(world, []);
+    expect(world.planets[2]!.coreHp).toBeLessThan(CORE_HP);
   });
 
   it('a friendly turret engaging an in-range enemy fires, deals damage, and publishes a muzzle beam', () => {
@@ -202,35 +207,33 @@ describe('combat visibility — every shooter drives a beam visual from sim stat
     expect(prey.hull).toBeLessThan(startHull);
   });
 
-  it('the render layer registers an active beam for BOTH shooters at once, sourced from sim state', () => {
+  it('both shooters are seen from sim state — the turret as a muzzle beam, the ship as a projectile', () => {
     const { world } = combatFixture();
     step(world, ATTACKER_FIRES);
 
-    // Exactly two shots this tick: the enemy ship and the turret. Nobody else
-    // is firing, and nobody is invented.
+    // The turret's shot still publishes a muzzle beam (unchanged, GDD §2.6); the
+    // attacking ship's weapon is a projectile now, not a beam — so combatBeams
+    // carries exactly the one turret muzzle, and the ship shows in the shot pool.
     const beams = combatBeams(world);
-    expect(beams).toHaveLength(2);
-    expect(beams.filter((b) => b.source === 'ship').map((b) => b.shooter)).toEqual([0]);
-    expect(beams.filter((b) => b.source === 'turret').map((b) => b.shooter)).toEqual([1]);
+    expect(beams).toHaveLength(1);
+    expect(beams[0]!.source).toBe('turret');
+    expect(beams[0]!.shooter).toBe(1);
 
-    // Drive the real renderer headlessly with the sim-sourced beam views.
+    const shipShots = world.projectiles.filter((p) => p.active && p.owner === 0 && p.kind === 'ship');
+    expect(shipShots).toHaveLength(1);
+
+    // Drive the real renderer headlessly with the sim-sourced views. The turret's
+    // beam draws in the beams layer; every active shot (ship + turret) draws in
+    // the shots layer — so neither shooter is invisible, whoever the camera follows.
     const stage = new Container();
     const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
     const views = beams.map(toBeamView);
-    renderer.draw(world, { cameraTarget: 0, beams: views });
+    renderer.draw(world, { cameraTarget: 2, beams: views });
 
-    // Both shooters register a visible beam segment, and — since both strike a
-    // target — both register a pooled impact glow riding the clamped hit point.
-    expect(visibleChildren(beamLayer(stage))).toHaveLength(2);
+    expect(visibleChildren(beamLayer(stage))).toHaveLength(1); // turret muzzle
+    expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(2); // ship + turret shots
+    // The turret's shot strikes its prey, so a pooled impact glow rides its hit point.
     const glows = visibleChildren(impactLayer(stage));
-    expect(glows).toHaveLength(2);
-    const glowPoints = glows.map((g) => ({ x: g.x, y: g.y }));
-    for (const b of beams) {
-      expect(b.hitPoint).not.toBeNull();
-      const matched = glowPoints.some(
-        (p) => Math.abs(p.x - b.hitPoint!.x) < 1e-6 && Math.abs(p.y - b.hitPoint!.y) < 1e-6,
-      );
-      expect(matched, `a glow rides shooter ${b.shooter}'s hit point`).toBe(true);
-    }
+    expect(glows.length).toBeGreaterThanOrEqual(1);
   });
 });

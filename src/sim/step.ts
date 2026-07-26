@@ -47,6 +47,7 @@ import {
   HASH_CELL_SIZE,
   PLANET,
   SHIP_ASTEROID_RESTITUTION,
+  SHIP_WEAPON,
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
@@ -54,27 +55,23 @@ import {
 } from './constants';
 import {
   buyUpgrade,
-  damagePlanet,
-  damageTurret,
   isDocked,
   placeOrder,
   planetOf,
   planetTargetRadius,
   sweepDeadTurrets,
   updatePlanets,
-  updateProjectiles,
   updateTurrets,
 } from './buildings';
-import { damageShip } from './damage';
+import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, OreChunk, Planet, Ship, World } from './state';
 import {
   refreshDerivedStats,
   shipAccel,
-  shipBeamCoreDps,
-  shipBeamShipDps,
   shipMiningRate,
+  shipProjectileSpeed,
   shipTopSpeed,
   shipTurnRate,
 } from './upgrades';
@@ -194,6 +191,12 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   for (const ship of world.ships) {
     if (ship.alive) {
       if (ship.spawnProtect > 0) ship.spawnProtect = Math.max(0, ship.spawnProtect - dt);
+      // Weapon reload recovers every tick, firing or not, so the first shot of an
+      // engagement is instant and the cadence is `SHIP_WEAPON.fireInterval`
+      // thereafter (design amendment v0.2). `?? 0` — an untagged fixture ship
+      // reads as ready (see `Ship.weaponCooldown`).
+      const cd = ship.weaponCooldown ?? 0;
+      if (cd > 0) ship.weaponCooldown = Math.max(0, cd - dt);
     } else if (!ship.eliminated) {
       ship.respawnTimer -= dt;
       if (ship.respawnTimer <= 0) respawn(ship);
@@ -256,15 +259,18 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     resolveFacing(world, ship, intent, autoTargets[i]!, dt);
   }
 
-  // 7. Beam — mine asteroids / damage ships (one beam, one stat; GDD §2.3).
+  // 7. Fire — the mining beam cuts rock, the weapon looses a projectile at ships
+  //    and structures (design amendment v0.2: mining stays a beam, combat is a
+  //    projectile). Still one trigger and one beam stat (GDD §2.3, §2.5).
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
-    if (ship.alive) fireBeam(world, ship, intents[i]!, autoTargets[i]!, hash, dt);
+    if (ship.alive) fireShip(world, ship, intents[i]!, autoTargets[i]!, hash, dt);
   }
 
-  // 8. Turrets acquire, track, and fire; their shots fly and land (GDD §2.6).
-  //    After the beam, so a turret killed this tick does not also get a shot
-  //    off — the attacker's kill is worth the tick it cost them.
+  // 8. Turrets acquire, track, and fire; every shot — ship weapon and turret
+  //    alike — then flies and lands (GDD §2.6). After the ship fire step, so a
+  //    turret killed this tick does not also get a shot off, and a ship shot
+  //    fired this tick advances and can strike this tick.
   updateTurrets(world, dt);
   updateProjectiles(world, dt);
 
@@ -479,7 +485,27 @@ type BeamHit =
   | { kind: 'turret'; planet: number; index: number }
   | { kind: 'planet'; planet: number };
 
-function fireBeam(
+/**
+ * One trigger, two jobs (design amendment v0.2). The **mining laser vs asteroids
+ * is unchanged** — a segment-vs-circle raycast that cuts rock and publishes
+ * `Ship.beam` as the mining tell (GDD §4.1). But **ship-vs-ship and
+ * ship-vs-structure combat is a projectile now**: when what the player is lining
+ * up is anything other than a rock, the weapon looses a pooled projectile on the
+ * fire cadence (`./projectiles`) instead of an instant beam — so a target has
+ * travel time to dodge, the whole point of the switch. It is still one trigger
+ * and one beam stat: mining rate and weapon damage move together (GDD §2.5).
+ *
+ *  - **Manual** — the nearest thing along the ship's facing decides. A rock
+ *    nearest ⇒ mine it; anything else (an enemy, a structure, or empty space) ⇒
+ *    the weapon fires straight down the barrel, the player's own aim as the lead.
+ *  - **Auto-aim** — the nearest valid target acquired in the facing phase decides
+ *    the same way: a rock ⇒ mine, an enemy ⇒ fire with an intercept lead so the
+ *    full-360° engagement still lands on a mover (GDD §2.4).
+ *
+ * `Ship.beam` is a pure **mining** tell now — non-null only on a tick this ship
+ * is actually cutting rock, never on a weapon shot.
+ */
+function fireShip(
   world: World,
   ship: Ship,
   intent: Intent,
@@ -492,63 +518,88 @@ function fireBeam(
     return;
   }
 
-  let hit: BeamHit | null;
-  let hitT: number; // distance along the beam to the first hit (BEAM_RANGE if none)
-  // Beam direction — the ship's facing, except that an auto-aim beam runs to
-  // the target it engaged (see below).
-  let dx = Math.cos(ship.angle);
-  let dy = Math.sin(ship.angle);
-
   if (intent.auto) {
-    // Auto-aim: nearest valid target across the full 360°, no front arc
-    // (GDD §2.4). Engagement does not wait for the hull — the beam runs to the
-    // acquired target's surface while the nose turns toward it at the class
-    // turn rate (`resolveFacing`), so a 360° engagement stays 360°.
-    hit = autoTarget;
-    if (hit) {
-      const t = targetPos(world, hit);
-      const aim = normalize({ x: t.x - ship.pos.x, y: t.y - ship.pos.y }, { x: dx, y: dy });
-      dx = aim.x;
-      dy = aim.y;
-      hitT = surfaceDistance(ship, dx, dy, world, hit);
-    } else {
-      hitT = BEAM_RANGE;
+    // Auto-aim: the nearest valid target across the full 360° (acquired in the
+    // facing phase). A rock is mined; anything else is shot with lead.
+    if (autoTarget && autoTarget.kind === 'asteroid') {
+      mineBeam(world, ship, autoTarget, dt);
+      return;
     }
-  } else {
-    // Manual: raycast a segment along current facing, nearest hit wins.
-    const cast = raycastBeam(world, ship, hash);
-    hit = cast.hit;
-    hitT = cast.t;
+    ship.beam = null;
+    if (!autoTarget) return; // nothing acquired in range: hold fire
+    fireWeapon(world, ship, weaponLead(world, ship, autoTarget));
+    return;
   }
 
-  // Publish the beam geometry so the renderer stops the beam at the hit
-  // (GDD §4.1). `length` clamps to range; `hitPoint` is null on a clean miss.
-  const length = Math.min(hitT, BEAM_RANGE);
+  // Manual: cast the mining ray along facing. A rock nearest ⇒ mine; otherwise
+  // (enemy, structure, or empty space) the weapon fires down the barrel.
+  const cast = raycastBeam(world, ship, hash);
+  if (cast.hit && cast.hit.kind === 'asteroid') {
+    mineBeam(world, ship, cast.hit, dt, cast.t);
+    return;
+  }
+  ship.beam = null;
+  fireWeapon(world, ship, { x: Math.cos(ship.angle), y: Math.sin(ship.angle) });
+}
+
+/**
+ * Cut an asteroid this tick and publish the mining-beam geometry the renderer
+ * draws (GDD §4.1). `hitT` is supplied by the manual raycast, which already knows
+ * the distance to the rock's surface; the auto path omits it and the beam is run
+ * to the acquired rock's surface while the hull swings round to face it — the
+ * same 360° mining reach the shared beam always had.
+ */
+function mineBeam(
+  world: World,
+  ship: Ship,
+  hit: Extract<BeamHit, { kind: 'asteroid' }>,
+  dt: number,
+  hitT?: number,
+): void {
+  let dx = Math.cos(ship.angle);
+  let dy = Math.sin(ship.angle);
+  let length: number;
+  if (hitT !== undefined) {
+    length = Math.min(hitT, BEAM_RANGE);
+  } else {
+    const t = targetPos(world, hit);
+    const aim = normalize({ x: t.x - ship.pos.x, y: t.y - ship.pos.y }, { x: dx, y: dy });
+    dx = aim.x;
+    dy = aim.y;
+    length = Math.min(surfaceDistance(ship, dx, dy, world, hit), BEAM_RANGE);
+  }
   ship.beam = {
     origin: { x: ship.pos.x, y: ship.pos.y },
     dir: { x: dx, y: dy },
-    hitPoint: hit ? { x: ship.pos.x + dx * length, y: ship.pos.y + dy * length } : null,
+    hitPoint: { x: ship.pos.x + dx * length, y: ship.pos.y + dy * length },
     length,
   };
+  mineAsteroid(world, world.asteroids[hit.index]!, ship, dt);
+}
 
-  if (!hit) return;
+/** Loose one weapon projectile along unit `dir` if the reload is ready, then
+ *  start the reload (design amendment v0.2). Damage, speed and lifetime read from
+ *  the ship's beam-upgrade state inside `fireShipProjectile`. */
+function fireWeapon(world: World, ship: Ship, dir: Vec2): void {
+  if ((ship.weaponCooldown ?? 0) > 0) return;
+  fireShipProjectile(world, ship, dir);
+  ship.weaponCooldown = SHIP_WEAPON.fireInterval;
+}
 
-  // One beam, one stat — the same emitter mines rock, cuts hulls and turrets at
-  // the ship rate, and cuts shields and cores at the core rate (GDD §2.8).
-  switch (hit.kind) {
-    case 'asteroid':
-      mineAsteroid(world, world.asteroids[hit.index]!, ship, dt);
-      break;
-    case 'ship':
-      damageShip(world, world.ships[hit.index]!, shipBeamShipDps(ship) * dt);
-      break;
-    case 'turret':
-      damageTurret(world.planets[hit.planet]!.turrets[hit.index]!, shipBeamShipDps(ship) * dt);
-      break;
-    case 'planet':
-      damagePlanet(world, world.planets[hit.planet]!, shipBeamCoreDps(ship) * dt);
-      break;
+/**
+ * The unit aim for an auto-aim weapon shot at a non-asteroid target: an
+ * intercept lead on a moving ship (so a strafing enemy is actually hit, design
+ * amendment v0.2 item 5), or a straight shot at a stationary turret or core.
+ */
+function weaponLead(world: World, ship: Ship, hit: BeamHit): Vec2 {
+  const t = targetPos(world, hit);
+  if (hit.kind === 'ship') {
+    return leadAim(ship.pos, t, world.ships[hit.index]!.vel, shipProjectileSpeed(ship));
   }
+  return normalize(
+    { x: t.x - ship.pos.x, y: t.y - ship.pos.y },
+    { x: Math.cos(ship.angle), y: Math.sin(ship.angle) },
+  );
 }
 
 /** Distance from the ship to the surface of an acquired (auto-aim) target along
@@ -950,4 +1001,5 @@ function respawn(ship: Ship): void {
   ship.cargo = 0;
   ship.respawnTimer = 0;
   ship.spawnProtect = SPAWN_PROTECTION_S;
+  ship.weaponCooldown = 0;
 }

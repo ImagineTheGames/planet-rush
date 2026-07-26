@@ -158,6 +158,11 @@ export interface TargetScore {
   readonly pos: Vec2;
   /** Body radius, for the stand-off maths in `./behaviors`. */
   readonly radius: number;
+  /** The target's velocity when last seen, for intercept lead (design amendment
+   *  v0.2: combat is a projectile, so a bot must aim where a mover *will be*).
+   *  Present for ships; a home never moves, so it is omitted for planets and the
+   *  lead collapses to a straight shot. */
+  readonly vel?: Vec2;
   readonly threat: number;
   readonly proximity: number;
   readonly opportunity: number;
@@ -235,6 +240,7 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
     kind: 'ship',
     id: ship.id,
     pos: ship.pos,
+    vel: ship.vel,
     radius: 16,
     threat,
     proximity,

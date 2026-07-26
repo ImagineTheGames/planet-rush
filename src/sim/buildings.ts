@@ -33,14 +33,13 @@
 import type { Beam, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   PLANET,
-  PROJECTILE,
   REPAIR,
   SHIELD,
   TURRET,
 } from './constants';
-import { damageShip } from './damage';
 import { destroyCore, isCollapsed } from './match';
-import type { Planet, Projectile, Ship, Shield, Turret, World } from './state';
+import { fireTurretProjectile } from './projectiles';
+import type { Planet, Ship, Shield, Turret, World } from './state';
 import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
 
@@ -546,7 +545,7 @@ export function updateTurrets(world: World, dt: number): void {
       turret.angle = turnToward(turret.angle, aim, TURRET.turnRate * dt);
 
       if (turret.cooldown <= 0) {
-        fireProjectile(world, turret, aim);
+        fireTurretProjectile(world, turret, aim);
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
         turret.muzzle = muzzleBeam(turret, target, aim);
@@ -569,14 +568,31 @@ export function planetThreatRadius(planet: Planet): number {
   return planet.radius + TURRET.mountOffset + TURRET.radius + TURRET.range;
 }
 
-/** True when `ship` is actively beaming this planet — its live beam segment
- *  reaches the shield/core surface (field report P1, §3). This is the signal
- *  that ranks an attacker over a mere loiterer: a ship shooting the core is a
- *  threat to answer even from the far side, ahead of one just drifting close. */
-function isAttackingPlanet(planet: Planet, ship: Ship): boolean {
-  const beam = ship.beam;
-  if (!beam || beam.hitPoint === null) return false;
-  return segmentHitsCircle(beam.origin, beam.dir, beam.length, planet.pos, planetTargetRadius(planet));
+/**
+ * True when `ship` is actively shooting this planet — it owns a live weapon
+ * projectile whose forward path reaches the shield/core surface (field report
+ * P1, §3; design amendment v0.2). This is the signal that ranks an attacker over
+ * a mere loiterer: a ship putting shots on the core is a threat to answer even
+ * from the far side, ahead of one just drifting close.
+ *
+ * Read from the projectile pool now, not `Ship.beam`: since combat became a
+ * projectile the beam is a *mining* tell, so an attacker carving the core no
+ * longer carries a beam pointed at it — its shots do. A shot lives longer than
+ * the fire interval, so a continuously-firing attacker always has one in flight,
+ * and the detection never blinks between shots. `updateTurrets` runs after the
+ * ship fire step, so this tick's fresh shots are already visible here.
+ */
+function isAttackingPlanet(world: World, planet: Planet, ship: Ship): boolean {
+  const targetR = planetTargetRadius(planet);
+  for (const p of world.projectiles) {
+    if (!p.active || p.owner !== ship.id || p.kind !== 'ship') continue;
+    const speed = Math.sqrt(p.vel.x * p.vel.x + p.vel.y * p.vel.y);
+    if (speed < 1e-9) continue;
+    const dir = { x: p.vel.x / speed, y: p.vel.y / speed };
+    // How far the shot can still travel before it despawns — its remaining reach.
+    if (segmentHitsCircle(p.pos, dir, speed * p.life, planet.pos, targetR)) return true;
+  }
+  return false;
 }
 
 /** Whether the segment from `o` along unit `dir` for `len` passes within `r` of
@@ -624,7 +640,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
     if (!ship.alive || ship.id === planet.owner || ship.spawnProtect > 0) continue;
     const d2 = dist2(ref, ship.pos);
     if (d2 > reach2) continue;
-    const atk = isAttackingPlanet(planet, ship);
+    const atk = isAttackingPlanet(world, planet, ship);
     if (best === null || (atk && !bestAtk) || (atk === bestAtk && d2 < bestD2)) {
       best = ship;
       bestAtk = atk;
@@ -646,7 +662,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
 
   // Priority class trumps distance and hysteresis: switch to an attacker over a
   // loiterer at once, and never abandon an attacker for a merely-closer loiterer.
-  const curAtk = isAttackingPlanet(planet, current!);
+  const curAtk = isAttackingPlanet(world, planet, current!);
   if (bestAtk !== curAtk) return bestAtk ? best : current;
 
   // Same class: only defect if the newcomer is meaningfully closer, i.e. within
@@ -808,75 +824,7 @@ function muzzleBeam(turret: Turret, target: Ship, aim: number): Beam {
   };
 }
 
-/** Take a slot from the pool, or grow it once. Growth is the only allocation
- *  the projectile system ever does, and it stops as soon as the pool reaches
- *  the match's peak concurrent shots (GDD §4.3: no per-frame allocation). */
-function fireProjectile(world: World, turret: Turret, aim: number): void {
-  const dx = Math.cos(aim);
-  const dy = Math.sin(aim);
-  const slot = takeProjectile(world);
-  // A recycled slot gets a *fresh* id: a renderer or snapshot encoder keying on
-  // id must never mistake this shot for the one that used the slot before it.
-  slot.id = world.nextEntityId++;
-  slot.owner = turret.owner;
-  slot.pos.x = turret.pos.x + dx * turret.radius;
-  slot.pos.y = turret.pos.y + dy * turret.radius;
-  slot.vel.x = dx * TURRET.projectileSpeed;
-  slot.vel.y = dy * TURRET.projectileSpeed;
-  slot.damage = PROJECTILE.damage;
-  slot.radius = PROJECTILE.radius;
-  slot.life = PROJECTILE.life;
-  slot.active = true;
-}
-
-function takeProjectile(world: World): Projectile {
-  for (const p of world.projectiles) {
-    if (!p.active) return p;
-  }
-  const fresh: Projectile = {
-    id: 0, // assigned per shot by `fireProjectile`
-    active: false,
-    owner: -1,
-    pos: { x: 0, y: 0 },
-    vel: { x: 0, y: 0 },
-    damage: 0,
-    radius: PROJECTILE.radius,
-    life: 0,
-  };
-  world.projectiles.push(fresh);
-  return fresh;
-}
-
-/**
- * Fly every live shot, expire it, and test it against enemy ships — the same
- * circle test as everything else (GDD §4.1). A projectile despawns on hit, on
- * expiry, or on leaving the arena; the slot returns to the pool.
- */
-export function updateProjectiles(world: World, dt: number): void {
-  for (const p of world.projectiles) {
-    if (!p.active) continue;
-
-    p.life -= dt;
-    if (p.life <= 0) {
-      p.active = false;
-      continue;
-    }
-
-    p.pos.x += p.vel.x * dt;
-    p.pos.y += p.vel.y * dt;
-
-    if (p.pos.x < 0 || p.pos.y < 0 || p.pos.x > world.bounds.width || p.pos.y > world.bounds.height) {
-      p.active = false;
-      continue;
-    }
-
-    for (const ship of world.ships) {
-      if (!ship.alive || ship.id === p.owner || ship.spawnProtect > 0) continue;
-      const rr = ship.radius + p.radius;
-      if (dist2(p.pos, ship.pos) > rr * rr) continue;
-      damageShip(world, ship, p.damage);
-      p.active = false;
-      break;
-    }
-  }
-}
+// Ship and turret projectiles — firing, flight, collision and the pool — live in
+// `./projectiles`, the single system both shooters share since the combat model
+// became projectiles (design amendment v0.2). `updateTurrets` above calls
+// `fireTurretProjectile`; `./step` runs `updateProjectiles` and the ship weapon.
