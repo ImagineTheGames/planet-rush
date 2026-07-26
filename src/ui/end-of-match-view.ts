@@ -18,6 +18,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_BODY, FONT_HEADING, TEXT_DIM, TEXT_PRIMARY } from './typography';
+import { buttonStyle } from './button-theme';
 import { END_OF_MATCH_ID, endOfMatchHitTest, endOfMatchLayout } from './end-of-match';
 import type { EndKind, EndOfMatchLayout, EndOfMatchModel, EndTarget } from './end-of-match';
 import type { Insets } from './menu-geometry';
@@ -120,16 +121,20 @@ export class EndOfMatchView extends Container {
   }
 
   private drawButton(nodes: ButtonNodes, rect: Rect, label: string, primary: boolean): void {
-    const tint = primary ? PALETTE.plasma : PALETTE.hullSteel;
+    // REMATCH is PRIMARY; MAIN MENU / SPECTATE are STANDARD — all fully active.
+    // The old code gave the standard buttons a TEXT_DIM label, which is exactly
+    // the field-report "one gray button" bug. The contract forbids it.
+    const style = buttonStyle(primary ? 'primary' : 'standard');
     setVisible(true, nodes.body, nodes.label);
     nodes.body.clear();
     nodes.body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: tint, alpha: primary ? 0.18 : 0.09 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: primary ? 2 : 1, color: tint, alpha: 0.85 });
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
     nodes.label.text = label;
-    nodes.label.style.fill = primary ? TEXT_PRIMARY : TEXT_DIM;
+    nodes.label.style.fill = style.label;
+    nodes.label.alpha = style.labelAlpha;
     nodes.label.x = rect.x + rect.width / 2;
     nodes.label.y = rect.y + rect.height / 2;
   }

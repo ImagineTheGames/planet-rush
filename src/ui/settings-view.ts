@@ -18,6 +18,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_HEADING, TEXT_DIM, TEXT_PRIMARY } from './typography';
+import { buttonStyle } from './button-theme';
 import {
   SETTINGS_ID,
   VOLUME_STEPS,
@@ -178,14 +179,17 @@ export class SettingsView extends Container {
   }
 
   private drawButton(body: Graphics, label: Text, rect: Rect, enabled: boolean, primary: boolean): void {
-    const tint = primary ? PALETTE.plasma : PALETTE.hullSteel;
+    // DONE is the screen's confirm — PRIMARY, and always enabled. Routed through
+    // the one contract so it can never drift back to a gray-looking button.
+    const style = buttonStyle(primary ? 'primary' : 'standard', !enabled);
     body.clear();
     body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: tint, alpha: primary ? 0.18 : 0.09 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: primary && enabled ? 2 : 1, color: tint, alpha: 0.8 });
-    label.alpha = enabled ? 1 : 0.3;
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
+    label.style.fill = style.label;
+    label.alpha = style.labelAlpha;
     label.x = rect.x + rect.width / 2;
     label.y = rect.y + rect.height / 2;
   }
