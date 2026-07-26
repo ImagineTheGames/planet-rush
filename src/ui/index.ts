@@ -91,6 +91,7 @@ export type {
 } from './build-wheel';
 
 export { BuildWheelView } from './build-wheel-view';
+export type { DrawnUpgradeWedge } from './build-wheel-view';
 
 // --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
 //     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,

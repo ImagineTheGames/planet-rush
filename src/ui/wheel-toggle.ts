@@ -101,6 +101,17 @@ export class WheelToggle {
   }
 
   /**
+   * Jump straight to the current target (fully open or fully shut) with no
+   * in-between. Used when there is no time to animate across — a frozen frame
+   * (`?freeze=1`, where the clock does not advance so `dt` is always 0) must
+   * still show the wheel at full size, not stuck at scale 0. It only ever lands
+   * on the target, so it cannot desync the machine.
+   */
+  settle(): void {
+    this._progress = this._target ? 1 : 0;
+  }
+
+  /**
    * Force the wheel fully shut *now* — no animation. For a hard context change
    * (rematch, undock, ship death) where the wheel should just be gone, not seen
    * sliding away. Still leaves the machine in a clean, re-openable state, because

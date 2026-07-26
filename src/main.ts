@@ -36,6 +36,9 @@ import {
   turretCount,
 } from './sim';
 import type { CombatBeam, Planet, Turret, World } from './sim';
+// The sim's real, validated upgrade purchase — used only by the ?debug=1
+// upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
+import { buyUpgrade } from './sim/buildings';
 import { bootOfflineMatch } from '@platform/match-boot';
 import type { MatchBoot } from '@platform/match-boot';
 import {
@@ -418,6 +421,7 @@ async function boot(): Promise<void> {
     installOreDepositStage();
     installOreHudStage();
     installEndScreenStage();
+    installUpgradeWheelStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -1310,6 +1314,110 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__endScreenStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__upgradeWheelStage` — the ?debug=1 live-stage seam for the
+   * v0.2 upgrade-wheel field report ("it should be a wheel menu as well", the
+   * open/close leak, and dropping the top-right hull). The upgrade screen is now a
+   * radial wheel drawn by the same view as the Build wheel; only booting the real
+   * bundle proves a bought tier re-renders its wedge, an unaffordable wedge dims
+   * with a reason, and rapid open/close never wedges the menu shut — the same
+   * reason `__healthbarStage` and its siblings exist. Best paired with ?freeze=1,
+   * which pins the sim so the staged frame holds still. Methods:
+   *
+   *  - `openBuild()` / `openUpgrade(ore)` — park the LOCAL ship docked at its own
+   *    planet and open the Build wheel (or the Upgrade wheel behind its arrow),
+   *    giving it `ore` to spend so wedges read as affordable. Returns whether the
+   *    HUD wheel is up.
+   *  - `close()` — shut the wheel, the gesture the cycle test mashes.
+   *  - `interactive()` — whether the drawn wheel accepts input this frame (the
+   *    leak-fix's verdict: it must stay true after rapid open/close).
+   *  - `buyTier(i)` — buy one tier on `TRACK_ORDER[i]` through the sim's real
+   *    `buyUpgrade` (validated: docked, affordable, not maxed). Returns the result
+   *    and the ship's new tier — "sim state changes", the honest way.
+   *  - `tierOf(i)` — the ship's current tier on that track.
+   *  - `setOre(ore)` — bank exactly `ore` on the ship, to stage an unaffordable
+   *    wedge for the dimmed-with-a-reason assertion.
+   *  - `wedges()` — the upgrade wedges the real view drew last frame (label, tier,
+   *    current, next, cost, state), so the test reads what actually rendered.
+   *
+   * Like its siblings it flips only the same UI/sim state a real press does, lives
+   * entirely behind ?debug=1, and reaches into src/sim only through its public
+   * `buyUpgrade` (the exact call a real upgrade order makes).
+   */
+  function installUpgradeWheelStage(): void {
+    const parkDocked = () => {
+      const ship = world.ships.find(isLocalShip);
+      const planet = planetOf(world, LOCAL_PLAYER);
+      if (!ship || !planet) return null;
+      ship.alive = true;
+      // Settle clear of the planet's collider, at rest, inside dock range — the
+      // same staging the ore-deposit seam uses to sit a ship "at" its planet.
+      ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+      ship.pos.y = planet.pos.y;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      // Under ?freeze=1 `updateBuildWheel` never runs, so `docked` (which feedHud
+      // hands the HUD) would stay false; set it to what the staged pose means.
+      docked = true;
+      return ship;
+    };
+    const stage = {
+      openBuild(): { open: boolean } | null {
+        const ship = parkDocked();
+        if (!ship) return null;
+        if (!buildWheel.open) buildWheel.toggle();
+        buildWheel.closePanel();
+        return { open: buildWheel.open };
+      },
+      openUpgrade(ore = 999): { open: boolean } | null {
+        const ship = parkDocked();
+        if (!ship) return null;
+        ship.banked = ore;
+        if (!buildWheel.open) buildWheel.toggle();
+        buildWheel.openPanel();
+        return { open: buildWheel.panelOpen };
+      },
+      close(): void {
+        buildWheel.close();
+      },
+      interactive(): boolean {
+        return hud.debugWheelInteractive();
+      },
+      buyTier(i: number): { result: string; tier: number } | null {
+        const ship = parkDocked();
+        const track = TRACK_ORDER[i];
+        if (!ship || track === undefined) return null;
+        const result = buyUpgrade(world, ship, track);
+        return { result, tier: ship.tiers[track] };
+      },
+      tierOf(i: number): number | null {
+        const ship = world.ships.find(isLocalShip);
+        const track = TRACK_ORDER[i];
+        return ship && track !== undefined ? ship.tiers[track] : null;
+      },
+      setOre(ore: number): { banked: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        if (!ship) return null;
+        ship.cargo = 0;
+        ship.banked = ore;
+        return { banked: ship.banked };
+      },
+      wedges(): ReturnType<typeof hud.debugUpgradeWedges> {
+        return hud.debugUpgradeWedges();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__upgradeWheelStage', {
         value: stage,
         writable: false,
         configurable: false,

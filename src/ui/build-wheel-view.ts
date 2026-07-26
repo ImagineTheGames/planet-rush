@@ -47,6 +47,18 @@ import type { UpgradeWheelModel, UpgradeWedge, UpgradeWedgeState } from './upgra
 import { WheelToggle } from './wheel-toggle';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 
+/** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
+ *  (a bought tier must re-render its wedge here). */
+export interface DrawnUpgradeWedge {
+  readonly track: UpgradeWedge['track'];
+  readonly label: string;
+  readonly tier: number;
+  readonly current: string;
+  readonly next: string | null;
+  readonly cost: number | null;
+  readonly state: UpgradeWedgeState;
+}
+
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §5.6 — shared with the HUD)
 // ---------------------------------------------------------------------------
@@ -156,6 +168,12 @@ export class BuildWheelView extends Container {
   /** Outer ring radius in CSS px, recomputed on resize. */
   private radius = WHEEL_MIN_RADIUS;
 
+  /** ?debug=1 live-stage capture: the upgrade wedges the view actually drew last
+   *  frame (or empty when the upgrade wheel is not up), so a Playwright test can
+   *  assert a bought tier re-rendered. Costs nothing in a normal build. */
+  private lastUpgradeWedges: DrawnUpgradeWedge[] = [];
+  private lastUpgradeDrawn = false;
+
   constructor(screenWidth: number, screenHeight: number) {
     super();
 
@@ -218,8 +236,14 @@ export class BuildWheelView extends Container {
     // The player wants the wheel up iff the model is open; the shared toggle turns
     // that target into a pop and — critically — can never latch shut on it.
     this.toggle.update(wheel.open, dt);
+    // With no time to animate across (a frozen frame, or the very first update),
+    // land on the target rather than sitting at scale 0 — the pop needs a clock.
+    if (dt <= 0) this.toggle.settle();
     this.visible = this.toggle.visible;
-    if (!this.visible) return;
+    if (!this.visible) {
+      this.lastUpgradeDrawn = false;
+      return;
+    }
 
     // Pop from the screen centre: scale/fade each group about its own local
     // origin (which the resize() above pins at the viewport centre).
@@ -240,6 +264,7 @@ export class BuildWheelView extends Container {
   // --- Build wheel ---------------------------------------------------------
 
   private drawBuildWheel(model: BuildWheelModel): void {
+    this.lastUpgradeDrawn = false; // the upgrade wheel is not the one on top
     const r = this.radius;
     const inner = r * INNER_RADIUS;
     const hub = r * HUB_RADIUS;
@@ -286,6 +311,33 @@ export class BuildWheelView extends Container {
     this.upgradeHubLabel.y = this.upgradeHubOre.y + 12;
     // Name the hull whose stats these are — the class is the lobby choice.
     this.upgradeHubLabel.text = model.className;
+
+    // Capture what was drawn for the ?debug=1 live-stage seam (a bought tier must
+    // re-render here). Rebuilt from the model the view just drew from.
+    this.lastUpgradeDrawn = true;
+    this.lastUpgradeWedges = model.wedges.map((w) => ({
+      track: w.track,
+      label: w.label,
+      tier: w.tier,
+      current: w.current,
+      next: w.next,
+      cost: w.cost,
+      state: w.state,
+    }));
+  }
+
+  // --- ?debug=1 live-stage seam --------------------------------------------
+
+  /** Whether the wheel accepts input this frame — the leak-fix's verdict, read by
+   *  the cycle live-stage test to prove it still opens after rapid mashing. */
+  debugInteractive(): boolean {
+    return this.visible && this.toggle.interactive;
+  }
+
+  /** The upgrade wedges the view actually drew last frame (empty when the upgrade
+   *  wheel is not up), so a test can assert a bought tier re-rendered its wedge. */
+  debugUpgradeWedges(): DrawnUpgradeWedge[] {
+    return this.lastUpgradeDrawn ? this.lastUpgradeWedges : [];
   }
 
   // --- Shared wedge drawing (the field report's "same component family") ----

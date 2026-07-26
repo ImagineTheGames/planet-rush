@@ -104,6 +104,22 @@ describe('WheelToggle', () => {
     expect(t.progress).toBe(0);
   });
 
+  it('settle() jumps to the current target — a frozen frame shows full size', () => {
+    const t = new WheelToggle();
+    // A ?freeze=1 frame never advances the clock, so dt is always 0 and the pop
+    // would sit at scale 0. settle() lands it on the target instead.
+    t.update(true, 0);
+    expect(t.progress).toBe(0); // dt 0 → update alone moved nothing
+    t.settle();
+    expect(t.progress).toBe(1); // …but settle jumps to the open target
+    expect(t.phase).toBe('open');
+
+    t.update(false, 0);
+    t.settle();
+    expect(t.progress).toBe(0);
+    expect(t.phase).toBe('closed');
+  });
+
   it('reset() forces a clean, re-openable closed state', () => {
     const t = new WheelToggle();
     t.update(true, FULL);

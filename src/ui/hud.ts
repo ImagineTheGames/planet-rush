@@ -63,6 +63,7 @@ import { controlsStripRows, showControlsStrip } from './controls-strip';
 import { buildWheelModel } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
+import type { DrawnUpgradeWedge } from './build-wheel-view';
 import { upgradeWheelModel, STOCK_TIERS } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
@@ -677,6 +678,20 @@ export class Hud extends Container {
    */
   debugHullReadout(): number {
     return this.lastLocalHullFraction;
+  }
+
+  // --- Build/Upgrade wheel ?debug=1 live-stage seam (field report v0.2) ------
+
+  /** Whether the wheel view accepts input this frame — read by the cycle
+   *  live-stage test to prove it still opens after rapid open/close mashing. */
+  debugWheelInteractive(): boolean {
+    return this.wheel.debugInteractive();
+  }
+
+  /** The upgrade wheel wedges the view actually drew last frame (empty when it is
+   *  not up), so the live-stage test can assert a bought tier re-rendered. */
+  debugUpgradeWedges(): DrawnUpgradeWedge[] {
+    return this.wheel.debugUpgradeWedges();
   }
 
   /** ?debug=1 live-stage seam: arm the health-bar layer's drawn-bar capture so
