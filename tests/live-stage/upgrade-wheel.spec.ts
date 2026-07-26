@@ -50,6 +50,11 @@ interface UpgradeWheelStage {
   buyByTrack(track: string): { result: string; tier: number } | null;
   tierOf(i: number): number | null;
   setOre(ore: number): { banked: number } | null;
+  /** The LOGICAL screen point at the centre of wedge `i` on the current level —
+   *  where a real synthesized pointerdown must land to press it (the real door). */
+  wedgePoint(i: number): { x: number; y: number } | null;
+  /** The controls-strip rows the HUD resolved this frame (the PC legend). */
+  legend(): Array<{ action: string; label: string; binding: string | null; dimmed: boolean }>;
   wedges(): Array<{
     kind: 'track' | 'weapon' | 'back';
     track: string | null;
@@ -120,6 +125,55 @@ async function boot(page: import('@playwright/test').Page): Promise<string[]> {
     { timeout: 20_000 },
   );
   return pageErrors;
+}
+
+/** Boot the real client WITHOUT ?freeze — the sim steps, so an order placed by a
+ *  real press actually reaches the sim and changes ship state on the next tick.
+ *  (A frozen sim never runs `updateBuildWheel`, so a real purchase would latch and
+ *  never drain — the reason the purchase tests below run live.) */
+async function bootLive(page: import('@playwright/test').Page): Promise<string[]> {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+  await page.goto('/?debug=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => typeof window.__upgradeWheelStage?.wedgePoint === 'function',
+    undefined,
+    { timeout: 20_000 },
+  );
+  return pageErrors;
+}
+
+/**
+ * Press wedge `i` through the REAL door: dispatch a synthesized `pointerdown` on
+ * the canvas at the exact LOGICAL point the wedge is drawn — the same events the
+ * browser fires for a mouse click / thumb tap, into the same `main.ts` handler.
+ * NOT the debug stage's model methods; this exercises the hit-test the field
+ * report caught broken. Returns the point tapped so a test can assert on it.
+ */
+async function realTapWedge(
+  page: import('@playwright/test').Page,
+  i: number,
+): Promise<{ x: number; y: number }> {
+  const point = await page.evaluate((idx) => window.__upgradeWheelStage!.wedgePoint(idx), i);
+  if (!point) throw new Error(`no wedge ${i} on the current upgrade level`);
+  await page.evaluate((p) => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) throw new Error('no canvas to tap');
+    // A genuine synthesized pointer press — clientX/Y in the same CSS space the
+    // handler un-rotates through `toLogical` (identity on desktop). preventDefault
+    // + stopImmediatePropagation inside the handler make this a clean dispatch.
+    const ev = new PointerEvent('pointerdown', {
+      clientX: p.x,
+      clientY: p.y,
+      pointerId: 1,
+      pointerType: 'mouse',
+      bubbles: true,
+      cancelable: true,
+    });
+    canvas.dispatchEvent(ev);
+  }, point);
+  return point;
 }
 
 test('the top-right HULL readout is gone from the layout registry (field report #3)', async ({
@@ -355,6 +409,167 @@ test('tap WEAPON → sub-wheel with DAMAGE & SPEED → buy SPEED at exact cost �
   expect(speedPip.tier, 'the WEAPON summary shows the SPEED tier just bought').toBe(1);
 
   expect(pageErrors, 'no page errors staging the WEAPON sub-wheel').toEqual([]);
+});
+
+// --- REAL INPUT: the door the player walks through (field report v0.2.2) ------
+//
+// The three ship-stoppers below all hid behind seam/model tests that were green
+// while the real client was broken. These drive SYNTHESIZED pointer events on the
+// canvas — actual clicks/taps into the `main.ts` handler — and assert on the sim
+// state (or drawn wheel) that changed. Had these existed, all three would have
+// been CI failures.
+
+test('REAL TAP on a track wedge buys THAT track and reaches the sim — HULL taps HULL, never ENGINE (field report #1)', async ({
+  page,
+}) => {
+  const pageErrors = await bootLive(page);
+
+  // Park docked, funded, on the main upgrade wheel. Opening the wheel is not the
+  // bug under test — the PRESS is — so the setup uses the stage; the buy is a real
+  // synthesized tap on the drawn wedge.
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  const before = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'HULL') ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  const hullWedge = before!.find((w) => w.label === 'HULL')!;
+  const hullIndex = before!.indexOf(hullWedge);
+  expect(hullIndex, 'HULL is a wedge on the main wheel').toBeGreaterThanOrEqual(0);
+  expect(hullWedge.tier, 'HULL starts at stock tier 0').toBe(0);
+  expect(before!.find((w) => w.label === 'ENGINE')!.tier, 'ENGINE starts at stock tier 0').toBe(0);
+
+  // The real door: a synthesized pointerdown at HULL's drawn centre. Under the old
+  // row hit-test this pressed ENGINE (or nothing); it must now buy HULL.
+  await realTapWedge(page, hullIndex);
+
+  const hull = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges().find((x) => x.label === 'HULL');
+        return w && w.tier === 1 ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(hull!.tier, 'the real HULL tap advanced HULL one tier in the sim').toBe(1);
+
+  const engineTier = await page.evaluate(
+    () => window.__upgradeWheelStage!.wedges().find((w) => w.label === 'ENGINE')!.tier,
+  );
+  expect(engineTier, 'and it did NOT buy ENGINE — the wrong-track bug is dead').toBe(0);
+
+  expect(pageErrors, 'no page errors buying an upgrade by real tap').toEqual([]);
+});
+
+test('REAL TAP on WEAPON opens the sub-wheel (it does NOT fall back to the main/build wheel), and BACK returns (field report #2)', async ({
+  page,
+}) => {
+  const pageErrors = await boot(page);
+
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  const main = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'WEAPON') ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  const weaponWedge = main!.find((w) => w.label === 'WEAPON')!;
+  const weaponIndex = main!.indexOf(weaponWedge);
+  expect(weaponWedge.kind, 'the WEAPON wedge opens a screen, it does not buy').toBe('weapon');
+
+  // The real door: tap the WEAPON wedge where it is drawn. The field bug is that
+  // this "just goes back to the main build wheel"; it must drill INTO the sub-wheel.
+  await realTapWedge(page, weaponIndex);
+
+  const sub = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'SPEED') ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(sub!.map((w) => w.label), 'a real WEAPON tap drilled into DAMAGE, SPEED, BACK').toEqual([
+    'DAMAGE',
+    'SPEED',
+    'BACK',
+  ]);
+
+  // …and a real tap on BACK returns to the main wheel — the sub-wheel is not a
+  // one-way trap.
+  const backIndex = sub!.findIndex((w) => w.label === 'BACK');
+  await realTapWedge(page, backIndex);
+  const backOut = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'WEAPON') ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(backOut!.map((w) => w.label), 'a real BACK tap lands on the main wheel').toEqual([
+    'WEAPON',
+    'ENGINE',
+    'CARGO',
+    'HULL',
+  ]);
+
+  expect(pageErrors, 'no page errors drilling the WEAPON sub-wheel by real tap').toEqual([]);
+});
+
+test('the PC controls legend is contextual: no dead "E" away from your planet, live "E" when docked (field report #3)', async ({
+  page,
+}) => {
+  const pageErrors = await boot(page);
+
+  // A fresh desktop boot is NOT docked — the legend must not promise the build key.
+  const away = await page
+    .waitForFunction(
+      () => {
+        const rows = window.__upgradeWheelStage!.legend();
+        const build = rows.find((r) => r.action === 'build');
+        return build ? build : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(away!.binding, 'away from the planet the Build legend shows NO live key').toBeNull();
+  expect(away!.dimmed, 'it is dimmed — visible, but not a live affordance').toBe(true);
+  expect(away!.label, 'and it says how to make it live').toContain('get closer');
+
+  // Dock at the planet (the stage parks the ship home); now the key is live.
+  await page.evaluate(() => window.__upgradeWheelStage!.openBuild());
+  const home = await page
+    .waitForFunction(
+      () => {
+        const build = window.__upgradeWheelStage!.legend().find((r) => r.action === 'build');
+        return build && build.binding !== null ? build : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(home!.binding, 'docked at the planet the Build key ("E") is live').toBe('E');
+  expect(home!.dimmed, 'a live affordance is not dimmed').toBe(false);
+  expect(home!.label, 'named in full — never just "BUILD" (GDD §2.5)').toBe('Build & Upgrade');
+
+  expect(pageErrors, 'no page errors reading the contextual legend').toEqual([]);
 });
 
 test('the build wheel shares the same exact-cost boundary: TURRET buys at exactly its cost, refuses one ore short (field report v0.2.2)', async ({

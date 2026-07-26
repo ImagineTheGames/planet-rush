@@ -69,7 +69,8 @@ export type { OreHold } from './ore-hold';
 export { OreHoldView, ORE_HOLD_ID, ORE_HOLD_ANCHOR } from './ore-hold-view';
 export type { DrawnOreHold } from './ore-hold-view';
 
-export { controlsStripRows, showControlsStrip } from './controls-strip';
+export { controlsStripRows, controlsStripView, showControlsStrip, BUILD_AWAY_HINT } from './controls-strip';
+export type { StripRow } from './controls-strip';
 
 // --- Build & Upgrade wheel (GDD §2.5) --------------------------------------
 
