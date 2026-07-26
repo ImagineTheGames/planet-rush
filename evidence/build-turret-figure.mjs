@@ -62,7 +62,7 @@ async function main() {
     .t{display:inline-block;background:#1b3a6b;color:#cfe0ff;border-radius:4px;padding:1px 8px;font-weight:600;margin-right:6px}
   </style></head><body>
     <h1>turret-healthbars — every turret wears a bar when damaged; a full one wears none (v0.2.2)</h1>
-    <p class="sub">Build fb75961. Live ?debug=1 offline match (turrets do not exist at spawn — they are built). Bars are drawn by the real HUD health-bar layer; each caption quotes the bars() the layer reported for that frame. The bar colour is the turret OWNER’s identity colour — blue for the local player, teal for the bot Rusty.</p>
+    <p class="sub">Build b4cd87d. Live ?debug=1 offline match (turrets do not exist at spawn — they are built). Bars are drawn by the real HUD health-bar layer; each caption quotes the bars() the layer reported for that frame. The bar colour is the turret OWNER’s identity colour — blue for the local player, teal for the bot Rusty.</p>
     <div class="grid">${cells}</div>
   </body></html>`;
   writeFileSync('/tmp/fig_turret_hb.html', html);
