@@ -522,6 +522,7 @@ async function boot(): Promise<void> {
   if (flags.debug) {
     hud.enableHealthBarDebug();
     hud.enableNameplateDebug();
+    hud.enableTapMarkerDebug();
     installHealthbarStage();
     installNameplateStage();
     installOreDepositStage();
@@ -530,6 +531,7 @@ async function boot(): Promise<void> {
     installUpgradeWheelStage();
     installPressStage();
     installTapCommanderStage();
+    installTapMarkerStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -655,6 +657,13 @@ async function boot(): Promise<void> {
   };
   /** Reused per-frame ship kinematics handed to the pilot (zero-alloc). */
   const pilotShip: { pos: Vec2; radius: number } = { pos: { x: 0, y: 0 }, radius: 0 };
+  /** Reused per-frame marker records handed to the HUD's tap-marker layer, so the
+   *  order-marker feed allocates nothing while an order stands (GDD §4.3). The
+   *  waypoint mark doubles as the projection scratch; the lock mark carries the
+   *  target's projected centre + its screen radius. */
+  const tapWaypointMark: Vec2 = { x: 0, y: 0 };
+  const tapLockMark: { x: number; y: number; radius: number } = { x: 0, y: 0, radius: 0 };
+  const tapLockScreen: Vec2 = { x: 0, y: 0 };
   /** Reused candidate list + records for tap hit-testing, grown once and refilled
    *  on each tap (a tap is rare; this still avoids per-tap garbage). */
   const tapCandidatePool: MutTapCandidate[] = [];
@@ -1041,6 +1050,9 @@ async function boot(): Promise<void> {
       // AFTER renderer.draw so the camera transform is current — projected to the
       // same screen space the labels draw in, stacked above the health bars.
       feedNameplates();
+      // Tap Commander order markers (developer §4): the waypoint pulse + lock-on
+      // reticle, projected to screen the same way, drawn UNDER the bars/labels.
+      feedTapMarkers();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
@@ -1741,6 +1753,54 @@ async function boot(): Promise<void> {
       nameablePool[i] = c;
     }
     return c;
+  }
+
+  /**
+   * Feed this frame's Tap Commander order markers to the HUD (developer §4): the
+   * waypoint marker (the pilot's move target) and the lock-on reticle (the locked
+   * entity), each projected world → screen via the renderer's *actual* camera
+   * transform (`projectToScreen`, called after `renderer.draw`), so a marker sits
+   * exactly where the order is and is a fixed screen size regardless of zoom.
+   *
+   * Only the tap scheme carries these — the sticks scheme has no standing order —
+   * so anything else clears the fields, dropping the reticle/waypoint the instant
+   * the player switches away (the layer then fades the last waypoint out). The
+   * pilot re-resolves the lock to a live position through the SAME
+   * {@link resolvePilotTarget} the input path uses, so the reticle tracks a moving
+   * ship / shrinking rock and vanishes the frame the target dies. Reuses pooled
+   * mark records, so an order standing frame after frame allocates nothing (§4.3).
+   */
+  function feedTapMarkers(): void {
+    if (controlScheme !== 'tap') {
+      delete hudFrame.tapWaypoint;
+      delete hudFrame.tapLock;
+      hudFrame.tapFiring = false;
+      return;
+    }
+
+    const wp = tapPilot.waypoint;
+    if (wp) {
+      renderer.projectToScreen(wp, tapWaypointMark);
+      hudFrame.tapWaypoint = tapWaypointMark;
+    } else {
+      delete hudFrame.tapWaypoint;
+    }
+
+    const locked = resolvePilotTarget();
+    if (locked) {
+      renderer.projectToScreen(locked.pos, tapLockScreen);
+      tapLockMark.x = tapLockScreen.x;
+      tapLockMark.y = tapLockScreen.y;
+      tapLockMark.radius = locked.radius;
+      hudFrame.tapLock = tapLockMark;
+    } else {
+      delete hudFrame.tapLock;
+    }
+
+    // The line of intent draws only while the ship is actually loosing its weapon
+    // (the sim's own firing tell) — the tap scheme fires only on a hostile lock.
+    const ship = world.ships.find(isLocalShip);
+    hudFrame.tapFiring = ship?.firing ?? false;
   }
 
   /**
@@ -2463,6 +2523,36 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__tapCommanderStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__tapMarkerStage` — the ?debug=1 live-stage seam that proves
+   * the Tap Commander order MARKERS are drawn on a real boot (developer §4), the
+   * UI-side counterpart to the Platform lane's `__tapCommanderStage` (which drives
+   * the pilot). The pure decision + the view's animation are unit-tested; what a
+   * unit test cannot reach is that the shipped bundle projects the standing order
+   * to screen and the layer draws a reticle on the right target and a waypoint
+   * pulse at the tapped point. This exposes the markers the real layer drew last
+   * frame ({@link Hud.debugTapMarkers}) so a Playwright test — driving the pilot
+   * through `__tapCommanderStage` — can read them back. Behind ?debug=1 only.
+   */
+  function installTapMarkerStage(): void {
+    const stage = {
+      /** The order markers the HUD's tap-marker layer actually drew last frame. */
+      markers(): ReturnType<typeof hud.debugTapMarkers> {
+        return hud.debugTapMarkers();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__tapMarkerStage', {
         value: stage,
         writable: false,
         configurable: false,
