@@ -268,9 +268,34 @@ export function pingButtonRect(isTouch: boolean, w: number, h: number): Rect | n
   return { x: c.x - R_PING, y: c.y - R_PING, width: 2 * R_PING, height: 2 * R_PING };
 }
 
-/** PING sits above the FIRE button, aligned to the right edge. */
+/**
+ * PING's home. On a tall enough viewport it stacks just above the FIRE button on
+ * the right edge. But on a SHORT landscape phone (e.g. the iPhone's 844×390
+ * logical viewport) that stack — the FIRE diameter, a gap, and the PING diameter,
+ * all above the bottom margin — is taller than the lower half of the screen, so
+ * the stacked PING climbs out of the top of its `right-half-bottom` anchor
+ * (y ≥ H/2) and breaks the layout contract. So the placement REFLOWS: when the
+ * stacked PING's top would rise past the viewport midpoint (the anchor's top
+ * edge), PING moves inboard of FIRE on the same bottom row instead — where it
+ * still clears FIRE by a gap and stays inside the lower-right zone. The threshold
+ * is computed from the very constants that size the cluster (R_FIRE, R_PING, the
+ * gaps, the margin) against H/2, so it scales with any device rather than pinning
+ * a magic height.
+ */
 function pingButtonCenter(w: number, h: number): { x: number; y: number } {
-  return { x: w - EDGE_MARGIN - R_PING, y: h - EDGE_MARGIN - 2 * R_FIRE - PING_GAP - R_PING };
+  // Stacked home: centred on the right edge, one PING_GAP above the FIRE button.
+  const stackedY = h - EDGE_MARGIN - 2 * R_FIRE - PING_GAP - R_PING;
+  // The stacked button's top must clear the bottom-half boundary (y = H/2), the
+  // top edge of PING's `right-half-bottom` anchor. If it doesn't, reflow inboard.
+  if (stackedY - R_PING >= h / 2) {
+    return { x: w - EDGE_MARGIN - R_PING, y: stackedY };
+  }
+  // Short-viewport reflow: bottom aligned with FIRE's, one PING_GAP inboard (left)
+  // of FIRE's outer edge — the FIRE button spans 2*R_FIRE in from the edge margin.
+  return {
+    x: w - EDGE_MARGIN - 2 * R_FIRE - PING_GAP - R_PING,
+    y: h - EDGE_MARGIN - R_PING,
+  };
 }
 
 /** Allocating convenience over {@link writeAffordanceRects} — tests/one-off use. */

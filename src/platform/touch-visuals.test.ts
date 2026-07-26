@@ -257,6 +257,40 @@ describe('the BOOST + PING buttons — the v0.2.2 parity fills (GDD §2.4)', () 
     expect(ping.y + ping.height).toBeLessThanOrEqual(fire.y);
   });
 
+  it('reflows PING inboard of FIRE on a SHORT landscape phone (iPhone 844×390)', () => {
+    // On the iPhone's short logical viewport the FIRE+gap+PING stack is taller
+    // than the lower half of the screen, so the stacked PING would climb out of
+    // the top of its `right-half-bottom` anchor (y ≥ H/2) and break the layout
+    // contract. It must reflow onto the bottom row, inboard of FIRE, staying in
+    // the lower-right zone (this is the exact hotfix: main was red on iphone).
+    const w = 844;
+    const h = 390;
+    const ping = pingButtonRect(true, w, h)!;
+    const fire = affordanceRects(true, FireMode.AutoAim, w, h).fireButton!;
+
+    // Inside the lower-right zone: right half (x ≥ W/2) and bottom half (y ≥ H/2).
+    expect(ping.x).toBeGreaterThanOrEqual(w / 2);
+    expect(ping.x + ping.width).toBeLessThanOrEqual(w);
+    expect(ping.y).toBeGreaterThanOrEqual(h / 2);
+    expect(ping.y + ping.height).toBeLessThanOrEqual(h);
+
+    // Still thumb-scale, and it clears the FIRE button (now to FIRE's left, not
+    // stacked): PING's right edge is at or before FIRE's left edge.
+    expect(ping.width).toBeGreaterThanOrEqual(72);
+    expect(ping.x + ping.width).toBeLessThanOrEqual(fire.x);
+  });
+
+  it('keeps PING stacked above FIRE on a tall enough viewport (no needless reflow)', () => {
+    // Pixel's 915×412 logical viewport has room to stack, so PING stays above FIRE
+    // — the reflow triggers only when the stack genuinely overflows the bottom half.
+    const w = 915;
+    const h = 412;
+    const ping = pingButtonRect(true, w, h)!;
+    const fire = affordanceRects(true, FireMode.AutoAim, w, h).fireButton!;
+    expect(ping.y + ping.height).toBeLessThanOrEqual(fire.y);
+    expect(ping.y).toBeGreaterThanOrEqual(h / 2);
+  });
+
   it('the Pixi layer draws both on touch, at their rects, with a pressed state', () => {
     const v = new TouchVisuals();
     v.update(readout({ mode: FireMode.AutoAim }), false, 1280, 720); // desktop
