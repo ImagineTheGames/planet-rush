@@ -651,10 +651,13 @@ describe('buying an upgrade (GDD §2.5)', () => {
     homeless.world.planets = [];
     expect(buyUpgrade(homeless.world, homeless.ship, UpgradeTrack.Power)).toBe('no-planet');
 
-    // A dead ship buys nothing, even sitting on top of its planet.
+    // A dead ship buys nothing, even sitting on top of its planet — and the
+    // refusal names the true reason, `dead`, not a misleading `not-docked`: a
+    // purchase is a live action, and a wreck on the respawn clock takes none
+    // (v0.2.2 field report, ratified; see tests/sim/upgrade-after-respawn).
     const corpse = dockedWorld(ShipClass.Vanguard, cost);
     corpse.ship.alive = false;
-    expect(buyUpgrade(corpse.world, corpse.ship, UpgradeTrack.Power)).toBe('not-docked');
+    expect(buyUpgrade(corpse.world, corpse.ship, UpgradeTrack.Power)).toBe('dead');
   });
 
   it('pays hold-first, then the bank — banking is still a real decision', () => {
