@@ -23,6 +23,8 @@
  */
 
 import type { Action, Rng, Vec2 } from '@shared/types';
+import type { Latch } from './commitment';
+import { newLatch, release } from './commitment';
 import { BotMemory } from './memory';
 import type { BotView, SelfView } from './perception';
 import type { DifficultyTuning, Personality, PersonalityWeights } from './personalities';
@@ -81,6 +83,16 @@ export interface Brain {
    */
   readonly aim: AimTrack;
   /**
+   * The flee/fight commitment (`./commitment`, v0.2.2 field report). A wounded
+   * bot breaking off latches this *on* and holds it until it has actually
+   * escaped or its hull is whole again — so the tree cannot flap between fleeing
+   * and re-engaging every time backing off nudges the threat out of range. The
+   * bit lives here, on the brain, because a commitment is memory that must
+   * persist across decisions; a strictly-higher priority (a core under final
+   * assault) {@link release}s it (`./behaviors` `wantsRetreat`).
+   */
+  readonly fleeing: Latch;
+  /**
    * Spendable ore that was already aboard when this bot first took the controls
    * — ore it did not earn, and will not spend (`./behaviors`'s `spendAtHome`).
    *
@@ -109,6 +121,7 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     escapeUntil: -1,
     escapeDir: { x: 0, y: 0 },
     aim: newAimTrack(),
+    fleeing: newLatch(),
     endowment: -1,
   };
 }
@@ -152,6 +165,9 @@ export const STUCK_DECISIONS = 12;
 export function context(view: BotView, brain: Brain): BotCtx {
   brain.memory.observe(view);
   trackStuck(view, brain);
+  // A dead ship holds no commitment: it respawns at full hull (GDD §2.7), so its
+  // flee latch must not carry the last life's panic into the next one.
+  if (!view.self.alive) release(brain.fleeing);
   // Book the endowment once, on the first decision. A bot seated at the opening
   // (`tick 0`) earns its `STARTING_ORE` grant and owes nothing; a bot that takes
   // over after the match has begun inherits a dropped pilot's ore and must leave

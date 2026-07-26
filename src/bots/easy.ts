@@ -27,17 +27,21 @@ import { UpgradeTrack } from '@shared/types';
 import { SHIELD, TURRET } from '../sim';
 import type { Purchase } from './behaviors';
 import {
+  RETREAT_CLEAR_RANGE,
+  coreUnderFinalAssault,
   defendHome,
   engage,
   haulHome,
-  incomingThreat,
+  lastStandDefend,
   mine,
+  nearestThreat,
   order,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   upgrade,
+  wantsRetreat,
   wantsToHaul,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
@@ -97,11 +101,18 @@ export const easyTree: Node = selector('easy', [
   // Dead and waiting on the respawn clock: hands still, like a human watching it.
   when('dead', (ctx) => !ctx.self.alive, () => NEUTRAL),
 
-  // "retreats at half hull" — above everything except being alive.
+  // A core under final assault outranks even an over-defender's own skin
+  // (v0.2.2 field report): above the retreat, and interrupts a committed one.
+  when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // "retreats at half hull" — above everything except being alive and the last
+  // stand. Latched so it does not flap: once an Easy bot turns to run it commits
+  // to the run until it has cleared the threat or respawned (`./commitment`;
+  // v0.2.2 field report).
   when(
     'retreat',
-    (ctx) => isWounded(ctx) && incomingThreat(ctx) !== null,
-    (ctx) => retreat(ctx, incomingThreat(ctx)),
+    (ctx) => wantsRetreat(ctx),
+    (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
 
   // "over-defends": the alarm outranks the economy, always.
