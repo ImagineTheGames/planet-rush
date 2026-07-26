@@ -61,7 +61,7 @@ import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bot
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
 import { playerColor } from './planet-hp';
-import { CLASS_NAMES } from './upgrade-panel';
+import { CLASS_NAMES } from './upgrade-wheel';
 import { normalizeMapId } from './map-picker';
 
 // ---------------------------------------------------------------------------

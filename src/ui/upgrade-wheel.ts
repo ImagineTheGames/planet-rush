@@ -1,38 +1,43 @@
 /**
- * src/ui/upgrade-panel.ts — the ship upgrade panel. OWNER: UI Engineer.
+ * src/ui/upgrade-wheel.ts — the ship upgrade WHEEL. OWNER: UI Engineer.
  *
- * The second screen behind the wheel's UPGRADE SHIP arrow (GDD §2.5), and **the
- * only place ship stats are ever shown**:
+ * The second screen behind the Build wheel's UPGRADE SHIP arrow (GDD §2.5), and
+ * **the only place ship stats are ever shown**:
  *
  * > Ship stats — beam, engine, cargo, hull tiers — are deliberately *not* on the
- * > HUD. They appear only in the upgrade panel, where they are a spending
+ * > HUD. They appear only in the upgrade screen, where they are a spending
  * > decision rather than clutter. (GDD §2.2, §2.5)
  *
- * Each row gives **current value → next tier → ore cost** (GDD §2.5), so
- * upgrading is an explicit trade against turrets, shields and repair. Upgrades
- * *multiply* the class base stats (GDD §2.5, §2.11), so a maxed Interceptor is
- * still the fastest thing on the map and a maxed Hauler still the toughest —
- * which is why the ladder below is expressed as multipliers over
+ * ── WHY THIS IS A WHEEL AND NOT A PANEL (the field report) ──────────────────
+ * A developer reported the upgrade screen *"is not immediately readable, and
+ * it's very different from the planet's wheel menu — it should be a wheel menu as
+ * well."* So it is one now: the same component family, gestures, and visual
+ * language as the Build wheel ({@link ./build-wheel}). One **wedge per upgrade
+ * track**, laid out clockwise from twelve o'clock exactly as the Build wheel's
+ * segments are, each wedge carrying its **current tier value → next → ore cost**
+ * (GDD §2.5) and dimmed *with a reason* when it cannot be bought — unaffordable,
+ * or already maxed. Because upgrading is still an explicit trade against turrets,
+ * shields and repair, every wedge names what the next tier costs, and cost is the
+ * only place ore-yellow appears (style-guide §2), the same rule the Build wheel
+ * obeys.
+ *
+ * Upgrades *multiply* the class base stats (GDD §2.5, §2.11), so a maxed
+ * Interceptor is still the fastest thing on the map and a maxed Hauler still the
+ * toughest — which is why the ladder below is expressed as multipliers over
  * `SHIP_STATS[class]` rather than as absolute numbers per class.
  *
- * Pure and DOM-free: it derives rows from the class table (`../sim/constants`)
+ * Pure and DOM-free: it derives wedges from the class table (`../sim/constants`)
  * plus the ladder, so it unit-tests headless and the Pixi view only draws what
  * it returns.
  *
- * ---------------------------------------------------------------------------
- * PROVISIONAL LADDER — read this before tuning
- * ---------------------------------------------------------------------------
- * Ship upgrades are not yet simulated: `Ship` carries no per-track tier, and
- * `placeOrder` has no `upgrade` item (see `@shared/types` — UPGRADE SHIP is
- * deliberately not a `BuildItem`, because it opens a screen instead of
- * spending). So the tier ladder below is the **UI's own opening hypothesis**,
- * written in the shape of GDD §2.5's rules — cargo "+2 per tier, cap 8",
- * "escalating cost", "first tier cheap" (§2.8) — and flagged the same way the
- * sim's constants table is: a hypothesis for QA to falsify, not a fact.
- *
- * {@link upgradePanelModel} takes the ladder as a parameter for exactly this
- * reason: the day the Gameplay Engineer lands real upgrade tiers, the wiring
- * passes theirs and **no UI code changes**.
+ * ── DATA-DRIVEN OFF THE LADDER (so new tracks appear for free) ──────────────
+ * {@link upgradeWheelModel} builds one wedge per entry in the ladder's track
+ * order and takes the ladder as a parameter. That is the load-bearing bit: the
+ * day p2-03's projectile tracks (speed / damage) land as new rungs on the ladder,
+ * they become wedges here with **no change to this file or the view** — the wheel
+ * lays out however many wedges the ladder has and prints whatever numbers it
+ * carries. The provisional numbers below match the sim's ratified `UPGRADES`
+ * table (`../sim/constants`), so what a player is shown is what they are sold.
  */
 
 import { ShipClass } from '@shared/types';
@@ -201,19 +206,47 @@ export function formatTrackValue(value: number, format: TrackFormat): string {
 }
 
 // ---------------------------------------------------------------------------
+// Wheel layout — one wedge per track, clockwise from twelve o'clock
+// ---------------------------------------------------------------------------
+
+/**
+ * The order the wedges are laid out in, clockwise from the top. Defaults to the
+ * sim's ratified {@link TRACK_ORDER} so the wheel and the sim iterate the tracks
+ * the same way — but {@link upgradeWheelModel} takes it as a parameter, so a
+ * longer ladder (p2-03's projectile tracks) lays out its extra wedges for free.
+ */
+export const UPGRADE_WHEEL_ORDER: readonly UpgradeTrack[] = TRACK_ORDER;
+
+/** Angular width of one wedge (radians) for a wheel of `count` wedges. Matches
+ *  the Build wheel's construction, so the two wheels feel identical. */
+export function upgradeWedgeArc(count: number): number {
+  return count > 0 ? (2 * Math.PI) / count : 0;
+}
+
+/** Screen-space angle of a wedge's centre (radians, y-down: `-π/2` is up).
+ *  Wedge 0 sits at twelve o'clock and the rest run clockwise — the same
+ *  convention the Build wheel's {@link ./build-wheel.segmentAngle} uses, so a
+ *  press maps to a wedge the same way on both wheels. */
+export function upgradeWedgeAngle(index: number, count: number): number {
+  return -Math.PI / 2 + index * upgradeWedgeArc(count);
+}
+
+// ---------------------------------------------------------------------------
 // The model
 // ---------------------------------------------------------------------------
 
-/** Whether a row can be bought right now. `maxed` is a finished ladder — the
- *  row still shows its current value, because this is where stats live. */
-export type UpgradeRowState = 'ready' | 'unaffordable' | 'maxed';
+/** Whether a wedge can be bought right now, and if not, why — the "dimmed with a
+ *  reason" the field report asked for. `maxed` is a finished ladder; the wedge
+ *  still shows its current value, because this is where stats live. */
+export type UpgradeWedgeState = 'ready' | 'unaffordable' | 'maxed';
 
 /**
- * One panel row: **current value → next tier → ore cost** (GDD §2.5). Values
- * are pre-formatted strings so the view prints them and computes nothing —
- * the numbers on this screen are the whole point, and they are decided here.
+ * One wheel wedge: **current value → next tier → ore cost** (GDD §2.5), plus the
+ * centre angle it draws at. Values are pre-formatted strings so the view prints
+ * them and computes nothing — the numbers on this screen are the whole point,
+ * and they are decided here.
  */
-export interface UpgradeRow {
+export interface UpgradeWedge {
   readonly track: UpgradeTrack;
   readonly label: string;
   /** Current tier, 0 = stock. */
@@ -224,57 +257,73 @@ export interface UpgradeRow {
   readonly current: string;
   /** Next tier's value, formatted — `null` at max tier. */
   readonly next: string | null;
-  /** Ore cost of the next tier — `null` at max tier. */
+  /** Ore cost of the next tier — `null` at max tier, the one number on the
+   *  wedge besides the tier values (style-guide §2: cost is the only yellow). */
   readonly cost: number | null;
-  readonly state: UpgradeRowState;
+  readonly state: UpgradeWedgeState;
+  /** Centre angle on the wheel, radians, y-down (`-π/2` = twelve o'clock). */
+  readonly angle: number;
 }
 
-/** The panel for one frame. */
-export interface UpgradePanelModel {
-  /** Open only when the player chose UPGRADE SHIP on an open wheel — the panel
-   *  lives behind the wheel's arrow and nowhere else (GDD §2.5). */
+/** The upgrade wheel for one frame. */
+export interface UpgradeWheelModel {
+  /** Open only when the player chose UPGRADE SHIP on an open Build wheel — this
+   *  wheel lives behind that arrow and nowhere else (GDD §2.5). */
   readonly open: boolean;
   /** The hull being upgraded (GDD §2.11 — locked at the lobby for the match). */
   readonly shipClass: ShipClass;
-  /** Player-facing hull name for the panel heading. */
+  /** Player-facing hull name for the wheel's hub heading. */
   readonly className: string;
-  /** Live ore total, the same number the wheel's hub shows. */
+  /** Live ore total, the same number the Build wheel's hub shows. */
   readonly ore: number;
-  readonly rows: readonly UpgradeRow[];
+  /** One wedge per track, clockwise from twelve o'clock. */
+  readonly wedges: readonly UpgradeWedge[];
 }
 
-/** What the panel needs for one frame. */
-export interface UpgradePanelSignals {
-  /** The player pressed UPGRADE SHIP on an open wheel. */
+/** What the upgrade wheel needs for one frame. */
+export interface UpgradeWheelSignals {
+  /** The player pressed UPGRADE SHIP on an open Build wheel. */
   readonly open: boolean;
   readonly shipClass: ShipClass;
   /** Tiers already bought, per track. */
   readonly tiers: UpgradeTiers;
-  /** Ore a purchase can draw on — hold plus bank (the wheel's `spendableOre`). */
+  /** Ore a purchase can draw on — hold plus bank (the Build wheel's
+   *  `spendableOre`), so the two wheels agree on what is affordable. */
   readonly ore: number;
 }
 
 /**
- * Build the panel. Every row is present at every tier, including maxed ones:
- * this screen is where a player finds out ship stats exist at all, so a
- * finished track still shows what it finished at.
+ * Build the upgrade wheel. Every wedge is present at every tier, including maxed
+ * ones: this screen is where a player finds out ship stats exist at all, so a
+ * finished track still shows what it finished at. The wedge count comes from the
+ * `order` argument, so a ladder that grows (p2-03) grows the wheel with no code
+ * change here.
  */
-export function upgradePanelModel(
-  signals: UpgradePanelSignals,
+export function upgradeWheelModel(
+  signals: UpgradeWheelSignals,
   ladder: UpgradeLadder = UPGRADE_LADDER,
-): UpgradePanelModel {
-  const rows = TRACK_ORDER.map((track) => upgradeRow(signals, ladder[track]));
+  order: readonly UpgradeTrack[] = UPGRADE_WHEEL_ORDER,
+): UpgradeWheelModel {
+  const count = order.length;
+  const wedges = order.map((track, index) =>
+    upgradeWedge(signals, ladder[track], upgradeWedgeAngle(index, count)),
+  );
   return {
     open: signals.open,
     shipClass: signals.shipClass,
     className: CLASS_NAMES[signals.shipClass],
     ore: Math.floor(Math.max(0, signals.ore)),
-    rows,
+    wedges,
   };
 }
 
-/** One row: current → next → cost, plus whether it can be bought (GDD §2.5). */
-export function upgradeRow(signals: UpgradePanelSignals, spec: UpgradeTrackSpec): UpgradeRow {
+/** One wedge: current → next → cost, plus whether it can be bought and why
+ *  (GDD §2.5). `angle` is where it sits on the wheel. */
+export function upgradeWedge(
+  signals: UpgradeWheelSignals,
+  spec: UpgradeTrackSpec,
+  angle: number,
+): UpgradeWedge {
   const maxTier = spec.steps.length - 1;
   const tier = Math.max(0, Math.min(Math.floor(signals.tiers[spec.track] ?? 0), maxTier));
   const current = formatTrackValue(trackValue(signals.shipClass, spec, tier), spec.format);
@@ -289,6 +338,7 @@ export function upgradeRow(signals: UpgradePanelSignals, spec: UpgradeTrackSpec)
       next: null,
       cost: null,
       state: 'maxed',
+      angle,
     };
   }
 
@@ -303,5 +353,6 @@ export function upgradeRow(signals: UpgradePanelSignals, spec: UpgradeTrackSpec)
     next,
     cost,
     state: cost !== null && signals.ore + 1e-9 >= cost ? 'ready' : 'unaffordable',
+    angle,
   };
 }
