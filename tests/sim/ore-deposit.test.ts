@@ -6,24 +6,34 @@
  * planet but it doesn't, it just stays on my ship." Mining filled the hold, but
  * the only thing that emptied it into the safe banked total — the ore the Build
  * wheel actually spends — was an explicit BANK press a first-time player never
- * finds. The fix is a sim rule: while a ship is **docked at its own living
- * planet**, its hold auto-transfers into the bank at `DEPOSIT.drainRate`, and
- * ore-flight couriers fly ship→planet to show it. Undock and the drain stops.
+ * finds. The fix is a sim rule: while a ship is inside its own living planet's
+ * **atmosphere** (`DEPOSIT_RANGE`), its hold auto-transfers into the bank at
+ * `DEPOSIT.drainRate`, and ore-flight couriers fly ship→planet to show it. Leave
+ * the atmosphere and the drain stops.
  *
- * These pins hold every half of that rule: the drain rate, that it empties the
- * whole hold, that undocking (and every other gate) stops it, that the banked
- * ore is then spendable, that the couriers are cosmetic (they never add or steal
- * ore, and are never tractored back), and that the whole thing is deterministic.
+ * Ratified p4 (developer): "You shouldn't need to touch your planet to deposit —
+ * just be in that atmosphere." The old rule gated deposit on docking *and*
+ * parking (near-rest inside the tight `dockRange`); the new rule is purely
+ * geometric — inside `DEPOSIT_RANGE`, at your own living planet, moving or not.
+ *
+ * These pins hold every half of that rule: the drain rate, that it starts the
+ * tick the ship crosses into the atmosphere (moving, undocked, boundary exact)
+ * and stops the tick it crosses out, that it empties the whole hold, that every
+ * other gate (wrong planet, dead planet) still stops it, that the banked ore is
+ * then spendable, that the couriers are cosmetic (they never add or steal ore,
+ * and are never tractored back), and that the whole thing is deterministic.
  */
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
   DEPOSIT,
+  DEPOSIT_RANGE,
   PLANET,
   TICK_DT,
   TURRET,
   createWorld,
+  inAtmosphere,
   isDocked,
   placeOrder,
   planetOf,
@@ -111,10 +121,62 @@ describe('auto-deposit while docked at your own planet', () => {
   });
 });
 
-// --- the interrupt (undock, and the other gates) ---------------------------
+// --- the atmosphere rule: just be inside DEPOSIT_RANGE (ratified p4) --------
+
+describe('the drain runs on atmosphere presence alone', () => {
+  it('does nothing outside the atmosphere, then starts the tick the ship crosses in', () => {
+    const { world, ship } = stagedAtHome(2);
+    const planet = planetOf(world, 0)!;
+    const total = realOre(ship);
+
+    // Park just OUTSIDE the atmosphere — a hair past DEPOSIT_RANGE.
+    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE + 1, y: planet.pos.y };
+    expect(inAtmosphere(ship, planet)).toBe(false);
+    step(world, []);
+    expect(ship.cargo).toBe(total); // untouched: not in the atmosphere yet
+    expect(ship.banked).toBe(0);
+
+    // Cross the boundary; the very next tick drains.
+    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE - 1, y: planet.pos.y };
+    expect(inAtmosphere(ship, planet)).toBe(true);
+    step(world, []);
+    expect(ship.cargo).toBeCloseTo(total - DEPOSIT.drainRate * TICK_DT, 9);
+    expect(realOre(ship)).toBeCloseTo(total, 9);
+  });
+
+  it('deposits while orbiting fast (no park gate) and past dock range (no dock gate)', () => {
+    const { world, ship } = stagedAtHome(2);
+    const planet = planetOf(world, 0)!;
+    const before = ship.cargo;
+
+    // In the atmosphere but OUTSIDE dockRange, and moving well above the old
+    // parkSpeed — the two gates the ratified rule retired.
+    ship.pos = { x: planet.pos.x + (PLANET.dockRange + DEPOSIT_RANGE) / 2, y: planet.pos.y };
+    ship.vel = { x: 0, y: 200 };
+    expect(isDocked(ship, planet)).toBe(false);
+    expect(inAtmosphere(ship, planet)).toBe(true);
+
+    step(world, []);
+    expect(ship.cargo).toBeLessThan(before); // drained despite undocked + moving
+  });
+
+  it('treats the exact boundary as inside (≤ DEPOSIT_RANGE)', () => {
+    const { world, ship } = stagedAtHome(2);
+    const planet = planetOf(world, 0)!;
+    const before = ship.cargo;
+
+    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE, y: planet.pos.y };
+    expect(inAtmosphere(ship, planet)).toBe(true);
+
+    step(world, []);
+    expect(ship.cargo).toBeCloseTo(before - DEPOSIT.drainRate * TICK_DT, 9);
+  });
+});
+
+// --- the interrupt (leave the atmosphere, and the other gates) -------------
 
 describe('the drain is interruptible', () => {
-  it('stops the moment the ship undocks', () => {
+  it('stops the moment the ship leaves the atmosphere', () => {
     const { world, ship } = stagedAtHome(2);
     const planet = planetOf(world, 0)!;
 
@@ -123,9 +185,9 @@ describe('the drain is interruptible', () => {
     const cargo = ship.cargo;
     expect(cargo).toBeLessThan(2);
 
-    // Fly the ship a full ring away — out of dock range.
-    ship.pos = { x: planet.pos.x + PLANET.dockRange * 4, y: planet.pos.y };
-    expect(isDocked(ship, planet)).toBe(false);
+    // Fly the ship a full ring away — well outside the atmosphere.
+    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE * 2, y: planet.pos.y };
+    expect(inAtmosphere(ship, planet)).toBe(false);
 
     for (let i = 0; i < 60; i++) step(world, []);
     expect(ship.cargo).toBeCloseTo(cargo, 9); // hold frozen where it was

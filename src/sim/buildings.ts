@@ -32,6 +32,7 @@
 
 import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 import {
+  DEPOSIT_RANGE,
   PLANET,
   REPAIR,
   SHIELD,
@@ -67,6 +68,16 @@ export function shipOf(world: World, owner: PlayerId): Ship | null {
  *  (GDD §2.5: "opened at your own planet"). Centre-to-centre. */
 export function isDocked(ship: Ship, planet: Planet): boolean {
   return ship.alive && dist2(ship.pos, planet.pos) <= PLANET.dockRange * PLANET.dockRange;
+}
+
+/** True while a ship is inside a planet's atmosphere — the `DEPOSIT_RANGE` halo
+ *  within which its hold auto-deposits at its own living planet (ratified p4:
+ *  "just be in that atmosphere"). Centre-to-centre, boundary counting as inside.
+ *  `DEPOSIT_RANGE > PLANET.dockRange`, so a docked ship is always in-atmosphere.
+ *  The caller checks ownership/liveness (see `updateDeposits`); the renderer
+ *  draws the halo from the same `DEPOSIT_RANGE` this reads. */
+export function inAtmosphere(ship: Ship, planet: Planet): boolean {
+  return ship.alive && dist2(ship.pos, planet.pos) <= DEPOSIT_RANGE * DEPOSIT_RANGE;
 }
 
 /** Ore a player can actually spend: what's in the hold plus what's banked. */
