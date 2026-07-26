@@ -60,12 +60,14 @@ import { oreHoldModel } from './ore-hold';
 import { OreHoldView } from './ore-hold-view';
 import type { DrawnOreHold } from './ore-hold-view';
 import { controlsStripRows, showControlsStrip } from './controls-strip';
-import { buildWheelModel } from './build-wheel';
+import { buildWheelModel, segmentAngle } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
 import type { DrawnUpgradeWedge } from './build-wheel-view';
-import { upgradeWheelModel, STOCK_TIERS } from './upgrade-wheel';
+import { upgradeWheelModel, upgradeWedgeAngle, STOCK_TIERS } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
+import { PressFeedback, detectConfirmations } from './press-feedback';
+import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './press-feedback';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn } from './planet-hp';
@@ -92,6 +94,7 @@ import {
   PROMPT_STROKE,
   PROMPT_CENTER_Y,
   promptWrapWidth,
+  wheelRadius,
 } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
@@ -382,6 +385,34 @@ export class Hud extends Container {
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
 
+  // --- Press & action feedback (field report v0.2.2) ----------------------
+  //     One shared driver for the whole wheel family: it holds the live press
+  //     (scale/glow/reject) and the confirmations (pulse/shimmer/cost-float), and
+  //     the wheel view samples it per wedge. Confirmations are *derived* from the
+  //     sim numbers this HUD already receives — a turret queued, a tier bought,
+  //     ore banked, the core healing under a repair channel — so pressing REPAIR
+  //     and watching the core tick up needs no new plumbing (press-feedback.ts).
+  private readonly pressFeedback = new PressFeedback();
+  /** Last frame's wheel-relevant sim numbers + whether the wheel was open, so a
+   *  confirmation is the *change* between two open frames (never a spawn/wiring
+   *  jump, which happens with the wheel shut). Null until the first frame. */
+  private prevSnapshot: (WheelSnapshot & { open: boolean }) | null = null;
+  /** This frame's match time, so a press arriving from a pointer event (between
+   *  frames) is stamped with a clock the next sample can measure elapsed against. */
+  private frameTime = 0;
+  /** `ready` per wedge index on each surface, captured from the last drawn model
+   *  so a press seam can tell a live wedge from a disabled one (drives reject). */
+  private buildReady: boolean[] = [];
+  private upgradeReady: boolean[] = [];
+  /** How many wedges the upgrade wheel last drew — the float layer needs it to
+   *  place an upgrade-wedge cost float at the right angle. */
+  private upgradeWedgeCount = 0;
+  /** The floating ore costs, drawn in screen space so one can travel from a
+   *  centred wedge all the way to the top-left bank readout and outlive the wheel
+   *  closing. A pooled Text row, same discipline as the rest of the HUD. */
+  private readonly floatsGroup = new Container();
+  private readonly floatTexts: Text[] = [];
+
   constructor(
     private screenWidth: number,
     private screenHeight: number,
@@ -447,6 +478,10 @@ export class Hud extends Container {
       this.stripGroup,
       this.alarmGroup,
       this.wheel,
+      // Cost floats ride above the wheel (they launch off its wedges) and travel
+      // to the top-left bank readout, so they sit over the wheel but under the
+      // onboarding prompt.
+      this.floatsGroup,
       // The onboarding prompt draws last: the SPEND prompt fires *while the
       // wheel is open* (GDD §2.10), so it has to sit on top of it.
       this.promptGroup,
@@ -479,6 +514,7 @@ export class Hud extends Container {
 
   /** Draw one frame. Pull the pure models, then update the Pixi children. */
   update(frame: HudFrame): void {
+    this.frameTime = frame.time;
     this.updateOre(frame);
     this.updateWaveClock(frame);
     // The alarm runs first now, because three things downstream read its verdict:
@@ -492,6 +528,7 @@ export class Hud extends Container {
     this.updatePlanetHp(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
+    this.updateCostFloats(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
 
@@ -647,6 +684,16 @@ export class Hud extends Container {
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
     }
 
+    // Repair shimmer: a brief patina wash over the healed core while a REPAIR
+    // confirmation is live (field report v0.2.2) — the "core HP pip ticks up"
+    // tell, in the repair tint (patina — style-guide §1), so a player watching
+    // the bar sees it move, not just a silent number.
+    const shimmer = this.pressFeedback.coreShimmer(this.frameTime);
+    if (shimmer > 0 && model.coreFraction > 0) {
+      const w = HP_BAR_WIDTH * model.coreFraction;
+      this.planetBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
+    }
+
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
   }
@@ -753,6 +800,41 @@ export class Hud extends Container {
    *  not up), so the live-stage test can assert a bought tier re-rendered. */
   debugUpgradeWedges(): DrawnUpgradeWedge[] {
     return this.wheel.debugUpgradeWedges();
+  }
+
+  // --- Press-feedback ?debug=1 live-stage seam (field report v0.2.2) --------
+
+  /** Drive a wedge press through the same path the real pointer handler uses, so
+   *  a live-stage test can prove the pressed / rejected tell fires on the real
+   *  booted client (not just the headless model). */
+  debugPressWedge(surface: PressSurface, index: number): void {
+    this.pressWheelSegment(surface, index);
+  }
+
+  /** Inject a confirmation directly, so a live-stage test can prove the confirm
+   *  pulse + cost-float + core shimmer are wired and DRAWN — the derivation itself
+   *  (`detectConfirmations`) is what the unit tests cover. */
+  debugConfirmWedge(surface: PressSurface, index: number, amount: number, deposit: boolean, core: boolean): void {
+    this.pressFeedback.confirm({ surface, index, amount, deposit, core }, this.frameTime);
+  }
+
+  /** The combined press/confirm motion the driver holds for one wedge this frame
+   *  (scale, glow, shake, reject flash, shimmer) — read back by the live-stage
+   *  test to assert a press scaled/glowed it and a disabled press red-flashed it. */
+  debugWedgeFeedback(surface: PressSurface, index: number): ControlFeedback {
+    return this.pressFeedback.feedback(surface, index, this.frameTime);
+  }
+
+  /** The cost floats live this frame — the test asserts a confirmed spend launched
+   *  one toward the bank. */
+  debugCostFloats(): CostFloat[] {
+    return this.pressFeedback.floats(this.frameTime);
+  }
+
+  /** The core-shimmer alpha this frame (repair confirmations) — the test asserts a
+   *  repair shimmered the core. */
+  debugCoreShimmer(): number {
+    return this.pressFeedback.coreShimmer(this.frameTime);
   }
 
   /** ?debug=1 live-stage seam: arm the health-bar layer's drawn-bar capture so
@@ -874,8 +956,102 @@ export class Hud extends Container {
       tiers: frame.upgradeTiers ?? STOCK_TIERS,
       ore: wheel.ore,
     });
-    this.wheel.update(wheel, upgrade, frame.time);
+
+    // Confirmations, derived from the sim's own numbers (field report v0.2.2):
+    // compare this frame to the last, but only across two frames where the wheel
+    // was open — so a spawn/wiring jump (wheel shut) can never fake a repair, and
+    // the celebration only fires while the player is actually at the wheel.
+    const tiers = frame.upgradeTiers ?? STOCK_TIERS;
+    const snap: WheelSnapshot & { open: boolean } = {
+      coreHp: frame.coreHp ?? 0,
+      banked: frame.banked,
+      cargo: frame.cargo,
+      turrets: frame.turrets ?? 0,
+      shields: frame.shields ?? 0,
+      tiers: { ...tiers },
+      open: wheel.open,
+    };
+    const prev = this.prevSnapshot;
+    if (prev && prev.open && snap.open) {
+      for (const c of detectConfirmations(prev, snap)) this.pressFeedback.confirm(c, frame.time);
+    }
+    this.prevSnapshot = snap;
+
+    // Capture which wedges are pressable, so a press on a disabled one reads as a
+    // rejection (shake + flash) rather than a dead press. Cost floats need the
+    // upgrade wedge count to place an upgrade float at the right angle.
+    this.buildReady = wheel.segments.map((s) => s.state === 'ready');
+    this.upgradeReady = upgrade.wedges.map((w) => w.state === 'ready');
+    this.upgradeWedgeCount = upgrade.wedges.length;
+
+    this.wheel.update(wheel, upgrade, frame.time, this.pressFeedback);
     return wheel.open;
+  }
+
+  // --- Press & confirmation feedback (field report v0.2.2) -----------------
+
+  /**
+   * Register a press on a wheel wedge for the pressed/rejected tell. Called from
+   * the boot path's pointer handler (the same tap that drives {@link ./build-wheel}
+   * selection) and from the `?debug=1` live-stage seam. Whether it reads as a
+   * press (scale + glow) or a rejection (shake + red flash) is decided *here* from
+   * the wedge's own drawn state — the caller does not have to know, so one call
+   * site covers both.
+   */
+  pressWheelSegment(surface: PressSurface, index: number): void {
+    const ready = surface === 'build' ? this.buildReady[index] : this.upgradeReady[index];
+    this.pressFeedback.press(surface, index, ready ?? false, this.frameTime);
+  }
+
+  /** Draw the floating ore costs launched by confirmed spends — each travels from
+   *  its wedge toward the top-left bank readout and fades. Signal yellow, because
+   *  a floating cost *is* ore (style-guide §2). */
+  private updateCostFloats(frame: HudFrame): void {
+    const floats = this.pressFeedback.floats(frame.time);
+    const bankX = PAD + 8;
+    const bankY = PAD + TOTAL_LABEL_H;
+    for (let i = 0; i < floats.length; i++) {
+      const f = floats[i]!;
+      const start = this.floatStart(f);
+      const t = f.progress;
+      const text = this.floatSlot(i);
+      text.visible = true;
+      // A BANK deposit reads as ore arriving (`+n`); a spend reads as the bare cost.
+      text.text = f.deposit ? `+${f.amount}` : `${f.amount}`;
+      text.x = start.x + (bankX - start.x) * t;
+      // Ease the vertical travel and lift it a touch, so it arcs toward the bank
+      // rather than sliding flat.
+      text.y = start.y + (bankY - start.y) * t - 10 * Math.sin(Math.PI * t);
+      text.alpha = f.alpha;
+      text.scale.set(1 + 0.15 * (1 - t));
+    }
+    for (let i = floats.length; i < this.floatTexts.length; i++) {
+      const t = this.floatTexts[i];
+      if (t) t.visible = false;
+    }
+  }
+
+  /** The screen-space point a cost float launches from: its wedge's label point
+   *  on the centred wheel, in the same geometry the view draws it at. */
+  private floatStart(f: CostFloat): { x: number; y: number } {
+    const cx = this.screenWidth / 2;
+    const cy = this.screenHeight / 2;
+    const r = wheelRadius(this.screenWidth, this.screenHeight) * 0.6;
+    const angle =
+      f.surface === 'build'
+        ? segmentAngle(f.index)
+        : upgradeWedgeAngle(f.index, Math.max(1, this.upgradeWedgeCount));
+    return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+  }
+
+  private floatSlot(index: number): Text {
+    const existing = this.floatTexts[index];
+    if (existing) return existing;
+    const text = this.makeText('', FONT_NUMERAL, 18, PALETTE.signalYellow, 'bold');
+    text.anchor.set(0.5, 0.5);
+    this.floatsGroup.addChild(text);
+    this.floatTexts[index] = text;
+    return text;
   }
 
   // --- Onboarding prompt ---------------------------------------------------

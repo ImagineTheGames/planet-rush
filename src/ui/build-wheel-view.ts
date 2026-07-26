@@ -35,6 +35,16 @@
  * Sizing is thumb-scale aware: {@link BuildWheelView.resize} scales the whole
  * wheel to the smaller viewport dimension so it stays reachable on a phone and
  * doesn't swallow a desktop screen.
+ *
+ * ── PRESS & CONFIRM FEEDBACK (field report v0.2.2) ──────────────────────────
+ * Each wedge draws its press/confirm motion from the shared {@link PressFeedback}
+ * driver ({@link ./press-feedback}), sampled per wedge as it is drawn: a press-down
+ * glows and scales it, a disabled press shakes and red-flashes it, a confirmed
+ * spend pulses and shimmers it. The words live in a per-wedge {@link Container}
+ * (the "cluster") precisely so one transform can scale and shake the whole label
+ * group; the glow/flash/shimmer are palette-legal overlays on the wedge body. All
+ * of it is a no-op when the driver is absent or idle, so an untouched wheel draws
+ * exactly as it did before this pass — the feedback lights up, nothing else moves.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
@@ -45,6 +55,8 @@ import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel'
 import { upgradeWedgeArc } from './upgrade-wheel';
 import type { UpgradeWheelModel, UpgradeWedge, UpgradeWedgeState } from './upgrade-wheel';
 import { WheelToggle } from './wheel-toggle';
+import { NEUTRAL_FEEDBACK } from './press-feedback';
+import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 
 /** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
@@ -111,6 +123,11 @@ function bodyAlpha(ready: boolean): number {
 
 interface WedgeNodes {
   readonly body: Graphics;
+  /** The label/sub/cost/arrow, parented together so a press-down or confirm pulse
+   *  scales — and a rejection shakes — the whole cluster as one (press feedback,
+   *  field report v0.2.2). Positioned at the wedge's label point; its children sit
+   *  at offsets from there. */
+  readonly cluster: Container;
   readonly label: Text;
   /** The second line: a build target ("YOUR PLANET") or a stat value ("10 → 13"). */
   readonly sub: Text;
@@ -228,8 +245,16 @@ export class BuildWheelView extends Container {
    * @param upgrade The Upgrade wheel model — `open: true` puts it in front of the
    *                Build wheel, which is what the UPGRADE SHIP arrow means.
    * @param time    The frame's match time (`world.time`), for the pop's `dt`.
+   * @param feedback Per-wedge press/confirm motion (field report v0.2.2), sampled
+   *                per wedge as it is drawn. Optional — omitted, every wedge draws
+   *                neutral, exactly as before the press-feedback pass landed.
    */
-  update(wheel: BuildWheelModel, upgrade: UpgradeWheelModel, time: number): void {
+  update(
+    wheel: BuildWheelModel,
+    upgrade: UpgradeWheelModel,
+    time: number,
+    feedback?: PressFeedback,
+  ): void {
     const dt = this.lastTime < 0 ? 0 : Math.max(0, time - this.lastTime);
     this.lastTime = time;
 
@@ -257,13 +282,24 @@ export class BuildWheelView extends Container {
     this.buildGroup.visible = !showUpgrade;
     this.upgradeGroup.visible = showUpgrade;
 
-    if (showUpgrade) this.drawUpgradeWheel(upgrade);
-    else this.drawBuildWheel(wheel);
+    if (showUpgrade) this.drawUpgradeWheel(upgrade, time, feedback);
+    else this.drawBuildWheel(wheel, time, feedback);
+  }
+
+  /** The press/confirm motion for one wedge on `surface`, or the neutral no-op
+   *  when there is no feedback driver (an unwired caller / a headless test). */
+  private sample(
+    feedback: PressFeedback | undefined,
+    surface: PressSurface,
+    index: number,
+    time: number,
+  ): ControlFeedback {
+    return feedback ? feedback.feedback(surface, index, time) : NEUTRAL_FEEDBACK;
   }
 
   // --- Build wheel ---------------------------------------------------------
 
-  private drawBuildWheel(model: BuildWheelModel): void {
+  private drawBuildWheel(model: BuildWheelModel, time: number, feedback?: PressFeedback): void {
     this.lastUpgradeDrawn = false; // the upgrade wheel is not the one on top
     const r = this.radius;
     const inner = r * INNER_RADIUS;
@@ -275,7 +311,7 @@ export class BuildWheelView extends Container {
       const seg = model.segments[i];
       if (!seg) continue;
       const nodes = this.wedgeNodes(this.buildGroup, this.buildWedges, i);
-      this.drawWedge(nodes, buildSegmentDraw(seg), inner, r, SEGMENT_ARC);
+      this.drawWedge(nodes, buildSegmentDraw(seg), inner, r, SEGMENT_ARC, this.sample(feedback, 'build', i, time));
     }
     // Any pooled wedges beyond this model's segment count stay hidden.
     this.hideWedgesFrom(this.buildWedges, model.segments.length);
@@ -290,7 +326,7 @@ export class BuildWheelView extends Container {
 
   /** The one screen where ship stats appear (GDD §2.2, §2.5), now a wheel: one
    *  wedge per track, each giving current value → next tier → ore cost. */
-  private drawUpgradeWheel(model: UpgradeWheelModel): void {
+  private drawUpgradeWheel(model: UpgradeWheelModel, time: number, feedback?: PressFeedback): void {
     const r = this.radius;
     const inner = r * INNER_RADIUS;
     const hub = r * HUB_RADIUS;
@@ -302,7 +338,7 @@ export class BuildWheelView extends Container {
       const wedge = model.wedges[i];
       if (!wedge) continue;
       const nodes = this.wedgeNodes(this.upgradeGroup, this.upgradeWedges, i);
-      this.drawWedge(nodes, upgradeWedgeDraw(wedge), inner, r, arc);
+      this.drawWedge(nodes, upgradeWedgeDraw(wedge), inner, r, arc, this.sample(feedback, 'upgrade', i, time));
     }
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
 
@@ -357,42 +393,66 @@ export class BuildWheelView extends Container {
   }
 
   /** Draw one wedge: the body, the words, the second line, and the cost — and
-   *  nothing else (GDD §2.5). Written once, used by both wheels. */
+   *  nothing else (GDD §2.5). Written once, used by both wheels. `fb` is the
+   *  press/confirm motion for this wedge (field report v0.2.2): a press-down
+   *  glows and scales it, a rejection shakes and red-flashes it, a confirmed spend
+   *  pulses and shimmers it — all neutral (a no-op) when nothing is happening. */
   private drawWedge(
     nodes: WedgeNodes,
     d: WedgeDraw,
     inner: number,
     outer: number,
     arc: number,
+    fb: ControlFeedback = NEUTRAL_FEEDBACK,
   ): void {
     const half = arc / 2;
     const a0 = d.angle - half;
     const a1 = d.angle + half;
 
+    // Trace the wedge arc into the body. Re-issued before each fill/stroke group
+    // (the same discipline drawRings uses) so an overlay always draws on a freshly
+    // traced path rather than relying on Pixi's retained-path behaviour.
+    const trace = (): Graphics =>
+      nodes.body
+        .moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner)
+        .arc(0, 0, outer, a0, a1)
+        .lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner)
+        .arc(0, 0, inner, a1, a0, true)
+        .closePath();
+
     nodes.body.visible = true;
     nodes.body.clear();
-    nodes.body
-      .moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner)
-      .arc(0, 0, outer, a0, a1)
-      .lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner)
-      .arc(0, 0, inner, a1, a0, true)
-      .closePath()
+    trace()
       .fill({ color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.16 })
       .stroke({ width: 1, color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.5 });
 
+    // Press/confirm/reject overlays on the body, in palette-legal colours: a
+    // plasma glow on press, a plasma shimmer on a confirmed spend, a threat-red
+    // wash on a rejection (danger only — style-guide §2). Each is 0-alpha when
+    // idle, so an untouched wedge draws exactly as before.
+    const energy = Math.max(fb.glow, fb.shimmer);
+    if (energy > 0) trace().fill({ color: PALETTE.plasma, alpha: energy * 0.2 });
+    if (fb.glow > 0) trace().stroke({ width: 2, color: PALETTE.plasma, alpha: fb.glow });
+    if (fb.reject > 0) {
+      trace().fill({ color: PALETTE.threatRed, alpha: fb.reject * 0.28 });
+      trace().stroke({ width: 2, color: PALETTE.threatRed, alpha: fb.reject });
+    }
+
     const lx = Math.cos(d.angle) * outer * LABEL_RADIUS;
     const ly = Math.sin(d.angle) * outer * LABEL_RADIUS;
+    // The cluster carries the words; the feedback scales it (press-down / confirm
+    // pulse) and shakes it sideways (rejection).
+    nodes.cluster.visible = true;
+    nodes.cluster.x = lx + fb.shakeX;
+    nodes.cluster.y = ly;
+    nodes.cluster.scale.set(fb.scale);
 
     nodes.label.visible = true;
     nodes.label.text = d.label;
     nodes.label.style.fill = d.ready ? TEXT_PRIMARY : TEXT_DIM;
-    nodes.label.x = lx;
-    nodes.label.y = ly - 16;
 
     nodes.sub.visible = true;
     nodes.sub.text = d.sub;
-    nodes.sub.x = lx;
-    nodes.sub.y = ly - 2;
 
     if (d.cost !== null) {
       nodes.cost.visible = true;
@@ -400,8 +460,6 @@ export class BuildWheelView extends Container {
       // Yellow only when payable — a half-lit yellow still reads as "ore is here"
       // at a glance, and that trust is what style-guide §2 forbids spending.
       nodes.cost.style.fill = d.costReady ? PALETTE.signalYellow : TEXT_DIM;
-      nodes.cost.x = lx;
-      nodes.cost.y = ly + 12;
     } else {
       nodes.cost.visible = false;
     }
@@ -412,8 +470,8 @@ export class BuildWheelView extends Container {
       nodes.arrow
         .poly([0, -5, 8, 0, 0, 5])
         .fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
-      nodes.arrow.x = lx + nodes.label.width / 2 + 10;
-      nodes.arrow.y = ly - 9;
+      nodes.arrow.x = nodes.label.width / 2 + 10;
+      nodes.arrow.y = -9;
     }
   }
 
@@ -423,15 +481,25 @@ export class BuildWheelView extends Container {
     if (existing) return existing;
 
     const body = new Graphics();
+    const cluster = new Container();
     const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
     const sub = makeText('', FONT_HEADING, 9, TEXT_DIM);
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
     const arrow = new Graphics();
     for (const t of [label, sub, cost]) t.anchor.set(0.5, 0);
+    // Children sit at fixed offsets from the cluster origin (the wedge's label
+    // point), so scaling/offsetting the cluster moves the whole label group.
+    label.y = -16;
+    sub.y = -2;
+    cost.y = 12;
+    // The cluster is pivoted on its own centre so a confirm pulse swells about the
+    // label rather than growing off one corner.
+    cluster.pivot.set(0, -2);
+    cluster.addChild(label, sub, cost, arrow);
     group.addChild(body);
-    group.addChild(label, sub, cost, arrow);
+    group.addChild(cluster);
 
-    const nodes: WedgeNodes = { body, label, sub, cost, arrow };
+    const nodes: WedgeNodes = { body, cluster, label, sub, cost, arrow };
     pool[index] = nodes;
     return nodes;
   }
@@ -443,10 +511,9 @@ export class BuildWheelView extends Container {
       const n = pool[i];
       if (!n) continue;
       n.body.visible = false;
-      n.label.visible = false;
-      n.sub.visible = false;
-      n.cost.visible = false;
-      n.arrow.visible = false;
+      // The label/sub/cost/arrow all live under the cluster, so one flag hides the
+      // whole wedge's words.
+      n.cluster.visible = false;
     }
   }
 }
