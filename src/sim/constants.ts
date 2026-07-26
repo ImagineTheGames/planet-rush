@@ -141,6 +141,61 @@ export const PROJECTILE = {
   life: TURRET.range / TURRET.projectileSpeed,
 } as const;
 
+/**
+ * Ship weapon — **ship-vs-ship and ship-vs-structure combat is a projectile now**
+ * (design amendment v0.2, `docs/design-amendments.md`). The mining laser vs
+ * asteroids/ore is untouched (that stays the segment-vs-circle beam, GDD §4.1);
+ * only the *weapon* half of "one beam, one stat" left hitscan. The reason is the
+ * developer's: "It's too easy right now to kill each other and there's no way to
+ * dodge. If we switch to a projectile there's a chance to dodge and it becomes a
+ * lot funner." Travel time is the mechanic — a ship at combat range strafing at
+ * full speed can evade a shot, which is pinned by a test (`projectiles.test.ts`).
+ *
+ * "One beam, one stat" survives the split: per-shot damage is still the beam stat
+ * (`shipWeaponDamage` = `shipBeamShipDps × fireInterval`) and mining still scales
+ * off the same beam, so mining speed and weapon damage move together exactly as
+ * GDD §2.5 requires. What changed is only that the weapon's damage is *delivered*
+ * by a pooled projectile that can miss, not by an instant ray that cannot. TUNABLE
+ */
+export const SHIP_WEAPON = {
+  /** Seconds between shots while fire is held. Base weapon DPS (if every shot
+   *  lands) equals the old beam DPS: per-shot damage = `shipBeamShipDps ×
+   *  fireInterval`, so a stock Vanguard still deals `BEAM_DPS_SHIP` = 10 to a
+   *  target it never lets dodge. Missing is the new skill floor. */
+  fireInterval: 0.35,
+  /**
+   * Base muzzle speed (world units/s) at beam tier 0 — the design's "chance to
+   * dodge" lives in this number against `BASE_SPEED`. At 520 a shot crosses the
+   * 260-unit combat range in 0.5 s, in which a Vanguard strafing at full speed
+   * (260 u/s) slides ~130 u sideways — far past a ship+shot radius, so the dodge
+   * is real (`projectiles.test.ts`). Fast enough that a committed attacker who
+   * closes the range still lands hits; slow enough that a boosting ship outruns a
+   * stale shot. Scaled up by the beam upgrade ladder (`shipProjectileSpeed`) —
+   * "add upgrades to make them faster, stronger" (amendment v0.2). TUNABLE
+   */
+  projectileSpeed: 520,
+  /** How far a base shot travels before it despawns (world units) — the ship's
+   *  effective weapon reach, a touch past `BEAM_RANGE` so a projectile weapon is
+   *  not shorter-ranged than the mining beam it replaced for combat. Lifetime is
+   *  `range / speed`, and scales with muzzle speed so a faster shot reaches the
+   *  same distance (`shipProjectileLife`). */
+  range: 300,
+  /** Collision radius (world units) — a hair larger than a turret shot so the
+   *  ship weapon reads as the heavier gun. */
+  radius: 5,
+} as const;
+
+/**
+ * How much of a projectile's ship-damage a shield or core actually takes — the
+ * core:ship ratio (`BEAM_DPS_CORE / BEAM_DPS_SHIP` = 5:10) the beam already
+ * applied (`shipBeamCoreDps`). A projectile carries one `damage` number (its
+ * ship/turret value); this scales it down when it lands on a shield or a core,
+ * so a stock Vanguard shot deals `BEAM_DPS_SHIP × fireInterval` to a hull and
+ * `BEAM_DPS_CORE × fireInterval` to a core — the §2.8 balance, unchanged by the
+ * switch to projectiles. TUNABLE
+ */
+export const PROJECTILE_CORE_FACTOR: Tunable<number> = BEAM_DPS_CORE / BEAM_DPS_SHIP;
+
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
  *  hit (s) · build time (s) · per-planet cap. Regenerates only after
  *  `regenDelay` undamaged seconds (GDD §2.6 "pressure beats regeneration"). TUNABLE */
@@ -248,11 +303,12 @@ export const WAVE_INTERVAL_S: Tunable<number> = 150;
  * wave *yield* is `FIELD_YIELD / WAVE_COUNT`; this is where they land. TUNABLE
  */
 export const WAVE = {
-  /** Asteroids delivered per wave. `WAVE_COUNT × this` is the whole match's
-   *  rock count — 5 × 20 = 100, half the ~200-asteroid performance budget
-   *  (GDD §4.3) even if nobody mines a thing. At `WAVE_ORE` = 80 that is ~4 ore
-   *  a rock: eight seconds of Vanguard beam time, two round trips for a base
-   *  2-slot hold — small enough that "how full do I run?" is asked often. */
+  /** Asteroids delivered per wave (a target — the spawner rounds it to the
+   *  nearest multiple of the player count so the wave is `N`-fold symmetric,
+   *  `RESOURCE_FIELD`). `WAVE_COUNT × this` plus the home fields is the whole
+   *  match's rock count — roughly 5 × 20 + 3 × N ≈ 124 at 8 players, well under
+   *  the ~200-asteroid performance budget (GDD §4.3) even if nobody mines a
+   *  thing. Rocks stay small enough that "how full do I run?" is asked often. */
   asteroidsPerWave: 20,
   /** Wave 1's scatter disc, as a fraction of the base field radius. */
   firstRadiusFraction: 1.0,
@@ -261,8 +317,128 @@ export const WAVE = {
   lastRadiusFraction: 0.25,
 } as const;
 
-/** Ore delivered by one wave — the finite field, divided evenly (GDD §2.3). */
-export const WAVE_ORE: Tunable<number> = FIELD_YIELD / WAVE_COUNT;
+/**
+ * Fair resource layout (developer field rule v0.1.2: "equally located resources
+ * for every planet, before the fight begins — with neighbor resources and
+ * central ones as well"). Resource placement is a **fairness invariant**, not
+ * scatter: the whole asteroid field is invariant under rotation by `2π / N`
+ * about the arena centre, where `N` is the player count. See the invariant note
+ * in `./waves`. Every value TUNABLE.
+ *
+ *  - **Home fields** are the per-planet "neighbour resources": one seeded
+ *    canonical pattern, stamped around each planet rotated by that planet's ring
+ *    angle, so all `N` home fields are IDENTICAL by construction — equal totals
+ *    need no tolerance. They sit inboard of the planet (between it and the ring
+ *    midline), OUTSIDE turret range, and clear of `WORLD_EDGE_MARGIN`.
+ *  - **The commons** is the contested centre: a richer central field delivered
+ *    by the asteroid waves, itself `N`-fold symmetric so mid-map favours nobody.
+ */
+export const RESOURCE_FIELD = {
+  /** Share of `FIELD_YIELD` delivered as the contested central commons — the
+   *  rest (`1 - commonsShare`) funds the equal home neighbourhoods, split evenly
+   *  across the `N` planets. The commons holds this whole share; each home holds
+   *  `(1 - commonsShare) / N`, so the commons is richer than any single home
+   *  field by construction. TUNABLE */
+  commonsShare: 0.6,
+  /** The fairness test's floor: the commons must hold at least this fraction of
+   *  all world ore, so the centre is always worth fighting for (GDD §2.3). The
+   *  actual `commonsShare` sits comfortably above it. TUNABLE */
+  commonsMinShare: 0.5,
+  /** Commons scatter disc for wave 1, as a fraction of `ringRadius` (waves 2..5
+   *  shrink from it, `waveRadiusFraction`). Kept small enough that the commons
+   *  core stays clear of every home's measure radius — the two fields never
+   *  overlap, which is what lets the home totals be EXACTLY equal. TUNABLE */
+  commonsRadiusFraction: 0.4,
+  /** The commons is a coned RING: rocks avoid the inner this-fraction of each
+   *  wave's disc, leaving a clear central eye — and, crucially, a clear straight
+   *  spoke for a ship to launch down (field report P1; see the note in `./waves`).
+   *  Each wave is still a shrinking ring closer to the core than the last (GDD
+   *  §2.3 "Outer Drift"), so the concentric rings close in over the match. Sized
+   *  with `commonsSpokeGap` so the innermost ring rock clears a launching ship's
+   *  path by more than a ship+rock radius. TUNABLE */
+  commonsHoleFraction: 0.75,
+  /** Angular clearance (radians) kept around every planet spoke WITHIN the
+   *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
+   *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
+   *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
+  commonsSpokeGap: 0.33,
+  /** Canonical rocks per home field (before `N`-fold stamping). TUNABLE */
+  homeCount: 3,
+  /**
+   * Home-field centre-radius band, as fractions of the planet ring radius:
+   * inboard of the planet (between it and the ring midline). Pulled in from the
+   * v0.1.2 0.52–0.64 (field report P1: at 0.64 the nearest rock sat only ~215 u
+   * from the ship's spawn point, so a ship leaving spawn bumped rock — the mobile
+   * drag test measured 0.6–0.8 u/tick where open flight is expected). At
+   * 0.44–0.47 the field sits well inboard of `SPAWN_CLEAR_POCKET`, and — with the
+   * angular cone below — off the launch spoke entirely, so the outermost rock
+   * (~473 u from its planet) still clears turret range and the innermost still
+   * fits inside the measure radius `R`. TUNABLE
+   */
+  homeInnerFraction: 0.44,
+  homeOuterFraction: 0.47,
+  /**
+   * The home field is a two-lobe cone straddling its planet's spoke, NOT a blob
+   * centred on it: every rock's angular offset from the spoke has magnitude in
+   * `[homeConeInner, homeConeOuter]` radians (drawn per side), leaving a clear
+   * wedge of half-angle `homeConeInner` along the spoke itself. That wedge is the
+   * launch corridor (field report P1): a ship spawns orbiting its planet and, on
+   * the drag test, thrusts straight inboard *along its spoke* toward the centre —
+   * so a rock sitting ON the spoke is one the launching ship rams. Under a slow
+   * renderer (the CI software-WebGL profile) the test's gesture ramp alone flies
+   * the ship a few hundred units before the measured window even opens, so the
+   * spoke must be clear well past the field, not merely a pocket around the
+   * planet. `homeConeInner` is sized so the nearest lobe rock clears the ship's
+   * straight path by more than a ship+rock radius at the field's radius
+   * (`homeInnerFraction × ring × sin(homeConeInner)` ≈ 75 u > ~62 u). The cone is
+   * still symmetric about the spoke, so the field stays equidistant from both
+   * neighbours and the fairness invariant is untouched. TUNABLE
+   */
+  homeConeInner: 0.2,
+  homeConeOuter: 0.3,
+  /** Radius R around a home within which its local ore is measured for the
+   *  fairness invariant, as a fraction of the planet ring radius. Sized to
+   *  enclose the whole (now more-inboard, off-spoke) home field yet exclude both
+   *  the commons and any neighbour's field, so "ore within R of each home" is
+   *  exactly one home field per planet — all `N` equal. The window is (max
+   *  home-rock dist ≈ 513 u, min commons dist 557 u, min N=8 neighbour dist
+   *  ≈ 539 u); R ≈ 527 u sits inside all three with room. TUNABLE */
+  homeMeasureFraction: 0.61,
+} as const;
+
+/**
+ * SPAWN_CLEAR_POCKET — the launch pocket kept clear around every home planet, as
+ * a fraction of the planet ring radius (field report P1). **No asteroid body is
+ * stamped within this radius of a planet centre**, so a ship can leave its spawn
+ * (which orbits its planet by `PLANET.orbitOffset`) and manoeuvre in open space
+ * before it reaches the first rock — the drag test's "open flight," and what a
+ * real player feels launching out of a home that is no longer a rock garden.
+ *
+ * The home field is placed comfortably *beyond* the pocket: its nearest rock's
+ * centre sits at `ringRadius × (1 - homeOuterFraction)` ≈ 0.53 of the ring from
+ * the planet, well outside this 0.44, so the pocket is empty by construction and
+ * `./waves` additionally clamps the field's outer edge to it as a structural
+ * floor (the invariant survives a retune of the band fractions). Because the
+ * pocket is part of the per-planet stamp — a rigid rotation of one pattern — it
+ * is automatically identical for every home, so it costs the fairness invariant
+ * nothing (`resource-fairness.test.ts`). TUNABLE
+ */
+export const SPAWN_CLEAR_POCKET: Tunable<number> = 0.44;
+
+/** Ore delivered by one asteroid wave — the commons, divided evenly across the
+ *  `WAVE_COUNT` waves (GDD §2.3). The home neighbourhoods carry the remaining
+ *  `1 - commonsShare` of `FIELD_YIELD`, placed at construction, so the whole
+ *  match still yields exactly `FIELD_YIELD` (`RESOURCE_FIELD`). */
+export const WAVE_ORE: Tunable<number> =
+  (FIELD_YIELD * RESOURCE_FIELD.commonsShare) / WAVE_COUNT;
+
+/** Ore in one home neighbourhood — `(1 - commonsShare)` of `FIELD_YIELD`, split
+ *  evenly across the `N` planets. All `N` home fields carry exactly this (the
+ *  fairness invariant, `RESOURCE_FIELD`). */
+export function homeFieldOre(playerCount: number): number {
+  const n = Math.max(1, playerCount);
+  return (FIELD_YIELD * (1 - RESOURCE_FIELD.commonsShare)) / n;
+}
 
 /**
  * Sim time (seconds) at which wave `n` (1-based) arrives. Wave 1 is present at

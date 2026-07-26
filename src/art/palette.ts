@@ -21,27 +21,24 @@
  * toward Vacuum (darker) or toward white (lighter). They add no hue to the
  * world, and every one of them is declared with its recipe below and recomputed
  * by the test, so a hand-edited hex can never quietly smuggle a new colour in.
+ *
+ * The six colours, the ramp endpoint, and the identity roster are sourced from
+ * {@link ./tokens} — the art-direction single source. This file is the *ramp*:
+ * it turns those inputs into the shades every generator paints with.
  */
 
+import { PALETTE as TOKEN_PALETTE, PLAYER_ROSTER, WHITE as TOKEN_WHITE } from './tokens';
+
 // ---------------------------------------------------------------------------
-// The six (frozen — style-guide §1)
+// The six (frozen — style-guide §1), sourced from tokens.ts
 // ---------------------------------------------------------------------------
 
-/** The six Cold Vacuum material colours. This is the whole world palette. */
-export const PALETTE = {
-  /** Background. Near-black, so every entity carries its own contrast. */
-  vacuum: 0x0d1015,
-  /** All ships, all players. Hulls never take player colour. */
-  hullSteel: 0x7e8894,
-  /** Corrosion, continents, the repair channel. The "old system" tint. */
-  patina: 0x4fa08b,
-  /** Ore, hazard stripes, costs, the planet core. **RESERVED** (§2). */
-  signalYellow: 0xf2d24b,
-  /** Beams, cockpits, energy. */
-  plasma: 0x4dc3ff,
-  /** Damage, alarms, enemy fire, the under-attack tell. */
-  threatRed: 0xb23a3a,
-} as const;
+/**
+ * The six Cold Vacuum material colours. This is the whole world palette.
+ * Re-exported from {@link ./tokens} so a material hex is written in exactly one
+ * place; changing it there changes it everywhere the ramp and the audit reach.
+ */
+export const PALETTE = TOKEN_PALETTE;
 
 export type PaletteKey = keyof typeof PALETTE;
 
@@ -50,25 +47,16 @@ export type PaletteKey = keyof typeof PALETTE;
  * it exists only as the `toward` endpoint of a lightening mix, the same way
  * Vacuum is the endpoint of a darkening one.
  */
-export const WHITE = 0xffffff;
+export const WHITE = TOKEN_WHITE;
 
 /**
  * The 8-slot player identity roster (style-guide §3.1), indexed by `PlayerId`.
  * Identity is an **additive trim layer** over the steel fleet, never a repaint:
  * these appear only on wing tips, cockpit glass, engine flame, beam tint,
  * planet beacon ring and HP bar — and always alongside the hull number decal,
- * so no player is ever identified by hue alone.
+ * so no player is ever identified by hue alone. Sourced from {@link ./tokens}.
  */
-export const PLAYER_COLORS = [
-  0x3d7bff, // P1 Azure
-  0x22d3c5, // P2 Cyan
-  0x3dd68c, // P3 Spring
-  0x9b5de5, // P4 Violet
-  0xf15bb5, // P5 Magenta
-  0xff8a3d, // P6 Orange
-  0xdce3ec, // P7 Chalk
-  0x5c6ce0, // P8 Slate-Blue
-] as const;
+export const PLAYER_COLORS = PLAYER_ROSTER;
 
 /** The identity colour for a slot, wrapping so an out-of-range id is still safe. */
 export function playerColor(id: number): number {

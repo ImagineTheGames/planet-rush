@@ -94,16 +94,29 @@ export const MAIN_MENU_BUTTON_HEIGHT = 56;
 /** …and a fatter one under a thumb (matches the settings screen's touch rows). */
 export const MAIN_MENU_BUTTON_HEIGHT_TOUCH = 64;
 
+/** The band reserved between the wordmark and the buttons for the map picker
+ *  (`./map-picker`) — the four arena cards live here (m8-02). Capped so the
+ *  buttons keep their room on a wide desktop; a share of the band on a short
+ *  phone, where the cards compress with everything else. */
+export const MAIN_MENU_MAP_BAND_MAX = 196;
+/** Fraction of the space below the title the map band may take before the buttons
+ *  get the rest. */
+export const MAIN_MENU_MAP_BAND_FRACTION = 0.5;
+
 export interface MainMenuLayoutOptions {
   readonly isTouch?: boolean;
   readonly insets?: Insets;
 }
 
-/** The main menu's rects: the title band and one rect per {@link MAIN_MENU_ITEMS}
- *  in order. */
+/** The main menu's rects: the title band, the map-picker band, and one rect per
+ *  {@link MAIN_MENU_ITEMS} in order. */
 export interface MainMenuLayout {
   readonly content: Rect;
   readonly title: Rect;
+  /** The band reserved for the map picker, between the title and the buttons. The
+   *  picker divides it into cards (`./map-picker` `mapPickerLayout`); the menu view
+   *  itself draws nothing here. */
+  readonly mapBand: Rect;
   readonly buttons: readonly Rect[];
   readonly isTouch: boolean;
 }
@@ -128,10 +141,22 @@ export function mainMenuLayout(viewport: Viewport, options: MainMenuLayoutOption
     width: content.width,
     height: Math.max(0, content.height - titleHeight - MENU_ROW_GAP),
   };
-  const buttonHeight = isTouch ? MAIN_MENU_BUTTON_HEIGHT_TOUCH : MAIN_MENU_BUTTON_HEIGHT;
-  const buttons = centeredColumn(band, MAIN_MENU_ITEMS.length, MENU_COLUMN_MAX, buttonHeight);
 
-  return { content, title, buttons, isTouch };
+  // Reserve the map-picker band off the top of the band; the buttons take the
+  // rest. Capped so the buttons keep their room on a desktop, a share of the band
+  // on a short phone — where both compress rather than overflow.
+  const mapHeight = Math.max(0, Math.min(MAIN_MENU_MAP_BAND_MAX, band.height * MAIN_MENU_MAP_BAND_FRACTION));
+  const mapBand: Rect = { x: band.x, y: band.y, width: band.width, height: mapHeight };
+  const buttonBand: Rect = {
+    x: band.x,
+    y: band.y + mapHeight + (mapHeight > 0 ? MENU_ROW_GAP : 0),
+    width: band.width,
+    height: Math.max(0, band.height - mapHeight - (mapHeight > 0 ? MENU_ROW_GAP : 0)),
+  };
+  const buttonHeight = isTouch ? MAIN_MENU_BUTTON_HEIGHT_TOUCH : MAIN_MENU_BUTTON_HEIGHT;
+  const buttons = centeredColumn(buttonBand, MAIN_MENU_ITEMS.length, MENU_COLUMN_MAX, buttonHeight);
+
+  return { content, title, mapBand, buttons, isTouch };
 }
 
 /**

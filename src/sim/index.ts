@@ -20,6 +20,8 @@
  */
 
 export * from './constants';
+// The ratified map registry: arena bounds + home placements per layout.
+export * from './maps';
 // Class bases × upgrade tiers — every derived ship stat (GDD §2.5, §2.11).
 export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
@@ -28,6 +30,8 @@ export * from './waves';
 export * from './match';
 export * from './step';
 export * from './buildings';
+// Pooled combat projectiles — ship weapons and turret guns (design amendment v0.2).
+export * from './projectiles';
 export * from './damage';
 // Read model: every firing ship + turret this tick, for the renderer / audio.
 export * from './combat-view';

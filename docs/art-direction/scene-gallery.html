@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planet Rush — Scene Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  :root{--vac:#0D1015;--signal:#F2D24B;--plasma:#4DC3FF;--bone:#C6CDD6;
+        --panel:#141922;--rule:#252D3A;--muted:#8B95A5}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--vac);color:var(--bone);font-family:'Audiowide',system-ui,sans-serif;font-size:16px;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  header{padding:54px 0 26px}
+  h1{font-size:34px;margin:0 0 8px;color:var(--signal);font-weight:400}
+  .sub{color:var(--muted);margin:0;max-width:80ch;font-family:system-ui,sans-serif;font-size:16px}
+  h2{font-size:15px;color:var(--muted);font-weight:400;letter-spacing:.24em;text-transform:uppercase;margin:44px 0 14px;padding-top:24px;border-top:1px solid var(--rule)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .scene{background:var(--panel);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+  .scene svg{display:block;width:100%;height:auto;background:#0D1015}
+  .cap{padding:13px 16px 15px}
+  .cap h3{margin:0 0 5px;font-size:15px;color:var(--signal);font-weight:400}
+  .cap p{margin:0;font-size:13.5px;color:var(--muted);font-family:system-ui,sans-serif;line-height:1.5}
+  .cap em{color:var(--plasma);font-style:normal}
+  footer{border-top:1px solid var(--rule);padding:30px 0 60px;color:var(--muted);font-size:13.5px;font-family:system-ui,sans-serif;margin-top:40px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>PLANET RUSH — SCENE GALLERY</h1>
+  <p class="sub">Every distinct moment the ruleset can produce, drawn in the frozen Cold Vacuum style. If a scene here
+  isn't fun to look at or isn't legible at a glance, that's a design bug found before day 1 — which is the point of drawing them.</p>
+</header>
+
+<h2>The Triangle — Mine</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <g fill="#FFF"><circle cx="60" cy="40" r="1.4"/><circle cx="300" cy="26" r="1.1"/><circle cx="520" cy="60" r="1.5"/><circle cx="130" cy="300" r="1.2"/><circle cx="470" cy="290" r="1.3"/></g>
+      <!-- asteroids -->
+      <g stroke="#262C34" stroke-width="3">
+        <path d="M180 120 l30 -14 34 9 13 29 -16 28 -37 7 -26 -23 z" fill="#454E59"/>
+        <path d="M330 90 l22 -11 25 8 9 21 -12 19 -28 5 -18 -17 z" fill="#454E59"/>
+        <path d="M400 200 l26 -12 30 8 11 25 -14 24 -32 6 -22 -20 z" fill="#454E59"/>
+        <path d="M250 240 l18 -9 20 6 8 18 -10 15 -22 4 -15 -14 z" fill="#454E59"/>
+        <path d="M480 110 l12 -9 14 4 4 12 -8 10 -15 2 -9 -9 z" fill="#3E4750"/>
+      </g>
+      <g stroke="#F2D24B" stroke-width="2.5" fill="none"><path d="M202 132 l9 20 -7 13"/><path d="M418 214 l10 18"/><path d="M344 102 l8 14"/></g>
+      <!-- beam hitting asteroid, cracks -->
+      <path d="M196 138 l14 16 -8 12 12 10" fill="none" stroke="#262C34" stroke-width="3"/>
+      <line x1="290" y1="196" x2="214" y2="146" stroke="#4DC3FF" stroke-width="5" stroke-linecap="round"/>
+      <line x1="290" y1="196" x2="214" y2="146" stroke="#DFF4FF" stroke-width="2" stroke-linecap="round"/>
+      <!-- impact sparks -->
+      <g stroke="#F2D24B" stroke-width="2" stroke-linecap="round"><path d="M216 146 l-10 -8"/><path d="M216 146 l-2 -13"/><path d="M216 146 l-14 2"/></g>
+      <!-- freed ore drifting to ship -->
+      <g fill="#F2D24B" stroke="#262C34" stroke-width="1.5"><path d="M240 160 l6 -8 6 8 -6 8 z"/><path d="M262 176 l5 -7 5 7 -5 7 z"/></g>
+      <!-- ship: Excavator cyan -->
+      <g transform="translate(320,214) rotate(-146)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M42 -20 l0 10 -6 1 0 -9 z"/><path d="M42 20 l0 -10 -6 -1 0 9 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <path d="M-34 -6 l-10 3 10 3 M-34 4 l-10 3 10 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <g transform="translate(296,254)"><rect width="48" height="7" rx="2.5" fill="none" stroke="#4DC3FF" stroke-width="1.5"/><rect x="2" y="2" width="44" height="3" rx="1" fill="#4DC3FF"/></g>
+      <!-- HUD: hold filling -->
+      <g><rect x="16" y="14" width="104" height="30" rx="8" fill="#10141C" opacity=".9" stroke="#252D3A"/>
+      <rect x="30" y="22" width="15" height="15" rx="3" fill="#F2D24B" stroke="#262C34" stroke-width="1.2"/>
+      <rect x="49" y="22" width="15" height="15" rx="3" fill="none" stroke="#F2D24B" stroke-width="1.2" opacity=".45" stroke-dasharray="3 2"/>
+      <rect x="68" y="22" width="15" height="15" rx="3" fill="none" stroke="#F2D24B" stroke-width="1.2" opacity=".45" stroke-dasharray="3 2"/>
+      <rect x="87" y="22" width="15" height="15" rx="3" fill="none" stroke="#F2D24B" stroke-width="1.2" opacity=".45" stroke-dasharray="3 2"/></g>
+      <text x="584" y="30" text-anchor="end" font-size="12" fill="#8B95A5">ASTEROID WAVE 2/5</text>
+    </svg>
+    <div class="cap"><h3>Mining run</h3><p>Beam on rock, cracks spreading, freed ore drifting into the hold. Hold squares fill one by one — <em>the greed clock starts here.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <g fill="#FFF"><circle cx="80" cy="50" r="1.3"/><circle cx="520" cy="40" r="1.4"/><circle cx="300" cy="300" r="1.2"/></g>
+      <!-- wave spawn burst at center: new rocks arriving -->
+      <circle cx="300" cy="170" r="120" fill="none" stroke="#F2D24B" stroke-width="2" opacity=".25"/>
+      <circle cx="300" cy="170" r="86" fill="none" stroke="#F2D24B" stroke-width="2.5" opacity=".45"/>
+      <g stroke="#262C34" stroke-width="3">
+        <path d="M270 130 l24 -11 27 7 10 23 -13 22 -29 5 -19 -18 z" fill="#454E59"/>
+        <path d="M330 190 l20 -10 22 6 8 19 -11 18 -25 4 -16 -15 z" fill="#454E59"/>
+        <path d="M240 200 l16 -8 18 5 7 16 -9 14 -20 3 -13 -12 z" fill="#454E59"/>
+      </g>
+      <g stroke="#F2D24B" stroke-width="2.5" fill="none"><path d="M292 142 l8 18"/><path d="M348 202 l9 15"/></g>
+      <!-- converging ships from all sides -->
+      <g transform="translate(120,110) rotate(28)" stroke="#262C34" stroke-width="2"><rect x="-20" y="-9" width="35" height="18" rx="5" fill="#7E8894"/><circle cx="0" cy="0" r="6" fill="#4DC3FF"/><path d="M-26 -4 l-8 4 8 4" fill="#4DC3FF" stroke-width="0"/></g>
+      <g transform="translate(490,120) rotate(160)" stroke="#262C34" stroke-width="2"><path d="M30 0 L8 -7 L-16 -7 L-22 0 L-16 7 L8 7 Z" fill="#7E8894"/><rect x="6" y="-4" width="12" height="8" rx="3" fill="#E24A3B"/><path d="M-22 -3 l-8 3 8 3" fill="#E24A3B" stroke-width="0"/></g>
+      <g transform="translate(150,270) rotate(-42)" stroke="#262C34" stroke-width="2"><path d="M24 -10 L34 0 L24 10 L-14 13 L-22 0 L-14 -13 Z" fill="#7E8894"/><rect x="0" y="-6" width="12" height="12" rx="2" fill="#7ED957"/></g>
+      <g transform="translate(470,265) rotate(-140)" stroke="#262C34" stroke-width="2"><rect x="-18" y="-8" width="32" height="16" rx="5" fill="#7E8894"/><circle cx="0" cy="0" r="5.5" fill="#E858B8"/></g>
+      <!-- big centered callout -->
+      <g><rect x="196" y="16" width="208" height="34" rx="8" fill="#10141C" opacity=".92" stroke="#F2D24B"/>
+      <text x="300" y="39" text-anchor="middle" font-size="14" fill="#F2D24B">ASTEROID WAVE 3/5</text></g>
+      <text x="300" y="322" text-anchor="middle" font-size="12" fill="#8B95A5">every survivor arrives at once</text>
+    </svg>
+    <div class="cap"><h3>Asteroid wave drop</h3><p>A new wave spawns nearer the center and the whole lobby converges on the same rock. <em>The metronome that forces contact.</em></p></div>
+  </div>
+</div>
+
+<h2>The Triangle — Attack</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <defs><clipPath id="sg1"><circle r="76"/></clipPath></defs>
+      <g fill="#FFF"><circle cx="60" cy="46" r="1.3"/><circle cx="180" cy="290" r="1.2"/><circle cx="70" cy="200" r="1.1"/></g>
+      <!-- enemy planet defended -->
+      <g transform="translate(400,170)">
+        <circle r="88" fill="none" stroke="#E24A3B" stroke-width="3"/>
+        <g><circle r="106" fill="none" stroke="#F2D24B" stroke-width="5" stroke-dasharray="16 12"/><circle r="106" fill="none" stroke="#0D1015" stroke-width="5" stroke-dasharray="12 16" stroke-dashoffset="-14"/></g>
+        <circle r="76" fill="#2E6E9E"/>
+        <g clip-path="url(#sg1)" fill="#4FA08B" transform="scale(1.4) rotate(150)">
+          <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+          <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+        </g>
+        <circle r="18" fill="#F2D24B" stroke="#262C34" stroke-width="2.5"/>
+        <!-- turrets firing back -->
+        <g transform="translate(-58,-54) rotate(-125)" stroke="#262C34" stroke-width="2">
+          <path d="M-13 6 l4 -8 18 0 4 8 z" fill="#5A6470"/><circle cx="0" cy="-3" r="7" fill="#7E8894"/><rect x="4" y="-6" width="16" height="7" rx="2" fill="#6E7987"/>
+        </g>
+        <g transform="translate(-64,42) rotate(-160)" stroke="#262C34" stroke-width="2">
+          <path d="M-13 6 l4 -8 18 0 4 8 z" fill="#5A6470"/><circle cx="0" cy="-3" r="7" fill="#7E8894"/><rect x="4" y="-6" width="16" height="7" rx="2" fill="#6E7987"/>
+        </g>
+        <!-- scouted damage ring -->
+        <circle r="118" fill="none" stroke="#E24A3B" stroke-width="6" stroke-dasharray="520 220" stroke-dashoffset="-60" opacity=".85" stroke-linecap="round"/>
+        <text x="0" y="-132" text-anchor="middle" font-size="13" fill="#E24A3B">WARDEN · 70%</text>
+      </g>
+      <!-- attacker (you, cyan) taking turret fire -->
+      <g transform="translate(150,180) rotate(-6)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M42 -20 l0 10 -6 1 0 -9 z"/><path d="M42 20 l0 -10 -6 -1 0 9 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <path d="M-34 -6 l-10 3 10 3 M-34 4 l-10 3 10 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <g transform="translate(126,144)"><rect width="48" height="7" rx="2.5" fill="none" stroke="#4DC3FF" stroke-width="1.5"/><rect x="2" y="2" width="20" height="3" rx="1" fill="#4DC3FF"/></g>
+      <!-- your beam on their turret -->
+      <line x1="196" y1="178" x2="336" y2="120" stroke="#4DC3FF" stroke-width="4" stroke-linecap="round"/>
+      <!-- their turret shots incoming -->
+      <g stroke="#E24A3B" stroke-width="4" stroke-linecap="round"><line x1="330" y1="126" x2="290" y2="142"/><line x1="336" y1="212" x2="300" y2="200"/></g>
+      <g fill="#E24A3B"><circle cx="255" cy="156" r="4"/><circle cx="272" cy="192" r="3.4"/></g>
+      <text x="16" y="322" font-size="12" fill="#8B95A5">shield holds while turrets live</text>
+    </svg>
+    <div class="cap"><h3>Sieging a defended planet — alone</h3><p>Two turrets + shield vs one ship. Your hull is bleeding, their core is untouched. <em>The GDD's promise: an occupied planet punishes a lone attacker.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <defs><clipPath id="sg2"><circle r="72"/></clipPath></defs>
+      <!-- planet, shield down, cracking -->
+      <g transform="translate(360,175)">
+        <circle r="84" fill="none" stroke="#9D6BFF" stroke-width="3"/>
+        <!-- shield shattering -->
+        <g fill="none" stroke="#F2D24B" stroke-width="5" opacity=".45"><path d="M-102 -12 a102 102 0 0 1 22 -46" stroke-dasharray="14 10"/><path d="M96 34 a102 102 0 0 1 -30 42" stroke-dasharray="14 10"/></g>
+        <g fill="#F2D24B" opacity=".7"><circle cx="-60" cy="-82" r="2.6"/><circle cx="74" cy="70" r="2.2"/><circle cx="-88" cy="46" r="2"/></g>
+        <circle r="72" fill="#2E6E9E"/>
+        <g clip-path="url(#sg2)" fill="#4FA08B" transform="scale(1.33) rotate(18)">
+          <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+          <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+        </g>
+        <!-- damage cracks over surface -->
+        <g stroke="#B23A3A" stroke-width="2.5" fill="none" opacity=".9"><path d="M-40 -30 l14 18 -8 14 12 16"/><path d="M30 -40 l-8 20 10 12"/></g>
+        <circle r="17" fill="#F2D24B" stroke="#262C34" stroke-width="2.5"/>
+        <!-- core taking hits -->
+        <g stroke="#FFF6C8" stroke-width="2" stroke-linecap="round" opacity=".9"><path d="M-14 -14 l-8 -8"/><path d="M16 12 l9 9"/></g>
+        <!-- dead turret stub -->
+        <g transform="translate(48,-56)" stroke="#262C34" stroke-width="2"><path d="M-11 5 l3 -7 15 0 3 7 z" fill="#3A424D"/><path d="M-6 -4 l8 -8" stroke="#5A6470" stroke-width="3"/></g>
+        <circle r="94" fill="none" stroke="#B23A3A" stroke-width="6" stroke-dasharray="130 460" stroke-dashoffset="-30" stroke-linecap="round"/>
+        <text x="0" y="-108" text-anchor="middle" font-size="13" fill="#B23A3A">WARDEN · 22%</text>
+      </g>
+      <!-- two attackers -->
+      <g transform="translate(120,120) rotate(14)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-24" y="-11" width="42" height="22" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M18 -11 l20 -7 0 9 -20 3 z"/><path d="M18 11 l20 7 0 -9 -20 -3 z"/></g>
+        <circle cx="0" cy="0" r="7" fill="#4DC3FF"/>
+        <path d="M-31 -5 l-9 3 9 3 M-31 3 l-9 3 9 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <g transform="translate(140,268) rotate(-26)" stroke="#262C34" stroke-width="2.5">
+        <path d="M32 0 L8 -7 L-16 -7 L-23 0 L-16 7 L8 7 Z" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M-3 -7 l-6 -15 10 0 4 15 z"/><path d="M-3 7 l-6 15 10 0 4 -15 z"/></g>
+        <g fill="#7ED957" stroke-width="0"><path d="M-9 -22 l10 0 0 4 -10 0 z"/><path d="M-9 18 l10 0 0 4 -10 0 z"/></g>
+        <rect x="8" y="-4" width="12" height="8" rx="3" fill="#7ED957"/>
+      </g>
+      <!-- converging beams keep shield suppressed -->
+      <line x1="170" y1="128" x2="300" y2="158" stroke="#4DC3FF" stroke-width="4.5" stroke-linecap="round"/>
+      <line x1="176" y1="256" x2="304" y2="196" stroke="#7ED957" stroke-width="4.5" stroke-linecap="round"/>
+      <text x="16" y="36" font-size="12" fill="#8B95A5">sustained pressure = no shield regen, no repair</text>
+    </svg>
+    <div class="cap"><h3>Two attackers crack the turtle</h3><p>Unspoken alliance: constant damage means shields never regen and the owner can't channel repair. <em>Why being the leader is dangerous.</em></p></div>
+  </div>
+</div>
+
+<h2>The Triangle — Defend</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <defs><clipPath id="sg3"><circle r="80"/></clipPath></defs>
+      <!-- your planet, you defending with turrets -->
+      <g transform="translate(190,190)">
+        <circle r="92" fill="none" stroke="#4DC3FF" stroke-width="3.5"/>
+        <g><circle r="112" fill="none" stroke="#F2D24B" stroke-width="5" stroke-dasharray="16 12"/><circle r="112" fill="none" stroke="#0D1015" stroke-width="5" stroke-dasharray="12 16" stroke-dashoffset="-14"/></g>
+        <circle r="80" fill="#2E6E9E"/>
+        <g clip-path="url(#sg3)" fill="#4FA08B" transform="scale(1.48)">
+          <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+          <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+        </g>
+        <circle r="19" fill="#F2D24B" stroke="#262C34" stroke-width="2.5"/>
+        <g transform="translate(62,-56) rotate(42)" stroke="#262C34" stroke-width="2.2">
+          <path d="M-14 7 l4 -9 20 0 4 9 z" fill="#5A6470"/><circle cx="0" cy="-3" r="8" fill="#7E8894"/><rect x="5" y="-7" width="18" height="8" rx="2" fill="#6E7987"/>
+        </g>
+        <g transform="translate(66,44) rotate(30)" stroke="#262C34" stroke-width="2.2">
+          <path d="M-14 7 l4 -9 20 0 4 9 z" fill="#5A6470"/><circle cx="0" cy="-3" r="8" fill="#7E8894"/><rect x="5" y="-7" width="18" height="8" rx="2" fill="#6E7987"/>
+        </g>
+        <g transform="translate(-70,-40)"><rect width="52" height="8" rx="3" fill="none" stroke="#4DC3FF" stroke-width="1.5" transform="translate(-26,-92)"/><rect x="-24" y="-90" width="42" height="4" rx="1.5" fill="#4DC3FF"/></g>
+      </g>
+      <!-- your ship defending alongside -->
+      <g transform="translate(340,150) rotate(180)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <path d="M-34 -6 l-10 3 10 3 M-34 4 l-10 3 10 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <!-- attacker retreating, on fire -->
+      <g transform="translate(500,120) rotate(-38)" stroke="#262C34" stroke-width="2.5">
+        <path d="M30 0 L8 -7 L-16 -7 L-23 0 L-16 7 L8 7 Z" fill="#7E8894"/>
+        <rect x="6" y="-4" width="12" height="8" rx="3" fill="#E24A3B"/>
+        <path d="M-23 -3 l-9 3 9 3" fill="#E24A3B" stroke-width="0"/>
+        <g stroke="#FF7A3C" stroke-width="2.5" stroke-linecap="round"><path d="M-8 -8 l-6 -8"/><path d="M4 8 l4 8"/></g>
+      </g>
+      <g transform="translate(478,84)"><rect width="42" height="6" rx="2" fill="none" stroke="#E24A3B" stroke-width="1.4"/><rect x="2" y="2" width="8" height="2.5" rx="1" fill="#E24A3B"/></g>
+      <!-- focus fire: turrets + your ship all on the attacker -->
+      <g stroke-linecap="round">
+        <line x1="278" y1="122" x2="474" y2="112" stroke="#F2D24B" stroke-width="3.5" opacity=".85"/>
+        <line x1="290" y1="222" x2="468" y2="140" stroke="#F2D24B" stroke-width="3.5" opacity=".85"/>
+        <line x1="384" y1="146" x2="470" y2="124" stroke="#4DC3FF" stroke-width="4.5"/>
+      </g>
+      <text x="584" y="322" text-anchor="end" font-size="12" fill="#8B95A5">turrets + your hull = focus fire</text>
+    </svg>
+    <div class="cap"><h3>Home defense — the ship is the wall</h3><p>Turrets deter; you and the turrets together kill. The raider breaks off burning. <em>Being home is what makes turrets matter.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <defs><clipPath id="sg4"><circle r="78"/></clipPath></defs>
+      <!-- repair channel scene -->
+      <g transform="translate(300,190)">
+        <circle r="90" fill="none" stroke="#4DC3FF" stroke-width="3.5"/>
+        <circle r="78" fill="#2E6E9E"/>
+        <g clip-path="url(#sg4)" fill="#4FA08B" transform="scale(1.44) rotate(-24)">
+          <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+          <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+        </g>
+        <g stroke="#B23A3A" stroke-width="2.5" fill="none" opacity=".7"><path d="M-42 -22 l12 16 -6 12"/><path d="M28 30 l-6 14"/></g>
+        <circle r="18" fill="#F2D24B" stroke="#262C34" stroke-width="2.5"/>
+        <!-- repair beam from ship to core -->
+        <g><path d="M96 -66 L14 -12" stroke="#4FA08B" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+        <path d="M96 -66 L14 -12" stroke="#B7FFE9" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 8"/></g>
+        <!-- repair sparkles at core -->
+        <g fill="#B7FFE9"><circle cx="22" cy="-20" r="2.4"/><circle cx="-6" cy="-24" r="1.8"/><circle cx="10" cy="6" r="2"/></g>
+        <!-- healing HP bar -->
+        <g transform="translate(-32,-116)"><rect width="64" height="9" rx="3" fill="none" stroke="#4DC3FF" stroke-width="1.6"/><rect x="2" y="2" width="26" height="5" rx="1.5" fill="#4DC3FF"/><rect x="28" y="2" width="9" height="5" rx="1.5" fill="#B7FFE9" opacity=".8"/></g>
+      </g>
+      <!-- your ship parked, channeling -->
+      <g transform="translate(410,110) rotate(146)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+      </g>
+      <!-- ore draining indicator -->
+      <g><rect x="16" y="14" width="104" height="30" rx="8" fill="#10141C" opacity=".9" stroke="#252D3A"/>
+      <text x="30" y="35" font-size="14" fill="#C6CDD6">ORE <tspan fill="#F2D24B">7</tspan><tspan fill="#B23A3A" font-size="12"> ▼</tspan></text></g>
+      <g><rect x="180" y="298" width="240" height="28" rx="7" fill="#10141C" opacity=".9" stroke="#4FA08B"/>
+      <text x="300" y="317" text-anchor="middle" font-size="12" fill="#4FA08B">REPAIRING — HOLD POSITION</text></g>
+    </svg>
+    <div class="cap"><h3>Repair channel</h3><p>Parked at your own core, ore draining, HP crawling back. Any hit cancels it. <em>Repair costs the two things you can't spare: ore and time.</em></p></div>
+  </div>
+</div>
+
+<h2>Ship-to-ship</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <g fill="#FFF"><circle cx="70" cy="60" r="1.4"/><circle cx="520" cy="46" r="1.2"/><circle cx="300" cy="300" r="1.3"/><circle cx="140" cy="250" r="1.1"/></g>
+      <!-- dogfight: cyan Excavator vs magenta Interceptor, beams crossing -->
+      <g transform="translate(200,200) rotate(-32)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <g fill="#4DC3FF" stroke-width="0"><path d="M42 -20 l0 10 -6 1 0 -9 z"/><path d="M42 20 l0 -10 -6 -1 0 9 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <path d="M-34 -6 l-12 4 12 4 M-34 4 l-12 4 12 4" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <g transform="translate(174,158)"><rect width="48" height="7" rx="2.5" fill="none" stroke="#4DC3FF" stroke-width="1.5"/><rect x="2" y="2" width="30" height="3" rx="1" fill="#4DC3FF"/></g>
+      <g transform="translate(410,130) rotate(152)" stroke="#262C34" stroke-width="2.5">
+        <path d="M34 0 L8 -7 L-17 -7 L-24 0 L-17 7 L8 7 Z" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M-3 -7 l-7 -15 10 0 5 15 z"/><path d="M-3 7 l-7 15 10 0 5 -15 z"/></g>
+        <g fill="#E858B8" stroke-width="0"><path d="M-10 -22 l10 0 0 4 -10 0 z"/><path d="M-10 18 l10 0 0 4 -10 0 z"/></g>
+        <rect x="8" y="-4" width="13" height="8" rx="3" fill="#E858B8"/>
+        <path d="M-24 -3 l-9 3 9 3" fill="#E858B8" stroke-width="0"/>
+      </g>
+      <g transform="translate(388,92)"><rect width="42" height="6" rx="2" fill="none" stroke="#E858B8" stroke-width="1.4"/><rect x="2" y="2" width="30" height="2.5" rx="1" fill="#E858B8"/></g>
+      <!-- crossing beams, both hitting -->
+      <line x1="248" y1="176" x2="392" y2="140" stroke="#4DC3FF" stroke-width="4.5" stroke-linecap="round"/>
+      <line x1="380" y1="146" x2="240" y2="192" stroke="#E858B8" stroke-width="4" stroke-linecap="round"/>
+      <!-- impact flashes -->
+      <g stroke="#FFF6C8" stroke-width="2" stroke-linecap="round"><path d="M392 140 l8 -6 M392 140 l6 8"/><path d="M240 192 l-8 -5 M240 192 l-5 8"/></g>
+      <!-- drifting ore dropped from an earlier kill -->
+      <g fill="#F2D24B" stroke="#262C34" stroke-width="1.4" opacity=".9"><path d="M300 250 l5 -7 5 7 -5 7 z"/><path d="M322 262 l4 -6 4 6 -4 6 z"/></g>
+      <text x="16" y="322" font-size="12" fill="#8B95A5">Excavator hits harder · Interceptor turns faster</text>
+    </svg>
+    <div class="cap"><h3>Dogfight in open space</h3><p>Class identity decides it: the Excavator wins if it lands the beam, the Interceptor wins if it doesn't have to. <em>Same beam that mines.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <!-- interception: hauler full of ore ambushed -->
+      <g stroke="#262C34" stroke-width="3"><path d="M60 90 l22 -11 25 8 9 21 -12 19 -28 5 -18 -17 z" fill="#454E59"/></g>
+      <!-- hauler running home, pods full -->
+      <g transform="translate(250,200) rotate(-16)" stroke="#262C34" stroke-width="2.5">
+        <rect x="18" y="-26" width="14" height="52" rx="5" fill="#7E8894"/>
+        <rect x="-30" y="-11" width="50" height="22" rx="6" fill="#6E7987"/>
+        <circle cx="-2" cy="0" r="8" fill="#FFC93E"/>
+        <g fill="#8F99A6"><rect x="-26" y="-24" width="22" height="10" rx="4"/><rect x="-26" y="14" width="22" height="10" rx="4"/></g>
+        <g fill="#F2D24B" stroke-width="0"><rect x="-24" y="-22" width="18" height="6" rx="2"/><rect x="-24" y="16" width="18" height="6" rx="2"/></g>
+        <path d="M-30 -5 l-13 5 13 5" fill="#FFC93E" stroke-width="0"/>
+      </g>
+      <g transform="translate(226,150)"><rect width="48" height="7" rx="2.5" fill="none" stroke="#FFC93E" stroke-width="1.5"/><rect x="2" y="2" width="22" height="3" rx="1" fill="#FFC93E"/></g>
+      <!-- interceptor diving in -->
+      <g transform="translate(430,110) rotate(146)" stroke="#262C34" stroke-width="2.5">
+        <path d="M34 0 L8 -7 L-17 -7 L-24 0 L-17 7 L8 7 Z" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M-3 -7 l-7 -15 10 0 5 15 z"/><path d="M-3 7 l-7 15 10 0 5 -15 z"/></g>
+        <g fill="#E24A3B" stroke-width="0"><path d="M-10 -22 l10 0 0 4 -10 0 z"/><path d="M-10 18 l10 0 0 4 -10 0 z"/></g>
+        <rect x="8" y="-4" width="13" height="8" rx="3" fill="#E24A3B"/>
+        <path d="M-24 -3 l-10 4 10 4" fill="#E24A3B" stroke-width="0"/>
+      </g>
+      <line x1="404" y1="128" x2="292" y2="182" stroke="#E24A3B" stroke-width="4.5" stroke-linecap="round"/>
+      <g stroke="#FFF6C8" stroke-width="2" stroke-linecap="round"><path d="M292 182 l-8 -5 M292 182 l-4 9"/></g>
+      <!-- ore knocked loose -->
+      <g fill="#F2D24B" stroke="#262C34" stroke-width="1.4"><path d="M320 214 l5 -7 5 7 -5 7 z"/><path d="M344 232 l4 -6 4 6 -4 6 z"/></g>
+      <!-- home planet in distance, so close -->
+      <g transform="translate(90,268)"><circle r="42" fill="#2E6E9E" opacity=".8"/><circle r="9" fill="#F2D24B" opacity=".8"/><circle r="48" fill="none" stroke="#FFC93E" stroke-width="2" opacity=".7"/></g>
+      <text x="150" y="316" font-size="12" fill="#8B95A5">home was 3 seconds away</text>
+    </svg>
+    <div class="cap"><h3>Interception — the loaded hauler</h3><p>A full hold is a target. Kill it and half that ore spills into space. <em>The reason "one more rock" is a real gamble.</em></p></div>
+  </div>
+</div>
+
+<h2>Consequences</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <!-- THE alarm moment: you're mining, planet is being hit -->
+      <g stroke="#262C34" stroke-width="3"><path d="M120 150 l30 -14 34 9 13 29 -16 28 -37 7 -26 -23 z" fill="#454E59"/></g>
+      <g stroke="#F2D24B" stroke-width="2.5" fill="none"><path d="M142 162 l9 20 -7 13"/></g>
+      <line x1="240" y1="212" x2="158" y2="168" stroke="#4DC3FF" stroke-width="5" stroke-linecap="round"/>
+      <g transform="translate(268,228) rotate(-152)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+      </g>
+      <!-- red vignette edges -->
+      <rect x="0" y="0" width="600" height="340" fill="none" stroke="#B23A3A" stroke-width="10" opacity=".5"/>
+      <rect x="0" y="0" width="600" height="340" fill="none" stroke="#B23A3A" stroke-width="24" opacity=".2"/>
+      <!-- screen-edge arrow pointing home -->
+      <g transform="translate(566,186)">
+        <path d="M22 0 L-10 -22 L-2 0 L-10 22 Z" fill="#B23A3A" stroke="#FFD9D3" stroke-width="1.5" transform="rotate(180)"/>
+      </g>
+      <text x="512" y="228" text-anchor="middle" font-size="12" fill="#B23A3A">HOME</text>
+      <!-- alarm banner -->
+      <g><rect x="150" y="20" width="300" height="40" rx="8" fill="#2A1215" stroke="#B23A3A" stroke-width="2"/>
+      <text x="300" y="46" text-anchor="middle" font-size="16" fill="#E24A3B">◤ PLANET UNDER ATTACK ◢</text></g>
+      <!-- your planet HP dropping, top right -->
+      <g><rect x="424" y="76" width="160" height="30" rx="8" fill="#10141C" opacity=".95" stroke="#B23A3A"/>
+      <text x="438" y="96" font-size="12" fill="#4DC3FF">MY PLANET</text>
+      <rect x="516" y="84" width="58" height="14" rx="3" fill="none" stroke="#B23A3A" stroke-width="1.6"/><rect x="518" y="86" width="22" height="10" rx="1.5" fill="#B23A3A"/></g>
+      <!-- the choice, spelled out -->
+      <g><rect x="130" y="292" width="340" height="30" rx="7" fill="#10141C" opacity=".9" stroke="#252D3A"/>
+      <text x="300" y="312" text-anchor="middle" font-size="12.5" fill="#8B95A5">one more rock, or fly home?</text></g>
+    </svg>
+    <div class="cap"><h3>The alarm — the game's whole design in one frame</h3><p>Deep in the field, hold nearly full, and your core starts taking hits. <em>Every system exists to make this second hurt.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <!-- death: ship exploding, ore spilling -->
+      <g transform="translate(280,170)">
+        <circle r="54" fill="#FF7A3C" opacity=".16"/>
+        <circle r="34" fill="#F2D24B" opacity=".28"/>
+        <circle r="18" fill="#FFF6C8" opacity=".8"/>
+        <!-- debris shards -->
+        <g stroke="#262C34" stroke-width="1.5" fill="#7E8894">
+          <path d="M-46 -30 l12 -6 6 10 -10 8 z" transform="rotate(-20)"/>
+          <path d="M40 -22 l10 4 -2 12 -12 -4 z" transform="rotate(14)"/>
+          <path d="M-30 36 l12 2 0 10 -12 -2 z" transform="rotate(30)"/>
+          <path d="M34 34 l10 6 -6 8 -10 -6 z"/>
+        </g>
+        <g fill="#4DC3FF" stroke="#262C34" stroke-width="1.2"><path d="M-54 6 l8 -3 2 8 -8 3 z"/><path d="M50 8 l7 4 -4 7 -7 -4 z"/></g>
+        <!-- radiating streaks -->
+        <g stroke="#FF7A3C" stroke-width="2.5" stroke-linecap="round" opacity=".8">
+          <path d="M-24 -24 l-16 -16"/><path d="M26 -22 l18 -14"/><path d="M-22 26 l-14 16"/><path d="M24 24 l16 14"/>
+        </g>
+      </g>
+      <!-- spilled ore drifting away -->
+      <g fill="#F2D24B" stroke="#262C34" stroke-width="1.5">
+        <path d="M180 240 l6 -8 6 8 -6 8 z"/><path d="M370 100 l6 -8 6 8 -6 8 z"/><path d="M400 236 l5 -7 5 7 -5 7 z"/>
+      </g>
+      <!-- killer flying off with a nod -->
+      <g transform="translate(470,120) rotate(-24)" stroke="#262C34" stroke-width="2.2">
+        <path d="M30 0 L8 -7 L-16 -7 L-22 0 L-16 7 L8 7 Z" fill="#7E8894"/>
+        <rect x="6" y="-4" width="12" height="8" rx="3" fill="#E24A3B"/>
+        <path d="M-22 -3 l-9 3 9 3" fill="#E24A3B" stroke-width="0"/>
+      </g>
+      <!-- respawn timer -->
+      <g><rect x="200" y="278" width="200" height="42" rx="9" fill="#10141C" opacity=".95" stroke="#252D3A"/>
+      <text x="300" y="298" text-anchor="middle" font-size="13" fill="#C6CDD6">RESPAWN 3</text>
+      <text x="300" y="314" text-anchor="middle" font-size="11" fill="#8B95A5">upgrades kept · half your hold is out there</text></g>
+    </svg>
+    <div class="cap"><h3>Death &amp; spill</h3><p>Ships are cheap: 5 seconds, upgrades intact. But half your hold is now loose in space for anyone. <em>The cost is time and position, never progress.</em></p></div>
+  </div>
+</div>
+
+<h2>Endgame</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <!-- wreck scavenging: contested corpse -->
+      <g transform="translate(300,180)">
+        <!-- ribcage wreck -->
+        <g stroke="#C6CDD6" stroke-width="2.5">
+          <path d="M-78 30 a82 82 0 0 1 52 -100" fill="none"/>
+          <path d="M76 34 a82 82 0 0 0 -40 -96" fill="none"/>
+          <path d="M-44 46 l24 -60 M-6 52 l14 -40 M34 40 l20 -32 M-64 12 l18 -32" fill="none" stroke="#5A6470"/>
+          <circle cx="-4" cy="-8" r="18" fill="#2A1215" stroke="#262C34"/>
+        </g>
+        <!-- ore in the debris -->
+        <g fill="#F2D24B" stroke="#262C34" stroke-width="1.5">
+          <path d="M-52 -34 l6 -8 6 8 -6 8 z"/><path d="M26 24 l5 -7 5 7 -5 7 z"/><path d="M54 -18 l5 -7 5 7 -5 7 z"/><path d="M-20 40 l5 -7 5 7 -5 7 z"/>
+        </g>
+        <text x="0" y="86" text-anchor="middle" font-size="11" fill="#5F6875">BOLT'S WORLD</text>
+      </g>
+      <!-- three scavengers fighting over it -->
+      <g transform="translate(120,110) rotate(28)" stroke="#262C34" stroke-width="2.2"><rect x="-20" y="-9" width="35" height="18" rx="5" fill="#7E8894"/><circle cx="0" cy="0" r="6" fill="#4DC3FF"/></g>
+      <g transform="translate(490,220) rotate(-160)" stroke="#262C34" stroke-width="2.2"><path d="M28 0 L6 -6 L-14 -6 L-20 0 L-14 6 L6 6 Z" fill="#7E8894"/><rect x="4" y="-4" width="11" height="8" rx="3" fill="#E24A3B"/></g>
+      <g transform="translate(150,268) rotate(-52)" stroke="#262C34" stroke-width="2.2"><rect x="-18" y="-8" width="32" height="16" rx="5" fill="#7E8894"/><circle cx="0" cy="0" r="5.5" fill="#3EDBB6"/></g>
+      <!-- beams at each other, not the loot -->
+      <line x1="160" y1="140" x2="440" y2="212" stroke="#4DC3FF" stroke-width="3.5" stroke-linecap="round" opacity=".9"/>
+      <line x1="452" y1="216" x2="186" y2="252" stroke="#E24A3B" stroke-width="3.5" stroke-linecap="round" opacity=".9"/>
+      <text x="16" y="36" font-size="12" fill="#8B95A5">a 2-slot hold can't take it all</text>
+    </svg>
+    <div class="cap"><h3>Wreck scavenging</h3><p>The dead player's ore stays on the map, and nobody can haul it away in one trip. <em>Small cargo turns a corpse into a battlefield.</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <!-- collapse phase: field exhausted, last two circling -->
+      <rect x="0" y="0" width="600" height="340" fill="#B23A3A" opacity=".05"/>
+      <g fill="#FFF" opacity=".8"><circle cx="80" cy="50" r="1.3"/><circle cx="520" cy="60" r="1.4"/><circle cx="300" cy="300" r="1.2"/></g>
+      <!-- empty center, just dust -->
+      <g fill="#3A424D"><circle cx="300" cy="170" r="2"/><circle cx="286" cy="156" r="1.4"/><circle cx="316" cy="182" r="1.6"/><circle cx="330" cy="160" r="1.2"/><circle cx="270" cy="186" r="1.3"/></g>
+      <circle cx="300" cy="170" r="120" fill="none" stroke="#B23A3A" stroke-width="1.5" stroke-dasharray="6 10" opacity=".5"/>
+      <!-- two last planets, both wounded, shields dead -->
+      <g transform="translate(110,180)">
+        <circle r="46" fill="#2E6E9E"/><circle r="52" fill="none" stroke="#4DC3FF" stroke-width="2.5"/>
+        <g stroke="#B23A3A" stroke-width="2" fill="none"><path d="M-24 -14 l8 10 -4 8"/><path d="M16 18 l-4 8"/></g>
+        <circle r="11" fill="#F2D24B"/>
+        <circle r="58" fill="none" stroke="#B23A3A" stroke-width="4" stroke-dasharray="90 275" stroke-linecap="round"/>
+      </g>
+      <g transform="translate(490,180)">
+        <circle r="46" fill="#2E6E9E"/><circle r="52" fill="none" stroke="#E24A3B" stroke-width="2.5"/>
+        <g stroke="#B23A3A" stroke-width="2" fill="none"><path d="M18 -16 l-6 12 6 8"/></g>
+        <circle r="11" fill="#F2D24B"/>
+        <circle r="58" fill="none" stroke="#B23A3A" stroke-width="4" stroke-dasharray="130 235" stroke-linecap="round"/>
+      </g>
+      <!-- wrecks of the fallen -->
+      <g stroke="#3A424D" stroke-width="2" fill="none" opacity=".8">
+        <g transform="translate(180,70)"><path d="M-16 6 a18 18 0 0 1 12 -22"/><circle cx="-2" cy="-2" r="4" fill="#2A1215" stroke="none"/></g>
+        <g transform="translate(420,280)"><path d="M-16 6 a18 18 0 0 1 12 -22"/><circle cx="-2" cy="-2" r="4" fill="#2A1215" stroke="none"/></g>
+        <g transform="translate(120,300)"><path d="M-14 5 a16 16 0 0 1 10 -19"/><circle cx="-2" cy="-2" r="3.4" fill="#2A1215" stroke="none"/></g>
+      </g>
+      <!-- final duel -->
+      <g transform="translate(250,180) rotate(0)" stroke="#262C34" stroke-width="2.2"><rect x="-20" y="-9" width="35" height="18" rx="5" fill="#7E8894"/><circle cx="0" cy="0" r="6" fill="#4DC3FF"/></g>
+      <g transform="translate(350,180) rotate(180)" stroke="#262C34" stroke-width="2.2"><path d="M28 0 L6 -6 L-14 -6 L-20 0 L-14 6 L6 6 Z" fill="#7E8894"/><rect x="4" y="-4" width="11" height="8" rx="3" fill="#E24A3B"/></g>
+      <line x1="272" y1="176" x2="330" y2="176" stroke="#4DC3FF" stroke-width="4" stroke-linecap="round"/>
+      <line x1="330" y1="186" x2="272" y2="186" stroke="#E24A3B" stroke-width="4" stroke-linecap="round"/>
+      <!-- banner -->
+      <g><rect x="170" y="18" width="260" height="38" rx="8" fill="#2A1215" stroke="#B23A3A" stroke-width="2"/>
+      <text x="300" y="43" text-anchor="middle" font-size="14" fill="#E24A3B">COLLAPSE — NO REGEN, NO REPAIR</text></g>
+      <text x="300" y="322" text-anchor="middle" font-size="12" fill="#8B95A5">the ore is gone · whoever saved most, wins</text>
+    </svg>
+    <div class="cap"><h3>Collapse phase</h3><p>Wave 5 mined out. Shields dead, repair off, wrecks everywhere, two cripples circling. <em>The rule that guarantees the match ends.</em></p></div>
+  </div>
+</div>
+
+<h2>Bookends</h2>
+<div class="grid">
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <defs><clipPath id="sg5"><circle r="66"/></clipPath></defs>
+      <!-- match start: RUSH countdown, spawn protection glow -->
+      <g transform="translate(300,190)">
+        <circle r="86" fill="#4DC3FF" opacity=".08"/>
+        <circle r="86" fill="none" stroke="#4DC3FF" stroke-width="2" stroke-dasharray="4 6" opacity=".8"/>
+        <circle r="76" fill="none" stroke="#4DC3FF" stroke-width="3"/>
+        <circle r="66" fill="#2E6E9E"/>
+        <g clip-path="url(#sg5)" fill="#4FA08B" transform="scale(1.22)">
+          <path d="M-58 -10 L-44 -26 Q-36 -36 -22 -32 L-14 -38 Q-2 -44 8 -36 L20 -34 Q34 -32 34 -20 L26 -14 Q34 -8 26 -2 L12 0 L8 -8 L0 2 Q-10 8 -18 0 L-20 -10 L-30 -4 Q-42 0 -48 -8 z"/>
+          <path d="M12 10 Q26 4 36 12 L42 24 Q44 34 34 40 L26 50 Q18 56 14 46 L12 32 Q8 18 12 10 z"/>
+        </g>
+        <circle r="16" fill="#F2D24B" stroke="#262C34" stroke-width="2.5"/>
+        <text x="0" y="106" text-anchor="middle" font-size="11" fill="#4DC3FF">SPAWN PROTECTED 10</text>
+      </g>
+      <!-- your ship orbiting, pristine -->
+      <g transform="translate(392,120) rotate(38)" stroke="#262C34" stroke-width="2.5">
+        <rect x="-26" y="-12" width="46" height="24" rx="6" fill="#7E8894"/>
+        <g fill="#6E7987"><path d="M20 -12 l22 -8 0 10 -22 4 z"/><path d="M20 12 l22 8 0 -10 -22 -4 z"/></g>
+        <circle cx="0" cy="0" r="8" fill="#4DC3FF"/>
+        <path d="M-34 -6 l-10 3 10 3 M-34 4 l-10 3 10 3" fill="#4DC3FF" stroke-width="0"/>
+      </g>
+      <!-- countdown -->
+      <text x="300" y="70" text-anchor="middle" font-size="44" fill="#F2D24B">RUSH!</text>
+      <!-- starting ore -->
+      <g><rect x="16" y="14" width="104" height="30" rx="8" fill="#10141C" opacity=".9" stroke="#252D3A"/>
+      <text x="30" y="35" font-size="14" fill="#C6CDD6">ORE <tspan fill="#F2D24B">3</tspan></text></g>
+      <text x="584" y="322" text-anchor="end" font-size="12" fill="#8B95A5">no turrets yet · everyone is naked</text>
+    </svg>
+    <div class="cap"><h3>Match start</h3><p>Spawn protection glowing, 3 ore in the bank, no defenses anywhere. <em>The opening choice: turret, upgrade, or bank it?</em></p></div>
+  </div>
+  <div class="scene">
+    <svg viewBox="0 0 600 340">
+      <rect width="600" height="340" fill="#0D1015"/>
+      <g fill="#FFF"><circle cx="90" cy="60" r="1.4"/><circle cx="500" cy="52" r="1.2"/><circle cx="300" cy="290" r="1.3"/><circle cx="160" cy="240" r="1.1"/><circle cx="440" cy="250" r="1.2"/></g>
+      <text x="300" y="86" text-anchor="middle" font-size="38" fill="#F2D24B">VICTORY</text>
+      <text x="300" y="112" text-anchor="middle" font-size="13" fill="#8B95A5">last core standing · 12:41</text>
+      <!-- your surviving planet -->
+      <g transform="translate(300,190)">
+        <circle r="44" fill="#2E6E9E"/><circle r="50" fill="none" stroke="#4DC3FF" stroke-width="3"/>
+        <circle r="10" fill="#F2D24B"/>
+        <circle r="56" fill="none" stroke="#4DC3FF" stroke-width="4" stroke-dasharray="230 122" stroke-linecap="round"/>
+      </g>
+      <!-- stats row -->
+      <g font-size="12">
+        <text x="120" y="252" fill="#8B95A5">ORE MINED</text><text x="120" y="272" font-size="18" fill="#F2D24B">147</text>
+        <text x="250" y="252" fill="#8B95A5">PLANETS KILLED</text><text x="250" y="272" font-size="18" fill="#C6CDD6">3</text>
+        <text x="400" y="252" fill="#8B95A5">DEATHS</text><text x="400" y="272" font-size="18" fill="#C6CDD6">6</text>
+        <text x="490" y="252" fill="#8B95A5">CLASS</text><text x="490" y="272" font-size="14" fill="#4DC3FF">EXCAVATOR</text>
+      </g>
+      <!-- rematch primary -->
+      <g><rect x="196" y="292" width="120" height="32" rx="7" fill="#F2D24B"/>
+      <text x="256" y="313" text-anchor="middle" font-size="14" fill="#0D1015">REMATCH ↺</text></g>
+      <g><rect x="328" y="292" width="90" height="32" rx="7" fill="none" stroke="#252D3A" stroke-width="1.5"/>
+      <text x="373" y="313" text-anchor="middle" font-size="13" fill="#8B95A5">MENU</text></g>
+    </svg>
+    <div class="cap"><h3>Victory / defeat</h3><p>Same screen either way, with REMATCH as the loud button. <em>Eliminated players see this instantly — nobody watches bots finish.</em></p></div>
+  </div>
+</div>
+
+<footer>
+  <p>Planet Rush · Scene gallery · 12 scenes covering mine / attack / defend / ship-to-ship / consequences / endgame / bookends.
+  Every scene uses the frozen Cold Vacuum palette, earthlike planets, redone cannons, player-color liveries, fog rules, and Audiowide type.
+  Not yet drawn (say the word): asteroid wave 5 collapse-spawn at map center, spectator view, lobby-to-match transition, touch-control layout.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -37,6 +37,13 @@ interface MenuSeam {
   matchStarted: boolean;
   play(): void;
 }
+/** The read-only `window.__lobby` seam (src/main.ts `openLobby`). Since M4, PLAY
+ *  opens the LOBBY between the menu and the match; RUSH! is what boots the world,
+ *  so reaching the match (and this fullscreen seam) now goes through it. Fullscreen
+ *  itself is still entered on PLAY (unchanged) — the lobby just sits inside it. */
+interface LobbySeam {
+  rush(): void;
+}
 /** The read-only `window.__fullscreen` seam (src/main.ts `FullscreenSeam`). */
 interface FullscreenSeam {
   supported: boolean;
@@ -51,6 +58,7 @@ interface FullscreenSeam {
 }
 interface StageWindow {
   __mainMenu?: MenuSeam;
+  __lobby?: LobbySeam;
   __fullscreen?: FullscreenSeam;
 }
 declare const window: Window & StageWindow;
@@ -94,9 +102,18 @@ async function bootToMenu(page: Page): Promise<void> {
   await page.waitForFunction(() => typeof window.__mainMenu?.play === 'function', undefined, { timeout: 20_000 });
 }
 
-/** Press PLAY through the menu seam and wait until the match world is built. */
+/** Press PLAY and drive the lobby's RUSH! through to a built match world.
+ *
+ * Fullscreen is entered on PLAY (a user gesture — unchanged by M4). Since M4, PLAY
+ * opens the LOBBY rather than building the world directly, so reaching the match
+ * (and the `__fullscreen` seam, which installs after the match boots) now goes
+ * through RUSH!. Every fullscreen assertion below is unchanged; only the path to
+ * the match gained the lobby it always should have had (GDD §2.1). */
 async function pressPlay(page: Page): Promise<void> {
   await page.evaluate(() => window.__mainMenu!.play());
+  // The lobby seam appears after PLAY; RUSH! runs the countdown and boots the match.
+  await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, { timeout: 20_000 });
+  await page.evaluate(() => window.__lobby!.rush());
   await page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, { timeout: 20_000 });
   // The __fullscreen seam installs on the same synchronous boot continuation.
   await page.waitForFunction(() => '__fullscreen' in window, undefined, { timeout: 20_000 });

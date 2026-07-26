@@ -5,8 +5,12 @@
  * (`@render`) in the same canvas — it does NOT move with the camera. The HUD
  * "shows only what the player acts on" (GDD §2.2). Day-1 surface (GDD §4.6):
  *
- *  - **Ore at a glance** (top-left): filled squares per cargo slot, flashing
- *    when full, above the banked ORE total (GDD §2.2, §2.3).
+ *  - **Ore at a glance**, split per the field rule: the banked **TOTAL** in the
+ *    top-left corner (the safe bank the Build wheel spends), and a compact
+ *    **hold indicator under the ship** — one pip per cargo slot, flashing when
+ *    full — that follows the local ship in screen space and drains during a dock
+ *    deposit ({@link ./ore-hold}). Two forms, two places, so held and banked ore
+ *    can never be confused (GDD §2.2, §2.3).
  *  - **Asteroid-wave clock** (top-center): wave name + countdown + match time
  *    (GDD §2.2, §2.3) — the match metronome made visible.
  *  - **Controls strip** (bottom edge, desktop only): bindings read from the live
@@ -52,6 +56,9 @@ import type { PlayerId } from '@shared/types';
 import { Onboarding, resolvePromptText } from './onboarding';
 import { computeWaveClock, formatClock } from './wave-clock';
 import { oreHudModel, oreFlashOn } from './ore-hud';
+import { oreHoldModel } from './ore-hold';
+import { OreHoldView } from './ore-hold-view';
+import type { DrawnOreHold } from './ore-hold-view';
 import { controlsStripRows, showControlsStrip } from './controls-strip';
 import { buildWheelModel } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
@@ -108,24 +115,11 @@ const TEXT_DIM = PALETTE.hullSteel;
 /** The corner margin, and the `margin` of the corner anchors — one constant, in
  *  `hud-geometry.ts`, so the drawing and the registered anchor cannot drift. */
 const PAD = HUD_PAD;
-const SQUARE = 18;
-const SQUARE_GAP = 5;
+/** Bottom strip's baseline offset from the screen bottom, CSS px. */
+const STRIP_ROW = 18;
 const STRIP_PAD = 12;
-
-/**
- * Outline width of an *empty* ore slot's ghost square.
- *
- * Drawn **inset by half its width**, so the stroke lands entirely inside the
- * `SQUARE × SQUARE` footprint the row was laid out with. Pixi centres a stroke
- * on its path: an outline drawn on the footprint itself would bleed
- * `SLOT_STROKE / 2` px *outside* it, which put the ore HUD's real rendered
- * bounds at x = PAD − 0.75 and escaped the `top-left` margin-`PAD` anchor by a
- * quarter pixel on every phone profile. The registry was right and the drawing
- * was wrong (GDD §2.2 puts ore at a glance in the top-left corner, and the
- * margin is what "corner, not edge" means), so the stroke moved inward rather
- * than the anchor outward.
- */
-const SLOT_STROKE = 1.5;
+/** Gap between the top-left TOTAL label and the banked number below it, CSS px. */
+const TOTAL_LABEL_H = 14;
 
 
 // ---------------------------------------------------------------------------
@@ -279,11 +273,21 @@ export class Hud extends Container {
   /** Onboarding state machine — each prompt fires once (GDD §2.10). */
   private readonly onboarding = new Onboarding();
 
-  // --- Ore at a glance (top-left) -----------------------------------------
+  // --- Ore TOTAL — the banked bank the Build wheel spends (top-left) --------
+  //     Field rule: top-left shows the TOTAL only; held ore moved under the ship
+  //     (see `oreHold` below), so the two ore numbers can never be confused.
   private readonly oreGroup = new Container();
-  private readonly squares: Graphics[] = [];
-  private squareCount = -1; // forces a rebuild on first frame
+  private readonly totalLabel: Text;
   private readonly bankedText: Text;
+  /** The banked total the top-left last drew — read back by the ?debug=1
+   *  live-stage seam to prove the total rises as the under-ship hold drains. */
+  private lastBankedTotal = 0;
+
+  // --- Ore HOLD — the under-ship indicator for what you're carrying ---------
+  //     A pooled, screen-space layer that follows the local ship (like the
+  //     health bar), showing hold / capacity as pips; visible while carrying or
+  //     mining, drains visibly during a dock deposit. Decisions in ./ore-hold.
+  private readonly oreHold = new OreHoldView();
 
   // --- Wave clock (top-center) --------------------------------------------
   private readonly waveGroup = new Container();
@@ -365,9 +369,14 @@ export class Hud extends Container {
   ) {
     super();
 
-    // Ore group: squares are built lazily in update(); the banked total below.
-    this.bankedText = this.makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
-    this.oreGroup.addChild(this.bankedText);
+    // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
+    // yellow. The heading names it as the safe bank total, distinct in both form
+    // and place from the pips carried under the ship (field rule).
+    this.totalLabel = this.makeText('TOTAL', FONT_HEADING, 11, TEXT_DIM);
+    this.totalLabel.y = 0;
+    this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
+    this.bankedText.y = TOTAL_LABEL_H;
+    this.oreGroup.addChild(this.totalLabel, this.bankedText);
     this.oreGroup.x = PAD;
     this.oreGroup.y = PAD;
 
@@ -411,10 +420,12 @@ export class Hud extends Container {
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
-      // Health bars draw first: they float over the world but under every piece
-      // of HUD chrome, so a bar never sits on top of the ore squares or the
-      // wave clock.
+      // Health bars and the under-ship hold indicator draw first: they float over
+      // the world but under every piece of HUD chrome, so neither ever sits on top
+      // of the ore total or the wave clock. Both track the local ship in screen
+      // space, bracketing it — bar above, hold below — as one status cluster.
       this.healthbars,
+      this.oreHold,
       this.oreGroup,
       this.waveGroup,
       this.planetGroup,
@@ -445,7 +456,7 @@ export class Hud extends Container {
     // an absolute y below the HOME footprint), so the group origin is at HULL_TOP.
     this.hullGroup.x = this.screenWidth - PAD;
     this.hullGroup.y = HULL_TOP;
-    this.stripGroup.y = this.screenHeight - SQUARE - STRIP_PAD;
+    this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
     this.promptGroup.x = this.screenWidth / 2;
     // Below the ship (the follow camera holds it at the centre) and above the
     // controls strip, so the prompt never covers the thing it is pointing at.
@@ -474,50 +485,47 @@ export class Hud extends Container {
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
 
-  // --- Ore at a glance -----------------------------------------------------
+  // --- Ore: the TOTAL (top-left) and the HOLD (under the ship) -------------
 
+  /** Draw the two ore readouts from the one sim-driven model (field rule): the
+   *  banked TOTAL in the top-left corner, and the held-ore indicator that follows
+   *  the ship under it. Each reads its own number from the same source of truth —
+   *  `banked` for the total, hold/capacity for the pips — so they cannot drift. */
   private updateOre(frame: HudFrame): void {
     const model = oreHudModel(frame.cargo, frame.cargoCap, frame.banked);
 
-    // Rebuild the square row only when the slot count changes (cargo upgrade).
-    if (model.slots !== this.squareCount) {
-      for (const s of this.squares) s.destroy();
-      this.squares.length = 0;
-      for (let i = 0; i < model.slots; i++) {
-        const g = new Graphics().roundRect(0, 0, SQUARE, SQUARE, 3);
-        g.x = i * (SQUARE + SQUARE_GAP);
-        this.oreGroup.addChildAt(g, 0); // behind the banked text
-        this.squares.push(g);
-      }
-      this.squareCount = model.slots;
-      // Banked total sits just under the square row.
-      this.bankedText.y = SQUARE + 8;
-    }
+    // Top-left TOTAL: just the safe banked number the Build wheel spends.
+    this.bankedText.text = `${model.banked}`;
+    this.lastBankedTotal = model.banked;
 
-    // Fill/outline each square; the full hold flashes (GDD §2.2).
-    const flashOn = oreFlashOn(model, frame.time);
-    for (let i = 0; i < this.squares.length; i++) {
-      const g = this.squares[i]!;
-      const filled = i < model.filled;
-      g.clear();
-      g.roundRect(0, 0, SQUARE, SQUARE, 3);
-      if (filled) {
-        // Filled ore square: signal yellow, RESERVED for ore (style-guide §2).
-        g.fill({ color: PALETTE.signalYellow, alpha: model.full && !flashOn ? 0.45 : 1 });
-      } else {
-        g.fill({ color: PALETTE.signalYellow, alpha: 0.1 }); // faint slot ghost
-        // Outline on an inset path, so the centred stroke stays inside the
-        // square's footprint and the row's bounds are exactly its layout box.
-        const i2 = SLOT_STROKE / 2;
-        g.roundRect(i2, i2, SQUARE - SLOT_STROKE, SQUARE - SLOT_STROKE, 3 - i2).stroke({
-          width: SLOT_STROKE,
-          color: PALETTE.signalYellow,
-          alpha: 0.5,
-        });
-      }
-    }
+    // Under-ship HOLD: the pips for what you're carrying, floated below the local
+    // ship (screen centre under the follow camera). Shown while carrying OR
+    // mining; the full hold flashes in step with the total's own full-flash. The
+    // pooled layer culls itself off-screen, so its `full` anchor stays honest.
+    const mining = (frame.shipFiring ?? false) && frame.nearAsteroid;
+    const radius = frame.shipRadius ?? DEFAULT_SHIP_SCREEN_RADIUS;
+    const hold = oreHoldModel(
+      frame.cargo,
+      frame.cargoCap,
+      mining,
+      this.screenWidth / 2,
+      this.screenHeight / 2,
+      radius,
+    );
+    this.oreHold.update(hold, oreFlashOn(model, frame.time), this.screenWidth, this.screenHeight);
+  }
 
-    this.bankedText.text = `ORE ${model.banked}`;
+  /** The banked total the top-left last drew — the ?debug=1 live-stage seam reads
+   *  this to prove the total rises as the under-ship hold deposits. */
+  debugBankedTotal(): number {
+    return this.lastBankedTotal;
+  }
+
+  /** The under-ship hold indicator the layer actually drew last frame (screen
+   *  position + pip counts), or null when hidden — the ?debug=1 live-stage seam
+   *  reads this to prove a drawn indicator tracks the ship with the right count. */
+  debugOreHold(): DrawnOreHold | null {
+    return this.oreHold.debugHold();
   }
 
   // --- Wave clock ----------------------------------------------------------
@@ -1039,6 +1047,15 @@ export class Hud extends Container {
     // on the HUD's own visibility, the same as `shown()` does for `push`.
     if (shown(this.healthbars)) {
       for (const entry of this.healthbars.describeLayout(viewport)) entries.push(entry);
+    }
+
+    // Under-ship ore-hold indicator: the same self-registering, screen-space
+    // discipline as the health bars — it reports the pip row it actually drew
+    // (culled off-screen, so the `full` anchor stays honest), or nothing when the
+    // hold is empty and idle. Its bounds come from the row itself, not a child's
+    // getBounds(), so it registers itself the same way.
+    if (shown(this.oreHold)) {
+      for (const entry of this.oreHold.describeLayout(viewport)) entries.push(entry);
     }
 
     // `viewport` is the host's size; the HUD was laid out against the same

@@ -30,17 +30,16 @@
  * then the projectile pool), no RNG, every rate `* dt`.
  */
 
-import type { Beam, PlayerId, BuildItem, UpgradeTrack } from '@shared/types';
+import type { Beam, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   PLANET,
-  PROJECTILE,
   REPAIR,
   SHIELD,
   TURRET,
 } from './constants';
-import { damageShip } from './damage';
 import { destroyCore, isCollapsed } from './match';
-import type { Planet, Projectile, Ship, Shield, Turret, World } from './state';
+import { fireTurretProjectile } from './projectiles';
+import type { Planet, Ship, Shield, Turret, World } from './state';
 import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
 
@@ -521,9 +520,14 @@ export function updateTurrets(world: World, dt: number): void {
       // branch that actually looses a shot below sets it. Cleared here so a
       // renderer never draws a stale flash a tick after the shot left.
       turret.muzzle = null;
-      const target = acquireTarget(world, turret);
+      const target = acquireTarget(world, planet, turret);
       turret.targetId = target ? target.id : null;
     }
+
+    // 1b. Coverage split: never stack two turrets on one threat while another
+    //     valid threat goes unengaged (field report P1, §4). A planet-level pass
+    //     because the split is a property of the *set* of turrets, not any one.
+    splitThreats(world, planet);
 
     // 2. Slide each turret along the rim toward its target's facing normal.
     slideTurrets(world, planet, dt);
@@ -541,7 +545,7 @@ export function updateTurrets(world: World, dt: number): void {
       turret.angle = turnToward(turret.angle, aim, TURRET.turnRate * dt);
 
       if (turret.cooldown <= 0) {
-        fireProjectile(world, turret, aim);
+        fireTurretProjectile(world, turret, aim);
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
         turret.muzzle = muzzleBeam(turret, target, aim);
@@ -552,45 +556,190 @@ export function updateTurrets(world: World, dt: number): void {
 }
 
 /**
- * The enemy ship a turret engages this tick — **sticky**, the "don't go crazy"
- * rule (field report P1, §2). A turret holds its current target as long as it is
- * alive, not the owner's, not spawn-protected, and still inside `TURRET.range`.
- * It only switches when it has no valid target, or when another enemy is closer
- * by the `TURRET.targetHysteresis` factor (≈25% closer) — so two enemies at
- * similar range never make it flap tick to tick.
+ * The far edge of the ring a **sliding** turret can bring a beam onto: the orbit
+ * radius plus `TURRET.range` (field report P1, §1). Threat detection is measured
+ * from the *planet centre*, not the turret's current rim spot — the whole point
+ * of orbiting is to slide around and reach a far-side attacker, so a threat this
+ * close to the core is engageable even when it sits outside beam range of where
+ * the turret happens to be sitting *right now*. Once the turret slides to the
+ * facing-normal point its beam has line of sight and closes to `range` (§2).
  */
-function acquireTarget(world: World, turret: Turret): Ship | null {
-  const range2 = TURRET.range * TURRET.range;
+export function planetThreatRadius(planet: Planet): number {
+  return planet.radius + TURRET.mountOffset + TURRET.radius + TURRET.range;
+}
 
-  // Nearest valid enemy this tick — the switch candidate.
+/**
+ * True when `ship` is actively shooting this planet — it owns a live weapon
+ * projectile whose forward path reaches the shield/core surface (field report
+ * P1, §3; design amendment v0.2). This is the signal that ranks an attacker over
+ * a mere loiterer: a ship putting shots on the core is a threat to answer even
+ * from the far side, ahead of one just drifting close.
+ *
+ * Read from the projectile pool now, not `Ship.beam`: since combat became a
+ * projectile the beam is a *mining* tell, so an attacker carving the core no
+ * longer carries a beam pointed at it — its shots do. A shot lives longer than
+ * the fire interval, so a continuously-firing attacker always has one in flight,
+ * and the detection never blinks between shots. `updateTurrets` runs after the
+ * ship fire step, so this tick's fresh shots are already visible here.
+ */
+function isAttackingPlanet(world: World, planet: Planet, ship: Ship): boolean {
+  const targetR = planetTargetRadius(planet);
+  for (const p of world.projectiles) {
+    if (!p.active || p.owner !== ship.id || p.kind !== 'ship') continue;
+    const speed = Math.sqrt(p.vel.x * p.vel.x + p.vel.y * p.vel.y);
+    if (speed < 1e-9) continue;
+    const dir = { x: p.vel.x / speed, y: p.vel.y / speed };
+    // How far the shot can still travel before it despawns — its remaining reach.
+    if (segmentHitsCircle(p.pos, dir, speed * p.life, planet.pos, targetR)) return true;
+  }
+  return false;
+}
+
+/** Whether the segment from `o` along unit `dir` for `len` passes within `r` of
+ *  `c` — the closest approach of the clamped segment to the circle centre. */
+function segmentHitsCircle(o: Vec2, dir: Vec2, len: number, c: Vec2, r: number): boolean {
+  let t = (c.x - o.x) * dir.x + (c.y - o.y) * dir.y;
+  if (t < 0) t = 0;
+  else if (t > len) t = len;
+  const px = o.x + dir.x * t - c.x;
+  const py = o.y + dir.y * t - c.y;
+  return px * px + py * py <= r * r;
+}
+
+/**
+ * The enemy ship a turret engages this tick — **sticky**, the "don't go crazy"
+ * rule (field report P1, §2), now scanned from the planet so far-side threats
+ * are visible (§1) and ranked so a core-attacker outranks a loiterer (§3).
+ *
+ * Detection is planet-centric for a sliding turret — a threat inside
+ * `planetThreatRadius` is a valid target even outside beam range of the turret's
+ * current rim spot, because the turret slides to reach it. A hand-built turret
+ * with no `orbitAngle` can't slide, so it keeps the old turret-centric `range`.
+ *
+ * The pick, in order: (1) a ship actively beaming the core outranks any loiterer
+ * regardless of distance; (2) within the same class the nearest wins; and (3)
+ * stickiness holds the current target until a same-class newcomer is closer by
+ * the `TURRET.targetHysteresis` factor (≈25%) — so equidistant enemies never
+ * make it flap. Priority (1) is not gated by hysteresis: an attacker appearing
+ * on the far side is switched to at once, and a nearby loiterer never steals a
+ * turret off the ship shooting the core.
+ */
+function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | null {
+  // A sliding turret measures threats from the planet centre; a fixed one (no
+  // `orbitAngle`) from itself, since it cannot slide to close the gap.
+  const sliding = turret.orbitAngle !== undefined;
+  const ref = sliding ? planet.pos : turret.pos;
+  const reach2 = sliding ? planetThreatRadius(planet) ** 2 : TURRET.range * TURRET.range;
+
+  // Best valid enemy this tick — attacker-first, then nearest — the switch
+  // candidate against the sticky current pick below.
   let best: Ship | null = null;
-  let bestD2 = range2;
+  let bestAtk = false;
+  let bestD2 = Infinity;
   for (const ship of world.ships) {
-    if (!ship.alive || ship.id === turret.owner || ship.spawnProtect > 0) continue;
-    const d2 = dist2(turret.pos, ship.pos);
-    if (d2 < bestD2) {
-      bestD2 = d2;
+    if (!ship.alive || ship.id === planet.owner || ship.spawnProtect > 0) continue;
+    const d2 = dist2(ref, ship.pos);
+    if (d2 > reach2) continue;
+    const atk = isAttackingPlanet(world, planet, ship);
+    if (best === null || (atk && !bestAtk) || (atk === bestAtk && d2 < bestD2)) {
       best = ship;
+      bestAtk = atk;
+      bestD2 = d2;
     }
   }
 
   // Is the turret's current pick still a valid target it may keep?
   const current = turret.targetId !== null ? shipOf(world, turret.targetId) : null;
-  const currentD2 = current ? dist2(turret.pos, current.pos) : Infinity;
   const currentValid =
     current !== null &&
     current.alive &&
-    current.id !== turret.owner &&
+    current.id !== planet.owner &&
     current.spawnProtect <= 0 &&
-    currentD2 <= range2;
+    dist2(ref, current.pos) <= reach2;
 
   if (!currentValid) return best;
   if (best === null || best.id === current!.id) return current;
 
-  // Both valid and different: only defect if the newcomer is meaningfully
-  // closer, i.e. within `hysteresis ×` the current target's distance.
+  // Priority class trumps distance and hysteresis: switch to an attacker over a
+  // loiterer at once, and never abandon an attacker for a merely-closer loiterer.
+  const curAtk = isAttackingPlanet(world, planet, current!);
+  if (bestAtk !== curAtk) return bestAtk ? best : current;
+
+  // Same class: only defect if the newcomer is meaningfully closer, i.e. within
+  // `hysteresis ×` the current target's distance.
+  const currentD2 = dist2(ref, current!.pos);
   const h = TURRET.targetHysteresis;
   return bestD2 <= currentD2 * h * h ? best : current;
+}
+
+/**
+ * Split a planet's turrets across distinct threats (field report P1, §4). After
+ * every turret has made its sticky pick, no two turrets should stack on one
+ * attacker while another valid threat goes unengaged — two turrets, two
+ * attackers on opposite sides, means one turret each.
+ *
+ * Deterministic greedy to a fixed point: while some valid threat has no turret
+ * on it and another threat carries two or more, move the over-covered turret
+ * *nearest by orbit angle* to the unengaged threat (slot breaks a tie) — the
+ * cheapest, most natural reassignment, and stable tick to tick because a turret
+ * that has slid onto a threat's bearing stays the nearest one for it. Only
+ * sliding turrets take part; a fixed turret cannot cover a far threat anyway.
+ */
+function splitThreats(world: World, planet: Planet): void {
+  const turrets = planet.turrets;
+  const reach2 = planetThreatRadius(planet) ** 2;
+
+  const threats: Ship[] = [];
+  for (const ship of world.ships) {
+    if (!ship.alive || ship.id === planet.owner || ship.spawnProtect > 0) continue;
+    if (dist2(planet.pos, ship.pos) <= reach2) threats.push(ship);
+  }
+  if (threats.length < 2) return; // nothing to spread across
+
+  // At most one move per uncovered threat, and each move covers one, so the
+  // turret count bounds the passes.
+  for (let pass = 0; pass < turrets.length; pass++) {
+    let moved = false;
+    for (const recip of threats) {
+      if (coverCount(turrets, recip.id) > 0) continue; // already engaged
+
+      const bearing = Math.atan2(recip.pos.y - planet.pos.y, recip.pos.x - planet.pos.x);
+      let donor: Turret | null = null;
+      let donorDelta = Infinity;
+      for (const t of turrets) {
+        if (t.hp <= 0 || t.orbitAngle === undefined || t.targetId === null) continue;
+        if (coverCount(turrets, t.targetId) < 2) continue; // only steal a doubled-up threat
+        const delta = Math.abs(shortestAngle(t.orbitAngle, bearing));
+        if (delta < donorDelta || (delta === donorDelta && donor !== null && t.slot < donor.slot)) {
+          donorDelta = delta;
+          donor = t;
+        }
+      }
+      if (donor !== null) {
+        donor.targetId = recip.id;
+        moved = true;
+        break; // recompute coverage from scratch
+      }
+    }
+    if (!moved) break;
+  }
+}
+
+/** Live sliding turrets on `targetId`. */
+function coverCount(turrets: Turret[], targetId: PlayerId | null): number {
+  let n = 0;
+  for (const t of turrets) {
+    if (t.hp > 0 && t.orbitAngle !== undefined && t.targetId === targetId) n++;
+  }
+  return n;
+}
+
+/** Shortest signed angle from `a` to `b`, in (-π, π]. */
+function shortestAngle(a: number, b: number): number {
+  let d = (b - a) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d < -Math.PI) d += 2 * Math.PI;
+  return d;
 }
 
 /**
@@ -675,75 +824,7 @@ function muzzleBeam(turret: Turret, target: Ship, aim: number): Beam {
   };
 }
 
-/** Take a slot from the pool, or grow it once. Growth is the only allocation
- *  the projectile system ever does, and it stops as soon as the pool reaches
- *  the match's peak concurrent shots (GDD §4.3: no per-frame allocation). */
-function fireProjectile(world: World, turret: Turret, aim: number): void {
-  const dx = Math.cos(aim);
-  const dy = Math.sin(aim);
-  const slot = takeProjectile(world);
-  // A recycled slot gets a *fresh* id: a renderer or snapshot encoder keying on
-  // id must never mistake this shot for the one that used the slot before it.
-  slot.id = world.nextEntityId++;
-  slot.owner = turret.owner;
-  slot.pos.x = turret.pos.x + dx * turret.radius;
-  slot.pos.y = turret.pos.y + dy * turret.radius;
-  slot.vel.x = dx * TURRET.projectileSpeed;
-  slot.vel.y = dy * TURRET.projectileSpeed;
-  slot.damage = PROJECTILE.damage;
-  slot.radius = PROJECTILE.radius;
-  slot.life = PROJECTILE.life;
-  slot.active = true;
-}
-
-function takeProjectile(world: World): Projectile {
-  for (const p of world.projectiles) {
-    if (!p.active) return p;
-  }
-  const fresh: Projectile = {
-    id: 0, // assigned per shot by `fireProjectile`
-    active: false,
-    owner: -1,
-    pos: { x: 0, y: 0 },
-    vel: { x: 0, y: 0 },
-    damage: 0,
-    radius: PROJECTILE.radius,
-    life: 0,
-  };
-  world.projectiles.push(fresh);
-  return fresh;
-}
-
-/**
- * Fly every live shot, expire it, and test it against enemy ships — the same
- * circle test as everything else (GDD §4.1). A projectile despawns on hit, on
- * expiry, or on leaving the arena; the slot returns to the pool.
- */
-export function updateProjectiles(world: World, dt: number): void {
-  for (const p of world.projectiles) {
-    if (!p.active) continue;
-
-    p.life -= dt;
-    if (p.life <= 0) {
-      p.active = false;
-      continue;
-    }
-
-    p.pos.x += p.vel.x * dt;
-    p.pos.y += p.vel.y * dt;
-
-    if (p.pos.x < 0 || p.pos.y < 0 || p.pos.x > world.bounds.width || p.pos.y > world.bounds.height) {
-      p.active = false;
-      continue;
-    }
-
-    for (const ship of world.ships) {
-      if (!ship.alive || ship.id === p.owner || ship.spawnProtect > 0) continue;
-      const rr = ship.radius + p.radius;
-      if (dist2(p.pos, ship.pos) > rr * rr) continue;
-      damageShip(world, ship, p.damage);
-      p.active = false;
-      break;
-    }
-  }
-}
+// Ship and turret projectiles — firing, flight, collision and the pool — live in
+// `./projectiles`, the single system both shooters share since the combat model
+// became projectiles (design amendment v0.2). `updateTurrets` above calls
+// `fireTurretProjectile`; `./step` runs `updateProjectiles` and the ship weapon.

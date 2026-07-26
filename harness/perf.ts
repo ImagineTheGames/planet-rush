@@ -118,14 +118,21 @@ export interface StressOptions {
  * own.
  */
 export function stressWorld(options: StressOptions = {}): World {
+  const requested = options.asteroids ?? STRESS_SCENE.asteroids;
   const world = createWorld({
     seed: options.seed ?? 1,
     players: Array.from({ length: STRESS_SCENE.ships }, (_, id) => ({
       id,
       shipClass: ShipClass.Vanguard,
     })),
-    asteroidCount: options.asteroids ?? STRESS_SCENE.asteroids,
+    asteroidCount: requested,
   });
+  // `createWorld` now seeds each planet's identical home field on top of the
+  // commons wave (fair-resources field rule v0.1.2), so the opening field is a
+  // little larger than `asteroidCount`. This is a synthetic profiling scene that
+  // wants an exact rock count — the home/commons mix is immaterial to frame
+  // cost — so trim back to exactly the requested number.
+  if (world.asteroids.length > requested) world.asteroids.length = requested;
 
   if (options.maxDefenses !== false) {
     for (const planet of world.planets) {

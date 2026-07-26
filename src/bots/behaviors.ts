@@ -274,7 +274,7 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
   if (!planet) return null;
   const intruder = homeIntruder(ctx);
   if (!intruder) return [go(ctx, orbit(ctx.self, planet.pos, GUARD_RADIUS)), fire(false)];
-  return engage(ctx, intruder.pos, 16, BEAM_RANGE * 0.6);
+  return engage(ctx, intruder.pos, 16, BEAM_RANGE * 0.6, intruder.vel);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,12 +287,15 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
  * turret it is {@link TURRET_STANDOFF} — outside the turret's reach and inside
  * the beam's (GDD §2.6).
  */
-export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number): readonly Action[] {
+export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, targetVel?: Vec2): readonly Action[] {
   const d = dist(ctx.self.pos, pos);
   const actions: Action[] = [
     go(ctx, standOff(ctx.self, pos, range)),
-    aimAt(ctx.self, pos, ctx.tuning.aimJitter, ctx.rng),
-    fire(canHit(ctx.self, pos, radius)),
+    // Lead a moving target so the projectile intercepts it (design amendment
+    // v0.2); a still target (a turret, a core) has no velocity and the aim is
+    // straight.
+    aimAt(ctx.self, pos, ctx.tuning.aimJitter, ctx.rng, targetVel),
+    fire(canHit(ctx.self, pos, radius, 0, targetVel)),
   ];
   // A bold character burns the boost closing the gap; a cautious one saves it
   // for the trip home. `caution` > 1 means "breaks off early" (`./personalities`).
@@ -302,7 +305,9 @@ export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number): r
 
 /** Attack a scored target at the stand-off its kind deserves. */
 export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
-  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, BEAM_RANGE * 0.6);
+  // A ship moves, so lead it (`target.vel`); a home does not, so the lead is a
+  // straight shot (design amendment v0.2).
+  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, BEAM_RANGE * 0.6, target.vel);
   return engage(ctx, target.pos, target.radius, SIEGE_STANDOFF);
 }
 

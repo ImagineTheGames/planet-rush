@@ -20,6 +20,8 @@ import {
   MAX_PROJECTILES,
   MAX_SHIPS,
   PROJECTILE_BYTES,
+  projIsShipShot,
+  projOwner,
   SHIP_BYTES,
   SHIP_FLAG,
   snapshotWorld,
@@ -120,6 +122,24 @@ describe('encode → decode against the sim', () => {
     );
 
     const decoded = decodeSnapshot(encodeWorldSnapshot(w));
+    // An untagged shot decodes as a turret shot (meta = owner, kind bit clear).
     expect(decoded.projectiles).toEqual([{ id: 1, posX: 120, posY: -40, meta: 3 }]);
+  });
+
+  it('tags a ship weapon shot in the reserved meta bit, turret shots clear it (amendment v0.2)', () => {
+    const w = world();
+    w.projectiles.push(
+      { id: 1, active: true, owner: 2, pos: { x: 10, y: 10 }, vel: { x: 1, y: 0 }, damage: 1, radius: 5, life: 1, kind: 'ship' },
+      { id: 2, active: true, owner: 5, pos: { x: 20, y: 20 }, vel: { x: 1, y: 0 }, damage: 1, radius: 4, life: 1, kind: 'turret' },
+    );
+
+    const [ship, turret] = decodeSnapshot(encodeWorldSnapshot(w)).projectiles;
+    // Same 6-byte record — the kind rides a previously-reserved bit, no byte cost.
+    expect(projOwner(ship!.meta)).toBe(2);
+    expect(projIsShipShot(ship!.meta)).toBe(true);
+    expect(projOwner(turret!.meta)).toBe(5);
+    expect(projIsShipShot(turret!.meta)).toBe(false);
+    // And the layout is still exactly the measured worst case.
+    expect(WORST_CASE_BYTES).toBe(510);
   });
 });

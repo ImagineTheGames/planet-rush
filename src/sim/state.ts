@@ -19,16 +19,16 @@ import type { Beam, PlayerId, ShipClass, Vec2 } from '@shared/types';
 import {
   CORE_HP,
   PLANET,
+  RESOURCE_FIELD,
   SHIELD,
   SHIP_RADIUS,
   SPAWN_PROTECTION_S,
   STARTING_ORE,
   WAVE,
-  WORLD_EDGE_MARGIN,
-  WORLD_SIZE,
 } from './constants';
+import { getMap } from './maps';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
-import { spawnWave } from './waves';
+import { spawnHomeFields, spawnWave } from './waves';
 
 // ---------------------------------------------------------------------------
 // Entities
@@ -81,10 +81,23 @@ export interface Ship {
   eliminated: boolean;
   /** Collision radius. */
   radius: number;
-  /** Public beam geometry for the tick it is firing, else `null` (GDD §4.1).
-   *  The sim's raycast already finds the nearest hit for damage/mining; this
-   *  exposes it so the renderer stops the beam at what it strikes. */
+  /** Public **mining**-beam geometry for the tick it is cutting a rock, else
+   *  `null` (GDD §4.1, design amendment v0.2). The sim's raycast finds the
+   *  nearest asteroid for mining; this exposes it so the renderer stops the beam
+   *  at the rock it strikes. Ship-vs-ship/structure *weapon* fire no longer rides
+   *  this beam — it is a pooled projectile now (`./projectiles`) — so `beam` is a
+   *  pure mining tell: non-null only when this ship is actually mining. */
   beam: Beam | null;
+  /** Seconds until the ship's weapon may loose its next projectile (0 = ready).
+   *  The weapon fires on `SHIP_WEAPON.fireInterval`, the projectile analogue of
+   *  the old continuous beam's per-tick damage (design amendment v0.2). Match
+   *  state like everything else; reset to 0 on respawn.
+   *
+   *  Optional so the `Ship` literals other agents build (bot/render/net/harness
+   *  fixtures) keep compiling — an absent cooldown reads as ready-to-fire (0), the
+   *  same backward-compatible discipline as `Turret.muzzle`. The sim's own ships
+   *  always carry it (`makeShip` sets it). */
+  weaponCooldown?: number;
 }
 
 /** A minable asteroid — the economy (GDD §2.3, §5.5). */
@@ -100,6 +113,19 @@ export interface Asteroid {
   crackStage: number;
   /** Fractional ore mined but not yet emitted as a whole chunk. */
   mineBuffer: number;
+  /**
+   * Which field this rock belongs to (field rule v0.1.2, `RESOURCE_FIELD`): the
+   * owner slot of the home neighbourhood it was stamped for, or `null` for the
+   * contested commons. It is the fairness invariant made legible — the fairness
+   * test groups home fields by owner and sums the commons by `null`, and a
+   * renderer may tint "your neighbourhood" apart from the centre.
+   *
+   * Optional so the asteroid literals other agents build (net wire-decode, bot
+   * fixtures, render tests) keep compiling — a rock with no `home` field simply
+   * predates the tag; the sim's own spawners (`./waves`) always set it. Same
+   * backward-compatible discipline as `Turret.orbitAngle` / `Turret.muzzle`.
+   */
+  home?: PlayerId | null;
 }
 
 /** A drifting ore chunk, tractor-collected by proximity (GDD §2.3). */
@@ -262,6 +288,20 @@ export interface Projectile {
   radius: number;
   /** Seconds of flight left before it despawns. */
   life: number;
+  /**
+   * What fired this shot (design amendment v0.2): a `'ship'` weapon projectile or
+   * a `'turret'` defensive shot. Both fly and die the same way; the difference is
+   * the target list — a ship shot is siege-capable (it collides with enemy ships,
+   * turrets, shields and cores), a turret shot hits only enemy ships, keeping
+   * p1-14's turret behaviour intact. It also lets the snapshot tint the two shots
+   * apart in the reserved `meta` bits, and the renderer size them differently.
+   *
+   * Optional so the pooled `Projectile` literals other code builds (net wire
+   * fixtures, the perf harness's `topUpProjectiles`) keep compiling — an
+   * untagged shot is treated as a `'turret'` shot, exactly the pre-amendment
+   * behaviour, the same backward-compatible discipline as `Turret.muzzle`.
+   */
+  kind?: 'ship' | 'turret';
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +405,15 @@ export interface PlayerSpec {
 export interface WorldConfig {
   readonly seed: number;
   readonly players: readonly PlayerSpec[];
-  /** Play bounds (world units). */
+  /**
+   * Which ratified layout to build (`./maps`) — the arena bounds and where the
+   * home planets sit. Defaults to `octagon` ("The Ring"), the hardwired default
+   * until the picker (m8-02) lands. An unknown id falls back to the default, so
+   * a stale saved key can never crash boot.
+   */
+  readonly mapId?: string;
+  /** Play bounds (world units). Overrides the map's own bounds — the QA harness
+   *  runs deliberately cramped worlds. */
   readonly bounds?: Bounds;
   /** Asteroids per wave, overriding `WAVE.asteroidsPerWave`. Wave 1 is placed
    *  at construction, so this is also the opening field's rock count; the
@@ -400,6 +448,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     eliminated: false,
     radius: SHIP_RADIUS,
     beam: null,
+    weaponCooldown: 0,
   };
 }
 
@@ -447,24 +496,28 @@ function initialMatch(): MatchState {
  * byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
-  const bounds: Bounds = config.bounds ?? { width: WORLD_SIZE, height: WORLD_SIZE };
+  // The layout owns the arena and where the homes sit (`./maps`); everything
+  // downstream is the same code for every map. A caller may override the map's
+  // own bounds (the QA harness runs cramped worlds).
+  const map = getMap(config.mapId);
+  const bounds: Bounds = config.bounds ?? map.bounds;
   const cx = bounds.width / 2;
   const cy = bounds.height / 2;
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
+  // The commons scatter radius is a fraction of the arena, independent of the
+  // map's planet arrangement — mid-map is the centre for every layout.
   const ringRadius = halfMin * 2 * PLANET.ringFraction;
-  // Planets sit outboard of the ship ring, and NOTHING hugs the wall: the
-  // outermost planet point clears the bounds by `WORLD_EDGE_MARGIN` (field
-  // report P1). The clamp keeps the ring wholly inside the arena — with the
-  // margin — even on the cramped worlds the QA harness builds on purpose.
-  const planetRing = Math.min(
-    ringRadius + PLANET.orbitOffset,
-    halfMin - PLANET.radius - WORLD_EDGE_MARGIN,
-  );
 
-  // Ships around the ring, one per lobby slot — deterministic, no RNG.
+  // The map's per-slot placements: planet centre, inboard ship spawn, spoke
+  // angle. Deterministic geometry (no RNG); the seed threads into the asteroid
+  // scatter below, not the layout. NOTHING hugs the wall — each map sizes its
+  // outermost planets to clear the bounds by `WORLD_EDGE_MARGIN` (field report
+  // P1), and the spawners clamp everything else through the same margin.
+  const placements = map.planets(config.seed, config.players.length, bounds);
+
+  // Ships spawn orbiting their planet, one per lobby slot — deterministic, no RNG.
   const ships: Ship[] = config.players.map((spec, i) => {
-    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
-    const pos = { x: cx + Math.cos(theta) * ringRadius, y: cy + Math.sin(theta) * ringRadius };
+    const pos = placements[i]!.ship;
     const ship = makeShip(spec, pos);
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
@@ -473,29 +526,35 @@ export function createWorld(config: WorldConfig): World {
 
   // One home planet per slot, on the same spoke as its ship, outboard of it.
   const planets: Planet[] = config.players.map((spec, i) => {
-    const theta = (2 * Math.PI * i) / Math.max(1, config.players.length);
-    const pos = { x: cx + Math.cos(theta) * planetRing, y: cy + Math.sin(theta) * planetRing };
-    return makePlanet(spec, i, pos, theta);
+    const place = placements[i]!;
+    return makePlanet(spec, i, place.planet, place.angle);
   });
 
   const world: World = {
     time: 0,
     tick: 0,
     rngState: config.seed >>> 0,
-    nextEntityId: 0, // wave 1's rocks take ids [0, count); everything continues from there
+    // The home fields take the first ids, then wave 1's commons; everything else
+    // continues from there.
+    nextEntityId: 0,
     ships,
     asteroids: [],
     chunks: [],
     planets,
     projectiles: [],
     bounds,
-    fieldRadius: ringRadius * 0.7,
+    // The commons scatter disc — a fraction of the ring, kept clear of every
+    // home's measure radius so the two fields never overlap (`RESOURCE_FIELD`).
+    fieldRadius: ringRadius * RESOURCE_FIELD.commonsRadiusFraction,
     asteroidsPerWave: config.asteroidCount ?? WAVE.asteroidsPerWave,
     match: initialMatch(),
   };
 
-  // Wave 1 is the opening field — same spawner, same schedule, so the rock a
-  // player mines at t=0 and the rock that lands at t=600 come from one code path.
+  // The fair opening layout, before the fight begins (field rule v0.1.2): the
+  // identical per-planet home neighbourhoods first, then wave 1 of the contested
+  // commons. Waves 2..5 land on the metronome — the rock a player mines at t=0
+  // and the rock that lands at t=600 come from one code path (`./waves`).
+  spawnHomeFields(world);
   spawnWave(world);
   return world;
 }

@@ -12,6 +12,15 @@
  * asteroids, turrets, shields, wrecks — are events on join and on change, so
  * they cost nothing per tick and are deliberately absent from this layout.
  *
+ * The projectile stream carries **both shooters** now (design amendment v0.2):
+ * ship-vs-ship / ship-vs-structure combat became a pooled projectile, so ship
+ * weapon shots ride the same `world.projectiles` pool the turret guns always did
+ * and the same 6-byte record streams them. The worst case was re-derived rather
+ * than assumed (see {@link MAX_PROJECTILES}) — it still fits the measured layout,
+ * so the byte cost is deliberately unchanged. What the amendment adds is a shot
+ * *kind* bit in the previously-reserved `meta` bits, at zero byte cost, so the
+ * renderer can tint/size a ship shot apart from a turret shot (see {@link SHOT_META}).
+ *
  * Everything is quantized to integers: the client renders at 60 fps and
  * interpolates between snapshots broadcast at 30 Hz (GDD §4.2), so sub-unit
  * precision is never worth its bytes. Velocity *is* sent, so a client can
@@ -43,6 +52,23 @@ export const PROJECTILE_BYTES = 6;
 
 /** GDD §4.2/§4.3 entity caps that bound one snapshot: 8 slots, 64 shots. */
 export const MAX_SHIPS = 8;
+/**
+ * Worst-case concurrent shots in one snapshot. Re-derived for two shooters after
+ * combat became a projectile (design amendment v0.2):
+ *
+ *  - **Turrets** — 4 per planet × 8 planets = 32, each with a shot life
+ *    (`TURRET.range / TURRET.projectileSpeed` ≈ 0.34 s) shorter than its fire
+ *    interval (0.5 s), so at most one in flight per turret: **≤ 32**.
+ *  - **Ships** — 8, firing on `SHIP_WEAPON.fireInterval` (0.35 s) with a shot
+ *    life (`range / speed` ≈ 0.58 s) a little over one interval, so at most two
+ *    in flight per ship: **≤ 16**.
+ *
+ * Peak ≈ 48, comfortably under this 64-slot budget, so the measured wire layout
+ * (and its 510-byte worst case) is unchanged by the amendment. The bound is a
+ * hard cap regardless: `snapshotWorld` streams at most this many and drops any
+ * tail, so a snapshot can never exceed {@link WORST_CASE_BYTES} even if a future
+ * retune pushes the real peak higher (that would be the signal to raise this).
+ */
 export const MAX_PROJECTILES = 64;
 
 /** Worst-case snapshot payload, in bytes — the number bandwidth is billed
@@ -62,6 +88,27 @@ export const SHIP_FLAG = {
   /** This player's home core is gone: out of the match, never respawning (§2.7). */
   eliminated: 1 << 3,
 } as const;
+
+/** Projectile `meta` byte layout. The owner slot lives in the low 3 bits; the
+ *  shot-kind bit was one of the bits the spike reserved for exactly this
+ *  (design amendment v0.2). Named so a bare `0b1011` in a decoder is readable. */
+export const SHOT_META = {
+  /** Owner player slot, 0..7, in bits 0..2. */
+  ownerMask: 0x7,
+  /** Bit 3 set ⇒ a ship weapon shot; clear ⇒ a turret shot. Lets the renderer
+   *  size/tint the two apart without a second query (all shooters, GDD §2.6). */
+  shipKind: 1 << 3,
+} as const;
+
+/** Owner slot carried by a projectile `meta` byte. */
+export function projOwner(meta: number): number {
+  return meta & SHOT_META.ownerMask;
+}
+
+/** Whether a projectile `meta` byte marks a ship weapon shot (vs a turret shot). */
+export function projIsShipShot(meta: number): boolean {
+  return (meta & SHOT_META.shipKind) !== 0;
+}
 
 /** Angle quantization: a full turn over the u16 range (~0.005° per step). */
 const ANGLE_SCALE = 65536 / (2 * Math.PI);
@@ -93,7 +140,9 @@ export interface ProjSnap {
   id: number;
   posX: number;
   posY: number;
-  /** `owner` in bits 0..2; bits 3..7 reserved for shot kind. */
+  /** `owner` in bits 0..2; bit 3 is the ship-vs-turret shot-kind flag (design
+   *  amendment v0.2); bits 4..7 still reserved. Decode with {@link projOwner} /
+   *  {@link projIsShipShot}. */
   meta: number;
 }
 
@@ -169,7 +218,9 @@ export function snapshotWorld(world: World): { ships: ShipSnap[]; projectiles: P
       id: slot & 0xff,
       posX: quantize(p.pos.x),
       posY: quantize(p.pos.y),
-      meta: p.owner & 0x7,
+      // Owner in bits 0..2; the shot-kind bit marks a ship weapon shot so the
+      // renderer can draw it apart from a turret shot (design amendment v0.2).
+      meta: (p.owner & SHOT_META.ownerMask) | (p.kind === 'ship' ? SHOT_META.shipKind : 0),
     });
   }
 

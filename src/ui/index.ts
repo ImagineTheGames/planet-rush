@@ -44,6 +44,27 @@ export type { WaveClock } from './wave-clock';
 export { oreHudModel, oreFlashOn } from './ore-hud';
 export type { OreHudModel } from './ore-hud';
 
+// --- Ore split (field rule): banked TOTAL top-left, HELD hold under the ship ---
+//
+// The held-ore squares that used to sit top-left move under the local ship as a
+// compact, pooled, screen-space indicator (same discipline as the health bar),
+// leaving the top-left to show only the banked TOTAL — so the two ore numbers can
+// never be confused. `ore-hold` is the pure model + geometry; `ore-hold-view` is
+// the thin Pixi layer, which the `Hud` owns and registers under `full`.
+export {
+  holdShown,
+  oreHoldModel,
+  oreHoldRowWidth,
+  oreHoldBounds,
+  ORE_HOLD_PIP,
+  ORE_HOLD_PIP_GAP,
+  ORE_HOLD_SHIP_GAP,
+} from './ore-hold';
+export type { OreHold } from './ore-hold';
+
+export { OreHoldView, ORE_HOLD_ID, ORE_HOLD_ANCHOR } from './ore-hold-view';
+export type { DrawnOreHold } from './ore-hold-view';
+
 export { controlsStripRows, showControlsStrip } from './controls-strip';
 
 // --- Build & Upgrade wheel (GDD §2.5) --------------------------------------
@@ -438,6 +459,7 @@ export {
   endOfMatchModel,
 } from './end-of-match';
 export type {
+  DeathCause,
   EndButton,
   EndButtonView,
   EndKind,
@@ -494,6 +516,46 @@ export type {
 } from './main-menu';
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
+
+// --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
+//
+// Four cards on the PLAY flow, each a mini layout preview drawn from the
+// registry's own planet positions so the picture can never drift from the board.
+// `octagon` preselected; `diamond` carries a VETERAN tag. The chosen id is
+// persisted (same seam as the fire mode) and fed to `bootOfflineMatch(seed, mapId)`.
+// Same three-piece shape as every screen here: a pure model with co-located
+// geometry (`./map-picker`) and a thin Pixi view (`./map-picker-view`).
+
+export {
+  MAP_STORAGE_KEY,
+  MAP_PICKER_ID,
+  MAP_ORDER,
+  MAP_PREVIEW_SLOTS,
+  MAP_PREVIEW_SEED,
+  VETERAN_MAP_ID,
+  MAP_CARD_GAP,
+  MAP_CARD_MIN_WIDTH,
+  MAP_CARD_MAX_WIDTH,
+  MAP_CARD_MIN_HEIGHT,
+  MAP_CARD_MAX_HEIGHT,
+  mapPickerModel,
+  mapPickerLayout,
+  mapPickerHitTest,
+  mapPreview,
+  normalizeMapId,
+  mapIndexOf,
+  mapIdAt,
+  registryPlanets,
+} from './map-picker';
+export type {
+  MapCardModel,
+  MapCardShape,
+  MapPickerLayout,
+  MapPickerModel,
+  MapPreview,
+} from './map-picker';
+
+export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
 
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
