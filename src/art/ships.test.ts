@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { asciiMask, coverage, jaccard, rasterize } from './raster';
-import { HULLS, SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
+import { damageStateFor, HULLS, SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
 import { IDENTITY_COLORS, PALETTE, playerColor } from './palette';
 import { spriteColors } from './shapes';
 
@@ -143,6 +143,86 @@ describe('ship liveries (style-guide §3)', () => {
     for (const c of SHIP_CLASSES) {
       for (const color of spriteColors(shipHulkSprite(c))) {
         expect(IDENTITY_COLORS.has(color)).toBe(false);
+      }
+    }
+  });
+});
+
+describe('ship damage states (GDD §2.11 armor, §3.6 tells)', () => {
+  it('bands remaining hull into three states, thirds, clamped', () => {
+    expect(damageStateFor(1)).toBe('ok');
+    expect(damageStateFor(0.7)).toBe('ok');
+    expect(damageStateFor(0.5)).toBe('scarred');
+    expect(damageStateFor(0.34)).toBe('scarred');
+    expect(damageStateFor(0.2)).toBe('critical');
+    expect(damageStateFor(0)).toBe('critical');
+  });
+
+  it('leaves a healthy hull byte-for-byte what it always was', () => {
+    for (const c of SHIP_CLASSES) {
+      // The default and the explicit `ok` are the same sprite, with the same
+      // pooled name — no damage suffix, so the existing texture is untouched.
+      expect(shipSprite({ shipClass: c, playerId: 0, damage: 'ok' })).toEqual(
+        shipSprite({ shipClass: c, playerId: 0 }),
+      );
+      expect(shipSprite({ shipClass: c, playerId: 0 }).name).toBe(`ship/${c}/p0`);
+    }
+  });
+
+  it('shows escalating damage: ok → scarred → critical each add marks', () => {
+    for (const c of SHIP_CLASSES) {
+      const ok = shipSprite({ shipClass: c, playerId: 0 });
+      const scarred = shipSprite({ shipClass: c, playerId: 0, damage: 'scarred' });
+      const critical = shipSprite({ shipClass: c, playerId: 0, damage: 'critical' });
+      expect(scarred).not.toEqual(ok);
+      expect(critical).not.toEqual(scarred);
+      expect(scarred.shapes.length).toBeGreaterThan(ok.shapes.length);
+      expect(critical.shapes.length).toBeGreaterThan(scarred.shapes.length);
+      // The pool key changes with the band, so a damaged ship gets its own texture.
+      expect(scarred.name).toBe(`ship/${c}/p0/scarred`);
+      expect(critical.name).toBe(`ship/${c}/p0/critical`);
+    }
+  });
+
+  it('is a tell, not a mask — steel and player identity still read through it', () => {
+    for (const c of SHIP_CLASSES) {
+      for (const damage of ['scarred', 'critical'] as const) {
+        const def = shipSprite({ shipClass: c, playerId: 3, damage });
+        const material = def.shapes.filter((s) => s.role === 'material' && s.fill);
+        expect(material.some((s) => s.fill!.color === PALETTE.hullSteel)).toBe(true);
+        expect(def.shapes.some((s) => s.role === 'identity')).toBe(true);
+        // No damage mark ever smuggles player colour onto a material shape (§3.2).
+        for (const s of material) expect(IDENTITY_COLORS.has(s.fill!.color)).toBe(false);
+      }
+    }
+  });
+
+  it('reserves the breach glow for critical, and paints it as danger (§2)', () => {
+    for (const c of SHIP_CLASSES) {
+      const scarred = shipSprite({ shipClass: c, playerId: 0, damage: 'scarred' });
+      const critical = shipSprite({ shipClass: c, playerId: 0, damage: 'critical' });
+      // Scorch alone is cold steel — no threat red until the hull is breached.
+      expect(scarred.shapes.some((s) => s.role === 'danger')).toBe(false);
+      const wounds = critical.shapes.filter((s) => s.role === 'danger');
+      expect(wounds.length).toBeGreaterThan(0);
+      for (const w of wounds) expect(w.fill?.color).toBe(PALETTE.threatRed);
+    }
+  });
+
+  it('never lets damage touch the silhouette — recognition survives being on fire', () => {
+    for (const c of SHIP_CLASSES) {
+      // The 24px test subject is the silhouette, which takes no damage param;
+      // its shape count stays equal to the plate count regardless.
+      expect(shipSilhouette(c).shapes).toHaveLength(HULLS[c].plates.length);
+    }
+  });
+
+  it('is deterministic under damage — same options, deep-equal sprite', () => {
+    for (const c of SHIP_CLASSES) {
+      for (const damage of ['scarred', 'critical'] as const) {
+        expect(shipSprite({ shipClass: c, playerId: 2, damage })).toEqual(
+          shipSprite({ shipClass: c, playerId: 2, damage }),
+        );
       }
     }
   });
