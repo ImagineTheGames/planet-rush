@@ -67,6 +67,7 @@ import {
 } from '@platform/orientation';
 import type { RootTransform } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
+import { createBrowserHaptics } from '@platform/haptics';
 import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -152,6 +153,18 @@ import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
 
 const LOCAL_PLAYER = 0;
+
+// Haptics feel tuning (field request v0.2.2; TUNABLE — feel owns these). A hull
+// change under this many HP is noise, not a hit. `hit` debounces to one knock per
+// cooldown under sustained fire; `alarm` accumulates base damage into a pressure
+// gauge that decays each frame, rings once the assault outpaces the decay, and
+// re-arms on a cadence so it pulses rather than chatters.
+const HAPTIC_HP_EPSILON = 0.001;
+const HAPTIC_HIT_COOLDOWN_MS = 250;
+const HAPTIC_ALARM_DECAY = 0.9;
+const HAPTIC_ALARM_TRIGGER = 40;
+const HAPTIC_ALARM_REARM_MS = 2500;
+
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
 /** Where the last hull picked in the lobby is remembered, so a returning player
  *  finds their choice pre-selected (GDD §2.11 — "persist last choice"). Same
@@ -184,6 +197,14 @@ async function boot(): Promise<void> {
   console.info(`WebGL available: ${gl.api}`);
 
   const platform = createBrowserPlatform();
+
+  // Vibration (field request v0.2.2; haptics.ts). One service behind the seam —
+  // gameplay names an event (`haptic('hit')`), the platform decides whether a
+  // motor exists, whether the player left it on, and what pattern to play. A silent
+  // no-op on desktop/iOS. Persists its toggle through the same storage seam as
+  // every other setting; the settings screen reads `haptics.isSupported()` to hide
+  // the toggle where a motor can't exist.
+  const haptics = createBrowserHaptics(platform.storage);
 
   // Dev flags (?debug=1, ?freeze=1). Off in a normal build — everything gated on
   // `flags.debug` below is zero-cost when the query string is absent.
@@ -569,6 +590,22 @@ async function boot(): Promise<void> {
   /** Any wheel order placed this match — retires the SPEND onboarding prompt. */
   let hasOrdered = false;
 
+  // --- Haptics event detection (field request v0.2.2). `feedHaptics` derives the
+  //     three combat vibrations — you-were-hit, base-under-attack, core-lost — from
+  //     the same live sim values the HUD reads, once per rendered frame. State here,
+  //     the function down by `feedHud`. `null` means "no baseline yet" (first frame
+  //     of a match / after a rematch), so a fresh full-HP world never false-fires.
+  let hapticPrevHull: number | null = null;
+  let hapticPrevDefense: number | null = null;
+  let hapticWasEliminated = false;
+  /** Last time a `hit` fired — debounces sustained fire into one knock, not a buzz
+   *  every frame. `alarmPressure` accumulates base damage and decays, so a stray
+   *  shot never rings the alarm but a sustained assault does (mirrors the audio
+   *  alarm's intent; the pattern is the tactile half of it). */
+  let hapticLastHitMs = 0;
+  let hapticAlarmPressure = 0;
+  let hapticLastAlarmMs = 0;
+
   // Drawn-geometry scratch, overwritten per press (never per frame): the hit
   // targets are computed from the very functions `src/ui` draws the wheel and
   // the panel with, so a press lands on the wedge the player actually sees.
@@ -602,7 +639,10 @@ async function boot(): Promise<void> {
     // and it always consumes the event.
     if (endOverlay.visible) {
       const target = endOverlay.hitTest(lp.x, lp.y);
-      if (target) handleEndTarget(target.kind);
+      if (target) {
+        haptics.haptic('tap');
+        handleEndTarget(target.kind);
+      }
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -613,6 +653,7 @@ async function boot(): Promise<void> {
     // so re-entering fullscreen from here is legal. Consumes the event so the tap
     // doesn't also engage a stick under it.
     if (fsAffordance.visible && fsAffordance.hitTest(lp.x, lp.y, w, h)) {
+      haptics.haptic('tap');
       fullscreen.enter();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -625,6 +666,7 @@ async function boot(): Promise<void> {
     // a button that is actually there.
     const build = buildButtonRect(isTouch, buildVisible, w, h);
     if (build && inRect(pressPoint, build)) {
+      haptics.haptic('tap');
       buildWheel.toggle();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -641,6 +683,7 @@ async function boot(): Promise<void> {
     panelLayout.height = size.height;
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
+      haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
       e.stopImmediatePropagation();
       e.preventDefault();
     }
@@ -749,6 +792,10 @@ async function boot(): Promise<void> {
 
       renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
       feedHud();
+      // Combat haptics (field request v0.2.2): read the same core/shield/hull
+      // values feedHud just pulled and buzz on hit / under-attack / core-lost. A
+      // silent no-op where there's no motor or the player switched it off.
+      feedHaptics(nowMs);
       // Health bars over every non-local combat entity (GDD §2.2). Fed AFTER
       // renderer.draw so the camera transform is current: each combatant's world
       // position is projected to the same screen space the bars draw in. This is
@@ -971,7 +1018,10 @@ async function boot(): Promise<void> {
     // Four segments spend on the spot; the fifth opened a screen and never
     // reaches here (GDD §2.5). The sim validates every one of them again —
     // ownership, docking, cost, caps — and refuses on its own terms.
-    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, TRACK_ORDER)) hasOrdered = true;
+    if (writeWheelOrders(buildWheel, merged, WHEEL_ORDER, TRACK_ORDER)) {
+      hasOrdered = true;
+      haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
+    }
   }
 
   /**
@@ -1034,6 +1084,70 @@ async function boot(): Promise<void> {
     hudFrame.maxHull = ship.maxHull;
     hudFrame.shipRadius = ship.radius;
     hudFrame.shipFiring = ship.firing;
+  }
+
+  /**
+   * Derive the three combat haptics from live sim state, once per rendered frame
+   * (field request v0.2.2). The service owns *whether* the motor fires (support,
+   * the toggle, visibility, the post-death hush); this only decides *when* an
+   * event happened, from the same core/shield/turret/hull values the HUD reads:
+   *
+   *  - **death** — your seat entered the elimination list this frame. Fires once
+   *    on the rising edge; the service then holds the motor quiet for three
+   *    seconds, so no `hit`/`alarm` stutters over the top.
+   *  - **hit** — your ship's hull fell since last frame, debounced so a stream of
+   *    shots is one knock, not a per-frame buzz.
+   *  - **alarm** — your base's defence (core + shields + turrets) is falling in a
+   *    *sustained* way. Damage feeds a pressure gauge that decays each frame, so a
+   *    lone stray shot bleeds off before it triggers but a real assault rings it —
+   *    the tactile half of the under-attack audio alarm (GDD §2.2), re-armed on a
+   *    cadence. This is a feel heuristic (framerate-sensitive by design), never the
+   *    authoritative alarm — that stays `src/ui`'s.
+   */
+  function feedHaptics(nowMs: number): void {
+    const eliminated = world.match.eliminated.includes(LOCAL_PLAYER);
+    if (eliminated && !hapticWasEliminated) haptics.haptic('death');
+    hapticWasEliminated = eliminated;
+    if (eliminated) {
+      // Nothing left to feel; drop baselines so a rematch starts clean (a full-HP
+      // world would otherwise read as a giant heal, harmless, but reset is tidier).
+      hapticPrevHull = null;
+      hapticPrevDefense = null;
+      hapticAlarmPressure = 0;
+      return;
+    }
+
+    const ship = world.ships.find(isLocalShip);
+    if (ship) {
+      if (
+        hapticPrevHull !== null &&
+        ship.hull < hapticPrevHull - HAPTIC_HP_EPSILON &&
+        nowMs - hapticLastHitMs >= HAPTIC_HIT_COOLDOWN_MS
+      ) {
+        haptics.haptic('hit');
+        hapticLastHitMs = nowMs;
+      }
+      hapticPrevHull = ship.hull;
+    } else {
+      hapticPrevHull = null;
+    }
+
+    const planet = planetOf(world, LOCAL_PLAYER);
+    if (planet) {
+      const defense = planet.coreHp + shieldPool(planet) + turretPool(planet);
+      if (hapticPrevDefense !== null && defense < hapticPrevDefense - HAPTIC_HP_EPSILON) {
+        hapticAlarmPressure += hapticPrevDefense - defense;
+      }
+      hapticAlarmPressure *= HAPTIC_ALARM_DECAY; // stray shots bleed off before they ring
+      if (hapticAlarmPressure >= HAPTIC_ALARM_TRIGGER && nowMs - hapticLastAlarmMs >= HAPTIC_ALARM_REARM_MS) {
+        haptics.haptic('alarm');
+        hapticLastAlarmMs = nowMs;
+        hapticAlarmPressure = 0;
+      }
+      hapticPrevDefense = defense;
+    } else {
+      hapticPrevDefense = null;
+    }
   }
 
   /**
