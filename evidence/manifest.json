@@ -438,5 +438,45 @@
     "image": "images/map-diamond-fields.png",
     "title": "Diamond home-field invariant — an OUTER and an INNER planet with congruent fields",
     "attestation": "Same frozen diamond frame, cropped on the local OUTER-N planet and the adjacent INNER-NE planet with the space inboard of each. WHAT IS ON SCREEN: two player-coloured planets at clearly DIFFERENT distances from the centre (one outer, one inner), and inboard of EACH a small cluster of grey asteroids of the same tight two-lobe character. Despite the asymmetric ground, each home carries the same field stamped inboard toward the commons — the p1-09 resource-fairness invariant holding even on the deliberately unfair-in-position veteran map (unfair in ground, never in ore). VERIFIED."
+  },
+  {
+    "id": "ore-hud-under-ship",
+    "title": "Ore HUD split — held ore UNDER the ship, TOTAL top-left (mining)",
+    "area": "hud",
+    "image": "images/ore-hud-mine.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Live desktop boot (?debug=1, 1280x800). The local steel-triangle ship sits at screen centre (the follow camera holds it there). Directly UNDER the ship is a compact row of FIVE filled yellow squares — the held-ore indicator, moving with the ship, not in the corner. Top-left reads the label 'TOTAL' with a yellow '3' beside the home minimap. The two numbers are DISTINCT (5 held under the ship vs 3 banked top-left) and both match the sim read back through window.__oreHudStage this same frame: mine(5) staged cargo=5/banked=3; the HUD drew hold {filled:5, slots:5, x:640 = viewport centre, y:423 = below the ship}; total()=3; readout {cargo:5, banked:3}. A 'Hold full — fly home and press E' hint shows bottom-right. This proves the field rule on a REAL boot: ore held on the ship is drawn under the ship; the top-left is the banked TOTAL. Corroborated by the full-frame capture images/ore-hud-mine-full.png (whole 1280x800 viewport, one shot: 'TOTAL 3' top-left beside the minimap AND the five filled held squares under the centre ship).",
+    "verdict": "verified"
+  },
+  {
+    "id": "ore-hud-deposit",
+    "title": "Ore HUD split — hold drains under the ship while the TOTAL rises (docking)",
+    "area": "hud",
+    "image": "images/ore-hud-dock.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Same live boot, moments later: the ship has docked at its home planet (dark-blue disc, blue shield ring, green+yellow core) and the sim is auto-draining the hold into the bank. Beside/under the ship the indicator now shows ONE filled yellow square followed by five empty outlined slots — the hold drained from 6 toward 0 — and a single yellow ore-courier dot is in flight between ship and planet. Top-left now reads 'TOTAL 7' (up from 3). The two numbers are distinct and both track the live sim: dock(6) staged cargo=6/banked=3; the captured mid-drain frame read hold {filled:1, slots:6}, total()=7, readout {cargo:1.97, banked:7.03}. This proves the second half of the rule — the under-ship held count DRAINS while the top-left TOTAL RISES by the deposited ore, two independent numbers from one sim source. Corroborated by the full-frame capture images/ore-hud-dock-full.png (whole viewport, one shot: 'TOTAL 7' top-left AND the drained under-ship indicator with a courier dot in flight to the planet).",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-far-side-engage",
+    "title": "Turret slides around the planet to engage a FAR-SIDE attacker",
+    "area": "match",
+    "image": "images/turret-far-side-engage.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "Live boot (?debug=1, unfrozen). A turret was built on the LOCAL home planet — mount slot 0, which is the EAST rim (turretHomeAngle = planet.angle = 0; planet centre world x=2058, east mount x≈2146). An attacker was then parked on the planet's WEST side (world x≈1888, due west of centre) via __healthbarStage.damageEnemy — the FAR side, opposite the mount, outside beam range of the east spot but inside the planet-centric threat radius. In the crop the grey turret disc has SLID ~180° around the planet body and now sits on the WEST rim (grey circle at the planet's left edge), directly between the planet and the west attacker (teal triangle with a cyan health bar just to its left); my own ship is far left. The window.__planetRush.beams instrument, sampled through the slide, confirms the muzzle: it starts near the east/NE mount (origin x≈2080) and SETTLES on the west rim (origin x=1964, ≈ the west-rim ring at 1970) with its endpoint further WEST (x≈1907) at the attacker — a beam lying entirely west of the planet's west edge (x=1994), i.e. CLEAN of the planet body. The settled origin held to 1–2 distinct positions (a glide that stops, no thrash) and a home-turret muzzle recurred across many frames (fire interval 0.5s — no idle gap). This proves the field-report root cause is fixed: a threat on the OTHER SIDE of the planet is now reached and engaged, the beam clamped clear of the core. HONEST BOUNDARY: no debug seam parks TWO simultaneous attackers around one turreted planet, so the two-attacker priority SPLIT (a core-attacker outranking a loiterer; two turrets covering two threats one-each) is NOT reproducible as live pixels — it is proven by the pure-sim suite tests/sim/turret-coverage.test.ts. What THIS shot verifies with pixels + instrument is the far-side reach-and-fire, the exact behaviour the developer reported missing.",
+    "verdict": "verified"
+  },
+  {
+    "id": "turret-far-side-context",
+    "title": "Turret far-side engage — full-frame context (under-attack alarm)",
+    "area": "match",
+    "image": "images/turret-far-side-full.png",
+    "capturedAt": "2026-07-26T00:23:08Z",
+    "buildSha": "dc7e2ac",
+    "attestation": "The wide frame behind the turret-far-side-engage crop. The red screen-edge vignette and the banner 'Your planet is under attack — follow the arrow' confirm the parked bot is a REAL registered threat to the home planet. Top-right shows the HOME and HULL bars for the local planet; top-left reads 'TOTAL 0' (the 3 boot ore was spent building the turret). The grey turret disc sits on the home planet's west rim with the teal attacker just west of it; a separate roaming-bot firefight (orange and blue ship beams) plays out to the north-west and is unrelated to the home turret — the home turret's own muzzle is the short west-pointing beam at the rim, a single-tick flash not frozen in this particular frame (see the instrument geometry cited in turret-far-side-engage). Build stamp 'dc7e2ac · 00:00Z' bottom-right.",
+    "verdict": "verified"
   }
 ]

@@ -211,3 +211,38 @@ the LIVE preview bundle at build `a5dd0b0` (clean, no page errors):
   (diamond) but never in ore.
 
 No page errors in any capture.
+
+---
+
+## Round 8 — ore HUD split + far-side turret coverage, on the live build (`dc7e2ac`)
+
+`capture-round8.mjs` — the two v0.1.3 field reports, gating the patch after v0.2.
+All items on the LIVE preview bundle at build `dc7e2ac` (clean, no page errors):
+
+- **ore-hud-under-ship / ore-hud-deposit** — the split ore HUD on a desktop boot
+  (`?debug=1`, 1280×800), driven through `window.__oreHudStage`. MINING: `mine(5)`
+  while the boot bank is 3 → FIVE filled yellow squares drawn **under the ship**
+  (screen centre, `y=423` below the ship) and the top-left reading **`TOTAL 3`** —
+  two DISTINCT numbers, both matching the sim readout (`hold.filled=5`, `total()=3`).
+  DOCKING: `dock(6)` at home → the sim auto-drains the hold; the captured mid-frame
+  shows **one** filled square + five empties under the ship with an ore courier in
+  flight, and the top-left risen to **`TOTAL 7`** (`hold.filled=1`, `total()=7`,
+  `readout cargo≈1.97 / banked≈7.03`). The held count DRAINS while the TOTAL RISES:
+  the field rule, on a real boot.
+- **turret-far-side-engage / turret-far-side-context** — a turret built on the home
+  planet's EAST mount (slot 0), then an attacker parked due WEST (the FAR side) via
+  `__healthbarStage.damageEnemy`. The turret SLID ~180° around the planet body to
+  the WEST rim and sits on the attacker there (grey disc at the planet's left edge,
+  teal attacker just left of it). `window.__planetRush.beams` confirms the muzzle
+  settling from the east/NE mount (`origin x≈2080`) to the west rim (`origin x=1964`)
+  with its endpoint further west (`x≈1907`) — a beam **entirely west of the planet's
+  west edge (`x=1994`), clean of the core** — held to 1–2 distinct rim positions
+  (no thrash) and recurring across frames (fire interval 0.5 s, no idle gap). The
+  planet's red under-attack alarm confirms the threat is real.
+  - **Honest boundary:** no debug seam parks TWO simultaneous attackers around one
+    turreted planet, so the two-attacker priority SPLIT (§3/§4 of the fix) is NOT
+    reproducible as live pixels — it is proven by `tests/sim/turret-coverage.test.ts`.
+    This round verifies with pixels + instrument the far-side reach-and-fire, the
+    exact behaviour the developer reported missing.
+
+No page errors in any capture.
