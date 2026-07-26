@@ -1,0 +1,45 @@
+{
+  "pcNear": {
+    "buildRow": {
+      "action": "build",
+      "label": "Build & Upgrade",
+      "binding": "E",
+      "dimmed": false
+    },
+    "errors": []
+  },
+  "pcFar": {
+    "buildRow": {
+      "action": "build",
+      "label": "Build & Upgrade — get closer to your planet",
+      "binding": null,
+      "dimmed": true
+    },
+    "flight": {
+      "start": {
+        "x": 1968,
+        "y": 1200
+      },
+      "travelled": 441
+    },
+    "errors": []
+  },
+  "mobileNear": {
+    "buildButtonPresent": true,
+    "rect": {
+      "id": "build-button"
+    },
+    "errors": []
+  },
+  "mobileFar": {
+    "buildButtonPresent": false,
+    "flight": {
+      "start": {
+        "x": 1968,
+        "y": 1200
+      },
+      "travelled": 458
+    },
+    "errors": []
+  }
+}
