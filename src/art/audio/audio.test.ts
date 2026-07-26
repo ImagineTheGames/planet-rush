@@ -43,6 +43,7 @@ import {
 } from './context';
 import { AudioEngine, EARSHOT_FAR, EARSHOT_NEAR } from './engine';
 import { AudioGraph, MIX_DEFAULTS, renderSound } from './graph';
+import { MusicDirector, MusicScore, MUSIC_COMBAT, SIEGE_ON, STING_GATE } from './music';
 import { DEFAULT_SAMPLE_RATE, peak, renderVoice, rms, seamless, voiceDuration, type VoiceSpec } from './synth';
 import { AudioUnlock, defaultUnlockTarget, UNLOCK_EVENTS, type UnlockTarget } from './unlock';
 
@@ -409,7 +410,7 @@ describe('the mix (`./graph`) — built headless', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
 
-    expect(ctx.gains).toHaveLength(5); // duck, master, and the three buses
+    expect(ctx.gains).toHaveLength(6); // duck, master, and the four buses
     expect((graph.duck as FakeGain).outputs).toEqual([ctx.destination]);
     expect((graph.master as FakeGain).outputs).toEqual([graph.duck]);
     for (const bus of Object.values(graph.buses)) {
@@ -417,6 +418,7 @@ describe('the mix (`./graph`) — built headless', () => {
     }
     expect(graph.master.gain.value).toBe(MIX_DEFAULTS.master);
     expect(graph.buses.ambient.gain.value).toBe(MIX_DEFAULTS.ambient);
+    expect(graph.buses.music.gain.value).toBe(MIX_DEFAULTS.music);
   });
 
   it('renders and caches every sound in the bank without a browser', () => {
@@ -747,7 +749,9 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     // A whole second of held fire and throttle: two looping sources, not 120
     // one-shots. (`preload` makes no sources, so every source here is a loop.)
     expect(engine.playCount).toBe(0);
-    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(3); // + the ambient bed
+    // Four loops: the two firing voices, the ambient bed, and the soundtrack's
+    // calm drone — mining is not combat, so the theme never joins them here.
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(4);
   });
 
   it('goes quiet for three seconds when a home dies (GDD §4.7)', () => {
@@ -812,7 +816,9 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
   });
 
   it('starts one alarm loop and ducks the ambience under it', () => {
-    const { ctx, engine } = engineOn({ local: 0 });
+    // Music off here so the loop count is just the two this test is about — the
+    // soundtrack's own ducking has its own test below.
+    const { ctx, engine } = engineOn({ local: 0, music: false });
     const q = new TellQueue(4);
     q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
     run(engine, ctx, 1, () => engine.consume(q));
@@ -822,6 +828,30 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(loops.length).toBe(2); // the bed, and the alarm — one of each
     const ambientRamps = (engine.graph!.buses.ambient.gain as FakeParam).events;
     expect(ambientRamps.some((e) => e.kind === 'ramp' && e.value < 1)).toBe(true);
+  });
+
+  it('ducks the soundtrack and the SFX under the alarm, not just the ambience', () => {
+    // The brief's mix pass: "music and SFX duck under the alarm." The soundtrack
+    // and ambience drop hard; the SFX only step aside, because they are the
+    // mechanics the alarm is telling you about (GDD §2.2).
+    const { ctx, engine } = engineOn({ local: 0 });
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+    run(engine, ctx, 1, () => engine.consume(q));
+    expect(engine.alarm.active).toBe(true);
+
+    const ducked = (bus: 'music' | 'sfx' | 'ambient') =>
+      (engine.graph!.buses[bus].gain as FakeParam).events.some((e) => e.kind === 'ramp' && e.value < 1);
+    expect(ducked('music')).toBe(true);
+    expect(ducked('sfx')).toBe(true);
+    expect(ducked('ambient')).toBe(true);
+
+    // …and the SFX are ducked *less* than the soundtrack — they must stay heard.
+    const lowest = (bus: 'music' | 'sfx') => {
+      const ramps = (engine.graph!.buses[bus].gain as FakeParam).events.filter((e) => e.kind === 'ramp');
+      return Math.min(...ramps.map((e) => e.value));
+    };
+    expect(lowest('sfx')).toBeGreaterThan(lowest('music'));
   });
 
   it('stops the alarm when the home it was defending dies', () => {
@@ -904,6 +934,222 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.alarm.active).toBe(false);
     engine.dispose();
     expect(engine.running).toBe(false);
+  });
+});
+
+describe('the adaptive soundtrack (`./music`) — following the match', () => {
+  /** Advance a pure score for `seconds`, optionally doing something each frame. */
+  const drive = (score: MusicScore, seconds: number, each?: () => void): void => {
+    for (let t = 0; t < seconds; t += 1 / 60) {
+      each?.();
+      score.update(1 / 60);
+    }
+  };
+
+  it('opens on the calm drone — bed only, no theme, no pulse', () => {
+    const score = new MusicScore();
+    expect(score.phase).toBe('calm');
+    expect(score.gains).toEqual({ bed: 1, pulse: 0, theme: 0, dread: 0 });
+  });
+
+  it('raises the pulse as the waves arrive, and never lowers it again', () => {
+    const score = new MusicScore();
+    score.wave(0.4); // wave 2 of 5
+    score.update(1 / 60);
+    expect(score.phase).toBe('rising');
+    expect(score.tension).toBeCloseTo(0.4, 5);
+    expect(score.gains.pulse).toBeCloseTo(0.4, 5);
+
+    // A later, *smaller* magnitude must not walk the tension back down — the
+    // waves only ever pull the match tighter (GDD §2.3).
+    score.wave(0.2);
+    score.update(1 / 60);
+    expect(score.tension).toBeCloseTo(0.4, 5);
+  });
+
+  it('heats the theme in a fight, but not while mining — the inversion (GDD §2.3)', () => {
+    const fighting = new MusicScore();
+    drive(fighting, 0.6, () => fighting.combat(TELL.weaponHit));
+    expect(fighting.gains.theme).toBeGreaterThan(0);
+
+    const mining = new MusicScore();
+    drive(mining, 0.6, () => mining.combat(TELL.mineHit));
+    expect(mining.gains.theme).toBe(0);
+    expect(mining.phase).toBe('calm');
+  });
+
+  it('forces the full theme fast when the local home is under siege (GDD §2.6)', () => {
+    const score = new MusicScore();
+    score.setUnderAttack(true); // the alarm is ringing
+    drive(score, 0.5);
+    expect(score.intensity).toBeGreaterThan(SIEGE_ON);
+    expect(score.phase).toBe('siege');
+    expect(score.gains.theme).toBeGreaterThan(SIEGE_ON);
+  });
+
+  it('lets the theme recede once the shooting stops', () => {
+    const score = new MusicScore();
+    score.setUnderAttack(true);
+    drive(score, 1);
+    const peak = score.gains.theme;
+    score.setUnderAttack(false);
+    drive(score, 3); // the leak takes over
+    expect(score.gains.theme).toBeLessThan(peak);
+    expect(score.gains.theme).toBeLessThan(0.1);
+  });
+
+  it('thins the bed to dread through the collapse (GDD §2.3)', () => {
+    const score = new MusicScore();
+    score.wave(0.6);
+    score.collapse();
+    score.update(1 / 60);
+    expect(score.phase).toBe('collapse');
+    expect(score.gains.bed).toBe(0);
+    expect(score.gains.pulse).toBe(0);
+    expect(score.gains.theme).toBe(0);
+    expect(score.gains.dread).toBe(1);
+  });
+
+  it('goes silent and queues a sting on the win or the loss', () => {
+    const win = new MusicScore();
+    win.collapse();
+    win.end(true);
+    win.update(1 / 60);
+    expect(win.phase).toBe('over');
+    expect(win.gains).toEqual({ bed: 0, pulse: 0, theme: 0, dread: 0 }); // the sting owns the last beat
+    expect(win.pendingSting).toBe('win');
+    expect(win.won).toBe(true);
+
+    const loss = new MusicScore();
+    loss.end(false);
+    expect(loss.pendingSting).toBe('loss');
+    expect(loss.won).toBe(false);
+  });
+
+  it('weights combat broadly but leaves mining and the clock out of it', () => {
+    const score = new MusicScore();
+    expect(score.combat(TELL.mineHit)).toBe(0);
+    expect(score.combat(TELL.waveArrive)).toBe(0);
+    expect(score.combat(TELL.coreHit)).toBeGreaterThan(0);
+    for (const kind of ALL_KINDS) {
+      const w = MUSIC_COMBAT[kind];
+      if (w !== undefined) expect(w).toBeGreaterThan(0);
+    }
+  });
+
+  it('resets to the opening drone for a rematch', () => {
+    const score = new MusicScore();
+    score.wave(1);
+    score.setUnderAttack(true);
+    drive(score, 1);
+    score.collapse();
+    score.end(false);
+    score.reset();
+    expect(score.phase).toBe('calm');
+    expect(score.gains).toEqual({ bed: 1, pulse: 0, theme: 0, dread: 0 });
+    expect(score.pendingSting).toBeNull();
+  });
+
+  it('starts its stems lazily and crossfades them in — no cut', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    const score = new MusicScore();
+    const director = new MusicDirector(graph, score);
+
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(0); // nothing until driven
+    for (let i = 0; i < 120; i++) {
+      score.update(1 / 60);
+      director.update(1 / 60, 1);
+      ctx.advance(1 / 60);
+    }
+    // The calm bed came up on its own, and it came up ramped, not snapped on.
+    expect(ctx.sources.filter((s) => s.loop).length).toBeGreaterThanOrEqual(1);
+    const bed = ctx.sources.find((s) => s.loop)!;
+    const node = bed.outputs[0] as FakeGain;
+    expect(node.gain.events.some((e) => e.kind === 'ramp')).toBe(true);
+  });
+
+  it('holds the win sting until the three-second quiet has lifted (GDD §4.7)', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    const score = new MusicScore();
+    const director = new MusicDirector(graph, score);
+    score.end(true);
+
+    // Through the hush — the mix is at (or near) zero — nothing sounds.
+    for (let i = 0; i < 60; i++) {
+      score.update(1 / 60);
+      director.update(1 / 60, 0);
+      ctx.advance(1 / 60);
+    }
+    expect(director.stingCount).toBe(0);
+    expect(score.pendingSting).toBe('win');
+
+    // The quiet lifts (gain climbs back past the gate): the sting lands, once.
+    director.update(1 / 60, STING_GATE + 0.1);
+    expect(director.stingCount).toBe(1);
+    expect(score.pendingSting).toBeNull();
+    director.update(1 / 60, 1);
+    expect(director.stingCount).toBe(1); // not again
+  });
+
+  it('stops its stems when the soundtrack is switched off (GDD §4.9 item 3)', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    const score = new MusicScore();
+    const director = new MusicDirector(graph, score);
+    for (let i = 0; i < 30; i++) {
+      score.update(1 / 60);
+      director.update(1 / 60, 1);
+      ctx.advance(1 / 60);
+    }
+    const started = ctx.sources.filter((s) => s.loop).length;
+    expect(started).toBeGreaterThanOrEqual(1);
+
+    director.setEnabled(false);
+    expect(director.playing).toBe(false);
+    director.update(1 / 60, 1);
+    // Every loop it started has been asked to stop, and nothing new is pushed.
+    for (const s of ctx.sources.filter((x) => x.loop)) expect(s.stops).toBeGreaterThan(0);
+  });
+
+  it('drives the whole arc through the engine, sting and all', () => {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine({ context: ctx, local: 0 });
+    engine.start();
+    const step = () => {
+      engine.update(1 / 60);
+      ctx.advance(1 / 60);
+    };
+    const feed = (kind: TellKind, magnitude = 1, player = 0) => {
+      const q = new TellQueue(4);
+      q.push(kind, 0, 0, 0, magnitude, player);
+      engine.consume(q);
+    };
+
+    expect(engine.musicScore.phase).toBe('calm');
+
+    feed(TELL.waveArrive, 0.4, -1);
+    step();
+    expect(engine.musicScore.phase).toBe('rising');
+
+    for (let i = 0; i < 40; i++) {
+      feed(TELL.coreHit, 0.5, 0); // a siege on my own home
+      step();
+    }
+    expect(engine.musicScore.phase).toBe('siege');
+    expect(engine.alarm.active).toBe(true);
+
+    feed(TELL.collapseBegin, 1, -1);
+    step();
+    expect(engine.musicScore.phase).toBe('collapse');
+
+    feed(TELL.matchEnd, 1, -1); // a win
+    // No planet death in this synthetic arc, so the hush is not down: the sting
+    // lands on the next frame.
+    step();
+    expect(engine.musicScore.phase).toBe('over');
+    expect(engine.music!.stingCount).toBe(1);
   });
 });
 

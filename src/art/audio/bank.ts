@@ -137,6 +137,20 @@ export const SOUND = {
   alarm: 'alarm',
   /** The ambient bed (GDD §3.6). See `./ambient`. */
   ambient: 'ambient',
+
+  // --- The adaptive soundtrack (a3) — phase-following music. See `./music` ---
+  /** The calm foundation drone, on until the collapse. */
+  musicBed: 'musicBed',
+  /** The heartbeat that rises with the asteroid waves. */
+  musicPulse: 'musicPulse',
+  /** The full theme, in during a siege. */
+  musicTheme: 'musicTheme',
+  /** The bleak drone that replaces the bed through the collapse. */
+  musicDread: 'musicDread',
+  /** The sting on a win — brief, bright, and after the three-second quiet. */
+  musicWin: 'musicWin',
+  /** The sting on a loss — the ache, falling. */
+  musicLoss: 'musicLoss',
 } as const;
 
 /** One of the {@link SOUND} names. */
@@ -1089,6 +1103,256 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           seed: 0x0d15,
         },
       },
+    ],
+  },
+
+  // --- The adaptive soundtrack (a3) ---------------------------------------
+  //
+  // Cold Vacuum has an ache under it (style-guide §8), so the soundtrack lives
+  // in A minor and harmonises with the ambient bed's A rather than fighting it.
+  // Every stem loops, so at least one voice in each is *sustained* (no decay to
+  // silence at the loop point) — a stem that faded to zero at its edges would
+  // pulse once per lap, the one artefact `../synth` seamless exists to kill.
+
+  /**
+   * The calm foundation drone: a low minor triad. The minor third is the ache —
+   * it is the one interval the ambient bed does not have, so the soundtrack reads
+   * as *music over* the atmosphere rather than a second copy of it.
+   */
+  [SOUND.musicBed]: {
+    name: 'musicBed',
+    loop: true,
+    crossfade: 0.5,
+    layers: [
+      {
+        spec: {
+          name: 'musicBed.root',
+          wave: 'triangle',
+          attack: 0,
+          hold: 8,
+          decay: 0,
+          freq: 55,
+          vibratoDepth: 0.004,
+          vibratoRate: 0.1,
+          lowPass: 600,
+          gain: 0.22,
+          seed: 0xa300,
+        },
+      },
+      {
+        spec: {
+          name: 'musicBed.third',
+          wave: 'sine',
+          attack: 0,
+          hold: 8,
+          decay: 0,
+          freq: 65.41,
+          vibratoDepth: 0.006,
+          vibratoRate: 0.083,
+          gain: 0.16,
+          seed: 0xa301,
+        },
+      },
+      {
+        spec: {
+          name: 'musicBed.fifth',
+          wave: 'sine',
+          attack: 0,
+          hold: 8,
+          decay: 0,
+          freq: 82.41,
+          gain: 0.12,
+          seed: 0xa302,
+        },
+      },
+    ],
+  },
+
+  /**
+   * The heartbeat: a low kick once per lap over a near-silent sub-drone, so the
+   * loop reads as a driving pulse rather than a held note. It fades in with the
+   * asteroid waves — the metronome of the match made a metronome (GDD §2.3).
+   */
+  [SOUND.musicPulse]: {
+    name: 'musicPulse',
+    loop: true,
+    crossfade: 0.04,
+    layers: [
+      {
+        // A quiet sustained floor so the loop's edges are never silent.
+        spec: {
+          name: 'musicPulse.floor',
+          wave: 'triangle',
+          attack: 0,
+          hold: 0.7,
+          decay: 0,
+          freq: 55,
+          lowPass: 400,
+          gain: 0.08,
+          seed: 0xa310,
+        },
+      },
+      {
+        spec: {
+          name: 'musicPulse.kick',
+          wave: 'sine',
+          attack: 0.004,
+          hold: 0.02,
+          decay: 0.5,
+          punch: 0.7,
+          freq: 110,
+          freqEnd: 44,
+          gain: 0.3,
+          seed: 0xa311,
+        },
+      },
+      {
+        spec: {
+          name: 'musicPulse.tick',
+          wave: 'triangle',
+          attack: 0.002,
+          hold: 0.01,
+          decay: 0.08,
+          freq: 220,
+          gain: 0.1,
+          seed: 0xa312,
+        },
+      },
+    ],
+  },
+
+  /**
+   * The full theme: a short A-minor riff over a sustained pad, in during a siege
+   * (GDD §2.6). Arcade but restrained — square notes for the tune, a triangle pad
+   * to sit them on — because the theme has to lift a fight without becoming a
+   * cartoon over a planet that is dying.
+   */
+  [SOUND.musicTheme]: {
+    name: 'musicTheme',
+    loop: true,
+    crossfade: 0.08,
+    layers: [
+      {
+        // The pad sets the 4-second loop length and sustains (no decay) so the
+        // seam is never a silent edge.
+        spec: {
+          name: 'musicTheme.pad',
+          wave: 'triangle',
+          attack: 0.02,
+          hold: 3.98,
+          decay: 0,
+          freq: 110,
+          vibratoDepth: 0.005,
+          vibratoRate: 0.2,
+          lowPass: 1200,
+          gain: 0.14,
+          seed: 0xa320,
+        },
+      },
+      { spec: { name: 'musicTheme.n0', wave: 'square', attack: 0.004, hold: 0.08, decay: 0.22, freq: 220, duty: 0.32, gain: 0.13, seed: 0xa321 }, at: 0 },
+      { spec: { name: 'musicTheme.n1', wave: 'square', attack: 0.004, hold: 0.08, decay: 0.22, freq: 261.63, duty: 0.32, gain: 0.13, seed: 0xa322 }, at: 0.5 },
+      { spec: { name: 'musicTheme.n2', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.26, freq: 329.63, duty: 0.3, gain: 0.13, seed: 0xa323 }, at: 1 },
+      { spec: { name: 'musicTheme.n3', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.3, freq: 293.66, duty: 0.3, gain: 0.12, seed: 0xa324 }, at: 1.5 },
+      { spec: { name: 'musicTheme.n4', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.3, freq: 261.63, duty: 0.3, gain: 0.12, seed: 0xa325 }, at: 2.1 },
+      { spec: { name: 'musicTheme.n5', wave: 'triangle', attack: 0.006, hold: 0.14, decay: 0.5, freq: 220, gain: 0.13, seed: 0xa326 }, at: 2.7 },
+      { spec: { name: 'musicTheme.n6', wave: 'triangle', attack: 0.006, hold: 0.2, decay: 0.4, freq: 164.81, gain: 0.12, seed: 0xa327 }, at: 3.3 },
+    ],
+  },
+
+  /**
+   * The collapse's own voice: a low drone with a semitone clash beating against
+   * it and a sub underneath, everything rolled off. No melody, no resolution —
+   * entropy arriving (GDD §2.3). The director thins the bed, pulse and theme out
+   * and brings this up, which is the "thinning dread" of the brief.
+   */
+  [SOUND.musicDread]: {
+    name: 'musicDread',
+    loop: true,
+    crossfade: 0.4,
+    layers: [
+      {
+        spec: {
+          name: 'musicDread.low',
+          wave: 'triangle',
+          attack: 0,
+          hold: 6,
+          decay: 0,
+          freq: 55,
+          lowPass: 500,
+          gain: 0.2,
+          seed: 0xa330,
+        },
+      },
+      {
+        // A hair sharp of the low: the two beat slowly against each other, which
+        // is the unease, and it costs one voice.
+        spec: {
+          name: 'musicDread.clash',
+          wave: 'sine',
+          attack: 0,
+          hold: 6,
+          decay: 0,
+          freq: 58.3,
+          gain: 0.14,
+          seed: 0xa331,
+        },
+      },
+      {
+        spec: {
+          name: 'musicDread.sub',
+          wave: 'sine',
+          attack: 0,
+          hold: 6,
+          decay: 0,
+          freq: 41,
+          gain: 0.12,
+          seed: 0xa332,
+        },
+      },
+      {
+        spec: {
+          name: 'musicDread.air',
+          wave: 'noise',
+          attack: 0,
+          hold: 6,
+          decay: 0,
+          freq: 30,
+          lowPass: 260,
+          gain: 0.05,
+          seed: 0xa333,
+        },
+      },
+    ],
+  },
+
+  /**
+   * The win sting: a rising major arpeggio, bright and quickly over — a firework
+   * for the surface (GDD §4.7), not a fanfare. Held back until the three-second
+   * quiet has lifted (`./music`), so it lands *after* the silence.
+   */
+  [SOUND.musicWin]: {
+    name: 'musicWin',
+    layers: [
+      { spec: { name: 'musicWin.n0', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.16, freq: 220, gain: 0.24, seed: 0xa340 }, at: 0 },
+      { spec: { name: 'musicWin.n1', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.16, freq: 277.18, gain: 0.24, seed: 0xa341 }, at: 0.14 },
+      { spec: { name: 'musicWin.n2', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.18, freq: 329.63, gain: 0.24, seed: 0xa342 }, at: 0.28 },
+      { spec: { name: 'musicWin.n3', wave: 'square', attack: 0.006, hold: 0.14, decay: 0.5, freq: 440, duty: 0.35, gain: 0.26, seed: 0xa343 }, at: 0.42 },
+      { spec: { name: 'musicWin.shine', wave: 'triangle', attack: 0.01, hold: 0.1, decay: 0.4, freq: 880, gain: 0.12, seed: 0xa344 }, at: 0.42 },
+    ],
+  },
+
+  /**
+   * The loss sting: a falling minor phrase that settles low and stops. The ache,
+   * with no arcade left on top of it — the one thing in the soundtrack that is
+   * allowed to be sad.
+   */
+  [SOUND.musicLoss]: {
+    name: 'musicLoss',
+    layers: [
+      { spec: { name: 'musicLoss.n0', wave: 'triangle', attack: 0.008, hold: 0.1, decay: 0.2, freq: 220, gain: 0.22, seed: 0xa350 }, at: 0 },
+      { spec: { name: 'musicLoss.n1', wave: 'triangle', attack: 0.008, hold: 0.1, decay: 0.24, freq: 174.61, gain: 0.22, seed: 0xa351 }, at: 0.24 },
+      { spec: { name: 'musicLoss.n2', wave: 'sine', attack: 0.008, hold: 0.12, decay: 0.5, freq: 146.83, gain: 0.24, seed: 0xa352 }, at: 0.5 },
+      { spec: { name: 'musicLoss.low', wave: 'sine', attack: 0.01, hold: 0.14, decay: 0.42, freq: 110, gain: 0.22, seed: 0xa353 }, at: 0.62 },
     ],
   },
 };
