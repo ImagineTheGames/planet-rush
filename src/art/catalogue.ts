@@ -18,6 +18,7 @@ import { ShipClass } from '@shared/types';
 import { asteroidSprite, oreChunkSprite } from './asteroids';
 import { buildProgressSprite, shieldSprite, turretSprite } from './buildings';
 import {
+  atmosphereHaloSprite,
   beaconRingSprite,
   damageRingSprite,
   planetSprite,
@@ -79,6 +80,9 @@ function entries(): CatalogueEntry[] {
   }
   for (const slot of ALL_SLOTS) {
     out.push({ group: 'Planets — ownership beacons', label: `P${slot + 1}`, def: beaconRingSprite(slot) });
+  }
+  for (const slot of ALL_SLOTS) {
+    out.push({ group: 'Planets — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
   }
   for (const f of [1, 0.75, 0.5, 0.25, 0]) {
     out.push({ group: 'Planets — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(f) });
