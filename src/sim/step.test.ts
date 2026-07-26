@@ -12,19 +12,27 @@
 import { describe, it, expect } from 'vitest';
 import type { Action } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { createWorld, step, type Inputs, type Ship, type Asteroid, type World } from './index';
+import {
+  activeProjectilesOf,
+  createWorld,
+  step,
+  type Inputs,
+  type Ship,
+  type Asteroid,
+  type World,
+} from './index';
 import {
   BASE_TURN_RATE,
-  BEAM_RANGE,
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   MINING_RATE,
   RESOURCE_FIELD,
   SHIP_RADIUS,
   SHIP_STATS,
+  SHIP_WEAPON,
   TICK_DT,
 } from './constants';
-import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
+import { shipCargoCap, shipMaxHull, shipWeaponDamage, stockTiers } from './upgrades';
 
 // --- builders --------------------------------------------------------------
 
@@ -157,20 +165,32 @@ describe('beam mining (GDD §2.3, §2.8)', () => {
     expect(oreMined).toBeCloseTo(MINING_RATE, 6); // 0.5 ore in one second
   });
 
-  it('the same beam damages an enemy ship (one beam, one stat)', () => {
+  it('the weapon fires projectiles that damage an enemy ship (one beam, one stat)', () => {
+    // Combat is a projectile now (design amendment v0.2), not the mining beam —
+    // but it is still the one beam stat, delivered per shot. A stationary target
+    // point-blank in the open eats every shot, so the delivered DPS matches the
+    // old hitscan beam (≈ Vanguard beam = 10/s).
     const shooter = makeShip({ id: 0, pos: { x: 0, y: 0 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 120, y: 0 }, spawnProtect: 0 });
     const world = emptyWorld({ ships: [shooter, target] });
 
     const before = target.hull;
+    const perShot = shipWeaponDamage(shooter); // 10 * 0.35 = 3.5
     const inputs: Inputs = [{ id: 0, actions: [fire()] }];
     for (let t = 0; t < 60; t++) step(world, inputs);
 
-    // Vanguard beam DPS = 10 → ~10 HP gone in a second.
-    expect(before - world.ships[1]!.hull).toBeCloseTo(10, 4);
+    const lost = before - world.ships[1]!.hull;
+    // Damage arrives in whole shots, ~3 in a second (fireInterval 0.35 s), and
+    // ~10 HP total — the beam DPS, if every shot lands.
+    expect(lost).toBeGreaterThanOrEqual(9);
+    expect(lost).toBeLessThanOrEqual(11);
+    expect(lost / perShot).toBeCloseTo(Math.round(lost / perShot), 6); // whole shots
+    // The weapon is a projectile, not a beam: no mining beam is published for it.
+    expect(world.ships[0]!.beam).toBeNull();
+    expect(world.projectiles.some((p) => p.kind === 'ship')).toBe(true);
   });
 
-  it('spawn protection blocks beam damage', () => {
+  it('spawn protection blocks weapon damage (the shot flies over a protected hull)', () => {
     const shooter = makeShip({ id: 0, pos: { x: 0, y: 0 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 120, y: 0 }, spawnProtect: 10 });
     const world = emptyWorld({ ships: [shooter, target] });
@@ -205,7 +225,7 @@ describe('beam hit geometry (GDD §4.1)', () => {
     expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre);
   });
 
-  it('hitPoint matches the damaged ship (one beam, one stat)', () => {
+  it('a weapon shot flies from the muzzle toward the ship it damages', () => {
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 620, y: 500 }, spawnProtect: 0 });
     const world = emptyWorld({ ships: [shooter, target] });
@@ -213,26 +233,32 @@ describe('beam hit geometry (GDD §4.1)', () => {
     const before = target.hull;
     step(world, [{ id: 0, actions: [fire()] }]);
 
-    const beam = world.ships[0]!.beam!;
-    expect(beam.length).toBeCloseTo(120 - SHIP_RADIUS, 6); // to the target's near surface
-    const hp = beam.hitPoint!;
-    expect(Math.hypot(hp.x - target.pos.x, hp.y - target.pos.y)).toBeCloseTo(target.radius, 6);
-    expect(world.ships[1]!.hull).toBeLessThan(before); // the point's owner took the damage
+    // No mining beam for a weapon shot; a ship-kind projectile is born at the
+    // muzzle heading +x toward the target (design amendment v0.2).
+    expect(world.ships[0]!.beam).toBeNull();
+    const shots = activeProjectilesOf(world, 0);
+    expect(shots).toHaveLength(1);
+    expect(shots[0]!.kind).toBe('ship');
+    expect(shots[0]!.vel.x).toBeGreaterThan(0);
+    expect(Math.abs(shots[0]!.vel.y)).toBeLessThan(1e-6);
+    // It reaches and damages the target within its short travel time.
+    for (let t = 0; t < 30; t++) step(world, [{ id: 0, actions: [] }]);
+    expect(world.ships[1]!.hull).toBeLessThan(before);
   });
 
-  it('length equals range and hitPoint is null when nothing is hit', () => {
+  it('manual fire into empty space shoots the weapon, not a mining beam', () => {
     const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const world = emptyWorld({ ships: [ship] }); // empty field ahead
 
     step(world, [{ id: 0, actions: [fire()] }]);
 
-    const beam = world.ships[0]!.beam!;
-    expect(beam.hitPoint).toBeNull();
-    expect(beam.length).toBe(BEAM_RANGE);
-    // Direction is the ship's facing.
-    expect(beam.dir.x).toBeCloseTo(1, 6);
-    expect(beam.dir.y).toBeCloseTo(0, 6);
-    expect(beam.origin).toEqual({ x: 500, y: 500 });
+    // Nothing to mine ⇒ no beam; the trigger fires a weapon projectile instead.
+    expect(world.ships[0]!.beam).toBeNull();
+    const shots = activeProjectilesOf(world, 0);
+    expect(shots).toHaveLength(1);
+    // Fired along the ship's facing (+x) at the base muzzle speed.
+    expect(shots[0]!.vel.x).toBeCloseTo(SHIP_WEAPON.projectileSpeed, 6);
+    expect(shots[0]!.vel.y).toBeCloseTo(0, 6);
   });
 
   it('nearest of several targets wins', () => {
@@ -250,8 +276,9 @@ describe('beam hit geometry (GDD §4.1)', () => {
     expect(world.asteroids[1]!.ore).toBe(far.maxOre);
   });
 
-  it('auto-aim hitPoint lands on the acquired target', () => {
-    // Target is perpendicular to the ship's facing — only auto-aim reaches it.
+  it('auto-aim shoots the acquired enemy with a leading projectile', () => {
+    // Target is perpendicular to the ship's facing — auto-aim engages it across
+    // the full 360° while the hull is still turning (GDD §2.4).
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
     const world = emptyWorld({ ships: [shooter, target] });
@@ -259,10 +286,13 @@ describe('beam hit geometry (GDD §4.1)', () => {
     const before = target.hull;
     step(world, [{ id: 0, actions: [fire(true)] }]); // auto-aim
 
-    const beam = world.ships[0]!.beam!;
-    expect(beam.length).toBeCloseTo(150 - SHIP_RADIUS, 6);
-    const hp = beam.hitPoint!;
-    expect(Math.hypot(hp.x - target.pos.x, hp.y - target.pos.y)).toBeCloseTo(target.radius, 6);
+    expect(world.ships[0]!.beam).toBeNull(); // weapon, not mining
+    const shots = activeProjectilesOf(world, 0);
+    expect(shots).toHaveLength(1);
+    // Stationary target: the intercept lead collapses to a straight shot +y.
+    expect(shots[0]!.vel.y).toBeGreaterThan(0);
+    expect(Math.abs(shots[0]!.vel.x)).toBeLessThan(1e-6);
+    for (let t = 0; t < 30; t++) step(world, [{ id: 0, actions: [] }]);
     expect(world.ships[1]!.hull).toBeLessThan(before);
   });
 
@@ -480,8 +510,12 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
     step(world, [{ id: 0, actions: [fire()] }]); // manual fire, no aim action
 
     expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
-    // The beam still runs along the (newly turned) facing.
-    expect(world.ships[0]!.beam!.dir.x).toBeCloseTo(Math.cos(turnStep()), 9);
+    // Firing into empty space shoots the weapon along the (newly turned) facing.
+    const shots = activeProjectilesOf(world, 0);
+    expect(shots).toHaveLength(1);
+    const sp = Math.hypot(shots[0]!.vel.x, shots[0]!.vel.y);
+    expect(shots[0]!.vel.x / sp).toBeCloseTo(Math.cos(turnStep()), 9);
+    expect(shots[0]!.vel.y / sp).toBeCloseTo(Math.sin(turnStep()), 9);
   });
 
   it('4. below the speed epsilon the ship holds its facing exactly', () => {

@@ -28,19 +28,17 @@ import {
   turretMountPos,
 } from './buildings';
 import {
-  BEAM_RANGE,
   CORE_HP,
   PLANET,
   PROJECTILE,
+  PROJECTILE_CORE_FACTOR,
   REPAIR,
   SHIELD,
   SHIP_RADIUS,
-  SHIP_STATS,
   TICK_DT,
   TURRET,
-  beamCoreDps,
 } from './constants';
-import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
+import { shipCargoCap, shipMaxHull, shipWeaponDamage, stockTiers } from './upgrades';
 import type { Planet, Projectile, Shield, Ship, Turret, World } from './state';
 
 // --- builders --------------------------------------------------------------
@@ -421,7 +419,7 @@ describe('repair channel (GDD §2.5: a channel, not a purchase)', () => {
     expect(planet.repairing).toBe(false);
   });
 
-  it('an enemy beam on the core interrupts it end to end', () => {
+  it('an enemy weapon shot on the core interrupts it end to end', () => {
     const { planet, world } = dockedRepairWorld();
     const attacker = makeShip({
       id: 1,
@@ -434,9 +432,16 @@ describe('repair channel (GDD §2.5: a channel, not a purchase)', () => {
     for (let t = 0; t < 10; t++) step(world, []);
     expect(planet.repairing).toBe(true);
 
+    // Combat is a projectile now (design amendment v0.2): the shot crosses the
+    // 100 units to the core in a few ticks and the channel drops when it lands —
+    // "pressure beats regeneration" still, just with travel time.
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
-    step(world, fire);
-    expect(planet.repairing).toBe(false);
+    let interrupted = false;
+    for (let t = 0; t < 40 && !interrupted; t++) {
+      step(world, fire);
+      if (!planet.repairing) interrupted = true;
+    }
+    expect(interrupted).toBe(true);
     expect(planet.coreHp).toBeLessThan(planet.maxCoreHp);
   });
 
@@ -558,8 +563,8 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
 
 // --- 7. the beam's day-2 targets -------------------------------------------
 
-describe('the beam finishes its target list (GDD §2.4)', () => {
-  it('strips the shield before the core, at the core rate', () => {
+describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)', () => {
+  it('a shot strips the shield before the core, at the core rate', () => {
     const planet = makePlanet({ id: 0, owner: 0, shields: [makeShield({ id: 9 })] });
     const attacker = makeShip({ id: 1, pos: at(-(SHIELD.radius + 60), 0), angle: 0 });
     const world = makeWorld({ ships: [attacker], planets: [planet] });
@@ -567,30 +572,35 @@ describe('the beam finishes its target list (GDD §2.4)', () => {
     expect(planetTargetRadius(planet)).toBe(SHIELD.radius);
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
-    const seconds = 1;
-    for (let t = 0; t < Math.round(seconds / TICK_DT); t++) step(world, fire);
+    const perShot = shipWeaponDamage(attacker) * PROJECTILE_CORE_FACTOR; // core rate
+    for (let t = 0; t < Math.round(2 / TICK_DT); t++) step(world, fire);
 
+    // Shots land on the bubble; the core behind it never feels them (GDD §2.6).
     expect(planet.coreHp).toBe(CORE_HP);
-    expect(shieldPool(planet)).toBeCloseTo(SHIELD.hp - beamCoreDps(ShipClass.Vanguard) * seconds, 1);
-    // The beam stops on the bubble, not on the core behind it.
-    expect(attacker.beam!.length).toBeCloseTo(60, 6);
+    const drained = SHIELD.hp - shieldPool(planet);
+    expect(drained).toBeGreaterThan(0);
+    expect(drained / perShot).toBeCloseTo(Math.round(drained / perShot), 6); // whole shots
+    // The weapon is a projectile: no mining beam is published for it.
+    expect(attacker.beam).toBeNull();
   });
 
-  it('kills a turret at the ship rate and leaves the core alone', () => {
+  it('a shot kills a turret at the ship rate and leaves the core alone', () => {
     const turret = makeTurret({ id: 5, owner: 0, pos: at(-200, 0) });
     const planet = makePlanet({ id: 0, owner: 0, turrets: [turret] });
-    const attacker = makeShip({ id: 1, pos: at(-200 - BEAM_RANGE / 2, 0), angle: 0 });
+    const attacker = makeShip({ id: 1, pos: at(-200 - 120, 0), angle: 0 });
     const world = makeWorld({ ships: [attacker], planets: [planet] });
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
-    const ticks = stepUntil(world, () => planet.turrets.length === 0, 1000, fire);
+    const ticks = stepUntil(world, () => planet.turrets.length === 0, 2000, fire);
 
-    // 30 HP at the Vanguard's 10 DPS ≈ 3 s.
-    expect(ticks * TICK_DT).toBeCloseTo(TURRET.hp / SHIP_STATS[ShipClass.Vanguard].beam, 1);
+    // 30 HP at the Vanguard's 10 DPS ≈ 3 s of landed shots, plus a little
+    // projectile travel — the shots block on the turret, never reaching the core.
+    expect(ticks * TICK_DT).toBeGreaterThan(2.5);
+    expect(ticks * TICK_DT).toBeLessThan(4.5);
     expect(planet.coreHp).toBe(CORE_HP);
   });
 
-  it('never targets its owner\'s own planet or turrets', () => {
+  it('never shoots its owner\'s own planet or turrets', () => {
     const turret = makeTurret({ id: 5, owner: 0, pos: at(100, 0) });
     const planet = makePlanet({ id: 0, owner: 0, pos: at(200, 0), turrets: [turret] });
     const owner = makeShip({ id: 0, pos: at(0, 0), angle: 0 });
@@ -601,7 +611,9 @@ describe('the beam finishes its target list (GDD §2.4)', () => {
 
     expect(turret.hp).toBe(TURRET.hp);
     expect(planet.coreHp).toBe(CORE_HP);
-    expect(owner.beam!.hitPoint).toBeNull();
+    // Auto-aim found no valid enemy target, so nothing was mined or fired.
+    expect(owner.beam).toBeNull();
+    expect(live(world)).toHaveLength(0);
   });
 
   it('spawn protection covers the core for its 10 seconds (GDD §2.1)', () => {

@@ -42,6 +42,7 @@ import {
   CARGO_BASE,
   MINING_RATE,
   SHIP_STATS,
+  SHIP_WEAPON,
   TRACK_ORDER,
   UPGRADES,
   VANGUARD_BEAM,
@@ -206,6 +207,49 @@ export function shipBeamCoreDps(loadout: ShipLoadout): number {
  *  against the Vanguard baseline, so a stock Vanguard mines exactly 0.5/s. */
 export function shipMiningRate(loadout: ShipLoadout): number {
   return MINING_RATE * (shipBeam(loadout) / VANGUARD_BEAM);
+}
+
+// ---------------------------------------------------------------------------
+// Weapon projectile stats (design amendment v0.2 — combat is projectiles)
+// ---------------------------------------------------------------------------
+//
+// Ship-vs-ship and ship-vs-structure combat fires a pooled projectile
+// (`./projectiles`) instead of the instant beam, so "make them faster, stronger"
+// (the developer's own words) rides the *same* beam upgrade track the mining
+// speed and weapon damage already ride — one beam, one stat (GDD §2.5). Damage
+// is the beam DPS per shot; muzzle speed climbs the beam multiplier ladder, so a
+// beam-maxed ship's shots are both harder to dodge and harder-hitting, and a
+// stock ship's shot is dodgeable at combat range (the whole point of the switch).
+
+/** Per-shot weapon damage vs a ship or turret — this ship's beam DPS over one
+ *  fire interval, so the delivered DPS *if every shot lands* is exactly the beam
+ *  stat the old hitscan beam dealt (GDD §2.8). Missing is the new skill floor. */
+export function shipWeaponDamage(loadout: ShipLoadout): number {
+  return shipBeamShipDps(loadout) * SHIP_WEAPON.fireInterval;
+}
+
+/** Muzzle speed (world units/s) of this ship's weapon projectile — the base
+ *  speed scaled by the beam upgrade tier's multiplier (tier 0 = base). Only the
+ *  *upgrade* multiplier, not the class beam stat, so every hull's stock shot has
+ *  the same dodgeable base velocity and the beam track alone buys "faster". */
+export function shipProjectileSpeed(loadout: ShipLoadout): number {
+  return SHIP_WEAPON.projectileSpeed * beamTierMul(loadout);
+}
+
+/** Flight lifetime (seconds) of this ship's weapon projectile — `range / speed`,
+ *  so a faster (upgraded) shot still reaches the same weapon range rather than
+ *  out-ranging it. */
+export function shipProjectileLife(loadout: ShipLoadout): number {
+  return SHIP_WEAPON.range / shipProjectileSpeed(loadout);
+}
+
+/** The beam track's *multiplier* for this loadout (1 at tier 0). Distinct from
+ *  {@link shipBeam}, which folds in the class base — muzzle speed wants only the
+ *  upgrade multiplier so class identity stays in damage, not velocity. */
+function beamTierMul(loadout: ShipLoadout): number {
+  const spec = UPGRADES[UpgradeTrack.Beam];
+  // Beam is a 'multiply' track, so its step is the multiplier itself.
+  return spec.steps[tierOf(loadout, UpgradeTrack.Beam)] ?? 1;
 }
 
 // ---------------------------------------------------------------------------

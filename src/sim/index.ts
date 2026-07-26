@@ -30,6 +30,8 @@ export * from './waves';
 export * from './match';
 export * from './step';
 export * from './buildings';
+// Pooled combat projectiles — ship weapons and turret guns (design amendment v0.2).
+export * from './projectiles';
 export * from './damage';
 // Read model: every firing ship + turret this tick, for the renderer / audio.
 export * from './combat-view';

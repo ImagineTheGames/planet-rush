@@ -24,7 +24,7 @@
  */
 
 import type { Action, AimAction, BoostAction, FireAction, Rng, ThrustAction, Vec2 } from '@shared/types';
-import { BASE_SPEED, BEAM_RANGE, SHIP_RADIUS, SHIP_STATS } from '../sim';
+import { BASE_SPEED, BEAM_RANGE, leadAim, SHIP_RADIUS, SHIP_STATS, shipProjectileSpeed } from '../sim';
 import type { SelfView } from './perception';
 
 // ---------------------------------------------------------------------------
@@ -253,11 +253,27 @@ export function dodge(self: SelfView, dir: Vec2, center: Vec2, radius: number): 
  * The error is redrawn every *decision*, not every tick, so an Easy bot's aim
  * visibly wanders at its own slow reaction cadence while a Hard bot's does not —
  * which is exactly the difference GDD §2.9 asks difficulty to express.
+ *
+ * When `targetVel` is given, the aim is an **intercept lead** on a mover, not a
+ * straight bearing at where it stands (design amendment v0.2: combat is a
+ * projectile, so a shot fired where a strafing enemy *is* misses — Easy bots go
+ * harmless and Hard bots stall without lead). `jitter` still rides on top, so the
+ * tier ladder is intact — an Easy bot leads *badly*, a Hard bot leads well.
  */
-export function aimAt(self: SelfView, target: Vec2, jitter: number, rng: Rng): AimAction {
-  const dir = toward(self.pos, target, { x: Math.cos(self.angle), y: Math.sin(self.angle) });
+export function aimAt(self: SelfView, target: Vec2, jitter: number, rng: Rng, targetVel?: Vec2): AimAction {
+  const dir = aimDir(self, target, targetVel);
   if (jitter <= 0) return aim(dir);
   return aim(rotate(dir, (rng.next() * 2 - 1) * jitter));
+}
+
+/** The unit aim direction at a target: a straight bearing at a still one, an
+ *  intercept lead at a mover (using this hull's actual muzzle speed). */
+function aimDir(self: SelfView, target: Vec2, targetVel?: Vec2): Vec2 {
+  const fallback = { x: Math.cos(self.angle), y: Math.sin(self.angle) };
+  if (!targetVel || (targetVel.x === 0 && targetVel.y === 0)) {
+    return toward(self.pos, target, fallback);
+  }
+  return leadAim(self.pos, target, targetVel, shipProjectileSpeed(self));
 }
 
 /**
@@ -277,11 +293,20 @@ export const FIRE_TOLERANCE = 0.06;
  * trigger through a 180° turn, lighting up the sky, and telling every player on
  * the map exactly where they are (GDD §2.2 — "the beam is the loudest tell").
  */
-export function canHit(self: SelfView, target: Vec2, targetRadius: number, extraTolerance = 0): boolean {
+export function canHit(
+  self: SelfView,
+  target: Vec2,
+  targetRadius: number,
+  extraTolerance = 0,
+  targetVel?: Vec2,
+): boolean {
   const d = dist(self.pos, target);
   if (d > BEAM_RANGE) return false;
   if (d < 1e-6) return true;
-  const want = Math.atan2(target.y - self.pos.y, target.x - self.pos.x);
+  // Fire when the hull points at the *intercept* bearing, not the raw target
+  // bearing — a leading shot only lands if the nose is on the lead (amendment v0.2).
+  const lead = aimDir(self, target, targetVel);
+  const want = Math.atan2(lead.y, lead.x);
   const halfWidth = Math.atan2(targetRadius, d);
   return Math.abs(angleDelta(self.angle, want)) <= halfWidth + FIRE_TOLERANCE + extraTolerance;
 }
