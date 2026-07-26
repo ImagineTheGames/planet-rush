@@ -738,5 +738,25 @@
     "buildSha": "1be25f2",
     "verdict": "failed",
     "attestation": "The SETTINGS screen on a clean boot (no ?debug=1; navigated by clicking through the main menu). Crucially it was captured with a recording navigator.vibrate defined BEFORE any page script ran, so the haptics service feature-detects a motor and haptics.isSupported() reports TRUE — meaning a motor-gated Vibration toggle WOULD render if one existed. It does not. The screen shows exactly five rows under the 'SETTINGS' title: FIRE MODE (MANUAL), REDUCE VFX (OFF), MASTER VOLUME (stepped bar), SFX VOLUME (stepped bar), MUSIC VOLUME (stepped bar), and a 'DONE' button. There is NO Vibration/Haptics row or toggle anywhere. This matches the source: SETTINGS_ROWS (src/ui/settings.ts) lists only fireMode, reduceVfx and the volume channels, and no UI reads haptics.isSupported() (the main.ts comment describing a hidden-where-unsupported toggle is not implemented). The haptics SERVICE itself is wired and works (see the haptics note on press-feedback: the live-stage spy test passes), but the player has no on-screen control to turn vibration off. FAILED for the 'Vibration toggle appears in settings' claim — reported plainly with the settings screen as proof of the absence."
+  },
+  {
+    "id": "press-feedback-tip-697ddb8",
+    "title": "Press feedback re-verified on the current tip (697ddb8) — pressed vs rejected, one strip",
+    "area": "build-wheel",
+    "image": "images/press-feedback-strip.png",
+    "capturedAt": "2026-07-26T17:10:00Z",
+    "buildSha": "697ddb8",
+    "verdict": "verified",
+    "attestation": "Corroboration of the delivered 'press-feedback' entries on the CURRENT branch tip — a clean build 697ddb8, one build ahead of the original captures (1be25f2, dirty). A two-up strip of the SAME Build wheel on a touch profile (900x600, dpr2, hasTouch), driven through the shipped ?debug=1 __pressStage seam with a real pointer held on the TURRET wedge. LEFT (PRESSED): hub reads 999 ORE (TOTAL 999); the TURRET wedge at twelve o'clock is lit with a bright cyan/plasma outline glow and a lighter fill, every other wedge (SHIELD 5, REPAIR CORE, UPGRADE SHIP, BANK) dark neutral — seam read scale 0.9 / glow 0.6 / reject 0. RIGHT (REJECTED): identical wheel with the bank DRAINED (hub 0 ORE, TOTAL 0) so TURRET is unaffordable; pressing it flashes the wedge threat-RED (seam reject 0.7 / glow 0) and the bank stayed 0 before and after. Cyan-lit accepted vs red-flashed rejected, unmistakably different. HAPTICS (unphotographable): the live-stage haptics spy test (tests/live-stage/haptics.spec.ts) PASSES on THIS build 697ddb8 — I ran it and a real pointer tap drove navigator.vibrate exactly once with the tap pattern [10]. The Vibration TOGGLE is still absent from Settings on this tip (the delivered 'settings-vibration-absent' finding still holds on 697ddb8). VERIFIED."
+  },
+  {
+    "id": "repair-confirmation-tip-697ddb8",
+    "title": "Repair confirmation re-verified on the current tip (697ddb8) — a real heal, cost floats to bank",
+    "area": "build-wheel",
+    "image": "images/repair-confirmation-tip-697ddb8.png",
+    "capturedAt": "2026-07-26T17:10:00Z",
+    "buildSha": "697ddb8",
+    "verdict": "verified",
+    "attestation": "Corroboration of the delivered 'repair-confirmation' flagship on the CURRENT clean tip 697ddb8 (the original was captured on the dirty 1be25f2). A REAL repair (desktop 1280x800, NO ?freeze — the sim stepped so the core actually healed): own core damaged to 40/100 via the damageCore seam, Build wheel opened with 40 ore, REPAIR CORE pressed through the real pointer path. VISIBLE in the captured mid-repair frame: the REPAIR CORE wedge (bottom-right, cost 1) lit brighter than its neighbours; a single signal-YELLOW '1' — the 1-ore repair entry cost — floating free between the wheel and the top-left TOTAL, travelling toward the bank; a bright cyan shimmer ring around the central core hub; the top-right HOME planet-HP bar about two-thirds filled. BEFORE / AFTER off the sim seams: core 40 -> 66 of 100 (a real +26 heal), bank 40 -> 34.78 ore (~5 spent); captured frame core ~65, bank ~34.94 (hub '34 ORE', TOTAL 34), shimmer 0.67, float at 21% travel / alpha 0.79. No page errors. VERIFIED."
   }
 ]
