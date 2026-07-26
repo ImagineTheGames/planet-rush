@@ -14,7 +14,7 @@
  */
 
 import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { WEAPON_RANGE, PLANET, SHIELD, TURRET } from '../sim';
+import { WEAPON_RANGE, PLANET, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
@@ -160,21 +160,33 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
   // outlast the thing it is escaping.
   const brain = ctx.brain;
   if (brain.stuckFor >= STUCK_DECISIONS && ctx.view.time >= brain.escapeUntil) {
-    const away = worstPos === null ? { x: -dir.x, y: -dir.y } : toward(worstPos, ctx.self.pos);
-    // Away from the obstacle, thrown off to one side so the escape is a run
-    // *past* it rather than a rebound into the same approach. The draw is the
-    // bot's own seeded stream, so it stays deterministic and two bots wedged in
-    // the same clump do not pick the same line out of it.
-    brain.escapeDir = rotate(away, (brain.rng.next() * 2 - 1) * ESCAPE_SPREAD);
+    // The way *out*, not merely away from the single nearest rock: "away from the
+    // closest body" in a dense central cluster (GDD §2.3) is usually straight into
+    // the next one, which is exactly how a bot trades one wedge for another and
+    // never leaves. `openDirection` sums the repulsion of the whole clump, so it
+    // points down the clearest lane.
+    const fallback = worstPos === null ? { x: -dir.x, y: -dir.y } : toward(worstPos, ctx.self.pos);
+    const open = openDirection(ctx, fallback, ignoreRock);
+    // Thrown off to one side so two bots wedged in the same clump do not pick the
+    // same line, and so a lane the resultant points dead-down is still committed
+    // to off-centre rather than threaded perfectly. The draw is the bot's own
+    // seeded stream, so it stays deterministic.
+    brain.escapeDir = rotate(open, (brain.rng.next() * 2 - 1) * ESCAPE_SPREAD);
     brain.escapeUntil = ctx.view.time + ESCAPE_SECONDS;
     brain.stuckFor = 0;
   }
+  // The heading this decision commits to: the escape run while one is live, else
+  // the tree's own desired direction.
   const escaping = ctx.view.time < brain.escapeUntil;
-  const steered = escaping
-    ? brain.escapeDir
-    : worstPos === null
-      ? dir
-      : dodge(ctx.self, dir, worstPos, worstRadius);
+  const heading = escaping ? brain.escapeDir : dir;
+  // Curve *either* heading around the nearest body. An escape run that ignored
+  // obstacles (as this once did) drives straight out of one rock and into the
+  // next in a dense central cluster, so the bot never actually leaves — it just
+  // trades which rock it is pinned against. Sliding the escape past whatever is
+  // ahead is what lets a committed run thread out of the clump; the escape points
+  // *away* from the body it was wedged on, so dodging around later ones curves
+  // the exit, it never loops the run back onto the target.
+  const steered = worstPos === null ? heading : dodge(ctx.self, heading, worstPos, worstRadius);
 
   const out = clampUnit(steered);
   ctx.brain.lastThrust = Math.sqrt(out.x * out.x + out.y * out.y);
@@ -185,8 +197,76 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
  *  late-wave asteroid cluster at cruise. TUNABLE */
 export const ESCAPE_SECONDS = 1.5;
 
-/** Half-angle the escape heading is thrown off "straight back". TUNABLE */
+/** Half-angle the escape heading is thrown off the open lane. TUNABLE */
 export const ESCAPE_SPREAD = Math.PI / 3;
+
+/** How far out {@link openDirection} lets a body vote on the way out. Wide enough
+ *  to take in a whole late-wave cluster around a wedged hull, short enough that
+ *  rocks the bot is nowhere near do not drag the escape sideways. TUNABLE */
+export const ESCAPE_SENSE = 220;
+
+/** Denominator floor for a body's escape-repulsion weight, in surface-distance
+ *  units. A touching or overlapping body (slack ≤ 0) is clamped to this rather
+ *  than dividing by ~zero, so the resultant stays finite and one contact never
+ *  drowns out the rest of the clump. TUNABLE */
+export const ESCAPE_WEIGHT_FLOOR = 6;
+
+/**
+ * The clearest direction out of wherever a bot is wedged: a proximity-weighted
+ * sum of the unit vectors *away* from every body within {@link ESCAPE_SENSE},
+ * normalised. Because a nearer body pushes harder ({@link ESCAPE_WEIGHT_FLOOR}
+ * sets the ceiling on that push), the resultant leans down the open lane between
+ * rocks instead of straight back off the single closest one — the difference
+ * between leaving a cluster and swapping which rock you are pinned against.
+ *
+ * This is a *potential-field* read, the very thing {@link go}'s per-tick steering
+ * deliberately avoids because thirty overlapping pushes shiver a ship in place.
+ * It is safe *here* only because it is sampled once, at the instant an escape is
+ * committed, and then flown open-loop for {@link ESCAPE_SECONDS} — a heading, not
+ * a per-tick force. `fallback` is returned when nothing is close enough to repel.
+ */
+export function openDirection(ctx: BotCtx, fallback: Vec2, ignoreRock?: number): Vec2 {
+  let rx = 0;
+  let ry = 0;
+  const vote = (pos: Vec2, radius: number, distance: number): void => {
+    const slack = distance - radius;
+    if (slack > ESCAPE_SENSE) return;
+    const away = toward(pos, ctx.self.pos, fallback);
+    const denom = Math.max(ESCAPE_WEIGHT_FLOOR, slack);
+    const w = 1 / (denom * denom);
+    rx += away.x * w;
+    ry += away.y * w;
+  };
+  for (const rock of ctx.view.asteroids) {
+    if (rock.id === ignoreRock) continue;
+    vote(rock.pos, rock.radius, rock.distance);
+  }
+  for (const planet of ctx.view.planets) vote(planet.pos, planet.radius, planet.distance);
+  const own = ctx.self.planet;
+  if (own) vote(own.pos, own.radius, own.distance);
+
+  // The arena edge is a hard wall (`sim/step.ts` clamps position and kills the
+  // inward velocity), so a bot fled into a corner is as wedged as one against a
+  // rock — and no body in view repels it back out. Vote the four walls in as
+  // inward pushes, weighted by how close each one is, so the open lane leans away
+  // from the corner rather than deeper into it.
+  const { x: px, y: py } = ctx.self.pos;
+  const wall = (ax: number, ay: number, slack: number): void => {
+    if (slack > ESCAPE_SENSE) return;
+    const denom = Math.max(ESCAPE_WEIGHT_FLOOR, slack);
+    const w = 1 / (denom * denom);
+    rx += ax * w;
+    ry += ay * w;
+  };
+  wall(1, 0, px - SHIP_RADIUS);
+  wall(-1, 0, ctx.view.bounds.width - px - SHIP_RADIUS);
+  wall(0, 1, py - SHIP_RADIUS);
+  wall(0, -1, ctx.view.bounds.height - py - SHIP_RADIUS);
+
+  const m = Math.sqrt(rx * rx + ry * ry);
+  if (m < 1e-9) return fallback;
+  return { x: rx / m, y: ry / m };
+}
 
 // ---------------------------------------------------------------------------
 // Purchases (GDD §2.5 — one wheel, five segments, and the panel behind one)
