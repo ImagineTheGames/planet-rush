@@ -69,6 +69,7 @@ export type UpgradeTiers = Record<UpgradeTrack, number>;
 export function stockTiers(): UpgradeTiers {
   return {
     [UpgradeTrack.Power]: 0,
+    [UpgradeTrack.Speed]: 0,
     [UpgradeTrack.Engine]: 0,
     [UpgradeTrack.Cargo]: 0,
     [UpgradeTrack.Hull]: 0,
@@ -229,27 +230,37 @@ export function shipMineYield(loadout: ShipLoadout): number {
 // ---------------------------------------------------------------------------
 //
 // Ship-vs-ship, ship-vs-structure, and (since v0.3) mining all fire a pooled
-// projectile (`./projectiles`) instead of a hitscan ray, so "make them faster,
-// stronger" (the developer's own words) rides the *same* power upgrade track the
-// mining speed and weapon damage already ride — one weapon, one stat (GDD §2.5).
-// Damage is the power DPS per shot; muzzle speed climbs the power multiplier
-// ladder, so a power-maxed ship's shots are both harder to dodge and
-// harder-hitting, and a stock ship's shot is dodgeable at combat range (the whole
-// point of the switch).
+// projectile (`./projectiles`) instead of a hitscan ray. "Make them faster,
+// stronger" (the developer's own words) is now TWO upgrade tracks, not one
+// (v0.2.2 field report):
+//
+//  - DAMAGE (`UpgradeTrack.Power`) — how hard a shot bites. Rides the class power
+//    stat, so mining speed and weapon damage still move together, one stat
+//    (GDD §2.5). This is `shotDamage`.
+//  - SPEED (`UpgradeTrack.Speed`) — muzzle velocity, and nothing else. A faster
+//    shot is harder to dodge, so it lands the damage you already have more often.
+//    This is `shotSpeed`, and it is deliberately independent of the class power
+//    stat: every hull's stock shot shares one dodgeable base velocity, and only
+//    the SPEED track buys "faster".
+//
+// A stock ship's shot is dodgeable at combat range (the whole point of the switch
+// to projectiles); a player buys DAMAGE to punish the hits that land and SPEED to
+// make more of them land — separate decisions, separate wedges.
 
 /** Per-shot weapon damage vs a ship or turret — this ship's power DPS over one
  *  fire interval, so the delivered DPS *if every shot lands* is exactly the power
- *  stat the old hitscan weapon dealt (GDD §2.8). Missing is the new skill floor. */
+ *  stat the old hitscan weapon dealt (GDD §2.8). Missing is the new skill floor.
+ *  Rides the DAMAGE track (`UpgradeTrack.Power`); see {@link shotDamage}. */
 export function shipWeaponDamage(loadout: ShipLoadout): number {
   return shipWeaponDps(loadout) * SHIP_WEAPON.fireInterval;
 }
 
-/** Muzzle speed (world units/s) of this ship's weapon projectile — the base
- *  speed scaled by the power upgrade tier's multiplier (tier 0 = base). Only the
+/** Muzzle speed (world units/s) of this ship's weapon projectile — the base speed
+ *  scaled by the SPEED upgrade tier's multiplier (tier 0 = base). Only the SPEED
  *  *upgrade* multiplier, not the class power stat, so every hull's stock shot has
- *  the same dodgeable base velocity and the power track alone buys "faster". */
+ *  the same dodgeable base velocity and the SPEED track alone buys "faster". */
 export function shipProjectileSpeed(loadout: ShipLoadout): number {
-  return SHIP_WEAPON.projectileSpeed * powerTierMul(loadout);
+  return SHIP_WEAPON.projectileSpeed * speedTierMul(loadout);
 }
 
 /** Flight lifetime (seconds) of this ship's weapon projectile — `range / speed`,
@@ -259,13 +270,35 @@ export function shipProjectileLife(loadout: ShipLoadout): number {
   return SHIP_WEAPON.range / shipProjectileSpeed(loadout);
 }
 
-/** The power track's *multiplier* for this loadout (1 at tier 0). Distinct from
+/** The SPEED track's *multiplier* for this loadout (1 at tier 0). Distinct from
  *  {@link shipPower}, which folds in the class base — muzzle speed wants only the
- *  upgrade multiplier so class identity stays in damage, not velocity. */
-function powerTierMul(loadout: ShipLoadout): number {
-  const spec = UPGRADES[UpgradeTrack.Power];
-  // Power is a 'multiply' track, so its step is the multiplier itself.
-  return spec.steps[tierOf(loadout, UpgradeTrack.Power)] ?? 1;
+ *  upgrade multiplier so class identity stays in DAMAGE, not velocity. */
+function speedTierMul(loadout: ShipLoadout): number {
+  const spec = UPGRADES[UpgradeTrack.Speed];
+  // Speed is a 'multiply' track, so its step is the multiplier itself.
+  return spec.steps[tierOf(loadout, UpgradeTrack.Speed)] ?? 1;
+}
+
+// ---------------------------------------------------------------------------
+// The two WEAPON-group accessors (v0.2.2 field report — DAMAGE and SPEED)
+// ---------------------------------------------------------------------------
+//
+// Canonical, symmetrically-named readers for the split projectile tracks, so a
+// caller reads the weapon's two dimensions the same way — `shotDamage(ship)` and
+// `shotSpeed(ship)` — and a projectile honours each track's tier state through
+// one of these (`./projectiles`). They alias the ship* functions above; the names
+// are the projectile-tracks vocabulary the field report and its tests speak.
+
+/** Per-shot weapon DAMAGE (HP per hit) — the DAMAGE track's payoff at this
+ *  loadout's tier. The `SHOT_DAMAGE` half of the WEAPON group. */
+export function shotDamage(loadout: ShipLoadout): number {
+  return shipWeaponDamage(loadout);
+}
+
+/** Muzzle SPEED (world units/s) — the SPEED track's payoff at this loadout's
+ *  tier. The `SHOT_SPEED` half of the WEAPON group. */
+export function shotSpeed(loadout: ShipLoadout): number {
+  return shipProjectileSpeed(loadout);
 }
 
 // ---------------------------------------------------------------------------

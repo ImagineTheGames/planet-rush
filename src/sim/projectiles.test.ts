@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 import {
   activeProjectilesOf,
   fireShipProjectile,
@@ -30,7 +30,14 @@ import {
   type World,
 } from './index';
 import { CORE_HP, PLANET, SHIELD, SHIP_RADIUS, SHIP_WEAPON, TURRET } from './constants';
-import { shipCargoCap, shipMaxHull, stockTiers } from './upgrades';
+import {
+  maxTier,
+  shipCargoCap,
+  shipMaxHull,
+  shipProjectileSpeed,
+  shipWeaponDamage,
+  stockTiers,
+} from './upgrades';
 import { normalize } from './vec';
 
 // --- builders (self-contained fixtures, no ring layout) --------------------
@@ -328,3 +335,63 @@ describe('the shared projectile pool (GDD §4.3)', () => {
     expect(world.projectiles.length).toBeLessThan(12);
   });
 });
+
+// --- the WEAPON group rides the shot (v0.2.2 field report) -----------------
+
+describe('a fired projectile honors the SPEED and DAMAGE tiers (v0.2.2)', () => {
+  it('carries the muzzle speed and per-hit damage of its exact loadout', () => {
+    // A spread of (speed, damage) tier pairs — the two tracks vary independently.
+    const pairs: readonly (readonly [number, number])[] = [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [0, 3],
+      [2, 3],
+    ];
+    for (const [speedTier, dmgTier] of pairs) {
+      const tiers = {
+        ...stockTiers(),
+        [UpgradeTrack.Speed]: speedTier,
+        [UpgradeTrack.Power]: dmgTier,
+      };
+      const ship = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, tiers });
+      const world = makeWorld({ ships: [ship] });
+      fireShipProjectile(world, ship, normalize({ x: 1, y: 0 }));
+
+      const shots = activeProjectilesOf(world, 0);
+      expect(shots.length).toBe(1);
+      const shot = shots[0]!;
+      // The shot's velocity magnitude is exactly the SPEED-track muzzle speed…
+      expect(Math.hypot(shot.vel.x, shot.vel.y)).toBeCloseTo(shipProjectileSpeed(ship), 6);
+      // …and its damage is exactly the DAMAGE-track per-hit value.
+      expect(shot.damage).toBeCloseTo(shipWeaponDamage(ship), 6);
+    }
+  });
+
+  it('a SPEED-maxed shot flies strictly faster than a stock shot at the same DAMAGE', () => {
+    const stock = makeShip({ id: 0, pos: { x: 0, y: 0 } });
+    const fast = makeShip({
+      id: 1,
+      pos: { x: 500, y: 0 },
+      tiers: { ...stockTiers(), [UpgradeTrack.Speed]: maxTier(UpgradeTrack.Speed) },
+    });
+    const world = makeWorld({ ships: [stock, fast] });
+    fireShipProjectile(world, stock, normalize({ x: 1, y: 0 }));
+    fireShipProjectile(world, fast, normalize({ x: 1, y: 0 }));
+
+    const stockSpeed = Math.hypot(...velOf(world, 0));
+    const fastSpeed = Math.hypot(...velOf(world, 1));
+    expect(fastSpeed).toBeGreaterThan(stockSpeed);
+    // Same per-hit damage — SPEED bought velocity, not bite.
+    expect(activeProjectilesOf(world, 1)[0]!.damage).toBeCloseTo(
+      activeProjectilesOf(world, 0)[0]!.damage,
+      6,
+    );
+  });
+});
+
+/** The velocity of an owner's single active shot, as a tuple for `Math.hypot`. */
+function velOf(world: World, owner: number): [number, number] {
+  const shot = activeProjectilesOf(world, owner)[0]!;
+  return [shot.vel.x, shot.vel.y];
+}
