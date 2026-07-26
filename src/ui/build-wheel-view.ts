@@ -53,7 +53,12 @@ import { PALETTE } from '@render/index';
 import { SEGMENT_ARC } from './build-wheel';
 import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel';
 import { upgradeWedgeArc } from './upgrade-wheel';
-import type { UpgradeWheelModel, UpgradeWedge, UpgradeWedgeState } from './upgrade-wheel';
+import type {
+  UpgradeWheelModel,
+  UpgradeWedge,
+  UpgradeWedgeState,
+  UpgradeSummaryPip,
+} from './upgrade-wheel';
 import { WheelToggle } from './wheel-toggle';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
@@ -62,6 +67,7 @@ import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 /** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
  *  (a bought tier must re-render its wedge here). */
 export interface DrawnUpgradeWedge {
+  readonly kind: UpgradeWedge['kind'];
   readonly track: UpgradeWedge['track'];
   readonly label: string;
   readonly tier: number;
@@ -69,6 +75,8 @@ export interface DrawnUpgradeWedge {
   readonly next: string | null;
   readonly cost: number | null;
   readonly state: UpgradeWedgeState;
+  /** The WEAPON wedge's tier summary (pips), or `null` on other wedges. */
+  readonly summary: UpgradeWedge['summary'];
 }
 
 // ---------------------------------------------------------------------------
@@ -147,8 +155,19 @@ interface WedgeDraw {
   readonly ready: boolean;
   /** Whether the cost numeral is payable — drives its yellow-vs-grey. */
   readonly costReady: boolean;
-  /** Draw the "opens a screen" arrow (UPGRADE SHIP on the Build wheel only). */
+  /** Draw the "opens a screen" arrow — UPGRADE SHIP on the Build wheel, and the
+   *  WEAPON wedge on the upgrade wheel (both open a wheel behind them). */
   readonly arrow: boolean;
+  /** Draw the "go back" chevron (the weapon sub-wheel's BACK wedge). */
+  readonly back: boolean;
+}
+
+/** A weapon track's tiers as filled-vs-empty pip glyphs: `●●○` at tier 2 of 3.
+ *  A compact, palette-neutral summary that reads without opening the sub-wheel. */
+function pipRow(pip: UpgradeSummaryPip): string {
+  const filled = '●'.repeat(Math.max(0, pip.tier));
+  const empty = '○'.repeat(Math.max(0, pip.maxTier - pip.tier));
+  return `${pip.label} ${filled}${empty}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -352,6 +371,7 @@ export class BuildWheelView extends Container {
     // re-render here). Rebuilt from the model the view just drew from.
     this.lastUpgradeDrawn = true;
     this.lastUpgradeWedges = model.wedges.map((w) => ({
+      kind: w.kind,
       track: w.track,
       label: w.label,
       tier: w.tier,
@@ -359,6 +379,7 @@ export class BuildWheelView extends Container {
       next: w.next,
       cost: w.cost,
       state: w.state,
+      summary: w.summary,
     }));
   }
 
@@ -464,13 +485,15 @@ export class BuildWheelView extends Container {
       nodes.cost.visible = false;
     }
 
-    nodes.arrow.visible = d.arrow;
-    if (d.arrow) {
+    // An "opens a screen" arrow points right (UPGRADE SHIP, WEAPON); the BACK
+    // chevron points left, off the label's leading edge — one node, two glyphs.
+    const showArrow = d.arrow || d.back;
+    nodes.arrow.visible = showArrow;
+    if (showArrow) {
       nodes.arrow.clear();
-      nodes.arrow
-        .poly([0, -5, 8, 0, 0, 5])
-        .fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
-      nodes.arrow.x = nodes.label.width / 2 + 10;
+      const glyph = d.back ? [8, -5, 0, 0, 8, 5] : [0, -5, 8, 0, 0, 5];
+      nodes.arrow.poly(glyph).fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
+      nodes.arrow.x = d.back ? -(nodes.label.width / 2 + 18) : nodes.label.width / 2 + 10;
       nodes.arrow.y = -9;
     }
   }
@@ -533,13 +556,43 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
     ready: wedgeReady(seg.state),
     costReady: seg.state === 'ready',
     arrow: seg.opensPanel,
+    back: false,
   };
 }
 
-/** An Upgrade-wheel wedge: label, its current → next stat value, its cost. This
- *  screen is the one place a stat value ever shows, so the second line carries
- *  it (GDD §2.5): `10 → 13`, or `MAX` on a finished ladder. */
+/** An Upgrade-wheel wedge. A `track` wedge carries its current → next stat value
+ *  (GDD §2.5 — the one screen a stat value ever shows): `10 → 13`, or `MAX` on a
+ *  finished ladder. The WEAPON wedge carries its tier pips and an arrow (it opens
+ *  the sub-wheel); the BACK wedge carries a go-back chevron. */
 function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
+  if (wedge.kind === 'weapon') {
+    // The pips ARE the second line — the main wheel says the weapon tiers at a
+    // glance without the sub-wheel (RATIFIED v0.2.2, item 3). No cost: it opens a
+    // screen rather than spending, exactly like UPGRADE SHIP on the Build wheel.
+    const sub = (wedge.summary ?? []).map(pipRow).join('\n');
+    return {
+      angle: wedge.angle,
+      label: wedge.label,
+      sub,
+      cost: null,
+      ready: wedgeReady(wedge.state),
+      costReady: false,
+      arrow: true,
+      back: false,
+    };
+  }
+  if (wedge.kind === 'back') {
+    return {
+      angle: wedge.angle,
+      label: wedge.label,
+      sub: 'TO SHIP',
+      cost: null,
+      ready: wedgeReady(wedge.state),
+      costReady: false,
+      arrow: false,
+      back: true,
+    };
+  }
   const sub = wedge.state === 'maxed' ? `${wedge.current} · MAX` : `${wedge.current} → ${wedge.next}`;
   return {
     angle: wedge.angle,
@@ -549,6 +602,7 @@ function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
     ready: wedgeReady(wedge.state),
     costReady: wedge.state === 'ready',
     arrow: false,
+    back: false,
   };
 }
 

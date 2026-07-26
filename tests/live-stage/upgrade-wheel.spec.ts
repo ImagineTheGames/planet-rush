@@ -30,22 +30,36 @@ import { test, expect } from '@playwright/test';
 
 /** The `?debug=1`-only upgrade-wheel seam this spec drives (mirrors
  *  `installUpgradeWheelStage` in `src/main.ts`). */
+interface WeaponPip {
+  track: string;
+  label: string;
+  tier: number;
+  maxTier: number;
+}
 interface UpgradeWheelStage {
   openBuild(): { open: boolean } | null;
   openUpgrade(ore?: number): { open: boolean } | null;
+  /** Drill into the nested WEAPON sub-wheel (RATIFIED v0.2.2 — "tap WEAPON"). */
+  openWeapon(): { weaponOpen: boolean } | null;
+  /** Back out of the sub-wheel to the main wheel (the BACK wedge). */
+  back(): { weaponOpen: boolean };
   close(): void;
   interactive(): boolean;
   buyTier(i: number): { result: string; tier: number } | null;
+  /** Buy a tier on a named track — used to buy SPEED off the drawn sub-wheel. */
+  buyByTrack(track: string): { result: string; tier: number } | null;
   tierOf(i: number): number | null;
   setOre(ore: number): { banked: number } | null;
   wedges(): Array<{
-    track: string;
+    kind: 'track' | 'weapon' | 'back';
+    track: string | null;
     label: string;
     tier: number;
     current: string;
     next: string | null;
     cost: number | null;
     state: 'ready' | 'unaffordable' | 'maxed';
+    summary: WeaponPip[] | null;
   }>;
 }
 interface LayoutEntry {
@@ -90,9 +104,10 @@ declare const window: Window & StageWindow;
 const TURRET_WEDGE = 0;
 const REPAIR_WEDGE = 2;
 
-/** POWER leads TRACK_ORDER, so wedge index 0 is POWER on the Vanguard: current 10,
- *  first tier 13 (10 × 1.25), cost 4. */
-const POWER = 0;
+/** buyTier maps onto the flat funnel order [Power, Engine, Cargo, Hull], so index
+ *  1 is ENGINE — a SHIP track that stays on the main wheel (the weapon tracks moved
+ *  into the sub-wheel). On the Vanguard it reads 100% at stock, 115% at tier 1. */
+const ENGINE = 1;
 
 async function boot(page: import('@playwright/test').Page): Promise<string[]> {
   const pageErrors: string[] = [];
@@ -127,15 +142,16 @@ test('the top-right HULL readout is gone from the layout registry (field report 
   expect(pageErrors, 'no page errors on a clean boot').toEqual([]);
 });
 
-test('opening the upgrade wheel draws a wedge per track, buying a tier re-renders it (field report #1)', async ({
+test('the main upgrade wheel is about the SHIP: HULL, ENGINE, CARGO and a WEAPON wedge (RATIFIED v0.2.2)', async ({
   page,
 }) => {
   const pageErrors = await boot(page);
 
   // Open the upgrade wheel with ore to spend, then read the wedges the REAL view
-  // drew — one per upgrade track, all at stock tier on a fresh ship.
+  // drew — the main wheel is the ship: HULL, ENGINE, CARGO and a WEAPON wedge that
+  // opens the sub-wheel. A bare SPEED/DAMAGE wedge never sits next to ENGINE.
   await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
-  const before = await page
+  const main = await page
     .waitForFunction(
       () => {
         const w = window.__upgradeWheelStage!.wedges();
@@ -146,37 +162,53 @@ test('opening the upgrade wheel draws a wedge per track, buying a tier re-render
     )
     .then((h) => h.jsonValue());
 
-  expect(before!.length, 'one wedge per upgrade track').toBeGreaterThanOrEqual(4);
-  const powerBefore = before!.find((w) => w.label === 'POWER')!;
-  expect(powerBefore, 'a POWER wedge is drawn').toBeDefined();
-  expect(powerBefore.tier, 'stock ship starts at tier 0').toBe(0);
-  expect(powerBefore.current, 'Vanguard power reads 10 at stock').toBe('10');
-  expect(powerBefore.next, 'next tier previews the value, not the delta').toBe('13');
-  expect(powerBefore.state, 'affordable with ore banked').toBe('ready');
+  const labels = main!.map((w) => w.label);
+  expect(labels, 'the main wheel names the ship tracks + WEAPON').toEqual([
+    'WEAPON',
+    'ENGINE',
+    'CARGO',
+    'HULL',
+  ]);
+  expect(labels, 'DAMAGE is a weapon-group track — it lives in the sub-wheel').not.toContain('DAMAGE');
+  expect(labels, 'so does SPEED — the whole reason for the sub-wheel').not.toContain('SPEED');
+
+  // The WEAPON wedge opens a screen and summarises the weapon tiers as pips (item 3).
+  const weapon = main!.find((w) => w.label === 'WEAPON')!;
+  expect(weapon.kind, 'the WEAPON wedge opens the sub-wheel, it does not buy').toBe('weapon');
+  expect(weapon.cost, 'a screen-opening wedge shows no cost').toBeNull();
+  expect(weapon.summary, 'it carries a pip summary of the weapon tracks').not.toBeNull();
+  expect(weapon.summary!.map((p) => p.label), 'DAMAGE and SPEED tiers at a glance').toEqual([
+    'DAMAGE',
+    'SPEED',
+  ]);
 
   // The upgrade wheel is registered as a drawn overlay.
   const openIds = await page.evaluate(() => window.__planetRush!.layout.map((e) => e.id));
   expect(openIds, 'the upgrade wheel registers its drawn footprint').toContain('upgrade-wheel');
 
-  // Buy one tier through the sim's real validated purchase.
-  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
-  expect(bought, 'the purchase went through the sim').not.toBeNull();
-  expect(bought!.result, 'buyUpgrade accepted it').toBe('ok');
-  expect(bought!.tier, 'the ship is now one tier up on POWER').toBe(1);
+  // Buy a tier on a main-wheel track (ENGINE) through the sim's real validated
+  // purchase, and assert the wedge re-renders — the path report #1 asked for.
+  const engineBefore = main!.find((w) => w.label === 'ENGINE')!;
+  expect(engineBefore.current, 'Vanguard engine reads 100% at stock').toBe('100%');
+  expect(engineBefore.state, 'affordable with ore banked').toBe('ready');
 
-  // The wedge must re-render the new tier — the whole point of report #1.
-  const powerAfter = await page
+  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), ENGINE);
+  expect(bought!.result, 'buyUpgrade accepted it').toBe('ok');
+  expect(bought!.tier, 'the ship is now one tier up on ENGINE').toBe(1);
+
+  const engineAfter = await page
     .waitForFunction(
       () => {
-        const w = window.__upgradeWheelStage!.wedges().find((x) => x.label === 'POWER');
+        const w = window.__upgradeWheelStage!.wedges().find((x) => x.label === 'ENGINE');
         return w && w.tier === 1 ? w : null;
       },
       undefined,
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(powerAfter!.tier, 'the drawn POWER wedge advanced a tier').toBe(1);
-  expect(powerAfter!.current, 'its current value re-rendered to the new tier (10 → 13)').toBe('13');
+  expect(engineAfter!.current, 'its current value re-rendered to the new tier (100% → 115%)').toBe(
+    '115%',
+  );
 
   expect(pageErrors, 'no page errors staging the upgrade wheel').toEqual([]);
 });
@@ -184,7 +216,7 @@ test('opening the upgrade wheel draws a wedge per track, buying a tier re-render
 test('an unaffordable wedge dims with a reason (field report #1)', async ({ page }) => {
   const pageErrors = await boot(page);
 
-  // Open the wheel with too little ore to buy anything — every wedge should be
+  // Open the wheel with too little ore to buy anything — a buyable wedge should be
   // dimmed, and specifically flagged `unaffordable`, not just greyed.
   await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(0));
   const wedges = await page
@@ -198,23 +230,26 @@ test('an unaffordable wedge dims with a reason (field report #1)', async ({ page
     )
     .then((h) => h.jsonValue());
 
-  const power = wedges!.find((w) => w.label === 'POWER')!;
-  expect(power.state, 'a broke player sees POWER dimmed *because* unaffordable').toBe('unaffordable');
-  expect(power.cost, 'the cost is still shown — the trade stays legible').not.toBeNull();
+  const engine = wedges!.find((w) => w.label === 'ENGINE')!;
+  expect(engine.state, 'a broke player sees ENGINE dimmed *because* unaffordable').toBe('unaffordable');
+  expect(engine.cost, 'the cost is still shown — the trade stays legible').not.toBeNull();
+  // The WEAPON wedge opens a screen, so it is never dimmed for being broke.
+  const weapon = wedges!.find((w) => w.label === 'WEAPON')!;
+  expect(weapon.state, 'WEAPON still invites exploration when broke').toBe('ready');
 
   expect(pageErrors, 'no page errors staging an unaffordable wedge').toEqual([]);
 });
 
-// --- The exact-cost boundary (field report v0.2.2) -------------------------
+// --- The WEAPON sub-wheel + its exact-cost boundary (RATIFIED v0.2.2) --------
 //
-// "TOTAL says 4, POWER costs 4, can't buy." The boundary rule, proved on the
-// REAL booted client through the sim's own `buyUpgrade`: a bank that *equals*
-// the cost buys (and the bank hits zero); a bank one ore short dims the wedge
-// *with the cost still shown*, so the shortfall reads. Both wheels now share one
-// affordability helper (src/ui/affordability.ts) — this pins the upgrade wheel,
-// the build-wheel test below pins the other half of that same helper.
+// The full field flow, proved on the REAL booted client: open upgrades → tap
+// WEAPON → a sub-wheel with both weapon tracks (DAMAGE, SPEED) → buy SPEED at
+// exactly its cost through the sim's own `buyUpgrade` → back out → the main wheel
+// is intact. The exact-cost boundary (p4-06's shared affordability helper, GDD
+// screenshot "TOTAL == cost, can't buy") is inherited here: bank == cost buys and
+// empties the bank; bank == cost-1 dims SPEED with the cost still shown.
 
-test('exact-cost boundary: bank == cost buys and empties the bank; bank == cost-1 dims with the cost shown (field report v0.2.2)', async ({
+test('tap WEAPON → sub-wheel with DAMAGE & SPEED → buy SPEED at exact cost → back out → main wheel intact (RATIFIED v0.2.2)', async ({
   page,
 }) => {
   const pageErrors = await boot(page);
@@ -224,67 +259,102 @@ test('exact-cost boundary: bank == cost buys and empties the bank; bank == cost-
     timeout: 20_000,
   });
 
-  // Read POWER's real cost off the DRAWN wheel — the screenshot's "4" — rather
-  // than hard-coding it, so a retune of the ladder cannot silently rot this test.
+  // Open upgrades — the main wheel — then TAP WEAPON to drill into the sub-wheel.
   await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
-  const cost = await page
+  await page.evaluate(() => window.__upgradeWheelStage!.openWeapon());
+
+  const sub = await page
     .waitForFunction(
       () => {
-        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
-        return p && p.cost != null ? p.cost : null;
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'SPEED') ? w : null;
       },
       undefined,
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(cost, 'the POWER wedge prints a cost').toBeGreaterThan(0);
 
-  // --- bank == cost - 1: one ore short. The wedge must dim WITH its cost, and
-  //     the sim's real purchase must refuse it, spending nothing. ---
+  expect(sub!.map((w) => w.label), 'the sub-wheel is DAMAGE, SPEED, then BACK').toEqual([
+    'DAMAGE',
+    'SPEED',
+    'BACK',
+  ]);
+  const backWedge = sub!.find((w) => w.label === 'BACK')!;
+  expect(backWedge.kind, 'BACK navigates home, it does not buy').toBe('back');
+
+  // Screenshot the drawn sub-wheel (attached to the PR body).
+  await page.screenshot({ path: 'tests/live-stage/weapon-subwheel-evidence.png' });
+
+  // Read SPEED's real cost off the DRAWN sub-wheel rather than hard-coding it, so
+  // a retune of the ladder cannot silently rot this test.
+  const cost = sub!.find((w) => w.label === 'SPEED')!.cost;
+  expect(cost, 'the SPEED wedge prints a cost').toBeGreaterThan(0);
+
+  // --- bank == cost - 1: one ore short. SPEED dims WITH its cost, and the sim's
+  //     real purchase refuses it, spending nothing. ---
   await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c - 1), cost!);
   const short = await page
     .waitForFunction(
       () => {
-        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'SPEED');
         return p && p.state === 'unaffordable' ? p : null;
       },
       undefined,
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(short!.state, 'bank == cost-1 → the wedge is dimmed unaffordable').toBe('unaffordable');
-  expect(short!.cost, 'the cost stays on the dimmed wedge so the shortfall reads').toBe(cost);
+  expect(short!.cost, 'the cost stays on the dimmed SPEED wedge so the shortfall reads').toBe(cost);
 
-  const refused = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  const refused = await page.evaluate(() => window.__upgradeWheelStage!.buyByTrack('speed'));
   expect(refused!.result, 'the sim refuses a bank one ore short').toBe('cannot-afford');
   expect(refused!.tier, 'a refused purchase advances no tier').toBe(0);
   expect(await page.evaluate(() => window.__pressStage!.bank()), 'a refused purchase spends nothing').toBe(
     cost! - 1,
   );
 
-  // --- bank == cost exactly: the developer's screenshot, refuted. The wedge is
-  //     ready, the purchase succeeds, and the bank hits zero. ---
+  // --- bank == cost exactly: SPEED is ready, the purchase succeeds, bank → 0. ---
   await page.evaluate((c) => window.__upgradeWheelStage!.setOre(c), cost!);
   const ready = await page
     .waitForFunction(
       () => {
-        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'POWER');
+        const p = window.__upgradeWheelStage!.wedges().find((w) => w.label === 'SPEED');
         return p && p.state === 'ready' ? p : null;
       },
       undefined,
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(ready!.state, 'bank == cost → the wedge is purchasable, not dimmed').toBe('ready');
+  expect(ready!.state, 'bank == cost → SPEED is purchasable, not dimmed').toBe('ready');
 
-  const bought = await page.evaluate((i) => window.__upgradeWheelStage!.buyTier(i), POWER);
+  const bought = await page.evaluate(() => window.__upgradeWheelStage!.buyByTrack('speed'));
   expect(bought!.result, 'the exact-cost purchase went through the sim').toBe('ok');
-  expect(bought!.tier, 'the ship advanced one tier on POWER').toBe(1);
+  expect(bought!.tier, 'the ship advanced one tier on SPEED').toBe(1);
   expect(await page.evaluate(() => window.__pressStage!.bank()), 'the last ore spent — the bank hit zero').toBe(
     0,
   );
 
-  expect(pageErrors, 'no page errors staging the exact-cost boundary').toEqual([]);
+  // --- Back out: the main wheel is intact, and the WEAPON pip summary caught up. ---
+  await page.evaluate(() => window.__upgradeWheelStage!.back());
+  const main = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.some((x) => x.label === 'WEAPON') ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(main!.map((w) => w.label), 'back out lands on the main wheel, unchanged').toEqual([
+    'WEAPON',
+    'ENGINE',
+    'CARGO',
+    'HULL',
+  ]);
+  const speedPip = main!.find((w) => w.label === 'WEAPON')!.summary!.find((p) => p.label === 'SPEED')!;
+  expect(speedPip.tier, 'the WEAPON summary shows the SPEED tier just bought').toBe(1);
+
+  expect(pageErrors, 'no page errors staging the WEAPON sub-wheel').toEqual([]);
 });
 
 test('the build wheel shares the same exact-cost boundary: TURRET buys at exactly its cost, refuses one ore short (field report v0.2.2)', async ({
@@ -368,6 +438,51 @@ test('mashing each wheel open/closed 15× still opens and stays interactive (fie
 
   await cycle('openBuild', 'build-wheel');
   await cycle('openUpgrade', 'upgrade-wheel');
+
+  // Extend the robustness to the NESTED pair (RATIFIED v0.2.2): drill WEAPON in
+  // and out 15× and assert the sub-wheel still draws and the wheel stays
+  // interactive — the p2-05 leak fix must hold across the extra level too.
+  for (let i = 0; i < 15; i++) {
+    await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade());
+    await page.evaluate(() => window.__upgradeWheelStage!.openWeapon());
+    await page.waitForFunction(
+      () => window.__upgradeWheelStage!.wedges().some((w) => w.label === 'SPEED'),
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.evaluate(() => window.__upgradeWheelStage!.back());
+    await page.waitForFunction(
+      () => window.__upgradeWheelStage!.wedges().some((w) => w.label === 'WEAPON'),
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.evaluate(() => window.__upgradeWheelStage!.close());
+  }
+  // One more full drill after all the mashing — the assertion the field bug fails.
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade());
+  await page.evaluate(() => window.__upgradeWheelStage!.openWeapon());
+  const drilled = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return window.__upgradeWheelStage!.interactive() && w.some((x) => x.label === 'SPEED')
+          ? w
+          : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(drilled!.map((w) => w.label), 'the sub-wheel still drills after 15 cycles').toEqual([
+    'DAMAGE',
+    'SPEED',
+    'BACK',
+  ]);
+  const ids = await page.evaluate(() => window.__planetRush!.layout.map((e) => e.id));
+  expect(ids, 'the upgrade wheel still draws its footprint after the drill mash').toContain(
+    'upgrade-wheel',
+  );
+  await page.evaluate(() => window.__upgradeWheelStage!.close());
 
   expect(pageErrors, 'no page errors while mashing the wheels').toEqual([]);
 });
