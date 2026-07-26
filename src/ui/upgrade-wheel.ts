@@ -48,19 +48,19 @@ import { CARGO_CAP_MAX, CARGO_PER_TIER, SHIP_STATS } from '../sim/constants';
 // ---------------------------------------------------------------------------
 
 /**
- * The four things ore can buy on a ship (GDD §2.5). `power` is deliberately one
- * track and not two: mining speed and weapon damage are **one weapon, one stat**,
- * which is the inversion the whole game turns on.
+ * The track NAMES live in src/shared/types.ts — one enum for the whole repo.
+ * This file used to declare its own identical copy; the copies diverged the
+ * moment SPEED split off DAMAGE (p4-07) and typechecking caught it (#108).
+ * Re-exported so existing `from './upgrade-wheel'` imports keep working.
  */
-export enum UpgradeTrack {
-  Power = 'power',
-  Engine = 'engine',
-  Cargo = 'cargo',
-  Hull = 'hull',
-}
+export { UpgradeTrack } from '@shared/types';
+import { UpgradeTrack } from '@shared/types';
 
-/** Iteration order of the panel's rows, top to bottom. Power leads because it is
- *  the stat that pays for itself twice (mine faster *and* hit harder). */
+/** Iteration order of the panel's rows, top to bottom. Power leads because it
+ *  pays for itself twice. SPEED is deliberately absent from THIS flat panel:
+ *  the WEAPON sub-wheel (p4-10) is where the weapon group renders; until it
+ *  lands, SPEED exists in the sim ladder and is bot-purchasable but has no
+ *  flat-panel row. */
 export const TRACK_ORDER: readonly UpgradeTrack[] = [
   UpgradeTrack.Power,
   UpgradeTrack.Engine,
@@ -78,6 +78,7 @@ export const STOCK_TIERS: UpgradeTiers = {
   [UpgradeTrack.Engine]: 0,
   [UpgradeTrack.Cargo]: 0,
   [UpgradeTrack.Hull]: 0,
+  [UpgradeTrack.Speed]: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -159,6 +160,18 @@ export const UPGRADE_LADDER: UpgradeLadder = {
     format: 'integer',
     max: null,
   },
+  // Speed: projectile muzzle velocity (v0.2.2 split). Mirrors the sim's
+  // SHOT_SPEED_STEPS/COSTS; renders in the WEAPON sub-wheel (p4-10), not this
+  // flat panel — present here so the tier record and ladder types stay total.
+  [UpgradeTrack.Speed]: {
+    track: UpgradeTrack.Speed,
+    label: 'SPEED',
+    steps: [1, 1.15, 1.3],
+    costs: [8, 14], // TUNABLE — a tier above DAMAGE at each rung (sim ratified)
+    mode: 'multiply',
+    format: 'percent',
+    max: null,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -187,6 +200,10 @@ export function trackBase(shipClass: ShipClass, track: UpgradeTrack): number {
       return stats.cargo;
     case UpgradeTrack.Hull:
       return stats.hull;
+    case UpgradeTrack.Speed:
+      // Muzzle velocity, printed as a percentage of the base shot — the same
+      // relative convention ENGINE uses (base = 100%).
+      return 100;
   }
 }
 
