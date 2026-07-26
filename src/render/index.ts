@@ -24,11 +24,13 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
-import type { PlayerId, Vec2 } from '@shared/types';
+import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
 import { SENSOR_RANGE } from '../sim/constants';
 import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
+import { shipSprite } from '../art/ships';
+import { spriteGraphics } from '../art/textures';
 
 // ---------------------------------------------------------------------------
 // Palette (frozen — style-guide.md §1 / §3.1). Hex as PixiJS numbers.
@@ -160,13 +162,20 @@ function makeUnitShot(): Graphics {
   return new Graphics().circle(0, 0, 1).fill(PALETTE.threatRed);
 }
 
-function makeShip(id: number): Graphics {
-  // Placeholder triangle pointing +x (angle 0 faces +x, matching the sim). Hull
-  // stays steel; the cockpit carries player identity (style-guide §3 rule 2).
-  const g = new Graphics();
-  g.poly([1.0, 0.0, -0.7, 0.62, -0.7, -0.62]).fill(PALETTE.hullSteel);
-  g.circle(0.15, 0, 0.28).fill(playerColor(id)); // cockpit = player colour
-  return g;
+/**
+ * Pixels-per-unit the ship hull is drawn at before the per-frame `scale.set`.
+ * Drawing above 1 keeps thin outline strokes from hitting `drawSprite`'s 0.5px
+ * floor; `drawShips` divides it back out so the hull still lands at `ship.radius`.
+ */
+const SHIP_ART_SCALE = 64;
+
+function makeShip(id: number, shipClass: ShipClass): Graphics {
+  // The real hull, from the art pipeline (src/art/ships) — no longer a
+  // placeholder. Drawn once at SHIP_ART_SCALE and then only transformed per
+  // frame, so the pooling discipline (GDD §4.3) is unchanged. The hull stays
+  // steel; player colour rides the trim, cockpit and number decal (style-guide
+  // §3), and the silhouette is the class tell (GDD §2.11).
+  return spriteGraphics(shipSprite({ shipClass, playerId: id }), SHIP_ART_SCALE);
 }
 
 // Crack-stage alpha: an intact rock is solid; a cracked one reads darker
@@ -561,7 +570,7 @@ export class Renderer {
     for (const ship of ships) {
       let g = this.shipGfx[ship.id];
       if (!g) {
-        g = makeShip(ship.id);
+        g = makeShip(ship.id, ship.shipClass);
         this.shipGfx[ship.id] = g;
         this.shipLayer.addChild(g);
       }
@@ -573,7 +582,9 @@ export class Renderer {
       g.x = ship.pos.x;
       g.y = ship.pos.y;
       g.rotation = ship.angle;
-      g.scale.set(ship.radius);
+      // Art is drawn at SHIP_ART_SCALE px/unit, so divide it back out to land
+      // the hull at the ship's collision radius in world units.
+      g.scale.set(ship.radius / SHIP_ART_SCALE);
       // Spawn-protected ships read as translucent (placeholder for the glow VFX).
       g.alpha = ship.spawnProtect > 0 ? 0.5 : 1;
     }

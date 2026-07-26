@@ -61,6 +61,15 @@ function entries(): CatalogueEntry[] {
     });
   }
   for (const c of SHIP_CLASSES) {
+    for (const damage of ['scarred', 'critical'] as const) {
+      out.push({
+        group: 'Ships — states',
+        label: `${c} ${damage}`,
+        def: shipSprite({ shipClass: c, playerId: 0, damage }),
+      });
+    }
+  }
+  for (const c of SHIP_CLASSES) {
     out.push({ group: 'Ships — states', label: `${c} hulk`, def: shipHulkSprite(c) });
   }
 

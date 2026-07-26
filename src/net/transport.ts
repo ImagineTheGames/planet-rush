@@ -79,6 +79,16 @@ export interface JoinMessage {
    * take over a slot that is merely inside its grace window (GDD §4.2).
    */
   reclaimToken?: string;
+  /**
+   * The allocator's signed routing decision (`src/net/ticket.ts`), presented so
+   * a Machine can refuse a join it was never sent (M9 fleet membership). In a
+   * fleet, "which Machine hosts this room?" is a decision the allocator makes and
+   * signs; a client that could pick for itself could land on someone else's
+   * Machine or a room it was never allocated. Absent on the solo/offline path and
+   * on any self-hosted server that runs without a `TICKET_SECRET` — there is only
+   * one Machine, so there is no decision to sign.
+   */
+  ticket?: string;
 }
 
 /** Lobby choices before RUSH!: ship class and, for the creator, bot difficulty. */

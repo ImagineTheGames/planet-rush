@@ -34,6 +34,18 @@
  * other role, or if steel is ever swapped for a player colour. A livery is a
  * palette swap over these four silhouettes, never a new shape (§4), which is
  * why the bot personalities (GDD §2.9) need no art of their own here.
+ *
+ * ## Damage states (GDD §2.11 armor, §3.6 tells)
+ *
+ * A hull under fire is a tell like any other: three bands (`ok` → `scarred` →
+ * `critical`), banded off remaining hull HP the same way an asteroid cracks off
+ * remaining ore. Damage is drawn as **charred plating and split seams** over the
+ * steel, and, at `critical`, a threat-red breach glow — the only warm colour on
+ * a ship, and legal precisely because it is *damage* (style-guide §2). It is a
+ * tell, not a mask: the scorch hugs the spine, avoids the cockpit, and sits
+ * under the identity layer, so trim, number and player colour still read on a
+ * burning ship. The silhouette is untouched — damage never changes which four
+ * shapes a 24px render sees, so recognition survives being on fire.
  */
 
 import { ShipClass } from '@shared/types';
@@ -225,6 +237,53 @@ export function shipSilhouette(shipClass: ShipClass): SpriteDef {
   );
 }
 
+/**
+ * How beaten a hull looks. Three bands, so the pool stays small (a texture per
+ * class × slot × band, not per HP point) and the read is coarse enough to trust
+ * at a glance: whole, hurt, or about to go.
+ */
+export type DamageState = 'ok' | 'scarred' | 'critical';
+
+/**
+ * Band remaining-hull fraction (1 = full, 0 = dead) into a {@link DamageState}.
+ * Thirds, mirroring the asteroid's three crack stages — a ship reads its own
+ * health on the same scale the world reads a rock's payout.
+ */
+export function damageStateFor(hullFraction: number): DamageState {
+  if (hullFraction > 0.66) return 'ok';
+  if (hullFraction > 0.33) return 'scarred';
+  return 'critical';
+}
+
+/**
+ * Charred plating and split seams over the steel — and, at `critical`, a
+ * threat-red breach. Authored in raw unit space (not scaled by `extent`) and
+ * hugging the spine, so the same marks land on the body of a needle Interceptor
+ * and a wide Hauler alike. Returns nothing for an intact hull, so a healthy
+ * ship's sprite is byte-for-byte what it always was.
+ */
+function damageShapes(state: DamageState): Shape[] {
+  if (state === 'ok') return [];
+  const char = fill(DERIVED.wreckBody, 'material', 0.9); // charred steel
+  const seam = stroke(DERIVED.rockFissure, 0.03, 'material', 0.95); // split plating
+  const out: Shape[] = [
+    poly(boxPoly([0.14, 0.05, 0.13, 0.05]), char),
+    poly(boxPoly([-0.28, -0.06, 0.15, 0.05]), char),
+    polyline([0.28, 0.03, 0.1, -0.03, -0.06, 0.04], seam),
+  ];
+  if (state === 'critical') {
+    out.push(
+      poly(boxPoly([-0.04, 0.1, 0.1, 0.045]), char),
+      // A glowing breach. Threat red is legal here because this *is* damage —
+      // the one warm colour a hull may ever wear (style-guide §2, role danger).
+      circle(-0.02, -0.01, 0.11, fill(PALETTE.threatRed, 'danger', 0.5)),
+      circle(-0.02, -0.01, 0.055, fill(PALETTE.threatRed, 'danger', 0.85)),
+      polyline([-0.02, -0.12, 0.04, -0.02, -0.08, 0.05, 0, 0.13], seam),
+    );
+  }
+  return out;
+}
+
 /** What a ship sprite needs to know about the player flying it. */
 export interface ShipSpriteOptions {
   readonly shipClass: ShipClass;
@@ -232,6 +291,8 @@ export interface ShipSpriteOptions {
   readonly playerId: number;
   /** Spawn-protected ships get a plasma shell (GDD §2.1, 10 s). */
   readonly spawnProtected?: boolean;
+  /** How beaten the hull looks (GDD §2.11 armor). Defaults to `'ok'`. */
+  readonly damage?: DamageState;
 }
 
 /**
@@ -243,12 +304,16 @@ export function shipSprite(options: ShipSpriteOptions): SpriteDef {
   const hull = HULLS[shipClass];
   const id = playerColor(playerId);
   const protectedShell = options.spawnProtected === true;
+  const damage = options.damage ?? 'ok';
 
   const steel = fill(PALETTE.hullSteel, 'material');
   const panel = fill(DERIVED.hullShadow, 'material');
   const lit = fill(DERIVED.hullLight, 'material', 0.85);
   const identity = fill(id, 'identity');
-  const rim = stroke(DERIVED.hullDark, 0.03, 'material', 0.9);
+  // One crisp, dark ink outline — the darkest sanctioned steel shade (GAP-
+  // ANALYSIS Lever A). A tighter, darker rim than the old soft `hullDark` is
+  // what makes the four silhouettes snap at gameplay zoom.
+  const rim = stroke(DERIVED.decalInk, 0.035, 'material', 0.95);
 
   const shapes: (Shape | null)[] = [
     // Spawn-protection shell sits behind the hull so the ship stays readable
@@ -262,6 +327,10 @@ export function shipSprite(options: ShipSpriteOptions): SpriteDef {
     ...hull.plates.map((p) => poly(p, rim)),
     ...hull.panels.map((p) => poly(p, panel)),
     ...hull.highlights.map((p) => poly(p, lit)),
+
+    // Battle damage sits on the plating, under the identity layer below, so a
+    // burning hull still reads its player colour and number (a tell, not a mask).
+    ...damageShapes(damage),
 
     // Engine nozzles: dark wells with a player-colour ember at the throat.
     ...hull.nozzles.map((n) => poly(boxPoly(n), fill(DERIVED.hullDark, 'material'))),
@@ -284,8 +353,15 @@ export function shipSprite(options: ShipSpriteOptions): SpriteDef {
     ...hullDecal(playerId, hull.decal[0], hull.decal[1], hull.decal[2]),
   ];
 
+  // The key carries only what changes the look, so healthy ships keep their
+  // original `ship/<class>/p<id>` name (and pooled texture) untouched.
+  const dmg = damage === 'ok' ? '' : `/${damage}`;
   const suffix = protectedShell ? '/protected' : '';
-  return sprite(`ship/${shipClass}/p${playerId}${suffix}`, hull.extent * (protectedShell ? 1.14 : 1), shapes);
+  return sprite(
+    `ship/${shipClass}/p${playerId}${dmg}${suffix}`,
+    hull.extent * (protectedShell ? 1.14 : 1),
+    shapes,
+  );
 }
 
 /**
