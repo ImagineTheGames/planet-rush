@@ -16,12 +16,12 @@
  *
  * Particles can be tinted per emission — a thruster trail has to be the pilot's
  * colour. Style-guide §3 is strict about where identity colour may live ("wing
- * tips, cockpit glass, engine flame, beam tint, planet beacon ring, HP bar"), so
+ * tips, cockpit glass, engine flame, weapon tint, planet beacon ring, HP bar"), so
  * each kind declares whether it may take one:
  *
  *  - `fixed`    — the kind's own palette colour, always. A rock chip is rock.
  *  - `identity` — may be tinted with a roster colour, because the thing it
- *                 depicts is on the style guide's list: engine flame, beam tint.
+ *                 depicts is on the style guide's list: engine flame, weapon tint.
  *
  * `kinds.test.ts` checks emitters against that policy, so the rule is mechanical
  * rather than remembered.
@@ -36,7 +36,7 @@ import { annulusPoints, circle, fill, poly, sprite, type SpriteDef } from '../sh
 
 /** The stock particle looks. Numeric — a particle's kind is a byte column. */
 export const PARTICLE = {
-  /** Plasma bite: beam impact, the cutting torch throwing sparks. */
+  /** Plasma bite: shot impact, the cutting torch throwing sparks. */
   spark: 0,
   /** Firework ember: explosions (GDD §4.7 — "explosions are fireworks"). */
   ember: 1,
@@ -162,9 +162,9 @@ export const PARTICLE_KINDS: readonly ParticleKindSpec[] = [
     name: 'spark',
     color: PALETTE.plasma,
     fade: 'flash',
-    tint: 'identity', // beam tint is on the style guide's identity list (§3)
+    tint: 'identity', // weapon tint is on the style guide's identity list (§3)
     additive: true,
-    why: 'Beam impact — the cold plasma cutting torch biting something.',
+    why: 'Shot impact — the cold plasma cutting torch biting something.',
   },
   {
     kind: PARTICLE.ember,

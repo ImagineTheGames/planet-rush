@@ -52,7 +52,7 @@ describe('the wheel is the one place ship stats appear (GDD §2.2, §2.5)', () =
   it('shows a wedge for each of the four upgrade tracks', () => {
     const wedges = upgradeWheelModel(sig()).wedges;
     expect(wedges.map((w) => w.track)).toEqual([...TRACK_ORDER]);
-    expect(wedges.map((w) => w.label)).toEqual(['BEAM', 'ENGINE', 'CARGO', 'HULL']);
+    expect(wedges.map((w) => w.label)).toEqual(['POWER', 'ENGINE', 'CARGO', 'HULL']);
   });
 
   it('names the hull being upgraded — locked at the lobby (GDD §2.11)', () => {
@@ -67,12 +67,12 @@ describe('the wheel is the one place ship stats appear (GDD §2.2, §2.5)', () =
     expect(upgradeWheelModel(sig({ open: true })).open).toBe(true);
   });
 
-  it('keeps beam as ONE track: mining speed and weapon damage are one stat', () => {
-    // GDD §2.5 — "beam power (mining speed and weapon damage — one beam, one
+  it('keeps power as ONE track: mining speed and weapon damage are one stat', () => {
+    // GDD §2.5 — "weapon power (mining speed and weapon damage — one weapon, one
     // stat)". Two wedges here would be two stats, and the inversion the game
     // turns on would stop reading.
-    const beamWedges = upgradeWheelModel(sig()).wedges.filter((w) => w.track === UpgradeTrack.Beam);
-    expect(beamWedges).toHaveLength(1);
+    const powerWedges = upgradeWheelModel(sig()).wedges.filter((w) => w.track === UpgradeTrack.Power);
+    expect(powerWedges).toHaveLength(1);
   });
 });
 
@@ -93,7 +93,7 @@ describe('the wedges lay out as a wheel, clockwise from the top (field report)',
   it('is data-driven: a longer ladder lays out more wedges for free (p2-03)', () => {
     // Simulate p2-03 landing a projectile track by extending the order the wheel
     // walks — no change to the model, just a longer order and ladder.
-    const extraTrack = UpgradeTrack.Beam; // reuse a real spec so the ladder resolves
+    const extraTrack = UpgradeTrack.Power; // reuse a real spec so the ladder resolves
     const longer = [...UPGRADE_WHEEL_ORDER, extraTrack];
     const model = upgradeWheelModel(sig(), UPGRADE_LADDER as UpgradeLadder, longer);
     expect(model.wedges).toHaveLength(longer.length);
@@ -105,18 +105,18 @@ describe('the wedges lay out as a wheel, clockwise from the top (field report)',
 
 describe('every wedge gives current → next → cost (GDD §2.5)', () => {
   it('prints the stock value as "current" on a fresh ship', () => {
-    // The Vanguard is the balance reference: beam 10, hull 50, cargo 2, 100%.
-    expect(wedgeOf(UpgradeTrack.Beam).current).toBe('10');
+    // The Vanguard is the balance reference: power 10, hull 50, cargo 2, 100%.
+    expect(wedgeOf(UpgradeTrack.Power).current).toBe('10');
     expect(wedgeOf(UpgradeTrack.Hull).current).toBe('50');
     expect(wedgeOf(UpgradeTrack.Cargo).current).toBe('2');
     expect(wedgeOf(UpgradeTrack.Engine).current).toBe('100%');
   });
 
   it('prints the next tier\'s value, not the delta', () => {
-    const beam = wedgeOf(UpgradeTrack.Beam);
+    const power = wedgeOf(UpgradeTrack.Power);
     // Base 10 × the first step (1.25) = 13 (rounded) — the value the player
     // will have, so the trade is legible without arithmetic.
-    expect(beam.next).toBe('13');
+    expect(power.next).toBe('13');
     expect(wedgeOf(UpgradeTrack.Cargo).next).toBe('4'); // +2 per tier (GDD §2.8)
   });
 
@@ -145,9 +145,9 @@ describe('every wedge gives current → next → cost (GDD §2.5)', () => {
 
 describe('affordability — dimmed with a reason (the field report)', () => {
   it('marks a wedge ready only when the ore is actually there', () => {
-    const cost = UPGRADE_LADDER[UpgradeTrack.Beam].costs[0]!;
-    expect(wedgeOf(UpgradeTrack.Beam, { ore: cost - 1 }).state).toBe('unaffordable');
-    expect(wedgeOf(UpgradeTrack.Beam, { ore: cost }).state).toBe('ready');
+    const cost = UPGRADE_LADDER[UpgradeTrack.Power].costs[0]!;
+    expect(wedgeOf(UpgradeTrack.Power, { ore: cost - 1 }).state).toBe('unaffordable');
+    expect(wedgeOf(UpgradeTrack.Power, { ore: cost }).state).toBe('ready');
   });
 
   it('echoes the same whole-ore total the Build wheel\'s hub shows', () => {
@@ -158,9 +158,9 @@ describe('affordability — dimmed with a reason (the field report)', () => {
 
 describe('a finished ladder (GDD §2.5 — stats live here, maxed or not)', () => {
   it('still shows the current value at max tier, with no next and no cost', () => {
-    const maxTier = UPGRADE_LADDER[UpgradeTrack.Beam].steps.length - 1;
-    const wedge = wedgeOf(UpgradeTrack.Beam, {
-      tiers: tiers({ [UpgradeTrack.Beam]: maxTier }),
+    const maxTier = UPGRADE_LADDER[UpgradeTrack.Power].steps.length - 1;
+    const wedge = wedgeOf(UpgradeTrack.Power, {
+      tiers: tiers({ [UpgradeTrack.Power]: maxTier }),
       ore: 999,
     });
     expect(wedge.state).toBe('maxed');
@@ -204,7 +204,7 @@ describe('upgrades multiply the class base (GDD §2.5, §2.11)', () => {
 
   it('reads its bases from the ratified class table, never a second copy', () => {
     for (const cls of Object.values(ShipClass)) {
-      expect(trackBase(cls, UpgradeTrack.Beam)).toBe(SHIP_STATS[cls].beam);
+      expect(trackBase(cls, UpgradeTrack.Power)).toBe(SHIP_STATS[cls].power);
       expect(trackBase(cls, UpgradeTrack.Hull)).toBe(SHIP_STATS[cls].hull);
       expect(trackBase(cls, UpgradeTrack.Cargo)).toBe(SHIP_STATS[cls].cargo);
       expect(trackBase(cls, UpgradeTrack.Engine)).toBe(SHIP_STATS[cls].speedMul * 100);

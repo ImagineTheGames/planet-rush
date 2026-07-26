@@ -22,33 +22,37 @@ export interface Vec2 {
 }
 
 // ---------------------------------------------------------------------------
-// Beam state (GDD §2.3, §4.1)
+// Muzzle-flash geometry (GDD §2.6, §4.1)
 // ---------------------------------------------------------------------------
 
 /**
- * The public geometry of a ship's beam for the tick it is firing. The sim
- * already casts a segment-vs-circle ray to find the nearest hit for damage /
- * mining (GDD §4.1, "immune to tunnelling"); this exposes that same hit so the
- * renderer draws the beam stopping at what it strikes instead of running full
- * length through it.
+ * The public geometry of a turret's muzzle flash for the tick it looses a shot
+ * (GDD §2.6). A turret's damage rides a pooled projectile, but its *tell* is the
+ * flash at the barrel; the sim clamps the flash to the tracked ship's surface so
+ * the renderer draws a muzzle bloom or short tracer stopping at what the shot is
+ * aimed at instead of running full length through it.
  *
- * Present (non-null on `Ship.beam`) only on ticks the ship is actually firing;
+ * Present (non-null on `Turret.muzzle`) only on ticks the turret actually fires;
  * `null` otherwise. Plain data, so it serializes for snapshots and compares
  * cleanly under the determinism replay (GDD §4.8).
+ *
+ * (Ships no longer carry one: the mining/attack laser retired to a projectile —
+ * ratified amendment v0.3, docs/design-amendments.md — so a ship's shots are
+ * drawn from the projectile pool, not a standing line.)
  */
-export interface Beam {
-  /** Beam emitter — the firing ship's position this tick. */
+export interface Muzzle {
+  /** Flash origin — the firing turret's barrel tip this tick. */
   origin: Vec2;
-  /** Unit direction the beam travels (cos/sin of the ship's facing). */
+  /** Unit direction the shot travels (cos/sin of the barrel's facing). */
   dir: Vec2;
   /**
-   * World-space point of the first strike (asteroid, ship, and later turret /
-   * shield / core), or `null` when the beam reaches its full range unobstructed.
+   * World-space point the shot is aimed at (the tracked ship's near surface), or
+   * `null` when it reaches full range unobstructed.
    */
   hitPoint: Vec2 | null;
   /**
-   * Distance from `origin` to the first hit, clamped to max beam range. Equals
-   * the range when nothing is hit; the nearest of several hits wins.
+   * Distance from `origin` to `hitPoint`, clamped to max range. Equals the range
+   * when nothing is hit.
    */
   length: number;
 }
@@ -65,7 +69,7 @@ export type PlayerId = number;
 
 /**
  * The four ship hulls (GDD §2.11). The lobby choice is locked for the match and
- * sets top speed, acceleration, turn rate, hull HP, and beam damage. Four
+ * sets top speed, acceleration, turn rate, hull HP, and weapon power. Four
  * classes ship in week one, and no others.
  */
 export enum ShipClass {
@@ -80,11 +84,10 @@ export enum ShipClass {
 // ---------------------------------------------------------------------------
 
 /**
- * The four things ore can buy on a ship (GDD §2.5): "beam power (mining speed
- * and weapon damage — one beam, one stat), engine speed, cargo capacity …, hull
- * HP."
+ * The four things ore can buy on a ship (GDD §2.5): "power (mining speed and
+ * weapon damage — one stat), engine speed, cargo capacity …, hull HP."
  *
- * `Beam` is deliberately one track and not two — mining speed and weapon damage
+ * `Power` is deliberately one track and not two — mining speed and weapon damage
  * are the same number, which is the inversion the whole game turns on. Tiers
  * *multiply* the class base stats (GDD §2.5, §2.11), so a maxed Interceptor is
  * still the fastest thing on the map and a maxed Hauler still the toughest.
@@ -96,7 +99,7 @@ export enum ShipClass {
  * action a human does.
  */
 export enum UpgradeTrack {
-  Beam = 'beam',
+  Power = 'power',
   Engine = 'engine',
   Cargo = 'cargo',
   Hull = 'hull',
@@ -122,7 +125,7 @@ export interface ThrustAction {
 }
 
 /**
- * Aim (GDD §2.4). `dir` is a direction the ship should face/beam toward.
+ * Aim (GDD §2.4). `dir` is a direction the ship should face/shoot toward.
  * Meaningful in Manual fire mode (mouse cursor, right stick, touch aim stick);
  * ignored by the sim in Auto-aim, where positioning decides what gets hit.
  */
@@ -132,9 +135,9 @@ export interface AimAction {
 }
 
 /**
- * Fire / Mine (GDD §2.4). The same beam mines asteroids and damages ships —
- * one beam, one stat. `active` is the held state; `auto` marks Auto-aim, where
- * the sim engages the nearest valid target within beam range across the full
+ * Fire / Mine (GDD §2.4). The same shot mines asteroids and damages ships —
+ * one weapon, one stat. `active` is the held state; `auto` marks Auto-aim, where
+ * the sim engages the nearest valid target within weapon range across the full
  * 360° (GDD §2.4 fire modes; mobile amendment §2).
  */
 export interface FireAction {

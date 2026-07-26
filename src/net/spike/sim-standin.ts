@@ -9,7 +9,7 @@
  *   • Euler integration with drag for 8 ships and up to 64 projectiles,
  *   • a uniform-grid spatial hash (broad phase, cell ≈ 2× max radius),
  *   • narrow-phase circle tests (dx² + dy² < (r1+r2)², no square roots),
- *   • one segment-vs-circle beam raycast per ship against nearby asteroids,
+ *   • one segment-vs-circle shot raycast per ship against nearby asteroids,
  *   • turrets firing pooled projectiles at the nearest ship.
  * Entity counts are the GDD budget (§4.3): ~200 asteroids, 8 ships, 32 turrets
  * (4 × 8 planets), 64 projectiles.
@@ -70,7 +70,7 @@ const DT = 1 / 60; // sim integrates at the fixed 60 Hz timestep (GDD §4.1)
 const SHIP_RADIUS = 12;
 const PROJ_RADIUS = 3;
 const PROJ_SPEED = 800;
-const BEAM_LEN = 300;
+const SHOT_LEN = 300;
 
 export function createStandInSim(
   cfg: SimConfig = DEFAULT_SIM,
@@ -260,13 +260,13 @@ export function createStandInSim(
       }
     }
 
-    // 6) Beam raycast: one segment-vs-circle sweep per ship against nearby
+    // 6) Shot raycast: one segment-vs-circle sweep per ship against nearby
     //    asteroids (exact, immune to tunnelling — GDD §4.1).
     for (let s = 0; s < ns; s++) {
       const bx = Math.cos(sHeading[s]!);
       const by = Math.sin(sHeading[s]!);
-      const ex = sx[s]! + bx * BEAM_LEN;
-      const ey = sy[s]! + by * BEAM_LEN;
+      const ex = sx[s]! + bx * SHOT_LEN;
+      const ey = sy[s]! + by * SHOT_LEN;
       const cx = Math.floor((sx[s]! + half) / cell);
       const cy = Math.floor((sy[s]! + half) / cell);
       for (let oy = -1; oy <= 1; oy++) {
@@ -309,7 +309,6 @@ export function createStandInSim(
         velX: quant(svx[i]!),
         velY: quant(svy[i]!),
         heading: Math.floor(((sHeading[i]! % (Math.PI * 2)) / (Math.PI * 2)) * 65535) & 0xffff,
-        aim: 0,
         hull: sHull[i]! & 0xff,
         flags: 0b101,
       });

@@ -162,7 +162,7 @@ describe('TellQueue — the same discipline, one layer up', () => {
     const before = [tells.kind, tells.x, tells.y, tells.angle, tells.magnitude, tells.player];
     withNoAllocation(() => {
       for (let frame = 0; frame < 1000; frame++) {
-        for (let i = 0; i < 40; i++) tells.push(TELL.beamRock, i, i, 0, 1, i % 8);
+        for (let i = 0; i < 40; i++) tells.push(TELL.mineHit, i, i, 0, 1, i % 8);
         tells.clear();
       }
     });

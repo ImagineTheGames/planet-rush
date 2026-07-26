@@ -1,11 +1,12 @@
 /**
  * src/sim/damage.ts — what it costs to be hit. OWNER: Gameplay Engineer.
  *
- * Ship damage and death live here rather than inside the beam, because from
- * day 2 there are two things that can kill a ship — the shared beam
- * (`step.ts`) and a turret's pooled projectile (`buildings.ts`) — and they must
- * agree exactly on spawn protection, the half-hold ore drop, and the respawn
- * clock (GDD §2.1, §2.3, §2.7). One implementation, two callers, no drift.
+ * Ship damage and death live here rather than inside the shot resolver, because
+ * there are two things that can kill a ship — the ship weapon projectile
+ * (`step.ts` → `projectiles.ts`) and a turret's pooled projectile
+ * (`buildings.ts`) — and they must agree exactly on spawn protection, the
+ * half-hold ore drop, and the respawn clock (GDD §2.1, §2.3, §2.7). One
+ * implementation, two callers, no drift.
  *
  * Planet damage (shields, then core) is *not* here: it carries the repair
  * interruption and shield-regen window with it, so it lives with the buildings
@@ -38,7 +39,7 @@ export function killShip(world: World, ship: Ship): void {
   ship.respawnTimer = RESPAWN_S;
   ship.vel.x = 0;
   ship.vel.y = 0;
-  ship.beam = null;
+  ship.firing = false;
 
   const drop = ship.cargo * DEATH_ORE_DROP_FRACTION;
   ship.cargo = 0;

@@ -7,7 +7,7 @@
  *
  * Day-1 scope (GDD §2.3, §2.8): ship Euler integration with drag, the one
  * weapon system as a pooled projectile that both mines asteroids and damages
- * ships (one beam, one stat — ratified amendment v0.3, the mining beam retired),
+ * ships (one weapon, one stat — ratified amendment v0.3, the mining laser retired),
  * asteroids that crack and burst into ore chunks, proximity-tractor collection
  * into a capped hold, turn-rate-limited facing (aim input → auto-aim target →
  * velocity → hold), and ship-vs-asteroid reflection — all over a uniform-grid
@@ -25,7 +25,7 @@
  * phase; and win/loss with the last-to-die tiebreak (`./match`).
  *
  * Day-4 scope (GDD §2.5, §2.11): **ship classes take effect.** Every stat the
- * step reads — acceleration, top speed, turn rate, beam damage, core damage,
+ * step reads — acceleration, top speed, turn rate, weapon damage, core damage,
  * mining rate, hull, hold — now comes from `./upgrades`, which resolves the
  * §2.11 class base against the §2.5 tier ladder the player has been buying with
  * ore. Tiers are bought through the action stream (`upgradeOrder`), persist
@@ -36,10 +36,10 @@
  * contract (GDD §4.8 — same inputs, same final state hash).
  */
 
-import type { Action, Beam, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/types';
+import type { Action, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   ASTEROID,
-  BEAM_RANGE,
+  WEAPON_RANGE,
   BOOST_MULTIPLIER,
   CHUNK,
   DEPOSIT,
@@ -235,7 +235,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     if (ship.alive) integrate(ship, intents[i]!, dt, world.bounds);
   }
 
-  // 4. Broad phase over the (static) asteroid field, reused by collision + beam.
+  // 4. Broad phase over the (static) asteroid field, reused by collision + shots.
   const hash = SpatialHash.from(world.asteroids.map((a) => a.pos), HASH_CELL_SIZE);
 
   // 5. Ship-vs-asteroid and ship-vs-planet reflection (GDD §4.1).
@@ -260,7 +260,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 7. Fire — one weapon system (ratified amendment v0.3). Holding fire looses a
   //    pooled projectile on the weapon cadence; what it strikes first decides its
   //    effect — a rock is chipped for ore, a ship or structure is damaged. Still
-  //    one trigger and one beam stat: mine and fight with the same verb.
+  //    one trigger and one power stat: mine and fight with the same verb.
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
     if (ship.alive) fireShip(world, ship, intents[i]!, autoTargets[i]!);
@@ -285,7 +285,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   updateChunks(world, dt);
 
   // 10. End-of-tick cleanup: depleted asteroids and turrets killed this tick.
-  //     Both are removed only here so every beam resolved this tick indexed a
+  //     Both are removed only here so every shot resolved this tick indexed a
   //     stable array (GDD §4.8).
   world.asteroids = world.asteroids.filter((a) => a.ore > 1e-9);
   sweepDeadTurrets(world);
@@ -368,15 +368,15 @@ function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds
  *
  *  1. **Explicit aim input** — mouse-aim delta, right stick, or an engaged
  *     touch aim stick; the sim only ever sees an `aim` action (GDD §2.4).
- *  2. **Auto-aim's engaged target** — the nose follows what the beam engaged.
+ *  2. **Auto-aim's engaged target** — the nose follows what the weapon engaged.
  *  3. **Velocity** — with nothing aimed, the nose follows travel so motion
  *     reads naturally, once speed clears `FACE_VELOCITY_MIN_SPEED`.
  *  4. **Hold** — a stationary, unaimed ship keeps the facing it had.
  *
  * Rotation is *always* turn-rate limited, including toward an auto-aim target:
  * a hull never snaps. (Auto-aim's *engagement* is still the full 360° with no
- * front arc, per GDD §2.4 — the beam reaches its target while the hull is
- * still swinging around; see `fireBeam`.)
+ * front arc, per GDD §2.4 — a shot reaches its target while the hull is
+ * still swinging around; see `fireShip`.)
  */
 function resolveFacing(world: World, ship: Ship, intent: Intent, autoTarget: AimTarget | null, dt: number): void {
   const desired = desiredFacing(world, ship, intent, autoTarget);
@@ -492,7 +492,7 @@ type AimTarget =
  * chips a rock or damages a hull/structure, whichever it reaches first
  * (`./projectiles`), so mining and fighting are the same act and "you cannot
  * shoot through things" falls out of the collision. Mining rate and weapon damage
- * still ride the one beam stat (GDD §2.5).
+ * still ride the one power stat (GDD §2.5).
  *
  *  - **Manual** — the shot fires straight down the barrel (the player's facing is
  *    the aim). If a rock is ahead it is mined; if an enemy is ahead it is hit.
@@ -500,68 +500,34 @@ type AimTarget =
  *    with an intercept lead on a moving ship so the full-360° engagement lands on
  *    a mover, or a straight shot at a rock, turret or core (GDD §2.4).
  *
- * `Ship.beam` is retired as a *mechanism* (no ray mines or damages — the
- * projectile does), but it survives as a **mining indicator tell**: non-null only
- * on a tick this ship is mining a rock, `null` while shooting an enemy or empty
- * space. It carries no damage and no mining; it is the signal the netcode's
- * "firing" bit (`src/net/snapshot.ts`) and the renderer read across the
- * agent-ownership boundary. Its full removal (and the beam VFX retirement,
- * amendment v0.3 item 5) is a coordinated render/net follow-up — the sim cannot
- * drop the field without breaking ratified consumers it does not own.
+ * `ship.firing` is the surviving **firing tell** — true on any tick the trigger
+ * is engaged with a shot going out (mining or fighting), `false` otherwise. It is
+ * the signal the netcode's "firing" bit (`src/net/snapshot.ts`), the bots' threat
+ * read, and the renderer's in-combat glow key off; there is no longer any line
+ * geometry, because a ship's shots are drawn from the projectile pool.
  */
 function fireShip(world: World, ship: Ship, intent: Intent, autoTarget: AimTarget | null): void {
-  ship.beam = null;
+  ship.firing = false;
   if (!intent.fire) return;
 
   if (intent.auto) {
     // Auto-aim: the nearest valid target across the full 360°, acquired in the
     // facing phase. Nothing in range ⇒ hold fire.
     if (!autoTarget) return;
-    if (autoTarget.kind === 'asteroid') ship.beam = miningTell(world, ship, autoTarget);
+    ship.firing = true;
     fireWeapon(world, ship, weaponLead(world, ship, autoTarget));
     return;
   }
 
-  // Manual: the shot goes straight down the barrel and hits whatever it reaches.
-  // If a rock sits ahead (within the shot's forward half-plane), the ship is
-  // mining, so publish the tell — the projectile still does the actual chipping.
-  const nearest = acquireNearest(world, ship);
-  if (nearest && nearest.kind === 'asteroid') {
-    const rock = world.asteroids[nearest.index]!;
-    const ahead =
-      Math.cos(ship.angle) * (rock.pos.x - ship.pos.x) +
-      Math.sin(ship.angle) * (rock.pos.y - ship.pos.y);
-    if (ahead > 0) ship.beam = miningTell(world, ship, nearest);
-  }
+  // Manual: the shot goes straight down the barrel and hits whatever it reaches
+  // first — a rock ahead is chipped for ore, an enemy ahead is bitten.
+  ship.firing = true;
   fireWeapon(world, ship, { x: Math.cos(ship.angle), y: Math.sin(ship.angle) });
-}
-
-/**
- * The mining-indicator geometry for a ship cutting the acquired rock `hit` — a
- * pure tell (amendment v0.3), origin at the ship, pointing at the rock, clamped
- * to its near surface. It does no mining; `./projectiles` chips the ore on
- * impact. Published so the netcode firing bit and any mining VFX have the signal
- * they read, exactly as the retired beam left it.
- */
-function miningTell(world: World, ship: Ship, hit: Extract<AimTarget, { kind: 'asteroid' }>): Beam {
-  const rock = world.asteroids[hit.index]!;
-  const dx = rock.pos.x - ship.pos.x;
-  const dy = rock.pos.y - ship.pos.y;
-  const d = Math.hypot(dx, dy) || 1;
-  const ux = dx / d;
-  const uy = dy / d;
-  const length = Math.min(Math.max(d - rock.radius, 0), BEAM_RANGE);
-  return {
-    origin: { x: ship.pos.x, y: ship.pos.y },
-    dir: { x: ux, y: uy },
-    hitPoint: { x: ship.pos.x + ux * length, y: ship.pos.y + uy * length },
-    length,
-  };
 }
 
 /** Loose one weapon projectile along unit `dir` if the reload is ready, then
  *  start the reload (design amendment v0.2). Damage, speed and lifetime read from
- *  the ship's beam-upgrade state inside `fireShipProjectile`. */
+ *  the ship's power-upgrade state inside `fireShipProjectile`. */
 function fireWeapon(world: World, ship: Ship, dir: Vec2): void {
   if ((ship.weaponCooldown ?? 0) > 0) return;
   fireShipProjectile(world, ship, dir);
@@ -592,7 +558,7 @@ function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
  */
 function acquireNearest(world: World, ship: Ship): AimTarget | null {
   let best: AimTarget | null = null;
-  let bestD2 = BEAM_RANGE * BEAM_RANGE;
+  let bestD2 = WEAPON_RANGE * WEAPON_RANGE;
   for (let i = 0; i < world.asteroids.length; i++) {
     const a = world.asteroids[i]!;
     const d2 = dist2(ship.pos, a.pos);
@@ -638,7 +604,7 @@ function acquireNearest(world: World, ship: Ship): AimTarget | null {
   return best;
 }
 
-/** Center of whatever a beam hit resolved to. */
+/** Center of whatever a shot's target resolved to. */
 function targetPos(world: World, hit: AimTarget): Vec2 {
   switch (hit.kind) {
     case 'asteroid':

@@ -27,10 +27,10 @@
  * The other two thirds of the mandate live in subdirectories, each with its own
  * index, because each is a whole subsystem rather than another sprite:
  *
- *  - `./vfx/` — the specified VFX set (GDD §3.6): beam impacts, crack-and-burst,
+ *  - `./vfx/` — the specified VFX set (GDD §3.6): shot impacts, crack-and-burst,
  *    shield shimmer, muzzle flashes, explosions, thruster trails, spawn glow,
  *    and the planet-death moment with its three seconds of quiet (§4.7).
- *  - `./audio/` — synthesized SFX, the two beam voices, the under-attack alarm
+ *  - `./audio/` — synthesized SFX, the two firing voices, the under-attack alarm
  *    (§2.2) and the ambient loop. No binary assets: audio is code too.
  *
  * Both read one vocabulary of moments (`./tells`), so a mechanic can never be

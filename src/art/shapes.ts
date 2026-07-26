@@ -33,7 +33,7 @@
  *
  *  - `material` — hull, rock, ocean, continent. The world's own substance.
  *  - `identity` — player colour trim: wing tips, cockpit, beacon ring, HP bar.
- *  - `energy`   — plasma: beams, cockpit glass glow, shield bubbles, muzzles.
+ *  - `energy`   — plasma: weapon fire, cockpit glass glow, shield bubbles, muzzles.
  *  - `ore`      — ore chunks and the veins in a rock. Signal yellow, legally.
  *  - `core`     — the planet core: the win condition, so it earns yellow (§2).
  *  - `danger`   — damage, alarms, hazard stripes, enemy fire. Threat red, and

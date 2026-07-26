@@ -8,7 +8,7 @@
  * it strikes first decides which applies:
  *  - it hits an **asteroid** ⇒ it chips ore chunks (`mineYield`), and the tractor
  *    rules (GDD §2.3) collect them exactly as before — only the chipping
- *    mechanism changed, the beam is gone;
+ *    mechanism changed, the laser is gone;
  *  - it hits an enemy **ship / turret / shield / core** ⇒ it deals `damage`
  *    (GDD §2.4 target list).
  * Because collision decides, "you cannot shoot through things" is free: a rock
@@ -83,7 +83,7 @@ export function takeProjectile(world: World): Projectile {
  * Loose one **ship weapon** projectile along the unit vector `dir` — the single
  * shot that both mines and fights (ratified amendment v0.3). Speed, damage,
  * mining yield and lifetime all read from the ship's upgrade state through
- * `./upgrades` — one beam, one stat (GDD §2.5): the beam ladder that speeds
+ * `./upgrades` — one weapon, one stat (GDD §2.5): the power ladder that speeds
  * mining also speeds and hardens the shot ("make them faster, stronger"). Born
  * at the hull's surface so the muzzle sits on the ship, not inside it. `dir` must
  * be unit length; the callers (`./step`) normalise.
@@ -267,15 +267,15 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       forfeitProtection(world, p.owner);
       return true;
     }
-    // A dead or spawn-protected core is not a target — the shot flies over it,
-    // exactly as the beam did (GDD §2.1). `damagePlanet` guards this too, but
-    // skipping here keeps the shot alive to hit something real behind it.
+    // A dead or spawn-protected core is not a target — the shot flies over it
+    // (GDD §2.1). `damagePlanet` guards this too, but skipping here keeps the
+    // shot alive to hit something real behind it.
     if (!planet.alive || planet.spawnProtect > 0) continue;
     const targetR = planetTargetRadius(planet);
     const rr = targetR + p.radius;
     if (dist2(p.pos, planet.pos) > rr * rr) continue;
     // Shields and cores take the core rate, not the hull rate (GDD §2.8): the
-    // projectile carries its ship-damage, scaled down here the way the beam's
+    // projectile carries its ship-damage, scaled down here the way the weapon's
     // core DPS was scaled from its ship DPS.
     damagePlanet(world, planet, p.damage * PROJECTILE_CORE_FACTOR);
     forfeitProtection(world, p.owner);
@@ -321,7 +321,7 @@ function ownerShip(world: World, owner: PlayerId): Ship | null {
 
 /**
  * Chip `yieldAmount` ore out of asteroid `a` — one weapon projectile's mining
- * hit (amendment v0.3). Identical bookkeeping to the retired continuous beam:
+ * hit (amendment v0.3). Identical bookkeeping to the retired continuous laser:
  * ore is drawn down (never below zero, so total-ore-per-asteroid is exactly the
  * ratified `ore`), the crack stage advances across its three thresholds
  * (GDD §5.5), and whole chunks are emitted from a fractional buffer, drifting

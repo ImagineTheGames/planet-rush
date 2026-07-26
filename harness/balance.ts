@@ -29,8 +29,8 @@
 
 import { ShipClass } from '@shared/types';
 import {
-  BEAM_DPS_CORE,
-  BEAM_DPS_SHIP,
+  WEAPON_DPS_CORE,
+  WEAPON_DPS_SHIP,
   COLLAPSE_CORE_DECAY,
   COLLAPSE_GRACE_S,
   CORE_HP,
@@ -305,8 +305,8 @@ export function winRecords(
 function constantsSnapshot(): { name: string; value: string; gdd: string }[] {
   return [
     { name: 'CORE_HP', value: String(CORE_HP), gdd: '100' },
-    { name: 'BEAM_DPS_CORE', value: String(BEAM_DPS_CORE), gdd: '5' },
-    { name: 'BEAM_DPS_SHIP', value: String(BEAM_DPS_SHIP), gdd: '10' },
+    { name: 'WEAPON_DPS_CORE', value: String(WEAPON_DPS_CORE), gdd: '5' },
+    { name: 'WEAPON_DPS_SHIP', value: String(WEAPON_DPS_SHIP), gdd: '10' },
     { name: 'MINING_RATE', value: String(MINING_RATE), gdd: '0.5' },
     { name: 'STARTING_ORE', value: String(STARTING_ORE), gdd: '3' },
     { name: 'SPAWN_PROTECTION_S', value: String(SPAWN_PROTECTION_S), gdd: '10' },

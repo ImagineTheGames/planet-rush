@@ -48,7 +48,7 @@ export const PALETTE = {
   patina: 0x4fa08b,
   /** Ore, hazard stripes, costs, the planet core. **RESERVED** (§2). */
   signalYellow: 0xf2d24b,
-  /** Beams, cockpits, energy. The cold cutting-torch blue. */
+  /** Weapon fire, cockpits, energy. The cold cutting-torch blue. */
   plasma: 0x4dc3ff,
   /** Damage, alarms, enemy fire, the under-attack tell. */
   threatRed: 0xb23a3a,
@@ -130,9 +130,9 @@ export const MATERIALS = {
   ice: {
     bases: ['plasma'],
     reads:
-      'The cold cutting-torch blue: the mining/laser beam, cockpit glass, shield sheen and the frost veins on an ice-cored asteroid. Also the register the steel-blue ocean sits in. Energy reads cold here — never a warm spark.',
+      'The cold cutting-torch blue: the plasma torch, cockpit glass, shield sheen and the frost veins on an ice-cored asteroid. Also the register the steel-blue ocean sits in. Energy reads cold here — never a warm spark.',
     shades: [
-      { hex: 0xdff4ff, where: 'Bright inner pass of the plasma torch / beam' },
+      { hex: 0xdff4ff, where: 'Bright inner pass of the plasma torch' },
       { hex: 0xc6cdd6, where: 'Cold off-white ("bone"): rail barrels, wreck struts, HUD text and HP-bar frames' },
       { hex: 0x2e6e9e, where: 'Earthlike ocean on the boards — reads bluer than the shipped grey-blue; see GAP-ANALYSIS' },
     ],
@@ -203,7 +203,7 @@ export const LINE = {
 export const GLOW = {
   principle:
     'No bloom. Glow is a brighter inner pass on a crisp silhouette, never a gaussian blur — so effects stay cheap, instanced and legible at 24px on the void.',
-  /** Beam, torch, cockpit: a plasma body with a white-tinted inner core. */
+  /** Weapon fire, torch, cockpit: a plasma body with a white-tinted inner core. */
   energy: { base: 'plasma', innerTowardWhite: 0.45, inner: 0xdff4ff },
   /** Planet core: signal-yellow disc, hot near-white centre. Obeys RESERVED (§2). */
   core: { base: 'signalYellow', innerTowardWhite: 0.35, inner: 0xfff6c8 },
@@ -231,17 +231,17 @@ export const SILHOUETTE = {
   legibilitySizePx: 24,
   /** The grey-out test paints the hull flat steel with player colour removed. */
   greyTest: 'hullSteel',
-  /** Nose points +x; the beam emitter sits on the nose / prow and is marked. */
+  /** Nose points +x; the weapon emitter sits on the nose / prow and is marked. */
   facing: 'right',
   /** The four week-one hulls and the shape each silhouette must telegraph (§4). */
   classes: {
     interceptor: { hull: 'Quadfin', intent: 'Narrow, swept, four canted fins — the fastest, lightest read.' },
     vanguard: { hull: 'Anvil', intent: 'Faceted arrowhead brick — the neutral, symmetric baseline shape.' },
-    excavator: { hull: 'Pincer', intent: 'Forked prongs framing the beam — reads as a mining tool up front.' },
+    excavator: { hull: 'Pincer', intent: 'Forked prongs framing the muzzle — reads as a mining tool up front.' },
     hauler: { hull: 'Hammerhead', intent: 'Widest, blunt hammerhead mass — visibly the heavy, slow, tanky hull.' },
   },
   /** Player colour appears only on trim; the hull body stays steel (§3). */
-  trimOnly: ['wing tips', 'cockpit glass', 'engine flame', 'beam tint', 'beacon ring', 'HP bar'],
+  trimOnly: ['wing tips', 'cockpit glass', 'engine flame', 'weapon tint', 'beacon ring', 'HP bar'],
 } as const;
 
 // ---------------------------------------------------------------------------

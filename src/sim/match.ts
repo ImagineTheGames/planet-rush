@@ -82,11 +82,11 @@ export function collapseDeadline(): number {
  * turrets stop being a threat — and its owner is eliminated.
  *
  * Called the instant a core reaches zero, from whichever source took it there
- * (`damagePlanet`, or collapse decay). Idempotent, because two beams can land on
+ * (`damagePlanet`, or collapse decay). Idempotent, because two shots can land on
  * the same core in the same tick.
  *
  * Turrets are zeroed rather than spliced — `sweepDeadTurrets` removes them at
- * end of step, so indices stay stable for every beam already resolved this tick.
+ * end of step, so indices stay stable for every shot already resolved this tick.
  */
 export function destroyCore(world: World, planet: Planet): void {
   planet.coreHp = 0;

@@ -26,6 +26,14 @@
  * precision is never worth its bytes. Velocity *is* sent, so a client can
  * dead-reckon a remote ship between snapshots instead of stuttering.
  *
+ * The ship record lost its `aim` field in the v0.3 laser funeral
+ * (`docs/design-amendments.md`): `aim` was the old firing-ray direction, and once
+ * mining and combat became pooled projectiles a ship carries no standing line — its
+ * shots stream in the projectile pool, its hull points at `heading`, and there
+ * was nothing left for a second angle to say. Dropping it takes the ship record
+ * from 15 bytes to 13 and the worst case from 510 to 494 (see
+ * {@link WORST_CASE_BYTES}); `docs/netcode-spike.md` carries the re-derivation.
+ *
  * Encoding is little-endian and hand-packed — we own every byte, the same
  * discipline the sim applies to collision (GDD §4.1).
  */
@@ -40,14 +48,14 @@ import type { World } from '../sim';
 //   Ship   (per entity)  id u8                                          1
 //                        posX i16 | posY i16                            4
 //                        velX i16 | velY i16                            4
-//                        heading u16 | aim u16                          4
+//                        heading u16                                    2
 //                        hull u8                                        1
 //                        flags u8                                       1
-//                                                                    = 15 bytes
+//                                                                    = 13 bytes
 //   Proj   (per entity)  id u8 | posX i16 | posY i16 | meta u8          6 bytes
 
 export const HEADER_BYTES = 6;
-export const SHIP_BYTES = 15;
+export const SHIP_BYTES = 13;
 export const PROJECTILE_BYTES = 6;
 
 /** GDD §4.2/§4.3 entity caps that bound one snapshot: 8 slots, 64 shots. */
@@ -63,16 +71,18 @@ export const MAX_SHIPS = 8;
  *    life (`range / speed` ≈ 0.58 s) a little over one interval, so at most two
  *    in flight per ship: **≤ 16**.
  *
- * Peak ≈ 48, comfortably under this 64-slot budget, so the measured wire layout
- * (and its 510-byte worst case) is unchanged by the amendment. The bound is a
- * hard cap regardless: `snapshotWorld` streams at most this many and drops any
- * tail, so a snapshot can never exceed {@link WORST_CASE_BYTES} even if a future
- * retune pushes the real peak higher (that would be the signal to raise this).
+ * Peak ≈ 48, comfortably under this 64-slot budget, so the projectile stream is
+ * unchanged by the amendment. The bound is a hard cap regardless: `snapshotWorld`
+ * streams at most this many and drops any tail, so a snapshot can never exceed
+ * {@link WORST_CASE_BYTES} even if a future retune pushes the real peak higher
+ * (that would be the signal to raise this).
  */
 export const MAX_PROJECTILES = 64;
 
 /** Worst-case snapshot payload, in bytes — the number bandwidth is billed
- *  against in docs/netcode-spike.md (measured, not assumed; GDD risk 4). */
+ *  against in docs/netcode-spike.md (measured, not assumed; GDD risk 4). Now
+ *  494 B, down from 510 B: the v0.3 laser funeral dropped the ship `aim`
+ *  field (2 B × 8 ships). */
 export const WORST_CASE_BYTES =
   HEADER_BYTES + MAX_SHIPS * SHIP_BYTES + MAX_PROJECTILES * PROJECTILE_BYTES;
 
@@ -81,7 +91,8 @@ export const WORST_CASE_BYTES =
 export const SHIP_FLAG = {
   /** The ship is flying (clear while dead and waiting on the respawn timer). */
   alive: 1 << 0,
-  /** The beam is on this tick — the renderer draws it, the audio layer sounds it. */
+  /** The weapon is firing this tick (`Ship.firing`) — the renderer's in-combat
+   *  glow keys off it and the audio layer sounds the shot. */
   firing: 1 << 1,
   /** Inside spawn protection (GDD §2.1) — drawn with the protection glow. */
   spawnProtected: 1 << 2,
@@ -126,9 +137,6 @@ export interface ShipSnap {
   velY: number;
   /** Hull facing, `angle * 65536 / 2π`. */
   heading: number;
-  /** Beam direction while firing, same quantization; equals `heading` when the
-   *  beam is off (there is nothing else to point at). */
-  aim: number;
   hull: number;
   flags: number;
 }
@@ -186,20 +194,17 @@ export function snapshotWorld(world: World): { ships: ShipSnap[]; projectiles: P
   const ships: ShipSnap[] = [];
   for (const ship of world.ships) {
     if (ships.length >= MAX_SHIPS) break;
-    const heading = quantizeAngle(ship.angle);
-    const beam = ship.beam;
     ships.push({
       id: ship.id & 0xff,
       posX: quantize(ship.pos.x),
       posY: quantize(ship.pos.y),
       velX: quantize(ship.vel.x),
       velY: quantize(ship.vel.y),
-      heading,
-      aim: beam ? quantizeAngle(Math.atan2(beam.dir.y, beam.dir.x)) : heading,
+      heading: quantizeAngle(ship.angle),
       hull: Math.max(0, Math.min(255, Math.round(ship.hull))),
       flags:
         (ship.alive ? SHIP_FLAG.alive : 0) |
-        (beam ? SHIP_FLAG.firing : 0) |
+        (ship.firing ? SHIP_FLAG.firing : 0) |
         (ship.spawnProtect > 0 ? SHIP_FLAG.spawnProtected : 0) |
         (ship.eliminated ? SHIP_FLAG.eliminated : 0),
     });
@@ -273,8 +278,6 @@ export function encodeSnapshot(
     o += 2;
     dv.setUint16(o, s.heading & 0xffff, true);
     o += 2;
-    dv.setUint16(o, s.aim & 0xffff, true);
-    o += 2;
     dv.setUint8(o, s.hull & 0xff);
     o += 1;
     dv.setUint8(o, s.flags & 0xff);
@@ -321,13 +324,11 @@ export function decodeSnapshot(buf: ArrayBuffer): DecodedSnapshot {
     o += 2;
     const heading = dv.getUint16(o, true);
     o += 2;
-    const aim = dv.getUint16(o, true);
-    o += 2;
     const hull = dv.getUint8(o);
     o += 1;
     const flags = dv.getUint8(o);
     o += 1;
-    ships.push({ id, posX, posY, velX, velY, heading, aim, hull, flags });
+    ships.push({ id, posX, posY, velX, velY, heading, hull, flags });
   }
 
   const projectiles: ProjSnap[] = [];

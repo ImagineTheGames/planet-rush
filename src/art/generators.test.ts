@@ -106,7 +106,7 @@ describe('asteroids — the payout read (style-guide §6)', () => {
     expect(s2.shapes.some((s) => s.path.kind === 'poly' && s.path.closed)).toBe(true);
   });
 
-  it('lets a player judge a payout before committing beam time', () => {
+  it('lets a player judge a payout before committing mining time', () => {
     const oreShapes = (d: SpriteDef): number => d.shapes.filter((s) => s.role === 'ore').length;
     const rich = asteroidSprite({ seed: 3, crackStage: 0, richness: 1 });
     const poor = asteroidSprite({ seed: 3, crackStage: 0, richness: 0.2 });
@@ -114,7 +114,7 @@ describe('asteroids — the payout read (style-guide §6)', () => {
     expect(oreShapes(asteroidSprite({ seed: 3, crackStage: 0, richness: 0 }))).toBe(0);
   });
 
-  it('never draws mineral outside the collision radius the beam tests against', () => {
+  it('never draws mineral outside the collision radius the mining shot tests against', () => {
     for (const seed of [1, 2, 3, 17, 99]) {
       const outline = asteroidOutline(seed);
       let max = 0;

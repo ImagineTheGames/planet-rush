@@ -8,12 +8,12 @@
  * many-entity paths (asteroids, ore chunks) allocate their Graphics once and per
  * frame only touch transforms (position / scale / tint), never geometry, so the
  * frame loop makes zero per-frame allocations. Ships (≤8) get one Graphics each,
- * with player-identity colour baked in (hull stays steel — style guide §3). The
- * beam is a handful of short-lived lines redrawn each frame.
+ * with player-identity colour baked in (hull stays steel — style guide §3).
+ * Turret muzzle flashes are a handful of short-lived lines redrawn each frame.
  *
  * Placeholder shapes stand in until art lands (GDD §2.4 day-1: "placeholder
  * triangle ok"): a steel triangle ship with a player-colour cockpit, grey rocks
- * that darken as they crack, signal-yellow ore chunks, a plasma beam line, and
+ * that darken as they crack, signal-yellow ore chunks, plasma muzzle flashes, and
  * planets as patina discs with a player-colour beacon ring and a signal-yellow
  * core (GDD §5.4 — the art pass replaces the shapes, not the layers).
  *
@@ -61,17 +61,17 @@ function playerColor(id: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// A beam segment to draw this frame (computed by the caller from fire intent —
-// the sim state doesn't record a beam, so render is told where it goes).
+// A muzzle-flash segment to draw this frame (mapped by the caller from the sim's
+// `muzzleFlashes` read model — one short line per turret that fired this tick).
 // ---------------------------------------------------------------------------
 
-export interface BeamView {
+export interface MuzzleView {
   readonly from: Vec2;
   readonly to: Vec2;
   readonly color: number;
-  /** Where the beam struck (asteroid/ship surface), or `null` on a clean miss
-   *  that runs the full range. A pooled plasma impact glow is drawn here when
-   *  present; `to` already ends at this point (sim clamps it — GDD §4.1). */
+  /** Where the shot is aimed (the tracked ship's surface), or `null` on a clean
+   *  miss that runs the full range. A pooled plasma impact glow is drawn here
+   *  when present; `to` already ends at this point (sim clamps it — GDD §4.1). */
   readonly hit: Vec2 | null;
 }
 
@@ -79,8 +79,8 @@ export interface BeamView {
 export interface RenderView {
   /** The player whose ship the camera follows (centered on screen). */
   readonly cameraTarget: PlayerId;
-  /** Active beam segments this frame (usually ≤ number of ships). */
-  readonly beams: readonly BeamView[];
+  /** Active muzzle-flash segments this frame (one per turret that fired). */
+  readonly muzzles: readonly MuzzleView[];
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ function makeUnitChunk(): Graphics {
   return new Graphics().circle(0, 0, 1).fill(PALETTE.signalYellow);
 }
 
-// Impact flare radius (world units) at the beam's hit point. Punchy but small
+// Impact flare radius (world units) at the muzzle flash's hit point. Punchy but small
 // so it reads as a torch bite, not an explosion (style-guide §8 "bright, punchy").
 const IMPACT_RADIUS = 7;
 
@@ -208,14 +208,14 @@ export class Renderer {
   private readonly turretLayer = new Container();
   private readonly asteroidLayer = new Container();
   private readonly chunkLayer = new Container();
-  private readonly beamLayer = new Container();
+  private readonly muzzleLayer = new Container();
   private readonly impactLayer = new Container();
   private readonly shipLayer = new Container();
   private readonly shotLayer = new Container();
 
   private readonly asteroidPool: GraphicsPool;
   private readonly chunkPool: GraphicsPool;
-  private readonly beamPool: GraphicsPool;
+  private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
   private readonly turretPool: GraphicsPool;
   private readonly shotPool: GraphicsPool;
@@ -241,7 +241,7 @@ export class Renderer {
   /** When true, shed the non-load-bearing VFX (impact glows) to buy back frame
    *  time on a struggling device. Driven by the platform's auto-reducer on a
    *  sustained drop below the fps floor (GDD §4.3, risk 5 "reduce VFX"). The
-   *  readable tells — beam line, ships, ore — always draw; only decoration goes. */
+   *  readable tells — muzzle flashes, ships, ore — always draw; only decoration goes. */
   private reduceVfx = false;
 
   /** The visible viewport the camera centres on. This is the *visual* viewport
@@ -256,14 +256,14 @@ export class Renderer {
 
     // Back to front: planets (the map's furniture — big, static, and behind
     // everything that moves over them), turrets mounted on them, rocks, chunks,
-    // beams, impact glows (over the beam end), ships, turret shots. Labels aid
-    // the layout registry + render tests.
+    // muzzle flashes, impact glows (over the flash end), ships, turret shots.
+    // Labels aid the layout registry + render tests.
     this.boundaryLayer.label = 'boundary';
     this.planetLayer.label = 'planets';
     this.turretLayer.label = 'turrets';
     this.asteroidLayer.label = 'asteroids';
     this.chunkLayer.label = 'chunks';
-    this.beamLayer.label = 'beams';
+    this.muzzleLayer.label = 'muzzles';
     this.impactLayer.label = 'impacts';
     this.shipLayer.label = 'ships';
     this.shotLayer.label = 'shots';
@@ -273,7 +273,7 @@ export class Renderer {
       this.turretLayer,
       this.asteroidLayer,
       this.chunkLayer,
-      this.beamLayer,
+      this.muzzleLayer,
       this.impactLayer,
       this.shipLayer,
       this.shotLayer,
@@ -282,7 +282,7 @@ export class Renderer {
 
     this.asteroidPool = new GraphicsPool(this.asteroidLayer, makeUnitRock);
     this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
-    this.beamPool = new GraphicsPool(this.beamLayer, () => new Graphics());
+    this.muzzlePool = new GraphicsPool(this.muzzleLayer, () => new Graphics());
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
     this.turretPool = new GraphicsPool(this.turretLayer, makeUnitTurret);
     this.shotPool = new GraphicsPool(this.shotLayer, makeUnitShot);
@@ -320,7 +320,7 @@ export class Renderer {
     this.drawChunks(world.chunks);
     this.drawShips(world.ships);
     this.drawShots(world.projectiles);
-    this.drawBeams(view.beams);
+    this.drawMuzzles(view.muzzles);
   }
 
   private centerCamera(world: World, targetId: PlayerId): void {
@@ -579,26 +579,26 @@ export class Renderer {
     }
   }
 
-  private drawBeams(beams: readonly BeamView[]): void {
-    // A beam that hits ends at its impact point and gets a plasma glow there; a
+  private drawMuzzles(muzzles: readonly MuzzleView[]): void {
+    // A flash that hits ends at its impact point and gets a plasma glow there; a
     // clean miss runs full range with no glow (GDD §4.1). Glows are pooled
-    // separately since only some beams strike — index them independently.
+    // separately since only some flashes strike — index them independently.
     let glows = 0;
-    for (let i = 0; i < beams.length; i++) {
-      const b = beams[i]!;
-      const g = this.beamPool.at(i);
+    for (let i = 0; i < muzzles.length; i++) {
+      const m = muzzles[i]!;
+      const g = this.muzzlePool.at(i);
       g.clear();
-      g.moveTo(b.from.x, b.from.y).lineTo(b.to.x, b.to.y).stroke({ width: 3, color: b.color, cap: 'round' });
-      // The beam line always draws (it is the mining/attack tell); the impact
+      g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: 3, color: m.color, cap: 'round' });
+      // The flash line always draws (it is the turret-fire tell); the impact
       // glow is decoration, so it is the first thing reduce-VFX sheds (§4.3).
-      if (b.hit && !this.reduceVfx) {
+      if (m.hit && !this.reduceVfx) {
         const glow = this.impactPool.at(glows++);
-        glow.x = b.hit.x;
-        glow.y = b.hit.y;
+        glow.x = m.hit.x;
+        glow.y = m.hit.y;
         glow.scale.set(IMPACT_RADIUS);
       }
     }
-    this.beamPool.hideFrom(beams.length);
+    this.muzzlePool.hideFrom(muzzles.length);
     this.impactPool.hideFrom(glows);
   }
 }

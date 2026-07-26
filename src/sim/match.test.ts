@@ -79,7 +79,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
   };
 }
 
@@ -313,7 +313,7 @@ describe('elimination and the wreck (GDD §2.7)', () => {
     expect(scavenger.cargo).toBeGreaterThan(0);
   });
 
-  it('a wreck cannot be re-eliminated, however many beams land on it', () => {
+  it('a wreck cannot be re-eliminated, however many shots land on it', () => {
     const { world, wreck } = siegeWorld();
 
     damagePlanet(world, wreck, 5);

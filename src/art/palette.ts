@@ -52,7 +52,7 @@ export const WHITE = TOKEN_WHITE;
 /**
  * The 8-slot player identity roster (style-guide §3.1), indexed by `PlayerId`.
  * Identity is an **additive trim layer** over the steel fleet, never a repaint:
- * these appear only on wing tips, cockpit glass, engine flame, beam tint,
+ * these appear only on wing tips, cockpit glass, engine flame, weapon tint,
  * planet beacon ring and HP bar — and always alongside the hull number decal,
  * so no player is ever identified by hue alone. Sourced from {@link ./tokens}.
  */

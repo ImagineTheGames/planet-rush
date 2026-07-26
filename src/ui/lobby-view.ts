@@ -13,7 +13,7 @@
  *  1. **Hulls stay steel** (style-guide §3 rule 1). A seat row's chrome is
  *     hull-steel and Vacuum; the player's identity colour appears only on the
  *     colour chip, the decal and the row's edge stripe — the UI equivalents of
- *     "wing tips, cockpit, beam tint, beacon ring, HP bar."
+ *     "wing tips, cockpit, weapon tint, beacon ring, HP bar."
  *  2. **Identity never depends on colour alone** (§3 rule 3). Every row draws
  *     its `P1`…`P8` decal *and* names its colour in words, so the roster reads
  *     with the hue removed.

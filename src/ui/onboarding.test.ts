@@ -171,7 +171,7 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
 describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)', () => {
   it('renders the mine prompt with the keyboard fire binding on desktop', () => {
     const text = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual);
-    expect(text).toContain('on the asteroid — your beam mines it');
+    expect(text).toContain('on the asteroid — your shots chip the rock');
     // {fire} resolved to the keyboard binding, not left as a literal token.
     expect(text).not.toContain('{fire}');
     expect(text).toContain('Left mouse');

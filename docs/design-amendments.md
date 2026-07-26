@@ -24,6 +24,38 @@ space and stay put when the hold is full.
 > "I think mining laser should go away, it should be a projectile as well… that
 > way we don't have laser + projectile, just projectile."
 
+### Addendum (v0.3.1) — the funeral is total: the VISUAL and the WORD retire
+
+**Date:** 2026-07-26 · branch `agent/gameplay/p2-beam-funeral`
+
+The original v0.3 entry below retired the beam *as a mechanism* but deliberately
+kept `Ship.beam` alive as a cross-agent seam (a "mining indicator tell"), so the
+beam VFX line and the "your beam mines it" coach copy still shipped. Evidence
+round p2-07 flagged that surviving tell. This addendum finishes the retirement —
+the word "beam" no longer appears anywhere in the living `src/` code:
+
+- **`Ship.beam` is deleted.** It is replaced by a bare boolean **`Ship.firing`**
+  (true on any tick the trigger is engaged, mining or fighting). There is no shot
+  geometry on a ship any more — its shots are drawn from the projectile pool.
+  `miningTell()` in `src/sim/step.ts` is gone.
+- **The `Beam` geometry type → `Muzzle`.** It is now used only by `Turret.muzzle`
+  (a turret's muzzle flash is its tell; a turret's damage still rides a
+  projectile). `combat-view.ts`'s `combatBeams()`/`CombatBeam` → `muzzleFlashes()`
+  /`MuzzleFlash`, now turret-only.
+- **The upgrade track `UpgradeTrack.Beam='beam'` → `UpgradeTrack.Power='power'`;**
+  the ship stat `SHIP_STATS[c].beam` → `.power`; `BEAM_RANGE` → `WEAPON_RANGE`;
+  `BEAM_DPS_CORE/SHIP` → `WEAPON_DPS_CORE/SHIP`; `VANGUARD_BEAM` → `VANGUARD_POWER`.
+  The wheel row relabels **BEAM → POWER**; the coach copy becomes "Hold {fire} on
+  the asteroid — your shots chip the rock."
+- **Wire: the ship `aim` field is retired.** `aim` was the beam direction on the
+  wire, read only to reconstruct remote beams; with the beam gone it was a dead
+  field, so it is dropped. Ship record 15 B → 13 B, worst case **510 B → 494 B**
+  (`docs/netcode-spike.md` re-derived; `snapshot.test.ts` re-pinned; the spike
+  measurement artifact updated to match). The `firing` **flag** stays — sourced
+  from `Ship.firing` and reconstructed for remote ships by `paintRemoteFiring`.
+- **Goldens re-baselined.** The frozen scene loses the ship beam line the old
+  draw produced; turret muzzle flashes remain.
+
 ### What changed
 
 - **Mining is shooting.** There is now ONE weapon system. Holding fire looses a

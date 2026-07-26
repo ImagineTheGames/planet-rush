@@ -4,7 +4,7 @@
  *
  * The three contract checks from the brief:
  *   1. every class's derived stats match the GDD §2.11 table — speed, accel,
- *      turn, hull, beam, cargo — and match it *through the sim*, not just in
+ *      turn, hull, power, cargo — and match it *through the sim*, not just in
  *      arithmetic;
  *   2. upgrades persist through respawn;
  *   3. a maxed Interceptor is still the fastest thing on the map and a maxed
@@ -23,8 +23,8 @@ import {
   BASE_ACCEL,
   BASE_SPEED,
   BASE_TURN_RATE,
-  BEAM_DPS_CORE,
-  BEAM_DPS_SHIP,
+  WEAPON_DPS_CORE,
+  WEAPON_DPS_SHIP,
   CARGO_CAP_MAX,
   CARGO_PER_TIER,
   CORE_HP,
@@ -42,9 +42,9 @@ import {
   nextUpgradeCost,
   oreSpentOnUpgrades,
   shipAccel,
-  shipBeam,
-  shipBeamCoreDps,
-  shipBeamShipDps,
+  shipPower,
+  shipCoreDps,
+  shipWeaponDps,
   shipCargoCap,
   shipMaxHull,
   shipMiningRate,
@@ -110,7 +110,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
   };
 }
 
@@ -210,12 +210,12 @@ describe('the class stat table (GDD §2.11)', () => {
   //   Excavator   (Pincer)       90% / 100% /  80% / 55 / 13 / 2
   //   Hauler      (Hammerhead)   85% /  80% /  85% / 70 /  9 / 3
   const TABLE: Readonly<
-    Record<ShipClass, { speed: number; accel: number; turn: number; hull: number; beam: number; cargo: number }>
+    Record<ShipClass, { speed: number; accel: number; turn: number; hull: number; power: number; cargo: number }>
   > = {
-    [ShipClass.Interceptor]: { speed: 1.3, accel: 1.2, turn: 1.4, hull: 35, beam: 8, cargo: 2 },
-    [ShipClass.Vanguard]: { speed: 1.0, accel: 1.0, turn: 1.0, hull: 50, beam: 10, cargo: 2 },
-    [ShipClass.Excavator]: { speed: 0.9, accel: 1.0, turn: 0.8, hull: 55, beam: 13, cargo: 2 },
-    [ShipClass.Hauler]: { speed: 0.85, accel: 0.8, turn: 0.85, hull: 70, beam: 9, cargo: 3 },
+    [ShipClass.Interceptor]: { speed: 1.3, accel: 1.2, turn: 1.4, hull: 35, power: 8, cargo: 2 },
+    [ShipClass.Vanguard]: { speed: 1.0, accel: 1.0, turn: 1.0, hull: 50, power: 10, cargo: 2 },
+    [ShipClass.Excavator]: { speed: 0.9, accel: 1.0, turn: 0.8, hull: 55, power: 13, cargo: 2 },
+    [ShipClass.Hauler]: { speed: 0.85, accel: 0.8, turn: 0.85, hull: 70, power: 9, cargo: 3 },
   };
 
   it.each(ALL_CLASSES)('derives every stock stat from the table: %s', (cls) => {
@@ -226,7 +226,7 @@ describe('the class stat table (GDD §2.11)', () => {
     expect(shipAccel(stock)).toBeCloseTo(BASE_ACCEL * row.accel, 9);
     expect(shipTurnRate(stock)).toBeCloseTo(BASE_TURN_RATE * row.turn, 9);
     expect(shipMaxHull(stock)).toBeCloseTo(row.hull, 9);
-    expect(shipBeam(stock)).toBeCloseTo(row.beam, 9);
+    expect(shipPower(stock)).toBeCloseTo(row.power, 9);
     expect(shipCargoCap(stock)).toBe(row.cargo);
   });
 
@@ -238,31 +238,31 @@ describe('the class stat table (GDD §2.11)', () => {
       expect(stats.accelMul).toBeCloseTo(row.accel, 9);
       expect(stats.turnMul).toBeCloseTo(row.turn, 9);
       expect(stats.hull).toBe(row.hull);
-      expect(stats.beam).toBe(row.beam);
+      expect(stats.power).toBe(row.power);
       expect(stats.cargo).toBe(row.cargo);
     }
   });
 
   it('pins the Vanguard to the §2.8 baselines it is the reference for', () => {
-    // GDD §2.8 states hull 50, beam-vs-ships 10, beam-vs-core 5, mining 0.5 —
+    // GDD §2.8 states hull 50, weapon-vs-ships 10, weapon-vs-core 5, mining 0.5 —
     // and §2.11 makes the Vanguard the 100% hull those numbers describe. If this
     // fails, one of the two tables moved without the other.
     const van = loadout(ShipClass.Vanguard);
     expect(shipMaxHull(van)).toBe(50);
-    expect(shipBeamShipDps(van)).toBeCloseTo(BEAM_DPS_SHIP, 9);
-    expect(shipBeamCoreDps(van)).toBeCloseTo(BEAM_DPS_CORE, 9);
+    expect(shipWeaponDps(van)).toBeCloseTo(WEAPON_DPS_SHIP, 9);
+    expect(shipCoreDps(van)).toBeCloseTo(WEAPON_DPS_CORE, 9);
     expect(shipMiningRate(van)).toBeCloseTo(MINING_RATE, 9);
   });
 
-  it('scales mining and core damage off the one beam stat (GDD §2.5)', () => {
-    // One beam, one stat: the Excavator's 13 beam must buy it exactly the same
+  it('scales mining and core damage off the one power stat (GDD §2.5)', () => {
+    // One weapon, one stat: the Excavator's 13 power must buy it exactly the same
     // proportional advantage at the rock face as at an enemy core.
     for (const cls of ALL_CLASSES) {
       const load = loadout(cls);
-      const ratio = shipBeam(load) / SHIP_STATS[ShipClass.Vanguard].beam;
+      const ratio = shipPower(load) / SHIP_STATS[ShipClass.Vanguard].power;
       expect(shipMiningRate(load)).toBeCloseTo(MINING_RATE * ratio, 9);
-      expect(shipBeamCoreDps(load)).toBeCloseTo(BEAM_DPS_CORE * ratio, 9);
-      expect(shipBeamShipDps(load)).toBeCloseTo(BEAM_DPS_SHIP * ratio, 9);
+      expect(shipCoreDps(load)).toBeCloseTo(WEAPON_DPS_CORE * ratio, 9);
+      expect(shipWeaponDps(load)).toBeCloseTo(WEAPON_DPS_SHIP * ratio, 9);
     }
   });
 
@@ -319,13 +319,13 @@ describe('the upgrade ladder (GDD §2.5, §2.8)', () => {
   });
 
   it('prices the next step and only the next step', () => {
-    const spec = UPGRADES[UpgradeTrack.Beam];
-    for (let tier = 0; tier < maxTier(UpgradeTrack.Beam); tier++) {
-      const load = { shipClass: ShipClass.Vanguard, tiers: { ...stockTiers(), [UpgradeTrack.Beam]: tier } };
-      expect(nextUpgradeCost(load, UpgradeTrack.Beam)).toBe(spec.costs[tier]);
+    const spec = UPGRADES[UpgradeTrack.Power];
+    for (let tier = 0; tier < maxTier(UpgradeTrack.Power); tier++) {
+      const load = { shipClass: ShipClass.Vanguard, tiers: { ...stockTiers(), [UpgradeTrack.Power]: tier } };
+      expect(nextUpgradeCost(load, UpgradeTrack.Power)).toBe(spec.costs[tier]);
     }
-    const maxed = { shipClass: ShipClass.Vanguard, tiers: { ...stockTiers(), [UpgradeTrack.Beam]: 3 } };
-    expect(nextUpgradeCost(maxed, UpgradeTrack.Beam)).toBeNull();
+    const maxed = { shipClass: ShipClass.Vanguard, tiers: { ...stockTiers(), [UpgradeTrack.Power]: 3 } };
+    expect(nextUpgradeCost(maxed, UpgradeTrack.Power)).toBeNull();
   });
 
   it('bills a fully-maxed hull for the whole ladder', () => {
@@ -346,15 +346,15 @@ describe('the upgrade ladder (GDD §2.5, §2.8)', () => {
         const kitted = loadout(cls, tier);
         const engineStep = UPGRADES[UpgradeTrack.Engine].steps[tier]!;
         const hullStep = UPGRADES[UpgradeTrack.Hull].steps[tier]!;
-        const beamStep = UPGRADES[UpgradeTrack.Beam].steps[tier]!;
+        const powerStep = UPGRADES[UpgradeTrack.Power].steps[tier]!;
 
         expect(shipTopSpeed(kitted)).toBeCloseTo(shipTopSpeed(stock) * engineStep, 9);
         expect(shipAccel(kitted)).toBeCloseTo(shipAccel(stock) * engineStep, 9);
         expect(shipMaxHull(kitted)).toBeCloseTo(shipMaxHull(stock) * hullStep, 9);
-        expect(shipBeam(kitted)).toBeCloseTo(shipBeam(stock) * beamStep, 9);
-        // Mining and core damage ride the beam stat, so they scale with it.
-        expect(shipMiningRate(kitted)).toBeCloseTo(shipMiningRate(stock) * beamStep, 9);
-        expect(shipBeamCoreDps(kitted)).toBeCloseTo(shipBeamCoreDps(stock) * beamStep, 9);
+        expect(shipPower(kitted)).toBeCloseTo(shipPower(stock) * powerStep, 9);
+        // Mining and core damage ride the power stat, so they scale with it.
+        expect(shipMiningRate(kitted)).toBeCloseTo(shipMiningRate(stock) * powerStep, 9);
+        expect(shipCoreDps(kitted)).toBeCloseTo(shipCoreDps(stock) * powerStep, 9);
       }
     }
   });
@@ -435,7 +435,7 @@ describe('class identity at every tier (GDD §2.5, §2.11)', () => {
     // The general statement of the two checks above: for each stat, sorting the
     // four hulls by it gives the same order however much ore has been spent —
     // as long as every hull is at the same tier.
-    const stats = [shipTopSpeed, shipAccel, shipTurnRate, shipMaxHull, shipBeam, shipMiningRate];
+    const stats = [shipTopSpeed, shipAccel, shipTurnRate, shipMaxHull, shipPower, shipMiningRate];
     for (const stat of stats) {
       const order = (tier: number) =>
         [...ALL_CLASSES].sort((a, b) => stat(loadout(b, tier)) - stat(loadout(a, tier))).join(',');
@@ -460,18 +460,18 @@ describe('class identity at every tier (GDD §2.5, §2.11)', () => {
 
 describe('buying an upgrade (GDD §2.5)', () => {
   it('spends the escalating cost and raises the tier, one step at a time', () => {
-    const spec = UPGRADES[UpgradeTrack.Beam];
+    const spec = UPGRADES[UpgradeTrack.Power];
     const total = spec.costs.reduce((n, c) => n + c, 0);
     const { world, ship } = dockedWorld(ShipClass.Vanguard, total);
 
     for (let tier = 0; tier < 3; tier++) {
       const before = spendableOre(ship);
-      expect(buyUpgrade(world, ship, UpgradeTrack.Beam)).toBe('ok');
-      expect(ship.tiers[UpgradeTrack.Beam]).toBe(tier + 1);
+      expect(buyUpgrade(world, ship, UpgradeTrack.Power)).toBe('ok');
+      expect(ship.tiers[UpgradeTrack.Power]).toBe(tier + 1);
       expect(before - spendableOre(ship)).toBeCloseTo(spec.costs[tier]!, 9);
     }
     expect(spendableOre(ship)).toBeCloseTo(0, 9);
-    expect(shipBeam(ship)).toBeCloseTo(SHIP_STATS[ShipClass.Vanguard].beam * spec.steps[3]!, 9);
+    expect(shipPower(ship)).toBeCloseTo(SHIP_STATS[ShipClass.Vanguard].power * spec.steps[3]!, 9);
   });
 
   it('refuses a fourth tier — the ladder has an end', () => {
@@ -483,35 +483,35 @@ describe('buying an upgrade (GDD §2.5)', () => {
   });
 
   it('refuses a purchase the player cannot afford, and charges nothing', () => {
-    const cost = UPGRADES[UpgradeTrack.Beam].costs[0]!;
+    const cost = UPGRADES[UpgradeTrack.Power].costs[0]!;
     const { world, ship } = dockedWorld(ShipClass.Vanguard, cost - 1);
-    expect(buyUpgrade(world, ship, UpgradeTrack.Beam)).toBe('cannot-afford');
-    expect(ship.tiers[UpgradeTrack.Beam]).toBe(0);
+    expect(buyUpgrade(world, ship, UpgradeTrack.Power)).toBe('cannot-afford');
+    expect(ship.tiers[UpgradeTrack.Power]).toBe(0);
     expect(spendableOre(ship)).toBe(cost - 1);
   });
 
   it('requires the ship to be at its own living planet', () => {
-    const cost = UPGRADES[UpgradeTrack.Beam].costs[0]!;
+    const cost = UPGRADES[UpgradeTrack.Power].costs[0]!;
 
     // Out in the field, far from home: the panel is not live (GDD §2.5).
     const away = dockedWorld(ShipClass.Vanguard, cost);
     away.ship.pos = at(PLANET.dockRange + 50, 0);
-    expect(buyUpgrade(away.world, away.ship, UpgradeTrack.Beam)).toBe('not-docked');
+    expect(buyUpgrade(away.world, away.ship, UpgradeTrack.Power)).toBe('not-docked');
 
     // Docked, but the home is a wreck: this player's match is over.
     const dead = dockedWorld(ShipClass.Vanguard, cost);
     dead.world.planets[0]!.alive = false;
-    expect(buyUpgrade(dead.world, dead.ship, UpgradeTrack.Beam)).toBe('planet-dead');
+    expect(buyUpgrade(dead.world, dead.ship, UpgradeTrack.Power)).toBe('planet-dead');
 
     // No planet at all (a spectator, or a slot with no home).
     const homeless = dockedWorld(ShipClass.Vanguard, cost);
     homeless.world.planets = [];
-    expect(buyUpgrade(homeless.world, homeless.ship, UpgradeTrack.Beam)).toBe('no-planet');
+    expect(buyUpgrade(homeless.world, homeless.ship, UpgradeTrack.Power)).toBe('no-planet');
 
     // A dead ship buys nothing, even sitting on top of its planet.
     const corpse = dockedWorld(ShipClass.Vanguard, cost);
     corpse.ship.alive = false;
-    expect(buyUpgrade(corpse.world, corpse.ship, UpgradeTrack.Beam)).toBe('not-docked');
+    expect(buyUpgrade(corpse.world, corpse.ship, UpgradeTrack.Power)).toBe('not-docked');
   });
 
   it('pays hold-first, then the bank — banking is still a real decision', () => {
@@ -532,8 +532,8 @@ describe('buying an upgrade (GDD §2.5)', () => {
     const { world, ship } = dockedWorld(ShipClass.Vanguard, 20);
     world.match.collapseTime = 1;
     world.match.phase = 'collapse';
-    expect(buyUpgrade(world, ship, UpgradeTrack.Beam)).toBe('ok');
-    expect(ship.tiers[UpgradeTrack.Beam]).toBe(1);
+    expect(buyUpgrade(world, ship, UpgradeTrack.Power)).toBe('ok');
+    expect(ship.tiers[UpgradeTrack.Power]).toBe(1);
   });
 
   it('widens the hold immediately, and never over the cap', () => {
@@ -605,16 +605,16 @@ describe('the upgradeOrder action (GDD §2.4, §2.9)', () => {
     expect(Math.hypot(ship.vel.x, ship.vel.y)).toBeGreaterThan(Math.hypot(control.vel.x, control.vel.y));
   });
 
-  it('makes a bought beam tier mine faster and hit harder', () => {
-    const spec = UPGRADES[UpgradeTrack.Beam];
+  it('makes a bought power tier mine faster and hit harder', () => {
+    const spec = UPGRADES[UpgradeTrack.Power];
     const { world, ship } = dockedWorld(ShipClass.Vanguard, 100);
-    step(world, buy(0, UpgradeTrack.Beam));
-    expect(ship.tiers[UpgradeTrack.Beam]).toBe(1);
+    step(world, buy(0, UpgradeTrack.Power));
+    expect(ship.tiers[UpgradeTrack.Power]).toBe(1);
 
     // Mining faster: mining is a projectile now (amendment v0.3), so compare the
     // upgraded ship's ore/s against a stock control over the same window and
-    // standoff rather than pin an exact continuous rate. The chip rides the beam
-    // multiplier, so the ratio is the beam tier's step.
+    // standoff rather than pin an exact continuous rate. The chip rides the power
+    // multiplier, so the ratio is the power tier's step.
     const measure = (tiers: UpgradeTiers): number => {
       const shooter = makeShip({ id: 0, pos: at(0, 0), angle: 0, cargoCap: 999, tiers });
       const rock = makeAsteroid({ id: 7, pos: at(120, 0), ore: 1000 });
@@ -626,12 +626,12 @@ describe('the upgradeOrder action (GDD §2.4, §2.9)', () => {
     };
     const upgraded = measure(ship.tiers);
     const stock = measure(stockTiers());
-    expect(upgraded).toBeGreaterThan(stock); // the bought beam tier mines faster
-    expect(upgraded / stock).toBeCloseTo(spec.steps[1]!, 1); // ×1.25, the beam step
+    expect(upgraded).toBeGreaterThan(stock); // the bought power tier mines faster
+    expect(upgraded / stock).toBeCloseTo(spec.steps[1]!, 1); // ×1.25, the power step
 
     // Weapon: the same tier, the same multiplier, against an enemy core.
-    expect(shipBeamShipDps(ship)).toBeCloseTo(BEAM_DPS_SHIP * spec.steps[1]!, 9);
-    expect(shipBeamCoreDps(ship)).toBeCloseTo(BEAM_DPS_CORE * spec.steps[1]!, 9);
+    expect(shipWeaponDps(ship)).toBeCloseTo(WEAPON_DPS_SHIP * spec.steps[1]!, 9);
+    expect(shipCoreDps(ship)).toBeCloseTo(WEAPON_DPS_CORE * spec.steps[1]!, 9);
   });
 
   it('replays identically — a purchase is deterministic (GDD §4.8)', () => {
@@ -647,7 +647,7 @@ describe('the upgradeOrder action (GDD §2.4, §2.9)', () => {
     const script = (tick: number): Inputs => [
       {
         id: 0,
-        actions: tick === 5 ? [buyAction(UpgradeTrack.Beam), thrust(1, 0)] : [thrust(1, 0), fire()],
+        actions: tick === 5 ? [buyAction(UpgradeTrack.Power), thrust(1, 0)] : [thrust(1, 0), fire()],
       },
       { id: 1, actions: tick === 9 ? [buyAction(UpgradeTrack.Hull)] : [thrust(-1, 0.5)] },
     ];

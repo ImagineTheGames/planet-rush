@@ -132,7 +132,7 @@ export function turretSprite(options: TurretSpriteOptions): SpriteDef {
 /**
  * How much bubble is left, as the three states a player can act on. The sim
  * owns the HP; this is the banding that makes "pressure beats regeneration"
- * (GDD §2.6) visible from outside beam range.
+ * (GDD §2.6) visible from outside weapon range.
  */
 export type ShieldStrength = 'full' | 'weakened' | 'failing';
 
@@ -157,7 +157,7 @@ const SHIELD_ALPHA: Readonly<Record<ShieldStrength, number>> = {
 };
 
 /**
- * The bubble over the core, at unit radius. Plasma by contract (§1: "beams,
+ * The bubble over the core, at unit radius. Plasma by contract (§1: "weapon fire,
  * cockpits, **energy**"), with a player-colour equator so a defender can tell
  * their own bubble from an ally's at a glance.
  */

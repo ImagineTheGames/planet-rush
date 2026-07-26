@@ -40,20 +40,20 @@ export const TICK_DT: Tunable<number> = 1 / 60;
 // GDD §2.8 — Baseline constants (the table, verbatim)
 // ---------------------------------------------------------------------------
 
-/** Core HP. Naked-core kill time = 100 ÷ 5 ≈ 20 s of sustained beam. TUNABLE */
+/** Core HP. Naked-core kill time = 100 ÷ 5 ≈ 20 s of sustained fire. TUNABLE */
 export const CORE_HP: Tunable<number> = 100;
 
-/** Beam-vs-core DPS — the constant the whole match balances on (GDD §2.8).
- *  This is the Vanguard baseline; a class's actual core DPS scales by its beam
- *  stat (see `beamCoreDps`). TUNABLE */
-export const BEAM_DPS_CORE: Tunable<number> = 5;
+/** Weapon-vs-core DPS — the constant the whole match balances on (GDD §2.8).
+ *  This is the Vanguard baseline; a class's actual core DPS scales by its power
+ *  stat (see `classCoreDps`). TUNABLE */
+export const WEAPON_DPS_CORE: Tunable<number> = 5;
 
-/** Beam-vs-ships/turrets DPS, Vanguard baseline (GDD §2.8). A class's actual
- *  weapon DPS is its beam stat directly (Vanguard beam = 10). TUNABLE */
-export const BEAM_DPS_SHIP: Tunable<number> = 10;
+/** Weapon-vs-ships/turrets DPS, Vanguard baseline (GDD §2.8). A class's actual
+ *  weapon DPS is its power stat directly (Vanguard power = 10). TUNABLE */
+export const WEAPON_DPS_SHIP: Tunable<number> = 10;
 
-/** Mining rate: ore per second of beam-on-asteroid, Vanguard baseline
- *  (GDD §2.8). Scales by beam stat for other classes (see `miningRate`). The
+/** Mining rate: ore per second of fire-on-asteroid, Vanguard baseline
+ *  (GDD §2.8). Scales by power stat for other classes (see `miningRate`). The
  *  day-1 test pins the Vanguard at exactly this. TUNABLE */
 export const MINING_RATE: Tunable<number> = 0.5;
 
@@ -87,16 +87,16 @@ export const TURRET = {
   dps: 4,
   buildTime: 10,
   capPerPlanet: 4,
-  /** Engagement radius (world units). Deliberately *under* `BEAM_RANGE` (260):
+  /** Engagement radius (world units). Deliberately *under* `WEAPON_RANGE` (260):
    *  GDD §2.6 — "a patient attacker can pick off turrets from the edge of their
-   *  range." That only exists as a skill if the beam out-ranges the turret. */
+   *  range." That only exists as a skill if the ship out-ranges the turret. */
   range: 240,
   /** Seconds between shots. Per-shot damage = `dps * fireInterval` = 2. */
   fireInterval: 0.5,
   /** Projectile muzzle speed (units/s) — fast enough that lead is small at
    *  `range`, slow enough that a boosting ship can outrun a stale shot. */
   projectileSpeed: 700,
-  /** Turret collision radius (it is a beam target — GDD §2.6 "turrets deter"). */
+  /** Turret collision radius (it is a shot target — GDD §2.6 "turrets deter"). */
   radius: 12,
   /** Mount height above the planet surface; turret slots ring the planet. */
   mountOffset: 12,
@@ -142,41 +142,43 @@ export const PROJECTILE = {
 } as const;
 
 /**
- * Ship weapon — **ship-vs-ship and ship-vs-structure combat is a projectile now**
- * (design amendment v0.2, `docs/design-amendments.md`). The mining laser vs
- * asteroids/ore is untouched (that stays the segment-vs-circle beam, GDD §4.1);
- * only the *weapon* half of "one beam, one stat" left hitscan. The reason is the
- * developer's: "It's too easy right now to kill each other and there's no way to
- * dodge. If we switch to a projectile there's a chance to dodge and it becomes a
- * lot funner." Travel time is the mechanic — a ship at combat range strafing at
- * full speed can evade a shot, which is pinned by a test (`projectiles.test.ts`).
+ * Ship weapon — **everything a ship does with its trigger is a projectile now**
+ * (design amendments v0.2 and v0.3, `docs/design-amendments.md`). v0.2 moved
+ * ship-vs-ship / ship-vs-structure combat off hitscan; v0.3 finished the job by
+ * retiring the mining laser too, so a rock is chipped by the same shot that bites
+ * a hull. The reason is the developer's: "It's too easy right now to kill each
+ * other and there's no way to dodge. If we switch to a projectile there's a chance
+ * to dodge and it becomes a lot funner." Travel time is the mechanic — a ship at
+ * combat range strafing at full speed can evade a shot, pinned by a test
+ * (`projectiles.test.ts`).
  *
- * "One beam, one stat" survives the split: per-shot damage is still the beam stat
- * (`shipWeaponDamage` = `shipBeamShipDps × fireInterval`) and mining still scales
- * off the same beam, so mining speed and weapon damage move together exactly as
- * GDD §2.5 requires. What changed is only that the weapon's damage is *delivered*
- * by a pooled projectile that can miss, not by an instant ray that cannot. TUNABLE
+ * "One weapon, one stat" survives the split: per-shot damage is still the power
+ * stat (`shipWeaponDamage` = `shipWeaponDps × fireInterval`) and mining still
+ * scales off the same power, so mining speed and weapon damage move together
+ * exactly as GDD §2.5 requires. What changed is only that the weapon's damage is
+ * *delivered* by a pooled projectile that can miss, not by an instant ray that
+ * cannot. TUNABLE
  */
 export const SHIP_WEAPON = {
   /** Seconds between shots while fire is held. Base weapon DPS (if every shot
-   *  lands) equals the old beam DPS: per-shot damage = `shipBeamShipDps ×
-   *  fireInterval`, so a stock Vanguard still deals `BEAM_DPS_SHIP` = 10 to a
+   *  lands) equals the pre-projectile DPS: per-shot damage = `shipWeaponDps ×
+   *  fireInterval`, so a stock Vanguard still deals `WEAPON_DPS_SHIP` = 10 to a
    *  target it never lets dodge. Missing is the new skill floor. */
   fireInterval: 0.35,
   /**
-   * Base muzzle speed (world units/s) at beam tier 0 — the design's "chance to
+   * Base muzzle speed (world units/s) at power tier 0 — the design's "chance to
    * dodge" lives in this number against `BASE_SPEED`. At 520 a shot crosses the
    * 260-unit combat range in 0.5 s, in which a Vanguard strafing at full speed
    * (260 u/s) slides ~130 u sideways — far past a ship+shot radius, so the dodge
    * is real (`projectiles.test.ts`). Fast enough that a committed attacker who
    * closes the range still lands hits; slow enough that a boosting ship outruns a
-   * stale shot. Scaled up by the beam upgrade ladder (`shipProjectileSpeed`) —
+   * stale shot. Scaled up by the power upgrade ladder (`shipProjectileSpeed`) —
    * "add upgrades to make them faster, stronger" (amendment v0.2). TUNABLE
    */
   projectileSpeed: 520,
   /** How far a base shot travels before it despawns (world units) — the ship's
-   *  effective weapon reach, a touch past `BEAM_RANGE` so a projectile weapon is
-   *  not shorter-ranged than the mining beam it replaced for combat. Lifetime is
+   *  effective weapon reach, a touch past `WEAPON_RANGE` so the projectile weapon
+   *  is not shorter-ranged than the hitscan it replaced. Lifetime is
    *  `range / speed`, and scales with muzzle speed so a faster shot reaches the
    *  same distance (`shipProjectileLife`). */
   range: 300,
@@ -187,28 +189,28 @@ export const SHIP_WEAPON = {
 
 /**
  * How much of a projectile's ship-damage a shield or core actually takes — the
- * core:ship ratio (`BEAM_DPS_CORE / BEAM_DPS_SHIP` = 5:10) the beam already
- * applied (`shipBeamCoreDps`). A projectile carries one `damage` number (its
+ * core:ship ratio (`WEAPON_DPS_CORE / WEAPON_DPS_SHIP` = 5:10) the hitscan weapon
+ * already applied (`shipCoreDps`). A projectile carries one `damage` number (its
  * ship/turret value); this scales it down when it lands on a shield or a core,
- * so a stock Vanguard shot deals `BEAM_DPS_SHIP × fireInterval` to a hull and
- * `BEAM_DPS_CORE × fireInterval` to a core — the §2.8 balance, unchanged by the
+ * so a stock Vanguard shot deals `WEAPON_DPS_SHIP × fireInterval` to a hull and
+ * `WEAPON_DPS_CORE × fireInterval` to a core — the §2.8 balance, unchanged by the
  * switch to projectiles. TUNABLE
  */
-export const PROJECTILE_CORE_FACTOR: Tunable<number> = BEAM_DPS_CORE / BEAM_DPS_SHIP;
+export const PROJECTILE_CORE_FACTOR: Tunable<number> = WEAPON_DPS_CORE / WEAPON_DPS_SHIP;
 
 /**
  * Ore chipped from an asteroid by ONE weapon projectile that strikes it —
  * **mining is shooting now** (ratified amendment v0.3, `docs/design-amendments.md`:
  * "the mining laser should go away, it should be a projectile as well"). The
- * segment-vs-circle mining beam is gone; a projectile hit chips ore chunks, and
+ * segment-vs-circle mining laser is gone; a projectile hit chips ore chunks, and
  * the tractor rules (GDD §2.3) are unchanged — only the chipping mechanism did.
  *
  * This is the Vanguard baseline; a class's actual per-hit yield scales by its
- * beam stat (`shipMineYield`), exactly as the old continuous mining rate did —
- * one beam, one stat (GDD §2.5).
+ * power stat (`shipMineYield`), exactly as the old continuous mining rate did —
+ * one weapon, one stat (GDD §2.5).
  *
  * Sized so a ship holding fire at the mining face extracts ore at the SAME rate
- * the old beam did. Shots land one `SHIP_WEAPON.fireInterval` apart (the weapon
+ * the old laser did. Shots land one `SHIP_WEAPON.fireInterval` apart (the weapon
  * is a pipeline — travel time is a one-off latency, not a rate cap), so ore per
  * second at contact = yield ⁄ fireInterval = `MINING_RATE`. It is *derived* from
  * the two constants it balances between rather than typed loose, so a retune of
@@ -289,7 +291,7 @@ export function clampToMargin(
  *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
  *  on — but the sim cannot place a core without it. TUNABLE */
 export const PLANET = {
-  /** Core body radius: the collision/beam target and the mount ring for turrets. */
+  /** Core body radius: the collision/shot target and the mount ring for turrets. */
   radius: 64,
   /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
    *  in a ring around the central asteroid field). Lowered from the v0.1 0.42
@@ -511,7 +513,7 @@ export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
  * four rules, not three — the design decision the doc flagged, made.
  *
  * At `1` HP/s, decay is intentionally slow: it is the backstop that guarantees
- * an ending (GDD §2.3), not a race — an attacker's beam (`BEAM_DPS_CORE` = 5)
+ * an ending (GDD §2.3), not a race — an attacker's fire (`WEAPON_DPS_CORE` = 5)
  * still finishes a home far faster than entropy does. TUNABLE
  *
  * (Written `= 1 as Tunable<number>` rather than the file's usual
@@ -564,8 +566,8 @@ export const AUTO_AIM_ARC: Tunable<number> = 2 * Math.PI;
 // ---------------------------------------------------------------------------
 
 /** The five locked-at-lobby class attributes (GDD §2.11). Speed/accel/turn are
- *  multipliers over the Vanguard base; hull and beam are absolute; beam is also
- *  mining speed (one beam, one stat). Upgrades multiply these bases (GDD §2.5),
+ *  multipliers over the Vanguard base; hull and power are absolute; power is also
+ *  mining speed (one weapon, one stat). Upgrades multiply these bases (GDD §2.5),
  *  so relative class identity is preserved at every tier. */
 export interface ShipStats {
   /** Top-speed multiplier over `BASE_SPEED`. */
@@ -576,51 +578,51 @@ export interface ShipStats {
   readonly turnMul: number;
   /** Absolute hull HP (armor). */
   readonly hull: number;
-  /** Beam stat: weapon DPS vs ships/turrets, and mining/core scale (one stat). */
-  readonly beam: number;
+  /** Power stat: weapon DPS vs ships/turrets, and mining/core scale (one stat). */
+  readonly power: number;
   /** Base cargo slots for the hull. */
   readonly cargo: number;
 }
 
 /** Per-class stats (GDD §2.11 table). All TUNABLE. */
 export const SHIP_STATS: Readonly<Record<ShipClass, ShipStats>> = {
-  // Quadfin — scout, miner-hunter · 130/120/140 · hull 35 · beam 8 · cargo 2
-  [ShipClass.Interceptor]: { speedMul: 1.3, accelMul: 1.2, turnMul: 1.4, hull: 35, beam: 8, cargo: 2 },
-  // Anvil — all-rounder, onboarding default · 100/100/100 · hull 50 · beam 10 · cargo 2
-  [ShipClass.Vanguard]: { speedMul: 1.0, accelMul: 1.0, turnMul: 1.0, hull: 50, beam: 10, cargo: 2 },
-  // Pincer — mining engine, close bruiser · 90/100/80 · hull 55 · beam 13 · cargo 2
-  [ShipClass.Excavator]: { speedMul: 0.9, accelMul: 1.0, turnMul: 0.8, hull: 55, beam: 13, cargo: 2 },
-  // Hammerhead — logistics, siege tank · 85/80/85 · hull 70 · beam 9 · cargo 3
-  [ShipClass.Hauler]: { speedMul: 0.85, accelMul: 0.8, turnMul: 0.85, hull: 70, beam: 9, cargo: 3 },
+  // Quadfin — scout, miner-hunter · 130/120/140 · hull 35 · power 8 · cargo 2
+  [ShipClass.Interceptor]: { speedMul: 1.3, accelMul: 1.2, turnMul: 1.4, hull: 35, power: 8, cargo: 2 },
+  // Anvil — all-rounder, onboarding default · 100/100/100 · hull 50 · power 10 · cargo 2
+  [ShipClass.Vanguard]: { speedMul: 1.0, accelMul: 1.0, turnMul: 1.0, hull: 50, power: 10, cargo: 2 },
+  // Pincer — mining engine, close bruiser · 90/100/80 · hull 55 · power 13 · cargo 2
+  [ShipClass.Excavator]: { speedMul: 0.9, accelMul: 1.0, turnMul: 0.8, hull: 55, power: 13, cargo: 2 },
+  // Hammerhead — logistics, siege tank · 85/80/85 · hull 70 · power 9 · cargo 3
+  [ShipClass.Hauler]: { speedMul: 0.85, accelMul: 0.8, turnMul: 0.85, hull: 70, power: 9, cargo: 3 },
 };
 
-/** The Vanguard is the balance reference: its beam stat is the denominator for
- *  every beam-scaled rate (mining, core DPS). Equals `SHIP_STATS.vanguard.beam`. */
-export const VANGUARD_BEAM: Tunable<number> = SHIP_STATS[ShipClass.Vanguard].beam;
+/** The Vanguard is the balance reference: its power stat is the denominator for
+ *  every power-scaled rate (mining, core DPS). Equals `SHIP_STATS.vanguard.power`. */
+export const VANGUARD_POWER: Tunable<number> = SHIP_STATS[ShipClass.Vanguard].power;
 
-/** Weapon DPS a class deals to ships/turrets — the beam stat, directly. */
-export function beamShipDps(cls: ShipClass): number {
-  return SHIP_STATS[cls].beam;
+/** Weapon DPS a class deals to ships/turrets — the power stat, directly. */
+export function classWeaponDps(cls: ShipClass): number {
+  return SHIP_STATS[cls].power;
 }
 
-/** Core DPS a class deals — beam scaled to the Vanguard's core:ship ratio
- *  (5:10), so a Vanguard hits the core for `BEAM_DPS_CORE` = 5. */
-export function beamCoreDps(cls: ShipClass): number {
-  return SHIP_STATS[cls].beam * (BEAM_DPS_CORE / BEAM_DPS_SHIP);
+/** Core DPS a class deals — power scaled to the Vanguard's core:ship ratio
+ *  (5:10), so a Vanguard hits the core for `WEAPON_DPS_CORE` = 5. */
+export function classCoreDps(cls: ShipClass): number {
+  return SHIP_STATS[cls].power * (WEAPON_DPS_CORE / WEAPON_DPS_SHIP);
 }
 
-/** Mining rate (ore/s) a class extracts — `MINING_RATE` scaled by beam vs the
+/** Mining rate (ore/s) a class extracts — `MINING_RATE` scaled by power vs the
  *  Vanguard baseline, so a Vanguard mines at exactly `MINING_RATE` = 0.5. */
 export function miningRate(cls: ShipClass): number {
-  return MINING_RATE * (SHIP_STATS[cls].beam / VANGUARD_BEAM);
+  return MINING_RATE * (SHIP_STATS[cls].power / VANGUARD_POWER);
 }
 
 // ---------------------------------------------------------------------------
 // GDD §2.5 — Ship upgrades: the ladder, and its escalating costs
 // ---------------------------------------------------------------------------
 //
-// "Ship upgrades (escalating cost): beam power (mining speed and weapon damage —
-// one beam, one stat), engine speed, cargo capacity (base hold 2, +2 per tier),
+// "Ship upgrades (escalating cost): power (mining speed and weapon damage —
+// one stat), engine speed, cargo capacity (base hold 2, +2 per tier),
 // hull HP. … Upgrades *multiply* the class base stats (2.11), so a maxed
 // Interceptor is still the fastest thing on the map and a maxed Hauler still the
 // toughest." (GDD §2.5)
@@ -667,11 +669,11 @@ export interface UpgradeTrackSpec {
  * between what a player is shown and what they are sold. All TUNABLE.
  */
 export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
-  // Beam: mining speed *and* weapon damage, one stat (GDD §2.5). Multiplies the
-  // class beam, so the Excavator stays the mining engine at every tier — and the
+  // Power: mining speed *and* weapon damage, one stat (GDD §2.5). Multiplies the
+  // class power, so the Excavator stays the mining engine at every tier — and the
   // track pays for itself twice, which is why it is the dearest.
-  [UpgradeTrack.Beam]: {
-    track: UpgradeTrack.Beam,
+  [UpgradeTrack.Power]: {
+    track: UpgradeTrack.Power,
     mode: 'multiply',
     steps: [1, 1.25, 1.5, 1.8],
     costs: [4, 8, 14], // TUNABLE
@@ -711,10 +713,10 @@ export const UPGRADES: Readonly<Record<UpgradeTrack, UpgradeTrackSpec>> = {
 };
 
 /** Iteration order over the four tracks. Fixed, because anything that walks all
- *  four inside the sim must walk them in one order (GDD §4.8). Beam leads: it is
+ *  four inside the sim must walk them in one order (GDD §4.8). Power leads: it is
  *  the stat that pays for itself twice, and the upgrade panel lists it first. */
 export const TRACK_ORDER: readonly UpgradeTrack[] = [
-  UpgradeTrack.Beam,
+  UpgradeTrack.Power,
   UpgradeTrack.Engine,
   UpgradeTrack.Cargo,
   UpgradeTrack.Hull,
@@ -771,12 +773,10 @@ export const SHIP_ASTEROID_RESTITUTION: Tunable<number> = 0.8;
  * Engagement reach (world units): the radius within which auto-aim acquires the
  * nearest valid target (asteroid, enemy ship, turret, core) across the full 360°
  * (GDD §2.4), and the standoff distance the bots and QA probes mine and fight
- * from. Named `BEAM_RANGE` for continuity — it was the mining beam's segment
- * length before the beam retired (amendment v0.3) — and kept because the bot
- * behaviour trees, the netcode, and the QA harness all size their standoffs from
- * it; it is the one weapon system's reach, whether the shot lands on rock or
- * hull. TUNABLE */
-export const BEAM_RANGE: Tunable<number> = 260;
+ * from. It is the one weapon system's reach, whether the shot lands on rock or
+ * hull; the bot behaviour trees, the netcode, and the QA harness all size their
+ * standoffs from it. TUNABLE */
+export const WEAPON_RANGE: Tunable<number> = 260;
 
 // ---------------------------------------------------------------------------
 // Asteroids and ore chunks (GDD §2.3, §5.5)
@@ -835,7 +835,7 @@ export const TRACTOR = {
  * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
  * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
  * the *telegraph*, pooled ore sprites emitted on a fixed cadence and reabsorbed
- * at the planet — the same discipline as the beam tell, and they reuse the ore
+ * at the planet — the same discipline as the firing tell, and they reuse the ore
  * chunk the renderer already draws, so the visual needs no new render path.
  *
  * You unload when you **park**, not when you skim past: the drain only runs

@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { TELL, TELL_NAMES, TellQueue, type TellKind } from '../tells';
 import { DeathMoment, HUSH_S } from '../vfx/death-moment';
 import { ENGAGE, LEAK, MIN_HOLD_S, UnderAttackAlarm, WEIGHTS } from './alarm';
-import { BeamVoices, SustainedVoice } from './beams';
+import { WeaponVoices, SustainedVoice } from './weapons';
 import {
   isLayered,
   loops,
@@ -348,9 +348,9 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(SUSTAINED_TELLS).toHaveLength(3);
   });
 
-  it('names both beam voices, because the brief names them (GDD §3.6)', () => {
-    expect(loops(soundSpec(SOUND.beamRockLoop))).toBe(true);
-    expect(loops(soundSpec(SOUND.beamHullLoop))).toBe(true);
+  it('names both firing voices, because the brief names them (GDD §3.6)', () => {
+    expect(loops(soundSpec(SOUND.mineLoop))).toBe(true);
+    expect(loops(soundSpec(SOUND.weaponLoop))).toBe(true);
   });
 
   it('makes rock and hull genuinely distinct, not two takes of one sound', () => {
@@ -364,8 +364,8 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       }
       return n / samples.length;
     };
-    const rock = crossings(renderSound(soundSpec(SOUND.beamRockLoop)));
-    const hull = crossings(renderSound(soundSpec(SOUND.beamHullLoop)));
+    const rock = crossings(renderSound(soundSpec(SOUND.mineLoop)));
+    const hull = crossings(renderSound(soundSpec(SOUND.weaponLoop)));
     expect(hull).toBeGreaterThan(rock * 1.8);
   });
 
@@ -533,7 +533,7 @@ describe('the mix (`./graph`) — built headless', () => {
   });
 });
 
-describe('held voices (`./beams`)', () => {
+describe('held voices (`./weapons`)', () => {
   it('starts on demand and stops itself when the state goes quiet', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
@@ -559,46 +559,46 @@ describe('held voices (`./beams`)', () => {
     expect(voice.gain).toBeCloseTo(0.9, 5);
   });
 
-  it('crossfades the two beam voices instead of switching between them', () => {
+  it('crossfades the two firing voices instead of switching between them', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
-    const beams = new BeamVoices(graph);
+    const weapons = new WeaponVoices(graph);
 
     for (let i = 0; i < 20; i++) {
-      beams.onBeam(false, 1); // mining
-      beams.update(1 / 60);
+      weapons.onHit(false, 1); // mining
+      weapons.update(1 / 60);
     }
-    expect(beams.levels.rock).toBeGreaterThan(0.5);
-    expect(beams.levels.hull).toBe(0);
+    expect(weapons.levels.rock).toBeGreaterThan(0.5);
+    expect(weapons.levels.hull).toBe(0);
 
-    // The beam sweeps off the rock and onto a hull: rock falls, hull rises,
+    // A shot sweeps off the rock and onto a hull: rock falls, hull rises,
     // and for a moment both are sounding — that is the slide.
-    beams.onBeam(true, 1);
-    beams.update(1 / 60);
-    expect(beams.levels.hull).toBeGreaterThan(0);
-    expect(beams.levels.rock).toBeGreaterThan(0);
-    expect(beams.levels.rock).toBeLessThan(0.7);
+    weapons.onHit(true, 1);
+    weapons.update(1 / 60);
+    expect(weapons.levels.hull).toBeGreaterThan(0);
+    expect(weapons.levels.rock).toBeGreaterThan(0);
+    expect(weapons.levels.rock).toBeLessThan(0.7);
 
     for (let i = 0; i < 60; i++) {
-      beams.onBeam(true, 1);
-      beams.update(1 / 60);
+      weapons.onHit(true, 1);
+      weapons.update(1 / 60);
     }
-    expect(beams.levels.rock).toBe(0);
-    expect(beams.levels.hull).toBeGreaterThan(0.5);
+    expect(weapons.levels.rock).toBe(0);
+    expect(weapons.levels.hull).toBeGreaterThan(0.5);
   });
 
-  it('rides pitch with beam power — a heavier tool sounds like one', () => {
+  it('rides pitch with weapon power — a heavier tool sounds like one', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
-    const beams = new BeamVoices(graph);
-    beams.onBeam(false, 1);
-    beams.update(1 / 60);
+    const weapons = new WeaponVoices(graph);
+    weapons.onHit(false, 1);
+    weapons.update(1 / 60);
     const strong = ctx.sources[ctx.sources.length - 1]!.playbackRate.value;
 
     const ctx2 = new FakeAudioContext();
-    const beams2 = new BeamVoices(new AudioGraph(ctx2));
-    beams2.onBeam(false, 0);
-    beams2.update(1 / 60);
+    const weapons2 = new WeaponVoices(new AudioGraph(ctx2));
+    weapons2.onHit(false, 0);
+    weapons2.update(1 / 60);
     const weak = ctx2.sources[ctx2.sources.length - 1]!.playbackRate.value;
 
     expect(strong).toBeGreaterThan(weak);
@@ -606,9 +606,9 @@ describe('held voices (`./beams`)', () => {
 
   it('is a no-op when nothing ever fires — a quiet match makes no nodes', () => {
     const ctx = new FakeAudioContext();
-    const beams = new BeamVoices(new AudioGraph(ctx));
-    for (let i = 0; i < 120; i++) beams.update(1 / 60);
-    expect(beams.playing).toBe(false);
+    const weapons = new WeaponVoices(new AudioGraph(ctx));
+    for (let i = 0; i < 120; i++) weapons.update(1 / 60);
+    expect(weapons.playing).toBe(false);
     expect(ctx.sources).toHaveLength(0);
   });
 });
@@ -633,7 +633,7 @@ describe('the under-attack alarm (GDD §2.2) — sustained, not stray', () => {
     expect(alarm.pressure).toBe(0);
   });
 
-  it('fires on a beam held on the core, in well under a second', () => {
+  it('fires on sustained fire held on the core, in well under a second', () => {
     const alarm = new UnderAttackAlarm();
     let elapsed = 0;
     while (!alarm.active && elapsed < 3) {
@@ -736,7 +736,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
   it('sustains the three held states instead of retriggering them', () => {
     const { ctx, engine } = engineOn();
     const tells = new TellQueue(8);
-    tells.push(TELL.beamRock, 0, 0, 0, 1, 0);
+    tells.push(TELL.mineHit, 0, 0, 0, 1, 0);
     tells.push(TELL.thrust, 0, 0, 0, 1, 0);
 
     for (let i = 0; i < 60; i++) {
@@ -744,7 +744,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
       engine.update(1 / 60);
       ctx.advance(1 / 60);
     }
-    // A whole second of held beam and throttle: two looping sources, not 120
+    // A whole second of held fire and throttle: two looping sources, not 120
     // one-shots. (`preload` makes no sources, so every source here is a loop.)
     expect(engine.playCount).toBe(0);
     expect(ctx.sources.filter((s) => s.loop)).toHaveLength(3); // + the ambient bed

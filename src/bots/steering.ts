@@ -24,7 +24,7 @@
  */
 
 import type { Action, AimAction, BoostAction, FireAction, Rng, ThrustAction, Vec2 } from '@shared/types';
-import { BASE_SPEED, BEAM_RANGE, leadAim, SHIP_RADIUS, SHIP_STATS, shipProjectileSpeed } from '../sim';
+import { BASE_SPEED, WEAPON_RANGE, leadAim, SHIP_RADIUS, SHIP_STATS, shipProjectileSpeed } from '../sim';
 import type { SelfView } from './perception';
 
 // ---------------------------------------------------------------------------
@@ -278,20 +278,20 @@ function aimDir(self: SelfView, target: Vec2, targetVel?: Vec2): Vec2 {
 
 /**
  * Extra angular slop allowed on top of a target's own angular size before a bot
- * pulls the trigger. Small: a Manual beam runs along the *hull's* facing, and
+ * pulls the trigger. Small: a Manual shot fires along the *hull's* facing, and
  * the hull is still swinging at its class turn rate, so a bot that fires the
  * instant it is roughly lined up mostly misses. TUNABLE
  */
 export const FIRE_TOLERANCE = 0.06;
 
 /**
- * Would firing this tick actually hit? True when the target is inside beam range
+ * Would firing this tick actually hit? True when the target is inside weapon range
  * and the ship's *current facing* — not the direction it asked for — is within
  * the target's angular radius plus {@link FIRE_TOLERANCE}.
  *
  * This is the one place bots avoid a whole class of silly behavior: holding the
  * trigger through a 180° turn, lighting up the sky, and telling every player on
- * the map exactly where they are (GDD §2.2 — "the beam is the loudest tell").
+ * the map exactly where they are (GDD §2.2 — "gunfire is the loudest tell").
  */
 export function canHit(
   self: SelfView,
@@ -301,7 +301,7 @@ export function canHit(
   targetVel?: Vec2,
 ): boolean {
   const d = dist(self.pos, target);
-  if (d > BEAM_RANGE) return false;
+  if (d > WEAPON_RANGE) return false;
   if (d < 1e-6) return true;
   // Fire when the hull points at the *intercept* bearing, not the raw target
   // bearing — a leading shot only lands if the nose is on the lead (amendment v0.2).
@@ -311,5 +311,5 @@ export function canHit(
   return Math.abs(angleDelta(self.angle, want)) <= halfWidth + FIRE_TOLERANCE + extraTolerance;
 }
 
-/** Beam reach, re-exported so trees plan trips in the units they shoot in. */
-export { BEAM_RANGE };
+/** Weapon reach, re-exported so trees plan trips in the units they shoot in. */
+export { WEAPON_RANGE };

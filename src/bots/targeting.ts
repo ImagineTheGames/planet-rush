@@ -127,7 +127,7 @@ export function nearestEnemy(ctx: BotCtx): PerceivedShip | null {
 
 /**
  * The rock worth mining: estimated payout against the trip to reach it
- * (GDD §5.5 — "let a player judge a payout before committing beam time").
+ * (GDD §5.5 — "let a player judge a payout before committing weapon time").
  * Fog-honest — {@link estimateOre} reads size and crack stage, never `ore`.
  * Ties break on the lower id so the choice is stable frame to frame and a bot
  * never dithers between two identical rocks.
@@ -209,7 +209,7 @@ function total(
 /**
  * Score an enemy **ship**.
  *
- *  - *threat* — what it is (hull class), whether its beam is lit, and how close
+ *  - *threat* — what it is (hull class), whether it is firing, and how close
  *    it is to this bot's own planet. A firing Interceptor over your house is the
  *    highest-threat thing in the game.
  *  - *proximity* — how cheap it is to reach, as a fraction of visual range.
@@ -219,7 +219,7 @@ function total(
  *    term is "the miner far from home", spelled arithmetically.
  *
  * A spawn-protected ship scores zero opportunity: it cannot be hurt, so hitting
- * it is not an opportunity, it is a waste of a beam (GDD §2.1).
+ * it is not an opportunity, it is a waste of a shot (GDD §2.1).
  */
 export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
   const threat = clamp01(

@@ -30,17 +30,19 @@
 //   Ship   (per entity)  id u8                                          1
 //                        posX i16 | posY i16                            4
 //                        velX i16 | velY i16                            4   (dead-reckoning between snapshots)
-//                        heading u16 | aim u16                          4   (facing + beam/aim direction)
+//                        heading u16                                    2   (hull facing)
 //                        hull u8                                        1   (0..255; over-ship HP bar, GDD §2.2)
 //                        flags u8                                       1   (firing/boost/spawn-protect/alive)
-//                                                                    = 15 bytes
+//                                                                    = 13 bytes
 //   Proj   (per entity)  id u8 | posX i16 | posY i16 | meta u8          6 bytes
 //                        meta = owner (bits 0..2) | kind (bits 3..7)
 //
-// Worst case is the GDD entity cap: 8 ships + 64 projectiles.
+// Worst case is the GDD entity cap: 8 ships + 64 projectiles. (The ship record
+// was 15 B until the v0.3 laser funeral retired the `aim` field — see
+// docs/design-amendments.md and src/net/snapshot.ts.)
 
 export const HEADER_BYTES = 6;
-export const SHIP_BYTES = 15;
+export const SHIP_BYTES = 13;
 export const PROJECTILE_BYTES = 6;
 
 /** GDD entity counts that bound a single binary snapshot (GDD §4.2). */
@@ -63,7 +65,6 @@ export interface ShipSnap {
   velX: number;
   velY: number;
   heading: number;
-  aim: number;
   hull: number;
   flags: number;
 }
@@ -122,8 +123,6 @@ export function encodeSnapshot(
     o += 2;
     dv.setUint16(o, s.heading & 0xffff, true);
     o += 2;
-    dv.setUint16(o, s.aim & 0xffff, true);
-    o += 2;
     dv.setUint8(o, s.hull & 0xff);
     o += 1;
     dv.setUint8(o, s.flags & 0xff);
@@ -170,13 +169,11 @@ export function decodeSnapshot(buf: ArrayBuffer): DecodedSnapshot {
     o += 2;
     const heading = dv.getUint16(o, true);
     o += 2;
-    const aim = dv.getUint16(o, true);
-    o += 2;
     const hull = dv.getUint8(o);
     o += 1;
     const flags = dv.getUint8(o);
     o += 1;
-    ships.push({ id, posX, posY, velX, velY, heading, aim, hull, flags });
+    ships.push({ id, posX, posY, velX, velY, heading, hull, flags });
   }
 
   const projectiles: ProjSnap[] = [];
@@ -215,7 +212,6 @@ export function buildWorstCaseSnapshot(): ArrayBuffer {
       velX: 120 - i * 11,
       velY: -90 + i * 7,
       heading: (i * 8123) & 0xffff,
-      aim: (i * 4099) & 0xffff,
       hull: 70 - i * 3,
       flags: 0b10111, // alive | firing | boosting | spawn-protect sample
     });

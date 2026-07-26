@@ -4,7 +4,7 @@
  * The four contract checks from the brief:
  *   1. determinism — two runs, same inputs, deep-equal states;
  *   2. mining chips an asteroid at ~0.5 ore/s (Vanguard baseline) — a projectile
- *      now, not a beam (ratified amendment v0.3);
+ *      now, not a laser (ratified amendment v0.3);
  *   3. the hold caps at capacity;
  *   4. a ship reflects off an asteroid.
  * Plus a few guards around world construction and the one weapon system.
@@ -61,7 +61,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     spawnProtect: over.spawnProtect ?? 0,
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
-    beam: over.beam ?? null,
+    firing: over.firing ?? false,
   };
 }
 
@@ -123,7 +123,7 @@ describe('determinism (GDD §4.8)', () => {
       asteroidCount: 40,
     } as const;
 
-    // Deterministic, tick-dependent script so movement, beam, and tractor all run.
+    // Deterministic, tick-dependent script so movement, fire, and tractor all run.
     const inputsAt = (tick: number): Inputs =>
       cfg.players.map((p) => ({
         id: p.id,
@@ -157,7 +157,7 @@ describe('projectile mining (ratified amendment v0.3 — mining is shooting)', (
   it('a Vanguard mines an asteroid by shooting it, at ~0.5 ore/s at the face', () => {
     // Point-blank-ish manual fire straight at a rock. Shots land one fire
     // interval apart (the weapon is a pipeline), so ore per second at the mining
-    // face is yield ⁄ fireInterval = MINING_RATE — the same rate the old beam
+    // face is yield ⁄ fireInterval = MINING_RATE — the same rate the old laser
     // cut at (a touch under, by the one-off shot-travel latency).
     const ship = makeShip({ id: 0, pos: { x: 100, y: 100 }, angle: 0 }); // faces +x
     const rock = makeAsteroid({ id: 0, pos: { x: 250, y: 100 }, radius: 30, ore: 40 });
@@ -170,7 +170,7 @@ describe('projectile mining (ratified amendment v0.3 — mining is shooting)', (
     const oreMined = rock.maxOre - world.asteroids[0]!.ore;
     const rate = oreMined / SECONDS;
     expect(oreMined).toBeGreaterThan(0); // it is actually mining
-    // Within ~15% of the beam's old rate, and never above it (a shot cannot chip
+    // Within ~15% of the laser's old rate, and never above it (a shot cannot chip
     // more than one fire-interval's yield per interval).
     expect(rate).toBeGreaterThan(MINING_RATE * 0.85);
     expect(rate).toBeLessThanOrEqual(MINING_RATE + 1e-6);
@@ -204,11 +204,11 @@ describe('projectile mining (ratified amendment v0.3 — mining is shooting)', (
     expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and the rock was mined
   });
 
-  it('the weapon fires projectiles that damage an enemy ship (one beam, one stat)', () => {
-    // Combat is a projectile now (design amendment v0.2), not the mining beam —
-    // but it is still the one beam stat, delivered per shot. A stationary target
+  it('the weapon fires projectiles that damage an enemy ship (one weapon, one stat)', () => {
+    // Combat is a projectile now (design amendment v0.2), not a hitscan ray —
+    // but it is still the one power stat, delivered per shot. A stationary target
     // point-blank in the open eats every shot, so the delivered DPS matches the
-    // old hitscan beam (≈ Vanguard beam = 10/s).
+    // old hitscan (≈ Vanguard power = 10/s).
     const shooter = makeShip({ id: 0, pos: { x: 0, y: 0 }, angle: 0 });
     const target = makeShip({ id: 1, pos: { x: 120, y: 0 }, spawnProtect: 0 });
     const world = emptyWorld({ ships: [shooter, target] });
@@ -220,12 +220,12 @@ describe('projectile mining (ratified amendment v0.3 — mining is shooting)', (
 
     const lost = before - world.ships[1]!.hull;
     // Damage arrives in whole shots, ~3 in a second (fireInterval 0.35 s), and
-    // ~10 HP total — the beam DPS, if every shot lands.
+    // ~10 HP total — the weapon DPS, if every shot lands.
     expect(lost).toBeGreaterThanOrEqual(9);
     expect(lost).toBeLessThanOrEqual(11);
     expect(lost / perShot).toBeCloseTo(Math.round(lost / perShot), 6); // whole shots
-    // The weapon is a projectile, not a beam: no mining beam is published for it.
-    expect(world.ships[0]!.beam).toBeNull();
+    // The trigger is held, so the firing tell is set; the damage rides a ship shot.
+    expect(world.ships[0]!.firing).toBe(true);
     expect(world.projectiles.some((p) => p.kind === 'ship')).toBe(true);
   });
 
@@ -251,9 +251,9 @@ describe('weapon projectile geometry (GDD §4.1)', () => {
     const before = target.hull;
     step(world, [{ id: 0, actions: [fire()] }]);
 
-    // No mining beam (retired, amendment v0.3); a ship-kind projectile is born
-    // at the muzzle heading +x toward the target.
-    expect(world.ships[0]!.beam).toBeNull();
+    // No line geometry (retired, amendment v0.3); a ship-kind projectile is born
+    // at the muzzle heading +x toward the target, and the firing tell is set.
+    expect(world.ships[0]!.firing).toBe(true);
     const shots = activeProjectilesOf(world, 0);
     expect(shots).toHaveLength(1);
     expect(shots[0]!.kind).toBe('ship');
@@ -264,14 +264,15 @@ describe('weapon projectile geometry (GDD §4.1)', () => {
     expect(world.ships[1]!.hull).toBeLessThan(before);
   });
 
-  it('manual fire into empty space shoots the weapon, not a mining beam', () => {
+  it('manual fire into empty space shoots a weapon projectile', () => {
     const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const world = emptyWorld({ ships: [ship] }); // empty field ahead
 
     step(world, [{ id: 0, actions: [fire()] }]);
 
-    // Nothing to mine ⇒ no beam; the trigger fires a weapon projectile instead.
-    expect(world.ships[0]!.beam).toBeNull();
+    // Nothing ahead to hit; the trigger still fires a weapon projectile, and the
+    // firing tell is set (the tell is the trigger, not the target).
+    expect(world.ships[0]!.firing).toBe(true);
     const shots = activeProjectilesOf(world, 0);
     expect(shots).toHaveLength(1);
     // Fired along the ship's facing (+x) at the base muzzle speed.
@@ -302,7 +303,7 @@ describe('weapon projectile geometry (GDD §4.1)', () => {
     const before = target.hull;
     step(world, [{ id: 0, actions: [fire(true)] }]); // auto-aim
 
-    expect(world.ships[0]!.beam).toBeNull(); // weapon, not mining
+    expect(world.ships[0]!.firing).toBe(true); // trigger held ⇒ firing
     const shots = activeProjectilesOf(world, 0);
     expect(shots).toHaveLength(1);
     // Stationary target: the intercept lead collapses to a straight shot +y.
@@ -312,28 +313,31 @@ describe('weapon projectile geometry (GDD §4.1)', () => {
     expect(world.ships[1]!.hull).toBeLessThan(before);
   });
 
-  it('Ship.beam is a mining indicator only — set while mining, null while fighting', () => {
-    // The beam is retired as a mechanism (a projectile does the mining and the
-    // damage); Ship.beam survives as a pure tell the netcode firing bit reads —
-    // non-null on a tick the ship is mining a rock, null when it shoots an enemy.
+  it('Ship.firing tracks the trigger — true while shooting (mining or fighting), false when idle', () => {
+    // The laser retired to a projectile (a projectile does the mining and the
+    // damage); Ship.firing survives as the bare tell the netcode firing bit reads —
+    // true on any tick the trigger is engaged with a shot going out.
     const ship = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 });
     const rock = makeAsteroid({ id: 0, pos: { x: 700, y: 500 }, radius: 30, ore: 20 });
     const world = emptyWorld({ ships: [ship], asteroids: [rock] });
 
-    // Mining a rock ahead: the tell is published, but a projectile does the work.
+    // Mining a rock ahead: firing is set, and a projectile does the work.
     step(world, [{ id: 0, actions: [fire()] }]);
-    expect(world.ships[0]!.beam).not.toBeNull();
+    expect(world.ships[0]!.firing).toBe(true);
     expect(world.projectiles.some((p) => p.kind === 'ship')).toBe(true); // shot, not ray
     for (let t = 0; t < 40; t++) step(world, [{ id: 0, actions: [fire()] }]);
     expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and it is chipping
 
-    // Shooting an enemy (a ship at +y, no rock ahead): the tell stays null — the
-    // beam is not a combat tell (combat is a projectile the renderer draws itself).
+    // Shooting an enemy is also firing — the tell is the trigger, not the target.
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: Math.PI / 2 });
     const enemy = makeShip({ id: 1, pos: { x: 500, y: 650 }, spawnProtect: 0 });
     const combat = emptyWorld({ ships: [shooter, enemy] });
     step(combat, [{ id: 0, actions: [fire()] }]);
-    expect(combat.ships[0]!.beam).toBeNull();
+    expect(combat.ships[0]!.firing).toBe(true);
+
+    // Release the trigger: the firing tell clears next tick.
+    step(combat, [{ id: 0, actions: [] }]);
+    expect(combat.ships[0]!.firing).toBe(false);
   });
 });
 

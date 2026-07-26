@@ -34,7 +34,6 @@ import {
   asteroidBurst,
   asteroidCrack,
   bankOre,
-  beamImpact,
   buildComplete,
   buildPlaced,
   collapsePulse,
@@ -54,18 +53,19 @@ import {
   thrusterTrail,
   turretDown,
   upgradeBought,
+  weaponImpact,
 } from './emitters';
 import { ParticlePool, PARTICLE_CAPACITY } from './particles';
 
 /**
- * Minimum seconds between beam-impact bursts per player. A beam fires every
- * tick it is held, and eight held beams at 60 Hz would spend a third of the pool
+ * Minimum seconds between shot-impact bursts per player. A weapon fires every
+ * tick it is held, and eight held weapons at 60 Hz would spend a third of the pool
  * on sparks nobody can resolve. Throttled, the impact still reads continuous —
  * sparks outlive the gap between bursts — at a fifth of the particles.
  */
-const BEAM_BURST_INTERVAL = 0.05;
+const HIT_BURST_INTERVAL = 0.05;
 
-/** Player slots the beam throttle tracks (the 8-slot roster, GDD §2.1, plus air). */
+/** Player slots the firing throttle tracks (the 8-slot roster, GDD §2.1, plus air). */
 const SLOTS = 16;
 
 /** Planet radius the tells' normalised magnitudes are unpacked against. */
@@ -104,8 +104,8 @@ export class VfxField {
   private rng: Rng;
   private readonly seed: number;
   private time = 0;
-  /** Next time each slot's beam may burst again (see {@link BEAM_BURST_INTERVAL}). */
-  private readonly beamNext = new Float32Array(SLOTS);
+  /** Next time each slot's firing may burst again (see {@link HIT_BURST_INTERVAL}). */
+  private readonly hitNext = new Float32Array(SLOTS);
 
   constructor(options: VfxFieldOptions = {}) {
     this.pool = new ParticlePool(options.capacity ?? PARTICLE_CAPACITY);
@@ -131,11 +131,11 @@ export class VfxField {
       const player = tells.player[i]!;
 
       switch (tells.kindAt(i)) {
-        case TELL.beamRock:
-          if (this.beamReady(player)) beamImpact(pool, rng, x, y, angle, mag, playerColor(player), false, q);
+        case TELL.mineHit:
+          if (this.hitReady(player)) weaponImpact(pool, rng, x, y, angle, mag, playerColor(player), false, q);
           break;
-        case TELL.beamHull:
-          if (this.beamReady(player)) beamImpact(pool, rng, x, y, angle, mag, playerColor(player), true, q);
+        case TELL.weaponHit:
+          if (this.hitReady(player)) weaponImpact(pool, rng, x, y, angle, mag, playerColor(player), true, q);
           break;
         case TELL.rockCrack:
           asteroidCrack(pool, rng, x, y, 14, Math.round(mag * 2), q);
@@ -232,7 +232,7 @@ export class VfxField {
     this.death.reset();
     this.rng = mulberry32(this.seed);
     this.time = 0;
-    this.beamNext.fill(0);
+    this.hitNext.fill(0);
   }
 
   /** Live particles. */
@@ -240,11 +240,11 @@ export class VfxField {
     return this.pool.count;
   }
 
-  /** Whether this slot's beam may throw sparks again yet. */
-  private beamReady(player: number): boolean {
+  /** Whether this slot's firing may throw sparks again yet. */
+  private hitReady(player: number): boolean {
     const slot = player >= 0 && player < SLOTS ? player : SLOTS - 1;
-    if (this.time < this.beamNext[slot]!) return false;
-    this.beamNext[slot] = this.time + BEAM_BURST_INTERVAL;
+    if (this.time < this.hitNext[slot]!) return false;
+    this.hitNext[slot] = this.time + HIT_BURST_INTERVAL;
     return true;
   }
 }

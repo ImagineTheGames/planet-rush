@@ -7,7 +7,7 @@
  * stack on each other:
  *
  *  1. **The class base** (GDD §2.11) — the lobby choice, locked for the match,
- *     setting top speed, acceleration, turn rate, hull HP, beam and cargo.
+ *     setting top speed, acceleration, turn rate, hull HP, power and cargo.
  *  2. **The upgrade tiers** (GDD §2.5) — bought with ore, one step at a time, at
  *     an escalating cost, and *multiplying* the class base.
  *
@@ -37,15 +37,15 @@ import {
   BASE_ACCEL,
   BASE_SPEED,
   BASE_TURN_RATE,
-  BEAM_DPS_CORE,
-  BEAM_DPS_SHIP,
+  WEAPON_DPS_CORE,
+  WEAPON_DPS_SHIP,
   CARGO_BASE,
   MINING_RATE,
   SHIP_STATS,
   SHIP_WEAPON,
   TRACK_ORDER,
   UPGRADES,
-  VANGUARD_BEAM,
+  VANGUARD_POWER,
   type UpgradeTrackSpec,
 } from './constants';
 
@@ -68,7 +68,7 @@ export type UpgradeTiers = Record<UpgradeTrack, number>;
 /** A fresh, un-upgraded ship — every track at tier 0. */
 export function stockTiers(): UpgradeTiers {
   return {
-    [UpgradeTrack.Beam]: 0,
+    [UpgradeTrack.Power]: 0,
     [UpgradeTrack.Engine]: 0,
     [UpgradeTrack.Cargo]: 0,
     [UpgradeTrack.Hull]: 0,
@@ -183,32 +183,32 @@ export function shipCargoCap(loadout: ShipLoadout): number {
   return applyTier(base, UPGRADES[UpgradeTrack.Cargo], tierOf(loadout, UpgradeTrack.Cargo));
 }
 
-/** The beam stat — one number for mining speed *and* weapon damage (GDD §2.5).
- *  Every beam-derived rate below is a function of this and nothing else, so the
- *  "one beam, one stat" rule cannot drift apart in two places. */
-export function shipBeam(loadout: ShipLoadout): number {
-  const base = SHIP_STATS[loadout.shipClass].beam;
-  return applyTier(base, UPGRADES[UpgradeTrack.Beam], tierOf(loadout, UpgradeTrack.Beam));
+/** The power stat — one number for mining speed *and* weapon damage (GDD §2.5).
+ *  Every power-derived rate below is a function of this and nothing else, so the
+ *  "one weapon, one stat" rule cannot drift apart in two places. */
+export function shipPower(loadout: ShipLoadout): number {
+  const base = SHIP_STATS[loadout.shipClass].power;
+  return applyTier(base, UPGRADES[UpgradeTrack.Power], tierOf(loadout, UpgradeTrack.Power));
 }
 
-/** DPS this ship deals to hulls and turrets: the beam stat, directly
- *  (Vanguard stock = `BEAM_DPS_SHIP` = 10). */
-export function shipBeamShipDps(loadout: ShipLoadout): number {
-  return shipBeam(loadout);
+/** DPS this ship deals to hulls and turrets: the power stat, directly
+ *  (Vanguard stock = `WEAPON_DPS_SHIP` = 10). */
+export function shipWeaponDps(loadout: ShipLoadout): number {
+  return shipPower(loadout);
 }
 
-/** DPS this ship deals to shields and cores — the beam stat at the Vanguard's
- *  core:ship ratio (5:10), so a stock Vanguard hits a core for `BEAM_DPS_CORE`. */
-export function shipBeamCoreDps(loadout: ShipLoadout): number {
-  return shipBeam(loadout) * (BEAM_DPS_CORE / BEAM_DPS_SHIP);
+/** DPS this ship deals to shields and cores — the power stat at the Vanguard's
+ *  core:ship ratio (5:10), so a stock Vanguard hits a core for `WEAPON_DPS_CORE`. */
+export function shipCoreDps(loadout: ShipLoadout): number {
+  return shipPower(loadout) * (WEAPON_DPS_CORE / WEAPON_DPS_SHIP);
 }
 
-/** Ore per second at the mining face — `MINING_RATE` scaled by this ship's beam
+/** Ore per second at the mining face — `MINING_RATE` scaled by this ship's power
  *  against the Vanguard baseline, so a stock Vanguard mines exactly 0.5/s. Since
  *  mining is a projectile now (amendment v0.3), this is the *target* steady-state
  *  rate the per-hit chip (`shipMineYield`) is sized to hit, not a per-tick draw. */
 export function shipMiningRate(loadout: ShipLoadout): number {
-  return MINING_RATE * (shipBeam(loadout) / VANGUARD_BEAM);
+  return MINING_RATE * (shipPower(loadout) / VANGUARD_POWER);
 }
 
 /**
@@ -216,7 +216,7 @@ export function shipMiningRate(loadout: ShipLoadout): number {
  * asteroid — mining is shooting now (ratified amendment v0.3). It is the ship's
  * continuous mining rate spread over one fire interval, so a ship holding fire at
  * the mining face extracts ore at exactly `shipMiningRate` (shots land one
- * `SHIP_WEAPON.fireInterval` apart), and the chip still rides the one beam stat —
+ * `SHIP_WEAPON.fireInterval` apart), and the chip still rides the one power stat —
  * mining speed and weapon damage move together (GDD §2.5). `MINING_YIELD_PER_HIT`
  * is the Vanguard baseline this scales from.
  */
@@ -225,30 +225,31 @@ export function shipMineYield(loadout: ShipLoadout): number {
 }
 
 // ---------------------------------------------------------------------------
-// Weapon projectile stats (design amendment v0.2 — combat is projectiles)
+// Weapon projectile stats (design amendments v0.2 / v0.3 — everything is a shot)
 // ---------------------------------------------------------------------------
 //
-// Ship-vs-ship and ship-vs-structure combat fires a pooled projectile
-// (`./projectiles`) instead of the instant beam, so "make them faster, stronger"
-// (the developer's own words) rides the *same* beam upgrade track the mining
-// speed and weapon damage already ride — one beam, one stat (GDD §2.5). Damage
-// is the beam DPS per shot; muzzle speed climbs the beam multiplier ladder, so a
-// beam-maxed ship's shots are both harder to dodge and harder-hitting, and a
-// stock ship's shot is dodgeable at combat range (the whole point of the switch).
+// Ship-vs-ship, ship-vs-structure, and (since v0.3) mining all fire a pooled
+// projectile (`./projectiles`) instead of a hitscan ray, so "make them faster,
+// stronger" (the developer's own words) rides the *same* power upgrade track the
+// mining speed and weapon damage already ride — one weapon, one stat (GDD §2.5).
+// Damage is the power DPS per shot; muzzle speed climbs the power multiplier
+// ladder, so a power-maxed ship's shots are both harder to dodge and
+// harder-hitting, and a stock ship's shot is dodgeable at combat range (the whole
+// point of the switch).
 
-/** Per-shot weapon damage vs a ship or turret — this ship's beam DPS over one
- *  fire interval, so the delivered DPS *if every shot lands* is exactly the beam
- *  stat the old hitscan beam dealt (GDD §2.8). Missing is the new skill floor. */
+/** Per-shot weapon damage vs a ship or turret — this ship's power DPS over one
+ *  fire interval, so the delivered DPS *if every shot lands* is exactly the power
+ *  stat the old hitscan weapon dealt (GDD §2.8). Missing is the new skill floor. */
 export function shipWeaponDamage(loadout: ShipLoadout): number {
-  return shipBeamShipDps(loadout) * SHIP_WEAPON.fireInterval;
+  return shipWeaponDps(loadout) * SHIP_WEAPON.fireInterval;
 }
 
 /** Muzzle speed (world units/s) of this ship's weapon projectile — the base
- *  speed scaled by the beam upgrade tier's multiplier (tier 0 = base). Only the
- *  *upgrade* multiplier, not the class beam stat, so every hull's stock shot has
- *  the same dodgeable base velocity and the beam track alone buys "faster". */
+ *  speed scaled by the power upgrade tier's multiplier (tier 0 = base). Only the
+ *  *upgrade* multiplier, not the class power stat, so every hull's stock shot has
+ *  the same dodgeable base velocity and the power track alone buys "faster". */
 export function shipProjectileSpeed(loadout: ShipLoadout): number {
-  return SHIP_WEAPON.projectileSpeed * beamTierMul(loadout);
+  return SHIP_WEAPON.projectileSpeed * powerTierMul(loadout);
 }
 
 /** Flight lifetime (seconds) of this ship's weapon projectile — `range / speed`,
@@ -258,13 +259,13 @@ export function shipProjectileLife(loadout: ShipLoadout): number {
   return SHIP_WEAPON.range / shipProjectileSpeed(loadout);
 }
 
-/** The beam track's *multiplier* for this loadout (1 at tier 0). Distinct from
- *  {@link shipBeam}, which folds in the class base — muzzle speed wants only the
+/** The power track's *multiplier* for this loadout (1 at tier 0). Distinct from
+ *  {@link shipPower}, which folds in the class base — muzzle speed wants only the
  *  upgrade multiplier so class identity stays in damage, not velocity. */
-function beamTierMul(loadout: ShipLoadout): number {
-  const spec = UPGRADES[UpgradeTrack.Beam];
-  // Beam is a 'multiply' track, so its step is the multiplier itself.
-  return spec.steps[tierOf(loadout, UpgradeTrack.Beam)] ?? 1;
+function powerTierMul(loadout: ShipLoadout): number {
+  const spec = UPGRADES[UpgradeTrack.Power];
+  // Power is a 'multiply' track, so its step is the multiplier itself.
+  return spec.steps[tierOf(loadout, UpgradeTrack.Power)] ?? 1;
 }
 
 // ---------------------------------------------------------------------------

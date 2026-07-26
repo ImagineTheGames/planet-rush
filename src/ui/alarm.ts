@@ -17,7 +17,7 @@
  *     continuously, so a taunt-tap decays to nothing and only *pressure* — the
  *     thing GDD §2.6 says beats regeneration — ever reaches the threshold. It
  *     then *latches* for a few seconds so the alarm doesn't stutter between
- *     beam ticks.
+ *     weapon ticks.
  *  2. {@link homeArrow} — the **screen-edge arrow pointing home**. Pure
  *     geometry against the follow camera (the local ship is at the visible
  *     viewport centre — `@platform/camera`), clamped to a safe-area inset so it
@@ -34,7 +34,7 @@
 
 /**
  * Damage (HP) that must be standing in the bucket for the alarm to fire.
- * Sized against the beam that would be doing it: GDD §2.8's baseline beam-vs-
+ * Sized against the weapon that would be doing it: GDD §2.8's baseline weapon-vs-
  * core DPS is 5, so a real attacker crosses this in under two seconds, while a
  * single 2 HP turret-grade tap never can. TUNABLE.
  */
@@ -43,13 +43,13 @@ export const ALARM_THRESHOLD_HP = 5;
 /**
  * How fast the bucket drains (HP per second). This is the whole "not a single
  * stray shot" rule: anything landing slower than this is noise and the alarm
- * never hears it. At 2 HP/s a 5 DPS beam nets +3 HP/s and trips the alarm in
+ * never hears it. At 2 HP/s a 5 DPS weapon nets +3 HP/s and trips the alarm in
  * ~1.7 s; a taunt-tap of a couple of HP is gone in a second. TUNABLE.
  */
 export const ALARM_DRAIN_HP_PER_S = 2;
 
 /**
- * Seconds the alarm stays up after the pressure falls away. Beam damage arrives
+ * Seconds the alarm stays up after the pressure falls away. Weapon damage arrives
  * one tick at a time and an attacker circling a planet has gaps; without a hold
  * the alarm would flicker, and a flickering alarm is one a player learns to
  * ignore. TUNABLE.
