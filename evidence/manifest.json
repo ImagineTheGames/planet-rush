@@ -884,9 +884,9 @@
     "title": "Tap Commander — tap-to-move by touch (landscape + portrait)",
     "area": "touch",
     "image": "images/tap-move.png",
-    "capturedAt": "2026-07-27T00:37:39Z",
-    "buildSha": "40d5560",
-    "attestation": "Two-orientation montage off the real preview bundle (?debug=1), scheme switched to Tap Commander, emulated phone (hasTouch, isMobile). LANDSCAPE (844×390): a real touchscreen tap at screen (253,109) drew a waypoint marker — the blue-dot ring visible upper-left of the centred ship — at screen (254.2,109.6), 1.4px off the thumb; the ?debug seam reports the order as MOVE to world (1031,1114). ARRIVED: the steel-triangle ship (kept screen-centred by the follow camera) reached world (1050.9,1124.1) — the waypoint — and the order cleared to 'none', so the marker is gone. PORTRAIT (390×844): the landscape lock rotates the game root 90° (WAVE/NEXT/HOME read sideways); a real tap at screen (117,608) drew the marker at physical (117.9,605.9) — 2.3px off the thumb, visible lower-left — and the order became MOVE to world (1386,1278); the ship then flew to world (1367,1270) and the order cleared. The full tap→logical→world remap survives the portrait rotation. No page errors this run.",
+    "capturedAt": "2026-07-27T02:15:00Z",
+    "buildSha": "a04e934",
+    "attestation": "Re-captured on a04e934 (this branch merged current main, so the evidence reflects the shipping bundle). Two-orientation montage off the real preview bundle (?debug=1), scheme switched to Tap Commander, emulated phone (hasTouch, isMobile); build watermark 'a04e934*' visible bottom-right of each raw frame. LANDSCAPE (844×390): a real touchscreen tap at screen (253,109) drew a waypoint marker — the blue-dot ring visible upper-left of the centred ship — at physical screen (255,110), 2.3px off the thumb, i.e. AT the tap; the ?debug seam reports the order as MOVE to world (1031,1114). ARRIVED: the steel-triangle ship (kept screen-centred by the follow camera) reached world (1049.2,1123.3) — the waypoint — and the order cleared to 'none', so the marker is gone. PORTRAIT (390×844): the landscape lock rotates the game root 90° (WAVE/NEXT/HOME read sideways); a real tap at screen (117,608) drew the marker at logical (606.7,272.5) = physical (117.5,606.7) — 1.4px off the thumb, visible lower-left — and the order became MOVE to world (1386,1278); the ship then flew to world (1365.2,1269.3) and the order cleared. The full tap→logical→world remap survives the portrait rotation. No page errors this run.",
     "verdict": "verified"
   },
   {
@@ -894,9 +894,9 @@
     "title": "Tap Commander — tap-to-attack, release, and sticks survive the round trip",
     "area": "touch",
     "image": "images/tap-attack-lock.png",
-    "capturedAt": "2026-07-27T00:37:39Z",
-    "buildSha": "40d5560",
-    "attestation": "Three-panel montage, emulated landscape phone, Tap Commander scheme, one bot ('Rusty (EASY)') parked in weapon range right of the centred ship. LOCK+FIRE: a real touchscreen tap on the bot at screen (562,195) locked target ship #1 — the azure (#3d7bff) reticle brackets ride the bot at screen (545.6,194.4), right of the ship (x≈422); the sim's own firing tell is true and the line of intent draws from ship to target with projectiles in flight. RELEASE: a real tap on empty space at screen (272,125) cleared the lock — the reticle is gone (null) and the order became a MOVE, with a waypoint marker at the new point and the ship heading for it. STICKS BACK: switched back to the 'sticks' scheme, a real touch left-stick drag produces thrust (-1,0) at the sim (read off the input probe) and the twin-stick + BOOST/PING/FIRE/BUILD touch HUD is present again — the sticks survive the scheme round-trip. No page errors this run.",
+    "capturedAt": "2026-07-27T02:15:00Z",
+    "buildSha": "a04e934",
+    "attestation": "Re-captured on a04e934 (branch merged current main). Three-panel montage, emulated landscape phone, Tap Commander scheme, one bot ('Rusty (EASY)') parked in weapon range right of the centred ship. LOCK+FIRE: a real touchscreen tap on the bot at screen (562,195) locked target ship #1 — the azure (#3d7bff) reticle brackets (radius 16) ride the bot at screen (546.3,191.1), right of the ship (x≈422); the sim's own firing tell is true and the line of intent draws from ship to target with projectiles in flight. RELEASE: a real tap on empty space at screen (272,125) cleared the lock — the reticle is gone (null) and the order became a MOVE ('waypoint'), with the ship heading for the new point. STICKS BACK: switched back to the 'sticks' scheme, a real touch left-stick drag produces thrust (-1,0) at the sim (read off the input probe) and the twin-stick + BOOST/PING/FIRE/BUILD touch HUD is present again — the sticks survive the scheme round-trip. No page errors this run.",
     "verdict": "verified"
   },
   {
@@ -904,9 +904,9 @@
     "title": "Minimap — tap to expand, tap to collapse; own-ship dot tracks the ship",
     "area": "mobile",
     "image": "images/minimap-toggle.png",
-    "capturedAt": "2026-07-27T00:37:39Z",
-    "buildSha": "40d5560",
-    "attestation": "Three-panel montage, emulated landscape phone (844×390), real preview bundle (?debug=1). COLLAPSED: the minimap is an 80×80 square at (752,298) — bottom-right corner, clear of the thumb zones — with the own-ship dot at (817.6,338) inside it; a real touch stick drive moved the debug-hook shipWorld by (-238.4,0) and the own-ship dot tracked it by (-7.7,0), the same leftward direction, so the dot follows the ship. EXPANDED: a real tap at (792,338) on the corner opened a 273×273 centred overlay (with an × close affordance) showing 8 planet dots, 7 ship dots and 48 ore-field hints, and the arena's grey asteroids read through the semi-transparent overlay. COLLAPSED again: a real tap at (422,164) on the overlay collapsed it back to the corner (expanded=false) — a clean two-state round trip. No page errors this run.",
+    "capturedAt": "2026-07-27T02:15:00Z",
+    "buildSha": "a04e934",
+    "attestation": "Re-captured on a04e934 after merging current main — which carries the v0.2.2 fix (a6c4058) that pulls the collapsed square OFF the bottom-right action corner it used to overlap. Three-panel montage, emulated landscape phone (844×390), real preview bundle (?debug=1). COLLAPSED: the minimap is an 80×80 square at (498.8,271) — along the BOTTOM EDGE, sitting in the central gap between the two thumb clusters (BUILD/BOOST to its left, PING/FIRE to its right), visibly overlapping none of them. Checked in code against the real registered button rects (touch-boost-button, touch-ping-button, touch-fire-button, build-button): the square overlaps NONE (clear of thumbs), the nearest thumb button 65px away. The own-ship dot sits at (564.4,311) inside it; a real touch stick drive moved the debug-hook shipWorld by (-252.6,0) and the own-ship dot tracked it by (-8.1,0), the same leftward direction, so the dot follows the ship. EXPANDED: a real tap at (539,311) on the square opened a 273×273 centred overlay at (285.5,27.3) (with an × close affordance) showing 8 planet dots, 7 ship dots and 48 ore-field hints, and the arena's grey asteroids read through the semi-transparent overlay. COLLAPSED again: a real tap at (422,164) on the overlay collapsed it back to the tiny bottom-edge square (expanded=false) — a clean two-state round trip. No page errors this run.",
     "verdict": "verified"
   }
 ]

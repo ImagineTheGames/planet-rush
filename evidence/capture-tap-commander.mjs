@@ -225,6 +225,28 @@ async function minimapToggle(browser) {
 
   const collapsed0 = await mmState(page);
   const hook0 = await hook(page);
+  // Prove the collapsed square is genuinely clear of the touch thumb zones: read the
+  // real button rects from the layout registry and check the minimap overlaps NONE
+  // of them, plus the horizontal gap to the nearest thumb cluster. (The v0.2.2 fix
+  // a6c4058 pulled the square off the bottom-right action corner into the central
+  // gap between the BOOST cluster on the left and PING/FIRE on the right.)
+  const thumbClearance = await page.evaluate((mm) => {
+    const ids = ['touch-boost-button', 'touch-ping-button', 'touch-fire-button', 'build-button', 'touch-left-stick-button'];
+    const rects = [];
+    for (const id of ids) {
+      const e = window.__planetRush.layout.find((x) => x.id === id);
+      if (e) rects.push({ id, b: e.bounds });
+    }
+    const overlaps = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    let overlapId = null;
+    let minGapX = Infinity;
+    for (const r of rects) {
+      if (overlaps(mm, r.b)) overlapId = r.id;
+      const gap = r.b.x >= mm.x + mm.width ? r.b.x - (mm.x + mm.width) : mm.x - (r.b.x + r.b.width);
+      if (gap > 0 && gap < minGapX) minGapX = gap;
+    }
+    return { buttonsSeen: rects.map((r) => r.id), overlapId, minGapX: Number.isFinite(minGapX) ? Math.round(minGapX) : null };
+  }, collapsed0.rect);
   await page.screenshot({ path: join(OUT, 'minimap-collapsed-raw.png'), animations: 'disabled' });
 
   // Prove the own-ship dot tracks the debug hook: drive the touch stick, then read
@@ -258,8 +280,10 @@ async function minimapToggle(browser) {
   const vp = page.viewportSize();
   const info = {
     viewport: vp,
-    collapsedRect: collapsed0.rect,
-    cornerClearOfThumbs: collapsed0.rect.x > vp.width * 0.8 && collapsed0.rect.y > vp.height * 0.6,
+    collapsedRect: { x: round(collapsed0.rect.x), y: round(collapsed0.rect.y), width: round(collapsed0.rect.width), height: round(collapsed0.rect.height) },
+    thumbClearance,
+    clearOfThumbs: thumbClearance.overlapId === null,
+    inLowerBand: collapsed0.rect.y > vp.height * 0.6,
     ownDot0: collapsed0.ownDot && { x: round(collapsed0.ownDot.x), y: round(collapsed0.ownDot.y) },
     dotDelta: movedState.ownDot && collapsed0.ownDot && { x: round(movedState.ownDot.x - collapsed0.ownDot.x), y: round(movedState.ownDot.y - collapsed0.ownDot.y) },
     shipWorldDelta: { x: round(hook1.w.x - hook0.w.x), y: round(hook1.w.y - hook0.w.y) },
@@ -347,11 +371,11 @@ async function main() {
 
   await compose(browser, 'minimap-toggle.png',
     'Minimap — tap to expand, tap to collapse; the own-ship dot tracks the ship',
-    `Emulated landscape phone. The collapsed minimap is a tiny bottom-right square clear of the thumb zones; a REAL touch expands it to a readable centred overlay with the arena visible behind; a real touch collapses it again. The own-ship dot moves with the debug-hook ship position. Build ${sha}.`,
+    `Emulated landscape phone. The collapsed minimap is a tiny square along the bottom edge, sitting in the clear gap between the two thumb clusters (BOOST left, PING/FIRE right) — overlapping no touch control; a REAL touch expands it to a readable centred overlay with the arena visible behind; a real touch collapses it again. The own-ship dot moves with the debug-hook ship position. Build ${sha}.`,
     [
-      { img: 'minimap-collapsed-raw.png', tag: 'COLLAPSED', cap: `Corner square at (${mm.collapsedRect.x}, ${mm.collapsedRect.y}) ${mm.collapsedRect.width}×${mm.collapsedRect.height} in a ${mm.viewport.width}×${mm.viewport.height} view — bottom-right, clear of thumbs (${mm.cornerClearOfThumbs}). Own-ship dot at (${mm.ownDot0.x}, ${mm.ownDot0.y}). A touch stick drive moved shipWorld by (${mm.shipWorldDelta.x}, ${mm.shipWorldDelta.y}) and the dot tracked it by (${mm.dotDelta.x}, ${mm.dotDelta.y}).` },
+      { img: 'minimap-collapsed-raw.png', tag: 'COLLAPSED', cap: `Tiny square at (${mm.collapsedRect.x}, ${mm.collapsedRect.y}) ${mm.collapsedRect.width}×${mm.collapsedRect.height} in a ${mm.viewport.width}×${mm.viewport.height} view — along the bottom edge, in the central gap. Checked against the real button rects (${mm.thumbClearance.buttonsSeen.join(', ')}): overlaps none (clear of thumbs = ${mm.clearOfThumbs}), nearest thumb ${mm.thumbClearance.minGapX}px away. Own-ship dot at (${mm.ownDot0.x}, ${mm.ownDot0.y}). A touch stick drive moved shipWorld by (${mm.shipWorldDelta.x}, ${mm.shipWorldDelta.y}) and the dot tracked it by (${mm.dotDelta.x}, ${mm.dotDelta.y}), the same leftward direction.` },
       { img: 'minimap-expanded-raw.png', tag: 'EXPANDED', cap: `Real touch at (${mm.tapCorner.x}, ${mm.tapCorner.y}) expanded to a ${mm.expandedRect.width}×${mm.expandedRect.height} centred overlay (bigger = ${mm.expandedBigger}) showing ${mm.planetCount} planets, ${mm.shipCount} ships, ${mm.oreCount} ore hints — the arena reads behind it.` },
-      { img: 'minimap-recollapsed-raw.png', tag: 'COLLAPSED', cap: `Real touch at (${mm.tapOverlay.x}, ${mm.tapOverlay.y}) collapsed it back to the corner (expanded = ${mm.recollapsedExpanded}). The toggle is a clean two-state round trip.` },
+      { img: 'minimap-recollapsed-raw.png', tag: 'COLLAPSED', cap: `Real touch at (${mm.tapOverlay.x}, ${mm.tapOverlay.y}) collapsed it back to the tiny bottom-edge square (expanded = ${mm.recollapsedExpanded}). The toggle is a clean two-state round trip.` },
     ], 3);
 
   console.log('[done]', JSON.stringify({
