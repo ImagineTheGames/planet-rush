@@ -96,6 +96,24 @@ export const MINIMAP_COLLAPSED_MIN = 44;
  *  `DEFAULT_STRIP_HEIGHT}). */
 export const MINIMAP_STRIP_CLEARANCE = 40;
 
+/** Width the collapsed square keeps clear of the viewport's RIGHT edge, as a
+ *  fraction of the viewport width — the "action corner" reserve. The very
+ *  bottom-right is the primary FIRE / aim thumb on touch (GDD §2.4), and on
+ *  desktop it is the band the "no touch affordance" contract probes for a stray
+ *  FIRE ring (emulation.spec `REGION_FIRE`, x ≥ 0.7·W). So the collapsed map is
+ *  pulled LEFT of that column: it never draws onto the fire control, and it never
+ *  reads as one. 0.30 clears both the touch FIRE/PING cluster and the ≥0.7·W
+ *  desktop probe, while the map stays inside the right half (the `bottom-right`
+ *  band) on every profile. TUNABLE. */
+export const MINIMAP_ACTION_RESERVE_FRACTION = 0.3;
+
+/** On touch, the fraction of viewport height below which the collapsed square's
+ *  bottom edge must NOT fall — it lifts off the very-bottom band so its steel
+ *  frame never reads as a controls strip to the "strip ABSENT on touch" probe
+ *  (emulation.spec `REGION_STRIP_MID`, y ≥ 0.95·H). Desktop lifts off its real
+ *  strip via {@link MINIMAP_STRIP_CLEARANCE} instead. TUNABLE. */
+export const MINIMAP_BOTTOM_SAFE_FRACTION = 0.9;
+
 /** Expanded overlay side as a fraction of the shorter viewport dimension —
  *  readable scale, centred (GDD §2.2). */
 export const MINIMAP_EXPANDED_FRACTION = 0.7;
@@ -288,6 +306,15 @@ function inset(v: number | undefined): number {
  * the `bottom-right` layout band** (x∈[W/2,W], y∈[2H/3,H]) so its registered
  * placement is honest on every profile — a small viewport shrinks the square
  * rather than letting it spill out of its region.
+ *
+ * It also **reserves the bottom-right ACTION corner**: the extreme corner is the
+ * hold-to-FIRE / aim thumb on touch (GDD §2.4) and, on desktop, the region the
+ * "no touch affordance" contract probes for a stray FIRE ring. So the square hugs
+ * the bottom-right band but is pulled LEFT of the fire column
+ * ({@link MINIMAP_ACTION_RESERVE_FRACTION}) and, on touch, UP off the very-bottom
+ * strip band ({@link MINIMAP_BOTTOM_SAFE_FRACTION}) — it never sits on the fire
+ * control nor reads as one. Its tap surface is the lowest-priority interactive
+ * layer (main.ts), so a wheel/button under it still wins the press.
  */
 export function collapsedRect(
   viewport: { width: number; height: number },
@@ -297,20 +324,25 @@ export function collapsedRect(
   const W = viewport.width;
   const H = viewport.height;
   const m = MINIMAP_MARGIN;
-  const right = inset(insets.right);
+  const right = inset(insets.right) + W * MINIMAP_ACTION_RESERVE_FRACTION;
   const bottom = inset(insets.bottom) + (isTouch ? 0 : MINIMAP_STRIP_CLEARANCE);
 
+  // The right/bottom edges the square hugs — the action-corner reserve pulls the
+  // right edge in, and on touch the bottom edge lifts to the strip-safe line.
+  const rightEdge = W - m - right;
+  const bottomEdge = isTouch ? Math.min(H - m - inset(insets.bottom), H * MINIMAP_BOTTOM_SAFE_FRACTION) : H - m - bottom;
+
   const base = isTouch ? MINIMAP_COLLAPSED_TOUCH : MINIMAP_COLLAPSED_DESKTOP;
-  // Fit inside the bottom-right band so `withinAnchor` holds: width budget is the
-  // right half minus the edge margin/inset; height budget is the bottom third
-  // minus the margin/inset (and the desktop strip clearance).
-  const bandW = W / 2 - m - right;
-  const bandH = H / 3 - m - bottom;
+  // Fit inside the bottom-right band so `withinAnchor` holds: the budget is the
+  // room left in the band once the reserves are taken (right half from W/2, bottom
+  // third from 2H/3), so a small viewport shrinks the square rather than spilling.
+  const bandW = rightEdge - W / 2;
+  const bandH = bottomEdge - (2 * H) / 3;
   let size = Math.min(base, bandW, bandH);
   if (size < MINIMAP_COLLAPSED_MIN) size = Math.max(0, Math.min(MINIMAP_COLLAPSED_MIN, bandW, bandH));
 
-  const x = W - m - right - size;
-  const y = H - m - bottom - size;
+  const x = rightEdge - size;
+  const y = bottomEdge - size;
   return { x, y, width: size, height: size };
 }
 

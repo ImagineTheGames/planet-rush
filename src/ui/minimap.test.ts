@@ -35,6 +35,8 @@ import {
   MINIMAP_MARGIN,
   MINIMAP_COLLAPSED_TOUCH,
   MINIMAP_COLLAPSED_DESKTOP,
+  MINIMAP_ACTION_RESERVE_FRACTION,
+  MINIMAP_BOTTOM_SAFE_FRACTION,
   MINIMAP_DOT_ALPHA,
   MINIMAP_DERELICT_ALPHA,
   MINIMAP_SPAWN_PROTECT_ALPHA,
@@ -148,6 +150,34 @@ describe('placement — the drawn rect sits inside its declared anchor zone', ()
   it('minimapRect selects collapsed vs expanded by state', () => {
     expect(minimapRect('collapsed', PHONE_WIDE, true)).toEqual(collapsedRect(PHONE_WIDE, true));
     expect(minimapRect('expanded', PHONE_WIDE, true)).toEqual(expandedRect(PHONE_WIDE, true));
+  });
+
+  it('reserves the bottom-right ACTION corner — its right edge clears the fire column', () => {
+    // The extreme bottom-right is the FIRE / aim thumb (touch) and the desktop
+    // "no touch affordance" probe (REGION_FIRE, x ≥ 0.7·W). The square is pulled
+    // left of it, so its right edge sits at/inside W·(1 - action reserve): it never
+    // draws onto the fire control nor reads as one. (PR #147: the collapsed square
+    // overlapped the FIRE button on touch and lit REGION_FIRE on desktop.)
+    for (const [name, vp, touch] of [
+      ['phone-wide', PHONE_WIDE, true],
+      ['desktop', DESKTOP, false],
+    ] as const) {
+      const rect = collapsedRect(vp, touch);
+      const reservedRightEdge = vp.width * (1 - MINIMAP_ACTION_RESERVE_FRACTION);
+      expect(rect.x + rect.width, `${name}: right edge clears the action column`).toBeLessThanOrEqual(
+        reservedRightEdge + 0.5,
+      );
+      // Still in the RIGHT half — it is a bottom-RIGHT map, not a centred one.
+      expect(rect.x + rect.width, `${name}: still in the right half`).toBeGreaterThan(vp.width / 2);
+    }
+  });
+
+  it('touch: the collapsed square lifts off the very-bottom strip band', () => {
+    // A steel frame in the y ≥ 0.95·H band reads as a controls strip to the "strip
+    // ABSENT on touch" probe (REGION_STRIP_MID). The square's bottom stays above
+    // the strip-safe line so it never does.
+    const rect = collapsedRect(PHONE_WIDE, true);
+    expect(rect.y + rect.height).toBeLessThanOrEqual(PHONE_WIDE.height * MINIMAP_BOTTOM_SAFE_FRACTION + 0.5);
   });
 
   it('respects safe-area insets by pulling the corner further in', () => {

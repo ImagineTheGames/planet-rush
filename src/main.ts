@@ -794,21 +794,6 @@ async function boot(): Promise<void> {
       return;
     }
 
-    // The minimap (field request v0.2.2): a click/tap on the corner square opens
-    // the centred overlay; a tap anywhere on the overlay collapses it again. The
-    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
-    // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
-    // both platforms use (docs/input-parity.md). It only claims a press that
-    // actually lands on the visible minimap surface, so it never eats a tap meant
-    // for the wheel or a stick; when it does claim one, we consume the event so the
-    // same press never also flies the ship or engages a stick under it.
-    if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
-      haptics.haptic('tap');
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      return;
-    }
-
     // The touch BUILD button — the E-equivalent, on screen only at your own
     // planet (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
     // comes from the same `buildVisible` that draws it, so a tap can only land on
@@ -897,6 +882,23 @@ async function boot(): Promise<void> {
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
+    // The minimap (field request v0.2.2): a click/tap on the corner square opens
+    // the centred overlay; a tap anywhere on the overlay collapses it again. The
+    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
+    // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
+    // both platforms use (docs/input-parity.md). Checked LAST among the interactive
+    // surfaces — after the end/fullscreen overlays, the BUILD button, the BOOST/PING
+    // buttons and the open wheel — so the glance map is the lowest-priority claim:
+    // a control drawn near or over it always wins the press, and the map only takes
+    // one that lands on nothing else. When it does claim a press we consume the
+    // event so the same press never also flies the ship or engages a stick under it.
+    if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
+      haptics.haptic('tap');
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
