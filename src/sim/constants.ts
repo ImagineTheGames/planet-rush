@@ -636,12 +636,21 @@ export function homeFieldOre(playerCount: number): number {
 
 /**
  * Sim time (seconds) at which wave `n` (1-based) arrives. Wave 1 is present at
- * match start and each later wave lands one `WAVE_INTERVAL_S` after the one
- * before it — the same schedule the HUD's wave clock counts down to, so the
- * clock and the spawner can never drift.
+ * match start and each later wave lands one wave `interval` after the one before
+ * it — the same schedule the HUD's wave clock counts down to, so the clock and
+ * the spawner can never drift.
+ *
+ * `interval` defaults to the baseline `WAVE_INTERVAL_S`, which is what the
+ * cross-lane callers that predate abundance (`src/ui/wave-clock.ts`,
+ * `src/bots/perception.ts`) pass — so their schedule is unchanged. The sim's own
+ * spawner and collapse deadline pass the *per-world* interval
+ * (`world.economy.waveInterval`, an abundance multiple of the baseline), so a
+ * SCARCE match's waves are genuinely further apart. Where the two differ the HUD
+ * clock reads the baseline cadence until it is taught to read `world.economy`
+ * (the n1 wiring follow-up, alongside the lobby control) — see `ABUNDANCE`.
  */
-export function waveTime(n: number): number {
-  return (n - 1) * WAVE_INTERVAL_S;
+export function waveTime(n: number, interval: number = WAVE_INTERVAL_S): number {
+  return (n - 1) * interval;
 }
 
 /**
@@ -693,6 +702,164 @@ export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
  * comment.)
  */
 export const COLLAPSE_CORE_DECAY = 1 as Tunable<number>;
+
+// ---------------------------------------------------------------------------
+// Ore scarcity — the abundance levels (RATIFIED developer, p11)
+// ---------------------------------------------------------------------------
+//
+// "There's too much ore and it respawns too quickly … more scarcity, and
+// perhaps controllable before matches, but by default more scarce so combat and
+// resource management is deeper."
+//
+// `abundance` is a per-MATCH knob (it rides `MatchConfig`, authored in the lobby
+// and carried in the room ad), not a global constant: three named multiplier sets
+// over the economy tunables the developer named — **field density** (rock count,
+// home + commons), **total ore** (the field's whole yield, i.e. how rich each
+// asteroid is), and **respawn interval** (how long the wait is between asteroid
+// waves — "scarce respawns should feel like a real wait, not a refill"). SCARCE
+// is the DEFAULT (`DEFAULT_ABUNDANCE`): the shipped game is the deep, lean economy
+// unless the lobby opts up.
+//
+// Fairness is untouchable (p1-09): a multiplier scales the *pattern* uniformly —
+// it never re-rolls it per player — so every home field stays identical by
+// construction at every level (`resource-fairness` holds, `./waves`). Derelict
+// fields inherit the level like any home. The multipliers resolve to a
+// `ResolvedEconomy` once, at `createWorld`, and live on `world.economy`; the sim
+// reads that, never the raw baseline, so one match can be SCARCE while another is
+// RICH with no global state.
+
+/** The three ratified abundance levels (GDD §2.8 economy, developer p11). Ordered
+ *  lean→rich; `standard` is the pre-p11 baseline (every multiplier 1). */
+export type Abundance = 'scarce' | 'standard' | 'rich';
+
+/** The DEFAULT abundance a match runs at when the lobby does not say otherwise —
+ *  SCARCE, ratified: "by default more scarce" (developer p11). The config layer
+ *  (`MatchConfig`) reads this; a bare `createWorld` with no `abundance` keeps the
+ *  `standard` baseline so every pre-p11 caller (tests, harness, foreign worlds)
+ *  is byte-for-byte unchanged — see {@link resolveEconomy}. */
+export const DEFAULT_ABUNDANCE: Abundance = 'scarce';
+
+/** One abundance level's multiplier set over the three economy tunables the
+ *  developer named. All `TUNABLE`; owned by QA from here (GDD §2.8). */
+export interface AbundanceMultipliers {
+  /** Scales the whole field's ore yield (`FIELD_YIELD`) — home + commons together.
+   *  With `density` fixed this is per-asteroid richness; it is the dominant
+   *  ore-per-minute lever. */
+  readonly totalOre: number;
+  /** Scales the *count* of rocks — home-field `homeCount` and per-wave
+   *  `asteroidsPerWave`. Texture, not yield: fewer, individually leaner rocks at
+   *  SCARCE (the total is `totalOre`'s job), so "how full do I run?" is asked
+   *  more often. */
+  readonly density: number;
+  /** Scales the wait between asteroid waves (`WAVE_INTERVAL_S`). > 1 is a slower
+   *  respawn — the "real wait" SCARCE wants; < 1 is a quicker refill. The collapse
+   *  deadline is re-anchored so match length holds regardless
+   *  ({@link collapseDeadlineFor}). */
+  readonly respawnInterval: number;
+}
+
+/**
+ * The abundance table. **SCARCE is the default and the tuned target** (p11): its
+ * ore-per-minute sits ~40% below STANDARD (measured — see the p11 scarcity
+ * report), which is the "deeper combat and resource management" the developer
+ * asked for while every balance rail still holds (matches resolve inside 10–15
+ * min via the re-anchored collapse deadline, fairness is untouched, the
+ * discrete-repair stall stays green). STANDARD is the pre-p11 economy verbatim
+ * (all multipliers 1). RICH is the generous end for a lobby that wants a faster,
+ * looser match. All `TUNABLE` (GDD §2.8).
+ *
+ * SCARCE's `respawnInterval` is kept modest (1.1) on purpose: a longer wait is
+ * genuinely felt, but the wave-schedule *timing* is read by the HUD wave clock
+ * (`src/ui`) and bot perception (`src/bots`) through the baseline `waveTime`
+ * until the n1 wiring teaches them `world.economy` — so a large stretch would
+ * drift the clock. Most of SCARCE's "real wait, not a refill" is carried by the
+ * lean waves (`totalOre`): you mine a thin wave out fast, then wait the interval
+ * with an empty field.
+ */
+export const ABUNDANCE: Readonly<Record<Abundance, AbundanceMultipliers>> = {
+  scarce: { totalOre: 0.55, density: 0.75, respawnInterval: 1.1 },
+  standard: { totalOre: 1, density: 1, respawnInterval: 1 },
+  rich: { totalOre: 1.6, density: 1.25, respawnInterval: 0.85 },
+} as const;
+
+/** The multiplier set for a level, defaulting an unknown/absent level to the
+ *  pre-p11 `standard` baseline so a stale saved key can never crash a match. */
+export function abundanceMultipliers(abundance: Abundance): AbundanceMultipliers {
+  return ABUNDANCE[abundance] ?? ABUNDANCE.standard;
+}
+
+/** The economy values resolved for one match at one abundance level — plain data
+ *  that lives on `world.economy` and is the ONLY thing the sim's ore code reads
+ *  (never the raw baseline), so abundance is per-world, not global. */
+export interface ResolvedEconomy {
+  readonly abundance: Abundance;
+  /** The whole field's ore yield (`FIELD_YIELD × totalOre`). Home + commons split
+   *  it exactly as before (`commonsShare`), so fairness is untouched. */
+  readonly fieldYield: number;
+  /** Rocks per home field (`RESOURCE_FIELD.homeCount × density`, ≥ 1). */
+  readonly homeCount: number;
+  /** Commons rocks per wave (`WAVE.asteroidsPerWave × density`, ≥ 1) — the opening
+   *  field and every later wave. A `createWorld` `asteroidCount` override wins over
+   *  this (the QA harness sets rock counts directly). */
+  readonly asteroidsPerWave: number;
+  /** Seconds between asteroid waves (`WAVE_INTERVAL_S × respawnInterval`). */
+  readonly waveInterval: number;
+}
+
+/** Round a base count by a density multiplier, never below 1 — a field always has
+ *  at least one rock, whatever the multiplier. */
+function scaleCount(base: number, density: number): number {
+  return Math.max(1, Math.round(base * density));
+}
+
+/**
+ * Resolve the economy for a match. `abundance` picks the multiplier set;
+ * `asteroidCountOverride` (the `createWorld`/harness `asteroidCount`) wins over the
+ * density-scaled per-wave count when present, exactly as it did pre-p11.
+ * Deterministic and pure — same level ⇒ same numbers ⇒ same seeded field.
+ */
+export function resolveEconomy(
+  abundance: Abundance = 'standard',
+  asteroidCountOverride?: number,
+): ResolvedEconomy {
+  const m = abundanceMultipliers(abundance);
+  return {
+    abundance,
+    fieldYield: FIELD_YIELD * m.totalOre,
+    homeCount: scaleCount(RESOURCE_FIELD.homeCount, m.density),
+    asteroidsPerWave: asteroidCountOverride ?? scaleCount(WAVE.asteroidsPerWave, m.density),
+    waveInterval: WAVE_INTERVAL_S * m.respawnInterval,
+  };
+}
+
+/** Ore delivered by ONE commons wave for a given field yield — the commons share
+ *  split across the `WAVE_COUNT` waves. The abundance-aware form of `WAVE_ORE`
+ *  (which is this at the baseline `FIELD_YIELD`). */
+export function waveOreFor(fieldYield: number): number {
+  return (fieldYield * RESOURCE_FIELD.commonsShare) / WAVE_COUNT;
+}
+
+/** Ore in one home neighbourhood for a given field yield and player count — the
+ *  abundance-aware form of `homeFieldOre`. Every one of the `N` homes carries
+ *  exactly this (the fairness invariant, unaffected by any uniform multiplier). */
+export function homeFieldOreFor(fieldYield: number, playerCount: number): number {
+  const n = Math.max(1, playerCount);
+  return (fieldYield * (1 - RESOURCE_FIELD.commonsShare)) / n;
+}
+
+/**
+ * Minimum seconds of grace kept after the final wave before collapse is forced,
+ * however long the wave interval is — always some window to mine the last wave out
+ * (GDD §2.3). The abundance-aware collapse deadline (`match.ts` `collapseDeadline`)
+ * re-anchors so a longer SCARCE interval never pushes the ending past the 10–15
+ * min target (GDD §1): it holds at the baseline `waveTime(WAVE_COUNT) +
+ * COLLAPSE_GRACE_S` (750 s) unless a very long interval lands the final wave close
+ * to it, in which case this floor of grace is kept after that last wave. Below the
+ * baseline `COLLAPSE_GRACE_S`, so it only binds at respawn intervals longer than
+ * the shipped SCARCE level. Lives here (a leaf constant) so a test that mocks the
+ * constants table can override it alongside `COLLAPSE_GRACE_S`. TUNABLE
+ */
+export const COLLAPSE_GRACE_FLOOR_S: Tunable<number> = 60;
 
 /** Respawn time — free; time is the cost (GDD §2.7, §2.8), seconds. TUNABLE */
 export const RESPAWN_S: Tunable<number> = 5;

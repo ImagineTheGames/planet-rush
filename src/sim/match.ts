@@ -32,8 +32,10 @@ import type { PlayerId } from '@shared/types';
 import {
   CHUNK,
   COLLAPSE_CORE_DECAY,
+  COLLAPSE_GRACE_FLOOR_S,
   COLLAPSE_GRACE_S,
   WAVE_COUNT,
+  WAVE_INTERVAL_S,
   WRECK,
   clampToMargin,
   waveTime,
@@ -67,9 +69,25 @@ export function isWreck(planet: Planet): boolean {
   return !planet.alive;
 }
 
-/** Sim time at which collapse begins no matter what is left in the field. */
-export function collapseDeadline(): number {
-  return waveTime(WAVE_COUNT) + COLLAPSE_GRACE_S;
+/**
+ * Sim time at which collapse begins no matter what is left in the field. Reads
+ * the match's abundance-resolved wave interval (`world.economy.waveInterval`) and
+ * re-anchors the deadline so match length holds regardless of abundance
+ * (`collapseDeadlineFor`) — a SCARCE match's waves being further apart never
+ * pushes the ending past the 10–15 min target (GDD §1). A world without a
+ * resolved economy (legacy/foreign) reads the baseline interval, so the pre-p11
+ * deadline is unchanged.
+ */
+export function collapseDeadline(world?: World): number {
+  const interval = world?.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  // The pre-p11 anchor — the baseline deadline (750 s at shipped constants); a
+  // longer SCARCE interval must not push the ending past it.
+  const anchored = waveTime(WAVE_COUNT) + COLLAPSE_GRACE_S;
+  // …but collapse can never be forced before the final wave has actually landed,
+  // so keep a floor of grace after it (bounded by the base grace, so a mocked
+  // accelerated match with a tiny grace still forces on schedule).
+  const floor = Math.min(COLLAPSE_GRACE_FLOOR_S, COLLAPSE_GRACE_S);
+  return Math.max(anchored, waveTime(WAVE_COUNT, interval) + floor);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +242,7 @@ export function updateMatch(world: World, dt: number): void {
  */
 function enterCollapseIfDue(world: World): void {
   if (isCollapsed(world) || !allWavesSpawned(world)) return;
-  if (!fieldExhausted(world) && world.time < collapseDeadline()) return;
+  if (!fieldExhausted(world) && world.time < collapseDeadline(world)) return;
 
   world.match.collapseTime = world.time;
   if (world.match.phase === 'live') world.match.phase = 'collapse';

@@ -16,6 +16,7 @@
  */
 
 import type { Muzzle, PlayerId, ShipClass, Vec2 } from '@shared/types';
+import type { Abundance, ResolvedEconomy } from './constants';
 import {
   CORE_HP,
   PLANET,
@@ -24,7 +25,7 @@ import {
   SHIP_RADIUS,
   SPAWN_PROTECTION_S,
   STARTING_ORE,
-  WAVE,
+  resolveEconomy,
 } from './constants';
 import { getMap } from './maps';
 import { scatterDerelictLoot } from './match';
@@ -493,9 +494,26 @@ export interface World {
    *  is a fraction of it (`waveRadiusFraction`), so the shrinking field is
    *  derived from one stored number rather than re-derived from the config. */
   fieldRadius: number;
-  /** Rocks per wave (`WorldConfig.asteroidCount`, else `WAVE.asteroidsPerWave`).
-   *  Stored so waves 2..5 are the same size as the opening field. */
+  /** Rocks per wave (`WorldConfig.asteroidCount`, else the abundance-resolved
+   *  `economy.asteroidsPerWave`). Stored so waves 2..5 are the same size as the
+   *  opening field. */
   asteroidsPerWave: number;
+  /**
+   * The match's abundance-resolved economy (ore scarcity, p11): the field yield,
+   * home/commons rock counts, and wave interval this match runs at, resolved once
+   * at `createWorld` from `WorldConfig.abundance` (`./constants` `resolveEconomy`).
+   * The sim's ore code reads THIS, never the raw baseline constants, so abundance
+   * is per-world — one match can be SCARCE while another is RICH.
+   *
+   * Optional so the hand-built worlds other lanes construct (net snapshots, bot
+   * fixtures, `@platform/freeze`) keep compiling; a world without one reads the
+   * pre-p11 `standard` baseline everywhere (each consumer falls back to the
+   * baseline constant), so foreign worlds are byte-for-byte unchanged. Static
+   * match config, like `fieldRadius` — never on the per-tick snapshot, and not
+   * fingerprinted by the determinism hash (`harness/hash.ts`), so accounting for
+   * it never perturbs a replay.
+   */
+  economy?: ResolvedEconomy;
   /** Waves, collapse, and win/loss (GDD §1, §2.3). */
   match: MatchState;
   /**
@@ -554,11 +572,20 @@ export interface WorldConfig {
   /** Play bounds (world units). Overrides the map's own bounds — the QA harness
    *  runs deliberately cramped worlds. */
   readonly bounds?: Bounds;
-  /** Asteroids per wave, overriding `WAVE.asteroidsPerWave`. Wave 1 is placed
+  /** Asteroids per wave, overriding the abundance-resolved count. Wave 1 is placed
    *  at construction, so this is also the opening field's rock count; the
    *  wave's *ore* budget is unchanged, so fewer rocks means richer ones (the
    *  finite field is the design constant, GDD §2.3). */
   readonly asteroidCount?: number;
+  /**
+   * Ore scarcity for this match (p11): `scarce | standard | rich`, a named
+   * multiplier set over field density, total ore, and respawn interval
+   * (`./constants` `ABUNDANCE`). Omitted → the pre-p11 `standard` baseline, so
+   * every existing caller (tests, harness, foreign builders) is unchanged; the
+   * lobby/room-ad default is SCARCE and rides `MatchConfig.abundance`, which the
+   * world-build wiring passes here (`DEFAULT_ABUNDANCE`).
+   */
+  readonly abundance?: Abundance;
 }
 
 /** Build a ship at a spawn point with class-derived stats (GDD §2.11, §2.8).
@@ -724,6 +751,14 @@ export function createWorld(config: WorldConfig): World {
     }
   });
 
+  // Resolve the abundance economy once (ore scarcity, p11). An omitted level reads
+  // as the pre-p11 `standard` baseline (`resolveEconomy`'s default), so a bare
+  // `createWorld` — every existing test, the harness, foreign builders — is
+  // byte-for-byte unchanged; the SCARCE product default lives on `MatchConfig`
+  // (`DEFAULT_ABUNDANCE`) and is passed in as `config.abundance` by the world-build
+  // wiring. The `asteroidCount` override still wins over the density-scaled count.
+  const economy = resolveEconomy(config.abundance, config.asteroidCount);
+
   const world: World = {
     time: 0,
     tick: 0,
@@ -740,7 +775,8 @@ export function createWorld(config: WorldConfig): World {
     // The commons scatter disc — a fraction of the ring, kept clear of every
     // home's measure radius so the two fields never overlap (`RESOURCE_FIELD`).
     fieldRadius: ringRadius * RESOURCE_FIELD.commonsRadiusFraction,
-    asteroidsPerWave: config.asteroidCount ?? WAVE.asteroidsPerWave,
+    asteroidsPerWave: economy.asteroidsPerWave,
+    economy,
     match: initialMatch(),
     ledger: makeLedger(),
   };

@@ -59,12 +59,14 @@
 import type { PlayerId } from '@shared/types';
 import {
   ASTEROID,
+  FIELD_YIELD,
   RESOURCE_FIELD,
   SPAWN_CLEAR_POCKET,
   WAVE_COUNT,
-  WAVE_ORE,
+  WAVE_INTERVAL_S,
   clampToMargin,
-  homeFieldOre,
+  homeFieldOreFor,
+  waveOreFor,
   waveRadiusFraction,
   waveTime,
 } from './constants';
@@ -249,6 +251,14 @@ export function spawnHomeFields(world: World): void {
   const n = planets.length;
   if (n === 0) return;
 
+  // The abundance-resolved economy (`./constants` `resolveEconomy`, set on
+  // `world.economy` at build). A legacy/foreign world without one reads as the
+  // pre-p11 baseline, so nothing that hand-builds a world changes behaviour. A
+  // uniform multiplier scales the pattern, never re-rolls it, so every home field
+  // stays identical (the fairness invariant, `resource-fairness.test.ts`).
+  const fieldYield = world.economy?.fieldYield ?? FIELD_YIELD;
+  const homeCount = world.economy?.homeCount ?? RESOURCE_FIELD.homeCount;
+
   const cx = world.bounds.width / 2;
   const cy = world.bounds.height / 2;
   // Each live home's own distance from the centre. On a single-ring map (`octagon`
@@ -284,12 +294,12 @@ export function spawnHomeFields(world: World): void {
   // `±homeConeOuter`; it is then folded OUT of the launch corridor (below).
   const { rocks, rng } = drawCanon(
     world.rngState,
-    RESOURCE_FIELD.homeCount,
+    homeCount,
     innerR,
     outerR,
     -RESOURCE_FIELD.homeConeOuter,
     RESOURCE_FIELD.homeConeOuter,
-    homeFieldOre(n),
+    homeFieldOreFor(fieldYield, n),
   );
   world.rngState = rng;
 
@@ -367,8 +377,11 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   const gap = Math.min(RESOURCE_FIELD.commonsSpokeGap, sectorWidth * 0.45);
   const innerRadius = discRadius * RESOURCE_FIELD.commonsHoleFraction;
 
-  // Each of the `sectors` stamps carries a copy of the sector's ore, so the
-  // wave total is `WAVE_ORE`; the per-sector budget is `WAVE_ORE / sectors`.
+  // Each of the `sectors` stamps carries a copy of the sector's ore, so the wave
+  // total is `waveOre`; the per-sector budget is `waveOre / sectors`. `waveOre`
+  // is the commons share of the abundance-resolved field yield (`world.economy`),
+  // so a SCARCE wave is genuinely leaner; a legacy world reads the baseline.
+  const waveOre = waveOreFor(world.economy?.fieldYield ?? FIELD_YIELD);
   const { rocks, rng } = drawCanon(
     world.rngState,
     sectorRocks,
@@ -376,7 +389,7 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
     discRadius,
     gap,
     sectorWidth - gap,
-    WAVE_ORE / sectors,
+    waveOre / sectors,
   );
   world.rngState = rng;
 
@@ -405,7 +418,11 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
  */
 export function spawnDueWaves(world: World): void {
   if (world.match.collapseTime >= 0) return;
-  while (!allWavesSpawned(world) && world.time >= waveTime(world.match.wavesSpawned + 1)) {
+  // Waves land on the abundance-resolved interval (`world.economy.waveInterval`):
+  // a SCARCE match waits longer between refills. A legacy world reads the baseline
+  // `WAVE_INTERVAL_S`, so the pre-p11 schedule is unchanged.
+  const interval = world.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  while (!allWavesSpawned(world) && world.time >= waveTime(world.match.wavesSpawned + 1, interval)) {
     spawnWave(world);
   }
 }
