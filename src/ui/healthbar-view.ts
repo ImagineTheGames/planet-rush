@@ -8,6 +8,18 @@
  * space** (the model already projected world → screen), so the bars are a fixed
  * size regardless of camera zoom (GDD field report).
  *
+ * **The number (field request v0.2.4).** Every bar carries a compact "68/70"
+ * current/max readout — the same treatment the planet core got — floated just to
+ * the RIGHT of the bar and vertically centred on it. So the over-ship cluster now
+ * reads as two rows: **name + difficulty-tag** on top (the nameplate layer) and
+ * **bar + number** below it, with the ship under that. Placing the number beside
+ * the bar rather than under it keeps it out of that vertical stack so it never
+ * fights the name/tag above ([[layout-registry]]). The Text is pooled off a
+ * parallel array, one per bar slot, so a frame allocates nothing after warm-up —
+ * a Text re-rasterises only when its digits change, which a steady-hp scene never
+ * does. Whenever a bar draws its number draws, by the one visibility rule the
+ * model already decided — one health-bar component, ships and turrets alike.
+ *
  * **Pooling, the sprite-atlas discipline (GDD §4.3, risk 5).** Graphics are
  * allocated once and reused: a frame with N bars touches the first N pooled
  * objects (clear + redraw — no new geometry object per bar) and hides the rest.
@@ -22,7 +34,7 @@
  * sits inside `full`.
  */
 
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
@@ -34,6 +46,7 @@ import {
   HEALTHBAR_WIDTH,
 } from './healthbar';
 import type { HealthBar } from './healthbar';
+import { FONT_BODY, TEXT_PRIMARY } from './typography';
 
 /** Layout-registry id for the health-bar layer (one entry, the union of bars). */
 export const HEALTHBAR_ID = 'healthbars';
@@ -43,6 +56,19 @@ export const HEALTHBAR_ANCHOR: AnchorSpec = { region: 'full' };
 /** Alpha of the empty track behind the fill — present so a missing chunk reads
  *  as absence, not as nothing drawn. Steel, never a material colour of its own. */
 const TRACK_ALPHA = 0.28;
+
+/** The numeric "68/70" readout beside the bar (field request v0.2.4): Oxanium
+ *  numerals (style-guide §7), small enough not to fight the name/difficulty-tag
+ *  stack above — so the over-ship cluster reads as two rows, name+tag over
+ *  bar+number. Chalk-white, off the same neutral as the core readout, never a
+ *  reserved colour. */
+const NUMBER_SIZE = 9;
+/** Gap between the bar's right edge and the number's left edge, CSS px — the
+ *  number trails the bar the way the difficulty tag trails the name. */
+const NUMBER_GAP = 3;
+/** The number's alpha — a touch under the fill so it recedes behind the bar it
+ *  annotates rather than competing with it. */
+const NUMBER_ALPHA = 0.9;
 
 /**
  * One bar the layer actually drew this frame (post-cull), captured only when
@@ -62,10 +88,20 @@ export interface DrawnHealthBar {
   /** True for the local player's own-ship bar (drawn in the distinct style) —
    *  so a live-stage test can assert the own ship's bar is the one styled mine. */
   local: boolean;
+  /** The numeric "68/70" readout drawn beside this bar (field request v0.2.4),
+   *  or `''` when the number was culled off-canvas but the bar still drew — so a
+   *  live-stage test can assert the number is present and matches the hp state. */
+  hpText: string;
 }
 
 export class HealthBarView extends Container {
   private readonly bars: Graphics[] = [];
+  /** Parallel pool of the "68/70" numbers, one per bar slot (field request
+   *  v0.2.4). A Text re-rasterises only when its string changes, so a bar whose
+   *  hp holds steady across frames re-uses its glyphs for free — the same pooling
+   *  discipline as the nameplate layer. A slot whose number is culled off-canvas
+   *  (or whose bar is hidden) hides its Text. */
+  private readonly numbers: Text[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew — what the
    *  registry records (only what is actually on screen). */
   private drawnBounds: Rect | null = null;
@@ -105,8 +141,8 @@ export class HealthBarView extends Container {
         continue;
       }
 
-      if (this.debugCapture) this.recordDebug(drawn, bar, top);
-      const g = this.slot(drawn++);
+      const i = drawn++;
+      const g = this.slot(i);
       g.clear();
       // Track first, then the owner-colour fill over its left portion.
       g.roundRect(left, top, width, height, 1).fill({
@@ -128,6 +164,33 @@ export class HealthBarView extends Container {
       if (top < minY) minY = top;
       if (left + width > maxX) maxX = left + width;
       if (top + height > maxY) maxY = top + height;
+
+      // The "68/70" number (field request v0.2.4), floated to the RIGHT of the bar
+      // and vertically centred on it, so the over-ship cluster reads as two rows —
+      // name+tag over bar+number — instead of a third tier that would fight the
+      // nameplate stack. Whenever a bar shows, its number shows. Culled on its own:
+      // if the number would spill off-canvas the bar still stands, the number just
+      // hides this frame (so the bar is never left half-annotated at a screen edge).
+      const t = this.numberSlot(i);
+      if (t.text !== bar.hpText) t.text = bar.hpText;
+      const numLeft = left + width + NUMBER_GAP;
+      const numTop = top + height / 2 - t.height / 2;
+      const numRight = numLeft + t.width;
+      const numBottom = numTop + t.height;
+      const numFits = numTop >= 0 && numRight <= viewportWidth && numBottom <= viewportHeight;
+      let drawnNumber = '';
+      if (numFits) {
+        t.visible = true;
+        t.position.set(numLeft, numTop);
+        drawnNumber = bar.hpText;
+        if (numRight > maxX) maxX = numRight;
+        if (numTop < minY) minY = numTop;
+        if (numBottom > maxY) maxY = numBottom;
+      } else {
+        t.visible = false;
+      }
+
+      if (this.debugCapture) this.recordDebug(i, bar, top, drawnNumber);
     }
 
     this.hideFrom(drawn);
@@ -152,12 +215,14 @@ export class HealthBarView extends Container {
     return this.debugDrawn.slice(0, this.debugCount);
   }
 
-  /** Record one drawn bar into the reusable pool at `i` (grows to fit). Only
-   *  reached under {@link debugCapture}, so it costs nothing in a normal build. */
-  private recordDebug(i: number, bar: HealthBar, top: number): void {
+  /** Record one drawn bar into the reusable pool at `i` (grows to fit). `hpText`
+   *  is the number actually drawn beside the bar, or `''` when it was culled — so
+   *  the live-stage seam reports what is really on screen. Only reached under
+   *  {@link debugCapture}, so it costs nothing in a normal build. */
+  private recordDebug(i: number, bar: HealthBar, top: number, hpText: string): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: bar.owner, fraction: bar.fraction, x: bar.x, y: top, local: bar.local };
+      d = { owner: bar.owner, fraction: bar.fraction, x: bar.x, y: top, local: bar.local, hpText };
       this.debugDrawn[i] = d;
       return;
     }
@@ -166,6 +231,7 @@ export class HealthBarView extends Container {
     d.x = bar.x;
     d.y = top;
     d.local = bar.local;
+    d.hpText = hpText;
   }
 
   /**
@@ -202,10 +268,32 @@ export class HealthBarView extends Container {
     return g;
   }
 
+  /** The pooled number Text for bar slot `i` — Oxanium numerals, chalk-white,
+   *  left-anchored so it hangs off the bar's right edge (field request v0.2.4).
+   *  Created once and re-used; the caller sets its string and position. */
+  private numberSlot(i: number): Text {
+    let t = this.numbers[i];
+    if (!t) {
+      t = new Text({
+        text: '',
+        style: { fontFamily: FONT_BODY, fontSize: NUMBER_SIZE, fill: TEXT_PRIMARY, letterSpacing: 0.3 },
+      });
+      t.anchor.set(0, 0); // top-left: positioned from its computed top-left corner
+      t.alpha = NUMBER_ALPHA;
+      this.numbers[i] = t;
+      this.addChild(t);
+    }
+    return t;
+  }
+
   private hideFrom(count: number): void {
     for (let i = count; i < this.bars.length; i++) {
       const g = this.bars[i];
       if (g) g.visible = false;
+    }
+    for (let i = count; i < this.numbers.length; i++) {
+      const t = this.numbers[i];
+      if (t) t.visible = false;
     }
   }
 }
