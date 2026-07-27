@@ -25,6 +25,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, Muzzle, PlayerId, Vec2 } from '@shared/types';
 import {
   WEAPON_RANGE,
+  TRACTOR_PICKUP_RADIUS,
   muzzleFlashes,
   damagePlanet,
   damageShip,
@@ -691,11 +692,21 @@ async function boot(): Promise<void> {
   const tapPilot = new TapPilot({
     fireRange: WEAPON_RANGE * 0.82,
     engageRange: WEAPON_RANGE * 0.5,
+    // The tractor pickup radius (GDD §2.3), so a mined-rock lock holds INSIDE the
+    // grab range and its chipped ore reaches the hold (developer p9-02 range fix) —
+    // fed from the sim's single source, never a copied literal.
+    pickupRadius: TRACTOR_PICKUP_RADIUS,
   });
   const pilotState = createControlState();
   /** Reused per-frame resolved-target record, so re-resolving a lock allocates
    *  nothing on the input path (GDD §4.3). */
-  const resolvedTarget: { pos: Vec2; radius: number; hostile: boolean; standoff?: number } = {
+  const resolvedTarget: {
+    pos: Vec2;
+    radius: number;
+    hostile: boolean;
+    standoff?: number;
+    mineable?: boolean;
+  } = {
     pos: { x: 0, y: 0 },
     radius: 0,
     hostile: false,
@@ -1366,10 +1377,17 @@ async function boot(): Promise<void> {
     }
 
     updateBuildWheel();
-    // The pilot aims explicitly at the locked target, so its state is mapped in
+    // Tap Commander's fire mode depends on the pilot's order (developer p9-02 §1). On
+    // a LOCK the pilot aims explicitly at the tapped target, so map that frame in
     // Manual — an Auto-aim map would let the sim pick the nearest target instead of
-    // the one the player tapped. The sticks scheme keeps the player's fire-mode.
-    const actions = mapActions(merged, tap ? FireMode.Manual : fireMode);
+    // the one the player locked. With NO lock the pilot AUTO-ENGAGES (holds the
+    // trigger while flying/idling), so map Auto-aim and let the sim's own ladder pick
+    // the best target — enemies first, hittability + full-hold rock suppression built
+    // in (p9-01), never re-derived in the platform layer. The sticks scheme keeps the
+    // player's fire-mode. Read after `writeInto`, so a lock that died this frame has
+    // already cleared and correctly falls to auto-engage.
+    const tapMode = tapPilot.lockedRef ? FireMode.Manual : FireMode.AutoAim;
+    const actions = mapActions(merged, tap ? tapMode : fireMode);
     if (inputProbe.enabled) inputProbe.update(actions); // ?debug=1 parity seam
     return actions;
   }
@@ -1396,7 +1414,9 @@ async function boot(): Promise<void> {
       case 'asteroid': {
         const a = world.asteroids.find((r) => r.id === ref.id);
         if (!a) return null; // mined out → the rock is gone, drop the lock
-        return fillResolved(a.pos, a.radius, true);
+        // A rock is `mineable`: the pilot holds INSIDE the tractor pickup radius so
+        // its chipped ore reaches the hold (developer p9-02 range fix).
+        return fillResolved(a.pos, a.radius, true, undefined, true);
       }
       case 'turret': {
         for (const p of world.planets) {
@@ -1418,7 +1438,13 @@ async function boot(): Promise<void> {
   }
 
   /** Fill the reused resolved-target record (zero-alloc) and return it. */
-  function fillResolved(pos: Vec2, radius: number, hostile: boolean, standoff?: number): ResolvedTarget {
+  function fillResolved(
+    pos: Vec2,
+    radius: number,
+    hostile: boolean,
+    standoff?: number,
+    mineable = false,
+  ): ResolvedTarget {
     resolvedTarget.pos = pos;
     resolvedTarget.radius = radius;
     resolvedTarget.hostile = hostile;
@@ -1426,6 +1452,9 @@ async function boot(): Promise<void> {
     // target omits it (the pilot then uses its config engage range).
     if (standoff === undefined) delete resolvedTarget.standoff;
     else resolvedTarget.standoff = standoff;
+    // A rock holds inside the tractor pickup radius; every other target omits this.
+    if (mineable) resolvedTarget.mineable = true;
+    else delete resolvedTarget.mineable;
     return resolvedTarget;
   }
 
@@ -1886,7 +1915,11 @@ async function boot(): Promise<void> {
     }
 
     // The line of intent draws only while the ship is actually loosing its weapon
-    // (the sim's own firing tell) — the tap scheme fires only on a hostile lock.
+    // (the sim's own firing tell) AND a lock stands — the marker layer gates on
+    // `firing && lock` (src/ui/tap-markers.ts). Auto-engage (p9-02) fires with no
+    // lock, so this tell can now rise without a reticle; the layer draws no phantom
+    // line for it. A lighter auto-reticle over the ladder's current pick is flagged
+    // for ui/gameplay in the PR (the sim owns that pick; it is not surfaced here).
     const ship = world.ships.find(isLocalShip);
     hudFrame.tapFiring = ship?.firing ?? false;
   }
@@ -2763,6 +2796,33 @@ async function boot(): Promise<void> {
    * normal build; it mutates only the plain sim data the boot path already reads.
    */
   function installTapCommanderStage(): void {
+    /** Park the local ship at the arena centre with one bot in weapon range and the
+     *  field cleared — the shared base for the move/lock stage and the auto-engage
+     *  stage. Returns the staged world positions, or null if there is no ship / bot. */
+    function parkShipBot(): { ship: Vec2; bot: Vec2; botId: PlayerId } | null {
+      const ship = world.ships.find(isLocalShip);
+      const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER);
+      if (!ship || !bot) return null;
+      const cx = world.bounds.width / 2;
+      const cy = world.bounds.height / 2;
+      world.asteroids.length = 0; // empty space is genuinely empty for the move test
+      ship.pos.x = cx;
+      ship.pos.y = cy;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      ship.alive = true;
+      ship.spawnProtect = 0;
+      bot.pos.x = cx + 140;
+      bot.pos.y = cy;
+      bot.vel.x = 0;
+      bot.vel.y = 0;
+      bot.alive = true;
+      bot.spawnProtect = 0;
+      controlScheme = 'tap';
+      tapPilot.clear();
+      return { ship: { x: cx, y: cy }, bot: { x: cx + 140, y: cy }, botId: bot.id };
+    }
+
     const stage = {
       /** Switch schemes (persisted like the settings row would). */
       setScheme(scheme: 'sticks' | 'tap'): void {
@@ -2775,27 +2835,64 @@ async function boot(): Promise<void> {
        *  a tap on empty space is unambiguous. Switches to the tap scheme. Returns the
        *  staged world positions, or null if there is no local ship / no bot. */
       stage(): { ship: Vec2; bot: Vec2; botId: PlayerId } | null {
+        return parkShipBot();
+      },
+      /** Stage the auto-engage front door (developer p9-02 §1): the local ship at the
+       *  arena centre with one bot parked in weapon range, the field cleared, and a
+       *  waypoint returned WELL AWAY from the bot. A move to that waypoint (no lock)
+       *  must still auto-fire at the bot mid-flight — "move and it auto-fires at the
+       *  closest high priority target". Switches to the tap scheme. */
+      stageAutoEngage(): { ship: Vec2; bot: Vec2; botId: PlayerId; waypoint: Vec2 } | null {
+        const s = parkShipBot();
+        if (!s) return null;
         const ship = world.ships.find(isLocalShip);
-        const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER);
-        if (!ship || !bot) return null;
+        if (ship) ship.cargo = 0; // hold has room, so a rock would be mined too
+        return { ...s, waypoint: { x: s.ship.x, y: s.ship.y - 320 } };
+      },
+      /** Stage the full-hold rock suppression front door (developer p9-02 §1, "if ore
+       *  is full it shouldn't fire at asteroids automatically"): the local ship at the
+       *  arena centre, ONE asteroid in weapon range, and every enemy parked far out of
+       *  range so the ladder falls to the rock — which a full hold then suppresses.
+       *  `full` sets the hold full (shots stop at rocks) or empty (rock is mined).
+       *  Returns the ship + rock world positions and a waypoint away from the rock, or
+       *  null if there is no local ship. */
+      stageRockOnly(full: boolean): { ship: Vec2; rock: Vec2; waypoint: Vec2 } | null {
+        const ship = world.ships.find(isLocalShip);
+        if (!ship) return null;
         const cx = world.bounds.width / 2;
         const cy = world.bounds.height / 2;
-        world.asteroids.length = 0; // empty space is genuinely empty for the move test
         ship.pos.x = cx;
         ship.pos.y = cy;
         ship.vel.x = 0;
         ship.vel.y = 0;
         ship.alive = true;
         ship.spawnProtect = 0;
-        bot.pos.x = cx + 140;
-        bot.pos.y = cy;
-        bot.vel.x = 0;
-        bot.vel.y = 0;
-        bot.alive = true;
-        bot.spawnProtect = 0;
+        ship.cargo = full ? ship.cargoCap : 0;
+        // No hittable enemy: park every other ship in a far corner, out of weapon
+        // range and spawn-protected, so tier 1 is empty and the ladder falls to the
+        // rock (then the full-hold rule decides whether the rock is worth a shot).
+        for (const other of world.ships) {
+          if (other.id === LOCAL_PLAYER) continue;
+          other.pos.x = 0;
+          other.pos.y = 0;
+          other.vel.x = 0;
+          other.vel.y = 0;
+          other.spawnProtect = 999;
+        }
+        world.asteroids.length = 0;
+        world.asteroids.push({
+          id: 900_001,
+          pos: { x: cx + 140, y: cy },
+          radius: 30,
+          ore: 12,
+          maxOre: 12,
+          crackStage: 0,
+          mineBuffer: 0,
+          home: null,
+        });
         controlScheme = 'tap';
         tapPilot.clear();
-        return { ship: { x: cx, y: cy }, bot: { x: cx + 140, y: cy }, botId: bot.id };
+        return { ship: { x: cx, y: cy }, rock: { x: cx + 140, y: cy }, waypoint: { x: cx, y: cy - 320 } };
       },
       /** Place an order at a WORLD point exactly as a tap does — resolve the world
        *  hit-test through the client's own candidate list + picker and hand the pilot

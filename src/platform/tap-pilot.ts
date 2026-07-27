@@ -83,6 +83,12 @@ export interface ResolvedTarget {
   readonly hostile: boolean;
   /** Surface-gap standoff to hold at, world units. Defaults to `cfg.engageRange`. */
   readonly standoff?: number;
+  /** true → the target is a rock (asteroid): hold the ship's centre INSIDE the
+   *  tractor pickup radius so the ore a shot chips off drifts into the hold instead
+   *  of resting out of reach (developer p9-02 range fix). A combat standoff would
+   *  sit the ship too far back to collect — "it moves back to a range where it can't
+   *  pick up the ore". Ignored when an explicit `standoff` is set. */
+  readonly mineable?: boolean;
 }
 
 /** The local ship's kinematics the pilot steers — the only ship facts it needs. */
@@ -113,7 +119,21 @@ export interface TapPilotConfig {
   /** Dead-band around `engageRange` so the ship holds still instead of chattering
    *  thrust forward/back across the standoff boundary. */
   rangeHysteresis: number;
+  /** The tractor pickup radius (world units, ship-centre to chunk), fed from the
+   *  sim's `TRACTOR_PICKUP_RADIUS` so the pilot carries no copied literal. When the
+   *  engaged target is a rock the pilot holds the ship's centre INSIDE this — see
+   *  {@link ResolvedTarget.mineable} — so chipped ore reaches the hold (developer
+   *  p9-02 range fix). The combat hold against enemies is unchanged. */
+  pickupRadius: number;
 }
+
+/**
+ * Fraction of the tractor pickup radius the pilot holds a mined rock at, centre to
+ * centre. Comfortably inside the grab range so the chipped chunks drift into the
+ * hold, with room to spare so the standoff dead-band ({@link TapPilotConfig.rangeHysteresis})
+ * stays inside the pickup radius on the far side too (developer p9-02).
+ */
+const ASTEROID_HOLD_FRACTION = 0.6;
 
 /** World-unit forgiveness added to an entity's radius when hit-testing a tap, so a
  *  thumb near a small rock still selects it (§2). Exported for the wiring/tests. */
@@ -125,6 +145,7 @@ const DEFAULT_CONFIG: TapPilotConfig = {
   engageRange: 150,
   fireRange: 220,
   rangeHysteresis: 32,
+  pickupRadius: 120,
 };
 
 // ---------------------------------------------------------------------------
@@ -166,11 +187,17 @@ export function pickTapTarget(
  * device writes. Feed it the local ship and (for a target order) the re-resolved
  * live target; it clears its own order on arrival or on target death.
  *
- * The pilot aims explicitly at the locked target, so the caller maps its state in
- * **Manual** fire mode (aim honoured); an Auto-aim map would let the sim pick the
+ * On a lock the pilot aims explicitly at the target, so the caller maps that frame
+ * in **Manual** fire mode (aim honoured); an Auto-aim map would let the sim pick the
  * nearest target instead of the one the player locked, which is not what a tap
- * means. It never opens the build wheel — that affordance stays on its own device
- * and is merged alongside the pilot by the wiring.
+ * means. With NO lock the pilot AUTO-ENGAGES (developer p9-02 §1): it holds the
+ * trigger while flying a waypoint or idling, and the caller maps that frame in
+ * **Auto-aim** so the sim's own ladder picks the best target — enemies first,
+ * hittability and full-hold rock suppression built into that ladder (p9-01), never
+ * re-derived here. Movement and firing are independent: the ship flies its order
+ * and shoots what the ladder finds, like a twin-stick player. A lock overrides the
+ * ladder until it is cleared. It never opens the build wheel — that affordance stays
+ * on its own device and is merged alongside the pilot by the wiring.
  */
 export class TapPilot {
   private order: Order = null;
@@ -214,27 +241,46 @@ export class TapPilot {
 
   /**
    * Fold this frame's order into `state` (which the caller has reset to neutral).
-   * A waypoint drives thrust toward the point with arrival damping and clears on
-   * arrival; a target aims at the locked entity, closes to and holds firing range,
-   * and fires while in range (an own-planet fly-to holds at its atmosphere and
-   * never fires). A target order whose `resolved` came back `null` — the entity
-   * died — clears the lock and leaves the ship coasting.
+   *
+   * A **lock** (target order) aims at the locked entity, closes to and holds firing
+   * range, and fires while in range — a rock holds INSIDE the tractor pickup radius
+   * so its ore reaches the hold, an own-planet fly-to holds at its atmosphere and
+   * never fires. A lock overrides the auto-engage ladder until it is cleared
+   * (developer p9-02 §1). A lock whose `resolved` came back `null` — the entity died
+   * — is dropped, and the ship reverts to auto-engage rather than going passive.
+   *
+   * With **no lock** the pilot auto-engages (p9-02 §1): a waypoint drives thrust
+   * toward the point with arrival damping and clears on arrival, idle coasts, and in
+   * BOTH cases the trigger is held so the sim's Auto-aim ladder engages the best
+   * target while the ship flies. Movement and firing are independent — the caller
+   * maps this frame in Auto-aim (aim is left null so the sim acquires the target).
    */
   writeInto(state: ControlState, ship: PilotShip, resolved: ResolvedTarget | null): void {
     const order = this.order;
-    if (!order) return; // no order → neutral input, the ship coasts
 
-    if (order.kind === 'waypoint') {
-      this.steerToPoint(state, ship.pos, order.at);
-      return;
-    }
-
-    // A locked target the world no longer has is a dead lock — clear it (§2).
-    if (!resolved) {
+    if (order?.kind === 'target') {
+      if (resolved) {
+        // An active lock directs BOTH steering and fire — it overrides the ladder
+        // until cleared (developer p9-02 §1, "an explicit tap-lock still overrides").
+        this.steerToTarget(state, ship, resolved);
+        return;
+      }
+      // The locked entity is gone (dead ship, mined-out rock): drop the lock (§2)
+      // and fall through to auto-engage, so the ship keeps fighting/flying.
       this.order = null;
-      return;
+    } else if (order?.kind === 'waypoint') {
+      this.steerToPoint(state, ship.pos, order.at);
     }
-    this.steerToTarget(state, ship, resolved);
+    // else: no order — the ship coasts (thrust stays the neutral zero).
+
+    // Auto-engage is the pilot's default (developer p9-02 §1): with no lock directing
+    // fire, hold the trigger while flying a waypoint or idling and let the funnel's
+    // Auto-aim map hand the sim's ladder the pick — enemies first, hittability and
+    // full-hold rock suppression built into that ladder (p9-01), never re-derived
+    // here. Aim stays null: the sim acquires across the full 360°. If ore is full and
+    // only rocks are near, that ladder holds fire on its own (the p9-01 suppression),
+    // which is exactly "if ore is full it shouldn't fire at asteroids automatically".
+    state.fire = true;
   }
 
   /** Thrust toward `to`, magnitude eased down within `slowRadius`; clear the order
@@ -269,7 +315,7 @@ export class TapPilot {
       // Steer on the *surface* gap so the standoff reads the same for a rock, a
       // ship, and a planet core regardless of their very different radii.
       const surface = centreDist - target.radius - ship.radius;
-      const stop = target.standoff ?? this.cfg.engageRange;
+      const stop = this.holdStandoff(target, ship);
       const gap = surface - stop;
       const ux = dx / centreDist;
       const uy = dy / centreDist;
@@ -289,5 +335,27 @@ export class TapPilot {
 
       state.fire = target.hostile && surface <= this.cfg.fireRange;
     }
+  }
+
+  /**
+   * The surface-gap standoff the pilot holds at for `target`. An explicit `standoff`
+   * (the own-planet atmosphere) always wins. A **rock** (`mineable`) holds the ship's
+   * centre inside the tractor pickup radius so the ore a shot chips off reaches the
+   * hold — the p9-02 range fix: a combat `engageRange` would sit the ship well
+   * outside the grab range for a rock ("it moves back to a range where it can't pick
+   * up the ore"). Everything else holds at the unchanged combat `engageRange`.
+   *
+   * Returned as a surface gap (centre-to-centre minus both radii) because that is
+   * what {@link steerToTarget} steers on. The centre-to-centre hold for a rock is
+   * `pickupRadius * ASTEROID_HOLD_FRACTION`, comfortably inside `pickupRadius`; for a
+   * fat rock the gap can go small but never pushes the ship back out of grab range.
+   */
+  private holdStandoff(target: ResolvedTarget, ship: PilotShip): number {
+    if (target.standoff !== undefined) return target.standoff;
+    if (target.mineable) {
+      const holdCentre = this.cfg.pickupRadius * ASTEROID_HOLD_FRACTION;
+      return holdCentre - target.radius - ship.radius;
+    }
+    return this.cfg.engageRange;
   }
 }
