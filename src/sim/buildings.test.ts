@@ -4,7 +4,8 @@
  *
  * The five contract checks from the brief:
  *   1. construction timers — a turret takes exactly 10 s, a shield 15;
- *   2. repair interruption — any core/shield damage drops the channel;
+ *   2. repair — a DISCRETE 1-ore / REPAIR_HP_PER_ORE purchase (developer,
+ *      2026-07-26, supersedes the GDD §2.5 channel — see design-amendments.md);
  *   3. the shield regen window — nothing for 8 s, then 2 HP/s;
  *   4. turret target acquisition — nearest enemy in range, and nobody else;
  *   5. per-planet caps — 4 turrets, 2 shields, queued jobs included.
@@ -33,7 +34,9 @@ import {
   PLANET,
   PROJECTILE,
   PROJECTILE_CORE_FACTOR,
-  REPAIR,
+  REPAIR_HP_PER_ORE,
+  REPAIR_ORE_COST,
+  REPAIR_TELL_HOLD,
   SHIELD,
   SHIP_RADIUS,
   TICK_DT,
@@ -382,97 +385,170 @@ describe('shield regeneration (GDD §2.6: "pressure beats regeneration")', () =>
   });
 });
 
-// --- 5. the repair channel -------------------------------------------------
+// --- 5. repair core: a DISCRETE purchase (developer, 2026-07-26) ------------
+//
+// Ratified model: one tap = one purchase. Spends REPAIR_ORE_COST (1) ore from
+// the bank/hold, restores REPAIR_HP_PER_ORE (15) core HP, clamped at max. No
+// channel, no continuous drain, no stacking — N taps are N distinct spends. This
+// supersedes the GDD §2.5 channel line (docs/design-amendments.md).
 
-describe('repair channel (GDD §2.5: a channel, not a purchase)', () => {
+describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => {
   const dockedRepairWorld = (coreHp = 50, ore = 10) => {
     const ship = makeShip({ id: 0, pos: at(80, 0), banked: ore });
     const planet = makePlanet({ id: 0, owner: 0, coreHp });
     return { ship, planet, world: makeWorld({ ships: [ship], planets: [planet] }) };
   };
 
-  it('ticks the core back at 2 HP/s and charges 1 ore per 5 HP', () => {
-    const { ship, planet, world } = dockedRepairWorld();
-    step(world, order(0, 'repair'));
-    expect(planet.repairing).toBe(true);
-
-    const seconds = 2;
-    for (let t = 0; t < Math.round(seconds / TICK_DT); t++) step(world, []);
-
-    const healed = planet.coreHp - 50;
-    expect(healed).toBeCloseTo(REPAIR.hpPerSecond * seconds, 1);
-    expect(10 - ship.banked).toBeCloseTo(healed * REPAIR.orePerHp, 6);
+  it('one tap spends exactly 1 ore and restores REPAIR_HP_PER_ORE core HP', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
+    expect(ship.banked).toBeCloseTo(10 - REPAIR_ORE_COST, 6);
   });
 
-  it('any damage to the core interrupts it — the defender must drive them off', () => {
-    const { planet, world } = dockedRepairWorld();
-    step(world, order(0, 'repair'));
-    for (let t = 0; t < 30; t++) step(world, []);
-    const healed = planet.coreHp;
-    expect(healed).toBeGreaterThan(50);
-
-    damagePlanet(world, planet, 1);
-    expect(planet.repairing).toBe(false);
-
-    const after = planet.coreHp;
-    for (let t = 0; t < 60; t++) step(world, []);
-    expect(planet.coreHp).toBe(after); // no healing without a fresh order
+  it('draws the ore hold-first, then the bank — like every other purchase', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 0);
+    ship.cargo = 3;
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    expect(ship.cargo).toBeCloseTo(3 - REPAIR_ORE_COST, 6);
+    expect(ship.banked).toBe(0);
+    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
   });
 
-  it('damage absorbed by a shield interrupts it too', () => {
-    const { planet, world } = dockedRepairWorld();
+  it('clamps at the core max: a near-full core costs the full ore and heals to full', () => {
+    // Missing 10 HP < REPAIR_HP_PER_ORE (15): the tap still costs a whole ore and
+    // the core clamps to max, never overshooting — the wedge SHOWS the real
+    // number, so the player chooses informed (developer p5-08).
+    const { ship, planet, world } = dockedRepairWorld(CORE_HP - 10, 5);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(ship.banked).toBeCloseTo(5 - REPAIR_ORE_COST, 6);
+  });
+
+  it('five rapid taps are five distinct purchases: 5 ore, +75 HP, then zero further drain', () => {
+    // The developer's loop bug killed: one press must map to exactly one
+    // ore-spend, and N presses are N independent, individually-checked spends.
+    const { ship, planet, world } = dockedRepairWorld(20, 10);
+    for (let i = 0; i < 5; i++) expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    expect(planet.coreHp).toBe(20 + 5 * REPAIR_HP_PER_ORE); // 95, still under the cap
+    expect(ship.banked).toBeCloseTo(10 - 5 * REPAIR_ORE_COST, 6); // exactly 5 spent, no more
+
+    // No channel: time passing with no press moves neither HP nor ore.
+    const hp = planet.coreHp;
+    const ore = ship.banked;
+    for (let t = 0; t < 120; t++) step(world, []);
+    expect(planet.coreHp).toBe(hp);
+    expect(ship.banked).toBeCloseTo(ore, 6);
+  });
+
+  it('refuses a full core, spending nothing', () => {
+    const { ship, planet, world } = dockedRepairWorld(CORE_HP, 10);
+    expect(placeOrder(world, ship, 'repair')).toBe('core-full');
+    expect(ship.banked).toBe(10);
+    expect(planet.coreHp).toBe(planet.maxCoreHp);
+  });
+
+  it('refuses an empty bank, and a bank short of one whole ore, spending nothing', () => {
+    const empty = dockedRepairWorld(50, 0);
+    expect(placeOrder(empty.world, empty.ship, 'repair')).toBe('cannot-afford');
+    expect(empty.planet.coreHp).toBe(50);
+
+    const short = dockedRepairWorld(50, 0);
+    short.ship.cargo = 0.5; // less than one whole ore
+    expect(placeOrder(short.world, short.ship, 'repair')).toBe('cannot-afford');
+    expect(short.ship.cargo).toBe(0.5); // untouched
+    expect(short.planet.coreHp).toBe(50);
+  });
+
+  it('refuses once collapse has begun — repair shuts off (GDD §2.3)', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    world.match.collapseTime = 0; // isCollapsed(world) is now true
+    expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
+    expect(ship.banked).toBe(10);
+    expect(planet.coreHp).toBe(50);
+  });
+
+  it('refuses an undocked ship, spending nothing', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    ship.pos = at(1000, 0);
+    expect(placeOrder(world, ship, 'repair')).toBe('not-docked');
+    expect(ship.banked).toBe(10);
+    expect(planet.coreHp).toBe(50);
+  });
+
+  it('damage does not cancel a heal that already resolved — no channel to interrupt', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    const healed = planet.coreHp; // 65: the 15 HP is banked into the core
+    damagePlanet(world, planet, 5);
+    // The hit takes its 5 off the top; it does not "drop" a repair, because
+    // the purchase is done — there is nothing left running to interrupt.
+    expect(planet.coreHp).toBe(healed - 5);
+  });
+
+  it('a shield stands in front of the core during a repair, exactly as always', () => {
+    const { ship, planet, world } = dockedRepairWorld(50, 10);
     planet.shields.push(makeShield({ id: 9 }));
-    step(world, order(0, 'repair'));
-    expect(planet.repairing).toBe(true);
-
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
     damagePlanet(world, planet, 3);
     expect(shieldPool(planet)).toBe(SHIELD.hp - 3); // the core never felt it
+    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // and kept its heal
+  });
+
+  it('lights a repair TELL that holds for the pacing window, then releases when quiet', () => {
+    // The tell is a render/AI-pacing signal — not a channel: it heals nothing
+    // beyond the one purchase, but it holds for REPAIR_TELL_HOLD seconds so a
+    // renderer can glow and a bot paces its next order rather than buying 15 HP
+    // every tick.
+    const { planet, world } = dockedRepairWorld(50, 10);
+    step(world, order(0, 'repair'));
+    expect(planet.repairing).toBe(true);
+    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
+
+    for (let t = 0; t < 30; t++) step(world, []); // still inside the hold window…
+    expect(planet.repairing).toBe(true);
+    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // …and no channel heals it further
+
+    // Once the hold has fully elapsed on a quiet core, the tell releases.
+    const settle = Math.round(REPAIR_TELL_HOLD / TICK_DT) + 5;
+    for (let t = 0; t < settle; t++) step(world, []);
     expect(planet.repairing).toBe(false);
   });
 
-  it('an enemy weapon shot on the core interrupts it end to end', () => {
-    const { planet, world } = dockedRepairWorld();
-    const attacker = makeShip({
-      id: 1,
-      pos: at(-(planet.radius + 100), 0),
-      angle: 0, // aimed straight at the core
-    });
-    world.ships.push(attacker);
-
+  it('holds the tell while the core stays under fire — pressure beats repair (GDD §2.6)', () => {
+    // A besieged core keeps `sinceDamage` low, so the tell never releases and a
+    // bot reading `!repairing` holds off resuming repair under fire — it must
+    // drive the attacker off first. (A human is never gated: `placeOrder` above
+    // ignores the tell entirely.)
+    const { planet, world } = dockedRepairWorld(50, 10);
     step(world, order(0, 'repair'));
-    for (let t = 0; t < 10; t++) step(world, []);
     expect(planet.repairing).toBe(true);
 
-    // Combat is a projectile now (design amendment v0.2): the shot crosses the
-    // 100 units to the core in a few ticks and the channel drops when it lands —
-    // "pressure beats regeneration" still, just with travel time.
-    const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
-    let interrupted = false;
-    for (let t = 0; t < 40 && !interrupted; t++) {
-      step(world, fire);
-      if (!planet.repairing) interrupted = true;
+    const underFire = Math.round((REPAIR_TELL_HOLD * 2) / TICK_DT);
+    for (let t = 0; t < underFire; t++) {
+      planet.sinceDamage = 0; // a fresh hit landed this tick — the core is under fire
+      step(world, []);
     }
-    expect(interrupted).toBe(true);
-    expect(planet.coreHp).toBeLessThan(planet.maxCoreHp);
+    expect(planet.repairing).toBe(true); // held: a defender cannot repair under fire
   });
 
-  it('closes when the ship leaves, and when the ore runs out', () => {
-    const away = dockedRepairWorld();
-    step(away.world, order(0, 'repair'));
-    away.ship.pos.x = at(1000, 0).x;
-    step(away.world, []);
-    expect(away.planet.repairing).toBe(false);
-
-    const broke = dockedRepairWorld(50, 0.4); // 0.4 ore = 2 HP = one second
-    step(broke.world, order(0, 'repair'));
-    stepUntil(broke.world, () => !broke.planet.repairing, 600);
-    expect(broke.ship.banked).toBeCloseTo(0, 6);
-    expect(broke.planet.coreHp).toBeCloseTo(52, 1);
+  it('clears the repair TELL once the core is topped back to full', () => {
+    const { planet, world } = dockedRepairWorld(CORE_HP - 5, 10); // one tap fills it
+    step(world, order(0, 'repair'));
+    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    // The purchase lit the tell; the next maintenance pass sees a full core and
+    // drops it — nothing left to repair, nothing to glow.
+    step(world, []);
+    expect(planet.repairing).toBe(false);
   });
 
-  it('refuses to open on a full core', () => {
-    const { ship, world } = dockedRepairWorld(CORE_HP);
-    expect(placeOrder(world, ship, 'repair')).toBe('core-full');
+  it('is deterministic: two identical repair sequences deep-equal', () => {
+    const run = () => {
+      const { ship, world } = dockedRepairWorld(20, 10);
+      for (let i = 0; i < 3; i++) placeOrder(world, ship, 'repair');
+      return { coreHp: world.planets[0]!.coreHp, banked: ship.banked };
+    };
+    expect(run()).toEqual(run());
   });
 });
 

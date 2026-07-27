@@ -29,6 +29,8 @@ import {
   CORE_HP,
   FIELD_YIELD,
   PLANET,
+  REPAIR_HP_PER_ORE,
+  REPAIR_ORE_COST,
   RESOURCE_FIELD,
   RESPAWN_S,
   SHIELD,
@@ -525,20 +527,25 @@ describe('collapse (GDD §2.3)', () => {
     expect(planet.shields[0]!.hp).toBe(hp);
   });
 
-  it('shuts the repair channel off — open or requested', () => {
-    // Baseline: the same fixture, still live, repairs at 2 HP/s for 1 ore/5 HP.
+  it('shuts repair off at collapse — a purchase is refused, entropy only takes', () => {
+    // Baseline: the same fixture, still live, takes a normal DISCRETE repair —
+    // one purchase, +REPAIR_HP_PER_ORE core HP for REPAIR_ORE_COST ore (developer
+    // 2026-07-26, supersedes the channel). No ticking, no drain.
     const live = endgame({ wavesSpawned: 0 });
+    const liveHp0 = live.planet.coreHp;
+    const liveBank0 = live.ship.banked;
     expect(placeOrder(live.world, live.ship, 'repair')).toBe('ok');
-    for (let t = 0; t < 60; t++) step(live.world, []);
-    expect(live.planet.coreHp).toBeCloseTo(52, 6);
+    expect(live.planet.coreHp).toBe(liveHp0 + REPAIR_HP_PER_ORE);
+    expect(live.ship.banked).toBeCloseTo(liveBank0 - REPAIR_ORE_COST, 6);
 
-    // Collapse: an open channel closes, and a fresh order is refused outright.
-    // No repair pushes the core back up — and with COLLAPSE_CORE_DECAY = 1 (M5)
-    // entropy now pulls it *down*: the core decays by exactly the decay rate,
+    // Collapse: a fresh repair order is refused outright, and nothing pushes the
+    // core back up — with COLLAPSE_CORE_DECAY = 1 (M5) entropy pulls it *down*,
     // spending no ore to do it.
     const { world, ship, planet } = endgame();
-    expect(placeOrder(world, ship, 'repair')).toBe('ok');
     step(world, []); // collapse opens at the end of this tick
+    expect(isCollapsed(world)).toBe(true);
+    expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
+
     const coreHp = planet.coreHp;
     const banked = ship.banked;
     const steps = 300; // × TICK_DT = 5 s of collapse; a 50-HP core survives it
