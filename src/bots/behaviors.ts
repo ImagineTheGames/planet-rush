@@ -21,7 +21,6 @@ import {
   aimAndFire,
   aimAt,
   arrive,
-  boost,
   canHit,
   clampUnit,
   dist,
@@ -68,9 +67,6 @@ export const TURRET_STANDOFF = (TURRET.range + WEAPON_RANGE) / 2;
 /** Stand-off for shooting a core or shield bubble. Measured centre-to-centre, so
  *  it must clear the bubble (90) and stay inside weapon range. TUNABLE */
 export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
-
-/** Speed at which a bot chasing something leans on the boost button. TUNABLE */
-export const BOOST_CHASE_DISTANCE = 320;
 
 // ---------------------------------------------------------------------------
 // Core repair — a RATIONED discrete purchase (p5-repair-discrete, GDD §2.5/§2.9)
@@ -230,9 +226,14 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
   return thrust(out);
 }
 
-/** How long a wedged bot commits to its escape heading. Long enough to clear a
- *  late-wave asteroid cluster at cruise. TUNABLE */
-export const ESCAPE_SECONDS = 1.5;
+/** How long a wedged bot commits to its escape heading. Long enough to slide a
+ *  pinned hull out of a late-wave asteroid pocket at cruise. Raised from 1.5 s
+ *  when BOOST was cut (p7-remove-boost-ping): a chasing bot used to inherit the
+ *  chase boost during its escape run, and the 1.6× burst punched it clear of a
+ *  hard pin in one go; at base speed the run has to last a little longer so the
+ *  tangential slide accumulates instead of re-rolling into another blocked lane
+ *  (verified: worst wedge 16.5 s → 3.5 s across seeds 1–48, ceiling 12 s). TUNABLE */
+export const ESCAPE_SECONDS = 2.0;
 
 /** Half-angle the escape heading is thrown off the open lane. TUNABLE */
 export const ESCAPE_SPREAD = Math.PI / 3;
@@ -442,7 +443,6 @@ export function engage(
   targetVel?: Vec2,
   targetId?: PlayerId,
 ): readonly Action[] {
-  const d = dist(ctx.self.pos, pos);
   // A ship moves, so lead it with the tier's reaction lag on top (`targetId`
   // carries the bot's aim track — design amendment v0.2 + the v0.2.2 aim-error
   // model). A still target (a turret, a core) has no velocity, so `track` is null
@@ -461,9 +461,6 @@ export function engage(
     combatLatency(ctx),
   );
   const actions: Action[] = [go(ctx, standOff(ctx.self, pos, range)), aim, fireAction];
-  // A bold character burns the boost closing the gap; a cautious one saves it
-  // for the trip home. `caution` > 1 means "breaks off early" (`./personalities`).
-  if (d > BOOST_CHASE_DISTANCE && ctx.weights.caution < 1) actions.push(boost(true));
   return actions;
 }
 
@@ -628,7 +625,7 @@ export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Act
   const threatAtHome =
     planet !== null && planet.alive && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
   if (planet && planet.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
-  if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false), boost(true)];
+  if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false)];
   return [thrust({ x: 0, y: 0 }), fire(false)];
 }
 
