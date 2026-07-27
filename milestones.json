@@ -59,6 +59,11 @@
       "milestone": "v0.2 patch 3 - the feel update",
       "title": "v0.2.3 — the game answers your hands",
       "test_notes": "On your phone: deposit by flying into your planet atmosphere (the glowing halo IS the range), loot dead players ore (it banks 1:1 now), die and watch RESPAWNING 3... count down - your upgrades survive. Build turret tiers (Mk II), watch turret health bars. The WEAPON wheel works for real now, buttons press-flash, repair confirms, gray means disabled only. Try the new TAP COMMANDER control scheme in settings: tap to move, tap a target to lock and attack. Everything evidence-verified on the EVIDENCE page."
+    },
+    "v0.2.4": {
+      "milestone": "v0.2 patch 4 - the fair fight",
+      "title": "v0.2.4 — fights you can dodge, bots that behave",
+      "test_notes": "On your phone: enemy shots MISS now - strafe an EASY bot and feel clever (their names carry (EASY)/(MEDIUM)/(HARD) tags). Low-HP bots commit to fleeing somewhere real instead of twitching; none ever wedge on planet rims. No more phantom turret lasers. Repair is a clean purchase: +15 HP per ore, real numbers on the wedge, 75/100 on your core. The MINIMAP is in - tiny corner square, tap to expand. Tap Commander has its lock reticle. Boost and ping are gone (you asked, they cluttered). Six fresh evidence gates on the EVIDENCE page."
     }
   },
   "days": [
