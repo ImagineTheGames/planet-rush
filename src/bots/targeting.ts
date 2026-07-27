@@ -24,7 +24,7 @@
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { PLANET, SPAWN_PROTECTION_S, TURRET } from '../sim';
+import { PLANET, SPAWN_PROTECTION_S, TURRET, WEAPON_RANGE } from '../sim';
 import type { PerceivedAsteroid, PerceivedPlanet, PerceivedShip } from './perception';
 import { estimateOre } from './perception';
 import type { DifficultyTuning, PersonalityWeights } from './personalities';
@@ -169,18 +169,94 @@ export function nearestEnemy(ctx: BotCtx): PerceivedShip | null {
   return best;
 }
 
+/** Half-width of the approach corridor a hostile has to sit inside to spoil a
+ *  mining site (p11 field report point 1). One weapon-range-and-a-bit either
+ *  side of the straight line to the rock: a ship this close to the path can open
+ *  fire on the miner before it ever reaches the standoff, which is exactly the
+ *  "threat on the path" the report describes. TUNABLE */
+export const PATH_THREAT_RADIUS = WEAPON_RANGE * 1.4;
+
+/** How hard a fully-blocked approach divides a site's score down. At 3, a rock
+ *  whose path runs straight through a hostile is worth a quarter of the same
+ *  rock on a clean line — enough that a clean field one corridor further out
+ *  wins the pick, which is the developer's scenario resolving itself. TUNABLE */
+export const PATH_THREAT_PENALTY = 3;
+
+/** Shortest distance from point `p` to segment `a`→`b`. The approach path is a
+ *  segment, not a ray, so a hostile behind the miner or past the rock does not
+ *  count as "on the path". IEEE-exact sqrt, for the determinism reason
+ *  `./perception` gives. */
+function segmentDist(a: Vec2, b: Vec2, p: Vec2): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const apx = p.x - a.x;
+  const apy = p.y - a.y;
+  const len2 = abx * abx + aby * aby;
+  const t = len2 > 1e-9 ? clamp01((apx * abx + apy * aby) / len2) : 0;
+  const cx = a.x + abx * t;
+  const cy = a.y + aby * t;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * How clear the run to a rock is, in (0, 1]: 1 for a path no hostile is near,
+ * shrinking toward `1 / (1 + PATH_THREAT_PENALTY)` as a ship closes on the line
+ * the miner would fly. The worst single hostile sets it — a corridor with two
+ * threats is not twice as bad as one, it is just blocked (p11).
+ */
+function pathClearance(ctx: BotCtx, to: Vec2): number {
+  const from = ctx.self.pos;
+  let worst = 0;
+  for (const ship of ctx.view.ships) {
+    if (!isEngageable(ship)) continue;
+    const d = segmentDist(from, to, ship.pos);
+    if (d >= PATH_THREAT_RADIUS) continue;
+    const near = 1 - d / PATH_THREAT_RADIUS;
+    if (near > worst) worst = near;
+  }
+  return 1 / (1 + PATH_THREAT_PENALTY * worst);
+}
+
+/** Drop tabu sites whose cool-down has lifted (`Brain.tabu`, p11). Deletes
+ *  during iteration, which a `Map` allows and which stays deterministic because
+ *  the map is insertion-ordered and the clock is the sim's own `view.time`. */
+function pruneTabu(ctx: BotCtx): void {
+  const now = ctx.view.time;
+  for (const [id, until] of ctx.brain.tabu) {
+    if (until <= now) ctx.brain.tabu.delete(id);
+  }
+}
+
 /**
  * The rock worth mining: estimated payout against the trip to reach it
- * (GDD §5.5 — "let a player judge a payout before committing weapon time").
- * Fog-honest — {@link estimateOre} reads size and crack stage, never `ore`.
- * Ties break on the lower id so the choice is stable frame to frame and a bot
- * never dithers between two identical rocks.
+ * (GDD §5.5 — "let a player judge a payout before committing weapon time"),
+ * **discounted by the threat along the approach and excluding sites on
+ * cool-down** (p11 field report).
+ *
+ * Fog-honest — {@link estimateOre} reads size and crack stage, never `ore`, and
+ * the path threat is read off ships already filtered to visual range. Ties break
+ * on the lower id so the choice is stable frame to frame and a bot never dithers
+ * between two identical rocks.
+ *
+ * A site whose approach a retreat just broke off is booked tabu on the brain
+ * (`./behaviors`), so this skips it and commits to the next-best field — no
+ * re-litigating the same rock while the threat sits on the path. When *every*
+ * visible rock is tabu the bot mines nothing this decision and the tree falls
+ * through to roam, which carries it somewhere new to look — deliberately not a
+ * fall-back that re-includes the cooled sites, because flying back at them is
+ * the exact loop the tabu exists to break.
  */
 export function bestRock(ctx: BotCtx): PerceivedAsteroid | null {
+  pruneTabu(ctx);
+  const tabu = ctx.brain.tabu;
   let best: PerceivedAsteroid | null = null;
   let bestScore = 0;
   for (const rock of ctx.view.asteroids) {
-    const score = estimateOre(rock) / (1 + rock.distance / 150);
+    if (tabu.has(rock.id)) continue;
+    const payout = estimateOre(rock) / (1 + rock.distance / 150);
+    const score = payout * pathClearance(ctx, rock.pos);
     if (score > bestScore || (best !== null && score === bestScore && rock.id < best.id)) {
       bestScore = score;
       best = rock;
