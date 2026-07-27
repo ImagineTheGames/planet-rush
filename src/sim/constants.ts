@@ -193,6 +193,28 @@ export interface TurretTierSpec {
   readonly upgradeCost: number | null;
   /** Stable per-tier name — the art agent's key for a distinct tell. */
   readonly label: string;
+  /**
+   * **Aim deviance** (turret-lead field report v0.2.4). The half-width of the
+   * seeded angular error, radians, drawn once per re-aim and added to the
+   * intercept bearing — the ship's aim model (p5-01), given to the turret so
+   * "upgrading a turret buys accuracy" has felt meaning. Tier-scaled: **Mk I
+   * loosest, Mk III tightest**. Kept small relative to a hull's angular size at
+   * engagement range, so spread alone rarely misses a *stationary* target (it is
+   * the re-aim lag, {@link aimLatency}, that makes a moving one dodge — a still
+   * one is hit near-always at every tier). TUNABLE
+   */
+  readonly aimSpread: number;
+  /**
+   * **Re-aim latency** (turret-lead field report v0.2.4), seconds. The turret
+   * re-solves its intercept lead from a fresh target-velocity sample only this
+   * often; between samples it keeps the velocity it committed to, so a target
+   * that curves or reverses inside the window is led *where it was going* and the
+   * shot goes wide — the mechanism that lets a smart orbiter evade (mirrors the
+   * bot `aimLatency` / `trackAimVelocity`). Tier-scaled: **Mk I slowest to
+   * re-read, Mk III fastest**, so a higher Mk tracks a mover far better. Never
+   * `0` — that would restore the pre-lead aimbot. TUNABLE
+   */
+  readonly aimLatency: number;
 }
 
 /**
@@ -205,9 +227,9 @@ export interface TurretTierSpec {
  * of last resort"). All `TUNABLE`. TUNABLE
  */
 export const TURRET_TIERS: readonly TurretTierSpec[] = [
-  { hp: TURRET.hp, dps: TURRET.dps, range: TURRET.range, fireInterval: TURRET.fireInterval, upgradeCost: null, label: 'Mk I' },
-  { hp: 45, dps: 6, range: 245, fireInterval: 0.45, upgradeCost: 4, label: 'Mk II' },
-  { hp: 60, dps: 8, range: 250, fireInterval: 0.4, upgradeCost: 7, label: 'Mk III' },
+  { hp: TURRET.hp, dps: TURRET.dps, range: TURRET.range, fireInterval: TURRET.fireInterval, upgradeCost: null, label: 'Mk I', aimSpread: 0.06, aimLatency: 1.2 },
+  { hp: 45, dps: 6, range: 245, fireInterval: 0.45, upgradeCost: 4, label: 'Mk II', aimSpread: 0.04, aimLatency: 0.75 },
+  { hp: 60, dps: 8, range: 250, fireInterval: 0.4, upgradeCost: 7, label: 'Mk III', aimSpread: 0.025, aimLatency: 0.45 },
 ] as const;
 
 /** Highest turret tier index — the top of the ladder (`Mk III` at length-1). */
