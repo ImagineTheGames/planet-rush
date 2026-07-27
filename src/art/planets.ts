@@ -25,6 +25,7 @@
 import { mulberry32 } from '@shared/types';
 import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
 import { DERIVED, PALETTE, playerColor } from './palette';
+import { ringDamageShapes } from './rings';
 import {
   annulusPoints,
   arcPoints,
@@ -184,32 +185,26 @@ export function beaconRingSprite(playerId: number): SpriteDef {
 }
 
 /**
- * The scouted health ring (GDD §2.2, style-guide §5): a threat-red arc whose
- * *sweep* is the core's remaining HP. Drawn only when the viewer's ship is
- * within sensor range — this function has no opinion about that, it just makes
- * the ring the renderer asks for, so fog stays a decision the sim/UI owns.
+ * The scouted health ring (GDD §2.2, style-guide §5), in the ratified p11
+ * grammar: a whole ring in the OWNER's colour is the health you still have, and
+ * a threat-red segment FILLS it — from twelve o'clock, clockwise — as HP is
+ * lost. A fully red ring is core death, exactly. Drawn only when the viewer's
+ * ship is within sensor range — this function has no opinion about that, it just
+ * makes the ring the renderer asks for, so fog stays a decision the sim/UI owns.
  *
- * @param fraction Core HP remaining, 0..1.
+ * One primitive with the shield layers ({@link ringDamageShapes}), so a scouted
+ * rival reads in THEIR colour by exactly the same verb as your own home.
+ *
+ * @param playerId The core's owner — the base ring wears their roster colour.
+ * @param fraction Core HP REMAINING, 0..1 (1 = whole owner ring, 0 = fully red).
  */
-export function damageRingSprite(fraction: number): SpriteDef {
+export function damageRingSprite(playerId: number, fraction: number): SpriteDef {
   const f = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
   // Quantised to 5% steps: a ring that re-generates on every HP tick would
   // defeat the texture pool (GDD §4.3), and no player reads finer than that.
   const step = Math.round(f * 20) / 20;
-  const start = -Math.PI / 2;
-  const shapes: Shape[] = [
-    // The empty track, so "how much is gone" reads as well as "how much is left".
-    poly(annulusPoints(0, 0, 1.06, 0.98, 0, Math.PI * 2, 40), fill(DERIVED.hullDark, 'material', 0.65)),
-  ];
-  if (step > 0) {
-    shapes.push(
-      poly(
-        annulusPoints(0, 0, 1.06, 0.98, start, start + Math.PI * 2 * step, Math.max(2, Math.round(40 * step))),
-        fill(PALETTE.threatRed, 'danger', 0.95),
-      ),
-    );
-  }
-  return sprite(`planet/damage/${Math.round(step * 100)}`, 1.1, shapes);
+  const shapes = ringDamageShapes({ playerId, lost: 1 - step, outer: 1.06, inner: 0.98 });
+  return sprite(`planet/damage/p${playerId}/${Math.round(step * 100)}`, 1.1, shapes);
 }
 
 /**

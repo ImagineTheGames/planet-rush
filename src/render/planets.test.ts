@@ -37,9 +37,15 @@ function planetLayer(stage: Container): Container {
 /** Whether a labelled Graphics has any geometry this frame. `clear()` empties
  *  the instruction list, so "nothing was drawn" is exactly zero instructions. */
 function drewSomething(stage: Container, label: string): boolean {
+  return instructionCount(stage, label) > 0;
+}
+
+/** How many draw instructions a labelled Graphics holds this frame — the p11
+ *  gauge adds one segment (the red fill) on top of the owner-colour base. */
+function instructionCount(stage: Container, label: string): number {
   const node = stage.getChildByLabel(label, true);
-  if (!node) return false;
-  return (node as Graphics).context.instructions.length > 0;
+  if (!node) return 0;
+  return (node as Graphics).context.instructions.length;
 }
 
 describe('planets are on screen at all (the M2 integration gap)', () => {
@@ -118,13 +124,24 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     expect(drewSomething(stage, 'planet-overlay-0')).toBe(true);
   });
 
-  it('draws no ring on an untouched core — a full core says nothing', () => {
+  it('rings an untouched core whole in the owner colour, filling red only once hurt (p11)', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
+    const world = arena();
 
-    r.draw(arena(), { cameraTarget: 0, muzzles: [] });
+    // Ratified p11: health is the owner's colour, whole — the base ring is always
+    // drawn, and a full core carries no red. So an untouched own home shows its
+    // ring (unlike the old grammar, where a full core drew nothing).
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    const whole = instructionCount(stage, 'planet-overlay-0');
+    expect(whole).toBeGreaterThan(0);
 
-    expect(drewSomething(stage, 'planet-overlay-0')).toBe(false);
+    // Wound it: the red fill is an *added* segment over the same base ring, so
+    // "how much is gone" grows on top of "your colour, whole".
+    world.planets[0]!.spawnProtect = 0;
+    damagePlanet(world, world.planets[0]!, 30);
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    expect(instructionCount(stage, 'planet-overlay-0')).toBeGreaterThan(whole);
   });
 });
 

@@ -41,7 +41,7 @@ const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => shipSprite({ shipClass: ShipClass.Excavator, playerId: 5 }),
   () => planetSprite(2),
   () => beaconRingSprite(6),
-  () => damageRingSprite(0.42),
+  () => damageRingSprite(6, 0.42),
   () => repairAuraSprite(),
   () => asteroidSprite({ seed: 41, crackStage: 1 }),
   () => oreChunkSprite(9),
@@ -189,14 +189,19 @@ describe('planets — four variants, arrangement only (style-guide §5)', () => 
     expect(atmosphereHaloSprite(0)).not.toEqual(atmosphereHaloSprite(1));
   });
 
-  it('scales the damage ring by remaining core HP, quantised so the pool holds', () => {
-    expect(damageRingSprite(1).shapes.length).toBeGreaterThan(damageRingSprite(0).shapes.length);
+  it('fills red as core HP is LOST, quantised so the pool holds (p11 grammar)', () => {
+    // Ratified p11: a full core is the owner ring alone (one shape); a dead core
+    // adds the red fill on top (two). The red grows with damage — the reverse of
+    // the old "arc == remaining" grammar the developer called backwards.
+    expect(damageRingSprite(0, 0).shapes.length).toBeGreaterThan(damageRingSprite(0, 1).shapes.length);
     // 5% quantisation: two nearby fractions share a sprite (and so a texture).
-    expect(damageRingSprite(0.51)).toEqual(damageRingSprite(0.52));
-    expect(damageRingSprite(0.5)).not.toEqual(damageRingSprite(0.9));
+    expect(damageRingSprite(0, 0.51)).toEqual(damageRingSprite(0, 0.52));
+    expect(damageRingSprite(0, 0.5)).not.toEqual(damageRingSprite(0, 0.9));
+    // The owner is in the sprite: two owners at the same HP are two rings.
+    expect(damageRingSprite(0, 0.5)).not.toEqual(damageRingSprite(1, 0.5));
     // Out-of-range input is clamped, never thrown.
-    expect(damageRingSprite(-1)).toEqual(damageRingSprite(0));
-    expect(damageRingSprite(2)).toEqual(damageRingSprite(1));
+    expect(damageRingSprite(0, -1)).toEqual(damageRingSprite(0, 0));
+    expect(damageRingSprite(0, 2)).toEqual(damageRingSprite(0, 1));
   });
 });
 

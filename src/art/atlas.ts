@@ -123,7 +123,9 @@ export function beaconTexture(cache: SpriteTextureCache, owner: number, size: nu
 export function damageRingTexture(cache: SpriteTextureCache, planet: PlanetLike, size: number): Texture {
   const fraction = planet.maxCoreHp > 0 ? planet.coreHp / planet.maxCoreHp : 0;
   const band = Math.round(Math.max(0, Math.min(1, fraction)) * 20) / 20;
-  return cache.getBy(`damage:${band}:${size}`, () => damageRingSprite(band), size);
+  // Owner is in the key now: the base ring wears the owner's colour (p11), so
+  // two owners at the same HP are two different textures.
+  return cache.getBy(`damage:${planet.owner}:${band}:${size}`, () => damageRingSprite(planet.owner, band), size);
 }
 
 /** A turret in one of its four telegraph states. */

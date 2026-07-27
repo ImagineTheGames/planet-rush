@@ -433,7 +433,7 @@ export class Renderer {
         const scouted =
           planet.owner === viewerId ||
           (viewer !== undefined && withinSensorRange(viewer, planet));
-        if (scouted) this.drawDamageRing(overlay, planet, planet.owner === viewerId);
+        if (scouted) this.drawDamageRing(overlay, planet);
       }
 
       for (const turret of planet.turrets) {
@@ -575,18 +575,45 @@ export class Renderer {
     return g;
   }
 
-  /** The shield bubble over the core (GDD §2.5) — one ring per generator, so a
-   *  stacked pair reads as two. Brightness is the pool that is left. */
+  /**
+   * The ratified ring-damage grammar (p11), for core and shields alike: a whole
+   * ring in the OWNER's colour is the health that remains; a threat-red segment
+   * FILLS it — from twelve o'clock, clockwise — proportional to the pool LOST.
+   * Full red is death. One primitive so a besieged planet reads outermost-first:
+   * shields redden and die before the core starts to fill.
+   *
+   * Screen space is +y down, so `-π/2` is the top and an increasing sweep runs
+   * clockwise. `lost` is `1 - remaining` — the arc grows as the pool drains.
+   */
+  private drawDamageFill(
+    g: Graphics,
+    radius: number,
+    owner: number,
+    lost: number,
+    width: number,
+    alpha: number,
+  ): void {
+    const l = clamp01(lost);
+    // The base: the owner's colour, whole — full health is your colour, entire.
+    g.circle(0, 0, radius).stroke({ width, color: playerColor(owner), alpha });
+    if (l > 0) {
+      // The damage: threat red, filling clockwise from twelve o'clock.
+      g.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + l * 2 * Math.PI).stroke({
+        width,
+        color: PALETTE.threatRed,
+        alpha: Math.max(alpha, 0.9),
+      });
+    }
+  }
+
+  /** The shield bubble over the core (GDD §2.5) — one gauge ring per generator,
+   *  so a stacked pair reads as two, each filling red as its pool drains (p11). */
   private drawShieldBubble(g: Graphics, planet: Planet): void {
     for (let i = 0; i < planet.shields.length; i++) {
       const shield = planet.shields[i]!;
       if (shield.hp <= 1e-9) continue;
-      const frac = clamp01(shield.hp / shield.maxHp);
-      g.circle(0, 0, shield.radius + i * 6).stroke({
-        width: 2,
-        color: PALETTE.plasma,
-        alpha: 0.18 + 0.5 * frac,
-      });
+      const lost = clamp01(1 - shield.hp / shield.maxHp);
+      this.drawDamageFill(g, shield.radius + i * 6, planet.owner, lost, 2, 0.7);
     }
   }
 
@@ -607,18 +634,12 @@ export class Renderer {
     });
   }
 
-  /** The damage ring (GDD §2.2, §5.4): how much core is left, as an arc over the
-   *  planet. Player colour on your own home, threat red on a scouted rival's —
-   *  the same information, but yours is identity and theirs is a target. */
-  private drawDamageRing(g: Graphics, planet: Planet, own: boolean): void {
-    const frac = clamp01(planet.coreHp / planet.maxCoreHp);
-    const r = planet.radius + 5;
-    if (frac >= 1) return; // a full core says nothing worth drawing
-    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + frac * 2 * Math.PI).stroke({
-      width: 4,
-      color: own ? playerColor(planet.owner) : PALETTE.threatRed,
-      alpha: 0.95,
-    });
+  /** The damage ring (GDD §2.2, §5.4): the owner's colour whole, a threat-red
+   *  segment filling it as core HP is lost (p11). Enemy planets read in THEIR
+   *  colour by exactly this verb — red is the damage, never the planet. */
+  private drawDamageRing(g: Graphics, planet: Planet): void {
+    const lost = clamp01(1 - planet.coreHp / planet.maxCoreHp);
+    this.drawDamageFill(g, planet.radius + 5, planet.owner, lost, 4, 0.95);
   }
 
   /** Turret shots — the pool is sparse, so skip inactive slots rather than

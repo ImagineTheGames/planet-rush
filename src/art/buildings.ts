@@ -28,6 +28,7 @@
  */
 
 import { DERIVED, PALETTE, playerColor } from './palette';
+import { ringDamageShapes } from './rings';
 import {
   annulusPoints,
   arcPoints,
@@ -157,13 +158,28 @@ const SHIELD_ALPHA: Readonly<Record<ShieldStrength, number>> = {
 };
 
 /**
- * The bubble over the core, at unit radius. Plasma by contract (§1: "weapon fire,
- * cockpits, **energy**"), with a player-colour equator so a defender can tell
- * their own bubble from an ally's at a glance.
+ * The share of the layer's pool that has drained, by band — what the gauge ring
+ * fills red (ratified p11). `full` is whole (no red); `weakened` is filled to
+ * about half; `failing` is nearly gone, an outermost layer about to die before
+ * the core has begun to fill. The precise pool lives in the sim; these are the
+ * three steps an attacker reads from outside weapon range (GDD §2.6).
+ */
+const SHIELD_LOST: Readonly<Record<ShieldStrength, number>> = {
+  full: 0,
+  weakened: 0.5,
+  failing: 0.8,
+};
+
+/**
+ * The bubble over the core, at unit radius. The body is plasma by contract (§1:
+ * "weapon fire, cockpits, **energy**"); its deterioration speaks the ratified
+ * ring-damage grammar (p11) — an owner-colour gauge ring the same threat red
+ * FILLS as the pool drains, identical to the core's, so a defender reads the
+ * siege outermost-first ({@link ringDamageShapes}). The equator that once merely
+ * tinted the bubble is now that gauge, doing double duty as identity and health.
  */
 export function shieldSprite(options: ShieldSpriteOptions): SpriteDef {
   const a = SHIELD_ALPHA[options.strength];
-  const id = playerColor(options.playerId);
   const stack = options.stackIndex ?? 0;
   const r = 1 + stack * 0.09;
 
@@ -178,15 +194,15 @@ export function shieldSprite(options: ShieldSpriteOptions): SpriteDef {
         stroke(DERIVED.plasmaHot, 0.045, 'energy', 0.7 * a),
       ),
     ),
-    // Player-colour equator band — identity trim, never a repaint (§3.2).
-    poly(
-      annulusPoints(0, 0, r - 0.02, r - 0.09, Math.PI * 0.86, Math.PI * 1.14, 8),
-      fill(id, 'identity', 0.9 * a),
-    ),
-    poly(
-      annulusPoints(0, 0, r - 0.02, r - 0.09, -Math.PI * 0.14, Math.PI * 0.14, 8),
-      fill(id, 'identity', 0.9 * a),
-    ),
+    // The deterioration gauge: owner-colour base, red fill by pool lost (p11).
+    // A full ring at 32 segments so it reads as a ring, not a facet.
+    ...ringDamageShapes({
+      playerId: options.playerId,
+      lost: SHIELD_LOST[options.strength],
+      outer: r - 0.02,
+      inner: r - 0.09,
+      segments: 32,
+    }),
   ];
 
   if (options.strength === 'failing') {
