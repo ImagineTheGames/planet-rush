@@ -385,8 +385,13 @@ export function wantsToHaul(ctx: BotCtx): boolean {
  * mechanism, visible competence, no cheat in either direction (GDD §2.9).
  */
 export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number } | null): readonly Action[] | null {
-  if (!rock) return null;
-  if (ctx.self.cargoFull) return null;
+  if (!rock || ctx.self.cargoFull) {
+    ctx.brain.mineSite = -1;
+    return null;
+  }
+  // Book the site this decision commits to (p11). Read on the tick a retreat
+  // breaks off this approach ({@link wantsRetreat}) and by the oscillation soak.
+  ctx.brain.mineSite = rock.id;
   return [
     go(ctx, standOff(ctx.self, rock.pos, MINE_STANDOFF), rock.id),
     aimAt(ctx.self, rock.pos, ctx.tuning.aimJitter, ctx.rng),
@@ -521,6 +526,30 @@ export const RETREAT_CLEAR_RANGE = WEAPON_RANGE * 2.6;
  */
 export const RETREAT_RECOVER_MARGIN = 0.15;
 
+/**
+ * How long a mining site stays tabu after an approach to it was broken off by a
+ * retreat (p11 field report point 2). Long enough to outlast a threat that is
+ * merely passing through the approach corridor, so the bot commits to another
+ * field rather than wheeling straight back at the same rock the instant the flee
+ * latch releases — and short enough that a site abandoned to a threat that has
+ * since *left* is a candidate again within one mining errand. It sits at the
+ * same order as the flee band's own commitment (`./commitment`) on purpose: the
+ * tabu is the *spatial* commitment that outlives the flee's, so a released flee
+ * does not re-select the goal the flee was escaping. TUNABLE */
+export const TABU_SECONDS = 12;
+
+/**
+ * Book this bot's committed mine site (`Brain.mineSite`) as tabu until
+ * {@link TABU_SECONDS} from now. Called the instant a retreat *commits* off a
+ * mining approach — the one transition where the site the bot was flying at is
+ * the site the threat is sitting on (`wantsRetreat`).
+ */
+function tabuMineSite(ctx: BotCtx): void {
+  const site = ctx.brain.mineSite;
+  if (site < 0) return;
+  ctx.brain.tabu.set(site, ctx.view.time + TABU_SECONDS);
+}
+
 /** Core fraction below which self-preservation yields to home defence — the
  *  priority exception the field report names ("your core under final assault
  *  outranks self-preservation"). A bot this close to losing its home stops
@@ -591,7 +620,16 @@ export function wantsRetreat(ctx: BotCtx): boolean {
   const enter = wounded && incomingThreat(ctx) !== null;
   const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
   const escaped = nearestThreat(ctx, RETREAT_CLEAR_RANGE) === null;
-  return commit(latch, enter, recovered || escaped);
+  const wasFleeing = latch.on;
+  const fleeing = commit(latch, enter, recovered || escaped);
+  // The retreat just *committed* off a mining approach: cool the site down so the
+  // next mining decision picks another field rather than re-litigating this rock
+  // with the threat still on the path (p11). `lastBehavior` holds the *previous*
+  // decision's leaf here — the tree evaluates this test before the mine leaf runs
+  // — so gating on it scopes the tabu to a break-off from mining, never from a
+  // duel or a haul that happened to leave `mineSite` set from earlier.
+  if (fleeing && !wasFleeing && ctx.brain.lastBehavior === 'mine') tabuMineSite(ctx);
+  return fleeing;
 }
 
 /**
