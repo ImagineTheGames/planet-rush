@@ -1,0 +1,10 @@
+{
+  "source": "tests/sim/aim-error.test.ts (GREEN, 7 tests)",
+  "witnessedBuild": "7d1e2e1",
+  "rows": [
+    "easy    | juking  16.2% (25/154) | sitting  54.4% (31/57)",
+    "medium  | juking  22.3% (63/282) | sitting  98.6% (73/74)",
+    "hard    | juking  34.2% (103/301) | sitting  98.7% (76/77)",
+    "aimbot  | juking 42.9% (132/308) | sitting 98.7%  ← old Hard, for reference"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "bestFrame": 10,
+  "bestOrphanProjectilePixels": 426,
+  "bestTotalRedPixels": 426,
+  "framesWithOpenSpaceProjectiles": 37,
+  "shootersInBest": [
+    "Rusty (EASY)",
+    "Foreman (MEDIUM)",
+    "Patch (MEDIUM)",
+    "Sable (HARD)",
+    "Warden (HARD)"
+  ],
+  "note": "hit-rate quantified by tests/sim/aim-error.test.ts; see p5-aim-harness.json"
+}

@@ -1,0 +1,55 @@
+{
+  "botOwner": 1,
+  "botName": "Rusty",
+  "enterHp": 0.2,
+  "arriveHp": 0.07999999999999999,
+  "minDistFromHome": 96,
+  "startDistFromThreat": 188,
+  "endDistFromThreat": 1034,
+  "startDistFromHome": 639,
+  "endDistFromHome": 459,
+  "totalDisplacement": 923,
+  "monotonicTravel": true,
+  "samples": [
+    {
+      "t": 0,
+      "dThreat": 188,
+      "dHome": 639,
+      "hp": 0.2,
+      "bot": {
+        "x": 1181,
+        "y": 1052
+      }
+    },
+    {
+      "t": 4,
+      "dThreat": 609,
+      "dHome": 196,
+      "hp": 0.11999999999999998,
+      "bot": {
+        "x": 1465,
+        "y": 1393
+      }
+    },
+    {
+      "t": 8,
+      "dThreat": 915,
+      "dHome": 314,
+      "hp": 0.03999999999999999,
+      "bot": {
+        "x": 1453,
+        "y": 1795
+      }
+    },
+    {
+      "t": 12,
+      "dThreat": 1034,
+      "dHome": 459,
+      "hp": 0.03999999999999999,
+      "bot": {
+        "x": 1423,
+        "y": 1943
+      }
+    }
+  ]
+}

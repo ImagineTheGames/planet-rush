@@ -1,0 +1,72 @@
+{
+  "A": {
+    "staged": {
+      "coreHp": 20,
+      "maxCoreHp": 100,
+      "banked": 10
+    },
+    "wedge": {
+      "sub": "+15 HP",
+      "ready": true,
+      "cost": 1
+    },
+    "read": {
+      "coreHp": 20,
+      "maxCoreHp": 100,
+      "banked": 10,
+      "repairing": false
+    }
+  },
+  "B": {
+    "read": {
+      "coreHp": 65,
+      "maxCoreHp": 100,
+      "banked": 7,
+      "repairing": true
+    },
+    "coreDelta": 45,
+    "bankDelta": -3
+  },
+  "D": {
+    "staged": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10
+    },
+    "before": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10,
+      "repairing": false
+    },
+    "after": {
+      "coreHp": 85,
+      "maxCoreHp": 100,
+      "banked": 5,
+      "repairing": true
+    },
+    "coreDelta": 75,
+    "bankDelta": -5
+  },
+  "C": {
+    "wedge": {
+      "sub": "CORE FULL",
+      "ready": false,
+      "cost": 1
+    },
+    "before": {
+      "coreHp": 100,
+      "maxCoreHp": 100,
+      "banked": 9,
+      "repairing": false
+    },
+    "after": {
+      "coreHp": 100,
+      "maxCoreHp": 100,
+      "banked": 9,
+      "repairing": false
+    },
+    "bankFrozen": true,
+    "coreFrozen": true
+  }
+}

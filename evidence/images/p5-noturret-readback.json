@@ -1,0 +1,64 @@
+{
+  "geometry": {
+    "ticks": 4673,
+    "records": 20,
+    "distinctShooters": [
+      5,
+      4,
+      1,
+      3
+    ],
+    "distinctLengths": [
+      16
+    ],
+    "maxLen": 16,
+    "anyHitPointNonNull": false
+  },
+  "visual": {
+    "home": {
+      "x": 1968,
+      "y": 1200
+    },
+    "HOME_C": {
+      "x": 2058,
+      "y": 1200
+    },
+    "burstFrames": 160,
+    "framesWithProjectile": 72,
+    "framesWithMuzzle": 2,
+    "muzzleSamples": [
+      {
+        "ox": 1964,
+        "oy": 1196,
+        "ex": 1948,
+        "ey": 1196,
+        "len": 16,
+        "hit": null
+      },
+      {
+        "ox": 2136,
+        "oy": 1265,
+        "ex": 2138,
+        "ey": 1281,
+        "len": 16,
+        "hit": null
+      }
+    ],
+    "pickShot": {
+      "i": 142,
+      "red": 570,
+      "muzzle": null
+    },
+    "pickFlash": {
+      "i": 83,
+      "muzzle": {
+        "ox": 1964,
+        "oy": 1196,
+        "ex": 1948,
+        "ey": 1196,
+        "len": 16,
+        "hit": null
+      }
+    }
+  }
+}
