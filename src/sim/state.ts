@@ -173,6 +173,28 @@ export interface OreChunk {
 
 /** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
  *  the ship defends"). Cheap, killable, and a shot target in its own right. */
+/**
+ * A turret's committed intercept aim, re-solved on a tier cadence (turret-lead
+ * field report v0.2.4). Plain, serializable, hashable scratch that lives on the
+ * {@link Turret}; the sim's `updateTurrets` reads and rewrites it. Mirrors the
+ * bot `AimTrack`, but for a world entity rather than a per-brain closure.
+ */
+export interface TurretAim {
+  /** The (possibly stale) target velocity the intercept lead is solved from —
+   *  re-sampled only every `aimLatency` seconds, so a mover is led where it was
+   *  last seen going. */
+  vel: Vec2;
+  /** The committed angular error (radians) added to the lead bearing, redrawn
+   *  from the seeded RNG at each re-sample — the deviance the field report asks
+   *  for, tier-scaled by `aimSpread`. */
+  error: number;
+  /** Sim time (`world.time`) `vel` and `error` were adopted. */
+  since: number;
+  /** The target slot the commit belongs to; a change re-solves immediately (you
+   *  read a fresh threat's motion the moment you swing onto it). */
+  targetId: PlayerId;
+}
+
 export interface Turret {
   readonly id: number;
   /** The planet owner's slot — turrets never shoot their own fleet. */
@@ -224,6 +246,24 @@ export interface Turret {
   tier?: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
+  /**
+   * The turret's committed aim solution — the lead-and-deviance model's scratch
+   * (turret-lead field report v0.2.4). A turret no longer fires at where the
+   * enemy *is*: it solves an intercept lead (`leadAim`) with a seeded angular
+   * error on top, and — the half that makes a strafing attacker dodge — it
+   * re-samples the target's velocity only every tier `aimLatency` seconds. This
+   * holds the velocity and error it committed to between those re-samples, so a
+   * juking target is led where it *was* going. The world entity equivalent of the
+   * bots' per-brain {@link ../bots AimTrack}; a turret is world state, so its aim
+   * scratch has to live on the turret to persist across ticks and stay hashable.
+   *
+   * `null` when the turret is not currently leading anything (no target, or not
+   * yet committed). Optional so the turret literals other agents build (render
+   * tells, netcode reconstruction, bot fixtures) keep compiling — same
+   * backward-compatible discipline as `orbitAngle` / `tier` / `muzzle`; a turret
+   * with no `aim` simply re-commits from scratch the next tick it fires.
+   */
+  aim?: TurretAim | null;
   /**
    * Muzzle-flash geometry for the tick this turret actually loosed a shot, else
    * `null` (GDD §2.6, §4.1). A turret's damage rides a pooled projectile, but its
