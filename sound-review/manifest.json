@@ -1,0 +1,1047 @@
+{
+  "$comment": "Sound-review candidates for the s2 brief. Rendered by sound-review/render.ts. Review artifacts only — excluded from the game bundle. WAV paths are relative to this file.",
+  "brief": "s2-candidates",
+  "sampleRate": 44100,
+  "slots": [
+    {
+      "id": "rockChip",
+      "label": "Rock Chip",
+      "context": "Per-tick mining laser hit while chipping a rock — fires rapidly, must read as a stream",
+      "current": "previews/rockChip/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/rockChip/a.wav",
+          "character": "dry brittle tick",
+          "params": "src/art/audio/candidates.ts#rockChip.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/rockChip/b.wav",
+          "character": "grinding rasp scrape",
+          "params": "src/art/audio/candidates.ts#rockChip.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/rockChip/c.wav",
+          "character": "sharp crisp crack",
+          "params": "src/art/audio/candidates.ts#rockChip.c"
+        }
+      ]
+    },
+    {
+      "id": "hullHit",
+      "label": "Hull Hit",
+      "context": "A weapon shot bites an enemy ship/turret/shield/core.",
+      "current": "previews/hullHit/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/hullHit/a.wav",
+          "character": "sharp metallic clang-ping",
+          "params": "src/art/audio/candidates.ts#hullHit.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/hullHit/b.wav",
+          "character": "meaty crunching impact",
+          "params": "src/art/audio/candidates.ts#hullHit.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/hullHit/c.wav",
+          "character": "bright zippy sweep-hit",
+          "params": "src/art/audio/candidates.ts#hullHit.c"
+        }
+      ]
+    },
+    {
+      "id": "rockCrack",
+      "label": "Rock Crack Stage",
+      "context": "A rock advances one of its three crack stages",
+      "current": "previews/rockCrack/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/rockCrack/a.wav",
+          "character": "single sharp snap",
+          "params": "src/art/audio/candidates.ts#rockCrack.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/rockCrack/b.wav",
+          "character": "deep structural pop",
+          "params": "src/art/audio/candidates.ts#rockCrack.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/rockCrack/c.wav",
+          "character": "brittle jittery shatter",
+          "params": "src/art/audio/candidates.ts#rockCrack.c"
+        }
+      ]
+    },
+    {
+      "id": "rockBurst",
+      "label": "Rock Burst + Ore Payout",
+      "context": "A rock breaks apart entirely and pays out ore",
+      "current": "previews/rockBurst/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/rockBurst/a.wav",
+          "character": "big crumble, bright glint",
+          "params": "src/art/audio/candidates.ts#rockBurst.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/rockBurst/b.wav",
+          "character": "sharp crack, bell chime",
+          "params": "src/art/audio/candidates.ts#rockBurst.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/rockBurst/c.wav",
+          "character": "deep rumble, shimmer trail",
+          "params": "src/art/audio/candidates.ts#rockBurst.c"
+        }
+      ]
+    },
+    {
+      "id": "oreCollect",
+      "label": "Ore Collect",
+      "context": "A loose ore chunk is tractored in",
+      "current": "previews/oreCollect/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/oreCollect/a.wav",
+          "character": "quick bright blip",
+          "params": "src/art/audio/candidates.ts#oreCollect.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/oreCollect/b.wav",
+          "character": "twinkly rounder ping",
+          "params": "src/art/audio/candidates.ts#oreCollect.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/oreCollect/c.wav",
+          "character": "sparkly cha-ching flick",
+          "params": "src/art/audio/candidates.ts#oreCollect.c"
+        }
+      ]
+    },
+    {
+      "id": "holdFull",
+      "label": "Cargo Hold Full",
+      "context": "Cargo hold reaches capacity — signals 'fly home'",
+      "current": "previews/holdFull/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/holdFull/a.wav",
+          "character": "urgent descending two-tone",
+          "params": "src/art/audio/candidates.ts#holdFull.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/holdFull/b.wav",
+          "character": "buzzy nagging alarm",
+          "params": "src/art/audio/candidates.ts#holdFull.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/holdFull/c.wav",
+          "character": "sharp saw double-ping",
+          "params": "src/art/audio/candidates.ts#holdFull.c"
+        }
+      ]
+    },
+    {
+      "id": "turretFire",
+      "label": "Turret Fire",
+      "context": "Your turret or ship fires a shot.",
+      "current": "previews/turretFire/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/turretFire/a.wav",
+          "character": "sharp bright arcade zap",
+          "params": "src/art/audio/candidates.ts#turretFire.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/turretFire/b.wav",
+          "character": "meaty punchy cannon thud",
+          "params": "src/art/audio/candidates.ts#turretFire.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/turretFire/c.wav",
+          "character": "airy breathy pulse",
+          "params": "src/art/audio/candidates.ts#turretFire.c"
+        }
+      ]
+    },
+    {
+      "id": "shotImpact",
+      "label": "Shot Impact",
+      "context": "A turret/ship projectile lands.",
+      "current": "previews/shotImpact/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/shotImpact/a.wav",
+          "character": "sharp tight crack",
+          "params": "src/art/audio/candidates.ts#shotImpact.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/shotImpact/b.wav",
+          "character": "meaty low thump",
+          "params": "src/art/audio/candidates.ts#shotImpact.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/shotImpact/c.wav",
+          "character": "airy muffled puff",
+          "params": "src/art/audio/candidates.ts#shotImpact.c"
+        }
+      ]
+    },
+    {
+      "id": "shieldHit",
+      "label": "Shield Hit",
+      "context": "A shield absorbs a hit — struck bell, not broken.",
+      "current": "previews/shieldHit/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/shieldHit/a.wav",
+          "character": "crystal chime shimmer",
+          "params": "src/art/audio/candidates.ts#shieldHit.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/shieldHit/b.wav",
+          "character": "rubbery elastic bounce",
+          "params": "src/art/audio/candidates.ts#shieldHit.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/shieldHit/c.wav",
+          "character": "synthetic energy-field buzz",
+          "params": "src/art/audio/candidates.ts#shieldHit.c"
+        }
+      ]
+    },
+    {
+      "id": "shieldDown",
+      "label": "Shield Down",
+      "context": "A shield's bubble fails and falls.",
+      "current": "previews/shieldDown/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/shieldDown/a.wav",
+          "character": "descending power-down wail",
+          "params": "src/art/audio/candidates.ts#shieldDown.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/shieldDown/b.wav",
+          "character": "bubble-burst pop and splash",
+          "params": "src/art/audio/candidates.ts#shieldDown.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/shieldDown/c.wav",
+          "character": "electrical fizzle-out crackle",
+          "params": "src/art/audio/candidates.ts#shieldDown.c"
+        }
+      ]
+    },
+    {
+      "id": "coreHit",
+      "label": "Core Hit",
+      "context": "A home core takes damage. SERIOUS — low, drops, no sparkle.",
+      "current": "previews/coreHit/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/coreHit/a.wav",
+          "character": "deep sub thud with grit",
+          "params": "src/art/audio/candidates.ts#coreHit.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/coreHit/b.wav",
+          "character": "low metallic groan and creak",
+          "params": "src/art/audio/candidates.ts#coreHit.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/coreHit/c.wav",
+          "character": "muffled distant boom",
+          "params": "src/art/audio/candidates.ts#coreHit.c"
+        }
+      ]
+    },
+    {
+      "id": "turretDown",
+      "label": "Turret Destroyed",
+      "context": "A turret is destroyed.",
+      "current": "previews/turretDown/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/turretDown/a.wav",
+          "character": "sparking short-circuit collapse",
+          "params": "src/art/audio/candidates.ts#turretDown.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/turretDown/b.wav",
+          "character": "heavy metal collapse thud",
+          "params": "src/art/audio/candidates.ts#turretDown.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/turretDown/c.wav",
+          "character": "brittle glassy shatter-clang",
+          "params": "src/art/audio/candidates.ts#turretDown.c"
+        }
+      ]
+    },
+    {
+      "id": "shipExplode",
+      "label": "Ship Explosion",
+      "context": "A ship blows up — firework: bang then sparkle, quickly over.",
+      "current": "previews/shipExplode/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/shipExplode/a.wav",
+          "character": "deep boom with shimmer trail",
+          "params": "src/art/audio/candidates.ts#shipExplode.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/shipExplode/b.wav",
+          "character": "chaotic popcorn crackle burst",
+          "params": "src/art/audio/candidates.ts#shipExplode.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/shipExplode/c.wav",
+          "character": "cartoon whistle then bang",
+          "params": "src/art/audio/candidates.ts#shipExplode.c"
+        }
+      ]
+    },
+    {
+      "id": "shipSpawn",
+      "label": "Ship Spawn",
+      "context": "A ship arrives on the field",
+      "current": "previews/shipSpawn/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/shipSpawn/a.wav",
+          "character": "smooth rise, soft landing thud",
+          "params": "src/art/audio/candidates.ts#shipSpawn.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/shipSpawn/b.wav",
+          "character": "sci-fi sweep, bell settle",
+          "params": "src/art/audio/candidates.ts#shipSpawn.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/shipSpawn/c.wav",
+          "character": "impact thud then power-up rise",
+          "params": "src/art/audio/candidates.ts#shipSpawn.c"
+        }
+      ]
+    },
+    {
+      "id": "spawnPulse",
+      "label": "Spawn Protection Pulse",
+      "context": "Quiet repeating tick during 10s of spawn protection",
+      "current": "previews/spawnPulse/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/spawnPulse/a.wav",
+          "character": "soft sine blip",
+          "params": "src/art/audio/candidates.ts#spawnPulse.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/spawnPulse/b.wav",
+          "character": "gentle round pulse",
+          "params": "src/art/audio/candidates.ts#spawnPulse.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/spawnPulse/c.wav",
+          "character": "faint shimmer tick",
+          "params": "src/art/audio/candidates.ts#spawnPulse.c"
+        }
+      ]
+    },
+    {
+      "id": "thruster",
+      "label": "Thruster Loop",
+      "context": "Held engine note while the throttle is open (loops continuously)",
+      "current": "previews/thruster/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/thruster/a.wav",
+          "character": "deep gritty roar",
+          "params": "src/art/audio/candidates.ts#thruster.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/thruster/b.wav",
+          "character": "buzzy electric hum",
+          "params": "src/art/audio/candidates.ts#thruster.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/thruster/c.wav",
+          "character": "airy whoosh thrust",
+          "params": "src/art/audio/candidates.ts#thruster.c"
+        }
+      ]
+    },
+    {
+      "id": "buildPlaced",
+      "label": "Build Placed",
+      "context": "A turret/build is placed and starts building — ore spent, a latch not a fanfare.",
+      "current": "previews/buildPlaced/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/buildPlaced/a.wav",
+          "character": "heavy iron clank and settle",
+          "params": "src/art/audio/candidates.ts#buildPlaced.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/buildPlaced/b.wav",
+          "character": "soft magnetic snap and lock",
+          "params": "src/art/audio/candidates.ts#buildPlaced.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/buildPlaced/c.wav",
+          "character": "ratchet click-lock, stepped texture",
+          "params": "src/art/audio/candidates.ts#buildPlaced.c"
+        }
+      ]
+    },
+    {
+      "id": "buildComplete",
+      "label": "Build Complete",
+      "context": "A paid-for defence finishes building — rising perfect fifth confirmation.",
+      "current": "previews/buildComplete/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/buildComplete/a.wav",
+          "character": "single-voice chiptune arpeggio fifth",
+          "params": "src/art/audio/candidates.ts#buildComplete.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/buildComplete/b.wav",
+          "character": "warm sine swell, soft glow",
+          "params": "src/art/audio/candidates.ts#buildComplete.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/buildComplete/c.wav",
+          "character": "chunky retro two-step blip",
+          "params": "src/art/audio/candidates.ts#buildComplete.c"
+        }
+      ]
+    },
+    {
+      "id": "repairTick",
+      "label": "Repair Tick",
+      "context": "A soft repair tick while a structure heals — noticed mostly when it stops.",
+      "current": "previews/repairTick/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/repairTick/a.wav",
+          "character": "gentle rising sine chirp",
+          "params": "src/art/audio/candidates.ts#repairTick.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/repairTick/b.wav",
+          "character": "mellow steady triangle pulse",
+          "params": "src/art/audio/candidates.ts#repairTick.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/repairTick/c.wav",
+          "character": "tiny narrow-duty square blip",
+          "params": "src/art/audio/candidates.ts#repairTick.c"
+        }
+      ]
+    },
+    {
+      "id": "bankOre",
+      "label": "Bank Ore",
+      "context": "Ore banked into your economy — a drop that settles.",
+      "current": "previews/bankOre/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/bankOre/a.wav",
+          "character": "crisp square coin-drop",
+          "params": "src/art/audio/candidates.ts#bankOre.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/bankOre/b.wav",
+          "character": "woody marimba-like thud",
+          "params": "src/art/audio/candidates.ts#bankOre.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/bankOre/c.wav",
+          "character": "sparkling metallic coin clink",
+          "params": "src/art/audio/candidates.ts#bankOre.c"
+        }
+      ]
+    },
+    {
+      "id": "upgradeBought",
+      "label": "Upgrade Bought",
+      "context": "An upgrade purchased — the brightest confirmation in the bank.",
+      "current": "previews/upgradeBought/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/upgradeBought/a.wav",
+          "character": "fast bright square arpeggio sparkle",
+          "params": "src/art/audio/candidates.ts#upgradeBought.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/upgradeBought/b.wav",
+          "character": "shimmering layered bell harmonics",
+          "params": "src/art/audio/candidates.ts#upgradeBought.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/upgradeBought/c.wav",
+          "character": "glissando sparkle sweep upward",
+          "params": "src/art/audio/candidates.ts#upgradeBought.c"
+        }
+      ]
+    },
+    {
+      "id": "waveArrive",
+      "label": "Wave Arrive",
+      "context": "An asteroid wave arrives, field closes in — two low foghorn notes.",
+      "current": "previews/waveArrive/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/waveArrive/a.wav",
+          "character": "deep dual-note saw foghorn",
+          "params": "src/art/audio/candidates.ts#waveArrive.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/waveArrive/b.wav",
+          "character": "pulsing square siren, mechanical",
+          "params": "src/art/audio/candidates.ts#waveArrive.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/waveArrive/c.wav",
+          "character": "gritty noise-and-sub drone horn",
+          "params": "src/art/audio/candidates.ts#waveArrive.c"
+        }
+      ]
+    },
+    {
+      "id": "collapseBegin",
+      "label": "Collapse Begin",
+      "context": "The collapse phase begins — entropy arriving; low rumble and drone, slow.",
+      "current": "previews/collapseBegin/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/collapseBegin/a.wav",
+          "character": "grinding low noise rumble bed",
+          "params": "src/art/audio/candidates.ts#collapseBegin.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/collapseBegin/b.wav",
+          "character": "throbbing vibrato dread pulse",
+          "params": "src/art/audio/candidates.ts#collapseBegin.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/collapseBegin/c.wav",
+          "character": "crumbling stepped structural groan",
+          "params": "src/art/audio/candidates.ts#collapseBegin.c"
+        }
+      ]
+    },
+    {
+      "id": "planetDeath",
+      "label": "Planet Death",
+      "context": "A planet dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
+      "current": "previews/planetDeath/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/planetDeath/a.wav",
+          "character": "deep collapsing sine descent",
+          "params": "src/art/audio/candidates.ts#planetDeath.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/planetDeath/b.wav",
+          "character": "muffled noise implosion, sub-bass swallow",
+          "params": "src/art/audio/candidates.ts#planetDeath.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/planetDeath/c.wav",
+          "character": "slow tolling drone, cracking decay",
+          "params": "src/art/audio/candidates.ts#planetDeath.c"
+        }
+      ]
+    },
+    {
+      "id": "matchEnd",
+      "label": "Match End",
+      "context": "The match resolves — a short rising resolution.",
+      "current": "previews/matchEnd/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/matchEnd/a.wav",
+          "character": "triumphant triangle fanfare",
+          "params": "src/art/audio/candidates.ts#matchEnd.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/matchEnd/b.wav",
+          "character": "warm blended sine chord swell",
+          "params": "src/art/audio/candidates.ts#matchEnd.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/matchEnd/c.wav",
+          "character": "bouncy square staircase climb",
+          "params": "src/art/audio/candidates.ts#matchEnd.c"
+        }
+      ]
+    },
+    {
+      "id": "alarm",
+      "label": "Home Alarm",
+      "context": "Your home is under attack (GDD §2.2) — a mechanic, not music; loops until the threat clears.",
+      "current": "previews/alarm/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/alarm/a.wav",
+          "character": "classic twin-tone klaxon",
+          "params": "src/art/audio/candidates.ts#alarm.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/alarm/b.wav",
+          "character": "slow blaring foghorn siren",
+          "params": "src/art/audio/candidates.ts#alarm.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/alarm/c.wav",
+          "character": "rapid stuttering distress pulse",
+          "params": "src/art/audio/candidates.ts#alarm.c"
+        }
+      ]
+    },
+    {
+      "id": "ambient",
+      "label": "Ambient Bed",
+      "context": "The constant background loop during ordinary play — must vanish into the background over ~15 minutes.",
+      "current": "previews/ambient/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/ambient/a.wav",
+          "character": "deep frozen drone, distant creak",
+          "params": "src/art/audio/candidates.ts#ambient.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/ambient/b.wav",
+          "character": "thin metallic hull hum, static crackle",
+          "params": "src/art/audio/candidates.ts#ambient.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/ambient/c.wav",
+          "character": "void breath, slow pressure swell",
+          "params": "src/art/audio/candidates.ts#ambient.c"
+        }
+      ]
+    },
+    {
+      "id": "musicBed",
+      "label": "Music Bed — Calm",
+      "context": "Mining / building with no active threat — the calm foundation drone.",
+      "current": "previews/musicBed/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicBed/a.wav",
+          "character": "warm hollow triad, breathing",
+          "params": "src/art/audio/candidates.ts#musicBed.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicBed/b.wav",
+          "character": "sparse open fifth, airy",
+          "params": "src/art/audio/candidates.ts#musicBed.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicBed/c.wav",
+          "character": "murky sub-heavy triad, muffled",
+          "params": "src/art/audio/candidates.ts#musicBed.c"
+        }
+      ]
+    },
+    {
+      "id": "musicPulse",
+      "label": "Music Pulse — Rising Tension",
+      "context": "Threat detected, tension climbing toward a siege — a heartbeat over a floor.",
+      "current": "previews/musicPulse/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicPulse/a.wav",
+          "character": "single deep thud heartbeat",
+          "params": "src/art/audio/candidates.ts#musicPulse.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicPulse/b.wav",
+          "character": "double-thump lub-dub heartbeat",
+          "params": "src/art/audio/candidates.ts#musicPulse.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicPulse/c.wav",
+          "character": "fast nervous ticking pulse",
+          "params": "src/art/audio/candidates.ts#musicPulse.c"
+        }
+      ]
+    },
+    {
+      "id": "musicTheme",
+      "label": "Music Theme — Siege",
+      "context": "Active combat / base under assault — a short A-minor riff over a pad.",
+      "current": "previews/musicTheme/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicTheme/a.wav",
+          "character": "marching square-lead riff",
+          "params": "src/art/audio/candidates.ts#musicTheme.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicTheme/b.wav",
+          "character": "syncopated staccato stabs",
+          "params": "src/art/audio/candidates.ts#musicTheme.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicTheme/c.wav",
+          "character": "slow rising modal march",
+          "params": "src/art/audio/candidates.ts#musicTheme.c"
+        }
+      ]
+    },
+    {
+      "id": "musicDread",
+      "label": "Music Dread — Collapse",
+      "context": "Core critical, defeat imminent — no melody, no resolution; thinning dread.",
+      "current": "previews/musicDread/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicDread/a.wav",
+          "character": "grinding semitone clash",
+          "params": "src/art/audio/candidates.ts#musicDread.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicDread/b.wav",
+          "character": "distant sub rumble, faint flutter",
+          "params": "src/art/audio/candidates.ts#musicDread.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicDread/c.wav",
+          "character": "detuned unison smear",
+          "params": "src/art/audio/candidates.ts#musicDread.c"
+        }
+      ]
+    },
+    {
+      "id": "musicWin",
+      "label": "Victory Sting",
+      "context": "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
+      "current": "previews/musicWin/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicWin/a.wav",
+          "character": "quick bright fanfare pop",
+          "params": "src/art/audio/candidates.ts#musicWin.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicWin/b.wav",
+          "character": "cascading bell shimmer",
+          "params": "src/art/audio/candidates.ts#musicWin.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicWin/c.wav",
+          "character": "big brassy triumphant swell",
+          "params": "src/art/audio/candidates.ts#musicWin.c"
+        }
+      ]
+    },
+    {
+      "id": "musicLoss",
+      "label": "Defeat Sting",
+      "context": "Match lost (after the three-second quiet) — one-shot, falling minor phrase that settles low.",
+      "current": "previews/musicLoss/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/musicLoss/a.wav",
+          "character": "slow descending sigh",
+          "params": "src/art/audio/candidates.ts#musicLoss.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/musicLoss/b.wav",
+          "character": "dissonant stumbling collapse",
+          "params": "src/art/audio/candidates.ts#musicLoss.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/musicLoss/c.wav",
+          "character": "single low tolling bell",
+          "params": "src/art/audio/candidates.ts#musicLoss.c"
+        }
+      ]
+    },
+    {
+      "id": "pressTick",
+      "label": "Press Tick",
+      "context": "A wheel wedge / menu control was pressed — the lightest possible click, heard dozens of times a match.",
+      "current": "previews/pressTick/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/pressTick/a.wav",
+          "character": "soft triangle tap",
+          "params": "src/art/audio/candidates.ts#pressTick.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/pressTick/b.wav",
+          "character": "crisp gritty square click",
+          "params": "src/art/audio/candidates.ts#pressTick.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/pressTick/c.wav",
+          "character": "round low sine thump",
+          "params": "src/art/audio/candidates.ts#pressTick.c"
+        }
+      ]
+    },
+    {
+      "id": "purchaseConfirm",
+      "label": "Purchase Confirm",
+      "context": "A purchase or repair committed — a rising two-beat 'done'.",
+      "current": "previews/purchaseConfirm/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/purchaseConfirm/a.wav",
+          "character": "bright square two-note chime",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/purchaseConfirm/b.wav",
+          "character": "soft sine bell ding",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/purchaseConfirm/c.wav",
+          "character": "synthetic saw rising blip",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.c"
+        }
+      ]
+    },
+    {
+      "id": "rejectBuzz",
+      "label": "Reject Buzz",
+      "context": "A buy the player can't afford — a low, flat, faintly gritty 'nope' that falls a little and stops.",
+      "current": "previews/rejectBuzz/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/rejectBuzz/a.wav",
+          "character": "flat gritty square drone",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/rejectBuzz/b.wav",
+          "character": "short low triangle thud",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/rejectBuzz/c.wav",
+          "character": "gritty pitchless noise rasp",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.c"
+        }
+      ]
+    },
+    {
+      "id": "depositTick",
+      "label": "Deposit Tick",
+      "context": "One ore chunk settling into the bank on a deposit flight — soft & falling, one tick per chunk.",
+      "current": "previews/depositTick/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/depositTick/a.wav",
+          "character": "soft falling triangle pluck",
+          "params": "src/art/audio/candidates.ts#depositTick.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/depositTick/b.wav",
+          "character": "falling sine droplet",
+          "params": "src/art/audio/candidates.ts#depositTick.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/depositTick/c.wav",
+          "character": "thin muted falling square tick",
+          "params": "src/art/audio/candidates.ts#depositTick.c"
+        }
+      ]
+    },
+    {
+      "id": "respawnBeep",
+      "label": "Respawn Beep",
+      "context": "A tick of the respawn countdown — one clean mid beep a second, deliberately plain, a clock.",
+      "current": "previews/respawnBeep/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/respawnBeep/a.wav",
+          "character": "pure plain sine tone",
+          "params": "src/art/audio/candidates.ts#respawnBeep.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/respawnBeep/b.wav",
+          "character": "crisp digital square clock",
+          "params": "src/art/audio/candidates.ts#respawnBeep.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/respawnBeep/c.wav",
+          "character": "warm low triangle beep",
+          "params": "src/art/audio/candidates.ts#respawnBeep.c"
+        }
+      ]
+    },
+    {
+      "id": "respawnGo",
+      "label": "Respawn Go",
+      "context": "Respawn launch — the ship back on the field, brighter & a step up from the countdown beeps.",
+      "current": "previews/respawnGo/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/respawnGo/a.wav",
+          "character": "punchy square power-up rise",
+          "params": "src/art/audio/candidates.ts#respawnGo.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/respawnGo/b.wav",
+          "character": "bright sine and triangle launch chime",
+          "params": "src/art/audio/candidates.ts#respawnGo.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/respawnGo/c.wav",
+          "character": "energetic saw double-step launch",
+          "params": "src/art/audio/candidates.ts#respawnGo.c"
+        }
+      ]
+    },
+    {
+      "id": "minimapPing",
+      "label": "Minimap Ping",
+      "context": "A minimap ping — a rising sonar blip that rings a moment & fades; it locates, it must never read as an alarm.",
+      "current": "previews/minimapPing/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/minimapPing/a.wav",
+          "character": "clean rising sine sonar sweep",
+          "params": "src/art/audio/candidates.ts#minimapPing.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/minimapPing/b.wav",
+          "character": "soft triangle pulse with airy overtone",
+          "params": "src/art/audio/candidates.ts#minimapPing.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/minimapPing/c.wav",
+          "character": "bright bell-like two-partial ping",
+          "params": "src/art/audio/candidates.ts#minimapPing.c"
+        }
+      ]
+    }
+  ]
+}
