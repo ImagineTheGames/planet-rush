@@ -85,7 +85,8 @@ function entries(): CatalogueEntry[] {
     out.push({ group: 'Planets — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
   }
   for (const f of [1, 0.75, 0.5, 0.25, 0]) {
-    out.push({ group: 'Planets — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(f) });
+    // Owner-colour base, red filling as HP is lost (p11) — P1's colour here.
+    out.push({ group: 'Planets — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(0, f) });
   }
   out.push({ group: 'Planets — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
 
