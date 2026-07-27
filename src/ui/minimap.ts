@@ -10,9 +10,7 @@
  * it is no longer owned, GDD §2.7), ships as smaller dots (the local ship
  * highlighted, a spawn-protected ship dimmed — GDD §2.1), the collapse ring while
  * it is active (GDD §2.3), and faint ore-field hints. **Dots and colours only** —
- * no nameplates, no health numbers (those are scouted / over-ship, GDD §2.2). And
- * **no ping markers**: pings are cut from the game (p7-01/02), so nothing here
- * draws one.
+ * no nameplates, no health numbers (those are scouted / over-ship, GDD §2.2).
  *
  * **Two states, one gesture (the developer's spec).**
  *   - COLLAPSED — a small corner square, bottom-right (GDD §2.2). On mobile it is
@@ -102,7 +100,7 @@ export const MINIMAP_STRIP_CLEARANCE = 40;
  *  desktop it is the band the "no touch affordance" contract probes for a stray
  *  FIRE ring (emulation.spec `REGION_FIRE`, x ≥ 0.7·W). So the collapsed map is
  *  pulled LEFT of that column: it never draws onto the fire control, and it never
- *  reads as one. 0.30 clears both the touch FIRE/PING cluster and the ≥0.7·W
+ *  reads as one. 0.30 clears both the touch FIRE cluster and the ≥0.7·W
  *  desktop probe, while the map stays inside the right half (the `bottom-right`
  *  band) on every profile. TUNABLE. */
 export const MINIMAP_ACTION_RESERVE_FRACTION = 0.3;
