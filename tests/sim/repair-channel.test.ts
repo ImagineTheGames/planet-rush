@@ -8,26 +8,32 @@
  * verb that no-ops; or repair silently no-ops in some core state and never says
  * why. These pins nail all three to the floor.
  *
+ * Repair is now a **DISCRETE purchase** (developer, 2026-07-26; supersedes the
+ * GDD §2.5 channel — see docs/design-amendments.md): one wheel press = one
+ * purchase, spending `REPAIR_ORE_COST` ore to restore `REPAIR_HP_PER_ORE` core
+ * HP, clamped at max. No channel, no continuous drain, no stacking. This file was
+ * the channel-era end-to-end suite, updated deliberately to the ratified model.
+ *
  * Faithful reproduction: everything here runs through the **real** match — a
  * `createWorld` ring, the ship spawned docked at its own planet, and the repair
  * order delivered as a `buildOrder` **action through `step()`**, exactly the
  * verb the wheel funnels (`@platform/wheel-input` → `@platform/actions` →
- * `wire` → the sim). Nothing calls the channel directly except the pins that
- * assert the *reason* an order was refused — because "no-ops loudly" is a
- * contract about the reason, not just the effect.
+ * `wire` → the sim). Nothing calls the sim directly except the pins that assert
+ * the *reason* an order was refused — because "no-ops loudly" is a contract about
+ * the reason, not just the effect.
  *
  * The pins, one field-report clause each:
- *   §1 the order REACHES the sim — a `buildOrder: 'repair'` action opens the
- *      channel (`planet.repairing` flips true); this is the "never reaches the
- *      sim / wrong verb" suspect, killed;
- *   §2 damaged core + funded bank → HP RISES at the ratified rate and the bank
- *      FALLS by the ratified cost, per tick and integrated over seconds;
+ *   §1 the order REACHES the sim — a `buildOrder: 'repair'` action heals the
+ *      core (`planet.coreHp` rises, the one-tick tell `planet.repairing` flips
+ *      true); this is the "never reaches the sim / wrong verb" suspect, killed;
+ *   §2 damaged core + funded bank → HP rises by REPAIR_HP_PER_ORE and the bank
+ *      falls by REPAIR_ORE_COST, ON the order tick — one press, one purchase;
  *   §3 unfunded → NOTHING changes, and the order is refused with a REASON
  *      (`cannot-afford`) while the wheel model dims the wedge `unaffordable`;
  *   §4 full core → NOTHING changes, refused `core-full`, wedge `inactive`;
  *   §5 collapse → NOTHING changes, refused `collapsed`, wedge `inactive`
  *      (GDD §2.3: "no repair" for the rest of the match);
- *   plus determinism with the channel running (GDD §4.8).
+ *   plus determinism with repair orders in the stream (GDD §4.8).
  *
  * The wheel model (`src/ui/build-wheel`) is imported read-only to prove the
  * *loud* half of "no-ops loudly": the sim refuses with a reason, and the wheel
@@ -40,8 +46,8 @@ import { ShipClass } from '@shared/types';
 import type { Action } from '@shared/types';
 import {
   CORE_HP,
-  REPAIR,
-  TICK_DT,
+  REPAIR_HP_PER_ORE,
+  REPAIR_ORE_COST,
   createWorld,
   isDocked,
   placeOrder,
@@ -82,7 +88,7 @@ function setup(coreHp: number, banked: number, cargo = 0): { world: World; ship:
   const planet = planetOf(world, LOCAL)!;
 
   // Mid-match: protection gone on both the hull and the home, so damage lands
-  // and the channel is a normal open (not a tick-0 special case).
+  // and a repair is a normal purchase (not a tick-0 special case).
   ship.spawnProtect = 0;
   planet.spawnProtect = 0;
 
@@ -118,59 +124,74 @@ function signals(over: Partial<BuildWheelSignals>): BuildWheelSignals {
 
 describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix)', () => {
   // §1 — the "order never reaches the sim / fires the wrong verb" suspect.
-  it('a buildOrder:repair action opens the channel — the order reaches the sim', () => {
+  it('a buildOrder:repair action heals the core — the order reaches the sim', () => {
     const { world, planet } = setup(CORE_HP - 20, 10);
+    const hp0 = planet.coreHp;
     expect(planet.repairing).toBe(false);
 
     step(world, repairOrder());
 
     // The wheel press, funnelled as a `buildOrder` action, landed on the sim's
-    // repair verb and opened the channel. Not a no-op, not the wrong verb.
-    expect(planet.repairing).toBe(true);
+    // repair verb and moved state. Not a no-op, not the wrong verb.
+    expect(planet.coreHp).toBe(hp0 + REPAIR_HP_PER_ORE);
+    expect(planet.repairing).toBe(true); // the one-tick repair tell
   });
 
-  // §2 — the core symptom, refuted: HP rises, ore is spent, at the ratified rate.
-  it('heals at exactly REPAIR.hpPerSecond and charges REPAIR.orePerHp — per tick', () => {
+  // §2 — the core symptom, refuted: HP rises and ore is spent, at the ratified
+  // amounts, ON the order tick — one press is one purchase.
+  it('one press spends REPAIR_ORE_COST and restores REPAIR_HP_PER_ORE, on the order tick', () => {
     const { world, ship, planet } = setup(CORE_HP - 20, 10);
-
-    // The ordering tick opens the channel but does not heal on the same tick:
-    // planets update before orders are placed, so the first heal is next tick
-    // (part of the fixed subsystem order, GDD §4.8). Nothing spent yet.
-    step(world, repairOrder());
-    expect(planet.repairing).toBe(true);
     const hp0 = planet.coreHp;
     const bank0 = ship.banked;
-    expect(hp0).toBe(CORE_HP - 20);
-    expect(bank0).toBe(10);
 
-    // One held tick: HP up by rate·dt, bank down by that·orePerHp. Exact.
-    step(world, []);
-    const dHp = planet.coreHp - hp0;
-    const dBank = bank0 - ship.banked;
-    expect(dHp).toBeCloseTo(REPAIR.hpPerSecond * TICK_DT, 9);
-    expect(dBank).toBeCloseTo(REPAIR.hpPerSecond * TICK_DT * REPAIR.orePerHp, 9);
-  });
-
-  it('integrates to the rate over seconds, hold or bank funding it the same', () => {
-    const { world, ship, planet } = setup(CORE_HP - 40, 10);
     step(world, repairOrder());
 
-    const seconds = 3;
-    for (let t = 0; t < Math.round(seconds / TICK_DT); t++) step(world, []);
-
-    const healed = planet.coreHp - (CORE_HP - 40);
-    expect(healed).toBeCloseTo(REPAIR.hpPerSecond * seconds, 1);
-    // Every point of HP cost its ratified ore, drawn from the bank.
-    expect(10 - ship.banked).toBeCloseTo(healed * REPAIR.orePerHp, 6);
-    expect(planet.repairing).toBe(true); // still damaged, still funded
+    // Discrete: the purchase resolves the tick the order lands — HP up by
+    // REPAIR_HP_PER_ORE, bank down by REPAIR_ORE_COST, no waiting, no channel.
+    expect(planet.coreHp - hp0).toBeCloseTo(REPAIR_HP_PER_ORE, 9);
+    expect(bank0 - ship.banked).toBeCloseTo(REPAIR_ORE_COST, 9);
   });
 
-  it('a single press keeps healing across ticks — a held channel, not a one-shot', () => {
-    const { world, planet } = setup(CORE_HP - 30, 10);
+  it('N presses are N purchases; hold and bank fund them identically', () => {
+    // Start 50 HP down so three whole purchases (+45) never clip the cap.
+    const viaBank = setup(CORE_HP - 50, 10, 0);
+    const viaHold = setup(CORE_HP - 50, 0, 10);
+    for (let t = 0; t < 3; t++) {
+      step(viaBank.world, repairOrder());
+      step(viaHold.world, repairOrder());
+    }
+
+    const healedBank = viaBank.planet.coreHp - (CORE_HP - 50);
+    const healedHold = viaHold.planet.coreHp - (CORE_HP - 50);
+    expect(healedBank).toBeCloseTo(3 * REPAIR_HP_PER_ORE, 6);
+    expect(healedHold).toBeCloseTo(3 * REPAIR_HP_PER_ORE, 6);
+    // Three purchases cost exactly three ore, whichever wallet paid.
+    expect(10 - (viaBank.ship.banked + viaBank.ship.cargo)).toBeCloseTo(3 * REPAIR_ORE_COST, 6);
+    expect(10 - (viaHold.ship.banked + viaHold.ship.cargo)).toBeCloseTo(3 * REPAIR_ORE_COST, 6);
+  });
+
+  it('a single press heals ONCE — no held channel, no drain across idle ticks', () => {
+    const { world, ship, planet } = setup(CORE_HP - 30, 10);
     step(world, repairOrder()); // ONE order
-    const before = planet.coreHp;
+    const hpAfter = planet.coreHp;
+    const bankAfter = ship.banked;
+    expect(hpAfter).toBe(CORE_HP - 30 + REPAIR_HP_PER_ORE);
+
     for (let t = 0; t < 30; t++) step(world, []); // no further presses
-    expect(planet.coreHp).toBeGreaterThan(before);
+    expect(planet.coreHp).toBe(hpAfter); // not one more HP — no channel drains it up
+    expect(ship.banked).toBe(bankAfter); // not one more ore — no continuous drain
+    // The tell holds ("patched, not hit since") across the idle ticks; it just
+    // signals — it never heals a point past the single purchase above.
+    expect(planet.repairing).toBe(true);
+  });
+
+  it('clamps at the core max — a near-full core costs a whole ore and heals to full', () => {
+    // Missing 10 < REPAIR_HP_PER_ORE (15): the purchase still costs a whole ore
+    // and clamps to max, never overshooting (developer p5-08).
+    const { world, ship, planet } = setup(CORE_HP - 10, 10);
+    step(world, repairOrder());
+    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(ship.banked).toBeCloseTo(10 - REPAIR_ORE_COST, 6);
   });
 });
 
@@ -182,8 +203,8 @@ describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
     // The sim refuses with a REASON, not a silent shrug.
     expect(placeOrder(world, ship, 'repair')).toBe('cannot-afford');
 
-    // And driven through the action funnel: the channel never opens, and after
-    // a stretch of ticks the core and the (empty) bank are untouched.
+    // And driven through the action funnel: no heal, and after a stretch of ticks
+    // the core and the (empty) bank are untouched.
     step(world, repairOrder());
     expect(planet.repairing).toBe(false);
     const hp = planet.coreHp;
@@ -229,7 +250,7 @@ describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
   });
 });
 
-describe('determinism with the channel running (GDD §4.8)', () => {
+describe('determinism with repair orders in the stream (GDD §4.8)', () => {
   it('two identical runs with a repair order deep-equal', () => {
     const run = (): World => {
       const { world } = setup(CORE_HP - 25, 10);

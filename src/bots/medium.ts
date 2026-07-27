@@ -37,6 +37,7 @@ import {
   mine,
   nearestThreat,
   order,
+  repairTargetFraction,
   retreat,
   roam,
   scavenge,
@@ -86,7 +87,7 @@ export function mediumSpendPlan(ctx: BotCtx): Purchase | null {
     !ctx.view.collapsed &&
     !planet.repairing &&
     !planet.underAttack &&
-    planet.coreHp < planet.maxCoreHp * MEDIUM_REPAIR_AT &&
+    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, MEDIUM_REPAIR_AT) &&
     spendable >= 2
   ) {
     return order('repair');

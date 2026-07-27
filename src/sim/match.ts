@@ -199,8 +199,8 @@ function enterCollapseIfDue(world: World): void {
 
   world.match.collapseTime = world.time;
   if (world.match.phase === 'live') world.match.phase = 'collapse';
-  // Any repair channel still open closes with the phase: repair shuts off
-  // (GDD §2.3). `runRepairChannel` refuses to reopen it from here on.
+  // Clear any lingering repair tell as the phase turns: repair shuts off
+  // (GDD §2.3). `placeOrder` refuses every repair purchase from here on.
   for (const planet of world.planets) planet.repairing = false;
 }
 
