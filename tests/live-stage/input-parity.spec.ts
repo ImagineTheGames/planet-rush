@@ -5,11 +5,10 @@
  * The unit suite proves every abstract Action is *reachable* from touch
  * (src/platform/input-parity.test.ts, headless). This proves the same controls
  * survive the whole real pipeline — the shipped `vite preview` bundle, a genuine
- * CDP touch, the DOM edge, the twin sticks + contextual buttons, the funnel — and
- * that the sim actually receives each action. It reads `window.__planetRush.input`
+ * CDP touch, the DOM edge, the twin sticks + FIRE button, the funnel — and that
+ * the sim actually receives each action. It reads `window.__planetRush.input`
  * (the `?debug=1` seam, src/platform/debug-hook.ts `installInputProbe`): the
- * abstract input the sim was handed this frame. This is the ONLY way to prove
- * `ping`, whose effect is not yet rendered, crossed into the sim at all.
+ * abstract input the sim was handed this frame.
  *
  * Touch context: the live-stage config's `desktop` project has `hasTouch:false`,
  * so `main.ts`'s `isTouch` would be false and the touch affordances would not
@@ -31,12 +30,9 @@ test.use({ hasTouch: true, isMobile: true, viewport: { width: 900, height: 420 }
 interface InputReadout {
   frame: number;
   types: string[];
-  boost: boolean;
   fire: boolean;
   aim: boolean;
   thrust: { x: number; y: number };
-  pingCount: number;
-  lastPing: { x: number; y: number } | null;
 }
 
 async function boot(page: Page): Promise<void> {
@@ -122,38 +118,3 @@ test('touch FIRE button → the sim receives an active fire', async ({ page }) =
   expect(seen.fire, 'fire.active while holding the FIRE button').toBe(true);
 });
 
-test('touch BOOST button → the sim receives an active boost (parity gap #1)', async ({ page }) => {
-  await boot(page);
-  const boost = await centerOf(page, 'touch-boost-button');
-  expect(boost, 'BOOST button registered its layout rect').not.toBeNull();
-  const seen = await holdAndRead(page, boost!.x, boost!.y);
-  expect(seen.boost, 'boost.active while holding the BOOST button').toBe(true);
-});
-
-test('touch PING button tap → the sim receives a ping (parity gap #2)', async ({ page }) => {
-  await boot(page);
-  const ping = await centerOf(page, 'touch-ping-button');
-  expect(ping, 'PING button registered its layout rect').not.toBeNull();
-
-  const before = (await readInput(page)).pingCount;
-  const client: CDPSession = await page.context().newCDPSession(page);
-  try {
-    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: ping!.x, y: ping!.y }] });
-    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  } finally {
-    await client.detach();
-  }
-
-  // The counter latches across the one-shot ping frame, so the poll can't miss it.
-  await page.waitForFunction(
-    (was) => {
-      const d = (window as unknown as { __planetRush: { input: { pingCount: number } } }).__planetRush;
-      return d.input.pingCount > was;
-    },
-    before,
-    { timeout: 5000 },
-  );
-  const after = await readInput(page);
-  expect(after.pingCount).toBeGreaterThan(before);
-  expect(after.lastPing, 'the ping carried a world-space target').not.toBeNull();
-});
