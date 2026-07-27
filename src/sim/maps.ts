@@ -32,6 +32,21 @@
  * ring in `./match`, the margin clamp in `./constants`), so a wide arena costs
  * no special case.
  *
+ * **Variable N (Milestone B, ratified 2026-07-26).** A lobby seats 2..8 players,
+ * and each map answers a shrinking roster in one of two ways:
+ *  - **regenerate** (`octagon`, `oval`) — the layout is parametric, so it places
+ *    exactly `count` live homes at equal spacing for any N (octagon's ring at
+ *    `2π/N` steps; oval's equal-chord solve for `count` points). No wasted board.
+ *  - **derelict-fill** (`compass`, `diamond`) — the layout is an eight-point
+ *    construction whose character (corner-cover vs edge-lane; outer/inner
+ *    asymmetry) has no natural small-N form, so it always lays out all eight
+ *    positions and marks the `8-N` unused ones `derelict`. A derelict is an
+ *    unowned wreck (`createWorld` builds it dead, with lootable debris) — the
+ *    board keeps its shape, and the live homes are the first `count` positions so
+ *    slot 0's identity never moves. Resource fairness is a claim about the LIVE
+ *    homes; each gets `homeFieldOre(activeN)`, and the commons stays symmetric
+ *    about every board position (eight-fold), so it is fair from every live spoke.
+ *
  * Fully deterministic and RNG-free: planet placement is pure geometry (the seed
  * threads through to the asteroid scatter in `./waves`, not to the layout), so
  * the same map builds the same board every time (GDD §4.8).
@@ -58,6 +73,18 @@ export interface PlanetPlacement {
   readonly ship: Vec2;
   /** Outward angle from the arena centre (radians). */
   readonly angle: number;
+  /**
+   * True for a board position that holds an unowned **derelict wreck**, not a
+   * live home. The derelict-fill maps (`compass`, `diamond`) always lay out all
+   * eight board positions and mark the `8 - N` unused ones derelict, so the
+   * layout keeps its signature shape at any N (ratified 2026-07-26, Milestone B).
+   * `octagon`/`oval` regenerate exactly `count` live homes and never set this, so
+   * an absent flag reads as "a live home" — the same backward-compatible optional
+   * discipline the sim uses everywhere. `createWorld` (`./state`) builds a live
+   * ship + planet for every non-derelict placement and a match-start wreck for
+   * each derelict one.
+   */
+  readonly derelict?: boolean;
 }
 
 /** A ratified arena layout. */
@@ -120,6 +147,20 @@ function fromPolar(bounds: Bounds, homes: readonly { r: number; angle: number }[
       angle,
     };
   });
+}
+
+/**
+ * Take a full eight-position board and activate the first `count` of them; the
+ * rest become unowned **derelict wrecks**, so the layout keeps its shape at any
+ * N (the derelict-fill maps `compass`/`diamond`, ratified 2026-07-26). The active
+ * placements come first so they line up with the dense `0..N-1` player roster
+ * (`createWorld`): ship `i` and its live home are `full[i]`, and the identity of
+ * slot 0's board position never moves as N changes. `count` is clamped to the
+ * board size; config validation (`./match-config`) already caps N at eight.
+ */
+function derelictFill(full: PlanetPlacement[], count: number): PlanetPlacement[] {
+  const active = Math.max(0, Math.min(count, full.length));
+  return full.map((p, i) => (i < active ? p : { ...p, derelict: true }));
 }
 
 /**
@@ -251,7 +292,11 @@ const compass: MapDef = {
       // Even spokes (0°, 90°, …) are edge midpoints; odd (45°, …) are corners.
       homes.push({ r: i % 2 === 0 ? re : rc, angle });
     }
-    return fromPolar(bounds, homes).slice(0, count);
+    // Derelict-fill (ratified): the compass is an eight-point construction (its
+    // corner-cover / edge-lane character has no natural 2..7 truncation), so at
+    // N<8 it keeps all eight positions and the `8-N` unused ones become unowned
+    // wrecks rather than reshaping the board.
+    return derelictFill(fromPolar(bounds, homes), count);
   },
 };
 
@@ -272,15 +317,19 @@ const oval: MapDef = {
   planets(_seed, count, bounds) {
     const a = bounds.width / 2 - WORLD_EDGE_MARGIN - PLANET.radius;
     const b = bounds.height / 2 - WORLD_EDGE_MARGIN - PLANET.radius;
-    const ts = ellipseEqualChord(a, b, 8);
+    // Regenerate (ratified): the equal-chord solver is parametric, so the oval is
+    // a true `count`-planet ellipse at any N — solve directly for `count` points
+    // whose neighbour chords are all equal, not eight-then-slice (which would
+    // cluster contiguous slots and break the equal-stride shape below eight).
+    const ts = ellipseEqualChord(a, b, count);
     const homes = ts.map((t) => {
       const x = a * Math.cos(t);
       const y = b * Math.sin(t);
       return { r: Math.hypot(x, y), angle: Math.atan2(y, x) };
     });
-    // Order by angle so slot 0..7 walk the rim — neighbours are adjacent slots.
+    // Order by angle so slot 0..N-1 walk the rim — neighbours are adjacent slots.
     homes.sort((p, q) => norm(p.angle) - norm(q.angle));
-    return fromPolar(bounds, homes).slice(0, count);
+    return fromPolar(bounds, homes);
   },
 };
 
@@ -316,7 +365,11 @@ const diamond: MapDef = {
       homes.push({ r: rOut, angle: cardinal }); // outer (even slots)
       homes.push({ r: rIn, angle: diagonal }); // inner (odd slots)
     }
-    return fromPolar(bounds, homes).slice(0, count);
+    // Derelict-fill (ratified): the double diamond's whole character is its 4-fold
+    // outer/inner asymmetry — an eight-point construction with no natural small-N
+    // form — so at N<8 it keeps all eight positions and the unused ones become
+    // wrecks. Actives still come first, so slot 0 remains an outer home at any N.
+    return derelictFill(fromPolar(bounds, homes), count);
   },
 };
 

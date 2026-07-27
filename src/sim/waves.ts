@@ -228,13 +228,21 @@ function drawCanon(
  * and it holds with no tolerance — the totals are equal EXACTLY.
  */
 export function spawnHomeFields(world: World): void {
-  const planets = world.planets;
+  // Only LIVE homes get a stamped neighbourhood: a derelict is an unowned wreck
+  // (the derelict-fill maps, Milestone B), so it carries no home field — its
+  // lootable ore is wreck debris instead (`scatterDerelictLoot` in `./match`).
+  // `n` is the count of live homes, so `homeFieldOre` divides the home share by
+  // the ACTIVE player count, not the board size: every live player's
+  // neighbourhood is as rich at a small N as it would be on a regenerate map,
+  // and the finite field still totals exactly `FIELD_YIELD` (the derelict debris
+  // is separate loose ore, not part of the home/commons budget).
+  const planets = world.planets.filter((p) => !p.derelict);
   const n = planets.length;
   if (n === 0) return;
 
   const cx = world.bounds.width / 2;
   const cy = world.bounds.height / 2;
-  // Each planet's own distance from the centre. On a single-ring map (`octagon`
+  // Each live home's own distance from the centre. On a single-ring map (`octagon`
   // and the historical default) these are all equal; on `compass`/`oval`/
   // `diamond` they are not, and the field is stamped per-planet so it stays
   // inboard of each home wherever the home sits.

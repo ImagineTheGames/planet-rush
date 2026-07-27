@@ -27,6 +27,7 @@ import {
   WAVE,
 } from './constants';
 import { getMap } from './maps';
+import { scatterDerelictLoot } from './match';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
 
@@ -282,6 +283,19 @@ export interface Planet {
    * FFA. Static config, never on the per-tick snapshot (spike Trap 7).
    */
   team?: number;
+  /**
+   * True for a **derelict** — an unowned wreck the map lays out to keep its
+   * shape at a small N (the derelict-fill maps `compass`/`diamond`, ratified
+   * 2026-07-26, Milestone B). A derelict is born a wreck: `alive === false` from
+   * construction, no owning ship, no home field, its `owner`/`team` a board index
+   * beyond the live roster (`>= N`) that nobody shares — so every combat path
+   * ignores it exactly as it ignores a killed home (a dead core takes no damage,
+   * has no turrets, and is never auto-aimed). Its lootable debris is scattered at
+   * world-build like any wreck's (GDD §2.7). Optional and absent on live homes,
+   * the same backward-compatible discipline as `team`; never on the per-tick
+   * snapshot (static match layout — the client rebuilds it from map + roster).
+   */
+  derelict?: boolean;
   /** Static — planets do not move. */
   pos: Vec2;
   radius: number;
@@ -555,6 +569,40 @@ function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): 
   };
 }
 
+/**
+ * Build a **derelict wreck** at an unused board position (the derelict-fill maps,
+ * Milestone B). It is born dead — `alive: false`, `coreHp: 0`, `deathTime: 0` —
+ * so every combat path treats it exactly like a home whose core was destroyed:
+ * `damagePlanet`/siege collision/auto-aim all skip a dead core, and it carries no
+ * turrets, shields, or builds to defend or lose. `owner`/`team` are its board
+ * index, which is `>= N` (the live roster is the dense `0..N-1`), so no ship
+ * shares them and `areEnemies` reads it as everyone's foe — harmless, since a
+ * dead core is untargetable regardless. Its lootable debris is scattered
+ * separately at world-build (`scatterDerelictLoot`).
+ */
+function makeDerelictPlanet(index: number, pos: Vec2, angle: number): Planet {
+  return {
+    id: index,
+    owner: index,
+    team: index,
+    derelict: true,
+    pos: { x: pos.x, y: pos.y },
+    radius: PLANET.radius,
+    coreHp: 0,
+    maxCoreHp: CORE_HP,
+    alive: false,
+    deathTime: 0,
+    spawnProtect: 0,
+    angle,
+    sinceDamage: SHIELD.regenDelay,
+    repairing: false,
+    repairCooldown: 0,
+    turrets: [],
+    shields: [],
+    builds: [],
+  };
+}
+
 /** A fresh match's clock: nothing has spawned, collapsed, or been won yet. */
 function initialMatch(): MatchState {
   return {
@@ -593,21 +641,37 @@ export function createWorld(config: WorldConfig): World {
   // scatter below, not the layout. NOTHING hugs the wall — each map sizes its
   // outermost planets to clear the bounds by `WORLD_EDGE_MARGIN` (field report
   // P1), and the spawners clamp everything else through the same margin.
+  // A map returns one placement per board position: exactly `N` live homes for a
+  // regenerate map (`octagon`/`oval`), or all eight for a derelict-fill map
+  // (`compass`/`diamond`) with the `8-N` unused ones marked derelict. The live
+  // homes come first, so they line up with the dense `0..N-1` player roster.
   const placements = map.planets(config.seed, config.players.length, bounds);
+  const homes = placements.filter((p) => !p.derelict);
 
-  // Ships spawn orbiting their planet, one per lobby slot — deterministic, no RNG.
+  // Ships spawn orbiting their live home, one per lobby slot — deterministic, no
+  // RNG. Derelict positions carry no ship.
   const ships: Ship[] = config.players.map((spec, i) => {
-    const pos = placements[i]!.ship;
+    const pos = homes[i]!.ship;
     const ship = makeShip(spec, pos);
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
     return ship;
   });
 
-  // One home planet per slot, on the same spoke as its ship, outboard of it.
-  const planets: Planet[] = config.players.map((spec, i) => {
-    const place = placements[i]!;
-    return makePlanet(spec, i, place.planet, place.angle);
+  // A planet per board position: a live home for each player (on the same spoke
+  // as its ship, outboard of it), and an unowned wreck for each derelict position
+  // — so the layout keeps its shape at any N. The planet's array index is its
+  // board id; live homes take ids `0..N-1` (actives are first), matching each
+  // owner id, and derelicts take the remaining ids `>= N`.
+  const planets: Planet[] = [];
+  let liveIndex = 0;
+  placements.forEach((place, index) => {
+    if (place.derelict) {
+      planets.push(makeDerelictPlanet(index, place.planet, place.angle));
+    } else {
+      planets.push(makePlanet(config.players[liveIndex]!, index, place.planet, place.angle));
+      liveIndex++;
+    }
   });
 
   const world: World = {
@@ -636,5 +700,10 @@ export function createWorld(config: WorldConfig): World {
   // and the rock that lands at t=600 come from one code path (`./waves`).
   spawnHomeFields(world);
   spawnWave(world);
+  // Derelict wrecks are lootable (GDD §2.7, ratified 2026-07-26): each scatters a
+  // ring of scavengeable debris at construction, the same burst a home leaves
+  // when its core dies. Done after the fair field so the home + commons asteroid
+  // ids are stamped first and unaffected by how many derelicts a map carries.
+  scatterDerelictLoot(world);
   return world;
 }
