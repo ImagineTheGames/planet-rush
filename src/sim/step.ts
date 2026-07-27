@@ -529,8 +529,24 @@ function fireWeapon(world: World, ship: Ship, dir: Vec2): void {
 
 /**
  * The unit aim for an auto-aim weapon shot at a non-asteroid target: an
- * intercept lead on a moving ship (so a strafing enemy is actually hit, design
- * amendment v0.2 item 5), or a straight shot at a stationary turret or core.
+ * intercept lead on a moving ship (so a strafing *or orbiting* enemy is actually
+ * hit, design amendment v0.2 item 5; field report v0.2.4 "I can never hit an
+ * enemy orbiting my planet"), or a straight shot at a stationary turret or core.
+ *
+ * This is the **player's** consumer of the shared intercept solver — the third
+ * alongside the turrets (`buildings.ts`) and the bots (`bots/steering.ts`), all
+ * three calling the ONE {@link leadAim} in `./projectiles`, never a fork. The
+ * player's auto-aim (the stick's Auto-aim fire mode, and the Tap Commander pilot
+ * once its scheme rides this same Auto path) leads the ladder's current target
+ * with a CLEAN solve and no artificial error — it is an assist mode, so the cost
+ * of auto-aim is target *choice* (the ladder picks), not induced misses. Manual
+ * aim is untouched: leading a shot by hand stays the skill-ceiling option.
+ *
+ * The solve is a stationary-muzzle intercept because a ship's shot does NOT
+ * inherit the shooter's velocity (`fireShipProjectile` sets `vel = dir·speed`),
+ * so there is no own-velocity to compound in — `leadAim(origin, targetPos,
+ * targetVel, speed)` is exact for our shot and the shared solver needs no
+ * ship-side variation.
  */
 function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
   const t = targetPos(world, hit);
