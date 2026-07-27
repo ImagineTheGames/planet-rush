@@ -408,7 +408,7 @@ export class BuildWheelView extends Container {
     this.hideWedgesFrom(this.buildWedges, model.segments.length);
 
     this.buildHubOre.text = `${model.ore}`;
-    this.buildHubOre.y = 2;
+    this.buildHubOre.y = 4;
     this.buildHubLabel.y = this.buildHubOre.y + 12;
     this.buildHubLabel.text = 'ORE';
     this.drawHubBack(this.buildHubBackChevron, this.buildHubBackLabel, this.buildHubHit, hub, model.hubBack);
@@ -445,7 +445,7 @@ export class BuildWheelView extends Container {
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
 
     this.upgradeHubOre.text = `${model.ore}`;
-    this.upgradeHubOre.y = 2;
+    this.upgradeHubOre.y = 4;
     this.upgradeHubLabel.y = this.upgradeHubOre.y + 12;
     // Name the hull whose stats these are — the class is the lobby choice.
     this.upgradeHubLabel.text = model.className;
@@ -520,13 +520,13 @@ export class BuildWheelView extends Container {
     // CLOSE / BACK, plus the PC key that mirrors the hub tap (field report v0.2.4).
     label.visible = true;
     label.text = this.isTouch ? hb.label : `${hb.label} · ESC`;
-    label.y = -22;
+    label.y = -18;
 
     chevron.visible = true;
     chevron.clear();
     // A small up-chevron centred over the label — "go up a level".
     chevron.poly([-5, 3, 0, -3, 5, 3]).stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
-    chevron.y = -30;
+    chevron.y = -25;
   }
 
   private drawRings(rings: Graphics, r: number, hub: number): void {
