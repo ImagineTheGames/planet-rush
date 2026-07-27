@@ -65,6 +65,7 @@ import {
 import { areEnemies } from './allegiance';
 import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
+import { ledgerAdd } from './ore-ledger';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, OreChunk, Planet, Ship, World } from './state';
 import {
@@ -785,6 +786,10 @@ function updateChunks(world: World, dt: number): void {
           const take = Math.min(chunk.amount, room);
           target.cargo += take;
           chunk.amount -= take;
+          // Chunk → hold: the LOOT step. Mined ore, a death drop, wreck debris —
+          // all arrive here, so this one counter is every unit a ship ever picks
+          // up (`./ore-ledger`), the flow three regressions have lost.
+          ledgerAdd(world, 'looted', take);
         }
       }
     }
@@ -832,6 +837,9 @@ function updateDeposits(world: World, dt: number): void {
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
+    // Hold → bank: a transfer within the live economy (conserved), recorded so the
+    // ledger can attribute where banked ore came from (`./ore-ledger`).
+    ledgerAdd(world, 'deposited', moved);
 
     // The telegraph, CONSERVED: exactly one courier per whole unit that left the
     // hold this tick. Summed across a drain this equals the whole ore banked — the

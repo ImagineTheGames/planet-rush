@@ -43,6 +43,7 @@ import {
 } from './constants';
 import { damagePlanet, damageTurret, planetTargetRadius, turretRange, turretTier } from './buildings';
 import { damageShip } from './damage';
+import { ledgerAdd } from './ore-ledger';
 import type { SpatialHash } from './spatial-hash';
 import type { Asteroid, Projectile, Ship, Turret, World } from './state';
 import { shipMineYield, shipProjectileLife, shipProjectileSpeed, shipWeaponDamage } from './upgrades';
@@ -378,4 +379,7 @@ function spawnMinedChunk(world: World, a: Asteroid, toward: Ship | null, amount:
     amount,
     radius: CHUNK.radius,
   });
+  // Rock → chunk: a transfer within the live economy, recorded so the ledger can
+  // attribute every chunk's ore to where it came from (`./ore-ledger`).
+  ledgerAdd(world, 'mined', amount);
 }

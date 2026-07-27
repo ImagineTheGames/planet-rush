@@ -259,11 +259,12 @@ describe('the wheel is validated by the sim, never trusted (GDD §2.5)', () => {
 
   it('spends the hold before the bank, so banking stays a real decision', () => {
     const ship = makeShip({ id: 0, cargo: 2, banked: 5 });
-    expect(spendOre(ship, 3)).toBe(true);
+    const world = makeWorld({ ships: [ship] });
+    expect(spendOre(world, ship, 3)).toBe(true);
     expect(ship.cargo).toBe(0);
     expect(ship.banked).toBe(4);
 
-    expect(spendOre(ship, 99)).toBe(false);
+    expect(spendOre(world, ship, 99)).toBe(false);
     expect(ship.banked).toBe(4); // refused costs nothing
   });
 

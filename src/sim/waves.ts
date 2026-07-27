@@ -68,8 +68,17 @@ import {
   waveRadiusFraction,
   waveTime,
 } from './constants';
+import { ledgerAdd } from './ore-ledger';
 import { rngRange } from './rng';
 import type { World } from './state';
+
+/** Total ore locked in unmined rock (plus the fractional mine buffer that has
+ *  left `ore` but not yet formed a chunk) — the source a wave adds to. */
+function totalRockOre(world: World): number {
+  let ore = 0;
+  for (const a of world.asteroids) ore += a.ore + a.mineBuffer;
+  return ore;
+}
 
 /** True once every wave in the schedule has been delivered — no more ore is
  *  ever coming (GDD §2.3, the precondition for collapse). */
@@ -371,10 +380,16 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   );
   world.rngState = rng;
 
+  const rockBefore = totalRockOre(world);
   for (let j = 0; j < sectors; j++) {
     const rot = j * sectorWidth;
     for (const rock of rocks) stampRock(world, cx, cy, rot, rock, null);
   }
+  // A wave adds rock to the live economy — record the exact ore delivered so the
+  // conservation ledger balances this source (`./ore-ledger`). The opening wave
+  // fired during world-build is folded into `seeded` and this counter is zeroed
+  // there, so `injected` is post-build waves only.
+  ledgerAdd(world, 'injected', totalRockOre(world) - rockBefore);
 
   world.match.wavesSpawned = n;
 }

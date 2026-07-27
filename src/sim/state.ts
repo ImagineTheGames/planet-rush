@@ -28,6 +28,7 @@ import {
 } from './constants';
 import { getMap } from './maps';
 import { scatterDerelictLoot } from './match';
+import { liveOre, makeLedger, type OreLedger } from './ore-ledger';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
 
@@ -497,6 +498,15 @@ export interface World {
   asteroidsPerWave: number;
   /** Waves, collapse, and win/loss (GDD §1, §2.3). */
   match: MatchState;
+  /**
+   * Match-wide ore accounting (`./ore-ledger`). Optional so the hand-built worlds
+   * other lanes construct (net snapshots, bot fixtures, `@platform/freeze`) still
+   * satisfy the interface; `createWorld` always attaches one, and every ore
+   * mutation funnels its delta through `ledgerAdd`, which no-ops when it is
+   * absent. Write-only — the sim never reads it, so it never changes behaviour or
+   * a determinism hash.
+   */
+  ledger?: OreLedger;
 }
 
 // ---------------------------------------------------------------------------
@@ -732,6 +742,7 @@ export function createWorld(config: WorldConfig): World {
     fieldRadius: ringRadius * RESOURCE_FIELD.commonsRadiusFraction,
     asteroidsPerWave: config.asteroidCount ?? WAVE.asteroidsPerWave,
     match: initialMatch(),
+    ledger: makeLedger(),
   };
 
   // The fair opening layout, before the fight begins (field rule v0.1.2): the
@@ -745,5 +756,12 @@ export function createWorld(config: WorldConfig): World {
   // when its core dies. Done after the fair field so the home + commons asteroid
   // ids are stamped first and unaffected by how many derelicts a map carries.
   scatterDerelictLoot(world);
+
+  // Capture the t0 baseline and zero the flow counters the build fired (the
+  // opening `spawnWave` bumped `injected`, derelict debris bumped `dropped`): from
+  // here every source/transfer/sink the ledger records is real match activity, and
+  // `seeded` is the clean starting total the conservation invariant balances
+  // against (`./ore-ledger`).
+  world.ledger = { ...makeLedger(), seeded: liveOre(world) };
   return world;
 }
