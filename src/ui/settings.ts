@@ -31,7 +31,7 @@ import { FONT_HEADING } from './typography';
 import {
   MENU_COLUMN_MAX,
   MENU_ROW_GAP,
-  centeredColumn,
+  centeredGrid,
   clamp,
   hitRect,
   menuContent,
@@ -271,6 +271,15 @@ export const SETTINGS_BACK_HEIGHT = 48;
 export const SETTINGS_BACK_HEIGHT_TOUCH = 56;
 /** The −/+ buttons on a volume row are squares hung off the row's right edge. */
 export const VOLUME_BUTTON_GAP = 6;
+/**
+ * The most columns the rows may wrap into. A phone under the landscape lock gives
+ * the screen a wide-but-short logical viewport; a single stack of every row would
+ * have to shrink each one to a sub-thumb sliver to fit that height (the field
+ * report: the CONTROLS row "wasn't there" on the developer's phone — it was there,
+ * just crushed). Two columns spend the width the phone has to keep every row —
+ * CONTROLS included — at its full thumb height. Desktop, with height to spare,
+ * never leaves one column. */
+export const SETTINGS_MAX_COLUMNS = 2;
 
 export interface SettingsLayoutOptions {
   readonly isTouch?: boolean;
@@ -318,7 +327,16 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
     height: Math.max(0, back.y - MENU_ROW_GAP - (title.y + titleHeight + MENU_ROW_GAP)),
   };
   const rowHeight = isTouch ? SETTINGS_ROW_HEIGHT_TOUCH : SETTINGS_ROW_HEIGHT;
-  const rows = centeredColumn(band, SETTINGS_ROWS.length, MENU_COLUMN_MAX, rowHeight);
+  // How many rows fit in one column at the full (thumb) row height? If fewer than
+  // all of them, wrap into as many columns as it takes — capped — so no row is
+  // ever compressed below its target just to fit the height. On a tall desktop
+  // every row fits in one column and this is a no-op.
+  const perColumnFit = Math.floor((band.height + MENU_ROW_GAP) / (rowHeight + MENU_ROW_GAP));
+  const columns = Math.min(
+    SETTINGS_MAX_COLUMNS,
+    Math.max(1, Math.ceil(SETTINGS_ROWS.length / Math.max(1, perColumnFit))),
+  );
+  const rows = centeredGrid(band, SETTINGS_ROWS.length, MENU_COLUMN_MAX, rowHeight, columns);
 
   return { content, title, rows, back, isTouch };
 }

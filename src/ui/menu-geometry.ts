@@ -78,6 +78,52 @@ export function centeredColumn(
 }
 
 /**
+ * A grid of `count` equal cells, at most `colWidth` wide and `maxRowHeight` tall,
+ * flowed into `columns` COLUMN-MAJOR (fill a column top-to-bottom, then the next)
+ * and centred both ways in `band`. Column-major so the caller's index order is
+ * preserved cell-for-cell — `cells[i]` is still item `i` — which lets a hit test
+ * and a view keep walking one flat list regardless of how many columns it wrapped
+ * into.
+ *
+ * The point of the extra columns is vertical room: a short viewport that would
+ * force a single stack to compress its rows into slivers can instead spread them
+ * across two columns and keep every row at its intended (thumb) height. With
+ * `columns === 1` this is exactly {@link centeredColumn}.
+ */
+export function centeredGrid(
+  band: Rect,
+  count: number,
+  colWidth: number,
+  maxRowHeight: number,
+  columns: number,
+  gap = MENU_ROW_GAP,
+  colGap = MENU_ROW_GAP,
+): Rect[] {
+  if (count <= 0) return [];
+  const cols = Math.max(1, Math.min(columns, count));
+  const perCol = Math.ceil(count / cols);
+  const w = Math.max(0, Math.min(colWidth, (band.width - (cols - 1) * colGap) / cols));
+  const available = band.height - (perCol - 1) * gap;
+  const height = Math.max(0, Math.min(maxRowHeight, available / perCol));
+  const totalW = cols * w + (cols - 1) * colGap;
+  const totalH = perCol * height + (perCol - 1) * gap;
+  const gridX = band.x + Math.max(0, (band.width - totalW) / 2);
+  const gridY = band.y + Math.max(0, (band.height - totalH) / 2);
+  const cells: Rect[] = [];
+  for (let i = 0; i < count; i++) {
+    const col = Math.floor(i / perCol);
+    const rowInCol = i - col * perCol;
+    cells.push({
+      x: gridX + col * (w + colGap),
+      y: gridY + rowInCol * (height + gap),
+      width: w,
+      height,
+    });
+  }
+  return cells;
+}
+
+/**
  * A single panel of at most `width` × `height`, centred in the content box.
  * The connection overlay and any confirm dialog use this: one card, in the
  * middle, never wider than it needs to be.
