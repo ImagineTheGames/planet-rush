@@ -174,6 +174,7 @@ import type {
   LobbyState,
   PauseScreen,
   PauseButton,
+  UiCue,
 } from './ui';
 import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
@@ -569,7 +570,28 @@ async function boot(): Promise<void> {
 
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
-  const hud = new Hud(transform.logicalWidth, transform.logicalHeight);
+  // The UI sound seam (field report v0.2.4+): the HUD's one shared press/confirm
+  // driver names an event — press, confirm, reject — and the audio engine decides
+  // the sound, the SFX-slider gain and the death-hush ducking (`art/audio` cue()).
+  // So every wheel/menu control is heard from the same state that draws its tell,
+  // and a disabled press gets the buzzer main.ts alone could never fire (it does
+  // not know a wedge's `ready` state — the HUD does).
+  //
+  // Under ?debug=1 the seam also tallies the cue KIND, which `__audioStage` reads
+  // back so a live-stage test can attribute a sound to the exact interaction
+  // (a live wedge → press, a disabled one → reject, a landed spend → confirm) —
+  // proof the RIGHT sound fired, not just that the one-shot count moved. Zero-cost
+  // (null) in a normal build.
+  const uiSfxLog: { press: number; confirm: number; reject: number; last: UiCue | null } | null = flags.debug
+    ? { press: 0, confirm: 0, reject: 0, last: null }
+    : null;
+  const hud = new Hud(transform.logicalWidth, transform.logicalHeight, (cue) => {
+    if (uiSfxLog) {
+      uiSfxLog[cue]++;
+      uiSfxLog.last = cue;
+    }
+    audio.cue(cue);
+  });
   gameRoot.addChild(hud);
 
   // --- Health-bar live-stage seam (?debug=1 only). The enemy over-ship health
@@ -958,6 +980,11 @@ async function boot(): Promise<void> {
       upgradeWheelLayout.segments = upgradeSlots.length;
 
       const hit = hitWheel(pressPoint.x, pressPoint.y, upgradeWheelLayout);
+      // A wedge sounds itself through the HUD's shared driver (`pressWheelSegment`
+      // → the sfx seam): a live wedge ticks, a disabled one buzzes — matched to
+      // its own drawn state. Only the BACK/dismiss tap (hub or off-wheel) needs a
+      // press tick fired here, so track whether a wedge already sounded.
+      let wedgeSounded = false;
       if (hit.kind === 'outside' || hit.kind === 'hub') {
         // The hub is the BACK affordance (field report v0.2.4), and a tap off the
         // wheel dismisses too — both pop exactly ONE level: WEAPON sub-wheel →
@@ -971,17 +998,19 @@ async function boot(): Promise<void> {
           // close the upgrade wheel back to the Build wheel (field report v0.2.2).
           weaponWheelOpen = true;
           hud.pressWheelSegment('upgrade', hit.index);
+          wedgeSounded = true;
         } else if (slot?.kind === 'track') {
           // Latch the pressed track; `updateBuildWheel` drains it into the funnel
           // as an `upgradeOrder` on the next tick, exactly like a Build segment.
           pendingUpgrade = slot.track;
           hud.pressWheelSegment('upgrade', hit.index);
+          wedgeSounded = true;
         }
       }
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
       haptics.haptic('tap');
-      audio.cue('press'); // a wedge on the OPEN upgrade wheel was pressed
+      if (!wedgeSounded) audio.cue('press'); // the BACK/dismiss tick (a wedge sounded itself)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -991,6 +1020,7 @@ async function boot(): Promise<void> {
     // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
     // pressed (scale + glow) or rejected (shake + red flash) visual. The HUD
     // decides which from the wedge's own drawn state.
+    let buildWedgeSounded = false;
     if (buildWheel.open && !buildWheel.panelOpen) {
       const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
       if (wheelHit.kind === 'hub') {
@@ -1003,12 +1033,17 @@ async function boot(): Promise<void> {
         e.preventDefault();
         return;
       }
-      if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
+      // A Build wedge sounds itself through the HUD's shared driver (press tick,
+      // or the buzzer if it is disabled) — so a press here does not also cue one.
+      if (wheelHit.kind === 'segment') {
+        hud.pressWheelSegment('build', wheelHit.index);
+        buildWedgeSounded = true;
+      }
     }
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
-      audio.cue('press'); // …and its audible twin (the wheel/menu tick, engine.ts)
+      if (!buildWedgeSounded) audio.cue('press'); // …and its audible twin, unless the wedge sounded itself
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -1849,7 +1884,11 @@ async function boot(): Promise<void> {
     if (ordered) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
-      audio.cue('confirm'); // the two-beat purchase-landed sound, its audible twin
+      // The confirm CHIME is no longer fired here: an order submitted is not an
+      // order the sim ACCEPTED (it re-validates docking, affordability and max
+      // tier — comment above). The HUD sounds `confirm` off the sim's own state
+      // change (a turret/shield/tier count or core HP actually rising), so a
+      // refused order can never fake the chime (`ui/press-feedback` confirm()).
     }
   }
 
@@ -3361,6 +3400,15 @@ async function boot(): Promise<void> {
         sfxCount: number;
         /** One-shots skipped because the death hush had the mix at zero (§4.7). */
         hushedCount: number;
+        /** The SFX bus gain the cue actually rides, 0..1 (the SFX slider × the
+         *  alarm duck). Zero means the seam still fired but nothing is audible —
+         *  the "slider at 0" case (field report v0.2.4+ point 4). */
+        sfxBusGain: number | null;
+        /** UI cues fired through the shared seam since boot, per KIND — so a test
+         *  can attribute a sound to the interaction (a live wedge → press, a
+         *  disabled one → reject, a landed spend → confirm). Null in a normal build
+         *  (the tally is ?debug=1 only). */
+        uiCues: { press: number; confirm: number; reject: number; last: UiCue | null } | null;
       } {
         return {
           contextState: audioCtx ? audioCtx.state : null,
@@ -3371,6 +3419,8 @@ async function boot(): Promise<void> {
           musicPhase: audio.musicScore.phase,
           sfxCount: audio.playCount,
           hushedCount: audio.hushedCount,
+          sfxBusGain: audio.graph ? audio.graph.buses.sfx.gain.value : null,
+          uiCues: uiSfxLog ? { ...uiSfxLog } : null,
         };
       },
       /** Resume the context by hand — the exact call the unlock makes from a
@@ -3381,6 +3431,14 @@ async function boot(): Promise<void> {
         if (!audioUnlock) return null;
         await audioUnlock.unlockNow();
         return audioCtx ? audioCtx.state : null;
+      },
+      /** Set the SFX bus level, 0..1 — the same call the settings slider makes
+       *  through {@link applyAudioMix}. Behind ?debug=1 only, so a live-stage test
+       *  can prove the "slider at 0" case: the UI seam still FIRES (`uiCues`
+       *  climbs) but `sfxBusGain` reads 0, so the cue is inaudible (field report
+       *  v0.2.4+ point 4). The real slider→gain path is the settings test's job. */
+      setSfx(value: number): void {
+        audio.setSfxVolume(value);
       },
     };
     try {
