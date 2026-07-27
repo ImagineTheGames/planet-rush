@@ -1068,5 +1068,45 @@
     "buildSha": "58a4e89",
     "attestation": "Three-panel montage, real desktop bundle (?debug=1&freeze=1), context woken by a real gesture first; presses then go through the HUD's ONE shared control driver (__pressStage — the same call a real thumb's press reaches) and the per-kind SFX-spy tally (uiCues) is read back through __audioStage and captioned. PRESS TICK: a LIVE affordable upgrade wedge (drawn 'ready', hub 999) → the press tally rose 1→2 and the last cue was 'press' — a live control ticks. REJECT BUZZ: with the bank zeroed (hub 0) a DISABLED wedge (lit red) → the reject tally rose 0→1, last cue 'reject' — main.ts alone can't know a wedge's ready state, the HUD does, so a disabled press BUZZES. CONFIRM CHIME: a sim-confirmed landed spend through the driver's confirm path → the confirm tally rose 0→1, last cue 'confirm'. Three distinct voices, each married to its exact interaction; SFX bus gain 0.8. The voices sat unwired in the bank for a day — this gate keeps callers and voices married. Zero page errors.",
     "verdict": "verified"
+  },
+  {
+    "id": "tap-autofire-in-motion",
+    "title": "Tap Commander — auto-fires while you fly (no lock)",
+    "area": "touch",
+    "image": "images/tap-autofire-in-motion.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Two-panel figure, real desktop bundle (?debug=1). Tap Commander was engaged through the REAL pause Settings → Controls row — a real click on the point __pauseStage reports the client drew that row at, never a hit-test seam — and the scheme read back as 'tap'. STAGED: the local ship (steel triangle, hull bar 50/50) sits screen-centred with the bot 'Rusty (EASY)' parked 140u to its right and the asteroid field cleared. MID-FLIGHT · FIRING: a real left-click on empty space up-field placed a MOVE order (order kind 'waypoint', ref null — there is NO target lock); the ship has thrust ~40% of the way to the waypoint (visibly in motion, thrust flare below it, world y 1200→1101), and a single red projectile is streaming down-right toward Rusty, which is the nearest enemy on screen (~120px) and whose hull has fallen to 60/70 (85%). Three other bots (Sable/Warden/Patch) sit at the frame edges, untargeted. The ship fights while flying with no lock — the target is the auto-aim ladder's pick. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "tap-mining-in-tractor-range",
+    "title": "Tap Commander — mines from INSIDE the tractor radius (ore reaches the hold)",
+    "area": "touch",
+    "image": "images/tap-mining-in-tractor-range.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Single annotated frame, real desktop bundle (?debug=1), Tap Commander. A real left-click LOCKED the rock (order read back = target, asteroid #900001). The overlay marks the local ship (white box, screen-centred), the locked rock (the large tan asteroid, orange box at its centre), a dashed CYAN ring at the 120u tractor pickup radius and a grey ring at the old 150u engage standoff, and a yellow line = the measured hold. The rock centre sits plainly INSIDE the cyan tractor ring: the ship settled 81u from the rock centre (measured), well short of the old 150u standoff. Two yellow ore pips sit under the ship and the hold climbed 0→2 over the run as chipped chunks drifted into it. This is the p9-02 fix visible on a real boot — the pilot holds a mined rock's centre inside the tractor pickup radius so the ore is actually collected, instead of parking at engage range (150u) and stranding it. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "full-hold-no-rock-fire",
+    "title": "Tap Commander — a FULL hold silences rock fire, but never enemy fire",
+    "area": "touch",
+    "image": "images/full-hold-no-rock-fire.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Two-panel figure, ONE continuous live scene, real desktop bundle (?debug=1), Tap Commander. The ship first mined a natural rock to a full hold. FULL HOLD · SILENT: the ship sits amid a dense field of grey asteroids with two yellow ore pips under it (hold full, cargo 2/2) and the game's own 'Hold full — fly home and press E' prompt showing; with no lock (pure auto-aim), across 12 sampled frames the sim's firing tell was FALSE on all 12 — the weapon is SILENT, not one shot toward the surrounding minable rock. ENEMY ARRIVES · FIRES: a bot ('Rusty (EASY)', hull 67/70) is brought into range and the weapon speaks at once — several red projectiles stream toward it (firing on 26 of 26 sampled frames), its hull draining — while the hold is STILL full (2/2, the 'Hold full' prompt still shown) and the rock is still ignored. A full hold drops asteroids from the auto-aim ladder entirely, yet an enemy (tier 1) is engaged the instant it is in range. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "autoaim-hits-orbiter",
+    "title": "Tap Commander — auto-aim LEADS an orbiter: a sequence of shots lands on the arc",
+    "area": "touch",
+    "image": "images/autoaim-hits-orbiter.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Three-panel strip, live desktop bundle (?debug=1), player on auto-aim (Tap Commander, no lock — so the sim's lead solver aims the ladder's pick). A bot ('Rusty') traces an arc around a planet while the local ship (white box, screen-centred) fires on it. Each panel is a captured LANDED shot: the orbiter is ringed white at successive points along the arc, its recent path drawn in cyan, the shot span in yellow, and the planet it circles boxed blue with a faint orbit ring. Across 170 frames (the firing tell true on all 170) the bot swept a ~50° arc at ~237px radius and its hull stepped DOWN 7 times — the three panels catch it at 95% → 75% → 60% as the arc sweeps up-left → up → up-right. Panel 2 carries the game's own 'Your planet is under attack — follow the arrow' warning. Seven landed shots on a moving orbiter: the developer's field report ('I can never hit an enemy orbiting my planet') answered by the auto-aim lead solver. Zero page errors.",
+    "verdict": "verified"
   }
 ]
