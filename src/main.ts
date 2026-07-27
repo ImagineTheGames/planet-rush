@@ -969,19 +969,42 @@ async function boot(): Promise<void> {
       return;
     }
 
-    // --- Tap Commander (developer §1–2): a primary tap no affordance claimed places
-    //     the ship's next order. Empty space → move there; an entity → LOCK it —
-    //     attack a rival ship / turret / core, mine an asteroid ("a rock is just a
-    //     target"), or fly to your own planet's atmosphere. `pressPoint` is already
-    //     un-rotated into logical space (the landscape lock); project it back to
-    //     WORLD space through the live camera and hit-test the world. Consumes the
-    //     event so the same tap never also engages a stick under it. A no-op in the
-    //     default 'sticks' scheme, so that path is byte-for-byte unchanged.
+    // --- Tap Commander (developer §1–2, p10): a primary tap no affordance claimed
+    //     places the ship's next order — OR opens the build wheel. Empty space → move
+    //     there; a rival ship / turret / core or an asteroid → LOCK it ("a rock is
+    //     just a target"); YOUR OWN PLANET within build range → open the Build wheel
+    //     (developer p10 §1), and too far → a plain move toward it (a second tap when
+    //     close opens). `pressPoint` is already un-rotated into logical space (the
+    //     landscape lock); project it back to WORLD space through the live camera and
+    //     hit-test the world. The pilot is the one place these semantics live
+    //     ({@link TapPilot.resolveTap}) — it applies the move/lock to its own order and
+    //     hands back the wheel intent, which is carried out here. Consumes the event so
+    //     the same tap never also engages a stick under it. A no-op in the default
+    //     'sticks' scheme, so that path is byte-for-byte unchanged.
+    //
+    //     The open wheel claims its own taps FIRST (its `press` closes on an outside
+    //     tap, its wedges consume inside ones — the returns above), so a tap reaching
+    //     here has the wheel closed; `inBuildRange` is the SAME `docked` answer the
+    //     wheel gates on, reused rather than re-derived (developer p10 §1).
     if (controlScheme === 'tap' && e.button === 0) {
       logicalToWorld(pressPoint, worldTapPoint);
       const hit = pickTapTarget(buildTapCandidates(), worldTapPoint);
-      if (hit) tapPilot.lockTarget({ kind: hit.kind, id: hit.id });
-      else tapPilot.orderMove({ x: worldTapPoint.x, y: worldTapPoint.y });
+      const cmd = tapPilot.resolveTap(hit, worldTapPoint, {
+        wheelOpen: buildWheel.open,
+        insideWheel: false,
+        inBuildRange: docked,
+      });
+      if (cmd.kind === 'openWheel') {
+        // Tap your planet in build range → open the same wheel E / Y / BUILD open.
+        if (!buildWheel.open) buildWheel.toggle();
+        audio.cue('press'); // the wheel came up — a press tick, like the BUILD button
+      } else if (cmd.kind === 'closeWheel') {
+        // Defensive: the wheel's own `press` already closes on an outside tap before
+        // this block, so this only fires if that path is ever bypassed — pop one
+        // level the wheel family's own way, never a re-derived close.
+        wheelBackOneLevel();
+      }
+      // move / lock: the pilot has already taken the order; passThrough: nothing.
       haptics.haptic('tap');
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -1478,11 +1501,28 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Build the tap hit-test candidate list from the live world (developer §2): every
-   * enemy ship, every asteroid (mine), every enemy turret, every standing core, and
-   * the player's own planet (a friendly fly-to). The local ship and the player's own
-   * turrets are not lock targets, and a wreck (dead planet) is neither attackable nor
-   * fly-to-able. Pooled records overwritten in place, so a tap allocates nothing.
+   * The forward of {@link logicalToWorld}: a WORLD point to the LOGICAL screen point
+   * it draws at, through the SAME live camera offset — so a `?debug=1` stage can hand
+   * a Playwright test the exact place to REAL-tap an entity (the p10 planet-wheel
+   * front door). Reuses the same camera-inverse scratch, so it allocates nothing but
+   * the small returned record it is asked for. Only ever called off the input path.
+   */
+  function worldToLogical(wx: number, wy: number): { x: number; y: number } {
+    const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
+    camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
+    camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
+    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport);
+    return { x: wx + camOffsetScratch.x, y: wy + camOffsetScratch.y };
+  }
+
+  /**
+   * Build the tap hit-test candidate list from the live world (developer §2, p10):
+   * every enemy ship, every asteroid (mine), every enemy turret, every standing core,
+   * and the player's own planet (kind `planet` — a tap on it opens the Build wheel in
+   * range, or moves toward it when too far, developer p10 §1). The local ship and the
+   * player's own turrets are not lock targets, and a wreck (dead planet) is neither
+   * attackable nor a build target. Pooled records overwritten in place, so a tap
+   * allocates nothing.
    */
   function buildTapCandidates(): TapCandidate[] {
     let n = 0;
@@ -2905,6 +2945,86 @@ async function boot(): Promise<void> {
         }
         tapPilot.orderMove({ x, y });
         return { locked: false, kind: null, id: null };
+      },
+      /**
+       * Stage the p10 "tap your planet to open the build wheel" front door (developer
+       * §5): park the local ship DOCKED at its OWN planet (inside `PLANET.dockRange`,
+       * so the wheel's own `isDocked` gate is true), switch to the tap scheme, fund
+       * the bank so a turret is affordable, clear the field and park every rival far
+       * away so the planet tap is unambiguous, and start from a CLOSED wheel — the
+       * real tap must be what opens it. Returns the LOGICAL screen points a Playwright
+       * test REAL-taps: the planet centre (opens the wheel), the TURRET wedge (buys),
+       * a point well OUTSIDE the wheel (closes it, no move), and an empty up-field
+       * point (the move that flies again). Runs live (no ?freeze) so the buy actually
+       * drains. Null if there is no local ship / planet.
+       */
+      stagePlanetWheel(): {
+        planetPoint: Vec2;
+        turretWedgePoint: Vec2;
+        outsidePoint: Vec2;
+        movePoint: Vec2;
+        banked: number;
+        turretCount: number;
+      } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        // Dock the ship: sit it a short surface hop off the planet — the same close
+        // parking the repair stage uses, well inside `isDocked`'s range — so the
+        // wheel's own docking gate is true every frame (no ?freeze here to prop it up).
+        ship.alive = true;
+        ship.spawnProtect = 0;
+        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 20);
+        ship.pos.y = planet.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        ship.cargo = 0;
+        ship.banked = 999; // a turret is a few ore — comfortably affordable
+        planet.spawnProtect = 0;
+        world.asteroids.length = 0; // no rock steals the tap near the planet
+        for (const other of world.ships) {
+          if (other.id === LOCAL_PLAYER) continue;
+          other.pos.x = 0;
+          other.pos.y = 0;
+          other.vel.x = 0;
+          other.vel.y = 0;
+          other.spawnProtect = 999;
+        }
+        controlScheme = 'tap';
+        tapPilot.clear();
+        if (buildWheel.open) buildWheel.close(); // the tap is what must open it
+
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const radius = wheelRadius(w, h);
+        const turretIndex = WHEEL_ORDER.indexOf('turret');
+        const angle = segmentAngle(turretIndex);
+        return {
+          planetPoint: worldToLogical(planet.pos.x, planet.pos.y),
+          // 0.6 of the outer radius sits in the wedge's word band — the honest middle
+          // of the pressable TURRET wedge (mirrors `repairWedgePoint`).
+          turretWedgePoint: { x: w / 2 + Math.cos(angle) * radius * 0.6, y: h / 2 + Math.sin(angle) * radius * 0.6 },
+          // Below the wheel, comfortably past its outer ring, on cleared empty space:
+          // an OUTSIDE tap that closes the wheel and does NOT double as a move (§2).
+          outsidePoint: { x: w / 2, y: Math.min(h - 8, h / 2 + radius + 48) },
+          // An empty up-field point (well above the planet, clear of the top chrome):
+          // the fresh tap that flies the ship again once the wheel is closed.
+          movePoint: { x: w / 2, y: Math.max(24, h * 0.18) },
+          banked: ship.banked,
+          turretCount: turretCount(planet),
+        };
+      },
+      /** The build wheel's live screen state — what a real tap opened or closed. */
+      wheelState(): { open: boolean; panelOpen: boolean } {
+        return { open: buildWheel.open, panelOpen: buildWheel.panelOpen };
+      },
+      /** The local ship's banked ore and its planet's turret count (finished + queued):
+       *  the two tells a turret buy moves — banked drops by the cost, the count rises. */
+      buildReadout(): { banked: number; turretCount: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = planetOf(world, LOCAL_PLAYER);
+        if (!ship || !planet) return null;
+        return { banked: ship.banked, turretCount: turretCount(planet) };
       },
       /** The pilot's current standing order, as plain data. */
       order(): { kind: 'waypoint' | 'target' | 'none'; at: Vec2 | null; ref: { kind: TargetKind; id: number } | null } {

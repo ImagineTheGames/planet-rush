@@ -177,6 +177,46 @@ export function pickTapTarget(
   return best;
 }
 
+/**
+ * What a Tap Commander primary tap MEANS (developer p10). The pilot decides this
+ * from the tap and the two facts only the wiring knows — is the wheel open, and is
+ * the ship within build-wheel range of the tapped own-planet — and applies the
+ * movement/lock cases to its own order in place; the wheel-family cases (`openWheel`
+ * / `closeWheel`) it hands back for the wiring to carry out, because the pilot never
+ * touches the wheel or the DOM.
+ */
+export type TapResult =
+  /** Tap your own planet within build range: OPEN the build wheel (§1). The pilot
+   *  leaves its standing order untouched — the ship holds while the menu is up. */
+  | { readonly kind: 'openWheel' }
+  /** A tap that landed OUTSIDE an open wheel: CLOSE it, and do NOT move (§2). One
+   *  tap to dismiss, the next tap acts. The pilot sets no order. */
+  | { readonly kind: 'closeWheel' }
+  /** A tap the open wheel owns (a wedge / its hub): the pilot does not touch it —
+   *  the wheel handles it exactly as it expects (§2). No order, no wheel change. */
+  | { readonly kind: 'passThrough' }
+  /** Fly to a point: empty space, or an own planet too far to build at (§1–2). The
+   *  pilot has already set this waypoint as its standing order. */
+  | { readonly kind: 'move'; readonly at: Vec2 }
+  /** Lock a hostile entity — attack a rival ship/turret/core, mine a rock (§2). The
+   *  pilot has already set this lock as its standing order. */
+  | { readonly kind: 'lock'; readonly ref: TargetRef };
+
+/** The facts only the wiring knows, handed to {@link TapPilot.resolveTap}: the live
+ *  wheel state and whether the ship is within build-wheel range of the tapped
+ *  own-planet — the SAME `isDocked`/atmosphere answer the wheel itself gates on,
+ *  passed in rather than re-derived here (developer p10 §1, "reuse, never re-derive"). */
+export interface TapContext {
+  /** Is the build wheel currently up? */
+  readonly wheelOpen: boolean;
+  /** Did the tap land inside the open wheel's geometry (a wedge / its hub)? Only
+   *  meaningful when `wheelOpen`; the wheel's own hit-test provides it. */
+  readonly insideWheel: boolean;
+  /** Is the ship within build-wheel range of the tapped own-planet (the wheel's own
+   *  `isDocked` answer)? Only consulted for an own-planet tap. */
+  readonly inBuildRange: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // The pilot
 // ---------------------------------------------------------------------------
@@ -196,8 +236,16 @@ export function pickTapTarget(
  * hittability and full-hold rock suppression built into that ladder (p9-01), never
  * re-derived here. Movement and firing are independent: the ship flies its order
  * and shoots what the ladder finds, like a twin-stick player. A lock overrides the
- * ladder until it is cleared. It never opens the build wheel — that affordance stays
- * on its own device and is merged alongside the pilot by the wiring.
+ * ladder until it is cleared.
+ *
+ * The pilot never TOUCHES the build wheel — it holds no `WheelInput` and never
+ * reaches the DOM. But under the p10 ratification ("tap your planet to open the
+ * build wheel") it is the one place tap semantics live, so it *classifies* a tap
+ * into an intent the wiring carries out ({@link TapPilot.resolveTap}): tapping your
+ * own planet within build-wheel range asks the wiring to OPEN the wheel; a tap that
+ * lands outside an open wheel asks it to CLOSE (the wheel family's own close
+ * gesture, executed by the wiring); a wheel-internal tap passes straight through
+ * untouched. Movement/lock intents the pilot applies to its own order directly.
  */
 export class TapPilot {
   private order: Order = null;
@@ -237,6 +285,51 @@ export class TapPilot {
   /** Drop the standing order (e.g. on rematch / scheme switch). */
   clear(): void {
     this.order = null;
+  }
+
+  /**
+   * Classify a primary tap under Tap Commander and APPLY the movement/lock cases to
+   * the standing order, returning what the wiring must do about the build wheel
+   * (developer p10 §1–2). `hit` is the entity the tap picked (or `null` for empty
+   * space, from {@link pickTapTarget}); `at` is the tap in world space; {@link
+   * TapContext} carries the two facts only the wiring holds. The order of the checks
+   * IS the ratified priority:
+   *
+   *  1. **Wheel up** — the wheel owns the gesture. A tap inside it passes straight
+   *     through (the wheel's own wedges handle it); a tap outside CLOSES it and is
+   *     NOT also a move order (§2, "one tap to dismiss, the next tap acts"). Either
+   *     way the pilot sets no order — menus over motion.
+   *  2. **Own planet, in build range** — OPEN the wheel (§1). The pilot leaves its
+   *     standing order alone so the ship holds while the menu is up; the wiring opens
+   *     the same wheel E / Y / the BUILD button drive.
+   *  3. **Own planet, too far** — a normal move order toward it (§1). No lock, no
+   *     "surprise wheel later": it just flies you there, and a second tap when close
+   *     opens the wheel.
+   *  4. **Any other entity** — a lock: attack a rival ship/turret/core, mine a rock.
+   *  5. **Empty space** — fly there.
+   */
+  resolveTap(hit: TapCandidate | null, at: Vec2, ctx: TapContext): TapResult {
+    if (ctx.wheelOpen) {
+      // The open wheel owns every tap on it; a tap off it is the dismiss gesture.
+      // Neither becomes a move — the pilot's order is untouched while the menu is up.
+      return ctx.insideWheel ? { kind: 'passThrough' } : { kind: 'closeWheel' };
+    }
+    if (hit?.kind === 'planet') {
+      // Your own planet: in build range opens the wheel; too far it is a plain move
+      // toward it (a second tap when close opens — no lock, no surprise wheel later).
+      if (ctx.inBuildRange) return { kind: 'openWheel' };
+      this.orderMove(at);
+      return { kind: 'move', at: { x: at.x, y: at.y } };
+    }
+    if (hit) {
+      // A rival ship/turret/core, or a rock to mine: lock it (the wiring re-resolves
+      // the {kind,id} to a live target each frame).
+      this.lockTarget({ kind: hit.kind, id: hit.id });
+      return { kind: 'lock', ref: { kind: hit.kind, id: hit.id } };
+    }
+    // Empty space: fly there.
+    this.orderMove(at);
+    return { kind: 'move', at: { x: at.x, y: at.y } };
   }
 
   /**
