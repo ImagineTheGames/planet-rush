@@ -84,11 +84,11 @@ export const MIX_DEFAULTS = {
   repeatGap: 0.035,
 } as const;
 
-/** A held voice — the firing loops, the thruster, the alarm, the ambient bed. */
+/** A held voice — the thruster, the alarm, the ambient bed, the soundtrack stems. */
 export interface LoopHandle {
   /** Ramp this voice's gain over `seconds`. Ramped, because a jump clicks. */
   setGain(value: number, seconds?: number): void;
-  /** Ramp the playback rate — the firing voices ride this with weapon power. */
+  /** Ramp the playback rate — the thruster rides this with throttle. */
   setRate(value: number, seconds?: number): void;
   /** Fade out and stop. The handle is dead afterwards. */
   stop(fadeSeconds?: number): void;
