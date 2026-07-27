@@ -125,6 +125,8 @@ import {
   MAP_ORDER,
   MAP_STORAGE_KEY,
   settingsModel,
+  settingsLayout,
+  SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
   adjustVolume,
@@ -434,6 +436,15 @@ async function boot(): Promise<void> {
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
+  // Wire the menu seam's live match readback to the running world — the live ship
+  // position and active scheme, read fresh each access (so a rematch that rebinds
+  // `world` is tracked). Lets a clean-boot live-stage run prove the CONTROLS
+  // setting it flipped through the front door actually flies the ship on a tap,
+  // with no ?debug=1 seam. A no-op under ?debug=1, where there is no menu.
+  mainMenu?.bindMatch(() => {
+    const local = world.ships.find(isLocalShip);
+    return { scheme: controlScheme, shipPos: local ? { x: local.pos.x, y: local.pos.y } : null };
+  });
   // Hand the lobby seam the hull AND the arena the sim ACTUALLY built, read back
   // off the world itself — the hull off the local ship, the arena off the world's
   // own home-planet positions. This is the proof BOTH lobby picks reached the sim
@@ -3355,6 +3366,12 @@ interface MainMenuHandle {
   untilPlay(): Promise<void>;
   /** Mark the world as built (drives `window.__mainMenu.matchStarted`). */
   matchStarted(): void;
+  /** Wire the seam's live match readback (`localShipPos` / `matchControlScheme`)
+   *  to the running world, so a clean-boot live-stage run can prove the CONTROLS
+   *  setting it flipped through the front door actually drives the ship — a tap
+   *  moves it — without any `?debug=1` seam. Reads live bindings each call, so a
+   *  rematch that rebuilds the world is tracked with no re-bind. */
+  bindMatch(read: () => { scheme: ControlScheme; shipPos: { x: number; y: number } | null }): void;
 }
 
 /** The landscape-lock context `boot()` hands the menu so it lays out in the same
@@ -3387,6 +3404,16 @@ interface MenuControlReport {
   readonly physicalCenter: { x: number; y: number };
 }
 
+/** One settings-screen row (or DONE) as the seam reports it: its kind and the
+ *  physical point a real click/tap must land on to hit it. Lets a live-stage run
+ *  drive the settings screen through the front door — no `settingsHitTest` seam,
+ *  just a real press at `physicalCenter` — the discipline the CONTROLS-switch
+ *  evidence was missing (it flipped the scheme through a debug seam, not a tap). */
+interface SettingsControlReport {
+  readonly kind: string;
+  readonly physicalCenter: { x: number; y: number };
+}
+
 /** The read-only `window.__mainMenu` seam, extended for the landscape lock. */
 interface MainMenuSeam {
   visible: boolean;
@@ -3398,6 +3425,20 @@ interface MainMenuSeam {
   rotated: boolean;
   /** The menu buttons, logical rect + physical tap point (see {@link MenuControlReport}). */
   controls: readonly MenuControlReport[];
+  /** The settings-screen rows + DONE, each with the physical point a real press
+   *  must land on — the same landscape-lock remap the menu buttons get. */
+  settingsControls: readonly SettingsControlReport[];
+  /** The control scheme the settings screen currently shows and persists — the
+   *  menu's live value, written to the same storage the match reads at boot.
+   *  Readback proof that a tap on the CONTROLS row took effect immediately. */
+  controlScheme: ControlScheme;
+  /** The scheme the RUNNING match is driving with, once built (null before) — the
+   *  live match value, read through `bindMatch`. Proves the front-door setting
+   *  carried across PLAY → lobby → RUSH into the sim. */
+  matchControlScheme: ControlScheme | null;
+  /** The local ship's live WORLD position in the running match, or null before
+   *  the world exists. Lets a clean-boot run watch a real tap move the ship. */
+  localShipPos: { x: number; y: number } | null;
   play(): void;
 }
 
@@ -3424,9 +3465,17 @@ function openMainMenu(
 ): MainMenuHandle {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   let fireMode = readFireMode(platform, isTouch);
+  // The control scheme (developer §3), read from the same storage the match boots
+  // with. The CONTROLS settings row shows and toggles it here, persisting to that
+  // seam so the choice carries into the match exactly as the fire mode does.
+  let controlScheme = readControlScheme(platform);
   let settings: SettingsState = createSettings();
   let screen: 'menu' | 'settings' = 'menu';
   let played = false;
+  // Bound by boot() once the match world exists — lets the seam read the live
+  // ship + active scheme so a clean-boot run can watch the front-door setting fly
+  // the ship. Reads live bindings each call, so a rematch needs no re-bind.
+  let matchReader: (() => { scheme: ControlScheme; shipPos: { x: number; y: number } | null }) | null = null;
 
   // Lay the menu out in the LOGICAL (landscape) viewport and hang it off the
   // rotating game root — so a portrait phone gets a landscape menu that can never
@@ -3449,6 +3498,16 @@ function openMainMenu(
     logicalViewport: { width: menu0.w, height: menu0.h },
     rotated: ctx.isRotated(),
     controls: [],
+    settingsControls: [],
+    controlScheme,
+    // Live match readback, wired by boot() through `bindMatch` once the world is
+    // built; both read the live match binding each access so a rematch is tracked.
+    get matchControlScheme(): ControlScheme | null {
+      return matchReader ? matchReader().scheme : null;
+    },
+    get localShipPos(): { x: number; y: number } | null {
+      return matchReader ? matchReader().shipPos : null;
+    },
     play: (): void => play(),
   };
 
@@ -3470,6 +3529,19 @@ function openMainMenu(
       const center = ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
       return { kind: item.kind, logical: { ...r }, physicalCenter: center };
     });
+    // The settings-screen rows + DONE, in the same landscape-lock physical space,
+    // so a live-stage run can real-press the CONTROLS row through the front door.
+    const settingsRects = settingsLayout({ width: w, height: h }, { isTouch });
+    const rowReports = settingsRects.rows.map((r, i) => ({
+      kind: SETTINGS_ROWS[i]?.kind ?? 'row',
+      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+    }));
+    const back = settingsRects.back;
+    seam.settingsControls = [
+      ...rowReports,
+      { kind: 'back', physicalCenter: ctx.toPhysical(back.x + back.width / 2, back.y + back.height / 2) },
+    ];
+    seam.controlScheme = controlScheme;
   }
 
   /** Redraw the live screen from current state. Static content, so this runs on
@@ -3478,7 +3550,7 @@ function openMainMenu(
     menuView.visible = screen === 'menu';
     settingsView.visible = screen === 'settings';
     if (menuView.visible) menuView.update(mainMenuModel());
-    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
+    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode, controlScheme));
     seam.screen = screen;
     updateSeamLayout();
   }
@@ -3517,6 +3589,13 @@ function openMainMenu(
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         platform.storage.set(FIRE_MODE_KEY, fireMode);
+        break;
+      case 'controls':
+        // Sticks ⇄ Tap Commander, persisted to the same seam the match reads at
+        // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
+        // and carries into the match exactly as the fire mode does.
+        controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
+        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
         break;
       case 'reduceVfx':
         settings = toggleReduceVfx(settings);
@@ -3589,6 +3668,9 @@ function openMainMenu(
     untilPlay: () => playPromise,
     matchStarted: () => {
       seam.matchStarted = true;
+    },
+    bindMatch: (read) => {
+      matchReader = read;
     },
   };
 }

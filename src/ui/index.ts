@@ -558,6 +558,7 @@ export {
   volumeLevel,
 } from './settings';
 export type {
+  ControlScheme,
   SettingsLayout,
   SettingsModel,
   SettingsRowSpec,
