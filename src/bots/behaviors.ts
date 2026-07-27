@@ -14,7 +14,7 @@
  */
 
 import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { WEAPON_RANGE, PLANET, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
+import { CORE_HP, REPAIR_HP_PER_ORE, WEAPON_RANGE, PLANET, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
@@ -71,6 +71,43 @@ export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
 
 /** Speed at which a bot chasing something leans on the boost button. TUNABLE */
 export const BOOST_CHASE_DISTANCE = 320;
+
+// ---------------------------------------------------------------------------
+// Core repair — a RATIONED discrete purchase (p5-repair-discrete, GDD §2.5/§2.9)
+// ---------------------------------------------------------------------------
+
+/**
+ * The core-HP fraction below which a bot buys a discrete core repair — the gate
+ * every tier's spend plan shares. Repair is a one-tap `+REPAIR_HP_PER_ORE`
+ * purchase now (developer 2026-07-26, `docs/design-amendments.md`), cheap and
+ * instant, so a bot that repaired "whenever the core is below full" would top it
+ * back to **exactly** `maxCoreHp` every dip. A field of such bots reaches
+ * collapse at one identical HP and then dies in entropy lockstep — no survivor
+ * to crown, the match stalled by the tiebreak (`trees.test.ts`). Discrete repair
+ * therefore has to be a *ration*, not an always-on top-up (the brief's point 1).
+ *
+ * Two dials make it one:
+ *
+ *  - **Personality-modulated** by `caution` — the same character dial that sets
+ *    the retreat nerve (GDD §2.9): a timid Rusty (1.3) patches early, a reckless
+ *    Bolt (0.5) lets its core ride and dies on its own doorstep sooner. That
+ *    spread alone means two funded turtles rarely reach collapse at the same HP.
+ *  - **Capped strictly below the ceiling** — the target can never sit within one
+ *    repair chunk of full, so a repaired core *settles below `maxCoreHp`* at a
+ *    value that varies with its own damage history rather than snapping onto the
+ *    shared `maxCoreHp` clamp. That is what actually kills the lockstep: there is
+ *    no longer a single HP value every well-off defender converges on.
+ *
+ * Returns the fraction; a tier gates `coreHp < maxCoreHp * repairTargetFraction`.
+ */
+export function repairTargetFraction(ctx: BotCtx, baseAt: number): number {
+  const maxHp = ctx.self.planet?.maxCoreHp ?? CORE_HP;
+  // One repair chunk lands `REPAIR_HP_PER_ORE` HP; keep the target a further 5%
+  // below `maxHp - one chunk` so the last chunk before the bot stops can never
+  // reach — let alone clamp onto — the ceiling. (100/15 ⇒ cap ≈ 0.80.)
+  const ceiling = Math.max(0, (maxHp - REPAIR_HP_PER_ORE) / maxHp - 0.05);
+  return Math.min(baseAt * ctx.weights.caution, ceiling);
+}
 
 // ---------------------------------------------------------------------------
 // The aim-error model, per character (v0.2.2 field report). The tier owns the

@@ -36,6 +36,7 @@ import {
   mine,
   nearestThreat,
   order,
+  repairTargetFraction,
   retreat,
   roam,
   scavenge,
@@ -60,13 +61,16 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   if (!planet) return null;
   const spendable = ctx.self.spendable;
 
-  // Patch the core when nothing is hitting it — repair interrupts on any damage
-  // (GDD §2.5), so opening the channel mid-siege just wastes ore.
+  // Patch the core when nothing is hitting it — a besieged core cannot be
+  // out-repaired (GDD §2.6), so spending under fire just wastes ore. RATIONED,
+  // not topped to full: even timid Rusty stops short of the ceiling so a field
+  // of turtles does not reach collapse at one identical HP (`repairTargetFraction`,
+  // p5-repair-discrete). Rusty (caution 1.3) patches early; Bolt (0.5) rarely.
   if (
     !ctx.view.collapsed &&
     !planet.repairing &&
     !planet.underAttack &&
-    planet.coreHp < planet.maxCoreHp - 1 &&
+    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, EASY_REPAIR_AT) &&
     spendable >= 1
   ) {
     return order('repair');
@@ -84,6 +88,13 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   if (spendable >= EASY_UPGRADE_FLOOR) return upgrade(UpgradeTrack.Cargo);
   return null;
 }
+
+/** Base core fraction below which an Easy bot patches its core, before the
+ *  `caution` lean and the below-ceiling cap in `repairTargetFraction`. Was an
+ *  effective ~0.99 (repair to full); dropped to a genuine ration so the discrete
+ *  heal no longer pins every funded core on the `maxCoreHp` clamp — the collapse
+ *  lockstep the soak caught (p5-repair-discrete). TUNABLE */
+export const EASY_REPAIR_AT = 0.6;
 
 /** Turrets an Easy bot wants before it thinks about anything else. TUNABLE */
 export const EASY_TURRET_TARGET = 3;
