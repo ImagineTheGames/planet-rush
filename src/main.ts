@@ -146,6 +146,15 @@ import {
   CLASS_ORDER,
   normalizePlayerName,
   MINIMAP_TOGGLE_KEY,
+  PauseMenuView,
+  pauseMenuModel,
+  pauseButtons,
+  pauseButtonRect,
+  pauseButtonVisible,
+  pauseLayout,
+  nextPauseScreen,
+  isPauseOpen,
+  shouldFreezeSim,
 } from './ui';
 import type {
   HudFrame,
@@ -162,6 +171,8 @@ import type {
   MatchOutcome,
   DeathCause,
   LobbyState,
+  PauseScreen,
+  PauseButton,
 } from './ui';
 import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
@@ -587,6 +598,7 @@ async function boot(): Promise<void> {
     installTapMarkerStage();
     installMinimapStage();
     installAudioStage();
+    installPauseStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -652,6 +664,32 @@ async function boot(): Promise<void> {
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
+
+  // --- Pause menu (developer ratification, p10) ------------------------------
+  //     ESC (desktop) or a touch corner button opens an overlay over a match in
+  //     progress: RESUME / SETTINGS / EXIT TO MENU — EXIT behind a "Leave the
+  //     match?" confirm so one stray tap can never kill a match. The overlay is
+  //     ignorant of HOW a match pauses: `pausable` is the transport's flag —
+  //     offline (this in-process LocalLoopback) the sim FREEZES while it is up
+  //     (the loop below skips its tick and resumes seamlessly); online (m9) it
+  //     shows over a running sim. The whole distinction lives in `shouldFreezeSim`;
+  //     the flag path is built now, offline `true`, so the networked-`false`
+  //     branch is testable before that transport exists (developer §2). Topmost,
+  //     so it draws over the live match and HUD; its visibility is driven by
+  //     `syncPause()` each frame.
+  const pausable = true;
+  let pauseScreen: PauseScreen = 'closed';
+  // The match's live settings, so the pause SETTINGS screen shows and changes the
+  // real values mid-match (reduce-VFX floors the auto-reducer, the volumes drive
+  // the mixer). Seeded to the same DEFAULT_VOLUMES the audio engine booted with.
+  let matchSettings = createSettings();
+  const pauseView = new PauseMenuView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  gameRoot.addChild(pauseView);
+  // The pause SETTINGS screen reuses the real settings view (one settings UI, not
+  // two), shown in the overlay's place while `pauseScreen === 'settings'`.
+  const pauseSettings = new SettingsView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  pauseSettings.visible = false;
+  gameRoot.addChild(pauseSettings);
 
   const merged = createControlState();
   const sources: { source: InputSource; state: ControlState; device: DeviceKind }[] = [
@@ -820,6 +858,31 @@ async function boot(): Promise<void> {
     const lp = toLogical(e.clientX, e.clientY);
     pressPoint.x = lp.x;
     pressPoint.y = lp.y;
+
+    // The pause overlay (developer p10) owns the whole screen while it's up, like
+    // the end overlay: a tap lands on a pause control or on nothing, but never
+    // falls through to the frozen match under it. First refusal, always consumes.
+    if (isPauseOpen(pauseScreen)) {
+      handlePausePointer(lp.x, lp.y);
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
+    // The touch corner pause button — the ESC-equivalent on a device with no
+    // keyboard. On screen only while the match owns it (`pauseAvailable`), so a tap
+    // can only land on a button that is actually there. Opens the overlay.
+    if (isTouch && pauseButtonVisible({ isTouch, available: pauseAvailable() })) {
+      const pb = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+      if (inRect(pressPoint, pb)) {
+        haptics.haptic('tap');
+        audio.cue('press');
+        pauseScreen = nextPauseScreen(pauseScreen, 'toggle');
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
+    }
 
     // The end-of-match / DEFEATED overlay owns the whole screen while it's up: a
     // tap either lands on REMATCH / SPECTATE / BACK TO MENU or on nothing, but it
@@ -1093,6 +1156,12 @@ async function boot(): Promise<void> {
   const loop = new GameLoop({
     update: () => {
       if (flags.freeze) return; // sim is pinned at the seeded freeze tick
+      // Offline pause (developer §2): while the pause overlay is up over a
+      // `pausable` (offline) match the sim FREEZES — skip the tick entirely, so
+      // no time passes and RESUME picks up exactly where it left off. Render still
+      // runs below, so the overlay is live. Online (m9, not pausable) this is
+      // false and the sim keeps ticking under the overlay.
+      if (shouldFreezeSim(pauseScreen, pausable)) return;
       // One input tick per fixed step, in order — the pulse the whole protocol
       // is built on. Every bot seat files for the same tick first, then this
       // client's input advances the authoritative sim (GDD §4.2, §2.9).
@@ -1111,7 +1180,12 @@ async function boot(): Promise<void> {
       const nowMs = performance.now();
       const frameSeconds = (nowMs - lastRenderMs) / 1000;
       lastRenderMs = nowMs;
-      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
+      // Reduce VFX when the auto-reducer engages on a sustained fps drop OR the
+      // player set the floor by hand in settings (GDD §4.8 risk 5 — one flag, two
+      // ways to flip it). `sample` is evaluated first so the frame-time tracker
+      // keeps running even while the manual floor is on. Freeze keeps full VFX so
+      // the golden frame is byte-deterministic.
+      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx);
 
       renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
       // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
@@ -1175,6 +1249,10 @@ async function boot(): Promise<void> {
       // result. The whole "your planet died and nothing happened" fix (field report
       // v0.1.2) lives on this one call, fed truth the sim decides.
       syncEndScreen();
+      // Pause overlay (developer p10): draw whichever pause screen is up and the
+      // touch corner button. Runs every rendered frame, including while the sim is
+      // frozen above — so the overlay stays live over a stopped world.
+      syncPause();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -1313,6 +1391,134 @@ async function boot(): Promise<void> {
     // ended on (the observer's first post-reset frame primes and emits nothing).
     audioObserver.reset();
     audio.reset();
+    pauseScreen = 'closed'; // a fresh match is never mid-pause
+  }
+
+  // --- Pause menu wiring (developer ratification, p10) -----------------------
+
+  /** Whether the match currently owns the screen — nothing else claiming it — so
+   *  ESC / the touch corner button may open the pause overlay, and that button may
+   *  be drawn (developer §1: "clear of everything"). False while a wheel, the end
+   *  overlay, or the pause overlay itself is up. */
+  function pauseAvailable(): boolean {
+    return !isPauseOpen(pauseScreen) && !buildWheel.open && endScreen === 'none';
+  }
+
+  /** ESC on the keyboard: while a wheel is up it pops one wheel level (unchanged,
+   *  field report v0.2.4); otherwise it opens the pause overlay, or backs it out
+   *  one level — the same "one press, one level" gesture, now spanning the wheel
+   *  and the pause menu. Never opens over the end screen (that overlay owns its own
+   *  exits). */
+  function handlePauseKey(): void {
+    if (buildWheel.open) {
+      wheelBackOneLevel();
+      return;
+    }
+    if (!isPauseOpen(pauseScreen) && endScreen !== 'none') return;
+    pauseScreen = nextPauseScreen(pauseScreen, 'toggle');
+  }
+
+  /** Route a tap while the pause overlay (or its settings screen) is up — it owns
+   *  the screen, like the end overlay, so the tap lands on a pause control or on
+   *  nothing, never on the match under it. */
+  function handlePausePointer(lx: number, ly: number): void {
+    if (pauseScreen === 'settings') {
+      const hit = pauseSettings.hitTest(lx, ly);
+      if (hit) applyPauseSettings(hit);
+      return;
+    }
+    const target = pauseView.hitTest(lx, ly);
+    if (target) handlePauseButton(target.kind);
+  }
+
+  /** Apply a pause-overlay button. RESUME/STAY back out; SETTINGS/EXIT step in;
+   *  LEAVE tears the match down to the menu (the confirm is the guard). */
+  function handlePauseButton(kind: PauseButton): void {
+    haptics.haptic('tap');
+    audio.cue('press');
+    switch (kind) {
+      case 'resume':
+        pauseScreen = nextPauseScreen(pauseScreen, 'resume');
+        break;
+      case 'settings':
+        pauseScreen = nextPauseScreen(pauseScreen, 'openSettings');
+        break;
+      case 'exit':
+        pauseScreen = nextPauseScreen(pauseScreen, 'requestExit');
+        break;
+      case 'stay':
+        pauseScreen = nextPauseScreen(pauseScreen, 'cancelExit');
+        break;
+      case 'leave':
+        exitToMenu();
+        break;
+    }
+  }
+
+  /** Apply a tap on the pause SETTINGS screen. Unlike the pre-match menu's copy,
+   *  these fold into the LIVE match: the fire mode and control scheme take effect
+   *  at once and persist, reduce-VFX and the volumes drive the running renderer
+   *  and mixer through {@link applyAudioMix}. DONE steps back to the pause menu. */
+  function applyPauseSettings(target: SettingsTarget): void {
+    switch (target.kind) {
+      case 'back':
+        pauseScreen = nextPauseScreen(pauseScreen, 'closeSettings');
+        return;
+      case 'fireMode':
+        fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
+        touch.setFireMode(fireMode);
+        platform.storage.set(FIRE_MODE_KEY, fireMode);
+        break;
+      case 'controls':
+        controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
+        tapPilot.clear();
+        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        break;
+      case 'reduceVfx':
+        matchSettings = toggleReduceVfx(matchSettings);
+        break;
+      case 'volume':
+        matchSettings = adjustVolume(matchSettings, target.channel, target.dir);
+        applyAudioMix();
+        break;
+    }
+    haptics.haptic('tap');
+    audio.cue('press');
+  }
+
+  /** Push the live match volumes into the mixer (engine.ts). A no-op set of calls
+   *  when running silent (no audio context), so it is safe on every platform. */
+  function applyAudioMix(): void {
+    audio.setMasterVolume(matchSettings.volumes.master);
+    audio.setSfxVolume(matchSettings.volumes.sfx);
+    audio.setMusicVolume(matchSettings.volumes.music);
+  }
+
+  /** EXIT TO MENU (developer §3): tear the world down — the rematch machinery's own
+   *  teardown step ({@link MatchBoot.close}) — and return to the main menu. A clean
+   *  reload is the maximal teardown: no half-dead world and no stale seam can
+   *  survive it, and it lands on the real main menu (which only a clean boot shows),
+   *  where PLAY boots a genuinely fresh match. It mirrors BACK TO MENU on the end
+   *  screen, which reloads for the same reason — the two "go to the menu" exits are
+   *  one mechanism. The target drops any `?debug=1` flag so the menu appears even
+   *  from a harness boot (which otherwise skips it), preserving the app's base path. */
+  function exitToMenu(): void {
+    match.close();
+    const menuUrl = window.location.origin + window.location.pathname;
+    window.location.assign(menuUrl);
+  }
+
+  /** Draw whichever pause screen is up and the touch corner button, once per
+   *  rendered frame. Offline the loop has already frozen the sim; render keeps
+   *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
+  function syncPause(): void {
+    // The pause overlay: the menu or the confirm. While the settings screen is up
+    // the overlay hides (the real settings view takes its place), so feed 'closed'.
+    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    const settingsUp = pauseScreen === 'settings';
+    pauseSettings.visible = settingsUp;
+    if (settingsUp) pauseSettings.update(settingsModel(matchSettings, fireMode, controlScheme));
+    pauseView.updateButton(pauseButtonVisible({ isTouch, available: pauseAvailable() }));
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -2972,6 +3178,88 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__pauseStage` — the ?debug=1 live-stage seam that proves, on a
+   * REAL boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
+   * offline sim freezes while it is up and resumes on RESUME, SETTINGS round-trips,
+   * and EXIT+confirm tears the world down to the menu. Pure READBACK plus the
+   * physical press points the client itself drew each control at (through the
+   * landscape-lock remap, the same shape `__mainMenu` uses), so a Playwright test
+   * drives the WHOLE path with real ESC and real clicks — never a hit-test seam —
+   * and reads back only plain state. Behind ?debug=1; absent in a normal build.
+   */
+  function installPauseStage(): void {
+    const physOf = (lx: number, ly: number): { x: number; y: number } => {
+      const p = logicalToPhysical(lx, ly, transform);
+      return { x: p.x, y: p.y };
+    };
+    /** The controls on whichever pause screen is up — pause buttons, confirm
+     *  buttons, or the settings rows + DONE — each with the physical point a real
+     *  press must land on. Empty when the overlay is closed. */
+    const controls = (): { kind: string; physicalCenter: { x: number; y: number } }[] => {
+      const w = transform.logicalWidth;
+      const h = transform.logicalHeight;
+      if (pauseScreen === 'settings') {
+        const l = settingsLayout({ width: w, height: h }, { isTouch });
+        const rows = l.rows.map((r, i) => ({
+          kind: SETTINGS_ROWS[i]?.kind ?? 'row',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        }));
+        rows.push({
+          kind: 'back',
+          physicalCenter: physOf(l.back.x + l.back.width / 2, l.back.y + l.back.height / 2),
+        });
+        return rows;
+      }
+      if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
+        const ids = pauseButtons(pauseScreen);
+        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        return l.buttons.map((r, i) => ({
+          kind: ids[i] ?? 'button',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        }));
+      }
+      return [];
+    };
+    const stage = {
+      read(): {
+        screen: PauseScreen;
+        open: boolean;
+        pausable: boolean;
+        frozen: boolean;
+        simTicks: number;
+        controls: { kind: string; physicalCenter: { x: number; y: number } }[];
+        buttonPoint: { x: number; y: number };
+      } {
+        const r = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+        return {
+          screen: pauseScreen,
+          open: isPauseOpen(pauseScreen),
+          pausable,
+          // The one distinction the whole feature turns on: offline + overlay-up →
+          // frozen. Read live, so a test can watch it flip on ESC and off on RESUME.
+          frozen: shouldFreezeSim(pauseScreen, pausable),
+          // The sim's own step counter — unchanging while frozen, advancing after
+          // RESUME. The executable form of "ticks stop, resume continues."
+          simTicks,
+          controls: controls(),
+          // The touch corner button's physical centre (for the phone-profile path).
+          buttonPoint: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__pauseStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -3049,6 +3337,15 @@ async function boot(): Promise<void> {
     // it is actually on screen (the player has backed out of fullscreen).
     if (fsAffordance.visible) reg.register(FS_AFFORDANCE_ID, FS_AFFORDANCE_ANCHOR, fsAffordance.layoutBounds(w, h));
 
+    // Pause menu (developer p10): the overlay (while up) and the touch corner
+    // button (while the match owns the screen) register their own logical rects —
+    // so QA's placement suite can arbitrate that the corner button lands "clear of
+    // everything" and the overlay owns the frame. Self-computed logical bounds, so
+    // no physical→logical conversion (like the ship and the build button).
+    for (const e of pauseView.describeLayout({ width: w, height: h })) {
+      reg.register(e.id, e.anchor, e.bounds);
+    }
+
     // HUD-owned elements (ore HUD, banked total, wave clock, controls strip,
     // onboarding prompt): registered via the Hud's public describeLayout() seam
     // if present. Not implemented at M1 — see PR notes; no src/ui internals are
@@ -3110,6 +3407,8 @@ async function boot(): Promise<void> {
     touch.setScreenWidth(w);
     hud.resize(w, h);
     endOverlay.resize(w, h, isTouch);
+    pauseView.resize(w, h, isTouch);
+    pauseSettings.resize(w, h, isTouch);
   }
 
   /** The camera's LOGICAL (landscape) viewport, in the space the world is drawn
@@ -3224,12 +3523,13 @@ async function boot(): Promise<void> {
     if (e.code === MINIMAP_TOGGLE_KEY) {
       hud.toggleMinimap();
     }
-    // ESC mirrors the hub BACK on PC (field report v0.2.4): one press pops one
-    // wheel level — WEAPON → upgrade → Build → closed — the desktop twin of a tap
-    // on the wheel's centre. Only while a wheel is up, so ESC still falls through
-    // to anything else that wants it when the wheel is shut.
-    if (e.code === 'Escape' && buildWheel.open) {
-      wheelBackOneLevel();
+    // ESC (field report v0.2.4 + developer p10): with a wheel up it pops one wheel
+    // level — WEAPON → upgrade → Build → closed; otherwise it opens the pause
+    // overlay, or backs it out one level (settings → menu → closed). One "go back"
+    // gesture spanning the wheel and the pause menu. Never opens over the end
+    // screen, which owns its own exits.
+    if (e.code === 'Escape') {
+      handlePauseKey();
     }
   });
 

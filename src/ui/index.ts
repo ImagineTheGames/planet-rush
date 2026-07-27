@@ -605,6 +605,46 @@ export type {
 
 export { EndOfMatchView, END_OF_MATCH_ANCHOR } from './end-of-match-view';
 
+// --- The pause menu — exit / settings mid-match, offline-only pause (p10) ----
+//
+// ESC (or a touch corner button) opens an overlay over a match in progress:
+// RESUME / SETTINGS / EXIT TO MENU, with EXIT behind a "Leave the match?"
+// confirm. Offline the sim FREEZES while it is up (loop-gated in `src/main.ts`);
+// online it shows over a running sim — that distinction is the `pausable` flag
+// routed through `shouldFreezeSim`, nothing the overlay itself knows.
+
+export {
+  PAUSE_ANCHOR,
+  PAUSE_BUTTON_ANCHOR,
+  PAUSE_BUTTON_ID,
+  PAUSE_BUTTON_LEFT,
+  PAUSE_BUTTON_MARGIN,
+  PAUSE_BUTTON_SIZE,
+  PAUSE_ID,
+  isPauseOpen,
+  nextPauseScreen,
+  pauseButtonRect,
+  pauseButtonVisible,
+  pauseButtons,
+  pauseHitTest,
+  pauseLayout,
+  pauseMenuModel,
+  shouldFreezeSim,
+} from './pause-menu';
+export type {
+  PauseAction,
+  PauseButton,
+  PauseButtonSignals,
+  PauseButtonView,
+  PauseLayout,
+  PauseLayoutOptions,
+  PauseMenuModel,
+  PauseScreen,
+  PauseTarget,
+} from './pause-menu';
+
+export { PauseMenuView } from './pause-menu-view';
+
 export {
   CONNECTION_STATUS_ID,
   connectionStatusHitTest,
