@@ -31,8 +31,9 @@ import { SENSOR_RANGE } from '../sim/constants';
 import { inAtmosphere } from '../sim/buildings';
 import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
 import { atmosphereHaloSprite } from '../art/planets';
+import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
-import { spriteGraphics } from '../art/textures';
+import { drawSprite, spriteGraphics } from '../art/textures';
 
 // ---------------------------------------------------------------------------
 // Palette (frozen — style-guide.md §1 / §3.1). Hex as PixiJS numbers.
@@ -125,10 +126,21 @@ class GraphicsPool {
 // ---------------------------------------------------------------------------
 
 function makeUnitRock(): Graphics {
-  // Unit circle (r=1); neutral grey mineral body (style-guide §6). Crack stage
-  // reads as a darker rock via alpha against near-black Vacuum.
-  return new Graphics().circle(0, 0, 1).fill(0x9199a1);
+  // An empty shell. The rock's real geometry — one of the six ratified pool
+  // types (docs/art-direction §5.5) at its crack stage and payout band — is
+  // played into it per look-change by `drawAsteroids`, via the art pipeline
+  // (`asteroidArt` / `drawSprite`), the same way ship hulls are drawn. Pooling
+  // is unchanged: geometry is rebuilt only when a rock's look actually moves.
+  return new Graphics();
 }
+
+/**
+ * Pixels-per-unit asteroid art is drawn at before the per-frame `scale.set`,
+ * matching the ships' trick: drawing above 1 keeps thin vein/crack strokes off
+ * `drawSprite`'s 0.5px floor, and `drawAsteroids` divides it back out so the
+ * rock still lands at `asteroid.radius` world units.
+ */
+const ROCK_ART_SCALE = 64;
 
 function makeUnitChunk(): Graphics {
   // Ore chunk — signal yellow (RESERVED rule: ore, style-guide §2).
@@ -185,9 +197,6 @@ function makeShip(id: number, shipClass: ShipClass): Graphics {
   return spriteGraphics(shipSprite({ shipClass, playerId: id }), SHIP_ART_SCALE);
 }
 
-// Crack-stage alpha: an intact rock is solid; a cracked one reads darker
-// against Vacuum as it's mined out (style-guide §5.5, three stages).
-const CRACK_ALPHA = [1, 0.78, 0.56];
 
 // Module-level scratch point for the camera target, so centerCamera passes the
 // target to the pure camera math without allocating a Vec2 each frame (GDD §4.3).
@@ -233,6 +242,8 @@ export class Renderer {
   private readonly shotLayer = new Container();
 
   private readonly asteroidPool: GraphicsPool;
+  /** The look-key drawn into each pooled rock, so geometry rebuilds only on change. */
+  private readonly asteroidKeys: string[] = [];
   private readonly chunkPool: GraphicsPool;
   private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
@@ -660,10 +671,19 @@ export class Renderer {
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i]!;
       const g = this.asteroidPool.at(i);
+      // Rebuild geometry only when this slot's rock changes its look — a crack
+      // stage or a payout band — so steady state stays allocation-free (GDD §4.3).
+      const art = asteroidArt(a);
+      if (this.asteroidKeys[i] !== art.key) {
+        g.clear();
+        drawSprite(g, art.build(), ROCK_ART_SCALE);
+        this.asteroidKeys[i] = art.key;
+      }
       g.x = a.pos.x;
       g.y = a.pos.y;
-      g.scale.set(a.radius);
-      g.alpha = CRACK_ALPHA[a.crackStage] ?? CRACK_ALPHA[0]!;
+      // Art is authored at ROCK_ART_SCALE px/unit; divide it back out to land the
+      // rock at its collision radius. The crack stage is in the art now, not alpha.
+      g.scale.set(a.radius / ROCK_ART_SCALE);
     }
     this.asteroidPool.hideFrom(asteroids.length);
   }

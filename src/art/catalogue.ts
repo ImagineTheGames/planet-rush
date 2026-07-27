@@ -15,7 +15,7 @@
  */
 
 import { ShipClass } from '@shared/types';
-import { asteroidSprite, oreChunkSprite } from './asteroids';
+import { asteroidSprite, oreChunkSprite, ASTEROID_KINDS, type AsteroidKind } from './asteroids';
 import { buildProgressSprite, shieldSprite, turretSprite } from './buildings';
 import {
   atmosphereHaloSprite,
@@ -90,16 +90,29 @@ function entries(): CatalogueEntry[] {
   }
   out.push({ group: 'Planets — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
 
-  // --- Asteroids ------------------------------------------------------------
-  for (const seed of [1, 7, 23]) {
+  // --- Asteroids: the ratified pool (docs/art-direction §5.5) ----------------
+  // Every one of the six by name, across its three crack stages, and rich-vs-poor
+  // so the payout read is on the review surface next to the silhouette.
+  const KIND_NOTE: Record<AsteroidKind, string> = {
+    shard: 'A1 · veins along the fractures',
+    ice: 'A2 · frost brightens near breaking',
+    rubble: 'A3 · pebbles pop first',
+    husk: 'A4 · ore-rimmed cavity',
+    geode: 'A5 · crystals countable',
+    patina: 'A6 · teal oxidation bands',
+  };
+  ASTEROID_KINDS.forEach((kind, k) => {
+    const group = `Asteroids — A${k + 1} ${kind.toUpperCase()} (${KIND_NOTE[kind]})`;
+    const seed = k; // asteroidKindFor(k) === kind, so a natural rock of this type
+    // Three crack stages at their natural richness (stage 0 is the full, rich read).
     for (let stage = 0; stage < 3; stage++) {
-      out.push({ group: 'Asteroids — three crack stages', label: `rock ${seed} · stage ${stage}`, def: asteroidSprite({ seed, crackStage: stage }) });
+      out.push({ group, label: `stage ${stage}`, def: asteroidSprite({ seed, crackStage: stage, kind }) });
     }
-  }
-  out.push({ group: 'Asteroids — three crack stages', label: 'rich rock', def: asteroidSprite({ seed: 5, crackStage: 0, richness: 1 }) });
-  out.push({ group: 'Asteroids — three crack stages', label: 'poor rock', def: asteroidSprite({ seed: 5, crackStage: 0, richness: 0.2 }) });
+    // A poor intact rock beside the full one, so the payout read is on the sheet.
+    out.push({ group, label: 'stage 0 · poor', def: asteroidSprite({ seed, crackStage: 0, richness: 0.2, kind }) });
+  });
   for (const seed of [0, 3]) {
-    out.push({ group: 'Asteroids — three crack stages', label: `ore chunk ${seed}`, def: oreChunkSprite(seed) });
+    out.push({ group: 'Asteroids — loose ore chunks', label: `ore chunk ${seed}`, def: oreChunkSprite(seed) });
   }
 
   // --- Buildings ------------------------------------------------------------

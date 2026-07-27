@@ -23,6 +23,7 @@ import { continentPolygons } from './planets';
 import { DERIVED, PALETTE } from './palette';
 import {
   annulusPoints,
+  arcPoints,
   blob,
   circle,
   fill,
@@ -76,6 +77,18 @@ export function planetWreckSprite(variant: number): SpriteDef {
         seam,
       ),
     );
+  }
+
+  // Broken-crust ribs curving across the corpse — the "ribcage wreck" of the
+  // scene gallery (docs/art-direction, Wreck-scavenging moment), read into a body
+  // that GDD §2.7 keeps solid and full-radius. One shade above the ash, partial
+  // sweeps, so the shell reads as cracked open without the wreck ceasing to be
+  // one solid mass.
+  const rib = stroke(DERIVED.wreckCrust, 0.045, 'material', 0.9);
+  for (let i = 0; i < 3; i++) {
+    const r = 0.42 + i * 0.2;
+    const from = rng.next() * Math.PI * 2;
+    shapes.push(polyline(arcPoints(0, 0, r, from, from + 1.3 + rng.next() * 0.5, 9), rib));
   }
 
   // The core, gone out. Dark steel where the yellow was — the quiet, drawn.

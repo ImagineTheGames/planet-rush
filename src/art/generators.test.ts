@@ -16,7 +16,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { asteroidOutline, asteroidSprite, oreChunkSprite } from './asteroids';
+import {
+  asteroidKindFor,
+  asteroidOutline,
+  asteroidSprite,
+  oreChunkSprite,
+  ASTEROID_KINDS,
+} from './asteroids';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite } from './buildings';
 import { ALL_SPRITES } from './catalogue';
 import { decalDigit, decalStrokes } from './decals';
@@ -133,6 +139,42 @@ describe('asteroids — the payout read (style-guide §6)', () => {
   it('gives different rocks different shapes', () => {
     expect(asteroidOutline(1)).not.toEqual(asteroidOutline(2));
     expect(oreChunkSprite(0)).not.toEqual(oreChunkSprite(1));
+  });
+
+  it('builds all six ratified pool types, each visibly its own (docs/art-direction §5.5)', () => {
+    expect(ASTEROID_KINDS).toEqual(['shard', 'ice', 'rubble', 'husk', 'geode', 'patina']);
+    // The kind is a total, deterministic function of the pooling seed.
+    for (let seed = 0; seed < 6; seed++) expect(asteroidKindFor(seed)).toBe(ASTEROID_KINDS[seed]);
+    expect(asteroidKindFor(6)).toBe('shard'); // wraps
+    expect(asteroidKindFor(-1)).toBe('patina'); // and wraps the other way
+
+    // Six distinct sprites at the same seed/stage — six looks, not one rock recoloured.
+    const looks = ASTEROID_KINDS.map((kind) => spriteKey(asteroidSprite({ seed: 4, crackStage: 0, kind })));
+    expect(new Set(looks).size).toBe(ASTEROID_KINDS.length);
+
+    // And every one of them cracks across three stages.
+    for (const kind of ASTEROID_KINDS) {
+      const s = [0, 1, 2].map((crackStage) => asteroidSprite({ seed: 4, crackStage, kind }));
+      expect(s[0]).not.toEqual(s[1]);
+      expect(s[1]).not.toEqual(s[2]);
+    }
+  });
+
+  it('makes the geode payout countable — crystal count tracks the ore left (A5)', () => {
+    const crystals = (richness: number): number =>
+      // Each crystal is a signal-yellow kite; count the yellow bodies.
+      asteroidSprite({ seed: 4, crackStage: 0, richness, kind: 'geode' }).shapes.filter(
+        (s) => s.role === 'ore' && s.fill?.color === 0xf2d24b,
+      ).length;
+    expect(crystals(1)).toBeGreaterThan(crystals(0.5));
+    expect(crystals(0.5)).toBeGreaterThan(crystals(0.2));
+    expect(crystals(0)).toBe(0);
+  });
+
+  it('spends no yellow on an empty rock, whichever type it is (payout honesty)', () => {
+    const ore = (kind: (typeof ASTEROID_KINDS)[number]): number =>
+      asteroidSprite({ seed: 4, crackStage: 0, richness: 0, kind }).shapes.filter((s) => s.role === 'ore').length;
+    for (const kind of ASTEROID_KINDS) expect(ore(kind)).toBe(0);
   });
 });
 

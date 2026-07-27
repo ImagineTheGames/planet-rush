@@ -19,7 +19,8 @@
  */
 
 import type { Texture } from 'pixi.js';
-import { asteroidSprite, oreChunkSprite } from './asteroids';
+import { asteroidKindFor, asteroidSprite, oreChunkSprite, CRACK_STAGES } from './asteroids';
+import type { SpriteDef } from './shapes';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite, type TurretState } from './buildings';
 import { beaconRingSprite, damageRingSprite, planetSprite, planetVariantFor } from './planets';
 import { damageStateFor, shipSprite } from './ships';
@@ -93,6 +94,37 @@ export function asteroidTexture(cache: SpriteTextureCache, rock: AsteroidLike, s
     () => asteroidSprite({ seed, crackStage: rock.crackStage, richness }),
     size,
   );
+}
+
+/**
+ * A rock's look as a **cheap key plus a build thunk** — the seam a `Graphics`
+ * renderer uses to pool the ratified pool (docs/art-direction §5.5) without
+ * rebuilding geometry every frame.
+ *
+ * The `key` is derived from the pooling parameters *without* generating the
+ * sprite, so a renderer can compare it against the look already drawn into a
+ * pooled `Graphics` and only call `build()` when the rock's stage or payout band
+ * has actually moved. Two rocks that read the same (same seed fold, same crack
+ * stage, same richness band) share a key — and so a texture, per GDD §4.3.
+ */
+export interface AsteroidArt {
+  /** Cheap identity of the look — build only when this changes between frames. */
+  readonly key: string;
+  /** Generate the sprite for this look. Call only on a key change. */
+  build(): SpriteDef;
+}
+
+/** The pooled art for a rock: which of the six, at what crack stage and payout. */
+export function asteroidArt(rock: AsteroidLike): AsteroidArt {
+  // Same fold the texture path uses: a dozen silhouettes carry the whole field.
+  const seed = ((rock.id % 12) + 12) % 12;
+  const stage = Math.max(0, Math.min(CRACK_STAGES - 1, Math.trunc(rock.crackStage)));
+  const richness = richnessBand(rock.ore, rock.maxOre);
+  const kind = asteroidKindFor(seed);
+  return {
+    key: `${kind}:${seed}:${stage}:${Math.round(richness * 10)}`,
+    build: () => asteroidSprite({ seed, crackStage: stage, richness }),
+  };
 }
 
 /** A drifting ore chunk. Four shapes, chosen by id. */
