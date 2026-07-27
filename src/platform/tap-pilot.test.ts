@@ -173,13 +173,19 @@ describe('TapPilot — target (tap an entity → lock, close, hold, fire)', () =
     expect(state.thrust.x).toBeLessThan(0); // away from the target at +x
   });
 
-  it('drops the lock the frame the target dies (resolver returns null)', () => {
+  it('drops the lock the frame the target dies (resolver returns null) and reverts to auto-engage', () => {
     const pilot = new TapPilot();
     pilot.lockTarget({ kind: 'ship', id: 5 });
     const state = createControlState();
     pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null); // dead → gone
-    expect(pilot.currentOrder).toBeNull();
-    expect(state.fire).toBe(false);
+    expect(pilot.currentOrder).toBeNull(); // the lock is dropped (developer §2)
+    // The ship does not go passive: with no lock the pilot auto-engages, holding the
+    // trigger for the sim's Auto-aim ladder (developer p9-02 §1). Aim stays null (the
+    // sim acquires), and no thrust is written — the ship coasts while it fights.
+    expect(state.fire).toBe(true);
+    expect(state.aim).toBeNull();
+    expect(state.thrust.x).toBe(0);
+    expect(state.thrust.y).toBe(0);
   });
 
   it('an own-planet fly-to holds at its atmosphere and never fires', () => {
@@ -194,5 +200,140 @@ describe('TapPilot — target (tap an entity → lock, close, hold, fire)', () =
     const state = createControlState();
     pilot.writeInto(state, { pos: { x: 500, y: 0 }, radius: 16 }, friendly);
     expect(state.aim).toBeNull();
+  });
+});
+
+// The tractor pickup radius the wiring feeds the pilot (the sim's
+// TRACTOR_PICKUP_RADIUS, aliasing TRACTOR.range). Named here so the pilot stays
+// sim-free while the test asserts against the same number the wiring uses.
+const PICKUP_RADIUS = 120;
+/** A fire range comfortably past the rock hold, mirroring the wiring's
+ *  `WEAPON_RANGE * 0.82` — so a rock held inside the pickup radius is well in range. */
+const WEAPON_FIRE = 220;
+
+describe('TapPilot — auto-engage is the default (no lock → fly/idle + fire the ladder pick, developer p9-02 §1)', () => {
+  it('holds the trigger while flying a waypoint, and the waypoint still progresses (movement ⟂ fire)', () => {
+    const pilot = new TapPilot();
+    pilot.orderMove({ x: 400, y: 0 });
+    const state = createControlState();
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null);
+    // Fires (holds the trigger for the sim's Auto-aim ladder) AND thrusts toward the
+    // waypoint — the two are independent, like a twin-stick player.
+    expect(state.fire).toBe(true);
+    expect(state.thrust.x).toBeGreaterThan(0);
+    // Aim stays null: the sim acquires the target across the full 360° in Auto-aim.
+    expect(state.aim).toBeNull();
+    // And the waypoint order still stands and converges (it did not fire in place).
+    const out = fly(pilot, { x: 0, y: 0 }, () => null, 8);
+    expect(out.pos.x).toBeGreaterThan(0);
+    expect(out.lastFire).toBe(true);
+  });
+
+  it('holds the trigger while idle (no order) and coasts — no thrust', () => {
+    const pilot = new TapPilot();
+    const state = createControlState();
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null);
+    expect(state.fire).toBe(true);
+    expect(state.thrust.x).toBe(0);
+    expect(state.thrust.y).toBe(0);
+    expect(state.aim).toBeNull();
+    expect(pilot.currentOrder).toBeNull();
+  });
+
+  it('a friendly own-planet fly-to is a lock, not auto-engage: it never fires', () => {
+    const pilot = new TapPilot();
+    pilot.lockTarget({ kind: 'planet', id: 0 });
+    const friendly: ResolvedTarget = { pos: { x: 600, y: 0 }, radius: 64, hostile: false, standoff: 40 };
+    const state = createControlState();
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, friendly);
+    // The lock path runs and returns before auto-engage — a friendly hold holds fire.
+    expect(state.fire).toBe(false);
+  });
+});
+
+describe('TapPilot — an asteroid lock holds INSIDE the tractor pickup radius (developer p9-02 §2 range fix)', () => {
+  const rockAt = (x: number, y: number, radius = 30): ResolvedTarget => ({
+    pos: { x, y },
+    radius,
+    hostile: true,
+    mineable: true, // the wiring marks a rock lock mineable
+  });
+
+  it('closes to a hold whose CENTRE sits inside the tractor pickup radius (assert the number)', () => {
+    const pilot = new TapPilot({ pickupRadius: PICKUP_RADIUS, fireRange: WEAPON_FIRE, engageRange: 130 });
+    pilot.lockTarget({ kind: 'asteroid', id: 9 });
+    const rock = rockAt(1200, 0, 30);
+    const out = fly(pilot, { x: 0, y: 0 }, () => rock, 500);
+    const centreDist = Math.abs(1200 - out.pos.x);
+    // The whole point of the fix: the ship's centre ends up within the grab range, so
+    // the chipped ore actually reaches the hold (it does NOT sit back at combat range).
+    expect(centreDist).toBeLessThanOrEqual(PICKUP_RADIUS);
+    // Still holding + firing on the rock (it is a mine, not an arrival).
+    expect(out.hasOrder).toBe(true);
+    expect(out.lastFire).toBe(true);
+  });
+
+  it('holds NEARER than the combat standoff would — and leaves the enemy hold unchanged', () => {
+    const rock = rockAt(1200, 0, 30);
+    const enemy: ResolvedTarget = { pos: { x: 1200, y: 0 }, radius: 30, hostile: true }; // same body, not mineable
+
+    const rockPilot = new TapPilot({ pickupRadius: PICKUP_RADIUS, engageRange: 130, fireRange: WEAPON_FIRE });
+    rockPilot.lockTarget({ kind: 'asteroid', id: 1 });
+    const rockOut = fly(rockPilot, { x: 0, y: 0 }, () => rock, 500);
+
+    const enemyPilot = new TapPilot({ pickupRadius: PICKUP_RADIUS, engageRange: 130, fireRange: WEAPON_FIRE });
+    enemyPilot.lockTarget({ kind: 'ship', id: 2 });
+    const enemyOut = fly(enemyPilot, { x: 0, y: 0 }, () => enemy, 500);
+
+    const rockCentre = Math.abs(1200 - rockOut.pos.x);
+    const enemyCentre = Math.abs(1200 - enemyOut.pos.x);
+    // The rock is grabbed close; the enemy is still held at the combat standoff, well
+    // outside the pickup radius (the fix touches ONLY mineable targets).
+    expect(rockCentre).toBeLessThan(enemyCentre);
+    expect(enemyCentre).toBeGreaterThan(PICKUP_RADIUS);
+  });
+});
+
+describe('TapPilot — a lock overrides the auto-engage ladder (developer p9-02 §1)', () => {
+  it('a hostile lock aims EXPLICITLY (not the blind auto-engage trigger)', () => {
+    const pilot = new TapPilot({ fireRange: 220 });
+    pilot.lockTarget({ kind: 'ship', id: 5 });
+    const state = createControlState();
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, { pos: { x: 100, y: 0 }, radius: 16, hostile: true });
+    // The lock path writes an explicit aim — the tell that it, not the null-aim
+    // auto-engage, is driving this frame (so the wiring maps it in Manual).
+    expect(state.aim).not.toBeNull();
+    expect(state.aim!.x).toBeGreaterThan(0);
+    expect(state.fire).toBe(true);
+  });
+});
+
+describe('TapPilot — determinism (same orders + frames → identical control states)', () => {
+  it('two pilots fed identical orders and resolves write byte-identical state each frame', () => {
+    const mk = (): TapPilot => new TapPilot({ pickupRadius: PICKUP_RADIUS });
+    const a = mk();
+    const b = mk();
+    const rock: ResolvedTarget = { pos: { x: 500, y: 120 }, radius: 30, hostile: true, mineable: true };
+    const script: Array<() => void> = [
+      () => { a.orderMove({ x: 400, y: 0 }); b.orderMove({ x: 400, y: 0 }); },
+      () => { a.lockTarget({ kind: 'asteroid', id: 3 }); b.lockTarget({ kind: 'asteroid', id: 3 }); },
+    ];
+    const shipA = { pos: { x: 0, y: 0 }, radius: 16 };
+    const shipB = { pos: { x: 0, y: 0 }, radius: 16 };
+    const sa = createControlState();
+    const sb = createControlState();
+    for (let i = 0; i < 40; i++) {
+      if (script[i]) script[i]!();
+      resetState(sa);
+      resetState(sb);
+      const resolve = i >= 1 ? rock : null; // the lock is placed on frame 1
+      a.writeInto(sa, shipA, i >= 1 ? resolve : null);
+      b.writeInto(sb, shipB, i >= 1 ? resolve : null);
+      expect(sa).toEqual(sb);
+      shipA.pos.x += sa.thrust.x * 12;
+      shipA.pos.y += sa.thrust.y * 12;
+      shipB.pos.x += sb.thrust.x * 12;
+      shipB.pos.y += sb.thrust.y * 12;
+    }
   });
 });
