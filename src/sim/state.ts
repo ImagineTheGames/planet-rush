@@ -357,7 +357,7 @@ export interface Projectile {
    * What fired this shot (design amendment v0.2): a `'ship'` weapon projectile or
    * a `'turret'` defensive shot. Both fly and die the same way; the difference is
    * the target list — a ship shot is siege-capable (it collides with enemy ships,
-   * turrets, shields and cores), a turret shot hits only enemy ships, keeping
+   * turrets, shields and cores), a turret shot hits only enemy ships, holding
    * p1-14's turret behaviour intact. It also lets the snapshot tint the two shots
    * apart in the reserved `meta` bits, and the renderer size them differently.
    *

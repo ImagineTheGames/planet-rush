@@ -263,7 +263,7 @@ describe('two equidistant enemies: the turret settles, never orbits', () => {
       const before = turretOf(world).orbitAngle!;
       step(world, NO_INPUT);
       maxDrift = Math.max(maxDrift, Math.abs(angleDiff(turretOf(world).orbitAngle!, before)));
-      // And it never abandons the enemy it settled on — no flapping.
+      // And it never abandons the enemy it settled on — no oscillation.
       expect(turretOf(world).targetId).toBe(targetHeld);
     }
     expect(Math.abs(angleDiff(turretOf(world).orbitAngle!, settled))).toBeLessThan(1e-6);

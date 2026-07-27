@@ -186,7 +186,7 @@ export function turretUpgradeTarget(planet: Planet): Turret | null {
   return best;
 }
 
-/** Ore price of the next TURRET-wedge upgrade on a planet — stepping its
+/** Ore price of the next TURRET-wedge upgrade on a planet — advancing its
  *  {@link turretUpgradeTarget} one Mk up — or `null` when nothing can be
  *  upgraded. The UI prices the wedge's upgrade state from this. */
 export function turretUpgradeCost(planet: Planet): number | null {
@@ -402,7 +402,7 @@ export type UpgradeResult =
  * is match-lifetime state the respawn path never clears (`./step` `respawn`). So a
  * purchase resolves the same before a death and after a respawn: the same wallet,
  * the same ladder, no reference to a "previous" hull, because the sim mutates one
- * ship in place across a life rather than swapping instances. A fresh track and
+ * ship in place across a life rather than replacing instances. A fresh track and
  * the next tier of a pre-death track are both buyable the instant the ship is back.
  *
  * The one life-state gate is `alive`: a dead ship (between lives) is refused

@@ -211,7 +211,7 @@ describe('lead aiming (auto-aim + bots) hits a mover the naive shot misses', () 
   it('auto-aim lands on a full-speed strafing enemy (the shot the bots need)', () => {
     // At a *committed* range (closer than the max-dodge distance), the intercept
     // point sits inside weapon range, so the lead solve reliably connects even on
-    // a full-speed crosser — this is why closing the distance beats sniping.
+    // a full-speed crosser — this is why closing the distance beats a long poke.
     const ENGAGE_RANGE = 170;
     const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 } });
     const topSpeed = shipTopSpeed(shooter);
@@ -296,7 +296,7 @@ describe('a ship shot chips a rock — mining is shooting (amendment v0.3)', () 
     expect(world.chunks.length).toBeGreaterThan(0);
   });
 
-  it('conserves total ore: chipping a rock out yields exactly its ore, no more', () => {
+  it('conserves total ore: a rock chipped out yields exactly its ore, no more', () => {
     // A big hold so every chunk is collected; hold auto-fire until the rock is
     // gone, then the whole rock's ore is accounted for on the ship + loose chunks.
     const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0, cargoCap: 100 });

@@ -30,10 +30,10 @@
  *     (`./match`) and a ship's death drop (`./damage`) are the only other ore
  *     sources, and both are consequences of play, not the pre-fight layout.
  *
- * FUTURE MAPS: this is layout-agnostic by design — the rotation stamping works
+ * FUTURE MAPS: this is layout-agnostic by design — the rotation stamp works
  * for any ring order and any `N`. A new map in a future map registry keeps
  * parity for free **as long as it places home fields by the same per-planet
- * stamping and keeps every ore source `N`-fold symmetric**, and it must prove it
+ * stamp and keeps every ore source `N`-fold symmetric**, and it must prove it
  * against the same seeded suite, `tests/sim/resource-fairness.test.ts`.
  *
  * ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ export function fieldExhausted(world: World): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Stamping: one rock, rotated onto every planet's spoke
+// Stamp: one rock, rotated onto every planet's spoke
 // ---------------------------------------------------------------------------
 
 /** A canonical rock in the arena's polar frame: `r` from the centre, angular
@@ -261,7 +261,7 @@ export function spawnHomeFields(world: World): void {
   // fraction (degenerate tuning only — never on the shipped numbers).
   const innerR = Math.min(ringR * RESOURCE_FIELD.homeInnerFraction, outerR);
 
-  // Draw the shared pattern ONCE and advance the world RNG by it; the stamping
+  // Draw the shared pattern ONCE and advance the world RNG by it; the stamp
   // that follows is pure trig, so every field is identical and the RNG advance
   // does not depend on `n`. The raw angular draw spans the full cone
   // `±homeConeOuter`; it is then folded OUT of the launch corridor (below).
@@ -294,7 +294,7 @@ export function spawnHomeFields(world: World): void {
     for (const rock of rocks) {
       // Single-ring maps take the original arena-frame stamp unchanged (the
       // `octagon`/default board is byte-for-byte what it always was); varying-
-      // radius maps stamp the same pattern in each planet's own frame, keeping
+      // radius maps stamp the same pattern in each planet's own frame, holding
       // every home field congruent.
       if (singleRing) {
         stampRock(world, cx, cy, planet.angle, rock, planet.owner);

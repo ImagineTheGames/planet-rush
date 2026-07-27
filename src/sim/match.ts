@@ -111,7 +111,7 @@ function eliminate(world: World, planet: Planet): void {
   world.match.eliminated.push(planet.owner);
   planet.deathTime = world.time;
 
-  // The owner is out (GDD §2.7): their ship dies where it stands — dropping
+  // The owner is out (GDD §2.7): their ship dies where it stands — shedding
   // half its hold like any death — and it never respawns. The Rematch button is
   // the UI's answer to this flag.
   const ship = shipOwnedBy(world, planet.owner);

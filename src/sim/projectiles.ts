@@ -7,8 +7,8 @@
  * everything a ship or turret fires. A ship's shot carries two payloads and what
  * it strikes first decides which applies:
  *  - it hits an **asteroid** ⇒ it chips ore chunks (`mineYield`), and the tractor
- *    rules (GDD §2.3) collect them exactly as before — only the chipping
- *    mechanism changed, the laser is gone;
+ *    rules (GDD §2.3) collect them exactly as before — only the way a rock is
+ *    chipped changed, the laser is gone;
  *  - it hits an enemy **ship / turret / shield / core** ⇒ it deals `damage`
  *    (GDD §2.4 target list).
  * Because collision decides, "you cannot shoot through things" is free: a rock
@@ -20,7 +20,7 @@
  * the one-time pool growth. Consumers (renderer, snapshot encoder) skip
  * `active === false` slots.
  *
- * Determinism (GDD §4.8): fixed iteration order (pool order for stepping;
+ * Determinism (GDD §4.8): fixed iteration order (pool order for the update;
  * ships, then asteroids, then turrets, then cores for collision), no RNG, every
  * rate `* dt`, one sqrt only where a true magnitude is needed (the lead solve).
  *
@@ -111,7 +111,7 @@ export function fireShipProjectile(world: World, ship: Ship, dir: Vec2): void {
 
 /**
  * Loose one **turret** projectile along bearing `aim` (radians). Relocated from
- * the p1-14 turret gun so it shares the pool and stepping with the ship weapon;
+ * the p1-14 turret gun so it shares the pool and the per-tick update with the ship weapon;
  * since the parity field report (v0.2.2) its bite and reach read from the
  * turret's *tier* rather than the flat `PROJECTILE` constants — a Mk III shot
  * hits harder (`turretTierShotDamage`) and flies the turret's longer tier range
@@ -278,7 +278,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       return true;
     }
     // A dead or spawn-protected core is not a target — the shot flies over it
-    // (GDD §2.1). `damagePlanet` guards this too, but skipping here keeps the
+    // (GDD §2.1). `damagePlanet` guards this too, but omitting it here keeps the
     // shot alive to hit something real behind it.
     if (!planet.alive || planet.spawnProtect > 0) continue;
     const targetR = planetTargetRadius(planet);
@@ -316,7 +316,7 @@ export function activeProjectilesOf(world: World, owner: PlayerId): Projectile[]
 }
 
 // ---------------------------------------------------------------------------
-// Mining — chipping a rock with a shot (ratified amendment v0.3)
+// Mining — a shot chips a rock (ratified amendment v0.3)
 // ---------------------------------------------------------------------------
 
 /** The ship that fired a shot, so mined chunks can drift toward it (the tractor
@@ -331,7 +331,7 @@ function ownerShip(world: World, owner: PlayerId): Ship | null {
 
 /**
  * Chip `yieldAmount` ore out of asteroid `a` — one weapon projectile's mining
- * hit (amendment v0.3). Identical bookkeeping to the retired continuous laser:
+ * hit (amendment v0.3). Identical accounting to the retired continuous laser:
  * ore is drawn down (never below zero, so total-ore-per-asteroid is exactly the
  * ratified `ore`), the crack stage advances across its three thresholds
  * (GDD §5.5), and whole chunks are emitted from a fractional buffer, drifting

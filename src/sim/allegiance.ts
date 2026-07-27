@@ -40,7 +40,7 @@ export function teamOf(world: World, id: PlayerId): number {
  *
  * A player is never their own enemy (a shot always flies over its owner), so the
  * `a === b` short-circuit guarantees self-immunity independent of any team
- * bookkeeping. Otherwise it is simply "different team?": in FFA every player is a
+ * accounting. Otherwise it is simply "different team?": in FFA every player is a
  * team of one, so this is `a !== b`; in TEAMS, allies share a `team` and read as
  * friends. Friendly fire is therefore OFF by construction (ratified 2026-07-26) —
  * allies are not enemies, so shots, turrets, and auto-aim all pass them by.
