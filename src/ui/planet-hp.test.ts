@@ -122,9 +122,18 @@ describe('numeric core HP readout (developer request, p5-08 — "75/100")', () =
     expect(coreHpReadout(100, 100)).toBe('100/100');
   });
 
-  it('rounds a live-siege fractional current to a whole point', () => {
+  it('CEILS a live-siege fractional current — a standing core never reads down', () => {
     expect(coreHpReadout(74.6, 100)).toBe('75/100');
-    expect(coreHpReadout(0.4, 100)).toBe('0/100');
+    expect(coreHpReadout(74.2, 100)).toBe('75/100');
+  });
+
+  it('reads a barely-alive core as "1", never "0" — zero means the core is gone', () => {
+    // A core at 0.4 hp is ALIVE (destroyed is coreHp <= 0), so it must not read
+    // "0/100" and lie that the loss condition has already fired. Ceiling gives 1.
+    expect(coreHpReadout(0.4, 100)).toBe('1/100');
+    expect(coreHpReadout(0.001, 100)).toBe('1/100');
+    // Exactly gone is the only 0.
+    expect(coreHpReadout(0, 100)).toBe('0/100');
   });
 
   it('never reads a negative or an over-max current', () => {
