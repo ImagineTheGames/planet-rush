@@ -304,3 +304,23 @@ carries only the HOME core-HP bar.
   a `coreHp` readback (bank is already readable via `__oreDepositStage.readout()`).
 
 No page errors in any capture.
+
+## Evidence p1b — the wheel, walked through the front door (build `986b11e`)
+
+Four deliverables, all captured on the freshly-built live `986b11e` preview with
+REAL input driving the interactions (real `E` key + real mouse clicks / touch); the
+`__*` seams place the ship or read state back for verification only, never drive the
+interaction under test. Cameras: `capture-wheel-real.mjs`, `capture-legend.mjs`,
+`capture-theme.mjs`; figures composed by `build-p1b-figures.mjs`; per-run readbacks
+saved beside them (`wheel-real-readback.json`, `legend-readback.json`).
+
+| Deliverable | Shot | Result |
+| --- | --- | --- |
+| WEAPON sub-wheel by real clicks; BACK ≠ bounce | `weapon-wheel-real` | **verified** — E→UPGRADE SHIP→WEAPON→buy DAMAGE→BACK, landing on the UPGRADE main wheel (WEAPON/ENGINE/CARGO/HULL, DAMAGE pip ●○○), not the build wheel |
+| One tier of every track by clicking | `upgrades-apply-real` | **verified** — ENGINE/CARGO/HULL/DAMAGE/SPEED each +1 tier by real click; every wheel stat steps up (hub 999→979) |
+| BUILD affordance gated on proximity | `contextual-build-legend` | **verified** — PC offers `E Build & Upgrade` near, dims it to "get closer to your planet" far; mobile shows the BUILD button only near |
+| Button theme: active reads active, disabled says why | `button-theme-consistent` | **verified** — SETTINGS active beside PLAY; end-screen REMATCH + BACK TO MENU both alive; the one grey control (away-from-planet BUILD) carries its reason |
+
+The developer's report that buying in the WEAPON sub-wheel bounced back to the build
+wheel does NOT reproduce on `986b11e`: in one unbroken real-input session, BACK after
+a purchase returned to the upgrade main wheel every time.

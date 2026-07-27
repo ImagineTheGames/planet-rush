@@ -17,12 +17,13 @@ import {
   segmentCost,
   segmentState,
   spendableOre,
+  repairWedgeInfo,
   REPAIR_ENTRY_ORE,
   SEGMENT_ARC,
   WHEEL_ORDER,
 } from './build-wheel';
 import type { BuildWheelSignals, WheelSegmentId } from './build-wheel';
-import { SHIELD, TURRET } from '../sim/constants';
+import { REPAIR_HP_PER_ORE, SHIELD, TURRET } from '../sim/constants';
 
 /** A docked player at a healthy planet with `ore` banked, plus overrides. */
 function sig(over: Partial<BuildWheelSignals> = {}): BuildWheelSignals {
@@ -107,6 +108,67 @@ describe('costs — the only number on a segment (GDD §2.5)', () => {
       .map(([k]) => k)
       .sort();
     expect(numericKeys).toEqual(['angle', 'cost']);
+  });
+});
+
+describe('REPAIR CORE names its effect — the informed tap (p5-08)', () => {
+  it('shows a full tap\'s HP on a comfortably-damaged core', () => {
+    // Missing more than a full tap: the wedge shows the whole tap, "+15 HP".
+    const info = repairWedgeInfo(sig({ banked: 9, coreHp: 40, maxCoreHp: 100 }));
+    expect(info.line).toBe(`+${REPAIR_HP_PER_ORE} HP`);
+    expect(info.restoreHp).toBe(REPAIR_HP_PER_ORE);
+  });
+
+  it('shows the REAL partial when the core is missing less than a full tap', () => {
+    // Missing 7 HP: one ore still heals to full, but only 7 HP — so the wedge says
+    // "+7 HP", not "+15 HP", so the near-full tap is an informed choice.
+    const info = repairWedgeInfo(sig({ banked: 9, coreHp: 93, maxCoreHp: 100 }));
+    expect(info.line).toBe('+7 HP');
+    expect(info.restoreHp).toBe(7);
+  });
+
+  it('reads CORE FULL on a full core, whatever the ore', () => {
+    const info = repairWedgeInfo(sig({ banked: 99, coreHp: 100, maxCoreHp: 100 }));
+    expect(info.line).toBe('CORE FULL');
+    expect(info.restoreHp).toBe(0);
+  });
+
+  it('names the price when the bank is empty (the empty-bank reason)', () => {
+    const info = repairWedgeInfo(sig({ cargo: 0, banked: 0, coreHp: 50, maxCoreHp: 100 }));
+    expect(info.line).toBe(`NEED ${REPAIR_ENTRY_ORE} ORE`);
+  });
+
+  it('reads NO REPAIR once collapse has shut repair off (GDD §2.3)', () => {
+    const info = repairWedgeInfo(sig({ banked: 99, coreHp: 50, maxCoreHp: 100, collapsed: true }));
+    expect(info.line).toBe('NO REPAIR');
+    expect(info.restoreHp).toBe(0);
+  });
+
+  it('the line precedence matches segmentState exactly (never disagree)', () => {
+    // Wherever segmentState is not 'ready', the wedge line must be a reason, not a
+    // "+HP" deal — the dimmed state and the copy are one decision.
+    const frames: Partial<BuildWheelSignals>[] = [
+      { coreHp: 100, maxCoreHp: 100, banked: 9 }, // full
+      { coreHp: 50, maxCoreHp: 100, banked: 0, cargo: 0 }, // broke
+      { coreHp: 50, maxCoreHp: 100, banked: 9, collapsed: true }, // collapsed
+    ];
+    for (const f of frames) {
+      const s = sig(f);
+      const ready = segmentState('repair', s) === 'ready';
+      expect(repairWedgeInfo(s).line.startsWith('+')).toBe(ready);
+    }
+    // And a plain damaged, funded core IS ready and DOES show a "+HP" line.
+    const ok = sig({ coreHp: 50, maxCoreHp: 100, banked: 9 });
+    expect(segmentState('repair', ok)).toBe('ready');
+    expect(repairWedgeInfo(ok).line.startsWith('+')).toBe(true);
+  });
+
+  it('hangs the effect line on the repair segment only — never on another wedge', () => {
+    const byId = new Map(buildWheelModel(sig({ coreHp: 50 })).segments.map((s) => [s.id, s]));
+    expect(byId.get('repair')?.repair).not.toBeNull();
+    expect(byId.get('turret')?.repair).toBeNull();
+    expect(byId.get('shield')?.repair).toBeNull();
+    expect(byId.get('upgrade')?.repair).toBeNull();
   });
 });
 

@@ -27,17 +27,22 @@ import { UpgradeTrack } from '@shared/types';
 import { SHIELD, TURRET } from '../sim';
 import type { Purchase } from './behaviors';
 import {
+  RETREAT_CLEAR_RANGE,
+  coreUnderFinalAssault,
   defendHome,
   engage,
   haulHome,
-  incomingThreat,
+  lastStandDefend,
   mine,
+  nearestThreat,
   order,
+  repairTargetFraction,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   upgrade,
+  wantsRetreat,
   wantsToHaul,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
@@ -56,13 +61,16 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   if (!planet) return null;
   const spendable = ctx.self.spendable;
 
-  // Patch the core when nothing is hitting it — repair interrupts on any damage
-  // (GDD §2.5), so opening the channel mid-siege just wastes ore.
+  // Patch the core when nothing is hitting it — a besieged core cannot be
+  // out-repaired (GDD §2.6), so spending under fire just wastes ore. RATIONED,
+  // not topped to full: even timid Rusty stops short of the ceiling so a field
+  // of turtles does not reach collapse at one identical HP (`repairTargetFraction`,
+  // p5-repair-discrete). Rusty (caution 1.3) patches early; Bolt (0.5) rarely.
   if (
     !ctx.view.collapsed &&
     !planet.repairing &&
     !planet.underAttack &&
-    planet.coreHp < planet.maxCoreHp - 1 &&
+    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, EASY_REPAIR_AT) &&
     spendable >= 1
   ) {
     return order('repair');
@@ -81,6 +89,13 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   return null;
 }
 
+/** Base core fraction below which an Easy bot patches its core, before the
+ *  `caution` lean and the below-ceiling cap in `repairTargetFraction`. Was an
+ *  effective ~0.99 (repair to full); dropped to a genuine ration so the discrete
+ *  heal no longer pins every funded core on the `maxCoreHp` clamp — the collapse
+ *  lockstep the soak caught (p5-repair-discrete). TUNABLE */
+export const EASY_REPAIR_AT = 0.6;
+
 /** Turrets an Easy bot wants before it thinks about anything else. TUNABLE */
 export const EASY_TURRET_TARGET = 3;
 /** Shield generators it wants after the guns. TUNABLE */
@@ -97,11 +112,18 @@ export const easyTree: Node = selector('easy', [
   // Dead and waiting on the respawn clock: hands still, like a human watching it.
   when('dead', (ctx) => !ctx.self.alive, () => NEUTRAL),
 
-  // "retreats at half hull" — above everything except being alive.
+  // A core under final assault outranks even an over-defender's own skin
+  // (v0.2.2 field report): above the retreat, and interrupts a committed one.
+  when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // "retreats at half hull" — above everything except being alive and the last
+  // stand. Latched so it does not flap: once an Easy bot turns to run it commits
+  // to the run until it has cleared the threat or respawned (`./commitment`;
+  // v0.2.2 field report).
   when(
     'retreat',
-    (ctx) => isWounded(ctx) && incomingThreat(ctx) !== null,
-    (ctx) => retreat(ctx, incomingThreat(ctx)),
+    (ctx) => wantsRetreat(ctx),
+    (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
 
   // "over-defends": the alarm outranks the economy, always.

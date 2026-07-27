@@ -128,6 +128,17 @@ export const TURRET = {
    * make it flap. Unitless, in (0, 1]. TUNABLE
    */
   targetHysteresis: 0.75,
+  /**
+   * Length (world units) of the muzzle *flash* — a short flare off the barrel
+   * tip, NOT a line to the target. Since the laser retired to a projectile
+   * (design amendment v0.3) a turret's shot is the pooled projectile; the
+   * muzzle record is only the fire *tell*, a burst at the muzzle. This stub is
+   * kept short — a flare, not a beam — so a renderer never strokes a line
+   * reaching the ship it fired at (v0.2.2 field report: "turrets still flash a
+   * mining laser at me"). A hair past the barrel radius so the flare clears the
+   * mount. TUNABLE
+   */
+  muzzleFlashLength: 16,
 } as const;
 
 /** Turret projectile (GDD §4.1 "pooled projectiles, same circle test"). TUNABLE */
@@ -340,14 +351,31 @@ export const SHIELD = {
   radius: 90,
 } as const;
 
-/** Repair core (GDD §2.8): planet core only, HP/s channel, ore per HP, and the
- *  rule that any core/shield damage interrupts it (GDD §2.5). `orePerHp` =
- *  1 ore ⁄ 5 HP; never printed on the wheel. TUNABLE */
-export const REPAIR = {
-  hpPerSecond: 2,
-  orePerHp: 1 / 5,
-  interruptedByDamage: true,
-} as const;
+/**
+ * Repair core — a DISCRETE purchase (developer, 2026-07-26; supersedes the
+ * GDD §2.5 channel — see docs/design-amendments.md). One wheel press = one
+ * purchase: spend `REPAIR_ORE_COST` ore, restore `REPAIR_HP_PER_ORE` core HP,
+ * clamped at the core max. Planet core only, never the ship. No channel, no
+ * continuous drain, no stacking — N taps are N independent, individually
+ * affordable-checked purchases. A core missing less than `REPAIR_HP_PER_ORE`
+ * still costs the full ore and heals to full (the wheel SHOWS the real number,
+ * so the choice is informed — p5-08). TUNABLE.
+ */
+export const REPAIR_HP_PER_ORE: Tunable<number> = 15;
+/** Ore spent per repair purchase — the "bare 1 under REPAIR CORE" (GDD §2.5),
+ *  now the whole price of one tap rather than a channel's opening unit. TUNABLE */
+export const REPAIR_ORE_COST: Tunable<number> = 1;
+/**
+ * How long (seconds) the `repairing` *tell* holds after a repair purchase before
+ * it releases (`maintainRepairTell`). It does NOT gate a human — `placeOrder`
+ * always lets a tap buy a discrete repair, so "5 taps = 5 purchases" holds — it
+ * only PACES an AI defender, which reads `!repairing` to decide when to buy its
+ * next repair. Set to `REPAIR_HP_PER_ORE / 2` so a bot files one 15-HP purchase
+ * per hold, i.e. the ~2 HP/s cadence of the retired repair channel — keeping bot
+ * repair economics (and the collapse-phase balance that hangs off them) steady
+ * across the discrete-repair amendment. TUNABLE.
+ */
+export const REPAIR_TELL_HOLD: Tunable<number> = REPAIR_HP_PER_ORE / 2;
 
 /**
  * Default arena side length (world units). The bounds are a square this big
@@ -485,8 +513,22 @@ export const RESOURCE_FIELD = {
    *  Each wave is still a shrinking ring closer to the core than the last (GDD
    *  §2.3 "Outer Drift"), so the concentric rings close in over the match. Sized
    *  with `commonsSpokeGap` so the innermost ring rock clears a launching ship's
-   *  path by more than a ship+rock radius. TUNABLE */
-  commonsHoleFraction: 0.75,
+   *  path by more than a ship+rock radius.
+   *
+   *  Raised from the v0.1 0.75 (p5-repair-discrete soak): the five shrinking
+   *  rings stack near the centre, and at 0.75 the innermost wave's eye
+   *  (`0.75 × 0.25 × fieldRadius` ≈ 58 u) was small enough that a ship drawn into
+   *  the centre — GDD §2.3's whole "pulled into a smaller and smaller contested
+   *  space" — could be **sealed** by a full ring of body-radius rocks it could not
+   *  squeeze past (the harness caught a bot rattling >100 s inside one, the
+   *  `unstuck` invariant). A bigger eye pushes the innermost ring out to a radius
+   *  whose circumference actually admits a ship-wide gap, so the centre still
+   *  draws players in but never traps them; the 50-seed soak's worst wedge fell
+   *  from ~13 s to ~4 s, back in the honest detect-and-escape band. It is strictly
+   *  MORE clearance than 0.75 — the launch-corridor guarantee above only gets
+   *  stronger — and costs the fairness invariant nothing (still `N`-fold
+   *  symmetric, still the same `WAVE_ORE`). TUNABLE */
+  commonsHoleFraction: 0.85,
   /** Angular clearance (radians) kept around every planet spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below

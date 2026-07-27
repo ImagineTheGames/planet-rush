@@ -1,0 +1,134 @@
+{
+  "weaponWheel": {
+    "buildThenUpgradeShip_mainLabels": [
+      "WEAPON",
+      "ENGINE",
+      "CARGO",
+      "HULL"
+    ],
+    "weaponClick_subLabels": [
+      "DAMAGE",
+      "SPEED",
+      "BACK"
+    ],
+    "damage": {
+      "before": {
+        "tier": 0,
+        "current": "10",
+        "next": "13",
+        "cost": 4
+      },
+      "after": {
+        "tier": 1,
+        "current": "13"
+      }
+    },
+    "bank": {
+      "before": 60,
+      "afterBuy": 56
+    },
+    "afterBack_labels": [
+      "WEAPON",
+      "ENGINE",
+      "CARGO",
+      "HULL"
+    ],
+    "afterBack_isUpgradeMainWheel": true,
+    "errors": []
+  },
+  "upgradesApply": {
+    "applied": [
+      {
+        "track": "ENGINE",
+        "current_before": "100%",
+        "next_before": "115%",
+        "tier_before": 0,
+        "current_after": "115%",
+        "tier_after": 1,
+        "cost": 3
+      },
+      {
+        "track": "CARGO",
+        "current_before": "2",
+        "next_before": "4",
+        "tier_before": 0,
+        "current_after": "4",
+        "tier_after": 1,
+        "cost": 2
+      },
+      {
+        "track": "HULL",
+        "current_before": "50",
+        "next_before": "60",
+        "tier_before": 0,
+        "current_after": "60",
+        "tier_after": 1,
+        "cost": 3
+      },
+      {
+        "track": "DAMAGE",
+        "current_before": "10",
+        "next_before": "13",
+        "tier_before": 0,
+        "current_after": "13",
+        "tier_after": 1,
+        "cost": 4
+      },
+      {
+        "track": "SPEED",
+        "current_before": "100%",
+        "next_before": "115%",
+        "tier_before": 0,
+        "current_after": "115%",
+        "tier_after": 1,
+        "cost": 8
+      }
+    ],
+    "baseline": [
+      {
+        "label": "WEAPON",
+        "tier": 0,
+        "current": ""
+      },
+      {
+        "label": "ENGINE",
+        "tier": 0,
+        "current": "100%"
+      },
+      {
+        "label": "CARGO",
+        "tier": 0,
+        "current": "2"
+      },
+      {
+        "label": "HULL",
+        "tier": 0,
+        "current": "50"
+      }
+    ],
+    "finalMain": [
+      {
+        "label": "WEAPON",
+        "tier": 0,
+        "current": ""
+      },
+      {
+        "label": "ENGINE",
+        "tier": 1,
+        "current": "115%"
+      },
+      {
+        "label": "CARGO",
+        "tier": 1,
+        "current": "4"
+      },
+      {
+        "label": "HULL",
+        "tier": 1,
+        "current": "60"
+      }
+    ],
+    "bank": 979,
+    "errors": []
+  }
+}

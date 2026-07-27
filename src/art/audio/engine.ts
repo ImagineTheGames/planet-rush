@@ -50,6 +50,7 @@ import { SOUND, TELL_SOUND, type SoundName } from './bank';
 import { WeaponVoices, SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
 import { AudioGraph, type LoopHandle, type MixOptions } from './graph';
+import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
 
 /** Distance in world units at which a sound is at full level. */
 export const EARSHOT_NEAR = 260;
@@ -60,8 +61,17 @@ export const EARSHOT_FAR = 1400;
 /** Below this the mix is treated as silent and one-shots are not started. */
 const HUSHED = 0.001;
 
-/** Ambient bus level while the alarm is sounding — it must never compete. */
+/**
+ * How far each bus is pulled under the alarm — the mix pass the brief asks for,
+ * *"music and SFX duck under the alarm."* The ambience all but disappears and the
+ * soundtrack drops right back; the SFX only step aside, because they are the
+ * mechanics (turret fire, a shield falling) the alarm is telling you about
+ * (GDD §2.2). These are duck *factors*, not levels — the player's sliders survive
+ * underneath them (`./graph` setBusDuck).
+ */
 const AMBIENT_DUCK = 0.25;
+const MUSIC_DUCK = 0.3;
+const SFX_DUCK = 0.7;
 
 /** Options for {@link AudioEngine}. */
 export interface AudioEngineOptions {
@@ -81,6 +91,9 @@ export interface AudioEngineOptions {
   readonly alarm?: AlarmOptions;
   /** Start the ambient bed when the engine starts. Cuttable (GDD §4.9 item 3). */
   readonly ambient?: boolean;
+  /** Run the adaptive soundtrack (`./music`). On by default; cuttable (§4.9 item 3). */
+  readonly music?: boolean;
+  readonly musicMix?: MusicDirectorOptions;
 }
 
 /**
@@ -93,11 +106,20 @@ export class AudioEngine {
   readonly death: DeathMoment;
   /** The mix, or `null` when running silent. */
   readonly graph: AudioGraph | null;
+  /**
+   * The soundtrack's phase model (`./music`). Public and always present — a pure
+   * state machine like the alarm, so it runs (and tests) headless, and the HUD
+   * could read the same phase the mix is playing.
+   */
+  readonly musicScore: MusicScore;
+  /** The soundtrack, playing, or `null` when running silent. */
+  readonly music: MusicDirector | null;
 
   private readonly weapons: WeaponVoices | null;
   private readonly thruster: SustainedVoice | null;
   private readonly ownsDeath: boolean;
   private readonly wantsAmbient: boolean;
+  private wantsMusic: boolean;
 
   private ambientLoop: LoopHandle | null = null;
   private alarmLoop: LoopHandle | null = null;
@@ -121,6 +143,10 @@ export class AudioEngine {
     this.ownsDeath = options.death === undefined;
     this.local = options.local ?? -1;
     this.wantsAmbient = options.ambient ?? true;
+    this.wantsMusic = options.music ?? true;
+    this.musicScore = new MusicScore();
+    this.music = this.graph ? new MusicDirector(this.graph, this.musicScore, options.musicMix ?? {}) : null;
+    if (!this.wantsMusic) this.music?.setEnabled(false);
   }
 
   /** True when there is a real mix behind this engine. */
@@ -187,6 +213,17 @@ export class AudioEngine {
     this.ambientLoop = null;
   }
 
+  /** The music slider, 0..1 — the soundtrack's own level (GDD §4.9 item 3). */
+  setMusicVolume(value: number): void {
+    this.graph?.setBus('music', value);
+  }
+
+  /** Turn the adaptive soundtrack on or off — item 3 on the cut list (GDD §4.9). */
+  setMusic(on: boolean): void {
+    this.wantsMusic = on;
+    this.music?.setEnabled(on);
+  }
+
   /**
    * Sound every tell in the queue.
    *
@@ -203,6 +240,13 @@ export class AudioEngine {
 
       // The alarm hears only your own home taking sustained damage (GDD §2.2).
       if (player === this.local && this.local >= 0) this.alarm.damage(kind);
+
+      // The soundtrack reads the same queue: combat heats the theme, the waves
+      // raise the tension, the collapse and the end turn the arc (`./music`).
+      this.musicScore.combat(kind);
+      if (kind === TELL.waveArrive) this.musicScore.wave(magnitude);
+      else if (kind === TELL.collapseBegin) this.musicScore.collapse();
+      else if (kind === TELL.matchEnd) this.musicScore.end(magnitude >= 0.5);
 
       switch (kind) {
         // --- Held states: a voice, not a hit --------------------------------
@@ -236,13 +280,20 @@ export class AudioEngine {
     }
   }
 
-  /** Advance the alarm, the held voices, and the hush. */
+  /** Advance the alarm, the held voices, the soundtrack, and the hush. */
   update(dt: number): void {
     const step = dt > 0 ? dt : 0;
     this.alarm.update(step);
     if (this.ownsDeath) this.death.update(step);
     this.weapons?.update(step);
     this.thruster?.update(step);
+
+    // The soundtrack follows the local siege, then rides the same hush every
+    // other voice does — and holds its win/loss sting until the quiet lifts.
+    this.musicScore.setUnderAttack(this.alarm.active);
+    this.musicScore.update(step);
+    if (this.started) this.music?.update(step, this.death.gain);
+
     this.graph?.setDuck(this.death.gain);
     this.syncAlarm();
   }
@@ -251,6 +302,7 @@ export class AudioEngine {
   dispose(): void {
     this.weapons?.stop();
     this.thruster?.stop();
+    this.music?.stop();
     this.ambientLoop?.stop(0.2);
     this.ambientLoop = null;
     this.alarmLoop?.stop(0.1);
@@ -265,6 +317,8 @@ export class AudioEngine {
     if (this.ownsDeath) this.death.reset();
     this.weapons?.stop();
     this.thruster?.stop();
+    this.musicScore.reset();
+    this.music?.stop();
   }
 
   // -------------------------------------------------------------------------
@@ -322,15 +376,21 @@ export class AudioEngine {
       if (!this.alarmLoop) {
         this.alarmLoop = graph.startLoop(SOUND.alarm, 0, 'alarm');
         this.alarmLoop.setGain(1, 0.08);
-        // Your home is being taken apart; the ambience gets out of the way.
-        graph.setBus('ambient', AMBIENT_DUCK, 0.3);
+        // Your home is being taken apart; everything else gets out of the way.
+        // The soundtrack and the ambience drop hard, the SFX only step aside —
+        // they are the mechanics the alarm is about (GDD §2.2).
+        graph.setBusDuck('ambient', AMBIENT_DUCK, 0.3);
+        graph.setBusDuck('music', MUSIC_DUCK, 0.3);
+        graph.setBusDuck('sfx', SFX_DUCK, 0.2);
       }
       return;
     }
     if (this.alarmLoop) {
       this.alarmLoop.stop(0.12);
       this.alarmLoop = null;
-      graph.setBus('ambient', 1, 0.8);
+      graph.setBusDuck('ambient', 1, 0.8);
+      graph.setBusDuck('music', 1, 0.8);
+      graph.setBusDuck('sfx', 1, 0.4);
     }
   }
 

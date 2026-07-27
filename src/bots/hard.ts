@@ -15,9 +15,10 @@
  *  - It sees exactly what Easy sees. Same `BotView`, same `SENSOR_RANGE`, same
  *    `null` where a core has not been scouted. A Hard bot that knows you are
  *    wounded flew over and looked.
- *  - It decides more often (`reactionInterval` 1/20 s), aims straighter
- *    (`aimJitter` 0.02), holds its nerve longer (`retreatHullFraction` 0.2), and
- *    forgets more slowly (`memorySeconds` 20). Four competence knobs, no
+ *  - It decides more often (`reactionInterval` 1/20 s), aims straighter (tightest
+ *    spread `aimJitter` 0.05 and shortest lead-lag `aimLatency` 0.20 s — beatable,
+ *    not an aimbot, since v0.2.2), holds its nerve longer (`retreatHullFraction`
+ *    0.2), and forgets more slowly (`memorySeconds` 20). Competence knobs, no
  *    information knobs.
  *  - The *only* thing it does that the other tiers do not is **think about the
  *    whole board**: it compares a wounded miner against an unguarded core
@@ -33,23 +34,28 @@ import { UpgradeTrack } from '@shared/types';
 import { SHIELD, TURRET, nextUpgradeCost } from '../sim';
 import type { Purchase } from './behaviors';
 import {
+  RETREAT_CLEAR_RANGE,
   attack,
+  coreUnderFinalAssault,
   defendHome,
   haulHome,
   hunt,
-  incomingThreat,
+  lastStandDefend,
   mine,
+  nearestThreat,
   order,
+  repairTargetFraction,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   suppressTurrets,
   upgrade,
+  wantsRetreat,
   wantsToHaul,
 } from './behaviors';
 import { NEUTRAL } from './steering';
-import { bestRock, bestTarget, homeIntruder, isWounded, nearestLivingRival } from './targeting';
+import { bestRock, bestTarget, homeIntruder, nearestLivingRival } from './targeting';
 import type { BotCtx, Node } from './tree';
 import { selector, when } from './tree';
 
@@ -110,7 +116,7 @@ export function hardSpendPlan(ctx: BotCtx): Purchase | null {
   if (
     !ctx.view.collapsed &&
     !planet.repairing &&
-    planet.coreHp < planet.maxCoreHp * HARD_REPAIR_AT &&
+    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, HARD_REPAIR_AT) &&
     spendable >= 2
   ) {
     return order('repair');
@@ -154,14 +160,23 @@ export const SCAVENGE_COMMIT = 0.6;
 export const hardTree: Node = selector('hard', [
   when('dead', (ctx) => !ctx.self.alive, () => NEUTRAL),
 
+  // The priority exception (v0.2.2 field report): a core under final assault
+  // outranks self-preservation, so it sits *above* the retreat and is the one
+  // thing allowed to interrupt a committed one. A territorial Hard bot dies on
+  // its own doorstep rather than saving a hull that respawns free (GDD §2.7).
+  when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
   // Hard holds its nerve to 20% hull — and then leaves, because a dead ship
-  // drops half its hold to the player who just earned it (GDD §2.7). Once the
-  // field is spent there is no hold worth saving and a respawn is free, so the
-  // branch switches off and the bot fights to the end.
+  // drops half its hold to the player who just earned it (GDD §2.7). The break
+  // off is *latched* (`./commitment`): once committed it keeps fleeing until it
+  // has cleared the threat or respawned, so a wounded bot never twitches between
+  // fleeing and re-engaging (the v0.2.2 field report's exact bug). Once the field
+  // is spent there is no hold worth saving and a respawn is free, so `wantsRetreat`
+  // switches the whole thing off and the bot fights to the end.
   when(
     'retreat',
-    (ctx) => !ctx.view.collapsed && isWounded(ctx) && incomingThreat(ctx) !== null,
-    (ctx) => retreat(ctx, incomingThreat(ctx)),
+    (ctx) => wantsRetreat(ctx),
+    (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
 
   // Home comes first, but only when home is actually being hit — a Hard bot does

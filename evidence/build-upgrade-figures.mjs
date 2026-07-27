@@ -50,7 +50,7 @@ async function main() {
 
   await shoot(page, figureHTML(
     'exact-cost-purchase — the wheel sells at EXACT cost (the a192ed8 failure, now correct)',
-    'Build fb75961, ?debug=1&freeze=1 upgrade wheel via __upgradeWheelStage.openUpgrade(2) — the ship banked exactly 2 ore, CARGO’s cost. The purchase runs through the sim’s real buyUpgrade. Cost is the only ore-yellow number on a wedge (style-guide §2); a dimmed grey cost means unaffordable.',
+    'Build b4cd87d, ?debug=1&freeze=1 upgrade wheel via __upgradeWheelStage.openUpgrade(2) — the ship banked exactly 2 ore, CARGO’s cost. The purchase runs through the sim’s real buyUpgrade. Cost is the only ore-yellow number on a wedge (style-guide §2); a dimmed grey cost means unaffordable.',
     [
       { img: 'exact-cost-before.png', tag: 'BEFORE', cap: 'Hub ore = 2. CARGO (2 → 4) shows its cost “2” in ORE-YELLOW — affordable at exactly bank == cost. ENGINE and HULL, both cost 3, show “3” in GREY (unaffordable at bank 2). The exact-cost boundary is affordable, not off-by-one.' },
       { img: 'exact-cost-after.png', tag: 'AFTER', cap: 'buyByTrack(\'cargo\') → result "ok". Hub ore = 0 (bank hit exactly zero). CARGO re-rendered to its next tier: 4 → 6, cost now 6. The spent “2” is caught mid-arc floating from the wedge toward the hub. The purchase SUCCEEDED at exact cost.' },
@@ -59,7 +59,7 @@ async function main() {
 
   await shoot(page, figureHTML(
     'damage-and-speed-tracks — the WEAPON sub-wheel: DAMAGE and SPEED, both purchasable',
-    'Build fb75961, ?debug=1&freeze=1. openUpgrade(999) → openWeapon() drills into the WEAPON sub-wheel behind the main wheel’s WEAPON wedge. Two projectile tracks live here (RATIFIED v0.2.2). SPEED’s 100%→115%→130% mirrors the sim’s ratified SHOT_SPEED_STEPS [1,1.15,1.3] — projectile muzzle velocity; a speed tier makes the same shot cross the range sooner (harder to dodge). The isolated two-frame in-flight speed differential was not cleanly capturable headless and is not claimed here beyond the ratified constant.',
+    'Build b4cd87d, ?debug=1&freeze=1. openUpgrade(999) → openWeapon() drills into the WEAPON sub-wheel behind the main wheel’s WEAPON wedge. Two projectile tracks live here (RATIFIED v0.2.2). SPEED’s 100%→115%→130% mirrors the sim’s ratified SHOT_SPEED_STEPS [1,1.15,1.3] — projectile muzzle velocity; a speed tier makes the same shot cross the range sooner (harder to dodge). The isolated two-frame in-flight speed differential was not cleanly capturable headless and is not claimed here beyond the ratified constant.',
     [
       { img: 'weapon-subwheel.png', tag: 'SUB-WHEEL', cap: 'Three wedges: DAMAGE (10 → 13, per-hit value, cost “4” ore-yellow), SPEED (100% → 115%, cost “8” ore-yellow), and BACK ◀ TO SHIP. Both track costs are ore-yellow — both affordable/purchasable at 999 ore.' },
       { img: 'weapon-subwheel-damage-bought.png', tag: 'BOUGHT', cap: 'buyByTrack(\'power\') → "ok", tier 0→1: the DAMAGE wedge re-rendered to 13 → 15, its cost stepped to 8, hub ore 999 → 995, the spent “4” floating toward the hub. (SPEED buys identically: buyByTrack(\'speed\') → "ok", wedge → 115% → 130%.)' },

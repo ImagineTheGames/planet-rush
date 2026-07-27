@@ -31,6 +31,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { buttonStyle } from './button-theme';
 import { DIFFICULTY_LABELS, RUSH_LABEL } from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
@@ -396,15 +397,20 @@ export class LobbyView extends Container {
     const counting = model.countdown.active;
     const live = model.canStart || counting;
 
+    // RUSH! is the headline action — PRIMARY. A guest before the host starts is
+    // the one disabled case, and it carries its reason below (the hint), so the
+    // dim look is honest, not a stray gray (p4-03 / the button contract).
+    const style = buttonStyle('primary', !live);
     this.rushBody.clear();
     this.rushBody
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: PALETTE.plasma, alpha: live ? 0.18 : 0.06 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: live ? 2 : 1, color: PALETTE.plasma, alpha: live ? 0.9 : 0.3 });
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
 
     this.rushText.text = model.countdown.label;
-    this.rushText.style.fill = live ? TEXT_PRIMARY : TEXT_DIM;
+    this.rushText.style.fill = style.label;
+    this.rushText.alpha = style.labelAlpha;
     this.rushText.x = rect.x + rect.width / 2;
     this.rushText.y = rect.y + rect.height / 2;
 

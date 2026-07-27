@@ -82,6 +82,7 @@ export {
   segmentAngle,
   segmentAtDirection,
   spendableOre,
+  repairWedgeInfo,
   WHEEL_ORDER,
   SEGMENT_ARC,
   REPAIR_ENTRY_ORE,
@@ -93,10 +94,11 @@ export type {
   WheelSegmentId,
   SegmentState,
   SegmentTarget,
+  RepairWedgeInfo,
 } from './build-wheel';
 
 export { BuildWheelView } from './build-wheel-view';
-export type { DrawnUpgradeWedge } from './build-wheel-view';
+export type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 
 // --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
 //     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,
@@ -203,7 +205,7 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 // --- Own-planet HP, in the player's colour (GDD §2.2) ----------------------
 
-export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
+export { planetHpModel, planetHpFlashOn, coreHpReadout, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
 
 // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) --------------
@@ -263,12 +265,13 @@ export {
   nameplateModel,
   nameplateGetsLabel,
   resolveName,
+  resolveDifficultySuffix,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
 } from './nameplates';
-export type { Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
+export type { DifficultyTable, Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
 
 export {
   NameplateView,
@@ -673,6 +676,57 @@ export type {
 } from './map-picker';
 
 export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
+
+// --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
+//
+// Bottom-right corner square that taps/clicks open to a centred overlay (same
+// gesture PC + mobile, `M` on PC), drawing sim-driven dots — planets, ships, the
+// collapse ring, faint ore hints. Same pure-model / Pixi-view split as the rest:
+// `./minimap` decides (toggle, fit, scene), `./minimap-view` draws (throttled
+// cached content + a per-frame own-ship dot). The `Hud` owns both.
+
+export {
+  Minimap,
+  minimapScene,
+  minimapRect,
+  collapsedRect,
+  expandedRect,
+  fitBounds,
+  mapPoint,
+  pointInRect,
+  MINIMAP_TOGGLE_KEY,
+  MINIMAP_REDRAW_TICKS,
+  MINIMAP_MARGIN,
+  MINIMAP_COLLAPSED_DESKTOP,
+  MINIMAP_COLLAPSED_TOUCH,
+  MINIMAP_COLLAPSED_MIN,
+  MINIMAP_EXPANDED_FRACTION,
+  MINIMAP_EXPANDED_MIN,
+  MINIMAP_DOT_ALPHA,
+  MINIMAP_DERELICT_ALPHA,
+  MINIMAP_SPAWN_PROTECT_ALPHA,
+  MINIMAP_ORE_ALPHA,
+} from './minimap';
+export type {
+  MinimapState,
+  MinimapFrame,
+  MinimapPlanet,
+  MinimapShip,
+  MinimapRing,
+  MinimapInsets,
+  MinimapDot,
+  MinimapScene,
+  FitTransform,
+} from './minimap';
+
+export {
+  MinimapView,
+  MINIMAP_ID,
+  MINIMAP_EXPANDED_ID,
+  MINIMAP_ANCHOR,
+  MINIMAP_EXPANDED_ANCHOR,
+} from './minimap-view';
+export type { DrawnMinimap } from './minimap-view';
 
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //

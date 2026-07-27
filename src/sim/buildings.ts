@@ -11,8 +11,9 @@
  *    so defenses are bought *before* the attack, not during it (GDD §2.5).
  *  - **Shields** — a 40 HP bubble that stacks to two, regenerating 2 HP/s only
  *    after 8 undamaged seconds.
- *  - **The repair channel** — planet core only, 2 HP/s, 1 ore per 5 HP, held by
- *    a docked ship and interrupted by *any* core or shield damage.
+ *  - **Repair core** — a DISCRETE purchase (developer amendment, 2026-07-26,
+ *    supersedes the GDD channel): one docked press spends `REPAIR_ORE_COST` ore
+ *    and restores `REPAIR_HP_PER_ORE` core HP, clamped. No channel, no drain.
  *  - **Turrets** — auto-fire at enemy ships in range with pooled projectiles at
  *    a design DPS of 4.
  *  - **UPGRADE SHIP** — the fifth segment, and the only one that spends on the
@@ -21,10 +22,12 @@
  *    row press gets the same validation a wheel order does; the tier ladder and
  *    every stat it derives live in `./upgrades`.
  *
- * The two halves of GDD §2.6's "pressure beats regeneration" are one field:
- * `planet.sinceDamage`. A hit zeroes it, which both closes the shield-regen
- * window and drops the repair channel — so a defender cannot out-heal an
- * attacker who keeps shooting, they have to drive them off first.
+ * GDD §2.6's "pressure beats regeneration" now rides one field for shields only:
+ * `planet.sinceDamage`. A hit zeroes it, closing the shield-regen window — so a
+ * defender cannot out-regen an attacker who keeps shooting, they have to drive
+ * them off first. Repair no longer rides this field: it is a discrete ore-for-HP
+ * purchase (below), so pressure beats it through the *finite ore pool*, not an
+ * interrupt — every HP bought back is an upgrade or a turret not bought.
  *
  * Determinism (GDD §4.8): fixed iteration order (planets, then their turrets,
  * then the projectile pool), no RNG, every rate `* dt`.
@@ -34,7 +37,9 @@ import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/ty
 import {
   DEPOSIT_RANGE,
   PLANET,
-  REPAIR,
+  REPAIR_HP_PER_ORE,
+  REPAIR_ORE_COST,
+  REPAIR_TELL_HOLD,
   SHIELD,
   TURRET,
   TURRET_MAX_TIER,
@@ -252,7 +257,8 @@ export type OrderResult =
   /** Repair only: the collapse phase has shut it off for good (GDD §2.3). */
   | 'collapsed';
 
-/** Ore cost of a wheel segment. Repair and bank are not flat purchases. */
+/** Ore cost of a wheel segment. Repair is now a flat 1-ore purchase; bank is
+ *  free (it moves ore, never spends it). */
 export function orderCost(item: BuildItem): number {
   switch (item) {
     case 'turret':
@@ -260,6 +266,7 @@ export function orderCost(item: BuildItem): number {
     case 'shield':
       return SHIELD.cost;
     case 'repair':
+      return REPAIR_ORE_COST;
     case 'bank':
       return 0;
   }
@@ -288,10 +295,22 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // core is permanent and the only defence left is the ship in front of it.
       if (isCollapsed(world)) return 'collapsed';
       if (planet.coreHp >= planet.maxCoreHp - 1e-9) return 'core-full';
-      if (spendableOre(ship) <= 1e-9) return 'cannot-afford';
-      // The channel opens now and runs until the core is full, the ore runs
-      // out, the ship leaves — or anything at all hits the planet (GDD §2.5).
+      // ONE press = ONE purchase (developer, 2026-07-26, supersedes the GDD
+      // channel): spend REPAIR_ORE_COST and restore REPAIR_HP_PER_ORE, clamped.
+      // No channel, no drain — the affordability check is `spendOre`, so N taps
+      // are N independent, individually-checked spends. An empty/short bank is
+      // refused loudly, spending nothing (`spendOre` charges only on success).
+      if (!spendOre(ship, REPAIR_ORE_COST)) return 'cannot-afford';
+      // A core missing less than REPAIR_HP_PER_ORE still costs the full ore and
+      // heals to full — the wheel SHOWS the real number, so the choice is
+      // informed (p5-08). `repairing` is the repair TELL, lit here and held for
+      // `REPAIR_TELL_HOLD` seconds (see `maintainRepairTell`): the renderer glows
+      // on it and an AI defender paces its next order off it, but it drains
+      // nothing and heals nothing beyond this one purchase. It does NOT gate this
+      // call — a human taps as fast as they like, one purchase per tap.
+      planet.coreHp = Math.min(planet.maxCoreHp, planet.coreHp + REPAIR_HP_PER_ORE);
       planet.repairing = true;
+      planet.repairCooldown = REPAIR_TELL_HOLD;
       return 'ok';
     }
     case 'turret': {
@@ -410,20 +429,22 @@ export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): Upgra
 }
 
 // ---------------------------------------------------------------------------
-// Per-tick: construction, shields, the repair channel
+// Per-tick: construction, shields, and the repair tell
 // ---------------------------------------------------------------------------
 
 /**
  * Advance every planet one tick: spawn protection, the undamaged clock,
- * construction timers, shield regeneration, and the repair channel — in that
+ * construction timers, shield regeneration, and the repair tell — in that
  * order, which is part of the determinism contract.
  *
- * Runs *before* this tick's projectiles, so damage dealt now takes
- * effect on the next tick's regen/repair decision, never retroactively.
+ * Runs *before* this tick's orders (`placeOrder`, step 2b) and projectiles, so
+ * damage dealt now takes effect on the next tick's regen decision, never
+ * retroactively — and a repair purchase this tick lights `repairing` (step 2b,
+ * after this pass) which then survives to the post-step snapshot.
  *
- * Under collapse, two of those five stop happening for the rest of the match
- * (GDD §2.3) — the phase is read once per tick, not per planet, because it is a
- * property of the match rather than of anyone's home.
+ * Under collapse, shield regen stops for the rest of the match (GDD §2.3) — the
+ * phase is read once per tick, not per planet, because it is a property of the
+ * match rather than of anyone's home.
  */
 export function updatePlanets(world: World, dt: number): void {
   const collapsed = isCollapsed(world);
@@ -433,16 +454,56 @@ export function updatePlanets(world: World, dt: number): void {
     planet.sinceDamage += dt;
 
     advanceConstruction(world, planet, dt);
-    // Collapse: shields stop regenerating and repair shuts off (GDD §2.3).
-    // Construction still finishes — the ore was already spent, and a turret
-    // half-built when the field ran dry is the player's money, not entropy's.
-    if (!collapsed) {
-      regenShields(planet, dt);
-      runRepairChannel(world, planet, dt);
-    } else {
-      planet.repairing = false;
-    }
+    // Collapse: shields stop regenerating (GDD §2.3). Construction still
+    // finishes — the ore was already spent, and a turret half-built when the
+    // field ran dry is the player's money, not entropy's.
+    if (!collapsed) regenShields(planet, dt);
+    maintainRepairTell(world, planet, collapsed, dt);
   }
+}
+
+/**
+ * Keep the `repairing` tell honest. Repair is a DISCRETE purchase now (developer,
+ * 2026-07-26) — the ore-and-HP move resolves in full inside `placeOrder`, so
+ * there is NO channel to run here and NO ore drained. This pass only maintains
+ * the boolean *tell* and its `repairCooldown`: a purchase lights the tell and
+ * arms the cooldown, and this pass ticks the cooldown down and RELEASES the tell
+ * when it hits zero.
+ *
+ * The cooldown is why the tell is held rather than pulsed for one tick: an AI
+ * defender reads `!repairing` to decide when to buy its next repair, so holding
+ * the tell for `REPAIR_TELL_HOLD` seconds paces a bot to one 15-HP purchase per
+ * hold — the retired channel's ~2 HP/s cadence (`REPAIR_HP_PER_ORE / 2`) — rather
+ * than 15 HP every tick. It is signalling only and spends nothing, so it is not
+ * the "loop" the developer retired, and it never gates a human: `placeOrder` lets
+ * a person tap as fast as they like, one purchase per tap.
+ *
+ * The tell also clears early — cooldown and all — when there is nothing to hold
+ * for: the core is full, the owner has left or died, or collapse began.
+ */
+function maintainRepairTell(world: World, planet: Planet, collapsed: boolean, dt: number): void {
+  if (!planet.repairing) return;
+
+  const owner = shipOf(world, planet.owner);
+  if (
+    collapsed ||
+    planet.coreHp >= planet.maxCoreHp - 1e-9 ||
+    !owner ||
+    !owner.alive ||
+    !isDocked(owner, planet)
+  ) {
+    planet.repairing = false;
+    planet.repairCooldown = 0;
+    return;
+  }
+
+  planet.repairCooldown = Math.max(0, (planet.repairCooldown ?? 0) - dt);
+  // Release the tell only once the pacing cooldown has elapsed AND the core has
+  // been quiet for that long — so an AI defender resumes repairing only off the
+  // firing line. While hits keep landing, `sinceDamage` stays low and the tell
+  // holds, which is "pressure beats regeneration" for repair (GDD §2.6): you
+  // drive the attacker off first, exactly as the retired channel demanded.
+  if (planet.repairCooldown <= 0 && planet.sinceDamage >= REPAIR_TELL_HOLD) planet.repairing = false;
 }
 
 /** Tick construction timers; a job that reaches zero becomes the real thing
@@ -502,44 +563,9 @@ function regenShields(planet: Planet, dt: number): void {
   }
 }
 
-/**
- * Hold the repair channel open for one tick (GDD §2.5): the owner's ship must
- * be alive and docked, the core must be damaged, and ore must be available —
- * 2 HP/s at 1 ore per 5 HP, drawn hold-first. The channel closes the moment any
- * of that stops being true; damage closes it elsewhere, in {@link damagePlanet},
- * which is what makes repair interruptible.
- */
-function runRepairChannel(world: World, planet: Planet, dt: number): void {
-  if (!planet.repairing) return;
-
-  const ship = shipOf(world, planet.owner);
-  if (!ship || !ship.alive || !isDocked(ship, planet)) {
-    planet.repairing = false;
-    return;
-  }
-
-  const missing = planet.maxCoreHp - planet.coreHp;
-  if (missing <= 1e-9) {
-    planet.repairing = false;
-    return;
-  }
-
-  const available = spendableOre(ship);
-  if (available <= 1e-9) {
-    planet.repairing = false;
-    return;
-  }
-
-  // Heal what the tick, the missing HP, and the ore on hand all allow.
-  let hp = Math.min(REPAIR.hpPerSecond * dt, missing, available / REPAIR.orePerHp);
-  const cost = hp * REPAIR.orePerHp;
-  if (!spendOre(ship, cost)) {
-    planet.repairing = false;
-    return;
-  }
-  planet.coreHp = Math.min(planet.maxCoreHp, planet.coreHp + hp);
-  if (planet.coreHp >= planet.maxCoreHp - 1e-9 || spendableOre(ship) <= 1e-9) planet.repairing = false;
-}
+// Repair is no longer a per-tick channel — a purchase resolves in full inside
+// `placeOrder` (spend 1 ore, add REPAIR_HP_PER_ORE, clamp), so there is nothing
+// to advance here each tick (developer amendment, 2026-07-26).
 
 // ---------------------------------------------------------------------------
 // Damage routing — shields stand in front of the core
@@ -565,9 +591,13 @@ export function shieldPool(planet: Planet): number {
  * Apply `amount` damage to a planet: shields first (in build order, one bubble
  * at a time), then the core. Spawn protection blocks it entirely (GDD §2.1).
  *
- * Any damage that lands zeroes `sinceDamage` and drops the repair channel —
- * the single line of code behind "pressure beats regeneration" (GDD §2.6).
- * Returns true if the hit landed.
+ * Any damage that lands zeroes `sinceDamage`, closing the shield-regen window
+ * (GDD §2.6). That same clock also holds the repair *tell* down while a core is
+ * under fire (see {@link maintainRepairTell}) — so "pressure beats regeneration"
+ * covers repair too: a besieged defender can buy the odd emergency patch but
+ * cannot keep repairing under fire, they have to drive the attacker off first.
+ * The discrete heal already applied is never undone — there is no channel to
+ * interrupt. Returns true if the hit landed.
  */
 export function damagePlanet(world: World, planet: Planet, amount: number): boolean {
   if (!planet.alive || planet.spawnProtect > 0 || amount <= 0) return false;
@@ -583,7 +613,6 @@ export function damagePlanet(world: World, planet: Planet, amount: number): bool
   if (left > 0) planet.coreHp -= left;
 
   planet.sinceDamage = 0;
-  planet.repairing = false;
 
   if (planet.coreHp <= 0) destroyCore(world, planet);
   return true;
@@ -674,7 +703,7 @@ export function updateTurrets(world: World, dt: number): void {
         fireTurretProjectile(world, turret, aim);
         // Publish the muzzle flash from the same firing decision the projectile
         // rode out on, so the tell can never disagree with the shot (GDD §2.6).
-        turret.muzzle = makeMuzzle(turret, target, aim);
+        turret.muzzle = makeMuzzle(turret, aim);
         turret.cooldown = turretFireInterval(turret);
       }
     }
@@ -945,28 +974,30 @@ function desiredOrbitAngle(world: World, planet: Planet, turrets: Turret[], i: n
 }
 
 /**
- * The muzzle-flash geometry for a shot leaving `turret` at `target` along `aim`
- * (GDD §2.6, §4.1). Origin is the barrel tip — where the projectile is born, so
- * the flash sits on the muzzle — and the segment runs to the tracked ship's
- * near surface, clamped to what it is aimed at. This is the *tell*, not the hit
- * test: the projectile does the damage and can still miss a dodging ship; the
- * flash only reports that the turret fired and where it aimed, which is all a
- * renderer needs to make enemy turrets visibly shoot. Allocates only on fire
- * ticks, like `spawnChunk` on a mine.
+ * The muzzle-flash geometry for a shot leaving `turret` along `aim` (GDD §2.6,
+ * §4.1). A muzzle flash is a FLASH at the barrel — a short flare off the muzzle
+ * tip — **never a line to the target**. The turret's damage rides a pooled
+ * projectile (design amendment v0.3, the laser retired); this record is only the
+ * fire *tell*, so a renderer draws a burst at the muzzle to make enemy turrets
+ * visibly shoot. It does not reach the ship and carries no impact point: the
+ * projectile owns the shot and its impact.
+ *
+ * Regression fix (v0.2.2 field report "turrets still flash a mining laser at
+ * me"): the flare used to run the full barrel-tip → target-surface distance,
+ * with `hitPoint` out at the ship — beam-era geometry the renderer stroked as a
+ * line all the way to you. Now `length` is the short `TURRET.muzzleFlashLength`
+ * flare and `hitPoint` is `null`, so no primitive is drawn between turret and
+ * target. Allocates only on fire ticks, like `spawnChunk` on a mine.
  */
-function makeMuzzle(turret: Turret, target: Ship, aim: number): Muzzle {
+function makeMuzzle(turret: Turret, aim: number): Muzzle {
   const dx = Math.cos(aim);
   const dy = Math.sin(aim);
   const origin = { x: turret.pos.x + dx * turret.radius, y: turret.pos.y + dy * turret.radius };
-  const centerDist = Math.sqrt(dist2(turret.pos, target.pos));
-  // Barrel tip → target surface: total centre distance less both radii, floored
-  // at zero for the degenerate point-blank case.
-  const length = Math.max(0, centerDist - target.radius - turret.radius);
   return {
     origin,
     dir: { x: dx, y: dy },
-    hitPoint: { x: origin.x + dx * length, y: origin.y + dy * length },
-    length,
+    hitPoint: null, // the projectile owns impact — no glow out at the target
+    length: TURRET.muzzleFlashLength, // a flare off the muzzle, not a beam to the ship
   };
 }
 

@@ -13,11 +13,12 @@
  * reads nothing but its {@link BotCtx}. There is no path from here to the world.
  */
 
-import type { Action, BuildItem, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { WEAPON_RANGE, PLANET, SHIELD, TURRET } from '../sim';
+import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
+import { CORE_HP, REPAIR_HP_PER_ORE, WEAPON_RANGE, PLANET, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
+  aimAndFire,
   aimAt,
   arrive,
   boost,
@@ -34,7 +35,8 @@ import {
   thrust,
   toward,
 } from './steering';
-import { homeIntruder, isEngageable } from './targeting';
+import { commit, release } from './commitment';
+import { homeIntruder, isEngageable, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -69,6 +71,71 @@ export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
 
 /** Speed at which a bot chasing something leans on the boost button. TUNABLE */
 export const BOOST_CHASE_DISTANCE = 320;
+
+// ---------------------------------------------------------------------------
+// Core repair — a RATIONED discrete purchase (p5-repair-discrete, GDD §2.5/§2.9)
+// ---------------------------------------------------------------------------
+
+/**
+ * The core-HP fraction below which a bot buys a discrete core repair — the gate
+ * every tier's spend plan shares. Repair is a one-tap `+REPAIR_HP_PER_ORE`
+ * purchase now (developer 2026-07-26, `docs/design-amendments.md`), cheap and
+ * instant, so a bot that repaired "whenever the core is below full" would top it
+ * back to **exactly** `maxCoreHp` every dip. A field of such bots reaches
+ * collapse at one identical HP and then dies in entropy lockstep — no survivor
+ * to crown, the match stalled by the tiebreak (`trees.test.ts`). Discrete repair
+ * therefore has to be a *ration*, not an always-on top-up (the brief's point 1).
+ *
+ * Two dials make it one:
+ *
+ *  - **Personality-modulated** by `caution` — the same character dial that sets
+ *    the retreat nerve (GDD §2.9): a timid Rusty (1.3) patches early, a reckless
+ *    Bolt (0.5) lets its core ride and dies on its own doorstep sooner. That
+ *    spread alone means two funded turtles rarely reach collapse at the same HP.
+ *  - **Capped strictly below the ceiling** — the target can never sit within one
+ *    repair chunk of full, so a repaired core *settles below `maxCoreHp`* at a
+ *    value that varies with its own damage history rather than snapping onto the
+ *    shared `maxCoreHp` clamp. That is what actually kills the lockstep: there is
+ *    no longer a single HP value every well-off defender converges on.
+ *
+ * Returns the fraction; a tier gates `coreHp < maxCoreHp * repairTargetFraction`.
+ */
+export function repairTargetFraction(ctx: BotCtx, baseAt: number): number {
+  const maxHp = ctx.self.planet?.maxCoreHp ?? CORE_HP;
+  // One repair chunk lands `REPAIR_HP_PER_ORE` HP; keep the target a further 5%
+  // below `maxHp - one chunk` so the last chunk before the bot stops can never
+  // reach — let alone clamp onto — the ceiling. (100/15 ⇒ cap ≈ 0.80.)
+  const ceiling = Math.max(0, (maxHp - REPAIR_HP_PER_ORE) / maxHp - 0.05);
+  return Math.min(baseAt * ctx.weights.caution, ceiling);
+}
+
+// ---------------------------------------------------------------------------
+// The aim-error model, per character (v0.2.2 field report). The tier owns the
+// band (`DifficultyTuning`); a personality's `aimScale` leans inside it.
+// ---------------------------------------------------------------------------
+
+/** This character's aim modulation, clamped so it can never cross tiers
+ *  (`PersonalityWeights.aimScale`). The floor is deliberately higher than the
+ *  ceiling is far: a Hard gun snaps back toward the aimbot once its lead-lag
+ *  drops under ~0.16 s (`docs/bot-aim-error-p5.md`), so the tight end is capped
+ *  tighter than the loose end to keep every character a clear margin above that
+ *  cliff. */
+function aimScaleOf(ctx: BotCtx): number {
+  const s = ctx.weights.aimScale ?? 1;
+  return s < 0.85 ? 0.85 : s > 1.4 ? 1.4 : s;
+}
+
+/** Angular spread this bot fires with — the tier's `aimJitter`, leaned by the
+ *  character. */
+export function combatSpread(ctx: BotCtx): number {
+  return ctx.tuning.aimJitter * aimScaleOf(ctx);
+}
+
+/** Seconds before this bot re-solves its lead — the tier's `aimLatency`, leaned
+ *  by the character. */
+export function combatLatency(ctx: BotCtx): number {
+  return ctx.tuning.aimLatency * aimScaleOf(ctx);
+}
 
 // ---------------------------------------------------------------------------
 // Navigation
@@ -130,21 +197,33 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
   // outlast the thing it is escaping.
   const brain = ctx.brain;
   if (brain.stuckFor >= STUCK_DECISIONS && ctx.view.time >= brain.escapeUntil) {
-    const away = worstPos === null ? { x: -dir.x, y: -dir.y } : toward(worstPos, ctx.self.pos);
-    // Away from the obstacle, thrown off to one side so the escape is a run
-    // *past* it rather than a rebound into the same approach. The draw is the
-    // bot's own seeded stream, so it stays deterministic and two bots wedged in
-    // the same clump do not pick the same line out of it.
-    brain.escapeDir = rotate(away, (brain.rng.next() * 2 - 1) * ESCAPE_SPREAD);
+    // The way *out*, not merely away from the single nearest rock: "away from the
+    // closest body" in a dense central cluster (GDD §2.3) is usually straight into
+    // the next one, which is exactly how a bot trades one wedge for another and
+    // never leaves. `openDirection` sums the repulsion of the whole clump, so it
+    // points down the clearest lane.
+    const fallback = worstPos === null ? { x: -dir.x, y: -dir.y } : toward(worstPos, ctx.self.pos);
+    const open = openDirection(ctx, fallback, ignoreRock);
+    // Thrown off to one side so two bots wedged in the same clump do not pick the
+    // same line, and so a lane the resultant points dead-down is still committed
+    // to off-centre rather than threaded perfectly. The draw is the bot's own
+    // seeded stream, so it stays deterministic.
+    brain.escapeDir = rotate(open, (brain.rng.next() * 2 - 1) * ESCAPE_SPREAD);
     brain.escapeUntil = ctx.view.time + ESCAPE_SECONDS;
     brain.stuckFor = 0;
   }
+  // The heading this decision commits to: the escape run while one is live, else
+  // the tree's own desired direction.
   const escaping = ctx.view.time < brain.escapeUntil;
-  const steered = escaping
-    ? brain.escapeDir
-    : worstPos === null
-      ? dir
-      : dodge(ctx.self, dir, worstPos, worstRadius);
+  const heading = escaping ? brain.escapeDir : dir;
+  // Curve *either* heading around the nearest body. An escape run that ignored
+  // obstacles (as this once did) drives straight out of one rock and into the
+  // next in a dense central cluster, so the bot never actually leaves — it just
+  // trades which rock it is pinned against. Sliding the escape past whatever is
+  // ahead is what lets a committed run thread out of the clump; the escape points
+  // *away* from the body it was wedged on, so dodging around later ones curves
+  // the exit, it never loops the run back onto the target.
+  const steered = worstPos === null ? heading : dodge(ctx.self, heading, worstPos, worstRadius);
 
   const out = clampUnit(steered);
   ctx.brain.lastThrust = Math.sqrt(out.x * out.x + out.y * out.y);
@@ -155,8 +234,76 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
  *  late-wave asteroid cluster at cruise. TUNABLE */
 export const ESCAPE_SECONDS = 1.5;
 
-/** Half-angle the escape heading is thrown off "straight back". TUNABLE */
+/** Half-angle the escape heading is thrown off the open lane. TUNABLE */
 export const ESCAPE_SPREAD = Math.PI / 3;
+
+/** How far out {@link openDirection} lets a body vote on the way out. Wide enough
+ *  to take in a whole late-wave cluster around a wedged hull, short enough that
+ *  rocks the bot is nowhere near do not drag the escape sideways. TUNABLE */
+export const ESCAPE_SENSE = 220;
+
+/** Denominator floor for a body's escape-repulsion weight, in surface-distance
+ *  units. A touching or overlapping body (slack ≤ 0) is clamped to this rather
+ *  than dividing by ~zero, so the resultant stays finite and one contact never
+ *  drowns out the rest of the clump. TUNABLE */
+export const ESCAPE_WEIGHT_FLOOR = 6;
+
+/**
+ * The clearest direction out of wherever a bot is wedged: a proximity-weighted
+ * sum of the unit vectors *away* from every body within {@link ESCAPE_SENSE},
+ * normalised. Because a nearer body pushes harder ({@link ESCAPE_WEIGHT_FLOOR}
+ * sets the ceiling on that push), the resultant leans down the open lane between
+ * rocks instead of straight back off the single closest one — the difference
+ * between leaving a cluster and swapping which rock you are pinned against.
+ *
+ * This is a *potential-field* read, the very thing {@link go}'s per-tick steering
+ * deliberately avoids because thirty overlapping pushes shiver a ship in place.
+ * It is safe *here* only because it is sampled once, at the instant an escape is
+ * committed, and then flown open-loop for {@link ESCAPE_SECONDS} — a heading, not
+ * a per-tick force. `fallback` is returned when nothing is close enough to repel.
+ */
+export function openDirection(ctx: BotCtx, fallback: Vec2, ignoreRock?: number): Vec2 {
+  let rx = 0;
+  let ry = 0;
+  const vote = (pos: Vec2, radius: number, distance: number): void => {
+    const slack = distance - radius;
+    if (slack > ESCAPE_SENSE) return;
+    const away = toward(pos, ctx.self.pos, fallback);
+    const denom = Math.max(ESCAPE_WEIGHT_FLOOR, slack);
+    const w = 1 / (denom * denom);
+    rx += away.x * w;
+    ry += away.y * w;
+  };
+  for (const rock of ctx.view.asteroids) {
+    if (rock.id === ignoreRock) continue;
+    vote(rock.pos, rock.radius, rock.distance);
+  }
+  for (const planet of ctx.view.planets) vote(planet.pos, planet.radius, planet.distance);
+  const own = ctx.self.planet;
+  if (own) vote(own.pos, own.radius, own.distance);
+
+  // The arena edge is a hard wall (`sim/step.ts` clamps position and kills the
+  // inward velocity), so a bot fled into a corner is as wedged as one against a
+  // rock — and no body in view repels it back out. Vote the four walls in as
+  // inward pushes, weighted by how close each one is, so the open lane leans away
+  // from the corner rather than deeper into it.
+  const { x: px, y: py } = ctx.self.pos;
+  const wall = (ax: number, ay: number, slack: number): void => {
+    if (slack > ESCAPE_SENSE) return;
+    const denom = Math.max(ESCAPE_WEIGHT_FLOOR, slack);
+    const w = 1 / (denom * denom);
+    rx += ax * w;
+    ry += ay * w;
+  };
+  wall(1, 0, px - SHIP_RADIUS);
+  wall(-1, 0, ctx.view.bounds.width - px - SHIP_RADIUS);
+  wall(0, 1, py - SHIP_RADIUS);
+  wall(0, -1, ctx.view.bounds.height - py - SHIP_RADIUS);
+
+  const m = Math.sqrt(rx * rx + ry * ry);
+  if (m < 1e-9) return fallback;
+  return { x: rx / m, y: ry / m };
+}
 
 // ---------------------------------------------------------------------------
 // Purchases (GDD §2.5 — one wheel, five segments, and the panel behind one)
@@ -274,7 +421,7 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
   if (!planet) return null;
   const intruder = homeIntruder(ctx);
   if (!intruder) return [go(ctx, orbit(ctx.self, planet.pos, GUARD_RADIUS)), fire(false)];
-  return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel);
+  return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,16 +434,33 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
  * turret it is {@link TURRET_STANDOFF} — outside the turret's reach and inside
  * the weapon's (GDD §2.6).
  */
-export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, targetVel?: Vec2): readonly Action[] {
+export function engage(
+  ctx: BotCtx,
+  pos: Vec2,
+  radius: number,
+  range: number,
+  targetVel?: Vec2,
+  targetId?: PlayerId,
+): readonly Action[] {
   const d = dist(ctx.self.pos, pos);
-  const actions: Action[] = [
-    go(ctx, standOff(ctx.self, pos, range)),
-    // Lead a moving target so the projectile intercepts it (design amendment
-    // v0.2); a still target (a turret, a core) has no velocity and the aim is
-    // straight.
-    aimAt(ctx.self, pos, ctx.tuning.aimJitter, ctx.rng, targetVel),
-    fire(canHit(ctx.self, pos, radius, 0, targetVel)),
-  ];
+  // A ship moves, so lead it with the tier's reaction lag on top (`targetId`
+  // carries the bot's aim track — design amendment v0.2 + the v0.2.2 aim-error
+  // model). A still target (a turret, a core) has no velocity, so `track` is null
+  // and the aim is a straight bearing with only the spread.
+  const track = targetId !== undefined ? ctx.brain.aim : null;
+  const { aim, fire: fireAction } = aimAndFire(
+    ctx.self,
+    pos,
+    radius,
+    targetVel,
+    combatSpread(ctx),
+    ctx.rng,
+    track,
+    targetId ?? -1,
+    ctx.view.time,
+    combatLatency(ctx),
+  );
+  const actions: Action[] = [go(ctx, standOff(ctx.self, pos, range)), aim, fireAction];
   // A bold character burns the boost closing the gap; a cautious one saves it
   // for the trip home. `caution` > 1 means "breaks off early" (`./personalities`).
   if (d > BOOST_CHASE_DISTANCE && ctx.weights.caution < 1) actions.push(boost(true));
@@ -305,9 +469,12 @@ export function engage(ctx: BotCtx, pos: Vec2, radius: number, range: number, ta
 
 /** Attack a scored target at the stand-off its kind deserves. */
 export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
-  // A ship moves, so lead it (`target.vel`); a home does not, so the lead is a
-  // straight shot (design amendment v0.2).
-  if (target.kind === 'ship') return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel);
+  // A ship moves, so lead it (`target.vel`, with the reaction lag keyed on
+  // `target.id`); a home does not, so the lead is a straight shot (design
+  // amendment v0.2).
+  if (target.kind === 'ship') {
+    return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel, target.id);
+  }
   return engage(ctx, target.pos, target.radius, SIEGE_STANDOFF);
 }
 
@@ -328,35 +495,157 @@ export function suppressTurrets(ctx: BotCtx, target: TargetScore): readonly Acti
 }
 
 // ---------------------------------------------------------------------------
-// Break off (GDD §2.9)
+// Break off, with commitment (GDD §2.9; v0.2.2 field report — decision
+// hysteresis on the flee/fight pair)
 // ---------------------------------------------------------------------------
 
+/** How close an engageable ship must be to count as an active threat this bot
+ *  breaks off *from* — the enter side of the flee band. Just past knife-fight
+ *  range, so a bot reacts to a duel, not to a dot on the far edge of vision. TUNABLE */
+export const THREAT_RANGE = WEAPON_RANGE * 1.6;
+
 /**
- * Get out. Home is the destination — it is where the turrets are — unless the
- * thing that hurt this bot is *already* at home, in which case running there is
- * running into it and the bot simply puts distance between them.
+ * The wider ring a committed retreat must open before it counts as *escaped* —
+ * the exit side of the band, and the spatial half of the hysteresis. It is
+ * deliberately past {@link THREAT_RANGE}: a bot backing off must not re-read a
+ * pursuer that has only just left knife range as "gone" and wheel back into it,
+ * which is precisely the flap the field report photographed. The gap between the
+ * two ranges is the distance a retreat is allowed to commit to. TUNABLE
+ */
+export const RETREAT_CLEAR_RANGE = WEAPON_RANGE * 2.6;
+
+/**
+ * Hull margin above the tier's break-off point at which a *committed* retreat
+ * releases on health alone — the hull half of the dual threshold, meaningfully
+ * above the enter point so the two never coincide. In this sim a ship's hull
+ * does not regenerate mid-life (GDD §2.5: "Ship hull is not repairable at all"),
+ * so this fires almost entirely on a respawn-to-full — but it is the honest
+ * second threshold, and it is here for the day hull repair exists. TUNABLE
+ */
+export const RETREAT_RECOVER_MARGIN = 0.15;
+
+/** Core fraction below which self-preservation yields to home defence — the
+ *  priority exception the field report names ("your core under final assault
+ *  outranks self-preservation"). A bot this close to losing its home stops
+ *  saving its cheap, respawnable hull and fights for the thing that is not
+ *  cheap (GDD §1, §2.7). TUNABLE */
+export const CORE_FINAL_ASSAULT = 0.3;
+
+/** The nearest engageable ship within `range` — the thing that could be shooting
+ *  at this bot. The break-off band reads it at two ranges (enter/exit), so the
+ *  range is a parameter rather than a constant. */
+export function nearestThreat(ctx: BotCtx, range: number): PerceivedShip | null {
+  let best: PerceivedShip | null = null;
+  for (const ship of ctx.view.ships) {
+    if (!isEngageable(ship)) continue;
+    if (ship.distance > range) continue;
+    if (best === null || ship.distance < best.distance) best = ship;
+  }
+  return best;
+}
+
+/** The nearest thing that could be shooting at this bot right now — the enter-side
+ *  read of the break-off band. */
+export function incomingThreat(ctx: BotCtx): PerceivedShip | null {
+  return nearestThreat(ctx, THREAT_RANGE);
+}
+
+/** The hull fraction a committed retreat must climb back above to release on
+ *  health — the tier's break-off point plus {@link RETREAT_RECOVER_MARGIN},
+ *  capped short of full so a respawn always clears it. */
+export function retreatRecoverFraction(ctx: BotCtx): number {
+  return Math.min(0.95, retreatThreshold(ctx.tuning, ctx.weights) + RETREAT_RECOVER_MARGIN);
+}
+
+/** Is this bot's own core under final assault — the strictly-higher priority that
+ *  pre-empts fleeing (see {@link CORE_FINAL_ASSAULT})? False in collapse, where a
+ *  core cannot be repaired and defending it is a losing trade (`./hard`). */
+export function coreUnderFinalAssault(ctx: BotCtx): boolean {
+  const planet = ctx.self.planet;
+  if (!planet || !planet.alive || ctx.view.collapsed) return false;
+  return planet.underAttack && planet.coreHp < planet.maxCoreHp * CORE_FINAL_ASSAULT;
+}
+
+/**
+ * Does this bot want to be breaking off *right now*? The flee half of the
+ * flee/fight pair, latched so it cannot flap (`./commitment`; v0.2.2 field
+ * report).
  *
- * The trigger stays up on the way out. A retreating bot that keeps firing is a
- * bot that keeps its gun trained on the thing it is fleeing, and never gets
- * home.
+ *  - **Enter** when the hull is under the tier's nerve ({@link retreatThreshold})
+ *    and something engageable is inside {@link THREAT_RANGE}.
+ *  - **Exit** when the bot has *arrived somewhere* — cleared {@link
+ *    RETREAT_CLEAR_RANGE} of every threat — or its hull is whole again
+ *    ({@link retreatRecoverFraction}), i.e. it respawned.
+ *
+ * Between those two it holds: a committed retreat keeps fleeing even on the
+ * decisions where backing off has already nudged the nearest threat past
+ * {@link THREAT_RANGE}, so the tree does not fall through to `attack`/`mine` and
+ * drive the wounded ship straight back into the fight it was leaving. Collapse
+ * cancels the whole thing — there is no hold worth saving and a respawn is free
+ * (GDD §2.3, §2.7) — and releases the latch so the endgame reads cleanly.
+ */
+export function wantsRetreat(ctx: BotCtx): boolean {
+  const latch = ctx.brain.fleeing;
+  if (ctx.view.collapsed || !ctx.self.alive) {
+    release(latch);
+    return false;
+  }
+  const wounded = ctx.self.hullFraction < retreatThreshold(ctx.tuning, ctx.weights);
+  const enter = wounded && incomingThreat(ctx) !== null;
+  const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
+  const escaped = nearestThreat(ctx, RETREAT_CLEAR_RANGE) === null;
+  return commit(latch, enter, recovered || escaped);
+}
+
+/**
+ * Get out, and go *somewhere* — a committed retreat that never twitches in place
+ * (v0.2.2 field report point 2). Home is the destination, because home is where
+ * the turrets are and a bot's territorial identity is to retreat *into* its
+ * defences (GDD §2.6) — **unless** the thing that hurt it is already at home, in
+ * which case running there is running into the siege, and the bot puts flat
+ * distance between itself and the threat instead. Either way the flee vector has
+ * a positive component away from the threat, so a low-HP bot's distance from it
+ * increases every decision rather than oscillating (the screenshot scenario).
+ *
+ * The per-character read this produces (all one function, leaned by the tree's
+ * priority order and `caution`):
+ *
+ *  - **Warden / Patch** (homebody): jumped in the field, they run for their own
+ *    turret cover and turn to fight there; sieged at home, they break contact to
+ *    regroup rather than die on a core the {@link coreUnderFinalAssault} branch
+ *    has not yet flagged as worth dying for.
+ *  - **Sable / Bolt** (aggressive, low `caution`): a higher nerve floor means
+ *    they enter this later and leave it sooner, so they flee shallower.
+ *  - **Rusty** (timid, high `caution`): enters earliest, runs straight home.
+ *
+ * The trigger stays up on the way out only when there is no threat to flee (a
+ * fleeing bot that keeps firing keeps its gun trained on what it is running from
+ * and never leaves); with a live threat the weapon is off — a retreating bot
+ * does not advertise (GDD §2.2).
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
   const planet = ctx.self.planet;
-  const threatAtHome = planet !== null && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
-  if (planet && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
+  const threatAtHome =
+    planet !== null && planet.alive && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
+  if (planet && planet.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
   if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false), boost(true)];
   return [thrust({ x: 0, y: 0 }), fire(false)];
 }
 
-/** The nearest thing that could be shooting at this bot right now. */
-export function incomingThreat(ctx: BotCtx): PerceivedShip | null {
-  let best: PerceivedShip | null = null;
-  for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
-    if (ship.distance > WEAPON_RANGE * 1.6) continue;
-    if (best === null || ship.distance < best.distance) best = ship;
-  }
-  return best;
+/**
+ * The priority exception (v0.2.2 field report point 1): a core under final
+ * assault outranks self-preservation. Meet the attacker at home
+ * ({@link defendHome}) and **drop any flee commitment**, so a bot that was
+ * mid-retreat abandons it for the last stand and — once the assault lifts —
+ * re-decides its nerve from scratch rather than silently resuming the run.
+ *
+ * The trees place this *above* {@link wantsRetreat}: it is the one thing allowed
+ * to interrupt a committed retreat, which is exactly what a strictly-higher
+ * priority in a hysteresis pair is for.
+ */
+export function lastStandDefend(ctx: BotCtx): readonly Action[] | null {
+  release(ctx.brain.fleeing);
+  return defendHome(ctx);
 }
 
 // ---------------------------------------------------------------------------

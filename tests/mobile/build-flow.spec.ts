@@ -163,6 +163,21 @@ test.describe('build button persists through the whole build cycle', () => {
   }, testInfo) => {
     test.skip(!isTouchProject(testInfo.project.name), 'the BUILD button is a touch affordance (GDD §2.4)');
 
+    // This test drives a FULL construction cycle: it advances the sim ~650 fixed
+    // steps so a real 10 s-buildTime turret finishes (line ~219). On the
+    // software-WebGL CI runner a render frame can be ~1 fps and the loop admits at
+    // most MAX_FRAME_SECONDS (0.25 s ⇒ 15 steps) of catch-up per frame, so those
+    // 650 steps alone cost ~44 render frames ≈ ~45 s of wall clock — before the
+    // several tap→settle round-trips on top. That is irreducible without weakening
+    // what the test proves (the button survives a completed build), and it sits
+    // right at the default 60 s budget, so it flakes/times out there (#147). It is
+    // NOT a minimap cost — the map's per-frame render is negligible (an A/B removing
+    // its offscreen texture pass moved the advance by 0 ms), and the BUILD button is
+    // claimed before the minimap in the pointer handler (main.ts), on the opposite
+    // screen corner. Mark the cycle legitimately slow so the slow runner gets the
+    // 3× budget it genuinely needs. Touch-only (desktop is skipped above).
+    test.slow();
+
     await useLandscape(page);
     await bootDebug(page);
 

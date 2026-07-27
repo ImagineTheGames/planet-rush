@@ -228,10 +228,12 @@ export interface Turret {
    * `null` (GDD §2.6, §4.1). A turret's damage rides a pooled projectile, but its
    * *tell* is the flash at the barrel, and that tell has to come from sim combat
    * state so **every** turret in the world flashes when it fires — not just the
-   * local player's. Origin at the barrel tip, direction at the tracked ship,
-   * `hitPoint`/`length` clamped to that ship's surface, so a renderer can draw a
-   * muzzle bloom or a tracer without re-deriving the shot. Set only on fire ticks
-   * (~twice a second), cleared every other tick, so it is a transient event.
+   * local player's. Origin at the barrel tip, direction along the barrel, and a
+   * short `length` flare off the muzzle (`TURRET.muzzleFlashLength`) with a `null`
+   * `hitPoint`: a burst at the muzzle, **never a line to the target** — the
+   * projectile owns the shot and its impact (see `makeMuzzle`, v0.2.2 field
+   * report). Set only on fire ticks (~twice a second), cleared every other tick,
+   * so it is a transient event.
    *
    * Optional so this render tell can be added without breaking the turret
    * literals other agents build (wire-event reconstruction, bot fixtures) — the
@@ -297,12 +299,27 @@ export interface Planet {
   spawnProtect: number;
   /** Outward angle from the arena centre — the turret mount ring starts here. */
   angle: number;
-  /** Seconds since the core or any shield last took damage. Drives both halves
-   *  of "pressure beats regeneration" (GDD §2.6): shields regenerate only past
-   *  `SHIELD.regenDelay`, and any hit at all interrupts the repair channel. */
+  /** Seconds since the core or any shield last took damage. Drives shield
+   *  "pressure beats regeneration" (GDD §2.6): shields regenerate only past
+   *  `SHIELD.regenDelay` undamaged seconds. (Repair no longer reads this — it is
+   *  a discrete purchase now, not an interruptible channel; see `placeOrder`.) */
   sinceDamage: number;
-  /** True while the owner is holding the repair channel open (GDD §2.5). */
+  /** The repair TELL — "a repair was just bought and is still settling"
+   *  (developer amendment, 2026-07-26 — repair is a discrete purchase now, no
+   *  held channel). Lit by a repair purchase (`placeOrder`) and held for
+   *  `REPAIR_TELL_HOLD` seconds (see `repairCooldown`), then released — or cleared
+   *  early by a full core, the ship leaving, or collapse (`maintainRepairTell`).
+   *  It drains nothing and heals nothing — signalling only: the renderer pulses
+   *  the healed core from it, and an AI defender reads `!repairing` to PACE its
+   *  next repair order, so bots keep the retired channel's ~2 HP/s cadence
+   *  instead of buying 15 HP every tick. A human is never gated by it —
+   *  `placeOrder` lets a person tap as fast as they like, one purchase per tap. */
   repairing: boolean;
+  /** Seconds left on the repair-tell hold before `repairing` releases — the
+   *  bot-pacing cooldown behind the tell (`maintainRepairTell`). Optional and
+   *  treated as `0` when absent, so hand-built `Planet` fixtures need not set it;
+   *  `createWorld` seeds it to `0`. Never gates a human's `placeOrder`. */
+  repairCooldown?: number;
   turrets: Turret[];
   shields: Shield[];
   builds: BuildJob[];
@@ -528,9 +545,10 @@ function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): 
     spawnProtect: SPAWN_PROTECTION_S,
     angle,
     // No damage has ever landed, so the shield-regen window opens immediately
-    // and the repair channel is available from tick 0.
+    // and a repair purchase is available from tick 0.
     sinceDamage: SHIELD.regenDelay,
     repairing: false,
+    repairCooldown: 0,
     turrets: [],
     shields: [],
     builds: [],

@@ -19,6 +19,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_HEADING, TEXT_PRIMARY } from './typography';
+import { buttonStyle } from './button-theme';
 import { MAIN_MENU_ID, mainMenuHitTest, mainMenuLayout } from './main-menu';
 import type { MainMenuLayout, MainMenuModel, MainMenuOption } from './main-menu';
 import type { Insets } from './menu-geometry';
@@ -94,16 +95,19 @@ export class MainMenuView extends Container {
   }
 
   private drawButton(nodes: ButtonNodes, label: string, rect: Rect, primary: boolean): void {
-    const tint = primary ? PALETTE.plasma : PALETTE.hullSteel;
+    // One contract, one source: PLAY is PRIMARY, every other row is STANDARD —
+    // both fully active. No menu button is ever disabled, so gray never appears.
+    const style = buttonStyle(primary ? 'primary' : 'standard');
     nodes.body.clear();
     nodes.body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: tint, alpha: primary ? 0.18 : 0.09 })
+      .fill({ color: style.fill, alpha: style.fillAlpha })
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: primary ? 2 : 1, color: tint, alpha: 0.8 });
+      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
 
     nodes.label.text = label;
-    nodes.label.style.fill = primary ? TEXT_PRIMARY : PALETTE.hullSteel;
+    nodes.label.style.fill = style.label;
+    nodes.label.alpha = style.labelAlpha;
     nodes.label.x = rect.x + rect.width / 2;
     nodes.label.y = rect.y + rect.height / 2;
   }

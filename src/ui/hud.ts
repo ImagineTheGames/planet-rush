@@ -64,14 +64,14 @@ import type { StripRow } from './controls-strip';
 import { buildWheelModel, segmentAngle } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
-import type { DrawnUpgradeWedge } from './build-wheel-view';
+import type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 import { upgradeWheelModel, upgradeWedgeAngle, STOCK_TIERS } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
 import { PressFeedback, detectConfirmations } from './press-feedback';
 import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './press-feedback';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
-import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
 import { healthBarModel } from './healthbar';
@@ -79,9 +79,16 @@ import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
 import { nameplateModel } from './nameplates';
-import type { Nameable, NameTable } from './nameplates';
+import type { DifficultyTable, Nameable, NameTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
 import type { DrawnNameplate } from './nameplates-view';
+import { tapMarkersModel } from './tap-markers';
+import { TapMarkerView } from './tap-markers-view';
+import type { DrawnTapMarkers } from './tap-markers-view';
+import { Minimap } from './minimap';
+import type { MinimapFrame, MinimapInsets } from './minimap';
+import { MinimapView } from './minimap-view';
+import type { DrawnMinimap } from './minimap-view';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -278,9 +285,42 @@ export interface HudFrame {
   /** Per-slot name table (from the lobby's slot state — local name + bot cast).
    *  Default: none ⇒ every label falls back to its `P{n}` identity tag. */
   readonly names?: NameTable;
+  /** Per-slot difficulty table, mirroring {@link names} (field request v0.2.2): a
+   *  bot seat's tier becomes a recessive `(EASY)`/`(MEDIUM)`/`(HARD)` suffix, a
+   *  human seat is left empty so it shows none. Default: none ⇒ no suffixes. */
+  readonly difficulties?: DifficultyTable;
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
+
+  // --- Tap Commander order markers (developer §4; the optional scheme) --------
+
+  /** The waypoint marker's **screen-space** position (the tapped point the pilot
+   *  is flying to), or absent when there is no move order / not in the tap scheme.
+   *  The caller projects world → screen; the layer draws the fading pulse. */
+  readonly tapWaypoint?: { readonly x: number; readonly y: number };
+  /** The lock-on reticle's **screen-space** target centre + screen radius, or
+   *  absent when nothing is locked. Rides the target (already projected by the
+   *  caller), so the reticle tracks a moving ship / shrinking rock. */
+  readonly tapLock?: { readonly x: number; readonly y: number; readonly radius: number };
+  /** The pilot is firing on its lock this tick → the line of intent from ship to
+   *  target draws. Only meaningful with {@link tapLock} present. Default false. */
+  readonly tapFiring?: boolean;
+
+  // --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
+
+  /** The minimap's content in **map (world) space** — arena bounds, planets,
+   *  ships, the collapse ring, ore hints. Absent before the world exists (the M1
+   *  feed) ⇒ the minimap hides entirely; present ⇒ it draws. Unlike the rest of
+   *  the HUD this is NOT pre-projected to screen: the minimap does its own fit
+   *  ({@link ./minimap}). Default: none. */
+  readonly minimap?: MinimapFrame;
+  /** Safe-area / thumb insets for the minimap's corner + overlay placement
+   *  (mobile amendment §2). Default: none ⇒ plain edges. */
+  readonly minimapInsets?: MinimapInsets;
+  /** The sim tick, driving the minimap's low-frequency content redraw
+   *  ({@link ./minimap} `MINIMAP_REDRAW_TICKS}). Default: derived from `time`. */
+  readonly tick?: number;
 }
 
 /** Reused for a frame that carries no combatants, so the empty case allocates
@@ -290,6 +330,7 @@ const NO_COMBATANTS: readonly Combatant[] = [];
 /** Reused empties for the nameplate feed, same zero-allocation discipline. */
 const NO_NAMEABLES: readonly Nameable[] = [];
 const NO_NAMES: NameTable = [];
+const NO_DIFFICULTIES: DifficultyTable = [];
 
 /** Fallback screen radius for the own-ship over-bar when the frame carries no
  *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
@@ -371,6 +412,10 @@ export class Hud extends Container {
   // --- Own planet HP (top-right, player colour — GDD §2.2) ----------------
   private readonly planetGroup = new Container();
   private readonly planetLabel: Text;
+  /** Numeric core HP beside the bar — a "75/100" readout (developer request,
+   *  p5-08). Sim-driven off the same coreHp/maxCoreHp the bar fills from, so the
+   *  number and the bar can never disagree. */
+  private readonly coreLabel: Text;
   private readonly planetBar = new Graphics();
 
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
@@ -420,6 +465,25 @@ export class Hud extends Container {
   //     A pooled, screen-space layer stacked with the health bars: name on top,
   //     bar under it, ship under that. Its decisions live in ./nameplates.
   private readonly nameplates = new NameplateView();
+
+  // --- Tap Commander order markers (developer §4) ------------------------
+  //     The lock-on reticle, line-of-intent and waypoint pulse, in screen space.
+  //     Added FIRST below (bottom of the HUD), so it sits over the world but under
+  //     every piece of HUD chrome — the health bars and nameplates included — and
+  //     can never occlude them (p6-01 §3). Its decisions live in ./tap-markers.
+  private readonly tapMarkers = new TapMarkerView();
+
+  // --- Minimap (GDD §2.2; field request v0.2.2) --------------------------
+  //     Two states (a bottom-right corner square / a centred overlay), toggled by
+  //     the same click/tap on both platforms and the `M` key on PC. The pure model
+  //     holds the toggle + geometry + fit; the view draws the sim-driven dots to a
+  //     throttled cached texture. Decisions live in ./minimap.
+  private readonly minimapModel = new Minimap();
+  private readonly minimap = new MinimapView();
+  /** The last frame's touch flag + insets, so a pointer event arriving between
+   *  frames hit-tests the minimap against the geometry it actually drew with. */
+  private minimapIsTouch = false;
+  private minimapInsets: MinimapInsets = {};
 
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
@@ -494,10 +558,18 @@ export class Hud extends Container {
     this.respawnGroup.addChild(this.respawnPanel, this.respawnText);
     this.respawnGroup.visible = false;
 
-    // Own planet HP: a right-anchored label above a bar in the player's colour.
+    // Own planet HP: a right-anchored label above a bar in the player's colour,
+    // with the numeric core HP ("75/100") sitting left-aligned on the same row,
+    // opposite HOME and above the left end of the bar — a numeral, so Oxanium
+    // (style-guide §5.6). It rides within the bar's own x-span, so it never widens
+    // the top-right footprint the layout registry records (see hud-geometry.ts).
     this.planetLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
     this.planetLabel.anchor.set(1, 0);
-    this.planetGroup.addChild(this.planetBar, this.planetLabel);
+    this.coreLabel = this.makeText('', FONT_NUMERAL, 11, TEXT_PRIMARY);
+    this.coreLabel.anchor.set(0, 0);
+    this.coreLabel.x = -HP_BAR_WIDTH;
+    this.coreLabel.y = 1;
+    this.planetGroup.addChild(this.planetBar, this.planetLabel, this.coreLabel);
     this.planetGroup.visible = false;
 
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
@@ -510,6 +582,11 @@ export class Hud extends Container {
     this.wheel = new BuildWheelView(screenWidth, screenHeight);
 
     this.addChild(
+      // Tap Commander order markers draw at the very bottom of the HUD: over the
+      // world render, but UNDER every other HUD layer including the health bars and
+      // nameplates, so a reticle riding a target's rim can never sit on top of that
+      // target's bar or name (p6-01 §3 — never occludes them).
+      this.tapMarkers,
       // Health bars and the under-ship hold indicator draw first: they float over
       // the world but under every piece of HUD chrome, so neither ever sits on top
       // of the ore total or the wave clock. Both track the local ship in screen
@@ -523,6 +600,11 @@ export class Hud extends Container {
       this.waveGroup,
       this.planetGroup,
       this.stripGroup,
+      // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
+      // the collapse frame and the danger tells must read over it, and the wheel
+      // is what the player acts on when docked. Its expanded overlay lets the
+      // match play on behind it, so it deliberately does not claim the top.
+      this.minimap,
       this.alarmGroup,
       this.wheel,
       // Cost floats ride above the wheel (they launch off its wedges) and travel
@@ -581,6 +663,8 @@ export class Hud extends Container {
     const underAttack = this.updateAlarm(frame);
     this.updateHealthBars(frame, underAttack);
     this.updateNameplates(frame);
+    this.updateTapMarkers(frame);
+    this.updateMinimap(frame);
     this.updatePlanetHp(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
@@ -766,6 +850,13 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+
+    // Numeric core HP ("75/100") beside the bar, off the SAME numbers the bar
+    // fills from so the two can never drift. It flashes threat red in step with the
+    // bar's own critical flash — one danger tell, two forms — and otherwise stays
+    // chalk-white (never signal yellow, which is reserved for ore — style-guide §2).
+    this.coreLabel.text = coreHpReadout(frame.coreHp ?? maxCore, maxCore);
+    this.coreLabel.style.fill = model.critical && flash ? model.criticalColor : TEXT_PRIMARY;
   }
 
   // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) -----------
@@ -882,9 +973,12 @@ export class Hud extends Container {
    *  layer stacked above the health bars. */
   private updateNameplates(frame: HudFrame): void {
     const entities = frame.nameables ?? NO_NAMEABLES;
-    const plates = nameplateModel(entities, frame.names ?? NO_NAMES, {
-      showOwnShipLabel: frame.showOwnShipLabel ?? false,
-    });
+    const plates = nameplateModel(
+      entities,
+      frame.names ?? NO_NAMES,
+      { showOwnShipLabel: frame.showOwnShipLabel ?? false },
+      frame.difficulties ?? NO_DIFFICULTIES,
+    );
     this.nameplates.update(plates, this.screenWidth, this.screenHeight);
   }
 
@@ -900,6 +994,112 @@ export class Hud extends Container {
    *  {@link enableNameplateDebug} was called. */
   debugNameplates(): DrawnNameplate[] {
     return this.nameplates.debugPlates();
+  }
+
+  // --- Tap Commander order markers (developer §4) -------------------------
+
+  /** Draw the lock-on reticle, line-of-intent and waypoint pulse (developer §4).
+   *  The pure model in {@link ./tap-markers} decides which markers exist and their
+   *  identity colour from the pilot's standing order (already re-resolved and
+   *  projected to screen by the caller); this hands it the frame's marker fields
+   *  and draws the animated result in the bottom screen-space layer. The line of
+   *  intent's origin is the viewport centre — the follow camera holds the local
+   *  ship there, the same anchor the own-ship health bar uses. */
+  private updateTapMarkers(frame: HudFrame): void {
+    const markers = tapMarkersModel({
+      owner: frame.owner ?? 0,
+      waypoint: frame.tapWaypoint ?? null,
+      lock: frame.tapLock ?? null,
+      firing: frame.tapFiring ?? false,
+      shipX: this.screenWidth / 2,
+      shipY: this.screenHeight / 2,
+    });
+    this.tapMarkers.update(markers, frame.time);
+  }
+
+  /** ?debug=1 live-stage seam: arm the tap-marker layer's drawn-marker capture so
+   *  {@link debugTapMarkers} can read it back. Called once from `main.ts` under
+   *  ?debug=1; no effect on a normal build. */
+  enableTapMarkerDebug(): void {
+    this.tapMarkers.enableDebugCapture();
+  }
+
+  /** The order markers the layer actually drew last frame — the reticle (with the
+   *  target it rides), the waypoint pulse (and whether it is fading on arrival),
+   *  and whether the line of intent drew — for the live-stage test. Empty unless
+   *  {@link enableTapMarkerDebug} was called. */
+  debugTapMarkers(): DrawnTapMarkers {
+    return this.tapMarkers.debugMarkers();
+  }
+
+  // --- Minimap (GDD §2.2; field request v0.2.2) ---------------------------
+
+  /** Draw the minimap from this frame's map-space content (or hide it when the
+   *  world isn't wired yet). The pure model in {@link ./minimap} holds the toggle
+   *  state and the fit; this hands the view the frame, the current state, and the
+   *  viewport/touch/insets it lays out against, plus the sim tick that throttles
+   *  the content redraw. The touch flag + insets are stashed so a pointer event
+   *  between frames ({@link minimapTap}) hit-tests the same geometry. */
+  private updateMinimap(frame: HudFrame): void {
+    this.minimapIsTouch = frame.isTouch;
+    this.minimapInsets = frame.minimapInsets ?? {};
+    const tick = frame.tick ?? Math.floor(frame.time * 60);
+    this.minimap.update(
+      frame.minimap ?? null,
+      this.minimapModel.state,
+      { width: this.screenWidth, height: this.screenHeight },
+      this.minimapIsTouch,
+      this.minimapInsets,
+      tick,
+    );
+  }
+
+  /**
+   * Route a click/tap at a screen point to the minimap. If it lands on the active
+   * surface (the corner square, or the whole overlay when expanded) the model
+   * toggles and this returns `true` — the caller then consumes the event so the
+   * same press never also flies the ship or engages a stick under it. Returns
+   * `false` (leaving the event to fall through) when the minimap isn't showing or
+   * the point missed. The ONE entry point PC clicks and mobile taps share, so the
+   * two platforms can never diverge (docs/input-parity.md; ./minimap.test.ts).
+   */
+  minimapTap(x: number, y: number): boolean {
+    if (!this.minimap.visible) return false;
+    return this.minimapModel.tap(
+      x,
+      y,
+      { width: this.screenWidth, height: this.screenHeight },
+      this.minimapIsTouch,
+      this.minimapInsets,
+    );
+  }
+
+  /** Toggle the minimap (the `M` keyboard shortcut on PC — {@link
+   *  ./minimap} `MINIMAP_TOGGLE_KEY}). No-op-safe when the minimap is hidden: the
+   *  state flips regardless, and the view stays hidden until a frame is fed. */
+  toggleMinimap(): void {
+    this.minimapModel.toggle();
+  }
+
+  /** Whether the minimap overlay is open — for a caller that wants to know (e.g.
+   *  to suppress a conflicting overlay). */
+  minimapExpanded(): boolean {
+    return this.minimapModel.expanded;
+  }
+
+  /** ?debug=1 live-stage seam: arm the minimap layer's drawn-state capture so
+   *  {@link debugMinimap} can read it back. Called once from `main.ts` under
+   *  ?debug=1; no effect on a normal build. */
+  enableMinimapDebug(): void {
+    this.minimap.enableDebugCapture();
+  }
+
+  /** The minimap state the layer actually drew last frame — the active rect (where
+   *  a live-stage test taps to toggle), the toggle state, and the own-ship dot
+   *  position (which the test watches track the ship's motion). Empty until
+   *  {@link enableMinimapDebug} is called. */
+  debugMinimap(): DrawnMinimap {
+    return this.minimap.debugMinimap();
   }
 
   /**
@@ -927,6 +1127,14 @@ export class Hud extends Container {
    *  not up), so the live-stage test can assert a bought tier re-rendered. */
   debugUpgradeWedges(): DrawnUpgradeWedge[] {
     return this.wheel.debugUpgradeWedges();
+  }
+
+  /** The Build wheel wedges the view actually drew last frame (empty when the
+   *  Build wheel is not up), so the repair-wedge live-stage test can read the
+   *  REPAIR wedge's real effect/reason line ("+15 HP", the partial, "CORE FULL")
+   *  off the shipped bundle. */
+  debugBuildWedges(): DrawnBuildWedge[] {
+    return this.wheel.debugBuildWedges();
   }
 
   /** The controls-strip rows resolved for this frame (empty on touch), so a
@@ -1412,6 +1620,14 @@ export class Hud extends Container {
     // getBounds(), so it registers itself the same way.
     if (shown(this.oreHold)) {
       for (const entry of this.oreHold.describeLayout(viewport)) entries.push(entry);
+    }
+
+    // Minimap: registers its corner rect when collapsed and its overlay rect when
+    // expanded (one at a time — the state it drew), through the same self-computed
+    // getBounds() discipline as the health bars. So "it appears where it's supposed
+    // to" is a test on BOTH states and BOTH phone profiles (field request rule 3).
+    if (shown(this.minimap)) {
+      for (const entry of this.minimap.describeLayout(viewport)) entries.push(entry);
     }
 
     // `viewport` is the host's size; the HUD was laid out against the same

@@ -24,8 +24,9 @@
  *
  * Everything past that is optional: {@link ArtPresenter.setListener} for the
  * earshot falloff, {@link ArtPresenter.setQuality} for the "reduce VFX" escape
- * hatch (GDD §4.3), {@link ArtPresenter.setMasterVolume} for the settings
- * slider, {@link ArtPresenter.reset} for a rematch.
+ * hatch (GDD §4.3), {@link ArtPresenter.setMasterVolume} and
+ * {@link ArtPresenter.setMusicVolume} for the settings sliders,
+ * {@link ArtPresenter.reset} for a rematch.
  *
  * The presenter owns **no** state of its own beyond the pieces — it is a
  * façade, not a layer. Anything it can do, the pieces can still do directly;
@@ -54,6 +55,8 @@ export interface ArtPresenterOptions {
   readonly context?: AudioContextLike | null;
   /** Ambient bed on at start. Item 3 on the cut list (GDD §4.9). */
   readonly ambient?: boolean;
+  /** Adaptive soundtrack on at start. Item 3 on the cut list (GDD §4.9). */
+  readonly music?: boolean;
   /** Particle capacity, for a device that wants a smaller pool. */
   readonly capacity?: number;
 }
@@ -91,6 +94,7 @@ export class ArtPresenter {
       context: options.context ?? null,
       ...(options.local !== undefined ? { local: options.local } : {}),
       ...(options.ambient !== undefined ? { ambient: options.ambient } : {}),
+      ...(options.music !== undefined ? { music: options.music } : {}),
       ...(options.seed !== undefined ? { mix: { seed: options.seed } } : {}),
     };
     this.audio = new AudioEngine(audio);
@@ -167,6 +171,16 @@ export class ArtPresenter {
   /** Turn the ambient bed on or off (GDD §4.9 item 3). */
   setAmbient(on: boolean): void {
     this.audio.setAmbient(on);
+  }
+
+  /** The music slider, 0..1 — the adaptive soundtrack's own level (GDD §4.9 item 3). */
+  setMusicVolume(value: number): void {
+    this.audio.setMusicVolume(value);
+  }
+
+  /** Turn the adaptive soundtrack on or off (GDD §4.9 item 3). */
+  setMusic(on: boolean): void {
+    this.audio.setMusic(on);
   }
 
   /** Which slot's home rings the alarm. Set on join, and on a rejoin. */
