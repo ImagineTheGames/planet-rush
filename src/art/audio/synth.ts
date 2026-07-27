@@ -256,8 +256,8 @@ export function renderVoice(
 /**
  * Join a rendered signal's tail onto its head so it loops without a seam.
  *
- * The ambient bed, the two firing voices and the alarm all run as looping buffer
- * sources, and a loop point is the one place a click is guaranteed rather than
+ * The ambient bed, the thruster, the alarm and the soundtrack's stems all run as
+ * looping buffer sources, and a loop point is the one place a click is guaranteed rather than
  * merely likely: the player hears it once per lap, forever. Crossfading the last
  * `crossfade` seconds over the first and dropping them from the end makes the
  * end sample continuous with the start sample by construction.

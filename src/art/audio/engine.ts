@@ -26,8 +26,12 @@
  *    they cannot be optimised away by someone tidying the mixer.
  *  - **The alarm** (`./alarm`), fed only by damage against the local player's
  *    own home — a mechanic, not a notification (GDD §2.2).
- *  - **The held voices** (`./weapons`): the two firing voices and the thruster,
- *    which are states rather than moments.
+ *  - **The held voice** (`./weapons`): the thruster, a state rather than a moment.
+ *    Firing is no longer one — since amendment v0.3 a shot is a discrete one-shot
+ *    (`./bank` rockChip / hullHit), routed like any other tell.
+ *  - **The device cues** ({@link AudioEngine.cue}): the p4-03 UI seams — a press,
+ *    a purchase, a rejected buy, the ping, the respawn clock — raised by hand
+ *    rather than derived from the world, and matched to the haptic vocabulary.
  *  - **Earshot.** Sounds fall off with distance from the camera, so a siege on
  *    the far side of the map is background and the rock you are actually cutting
  *    is not. Without this the mix is a flat wall on any frame with eight ships
@@ -46,8 +50,8 @@ import type { PlayerId } from '@shared/types';
 import { DeathMoment } from '../vfx/death-moment';
 import { TELL, type TellKind, type TellQueue } from '../tells';
 import { UnderAttackAlarm, type AlarmOptions } from './alarm';
-import { SOUND, TELL_SOUND, type SoundName } from './bank';
-import { WeaponVoices, SustainedVoice } from './weapons';
+import { SOUND, TELL_SOUND, CUE_SOUND, type SoundName, type AudioCue } from './bank';
+import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
 import { AudioGraph, type LoopHandle, type MixOptions } from './graph';
 import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
@@ -115,7 +119,6 @@ export class AudioEngine {
   /** The soundtrack, playing, or `null` when running silent. */
   readonly music: MusicDirector | null;
 
-  private readonly weapons: WeaponVoices | null;
   private readonly thruster: SustainedVoice | null;
   private readonly ownsDeath: boolean;
   private readonly wantsAmbient: boolean;
@@ -134,7 +137,6 @@ export class AudioEngine {
   constructor(options: AudioEngineOptions = {}) {
     const ctx = options.context ?? null;
     this.graph = ctx ? new AudioGraph(ctx, options.mix ?? {}) : null;
-    this.weapons = this.graph ? new WeaponVoices(this.graph) : null;
     this.thruster = this.graph
       ? new SustainedVoice(this.graph, SOUND.thruster, { maxGain: 0.45, release: 0.14, attack: 0.05 })
       : null;
@@ -250,12 +252,6 @@ export class AudioEngine {
 
       switch (kind) {
         // --- Held states: a voice, not a hit --------------------------------
-        case TELL.mineHit:
-          this.weapons?.onHit(false, magnitude);
-          break;
-        case TELL.weaponHit:
-          this.weapons?.onHit(true, magnitude);
-          break;
         case TELL.thrust:
           // Your own engine, and only yours: eight thruster loops is a drone,
           // and the one a player needs to feel is the one under their thumb.
@@ -269,7 +265,6 @@ export class AudioEngine {
           this.oneShot(SOUND.planetDeath, x, y, 1);
           if (this.ownsDeath) this.death.trigger();
           if (player === this.local) this.alarm.silence();
-          this.weapons?.stop();
           break;
 
         // --- Everything else -----------------------------------------------
@@ -280,12 +275,32 @@ export class AudioEngine {
     }
   }
 
-  /** Advance the alarm, the held voices, the soundtrack, and the hush. */
+  /**
+   * Sound a device cue — a press, a purchase, a rejected buy, the ping, the
+   * respawn clock (`./bank` {@link CUE_SOUND}). The audible half of the p4-03
+   * haptic seams: call it wherever the game already raises a haptic, so buzz and
+   * blip land together.
+   *
+   * Non-diegetic, so it plays at full level with no earshot falloff — a menu is
+   * not a place in the world. It still respects the three-second hush (GDD §4.7):
+   * nothing sounds while a home is dying, cues included. A jitter keeps a rapid
+   * menu walk from sounding like one machine part.
+   */
+  cue(kind: AudioCue): void {
+    const graph = this.graph;
+    if (!graph) return;
+    if (this.death.gain <= HUSHED) {
+      this.skipped++;
+      return;
+    }
+    if (graph.play(CUE_SOUND[kind], 1, graph.jitter(0.04))) this.played++;
+  }
+
+  /** Advance the alarm, the held voice, the soundtrack, and the hush. */
   update(dt: number): void {
     const step = dt > 0 ? dt : 0;
     this.alarm.update(step);
     if (this.ownsDeath) this.death.update(step);
-    this.weapons?.update(step);
     this.thruster?.update(step);
 
     // The soundtrack follows the local siege, then rides the same hush every
@@ -300,7 +315,6 @@ export class AudioEngine {
 
   /** Stop everything and drop the graph. A match teardown, or a page unload. */
   dispose(): void {
-    this.weapons?.stop();
     this.thruster?.stop();
     this.music?.stop();
     this.ambientLoop?.stop(0.2);
@@ -315,7 +329,6 @@ export class AudioEngine {
   reset(): void {
     this.alarm.reset();
     if (this.ownsDeath) this.death.reset();
-    this.weapons?.stop();
     this.thruster?.stop();
     this.musicScore.reset();
     this.music?.stop();
@@ -420,6 +433,14 @@ function levelFor(kind: TellKind, magnitude: number): number {
     case TELL.bankOre:
     case TELL.waveArrive:
       return 0.6 + 0.4 * m;
+    // Projectile fire and impact carry weapon power / damage (GDD §2.5: mining
+    // speed and weapon damage are one stat) with a floor, so a tier-0 shot is
+    // clearly audible and a tier-4 tool lands heavier — the per-tier variation
+    // the brief asks for, in the mix.
+    case TELL.mineHit:
+    case TELL.weaponHit:
+    case TELL.shotImpact:
+      return 0.55 + 0.45 * m;
     // A failing shield flickers thin — the audible half of "pressure beats
     // regeneration" (GDD §2.6), and the attacker's cue that it is working.
     case TELL.shieldHit:
@@ -432,7 +453,6 @@ function levelFor(kind: TellKind, magnitude: number): number {
     case TELL.oreCollect:
     case TELL.holdFull:
     case TELL.turretFire:
-    case TELL.shotImpact:
     case TELL.shieldDown:
     case TELL.turretDown:
     case TELL.shipSpawn:
