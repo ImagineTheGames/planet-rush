@@ -10,7 +10,7 @@ import type { Action } from '@shared/types';
 import type { InputMessage } from './transport';
 
 const FIRE: readonly Action[] = [{ type: 'fire', active: true, auto: false }];
-const BOOST: readonly Action[] = [{ type: 'boost', active: true }];
+const BUILD: readonly Action[] = [{ type: 'build', active: true }];
 
 function input(tick: number, actions: readonly Action[] = FIRE, seq = tick): InputMessage {
   return { type: 'input', tick, seq, actions };
@@ -20,12 +20,12 @@ describe('InputQueue', () => {
   it('files input under the tick it names, not the tick it arrived on', () => {
     const q = new InputQueue();
     // Delivered backwards — the wire is allowed to do that.
-    expect(q.accept(0, input(3, BOOST), 0)).toBe('queued');
+    expect(q.accept(0, input(3, BUILD), 0)).toBe('queued');
     expect(q.accept(0, input(1, FIRE), 0)).toBe('queued');
 
     expect(q.take(1)).toEqual([{ id: 0, actions: FIRE, seq: 1 }]);
     expect(q.take(2)).toEqual([]);
-    expect(q.take(3)).toEqual([{ id: 0, actions: BOOST, seq: 3 }]);
+    expect(q.take(3)).toEqual([{ id: 0, actions: BUILD, seq: 3 }]);
   });
 
   it('hands players to the sim in slot order, whatever order they arrived in', () => {
@@ -46,7 +46,7 @@ describe('InputQueue', () => {
   it('keeps the first message for a (player, tick) and ignores retransmits', () => {
     const q = new InputQueue();
     expect(q.accept(2, input(1, FIRE), 0)).toBe('queued');
-    expect(q.accept(2, input(1, BOOST), 0)).toBe('duplicate');
+    expect(q.accept(2, input(1, BUILD), 0)).toBe('duplicate');
 
     expect(q.take(1)).toEqual([{ id: 2, actions: FIRE, seq: 1 }]);
     expect(q.stats.duplicate).toBe(1);
@@ -58,7 +58,7 @@ describe('InputQueue', () => {
     // queue is where that number survives the wait between arrival and tick.
     const q = new InputQueue();
     q.accept(0, input(5, FIRE, 41), 0);
-    q.accept(1, input(5, BOOST, 907), 0);
+    q.accept(1, input(5, BUILD, 907), 0);
 
     expect(q.take(5).map((row) => row.seq)).toEqual([41, 907]);
   });
