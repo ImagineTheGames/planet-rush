@@ -64,6 +64,21 @@ import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 
+/** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
+ *  shape. Repair (p5-08) is the one that needs this: a live-stage test reads back
+ *  the REPAIR wedge's real second line ("+15 HP", the partial, or a reason) off
+ *  the shipped bundle, the same discipline as {@link DrawnUpgradeWedge}. */
+export interface DrawnBuildWedge {
+  readonly id: WheelSegment['id'];
+  readonly label: string;
+  /** The second line the wedge drew — a target ("YOUR PLANET") or, for repair,
+   *  its effect/reason line. */
+  readonly sub: string;
+  readonly cost: number | null;
+  /** Whether the wedge drew bright (pressable) or dark (refused, with a reason). */
+  readonly ready: boolean;
+}
+
 /** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
  *  (a bought tier must re-render its wedge here). */
 export interface DrawnUpgradeWedge {
@@ -209,6 +224,10 @@ export class BuildWheelView extends Container {
    *  assert a bought tier re-rendered. Costs nothing in a normal build. */
   private lastUpgradeWedges: DrawnUpgradeWedge[] = [];
   private lastUpgradeDrawn = false;
+  /** The Build-wheel wedges the view drew last frame (empty when the Build wheel
+   *  is not the one on top), for the ?debug=1 repair-wedge live-stage seam. */
+  private lastBuildWedges: DrawnBuildWedge[] = [];
+  private lastBuildDrawn = false;
 
   constructor(screenWidth: number, screenHeight: number) {
     super();
@@ -286,6 +305,7 @@ export class BuildWheelView extends Container {
     this.visible = this.toggle.visible;
     if (!this.visible) {
       this.lastUpgradeDrawn = false;
+      this.lastBuildDrawn = false;
       return;
     }
 
@@ -339,6 +359,15 @@ export class BuildWheelView extends Container {
     this.buildHubOre.y = -4;
     this.buildHubLabel.y = this.buildHubOre.y + 12;
     this.buildHubLabel.text = 'ORE';
+
+    // Capture what was drawn for the ?debug=1 repair-wedge live-stage seam: the
+    // REAL second line each wedge rendered (repair's "+15 HP"/partial/reason),
+    // straight off the descriptors the view just drew from.
+    this.lastBuildDrawn = true;
+    this.lastBuildWedges = model.segments.map((seg) => {
+      const d = buildSegmentDraw(seg);
+      return { id: seg.id, label: d.label, sub: d.sub, cost: d.cost, ready: d.ready };
+    });
   }
 
   // --- Upgrade wheel -------------------------------------------------------
@@ -346,6 +375,7 @@ export class BuildWheelView extends Container {
   /** The one screen where ship stats appear (GDD §2.2, §2.5), now a wheel: one
    *  wedge per track, each giving current value → next tier → ore cost. */
   private drawUpgradeWheel(model: UpgradeWheelModel, time: number, feedback?: PressFeedback): void {
+    this.lastBuildDrawn = false; // the Build wheel is not the one on top
     const r = this.radius;
     const inner = r * INNER_RADIUS;
     const hub = r * HUB_RADIUS;
@@ -395,6 +425,13 @@ export class BuildWheelView extends Container {
    *  wheel is not up), so a test can assert a bought tier re-rendered its wedge. */
   debugUpgradeWedges(): DrawnUpgradeWedge[] {
     return this.lastUpgradeDrawn ? this.lastUpgradeWedges : [];
+  }
+
+  /** The Build-wheel wedges the view actually drew last frame (empty when the
+   *  Build wheel is not the one on top), so the repair-wedge live-stage test can
+   *  read the REPAIR wedge's real "+15 HP"/partial/reason line off the client. */
+  debugBuildWedges(): DrawnBuildWedge[] {
+    return this.lastBuildDrawn ? this.lastBuildWedges : [];
   }
 
   // --- Shared wedge drawing (the field report's "same component family") ----
@@ -550,8 +587,11 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
   return {
     angle: seg.angle,
     label: seg.label,
-    // "Every label names which" — planet or ship (GDD §2.5). Words, not a number.
-    sub: seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR PLANET',
+    // REPAIR CORE is the one wedge that names its effect: the HP a tap buys, or the
+    // reason it's refused (p5-08 — a discrete purchase, so the deal must be legible
+    // before the tap). Every other wedge's second line names its target instead —
+    // "every label names which" (GDD §2.5), planet or ship, words not a number.
+    sub: seg.repair ? seg.repair.line : seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR PLANET',
     cost: seg.cost,
     ready: wedgeReady(seg.state),
     costReady: seg.state === 'ready',

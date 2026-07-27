@@ -109,6 +109,7 @@ import {
   upgradeWheelSlots,
   upgradeWedgeAngle,
   WHEEL_ORDER,
+  segmentAngle,
   wheelRadius,
   buildButtonVisible,
   BUILD_BUTTON_ID,
@@ -534,6 +535,7 @@ async function boot(): Promise<void> {
     installEndScreenStage();
     installUpgradeWheelStage();
     installPressStage();
+    installRepairStage();
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
@@ -2578,6 +2580,116 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__pressStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__repairStage` — the ?debug=1 live-stage seam for discrete
+   * REPAIR CORE (p5-07/p5-08), the same discipline as {@link installPressStage} but
+   * driven by REAL clicks (the p1a rule). A unit test proves the wedge's copy and
+   * the sim's per-tap repair in memory; only booting the real bundle proves a
+   * genuine pointer press on the drawn REPAIR wedge places one discrete order that
+   * spends exactly one ore and lifts the core by one tap's HP — and that the wedge
+   * SHOWS the deal ("+15 HP", the partial near full, or a reason) before the tap.
+   *
+   * It stages the report's real precondition — a core only takes damage from a
+   * siege (GDD §2.6) — by damaging the LOCAL core through the sim's own
+   * `damagePlanet`, funding the bank, parking the ship docked, and opening the
+   * Build wheel so its wedges draw and can be hit. The test then dispatches real
+   * pointerdowns at {@link repairWedgePoint} (into the same `main.ts` handler a
+   * mouse/thumb uses) and reads the LIVE sim + the DRAWN wedge back. Runs WITHOUT
+   * ?freeze so the sim steps and each order actually resolves. Methods:
+   *
+   *  - `siege(damage, banked)` — damage the local core by `damage`, bank `banked`,
+   *    park docked at rest, open the Build wheel. Returns the staged core/bank.
+   *  - `setCore(hp)` — set the local core to exactly `hp` (stage near-full/full).
+   *  - `repairWedgePoint()` — the LOGICAL screen point at the centre of the REPAIR
+   *    wedge, the exact geometry the pointer handler hit-tests (real-click door).
+   *  - `wedge()` — the REPAIR wedge the real view drew this frame (sub line, ready,
+   *    cost), so the test asserts the shown deal/reason off the shipped bundle.
+   *  - `readout()` — the live core HP / max / bank / repair tell this frame.
+   *
+   * Behind ?debug=1, never in a normal build; it mutates only the plain sim data
+   * the boot path already reads, and reaches src/sim only through `damagePlanet`.
+   */
+  function installRepairStage(): void {
+    const REPAIR_INDEX = WHEEL_ORDER.indexOf('repair');
+    const localPlanet = () => planetOf(world, LOCAL_PLAYER);
+    const parkDockedOpen = () => {
+      const ship = world.ships.find(isLocalShip);
+      const planet = localPlanet();
+      if (!ship || !planet) return null;
+      ship.alive = true;
+      ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
+      ship.pos.y = planet.pos.y;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      docked = true; // the wheel opens at your own planet and nowhere else
+      if (!buildWheel.open) buildWheel.toggle();
+      buildWheel.closePanel(); // land on the main wheel, where REPAIR CORE lives
+      return { ship, planet };
+    };
+    const stage = {
+      siege(damage: number, banked: number): { coreHp: number; maxCoreHp: number; banked: number } | null {
+        const parked = parkDockedOpen();
+        if (!parked) return null;
+        const { ship, planet } = parked;
+        ship.cargo = 0;
+        ship.banked = banked;
+        // Lift the match-start planet spawn protection first (GDD §2.1) — it blocks
+        // `damagePlanet` entirely in the opening seconds, so a staged siege would
+        // no-op and leave the core full. Zeroing it here stages the mid-match state
+        // the report is about, then the hit lands the REAL way.
+        planet.spawnProtect = 0;
+        // Only a siege damages a core (GDD §2.6) — go through the sim's own damage
+        // function, the same path a real hit takes, rather than poking coreHp.
+        if (damage > 0) damagePlanet(world, planet, damage);
+        return { coreHp: planet.coreHp, maxCoreHp: planet.maxCoreHp, banked: ship.banked };
+      },
+      setCore(hp: number): { coreHp: number; maxCoreHp: number } | null {
+        const planet = localPlanet();
+        if (!planet) return null;
+        planet.coreHp = Math.max(0, Math.min(planet.maxCoreHp, hp));
+        return { coreHp: planet.coreHp, maxCoreHp: planet.maxCoreHp };
+      },
+      repairWedgePoint(): { x: number; y: number } | null {
+        if (REPAIR_INDEX < 0) return null;
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const radius = wheelRadius(w, h);
+        const angle = segmentAngle(REPAIR_INDEX);
+        // 0.6 of the outer radius sits inside the segment ring where the wedge's
+        // words are drawn — the honest middle of the pressable wedge.
+        return {
+          x: w / 2 + Math.cos(angle) * radius * 0.6,
+          y: h / 2 + Math.sin(angle) * radius * 0.6,
+        };
+      },
+      wedge(): { sub: string; ready: boolean; cost: number | null } | null {
+        const drawn = hud.debugBuildWedges().find((wedge) => wedge.id === 'repair');
+        return drawn ? { sub: drawn.sub, ready: drawn.ready, cost: drawn.cost } : null;
+      },
+      readout(): { coreHp: number; maxCoreHp: number; banked: number; repairing: boolean } | null {
+        const ship = world.ships.find(isLocalShip);
+        const planet = localPlanet();
+        if (!ship || !planet) return null;
+        return {
+          coreHp: planet.coreHp,
+          maxCoreHp: planet.maxCoreHp,
+          banked: ship.banked,
+          repairing: planet.repairing ?? false,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__repairStage', {
         value: stage,
         writable: false,
         configurable: false,

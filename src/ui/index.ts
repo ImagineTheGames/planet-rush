@@ -82,6 +82,7 @@ export {
   segmentAngle,
   segmentAtDirection,
   spendableOre,
+  repairWedgeInfo,
   WHEEL_ORDER,
   SEGMENT_ARC,
   REPAIR_ENTRY_ORE,
@@ -93,10 +94,11 @@ export type {
   WheelSegmentId,
   SegmentState,
   SegmentTarget,
+  RepairWedgeInfo,
 } from './build-wheel';
 
 export { BuildWheelView } from './build-wheel-view';
-export type { DrawnUpgradeWedge } from './build-wheel-view';
+export type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 
 // --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
 //     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,
@@ -203,7 +205,7 @@ export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
 // --- Own-planet HP, in the player's colour (GDD §2.2) ----------------------
 
-export { planetHpModel, planetHpFlashOn, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
+export { planetHpModel, planetHpFlashOn, coreHpReadout, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
 export type { PlanetHpModel } from './planet-hp';
 
 // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) --------------

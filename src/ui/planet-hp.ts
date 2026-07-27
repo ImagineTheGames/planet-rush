@@ -87,6 +87,24 @@ export function planetHpModel(
 }
 
 /**
+ * The numeric core-HP readout beside the bar (developer request, p5-08): a
+ * `"75/100"`-style current/max, so a player who wants the exact number has it and
+ * doesn't have to eyeball the bar. Current HP rounds to a whole point (core HP is
+ * whole at match start and only a live siege makes it fractional); max is already
+ * whole. A wrecked or unwired core reads `"0/N"`, never a negative or a NaN.
+ *
+ * This is a *readout*, not a rate — the "no numbers but cost on the wheel" rule
+ * (build-wheel.ts) is about the Build wheel; the HP bar has always been allowed to
+ * state your own planet's health (GDD §2.2, the loss condition).
+ */
+export function coreHpReadout(coreHp: number, maxCoreHp: number): string {
+  const whole = (v: number): number => (Number.isFinite(v) ? Math.round(v) : 0);
+  const max = Math.max(0, whole(maxCoreHp));
+  const cur = Math.max(0, Math.min(max, whole(coreHp)));
+  return `${cur}/${max}`;
+}
+
+/**
  * Whether the critical flash is "on" this frame. Driven by match time, not a
  * wall clock, so it is deterministic and needs no timer — the same discipline
  * as the ore HUD's full-hold blink. ~3 Hz: faster than the ore flash, because

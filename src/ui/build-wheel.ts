@@ -41,7 +41,7 @@
  */
 
 import type { BuildItem } from '@shared/types';
-import { SHIELD, TURRET } from '../sim/constants';
+import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SHIELD, TURRET } from '../sim/constants';
 import { affordable } from './affordability';
 
 // ---------------------------------------------------------------------------
@@ -86,17 +86,21 @@ export type SegmentState = 'ready' | 'unaffordable' | 'capped' | 'inactive';
 // ---------------------------------------------------------------------------
 
 /**
- * The ore printed under REPAIR CORE. GDD §2.5 spells this one out — "a bare
- * '1' under REPAIR CORE" — because repair is a *channel*, not a purchase: it
- * consumes ore as it ticks (1 ore per 5 HP, a tuning value **never printed on
- * the wheel**). One ore is the smallest whole unit the channel spends, so it is
- * the honest price of opening it, and the entry the sim's `placeOrder` checks
- * (`spendableOre > 0`).
+ * The ore printed under REPAIR CORE — bound to the sim's `REPAIR_ORE_COST` so the
+ * wheel can never quote a price `placeOrder` won't honour. GDD §2.5 named "a bare
+ * '1' under REPAIR CORE" when repair was a channel; the developer amendment
+ * (2026-07-26) made it a **discrete purchase** — one tap spends this much ore and
+ * restores {@link REPAIR_HP_PER_ORE} core HP, clamped at the max (see
+ * `../sim/constants` and {@link repairWedgeInfo}).
  *
- * One ore buys `1 / REPAIR.orePerHp` = 5 HP — and that rate is the thing the
- * wheel must never say. It stays a comment here and a row nowhere.
+ * The old "the rate is the thing the wheel must never say" rule is superseded for
+ * this one wedge (p5-08): a discrete purchase shows the HP it buys, so the
+ * near-full tap is an informed choice. That number is copy on the wedge's second
+ * line ({@link repairWedgeInfo}), never a numeric field on {@link WheelSegment} —
+ * the "the only numeric field is `cost`" guarantee (build-wheel.test.ts) still
+ * holds, so no rate can leak onto turret, shield or the upgrade arrow.
  */
-export const REPAIR_ENTRY_ORE = 1;
+export const REPAIR_ENTRY_ORE = REPAIR_ORE_COST;
 
 /** Cost printed under a segment, or `null` where a segment has no price:
  *  UPGRADE SHIP prices its rows in the panel (GDD §2.5). */
@@ -199,6 +203,24 @@ export interface BuildWheelSignals {
 // The model
 // ---------------------------------------------------------------------------
 
+/**
+ * The REPAIR CORE wedge's second line, the one wedge allowed to name its effect
+ * (p5-08 — repair is a discrete purchase now, so the deal must be legible before
+ * the tap). `null` on every other segment, so no rate can leak elsewhere.
+ *
+ *  - **ready** — `"+15 HP"`, or the REAL partial (`"+7 HP"`) when the core is
+ *    missing less than a full tap's worth, so the near-full tap is informed.
+ *  - **disabled-with-reason** — `"CORE FULL"` (nothing to heal), `"NO REPAIR"`
+ *    (collapse has shut repair off, GDD §2.3), or `"NEED 1 ORE"` (empty bank).
+ */
+export interface RepairWedgeInfo {
+  /** HP a single tap would restore right now — `min(perOre, missing)`, rounded
+   *  for display. 0 when the core is full or repair is off. */
+  readonly restoreHp: number;
+  /** The second-line copy the wedge shows (see the states above). */
+  readonly line: string;
+}
+
 /** One rendered segment. Words, a target, a cost, a state — and no other
  *  number (GDD §2.5, the rule this module enforces). */
 export interface WheelSegment {
@@ -216,6 +238,9 @@ export interface WheelSegment {
   readonly opensPanel: boolean;
   /** Centre angle on the wheel, radians, y-down (`-π/2` = twelve o'clock). */
   readonly angle: number;
+  /** Repair-only effect/reason copy (p5-08), or `null` on every other segment.
+   *  Not a numeric field — the "only `cost` is a number" guarantee is kept. */
+  readonly repair: RepairWedgeInfo | null;
 }
 
 /** The wheel for one frame. */
@@ -269,9 +294,32 @@ export function buildWheelModel(signals: BuildWheelSignals): BuildWheelModel {
       state: segmentState(id, signals, ore),
       opensPanel: id === 'upgrade',
       angle: segmentAngle(index),
+      repair: id === 'repair' ? repairWedgeInfo(signals, ore) : null,
     };
   });
   return { open: canOpenWheel(signals), ore: Math.floor(ore), segments };
+}
+
+/**
+ * The REPAIR CORE wedge's effect/reason line (p5-08). Repair is a discrete
+ * purchase, so the wheel is now allowed — required — to show the deal before the
+ * tap: `"+15 HP"`, the real partial (`"+7 HP"`) when the core is missing less
+ * than a full tap, or a reason when the press would be refused. The precedence
+ * mirrors {@link segmentState} exactly, so the line and the dimmed state can
+ * never disagree (collapse before full before affordability).
+ */
+export function repairWedgeInfo(signals: BuildWheelSignals, ore = spendableOre(signals)): RepairWedgeInfo {
+  const missing = Math.max(0, signals.maxCoreHp - signals.coreHp);
+  const restoreHp = Math.min(REPAIR_HP_PER_ORE, missing);
+  // Collapse shuts repair off for the rest of the match (GDD §2.3).
+  if (signals.collapsed === true) return { restoreHp: 0, line: 'NO REPAIR' };
+  // A full core has nothing to heal — the tap would be a no-op (sim `core-full`).
+  if (signals.coreHp >= signals.maxCoreHp - 1e-9) return { restoreHp: 0, line: 'CORE FULL' };
+  // Damaged but broke: name the price the tap needs (the empty-bank reason).
+  if (!affordable(ore, REPAIR_ENTRY_ORE)) return { restoreHp, line: `NEED ${REPAIR_ENTRY_ORE} ORE` };
+  // Ready: the REAL HP a tap buys right now — a full tap, or the partial that
+  // heals a near-full core to the top for the same ore (the informed choice).
+  return { restoreHp, line: `+${Math.max(1, Math.round(restoreHp))} HP` };
 }
 
 /**
