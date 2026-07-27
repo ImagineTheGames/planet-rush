@@ -513,8 +513,22 @@ export const RESOURCE_FIELD = {
    *  Each wave is still a shrinking ring closer to the core than the last (GDD
    *  §2.3 "Outer Drift"), so the concentric rings close in over the match. Sized
    *  with `commonsSpokeGap` so the innermost ring rock clears a launching ship's
-   *  path by more than a ship+rock radius. TUNABLE */
-  commonsHoleFraction: 0.75,
+   *  path by more than a ship+rock radius.
+   *
+   *  Raised from the v0.1 0.75 (p5-repair-discrete soak): the five shrinking
+   *  rings stack near the centre, and at 0.75 the innermost wave's eye
+   *  (`0.75 × 0.25 × fieldRadius` ≈ 58 u) was small enough that a ship drawn into
+   *  the centre — GDD §2.3's whole "pulled into a smaller and smaller contested
+   *  space" — could be **sealed** by a full ring of body-radius rocks it could not
+   *  squeeze past (the harness caught a bot rattling >100 s inside one, the
+   *  `unstuck` invariant). A bigger eye pushes the innermost ring out to a radius
+   *  whose circumference actually admits a ship-wide gap, so the centre still
+   *  draws players in but never traps them; the 50-seed soak's worst wedge fell
+   *  from ~13 s to ~4 s, back in the honest detect-and-escape band. It is strictly
+   *  MORE clearance than 0.75 — the launch-corridor guarantee above only gets
+   *  stronger — and costs the fairness invariant nothing (still `N`-fold
+   *  symmetric, still the same `WAVE_ORE`). TUNABLE */
+  commonsHoleFraction: 0.85,
   /** Angular clearance (radians) kept around every planet spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below

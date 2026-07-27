@@ -72,22 +72,50 @@ are still five purchases (per the ratification). `src/shared/` is untouched; the
 new `Planet.repairCooldown` is optional and server-internal (the net layer
 reconstructs `repairing` from its own event shapes and does not carry it).
 
-### Balance note (bot economy)
+### Balance note (bot economy) — the reconciliation
 
 Discrete repair is **3× more HP-per-ore** than the channel (1 ore ⁄ 15 HP vs the
 old 1 ore ⁄ 5 HP) and no longer drains ore per tick, so the finite pool now buys
-more core HP. In the 8-bot offline match (`src/bots/trees.test.ts`, seed 1) both
-before and after this change the match runs to the collapse phase and is decided
-by entropy at t≈750 s; the cheaper, chunkier repair shifts the sub-HP core
-landscape at collapse so the seed-1 tie resolves with the last two cores dying
-together (8 eliminated, last-to-die wins) rather than a lone survivor (7). This is
-a downstream **balance re-baseline** the change forces; it is not a bug (the match
-still ends deterministically with a winner, under the timeout). It was verified to
-be independent of the tell semantics — the outcome is identical across five tried
-`repairing` implementations — so it is the ratified channel removal itself, not
-the pacing. **Follow-up (bots lane):** update `trees.test.ts`'s exact
-`eliminated.toHaveLength(7)` (and its now-stale "COLLAPSE_CORE_DECAY is zero"
-comment) to the re-baselined ending.
+more core HP, and — crucially — a tap **snaps** the core up by a whole chunk
+instead of trickling at 2 HP/s. Two suites caught the fallout of that, and the
+ratified `1 ore ⁄ 15 HP` number **stays**; the reconciliation is elsewhere.
+
+**1. Collapse lockstep → ration bot repair (`trees.test.ts`).** The bots repaired
+"whenever the core is below full" (Easy's gate was `maxCoreHp − 1`). Under the
+slow channel a core rarely reached exactly full at collapse; under cheap discrete
+repair every well-off defender snaps its core to *exactly* `maxCoreHp` and pins on
+the clamp. A field of such bots then reaches collapse at one identical HP and dies
+in **entropy lockstep** — no survivor to crown, the match resolved only by the
+last-to-die tiebreak (seed 1: `0` and `1`, both Easy Rusty/Bolt, at 100.0 HP,
+dying together at t=850 → 8 eliminated). The measured resolution rate over 24
+shipped-cast seeds was **22/24** (2 mutual-extinctions), vs the channel's 24/24.
+
+The fix is the brief's point 1: repair is now a **ration**, not a top-up
+(`repairTargetFraction`, `src/bots/behaviors.ts`). It is (a) **personality-
+modulated** by `caution` — timid Rusty patches early, reckless Bolt lets its core
+ride — and (b) **capped strictly below the ceiling**, so a repaired core settles
+*below* `maxCoreHp` at a value that varies with its own damage history. There is
+no longer a single HP the funded turtles all converge on, so they enter collapse
+spread out and the match resolves. Resolution is back to **24/24**, and the
+mutual-extinction path stays legal for genuinely identical cores
+(`match-endgame.test.ts`, the do-nothing baseline, still 8-eliminated). The
+`1 ore ⁄ 15 HP` price is untouched.
+
+**2. Centre cage → a bigger commons eye (`harness/unstuck.test.ts`).** The cheaper
+economy also shifts trajectories, and on one seed a bot was drawn into the very
+centre and **sealed** there by the five shrinking commons rings (66 rocks within
+200 u; zero escape corridor ≥ 8 u) — wedged >100 s, tripping the standing no-wedge
+invariant. This is a latent geometry trap, not a repair bug: at
+`commonsHoleFraction = 0.75` the innermost wave's eye (≈58 u) is small enough that
+a full ring of body-radius rocks admits no ship-wide gap. Raising the eye to
+**0.85** pushes that ring out to a radius whose circumference does admit a gap, so
+the centre still draws players in (GDD §2.3) but never traps them. The 50-seed
+soak's worst wedge fell from ~13 s (and, pre-ration, ~103 s) to **~4 s**, back in
+the honest detect-and-escape band and on par with the channel branch (~3.9 s).
+
+The round-robin is essentially unchanged by the reconciliation — Hard-dominant
+per GDD §2.9 (warden top), match length median ~828 s vs the channel's ~819 s —
+so this restores the ratified balance rather than reshaping it.
 
 ### Constants (`src/sim/constants.ts`, all TUNABLE)
 
