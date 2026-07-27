@@ -308,6 +308,82 @@ describe('TapPilot — a lock overrides the auto-engage ladder (developer p9-02 
   });
 });
 
+describe('TapPilot.resolveTap — tap your planet to open the build wheel (developer p10 §1–2)', () => {
+  const planet = (over: Partial<TapCandidate> = {}): TapCandidate =>
+    cand({ kind: 'planet', id: 0, pos: { x: 600, y: 0 }, radius: 64, hostile: false, ...over });
+  const closedFar = { wheelOpen: false, insideWheel: false, inBuildRange: false };
+  const closedNear = { wheelOpen: false, insideWheel: false, inBuildRange: true };
+
+  it('near-tap on your own planet opens the wheel and sets NO order (§1)', () => {
+    const pilot = new TapPilot();
+    const res = pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear);
+    expect(res.kind).toBe('openWheel');
+    // The ship holds while the menu is up — the tap placed no waypoint or lock.
+    expect(pilot.currentOrder).toBeNull();
+  });
+
+  it('far-tap on your own planet is a plain move toward it — no lock, no surprise wheel (§1)', () => {
+    const pilot = new TapPilot();
+    const res = pilot.resolveTap(planet(), { x: 600, y: 0 }, closedFar);
+    expect(res.kind).toBe('move');
+    expect(pilot.waypoint).toEqual({ x: 600, y: 0 }); // a normal waypoint...
+    expect(pilot.lockedRef).toBeNull(); // ...not a fly-to lock
+  });
+
+  it('far → move, then the same tap in range opens (a second tap when close opens, §1)', () => {
+    const pilot = new TapPilot();
+    expect(pilot.resolveTap(planet(), { x: 600, y: 0 }, closedFar).kind).toBe('move');
+    // The ship flew there; docked now, the same tap opens the wheel instead.
+    expect(pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear).kind).toBe('openWheel');
+  });
+
+  it('outside-tap on an OPEN wheel closes it and does NOT double as a move (§2)', () => {
+    const pilot = new TapPilot();
+    pilot.orderMove({ x: 100, y: 100 }); // a standing order the close must not disturb
+    const res = pilot.resolveTap(null, { x: 999, y: 999 }, {
+      wheelOpen: true,
+      insideWheel: false,
+      inBuildRange: false,
+    });
+    expect(res.kind).toBe('closeWheel');
+    // The prior waypoint is untouched — the outside tap set NO new order at (999,999).
+    expect(pilot.waypoint).toEqual({ x: 100, y: 100 });
+  });
+
+  it('a wheel-internal tap passes straight through — the pilot does not eat it (§2)', () => {
+    const pilot = new TapPilot();
+    pilot.orderMove({ x: 100, y: 100 });
+    const res = pilot.resolveTap(null, { x: 0, y: 0 }, {
+      wheelOpen: true,
+      insideWheel: true,
+      inBuildRange: false,
+    });
+    expect(res.kind).toBe('passThrough');
+    expect(pilot.waypoint).toEqual({ x: 100, y: 100 }); // order untouched
+  });
+
+  it('a hostile entity still locks and empty space still moves (unchanged §2)', () => {
+    const pilot = new TapPilot();
+    const bot = cand({ kind: 'ship', id: 7, pos: { x: 50, y: 0 } });
+    expect(pilot.resolveTap(bot, { x: 50, y: 0 }, closedFar).kind).toBe('lock');
+    expect(pilot.lockedRef).toEqual({ kind: 'ship', id: 7 });
+    expect(pilot.resolveTap(null, { x: 10, y: 20 }, closedFar).kind).toBe('move');
+    expect(pilot.waypoint).toEqual({ x: 10, y: 20 });
+  });
+
+  it('auto-fire resumes once the wheel closes — a no-lock pilot holds the trigger (§4)', () => {
+    const pilot = new TapPilot();
+    // Opening the wheel leaves the order holding; while it is up the wiring does not
+    // call writeInto (menus over motion). On close the pilot resumes: no lock → it
+    // auto-engages, holding the trigger for the sim's Auto-aim ladder (p9-02 §1).
+    pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear);
+    const state = createControlState();
+    resetState(state);
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null);
+    expect(state.fire).toBe(true);
+  });
+});
+
 describe('TapPilot — determinism (same orders + frames → identical control states)', () => {
   it('two pilots fed identical orders and resolves write byte-identical state each frame', () => {
     const mk = (): TapPilot => new TapPilot({ pickupRadius: PICKUP_RADIUS });
