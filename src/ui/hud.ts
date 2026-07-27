@@ -72,7 +72,8 @@ import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './
 import { NO_UI_SFX } from './sfx';
 import type { UiSfx } from './sfx';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
-import type { Point } from './alarm';
+import type { Point, AlarmDamage, AlarmCause } from './alarm';
+import { COLLAPSE_CORE_DECAY } from '../sim/constants';
 import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
@@ -424,12 +425,20 @@ export class Hud extends Container {
   private readonly alarmGroup = new Container();
   private readonly alarmFrame = new Graphics();
   private readonly alarmArrow = new Graphics();
-  /** The sustained-damage trigger. A taunt-tap never reaches it (GDD §2.2). */
+  /** The sustained-damage trigger. A taunt-tap never reaches it (GDD §2.2). This
+   *  is the ONE under-attack predicate: the frame, the arrow, and (through the
+   *  shared seam) the haptic and audio alarm all read its verdict. */
   private readonly alarm = new UnderAttackAlarm();
-  /** Previous frame's total planet HP (core + shields + turrets) and match time.
-   *  The HUD derives "damage this tick" from the drop rather than asking the
-   *  caller for a damage event, so the alarm needs no new sim plumbing. */
-  private lastDefenseHp = -1;
+  /** Previous frame's planet HP, split by pool so the alarm can name which of
+   *  core/shield/turret rang it (the field report's cause). The HUD derives
+   *  "damage this tick" from the drop rather than asking the caller for a damage
+   *  event, so the alarm needs no new sim plumbing. */
+  private lastCoreHp = 0;
+  private lastShieldHp = 0;
+  private lastTurretHp = 0;
+  /** Whether {@link lastCoreHp} et al. hold a real prior frame yet — the first
+   *  frame with a planet establishes a baseline, never a phantom hit. */
+  private hasDefenseBaseline = false;
   private lastTime = -1;
   /** Whether the screen-edge arrow actually drew this frame. The arrow is hidden
    *  while home is already on screen (the planet is its own tell), and the
@@ -1126,6 +1135,17 @@ export class Hud extends Container {
     return this.lastLocalHullFraction;
   }
 
+  /**
+   * Why the under-attack alarm is in its current state — the field report's
+   * cause seam ("the alarm fired out of nowhere"). Read back under ?debug=1 so a
+   * phantom is diagnosed from a screenshot: `damage: 0` while `firing: true`
+   * means a stale latch; a `source`/`reason` names what rang it. This is the ONE
+   * predicate the frame, the arrow, the haptic and the audio alarm all share.
+   */
+  debugAlarmCause(): AlarmCause {
+    return this.alarm.cause;
+  }
+
   // --- Build/Upgrade wheel ?debug=1 live-stage seam (field report v0.2) ------
 
   /** Whether the wheel view accepts input this frame — read by the cycle
@@ -1223,20 +1243,42 @@ export class Hud extends Container {
     if (maxCore <= 0 || frame.planetAlive === false) {
       this.alarmGroup.visible = false;
       this.alarm.reset();
-      this.lastDefenseHp = -1;
+      this.hasDefenseBaseline = false;
       this.lastTime = frame.time;
       return false;
     }
 
-    const defenseHp = (frame.coreHp ?? maxCore) + (frame.shieldHp ?? 0) + (frame.turretHp ?? 0);
-    // First frame with a planet: establish a baseline, never a phantom hit.
-    const damage = this.lastDefenseHp < 0 ? 0 : Math.max(0, this.lastDefenseHp - defenseHp);
-    this.lastDefenseHp = defenseHp;
+    const coreHp = frame.coreHp ?? maxCore;
+    const shieldHp = frame.shieldHp ?? 0;
+    const turretHp = frame.turretHp ?? 0;
 
     // dt from match time, clamped: a tab that was backgrounded must not dump a
     // multi-second drain into the bucket and silence a live siege.
     const dt = this.lastTime < 0 ? 0 : Math.min(0.25, Math.max(0, frame.time - this.lastTime));
     this.lastTime = frame.time;
+
+    // Damage this tick is the FALL in each pool — repair and shield regen move
+    // the other way and are ignored. Split by pool so the recorded cause names
+    // what rang the alarm. The first frame with a planet only sets the baseline.
+    let damage: AlarmDamage = {};
+    if (this.hasDefenseBaseline) {
+      let coreDrop = Math.max(0, this.lastCoreHp - coreHp);
+      // Collapse decays every core at COLLAPSE_CORE_DECAY HP/s (GDD §2.3, the
+      // backstop that guarantees an ending). That is entropy, not an attacker —
+      // subtract the expected bleed so the endgame does not phantom-ring the
+      // alarm; only real fire ON TOP of the decay counts (GDD §2.2). Attacker
+      // fire during collapse still rings it, because it exceeds the decay.
+      if (frame.collapsed) coreDrop = Math.max(0, coreDrop - COLLAPSE_CORE_DECAY * dt);
+      damage = {
+        core: coreDrop,
+        shield: Math.max(0, this.lastShieldHp - shieldHp),
+        turret: Math.max(0, this.lastTurretHp - turretHp),
+      };
+    }
+    this.lastCoreHp = coreHp;
+    this.lastShieldHp = shieldHp;
+    this.lastTurretHp = turretHp;
+    this.hasDefenseBaseline = true;
 
     const active = this.alarm.update(dt, damage);
     this.alarmGroup.visible = active;
