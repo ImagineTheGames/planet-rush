@@ -142,11 +142,14 @@ import {
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
   normalizePlayerName,
+  MINIMAP_TOGGLE_KEY,
 } from './ui';
 import type {
   HudFrame,
   Combatant,
   DifficultyTable,
+  MinimapPlanet,
+  MinimapShip,
   Nameable,
   NameTable,
   SettingsState,
@@ -523,6 +526,7 @@ async function boot(): Promise<void> {
     hud.enableHealthBarDebug();
     hud.enableNameplateDebug();
     hud.enableTapMarkerDebug();
+    hud.enableMinimapDebug();
     installHealthbarStage();
     installNameplateStage();
     installOreDepositStage();
@@ -532,6 +536,7 @@ async function boot(): Promise<void> {
     installPressStage();
     installTapCommanderStage();
     installTapMarkerStage();
+    installMinimapStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -882,6 +887,23 @@ async function boot(): Promise<void> {
       return;
     }
 
+    // The minimap (field request v0.2.2): a click/tap on the corner square opens
+    // the centred overlay; a tap anywhere on the overlay collapses it again. The
+    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
+    // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
+    // both platforms use (docs/input-parity.md). Checked LAST among the interactive
+    // surfaces — after the end/fullscreen overlays, the BUILD button, the BOOST/PING
+    // buttons and the open wheel — so the glance map is the lowest-priority claim:
+    // a control drawn near or over it always wins the press, and the map only takes
+    // one that lands on nothing else. When it does claim a press we consume the
+    // event so the same press never also flies the ship or engages a stick under it.
+    if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
+      haptics.haptic('tap');
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
     // --- Tap Commander (developer §1–2): a primary tap no affordance claimed places
     //     the ship's next order. Empty space → move there; an entity → LOCK it —
     //     attack a rival ship / turret / core, mine an asteroid ("a rock is just a
@@ -954,6 +976,27 @@ async function boot(): Promise<void> {
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
   let playerDifficulties: DifficultyTable = [];
+
+  // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
+  //     planets, ships, ore-field hints, the collapse ring — pooled and reused so
+  //     the corner map allocates nothing after warm-up (GDD §4.3). The minimap
+  //     does its own fit (map → rect), so unlike the bars/labels this feed is NOT
+  //     projected to screen; it hands the HUD live world positions. Redraw cadence
+  //     is the VIEW's job (throttled to a cached texture, ./minimap-view).
+  const minimapPlanetPool: MutMinimapPlanet[] = [];
+  const minimapPlanets: MinimapPlanet[] = [];
+  const minimapShipPool: MutMinimapShip[] = [];
+  const minimapShips: MinimapShip[] = [];
+  const minimapOrePool: { x: number; y: number }[] = [];
+  const minimapOre: { x: number; y: number }[] = [];
+  const minimapCollapse: { x: number; y: number; radius: number } = { x: 0, y: 0, radius: 0 };
+  const minimapFrame: {
+    bounds: { width: number; height: number };
+    planets: MinimapPlanet[];
+    ships: MinimapShip[];
+    oreHints: { x: number; y: number }[];
+    collapse: { x: number; y: number; radius: number } | null;
+  } = { bounds: { width: 0, height: 0 }, planets: minimapPlanets, ships: minimapShips, oreHints: minimapOre, collapse: null };
   /** Rebuild the per-slot name table (and its mirror difficulty table) from the
    *  live match: the local player's chosen name (from the lobby, or persisted
    *  default under ?debug=1) plus each seated bot's personality name (GDD §2.9),
@@ -1053,6 +1096,10 @@ async function boot(): Promise<void> {
       // Tap Commander order markers (developer §4): the waypoint pulse + lock-on
       // reticle, projected to screen the same way, drawn UNDER the bars/labels.
       feedTapMarkers();
+      // Minimap content (field request v0.2.2): map-space dots — planets, ships,
+      // ore hints, the collapse ring. Not projected to screen (the minimap fits
+      // the arena itself), so its placement in the feed order is free.
+      feedMinimap();
       hud.update(hudFrame);
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
@@ -1801,6 +1848,105 @@ async function boot(): Promise<void> {
     // (the sim's own firing tell) — the tap scheme fires only on a hostile lock.
     const ship = world.ships.find(isLocalShip);
     hudFrame.tapFiring = ship?.firing ?? false;
+  }
+
+  /**
+   * Feed this frame's minimap content to the HUD (field request v0.2.2; GDD §2.2):
+   * arena bounds, planets (owner-coloured, a wreck neutral), ships (own
+   * highlighted, spawn-protected dimmed), the collapse ring while it is active
+   * (GDD §2.3), and faint ore-field hints — all in **map (world) space**, because
+   * the minimap does its own fit (unlike the bars/labels, which arrive projected).
+   * The minimap's presentation is the UI's; the sim decides the truth this reads.
+   *
+   * Pooled + reused (GDD §4.3): planet/ship/ore records and the frame arrays are
+   * overwritten in place, bounded by the entity caps (≤8 planets, ≤8 ships, and
+   * the asteroid field). `hudFrame.tick` drives the view's low-frequency redraw.
+   */
+  function feedMinimap(): void {
+    minimapFrame.bounds.width = world.bounds.width;
+    minimapFrame.bounds.height = world.bounds.height;
+
+    let pn = 0;
+    for (const p of world.planets) {
+      const r = minimapPlanetSlot(pn++);
+      r.owner = p.owner;
+      r.x = p.pos.x;
+      r.y = p.pos.y;
+      r.alive = p.alive;
+    }
+    minimapPlanets.length = 0;
+    for (let i = 0; i < pn; i++) minimapPlanets.push(minimapPlanetPool[i]!);
+
+    let sn = 0;
+    for (const s of world.ships) {
+      const r = minimapShipSlot(sn++);
+      r.owner = s.id;
+      r.x = s.pos.x;
+      r.y = s.pos.y;
+      r.alive = s.alive && !s.eliminated;
+      r.local = s.id === LOCAL_PLAYER;
+      r.spawnProtected = s.spawnProtect > 0;
+    }
+    minimapShips.length = 0;
+    for (let i = 0; i < sn; i++) minimapShips.push(minimapShipPool[i]!);
+
+    // Faint ore-field hints: the asteroid centres. Bounded by the field size and
+    // drawn dim (the view throttles the redraw), so the whole field is honest hint
+    // rather than a sampled guess.
+    let on = 0;
+    for (const a of world.asteroids) {
+      const r = minimapOreSlot(on++);
+      r.x = a.pos.x;
+      r.y = a.pos.y;
+    }
+    minimapOre.length = 0;
+    for (let i = 0; i < on; i++) minimapOre.push(minimapOrePool[i]!);
+
+    // The collapse ring (GDD §2.3): while collapse is active, a threat-red ring at
+    // the contested field's extent, centred on the arena — the closing space made
+    // legible on the glance map. `fieldRadius` is the field's outer disc; there is
+    // no shrinking kill-ring in the sim, so this marks the danger zone's boundary.
+    if (isCollapsed(world)) {
+      minimapCollapse.x = world.bounds.width / 2;
+      minimapCollapse.y = world.bounds.height / 2;
+      minimapCollapse.radius = world.fieldRadius;
+      minimapFrame.collapse = minimapCollapse;
+    } else {
+      minimapFrame.collapse = null;
+    }
+
+    hudFrame.minimap = minimapFrame;
+    hudFrame.tick = world.tick;
+  }
+
+  /** Pooled minimap planet record `i`, grown to fit and reused (GDD §4.3). */
+  function minimapPlanetSlot(i: number): MutMinimapPlanet {
+    let r = minimapPlanetPool[i];
+    if (!r) {
+      r = { owner: 0, x: 0, y: 0, alive: true };
+      minimapPlanetPool[i] = r;
+    }
+    return r;
+  }
+
+  /** Pooled minimap ship record `i`, grown to fit and reused (GDD §4.3). */
+  function minimapShipSlot(i: number): MutMinimapShip {
+    let r = minimapShipPool[i];
+    if (!r) {
+      r = { owner: 0, x: 0, y: 0, alive: false, local: false, spawnProtected: false };
+      minimapShipPool[i] = r;
+    }
+    return r;
+  }
+
+  /** Pooled minimap ore-hint point `i`, grown to fit and reused (GDD §4.3). */
+  function minimapOreSlot(i: number): { x: number; y: number } {
+    let r = minimapOrePool[i];
+    if (!r) {
+      r = { x: 0, y: 0 };
+      minimapOrePool[i] = r;
+    }
+    return r;
   }
 
   /**
@@ -2563,6 +2709,37 @@ async function boot(): Promise<void> {
     }
   }
 
+  /**
+   * Install `window.__minimapStage` — the ?debug=1 live-stage seam that proves, on
+   * a REAL boot, the minimap toggles between its two states under REAL input and
+   * its own-ship dot tracks the player's motion (the p1a rule; field request rule
+   * 4). The toggle + the fit + the scene are unit-tested; what a unit test cannot
+   * reach is that the shipped bundle routes a canvas tap to the toggle and the
+   * layer redraws the dots on the real client. A Playwright test reads the active
+   * rect from {@link Hud.debugMinimap} (so it knows where to tap), dispatches a
+   * real pointer at its centre, and reads back the flipped state + the moved dot.
+   * Behind ?debug=1 only; a normal build never installs it.
+   */
+  function installMinimapStage(): void {
+    const stage = {
+      /** The minimap state the HUD's minimap layer actually drew last frame — the
+       *  active rect (where to tap), the toggle state, and the own-ship dot. */
+      state(): ReturnType<typeof hud.debugMinimap> {
+        return hud.debugMinimap();
+      },
+    };
+    try {
+      Object.defineProperty(window, '__minimapStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   /** Refresh the layout registry from this frame's drawn state (debug only).
    *  Every positioned element registers its declared anchor + actual rendered
    *  rect, so a tool can assert "it appears where it's supposed to" (the whole
@@ -2818,6 +2995,12 @@ async function boot(): Promise<void> {
       tapPilot.clear();
       platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
     }
+    // Minimap toggle (field request v0.2.2): the `M` keyboard shortcut on PC, the
+    // desktop convenience over the primary click/tap gesture — the same toggle the
+    // corner tap runs, added to the input-parity table (docs/input-parity.md).
+    if (e.code === MINIMAP_TOGGLE_KEY) {
+      hud.toggleMinimap();
+    }
   });
 
   loop.start();
@@ -2879,6 +3062,26 @@ interface MutNameable {
   hpFraction: number;
   pos: Vec2;
   radius: number;
+}
+
+/** A mutable {@link MinimapPlanet} — the pooled records `feedMinimap()` overwrites
+ *  in place each frame (field request v0.2.2), handed over as `MinimapPlanet`. */
+interface MutMinimapPlanet {
+  owner: PlayerId;
+  x: number;
+  y: number;
+  alive: boolean;
+}
+
+/** A mutable {@link MinimapShip} — the pooled records `feedMinimap()` overwrites in
+ *  place each frame, handed over as `MinimapShip`. */
+interface MutMinimapShip {
+  owner: PlayerId;
+  x: number;
+  y: number;
+  alive: boolean;
+  local: boolean;
+  spawnProtected: boolean;
 }
 
 /** A mutable {@link TapCandidate} — the pooled records the Tap Commander hit-test

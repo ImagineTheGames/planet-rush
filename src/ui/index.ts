@@ -675,6 +675,57 @@ export type {
 
 export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
 
+// --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
+//
+// Bottom-right corner square that taps/clicks open to a centred overlay (same
+// gesture PC + mobile, `M` on PC), drawing sim-driven dots — planets, ships, the
+// collapse ring, faint ore hints. Same pure-model / Pixi-view split as the rest:
+// `./minimap` decides (toggle, fit, scene), `./minimap-view` draws (throttled
+// cached content + a per-frame own-ship dot). The `Hud` owns both.
+
+export {
+  Minimap,
+  minimapScene,
+  minimapRect,
+  collapsedRect,
+  expandedRect,
+  fitBounds,
+  mapPoint,
+  pointInRect,
+  MINIMAP_TOGGLE_KEY,
+  MINIMAP_REDRAW_TICKS,
+  MINIMAP_MARGIN,
+  MINIMAP_COLLAPSED_DESKTOP,
+  MINIMAP_COLLAPSED_TOUCH,
+  MINIMAP_COLLAPSED_MIN,
+  MINIMAP_EXPANDED_FRACTION,
+  MINIMAP_EXPANDED_MIN,
+  MINIMAP_DOT_ALPHA,
+  MINIMAP_DERELICT_ALPHA,
+  MINIMAP_SPAWN_PROTECT_ALPHA,
+  MINIMAP_ORE_ALPHA,
+} from './minimap';
+export type {
+  MinimapState,
+  MinimapFrame,
+  MinimapPlanet,
+  MinimapShip,
+  MinimapRing,
+  MinimapInsets,
+  MinimapDot,
+  MinimapScene,
+  FitTransform,
+} from './minimap';
+
+export {
+  MinimapView,
+  MINIMAP_ID,
+  MINIMAP_EXPANDED_ID,
+  MINIMAP_ANCHOR,
+  MINIMAP_EXPANDED_ANCHOR,
+} from './minimap-view';
+export type { DrawnMinimap } from './minimap-view';
+
 // --- Screen geometry for the M2 overlays (layout-registry contract) ---------
 //
 // Pure and PixiJS-free, so the rects the wheel, the panel and the alarm are
