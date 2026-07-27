@@ -111,7 +111,7 @@ function eliminate(world: World, planet: Planet): void {
   world.match.eliminated.push(planet.owner);
   planet.deathTime = world.time;
 
-  // The owner is out (GDD §2.7): their ship dies where it stands — dropping
+  // The owner is out (GDD §2.7): their ship dies where it stands — shedding
   // half its hold like any death — and it never respawns. The Rematch button is
   // the UI's answer to this flag.
   const ship = shipOwnedBy(world, planet.owner);
@@ -168,6 +168,21 @@ function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
       amount: i < whole ? CHUNK.ore : remainder,
       radius: CHUNK.radius,
     });
+  }
+}
+
+/**
+ * Scatter the lootable debris of every **derelict** wreck a map laid out
+ * (Milestone B, derelict-fill maps). A derelict is born a wreck with no owner and
+ * no bank, so — like a broke player's home — it leaves the `WRECK.baseDebrisOre`
+ * floor: a small ring of ore-laden chunks anyone can scavenge (ratified LOOTABLE,
+ * 2026-07-26; GDD §2.7). Called once at world-build (`createWorld`), after the
+ * fair opening field, so the home + commons asteroid ids are stamped first. No
+ * RNG (the debris ring is index-derived), so the board stays deterministic.
+ */
+export function scatterDerelictLoot(world: World): void {
+  for (const planet of world.planets) {
+    if (planet.derelict) scatterWreckDebris(world, planet, WRECK.baseDebrisOre);
   }
 }
 

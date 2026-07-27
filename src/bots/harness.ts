@@ -151,7 +151,7 @@ export function thinkOnce(
 /**
  * The part of a decision a bot may keep pressing between decisions.
  *
- * Held verbs — thrust, aim, fire, boost — are exactly that: a stick position and
+ * Held verbs — thrust, aim, fire — are exactly that: a stick position and
  * a trigger a human's hands are still on, and re-sending them every tick is the
  * point of the reaction cadence. **Wheel and upgrade-panel presses are not.**
  * They are one-shot by contract (`@shared/types`: "acted on for the tick it

@@ -174,7 +174,7 @@ describe('record and replay', () => {
 
 describe('QA probe strategies', () => {
   it('every probe emits only ratified actions (GDD §2.4)', () => {
-    const verbs = new Set(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'upgradeOrder', 'boost', 'ping']);
+    const verbs = new Set(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'upgradeOrder']);
     const seen = new Set<string>();
     for (const id of STRATEGY_IDS) {
       const setup = { seed: 2, lineup: mirrorLineup(id, ShipClass.Vanguard) };

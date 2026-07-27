@@ -28,10 +28,12 @@ import {
   killShip,
   spawnWave,
   step,
+  MAPS,
   WAVE_COUNT,
   WORLD_EDGE_MARGIN,
   WORLD_SIZE,
   clampToMargin,
+  type MapDef,
   type PlayerSpec,
   type World,
 } from '../../src/sim';
@@ -136,6 +138,24 @@ describe('nothing spawns within WORLD_EDGE_MARGIN of the bounds (field report P1
     killShip(world, ship);
     expect(world.chunks.length).toBeGreaterThan(0);
     assertAllInsideMargin(world, 'ship death at the corner');
+  });
+});
+
+// --- the clearance holds on every map, at every N (Milestone B) ------------
+
+describe.each(MAPS)('map "$id" spawns nothing on the wall, at any N', (map: MapDef) => {
+  it('holds for every seed × lobby size — planets, ships, home fields, derelict debris, commons', () => {
+    // Variable N: octagon/oval regenerate N homes; compass/diamond keep all eight
+    // positions with the extras as derelict wrecks whose lootable debris also rings
+    // outboard — every one of those bodies must clear `WORLD_EDGE_MARGIN` too.
+    for (const seed of SEEDS) {
+      for (const n of COUNTS) {
+        const world = createWorld({ seed, players: players(n), mapId: map.id });
+        assertAllInsideMargin(world, `${map.id} seed ${seed} × ${n} @ construction`);
+        for (let w = world.match.wavesSpawned; w < WAVE_COUNT; w++) spawnWave(world);
+        assertAllInsideMargin(world, `${map.id} seed ${seed} × ${n} @ full field`);
+      }
+    }
   });
 });
 

@@ -146,6 +146,9 @@ export class LocalLoopback implements Transport, LocalAuthority {
       player: spec.id,
       isBot: spec.id !== this.you,
       shipClass: spec.shipClass,
+      // FFA teams-of-one unless the config already grouped allies (variable-slots
+      // Task C4); mirrors the server so offline and online carry the same shape.
+      team: spec.team ?? spec.id,
       ready: true,
     }));
   }
@@ -235,7 +238,11 @@ export class LocalLoopback implements Transport, LocalAuthority {
     if (this.authoritative || this.connection !== 'open') return;
     // RUSH! — the world is built from the lobby as it stands, so a ship class
     // picked a moment ago is the hull that spawns.
-    const players = this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass }));
+    const players = this.slots.map((slot) => ({
+      id: slot.player,
+      shipClass: slot.shipClass,
+      ...(slot.team !== undefined ? { team: slot.team } : {}),
+    }));
     this.authoritative = createWorld({ ...this.config.match, players });
     // The same arguments the world was just built from. Offline nobody needs
     // them — the client reads this very world — but the protocol is the protocol
@@ -244,7 +251,11 @@ export class LocalLoopback implements Transport, LocalAuthority {
       type: 'matchStart',
       tick: this.authoritative.tick,
       seed: this.config.match.seed,
-      slots: players.map((spec) => ({ player: spec.id, shipClass: spec.shipClass })),
+      slots: players.map((spec) => ({
+        player: spec.id,
+        shipClass: spec.shipClass,
+        ...(spec.team !== undefined ? { team: spec.team } : {}),
+      })),
       ...(this.config.match.bounds ? { bounds: { ...this.config.match.bounds } } : {}),
       ...(this.config.match.asteroidCount !== undefined
         ? { asteroidCount: this.config.match.asteroidCount }

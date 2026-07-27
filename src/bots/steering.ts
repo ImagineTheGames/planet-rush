@@ -23,7 +23,7 @@
  *     a beginner can beat.
  */
 
-import type { Action, AimAction, BoostAction, FireAction, PlayerId, Rng, ThrustAction, Vec2 } from '@shared/types';
+import type { Action, AimAction, FireAction, PlayerId, Rng, ThrustAction, Vec2 } from '@shared/types';
 import { BASE_SPEED, WEAPON_RANGE, leadAim, SHIP_RADIUS, SHIP_STATS, shipProjectileSpeed } from '../sim';
 import type { SelfView } from './perception';
 
@@ -97,11 +97,6 @@ export function aim(dir: Vec2): AimAction {
 /** Hold (or release) the trigger. Bots always fly Manual — see the module note. */
 export function fire(active: boolean): FireAction {
   return { type: 'fire', active, auto: false };
-}
-
-/** Boost (GDD §2.4). */
-export function boost(active: boolean): BoostAction {
-  return { type: 'boost', active };
 }
 
 /** Sticks centred, trigger up: the neutral stream every idle branch emits. */

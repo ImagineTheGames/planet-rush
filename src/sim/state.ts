@@ -27,6 +27,7 @@ import {
   WAVE,
 } from './constants';
 import { getMap } from './maps';
+import { scatterDerelictLoot } from './match';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
 
@@ -172,6 +173,28 @@ export interface OreChunk {
 
 /** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
  *  the ship defends"). Cheap, killable, and a shot target in its own right. */
+/**
+ * A turret's committed intercept aim, re-solved on a tier cadence (turret-lead
+ * field report v0.2.4). Plain, serializable, hashable scratch that lives on the
+ * {@link Turret}; the sim's `updateTurrets` reads and rewrites it. Mirrors the
+ * bot `AimTrack`, but for a world entity rather than a per-brain closure.
+ */
+export interface TurretAim {
+  /** The (possibly stale) target velocity the intercept lead is solved from —
+   *  re-sampled only every `aimLatency` seconds, so a mover is led where it was
+   *  last seen going. */
+  vel: Vec2;
+  /** The committed angular error (radians) added to the lead bearing, redrawn
+   *  from the seeded RNG at each re-sample — the deviance the field report asks
+   *  for, tier-scaled by `aimSpread`. */
+  error: number;
+  /** Sim time (`world.time`) `vel` and `error` were adopted. */
+  since: number;
+  /** The target slot the commit belongs to; a change re-solves immediately (you
+   *  read a fresh threat's motion the moment you swing onto it). */
+  targetId: PlayerId;
+}
+
 export interface Turret {
   readonly id: number;
   /** The planet owner's slot — turrets never shoot their own fleet. */
@@ -223,6 +246,24 @@ export interface Turret {
   tier?: number;
   /** Ship it is tracking this tick, or null when nothing is in range. */
   targetId: PlayerId | null;
+  /**
+   * The turret's committed aim solution — the lead-and-deviance model's scratch
+   * (turret-lead field report v0.2.4). A turret no longer fires at where the
+   * enemy *is*: it solves an intercept lead (`leadAim`) with a seeded angular
+   * error on top, and — the half that makes a strafing attacker dodge — it
+   * re-samples the target's velocity only every tier `aimLatency` seconds. This
+   * holds the velocity and error it committed to between those re-samples, so a
+   * juking target is led where it *was* going. The world entity equivalent of the
+   * bots' per-brain {@link ../bots AimTrack}; a turret is world state, so its aim
+   * scratch has to live on the turret to persist across ticks and stay hashable.
+   *
+   * `null` when the turret is not currently leading anything (no target, or not
+   * yet committed). Optional so the turret literals other agents build (render
+   * tells, netcode reconstruction, bot fixtures) keep compiling — same
+   * backward-compatible discipline as `orbitAngle` / `tier` / `muzzle`; a turret
+   * with no `aim` simply re-commits from scratch the next tick it fires.
+   */
+  aim?: TurretAim | null;
   /**
    * Muzzle-flash geometry for the tick this turret actually loosed a shot, else
    * `null` (GDD §2.6, §4.1). A turret's damage rides a pooled projectile, but its
@@ -282,6 +323,19 @@ export interface Planet {
    * FFA. Static config, never on the per-tick snapshot (spike Trap 7).
    */
   team?: number;
+  /**
+   * True for a **derelict** — an unowned wreck the map lays out to keep its
+   * shape at a small N (the derelict-fill maps `compass`/`diamond`, ratified
+   * 2026-07-26, Milestone B). A derelict is born a wreck: `alive === false` from
+   * construction, no owning ship, no home field, its `owner`/`team` a board index
+   * beyond the live roster (`>= N`) that nobody shares — so every combat path
+   * ignores it exactly as it ignores a killed home (a dead core takes no damage,
+   * has no turrets, and is never auto-aimed). Its lootable debris is scattered at
+   * world-build like any wreck's (GDD §2.7). Optional and absent on live homes,
+   * the same backward-compatible discipline as `team`; never on the per-tick
+   * snapshot (static match layout — the client rebuilds it from map + roster).
+   */
+  derelict?: boolean;
   /** Static — planets do not move. */
   pos: Vec2;
   radius: number;
@@ -357,7 +411,7 @@ export interface Projectile {
    * What fired this shot (design amendment v0.2): a `'ship'` weapon projectile or
    * a `'turret'` defensive shot. Both fly and die the same way; the difference is
    * the target list — a ship shot is siege-capable (it collides with enemy ships,
-   * turrets, shields and cores), a turret shot hits only enemy ships, keeping
+   * turrets, shields and cores), a turret shot hits only enemy ships, holding
    * p1-14's turret behaviour intact. It also lets the snapshot tint the two shots
    * apart in the reserved `meta` bits, and the renderer size them differently.
    *
@@ -555,6 +609,40 @@ function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): 
   };
 }
 
+/**
+ * Build a **derelict wreck** at an unused board position (the derelict-fill maps,
+ * Milestone B). It is born dead — `alive: false`, `coreHp: 0`, `deathTime: 0` —
+ * so every combat path treats it exactly like a home whose core was destroyed:
+ * `damagePlanet`/siege collision/auto-aim all skip a dead core, and it carries no
+ * turrets, shields, or builds to defend or lose. `owner`/`team` are its board
+ * index, which is `>= N` (the live roster is the dense `0..N-1`), so no ship
+ * shares them and `areEnemies` reads it as everyone's foe — harmless, since a
+ * dead core is untargetable regardless. Its lootable debris is scattered
+ * separately at world-build (`scatterDerelictLoot`).
+ */
+function makeDerelictPlanet(index: number, pos: Vec2, angle: number): Planet {
+  return {
+    id: index,
+    owner: index,
+    team: index,
+    derelict: true,
+    pos: { x: pos.x, y: pos.y },
+    radius: PLANET.radius,
+    coreHp: 0,
+    maxCoreHp: CORE_HP,
+    alive: false,
+    deathTime: 0,
+    spawnProtect: 0,
+    angle,
+    sinceDamage: SHIELD.regenDelay,
+    repairing: false,
+    repairCooldown: 0,
+    turrets: [],
+    shields: [],
+    builds: [],
+  };
+}
+
 /** A fresh match's clock: nothing has spawned, collapsed, or been won yet. */
 function initialMatch(): MatchState {
   return {
@@ -593,21 +681,37 @@ export function createWorld(config: WorldConfig): World {
   // scatter below, not the layout. NOTHING hugs the wall — each map sizes its
   // outermost planets to clear the bounds by `WORLD_EDGE_MARGIN` (field report
   // P1), and the spawners clamp everything else through the same margin.
+  // A map returns one placement per board position: exactly `N` live homes for a
+  // regenerate map (`octagon`/`oval`), or all eight for a derelict-fill map
+  // (`compass`/`diamond`) with the `8-N` unused ones marked derelict. The live
+  // homes come first, so they line up with the dense `0..N-1` player roster.
   const placements = map.planets(config.seed, config.players.length, bounds);
+  const homes = placements.filter((p) => !p.derelict);
 
-  // Ships spawn orbiting their planet, one per lobby slot — deterministic, no RNG.
+  // Ships spawn orbiting their live home, one per lobby slot — deterministic, no
+  // RNG. Derelict positions carry no ship.
   const ships: Ship[] = config.players.map((spec, i) => {
-    const pos = placements[i]!.ship;
+    const pos = homes[i]!.ship;
     const ship = makeShip(spec, pos);
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
     return ship;
   });
 
-  // One home planet per slot, on the same spoke as its ship, outboard of it.
-  const planets: Planet[] = config.players.map((spec, i) => {
-    const place = placements[i]!;
-    return makePlanet(spec, i, place.planet, place.angle);
+  // A planet per board position: a live home for each player (on the same spoke
+  // as its ship, outboard of it), and an unowned wreck for each derelict position
+  // — so the layout keeps its shape at any N. The planet's array index is its
+  // board id; live homes take ids `0..N-1` (actives are first), matching each
+  // owner id, and derelicts take the remaining ids `>= N`.
+  const planets: Planet[] = [];
+  let liveIndex = 0;
+  placements.forEach((place, index) => {
+    if (place.derelict) {
+      planets.push(makeDerelictPlanet(index, place.planet, place.angle));
+    } else {
+      planets.push(makePlanet(config.players[liveIndex]!, index, place.planet, place.angle));
+      liveIndex++;
+    }
   });
 
   const world: World = {
@@ -636,5 +740,10 @@ export function createWorld(config: WorldConfig): World {
   // and the rock that lands at t=600 come from one code path (`./waves`).
   spawnHomeFields(world);
   spawnWave(world);
+  // Derelict wrecks are lootable (GDD §2.7, ratified 2026-07-26): each scatters a
+  // ring of scavengeable debris at construction, the same burst a home leaves
+  // when its core dies. Done after the fair field so the home + commons asteroid
+  // ids are stamped first and unaffected by how many derelicts a map carries.
+  scatterDerelictLoot(world);
   return world;
 }

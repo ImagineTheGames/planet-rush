@@ -1,0 +1,213 @@
+{
+  "close": {
+    "staged": {
+      "owner": 1,
+      "name": "Rusty",
+      "difficulty": "easy"
+    },
+    "difficulties": [
+      null,
+      "easy",
+      "easy",
+      "medium",
+      "medium",
+      "hard",
+      "hard",
+      "hard"
+    ],
+    "plates": [
+      {
+        "owner": 1,
+        "kind": "ship",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 570,
+        "y": 137
+      },
+      {
+        "owner": 0,
+        "kind": "planet",
+        "text": "YOU",
+        "suffix": "",
+        "local": false,
+        "x": 546,
+        "y": 213
+      },
+      {
+        "owner": 1,
+        "kind": "planet",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 570,
+        "y": 353
+      }
+    ]
+  },
+  "ladder": {
+    "staged": {
+      "ship": {
+        "x": 1200,
+        "y": 1200
+      },
+      "bot": {
+        "x": 1340,
+        "y": 1200
+      },
+      "botId": 1
+    },
+    "difficulties": [
+      null,
+      "easy",
+      "easy",
+      "medium",
+      "medium",
+      "hard",
+      "hard",
+      "hard"
+    ],
+    "tiers": [
+      "(EASY)",
+      "(MEDIUM)",
+      "(HARD)"
+    ],
+    "plates": [
+      {
+        "owner": 1,
+        "kind": "ship",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 1100,
+        "y": 957
+      },
+      {
+        "owner": 2,
+        "kind": "ship",
+        "text": "Bolt",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 1005,
+        "y": 1618
+      },
+      {
+        "owner": 3,
+        "kind": "ship",
+        "text": "Foreman",
+        "suffix": "(MEDIUM)",
+        "local": false,
+        "x": 523,
+        "y": 1440
+      },
+      {
+        "owner": 4,
+        "kind": "ship",
+        "text": "Patch",
+        "suffix": "(MEDIUM)",
+        "local": false,
+        "x": 308,
+        "y": 961
+      },
+      {
+        "owner": 5,
+        "kind": "ship",
+        "text": "Sable",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 537,
+        "y": 501
+      },
+      {
+        "owner": 6,
+        "kind": "ship",
+        "text": "Vulture",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 996,
+        "y": 285
+      },
+      {
+        "owner": 7,
+        "kind": "ship",
+        "text": "Warden",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 1475,
+        "y": 476
+      },
+      {
+        "owner": 0,
+        "kind": "planet",
+        "text": "YOU",
+        "suffix": "",
+        "local": false,
+        "x": 1864,
+        "y": 913
+      },
+      {
+        "owner": 1,
+        "kind": "planet",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 1611,
+        "y": 1524
+      },
+      {
+        "owner": 2,
+        "kind": "planet",
+        "text": "Bolt",
+        "suffix": "(EASY)",
+        "local": false,
+        "x": 1000,
+        "y": 1777
+      },
+      {
+        "owner": 3,
+        "kind": "planet",
+        "text": "Foreman",
+        "suffix": "(MEDIUM)",
+        "local": false,
+        "x": 389,
+        "y": 1524
+      },
+      {
+        "owner": 4,
+        "kind": "planet",
+        "text": "Patch",
+        "suffix": "(MEDIUM)",
+        "local": false,
+        "x": 136,
+        "y": 913
+      },
+      {
+        "owner": 5,
+        "kind": "planet",
+        "text": "Sable",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 389,
+        "y": 302
+      },
+      {
+        "owner": 6,
+        "kind": "planet",
+        "text": "Vulture",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 1000,
+        "y": 49
+      },
+      {
+        "owner": 7,
+        "kind": "planet",
+        "text": "Warden",
+        "suffix": "(HARD)",
+        "local": false,
+        "x": 1611,
+        "y": 302
+      }
+    ]
+  }
+}

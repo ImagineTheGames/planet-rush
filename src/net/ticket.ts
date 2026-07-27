@@ -44,6 +44,24 @@ export interface TicketClaims {
    * argument. This module reads no clock of its own.
    */
   readonly expiresAt: number;
+  /**
+   * The requested match size (N, 2..8) for a *new* room, signed so the Machine
+   * can trust it (variable-slots Task C1). A room is created by the first `join`
+   * that reaches its code, so the size the allocator was asked for has to ride
+   * to the Machine somehow; the ticket is the one channel a client cannot forge,
+   * which is exactly why the room→Machine binding already lives here. Absent on a
+   * plain join (the room exists, its size is set) and on the solo/self-hosted
+   * path (no allocator signs a ticket), where the Machine falls back to its
+   * process default.
+   */
+  readonly size?: number;
+  /**
+   * The requested match mode (`'ffa' | 'teams'`) for a *new* room, carried for
+   * the same reason and on the same terms as {@link TicketClaims.size}. Typed as
+   * a bare string here to keep this module below the sim layer that owns the
+   * `MatchMode` union (`src/sim/match-config.ts`); the Machine narrows it.
+   */
+  readonly mode?: string;
 }
 
 /**
@@ -96,10 +114,15 @@ export function verifyTicket(ticket: string, secret: string, nowMs: number): Tic
   return claims;
 }
 
-/** Structural check on a decoded, signature-verified payload. */
+/** Structural check on a decoded, signature-verified payload. The optional room
+ *  config (`size`/`mode`, variable-slots Task C1) is validated only for *type*
+ *  when present — the payload's authenticity is already proven by the signature,
+ *  so this guards against a malformed field, not a hostile one. */
 function isTicketClaims(value: unknown): value is TicketClaims {
   if (typeof value !== 'object' || value === null) return false;
   const c = value as Record<string, unknown>;
+  if (c.size !== undefined && (typeof c.size !== 'number' || !Number.isFinite(c.size))) return false;
+  if (c.mode !== undefined && typeof c.mode !== 'string') return false;
   return (
     typeof c.room === 'string' &&
     typeof c.machine === 'string' &&

@@ -87,7 +87,7 @@ describe('harness — the action stream', () => {
       // human, which is the one thing this module may never be.
       expect(row.actions.length).toBeGreaterThan(0);
       for (const a of row.actions) {
-        expect(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'upgradeOrder', 'boost', 'ping']).toContain(a.type);
+        expect(['thrust', 'aim', 'fire', 'build', 'buildOrder', 'upgradeOrder']).toContain(a.type);
       }
       // Every stream steers and states its trigger, so a held stream is a
       // complete control state rather than a delta.

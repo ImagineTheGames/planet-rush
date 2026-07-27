@@ -94,7 +94,7 @@ export const TURRET = {
   /** Seconds between shots. Per-shot damage = `dps * fireInterval` = 2. */
   fireInterval: 0.5,
   /** Projectile muzzle speed (units/s) — fast enough that lead is small at
-   *  `range`, slow enough that a boosting ship can outrun a stale shot. */
+   *  `range`, slow enough that a fast ship can outrun a stale shot. */
   projectileSpeed: 700,
   /** Turret collision radius (it is a shot target — GDD §2.6 "turrets deter"). */
   radius: 12,
@@ -174,7 +174,7 @@ export const PROJECTILE = {
  * owned by QA from M2 on (GDD §2.8); a balance pass may widen or flatten the
  * ladder, but the range rail is a design invariant, not a tuning knob.
  *
- * `upgradeCost` is the ore price of stepping *into* this tier from the one below
+ * `upgradeCost` is the ore price of advancing *into* this tier from the one below
  * — `null` for Mk I, which is *built* (`TURRET.cost`), never upgraded into.
  * `label` is the art agent's key for a distinct visual tell per tier (its
  * follow-up); the sim only needs it to be a stable per-tier name.
@@ -193,6 +193,28 @@ export interface TurretTierSpec {
   readonly upgradeCost: number | null;
   /** Stable per-tier name — the art agent's key for a distinct tell. */
   readonly label: string;
+  /**
+   * **Aim deviance** (turret-lead field report v0.2.4). The half-width of the
+   * seeded angular error, radians, drawn once per re-aim and added to the
+   * intercept bearing — the ship's aim model (p5-01), given to the turret so
+   * "upgrading a turret buys accuracy" has felt meaning. Tier-scaled: **Mk I
+   * loosest, Mk III tightest**. Kept small relative to a hull's angular size at
+   * engagement range, so spread alone rarely misses a *stationary* target (it is
+   * the re-aim lag, {@link aimLatency}, that makes a moving one dodge — a still
+   * one is hit near-always at every tier). TUNABLE
+   */
+  readonly aimSpread: number;
+  /**
+   * **Re-aim latency** (turret-lead field report v0.2.4), seconds. The turret
+   * re-solves its intercept lead from a fresh target-velocity sample only this
+   * often; between samples it keeps the velocity it committed to, so a target
+   * that curves or reverses inside the window is led *where it was going* and the
+   * shot goes wide — the mechanism that lets a smart orbiter evade (mirrors the
+   * bot `aimLatency` / `trackAimVelocity`). Tier-scaled: **Mk I slowest to
+   * re-read, Mk III fastest**, so a higher Mk tracks a mover far better. Never
+   * `0` — that would restore the pre-lead aimbot. TUNABLE
+   */
+  readonly aimLatency: number;
 }
 
 /**
@@ -205,9 +227,9 @@ export interface TurretTierSpec {
  * of last resort"). All `TUNABLE`. TUNABLE
  */
 export const TURRET_TIERS: readonly TurretTierSpec[] = [
-  { hp: TURRET.hp, dps: TURRET.dps, range: TURRET.range, fireInterval: TURRET.fireInterval, upgradeCost: null, label: 'Mk I' },
-  { hp: 45, dps: 6, range: 245, fireInterval: 0.45, upgradeCost: 4, label: 'Mk II' },
-  { hp: 60, dps: 8, range: 250, fireInterval: 0.4, upgradeCost: 7, label: 'Mk III' },
+  { hp: TURRET.hp, dps: TURRET.dps, range: TURRET.range, fireInterval: TURRET.fireInterval, upgradeCost: null, label: 'Mk I', aimSpread: 0.06, aimLatency: 1.2 },
+  { hp: 45, dps: 6, range: 245, fireInterval: 0.45, upgradeCost: 4, label: 'Mk II', aimSpread: 0.04, aimLatency: 0.75 },
+  { hp: 60, dps: 8, range: 250, fireInterval: 0.4, upgradeCost: 7, label: 'Mk III', aimSpread: 0.025, aimLatency: 0.45 },
 ] as const;
 
 /** Highest turret tier index — the top of the ladder (`Mk III` at length-1). */
@@ -260,7 +282,7 @@ export const SHIP_WEAPON = {
    * 260-unit combat range in 0.5 s, in which a Vanguard strafing at full speed
    * (260 u/s) slides ~130 u sideways — far past a ship+shot radius, so the dodge
    * is real (`projectiles.test.ts`). Fast enough that a committed attacker who
-   * closes the range still lands hits; slow enough that a boosting ship outruns a
+   * closes the range still lands hits; slow enough that a fast ship outruns a
    * stale shot. Scaled up by the dedicated SPEED upgrade track
    * (`SHOT_SPEED_STEPS`, read through `shipProjectileSpeed`) — "add upgrades to
    * make them faster, stronger" split into its two ratified tracks: SPEED buys
@@ -320,7 +342,7 @@ export const PROJECTILE_CORE_FACTOR: Tunable<number> = WEAPON_DPS_CORE / WEAPON_
  * **mining is shooting now** (ratified amendment v0.3, `docs/design-amendments.md`:
  * "the mining laser should go away, it should be a projectile as well"). The
  * segment-vs-circle mining laser is gone; a projectile hit chips ore chunks, and
- * the tractor rules (GDD §2.3) are unchanged — only the chipping mechanism did.
+ * the tractor rules (GDD §2.3) are unchanged — only the way a rock is chipped did.
  *
  * This is the Vanguard baseline; a class's actual per-hit yield scales by its
  * power stat (`shipMineYield`), exactly as the old continuous mining rate did —
@@ -371,7 +393,7 @@ export const REPAIR_ORE_COST: Tunable<number> = 1;
  * always lets a tap buy a discrete repair, so "5 taps = 5 purchases" holds — it
  * only PACES an AI defender, which reads `!repairing` to decide when to buy its
  * next repair. Set to `REPAIR_HP_PER_ORE / 2` so a bot files one 15-HP purchase
- * per hold, i.e. the ~2 HP/s cadence of the retired repair channel — keeping bot
+ * per hold, i.e. the ~2 HP/s cadence of the retired repair channel — holding bot
  * repair economics (and the collapse-phase balance that hangs off them) steady
  * across the discrete-repair amendment. TUNABLE.
  */
@@ -534,7 +556,7 @@ export const RESOURCE_FIELD = {
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
    *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
   commonsSpokeGap: 0.33,
-  /** Canonical rocks per home field (before `N`-fold stamping). TUNABLE */
+  /** Canonical rocks per home field (before the `N`-fold stamp). TUNABLE */
   homeCount: 3,
   /**
    * Home-field centre-radius band, as fractions of the planet ring radius:
@@ -813,7 +835,7 @@ export interface UpgradeTrackSpec {
   /**
    * Tracks the UI draws together as one nested sub-wheel (RATIFIED v0.2.2: DAMAGE
    * and SPEED are the **WEAPON** group). `undefined` is a standalone wedge. The
-   * grouping is metadata the sim owns; the p4-10 UI renders it, so grouping is
+   * group is metadata the sim owns; the p4-10 UI renders it, so the group is
    * data, not layout.
    */
   readonly group?: string;
@@ -949,10 +971,6 @@ export const FACE_VELOCITY_MIN_SPEED: Tunable<number> = 12;
  *  `BASE_ACCEL`/`BASE_SPEED` this also caps terminal velocity; the sim clamps
  *  to top speed as well so drag tuning never changes the ceiling. TUNABLE */
 export const DRAG: Tunable<number> = 3.0;
-
-/** Boost multiplier applied to top speed and acceleration while held
- *  (GDD §2.4 boost). TUNABLE */
-export const BOOST_MULTIPLIER: Tunable<number> = 1.6;
 
 /** Ship collision radius (world units). TUNABLE */
 export const SHIP_RADIUS: Tunable<number> = 16;

@@ -40,7 +40,6 @@ import type { Action, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/ty
 import {
   ASTEROID,
   WEAPON_RANGE,
-  BOOST_MULTIPLIER,
   CHUNK,
   DEPOSIT,
   DRAG,
@@ -58,6 +57,7 @@ import {
   inAtmosphere,
   placeOrder,
   planetOf,
+  planetTargetRadius,
   sweepDeadTurrets,
   updatePlanets,
   updateTurrets,
@@ -97,7 +97,6 @@ interface Intent {
   aim: Vec2 | null;
   fire: boolean;
   auto: boolean;
-  boost: boolean;
   /** Wheel presses this tick, in the order they arrived. Unlike the held verbs
    *  these accumulate: two presses in one tick are two orders (GDD §2.5). */
   orders: BuildItem[];
@@ -112,7 +111,6 @@ const NO_INTENT: Intent = {
   aim: null,
   fire: false,
   auto: false,
-  boost: false,
   orders: NO_ORDERS,
   upgrades: NO_UPGRADES,
 };
@@ -125,7 +123,6 @@ function resolveIntent(actions: readonly Action[]): Intent {
     aim: null,
     fire: false,
     auto: false,
-    boost: false,
     orders: NO_ORDERS,
     upgrades: NO_UPGRADES,
   };
@@ -141,9 +138,6 @@ function resolveIntent(actions: readonly Action[]): Intent {
         intent.fire = a.active;
         intent.auto = a.auto;
         break;
-      case 'boost':
-        intent.boost = a.active;
-        break;
       case 'buildOrder':
         // Allocate the list only for the rare tick that carries an order.
         if (intent.orders === NO_ORDERS) intent.orders = [];
@@ -154,9 +148,8 @@ function resolveIntent(actions: readonly Action[]): Intent {
         intent.upgrades.push(a.track);
         break;
       case 'build':
-      case 'ping':
-        // Opening the wheel and pinging the minimap are UI-side; the sim acts
-        // only on the confirmed order (`buildOrder`).
+        // Opening the wheel is UI-side; the sim acts only on the confirmed
+        // order (`buildOrder`).
         break;
     }
   }
@@ -254,7 +247,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     const ship = world.ships[i]!;
     if (!ship.alive) continue;
     const intent = intents[i]!;
-    if (intent.fire && intent.auto) autoTargets[i] = acquireNearest(world, ship);
+    if (intent.fire && intent.auto) autoTargets[i] = acquireAimTarget(world, ship);
     resolveFacing(world, ship, intent, autoTargets[i]!, dt);
   }
 
@@ -268,7 +261,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   }
 
   // 8. Turrets acquire, track, and fire; every shot — ship weapon and turret
-  //    alike — then flies and lands, chipping a rock or biting a hull (GDD §2.6).
+  //    alike — then flies and lands to chip a rock or bite a hull (GDD §2.6).
   //    After the ship fire step, so a turret killed this tick does not also get a
   //    shot off, and a ship shot fired this tick advances and can strike this
   //    tick. The asteroid broad phase (`hash`) narrows each shot's rock test.
@@ -314,9 +307,8 @@ function intentFor(id: PlayerId, inputs: Inputs): Intent {
 function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds']): void {
   // Class base × engine tier (GDD §2.11, §2.5) — resolved in `./upgrades`, so the
   // hull a player picked and the ore they spent on it arrive as one number.
-  const boost = intent.boost ? BOOST_MULTIPLIER : 1;
-  const accel = shipAccel(ship) * boost;
-  const maxSpeed = shipTopSpeed(ship) * boost;
+  const accel = shipAccel(ship);
+  const maxSpeed = shipTopSpeed(ship);
 
   // Thrust adds acceleration in the (analog-scaled) thrust direction.
   ship.vel.x += intent.thrust.x * accel * dt;
@@ -443,14 +435,14 @@ function reflectOffPlanets(ship: Ship, world: World): void {
   }
 }
 
-/** Push a ship out of an overlapping circle and reflect the normal component of
+/** Push a ship out of an intersecting circle and reflect the normal component of
  *  its velocity. No sqrt until a contact is confirmed. */
 function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
   const rr = ship.radius + radius;
   const d2 = dist2(ship.pos, center);
   if (d2 >= rr * rr) return;
 
-  // Overlapping: separate along the contact normal and reflect velocity.
+  // Intersecting: separate along the contact normal and reflect velocity.
   const d = Math.sqrt(d2);
   const nx = d > 1e-9 ? (ship.pos.x - center.x) / d : 1;
   const ny = d > 1e-9 ? (ship.pos.y - center.y) / d : 0;
@@ -552,37 +544,52 @@ function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
 }
 
 /**
- * Nearest valid target whose center is within engagement range — asteroid, enemy
- * ship, enemy turret, or enemy planet, checked across the full 360° with no
- * front arc (GDD §2.4). Your own planet and your own turrets are never targets:
- * a shot passes over your home.
+ * The auto-aim target this tick, by the ratified priority ladder (developer, p8:
+ * "if I'm near asteroids it should still target the closest enemy in line of
+ * sight"). A hittable enemy ALWAYS outranks a rock:
+ *
+ *   TIER 1 — the closest **hittable enemy** (ship, turret, or core): an enemy per
+ *     the same friend/foe + spawn-protection predicates the shot obeys, with a
+ *     clear line of sight (a planet body or an asteroid across the path eats the
+ *     shot, so it is not hittable — GDD §2.4 "you cannot shoot through things").
+ *   TIER 2 — only when no enemy is hittable, the closest **asteroid** (mining).
+ *
+ * "Near a rock with an enemy on screen" therefore always shoots the enemy; a rock
+ * is mined only when the field is otherwise empty of reachable foes.
  */
-function acquireNearest(world: World, ship: Ship): AimTarget | null {
+function acquireAimTarget(world: World, ship: Ship): AimTarget | null {
+  return acquireEnemy(world, ship) ?? acquireAsteroid(world, ship);
+}
+
+/**
+ * TIER 1 — the closest enemy ship, turret, or core within engagement range whose
+ * line of sight is clear, across the full 360° with no front arc (GDD §2.4). Your
+ * own/allied fleet and home are never targets (`areEnemies`); a spawn-protected
+ * ship or core is skipped exactly as a shot passes over it (the projectile
+ * collision skips both, GDD §2.1) — acquiring one would aim auto-fire at an
+ * invulnerable hull with no tell (field report "some ships would not take damage
+ * from me") and lock off a live enemy beside it. An occluded enemy is skipped for
+ * the same reason: the shot would die on the rock or planet in the way, so the
+ * closest *unblocked* enemy is the one the ladder engages.
+ *
+ * Hittability is not a second rule set: it reuses the collision/protection
+ * predicates (`areEnemies`, spawn protection, `planetTargetRadius`) so the aimer
+ * and the shot can never disagree about what can be struck.
+ */
+function acquireEnemy(world: World, ship: Ship): AimTarget | null {
   let best: AimTarget | null = null;
   let bestD2 = WEAPON_RANGE * WEAPON_RANGE;
-  for (let i = 0; i < world.asteroids.length; i++) {
-    const a = world.asteroids[i]!;
-    const d2 = dist2(ship.pos, a.pos);
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      best = { kind: 'asteroid', index: i };
-    }
-  }
+
   for (let i = 0; i < world.ships.length; i++) {
     const t = world.ships[i]!;
-    // A spawn-protected ship is not a target at all — a shot passes over it,
-    // exactly as it passes over a spawn-protected core (the projectile collision
-    // skips both, GDD §2.1). Acquiring it would aim auto-fire at an invulnerable
-    // hull that takes zero damage with no tell (field report: "some ships would
-    // not take damage from me"), and worse, auto-aim would lock onto it instead
-    // of a live enemy standing right beside it.
     if (!areEnemies(world, ship.id, t.id) || !t.alive || t.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, t.pos);
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      best = { kind: 'ship', index: i };
-    }
+    if (d2 >= bestD2) continue;
+    if (losBlocked(world, ship.pos, t.pos)) continue;
+    bestD2 = d2;
+    best = { kind: 'ship', index: i };
   }
+
   for (let p = 0; p < world.planets.length; p++) {
     const planet = world.planets[p]!;
     if (!areEnemies(world, ship.id, planet.owner)) continue;
@@ -590,19 +597,82 @@ function acquireNearest(world: World, ship: Ship): AimTarget | null {
       const turret = planet.turrets[i]!;
       if (turret.hp <= 0) continue;
       const d2 = dist2(ship.pos, turret.pos);
-      if (d2 < bestD2) {
-        bestD2 = d2;
-        best = { kind: 'turret', planet: p, index: i };
-      }
+      if (d2 >= bestD2) continue;
+      if (losBlocked(world, ship.pos, turret.pos)) continue;
+      bestD2 = d2;
+      best = { kind: 'turret', planet: p, index: i };
     }
     if (!planet.alive || planet.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, planet.pos);
+    if (d2 >= bestD2) continue;
+    if (losBlocked(world, ship.pos, planet.pos)) continue;
+    bestD2 = d2;
+    best = { kind: 'planet', planet: p };
+  }
+  return best;
+}
+
+/**
+ * TIER 2 — the closest asteroid whose center is within engagement range (mining),
+ * taken only when no enemy is hittable. No line-of-sight test: the auto-aim shot
+ * aims at the nearest rock, and whatever rock the shot reaches first is the one it
+ * mines, so "closest" is always a rock worth firing at.
+ */
+function acquireAsteroid(world: World, ship: Ship): AimTarget | null {
+  let best: AimTarget | null = null;
+  let bestD2 = WEAPON_RANGE * WEAPON_RANGE;
+  for (let i = 0; i < world.asteroids.length; i++) {
+    const d2 = dist2(ship.pos, world.asteroids[i]!.pos);
     if (d2 < bestD2) {
       bestD2 = d2;
-      best = { kind: 'planet', planet: p };
+      best = { kind: 'asteroid', index: i };
     }
   }
   return best;
+}
+
+/**
+ * Whether a straight shot from `from` to `to` is eaten before it arrives — "you
+ * cannot shoot through things" (GDD §2.4, amendment v0.3) applied to acquisition,
+ * so auto-aim never locks an enemy a shot could not actually reach. A blocker is
+ * an **asteroid** or a **planet body** (its shield/core surface — the same
+ * `planetTargetRadius` the projectile collides against) whose center's closest
+ * approach falls strictly *between* the endpoints and within its radius.
+ *
+ * Enemy ships are never blockers: the ladder already picks the closest enemy, so a
+ * nearer enemy never has to hide a farther one. A planet the segment ends *on* (an
+ * enemy core, whose aim point is the planet center) is not self-occluding — its
+ * closest approach is the endpoint (t == 1), outside the open interval — so a core
+ * stays hittable while a body squarely across the path does not.
+ */
+function losBlocked(world: World, from: Vec2, to: Vec2): boolean {
+  for (const a of world.asteroids) {
+    if (segmentCrossesCircle(from, to, a.pos, a.radius)) return true;
+  }
+  for (const planet of world.planets) {
+    if (segmentCrossesCircle(from, to, planet.pos, planetTargetRadius(planet))) return true;
+  }
+  return false;
+}
+
+/**
+ * True when circle (`c`, `r`) crosses the open interior of segment `from`→`to` —
+ * the analytic form of "a shot fired down this segment strikes the circle before
+ * the far endpoint". The closest approach is at parameter `t` along the segment;
+ * only a strictly-interior approach (0 < t < 1) within `r` counts, so a body at or
+ * beyond either endpoint is not a blocker. Squared throughout, one guarded
+ * division (a zero-length segment never blocks) — deterministic, no sqrt.
+ */
+function segmentCrossesCircle(from: Vec2, to: Vec2, c: Vec2, r: number): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const seg2 = dx * dx + dy * dy;
+  if (seg2 < 1e-9) return false;
+  const t = ((c.x - from.x) * dx + (c.y - from.y) * dy) / seg2;
+  if (t <= 0 || t >= 1) return false;
+  const px = from.x + t * dx - c.x;
+  const py = from.y + t * dy - c.y;
+  return px * px + py * py <= r * r;
 }
 
 /** Center of whatever a shot's target resolved to. */
@@ -645,7 +715,7 @@ function updateChunks(world: World, dt: number): void {
     // Nearest alive ship *with room in its hold* within tractor range pulls the
     // chunk in. A full hold never attracts: chunks stay where they are for
     // anyone (GDD §2.3). A chunk in flight toward a ship whose hold fills
-    // mid-pull loses its target here and coasts to a stop under drag — dropping
+    // mid-pull loses its target here and coasts to a stop under drag — falling
     // back to free-floating, collectable by any ship that still has space.
     let target: Ship | null = null;
     let bestD2 = range2;

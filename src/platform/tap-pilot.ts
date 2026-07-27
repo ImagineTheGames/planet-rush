@@ -169,8 +169,8 @@ export function pickTapTarget(
  * The pilot aims explicitly at the locked target, so the caller maps its state in
  * **Manual** fire mode (aim honoured); an Auto-aim map would let the sim pick the
  * nearest target instead of the one the player locked, which is not what a tap
- * means. It never opens the build wheel, boosts, or pings — those affordances stay
- * on their own devices and are merged alongside the pilot by the wiring.
+ * means. It never opens the build wheel — that affordance stays on its own device
+ * and is merged alongside the pilot by the wiring.
  */
 export class TapPilot {
   private order: Order = null;

@@ -91,21 +91,12 @@ describe('mapActions — the fire-mode morph', () => {
   });
 });
 
-describe('mapActions — build, boost, ping', () => {
-  it('emits build and boost held states and a one-shot ping', () => {
+describe('mapActions — build', () => {
+  it('emits the build held state', () => {
     const s = createControlState();
     s.build = true;
-    s.boost = true;
-    s.ping = { x: 42, y: 7 };
     const actions = mapActions(s, FireMode.Manual);
     expect(pick(actions, 'build')).toMatchObject({ active: true });
-    expect(pick(actions, 'boost')).toMatchObject({ active: true });
-    expect(pick(actions, 'ping')).toMatchObject({ at: { x: 42, y: 7 } });
-  });
-
-  it('omits ping when none is queued', () => {
-    const s = createControlState();
-    expect(pick(mapActions(s, FireMode.Manual), 'ping')).toBeUndefined();
   });
 });
 
@@ -114,20 +105,17 @@ describe('resetControlState', () => {
     const s = createControlState();
     s.thrust.x = 1;
     s.aim = { x: 1, y: 1 };
-    s.fire = s.boost = s.build = true;
+    s.fire = s.build = true;
     s.order = 'turret';
     s.upgrade = UpgradeTrack.Power;
-    s.ping = { x: 1, y: 1 };
     resetControlState(s);
     expect(s).toEqual({
       thrust: { x: 0, y: 0 },
       aim: null,
       fire: false,
-      boost: false,
       build: false,
       order: null,
       upgrade: null,
-      ping: null,
     });
   });
 });
@@ -192,8 +180,7 @@ describe('describeBindings — the controls strip reads from the map (GDD §2.4)
   });
 
   it('every row has a real binding on every device — no phantom labels (input-parity)', () => {
-    // The gamepad "D-pad" ping row once named a binding the code never wired; the
-    // legend must never advertise a control that does not exist.
+    // The legend must never advertise a control that does not exist.
     for (const device of ['keyboard', 'gamepad', 'touch'] as const) {
       for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
         for (const row of describeBindings(device, mode)) {
@@ -201,12 +188,5 @@ describe('describeBindings — the controls strip reads from the map (GDD §2.4)
         }
       }
     }
-  });
-
-  it('touch advertises the real boost + ping affordances (not vague placeholders)', () => {
-    const rows = describeBindings('touch', FireMode.AutoAim);
-    expect(rows.find((r) => r.action === 'boost')?.binding).toBe('Double-tap stick / BOOST');
-    expect(rows.find((r) => r.action === 'ping')?.binding).toBe('PING button');
-    expect(describeBindings('gamepad', FireMode.AutoAim).find((r) => r.action === 'ping')?.binding).toBe('D-pad');
   });
 });

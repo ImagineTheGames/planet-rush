@@ -65,7 +65,6 @@ describe('client → server', () => {
           { type: 'thrust', dir: { x: 0.5, y: -1 } },
           { type: 'fire', active: true, auto: false },
           { type: 'buildOrder', item: 'turret' },
-          { type: 'ping', at: { x: 120.5, y: -940.25 } },
         ],
       },
     ];
@@ -122,7 +121,7 @@ describe('client → server', () => {
         tick: 1,
         seq: 1,
         actions: Array.from({ length: MAX_ACTIONS_PER_MESSAGE + 1 }, () => ({
-          type: 'boost',
+          type: 'build',
           active: true,
         })),
       }),

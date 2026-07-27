@@ -12,7 +12,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { mulberry32 } from '@shared/types';
 import { DEFAULT_LIVENESS_MS, InMemoryRoomRegistry } from '../../allocator/registry';
+import { Allocator } from '../../allocator/allocator';
 import { MatchServer } from '../../server/match-server';
 import { encodeClientMessage } from '../../src/net/wire';
 import {
@@ -312,6 +314,40 @@ describe('the beat a MatchServer produces is one the allocator learns from', () 
     registry.observe(body, 1_000_000);
     expect(registry.machines(1_000_000).map((m) => m.machine)).toEqual(['iad-7']);
     expect(registry.locate(code, 1_000_000)).toBe('iad-7');
+  });
+
+  it('carries each room\'s size, mode, and free seats through to an advertisement (Task C3)', () => {
+    // A real match server hosting a size-4 room with one human seated: three
+    // seats still joinable, mode ffa.
+    const server = new MatchServer({ seed: 0x5eed });
+    server.update(1_000_000);
+    const code = server.createCode();
+    server.openRoom(code, { size: 4, mode: 'ffa' });
+    server.connect({ send: () => {}, close: () => {} }).receive(
+      encodeClientMessage({ type: 'join', room: code }),
+    );
+
+    const reporter = new HeartbeatReporter({
+      identity: IDENTITY,
+      source: server,
+      cordon: new Cordon(),
+      lag: new EventLoopLagMonitor(),
+      poster: new RecordingPoster(),
+    });
+    const body = reporter.compose();
+    const room = body.rooms.find((r) => r.code === code);
+    expect(room).toMatchObject({ players: 1, size: 4, mode: 'ffa', joinableSeats: 3 });
+
+    // The allocator learns it and can advertise the room's shape before a dial.
+    const registry = new InMemoryRoomRegistry();
+    registry.observe(body, 1_000_000);
+    const alloc = new Allocator({ registry, rng: mulberry32(1), secret: 'x' });
+    expect(alloc.roomInfo(code, 1_000_000)).toMatchObject({
+      size: 4,
+      mode: 'ffa',
+      joinableSeats: 3,
+      joinable: true,
+    });
   });
 
   it('keeps the registry\'s liveness assumption: three missed beats is the window', () => {

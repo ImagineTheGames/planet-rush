@@ -57,7 +57,6 @@ function scriptedInput(player: number, tick: number): Action[] {
     { type: 'thrust', dir: { x: Math.cos(a), y: Math.sin(a) } },
     { type: 'aim', dir: { x: Math.cos(a * 2), y: Math.sin(a * 2) } },
     { type: 'fire', active: rng.next() < 0.75, auto: player % 2 === 0 },
-    { type: 'boost', active: rng.next() < 0.2 },
   ];
   // A wheel press every so often — validated and paid for by the sim, which is
   // free to refuse it (wrong planet, no ore, cap reached). Either way both runs

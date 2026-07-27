@@ -30,7 +30,11 @@
  * interrupt — every HP bought back is an upgrade or a turret not bought.
  *
  * Determinism (GDD §4.8): fixed iteration order (planets, then their turrets,
- * then the projectile pool), no RNG, every rate `* dt`.
+ * then the projectile pool), every rate `* dt`. The turret aim model's seeded
+ * deviance (turret-lead field report v0.2.4) draws from a per-turret, per-tick
+ * hash of the ratified mulberry32 (`turretAimError`) — deterministic, and
+ * deliberately *not* the shared `world.rngState` stream, so a turret's spread
+ * never perturbs wave spawning (`./waves`, the stream's only consumer).
  */
 
 import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
@@ -47,7 +51,8 @@ import {
 } from './constants';
 import { areEnemies } from './allegiance';
 import { destroyCore, isCollapsed } from './match';
-import { fireTurretProjectile } from './projectiles';
+import { fireTurretProjectile, leadAim } from './projectiles';
+import { advanceRng } from './rng';
 import type { Planet, Ship, Shield, Turret, World } from './state';
 import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
@@ -186,7 +191,7 @@ export function turretUpgradeTarget(planet: Planet): Turret | null {
   return best;
 }
 
-/** Ore price of the next TURRET-wedge upgrade on a planet — stepping its
+/** Ore price of the next TURRET-wedge upgrade on a planet — advancing its
  *  {@link turretUpgradeTarget} one Mk up — or `null` when nothing can be
  *  upgraded. The UI prices the wedge's upgrade state from this. */
 export function turretUpgradeCost(planet: Planet): number | null {
@@ -402,7 +407,7 @@ export type UpgradeResult =
  * is match-lifetime state the respawn path never clears (`./step` `respawn`). So a
  * purchase resolves the same before a death and after a respawn: the same wallet,
  * the same ladder, no reference to a "previous" hull, because the sim mutates one
- * ship in place across a life rather than swapping instances. A fresh track and
+ * ship in place across a life rather than replacing instances. A fresh track and
  * the next tier of a pre-death track are both buyable the instant the ship is back.
  *
  * The one life-state gate is `alive`: a dead ship (between lives) is refused
@@ -545,6 +550,8 @@ function makeTurret(world: World, planet: Planet, slot: number): Turret {
     orbitAngle: home,
     cooldown: 0,
     targetId: null,
+    // No committed lead yet — the first fire tick against a target solves it.
+    aim: null,
     muzzle: null,
   };
 }
@@ -694,9 +701,7 @@ export function updateTurrets(world: World, dt: number): void {
       const target = turret.targetId !== null ? shipOf(world, turret.targetId) : null;
       if (!target) continue;
 
-      const dx = target.pos.x - turret.pos.x;
-      const dy = target.pos.y - turret.pos.y;
-      const aim = Math.atan2(dy, dx);
+      const aim = turretAimBearing(world, turret, target);
       turret.angle = turnToward(turret.angle, aim, TURRET.turnRate * dt);
 
       if (turret.cooldown <= 0) {
@@ -708,6 +713,56 @@ export function updateTurrets(world: World, dt: number): void {
       }
     }
   }
+}
+
+/**
+ * The bearing (radians) a turret fires at this tick — the lead-and-deviance aim
+ * model (turret-lead field report v0.2.4). Two parts, both tier-scaled so a
+ * higher Mk shoots straighter (upgrading a turret buys accuracy):
+ *
+ *  1. **Intercept lead.** Solve where the target *will be* with the shared
+ *     {@link leadAim} — the one lead solver the sim's auto-aim and the bots also
+ *     use, so no second solver can drift from it — using the committed (delayed)
+ *     velocity, not the live one.
+ *  2. **Deviance.** Add the committed seeded angular error.
+ *
+ * The commit ({@link Turret.aim}) is re-solved only every tier `aimLatency`
+ * seconds, or the instant the target changes (a fresh threat is read at once).
+ * Between re-solves the turret keeps the velocity and error it committed to, so a
+ * target that curves or reverses inside the window is led where it *was* going
+ * and the shot goes wide — the half of the model that lets a smart orbiter dodge
+ * (mirrors the bot `trackAimVelocity`). Mutates `turret.aim`.
+ */
+function turretAimBearing(world: World, turret: Turret, target: Ship): number {
+  const spec = turretTierSpec(turretTier(turret));
+  const prev = turret.aim ?? null;
+  const reacquired = prev === null || prev.targetId !== target.id;
+  if (reacquired || world.time - prev.since >= spec.aimLatency) {
+    turret.aim = {
+      vel: { x: target.vel.x, y: target.vel.y },
+      error: turretAimError(turret, world, spec.aimSpread),
+      since: world.time,
+      targetId: target.id,
+    };
+  }
+  const commit = turret.aim!;
+  const lead = leadAim(turret.pos, target.pos, commit.vel, TURRET.projectileSpeed);
+  return Math.atan2(lead.y, lead.x) + commit.error;
+}
+
+/**
+ * One seeded angular-error draw in `[-spread, +spread]` for this turret's aim
+ * deviance (turret-lead field report v0.2.4). Deterministic and seeded from the
+ * ratified mulberry32, but keyed on a per-turret, per-tick hash rather than the
+ * shared `world.rngState` — so a turret's spread is reproducible for a given
+ * match yet never advances (perturbs) the wave-spawn stream, the only consumer
+ * of `world.rngState`. `Math.imul` keeps the mix in exact 32-bit integer math;
+ * folding in `world.rngState` (read, never written) ties the spread to the match
+ * seed so two seeds diverge, without touching the stream.
+ */
+function turretAimError(turret: Turret, world: World, spread: number): number {
+  const seed = (Math.imul(turret.id, 0x9e3779b9) ^ Math.imul(world.tick, 0x85ebca6b) ^ world.rngState) >>> 0;
+  return (advanceRng(seed).value * 2 - 1) * spread;
 }
 
 /**

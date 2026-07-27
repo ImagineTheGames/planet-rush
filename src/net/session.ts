@@ -291,7 +291,14 @@ export class TransportSession implements MatchSession {
   private beginPredicting(message: MatchStartMessage): void {
     const world = createWorld({
       seed: message.seed,
-      players: message.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass })),
+      // Thread each seat's team so the predicted world groups allies exactly as
+      // the server's does (variable-slots Task C4); an absent team defaults to the
+      // seat's id at world-build (FFA teams-of-one), byte-identical to today.
+      players: message.slots.map((slot) => ({
+        id: slot.player,
+        shipClass: slot.shipClass,
+        ...(slot.team !== undefined ? { team: slot.team } : {}),
+      })),
       ...(message.bounds ? { bounds: { ...message.bounds } } : {}),
       ...(message.asteroidCount !== undefined ? { asteroidCount: message.asteroidCount } : {}),
     });
