@@ -3,8 +3,8 @@
  * v0.2.2; docs/input-parity.md). Input parity is a contract: every abstract
  * `Action` the sim accepts must be reachable from EVERY input source. This test
  * drives the real source modules headlessly and asserts each device can produce
- * every action — so a future PC-only control (the "boost/ping only exist on PC"
- * class of bug) fails CI here instead of reaching the developer's thumbs.
+ * every action — so a future PC-only control (the "some controls only exist on
+ * PC" class of bug) fails CI here instead of reaching the developer's thumbs.
  *
  * The rows are pinned to the `Action` union by an exhaustive `Record<ActionType>`
  * ({@link EXPECTED}); adding a new action type to `@shared/types` without teaching
