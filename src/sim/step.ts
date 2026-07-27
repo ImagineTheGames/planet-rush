@@ -687,23 +687,23 @@ function updateChunks(world: World, dt: number): void {
 
 /**
  * While a ship is inside its own living planet's atmosphere (`DEPOSIT_RANGE`),
- * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, on a
- * fixed tick cadence, spin off a courier chunk that flies ship→planet to show
- * it. Leave the atmosphere (or empty the hold, or lose the planet) and the drain
- * simply stops the next tick — the transfer is readable and interruptible,
- * exactly as the field report asks. There is no dock or park gate any more
- * (ratified p4: "just be in that atmosphere").
+ * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, for each
+ * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
+ * flies ship→planet to show it. Leave the atmosphere (or empty the hold, or lose
+ * the planet) and the drain simply stops the next tick — the transfer is readable
+ * and interruptible, exactly as the field report asks. There is no dock or park
+ * gate any more (ratified p4: "just be in that atmosphere").
  *
  * The transfer is authoritative here (hold and bank are the truth the HUD ticks
- * off); the couriers are cosmetic and carry no ore, so this can never bank more
- * than the hold held. Deterministic: the cadence is keyed to the integer tick,
- * the courier's heading is pure geometry, and no RNG is drawn.
+ * off) and the couriers CONSERVE it: one flight sprite per unit banked, so the
+ * chunks flying home always total the ore that actually moved — never more (field
+ * report p8: the atmosphere drain used to spawn couriers on a free-running time
+ * cadence, ~3 per ore at `drainRate`, so the developer saw "more ore flying than
+ * you hold"). Deterministic: the spawn count is a pure function of the hold's
+ * integer boundary crossings, the courier's heading is pure geometry, and no RNG
+ * is drawn.
  */
 function updateDeposits(world: World, dt: number): void {
-  // Interval → whole ticks on the canonical grid, so the cadence is the same
-  // whatever `dt` a caller steps at (part of the determinism contract).
-  const flightEvery = Math.max(1, Math.round(DEPOSIT.flightInterval / TICK_DT));
-  const emitThisTick = world.tick % flightEvery === 0;
   for (const ship of world.ships) {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
     // Ratified p4: just be in the atmosphere. No dock and no park gate — the
@@ -713,13 +713,20 @@ function updateDeposits(world: World, dt: number): void {
     if (!planet || !planet.alive || !inAtmosphere(ship, planet)) continue;
 
     // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
+    const cargoBefore = ship.cargo;
     const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
 
-    // The telegraph: a courier chunk leaves the hull for the planet.
-    if (emitThisTick) spawnDepositFlight(world, ship, planet);
+    // The telegraph, CONSERVED: exactly one courier per whole unit that left the
+    // hold this tick. Summed across a drain this equals the whole ore banked — the
+    // single unit-keyed spawner that replaces the old rate-based emitter (field
+    // report p8). Keyed to the HOLD's integer boundaries (which the terminal
+    // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
+    // `banked` can never invent or drop a courier at the exact end of a drain.
+    const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
+    for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, planet);
   }
 }
 

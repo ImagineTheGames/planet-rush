@@ -41,16 +41,18 @@
  *                                                     the deposit is conserved, the
  *                                                     couriers carry none)
  *
- * ── Scope note on the deposit-flight COURIER COUNT ──────────────────────────────
+ * ── The deposit-flight COURIER COUNT, now on the ATMOSPHERE path (field report p8) ─
  * The field report also asks for "one flight sprite per ore unit … chunks spawned
- * during a deposit MUST equal units banked." The couriers are spawned in `src/sim`
- * (`updateDeposits`/`DEPOSIT.flightInterval`) on a fixed *time* cadence, not one per
- * ore, and `src/sim` is outside the UI Engineer's ownership — this spec cannot fix
- * it without reaching across the lane. What it CAN and does prove is the substance
- * the reports are really about: the *numbers* never lie and the deposit conserves
- * ore exactly. The literal one-courier-per-ore requirement is captured as a
- * `test.fixme` below with the precise sim change it needs, so the requirement is on
- * record and owned by the Gameplay Engineer, not silently dropped.
+ * during a deposit MUST equal units banked." That was true of the retired DOCK-era
+ * flight (p4-01) but NOT of the ATMOSPHERE drain that replaced it (p4-11): the new
+ * drain spawned couriers on a free-running *time* cadence (~3 per ore at
+ * `drainRate`), so the developer kept seeing "more ore flying than you hold" through
+ * v0.2.4. The p8 fix keys the courier spawn to the hold's whole-unit boundary
+ * crossings — the same numbers the bank credits — so across a full atmosphere drain
+ * the total sprites flown == the whole ore banked, exactly. The second test below
+ * proves that on a REAL boot with a SMALL hold (an off-by-one courier is glaring),
+ * and proves the interrupt case: exit the atmosphere mid-drain and the flight stops
+ * cold — no courier spawns for a ship that is no longer depositing.
  */
 import { test, expect } from '@playwright/test';
 
@@ -170,14 +172,21 @@ test('ore readouts are exact projections of sim state, conserved across mine →
   await page.screenshot({ path: 'tests/live-stage/ore-conservation-evidence.png' });
 
   // === 3. UNDOCK MID-DRAIN — the interrupt case (the likely bug) ===
-  // Read the live hold, then yank the ship off its planet (mine() re-parks it far
-  // away without touching the bank), stopping the transfer mid-flight. An indicator
-  // that ACCUMULATED deposit deltas would keep ticking or freeze on a stale value
-  // here; a pure projection simply holds on the exact ore still in the hold.
-  const held = await page.evaluate(() => window.__oreHudStage!.readout());
-  expect(held, 'sim readout available at the interrupt').not.toBeNull();
-  const interruptCargo = held!.cargo;
-  const undocked = await page.evaluate((c) => window.__oreHudStage!.mine(c), interruptCargo);
+  // Yank the ship off its planet (mine() re-parks it far away without touching the
+  // bank), stopping the transfer mid-flight. An indicator that ACCUMULATED deposit
+  // deltas would keep ticking or freeze on a stale value here; a pure projection
+  // simply holds on the exact ore still in the hold.
+  //
+  // Read the live hold and re-park on it in ONE in-page call: the sim only advances
+  // inside a rAF callback, so nothing drains between the read and the re-set, and
+  // the frozen phase's conserved total is the exact hold+bank at the interrupt.
+  // (Two round-trips let the live drain move `banked` between them while `mine`
+  // resets `cargo` to the older, higher value — a staging race that inflated
+  // hold+bank under load.)
+  const undocked = await page.evaluate(() => {
+    const r = window.__oreHudStage!.readout();
+    return r ? window.__oreHudStage!.mine(r.cargo) : null;
+  });
   expect(undocked, 'the ship undocked mid-drain, hold preserved').not.toBeNull();
 
   // The frozen phase: for ~0.5 s the sim hold must not move (drain stopped), the
@@ -234,58 +243,125 @@ test('ore readouts are exact projections of sim state, conserved across mine →
 });
 
 /**
- * The literal "one flight sprite per ore unit" half of the field report.
+ * The literal "one flight sprite per ore unit" half of the field report, now on the
+ * ATMOSPHERE drain (field report p8) and GREEN — the p8 fix keyed the sim's courier
+ * spawn to the hold's whole-unit boundary crossings, so across a full atmosphere
+ * drain the sprites flown total the ore banked, exactly.
  *
- * BLOCKED on a Gameplay Engineer change, not a UI one: the deposit couriers are
- * spawned in `src/sim` (`updateDeposits`, cadence `DEPOSIT.flightInterval = 0.15 s`)
- * on a fixed *time* cadence, so at `drainRate = 2 ore/s` a deposit spawns ~3.3
- * couriers per ore — the "bunch of ore that doesn't represent actual amounts." The
- * fix is to key the courier spawn to whole ore drained (or set `flightInterval =
- * 1 / drainRate`) so `chunks spawned == ore banked`. `src/sim` is outside UI
- * ownership; the assertion below states the target so it is on record and green the
- * day that lands. Marked `fixme` rather than deleted so the requirement isn't lost.
+ * Counting is by rising edge of the LIVE flight count. The renderer draws one chunk
+ * per sim courier, and at `drainRate = 2 ore/s` the fix spawns one courier per whole
+ * unit ~0.5 s apart while each courier's short hop home lasts well under that — so
+ * the count returns to 0 between spawns and every spawn is its own rising edge. The
+ * dock happens INSIDE the sampler (no cross-process gap that could let the first
+ * courier fly and land unseen), and the baseline is 0, so even a courier already
+ * aloft on the first sampled frame is counted exactly once.
  */
-test.fixme(
-  'deposit-flight couriers are conserved one-per-ore (needs sim DEPOSIT cadence fix — Gameplay Engineer)',
-  async ({ page }) => {
-    await page.goto('/?debug=1', { waitUntil: 'load' });
-    await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
-    await page.waitForFunction(
-      () =>
-        typeof window.__oreHudStage?.dock === 'function' &&
-        typeof window.__oreDepositStage?.flights === 'function',
-      undefined,
-      { timeout: 20_000 },
-    );
+test('atmosphere drain flies exactly one courier per ore banked — and stops cold on a mid-drain exit', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
 
-    const DEP = 6;
-    await page.evaluate((ore) => window.__oreHudStage!.dock(ore), DEP);
+  await page.goto('/?debug=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () =>
+      typeof window.__oreHudStage?.dock === 'function' &&
+      typeof window.__oreDepositStage?.flights === 'function',
+    undefined,
+    { timeout: 20_000 },
+  );
 
-    // Count DISTINCT couriers spawned across the whole deposit (peak-tracking the
-    // live count is a lower bound; a spawn-event seam would be exact — a sim-side
-    // add). Whatever the count, the contract is: no more couriers than ore banked.
-    const couriers = await page.evaluate(async () => {
-      const s = window.__oreHudStage!;
-      const d = window.__oreDepositStage!;
-      let peak = 0;
-      await new Promise<void>((resolve) => {
-        const tick = (): void => {
-          peak = Math.max(peak, d.flights());
-          const r = s.readout();
-          if (r && r.cargo <= 0.001) return resolve();
-          requestAnimationFrame(tick);
-        };
+  // === A. FULL DRAIN — total couriers flown == whole ore banked ===
+  // A SMALL, INTEGER hold: small so an off-by-one courier is glaring, integer so
+  // "whole ore banked" is exactly the hold. The ship parks in its own atmosphere
+  // (dock() places it inside DEPOSIT_RANGE) and the auto-deposit drains it.
+  const HOLD = 3;
+  const drain = await page.evaluate(async (hold) => {
+    const s = window.__oreHudStage!;
+    const d = window.__oreDepositStage!;
+    if (!s.dock(hold)) return null; // no local ship/planet to stage
+    let spawned = 0;
+    let prev = 0; // baseline BEFORE the first courier, so the first one is counted
+    let maxConcurrent = 0;
+    let endCargo = hold;
+    const start = performance.now();
+    await new Promise<void>((resolve) => {
+      const tick = (): void => {
+        const now = d.flights();
+        if (now > prev) spawned += now - prev; // rising edge == this frame's new couriers
+        if (now > maxConcurrent) maxConcurrent = now;
+        prev = now;
+        const r = s.readout();
+        if (r) endCargo = r.cargo;
+        if (r && r.cargo <= 0.001) return resolve();
+        if (performance.now() - start > 12_000) return resolve(); // stall guard
         requestAnimationFrame(tick);
-      });
-      return peak;
+      };
+      requestAnimationFrame(tick);
     });
+    return { spawned, maxConcurrent, endCargo };
+  }, HOLD);
+  expect(drain, 'the local ship parked in its own atmosphere with the hold').not.toBeNull();
+  expect(drain!.endCargo, 'the hold fully drained').toBeLessThanOrEqual(0.01);
+  // The whole point of field report p8: sprites flown == ore banked, to the unit.
+  expect(drain!.spawned, 'one courier flew per whole ore banked, no rate-based extras').toBe(HOLD);
+  expect(
+    drain!.maxConcurrent,
+    'the conserved stream never floods — at most a courier or two aloft',
+  ).toBeLessThanOrEqual(2);
 
-    // No celebratory extra rocks: at most one courier in the air per ore of hold.
-    expect(couriers, 'couriers in flight never exceed the ore being deposited').toBeLessThanOrEqual(
-      DEP,
-    );
-  },
-);
+  // === B. INTERRUPT — exit the atmosphere mid-drain; the flight stops cold ===
+  // Re-dock a fresh hold, let one whole unit bank (>= one courier), then yank the
+  // ship out of the atmosphere (mine() re-parks it far from home without touching
+  // the bank). No courier may spawn for a ship no longer depositing; couriers
+  // already aloft land and are swept, so no NEW rising edge appears.
+  const HOLD2 = 3;
+  const interrupt = await page.evaluate(async (hold) => {
+    const s = window.__oreHudStage!;
+    const d = window.__oreDepositStage!;
+    if (!s.dock(hold)) return null;
+    // Wait until at least one whole unit has banked, then exit the atmosphere.
+    await new Promise<void>((resolve) => {
+      const wait = (): void => {
+        const r = s.readout();
+        if (r && r.cargo <= hold - 1.1) return resolve();
+        requestAnimationFrame(wait);
+      };
+      requestAnimationFrame(wait);
+    });
+    s.mine(s.readout()!.cargo); // re-park far from home; hold preserved, drain stops
+    const cargoAtExit = s.readout()!.cargo;
+    let spawnedAfterExit = 0;
+    let prev = d.flights(); // couriers already aloft are NOT new spawns
+    let cargoDrift = 0;
+    const start = performance.now();
+    await new Promise<void>((resolve) => {
+      const tick = (): void => {
+        const now = d.flights();
+        if (now > prev) spawnedAfterExit += now - prev;
+        prev = now;
+        const r = s.readout();
+        if (r) cargoDrift = Math.max(cargoDrift, Math.abs(r.cargo - cargoAtExit));
+        if (performance.now() - start >= 700) return resolve();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    return { spawnedAfterExit, cargoDrift };
+  }, HOLD2);
+  expect(interrupt, 're-staged the ship to interrupt a live atmosphere drain').not.toBeNull();
+  expect(
+    interrupt!.spawnedAfterExit,
+    'no courier spawns once the ship exits the atmosphere mid-drain',
+  ).toBe(0);
+  expect(
+    interrupt!.cargoDrift,
+    'the interrupted hold does not drain outside the atmosphere',
+  ).toBeLessThan(0.05);
+
+  expect(pageErrors, 'no page errors across the atmosphere-drain conservation run').toEqual([]);
+});
 
 // ---------------------------------------------------------------------------
 // In-page frame samplers. Each drives a requestAnimationFrame loop inside the
