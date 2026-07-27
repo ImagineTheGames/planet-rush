@@ -169,6 +169,31 @@ export interface HealthBar {
    *  view draws slightly larger with an identity outline so it reads as "mine"
    *  (field request v0.1.1). False for every enemy/hostile bar. */
   readonly local: boolean;
+  /** The compact current/max HP readout drawn beside the bar — `"68/70"` (field
+   *  request v0.2.4). Whenever the bar shows, the number shows; it is built from
+   *  the SAME sim hp as {@link fraction}, so the number and the fill can never
+   *  drift. The view pools the Text (no per-frame allocation). */
+  readonly hpText: string;
+}
+
+/**
+ * The compact `"68/70"` current/max HP readout drawn beside a health bar (field
+ * request v0.2.4) — the same treatment the planet core got in
+ * {@link ./planet-hp} `coreHpReadout`, now for every ship and turret so there is
+ * one health-bar component and one rule. Current HP rounds to a whole point
+ * (ship hull and turret HP step in whole hits; a live siege is the only thing
+ * that makes them fractional) and is clamped into `[0, max]`; max is rounded
+ * whole. A wrecked or degenerate entity reads `"0/0"`, never a negative or a NaN.
+ *
+ * This is a *readout*, not a rate — the "no numbers but cost on the wheel" rule
+ * (build-wheel.ts) is about the Build wheel; an HP bar has always been allowed to
+ * state health (GDD §2.2), and it now states the exact number the way the core does.
+ */
+export function hpReadout(hp: number, maxHp: number): string {
+  const whole = (v: number): number => (Number.isFinite(v) ? Math.round(v) : 0);
+  const max = Math.max(0, whole(maxHp));
+  const cur = Math.max(0, Math.min(max, whole(hp)));
+  return `${cur}/${max}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +251,7 @@ export function healthBarModel(
       y: e.pos.y,
       radius: e.radius,
       local: e.local === true,
+      hpText: hpReadout(e.hp, e.maxHp),
     });
   }
   return bars;
