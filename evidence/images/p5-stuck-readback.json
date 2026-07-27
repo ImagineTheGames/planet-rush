@@ -1,0 +1,65 @@
+{
+  "trackedSeconds": 9,
+  "dwellRadiusPx": 12,
+  "botsTracked": 7,
+  "maxDwellSecondsAnyBot": 6.3,
+  "picked": {
+    "owner": 5,
+    "name": "Sable",
+    "pathLen": 1629,
+    "netDisp": 282,
+    "maxDwellSeconds": 0.2,
+    "minPlanetRimPx": 37
+  },
+  "perBot": [
+    {
+      "name": "Rusty",
+      "pathLen": 113,
+      "netDisp": 113,
+      "maxDwellSeconds": 6.3,
+      "minPlanetRimPx": 665
+    },
+    {
+      "name": "Bolt",
+      "pathLen": 1465,
+      "netDisp": 797,
+      "maxDwellSeconds": 0.2,
+      "minPlanetRimPx": 127
+    },
+    {
+      "name": "Foreman",
+      "pathLen": 1414,
+      "netDisp": 536,
+      "maxDwellSeconds": 0.2,
+      "minPlanetRimPx": 111
+    },
+    {
+      "name": "Patch",
+      "pathLen": 1239,
+      "netDisp": 433,
+      "maxDwellSeconds": 0.3,
+      "minPlanetRimPx": 125
+    },
+    {
+      "name": "Sable",
+      "pathLen": 1629,
+      "netDisp": 282,
+      "maxDwellSeconds": 0.2,
+      "minPlanetRimPx": 37
+    },
+    {
+      "name": "Vulture",
+      "pathLen": 1482,
+      "netDisp": 126,
+      "maxDwellSeconds": 0.4,
+      "minPlanetRimPx": 499
+    },
+    {
+      "name": "Warden",
+      "pathLen": 1348,
+      "netDisp": 598,
+      "maxDwellSeconds": 0.4,
+      "minPlanetRimPx": 171
+    }
+  ]
+}

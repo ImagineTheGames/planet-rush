@@ -908,5 +908,65 @@
     "buildSha": "a04e934",
     "attestation": "Re-captured on a04e934 after merging current main — which carries the v0.2.2 fix (a6c4058) that pulls the collapsed square OFF the bottom-right action corner it used to overlap. Three-panel montage, emulated landscape phone (844×390), real preview bundle (?debug=1). COLLAPSED: the minimap is an 80×80 square at (498.8,271) — along the BOTTOM EDGE, sitting in the central gap between the two thumb clusters (BUILD/BOOST to its left, PING/FIRE to its right), visibly overlapping none of them. Checked in code against the real registered button rects (touch-boost-button, touch-ping-button, touch-fire-button, build-button): the square overlaps NONE (clear of thumbs), the nearest thumb button 65px away. The own-ship dot sits at (564.4,311) inside it; a real touch stick drive moved the debug-hook shipWorld by (-252.6,0) and the own-ship dot tracked it by (-8.1,0), the same leftward direction, so the dot follows the ship. EXPANDED: a real tap at (539,311) on the square opened a 273×273 centred overlay at (285.5,27.3) (with an × close affordance) showing 8 planet dots, 7 ship dots and 48 ore-field hints, and the arena's grey asteroids read through the semi-transparent overlay. COLLAPSED again: a real tap at (422,164) on the overlay collapsed it back to the tiny bottom-edge square (expanded=false) — a clean two-state round trip. No page errors this run.",
     "verdict": "verified"
+  },
+  {
+    "id": "bot-aim-dodgeable",
+    "title": "Bot aim is dodgeable — EASY sprays, the ladder holds, HARD is tighter but beatable",
+    "area": "match",
+    "image": "images/p5-bot-aim-dodgeable.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "Two-part montage. MEASUREMENT panel: the shipped harness tests/sim/aim-error.test.ts, which I re-ran GREEN (7 tests) at this build and whose printed table I read straight off — hit-rate vs a JUKING strafer / vs a SITTING duck: EASY 16.2% (25/154) / 54.4%; MEDIUM 22.3% (63/282) / 98.6%; HARD 34.2% (103/301) / 98.7%; aimbot (old Hard) 42.9% (132/308) / 98.7%. Visible in the table: the ladder holds EASY 16.2% < MEDIUM 22.3% < HARD 34.2%; HARD sits clearly under the old aimbot's 42.9% (a juker shakes ~2/3 of a HARD gun's shots); and every tier's juking column is far below its sitting-duck column, so dodging IS the difference (EASY evades 5 shots in 6 while moving, lands over half on a sitting duck). EYES panel: a live commons melee, camera centred, with Rusty (EASY), Foreman/Patch (MEDIUM) and Sable/Vulture/Warden (HARD) all on screen firing; this frame carries 426 red projectile pixels and EVERY one is in open space off all hulls (shots in flight that flew wide of moving ships); 37 of 80 burst frames carried open-space projectiles. Two consecutive burst frames (~220 ms apart) show a red dot off Foreman's hull, then the shots travelled on past the moving hulls without landing. HONEST SCOPE: the per-tier hit RATES are quantified by the harness (a statistic, not readable pixel-by-pixel in one frame); the frames corroborate that live bot fire misses moving hulls. Verdict: verified.",
+    "verdict": "verified"
+  },
+  {
+    "id": "difficulty-tags",
+    "title": "Difficulty tags — bots read (EASY)/(MEDIUM)/(HARD), dimmer than the name; the local player has none",
+    "area": "hud",
+    "image": "images/p5-difficulty-tags.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "Live ?debug=1, three panels. LADDER: camera centred on the 8-planet ring, all eight nameplates drawn on one frame — Rusty and Bolt read '(EASY)', Foreman and Patch '(MEDIUM)', Sable, Vulture and Warden '(HARD)', and the local 'YOU' (right) carries NO suffix. Each '(TIER)' suffix is painted in the same owner hue as its name but a visible step dimmer, so it reads as metadata rather than identity. DIM SUFFIX close-up (stageBot, frozen): 'Rusty (EASY)' floats over both the bot's ship and its home planet — the teal '(EASY)' is unmistakably dimmer than the teal 'Rusty'; the local planet reads 'YOU' with no suffix and the local ship carries no label at all (own-ship label off by default). LOCAL = NONE panel: the data-driven difficulties() table read back this run — slot 0 (YOU) = none, slots 1-2 EASY, slots 3-4 MEDIUM, slots 5-7 HARD — i.e. only the human seat is left blank, which is why only YOU shows no tier. Verdict: verified.",
+    "verdict": "verified"
+  },
+  {
+    "id": "bot-flee-commits",
+    "title": "A wounded bot commits to its retreat — distance from the threat grows, destination evident, no twitch",
+    "area": "match",
+    "image": "images/p5-bot-flee-commits.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "The screenshot scenario re-staged naturally: Rusty is wounded to 20% hull right beside the centred local ship (a threat in range) via the shipped __healthbarStage seam ONCE, then left alone; the flee/fight latch (src/bots/commitment.ts) is unit-proven by src/bots/commitment.test.ts, which I re-ran GREEN (11 tests). FLEE-ENTER frame: Rusty at 20% hull beside the threat at the arena centre, its home the teal ring bottom-right. COMMITTED frame: it drives off in one heading toward its own turret cover, not turning back to fight. ARRIVED frame: Rusty reaches within 96px of its own home planet, at 8% hull. Tracked readback across the retreat: its distance from the threat grew MONOTONICALLY 188 → 1034 px over 923 px of near-monotone travel (monotonic = true) — a committed run to an evident destination, never oscillating in place; it stayed committed even as fire dropped it from 20% to 8% (it did not flip back to attack). Verdict: verified.",
+    "verdict": "verified"
+  },
+  {
+    "id": "no-turret-laser",
+    "title": "No turret laser — a firing turret is a short muzzle flare + a travelling projectile, never a line to the target",
+    "area": "match",
+    "image": "images/p5-no-turret-laser.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "The developer saw a transient LINE from a firing turret to its target (beam-era geometry). This attests its absence through a full firing cycle. GEOMETRY panel (window.__planetRush.muzzles, the client's own drawn muzzle-flash set, over live fire from 4 distinct turret owners): 20 muzzle records collected across the cycle; EVERY record's |end - origin| length = 16 px (the short flare stub) and EVERY record's hit point is null. A laser would read length ~= distance-to-target and hit = the target; none do — and the renderer draws origin -> (origin + dir*16), so a real muzzle physically cannot reach a ~130-px-away target. FLASH frame: the staged home turret firing west at a parked attacker shows a short flare stub at the barrel and a SEPARATE red projectile dot already out in the gap — no line joins turret and dot. SHOT-IN-FLIGHT frame: red projectile dots travelling in open space between shooters and targets (72 of 160 burst frames carried a projectile); across every frame there is no turret->target line at any point. Verdict: verified.",
+    "verdict": "verified"
+  },
+  {
+    "id": "bot-never-stuck",
+    "title": "No bot pins — bots round bodies tangentially; the standing no-wedge soak invariant is green",
+    "area": "match",
+    "image": "images/p5-bot-never-stuck.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "ROUNDS-A-BODY panel: Sable's tracked trajectory over 9 s, drawn as time-graded dots (cyan -> magenta) — a smooth 1629-px arc that rounds its own planet tangentially (closest rim approach 37 px) and carries on past it. The dots are evenly spaced the whole way: constant motion, no clustering, i.e. no pin. NO-PIN table: over the same 9 s the six free-roaming bots each travelled 1200-1600 px with a longest dwell within 8 px of only 0.2-0.4 s — nowhere near a wedge. HONEST NOTE recorded on the figure: one bot (Rusty) sat ~6.3 s, but that is the ship the camera-centring seam parked at rest — it has no movement intent, the exact case the invariant excludes; a live client position metric cannot read a bot's throttle intent, so the RIGOROUS no-wedge proof is the standing invariant tests/harness/unstuck.test.ts (NO bot with movement intent stays within 8u of a point for > 12 s, across 24 full shipped-cast matches), which I re-ran GREEN, together with tests/harness/soak.test.ts GREEN (10 tests). This frame is the corroborating visual. Verdict: verified.",
+    "verdict": "verified"
+  },
+  {
+    "id": "repair-discrete-honest",
+    "title": "Repair is a discrete 1-ore/15-HP tap — no channel, no stacking, auto-refused at full",
+    "area": "build-wheel",
+    "image": "images/p5-repair-discrete-honest.png",
+    "capturedAt": "2026-07-27T03:52:00Z",
+    "buildSha": "7d1e2e1",
+    "attestation": "Live ?debug=1 (NO freeze); every press is a REAL pointerdown on the drawn REPAIR CORE wedge (the shipped __repairStage seam only sieged the local core and funded the bank). THE DEAL panel: core sieged to 20/100 (top-right HOME bar), bank 10 ore; the REPAIR CORE wedge draws '+15 HP' with the bare '1' as its only cost numeral, bright and pressable. BANK-FALLS-CORE-RISES panel: three real taps step the core up 15 HP each while the bank steps down 1 ore each — core 20 -> 65 (+45), bank 10 -> 7 (-3); the wedge still reads '+15 HP'. N-TAPS-ARE-N-PURCHASES panel: from a fresh siege (core 10, bank 10) five real taps buy exactly +75 HP for 5 ore (core 85, bank 5) — no channel over-spend, no drain. AUTO-STOP-AT-FULL panel: with the core topped to 100/100 the wedge dims to 'CORE FULL' (ready = false); five RAPID taps then spend ZERO ore — bank frozen 9 -> 9, core pinned at max. Discrete purchase, no stacking beyond N discrete buys, refused (not silently drained) at full. Verdict: verified.",
+    "verdict": "verified"
   }
 ]
