@@ -77,7 +77,7 @@ import { COLLAPSE_CORE_DECAY } from '../sim/constants';
 import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
-import { healthBarModel } from './healthbar';
+import { healthBarModel, HEALTHBAR_MIN_FILL } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
@@ -847,12 +847,17 @@ export class Hud extends Container {
       .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, 2)
       .stroke({ width: 1, color: model.color, alpha: 0.55 });
     if (model.coreFraction > 0) {
-      const w = HP_BAR_WIDTH * model.coreFraction;
+      // A standing core keeps at least a sliver of fill — a living thing never
+      // renders as an empty bar (field report; full-empty means the core is gone,
+      // which the `coreFraction > 0` gate already excludes). The true fraction
+      // still drives `destroyed`/`critical` in the model.
+      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
       this.planetBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: fill, alpha: 0.95 });
     }
-    // Shield overbar: plasma, and only while a generator stands (GDD §2.5).
+    // Shield overbar: plasma, and only while a generator stands (GDD §2.5). A
+    // standing shield pool keeps its sliver too, by the same living-never-empty rule.
     if (model.hasShield && model.shieldFraction > 0) {
-      const sw = HP_BAR_WIDTH * model.shieldFraction;
+      const sw = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.shieldFraction);
       this.planetBar
         .roundRect(-sw, y - SHIELD_BAR_HEIGHT - 2, sw, SHIELD_BAR_HEIGHT, 1)
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
@@ -864,7 +869,7 @@ export class Hud extends Container {
     // the bar sees it move, not just a silent number.
     const shimmer = this.pressFeedback.coreShimmer(this.frameTime);
     if (shimmer > 0 && model.coreFraction > 0) {
-      const w = HP_BAR_WIDTH * model.coreFraction;
+      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
       this.planetBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
     }
 

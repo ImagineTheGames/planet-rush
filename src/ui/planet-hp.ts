@@ -23,6 +23,7 @@
 
 import type { PlayerId } from '@shared/types';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
+import { livingWhole } from './healthbar';
 
 /** Core fraction at or below which the bar reads as critical and flashes. The
  *  fraction, not an HP number: a damage ring is a shape, not a readout. TUNABLE */
@@ -89,19 +90,22 @@ export function planetHpModel(
 /**
  * The numeric core-HP readout beside the bar (developer request, p5-08): a
  * `"75/100"`-style current/max, so a player who wants the exact number has it and
- * doesn't have to eyeball the bar. Current HP rounds to a whole point (core HP is
- * whole at match start and only a live siege makes it fractional); max is already
- * whole. A wrecked or unwired core reads `"0/N"`, never a negative or a NaN.
+ * doesn't have to eyeball the bar. Current HP **ceils** for a living core (field
+ * report — a living thing never displays 0: a core at 0.4 hp reads `"1/100"`, not
+ * `"0/100"`, so the readout never lies that a standing core is dead). Core HP is
+ * whole at match start and only a live siege makes it fractional; max is already
+ * whole. `coreHp <= 0` (the core is gone) is the only thing that reads `0`, and a
+ * wrecked or unwired core reads `"0/N"`, never a negative or a NaN — the same
+ * "living things never display 0" rule the ship/turret readout applies
+ * ([[healthbar]] `livingWhole`), shared so the grammar can never diverge.
  *
  * This is a *readout*, not a rate — the "no numbers but cost on the wheel" rule
  * (build-wheel.ts) is about the Build wheel; the HP bar has always been allowed to
  * state your own planet's health (GDD §2.2, the loss condition).
  */
 export function coreHpReadout(coreHp: number, maxCoreHp: number): string {
-  const whole = (v: number): number => (Number.isFinite(v) ? Math.round(v) : 0);
-  const max = Math.max(0, whole(maxCoreHp));
-  const cur = Math.max(0, Math.min(max, whole(coreHp)));
-  return `${cur}/${max}`;
+  const max = Math.max(0, Number.isFinite(maxCoreHp) ? Math.round(maxCoreHp) : 0);
+  return `${livingWhole(coreHp, max)}/${max}`;
 }
 
 /**

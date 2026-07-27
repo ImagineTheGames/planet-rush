@@ -100,6 +100,17 @@ export const HEALTHBAR_LOCAL_HEIGHT = 6;
  */
 export const HEALTHBAR_FULL_EPSILON = 1e-6;
 
+/**
+ * The smallest fill fraction a bar renders for a **living** entity — the
+ * "a living thing never shows empty" rule (field report: an enemy read 0/70 but
+ * wasn't dead). Death is `hp <= 0` in the sim; anything above that is alive, and
+ * a living hull's bar keeps at least this sliver of owner colour so "empty" (and
+ * "0") means exactly one thing: dead, and by then the entity is already gone.
+ * A hair of hp (0.4/70 ≈ 0.006 raw) would otherwise draw an invisible fill that
+ * reads as an empty track — the lie this floor removes. TUNABLE
+ */
+export const HEALTHBAR_MIN_FILL = 0.06;
+
 // ---------------------------------------------------------------------------
 // The model I/O
 // ---------------------------------------------------------------------------
@@ -156,7 +167,9 @@ export interface Combatant {
 export interface HealthBar {
   /** Owner slot — for the view/test to reason about identity if it wants to. */
   readonly owner: PlayerId;
-  /** Fill fraction 0..1 — the length of the coloured part of the bar. */
+  /** Fill fraction 0..1 — the length of the coloured part of the bar. Floored to
+   *  {@link HEALTHBAR_MIN_FILL} while the entity is alive so a living hull never
+   *  renders as an empty track (field report — full-empty means dead). */
   readonly fraction: number;
   /** The owner's identity colour (style-guide §3), from the ratified roster. */
   readonly color: number;
@@ -180,20 +193,34 @@ export interface HealthBar {
  * The compact `"68/70"` current/max HP readout drawn beside a health bar (field
  * request v0.2.4) — the same treatment the planet core got in
  * {@link ./planet-hp} `coreHpReadout`, now for every ship and turret so there is
- * one health-bar component and one rule. Current HP rounds to a whole point
- * (ship hull and turret HP step in whole hits; a live siege is the only thing
- * that makes them fractional) and is clamped into `[0, max]`; max is rounded
- * whole. A wrecked or degenerate entity reads `"0/0"`, never a negative or a NaN.
+ * one health-bar component and one rule. Current HP **ceils** for a living
+ * entity (field report — a living thing never displays 0: 0.4 hp reads `"1"`, not
+ * `"0"`, because the floored readout made a ship at 0.4 hull read `0/70` and lied
+ * that it was dead). Ship hull and turret HP step in whole hits, so only a live
+ * siege makes them fractional; ceiling that fraction keeps the number honest at
+ * the boundary that matters. Current is clamped into `[0, max]`; max is rounded
+ * whole. `hp <= 0` (exactly dead) is the only thing that reads `0`, and a wrecked
+ * or degenerate entity reads `"0/0"`, never a negative or a NaN.
  *
  * This is a *readout*, not a rate — the "no numbers but cost on the wheel" rule
  * (build-wheel.ts) is about the Build wheel; an HP bar has always been allowed to
  * state health (GDD §2.2), and it now states the exact number the way the core does.
  */
 export function hpReadout(hp: number, maxHp: number): string {
-  const whole = (v: number): number => (Number.isFinite(v) ? Math.round(v) : 0);
-  const max = Math.max(0, whole(maxHp));
-  const cur = Math.max(0, Math.min(max, whole(hp)));
-  return `${cur}/${max}`;
+  const max = Math.max(0, Number.isFinite(maxHp) ? Math.round(maxHp) : 0);
+  return `${livingWhole(hp, max)}/${max}`;
+}
+
+/**
+ * Current HP as the whole number a readout shows: a living entity (`hp > 0`)
+ * **ceils** so it never rounds down to a lie — 0.4 → 1 — and clamps to `max`;
+ * exactly-dead (`hp <= 0`) and non-finite hp are the only `0`. This is the one
+ * "living things never display 0" rule the ship/turret readout and the planet
+ * core readout ([[planet-hp]] `coreHpReadout`) both apply.
+ */
+export function livingWhole(hp: number, max: number): number {
+  if (!Number.isFinite(hp) || hp <= 0) return 0;
+  return Math.min(max, Math.ceil(hp));
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +272,7 @@ export function healthBarModel(
     if (!combatantGetsBar(e, localPlayer)) continue;
     bars.push({
       owner: e.owner,
-      fraction: clamp01(e.hp / e.maxHp),
+      fraction: livingFraction(e.hp, e.maxHp),
       color: playerColor(e.owner),
       x: e.pos.x,
       y: e.pos.y,
@@ -255,6 +282,19 @@ export function healthBarModel(
     });
   }
   return bars;
+}
+
+/**
+ * The bar's fill fraction: the true HP fraction, clamped to `[0, 1]`, but floored
+ * to {@link HEALTHBAR_MIN_FILL} while the entity is **alive** (`hp > 0`) so a
+ * living hull never draws an empty track (field report — a living thing never
+ * shows empty; full-empty is death, exactly). `hp <= 0` stays `0`: a corpse is
+ * filtered out upstream by {@link combatantGetsBar}, and a mid-explosion negative
+ * hp reads as the empty it is.
+ */
+export function livingFraction(hp: number, maxHp: number): number {
+  const raw = clamp01(hp / maxHp);
+  return raw > 0 ? Math.max(HEALTHBAR_MIN_FILL, raw) : 0;
 }
 
 function clamp01(v: number): number {
