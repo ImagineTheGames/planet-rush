@@ -179,6 +179,75 @@ describe('POST /rooms — allocate a new room', () => {
   });
 });
 
+describe('POST /rooms — the requested match config (Task C1/C3)', () => {
+  it('signs the body\'s size and mode into the ticket', async () => {
+    const { base, registry, now } = await fixture();
+    registry.observe(heartbeat('m-1', 'iad', []), now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ size: 4, mode: 'teams' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(verifyTicket(body.ticket, SECRET, now.value)).toMatchObject({ size: 4, mode: 'teams' });
+  });
+
+  it('still allocates a default room when the body names no size', async () => {
+    const { base, registry, now } = await fixture();
+    registry.observe(heartbeat('m-1', 'iad', []), now.value);
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ region: 'iad' }),
+    });
+    expect(res.status).toBe(201);
+    expect(verifyTicket((await res.json()).ticket, SECRET, now.value)?.size).toBeUndefined();
+  });
+});
+
+describe('GET /rooms/:code — advertise a room before dialing (Task C3)', () => {
+  it('reports the room\'s advertised config', async () => {
+    const { base, registry, now } = await fixture();
+    registry.observe(
+      {
+        machine: 'm-1',
+        region: 'iad',
+        capacity: 8,
+        rooms: [{ code: 'K7QM', players: 1, size: 4, mode: 'ffa', joinableSeats: 3 }],
+      },
+      now.value,
+    );
+
+    const res = await fetch(`${base}/rooms/K7QM`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      code: 'K7QM',
+      machine: 'm-1',
+      region: 'iad',
+      size: 4,
+      mode: 'ffa',
+      joinableSeats: 3,
+      joinable: true,
+    });
+  });
+
+  it('404s a code no live Machine hosts', async () => {
+    const { base } = await fixture();
+    const res = await fetch(`${base}/rooms/ZZZZ`);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('not-found');
+  });
+
+  it('405s a POST to the room-info path (that shape is GET-only)', async () => {
+    const { base } = await fixture();
+    // POST /rooms/:code (no /join) is a method error, not a missing route.
+    const res = await fetch(`${base}/rooms/K7QM`, { method: 'POST' });
+    expect(res.status).toBe(405);
+  });
+});
+
 describe('POST /rooms/:code/join — reach an existing room', () => {
   it('issues a ticket for the Machine hosting the code', async () => {
     const { base, registry, now } = await fixture();

@@ -60,7 +60,7 @@ import type {
 import { encodeServerMessage } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
 import { TICK_DT, createWorld, isOver, step } from '../src/sim';
-import type { Bounds, PlayerInput, World } from '../src/sim';
+import type { Bounds, MatchMode, PlayerInput, World } from '../src/sim';
 import { FogTracker, StaticEntityTracker, fullEntityState } from './static-events';
 
 // ---------------------------------------------------------------------------
@@ -128,6 +128,10 @@ interface Slot {
   /** The live human connection, or null when a bot has the controls. */
   socket: ServerSocket | null;
   shipClass: ShipClass;
+  /** The side this slot fights for (variable-slots Task C4). FFA is teams-of-one,
+   *  so it is the slot's own id; TEAMS (Milestone D/E) shares one team across
+   *  allies. Carried on `lobbyState`/`matchStart`, never the per-tick snapshot. */
+  team: number;
   ready: boolean;
   /** The bot currently flying: a lobby fill, or a substitute for a dropped
    *  human. Null exactly when a human is connected and flying. */
@@ -164,8 +168,16 @@ export interface RoomConfig {
   readonly code: RoomCode;
   /** Match seed — the world and every bot derive from it (GDD §4.1). */
   readonly seed: number;
-  /** Seats in the match. Default {@link MATCH_SLOTS} (8 planets, GDD §2.1). */
+  /** Seats in the match — N, the variable match size (2..8, variable-slots
+   *  Task C1). Default {@link MATCH_SLOTS} (8 planets, GDD §2.1). A room is sized
+   *  once, at open; "closing" a lobby slot is resolved to a smaller N *before* it
+   *  reaches here (dense-roster discipline, spike §S2 / Trap 6), so the room's
+   *  seats are always a contiguous `0..N-1` and no sparse id ever enters the sim. */
   readonly slots?: number;
+  /** Match mode (`'ffa' | 'teams'`), advertised in the heartbeat so a lobby can
+   *  show/refuse the room before dialing (Task C3). Default `'ffa'`. The sim reads
+   *  team allegiance per-ship; mode here is the room's advertised label. */
+  readonly mode?: MatchMode;
   /** Reconnect grace, ms. Default {@link DEFAULT_GRACE_MS}. */
   readonly graceMs?: number;
   /** Fixed sim timestep. Default the sim's 60 Hz `TICK_DT`. */
@@ -192,6 +204,8 @@ export class MatchRoom {
   readonly code: RoomCode;
 
   private readonly slots: Slot[];
+  /** The room's advertised mode (Task C3); `'ffa'` unless the lobby said teams. */
+  private readonly matchMode: MatchMode;
   private readonly queue = new InputQueue();
   private readonly statics = new StaticEntityTracker();
   private readonly graceMs: number;
@@ -218,12 +232,15 @@ export class MatchRoom {
     this.dt = config.dt ?? TICK_DT;
     this.snapshotInterval = config.snapshotIntervalTicks ?? DEFAULT_SNAPSHOT_INTERVAL_TICKS;
     this.eventInterval = config.eventIntervalTicks ?? DEFAULT_EVENT_INTERVAL_TICKS;
+    this.matchMode = config.mode ?? 'ffa';
     const count = config.slots ?? MATCH_SLOTS;
     this.slots = Array.from({ length: count }, (_, player) => ({
       player,
       socket: null,
       // The onboarding default, until the lobby says otherwise (GDD §2.11).
       shipClass: ShipClass.Vanguard,
+      // FFA teams-of-one until a TEAMS lobby regroups them (Milestone D/E).
+      team: player,
       ready: false,
       bot: null,
       personality: null,
@@ -251,6 +268,28 @@ export class MatchRoom {
     return this.slots.filter((s) => s.socket !== null).length;
   }
 
+  /** N — the seat count this room was opened at (variable-slots Task C1). This is
+   *  the match size a heartbeat advertises and the world is built to (2..8). */
+  get size(): number {
+    return this.slots.length;
+  }
+
+  /** The room's advertised mode (Task C3). */
+  get mode(): MatchMode {
+    return this.matchMode;
+  }
+
+  /**
+   * Seats a new human could take *right now* (Task C3): empty seats while the
+   * room is still in its lobby. Once the match is live a new arrival is refused
+   * (`join` → `'match-live'`) — reclaim is the only way back in — so a live or
+   * ended room advertises zero joinable seats even if a bot-flown seat is "empty".
+   */
+  get joinableSeats(): number {
+    if (this.phase !== 'lobby') return 0;
+    return this.slots.filter((s) => s.socket === null).length;
+  }
+
   /** True while somebody may still come back to a held seat (GDD §4.2). */
   get hasPendingReclaim(): boolean {
     return this.slots.some((s) => s.graceUntil >= 0);
@@ -270,6 +309,7 @@ export class MatchRoom {
       isBot: slot.bot !== null,
       ...(slot.difficulty ? { botDifficulty: slot.difficulty } : {}),
       shipClass: slot.shipClass,
+      team: slot.team,
       ready: slot.ready,
     }));
   }
@@ -458,7 +498,11 @@ export class MatchRoom {
 
     this.authoritative = createWorld({
       seed: this.config.seed,
-      players: this.slots.map((slot) => ({ id: slot.player, shipClass: slot.shipClass })),
+      players: this.slots.map((slot) => ({
+        id: slot.player,
+        shipClass: slot.shipClass,
+        team: slot.team,
+      })),
       ...(this.config.bounds ? { bounds: this.config.bounds } : {}),
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }
@@ -643,7 +687,7 @@ export class MatchRoom {
       type: 'matchStart',
       tick: this.authoritative.tick,
       seed: this.config.seed,
-      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass })),
+      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass, team: s.team })),
       ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }

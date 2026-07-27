@@ -54,6 +54,18 @@ export interface Room {
   readonly code: RoomCode;
   /** Current occupancy — data the fleet controller reads for load-aware placement. */
   readonly players: number;
+  /**
+   * Match size (N, 2..8) — the seat count the room was opened at (variable-slots
+   * Task C3). Optional so a heartbeat from a pre-variable-size Machine still
+   * ingests; the advertisement (`Allocator.roomInfo`) reports it when present.
+   */
+  readonly size?: number;
+  /** Match mode (`'ffa' | 'teams'`), advertised so a lobby can show/refuse a room
+   *  before dialing (Task C3). A bare string here — the sim owns the union. */
+  readonly mode?: string;
+  /** Seats a new human can still take right now: open lobby seats, 0 once the
+   *  match is live or full (Task C3). What a lobby refuses an incompatible join on. */
+  readonly joinableSeats?: number;
 }
 
 /**
@@ -94,6 +106,19 @@ export interface Reservation {
   readonly machine: MachineId;
   /** Epoch-ms after which the lease no longer covers the room. */
   readonly expiresAt: number;
+  /** The requested size the room will boot at, carried so the room is
+   *  advertisable during the boot gap — before its first heartbeat restates it
+   *  (variable-slots Task C1/C3). Optional; absent for a default-size room. */
+  readonly size?: number;
+  /** The requested mode the room will boot at, same purpose as {@link size}. */
+  readonly mode?: string;
+}
+
+/** The requested config for a new room, threaded from the allocate request into
+ *  the lease so the boot gap is advertisable (variable-slots Task C1/C3). */
+export interface ReserveConfig {
+  readonly size?: number;
+  readonly mode?: string;
 }
 
 /** Tuning for a {@link RoomRegistry}; both fields default to the constants above. */
@@ -114,8 +139,10 @@ export interface RoomRegistry {
   machines(now: number): MachineView[];
   /** Which live Machine hosts `room`, by heartbeat first then lease, or `null`. */
   locate(room: RoomCode, now: number): MachineId | null;
-  /** Lease `room` to `machine`, covering the gap until a heartbeat confirms it. */
-  reserve(room: RoomCode, machine: MachineId, now: number): Reservation;
+  /** Lease `room` to `machine`, covering the gap until a heartbeat confirms it.
+   *  `config` records the size/mode the room will boot at, so a join in the gap
+   *  can be advertised the room's shape before its first heartbeat (Task C1/C3). */
+  reserve(room: RoomCode, machine: MachineId, now: number, config?: ReserveConfig): Reservation;
   /** The currently-outstanding leases at `now` (lapsed ones excluded). */
   reservations(now: number): Reservation[];
 }
@@ -178,10 +205,16 @@ export class InMemoryRoomRegistry implements RoomRegistry {
     return null;
   }
 
-  reserve(room: RoomCode, machine: MachineId, now: number): Reservation {
+  reserve(room: RoomCode, machine: MachineId, now: number, config: ReserveConfig = {}): Reservation {
     // A fresh reservation replaces any prior one for the room — re-placing a
     // room onto a new Machine simply re-points the lease.
-    const lease: Reservation = { room, machine, expiresAt: now + this.reservationTtlMs };
+    const lease: Reservation = {
+      room,
+      machine,
+      expiresAt: now + this.reservationTtlMs,
+      ...(config.size !== undefined ? { size: config.size } : {}),
+      ...(config.mode !== undefined ? { mode: config.mode } : {}),
+    };
     this.leases.set(room, lease);
     return lease;
   }

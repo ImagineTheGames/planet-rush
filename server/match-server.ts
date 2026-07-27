@@ -41,7 +41,8 @@ import { verifyTicket } from '../src/net/ticket';
 import type { MachineId } from '../src/net/ticket';
 import { parseClientMessage, parseRoomCode } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
-import type { Bounds } from '../src/sim';
+import type { Bounds, MatchMode } from '../src/sim';
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from '../src/sim';
 import { MatchRoom } from './room';
 import type { JoinRejection, RoomConfig, ServerSocket } from './room';
 
@@ -132,6 +133,16 @@ export interface MatchServerConfig {
  *  ARM core's budget at the measured per-room cost (docs/netcode-spike.md). */
 export const DEFAULT_MAX_ROOMS = 64;
 
+/**
+ * The per-room shape a *new*-room join asks for (variable-slots Task C1): the
+ * match size (N) and mode. Both are optional — a join that carries neither opens
+ * a room at this process's default {@link MatchServerConfig.slots} and `'ffa'`.
+ */
+export interface RoomOpenOptions {
+  readonly size?: number;
+  readonly mode?: MatchMode;
+}
+
 // ---------------------------------------------------------------------------
 // The server
 // ---------------------------------------------------------------------------
@@ -172,12 +183,29 @@ export class MatchServer {
   }
 
   /**
-   * Every room this process hosts and how many humans are in it — the room list a
-   * heartbeat carries so the allocator can locate rooms and read load (M9).
+   * Every room this process hosts, with the truth a heartbeat carries so the
+   * allocator can locate rooms, read load, and *advertise* them (M9; variable-slots
+   * Task C3): each room's human count, its size (N) and mode, and the seats a new
+   * human can still take. The size/mode/joinableSeats fields are what let a lobby
+   * show or refuse a room before dialing (`Allocator.roomInfo`).
    */
-  roomLoads(): { code: RoomCode; players: number }[] {
-    const loads: { code: RoomCode; players: number }[] = [];
-    for (const [code, room] of this.rooms) loads.push({ code, players: room.humanCount });
+  roomLoads(): {
+    code: RoomCode;
+    players: number;
+    size: number;
+    mode: MatchMode;
+    joinableSeats: number;
+  }[] {
+    const loads = [];
+    for (const [code, room] of this.rooms) {
+      loads.push({
+        code,
+        players: room.humanCount,
+        size: room.size,
+        mode: room.mode,
+        joinableSeats: room.joinableSeats,
+      });
+    }
     return loads;
   }
 
@@ -241,14 +269,48 @@ export class MatchServer {
     }
   }
 
-  /** Create the room a code names, or return the one that already exists. */
-  openRoom(code: RoomCode): MatchRoom | null {
+  /**
+   * Create the room a code names at the requested size/mode, or return the one
+   * that already exists. `options` shapes only a *newly created* room — a join to
+   * an existing code lands in the room as it already stands, whatever size it was
+   * opened at, because the room's shape is fixed the moment it is created (its
+   * first join). This is what makes the room's size a single, stable fact for the
+   * whole match rather than something a later joiner could renegotiate.
+   */
+  openRoom(code: RoomCode, options: RoomOpenOptions = {}): MatchRoom | null {
     const existing = this.rooms.get(code);
     if (existing) return existing;
     if (this.rooms.size >= this.maxRooms) return null;
-    const room = new MatchRoom(this.roomConfig(code));
+    const room = new MatchRoom(this.roomConfig(code, options));
     this.rooms.set(code, room);
     return room;
+  }
+
+  /**
+   * The room-open options a *new*-room join carries, read from its signed ticket
+   * (variable-slots Task C1). Only a ticket the allocator signed for *this* room
+   * is trusted for the room's shape — a size a client could name for itself is a
+   * size an attacker names for someone else's room. When this Machine is not
+   * enforcing tickets (the solo/self-hosted path) there is no allocator to sign a
+   * config, so the room opens at the process default. A size outside the legal
+   * 2..8 range is dropped defensively even though the allocator already clamps it,
+   * so a bad ticket degrades to a default room rather than one the sim cannot build.
+   */
+  roomOptionsFromTicket(code: RoomCode, ticket: string | undefined): RoomOpenOptions {
+    if (this.ticketSecret === undefined || ticket === undefined) return {};
+    const claims = verifyTicket(ticket, this.ticketSecret, this.now);
+    if (claims === null || claims.room !== code) return {};
+    const options: { size?: number; mode?: MatchMode } = {};
+    if (
+      typeof claims.size === 'number' &&
+      Number.isInteger(claims.size) &&
+      claims.size >= MIN_MATCH_SIZE &&
+      claims.size <= MAX_MATCH_SIZE
+    ) {
+      options.size = claims.size;
+    }
+    if (claims.mode === 'ffa' || claims.mode === 'teams') options.mode = claims.mode;
+    return options;
   }
 
   /** A fresh, unused, human-typable room code (GDD §4.2 "shareable code"). */
@@ -263,12 +325,16 @@ export class MatchServer {
     return '';
   }
 
-  private roomConfig(code: RoomCode): RoomConfig {
+  private roomConfig(code: RoomCode, options: RoomOpenOptions = {}): RoomConfig {
+    // Per-room size wins over the process default; mode defaults to `'ffa'` unless
+    // the ticket named teams (variable-slots Task C1).
+    const slots = options.size ?? this.config.slots;
     return {
       code,
       // Every room gets its own world seed, drawn from the server's one stream.
       seed: Math.floor(this.rng.next() * 0xffff_ffff) >>> 0,
-      ...(this.config.slots !== undefined ? { slots: this.config.slots } : {}),
+      ...(slots !== undefined ? { slots } : {}),
+      ...(options.mode !== undefined ? { mode: options.mode } : {}),
       ...(this.config.graceMs !== undefined ? { graceMs: this.config.graceMs } : {}),
       ...(this.config.bounds ? { bounds: this.config.bounds } : {}),
       ...(this.config.asteroidCount !== undefined
@@ -364,8 +430,12 @@ class ServerConnection implements Connection {
       return;
     }
 
+    // A reclaim reaches for an existing room and never reshapes it; a fresh join
+    // opens the room at the size/mode its signed ticket names (variable-slots C1).
     const room =
-      message.reclaim !== undefined ? (this.server.room(code) ?? null) : this.server.openRoom(code);
+      message.reclaim !== undefined
+        ? (this.server.room(code) ?? null)
+        : this.server.openRoom(code, this.server.roomOptionsFromTicket(code, message.ticket));
     if (!room) {
       this.refuse(message.reclaim !== undefined ? 'reclaim-unknown' : 'room-full');
       return;

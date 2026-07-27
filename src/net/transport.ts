@@ -151,6 +151,15 @@ export interface LobbySlot {
   botDifficulty?: BotDifficulty;
   shipClass: ShipClass;
   ready: boolean;
+  /**
+   * The side this slot fights for (variable-slots Task C4). FFA is teams-of-one,
+   * so `team === player`; TEAMS shares one `team` across allies. Optional so a
+   * `LobbySlot` a pre-teams client builds still satisfies the type — an absent
+   * team reads as FFA (the slot's own id). Allegiance is static match config, so
+   * it rides this low-frequency lobby message, never the per-tick snapshot
+   * (spike §S2, Trap 7).
+   */
+  team?: number;
 }
 
 /** Full lobby snapshot, broadcast on any change before the match starts. */
@@ -186,6 +195,15 @@ export interface MatchStartMessage {
 export interface MatchStartSlot {
   player: PlayerId;
   shipClass: ShipClass;
+  /**
+   * The side this seat fights for (variable-slots Task C4) — the client threads
+   * it into `createWorld` so its predicted world groups allies exactly as the
+   * server's authoritative world does. FFA is teams-of-one (`team === player`);
+   * optional, and an absent team defaults to the seat's own id at world-build
+   * (`makeShip`), so a pre-teams roster is byte-identical to today. Static config:
+   * it rides RUSH!, never the snapshot (spike §S2, Trap 7).
+   */
+  team?: number;
 }
 
 /**

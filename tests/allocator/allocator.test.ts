@@ -225,6 +225,102 @@ describe('Allocator.regions — the capacity summary a region picker reads', () 
   });
 });
 
+describe('Allocator.allocate — the room config it signs and advertises (Task C1/C3)', () => {
+  it('signs the requested size and mode into the ticket', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', [])]);
+    const a = alloc.allocate({ size: 4, mode: 'teams' }, 1000);
+    // The Machine trusts the ticket, so the size/mode ride on it, tamper-proof.
+    const claims = verifyTicket(a.ticket, SECRET, 1000);
+    expect(claims).toMatchObject({ room: a.room, machine: 'm-1', size: 4, mode: 'teams' });
+  });
+
+  it('records the size and mode on the reservation, so the boot gap is advertisable', () => {
+    const { reg, alloc } = withFleet([beat('m-1', 'iad', [])]);
+    const a = alloc.allocate({ size: 6, mode: 'ffa' }, 1000);
+    const lease = reg.reservations(1000).find((r) => r.room === a.room);
+    expect(lease).toMatchObject({ size: 6, mode: 'ffa' });
+  });
+
+  it('leaves a default allocate byte-identical to before — no size/mode on the ticket', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', [])]);
+    const a = alloc.allocate({}, 1000);
+    // `toEqual` is exact: an unrequested config adds no keys to the claims.
+    expect(verifyTicket(a.ticket, SECRET, 1000)).toEqual({
+      room: a.room,
+      machine: 'm-1',
+      expiresAt: a.expiresAt,
+    });
+  });
+
+  it('drops an out-of-range or non-integer size rather than minting an unbuildable room', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', [])]);
+    for (const bad of [1, 9, 0, -3, 4.5, Number.NaN]) {
+      const a = alloc.allocate({ size: bad }, 1000);
+      expect(verifyTicket(a.ticket, SECRET, 1000)?.size).toBeUndefined();
+    }
+  });
+
+  it('drops an unknown mode', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', [])]);
+    const a = alloc.allocate({ mode: 'battle-royale' }, 1000);
+    expect(verifyTicket(a.ticket, SECRET, 1000)?.mode).toBeUndefined();
+  });
+});
+
+describe('Allocator.roomInfo — advertise a room before dialing (Task C3)', () => {
+  it('reports a live room\'s size, mode, and free seats from the heartbeat', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(
+      {
+        machine: 'm-1',
+        region: 'iad',
+        capacity: 8,
+        rooms: [{ code: 'K7QM', players: 2, size: 4, mode: 'ffa', joinableSeats: 2 }],
+      },
+      1000,
+    );
+    const alloc = new Allocator({ registry: reg, rng: mulberry32(1), secret: SECRET });
+    expect(alloc.roomInfo('K7QM', 1000)).toEqual({
+      code: 'K7QM',
+      machine: 'm-1',
+      region: 'iad',
+      size: 4,
+      mode: 'ffa',
+      joinableSeats: 2,
+      joinable: true,
+    });
+  });
+
+  it('refuses a full room in the advertisement: joinable is false at zero free seats', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(
+      {
+        machine: 'm-1',
+        region: 'iad',
+        capacity: 8,
+        rooms: [{ code: 'FULL', players: 4, size: 4, mode: 'ffa', joinableSeats: 0 }],
+      },
+      1000,
+    );
+    const alloc = new Allocator({ registry: reg, rng: mulberry32(1), secret: SECRET });
+    expect(alloc.roomInfo('FULL', 1000)?.joinable).toBe(false);
+  });
+
+  it('advertises a still-booting room from its reservation (the gap before the first heartbeat)', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', [])]);
+    const a = alloc.allocate({ size: 4, mode: 'teams' }, 1000);
+    // No heartbeat has confirmed the room yet — only the reservation knows it.
+    const info = alloc.roomInfo(a.room, 1000);
+    expect(info).toMatchObject({ machine: 'm-1', region: 'iad', size: 4, mode: 'teams' });
+    expect(info?.joinable).toBe(true); // nobody has reached it yet
+  });
+
+  it('returns null for a code no live Machine hosts or has reserved', () => {
+    const { alloc } = withFleet([beat('m-1', 'iad', ['K7QM'])]);
+    expect(alloc.roomInfo('ZZZZ', 1000)).toBeNull();
+  });
+});
+
 describe('Allocator.allocate — the cordon placement seam', () => {
   it('never places a new room on a cordoned (draining) Machine', () => {
     const reg = new InMemoryRoomRegistry();
