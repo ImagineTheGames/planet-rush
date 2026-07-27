@@ -191,6 +191,13 @@ export interface HeartbeatLoad {
 export interface HeartbeatRoom {
   readonly code: string;
   readonly players: number;
+  /** Match size (N), advertised so a lobby can show/refuse the room before
+   *  dialing (variable-slots Task C3). Optional — an old Machine omits it. */
+  readonly size?: number;
+  /** Match mode (`'ffa' | 'teams'`), advertised on the same terms as size. */
+  readonly mode?: string;
+  /** Seats a new human can still take right now (0 once live or full). */
+  readonly joinableSeats?: number;
 }
 
 /**

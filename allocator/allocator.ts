@@ -41,7 +41,18 @@ import type { RoomCode } from '../src/net/transport';
 import type { MachineId } from '../src/net/ticket';
 import { signTicket } from '../src/net/ticket';
 import { makeRoomCode } from '../src/net/room-code';
-import type { RoomRegistry, MachineView, Reservation } from './registry';
+import type { RoomRegistry, MachineView, Reservation, ReserveConfig } from './registry';
+
+/**
+ * The legal match-size range (variable-slots plan, `MatchConfig`). Restated here
+ * as bare constants rather than imported from `src/sim/match-config.ts`, because
+ * the allocator is pure control plane and imports no sim (see the file header):
+ * a room's size is a routing datum to it, not a simulation. The sim is the source
+ * of truth; these mirror `MIN_MATCH_SIZE` / `MAX_MATCH_SIZE` and are asserted to
+ * agree in the tests that touch both layers.
+ */
+export const MIN_ROOM_SIZE = 2;
+export const MAX_ROOM_SIZE = 8;
 
 /**
  * How long a signed ticket stays valid after issue. A ticket only has to survive
@@ -81,6 +92,33 @@ export interface RegionCapacity {
   readonly rooms: number;
   /** Slots still free — `capacity - rooms`. */
   readonly free: number;
+}
+
+/**
+ * The advertised shape of one room, read *before* a client dials it (variable-slots
+ * Task C3). This is what lets a lobby show "4-player FFA, 1 seat left" — or refuse
+ * a room it cannot join — instead of routing a player to a Machine only to be
+ * turned away with `room-full` after the socket is already open.
+ */
+export interface RoomInfo {
+  readonly code: RoomCode;
+  /** The Machine hosting (or booting) the room. */
+  readonly machine: MachineId;
+  /** That Machine's region, or '' when it is known only through a reservation. */
+  readonly region: string;
+  /** Match size (N), when the heartbeat or reservation carries it. */
+  readonly size?: number;
+  /** Match mode (`'ffa' | 'teams'`), when advertised. */
+  readonly mode?: string;
+  /** Seats a new human can still take, when the heartbeat carries it. */
+  readonly joinableSeats?: number;
+  /**
+   * Whether a fresh join would be accepted right now. A room still booting (known
+   * only through its reservation) is joinable — nobody is in it yet; a live room
+   * is joinable iff it advertises a free seat. A lobby refuses the join when this
+   * is false, WITH the reason the shape makes plain (full, or already live).
+   */
+  readonly joinable: boolean;
 }
 
 /** Why an allocation could not be answered — maps straight to an HTTP status. */
@@ -125,7 +163,8 @@ export interface AllocatorConfig {
   readonly excludeMachine?: (machine: MachineId) => boolean;
 }
 
-/** What a room needs to be placed: an optional preferred region. */
+/** What a room needs to be placed: an optional preferred region and the room's
+ *  requested shape (variable-slots Task C1). */
 export interface AllocateOptions {
   /**
    * Preferred datacentre. A *preference*, not a demand: if the region has room
@@ -133,6 +172,17 @@ export interface AllocateOptions {
    * Machine anywhere rather than failing — a placed match beats a refused one.
    */
   readonly region?: string;
+  /**
+   * Requested match size (N). Signed into the ticket so the Machine opens the
+   * room at this size, and recorded on the reservation so the room is
+   * advertisable during its boot gap. Out-of-range or non-integer values are
+   * dropped (the Machine then falls back to its default), so a garbage size can
+   * never mint an unbuildable room — the lobby is where 2..8 is truly enforced
+   * (`isValidSize`), this is the belt to that suspenders.
+   */
+  readonly size?: number;
+  /** Requested match mode (`'ffa' | 'teams'`), carried on the same terms as size. */
+  readonly mode?: string;
 }
 
 export class Allocator {
@@ -163,12 +213,14 @@ export class Allocator {
     if (machine === null) {
       throw new AllocatorError('no-capacity', 'no live machine has a free room slot');
     }
+    const config = normalizeRoomConfig(opts);
     const code = this.mintCode(now);
     // Reserve *before* anyone else can allocate: the lease both covers the
     // boot gap (join can locate the room before its first heartbeat) and counts
-    // against this Machine's capacity for the next allocation.
-    this.registry.reserve(code, machine.machine, now);
-    return this.issue(code, machine.machine, machine.region, now);
+    // against this Machine's capacity for the next allocation. The size/mode ride
+    // along so the room's shape is advertisable before its first heartbeat.
+    this.registry.reserve(code, machine.machine, now, config);
+    return this.issue(code, machine.machine, machine.region, now, config);
   }
 
   /**
@@ -212,6 +264,48 @@ export class Allocator {
       byRegion.set(view.region, { ...merged, free: merged.capacity - merged.rooms });
     }
     return [...byRegion.values()];
+  }
+
+  /**
+   * The advertised config of a room, or `null` when no live Machine hosts or has
+   * reserved it (variable-slots Task C3). Reality first: a live Machine whose
+   * heartbeat lists the room carries its current occupancy, so `joinableSeats`
+   * and `joinable` are live. In the boot gap — reserved but not yet
+   * heartbeat-confirmed — only the reservation's size/mode are known, and the
+   * room is treated as fully joinable because nobody has reached it yet.
+   */
+  roomInfo(code: RoomCode, now: number): RoomInfo | null {
+    const machine = this.registry.locate(code, now);
+    if (machine === null) return null;
+
+    const view = this.registry.machines(now).find((m) => m.machine === machine);
+    const room = view?.rooms.find((r) => r.code === code);
+    const region = view?.region ?? '';
+    if (room) {
+      return {
+        code,
+        machine,
+        region,
+        ...(room.size !== undefined ? { size: room.size } : {}),
+        ...(room.mode !== undefined ? { mode: room.mode } : {}),
+        ...(room.joinableSeats !== undefined ? { joinableSeats: room.joinableSeats } : {}),
+        // Unknown occupancy (an old Machine that does not report seats) reads as
+        // joinable — the room-full check at the Machine remains the backstop.
+        joinable: room.joinableSeats === undefined ? true : room.joinableSeats > 0,
+      };
+    }
+
+    // Boot gap: the room exists only as intent. The reservation knows its shape
+    // but not its occupancy; nobody is in it yet, so it is joinable.
+    const lease = this.registry.reservations(now).find((r) => r.room === code);
+    return {
+      code,
+      machine,
+      region,
+      ...(lease?.size !== undefined ? { size: lease.size } : {}),
+      ...(lease?.mode !== undefined ? { mode: lease.mode } : {}),
+      joinable: true,
+    };
   }
 
   /**
@@ -276,10 +370,48 @@ export class Allocator {
     return view?.region ?? '';
   }
 
-  /** Sign the routing decision into a ticket and package it as an {@link Allocation}. */
-  private issue(room: RoomCode, machine: MachineId, region: string, now: number): Allocation {
+  /** Sign the routing decision into a ticket and package it as an {@link Allocation}.
+   *  A `join` (existing room) passes no config, so the ticket is byte-identical to
+   *  the pre-variable-size shape; an `allocate` folds the room's size/mode in. */
+  private issue(
+    room: RoomCode,
+    machine: MachineId,
+    region: string,
+    now: number,
+    config: ReserveConfig = {},
+  ): Allocation {
     const expiresAt = now + this.ticketTtlMs;
-    const ticket = signTicket({ room, machine, expiresAt }, this.secret);
+    const ticket = signTicket(
+      {
+        room,
+        machine,
+        expiresAt,
+        ...(config.size !== undefined ? { size: config.size } : {}),
+        ...(config.mode !== undefined ? { mode: config.mode } : {}),
+      },
+      this.secret,
+    );
     return { room, machine, region, ticket, expiresAt };
   }
+}
+
+/**
+ * Distil an {@link AllocateOptions} down to the room config that survives onto
+ * the ticket and the reservation. A size is kept only when it is an integer in
+ * the legal 2..8 range; a mode only when it is one of the two known values.
+ * Anything else is dropped to `undefined`, so a malformed request degrades to a
+ * default-shaped room rather than minting one the sim cannot build.
+ */
+function normalizeRoomConfig(opts: AllocateOptions): ReserveConfig {
+  const config: { size?: number; mode?: string } = {};
+  if (
+    typeof opts.size === 'number' &&
+    Number.isInteger(opts.size) &&
+    opts.size >= MIN_ROOM_SIZE &&
+    opts.size <= MAX_ROOM_SIZE
+  ) {
+    config.size = opts.size;
+  }
+  if (opts.mode === 'ffa' || opts.mode === 'teams') config.mode = opts.mode;
+  return config;
 }

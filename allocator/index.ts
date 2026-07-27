@@ -85,6 +85,7 @@ interface RouteResult {
 }
 
 const JOIN_PATH = /^\/rooms\/([^/]+)\/join$/;
+const ROOM_PATH = /^\/rooms\/([^/]+)$/;
 
 /**
  * Build the allocator's `http.Server` without listening. Reads each request's
@@ -149,6 +150,12 @@ function route(
       ? joinRoute(deps, decodeURIComponent(joinMatch[1] ?? ''), now)
       : methodNotAllowed();
   }
+  const roomMatch = ROOM_PATH.exec(pathname);
+  if (roomMatch) {
+    return method === 'GET'
+      ? roomInfoRoute(deps, decodeURIComponent(roomMatch[1] ?? ''), now)
+      : methodNotAllowed();
+  }
   return { status: 404, body: { error: 'not-found' } };
 }
 
@@ -181,9 +188,13 @@ function heartbeatRoute(deps: AllocatorServerDeps, raw: string, now: number): Ro
   return { status: 204 };
 }
 
-/** Allocate a new room; 201 with the signed decision, 503 when the fleet is full. */
+/** Allocate a new room; 201 with the signed decision, 503 when the fleet is full.
+ *  The optional JSON body carries the room's requested shape: `region` (a routing
+ *  preference), and `size`/`mode` (the match config, variable-slots Task C1). Each
+ *  field is only honoured when well-typed; a malformed one is ignored, never a
+ *  400, so a client on an old shape still allocates a default room. */
 function allocateRoute(deps: AllocatorServerDeps, raw: string, now: number): RouteResult {
-  let region: string | undefined;
+  const opts: { region?: string; size?: number; mode?: string } = {};
   if (raw.trim().length > 0) {
     let parsed: unknown;
     try {
@@ -191,14 +202,15 @@ function allocateRoute(deps: AllocatorServerDeps, raw: string, now: number): Rou
     } catch {
       return { status: 400, body: { error: 'bad-json' } };
     }
-    if (typeof parsed === 'object' && parsed !== null && 'region' in parsed) {
-      const r = (parsed as { region: unknown }).region;
-      if (typeof r === 'string') region = r;
+    if (typeof parsed === 'object' && parsed !== null) {
+      const body = parsed as Record<string, unknown>;
+      if (typeof body['region'] === 'string') opts.region = body['region'];
+      if (typeof body['size'] === 'number') opts.size = body['size'];
+      if (typeof body['mode'] === 'string') opts.mode = body['mode'];
     }
   }
   try {
-    const allocation = deps.allocator.allocate(region === undefined ? {} : { region }, now);
-    return decided(deps, allocation, 201);
+    return decided(deps, deps.allocator.allocate(opts, now), 201);
   } catch (e) {
     return errorResult(e);
   }
@@ -211,6 +223,20 @@ function joinRoute(deps: AllocatorServerDeps, code: string, now: number): RouteR
   } catch (e) {
     return errorResult(e);
   }
+}
+
+/**
+ * Read a room's advertised config *before* joining it (variable-slots Task C3):
+ * 200 with `{code, machine, region, size?, mode?, joinableSeats?, joinable}`, or
+ * 404 when no live Machine hosts or has reserved the code. This is the read a
+ * lobby makes to show a room's shape and to refuse an incompatible or full one
+ * without ever opening a socket to the Machine — advertisement, not a booking, so
+ * it mints no ticket and reserves nothing.
+ */
+function roomInfoRoute(deps: AllocatorServerDeps, code: string, now: number): RouteResult {
+  const info = deps.allocator.roomInfo(code, now);
+  if (info === null) return { status: 404, body: { error: 'not-found' } };
+  return { status: 200, body: info };
 }
 
 /** Turn an {@link Allocation} into a response, folding in the Router's instruction. */
@@ -259,7 +285,14 @@ function isHeartbeat(value: unknown): value is Heartbeat {
   return h['rooms'].every((room) => {
     if (typeof room !== 'object' || room === null) return false;
     const r = room as Record<string, unknown>;
-    return typeof r['code'] === 'string' && typeof r['players'] === 'number';
+    if (typeof r['code'] !== 'string' || typeof r['players'] !== 'number') return false;
+    // The advertised config is optional (an old Machine omits it) but must be
+    // well-typed when present, so a malformed field never reaches an advertisement
+    // (variable-slots Task C3).
+    if (r['size'] !== undefined && typeof r['size'] !== 'number') return false;
+    if (r['mode'] !== undefined && typeof r['mode'] !== 'string') return false;
+    if (r['joinableSeats'] !== undefined && typeof r['joinableSeats'] !== 'number') return false;
+    return true;
   });
 }
 

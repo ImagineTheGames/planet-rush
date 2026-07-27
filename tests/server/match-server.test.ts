@@ -21,6 +21,7 @@ import type { ServerMessage } from '../../src/net/transport';
 import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
 import type { WireFrame } from '../../src/net/wire';
 import { TICK_DT } from '../../src/sim';
+import { signTicket } from '../../src/net/ticket';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
 
@@ -437,5 +438,81 @@ describe('the authoritative match server', () => {
 
     advance(GRACE_MS + 1_000);
     expect(server.roomCount).toBe(0);
+  });
+
+  // --- Variable room size (variable-slots Tasks C1 & C2) ------------------
+
+  describe('variable match size', () => {
+    it('opens two rooms at different sizes on one server, simultaneously (C1)', () => {
+      // The size is per-room now, not a process-global default: a four-planet
+      // duel-plus and a full eight-planet war coexist in one process.
+      const four = server.openRoom('SML4', { size: 4 })!;
+      const eight = server.openRoom('BIG8', { size: 8 })!;
+      expect(four.size).toBe(4);
+      expect(eight.size).toBe(8);
+      expect(server.roomCount).toBe(2);
+    });
+
+    it('refuses the (N+1)th join with room-full — a closed seat is one that never existed (C2)', () => {
+      // "Closing" a lobby slot is resolved to a smaller N before it reaches the
+      // server (dense-roster discipline, spike §S2): a size-4 room simply has
+      // four seats, so the fifth arrival is refused exactly as a full 8 would be.
+      const code = 'FOUR';
+      server.openRoom(code, { size: 4 });
+      for (let i = 0; i < 4; i++) join(connect(), code);
+      const fifth = connect();
+      join(fifth, code);
+      expect(fifth.connection.room).toBeNull();
+      expect(fifth.socket.errors()[0]?.reason).toBe('room-full');
+    });
+
+    it('builds an N-planet world and seats no bot beyond N (C2)', () => {
+      const code = 'FOUR';
+      const room = server.openRoom(code, { size: 4 })!;
+      const host = connect();
+      join(host, code);
+      host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
+
+      // Four seats: one human, three bots — a four-planet war, not an eight.
+      expect(room.world?.ships).toHaveLength(4);
+      expect(room.world?.planets).toHaveLength(4);
+      const lobby = room.lobbyState();
+      expect(lobby).toHaveLength(4);
+      expect(lobby.filter((s) => s.isBot)).toHaveLength(3);
+      // A dense FFA roster: each ship its own team, contiguous 0..3.
+      expect(room.world?.ships.map((s) => s.id)).toEqual([0, 1, 2, 3]);
+      expect(room.world?.ships.map((s) => s.team)).toEqual([0, 1, 2, 3]);
+    });
+
+    it('reads a new room\'s size from the signed ticket on an enforcing Machine (C1)', () => {
+      // In a fleet, the allocator decides the size and signs it; the Machine
+      // trusts the ticket, not a size a client could name for itself.
+      const SECRET = 'allocator-and-machine-share-this';
+      const enforcing = new MatchServer({ seed: 0x5eed, ticketSecret: SECRET, machineId: 'm-1' });
+      enforcing.update(now);
+      const code = enforcing.createCode();
+      const ticket = signTicket(
+        { room: code, machine: 'm-1', expiresAt: now + 30_000, size: 6, mode: 'ffa' },
+        SECRET,
+      );
+
+      const socket = new FakeSocket();
+      const connection = enforcing.connect(socket);
+      connection.receive(encodeClientMessage({ type: 'join', room: code, ticket }));
+
+      expect(connection.room?.size).toBe(6);
+      expect(connection.room?.mode).toBe('ffa');
+    });
+
+    it('ignores a size a client tries to smuggle in without a signed ticket (C1)', () => {
+      // No ticket secret here, so there is no allocator decision to honour and no
+      // config to read: the room opens at the process default, never at whatever a
+      // raw join might claim. (The join message has no size field at all — this
+      // pins that the *only* channel for size is the signed ticket.)
+      const code = server.createCode();
+      const host = connect();
+      join(host, code);
+      expect(host.connection.room?.size).toBe(8); // MATCH_SLOTS default
+    });
   });
 });
