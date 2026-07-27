@@ -252,3 +252,70 @@ test.describe('build button persists through the whole build cycle', () => {
     expect(has(reopened, 'build-button'), `[${label}] REOPEN: the button vanished on reopen`).toBe(true);
   });
 });
+
+// The BACK cycle (field report v0.2.4): drill BUILD → UPGRADE SHIP → WEAPON, then
+// tap the hub BACK-BACK-BACK back out to closed — one level per tap. Real touch
+// taps through the layout contract, on both phone profiles, so the "no way back up
+// a level" bug is a red-if-it-regresses test rather than a screenshot.
+test.describe('the wheel BACK cycle — drill in, hub-tap back out (field report v0.2.4)', () => {
+  test('BUILD → UPGRADE → WEAPON, then hub BACK×3 pops one level each to closed', async ({
+    page,
+  }, testInfo) => {
+    test.skip(!isTouchProject(testInfo.project.name), 'the wheel is tap-operated on touch (GDD §2.4)');
+
+    await useLandscape(page);
+    await bootDebug(page);
+
+    const label = testInfo.project.name;
+    const boot = await snapshot(page);
+    const w = boot.viewport.width;
+    const h = boot.viewport.height;
+
+    // Open the Build wheel from its button.
+    const c = buildButtonCenter(w, h);
+    await tap(page, c.x, c.y);
+    let snap = await snapshot(page);
+    expect(has(snap, 'build-wheel'), `[${label}] the wheel did not open`).toBe(true);
+    // The hub BACK affordance is registered thumb-sized at centre while a wheel is up.
+    expect(has(snap, 'wheel-hub-back'), `[${label}] the hub BACK affordance is not registered`).toBe(true);
+
+    // Geometry from the drawn wheel (registry bounds, not guessed pixels).
+    const wheel = find(snap, 'build-wheel')!;
+    const cx = wheel.bounds.x + wheel.bounds.width / 2;
+    const cy = wheel.bounds.y + wheel.bounds.height / 2;
+    const r = wheel.bounds.width / 2;
+
+    // Drill: UPGRADE SHIP (index 3 → angle π, LEFT of the hub) opens the upgrade wheel.
+    await tap(page, cx - r * 0.6, cy);
+    snap = await snapshot(page);
+    expect(has(snap, 'upgrade-wheel'), `[${label}] UPGRADE SHIP did not open the upgrade wheel`).toBe(true);
+
+    // Drill: WEAPON (index 0 → twelve o'clock, UP from the hub) opens the sub-wheel.
+    // It must NOT collapse back to the Build wheel — the upgrade wheel stays up.
+    await tap(page, cx, cy - r * 0.6);
+    snap = await snapshot(page);
+    expect(has(snap, 'upgrade-wheel'), `[${label}] WEAPON collapsed the wheel instead of drilling in`).toBe(true);
+    expect(has(snap, 'build-wheel'), `[${label}] WEAPON fell back to the Build wheel`).toBe(false);
+
+    // BACK 1 — hub tap: WEAPON sub-wheel → upgrade wheel. One level, not a full
+    // close: the upgrade wheel is still up and the Build wheel is not back yet.
+    await tap(page, cx, cy);
+    snap = await snapshot(page);
+    expect(has(snap, 'upgrade-wheel'), `[${label}] BACK 1 closed too much — expected the upgrade wheel`).toBe(true);
+    expect(has(snap, 'build-wheel'), `[${label}] BACK 1 jumped past the upgrade wheel to Build`).toBe(false);
+
+    // BACK 2 — hub tap: upgrade wheel → Build wheel.
+    await tap(page, cx, cy);
+    snap = await snapshot(page);
+    expect(has(snap, 'build-wheel'), `[${label}] BACK 2 did not land on the Build wheel`).toBe(true);
+    expect(has(snap, 'upgrade-wheel'), `[${label}] BACK 2 left the upgrade wheel up`).toBe(false);
+
+    // BACK 3 — hub tap: Build wheel → closed. The BUILD button is back (docked).
+    await tap(page, cx, cy);
+    snap = await snapshot(page);
+    expect(has(snap, 'build-wheel'), `[${label}] BACK 3 did not close the wheel`).toBe(false);
+    expect(has(snap, 'upgrade-wheel'), `[${label}] BACK 3 left the upgrade wheel up`).toBe(false);
+    expect(has(snap, 'wheel-hub-back'), `[${label}] the hub affordance lingered after closing`).toBe(false);
+    expect(has(snap, 'build-button'), `[${label}] the BUILD button did not return after closing`).toBe(true);
+  });
+});

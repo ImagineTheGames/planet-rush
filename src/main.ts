@@ -2485,6 +2485,14 @@ async function boot(): Promise<void> {
           y: h / 2 + Math.sin(angle) * radius * 0.6,
         };
       },
+      hubPoint(): { x: number; y: number } {
+        // The LOGICAL screen point at the wheel's hub — the BACK affordance a hub
+        // tap / ESC acts on (field report v0.2.4). The follow camera holds the
+        // docked ship, and the wheel drawn on it, at the viewport centre, so the
+        // hub is dead centre. A real-input test dispatches a pointerdown here to
+        // back out a level through the actual door.
+        return { x: transform.logicalWidth / 2, y: transform.logicalHeight / 2 };
+      },
       legend(): ReturnType<typeof hud.debugControlsStrip> {
         // The controls-strip rows the HUD resolved this frame — read by a
         // live-stage test to prove the PC Build legend is contextual on docking.
