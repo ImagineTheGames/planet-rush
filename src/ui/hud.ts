@@ -69,6 +69,8 @@ import { upgradeWheelModel, upgradeWedgeAngle, STOCK_TIERS } from './upgrade-whe
 import type { UpgradeTiers } from './upgrade-wheel';
 import { PressFeedback, detectConfirmations } from './press-feedback';
 import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './press-feedback';
+import { NO_UI_SFX } from './sfx';
+import type { UiSfx } from './sfx';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
 import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
@@ -495,7 +497,7 @@ export class Hud extends Container {
   //     sim numbers this HUD already receives — a turret queued, a tier bought,
   //     ore banked, the core healing under a repair channel — so pressing REPAIR
   //     and watching the core tick up needs no new plumbing (press-feedback.ts).
-  private readonly pressFeedback = new PressFeedback();
+  private readonly pressFeedback: PressFeedback;
   /** Last frame's wheel-relevant sim numbers + whether the wheel was open, so a
    *  confirmation is the *change* between two open frames (never a spawn/wiring
    *  jump, which happens with the wheel shut). Null until the first frame. */
@@ -519,8 +521,17 @@ export class Hud extends Container {
   constructor(
     private screenWidth: number,
     private screenHeight: number,
+    /** The UI sound seam (field report v0.2.4+). Fed to the one shared control
+     *  component so every wheel/menu control is heard as it is seen; defaults to
+     *  silent so a headless Hud (Node, the QA harness) makes no sound. */
+    sfx: UiSfx = NO_UI_SFX,
   ) {
     super();
+
+    // The one press/confirm driver for the whole wheel family, wired to the
+    // sound seam: a press ticks (or buzzes, if disabled) and a sim-confirmed
+    // spend chimes, all from the same state that drives the visual tell.
+    this.pressFeedback = new PressFeedback(sfx);
 
     // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
     // yellow. The heading names it as the safe bank total, distinct in both form

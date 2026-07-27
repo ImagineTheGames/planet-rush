@@ -204,6 +204,16 @@ export type {
   WheelSnapshot,
 } from './press-feedback';
 
+// --- UI sound seam (field report v0.2.4+) ----------------------------------
+//
+// The narrow seam a UI control calls to make a sound — the shape haptics uses.
+// The UI names an event (press / confirm / reject); the audio module behind the
+// seam decides the sound, the SFX-slider gain and the death-hush ducking. Wired
+// into the ONE shared control component (PressFeedback) so every wheel/menu
+// control is heard exactly as it is seen (sfx.ts).
+export { NO_UI_SFX } from './sfx';
+export type { UiCue, UiSfx } from './sfx';
+
 // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) ----------------
 
 export {

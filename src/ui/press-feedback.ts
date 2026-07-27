@@ -48,6 +48,7 @@ import type { WheelSegmentId } from './build-wheel';
 import { SHIELD, TURRET } from '../sim/constants';
 import { UPGRADE_LADDER, UPGRADE_WHEEL_ORDER, upgradeWheelSlots } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
+import { NO_UI_SFX, type UiSfx } from './sfx';
 
 // ---------------------------------------------------------------------------
 // Tunables — the Cold Vacuum press tokens (all seconds / 0..1 / CSS px)
@@ -345,6 +346,14 @@ interface ConfirmRecord {
  * press; confirmations can overlap (a purchase mid-shimmer), so they are a small
  * pruned list. Everything is a pure function of the frame time it is sampled at,
  * so a frozen frame (`?freeze=1`) simply shows whatever the last-seen time held.
+ *
+ * It is also the one place a control's SOUND fires (field report v0.2.4+): the
+ * injected {@link UiSfx} seam is sounded from the SAME `press()` / `confirm()`
+ * that drives the visual tell — `press` (ready) or `reject` (disabled) on a
+ * press, `confirm` on a spend the sim actually landed — so every wheel/menu
+ * control that routes through this driver is heard exactly as it is seen. The
+ * seam defaults to {@link NO_UI_SFX}, so a headless view (a unit test, the QA
+ * harness, Node) is byte-for-byte silent. See {@link ./sfx}.
  */
 export class PressFeedback {
   private lastPress: PressRecord | null = null;
@@ -352,23 +361,34 @@ export class PressFeedback {
   /** Cap so a pathological confirm storm can't grow the list without bound. */
   private static readonly MAX_CONFIRMS = 8;
 
-  /** Record a press on a control. `allowed = false` makes it a rejection (shake
-   *  + flash) instead of a press (scale + glow). Re-pressing the same control
-   *  restarts its flash, which is the right feel for a repeated tap. */
+  /** The sound seam (default silent). The audio module behind it decides which
+   *  sound, the SFX-slider gain and the death-hush ducking — this only names the
+   *  event, the same way {@link ../platform/haptics} does. */
+  constructor(private readonly sfx: UiSfx = NO_UI_SFX) {}
+
+  /** Record a press on a control, and sound it. `allowed = false` makes it a
+   *  rejection (shake + flash + the buzzer) instead of a press (scale + glow +
+   *  the tick). Re-pressing the same control restarts its flash and re-ticks,
+   *  which is the right feel for a repeated tap. */
   press(surface: PressSurface, index: number, allowed: boolean, time: number): void {
     this.lastPress = { surface, index, start: time, rejected: !allowed };
+    this.sfx(allowed ? 'press' : 'reject');
   }
 
-  /** Record a confirmed action. Throttled per control by {@link CONFIRM_REPEAT_GAP}
-   *  so the continuous repair channel ticks steadily instead of spraying a float
-   *  every frame; discrete spends (they don't repeat) are never affected. */
-  confirm(c: Confirmation, time: number): void {
+  /** Record a confirmed action, and — when it is a fresh one, not a throttled
+   *  repeat — sound the confirm chime. Throttled per control by
+   *  {@link CONFIRM_REPEAT_GAP} so the continuous repair channel ticks steadily
+   *  instead of spraying a float (and a chime) every frame; discrete spends (they
+   *  don't repeat) are never affected. Returns whether it registered. */
+  confirm(c: Confirmation, time: number): boolean {
     const recent = this.confirms.find(
       (r) => r.surface === c.surface && r.index === c.index && time - r.start < CONFIRM_REPEAT_GAP,
     );
-    if (recent) return;
+    if (recent) return false;
     this.confirms.push({ ...c, start: time });
     if (this.confirms.length > PressFeedback.MAX_CONFIRMS) this.confirms.shift();
+    this.sfx('confirm');
+    return true;
   }
 
   /** Drop everything (undock, ship death, rematch) so the next context starts
