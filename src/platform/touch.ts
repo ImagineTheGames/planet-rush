@@ -31,7 +31,7 @@ export interface PointerSample {
   readonly y: number;
 }
 
-/** Tuning for the virtual sticks. All in CSS pixels (except `doubleTapMs`). */
+/** Tuning for the virtual sticks. All in CSS pixels. */
 export interface TouchConfig {
   /** Screen width, used to split left/right halves. Update on resize. */
   screenWidth: number;
@@ -39,28 +39,13 @@ export interface TouchConfig {
   maxRadius: number;
   /** Dead zone (px from origin) below which the stick reads neutral. */
   deadzone: number;
-  /**
-   * Milliseconds within which a second left-stick press after a release counts as
-   * a **double-tap-and-hold** — the touch BOOST gesture (GDD §2.4, field report
-   * v0.2.2): the thumb taps, then re-lands and holds on the same stick to boost,
-   * so it never has to leave the movement side. Above this, the second press is
-   * just a fresh grab and boost stays off.
-   */
-  doubleTapMs: number;
 }
 
 const DEFAULT_CONFIG: TouchConfig = {
   screenWidth: 1280,
   maxRadius: 64,
   deadzone: 8,
-  doubleTapMs: 320,
 };
-
-/** Default clock for the double-tap window — `performance.now()` where present
- *  (browser), falling back to `Date.now()`. Injected via the constructor so the
- *  gesture unit-tests headless with a deterministic fake clock. */
-const defaultNow = (): number =>
-  typeof performance !== 'undefined' ? performance.now() : Date.now();
 
 /**
  * One dynamic virtual stick. Its origin is wherever the thumb first landed; the
@@ -142,19 +127,7 @@ export class TouchController {
   private readonly cfg: TouchConfig;
   private readonly scratch: Vec2 = { x: 0, y: 0 };
 
-  /** When the left stick was last released (clock ms). A fresh left press within
-   *  `cfg.doubleTapMs` of this is a double-tap-and-hold → BOOST. `-Infinity` means
-   *  "no recent release", so the very first press can never read as a double-tap. */
-  private leftReleasedAt = -Infinity;
-  /** Whether the current left-stick press is a held BOOST (a double-tap-and-hold).
-   *  Set when the second press lands; cleared the moment that press releases, so
-   *  boost is exactly the duration of the hold. */
-  private leftBoost = false;
-
-  constructor(
-    config?: Partial<TouchConfig>,
-    private readonly now: () => number = defaultNow,
-  ) {
+  constructor(config?: Partial<TouchConfig>) {
     this.cfg = { ...DEFAULT_CONFIG, ...config };
     this.left = new VirtualStick(this.cfg);
     this.right = new VirtualStick(this.cfg);
@@ -188,16 +161,6 @@ export class TouchController {
     return this.rightButtonPointer !== null;
   }
 
-  /**
-   * Whether the left stick is currently a held BOOST (double-tap-and-hold, GDD
-   * §2.4). True only while the second, quickly-repeated press is down. The visuals
-   * layer reads this to light the left stick's boost state (touch-visuals.ts), and
-   * it is what {@link writeInto} folds into `ControlState.boost`.
-   */
-  get boostEngaged(): boolean {
-    return this.leftBoost && this.left.engaged;
-  }
-
   private isLeftHalf(x: number): boolean {
     return x < this.cfg.screenWidth / 2;
   }
@@ -207,12 +170,7 @@ export class TouchController {
    *  point). A half already holding a pointer ignores a second touch there. */
   onPointerDown(sample: PointerSample): void {
     if (this.isLeftHalf(sample.x)) {
-      if (!this.left.engaged) {
-        // A quick re-press of the left stick after a release is the BOOST
-        // gesture: double-tap-and-hold, thumb never leaving the movement side.
-        this.leftBoost = this.now() - this.leftReleasedAt <= this.cfg.doubleTapMs;
-        this.left.press(sample);
-      }
+      if (!this.left.engaged) this.left.press(sample);
       return;
     }
     // Right half.
@@ -230,13 +188,7 @@ export class TouchController {
   }
 
   onPointerUp(id: number): void {
-    if (this.left.pointerId === id) {
-      // Remember when the left stick let go so a fast re-press reads as the BOOST
-      // double-tap, and end any boost the held press had engaged.
-      this.leftReleasedAt = this.now();
-      this.leftBoost = false;
-      this.left.release();
-    }
+    if (this.left.pointerId === id) this.left.release();
     if (this.right.pointerId === id) this.right.release();
     if (this.rightButtonPointer === id) this.rightButtonPointer = null;
   }
@@ -246,10 +198,6 @@ export class TouchController {
     this.left.release();
     this.right.release();
     this.rightButtonPointer = null;
-    // A blur is not a deliberate tap, so it must not seed a double-tap: forget the
-    // last release and drop any live boost.
-    this.leftBoost = false;
-    this.leftReleasedAt = -Infinity;
   }
 
   /**
@@ -259,10 +207,8 @@ export class TouchController {
    * the stick vector is the thrust/aim direction without a flip.
    */
   writeInto(state: ControlState): void {
-    // Left stick → thrust, and → boost while it is a held double-tap (the thumb
-    // still steers, so a boosting ship keeps flying where it is pointed).
+    // Left stick → thrust.
     this.left.output(state.thrust);
-    state.boost = this.boostEngaged;
 
     if (this.mode === FireMode.Manual) {
       // Right stick → aim, and firing while engaged (one gesture).

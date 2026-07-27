@@ -101,7 +101,7 @@ export enum ShipClass {
  * `Speed` track buys only projectile muzzle velocity — faster shots are harder to
  * dodge, the exact counterplay economy the projectile switch was for. The two are
  * a **WEAPON group** (RATIFIED): the sim's ladder tags both `group: 'weapon'` and
- * the UI renders them as one nested sub-wheel; the grouping is data, not layout.
+ * the UI renders them as one nested sub-wheel; the group is data, not layout.
  *
  * The enum *key* stays `Power` (value `'power'`) on purpose: it is the wire/replay
  * identity every agent already speaks (net encoding, the determinism hash, the
@@ -132,7 +132,7 @@ export enum UpgradeTrack {
 // Abstract actions (GDD §2.4)
 // ---------------------------------------------------------------------------
 //
-// Every input device produces these, and only these. The mapping layer
+// Every input device produces these, and only these. The translation layer
 // (src/platform/) translates keyboard/mouse, gamepad, and touch into this
 // union; the simulation consumes it without knowing the source. Fire mode
 // (Manual / Auto-aim) is resolved here too — see `AimAction` and `FireAction`.
@@ -227,22 +227,10 @@ export interface UpgradeOrderAction {
   track: UpgradeTrack;
 }
 
-/** Boost (GDD §2.4). Held state. */
-export interface BoostAction {
-  type: 'boost';
-  active: boolean;
-}
-
-/** Ping the minimap at a map-space position (GDD §2.4). */
-export interface PingAction {
-  type: 'ping';
-  at: Vec2;
-}
-
 /**
- * The abstract action union (GDD §2.4). Eight verbs: thrust, aim, fire, build,
- * buildOrder, upgradeOrder, boost, ping. This is the contract every input device
- * targets and the simulation consumes.
+ * The abstract action union (GDD §2.4). Six verbs: thrust, aim, fire, build,
+ * buildOrder, upgradeOrder. This is the contract every input device targets and
+ * the simulation consumes.
  */
 export type Action =
   | ThrustAction
@@ -250,9 +238,7 @@ export type Action =
   | FireAction
   | BuildAction
   | BuildOrderAction
-  | UpgradeOrderAction
-  | BoostAction
-  | PingAction;
+  | UpgradeOrderAction;
 
 /** Discriminator helper for exhaustive switches over `Action`. */
 export type ActionType = Action['type'];

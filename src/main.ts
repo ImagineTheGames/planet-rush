@@ -54,14 +54,13 @@ import {
 import type { ControlState, DeviceKind } from '@platform/actions';
 import { GameLoop } from '@platform/loop';
 import { VfxAutoQuality } from '@platform/vfx-quality';
-import { KeyboardMouseSource, GamepadSource, PING_DIR_DISTANCE } from '@platform/input';
+import { KeyboardMouseSource, GamepadSource } from '@platform/input';
 import type { InputSource } from '@platform/input';
 import { TouchController } from '@platform/touch';
-import { TouchButtons } from '@platform/touch-buttons';
 import { TapPilot, pickTapTarget } from '@platform/tap-pilot';
 import type { TapCandidate, ResolvedTarget, TargetKind } from '@platform/tap-pilot';
 import { bindTouchControls } from '@platform/touch-dom';
-import { TouchVisuals, buildButtonRect, boostButtonRect, pingButtonRect } from '@platform/touch-visuals';
+import { TouchVisuals, buildButtonRect } from '@platform/touch-visuals';
 import { WheelInput, writeWheelOrders, hitWheel } from '@platform/wheel-input';
 import {
   computeRootTransform,
@@ -469,8 +468,7 @@ async function boot(): Promise<void> {
   // --- Input probe (debug-hook.ts `installInputProbe`): only when ?debug=1.
   //     Exposes window.__planetRush.input — the abstract actions the sim received
   //     this frame — so the input-parity live-stage suite can fire each control via
-  //     CDP touch and prove it crossed into the sim (esp. `ping`, which has no
-  //     render side yet). Inert otherwise.
+  //     CDP touch and prove it crossed into the sim. Inert otherwise.
   const inputProbe = installInputProbe(window.location.search);
 
   // --- Combat-visuals instrument (combat-debug.ts): only when ?debug=1. Exposes
@@ -611,9 +609,7 @@ async function boot(): Promise<void> {
       device: 'keyboard',
     },
     {
-      // The gamepad D-pad pings a direction anchored on the local ship, so its
-      // ping is a world point like every other device's (docs/input-parity.md).
-      source: new GamepadSource(undefined, null, () => localShipPos()),
+      source: new GamepadSource(),
       state: createControlState(),
       device: 'gamepad',
     },
@@ -632,14 +628,6 @@ async function boot(): Promise<void> {
   const touch = new TouchController({ screenWidth: transform.logicalWidth });
   touch.setFireMode(fireMode);
   const touchState = createControlState();
-  // The contextual touch buttons (BOOST hold, PING tap/drag) — the v0.2.2
-  // input-parity fills (docs/input-parity.md). Pure geometry/state; `main.ts`
-  // anchors its PING gesture on the local ship and folds BOOST into `touchState`.
-  const touchButtons = new TouchButtons();
-  /** Whether touch boost was engaged last frame — so the haptic `tap` fires once
-   *  on the rising edge of a boost (double-tap-hold OR the BOOST button), not every
-   *  frame it is held. */
-  let touchBoostWasActive = false;
 
   // --- Tap Commander (developer's ratified tap/click-to-move, tap/click-to-attack
   //     scheme). A LOCAL PILOT, not a new protocol: it writes the SAME thrust/aim/
@@ -678,12 +666,6 @@ async function boot(): Promise<void> {
   const camTargetScratch: Vec2 = { x: 0, y: 0 };
   const camOffsetScratch: Vec2 = { x: 0, y: 0 };
 
-  /** The local ship's world position, or the origin when it isn't alive — the
-   *  anchor a directional ping (D-pad, touch drag) is offset from. */
-  function localShipPos(): Vec2 {
-    const ship = world.ships.find(isLocalShip);
-    return ship ? { x: ship.pos.x, y: ship.pos.y } : { x: 0, y: 0 };
-  }
   // --- The Build & Upgrade wheel (GDD §2.5). `buildWheel` holds the two bits of
   //     screen state the pure UI models deliberately don't — is it up, is the
   //     upgrade panel in front of it — and turns a press into a segment. What
@@ -807,19 +789,6 @@ async function boot(): Promise<void> {
       return;
     }
 
-    // The contextual touch buttons — BOOST (hold) and PING (tap/drag). Claimed
-    // before the twin sticks so a press on one never also engages a stick under
-    // it. The rects are the same ones the view draws, so a tap can only land on a
-    // button that is actually on screen (null and un-pressable off-touch).
-    touchButtons.setRects(boostButtonRect(isTouch, w, h), pingButtonRect(isTouch, w, h));
-    const claimed = touchButtons.tryPress({ id: e.pointerId, x: pressPoint.x, y: pressPoint.y });
-    if (claimed) {
-      haptics.haptic('tap'); // a finger landed on a button
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      return;
-    }
-
     buildWheelLayout.centerX = w / 2;
     buildWheelLayout.centerY = h / 2;
     buildWheelLayout.radius = wheelRadius(w, h);
@@ -929,24 +898,6 @@ async function boot(): Promise<void> {
   // the controller as the rotated logical point — the half-split, sticks and
   // FIRE button all live in logical (landscape) space.
   bindTouchControls(app.canvas, touch, window, toLogical);
-
-  // The contextual buttons track their own pointer (a PING drag, a BOOST hold)
-  // past the initial press. Their `pointerdown` is claimed in the wheel-first
-  // listener above (which consumes it before the sticks); these carry the rest of
-  // the gesture. Touch-only and remapped through the landscape lock, exactly like
-  // the sticks. A window blur releases everything so nothing sticks held.
-  app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
-    if (e.pointerType !== 'touch') return;
-    const p = toLogical(e.clientX, e.clientY);
-    touchButtons.onMove({ id: e.pointerId, x: p.x, y: p.y });
-  });
-  const releaseButton = (e: PointerEvent): void => {
-    if (e.pointerType !== 'touch') return;
-    touchButtons.onUp(e.pointerId);
-  };
-  app.canvas.addEventListener('pointerup', releaseButton);
-  app.canvas.addEventListener('pointercancel', releaseButton);
-  window.addEventListener('blur', () => touchButtons.clear());
 
   // --- HUD feed: one reusable mutable HudFrame, overwritten in place every frame
   //     so the feed path allocates nothing (GDD §4.3). All fields are primitives.
@@ -1110,8 +1061,6 @@ async function boot(): Promise<void> {
         transform.logicalWidth,
         transform.logicalHeight,
         buildVisible,
-        touch.boostEngaged || touchButtons.boostHeld,
-        touchButtons.pingPressed,
       );
       // Keep the build stamp cornered (logical bottom-right) as the viewport changes.
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
@@ -1270,22 +1219,6 @@ async function boot(): Promise<void> {
     }
     resetControlState(touchState);
     touch.writeInto(touchState);
-    // Fold the contextual touch buttons into the same neutral state the sticks
-    // wrote: BOOST OR-s with the left-stick double-tap-and-hold; a resolved PING
-    // gesture becomes a world-space ping anchored on the local ship — a tap pings
-    // the ship's own position, a drag pings a point offset in the pointed direction.
-    touchState.boost = touchState.boost || touchButtons.boostHeld;
-    const ping = touchButtons.takePing();
-    if (ping) {
-      const anchor = localShipPos();
-      touchState.ping = ping.tap
-        ? anchor
-        : { x: anchor.x + ping.dir.x * PING_DIR_DISTANCE, y: anchor.y + ping.dir.y * PING_DIR_DISTANCE };
-      haptics.haptic('confirm'); // a ping committed
-    }
-    // Haptic `tap` on the rising edge of touch boost (double-tap-hold OR button).
-    if (touchState.boost && !touchBoostWasActive) haptics.haptic('tap');
-    touchBoostWasActive = touchState.boost;
     if (controlActive(touchState)) activeDevice = 'touch';
 
     resetControlState(merged);
@@ -1294,11 +1227,11 @@ async function boot(): Promise<void> {
 
     // Tap Commander (developer §1–2): the pilot REPLACES the sticks. In this scheme
     // the human devices no longer thrust/aim/fire — the pilot flies the ship from
-    // the standing order — but BUILD, BOOST and PING stay on their own affordances,
-    // so `merged.build/boost/ping` are left as the devices wrote them. The wheel is
-    // tap-operated here (its taps are claimed before the sticks), so while it is
-    // open the ship holds and the pilot stands down; `updateBuildWheel` zeroes
-    // thrust/fire for the wheel's own aim/confirm exactly as it does for the sticks.
+    // the standing order — but BUILD stays on its own affordance, so `merged.build`
+    // is left as the devices wrote it. The wheel is tap-operated here (its taps are
+    // claimed before the sticks), so while it is open the ship holds and the pilot
+    // stands down; `updateBuildWheel` zeroes thrust/fire for the wheel's own
+    // aim/confirm exactly as it does for the sticks.
     const tap = controlScheme === 'tap';
     if (tap) {
       merged.thrust.x = 0;
@@ -2793,15 +2726,6 @@ async function boot(): Promise<void> {
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
 
-    // The contextual touch buttons — BOOST (left/movement side) and PING (right
-    // side) — the v0.2.2 input-parity fills. Always present on touch, so a phone
-    // profile can assert they are placed in their declared halves; null (and so
-    // unregistered) off-touch. Same rects the view draws and the hit test uses.
-    const boostBtn = boostButtonRect(isTouch, w, h);
-    if (boostBtn) reg.register('touch-boost-button', LEFT_STICK_ANCHOR, boostBtn);
-    const pingBtn = pingButtonRect(isTouch, w, h);
-    if (pingBtn) reg.register('touch-ping-button', RIGHT_STICK_ANCHOR, pingBtn);
-
     // The open-build-wheel button — a permanent HUD fixture at your own planet
     // (GDD §2.2, §2.4). Registered from the SAME `buildVisible`/`buildButtonRect`
     // that draw it, so the registry records what is really on screen: present
@@ -3214,14 +3138,7 @@ function describeStaged(shooter: number, muzzle: Muzzle): StagedMuzzle {
  *  device for the HUD. Mouse aim is excluded: it moves constantly and would peg
  *  the device to keyboard forever (GDD §2.4 auto device-switch). */
 function controlActive(s: ControlState): boolean {
-  return (
-    s.thrust.x !== 0 ||
-    s.thrust.y !== 0 ||
-    s.fire ||
-    s.boost ||
-    s.build ||
-    s.ping !== null
-  );
+  return s.thrust.x !== 0 || s.thrust.y !== 0 || s.fire || s.build;
 }
 
 /** Hoisted local-ship predicate so the per-frame lookup allocates no closure. */
@@ -3315,9 +3232,7 @@ function mergeControl(dst: ControlState, src: ControlState): void {
   }
   if (src.aim) dst.aim = src.aim;
   dst.fire = dst.fire || src.fire;
-  dst.boost = dst.boost || src.boost;
   dst.build = dst.build || src.build;
-  if (!dst.ping && src.ping) dst.ping = src.ping;
 }
 
 /** What `boot()` holds the main menu by: a promise that resolves when the player

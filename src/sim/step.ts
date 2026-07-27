@@ -40,7 +40,6 @@ import type { Action, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/ty
 import {
   ASTEROID,
   WEAPON_RANGE,
-  BOOST_MULTIPLIER,
   CHUNK,
   DEPOSIT,
   DRAG,
@@ -97,7 +96,6 @@ interface Intent {
   aim: Vec2 | null;
   fire: boolean;
   auto: boolean;
-  boost: boolean;
   /** Wheel presses this tick, in the order they arrived. Unlike the held verbs
    *  these accumulate: two presses in one tick are two orders (GDD §2.5). */
   orders: BuildItem[];
@@ -112,7 +110,6 @@ const NO_INTENT: Intent = {
   aim: null,
   fire: false,
   auto: false,
-  boost: false,
   orders: NO_ORDERS,
   upgrades: NO_UPGRADES,
 };
@@ -125,7 +122,6 @@ function resolveIntent(actions: readonly Action[]): Intent {
     aim: null,
     fire: false,
     auto: false,
-    boost: false,
     orders: NO_ORDERS,
     upgrades: NO_UPGRADES,
   };
@@ -141,9 +137,6 @@ function resolveIntent(actions: readonly Action[]): Intent {
         intent.fire = a.active;
         intent.auto = a.auto;
         break;
-      case 'boost':
-        intent.boost = a.active;
-        break;
       case 'buildOrder':
         // Allocate the list only for the rare tick that carries an order.
         if (intent.orders === NO_ORDERS) intent.orders = [];
@@ -154,9 +147,8 @@ function resolveIntent(actions: readonly Action[]): Intent {
         intent.upgrades.push(a.track);
         break;
       case 'build':
-      case 'ping':
-        // Opening the wheel and pinging the minimap are UI-side; the sim acts
-        // only on the confirmed order (`buildOrder`).
+        // Opening the wheel is UI-side; the sim acts only on the confirmed
+        // order (`buildOrder`).
         break;
     }
   }
@@ -268,7 +260,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   }
 
   // 8. Turrets acquire, track, and fire; every shot — ship weapon and turret
-  //    alike — then flies and lands, chipping a rock or biting a hull (GDD §2.6).
+  //    alike — then flies and lands to chip a rock or bite a hull (GDD §2.6).
   //    After the ship fire step, so a turret killed this tick does not also get a
   //    shot off, and a ship shot fired this tick advances and can strike this
   //    tick. The asteroid broad phase (`hash`) narrows each shot's rock test.
@@ -314,9 +306,8 @@ function intentFor(id: PlayerId, inputs: Inputs): Intent {
 function integrate(ship: Ship, intent: Intent, dt: number, bounds: World['bounds']): void {
   // Class base × engine tier (GDD §2.11, §2.5) — resolved in `./upgrades`, so the
   // hull a player picked and the ore they spent on it arrive as one number.
-  const boost = intent.boost ? BOOST_MULTIPLIER : 1;
-  const accel = shipAccel(ship) * boost;
-  const maxSpeed = shipTopSpeed(ship) * boost;
+  const accel = shipAccel(ship);
+  const maxSpeed = shipTopSpeed(ship);
 
   // Thrust adds acceleration in the (analog-scaled) thrust direction.
   ship.vel.x += intent.thrust.x * accel * dt;
@@ -443,14 +434,14 @@ function reflectOffPlanets(ship: Ship, world: World): void {
   }
 }
 
-/** Push a ship out of an overlapping circle and reflect the normal component of
+/** Push a ship out of an intersecting circle and reflect the normal component of
  *  its velocity. No sqrt until a contact is confirmed. */
 function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
   const rr = ship.radius + radius;
   const d2 = dist2(ship.pos, center);
   if (d2 >= rr * rr) return;
 
-  // Overlapping: separate along the contact normal and reflect velocity.
+  // Intersecting: separate along the contact normal and reflect velocity.
   const d = Math.sqrt(d2);
   const nx = d > 1e-9 ? (ship.pos.x - center.x) / d : 1;
   const ny = d > 1e-9 ? (ship.pos.y - center.y) / d : 0;
@@ -645,7 +636,7 @@ function updateChunks(world: World, dt: number): void {
     // Nearest alive ship *with room in its hold* within tractor range pulls the
     // chunk in. A full hold never attracts: chunks stay where they are for
     // anyone (GDD §2.3). A chunk in flight toward a ship whose hold fills
-    // mid-pull loses its target here and coasts to a stop under drag — dropping
+    // mid-pull loses its target here and coasts to a stop under drag — falling
     // back to free-floating, collectable by any ship that still has space.
     let target: Ship | null = null;
     let bestD2 = range2;

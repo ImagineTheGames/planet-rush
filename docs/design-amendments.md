@@ -8,6 +8,119 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## BOOST and PING are CUT
+
+**Date:** 2026-07-27 · branch `agent/gameplay/p7-remove-boost-ping`
+**Ratified by:** Developer (Reinaldo)
+**Amends by reference:** GDD §2.4, the controls table rows *"Boost | Space /
+Shift | Left trigger | Button above left stick"* and *"Ping minimap | Middle
+click | D-pad | Tap minimap"*, and the §2.2/§2.4 touch-controls prose *"a boost
+button sits above the left stick; ping is a tap on the minimap"*. Both mechanics
+are removed from the game entirely; the controls table drops to six verbs.
+
+### The ratification, verbatim
+
+> "Let's get rid of boost and ping. Just clutters UI and isn't needed."
+
+### What was removed
+
+- **BOOST** — the held speed/acceleration multiplier. `BOOST_MULTIPLIER` (was
+  1.6×) and its use in `integrate` are gone; the `Intent.boost` field, the
+  `'boost'` case in `resolveIntent`, and the `BoostAction` type are gone. A ship's
+  top speed and acceleration are now class-base × engine tier, full stop (GDD
+  §2.11/§2.5) — there is no longer a transient way to exceed the class ceiling.
+- **PING** — the minimap ping action. `PingAction` and the sim's no-op `'ping'`
+  case are gone. The abstract `Action` union drops from eight verbs to six:
+  thrust, aim, fire, build, buildOrder, upgradeOrder.
+
+### Ripple across the agent boundary
+
+The `Action` union is the cross-lane contract (`@shared/types`), so the cut
+reaches every layer that produced or consumed those two verbs — all removed on
+this branch:
+
+- **shared:** `BoostAction` / `PingAction` deleted from the `Action` union.
+- **sim:** the movement multiplier, the intent field, the ping no-op.
+- **net:** the `'boost'` / `'ping'` cases in `parseActions` (`wire.ts`); the
+  wire / input-queue / loopback test fixtures re-pointed at surviving verbs.
+- **bots:** the `boost()` steering factory and its two call sites (chase, flee),
+  plus the now-dead `BOOST_CHASE_DISTANCE`.
+- **platform:** the BOOST/PING keyboard/pad/touch bindings, the `TouchButtons`
+  class (BOOST-hold + PING-gesture — deleted whole), the on-screen BOOST/PING
+  buttons, `ControlState.boost`/`.ping`, and the two controls-strip rows.
+
+**No snapshot layout changed.** BOOST and PING were *input actions*, never
+encoded in the `World` snapshot, so the measured 510-byte projectile/snapshot
+layout and its byte-pin tests (`src/net/snapshot.ts`, `snapshot.test.ts`) are
+untouched. Client actions ride the JSON client-message frame, which simply
+carries two fewer optional verbs — it has no fixed byte layout to pin.
+
+### Bots — the escape retune the cut forced
+
+Two behaviors leaned on boost: a bold chaser boosted to close a gap, and any bot
+fleeing a threat boosted away. Dropping those is mostly free — but a chasing bot
+*inherited* its chase-boost during the wedge-escape run (the escape thrust rode
+the same tick's `boost(true)`), and that 1.6× burst turned out to be quietly
+load-bearing for the standing "no bot stays wedged" invariant
+(`tests/harness/unstuck.test.ts`, PR #146): it punched a hard-pinned hull out of
+a late-wave asteroid pocket in a single escape cycle. At base speed the same hull
+re-rolled a fresh random escape heading every 1.5 s and never built enough
+tangential slide to leave the pocket — seed 19 wedged **16.5 s**, past the 12 s
+ceiling.
+
+Fix, in the bots' own tuning (the brief's point 2): **`ESCAPE_SECONDS` 1.5 →
+2.0 s**. A longer committed run lets a pinned hull slide out at cruise instead of
+re-rolling into another blocked lane — the same escape boost used to buy with raw
+speed. Verified worst-wedge **16.5 s → 3.5 s across seeds 1–48** (the invariant
+soaks 24), an order of magnitude under the ceiling.
+
+### Balance (harness re-run on the final code)
+
+Removing boost and retuning the escape is **balance-neutral** — the round-robin is
+unchanged from the pre-cut baseline. Boost was never a rusher's tool (it parks at
+range and holds the trigger), so cutting it moves nothing in the strategy sweep.
+
+`balance` — 6 seeds × every rotation:
+
+| Target | Verdict |
+|---|---|
+| Every match reaches an ending | **PASS** (72/72) |
+| No ship class > 55% | **PASS** (top `hauler` 43.8%) |
+| No strategy > 55% | **FAIL** — `rusher` 100% |
+| Match length 10–15 min | **FAIL** — rusher mirrors end < 1 min |
+
+The two FAILs are **pre-existing and orthogonal to this cut** — the undefended-core
+/ rusher problem the shipped balance report already names (`tests/reports/balance-01.md`,
+Finding 2: *"`rusher` wins ~97%, because nobody defends… Blocked on the bot trees"*).
+
+`soak` — 30 real-roster (shipped-cast) matches, the honest experience:
+
+| matches | ended | hangs | match length (median) | inside 10–15 min |
+|---|---|---|---|---|
+| 30 | 30 | 0 | 13:51 | 100.0% |
+
+No wedge hangs at soak scale, and match length lands squarely in target with boost
+gone.
+
+### Constants removed / changed (`src/sim/constants.ts`, `src/bots/behaviors.ts`)
+
+- `BOOST_MULTIPLIER` — removed (was 1.6×).
+- `BOOST_CHASE_DISTANCE` (bots) — removed.
+- `ESCAPE_SECONDS` (bots) — 1.5 → 2.0 s (see the escape retune above).
+
+### Tests retired (deliberately)
+
+- `src/platform/touch-buttons.test.ts` — deleted whole; it tested only the
+  BOOST/PING button class, which is gone.
+- BOOST/PING assertions and fixtures trimmed from `actions.test.ts`,
+  `input.test.ts`, `touch.test.ts`, `touch-visuals.test.ts`,
+  `input-parity.test.ts` (platform); `wire.test.ts`, `input-queue.test.ts`,
+  `loopback.test.ts` (net); the abstract-verb-set assertions in
+  `src/bots/harness.test.ts` and `tests/harness/match.test.ts`; and the BOOST/PING
+  parity subtests in `tests/live-stage/input-parity.spec.ts`.
+
+---
+
 ## Repair is a DISCRETE purchase, not a channel
 
 **Date:** 2026-07-26 · branch `agent/gameplay/p5-repair-discrete`

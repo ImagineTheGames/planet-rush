@@ -10,8 +10,8 @@
  * ({@link EXPECTED}); adding a new action type to `@shared/types` without teaching
  * this table how each device produces it fails to compile. The columns are the
  * three sources — keyboard/mouse, gamepad, touch — each computed by exercising the
- * actual production code (`input.ts`, `touch.ts`, `touch-buttons.ts`,
- * `wheel-input.ts`, `touch-visuals.ts`), never a hand-maintained restatement of it.
+ * actual production code (`input.ts`, `touch.ts`, `wheel-input.ts`,
+ * `touch-visuals.ts`), never a hand-maintained restatement of it.
  */
 import { describe, it, expect } from 'vitest';
 import type { Action, ActionType } from '@shared/types';
@@ -20,9 +20,8 @@ import { FireMode, createControlState, mapActions, defaultFireMode } from './act
 import { GamepadSource, KeyboardMouseSource } from './input';
 import type { GamepadProvider } from './input';
 import { TouchController } from './touch';
-import { TouchButtons } from './touch-buttons';
 import { WheelInput, writeWheelOrders } from './wheel-input';
-import { buildButtonRect, boostButtonRect, pingButtonRect } from './touch-visuals';
+import { buildButtonRect } from './touch-visuals';
 
 // ---------------------------------------------------------------------------
 // The rows: every action type, exhaustively (a new one fails to compile here).
@@ -35,14 +34,12 @@ const EXPECTED: Record<ActionType, true> = {
   build: true,
   buildOrder: true,
   upgradeOrder: true,
-  boost: true,
-  ping: true,
 };
 const ACTION_TYPES = Object.keys(EXPECTED) as ActionType[];
 
 /** Fold every *meaningfully active* action from a control state into `got`. Held
- *  actions (fire/boost/build) count only when active; thrust only when non-zero;
- *  aim/orders/ping only when actually emitted. This is "the device did the thing",
+ *  actions (fire/build) count only when active; thrust only when non-zero;
+ *  aim/orders only when actually emitted. This is "the device did the thing",
  *  not "the funnel always mentions the verb". */
 function addActive(got: Set<ActionType>, actions: readonly Action[]): void {
   for (const a of actions) {
@@ -53,16 +50,12 @@ function addActive(got: Set<ActionType>, actions: readonly Action[]): void {
       case 'fire':
         if (a.active) got.add('fire');
         break;
-      case 'boost':
-        if (a.active) got.add('boost');
-        break;
       case 'build':
         if (a.active) got.add('build');
         break;
       case 'aim':
       case 'buildOrder':
       case 'upgradeOrder':
-      case 'ping':
         got.add(a.type);
         break;
     }
@@ -144,10 +137,8 @@ function keyboardActions(): Set<ActionType> {
   const kb = new KeyboardMouseSource(() => ({ x: 500, y: 300 }), win);
   win.fire('keydown', { code: 'KeyW' }); // thrust
   win.fire('keydown', { code: 'KeyE' }); // build (open wheel)
-  win.fire('keydown', { code: 'Space' }); // boost
   win.fire('mousemove', { clientX: 620, clientY: 300 }); // aim (offset from centre)
   win.fire('mousedown', { button: 0 }); // fire
-  win.fire('mousedown', { button: 1, clientX: 620, clientY: 300 }); // ping (middle click)
   const s = createControlState();
   kb.update(s);
   addActive(got, mapActions(s, FireMode.Manual));
@@ -157,16 +148,11 @@ function keyboardActions(): Set<ActionType> {
 
 function gamepadActions(): Set<ActionType> {
   const got = new Set<ActionType>();
-  const anchor = () => ({ x: 0, y: 0 });
-  // thrust + aim + fire + boost + build in one rich frame.
-  const rich = fakePad({ axes: [0.8, -0.6, -1, 0.5], buttons: { 7: 1, 6: 1, 3: 1 } });
+  // thrust + aim + fire + build in one rich frame.
+  const rich = fakePad({ axes: [0.8, -0.6, -1, 0.5], buttons: { 7: 1, 3: 1 } });
   const s = createControlState();
-  new GamepadSource(pads(rich), null, anchor).update(s);
+  new GamepadSource(pads(rich)).update(s);
   addActive(got, mapActions(s, defaultFireMode(false))); // gamepad default = Manual → aim emitted
-  // ping via the D-pad (rising edge — its own source instance).
-  const s2 = createControlState();
-  new GamepadSource(pads(fakePad({ buttons: { 12: 1 } })), null, anchor).update(s2);
-  addActive(got, mapActions(s2, FireMode.Manual));
   addWheelOrders(got);
   return got;
 }
@@ -203,36 +189,6 @@ function touchActions(): Set<ActionType> {
     tc.writeInto(s);
     addActive(got, mapActions(s, FireMode.AutoAim));
   }
-  // boost — left-stick double-tap-and-hold.
-  {
-    let t = 0;
-    const tc = new TouchController({ screenWidth: W, doubleTapMs: 300 }, () => t);
-    tc.onPointerDown({ id: 1, x: 100, y: 500 });
-    tc.onPointerUp(1);
-    t = 120;
-    tc.onPointerDown({ id: 2, x: 100, y: 500 });
-    const s = createControlState();
-    tc.writeInto(s);
-    addActive(got, mapActions(s, tc.getFireMode()));
-  }
-  // boost + ping — the contextual buttons (folded as main.ts folds them).
-  {
-    const b = new TouchButtons();
-    b.setRects(boostButtonRect(true, W, H), pingButtonRect(true, W, H));
-    const boost = boostButtonRect(true, W, H)!;
-    b.tryPress({ id: 1, x: boost.x + boost.width / 2, y: boost.y + boost.height / 2 });
-    const sBoost = createControlState();
-    sBoost.boost = b.boostHeld; // main.ts: touchState.boost ||= touchButtons.boostHeld
-    addActive(got, mapActions(sBoost, FireMode.AutoAim));
-
-    const ping = pingButtonRect(true, W, H)!;
-    b.tryPress({ id: 2, x: ping.x + ping.width / 2, y: ping.y + ping.height / 2 });
-    b.onUp(2); // a tap → ping own position
-    const req = b.takePing();
-    const sPing = createControlState();
-    if (req) sPing.ping = { x: 42, y: 7 }; // main.ts anchors it on the ship's world pos
-    addActive(got, mapActions(sPing, FireMode.AutoAim));
-  }
   // build — the touch BUILD button affordance exists at your own planet.
   if (buildButtonRect(true, /* docked */ true, W, H)) got.add('build');
   // buildOrder + upgradeOrder — the wheel the BUILD button opens (device-agnostic).
@@ -260,14 +216,4 @@ describe('input parity — every action is reachable from every device (docs/inp
       expect(missing, `${device} is missing: [${missing.join(', ')}]`).toEqual([]);
     });
   }
-
-  it('the two field-report gaps are specifically covered on touch (boost + ping)', () => {
-    const touch = touchActions();
-    expect(touch.has('boost')).toBe(true);
-    expect(touch.has('ping')).toBe(true);
-  });
-
-  it('the audit-surfaced gap is covered: the gamepad D-pad actually pings', () => {
-    expect(gamepadActions().has('ping')).toBe(true);
-  });
 });

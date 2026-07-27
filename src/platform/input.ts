@@ -24,7 +24,7 @@ export interface InputSource {
 }
 
 // ---------------------------------------------------------------------------
-// Keyboard + mouse (GDD §2.4: WASD, mouse aim, LMB fire, E build, Space boost)
+// Keyboard + mouse (GDD §2.4: WASD, mouse aim, LMB fire, E build)
 // ---------------------------------------------------------------------------
 
 /** Provides the ship's current screen position so mouse aim is relative to it.
@@ -35,7 +35,6 @@ export class KeyboardMouseSource implements InputSource {
   private readonly keys = new Set<string>();
   private readonly mouse: Vec2 = { x: 0, y: 0 };
   private firing = false;
-  private pingRequest: Vec2 | null = null;
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     this.keys.add(e.code);
@@ -49,7 +48,6 @@ export class KeyboardMouseSource implements InputSource {
   };
   private readonly onMouseDown = (e: MouseEvent): void => {
     if (e.button === 0) this.firing = true;
-    if (e.button === 1) this.pingRequest = { x: e.clientX, y: e.clientY };
   };
   private readonly onMouseUp = (e: MouseEvent): void => {
     if (e.button === 0) this.firing = false;
@@ -96,13 +94,7 @@ export class KeyboardMouseSource implements InputSource {
     state.aim = ax !== 0 || ay !== 0 ? { x: ax, y: ay } : null;
 
     state.fire = this.firing;
-    state.boost = this.keys.has('Space') || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
     state.build = this.keys.has('KeyE');
-
-    if (this.pingRequest) {
-      state.ping = this.pingRequest;
-      this.pingRequest = null;
-    }
   }
 
   dispose(): void {
@@ -116,7 +108,7 @@ export class KeyboardMouseSource implements InputSource {
 }
 
 // ---------------------------------------------------------------------------
-// Gamepad (GDD §2.4: left stick, right stick aim, RT fire, LT boost, Y build)
+// Gamepad (GDD §2.4: left stick, right stick aim, RT fire, Y build)
 // ---------------------------------------------------------------------------
 
 const STICK_DEADZONE = 0.2;
@@ -140,31 +132,10 @@ const liveGamepads: GamepadProvider = () =>
  * so a controller plugged into a later slot still drives the ship. Pass an
  * explicit `preferredIndex` to pin one pad (e.g. a future two-player split).
  */
-/** Standard-mapping D-pad button indices (GDD §2.4 gamepad ping — the binding the
- *  controls strip advertises). up / down / left / right. */
-const DPAD_UP = 12;
-const DPAD_DOWN = 13;
-const DPAD_LEFT = 14;
-const DPAD_RIGHT = 15;
-
-/** How far (world units) a directional ping lands from the pinging ship — the
- *  D-pad and touch-drag both point rather than place, so the ping is offset from
- *  the ship in the pointed direction. TUNABLE; inert until ping rendering lands. */
-export const PING_DIR_DISTANCE = 600;
-
 export class GamepadSource implements InputSource {
-  /** Whether a D-pad direction was held last frame — so a held D-pad pings once on
-   *  its rising edge, not every frame it stays down. */
-  private dpadWasPressed = false;
-
   constructor(
     private readonly getPads: GamepadProvider = liveGamepads,
     private readonly preferredIndex: number | null = null,
-    /** The pinging ship's world position, so a D-pad ping anchors on the ship (the
-     *  space "render for all players" needs — docs/input-parity.md). Defaults to
-     *  the origin, which is all a headless unit test needs to read the direction. */
-    private readonly pingAnchor: () => Vec2 = () => ({ x: 0, y: 0 }),
-    private readonly pingDistance: number = PING_DIR_DISTANCE,
   ) {}
 
   /** The active pad: the pinned index if requested, else the first pad the
@@ -196,28 +167,7 @@ export class GamepadSource implements InputSource {
 
     // Right trigger fires; standard mapping puts triggers on buttons 6 (LT) / 7 (RT).
     state.fire = buttonValue(pad, 7) > TRIGGER_THRESHOLD;
-    state.boost = buttonValue(pad, 6) > TRIGGER_THRESHOLD;
     state.build = buttonPressed(pad, 3); // Y / Triangle
-
-    // D-pad → a directional ping (GDD §2.4 — the binding the controls strip has
-    // always advertised, finally wired). Rising-edge only, so a held D-pad pings
-    // once; anchored on the ship so the ping is a world point, not a pad direction.
-    let dx = 0;
-    let dy = 0;
-    if (buttonPressed(pad, DPAD_UP)) dy -= 1;
-    if (buttonPressed(pad, DPAD_DOWN)) dy += 1;
-    if (buttonPressed(pad, DPAD_LEFT)) dx -= 1;
-    if (buttonPressed(pad, DPAD_RIGHT)) dx += 1;
-    const dpadPressed = dx !== 0 || dy !== 0;
-    if (dpadPressed && !this.dpadWasPressed) {
-      const len = Math.hypot(dx, dy) || 1;
-      const anchor = this.pingAnchor();
-      state.ping = {
-        x: anchor.x + (dx / len) * this.pingDistance,
-        y: anchor.y + (dy / len) * this.pingDistance,
-      };
-    }
-    this.dpadWasPressed = dpadPressed;
   }
 
   dispose(): void {

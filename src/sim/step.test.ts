@@ -326,7 +326,7 @@ describe('weapon projectile geometry (GDD §4.1)', () => {
     expect(world.ships[0]!.firing).toBe(true);
     expect(world.projectiles.some((p) => p.kind === 'ship')).toBe(true); // shot, not ray
     for (let t = 0; t < 40; t++) step(world, [{ id: 0, actions: [fire()] }]);
-    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and it is chipping
+    expect(world.asteroids[0]!.ore).toBeLessThan(rock.maxOre); // and the rock is chipped
 
     // Shooting an enemy is also firing — the tell is the trigger, not the target.
     const shooter = makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: Math.PI / 2 });
@@ -460,7 +460,7 @@ describe('ship-vs-asteroid reflection (GDD §4.1)', () => {
 
     const s = world.ships[0]!;
     expect(s.vel.x).toBeLessThan(0); // bounced back along -x
-    // And it is no longer deeply overlapping the asteroid.
+    // And it is no longer deeply intersecting the asteroid.
     const dx = s.pos.x - rock.pos.x;
     const dy = s.pos.y - rock.pos.y;
     const sep = Math.sqrt(dx * dx + dy * dy);

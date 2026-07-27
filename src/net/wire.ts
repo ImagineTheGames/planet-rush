@@ -301,8 +301,8 @@ function clamp(v: number, limit: number): number {
   return v > limit ? limit : v < -limit ? -limit : v;
 }
 
-/** World-space coordinates a ping may name — generous, but finite and bounded
- *  so a ping can never carry an absurd number into the UI. */
+/** World-space coordinate bound for an aim vector — generous, but finite and
+ *  bounded so a malformed message can never carry an absurd number into the sim. */
 const MAX_WORLD_COORD = 1e6;
 
 const BUILD_ITEMS: ReadonlySet<string> = new Set<BuildItem>(['turret', 'shield', 'repair', 'bank']);
@@ -346,17 +346,6 @@ export function parseActions(value: unknown): Action[] | null {
         const item = entry['item'];
         if (typeof item !== 'string' || !BUILD_ITEMS.has(item)) return null;
         actions.push({ type: 'buildOrder', item: item as BuildItem });
-        break;
-      }
-      case 'boost': {
-        if (typeof entry['active'] !== 'boolean') return null;
-        actions.push({ type: 'boost', active: entry['active'] });
-        break;
-      }
-      case 'ping': {
-        const at = parseVec(entry['at'], MAX_WORLD_COORD);
-        if (!at) return null;
-        actions.push({ type: 'ping', at });
         break;
       }
       default:

@@ -395,8 +395,7 @@ export function installDebugStage(
  * `window.__planetRush.input`. The input-parity live-stage suite (tests/live-stage/
  * input-parity.spec.ts) fires each action via CDP touch and asserts it shows up
  * here — proof the whole funnel (device → ControlState → Action) crossed into the
- * sim, which matters most for `ping`, whose effect is not (yet) rendered and so is
- * otherwise unobservable.
+ * sim.
  */
 export interface InputProbeReadout {
   /** Fixed-tick frames the probe has recorded — a liveness counter for the poller. */
@@ -405,21 +404,12 @@ export interface InputProbeReadout {
   readonly types: string[];
   /** Convenience mirrors of the merged control state, so a test asserts intent
    *  without re-parsing `types`. */
-  boost: boolean;
   fire: boolean;
   build: boolean;
   /** Whether an `aim` action was emitted this frame (Manual fire mode only). */
   aim: boolean;
   /** The thrust vector this frame — its magnitude proves a stick drag crossed in. */
   readonly thrust: { x: number; y: number };
-  /** The ping target (world space) this frame, or `null`. The one action with no
-   *  render side yet, so this seam is the only way to prove it landed. */
-  ping: { x: number; y: number } | null;
-  /** Monotonic count of pings seen since boot, and the last target. Because a ping
-   *  is one-shot (present for a single frame), a live poller races the per-frame
-   *  `ping`; the counter and latched `lastPing` are what a CDP test reads instead. */
-  pingCount: number;
-  lastPing: { x: number; y: number } | null;
 }
 
 /** What `main.ts` drives each frame with the action list it hands the sim. */
@@ -445,14 +435,10 @@ export function installInputProbe(
   const readout: InputProbeReadout = {
     frame: 0,
     types: [],
-    boost: false,
     fire: false,
     build: false,
     aim: false,
     thrust: { x: 0, y: 0 },
-    ping: null,
-    pingCount: 0,
-    lastPing: null,
   };
 
   const probe: InputProbe = {
@@ -460,26 +446,19 @@ export function installInputProbe(
     update(actions): void {
       readout.frame++;
       readout.types.length = 0;
-      readout.boost = false;
       readout.fire = false;
       readout.build = false;
       readout.aim = false;
       readout.thrust.x = 0;
       readout.thrust.y = 0;
-      readout.ping = null;
       for (const a of actions) {
         if (!readout.types.includes(a.type)) readout.types.push(a.type);
-        if (a.type === 'boost') readout.boost = a.active;
-        else if (a.type === 'fire') readout.fire = a.active;
+        if (a.type === 'fire') readout.fire = a.active;
         else if (a.type === 'build') readout.build = a.active;
         else if (a.type === 'aim') readout.aim = true;
         else if (a.type === 'thrust') {
           readout.thrust.x = a.dir.x;
           readout.thrust.y = a.dir.y;
-        } else if (a.type === 'ping') {
-          readout.ping = { x: a.at.x, y: a.at.y };
-          readout.lastPing = readout.ping;
-          readout.pingCount++;
         }
       }
     },

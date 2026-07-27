@@ -62,8 +62,6 @@ export interface ControlState {
   aim: Vec2 | null;
   /** Fire / Mine held (GDD §2.3 — one weapon mines and shoots). */
   fire: boolean;
-  /** Boost held (GDD §2.4). */
-  boost: boolean;
   /** Build & Upgrade wheel requested near own planet (GDD §2.5). */
   build: boolean;
   /**
@@ -78,8 +76,6 @@ export interface ControlState {
    *  track rather than an item (GDD §2.5). One-shot on the same terms as
    *  {@link ControlState.order}. */
   upgrade: UpgradeTrack | null;
-  /** Minimap ping target in map space, consumed once then cleared, or `null`. */
-  ping: Vec2 | null;
 }
 
 /** A fresh, neutral control state (all inputs released). */
@@ -88,11 +84,9 @@ export function createControlState(): ControlState {
     thrust: { x: 0, y: 0 },
     aim: null,
     fire: false,
-    boost: false,
     build: false,
     order: null,
     upgrade: null,
-    ping: null,
   };
 }
 
@@ -102,11 +96,9 @@ export function resetControlState(state: ControlState): void {
   state.thrust.y = 0;
   state.aim = null;
   state.fire = false;
-  state.boost = false;
   state.build = false;
   state.order = null;
   state.upgrade = null;
-  state.ping = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +115,8 @@ export function resetControlState(state: ControlState): void {
  *    hit), and `fire.auto` is true — the sim acquires the nearest target across
  *    the full 360°.
  *
- * Every device produces the same six verbs; nothing downstream can tell which
+ * Every device produces the same verbs — thrust, fire, build, and the two
+ * one-shot purchases, plus aim in Manual mode; nothing downstream can tell which
  * device — or which fire mode — they came from beyond what the sim is told.
  */
 export function mapActions(state: ControlState, mode: FireMode): Action[] {
@@ -138,7 +131,6 @@ export function mapActions(state: ControlState, mode: FireMode): Action[] {
   }
 
   actions.push({ type: 'fire', active: state.fire, auto });
-  actions.push({ type: 'boost', active: state.boost });
   actions.push({ type: 'build', active: state.build });
 
   // The two purchases (GDD §2.5). They ride the same funnel every other verb
@@ -147,10 +139,6 @@ export function mapActions(state: ControlState, mode: FireMode): Action[] {
   // confirmed, because `order`/`upgrade` are one-shot fields.
   if (state.order) actions.push({ type: 'buildOrder', item: state.order });
   if (state.upgrade) actions.push({ type: 'upgradeOrder', track: state.upgrade });
-
-  if (state.ping) {
-    actions.push({ type: 'ping', at: { x: state.ping.x, y: state.ping.y } });
-  }
 
   return actions;
 }
@@ -165,7 +153,7 @@ export type DeviceKind = 'keyboard' | 'gamepad' | 'touch';
 /** One row of the device-aware controls strip: an action and its binding. */
 export interface BindingLabel {
   /** The abstract verb this row explains. */
-  readonly action: 'thrust' | 'aim' | 'fire' | 'build' | 'boost' | 'ping';
+  readonly action: 'thrust' | 'aim' | 'fire' | 'build';
   /** Player-facing name of the action (never just "BUILD" — see GDD §2.5). */
   readonly label: string;
   /** The active device's binding, e.g. "WASD", "Right stick", "Right side". */
@@ -208,27 +196,12 @@ export function describeBindings(device: DeviceKind, mode: FireMode): BindingLab
     gamepad: 'Y / △',
     touch: 'BUILD',
   };
-  const boost: Record<DeviceKind, string> = {
-    keyboard: 'Space / Shift',
-    gamepad: 'Left trigger',
-    // Double-tap-and-hold the movement stick (thumb never leaves it), or the
-    // discoverable BOOST button (touch.ts / touch-buttons.ts, GDD §2.4).
-    touch: 'Double-tap stick / BOOST',
-  };
-  const ping: Record<DeviceKind, string> = {
-    keyboard: 'Middle click',
-    gamepad: 'D-pad',
-    // Tap pings your position, drag pings a direction (touch-buttons.ts, GDD §2.4).
-    touch: 'PING button',
-  };
 
   rows.push({ action: 'thrust', label: 'Thrust', binding: thrust[device] });
   // In Auto-aim the aim binding folds away — the right side becomes fire only.
   if (!auto) rows.push({ action: 'aim', label: 'Aim', binding: aim[device] });
   rows.push({ action: 'fire', label: 'Fire / Mine', binding: (auto ? fireAuto : fireManual)[device] });
   rows.push({ action: 'build', label: 'Build & Upgrade', binding: build[device] });
-  rows.push({ action: 'boost', label: 'Boost', binding: boost[device] });
-  rows.push({ action: 'ping', label: 'Ping', binding: ping[device] });
 
   return rows;
 }
