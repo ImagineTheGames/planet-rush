@@ -44,6 +44,7 @@ import {
   mine,
   nearestThreat,
   order,
+  repairTargetFraction,
   retreat,
   roam,
   scavenge,
@@ -115,7 +116,7 @@ export function hardSpendPlan(ctx: BotCtx): Purchase | null {
   if (
     !ctx.view.collapsed &&
     !planet.repairing &&
-    planet.coreHp < planet.maxCoreHp * HARD_REPAIR_AT &&
+    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, HARD_REPAIR_AT) &&
     spendable >= 2
   ) {
     return order('repair');

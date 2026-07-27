@@ -93,7 +93,7 @@ const BUILD_PATHS: Record<BuildItem, PlayerPath> = {
   turret: ({ world, ship }) => expect(placeOrder(world, ship, 'turret')).toBe('ok'),
   shield: ({ world, ship }) => expect(placeOrder(world, ship, 'shield')).toBe('ok'),
   repair: ({ world, ship, planet }) => {
-    damagePlanet(world, planet, 10); // a channel needs a wound to close
+    damagePlanet(world, planet, 10); // a repair purchase needs a wound to heal
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
   },
   bank: ({ world, ship }) => {
