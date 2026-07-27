@@ -12,6 +12,7 @@ import { PALETTE, PLAYER_COLORS } from '@render/index';
 import {
   planetHpModel,
   planetHpFlashOn,
+  coreHpReadout,
   playerColor,
   PLANET_CRITICAL_FRACTION,
 } from './planet-hp';
@@ -112,5 +113,28 @@ describe('shields stand in front of the core (GDD §2.5)', () => {
     // taking pressure, not dying.
     const m = planetHpModel(0, CORE_HP, CORE_HP, 1, SHIELD.hp);
     expect(m.critical).toBe(false);
+  });
+});
+
+describe('numeric core HP readout (developer request, p5-08 — "75/100")', () => {
+  it('reads current/max as whole points', () => {
+    expect(coreHpReadout(75, 100)).toBe('75/100');
+    expect(coreHpReadout(100, 100)).toBe('100/100');
+  });
+
+  it('rounds a live-siege fractional current to a whole point', () => {
+    expect(coreHpReadout(74.6, 100)).toBe('75/100');
+    expect(coreHpReadout(0.4, 100)).toBe('0/100');
+  });
+
+  it('never reads a negative or an over-max current', () => {
+    expect(coreHpReadout(-5, 100)).toBe('0/100');
+    // A frame that reports HP above max (a stale/racy feed) still clamps to max.
+    expect(coreHpReadout(120, 100)).toBe('100/100');
+  });
+
+  it('degrades an unwired or NaN core to a safe 0/0 rather than a NaN readout', () => {
+    expect(coreHpReadout(Number.NaN, Number.NaN)).toBe('0/0');
+    expect(coreHpReadout(0, 0)).toBe('0/0');
   });
 });

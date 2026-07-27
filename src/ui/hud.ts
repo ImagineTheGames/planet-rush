@@ -64,14 +64,14 @@ import type { StripRow } from './controls-strip';
 import { buildWheelModel, segmentAngle } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
-import type { DrawnUpgradeWedge } from './build-wheel-view';
+import type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 import { upgradeWheelModel, upgradeWedgeAngle, STOCK_TIERS } from './upgrade-wheel';
 import type { UpgradeTiers } from './upgrade-wheel';
 import { PressFeedback, detectConfirmations } from './press-feedback';
 import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './press-feedback';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
 import type { Point } from './alarm';
-import { planetHpModel, planetHpFlashOn } from './planet-hp';
+import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
 import { healthBarModel } from './healthbar';
@@ -412,6 +412,10 @@ export class Hud extends Container {
   // --- Own planet HP (top-right, player colour — GDD §2.2) ----------------
   private readonly planetGroup = new Container();
   private readonly planetLabel: Text;
+  /** Numeric core HP beside the bar — a "75/100" readout (developer request,
+   *  p5-08). Sim-driven off the same coreHp/maxCoreHp the bar fills from, so the
+   *  number and the bar can never disagree. */
+  private readonly coreLabel: Text;
   private readonly planetBar = new Graphics();
 
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
@@ -554,10 +558,18 @@ export class Hud extends Container {
     this.respawnGroup.addChild(this.respawnPanel, this.respawnText);
     this.respawnGroup.visible = false;
 
-    // Own planet HP: a right-anchored label above a bar in the player's colour.
+    // Own planet HP: a right-anchored label above a bar in the player's colour,
+    // with the numeric core HP ("75/100") sitting left-aligned on the same row,
+    // opposite HOME and above the left end of the bar — a numeral, so Oxanium
+    // (style-guide §5.6). It rides within the bar's own x-span, so it never widens
+    // the top-right footprint the layout registry records (see hud-geometry.ts).
     this.planetLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
     this.planetLabel.anchor.set(1, 0);
-    this.planetGroup.addChild(this.planetBar, this.planetLabel);
+    this.coreLabel = this.makeText('', FONT_NUMERAL, 11, TEXT_PRIMARY);
+    this.coreLabel.anchor.set(0, 0);
+    this.coreLabel.x = -HP_BAR_WIDTH;
+    this.coreLabel.y = 1;
+    this.planetGroup.addChild(this.planetBar, this.planetLabel, this.coreLabel);
     this.planetGroup.visible = false;
 
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
@@ -838,6 +850,13 @@ export class Hud extends Container {
 
     this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
     this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+
+    // Numeric core HP ("75/100") beside the bar, off the SAME numbers the bar
+    // fills from so the two can never drift. It flashes threat red in step with the
+    // bar's own critical flash — one danger tell, two forms — and otherwise stays
+    // chalk-white (never signal yellow, which is reserved for ore — style-guide §2).
+    this.coreLabel.text = coreHpReadout(frame.coreHp ?? maxCore, maxCore);
+    this.coreLabel.style.fill = model.critical && flash ? model.criticalColor : TEXT_PRIMARY;
   }
 
   // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) -----------
@@ -1108,6 +1127,14 @@ export class Hud extends Container {
    *  not up), so the live-stage test can assert a bought tier re-rendered. */
   debugUpgradeWedges(): DrawnUpgradeWedge[] {
     return this.wheel.debugUpgradeWedges();
+  }
+
+  /** The Build wheel wedges the view actually drew last frame (empty when the
+   *  Build wheel is not up), so the repair-wedge live-stage test can read the
+   *  REPAIR wedge's real effect/reason line ("+15 HP", the partial, "CORE FULL")
+   *  off the shipped bundle. */
+  debugBuildWedges(): DrawnBuildWedge[] {
+    return this.wheel.debugBuildWedges();
   }
 
   /** The controls-strip rows resolved for this frame (empty on touch), so a
