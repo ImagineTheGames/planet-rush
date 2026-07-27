@@ -351,14 +351,31 @@ export const SHIELD = {
   radius: 90,
 } as const;
 
-/** Repair core (GDD §2.8): planet core only, HP/s channel, ore per HP, and the
- *  rule that any core/shield damage interrupts it (GDD §2.5). `orePerHp` =
- *  1 ore ⁄ 5 HP; never printed on the wheel. TUNABLE */
-export const REPAIR = {
-  hpPerSecond: 2,
-  orePerHp: 1 / 5,
-  interruptedByDamage: true,
-} as const;
+/**
+ * Repair core — a DISCRETE purchase (developer, 2026-07-26; supersedes the
+ * GDD §2.5 channel — see docs/design-amendments.md). One wheel press = one
+ * purchase: spend `REPAIR_ORE_COST` ore, restore `REPAIR_HP_PER_ORE` core HP,
+ * clamped at the core max. Planet core only, never the ship. No channel, no
+ * continuous drain, no stacking — N taps are N independent, individually
+ * affordable-checked purchases. A core missing less than `REPAIR_HP_PER_ORE`
+ * still costs the full ore and heals to full (the wheel SHOWS the real number,
+ * so the choice is informed — p5-08). TUNABLE.
+ */
+export const REPAIR_HP_PER_ORE: Tunable<number> = 15;
+/** Ore spent per repair purchase — the "bare 1 under REPAIR CORE" (GDD §2.5),
+ *  now the whole price of one tap rather than a channel's opening unit. TUNABLE */
+export const REPAIR_ORE_COST: Tunable<number> = 1;
+/**
+ * How long (seconds) the `repairing` *tell* holds after a repair purchase before
+ * it releases (`maintainRepairTell`). It does NOT gate a human — `placeOrder`
+ * always lets a tap buy a discrete repair, so "5 taps = 5 purchases" holds — it
+ * only PACES an AI defender, which reads `!repairing` to decide when to buy its
+ * next repair. Set to `REPAIR_HP_PER_ORE / 2` so a bot files one 15-HP purchase
+ * per hold, i.e. the ~2 HP/s cadence of the retired repair channel — keeping bot
+ * repair economics (and the collapse-phase balance that hangs off them) steady
+ * across the discrete-repair amendment. TUNABLE.
+ */
+export const REPAIR_TELL_HOLD: Tunable<number> = REPAIR_HP_PER_ORE / 2;
 
 /**
  * Default arena side length (world units). The bounds are a square this big

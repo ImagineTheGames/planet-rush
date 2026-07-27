@@ -8,6 +8,116 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Repair is a DISCRETE purchase, not a channel
+
+**Date:** 2026-07-26 · branch `agent/gameplay/p5-repair-discrete`
+**Ratified by:** Developer (Reinaldo)
+**Amends by reference:** GDD §2.5 ("Repair core… a *channel*, not a purchase.
+Your ship must sit at your planet while core HP ticks back at a slow rate,
+consuming ore as it goes… Any damage to your core or shield interrupts the
+channel"), and the §2.8 baseline row ("Repair core | 2 HP/s channel · 1 ore =
+5 HP · interrupted by damage"). Supersedes the channel line entirely. Everything
+else in §2.5 — repair is the planet's *core* only, never the ship; ship hull is
+never repairable; collapse (§2.3) shuts repair off for good — is unchanged.
+
+### The ratification, verbatim
+
+> "Repair shows how many hit points it's going to restore… each 1 ore repairs
+> 15… but it's not on a loop."
+
+### The model
+
+One tap = one purchase. A press of the REPAIR CORE wedge spends
+`REPAIR_ORE_COST` = **1 ore** (hold-first, then bank, like every other buy) and
+restores `REPAIR_HP_PER_ORE` = **15 core HP**, clamped at the core max. No
+channel, no continuous drain, no stacking: **N taps = N distinct purchases**,
+each individually affordable-checked. There is no per-tick repair work left in
+the sim — a purchase resolves in full inside `placeOrder`.
+
+- **Near-full edge:** if the core is missing less than 15 HP, the tap still costs
+  a whole ore and heals to full — the wheel SHOWS the real number, so the player
+  chooses informed (developer, p5-08). Never overshoots the cap.
+- **The developer's loop bug, killed:** the channel opened by one press used to
+  drain ore every tick until the core filled or the bank emptied — one click,
+  repeated spend. That path (`runRepairChannel`) is gone. A tap now maps to
+  exactly one ore-spend, ever.
+- **The heal is never interrupted.** With no channel to drop, a hit that lands
+  after a repair does not undo the HP already banked into the core. "Pressure
+  beats regeneration" (§2.6) still holds — for shields via `planet.sinceDamage`,
+  and for repair through the *finite ore pool* (every HP bought back is a turret,
+  shield, or upgrade not bought) **and** through the AI-pacing tell below (a bot
+  cannot resume repairing while its core is under fire).
+- **Refusals stay loud:** full core → `core-full`; empty/short bank →
+  `cannot-afford`; collapse → `collapsed`. Each spends nothing.
+
+### The repair tell, and how it PACES bots (not humans)
+
+`Planet.repairing` stays a boolean tell, but its meaning changes from "a channel
+is open" to "a repair was just bought and is still settling." A purchase lights it
+and arms `Planet.repairCooldown` (a new *optional* `Planet` field, defaulting to
+`0`); `maintainRepairTell` in `updatePlanets` ticks the cooldown down and releases
+the tell when it hits zero **and** the core has been quiet that long — or clears it
+early on a full core, the ship leaving, or collapse.
+
+Why held rather than pulsed: it is a **ratified cross-lane signal**. The
+renderer/observer glows the healed core from it, and the **bots read `!repairing`
+to decide when to buy their next repair**. Under the retired channel the flag
+stayed lit for the whole heal, so a bot filed *one* repair order and waited; a
+naïve one-tick pulse would instead let a bot re-buy every tick (15 HP/tick). The
+cooldown restores the old cadence: `REPAIR_TELL_HOLD = REPAIR_HP_PER_ORE / 2`, so
+a bot files one 15-HP purchase per hold — the channel's old **~2 HP/s** rate — and
+the "quiet core" release makes pressure beat repair for AI defenders too. **A
+human is never gated by the tell**: `placeOrder` ignores it, so five rapid taps
+are still five purchases (per the ratification). `src/shared/` is untouched; the
+new `Planet.repairCooldown` is optional and server-internal (the net layer
+reconstructs `repairing` from its own event shapes and does not carry it).
+
+### Balance note (bot economy)
+
+Discrete repair is **3× more HP-per-ore** than the channel (1 ore ⁄ 15 HP vs the
+old 1 ore ⁄ 5 HP) and no longer drains ore per tick, so the finite pool now buys
+more core HP. In the 8-bot offline match (`src/bots/trees.test.ts`, seed 1) both
+before and after this change the match runs to the collapse phase and is decided
+by entropy at t≈750 s; the cheaper, chunkier repair shifts the sub-HP core
+landscape at collapse so the seed-1 tie resolves with the last two cores dying
+together (8 eliminated, last-to-die wins) rather than a lone survivor (7). This is
+a downstream **balance re-baseline** the change forces; it is not a bug (the match
+still ends deterministically with a winner, under the timeout). It was verified to
+be independent of the tell semantics — the outcome is identical across five tried
+`repairing` implementations — so it is the ratified channel removal itself, not
+the pacing. **Follow-up (bots lane):** update `trees.test.ts`'s exact
+`eliminated.toHaveLength(7)` (and its now-stale "COLLAPSE_CORE_DECAY is zero"
+comment) to the re-baselined ending.
+
+### Constants (`src/sim/constants.ts`, all TUNABLE)
+
+- `REPAIR_HP_PER_ORE` = **15** — core HP restored per purchase (was the channel's
+  `REPAIR.hpPerSecond` 2 / `orePerHp` 1⁄5 → 5 HP per ore).
+- `REPAIR_ORE_COST` = **1** — ore spent per purchase (the "bare 1 under REPAIR
+  CORE", now the whole price of a tap rather than a channel's opening unit).
+- `REPAIR_TELL_HOLD` = **`REPAIR_HP_PER_ORE / 2`** (7.5 s) — how long the
+  `repairing` tell holds, pacing AI repair to the retired channel's ~2 HP/s. Does
+  not gate humans.
+
+The old `REPAIR` object (`hpPerSecond`, `orePerHp`, `interruptedByDamage`) is
+removed; only `src/sim` (and its tests) imported it.
+
+### Tests updated to the ratified model (deliberately)
+
+- `src/sim/buildings.test.ts` — the whole "repair channel" describe block was
+  rewritten to the discrete model: 1 tap → +15 / −1 ore; hold-first funding;
+  clamp math; the 5-tap case (5 taps = 5 ore, +75 HP, then zero drain); refuse
+  cases (full core, empty/short bank, collapse, undocked); damage-does-not-cancel;
+  a shield still standing in front of the core; the tell holding for its pacing
+  window and under fire, releasing when quiet, and clearing on a full core;
+  determinism.
+- `tests/sim/repair-channel.test.ts` — the end-to-end field-report suite, updated
+  from "the order opens a held channel" to "the order is one purchase that heals
+  on the order tick." The loud-refusal and wheel-model pins are unchanged.
+- `tests/sim/turret-parity.test.ts` — comment only (a repair still needs a wound).
+
+---
+
 ## v0.3 — The mining laser goes away: PROJECTILES for everything
 
 **Date:** 2026-07-26
