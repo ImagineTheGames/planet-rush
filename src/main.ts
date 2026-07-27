@@ -861,8 +861,8 @@ async function boot(): Promise<void> {
     // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
     // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
     // both platforms use (docs/input-parity.md). Checked LAST among the interactive
-    // surfaces — after the end/fullscreen overlays, the BUILD button, the BOOST/PING
-    // buttons and the open wheel — so the glance map is the lowest-priority claim:
+    // surfaces — after the end/fullscreen overlays, the BUILD button and the open
+    // wheel — so the glance map is the lowest-priority claim:
     // a control drawn near or over it always wins the press, and the map only takes
     // one that lands on nothing else. When it does claim a press we consume the
     // event so the same press never also flies the ship or engages a stick under it.
