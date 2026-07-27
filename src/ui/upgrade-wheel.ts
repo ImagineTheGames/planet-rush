@@ -43,6 +43,8 @@
 import { ShipClass } from '@shared/types';
 import { CARGO_CAP_MAX, CARGO_PER_TIER, SHIP_STATS } from '../sim/constants';
 import { affordable } from './affordability';
+import { hubBack } from './wheel-nav';
+import type { HubBack } from './wheel-nav';
 
 // ---------------------------------------------------------------------------
 // The four upgrade tracks (GDD §2.5)
@@ -297,10 +299,14 @@ export type UpgradeWedgeState = 'ready' | 'unaffordable' | 'maxed';
  *  - `weapon` — the main wheel's WEAPON wedge: opens the nested weapon sub-wheel
  *               instead of spending, and carries a {@link UpgradeWedge.summary}
  *               so the main wheel still says the weapon tiers at a glance.
- *  - `back`   — the sub-wheel's back-out wedge: returns to the main wheel.
- * The nav wedges buy nothing, so they carry no cost and no stat value.
+ * The nav wedge buys nothing, so it carries no cost and no stat value.
+ *
+ * There is no longer a `back` wedge: BACK moved to the hub, the single consistent
+ * spot every wheel level shares (field report v0.2.4 — {@link ./wheel-nav}). The
+ * sub-wheel's home is a hub tap now, not a wedge, so the weapon sub-wheel is just
+ * its two weapon tracks.
  */
-export type UpgradeWedgeKind = 'track' | 'weapon' | 'back';
+export type UpgradeWedgeKind = 'track' | 'weapon';
 
 /** A pip on the WEAPON wedge's summary: one weapon track's current tier out of
  *  its max, so the main wheel shows DAMAGE/SPEED as filled-vs-empty dots without
@@ -352,7 +358,8 @@ export interface UpgradeWheelModel {
    *  wheel lives behind that arrow and nowhere else (GDD §2.5). */
   readonly open: boolean;
   /** The weapon sub-wheel is drilled into (WEAPON pressed). The wedges then are
-   *  the weapon-group tracks plus a BACK wedge, not the main-wheel set. */
+   *  the weapon-group tracks, not the main-wheel set; its way back is the hub
+   *  (field report v0.2.4), not a wedge. */
   readonly weaponOpen: boolean;
   /** The hull being upgraded (GDD §2.11 — locked at the lobby for the match). */
   readonly shipClass: ShipClass;
@@ -362,6 +369,14 @@ export interface UpgradeWheelModel {
   readonly ore: number;
   /** One wedge per slot on the current level, clockwise from twelve o'clock. */
   readonly wedges: readonly UpgradeWedge[];
+  /**
+   * The hub's BACK affordance (field report v0.2.4). This wheel sits *behind* the
+   * Build wheel, so its hub says `BACK` and a hub tap / ESC pops one level — the
+   * WEAPON sub-wheel back to the main upgrade wheel, and the main upgrade wheel
+   * back to the Build wheel ({@link ./wheel-nav}). `null` while this wheel is not
+   * up (there is no hub to press).
+   */
+  readonly hubBack: HubBack | null;
 }
 
 /** What the upgrade wheel needs for one frame. */
@@ -382,21 +397,22 @@ export interface UpgradeWheelSignals {
 // Two-level layout — main wheel + the nested WEAPON sub-wheel (RATIFIED v0.2.2)
 // ---------------------------------------------------------------------------
 
-/** One position on the current wheel level: a stat track, or a navigation wedge
- *  (WEAPON opens the sub-wheel, BACK returns). Exported so the input layer can
- *  map a pressed row to the same action the drawn wedge represents, without
- *  re-deriving the level's shape. */
+/** One position on the current wheel level: a stat track, or the WEAPON wedge
+ *  that opens the sub-wheel. Exported so the input layer can map a pressed row to
+ *  the same action the drawn wedge represents, without re-deriving the level's
+ *  shape. (BACK is not a slot any more — it lives on the hub, field report
+ *  v0.2.4, {@link ./wheel-nav}.) */
 export type UpgradeSlot =
   | { readonly kind: 'track'; readonly track: UpgradeTrack }
-  | { readonly kind: 'weapon' }
-  | { readonly kind: 'back' };
+  | { readonly kind: 'weapon' };
 
 /**
  * The slots on the current wheel level, clockwise from twelve o'clock. The main
  * wheel (`weaponOpen === false`) shows the non-weapon tracks with the contiguous
  * weapon run collapsed into one WEAPON wedge at the run's position; the weapon
- * sub-wheel (`weaponOpen === true`) shows the weapon-group tracks followed by a
- * BACK wedge. Both are derived from `order`, so grouping is data, not layout.
+ * sub-wheel (`weaponOpen === true`) shows just the weapon-group tracks — its way
+ * back to the main wheel is the hub, not a wedge (field report v0.2.4). Both are
+ * derived from `order`, so grouping is data, not layout.
  */
 export function upgradeWheelSlots(
   weaponOpen: boolean,
@@ -406,11 +422,7 @@ export function upgradeWheelSlots(
   const isWeapon = (track: UpgradeTrack): boolean => ladder[track].group === WEAPON_GROUP;
 
   if (weaponOpen) {
-    const slots: UpgradeSlot[] = order
-      .filter(isWeapon)
-      .map((track) => ({ kind: 'track', track }) as const);
-    slots.push({ kind: 'back' });
-    return slots;
+    return order.filter(isWeapon).map((track) => ({ kind: 'track', track }) as const);
   }
 
   const slots: UpgradeSlot[] = [];
@@ -458,10 +470,15 @@ export function upgradeWheelModel(
     className: CLASS_NAMES[signals.shipClass],
     ore: Math.floor(Math.max(0, signals.ore)),
     wedges,
+    // The hub is the BACK affordance (field report v0.2.4). This wheel is never
+    // the top level — it lives behind the Build wheel's arrow — so its back POPS
+    // a level: WEAPON → upgrade, upgrade → Build. `null` while shut.
+    hubBack: signals.open ? hubBack(signals.weaponOpen ? 'weapon' : 'upgrade') : null,
   };
 }
 
-/** One wedge for a slot: a stat track, the WEAPON navigation wedge, or BACK. */
+/** One wedge for a slot: a stat track, or the WEAPON navigation wedge (BACK now
+ *  lives on the hub, not a wedge — field report v0.2.4). */
 function slotWedge(
   signals: UpgradeWheelSignals,
   ladder: UpgradeLadder,
@@ -470,7 +487,6 @@ function slotWedge(
   angle: number,
 ): UpgradeWedge {
   if (slot.kind === 'weapon') return weaponWedge(signals, ladder, order, angle);
-  if (slot.kind === 'back') return backWedge(angle);
   return upgradeWedge(signals, ladder[slot.track], angle);
 }
 
@@ -495,23 +511,6 @@ function weaponWedge(
     // the weapon tracks exist (same rule as the Build wheel's UPGRADE SHIP).
     state: 'ready',
     summary: weaponSummary(signals, ladder, order),
-    angle,
-  };
-}
-
-/** The sub-wheel's BACK wedge — returns to the main wheel, buys nothing. */
-function backWedge(angle: number): UpgradeWedge {
-  return {
-    kind: 'back',
-    track: null,
-    label: 'BACK',
-    tier: 0,
-    maxTier: 0,
-    current: '',
-    next: null,
-    cost: null,
-    state: 'ready',
-    summary: null,
     angle,
   };
 }

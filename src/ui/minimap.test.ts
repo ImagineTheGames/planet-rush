@@ -35,8 +35,8 @@ import {
   MINIMAP_MARGIN,
   MINIMAP_COLLAPSED_TOUCH,
   MINIMAP_COLLAPSED_DESKTOP,
-  MINIMAP_ACTION_RESERVE_FRACTION,
-  MINIMAP_BOTTOM_SAFE_FRACTION,
+  MINIMAP_FIRE_COLUMN,
+  MINIMAP_STRIP_CLEARANCE,
   MINIMAP_DOT_ALPHA,
   MINIMAP_DERELICT_ALPHA,
   MINIMAP_SPAWN_PROTECT_ALPHA,
@@ -152,32 +152,30 @@ describe('placement — the drawn rect sits inside its declared anchor zone', ()
     expect(minimapRect('expanded', PHONE_WIDE, true)).toEqual(expandedRect(PHONE_WIDE, true));
   });
 
-  it('reserves the bottom-right ACTION corner — its right edge clears the fire column', () => {
-    // The extreme bottom-right is the FIRE / aim thumb (touch) and the desktop
-    // "no touch affordance" probe (REGION_FIRE, x ≥ 0.7·W). The square is pulled
-    // left of it, so its right edge sits at/inside W·(1 - action reserve): it never
-    // draws onto the fire control nor reads as one. (PR #147: the collapsed square
-    // overlapped the FIRE button on touch and lit REGION_FIRE on desktop.)
-    for (const [name, vp, touch] of [
-      ['phone-wide', PHONE_WIDE, true],
-      ['desktop', DESKTOP, false],
-    ] as const) {
-      const rect = collapsedRect(vp, touch);
-      const reservedRightEdge = vp.width * (1 - MINIMAP_ACTION_RESERVE_FRACTION);
-      expect(rect.x + rect.width, `${name}: right edge clears the action column`).toBeLessThanOrEqual(
-        reservedRightEdge + 0.5,
-      );
-      // Still in the RIGHT half — it is a bottom-RIGHT map, not a centred one.
-      expect(rect.x + rect.width, `${name}: still in the right half`).toBeGreaterThan(vp.width / 2);
-    }
+  it('desktop hugs the true bottom-right corner (only the strip lifts it)', () => {
+    // No fire button on desktop (field report v0.2.4): the square takes the corner,
+    // its right edge at the right margin and its bottom edge only lifted above the
+    // controls strip. Well inside the right half — a bottom-RIGHT map.
+    const rect = collapsedRect(DESKTOP, false);
+    expect(rect.x + rect.width).toBeCloseTo(DESKTOP.width - MINIMAP_MARGIN, 5);
+    expect(rect.y + rect.height).toBeCloseTo(DESKTOP.height - MINIMAP_MARGIN - MINIMAP_STRIP_CLEARANCE, 5);
+    expect(rect.x + rect.width).toBeGreaterThan(DESKTOP.width / 2);
   });
 
-  it('touch: the collapsed square lifts off the very-bottom strip band', () => {
-    // A steel frame in the y ≥ 0.95·H band reads as a controls strip to the "strip
-    // ABSENT on touch" probe (REGION_STRIP_MID). The square's bottom stays above
-    // the strip-safe line so it never does.
-    const rect = collapsedRect(PHONE_WIDE, true);
-    expect(rect.y + rect.height).toBeLessThanOrEqual(PHONE_WIDE.height * MINIMAP_BOTTOM_SAFE_FRACTION + 0.5);
+  it('touch sits in the bottom-right band, LEFT of the fire column (clear of FIRE)', () => {
+    // The hold-to-FIRE button owns the extreme touch corner (GDD §2.4). The map
+    // wins the bottom-right band but stays clear of the fire column, so its right
+    // edge sits at/inside W − margin − fire column. (PR #147: the map used to
+    // overlap the FIRE button; now it is held left of it.)
+    for (const vp of [PHONE_WIDE, PHONE_NARROW] as const) {
+      const rect = collapsedRect(vp, true);
+      const fireLeftEdge = vp.width - MINIMAP_MARGIN - MINIMAP_FIRE_COLUMN;
+      expect(rect.x + rect.width, 'right edge clears the fire column').toBeLessThanOrEqual(
+        fireLeftEdge + 0.5,
+      );
+      // Still in the RIGHT half — a bottom-RIGHT map, not a centred one.
+      expect(rect.x + rect.width, 'still in the right half').toBeGreaterThan(vp.width / 2);
+    }
   });
 
   it('respects safe-area insets by pulling the corner further in', () => {
