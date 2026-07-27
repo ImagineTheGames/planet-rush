@@ -968,5 +968,45 @@
     "buildSha": "7d1e2e1",
     "attestation": "Live ?debug=1 (NO freeze); every press is a REAL pointerdown on the drawn REPAIR CORE wedge (the shipped __repairStage seam only sieged the local core and funded the bank). THE DEAL panel: core sieged to 20/100 (top-right HOME bar), bank 10 ore; the REPAIR CORE wedge draws '+15 HP' with the bare '1' as its only cost numeral, bright and pressable. BANK-FALLS-CORE-RISES panel: three real taps step the core up 15 HP each while the bank steps down 1 ore each — core 20 -> 65 (+45), bank 10 -> 7 (-3); the wedge still reads '+15 HP'. N-TAPS-ARE-N-PURCHASES panel: from a fresh siege (core 10, bank 10) five real taps buy exactly +75 HP for 5 ore (core 85, bank 5) — no channel over-spend, no drain. AUTO-STOP-AT-FULL panel: with the core topped to 100/100 the wedge dims to 'CORE FULL' (ready = false); five RAPID taps then spend ZERO ore — bank frozen 9 -> 9, core pinned at max. Discrete purchase, no stacking beyond N discrete buys, refused (not silently drained) at full. Verdict: verified.",
     "verdict": "verified"
+  },
+  {
+    "id": "pause-menu-offline",
+    "title": "Pause — real ESC freezes the offline match; settings round-trip; EXIT re-boots",
+    "area": "match",
+    "image": "images/pause-menu-offline.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Six-panel montage from the real desktop bundle over an offline ?debug=1 match; every control pressed at the physical point the client itself drew it (through the read-only __pauseStage seam). Panels 1–2 show the PAUSED overlay (RESUME / SETTINGS / EXIT TO MENU) after a REAL ESC, both captioned TICK 122 — the two captures were taken 500ms apart (≈30 ticks would pass at 60Hz) yet the sim tick counter is identical (Δticks=0, frozen=true): the offline sim is genuinely FROZEN, not merely visually paused. Panel 3 is the real SETTINGS screen (FIRE MODE / CONTROLS / REDUCE VFX / MASTER·SFX·MUSIC VOLUME / DONE), still frozen, reached from and returned to the overlay — a clean round trip. Panel 4 is the 'LEAVE THE MATCH?' confirm (LEAVE / STAY) — one accidental tap can't kill a match. Panel 5 is the clean PLANET RUSH main menu after LEAVE (menuVisible=true, matchStarted=false, and __pauseStage gone — no stale match seam survived the teardown). Panel 6 is a brand-new live arena after PLAY→RUSH (matchStarted=true). Zero page errors across the whole path.",
+    "verdict": "verified"
+  },
+  {
+    "id": "tap-planet-wheel",
+    "title": "Tap Commander — tap your planet to open the build wheel, buy, close, and fly again",
+    "area": "build-wheel",
+    "image": "images/tap-planet-wheel.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Four-panel montage, real desktop bundle, Tap Commander scheme, ship docked at its own planet (?debug=1, LIVE sim). Every press is a REAL synthesized pointerdown at the logical point the client drew, into the same main.ts handler a thumb hits. Panel 1: the wheel was closed, then a real tap on the planet OPENED the build wheel (TURRET / UPGRADE SHIP / SHIELD / REPAIR CORE segments visible); the bank reads 999 ore in the wheel hub, 0 turrets at the planet. Panel 2: a real tap on the TURRET wedge bought one through the wheel's own funnel — the hub number visibly drops 999→996 (spent exactly 3 = TURRET.cost) and the planet's turret count rises 0→1. Panel 3: a real tap OUTSIDE the wheel closed it (open→false) and placed NO move order (order='none') — one tap dismisses, it does not double as a move. Panel 4: the very NEXT real tap on empty space is a move order ('waypoint') and the ship flew up-field (y 1200→1143). Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "game-has-sound",
+    "title": "The game SOUNDS — a real gesture resumes the context, the mix runs, the soundtrack plays",
+    "area": "audio",
+    "image": "images/game-has-sound.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Three-panel montage, real desktop bundle (?debug=1&freeze=1), read through the pure-readback __audioStage seam (it drives no sound — audio is invisible, so the readback IS the evidence). BEFORE: prior to any gesture the standing voices have NOT started (running=false) and the unlock has NOT latched (unlocked=false) — the game is silent; the raw context state reads 'running' only because headless Chromium starts its AudioContext running (a real browser reports 'suspended' here), so the honest proof is running/unlocked flipping. RUNNING: after a REAL TRUSTED mouse click (the unlock's 'tap on PLAY') the context is running, unlocked=true, standing voices running=true, the master gain the player hears through = 0.8 (>0, audible), and the adaptive soundtrack is playing (musicPlaying=true, phase 'calm'). SFX FIRES: a real wheel-wedge tap bumped the SFX one-shot count 6→7 in the SAME page turn (no background frame between the two reads, so the rise is the tap's own sound node), on an SFX bus gain of 0.8. The game was silent for a day because nothing asserted this; now the record shows it makes sound from a real gesture. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "ui-sfx-audible",
+    "title": "UI SFX — the shared control driver names the RIGHT voice: press ticks, disabled buzzes, spend chimes",
+    "area": "audio",
+    "image": "images/ui-sfx-audible.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Three-panel montage, real desktop bundle (?debug=1&freeze=1), context woken by a real gesture first; presses then go through the HUD's ONE shared control driver (__pressStage — the same call a real thumb's press reaches) and the per-kind SFX-spy tally (uiCues) is read back through __audioStage and captioned. PRESS TICK: a LIVE affordable upgrade wedge (drawn 'ready', hub 999) → the press tally rose 1→2 and the last cue was 'press' — a live control ticks. REJECT BUZZ: with the bank zeroed (hub 0) a DISABLED wedge (lit red) → the reject tally rose 0→1, last cue 'reject' — main.ts alone can't know a wedge's ready state, the HUD does, so a disabled press BUZZES. CONFIRM CHIME: a sim-confirmed landed spend through the driver's confirm path → the confirm tally rose 0→1, last cue 'confirm'. Three distinct voices, each married to its exact interaction; SFX bus gain 0.8. The voices sat unwired in the bank for a day — this gate keeps callers and voices married. Zero page errors.",
+    "verdict": "verified"
   }
 ]
