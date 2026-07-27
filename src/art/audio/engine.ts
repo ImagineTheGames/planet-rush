@@ -215,6 +215,11 @@ export class AudioEngine {
     this.ambientLoop = null;
   }
 
+  /** The SFX slider, 0..1 — every world tell and device cue rides this bus. */
+  setSfxVolume(value: number): void {
+    this.graph?.setBus('sfx', value);
+  }
+
   /** The music slider, 0..1 — the soundtrack's own level (GDD §4.9 item 3). */
   setMusicVolume(value: number): void {
     this.graph?.setBus('music', value);

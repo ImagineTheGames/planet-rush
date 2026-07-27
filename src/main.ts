@@ -130,6 +130,7 @@ import {
   createSettings,
   toggleReduceVfx,
   adjustVolume,
+  DEFAULT_VOLUMES,
   EndOfMatchView,
   endOfMatchModel,
   LobbyView,
@@ -164,6 +165,9 @@ import type {
 } from './ui';
 import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
+import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext } from './art/audio';
+import { TellQueue, TELL_CAPACITY } from './art/tells';
+import { WorldObserver } from './art/vfx/observer';
 
 const LOCAL_PLAYER = 0;
 
@@ -249,6 +253,40 @@ async function boot(): Promise<void> {
   // Dev flags (?debug=1, ?freeze=1). Off in a normal build — everything gated on
   // `flags.debug` below is zero-cost when the query string is absent.
   const flags = parseDebugFlags(typeof window !== 'undefined' ? window.location.search : '');
+
+  // --- Audio (src/art/audio): the game's whole synthesized voice, finally wired.
+  //     The SFX bank has existed since d5 and the adaptive soundtrack merged in
+  //     #132, yet the booted client never opened a context, never armed the
+  //     unlock, and never fed the graph a single tell — merged-but-never-called,
+  //     the exact "dark matter" the presenter file warns about — so the developer
+  //     heard total silence (field report v0.2.4). Three moving parts, all live
+  //     from here:
+  //       1. Open a context. `null` in Node / the QA harness (no `AudioContext`),
+  //          which makes `audio` a silent no-op rather than an error (GDD §4.1).
+  //       2. Arm the unlock NOW, before the menu opens, so the FIRST real gesture
+  //          — the tap on PLAY included — resumes the context (browsers hold it
+  //          `suspended` until then) and starts the standing voices. It re-arms
+  //          whenever the context is found asleep again (backgrounded tab, an
+  //          answered phone call); the frame loop rechecks it once a frame (risk 7,
+  //          ./art/audio/unlock).
+  //       3. Derive tells off the SAME live world the renderer draws, and sound
+  //          them — the audible twin of the VFX field (GDD §3.6), fed in the loop.
+  //     The starting mix is the settings screen's own DEFAULT_VOLUMES, so what the
+  //     player hears matches what the sliders show, and every default is audible.
+  const audioCtx = openAudioContext();
+  const audio = new AudioEngine({
+    context: audioCtx,
+    local: LOCAL_PLAYER,
+    mix: { master: DEFAULT_VOLUMES.master, sfx: DEFAULT_VOLUMES.sfx, music: DEFAULT_VOLUMES.music },
+  });
+  const audioTells = new TellQueue(TELL_CAPACITY);
+  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+  const unlockTarget = defaultUnlockTarget();
+  const audioUnlock =
+    audioCtx && unlockTarget
+      ? new AudioUnlock(audioCtx, unlockTarget, { onUnlock: () => audio.start() })
+      : null;
+  audioUnlock?.arm();
 
   const app = new Application();
   await app.init({
@@ -548,6 +586,7 @@ async function boot(): Promise<void> {
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
+    installAudioStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -790,6 +829,7 @@ async function boot(): Promise<void> {
       const target = endOverlay.hitTest(lp.x, lp.y);
       if (target) {
         haptics.haptic('tap');
+        audio.cue('press'); // the audible twin of the press haptic (engine.ts)
         handleEndTarget(target.kind);
       }
       e.stopImmediatePropagation();
@@ -803,6 +843,7 @@ async function boot(): Promise<void> {
     // doesn't also engage a stick under it.
     if (fsAffordance.visible && fsAffordance.hitTest(lp.x, lp.y, w, h)) {
       haptics.haptic('tap');
+      audio.cue('press');
       fullscreen.enter();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -816,6 +857,7 @@ async function boot(): Promise<void> {
     const build = buildButtonRect(isTouch, buildVisible, w, h);
     if (build && inRect(pressPoint, build)) {
       haptics.haptic('tap');
+      audio.cue('press'); // the BUILD button opened/closed the wheel — a press tick
       buildWheel.toggle();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -865,6 +907,7 @@ async function boot(): Promise<void> {
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
       haptics.haptic('tap');
+      audio.cue('press'); // a wedge on the OPEN upgrade wheel was pressed
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -891,6 +934,7 @@ async function boot(): Promise<void> {
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
+      audio.cue('press'); // …and its audible twin (the wheel/menu tick, engine.ts)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -908,6 +952,7 @@ async function boot(): Promise<void> {
     // event so the same press never also flies the ship or engages a stick under it.
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
+      audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -1069,6 +1114,22 @@ async function boot(): Promise<void> {
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
 
       renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
+      // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
+      // tells off the live world (the audible twin of the VFX field, GDD §3.6),
+      // sound them, then advance the standing voices, the alarm, the adaptive
+      // soundtrack and the death hush. The listener follows the SAME camera the
+      // renderer just used, so a siege on the far side of the map stays background
+      // (earshot falloff, engine.ts). A no-op when running silent (no context).
+      const heard = world.ships.find((s) => s.id === cameraTarget);
+      if (heard) audio.setListener(heard.pos.x, heard.pos.y);
+      audioTells.clear();
+      audioObserver.observe(world, frameSeconds, audioTells);
+      audio.consume(audioTells);
+      audio.update(frameSeconds);
+      // Phones lock and tabs get backgrounded mid-match; the context comes back
+      // suspended and the rest of the game is silent unless something re-arms the
+      // unlock. Cheap, and a no-op while the context is running (risk 7).
+      audioUnlock?.recheck();
       feedHud();
       // Combat haptics (field request v0.2.2): read the same core/shield/hull
       // values feedHud just pulled and buzz on hit / under-attack / core-lost. A
@@ -1247,6 +1308,11 @@ async function boot(): Promise<void> {
     hasOrdered = false;
     tapPilot.clear(); // a fresh match has no standing order (developer §2)
     if (buildWheel.open) buildWheel.toggle();
+    // Forget the old world's tell baseline and reset the standing voices, so the
+    // new arena does not open with a phantom burst of the siege the last one
+    // ended on (the observer's first post-reset frame primes and emits nothing).
+    audioObserver.reset();
+    audio.reset();
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -1508,6 +1574,7 @@ async function boot(): Promise<void> {
     if (ordered) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
+      audio.cue('confirm'); // the two-beat purchase-landed sound, its audible twin
     }
   }
 
@@ -2824,6 +2891,77 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__minimapStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__audioStage` — the ?debug=1 live-stage seam that proves, on a
+   * REAL boot, that the game actually MAKES SOUND (field report v0.2.4: "why don't
+   * I hear ANY sounds yet?"). The unit tests build the whole graph headless against
+   * a stub context and assert its shape; what they cannot reach is the one thing
+   * that was broken — that the shipped bundle opens a context, resumes it on a real
+   * gesture, and drives the mix. This is a pure READBACK: it reports the live audio
+   * state (the raw `AudioContext.state`, the master gain the player will actually
+   * hear through, whether the adaptive soundtrack is running and in which phase, and
+   * a running count of SFX one-shots the mix has started). A Playwright test does a
+   * REAL tap on PLAY (the unlock gesture), then asserts `state === 'running'`, the
+   * master gain is above zero, the music is playing, and a real wheel tap bumped the
+   * SFX count. It drives nothing — every sound comes from a real gesture on the real
+   * client — so it cannot fake the very wiring it is there to prove. Behind ?debug=1.
+   */
+  function installAudioStage(): void {
+    const stage = {
+      /** A snapshot of the live audio state — the whole "is it alive?" readout. */
+      read(): {
+        /** `null` running silent (no context — Node, the harness); otherwise the
+         *  raw `AudioContext.state`: `suspended` until a gesture, then `running`. */
+        contextState: string | null;
+        /** True once a gesture resumed the context (`./art/audio/unlock`). */
+        unlocked: boolean;
+        /** True once `start()` ran — the standing voices (ambient + music) began. */
+        running: boolean;
+        /** The master gain the player hears through, 0..1. Zero would be silence. */
+        master: number | null;
+        /** True while the adaptive soundtrack is enabled and playing (`./music`). */
+        musicPlaying: boolean;
+        /** The soundtrack's current phase — calm / building / siege / … . */
+        musicPhase: string;
+        /** SFX one-shots the mix has STARTED since boot — bumps on every real tell
+         *  and cue. A wheel tap raising this proves an SFX node actually fired. */
+        sfxCount: number;
+        /** One-shots skipped because the death hush had the mix at zero (§4.7). */
+        hushedCount: number;
+      } {
+        return {
+          contextState: audioCtx ? audioCtx.state : null,
+          unlocked: audioUnlock?.unlocked ?? false,
+          running: audio.running,
+          master: audio.graph ? audio.graph.master.gain.value : null,
+          musicPlaying: audio.music?.playing ?? false,
+          musicPhase: audio.musicScore.phase,
+          sfxCount: audio.playCount,
+          hushedCount: audio.hushedCount,
+        };
+      },
+      /** Resume the context by hand — the exact call the unlock makes from a
+       *  gesture. The spec still drives sound through a REAL tap; this is only the
+       *  escape hatch for a headless runner whose synthetic input a browser might
+       *  not count as a gesture, so the readback above is never a false negative. */
+      async resume(): Promise<string | null> {
+        if (!audioUnlock) return null;
+        await audioUnlock.unlockNow();
+        return audioCtx ? audioCtx.state : null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__audioStage', {
         value: stage,
         writable: false,
         configurable: false,
