@@ -14,6 +14,7 @@
  */
 
 import { CHUNK, DEATH_ORE_DROP_FRACTION, RESPAWN_S, clampToMargin } from './constants';
+import { ledgerAdd } from './ore-ledger';
 import type { Ship, World } from './state';
 
 /**
@@ -41,15 +42,29 @@ export function killShip(world: World, ship: Ship): void {
   ship.vel.y = 0;
   ship.firing = false;
 
-  const drop = ship.cargo * DEATH_ORE_DROP_FRACTION;
+  const held = ship.cargo;
+  const drop = held * DEATH_ORE_DROP_FRACTION;
   ship.cargo = 0;
-  if (drop <= 1e-9) return;
+  if (drop <= 1e-9) {
+    // Nothing worth dropping: the whole (tiny) hold is destroyed with the ship.
+    ledgerAdd(world, 'deathLoss', held);
+    return;
+  }
+  // The unshed half is destroyed with the ship — a real sink (GDD §2.3). Recorded
+  // before the drop so the ledger sees the full hold leave the economy: half to
+  // chunks (`dropped`, below), half gone (`deathLoss`).
+  ledgerAdd(world, 'deathLoss', held - drop);
+  ledgerAdd(world, 'dropped', drop);
 
-  // Scatter debris in a deterministic ring (no RNG needed — angle by index).
-  const whole = Math.floor(drop);
-  const pieces = whole + (drop - whole > 1e-9 ? 1 : 0);
+  // Scatter debris in a deterministic ring (no RNG needed — angle by index). Ore
+  // is split into whole CHUNK.ore pieces plus one remainder, so the pieces sum to
+  // `drop` EXACTLY for any chunk size — never the `/1` shortcut that would mint or
+  // burn ore the day CHUNK.ore is tuned off 1 (it is TUNABLE).
+  const whole = Math.floor(drop / CHUNK.ore);
+  const remainder = drop - whole * CHUNK.ore;
+  const pieces = whole + (remainder > 1e-9 ? 1 : 0);
   for (let i = 0; i < pieces; i++) {
-    const amount = i < whole ? CHUNK.ore : drop - whole;
+    const amount = i < whole ? CHUNK.ore : remainder;
     const theta = (2 * Math.PI * i) / Math.max(1, pieces);
     const dx = Math.cos(theta);
     const dy = Math.sin(theta);

@@ -39,6 +39,7 @@ import {
   waveTime,
 } from './constants';
 import { killShip } from './damage';
+import { ledgerAdd } from './ore-ledger';
 import type { Planet, World } from './state';
 import { allWavesSpawned, fieldExhausted } from './waves';
 
@@ -124,6 +125,12 @@ function eliminate(world: World, planet: Planet): void {
     ship.banked = 0;
   }
 
+  // The wreck pays out the dead player's bank PLUS a floor minted from nothing so
+  // even a broke player leaves something to scavenge (GDD §2.7). The banked share
+  // is a transfer (bank → chunks, conserved); the floor is a fresh source, so the
+  // ledger records only the floor here — `scatterWreckDebris` records the chunks
+  // it actually lays down as `dropped` and any capped overflow as `capLoss`.
+  ledgerAdd(world, 'debrisFloor', WRECK.baseDebrisOre);
   scatterWreckDebris(world, planet, banked + WRECK.baseDebrisOre);
 }
 
@@ -169,6 +176,13 @@ function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
       radius: CHUNK.radius,
     });
   }
+
+  // Ledger: the chunks laid down are `dropped` ore (loot on the map); anything the
+  // `maxDebrisChunks` cap refused to scatter died with the planet — a real sink
+  // (`capLoss`), so a hoarder's over-cap fortune is accounted, not silently gone.
+  const scattered = whole * CHUNK.ore + (remainder > 1e-9 ? remainder : 0);
+  ledgerAdd(world, 'dropped', scattered);
+  ledgerAdd(world, 'capLoss', ore - scattered);
 }
 
 /**
