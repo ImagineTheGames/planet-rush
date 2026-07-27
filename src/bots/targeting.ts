@@ -37,6 +37,50 @@ export function clamp01(x: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// Index-blind tie-breaks (p8 aggression-bias field question)
+// ---------------------------------------------------------------------------
+
+/**
+ * An **index-blind** symmetry-break for a dead heat between two targets owned by
+ * different slots, judged by the bot in `observer` (its own `ctx.self.id`).
+ *
+ * The scoring terms are continuous, so an exact score tie is a genuine dead heat
+ * — two rivals a bot has no honest reason to separate. The obvious `a.id < b.id`
+ * hands every such tie to the **lowest slot id**, and that is not a rare corner:
+ * an *unscouted* rival core reads as full with no turrets, so `leaderPlanet`
+ * scores every un-visited home at one identical standing, and early-match a bot's
+ * whole board is tied there — "gang the leader" then silently means "gang slot
+ * 0". Measured, the lowest-id tie-break sends 7 of 8 observers at slot 0 with
+ * slots 2–7 never chosen (see `tests/harness/aggression-bias.test.ts`). That is a
+ * slot-position bias — player 0 draws fire it did nothing to earn.
+ *
+ * The fix is the ratified mulberry32 avalanche (`@shared/types`) used as a hash,
+ * **keyed by the observer** so different bots break the same dead heat toward
+ * different slots — across the cast no single slot is preferred — while a given
+ * bot's pick stays a pure function of the ids, so it is stable from one decision
+ * to the next and a bot never dithers between two equal rivals (which a freshly
+ * drawn RNG value each tick would cause). Deterministic, so replays are
+ * unaffected (GDD §4.8), and it only ever changes the outcome of an *exact* tie.
+ */
+export function tiebreakKey(observer: PlayerId, candidate: PlayerId): number {
+  let h = (Math.imul(observer + 1, 0x9e37_79b9) ^ Math.imul(candidate + 1, 0x85eb_ca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x21f0_aaad) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x735a_2d97) >>> 0;
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
+/**
+ * True when `candidate` should displace `best` on an exact-score dead heat: the
+ * higher index-blind key wins, and an astronomically rare key collision falls
+ * back to the lower id so the order stays total and deterministic.
+ */
+export function breaksTie(observer: PlayerId, candidate: PlayerId, best: PlayerId): boolean {
+  const kc = tiebreakKey(observer, candidate);
+  const kb = tiebreakKey(observer, best);
+  return kc > kb || (kc === kb && candidate < best);
+}
+
+// ---------------------------------------------------------------------------
 // Nerve: when a bot breaks off (GDD §2.9 — Easy "retreats at half hull")
 // ---------------------------------------------------------------------------
 
@@ -313,8 +357,9 @@ export function scorePlanet(ctx: BotCtx, planet: PerceivedPlanet): TargetScore {
  * chasing a wounded miner and besieging an undefended core should be making one
  * comparison, not two (GDD §2.9).
  *
- * Ties break on kind (ships first — they shoot back) and then on the lower slot
- * id, so the choice is stable and a bot never oscillates between two equals.
+ * An exact-score dead heat is broken index-blind ({@link breaksTie}, keyed by
+ * the observing bot), not by lowest slot id, so no player draws fire merely for
+ * sitting in a low slot (p8) — while the pick stays stable frame to frame.
  */
 export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
   let best: TargetScore | null = null;
@@ -324,7 +369,7 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
       best = candidate;
       return;
     }
-    if (candidate.score === best.score && candidate.id < best.id) best = candidate;
+    if (candidate.score === best.score && breaksTie(ctx.self.id, candidate.id, best.id)) best = candidate;
   };
 
   for (const ship of ctx.view.ships) consider(scoreShip(ctx, ship));
@@ -372,6 +417,11 @@ export function nearestLivingRival(ctx: BotCtx): PerceivedPlanet | null {
  * everyone free-ride on every attack; fog makes third-party awareness a skill"
  * (GDD §2.2) — so a bot that has scouted nobody thinks the nearest healthy
  * neighbour is the leader, and is often wrong.
+ *
+ * When several rivals look equally strong — the common early-match case, where
+ * every unscouted home reads at one standing — the dead heat is broken
+ * index-blind ({@link breaksTie}), not toward slot 0: without that, "gang the
+ * leader" quietly means "gang the lowest slot" (p8 aggression-bias fix).
  */
 export function leaderPlanet(ctx: BotCtx): PerceivedPlanet | null {
   let best: PerceivedPlanet | null = null;
@@ -382,7 +432,10 @@ export function leaderPlanet(ctx: BotCtx): PerceivedPlanet | null {
     const core = memo?.coreFraction ?? 1;
     const turrets = memo?.turrets ?? 0;
     const standing = 0.7 * core + 0.3 * clamp01(turrets / TURRET.capPerPlanet);
-    if (standing > bestStanding || (best !== null && standing === bestStanding && planet.owner < best.owner)) {
+    if (
+      standing > bestStanding ||
+      (best !== null && standing === bestStanding && breaksTie(ctx.self.id, planet.owner, best.owner))
+    ) {
       bestStanding = standing;
       best = planet;
     }
