@@ -558,7 +558,26 @@ function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
  * is mined only when the field is otherwise empty of reachable foes.
  */
 function acquireAimTarget(world: World, ship: Ship): AimTarget | null {
-  return acquireEnemy(world, ship) ?? acquireAsteroid(world, ship);
+  const enemy = acquireEnemy(world, ship);
+  if (enemy) return enemy;
+  // A FULL hold drops asteroids out of tier 2 entirely (developer, p9): the
+  // chunks a shot would chip have nowhere to go — the tractor leaves a full
+  // hold's chunks where they are for anyone (GDD §2.3, `holdFull`) — so auto-aim
+  // (stick mode and the tap pilot alike) never wastes a shot on a rock it cannot
+  // profit from. Enemies are unaffected: they are tier 1, resolved above. The
+  // tick the hold has room again, rocks re-enter the ladder.
+  if (holdFull(ship)) return null;
+  return acquireAsteroid(world, ship);
+}
+
+/**
+ * Whether `ship`'s hold has no room left — the single "full hold" predicate the
+ * tractor (a full hold exerts no pull, GDD §2.3) and the p9 auto-aim suppression
+ * (a full hold stops targeting rocks) both read, so the two can never disagree
+ * about when a rock stops being worth mining.
+ */
+function holdFull(ship: Ship): boolean {
+  return ship.cargoCap - ship.cargo <= 1e-9;
 }
 
 /**
@@ -721,7 +740,7 @@ function updateChunks(world: World, dt: number): void {
     let bestD2 = range2;
     for (const ship of world.ships) {
       if (!ship.alive) continue;
-      if (ship.cargoCap - ship.cargo <= 1e-9) continue;
+      if (holdFull(ship)) continue;
       const d2 = dist2(chunk.pos, ship.pos);
       if (d2 < bestD2) {
         bestD2 = d2;

@@ -1036,6 +1036,15 @@ export const TRACTOR = {
 } as const;
 
 /**
+ * TRACTOR_PICKUP_RADIUS — the tractor grab range as a standalone named constant
+ * for consumers outside the sim (the platform tap-pilot, p9-02: it reads how
+ * close a mined rock's chunks must be to drift into the hold). SINGLE SOURCE: it
+ * *is* `TRACTOR.range`, never a copied literal, so tuning the tractor moves the
+ * pilot's read in lockstep — the pilot must import this, not hardcode 120. TUNABLE
+ */
+export const TRACTOR_PICKUP_RADIUS: Tunable<number> = TRACTOR.range;
+
+/**
  * DEPOSIT_RANGE — the atmosphere radius (world units, centre-to-centre) inside
  * which a ship auto-deposits its hold at its OWN living planet. Ratified p4
  * (developer): "You shouldn't need to touch your planet to deposit — just be in

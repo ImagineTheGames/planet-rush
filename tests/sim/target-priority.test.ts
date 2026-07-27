@@ -370,6 +370,56 @@ describe('auto-aim priority ladder — enemies before rocks (ratified p8)', () =
   });
 });
 
+// ---------------------------------------------------------------------------
+// Full-hold suppression — a full hold drops rocks out of tier 2 (ratified p9)
+// ---------------------------------------------------------------------------
+
+describe('full-hold suppression — rocks leave tier 2 when the hold is full (ratified p9)', () => {
+  it('full hold + only asteroids: no auto-target, the ship holds fire', () => {
+    // A rock squarely in range, nothing else. With the hold FULL the chunks a
+    // shot would chip have nowhere to go (the tractor leaves a full hold's
+    // chunks put, GDD §2.3), so the ladder acquires nothing and no shot goes out.
+    const shooter = makeShip({ id: SHOOTER, pos: { ...ORIGIN }, cargoCap: 2, cargo: 2 });
+    const rock = makeAsteroid({ id: 5, pos: { x: ORIGIN.x + 100, y: ORIGIN.y } });
+    const world = makeWorld({ ships: [shooter], asteroids: [rock] });
+
+    for (let k = 0; k < 30; k++) tick(world, SHOOTER);
+    expect(world.projectiles.some((p) => p.active && p.owner === SHOOTER)).toBe(false);
+  });
+
+  it('full hold + enemy: the enemy is still shot — suppression touches only rocks', () => {
+    // Same full hold, but now a hittable enemy shares the field with a closer
+    // rock. Tier 1 is unaffected by the hold: the enemy is acquired and fired on,
+    // never the rock.
+    const shooter = makeShip({ id: SHOOTER, pos: { ...ORIGIN }, cargoCap: 2, cargo: 2 });
+    const enemy = makeShip({ id: ENEMY, pos: { x: ORIGIN.x + 220, y: ORIGIN.y }, hull: 1e7, maxHull: 1e7 });
+    const rock = makeAsteroid({ id: 5, pos: { x: ORIGIN.x, y: ORIGIN.y + 100 } });
+    const world = makeWorld({ ships: [shooter, enemy], asteroids: [rock] });
+
+    const aim = fireAim(world, SHOOTER);
+    expect(aimsAt(aim, ORIGIN, enemy.pos)).toBe(true);
+    expect(aimsAt(aim, ORIGIN, rock.pos)).toBe(false);
+  });
+
+  it('hold frees: the same rock re-enters tier 2 and is mined the tick there is room', () => {
+    // Full hold + only a rock ⇒ no shot (suppressed). Free the hold (as a
+    // deposit would) and the very next acquisition re-admits the rock and mines
+    // it — the suppression is re-evaluated every tick, never sticky.
+    const shooter = makeShip({ id: SHOOTER, pos: { ...ORIGIN }, cargoCap: 2, cargo: 2 });
+    const rock = makeAsteroid({ id: 5, pos: { x: ORIGIN.x + 100, y: ORIGIN.y } });
+    const world = makeWorld({ ships: [shooter], asteroids: [rock] });
+
+    // Suppressed while full: no shot after plenty of ticks.
+    for (let k = 0; k < 30; k++) tick(world, SHOOTER);
+    expect(world.projectiles.some((p) => p.active && p.owner === SHOOTER)).toBe(false);
+
+    // The hold empties (banked at home, GDD §2.3) — rocks re-enter the ladder.
+    world.ships[0]!.cargo = 0;
+    const aim = fireAim(world, SHOOTER);
+    expect(aimsAt(aim, ORIGIN, rock.pos)).toBe(true);
+  });
+});
+
 /** Fire once and return the exact velocity of the shot — the determinism probe
  *  reads the raw numbers, not a normalized direction, so any drift shows. */
 function newestShotAfterFire(world: World): Vec2 {
