@@ -6,15 +6,19 @@
  * every *decision* (which dots, what colour, the fit, the toggle) lives in the
  * pure sibling and unit-tests headless.
  *
- * **Low-frequency redraw (GDD §4.3 — field request "every N ticks to an offscreen
- * texture, never per-frame").** The heavy content — planets, enemy ships, ore
- * hints, the collapse ring — is rebuilt into a `cacheAsTexture` container only
- * every {@link MINIMAP_REDRAW_TICKS} ticks (or when the rect/state changes), so a
- * static scene rasterises ~10×/s, not 60. The **local ship's own dot** is the one
+ * **Low-frequency redraw (GDD §4.3 — field request "every N ticks … never
+ * per-frame").** The heavy content — planets, enemy ships, ore hints, the collapse
+ * ring — is re-tessellated into its `content` Graphics only every
+ * {@link MINIMAP_REDRAW_TICKS} ticks (or when the rect/state changes), so a static
+ * scene rebuilds ~10×/s, not 60. The **local ship's own dot** is the one
  * exception: a single dot redrawn every frame, so it tracks the player's motion
  * smoothly (the per-frame cost the throttle exists to dodge does not apply to one
  * dot). Content and own dot are clipped to the rect by a mask, so nothing spills
- * past the frame — which keeps the registered bounds honest.
+ * past the frame — which keeps the registered bounds honest. (The field request
+ * also suggested caching that content to an *offscreen texture*; we deliberately do
+ * NOT — on the software-WebGL path a render-to-texture pass is a pessimisation, and
+ * on a collapsed frame rate the throttle can't skip it, which is exactly what
+ * regressed build-flow.spec on CI. See {@link MinimapView.rebuildContent}.)
  *
  * **Registered on both states.** The layer reports its `bottom-right` corner rect
  * when collapsed and its `full` overlay rect when expanded, through
@@ -108,7 +112,6 @@ export class MinimapView extends Container {
   private lastRebuildTick = -Infinity;
   private lastState: MinimapState | null = null;
   private lastRectKey = '';
-  private cacheEnabled = false;
 
   // --- ?debug=1 live-stage capture (cold in a normal build) -----------------
   private debugCapture = false;
@@ -246,20 +249,22 @@ export class MinimapView extends Container {
     for (const p of scene.planetDots) g.circle(p.x, p.y, p.radius).fill({ color: p.color, alpha: p.alpha });
     for (const s of scene.shipDots) g.circle(s.x, s.y, s.radius).fill({ color: s.color, alpha: s.alpha });
 
-    // Cache the freshly-drawn content to a texture (the "offscreen texture" the
-    // field request asks for). Best-effort: guarded so a pre-first-render call or
-    // an unsupported path never breaks drawing — the throttle already bought the
-    // per-frame saving regardless.
-    try {
-      if (!this.cacheEnabled) {
-        this.content.cacheAsTexture(true);
-        this.cacheEnabled = true;
-      } else {
-        this.content.updateCacheTexture();
-      }
-    } catch {
-      /* caching unavailable this frame — the un-cached Graphics still draws fine */
-    }
+    // NO offscreen texture cache. The field request's "cache to an offscreen
+    // texture" is a poor trade on the software-WebGL path (the ~1 fps CI runner, and
+    // any phone that falls back to SwiftShader): `cacheAsTexture` adds a full
+    // render-to-texture pass *every* rebuild, and on a collapsed frame rate the
+    // tick-delta throttle below never skips a frame (≥ 6 sim ticks elapse per frame
+    // once the rate drops — MAX_FRAME_SECONDS admits up to 15), so that extra pass
+    // ran on every single frame for zero benefit. The content is a dozen small
+    // circles Pixi already batches; drawing the Graphics directly is no more
+    // expensive than compositing a cached texture and is pixel-identical (the
+    // frozen-scene goldens confirm). The CPU win the field request actually wanted —
+    // not re-tessellating the scene per frame — is still bought by the
+    // {@link MINIMAP_REDRAW_TICKS} throttle in {@link update} whenever the frame rate
+    // is healthy enough for it to engage. (The minimap is not the reason
+    // build-flow.spec was slow on CI — that is the irreducible cost of its long
+    // construction-cycle advance; this just stops the map wasting a pass on the
+    // slowest renderers regardless.)
   }
 
   // --- ?debug=1 live-stage seam --------------------------------------------
