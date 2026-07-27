@@ -715,6 +715,26 @@ async function boot(): Promise<void> {
    *  every other frame. */
   let pendingUpgrade: UpgradeTrack | null = null;
 
+  /**
+   * Pop exactly one wheel LEVEL, the BACK affordance the hub tap and ESC share
+   * (field report v0.2.4 — {@link @ui/wheel-nav}). WEAPON sub-wheel → upgrade
+   * wheel → Build wheel → closed, one step per call, mirroring the level stack
+   * `wheelLevel` derives. Returns whether anything was open to back out of, so the
+   * caller can consume the event only when it did something. The three bits of
+   * state are the platform `WheelInput.open`/`.panelOpen` and the UI's
+   * `weaponWheelOpen`, exactly as the HUD reads them, so there is no fourth copy.
+   */
+  function wheelBackOneLevel(): boolean {
+    if (!buildWheel.open) return false;
+    if (buildWheel.panelOpen) {
+      if (weaponWheelOpen) weaponWheelOpen = false; // WEAPON sub-wheel → upgrade wheel
+      else buildWheel.closePanel(); // upgrade wheel → Build wheel
+    } else {
+      buildWheel.close(); // Build wheel → closed
+    }
+    return true;
+  }
+
   // --- Haptics event detection (field request v0.2.2). `feedHaptics` derives the
   //     three combat vibrations — you-were-hit, base-under-attack, core-lost — from
   //     the same live sim values the HUD reads, once per rendered frame. State here,
@@ -822,11 +842,12 @@ async function boot(): Promise<void> {
       upgradeWheelLayout.segments = upgradeSlots.length;
 
       const hit = hitWheel(pressPoint.x, pressPoint.y, upgradeWheelLayout);
-      if (hit.kind === 'outside') {
-        // A tap off the wheel backs out of the upgrade wheel to the Build wheel —
-        // the same "outside dismisses this level" gesture the Build wheel obeys.
-        buildWheel.closePanel();
-        weaponWheelOpen = false;
+      if (hit.kind === 'outside' || hit.kind === 'hub') {
+        // The hub is the BACK affordance (field report v0.2.4), and a tap off the
+        // wheel dismisses too — both pop exactly ONE level: WEAPON sub-wheel →
+        // upgrade wheel, upgrade wheel → Build wheel. Consistent with ESC and the
+        // Build wheel's own hub, so "go up a level" is one gesture everywhere.
+        wheelBackOneLevel();
       } else if (hit.kind === 'segment') {
         const slot = upgradeSlots[hit.index];
         if (slot?.kind === 'weapon') {
@@ -834,16 +855,12 @@ async function boot(): Promise<void> {
           // close the upgrade wheel back to the Build wheel (field report v0.2.2).
           weaponWheelOpen = true;
           hud.pressWheelSegment('upgrade', hit.index);
-        } else if (slot?.kind === 'back') {
-          weaponWheelOpen = false;
-          hud.pressWheelSegment('upgrade', hit.index);
         } else if (slot?.kind === 'track') {
           // Latch the pressed track; `updateBuildWheel` drains it into the funnel
           // as an `upgradeOrder` on the next tick, exactly like a Build segment.
           pendingUpgrade = slot.track;
           hud.pressWheelSegment('upgrade', hit.index);
         }
-        // A press in the hub / inner gap buys nothing — a miss on the open wheel.
       }
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
@@ -859,6 +876,16 @@ async function boot(): Promise<void> {
     // decides which from the wedge's own drawn state.
     if (buildWheel.open && !buildWheel.panelOpen) {
       const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
+      if (wheelHit.kind === 'hub') {
+        // The hub is the BACK affordance (field report v0.2.4): on the top-level
+        // Build wheel, backing out closes it. Consume so the same tap doesn't fall
+        // through to fly the ship or engage a stick under it.
+        wheelBackOneLevel();
+        haptics.haptic('tap');
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
       if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
     }
 
@@ -1456,8 +1483,9 @@ async function boot(): Promise<void> {
     // Four segments spend on the spot; the fifth opened a screen and never
     // reaches here (GDD §2.5). The sim validates every one of them again —
     // ownership, docking, cost, caps — and refuses on its own terms. The upgrade
-    // rows map to the CURRENT level's tracks; the WEAPON/BACK nav wedges never set
-    // a row (consumed at press), so their positions are never drained as a buy.
+    // rows map to the CURRENT level's tracks; the WEAPON nav wedge never sets a row
+    // (consumed at press), so its position is never drained as a buy. BACK is not a
+    // wedge any more — it lives on the hub (field report v0.2.4).
     const rowTracks = upgradeWheelSlots(weaponWheelOpen).map((s) =>
       s.kind === 'track' ? s.track : UpgradeTrack.Power,
     );
@@ -2392,10 +2420,12 @@ async function boot(): Promise<void> {
         weaponWheelOpen = true;
         return { weaponOpen: weaponWheelOpen };
       },
-      back(): { weaponOpen: boolean } {
-        // Back out of the sub-wheel to the main wheel (the BACK wedge).
-        weaponWheelOpen = false;
-        return { weaponOpen: weaponWheelOpen };
+      back(): { open: boolean; panelOpen: boolean; weaponOpen: boolean } {
+        // Pop ONE wheel level — the hub BACK / ESC gesture (field report v0.2.4):
+        // WEAPON → upgrade → Build → closed. The same helper the real hub tap and
+        // ESC call, so the seam stages exactly what a player's back does.
+        wheelBackOneLevel();
+        return { open: buildWheel.open, panelOpen: buildWheel.panelOpen, weaponOpen: weaponWheelOpen };
       },
       close(): void {
         buildWheel.close();
@@ -2454,6 +2484,14 @@ async function boot(): Promise<void> {
           x: w / 2 + Math.cos(angle) * radius * 0.6,
           y: h / 2 + Math.sin(angle) * radius * 0.6,
         };
+      },
+      hubPoint(): { x: number; y: number } {
+        // The LOGICAL screen point at the wheel's hub — the BACK affordance a hub
+        // tap / ESC acts on (field report v0.2.4). The follow camera holds the
+        // docked ship, and the wheel drawn on it, at the viewport centre, so the
+        // hub is dead centre. A real-input test dispatches a pointerdown here to
+        // back out a level through the actual door.
+        return { x: transform.logicalWidth / 2, y: transform.logicalHeight / 2 };
       },
       legend(): ReturnType<typeof hud.debugControlsStrip> {
         // The controls-strip rows the HUD resolved this frame — read by a
@@ -3047,6 +3085,13 @@ async function boot(): Promise<void> {
     // corner tap runs, added to the input-parity table (docs/input-parity.md).
     if (e.code === MINIMAP_TOGGLE_KEY) {
       hud.toggleMinimap();
+    }
+    // ESC mirrors the hub BACK on PC (field report v0.2.4): one press pops one
+    // wheel level — WEAPON → upgrade → Build → closed — the desktop twin of a tap
+    // on the wheel's centre. Only while a wheel is up, so ESC still falls through
+    // to anything else that wants it when the wheel is shut.
+    if (e.code === 'Escape' && buildWheel.open) {
+      wheelBackOneLevel();
     }
   });
 

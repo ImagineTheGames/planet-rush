@@ -43,6 +43,8 @@
 import type { BuildItem } from '@shared/types';
 import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SHIELD, TURRET } from '../sim/constants';
 import { affordable } from './affordability';
+import { hubBack } from './wheel-nav';
+import type { HubBack } from './wheel-nav';
 
 // ---------------------------------------------------------------------------
 // Segment identity
@@ -253,6 +255,13 @@ export interface BuildWheelModel {
   /** The four segments, clockwise from twelve o'clock. Always all four, even
    *  when the wheel is closed, so the view can pool its children once. */
   readonly segments: readonly WheelSegment[];
+  /**
+   * The hub's BACK affordance (field report v0.2.4). The Build wheel is the top
+   * level, so its hub says `CLOSE` and a hub tap / ESC shuts the wheel — the
+   * single, consistent "go up a level" spot every wheel now shares
+   * ({@link ./wheel-nav}). `null` only when the wheel is closed (no hub to press).
+   */
+  readonly hubBack: HubBack | null;
 }
 
 /** Static per-segment copy. Words only — the numbers come from `segmentCost`. */
@@ -297,7 +306,10 @@ export function buildWheelModel(signals: BuildWheelSignals): BuildWheelModel {
       repair: id === 'repair' ? repairWedgeInfo(signals, ore) : null,
     };
   });
-  return { open: canOpenWheel(signals), ore: Math.floor(ore), segments };
+  const open = canOpenWheel(signals);
+  // The hub is the BACK affordance (field report v0.2.4); the Build wheel is the
+  // top level, so its back CLOSES the wheel. `null` while shut — no hub is drawn.
+  return { open, ore: Math.floor(ore), segments, hubBack: open ? hubBack('build') : null };
 }
 
 /**

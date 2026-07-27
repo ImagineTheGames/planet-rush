@@ -100,10 +100,12 @@ describe('the main wheel is about the SHIP (RATIFIED v0.2.2)', () => {
 });
 
 describe('the WEAPON sub-wheel (RATIFIED v0.2.2)', () => {
-  it('drills into every group:weapon track plus a BACK wedge', () => {
+  it('drills into exactly the group:weapon tracks — BACK is the hub now', () => {
+    // Field report v0.2.4: the sub-wheel's back-out moved to the hub, so the
+    // wedges are just its weapon tracks (no BACK wedge among them).
     const wedges = upgradeWheelModel(sig({ weaponOpen: true })).wedges;
-    expect(wedges.map((w) => w.label)).toEqual(['DAMAGE', 'SPEED', 'BACK']);
-    expect(wedges.map((w) => w.kind)).toEqual(['track', 'track', 'back']);
+    expect(wedges.map((w) => w.label)).toEqual(['DAMAGE', 'SPEED']);
+    expect(wedges.map((w) => w.kind)).toEqual(['track', 'track']);
     // Both are really the weapon group off the ladder.
     expect(UPGRADE_LADDER[UpgradeTrack.Power].group).toBe(WEAPON_GROUP);
     expect(UPGRADE_LADDER[UpgradeTrack.Speed].group).toBe(WEAPON_GROUP);
@@ -118,22 +120,44 @@ describe('the WEAPON sub-wheel (RATIFIED v0.2.2)', () => {
     expect(damage[0]!.label).toBe('DAMAGE');
   });
 
-  it('the BACK wedge navigates, never buys', () => {
-    const back = wedgeOf('BACK', { weaponOpen: true });
-    expect(back.kind).toBe('back');
-    expect(back.track).toBeNull();
-    expect(back.cost).toBeNull();
+  it('carries no BACK wedge — the hub is the back affordance (field report v0.2.4)', () => {
+    const wedges = upgradeWheelModel(sig({ weaponOpen: true })).wedges;
+    expect(wedges.some((w) => w.label === 'BACK')).toBe(false);
+    // The back-out is on the hub: the sub-wheel's hub says BACK and pops a level.
+    const hub = upgradeWheelModel(sig({ weaponOpen: true })).hubBack;
+    expect(hub).not.toBeNull();
+    expect(hub!.label).toBe('BACK');
+    expect(hub!.to).toBe('upgrade');
+    expect(hub!.closes).toBe(false);
   });
 
   it('is data-driven: a track tagged weapon appears in the sub-wheel for free', () => {
     // upgradeWheelSlots walks the ladder's group metadata — the sub-wheel is
-    // exactly the group:weapon tracks (in order) plus BACK.
+    // exactly the group:weapon tracks (in order). BACK is the hub, not a slot.
     const weaponTracks = WHEEL_TRACK_ORDER.filter(
       (t) => UPGRADE_LADDER[t].group === WEAPON_GROUP,
     );
     const slots = upgradeWheelSlots(true);
-    expect(slots.slice(0, -1)).toEqual(weaponTracks.map((track) => ({ kind: 'track', track })));
-    expect(slots[slots.length - 1]).toEqual({ kind: 'back' });
+    expect(slots).toEqual(weaponTracks.map((track) => ({ kind: 'track', track })));
+  });
+});
+
+describe('the hub BACK affordance (field report v0.2.4)', () => {
+  it('the main upgrade wheel backs to the Build wheel', () => {
+    const hub = upgradeWheelModel(sig({ weaponOpen: false })).hubBack;
+    expect(hub).not.toBeNull();
+    expect(hub!.label).toBe('BACK');
+    expect(hub!.to).toBe('build');
+    expect(hub!.closes).toBe(false);
+  });
+
+  it('the WEAPON sub-wheel backs to the main upgrade wheel', () => {
+    const hub = upgradeWheelModel(sig({ weaponOpen: true })).hubBack;
+    expect(hub!.to).toBe('upgrade');
+  });
+
+  it('has no hub when the wheel is shut — there is nothing to press', () => {
+    expect(upgradeWheelModel(sig({ open: false })).hubBack).toBeNull();
   });
 });
 
@@ -156,9 +180,9 @@ describe('the wedges lay out as a wheel, clockwise from the top (field report)',
     const main = upgradeWheelModel(sig({ weaponOpen: false })).wedges;
     const sub = upgradeWheelModel(sig({ weaponOpen: true })).wedges;
     expect(main).toHaveLength(4); // WEAPON, ENGINE, CARGO, HULL
-    expect(sub).toHaveLength(3); // DAMAGE, SPEED, BACK
+    expect(sub).toHaveLength(2); // DAMAGE, SPEED (BACK is the hub now — field report v0.2.4)
     expect(main[1]!.angle - main[0]!.angle).toBeCloseTo((2 * Math.PI) / 4, 6);
-    expect(sub[1]!.angle - sub[0]!.angle).toBeCloseTo((2 * Math.PI) / 3, 6);
+    expect(sub[1]!.angle - sub[0]!.angle).toBeCloseTo((2 * Math.PI) / 2, 6);
   });
 });
 
@@ -214,11 +238,11 @@ describe('affordability — dimmed with a reason (the field report)', () => {
     expect(wedgeOf('SPEED', { weaponOpen: true, ore: cost }).state).toBe('ready');
   });
 
-  it('leaves the navigation wedges always pressable — a broke player still explores', () => {
-    // WEAPON and BACK open/close a screen; a broke player must still find the
-    // weapon tracks exist (same rule as the Build wheel's UPGRADE SHIP).
+  it('leaves the WEAPON navigation wedge always pressable — a broke player still explores', () => {
+    // WEAPON opens a screen; a broke player must still find the weapon tracks
+    // exist (same rule as the Build wheel's UPGRADE SHIP). BACK is the hub now
+    // (field report v0.2.4), and the hub is always pressable by construction.
     expect(wedgeOf('WEAPON', { ore: 0 }).state).toBe('ready');
-    expect(wedgeOf('BACK', { weaponOpen: true, ore: 0 }).state).toBe('ready');
   });
 
   it('echoes the same whole-ore total the Build wheel\'s hub shows', () => {

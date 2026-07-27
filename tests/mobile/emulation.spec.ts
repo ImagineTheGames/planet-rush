@@ -46,6 +46,7 @@ import {
   REGION_STRIP_MID,
   REGION_FULL,
   type Img,
+  type Region,
 } from './pixels';
 
 // --- Which projects are touch phones vs the desktop control -----------------
@@ -120,6 +121,47 @@ async function boot(page: Page): Promise<void> {
 /** Decode the current viewport screenshot into an {@link Img}. */
 async function shoot(page: Page): Promise<Img> {
   return decode(await page.screenshot());
+}
+
+/** The overlap of two fractional {@link Region}s, or null when they don't meet. */
+function intersectRegions(a: Region, b: Region): Region | null {
+  const x0 = Math.max(a.x0, b.x0);
+  const y0 = Math.max(a.y0, b.y0);
+  const x1 = Math.min(a.x1, b.x1);
+  const y1 = Math.min(a.y1, b.y1);
+  return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : null;
+}
+
+/**
+ * The collapsed minimap's own square as a fractional {@link Region}, read from the
+ * layout registry the app publishes under `?debug=1` (`window.__planetRush.layout`,
+ * id `minimap`) — authoritative, never a hardcoded corner. Null if the entry is
+ * absent (the minimap was expanded, or the seam is off). Field report v0.2.4 moved
+ * the collapsed map into the bottom-right corner, so it now overlaps `REGION_FIRE`
+ * and legitimately paints team-plasma dots there (own ship + own home planet); the
+ * desktop FIRE-absent check subtracts this square so a real leaked FIRE ring — which
+ * lights the corner well beyond the small map — is still what trips the guard.
+ */
+async function minimapRegion(page: Page): Promise<Region | null> {
+  return page.evaluate(() => {
+    const pr = (
+      window as unknown as {
+        __planetRush?: {
+          viewport: { w: number; h: number };
+          layout: { id: string; bounds: { x: number; y: number; width: number; height: number } }[];
+        };
+      }
+    ).__planetRush;
+    const e = pr?.layout.find((x) => x.id === 'minimap');
+    if (!pr || !e || !(pr.viewport.w > 0) || !(pr.viewport.h > 0)) return null;
+    const { x, y, width, height } = e.bounds;
+    return {
+      x0: x / pr.viewport.w,
+      y0: y / pr.viewport.h,
+      x1: (x + width) / pr.viewport.w,
+      y1: (y + height) / pr.viewport.h,
+    };
+  });
 }
 
 /** What one tick-bounded drag measured: world distance covered and the number of
@@ -381,9 +423,21 @@ test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, t
   await boot(page);
   const img = await shoot(page);
 
-  // No hold-to-FIRE button on desktop (mouse/keyboard).
-  const fire = count(img, REGION_FIRE, isPlasma);
-  expect(fire.matched, 'FIRE button must be absent on desktop').toBeLessThan(ABSENT_MAX_PX);
+  // No hold-to-FIRE button on desktop (mouse/keyboard). The collapsed minimap now
+  // hugs the bottom-right corner (field report v0.2.4) and legitimately paints
+  // team-plasma dots (own ship + own home planet) inside REGION_FIRE — so subtract
+  // its own square (read from the layout registry, not hardcoded) and assert the
+  // plasma that REMAINS is absent. A real leaked FIRE ring lights the corner well
+  // beyond that small map square, so the "no touch FIRE on desktop" invariant is
+  // preserved; only the ratified minimap is exempted.
+  const mmRegion = await minimapRegion(page);
+  const firePlasma = count(img, REGION_FIRE, isPlasma).matched;
+  const mmOverlap = mmRegion ? intersectRegions(REGION_FIRE, mmRegion) : null;
+  const mmPlasma = mmOverlap ? count(img, mmOverlap, isPlasma).matched : 0;
+  const fireMatched = firePlasma - mmPlasma;
+  expect(fireMatched, 'FIRE button must be absent on desktop (minimap corner excluded)').toBeLessThan(
+    ABSENT_MAX_PX,
+  );
 
   // The controls strip IS drawn along the bottom edge (GDD §2.2), plasma keys +
   // grey labels.

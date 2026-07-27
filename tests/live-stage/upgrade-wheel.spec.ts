@@ -41,8 +41,11 @@ interface UpgradeWheelStage {
   openUpgrade(ore?: number): { open: boolean } | null;
   /** Drill into the nested WEAPON sub-wheel (RATIFIED v0.2.2 — "tap WEAPON"). */
   openWeapon(): { weaponOpen: boolean } | null;
-  /** Back out of the sub-wheel to the main wheel (the BACK wedge). */
-  back(): { weaponOpen: boolean };
+  /** Pop ONE wheel level — the hub BACK / ESC gesture (field report v0.2.4). */
+  back(): { open: boolean; panelOpen: boolean; weaponOpen: boolean };
+  /** The LOGICAL screen point at the wheel's hub — where a real hub-tap BACK lands
+   *  (field report v0.2.4). */
+  hubPoint(): { x: number; y: number };
   close(): void;
   interactive(): boolean;
   buyTier(i: number): { result: string; tier: number } | null;
@@ -56,7 +59,7 @@ interface UpgradeWheelStage {
   /** The controls-strip rows the HUD resolved this frame (the PC legend). */
   legend(): Array<{ action: string; label: string; binding: string | null; dimmed: boolean }>;
   wedges(): Array<{
-    kind: 'track' | 'weapon' | 'back';
+    kind: 'track' | 'weapon';
     track: string | null;
     label: string;
     tier: number;
@@ -163,6 +166,29 @@ async function realTapWedge(
     // A genuine synthesized pointer press — clientX/Y in the same CSS space the
     // handler un-rotates through `toLogical` (identity on desktop). preventDefault
     // + stopImmediatePropagation inside the handler make this a clean dispatch.
+    const ev = new PointerEvent('pointerdown', {
+      clientX: p.x,
+      clientY: p.y,
+      pointerId: 1,
+      pointerType: 'mouse',
+      bubbles: true,
+      cancelable: true,
+    });
+    canvas.dispatchEvent(ev);
+  }, point);
+  return point;
+}
+
+/**
+ * Press the wheel HUB through the REAL door — the BACK affordance a hub tap pops
+ * one level with (field report v0.2.4). Same synthesized `pointerdown` on the
+ * canvas as {@link realTapWedge}, aimed at the hub's logical centre.
+ */
+async function realTapHub(page: import('@playwright/test').Page): Promise<{ x: number; y: number }> {
+  const point = await page.evaluate(() => window.__upgradeWheelStage!.hubPoint());
+  await page.evaluate((p) => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) throw new Error('no canvas to tap');
     const ev = new PointerEvent('pointerdown', {
       clientX: p.x,
       clientY: p.y,
@@ -328,13 +354,10 @@ test('tap WEAPON → sub-wheel with DAMAGE & SPEED → buy SPEED at exact cost �
     )
     .then((h) => h.jsonValue());
 
-  expect(sub!.map((w) => w.label), 'the sub-wheel is DAMAGE, SPEED, then BACK').toEqual([
+  expect(sub!.map((w) => w.label), 'the sub-wheel is DAMAGE, SPEED (BACK is the hub now)').toEqual([
     'DAMAGE',
     'SPEED',
-    'BACK',
   ]);
-  const backWedge = sub!.find((w) => w.label === 'BACK')!;
-  expect(backWedge.kind, 'BACK navigates home, it does not buy').toBe('back');
 
   // Screenshot the drawn sub-wheel (attached to the PR body).
   await page.screenshot({ path: 'tests/live-stage/weapon-subwheel-evidence.png' });
@@ -502,16 +525,15 @@ test('REAL TAP on WEAPON opens the sub-wheel (it does NOT fall back to the main/
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(sub!.map((w) => w.label), 'a real WEAPON tap drilled into DAMAGE, SPEED, BACK').toEqual([
+  expect(sub!.map((w) => w.label), 'a real WEAPON tap drilled into DAMAGE, SPEED').toEqual([
     'DAMAGE',
     'SPEED',
-    'BACK',
   ]);
 
-  // …and a real tap on BACK returns to the main wheel — the sub-wheel is not a
-  // one-way trap.
-  const backIndex = sub!.findIndex((w) => w.label === 'BACK');
-  await realTapWedge(page, backIndex);
+  // …and a real tap on the HUB backs out one level to the main wheel — the
+  // sub-wheel is not a one-way trap, and BACK lives on the hub now (field report
+  // v0.2.4), the single consistent spot.
+  await realTapHub(page);
   const backOut = await page
     .waitForFunction(
       () => {
@@ -522,7 +544,7 @@ test('REAL TAP on WEAPON opens the sub-wheel (it does NOT fall back to the main/
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(backOut!.map((w) => w.label), 'a real BACK tap lands on the main wheel').toEqual([
+  expect(backOut!.map((w) => w.label), 'a real hub tap lands on the main wheel').toEqual([
     'WEAPON',
     'ENGINE',
     'CARGO',

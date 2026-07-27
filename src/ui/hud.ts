@@ -1332,7 +1332,7 @@ export class Hud extends Container {
     this.upgradeReady = upgrade.wedges.map((w) => w.state === 'ready');
     this.upgradeWedgeCount = upgrade.wedges.length;
 
-    this.wheel.update(wheel, upgrade, frame.time, this.pressFeedback);
+    this.wheel.update(wheel, upgrade, frame.time, this.pressFeedback, frame.isTouch ?? false);
     return wheel.open;
   }
 
@@ -1589,6 +1589,13 @@ export class Hud extends Container {
     // beneath HOME any more: the layout hole is closed, not orphaned.
     push('build-wheel', 'full', 0, this.wheel.wheelNode);
     push('upgrade-wheel', 'full', 0, this.wheel.panelNode);
+    // The hub BACK affordance (field report v0.2.4): the tap disc at the wheel's
+    // centre a hub tap / ESC backs out of a level. `center`, because the follow
+    // camera holds the docked ship — and the wheel drawn on it — at screen centre,
+    // the same anchor `ship-local` uses. Registered only while a wheel is up (the
+    // node is null otherwise), and sized to the hub ring so it is thumb-sized.
+    const hubBack = this.wheel.hubBackNode;
+    if (hubBack) push('wheel-hub-back', 'center', 0, hubBack);
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
