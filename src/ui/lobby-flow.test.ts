@@ -449,6 +449,23 @@ describe('the settings screen (the fourth main-menu option)', () => {
     expect(sent(flowConnected(opened.state, 0))[0]).toMatchObject({ fireMode: 'auto' });
   });
 
+  it('toggles the control scheme, and it never rides the wire (local input only)', () => {
+    const settings = flowOpenSettings(createFlow()).state;
+    expect(settings.controlScheme).toBe('sticks'); // the untouched default
+    const tap = flowTapSettings(settings, { kind: 'controls' });
+    expect(tap.state.controlScheme).toBe('tap');
+    expect(tap.effects).toEqual([]); // the scheme is local input — nothing to send
+    const back = flowTapSettings(tap.state, { kind: 'controls' });
+    expect(back.state.controlScheme).toBe('sticks');
+
+    // …and unlike the fire mode it does NOT ride a lobbyChoice — the sim never
+    // sees the scheme, so opening a room carries no control-scheme field.
+    const done = flowCloseSettings(tap.state).state;
+    const rng = mulberry32(23);
+    const opened = flowTapEntry(done, { kind: 'door', index: doorIndex('solo') }, rng);
+    expect(sent(flowConnected(opened.state, 0))[0]).not.toHaveProperty('controlScheme');
+  });
+
   it('toggles reduce VFX and steps a volume, without a message either', () => {
     const settings = flowOpenSettings(createFlow()).state;
     const vfx = flowTapSettings(settings, { kind: 'reduceVfx' });
@@ -509,7 +526,7 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
   it('Rematch resets the world to a clean door, keeping fire mode and settings', () => {
     // A match played with non-default preferences.
     let state = setFlowFireMode(inMatch(0), FireMode.AutoAim);
-    state = { ...state, settings: { ...createSettings(), reduceVfx: true } };
+    state = { ...state, settings: { ...createSettings(), reduceVfx: true }, controlScheme: 'tap' };
     const ended = flowMatchEnded(state, 0).state;
 
     const rematch = flowTapEnd(ended, { kind: 'rematch' });
@@ -522,6 +539,7 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     // …but the player's choices survive the reset.
     expect(back.fireMode).toBe(FireMode.AutoAim);
     expect(back.settings.reduceVfx).toBe(true);
+    expect(back.controlScheme).toBe('tap'); // the control scheme is the player's too
   });
 
   it('a fresh match after spectating never opens over a stale summary', () => {

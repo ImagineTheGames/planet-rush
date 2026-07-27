@@ -20,10 +20,18 @@
  *    (field report §3). Proven by the menu seam being absent and the `?debug=1`
  *    instrument (`window.__planetRush`) present.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /** The read-only `?clean-boot`-only seam this spec drives. Mirrors the object
  *  `main.ts` installs in `openMainMenu` / `installMainMenuSeam`. */
+interface PhysicalPoint {
+  readonly x: number;
+  readonly y: number;
+}
+interface ControlReport {
+  readonly kind: string;
+  readonly physicalCenter: PhysicalPoint;
+}
 interface MainMenuSeam {
   /** The menu layer is up (true until PLAY). */
   visible: boolean;
@@ -32,6 +40,19 @@ interface MainMenuSeam {
   /** Flipped true only once `boot()` has actually built the match world — which,
    *  since M4, is after the LOBBY's RUSH!, not directly on PLAY (see below). */
   matchStarted: boolean;
+  /** The main-menu buttons (PLAY / SETTINGS), each with the physical point a real
+   *  press must land on (through the landscape-lock remap). */
+  controls: readonly ControlReport[];
+  /** The settings-screen rows + DONE, each with the physical press point — the
+   *  front-door handles for the CONTROLS row and DONE. */
+  settingsControls: readonly ControlReport[];
+  /** The control scheme the settings screen shows and persists — readback proof a
+   *  press on the CONTROLS row took effect immediately. */
+  controlScheme: 'sticks' | 'tap';
+  /** The scheme the RUNNING match drives with (null before the world exists). */
+  matchControlScheme: 'sticks' | 'tap' | null;
+  /** The local ship's live WORLD position in the running match (null before). */
+  localShipPos: PhysicalPoint | null;
   /** Activate PLAY as a real tap would — resolves boot's `untilPlay()`. */
   play(): void;
 }
@@ -41,6 +62,7 @@ interface MainMenuSeam {
 interface LobbySeam {
   visible: boolean;
   rush(): void;
+  rushControl: { physicalCenter: PhysicalPoint };
 }
 interface StageWindow {
   __mainMenu?: MainMenuSeam;
@@ -125,4 +147,157 @@ test('?debug=1 skips the menu and boots straight into a match', async ({ page })
   expect(menuPresent, 'the main-menu seam must be absent under ?debug=1 (no menu)').toBe(false);
 
   expect(pageErrors, 'no page errors booting straight into a match').toEqual([]);
+});
+
+// ===========================================================================
+// The CONTROLS settings row switches to Tap Commander — FRONT DOOR, both PC and
+// phone (field report v0.2.4: "there was no settings option to choose tap
+// controls"). OWNER: UI Engineer.
+//
+// Tap Commander merged, piloted and evidence-verified — but the developer could
+// not TURN IT ON: the CONTROLS row from the p6-01 spec was never built into the
+// settings screen. And the p6-03 "scheme switched in settings" gate never caught
+// it, because that capture flipped the scheme through the `__tapCommanderStage`
+// debug seam, not a real press on a settings row — so a missing row read as
+// present. This closes that discipline gap: it drives the WHOLE path with real
+// clicks/taps at the seam's reported physical points (front door) and reads back
+// only plain state — never a hit-test or scheme seam. Boot → press SETTINGS →
+// press the CONTROLS row → the scheme flips and persists → DONE → PLAY → lobby →
+// RUSH → the running match drives with Tap Commander, and a real empty-space tap
+// moves the ship.
+// ===========================================================================
+
+/** A real press at a PAGE coordinate — a left click on PC, a touch tap on a phone
+ *  profile. The two ways a player actually reaches a control. */
+type Press = (pageX: number, pageY: number) => Promise<void>;
+
+/** The origin of the canvas in page space — the seam reports control points in
+ *  canvas-local physical coordinates (its `toLogical` subtracts this), so a real
+ *  press must add it back to land on the drawn control. */
+async function canvasOrigin(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('no canvas bounding box');
+  return { x: box.x, y: box.y };
+}
+
+/** The physical press point of a control by kind, from one of the seam's control
+ *  lists (`controls` = the menu buttons, `settingsControls` = the settings rows +
+ *  DONE). Readback only — the point is where the client itself drew the control. */
+async function controlPoint(
+  page: Page,
+  list: 'controls' | 'settingsControls',
+  kind: string,
+): Promise<{ x: number; y: number }> {
+  const p = await page.evaluate(
+    ({ list, kind }) => {
+      const controls = window.__mainMenu?.[list] ?? [];
+      const c = controls.find((x) => x.kind === kind);
+      return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+    },
+    { list, kind },
+  );
+  if (!p) throw new Error(`no ${list} control of kind ${kind}`);
+  return p;
+}
+
+/** The whole front-door path, pressing with `press`. Shared by the PC and phone
+ *  profiles so both prove the identical journey through their own input. */
+async function switchToTapCommanderThroughSettings(page: Page, press: Press): Promise<void> {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+  await page.goto('/', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(() => typeof window.__mainMenu?.play === 'function', undefined, {
+    timeout: 20_000,
+  });
+
+  const origin = await canvasOrigin(page);
+  const pressPoint = async (p: { x: number; y: number }): Promise<void> => {
+    await press(origin.x + p.x, origin.y + p.y);
+  };
+
+  // --- On the menu: sticks is the untouched default (developer §3). -----------
+  const onMenu = await page.evaluate(() => ({
+    screen: window.__mainMenu!.screen,
+    scheme: window.__mainMenu!.controlScheme,
+  }));
+  expect(onMenu.screen, 'opens on the menu, not settings').toBe('menu');
+  expect(onMenu.scheme, 'the untouched default scheme is sticks').toBe('sticks');
+
+  // --- Real-press SETTINGS → the settings screen opens. -----------------------
+  await pressPoint(await controlPoint(page, 'controls', 'settings'));
+  await page.waitForFunction(() => window.__mainMenu?.screen === 'settings', undefined, { timeout: 10_000 });
+
+  // The CONTROLS row exists on the real settings screen — the absence the field
+  // report found. Its press point is reported because the client drew the row.
+  const controlsRow = await controlPoint(page, 'settingsControls', 'controls');
+
+  // --- Real-press the CONTROLS row → the scheme flips to Tap Commander AT ONCE. -
+  await pressPoint(controlsRow);
+  await page.waitForFunction(() => window.__mainMenu?.controlScheme === 'tap', undefined, { timeout: 10_000 });
+  const persisted = await page.evaluate(() => localStorage.getItem('planet-rush:controlScheme'));
+  expect(persisted, 'the choice persists to the same storage family as the fire mode').toBe('tap');
+
+  // --- DONE → back to the menu (the change is already applied). ---------------
+  await pressPoint(await controlPoint(page, 'settingsControls', 'back'));
+  await page.waitForFunction(() => window.__mainMenu?.screen === 'menu', undefined, { timeout: 10_000 });
+
+  // --- PLAY → the lobby, then RUSH! → the match world builds. ------------------
+  await pressPoint(await controlPoint(page, 'controls', 'play'));
+  await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, { timeout: 20_000 });
+  const rush = await page.evaluate(() => {
+    const c = window.__lobby!.rushControl.physicalCenter;
+    return { x: c.x, y: c.y };
+  });
+  await pressPoint(rush);
+  await page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, { timeout: 20_000 });
+
+  // The setting flipped through the FRONT DOOR carried across PLAY → lobby → RUSH
+  // into the running sim — the match is driving with Tap Commander.
+  await page.waitForFunction(() => window.__mainMenu?.matchControlScheme === 'tap', undefined, { timeout: 10_000 });
+
+  // --- And a real empty-space tap MOVES the ship (developer §2). --------------
+  // The camera keeps the local ship at the visible centre, so a press well off
+  // centre is empty world away from the ship — a move order the pilot flies. Poll
+  // the live ship position (readback) until it has travelled a clear distance.
+  const ship0 = await page.evaluate(() => window.__mainMenu!.localShipPos);
+  expect(ship0, 'the running match exposes the local ship position').not.toBeNull();
+  const canvasBox = await page.locator('canvas').boundingBox();
+  const cx = canvasBox!.x + canvasBox!.width / 2;
+  const cy = canvasBox!.y + canvasBox!.height / 2;
+  // Straight up from centre: clear of the ore HUD (top corners), the wave clock
+  // edge, the build button (bottom) and the minimap corner — open space.
+  await press(cx, cy - canvasBox!.height * 0.22);
+  await page.waitForFunction(
+    (start) => {
+      const p = window.__mainMenu?.localShipPos;
+      if (!p || !start) return false;
+      return Math.hypot(p.x - start.x, p.y - start.y) > 30;
+    },
+    ship0,
+    { timeout: 8_000 },
+  );
+
+  expect(pageErrors, `no page errors on the front-door path: ${pageErrors.join('\n')}`).toEqual([]);
+}
+
+test('PC: real clicks through SETTINGS → the CONTROLS row switch Tap Commander on, into the match', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await switchToTapCommanderThroughSettings(page, (x, y) => page.mouse.click(x, y));
+});
+
+test.describe('phone profile', () => {
+  // hasTouch lays the menu + settings out at thumb scale AND makes the CONTROLS
+  // row reachable by a real touch — the exact platform the field report was on.
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 900, height: 420 } });
+
+  test('phone: real taps through SETTINGS → the CONTROLS row switch Tap Commander on, into the match', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await switchToTapCommanderThroughSettings(page, (x, y) => page.touchscreen.tap(x, y));
+  });
 });
