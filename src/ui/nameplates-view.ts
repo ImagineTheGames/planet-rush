@@ -8,13 +8,16 @@
  * labels are a fixed size regardless of camera zoom (field request rule 3) — the
  * same discipline as the over-ship health bars ({@link ./healthbar-view}).
  *
- * **The stack (field request rule 1).** A ship's three status marks read as one
- * unit: the **name** on top, the **health bar** below it, the **ship** under that.
- * So a ship label is floated clear of the health-bar cluster — above the bar's own
- * top, using the same bar geometry the bar layer draws with ({@link ./healthbar}
- * `HEALTHBAR_*`), so the name can *never* cover the bar (rule 3). A planet label
- * sits above the planet, clear of its HP pin / damage ring, by the planet's own
- * screen radius plus a gap.
+ * **The stack (field request rule 1).** A ship's status marks read as one unit,
+ * top to bottom: the **name + difficulty-tag** row on top, the **health bar +
+ * "68/70" number** row below it (the number hangs off the bar's right edge, not
+ * under it — field request v0.2.4, drawn by {@link ./healthbar-view}), and the
+ * **ship** under that. So a ship label is floated clear of the health-bar cluster
+ * — above the bar's own top, using the same bar geometry the bar layer draws with
+ * ({@link ./healthbar} `HEALTHBAR_*`), so the name can *never* cover the bar
+ * (rule 3); the number sits beside the bar and so stays out of this vertical stack
+ * entirely. A planet label sits above the planet, clear of its HP pin / damage
+ * ring, by the planet's own screen radius plus a gap.
  *
  * **Pooling (GDD §4.3, risk 5).** Text objects are allocated once and reused: a
  * frame with N labels touches the first N pooled Texts (set text/tint/position —

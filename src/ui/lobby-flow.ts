@@ -60,7 +60,7 @@ import { FireMode } from '@platform/actions';
 import type { ClientMessage, FireMode as WireFireMode, LobbySlot, RoomCode } from '../net/transport';
 import type { EntryTarget, LobbyTarget } from './lobby-geometry';
 import { adjustVolume, createSettings, toggleReduceVfx } from './settings';
-import type { SettingsState, SettingsTarget } from './settings';
+import type { ControlScheme, SettingsState, SettingsTarget } from './settings';
 import { endButtons } from './end-of-match';
 import type { EndTarget, MatchOutcome } from './end-of-match';
 import {
@@ -130,6 +130,12 @@ export interface FlowState {
    *  present; survives a rematch ({@link resetFlow}), because a setting is not
    *  match state. */
   readonly settings: SettingsState;
+  /** How the player drives the ship (developer §3): `'sticks'` or Tap Commander.
+   *  Held here beside the fire mode — the settings screen's other how-it-plays
+   *  toggle — but unlike the fire mode it never rides the wire (it is a purely
+   *  local input scheme), so changing it costs the lobby nothing. Survives a
+   *  rematch ({@link resetFlow}). */
+  readonly controlScheme: ControlScheme;
   /** The end-of-match outcome, once a match has ended. Null on every other
    *  screen; the {@link ./end-of-match} summary is built from it. */
   readonly end: MatchOutcome | null;
@@ -166,6 +172,7 @@ const NO_EFFECTS: readonly FlowEffect[] = [];
 export function createFlow(
   fireMode: FireMode = FireMode.Manual,
   settings: SettingsState = createSettings(),
+  controlScheme: ControlScheme = 'sticks',
 ): FlowState {
   return {
     screen: 'entry',
@@ -175,6 +182,7 @@ export function createFlow(
     online: false,
     fireMode,
     settings,
+    controlScheme,
     end: null,
     spectating: false,
     settingsReturn: 'entry',
@@ -491,6 +499,10 @@ export function flowTapSettings(state: FlowState, target: SettingsTarget): FlowR
       return flowCloseSettings(state);
     case 'fireMode':
       return applyFireMode(state, state.fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim);
+    case 'controls':
+      // Toggle the scheme. Unlike the fire mode it never touches the wire — it is
+      // a local input scheme the sim never sees — so this only folds into state.
+      return rest({ ...state, controlScheme: state.controlScheme === 'tap' ? 'sticks' : 'tap' });
     case 'reduceVfx':
       return foldSettings(state, toggleReduceVfx(state.settings));
     case 'volume':
@@ -572,8 +584,8 @@ export function setFlowFireMode(state: FlowState, fireMode: FireMode): FlowState
 /** Leave the match and come back to a clean door — Rematch's way out, and the
  *  reset the end-of-match summary performs. Deliberately a full reset: a stale
  *  roster behind a new door is how a player ends up looking at the previous
- *  match's colours. Fire mode and settings survive it — they are the player's,
- *  not the match's. */
+ *  match's colours. Fire mode, the control scheme and the rest of settings survive
+ *  it — they are the player's, not the match's. */
 export function resetFlow(state: FlowState): FlowState {
-  return createFlow(state.fireMode, state.settings);
+  return createFlow(state.fireMode, state.settings, state.controlScheme);
 }

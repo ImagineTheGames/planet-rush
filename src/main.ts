@@ -25,6 +25,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, Muzzle, PlayerId, Vec2 } from '@shared/types';
 import {
   WEAPON_RANGE,
+  TRACTOR_PICKUP_RADIUS,
   muzzleFlashes,
   damagePlanet,
   damageShip,
@@ -125,9 +126,12 @@ import {
   MAP_ORDER,
   MAP_STORAGE_KEY,
   settingsModel,
+  settingsLayout,
+  SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
   adjustVolume,
+  DEFAULT_VOLUMES,
   EndOfMatchView,
   endOfMatchModel,
   LobbyView,
@@ -162,6 +166,9 @@ import type {
 } from './ui';
 import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
+import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext } from './art/audio';
+import { TellQueue, TELL_CAPACITY } from './art/tells';
+import { WorldObserver } from './art/vfx/observer';
 
 const LOCAL_PLAYER = 0;
 
@@ -247,6 +254,40 @@ async function boot(): Promise<void> {
   // Dev flags (?debug=1, ?freeze=1). Off in a normal build — everything gated on
   // `flags.debug` below is zero-cost when the query string is absent.
   const flags = parseDebugFlags(typeof window !== 'undefined' ? window.location.search : '');
+
+  // --- Audio (src/art/audio): the game's whole synthesized voice, finally wired.
+  //     The SFX bank has existed since d5 and the adaptive soundtrack merged in
+  //     #132, yet the booted client never opened a context, never armed the
+  //     unlock, and never fed the graph a single tell — merged-but-never-called,
+  //     the exact "dark matter" the presenter file warns about — so the developer
+  //     heard total silence (field report v0.2.4). Three moving parts, all live
+  //     from here:
+  //       1. Open a context. `null` in Node / the QA harness (no `AudioContext`),
+  //          which makes `audio` a silent no-op rather than an error (GDD §4.1).
+  //       2. Arm the unlock NOW, before the menu opens, so the FIRST real gesture
+  //          — the tap on PLAY included — resumes the context (browsers hold it
+  //          `suspended` until then) and starts the standing voices. It re-arms
+  //          whenever the context is found asleep again (backgrounded tab, an
+  //          answered phone call); the frame loop rechecks it once a frame (risk 7,
+  //          ./art/audio/unlock).
+  //       3. Derive tells off the SAME live world the renderer draws, and sound
+  //          them — the audible twin of the VFX field (GDD §3.6), fed in the loop.
+  //     The starting mix is the settings screen's own DEFAULT_VOLUMES, so what the
+  //     player hears matches what the sliders show, and every default is audible.
+  const audioCtx = openAudioContext();
+  const audio = new AudioEngine({
+    context: audioCtx,
+    local: LOCAL_PLAYER,
+    mix: { master: DEFAULT_VOLUMES.master, sfx: DEFAULT_VOLUMES.sfx, music: DEFAULT_VOLUMES.music },
+  });
+  const audioTells = new TellQueue(TELL_CAPACITY);
+  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+  const unlockTarget = defaultUnlockTarget();
+  const audioUnlock =
+    audioCtx && unlockTarget
+      ? new AudioUnlock(audioCtx, unlockTarget, { onUnlock: () => audio.start() })
+      : null;
+  audioUnlock?.arm();
 
   const app = new Application();
   await app.init({
@@ -434,6 +475,15 @@ async function boot(): Promise<void> {
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
   // (a no-op under ?debug=1, where there is no menu and this is null).
   mainMenu?.matchStarted();
+  // Wire the menu seam's live match readback to the running world — the live ship
+  // position and active scheme, read fresh each access (so a rematch that rebinds
+  // `world` is tracked). Lets a clean-boot live-stage run prove the CONTROLS
+  // setting it flipped through the front door actually flies the ship on a tap,
+  // with no ?debug=1 seam. A no-op under ?debug=1, where there is no menu.
+  mainMenu?.bindMatch(() => {
+    const local = world.ships.find(isLocalShip);
+    return { scheme: controlScheme, shipPos: local ? { x: local.pos.x, y: local.pos.y } : null };
+  });
   // Hand the lobby seam the hull AND the arena the sim ACTUALLY built, read back
   // off the world itself — the hull off the local ship, the arena off the world's
   // own home-planet positions. This is the proof BOTH lobby picks reached the sim
@@ -537,6 +587,7 @@ async function boot(): Promise<void> {
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
+    installAudioStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -641,11 +692,21 @@ async function boot(): Promise<void> {
   const tapPilot = new TapPilot({
     fireRange: WEAPON_RANGE * 0.82,
     engageRange: WEAPON_RANGE * 0.5,
+    // The tractor pickup radius (GDD §2.3), so a mined-rock lock holds INSIDE the
+    // grab range and its chipped ore reaches the hold (developer p9-02 range fix) —
+    // fed from the sim's single source, never a copied literal.
+    pickupRadius: TRACTOR_PICKUP_RADIUS,
   });
   const pilotState = createControlState();
   /** Reused per-frame resolved-target record, so re-resolving a lock allocates
    *  nothing on the input path (GDD §4.3). */
-  const resolvedTarget: { pos: Vec2; radius: number; hostile: boolean; standoff?: number } = {
+  const resolvedTarget: {
+    pos: Vec2;
+    radius: number;
+    hostile: boolean;
+    standoff?: number;
+    mineable?: boolean;
+  } = {
     pos: { x: 0, y: 0 },
     radius: 0,
     hostile: false,
@@ -704,6 +765,26 @@ async function boot(): Promise<void> {
    *  every other frame. */
   let pendingUpgrade: UpgradeTrack | null = null;
 
+  /**
+   * Pop exactly one wheel LEVEL, the BACK affordance the hub tap and ESC share
+   * (field report v0.2.4 — {@link @ui/wheel-nav}). WEAPON sub-wheel → upgrade
+   * wheel → Build wheel → closed, one step per call, mirroring the level stack
+   * `wheelLevel` derives. Returns whether anything was open to back out of, so the
+   * caller can consume the event only when it did something. The three bits of
+   * state are the platform `WheelInput.open`/`.panelOpen` and the UI's
+   * `weaponWheelOpen`, exactly as the HUD reads them, so there is no fourth copy.
+   */
+  function wheelBackOneLevel(): boolean {
+    if (!buildWheel.open) return false;
+    if (buildWheel.panelOpen) {
+      if (weaponWheelOpen) weaponWheelOpen = false; // WEAPON sub-wheel → upgrade wheel
+      else buildWheel.closePanel(); // upgrade wheel → Build wheel
+    } else {
+      buildWheel.close(); // Build wheel → closed
+    }
+    return true;
+  }
+
   // --- Haptics event detection (field request v0.2.2). `feedHaptics` derives the
   //     three combat vibrations — you-were-hit, base-under-attack, core-lost — from
   //     the same live sim values the HUD reads, once per rendered frame. State here,
@@ -759,6 +840,7 @@ async function boot(): Promise<void> {
       const target = endOverlay.hitTest(lp.x, lp.y);
       if (target) {
         haptics.haptic('tap');
+        audio.cue('press'); // the audible twin of the press haptic (engine.ts)
         handleEndTarget(target.kind);
       }
       e.stopImmediatePropagation();
@@ -772,6 +854,7 @@ async function boot(): Promise<void> {
     // doesn't also engage a stick under it.
     if (fsAffordance.visible && fsAffordance.hitTest(lp.x, lp.y, w, h)) {
       haptics.haptic('tap');
+      audio.cue('press');
       fullscreen.enter();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -785,6 +868,7 @@ async function boot(): Promise<void> {
     const build = buildButtonRect(isTouch, buildVisible, w, h);
     if (build && inRect(pressPoint, build)) {
       haptics.haptic('tap');
+      audio.cue('press'); // the BUILD button opened/closed the wheel — a press tick
       buildWheel.toggle();
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -811,11 +895,12 @@ async function boot(): Promise<void> {
       upgradeWheelLayout.segments = upgradeSlots.length;
 
       const hit = hitWheel(pressPoint.x, pressPoint.y, upgradeWheelLayout);
-      if (hit.kind === 'outside') {
-        // A tap off the wheel backs out of the upgrade wheel to the Build wheel —
-        // the same "outside dismisses this level" gesture the Build wheel obeys.
-        buildWheel.closePanel();
-        weaponWheelOpen = false;
+      if (hit.kind === 'outside' || hit.kind === 'hub') {
+        // The hub is the BACK affordance (field report v0.2.4), and a tap off the
+        // wheel dismisses too — both pop exactly ONE level: WEAPON sub-wheel →
+        // upgrade wheel, upgrade wheel → Build wheel. Consistent with ESC and the
+        // Build wheel's own hub, so "go up a level" is one gesture everywhere.
+        wheelBackOneLevel();
       } else if (hit.kind === 'segment') {
         const slot = upgradeSlots[hit.index];
         if (slot?.kind === 'weapon') {
@@ -823,20 +908,17 @@ async function boot(): Promise<void> {
           // close the upgrade wheel back to the Build wheel (field report v0.2.2).
           weaponWheelOpen = true;
           hud.pressWheelSegment('upgrade', hit.index);
-        } else if (slot?.kind === 'back') {
-          weaponWheelOpen = false;
-          hud.pressWheelSegment('upgrade', hit.index);
         } else if (slot?.kind === 'track') {
           // Latch the pressed track; `updateBuildWheel` drains it into the funnel
           // as an `upgradeOrder` on the next tick, exactly like a Build segment.
           pendingUpgrade = slot.track;
           hud.pressWheelSegment('upgrade', hit.index);
         }
-        // A press in the hub / inner gap buys nothing — a miss on the open wheel.
       }
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
       haptics.haptic('tap');
+      audio.cue('press'); // a wedge on the OPEN upgrade wheel was pressed
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -848,11 +930,22 @@ async function boot(): Promise<void> {
     // decides which from the wedge's own drawn state.
     if (buildWheel.open && !buildWheel.panelOpen) {
       const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
+      if (wheelHit.kind === 'hub') {
+        // The hub is the BACK affordance (field report v0.2.4): on the top-level
+        // Build wheel, backing out closes it. Consume so the same tap doesn't fall
+        // through to fly the ship or engage a stick under it.
+        wheelBackOneLevel();
+        haptics.haptic('tap');
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
       if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
     }
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
+      audio.cue('press'); // …and its audible twin (the wheel/menu tick, engine.ts)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -870,6 +963,7 @@ async function boot(): Promise<void> {
     // event so the same press never also flies the ship or engages a stick under it.
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
+      audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -1031,6 +1125,22 @@ async function boot(): Promise<void> {
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
 
       renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
+      // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
+      // tells off the live world (the audible twin of the VFX field, GDD §3.6),
+      // sound them, then advance the standing voices, the alarm, the adaptive
+      // soundtrack and the death hush. The listener follows the SAME camera the
+      // renderer just used, so a siege on the far side of the map stays background
+      // (earshot falloff, engine.ts). A no-op when running silent (no context).
+      const heard = world.ships.find((s) => s.id === cameraTarget);
+      if (heard) audio.setListener(heard.pos.x, heard.pos.y);
+      audioTells.clear();
+      audioObserver.observe(world, frameSeconds, audioTells);
+      audio.consume(audioTells);
+      audio.update(frameSeconds);
+      // Phones lock and tabs get backgrounded mid-match; the context comes back
+      // suspended and the rest of the game is silent unless something re-arms the
+      // unlock. Cheap, and a no-op while the context is running (risk 7).
+      audioUnlock?.recheck();
       feedHud();
       // Combat haptics (field request v0.2.2): read the same core/shield/hull
       // values feedHud just pulled and buzz on hit / under-attack / core-lost. A
@@ -1209,6 +1319,11 @@ async function boot(): Promise<void> {
     hasOrdered = false;
     tapPilot.clear(); // a fresh match has no standing order (developer §2)
     if (buildWheel.open) buildWheel.toggle();
+    // Forget the old world's tell baseline and reset the standing voices, so the
+    // new arena does not open with a phantom burst of the siege the last one
+    // ended on (the observer's first post-reset frame primes and emits nothing).
+    audioObserver.reset();
+    audio.reset();
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -1262,10 +1377,17 @@ async function boot(): Promise<void> {
     }
 
     updateBuildWheel();
-    // The pilot aims explicitly at the locked target, so its state is mapped in
+    // Tap Commander's fire mode depends on the pilot's order (developer p9-02 §1). On
+    // a LOCK the pilot aims explicitly at the tapped target, so map that frame in
     // Manual — an Auto-aim map would let the sim pick the nearest target instead of
-    // the one the player tapped. The sticks scheme keeps the player's fire-mode.
-    const actions = mapActions(merged, tap ? FireMode.Manual : fireMode);
+    // the one the player locked. With NO lock the pilot AUTO-ENGAGES (holds the
+    // trigger while flying/idling), so map Auto-aim and let the sim's own ladder pick
+    // the best target — enemies first, hittability + full-hold rock suppression built
+    // in (p9-01), never re-derived in the platform layer. The sticks scheme keeps the
+    // player's fire-mode. Read after `writeInto`, so a lock that died this frame has
+    // already cleared and correctly falls to auto-engage.
+    const tapMode = tapPilot.lockedRef ? FireMode.Manual : FireMode.AutoAim;
+    const actions = mapActions(merged, tap ? tapMode : fireMode);
     if (inputProbe.enabled) inputProbe.update(actions); // ?debug=1 parity seam
     return actions;
   }
@@ -1292,7 +1414,9 @@ async function boot(): Promise<void> {
       case 'asteroid': {
         const a = world.asteroids.find((r) => r.id === ref.id);
         if (!a) return null; // mined out → the rock is gone, drop the lock
-        return fillResolved(a.pos, a.radius, true);
+        // A rock is `mineable`: the pilot holds INSIDE the tractor pickup radius so
+        // its chipped ore reaches the hold (developer p9-02 range fix).
+        return fillResolved(a.pos, a.radius, true, undefined, true);
       }
       case 'turret': {
         for (const p of world.planets) {
@@ -1314,7 +1438,13 @@ async function boot(): Promise<void> {
   }
 
   /** Fill the reused resolved-target record (zero-alloc) and return it. */
-  function fillResolved(pos: Vec2, radius: number, hostile: boolean, standoff?: number): ResolvedTarget {
+  function fillResolved(
+    pos: Vec2,
+    radius: number,
+    hostile: boolean,
+    standoff?: number,
+    mineable = false,
+  ): ResolvedTarget {
     resolvedTarget.pos = pos;
     resolvedTarget.radius = radius;
     resolvedTarget.hostile = hostile;
@@ -1322,6 +1452,9 @@ async function boot(): Promise<void> {
     // target omits it (the pilot then uses its config engage range).
     if (standoff === undefined) delete resolvedTarget.standoff;
     else resolvedTarget.standoff = standoff;
+    // A rock holds inside the tractor pickup radius; every other target omits this.
+    if (mineable) resolvedTarget.mineable = true;
+    else delete resolvedTarget.mineable;
     return resolvedTarget;
   }
 
@@ -1445,8 +1578,9 @@ async function boot(): Promise<void> {
     // Four segments spend on the spot; the fifth opened a screen and never
     // reaches here (GDD §2.5). The sim validates every one of them again —
     // ownership, docking, cost, caps — and refuses on its own terms. The upgrade
-    // rows map to the CURRENT level's tracks; the WEAPON/BACK nav wedges never set
-    // a row (consumed at press), so their positions are never drained as a buy.
+    // rows map to the CURRENT level's tracks; the WEAPON nav wedge never sets a row
+    // (consumed at press), so its position is never drained as a buy. BACK is not a
+    // wedge any more — it lives on the hub (field report v0.2.4).
     const rowTracks = upgradeWheelSlots(weaponWheelOpen).map((s) =>
       s.kind === 'track' ? s.track : UpgradeTrack.Power,
     );
@@ -1469,6 +1603,7 @@ async function boot(): Promise<void> {
     if (ordered) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
+      audio.cue('confirm'); // the two-beat purchase-landed sound, its audible twin
     }
   }
 
@@ -1780,7 +1915,11 @@ async function boot(): Promise<void> {
     }
 
     // The line of intent draws only while the ship is actually loosing its weapon
-    // (the sim's own firing tell) — the tap scheme fires only on a hostile lock.
+    // (the sim's own firing tell) AND a lock stands — the marker layer gates on
+    // `firing && lock` (src/ui/tap-markers.ts). Auto-engage (p9-02) fires with no
+    // lock, so this tell can now rise without a reticle; the layer draws no phantom
+    // line for it. A lighter auto-reticle over the ladder's current pick is flagged
+    // for ui/gameplay in the PR (the sim owns that pick; it is not surfaced here).
     const ship = world.ships.find(isLocalShip);
     hudFrame.tapFiring = ship?.firing ?? false;
   }
@@ -2381,10 +2520,12 @@ async function boot(): Promise<void> {
         weaponWheelOpen = true;
         return { weaponOpen: weaponWheelOpen };
       },
-      back(): { weaponOpen: boolean } {
-        // Back out of the sub-wheel to the main wheel (the BACK wedge).
-        weaponWheelOpen = false;
-        return { weaponOpen: weaponWheelOpen };
+      back(): { open: boolean; panelOpen: boolean; weaponOpen: boolean } {
+        // Pop ONE wheel level — the hub BACK / ESC gesture (field report v0.2.4):
+        // WEAPON → upgrade → Build → closed. The same helper the real hub tap and
+        // ESC call, so the seam stages exactly what a player's back does.
+        wheelBackOneLevel();
+        return { open: buildWheel.open, panelOpen: buildWheel.panelOpen, weaponOpen: weaponWheelOpen };
       },
       close(): void {
         buildWheel.close();
@@ -2443,6 +2584,14 @@ async function boot(): Promise<void> {
           x: w / 2 + Math.cos(angle) * radius * 0.6,
           y: h / 2 + Math.sin(angle) * radius * 0.6,
         };
+      },
+      hubPoint(): { x: number; y: number } {
+        // The LOGICAL screen point at the wheel's hub — the BACK affordance a hub
+        // tap / ESC acts on (field report v0.2.4). The follow camera holds the
+        // docked ship, and the wheel drawn on it, at the viewport centre, so the
+        // hub is dead centre. A real-input test dispatches a pointerdown here to
+        // back out a level through the actual door.
+        return { x: transform.logicalWidth / 2, y: transform.logicalHeight / 2 };
       },
       legend(): ReturnType<typeof hud.debugControlsStrip> {
         // The controls-strip rows the HUD resolved this frame — read by a
@@ -2647,6 +2796,33 @@ async function boot(): Promise<void> {
    * normal build; it mutates only the plain sim data the boot path already reads.
    */
   function installTapCommanderStage(): void {
+    /** Park the local ship at the arena centre with one bot in weapon range and the
+     *  field cleared — the shared base for the move/lock stage and the auto-engage
+     *  stage. Returns the staged world positions, or null if there is no ship / bot. */
+    function parkShipBot(): { ship: Vec2; bot: Vec2; botId: PlayerId } | null {
+      const ship = world.ships.find(isLocalShip);
+      const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER);
+      if (!ship || !bot) return null;
+      const cx = world.bounds.width / 2;
+      const cy = world.bounds.height / 2;
+      world.asteroids.length = 0; // empty space is genuinely empty for the move test
+      ship.pos.x = cx;
+      ship.pos.y = cy;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      ship.alive = true;
+      ship.spawnProtect = 0;
+      bot.pos.x = cx + 140;
+      bot.pos.y = cy;
+      bot.vel.x = 0;
+      bot.vel.y = 0;
+      bot.alive = true;
+      bot.spawnProtect = 0;
+      controlScheme = 'tap';
+      tapPilot.clear();
+      return { ship: { x: cx, y: cy }, bot: { x: cx + 140, y: cy }, botId: bot.id };
+    }
+
     const stage = {
       /** Switch schemes (persisted like the settings row would). */
       setScheme(scheme: 'sticks' | 'tap'): void {
@@ -2659,27 +2835,64 @@ async function boot(): Promise<void> {
        *  a tap on empty space is unambiguous. Switches to the tap scheme. Returns the
        *  staged world positions, or null if there is no local ship / no bot. */
       stage(): { ship: Vec2; bot: Vec2; botId: PlayerId } | null {
+        return parkShipBot();
+      },
+      /** Stage the auto-engage front door (developer p9-02 §1): the local ship at the
+       *  arena centre with one bot parked in weapon range, the field cleared, and a
+       *  waypoint returned WELL AWAY from the bot. A move to that waypoint (no lock)
+       *  must still auto-fire at the bot mid-flight — "move and it auto-fires at the
+       *  closest high priority target". Switches to the tap scheme. */
+      stageAutoEngage(): { ship: Vec2; bot: Vec2; botId: PlayerId; waypoint: Vec2 } | null {
+        const s = parkShipBot();
+        if (!s) return null;
         const ship = world.ships.find(isLocalShip);
-        const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER);
-        if (!ship || !bot) return null;
+        if (ship) ship.cargo = 0; // hold has room, so a rock would be mined too
+        return { ...s, waypoint: { x: s.ship.x, y: s.ship.y - 320 } };
+      },
+      /** Stage the full-hold rock suppression front door (developer p9-02 §1, "if ore
+       *  is full it shouldn't fire at asteroids automatically"): the local ship at the
+       *  arena centre, ONE asteroid in weapon range, and every enemy parked far out of
+       *  range so the ladder falls to the rock — which a full hold then suppresses.
+       *  `full` sets the hold full (shots stop at rocks) or empty (rock is mined).
+       *  Returns the ship + rock world positions and a waypoint away from the rock, or
+       *  null if there is no local ship. */
+      stageRockOnly(full: boolean): { ship: Vec2; rock: Vec2; waypoint: Vec2 } | null {
+        const ship = world.ships.find(isLocalShip);
+        if (!ship) return null;
         const cx = world.bounds.width / 2;
         const cy = world.bounds.height / 2;
-        world.asteroids.length = 0; // empty space is genuinely empty for the move test
         ship.pos.x = cx;
         ship.pos.y = cy;
         ship.vel.x = 0;
         ship.vel.y = 0;
         ship.alive = true;
         ship.spawnProtect = 0;
-        bot.pos.x = cx + 140;
-        bot.pos.y = cy;
-        bot.vel.x = 0;
-        bot.vel.y = 0;
-        bot.alive = true;
-        bot.spawnProtect = 0;
+        ship.cargo = full ? ship.cargoCap : 0;
+        // No hittable enemy: park every other ship in a far corner, out of weapon
+        // range and spawn-protected, so tier 1 is empty and the ladder falls to the
+        // rock (then the full-hold rule decides whether the rock is worth a shot).
+        for (const other of world.ships) {
+          if (other.id === LOCAL_PLAYER) continue;
+          other.pos.x = 0;
+          other.pos.y = 0;
+          other.vel.x = 0;
+          other.vel.y = 0;
+          other.spawnProtect = 999;
+        }
+        world.asteroids.length = 0;
+        world.asteroids.push({
+          id: 900_001,
+          pos: { x: cx + 140, y: cy },
+          radius: 30,
+          ore: 12,
+          maxOre: 12,
+          crackStage: 0,
+          mineBuffer: 0,
+          home: null,
+        });
         controlScheme = 'tap';
         tapPilot.clear();
-        return { ship: { x: cx, y: cy }, bot: { x: cx + 140, y: cy }, botId: bot.id };
+        return { ship: { x: cx, y: cy }, rock: { x: cx + 140, y: cy }, waypoint: { x: cx, y: cy - 320 } };
       },
       /** Place an order at a WORLD point exactly as a tap does — resolve the world
        *  hit-test through the client's own candidate list + picker and hand the pilot
@@ -2775,6 +2988,77 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__minimapStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__audioStage` — the ?debug=1 live-stage seam that proves, on a
+   * REAL boot, that the game actually MAKES SOUND (field report v0.2.4: "why don't
+   * I hear ANY sounds yet?"). The unit tests build the whole graph headless against
+   * a stub context and assert its shape; what they cannot reach is the one thing
+   * that was broken — that the shipped bundle opens a context, resumes it on a real
+   * gesture, and drives the mix. This is a pure READBACK: it reports the live audio
+   * state (the raw `AudioContext.state`, the master gain the player will actually
+   * hear through, whether the adaptive soundtrack is running and in which phase, and
+   * a running count of SFX one-shots the mix has started). A Playwright test does a
+   * REAL tap on PLAY (the unlock gesture), then asserts `state === 'running'`, the
+   * master gain is above zero, the music is playing, and a real wheel tap bumped the
+   * SFX count. It drives nothing — every sound comes from a real gesture on the real
+   * client — so it cannot fake the very wiring it is there to prove. Behind ?debug=1.
+   */
+  function installAudioStage(): void {
+    const stage = {
+      /** A snapshot of the live audio state — the whole "is it alive?" readout. */
+      read(): {
+        /** `null` running silent (no context — Node, the harness); otherwise the
+         *  raw `AudioContext.state`: `suspended` until a gesture, then `running`. */
+        contextState: string | null;
+        /** True once a gesture resumed the context (`./art/audio/unlock`). */
+        unlocked: boolean;
+        /** True once `start()` ran — the standing voices (ambient + music) began. */
+        running: boolean;
+        /** The master gain the player hears through, 0..1. Zero would be silence. */
+        master: number | null;
+        /** True while the adaptive soundtrack is enabled and playing (`./music`). */
+        musicPlaying: boolean;
+        /** The soundtrack's current phase — calm / building / siege / … . */
+        musicPhase: string;
+        /** SFX one-shots the mix has STARTED since boot — bumps on every real tell
+         *  and cue. A wheel tap raising this proves an SFX node actually fired. */
+        sfxCount: number;
+        /** One-shots skipped because the death hush had the mix at zero (§4.7). */
+        hushedCount: number;
+      } {
+        return {
+          contextState: audioCtx ? audioCtx.state : null,
+          unlocked: audioUnlock?.unlocked ?? false,
+          running: audio.running,
+          master: audio.graph ? audio.graph.master.gain.value : null,
+          musicPlaying: audio.music?.playing ?? false,
+          musicPhase: audio.musicScore.phase,
+          sfxCount: audio.playCount,
+          hushedCount: audio.hushedCount,
+        };
+      },
+      /** Resume the context by hand — the exact call the unlock makes from a
+       *  gesture. The spec still drives sound through a REAL tap; this is only the
+       *  escape hatch for a headless runner whose synthetic input a browser might
+       *  not count as a gesture, so the readback above is never a false negative. */
+      async resume(): Promise<string | null> {
+        if (!audioUnlock) return null;
+        await audioUnlock.unlockNow();
+        return audioCtx ? audioCtx.state : null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__audioStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -3036,6 +3320,13 @@ async function boot(): Promise<void> {
     // corner tap runs, added to the input-parity table (docs/input-parity.md).
     if (e.code === MINIMAP_TOGGLE_KEY) {
       hud.toggleMinimap();
+    }
+    // ESC mirrors the hub BACK on PC (field report v0.2.4): one press pops one
+    // wheel level — WEAPON → upgrade → Build → closed — the desktop twin of a tap
+    // on the wheel's centre. Only while a wheel is up, so ESC still falls through
+    // to anything else that wants it when the wheel is shut.
+    if (e.code === 'Escape' && buildWheel.open) {
+      wheelBackOneLevel();
     }
   });
 
@@ -3355,6 +3646,12 @@ interface MainMenuHandle {
   untilPlay(): Promise<void>;
   /** Mark the world as built (drives `window.__mainMenu.matchStarted`). */
   matchStarted(): void;
+  /** Wire the seam's live match readback (`localShipPos` / `matchControlScheme`)
+   *  to the running world, so a clean-boot live-stage run can prove the CONTROLS
+   *  setting it flipped through the front door actually drives the ship — a tap
+   *  moves it — without any `?debug=1` seam. Reads live bindings each call, so a
+   *  rematch that rebuilds the world is tracked with no re-bind. */
+  bindMatch(read: () => { scheme: ControlScheme; shipPos: { x: number; y: number } | null }): void;
 }
 
 /** The landscape-lock context `boot()` hands the menu so it lays out in the same
@@ -3387,6 +3684,16 @@ interface MenuControlReport {
   readonly physicalCenter: { x: number; y: number };
 }
 
+/** One settings-screen row (or DONE) as the seam reports it: its kind and the
+ *  physical point a real click/tap must land on to hit it. Lets a live-stage run
+ *  drive the settings screen through the front door — no `settingsHitTest` seam,
+ *  just a real press at `physicalCenter` — the discipline the CONTROLS-switch
+ *  evidence was missing (it flipped the scheme through a debug seam, not a tap). */
+interface SettingsControlReport {
+  readonly kind: string;
+  readonly physicalCenter: { x: number; y: number };
+}
+
 /** The read-only `window.__mainMenu` seam, extended for the landscape lock. */
 interface MainMenuSeam {
   visible: boolean;
@@ -3398,6 +3705,20 @@ interface MainMenuSeam {
   rotated: boolean;
   /** The menu buttons, logical rect + physical tap point (see {@link MenuControlReport}). */
   controls: readonly MenuControlReport[];
+  /** The settings-screen rows + DONE, each with the physical point a real press
+   *  must land on — the same landscape-lock remap the menu buttons get. */
+  settingsControls: readonly SettingsControlReport[];
+  /** The control scheme the settings screen currently shows and persists — the
+   *  menu's live value, written to the same storage the match reads at boot.
+   *  Readback proof that a tap on the CONTROLS row took effect immediately. */
+  controlScheme: ControlScheme;
+  /** The scheme the RUNNING match is driving with, once built (null before) — the
+   *  live match value, read through `bindMatch`. Proves the front-door setting
+   *  carried across PLAY → lobby → RUSH into the sim. */
+  matchControlScheme: ControlScheme | null;
+  /** The local ship's live WORLD position in the running match, or null before
+   *  the world exists. Lets a clean-boot run watch a real tap move the ship. */
+  localShipPos: { x: number; y: number } | null;
   play(): void;
 }
 
@@ -3424,9 +3745,17 @@ function openMainMenu(
 ): MainMenuHandle {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   let fireMode = readFireMode(platform, isTouch);
+  // The control scheme (developer §3), read from the same storage the match boots
+  // with. The CONTROLS settings row shows and toggles it here, persisting to that
+  // seam so the choice carries into the match exactly as the fire mode does.
+  let controlScheme = readControlScheme(platform);
   let settings: SettingsState = createSettings();
   let screen: 'menu' | 'settings' = 'menu';
   let played = false;
+  // Bound by boot() once the match world exists — lets the seam read the live
+  // ship + active scheme so a clean-boot run can watch the front-door setting fly
+  // the ship. Reads live bindings each call, so a rematch needs no re-bind.
+  let matchReader: (() => { scheme: ControlScheme; shipPos: { x: number; y: number } | null }) | null = null;
 
   // Lay the menu out in the LOGICAL (landscape) viewport and hang it off the
   // rotating game root — so a portrait phone gets a landscape menu that can never
@@ -3449,6 +3778,16 @@ function openMainMenu(
     logicalViewport: { width: menu0.w, height: menu0.h },
     rotated: ctx.isRotated(),
     controls: [],
+    settingsControls: [],
+    controlScheme,
+    // Live match readback, wired by boot() through `bindMatch` once the world is
+    // built; both read the live match binding each access so a rematch is tracked.
+    get matchControlScheme(): ControlScheme | null {
+      return matchReader ? matchReader().scheme : null;
+    },
+    get localShipPos(): { x: number; y: number } | null {
+      return matchReader ? matchReader().shipPos : null;
+    },
     play: (): void => play(),
   };
 
@@ -3470,6 +3809,19 @@ function openMainMenu(
       const center = ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
       return { kind: item.kind, logical: { ...r }, physicalCenter: center };
     });
+    // The settings-screen rows + DONE, in the same landscape-lock physical space,
+    // so a live-stage run can real-press the CONTROLS row through the front door.
+    const settingsRects = settingsLayout({ width: w, height: h }, { isTouch });
+    const rowReports = settingsRects.rows.map((r, i) => ({
+      kind: SETTINGS_ROWS[i]?.kind ?? 'row',
+      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+    }));
+    const back = settingsRects.back;
+    seam.settingsControls = [
+      ...rowReports,
+      { kind: 'back', physicalCenter: ctx.toPhysical(back.x + back.width / 2, back.y + back.height / 2) },
+    ];
+    seam.controlScheme = controlScheme;
   }
 
   /** Redraw the live screen from current state. Static content, so this runs on
@@ -3478,7 +3830,7 @@ function openMainMenu(
     menuView.visible = screen === 'menu';
     settingsView.visible = screen === 'settings';
     if (menuView.visible) menuView.update(mainMenuModel());
-    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode));
+    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode, controlScheme));
     seam.screen = screen;
     updateSeamLayout();
   }
@@ -3517,6 +3869,13 @@ function openMainMenu(
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         platform.storage.set(FIRE_MODE_KEY, fireMode);
+        break;
+      case 'controls':
+        // Sticks ⇄ Tap Commander, persisted to the same seam the match reads at
+        // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
+        // and carries into the match exactly as the fire mode does.
+        controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
+        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
         break;
       case 'reduceVfx':
         settings = toggleReduceVfx(settings);
@@ -3589,6 +3948,9 @@ function openMainMenu(
     untilPlay: () => playPromise,
     matchStarted: () => {
       seam.matchStarted = true;
+    },
+    bindMatch: (read) => {
+      matchReader = read;
     },
   };
 }

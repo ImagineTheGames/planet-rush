@@ -19,17 +19,35 @@
  * the only one in the bank with a tail longer than a second, and the only one
  * that is followed by nothing at all (`../vfx/death-moment`).
  *
- * ## The rock-vs-hull firing voices
+ * ## The rock-vs-hull firing voices, after the laser's retirement
  *
  * GDD §3.6 asks for *"the distinct rock-vs-hull firing sounds"* by name, because
  * firing is the game's central inversion — the same trigger mines and kills —
- * and the player needs to know which one they are doing without looking. They
- * are the two entries here that **loop**: firing is a held state, not an event,
- * so retriggering a one-shot per firing tick would be a machine-gun rattle at
- * 60 Hz. `./weapons.ts` sustains them and crossfades between them.
+ * and the player needs to know which one they are doing without looking. That
+ * requirement outlives the mechanism it was written for: the ratified amendment
+ * v0.3 retired the held mining laser and made *everything* a discrete projectile
+ * (`src/sim/projectiles.ts`), so these two voices retire with the laser that bore
+ * them. A shot is now an **event**, not a sustained state, so the pair are one-
+ * shots ({@link SOUND.rockChip}, {@link SOUND.hullHit}) rather than crossfaded
+ * loops — a rapid trigger reads as a stream because the mix's repeat-gap thins a
+ * per-tick burst to a chatter (`./graph`), which is the machine-gun rattle the
+ * old loops existed to avoid, solved one layer down instead of with a held tone.
  *
- *  - **Rock** is low, grainy, band-limited — a grinder chewing stone.
- *  - **Hull** is bright, thin and rude — a cutting torch on plate.
+ *  - **Rock chip** is low, grainy, band-limited — stone giving way under a shot.
+ *  - **Hull hit** is bright, thin and rude — a round biting plate.
+ *
+ * The impact of a shot in flight ({@link SOUND.shotImpact}) is the turret/ship
+ * projectile landing; it and the two chip voices carry weapon power in their gain
+ * (`./engine` `levelFor`), so a tier-4 tool hits heavier than a tier-0 one.
+ *
+ * ## The device cues (the p4-03 seams)
+ *
+ * A handful of sounds here are **not** wired to a world tell — they answer a
+ * finger, not a diff: a wheel press, a purchase landing, a rejected buy, the ping,
+ * the respawn countdown, an ore chunk settling into the bank. They are the audible
+ * half of the haptic vocabulary (`src/platform/haptics.ts`) and share its rhythm —
+ * a whisper for a press, a two-beat for a commit — and they are played through
+ * {@link AudioEngine.cue} rather than the tell router. See {@link CUE_SOUND}.
  *
  * ## Levels
  *
@@ -83,16 +101,16 @@ export function loops(spec: SoundSpec): boolean {
 
 /**
  * Every sound, by name. Keys are the vocabulary the engine and the tests speak;
- * most map 1:1 to a {@link TELL}, and the rest ({@link SOUND.alarm},
- * {@link SOUND.mineLoop}, {@link SOUND.weaponLoop}, {@link SOUND.thruster})
- * are held states rather than moments.
+ * most map 1:1 to a {@link TELL}, a few ({@link SOUND.alarm},
+ * {@link SOUND.thruster}) are held states rather than moments, and the last group
+ * ({@link CUE_SOUND}) answers a device cue rather than a world tell.
  */
 export const SOUND = {
   // --- Mine ---------------------------------------------------------------
-  /** A shot on rock, held. Low, grainy: a grinder chewing stone. */
-  mineLoop: 'mineLoop',
-  /** A shot on hull, held. Bright and rude: a cutting torch on plate. */
-  weaponLoop: 'weaponLoop',
+  /** A mining shot biting rock — one discrete chip. Low, grainy: stone giving way. */
+  rockChip: 'rockChip',
+  /** A weapon shot biting hull/turret/shield/core — one discrete hit. Bright, rude. */
+  hullHit: 'hullHit',
   /** A crack stage advancing — rock giving way, one step of three. */
   rockCrack: 'rockCrack',
   /** The rock coming apart and paying out. */
@@ -151,6 +169,22 @@ export const SOUND = {
   musicWin: 'musicWin',
   /** The sting on a loss — the ache, falling. */
   musicLoss: 'musicLoss',
+
+  // --- Device cues (p4-03 seams) — answered by AudioEngine.cue, not a tell ---
+  /** A wheel wedge / menu control was pressed. The lightest tick, matched to `tap`. */
+  pressTick: 'pressTick',
+  /** A purchase or repair committed — a rising two-beat "done", matched to `confirm`. */
+  purchaseConfirm: 'purchaseConfirm',
+  /** A buy the player can't afford — a low, flat nope. No haptic twin; the buzzer. */
+  rejectBuzz: 'rejectBuzz',
+  /** One ore chunk settling into the bank on a deposit flight — soft, conserved 1:1. */
+  depositTick: 'depositTick',
+  /** A tick of the respawn countdown (GDD §2.7). Clean, mid, once a second. */
+  respawnBeep: 'respawnBeep',
+  /** Respawn — free and fast (GDD §2.7): the ship arriving, brighter than the beeps. */
+  respawnGo: 'respawnGo',
+  /** A minimap ping (GDD §2.4). A rising sonar blip — locate, not alarm. */
+  minimapPing: 'minimapPing',
 } as const;
 
 /** One of the {@link SOUND} names. */
@@ -166,84 +200,61 @@ const LOOP_CROSSFADE = 0.04;
 const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- Mine ---------------------------------------------------------------
 
-  // Rock: pitched noise low in the spectrum with the top rolled off, so it
-  // reads as *material* being removed rather than as energy being spent.
-  [SOUND.mineLoop]: {
-    name: 'mineLoop',
-    loop: true,
-    crossfade: LOOP_CROSSFADE,
-    layers: [
-      {
-        spec: {
-          name: 'mineLoop.grind',
-          wave: 'noise',
-          attack: 0,
-          hold: 0.5,
-          decay: 0,
-          freq: 118,
-          vibratoDepth: 0.08,
-          vibratoRate: 21,
-          lowPass: 1500,
-          highPass: 90,
-          gain: 0.42,
-          seed: 0x9e37,
-        },
-      },
-      {
-        // A little body under the grit, so it has a pitch and not just a hiss.
-        spec: {
-          name: 'mineLoop.body',
-          wave: 'saw',
-          attack: 0,
-          hold: 0.5,
-          decay: 0,
-          freq: 74,
-          noiseMix: 0.35,
-          lowPass: 900,
-          gain: 0.2,
-          seed: 0x9e38,
-        },
-        level: 0.8,
-      },
-    ],
+  // Rock chip: one shot biting stone. Pitched noise low in the spectrum with the
+  // top rolled hard off, a short grind with a transient — material removed, not
+  // energy spent. Dark on purpose, so it sits far below the hull hit in spectral
+  // centre. A per-tick trigger reads as a stream once the mix thins it (`./graph`).
+  [SOUND.rockChip]: {
+    name: 'rockChip',
+    wave: 'noise',
+    attack: 0.001,
+    hold: 0.012,
+    decay: 0.09,
+    punch: 0.4,
+    freq: 150,
+    freqEnd: 100,
+    vibratoDepth: 0.06,
+    vibratoRate: 22,
+    lowPass: 1150,
+    highPass: 60,
+    gain: 0.4,
+    seed: 0x9e37,
   },
 
-  // Hull: the same held state, an octave and a half up, thin and buzzy. A
-  // player who has hit a ship by accident knows it in about 80 ms.
-  [SOUND.weaponLoop]: {
-    name: 'weaponLoop',
-    loop: true,
-    crossfade: LOOP_CROSSFADE,
+  // Hull hit: the same event on plate, an octave and a half up, thin and rude —
+  // a bright saw with a spit of high noise over it, so a player who caught a ship
+  // by accident knows it in about 80 ms. The spit is what puts its spectral centre
+  // well above the chip's, the one dimension that survives a bad phone speaker.
+  [SOUND.hullHit]: {
+    name: 'hullHit',
     layers: [
       {
         spec: {
-          name: 'weaponLoop.torch',
+          name: 'hullHit.bite',
           wave: 'saw',
-          attack: 0,
-          hold: 0.5,
-          decay: 0,
-          freq: 366,
-          vibratoDepth: 0.05,
-          vibratoRate: 33,
-          noiseMix: 0.22,
-          highPass: 320,
-          gain: 0.34,
+          attack: 0.001,
+          hold: 0.01,
+          decay: 0.06,
+          punch: 0.5,
+          freq: 452,
+          freqEnd: 268,
+          highPass: 340,
+          gain: 0.26,
           seed: 0x4dc3,
         },
       },
       {
         spec: {
-          name: 'weaponLoop.spit',
+          name: 'hullHit.spit',
           wave: 'noise',
-          attack: 0,
-          hold: 0.5,
-          decay: 0,
-          freq: 1450,
-          highPass: 900,
-          gain: 0.18,
+          attack: 0.001,
+          hold: 0.006,
+          decay: 0.05,
+          freq: 1500,
+          highPass: 950,
+          gain: 0.16,
           seed: 0x4dc4,
         },
-        level: 0.9,
       },
     ],
   },
@@ -1355,6 +1366,179 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       { spec: { name: 'musicLoss.low', wave: 'sine', attack: 0.01, hold: 0.14, decay: 0.42, freq: 110, gain: 0.22, seed: 0xa353 }, at: 0.62 },
     ],
   },
+
+  // --- Device cues (p4-03 seams) ------------------------------------------
+  //
+  // These answer a finger, not a world diff, and they borrow the haptic
+  // vocabulary's rhythm (`src/platform/haptics.ts`) so the buzz and the blip land
+  // together: `tap` is a whisper, `confirm` a two-beat, and so on. Kept quiet and
+  // short — a control the player works dozens of times a match must never nag.
+
+  // `tap` (10 ms whisper): the lightest possible click that a press registered.
+  [SOUND.pressTick]: {
+    name: 'pressTick',
+    wave: 'square',
+    attack: 0.001,
+    hold: 0.005,
+    decay: 0.022,
+    freq: 1240,
+    duty: 0.3,
+    gain: 0.14,
+    seed: 0x7a70,
+  },
+
+  // `confirm` ([12, 40, 12]): a rising perfect fourth, the two beats spaced to the
+  // haptic's 40 ms gap so finger and ear read one "done", not two events.
+  [SOUND.purchaseConfirm]: {
+    name: 'purchaseConfirm',
+    layers: [
+      {
+        spec: {
+          name: 'purchaseConfirm.a',
+          wave: 'triangle',
+          attack: 0.003,
+          hold: 0.03,
+          decay: 0.07,
+          freq: 659.25,
+          gain: 0.24,
+          seed: 0x7a71,
+        },
+      },
+      {
+        spec: {
+          name: 'purchaseConfirm.b',
+          wave: 'triangle',
+          attack: 0.003,
+          hold: 0.04,
+          decay: 0.12,
+          freq: 987.77,
+          gain: 0.24,
+          seed: 0x7a72,
+        },
+        at: 0.052,
+      },
+    ],
+  },
+
+  // The nope: a low, flat, faintly gritty buzz that falls a little and stops. No
+  // haptic twin — a rejected buy is the one cue the motor stays out of — so the
+  // ear carries it alone. Threat-red in sound (style-guide §1): this did nothing.
+  [SOUND.rejectBuzz]: {
+    name: 'rejectBuzz',
+    wave: 'saw',
+    attack: 0.002,
+    hold: 0.06,
+    decay: 0.07,
+    freq: 150,
+    freqEnd: 118,
+    noiseMix: 0.14,
+    lowPass: 2000,
+    duty: 0.5,
+    gain: 0.26,
+    seed: 0xb23f,
+  },
+
+  // Ore settling into the bank, one chunk at a time — the deposit twin of
+  // `oreCollect`, but softer and *falling* (it is coming to rest, not being won).
+  // One tick per chunk, conserved 1:1 like the sprites; a burst thins to a stream
+  // through the mix's repeat-gap (`./graph`), exactly as a wave of ore-collects does.
+  [SOUND.depositTick]: {
+    name: 'depositTick',
+    wave: 'square',
+    attack: 0.002,
+    hold: 0.01,
+    decay: 0.055,
+    freq: 520,
+    freqEnd: 392,
+    duty: 0.35,
+    gain: 0.16,
+    seed: 0xf2d7,
+  },
+
+  // The respawn countdown (GDD §2.7): one clean mid beep a second. Deliberately
+  // plain — it is a clock, and the bright one below is the release it counts to.
+  [SOUND.respawnBeep]: {
+    name: 'respawnBeep',
+    wave: 'triangle',
+    attack: 0.004,
+    hold: 0.035,
+    decay: 0.08,
+    freq: 660,
+    gain: 0.2,
+    seed: 0x3d7d,
+  },
+
+  // Free and fast (GDD §2.7): the ship back on the field. A rising blip with a
+  // square top over it — arriving, brighter and a step up from the countdown.
+  [SOUND.respawnGo]: {
+    name: 'respawnGo',
+    layers: [
+      {
+        spec: {
+          name: 'respawnGo.rise',
+          wave: 'triangle',
+          attack: 0.004,
+          hold: 0.04,
+          decay: 0.16,
+          freq: 660,
+          freqEnd: 990,
+          gain: 0.26,
+          seed: 0x3d7e,
+        },
+      },
+      {
+        spec: {
+          name: 'respawnGo.top',
+          wave: 'square',
+          attack: 0.003,
+          hold: 0.02,
+          decay: 0.1,
+          freq: 1320,
+          duty: 0.4,
+          gain: 0.16,
+          seed: 0x3d7f,
+        },
+        at: 0.12,
+      },
+    ],
+  },
+
+  // A minimap ping (GDD §2.4): a rising sonar blip that rings a moment and fades.
+  // Plasma-blue in character (style-guide §1) — this locates, it does not warn, so
+  // it must never be mistaken for the alarm.
+  [SOUND.minimapPing]: {
+    name: 'minimapPing',
+    layers: [
+      {
+        spec: {
+          name: 'minimapPing.blip',
+          wave: 'sine',
+          attack: 0.003,
+          hold: 0.03,
+          decay: 0.26,
+          freq: 880,
+          freqEnd: 1320,
+          vibratoDepth: 0.02,
+          vibratoRate: 12,
+          gain: 0.22,
+          seed: 0x4dc9,
+        },
+      },
+      {
+        spec: {
+          name: 'minimapPing.ring',
+          wave: 'triangle',
+          attack: 0.004,
+          hold: 0.02,
+          decay: 0.2,
+          freq: 1760,
+          gain: 0.1,
+          seed: 0x4dca,
+        },
+        at: 0.02,
+      },
+    ],
+  },
 };
 
 /** The spec for a named sound. */
@@ -1373,16 +1557,16 @@ export const SOUND_NAMES: readonly SoundName[] = Object.keys(SPECS) as SoundName
  * The audible half of "every mechanic has a visible and audible tell"
  * (GDD §3.6), stated as data so a test can walk it.
  *
- * Three kinds map to `null`, and each is a *deliberate* silence rather than a
- * gap — every one of them is a held state whose sound is sustained elsewhere,
- * because retriggering a one-shot every tick is a rattle, not a tell:
- *
- *  - `mineHit` / `weaponHit` → the two looping firing voices (`./weapons`).
- *  - `thrust` → the thruster loop, on the local ship (`./engine`).
+ * One kind maps to `null` — `thrust`, a *deliberate* silence rather than a gap:
+ * it is a held state whose voice is sustained on the local ship (`./weapons`,
+ * `./engine`), because retriggering a one-shot every tick is a rattle, not a tell.
+ * The two firing kinds used to sit here too; since the laser's retirement they are
+ * ordinary one-shots (the discrete rock-chip and hull-hit above), so a per-tick
+ * trigger thins to a stream through the mix's repeat-gap rather than a held tone.
  */
 export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
-  [TELL.mineHit]: null,
-  [TELL.weaponHit]: null,
+  [TELL.mineHit]: SOUND.rockChip,
+  [TELL.weaponHit]: SOUND.hullHit,
   [TELL.rockCrack]: SOUND.rockCrack,
   [TELL.rockBurst]: SOUND.rockBurst,
   [TELL.oreCollect]: SOUND.oreCollect,
@@ -1410,7 +1594,43 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
 
 /**
  * Tells whose sound is a *held* voice rather than a one-shot. Named here so the
- * coverage test can assert that a `null` in {@link TELL_SOUND} is one of these
- * three and never a mechanic somebody forgot.
+ * coverage test can assert that a `null` in {@link TELL_SOUND} is one of these and
+ * never a mechanic somebody forgot. Since the laser's retirement this is the thruster
+ * alone: firing became discrete (the two chip voices), so the engine no longer has
+ * two firing loops to sustain — only the engine note under the local player's thumb.
  */
-export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.mineHit, TELL.weaponHit, TELL.thrust];
+export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.thrust];
+
+// ---------------------------------------------------------------------------
+// Device cues → sounds
+// ---------------------------------------------------------------------------
+
+/**
+ * A cue the game raises directly rather than through a world diff — a finger on a
+ * control, the ping, the respawn clock, an ore chunk coming to rest. These are the
+ * audible half of the p4-03 haptic seams, so the vocabulary mirrors the haptic one
+ * (`src/platform/haptics.ts`, {@link HapticKind}) wherever they overlap:
+ *
+ *  - `press`   ↔ haptic `tap`     — a wheel wedge / menu control was pressed.
+ *  - `confirm` ↔ haptic `confirm` — a purchase or a repair committed.
+ *  - `reject`  — a buy the player can't afford. No haptic twin; the buzzer alone.
+ *  - `deposit` — one ore chunk settling into the bank on a deposit flight.
+ *  - `respawnBeep` / `respawnGo` — the respawn countdown, and the launch (GDD §2.7).
+ *  - `ping`    — a minimap ping (GDD §2.4).
+ *
+ * Played through {@link AudioEngine.cue}: full level, no earshot falloff (they are
+ * non-diegetic UI, not a thing at a place in the world), but still under the
+ * three-second hush like everything else (GDD §4.7).
+ */
+export type AudioCue = 'press' | 'confirm' | 'reject' | 'deposit' | 'respawnBeep' | 'respawnGo' | 'ping';
+
+/** The sound each device cue plays. */
+export const CUE_SOUND: Readonly<Record<AudioCue, SoundName>> = {
+  press: SOUND.pressTick,
+  confirm: SOUND.purchaseConfirm,
+  reject: SOUND.rejectBuzz,
+  deposit: SOUND.depositTick,
+  respawnBeep: SOUND.respawnBeep,
+  respawnGo: SOUND.respawnGo,
+  ping: SOUND.minimapPing,
+};

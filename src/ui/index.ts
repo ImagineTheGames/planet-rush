@@ -151,6 +151,19 @@ export type {
 export { WheelToggle, WHEEL_TRANSITION_SECONDS } from './wheel-toggle';
 export type { WheelPhase } from './wheel-toggle';
 
+// --- Wheel BACK navigation — the hub/ESC "go up a level" model (field report v0.2.4) --
+
+export {
+  WHEEL_LEVELS,
+  HUB_CLOSE_LABEL,
+  HUB_BACK_LABEL,
+  wheelDepth,
+  wheelBack,
+  hubBack,
+  wheelLevel,
+} from './wheel-nav';
+export type { WheelLevel, HubBack } from './wheel-nav';
+
 // --- Shared press & action feedback (field report v0.2.2) ------------------
 //
 // The ONE place press/confirm feel is implemented: an immediate pressed tell
@@ -558,6 +571,7 @@ export {
   volumeLevel,
 } from './settings';
 export type {
+  ControlScheme,
   SettingsLayout,
   SettingsModel,
   SettingsRowSpec,

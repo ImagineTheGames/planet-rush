@@ -27,6 +27,15 @@
  */
 import { test, expect } from '@playwright/test';
 
+/** Parse a "68/70" readout into its current/max fraction, so a test can assert the
+ *  drawn number agrees with the drawn fill without knowing the entity's max hp. */
+function readoutFraction(hpText: string): number {
+  const m = /^(\d+)\/(\d+)$/.exec(hpText);
+  if (!m) throw new Error(`not a current/max readout: ${JSON.stringify(hpText)}`);
+  const max = Number(m[2]);
+  return max > 0 ? Number(m[1]) / max : 0;
+}
+
 /** The shape of the `?debug=1`-only globals this spec drives. Mirrors the seams
  *  installed in `src/main.ts` (`installHealthbarStage`) and `debug-hook.ts`. */
 interface HealthbarStage {
@@ -40,8 +49,16 @@ interface HealthbarStage {
    *  centred local ship and set its hp to `fraction` of max; returns its owner
    *  slot, exact fill, and the screen position its orbit projects to. */
   damageTurret(fraction: number): { owner: number; fraction: number; x: number; y: number } | null;
-  /** The bars the real layer drew last frame — owner, fill, `local` flag, pos. */
-  bars(): Array<{ owner: number; fraction: number; x: number; y: number; local: boolean }>;
+  /** The bars the real layer drew last frame — owner, fill, `local` flag, pos,
+   *  and the "68/70" number drawn beside each (field request v0.2.4). */
+  bars(): Array<{
+    owner: number;
+    fraction: number;
+    x: number;
+    y: number;
+    local: boolean;
+    hpText: string;
+  }>;
   /** The hull fraction the HUD readout last drew (or -1 when hidden). */
   hullReadout(): number;
 }
@@ -107,6 +124,11 @@ test('a health bar renders over a damaged enemy in the real booted client', asyn
   expect(bar, 'a drawn health bar tracks the staged enemy').toBeDefined();
   expect(bar!.fraction, 'the bar fill matches the staged hull fraction').toBeCloseTo(0.4, 2);
 
+  // The "68/70" number drew beside the bar and agrees with the fill it annotates
+  // (field request v0.2.4) — one source, sim hp, so the digits and the bar match.
+  expect(bar!.hpText, 'a current/max number drew beside the enemy bar').toMatch(/^\d+\/\d+$/);
+  expect(readoutFraction(bar!.hpText), 'the number matches the drawn fill').toBeCloseTo(0.4, 1);
+
   // And it TRACKS the entity: the enemy was parked 120 world-px right of the
   // centred local ship, so its bar sits to the right of the viewport centre.
   const viewport = await page.evaluate(() => window.__planetRush!.viewport);
@@ -159,6 +181,11 @@ test('the local player’s own ship gets its own bar when it takes damage (v0.1.
   expect(own, 'a drawn health bar, flagged local, tracks the own ship').toBeDefined();
   expect(own!.owner, 'the own bar belongs to the local player slot').toBe(staged!.owner);
   expect(own!.fraction, 'the own bar fill matches the staged hull fraction').toBeCloseTo(0.35, 2);
+
+  // The own ship's bar carries its number too (field request v0.2.4), matching the
+  // hull it was left at — the same "68/70" treatment the core got, now on the ship.
+  expect(own!.hpText, 'a current/max number drew beside the own-ship bar').toMatch(/^\d+\/\d+$/);
+  expect(readoutFraction(own!.hpText), 'the own number matches the drawn fill').toBeCloseTo(0.35, 1);
 
   // It TRACKS the own ship, which the follow camera holds at the viewport centre.
   const viewport = await page.evaluate(() => window.__planetRush!.viewport);

@@ -529,8 +529,24 @@ function fireWeapon(world: World, ship: Ship, dir: Vec2): void {
 
 /**
  * The unit aim for an auto-aim weapon shot at a non-asteroid target: an
- * intercept lead on a moving ship (so a strafing enemy is actually hit, design
- * amendment v0.2 item 5), or a straight shot at a stationary turret or core.
+ * intercept lead on a moving ship (so a strafing *or orbiting* enemy is actually
+ * hit, design amendment v0.2 item 5; field report v0.2.4 "I can never hit an
+ * enemy orbiting my planet"), or a straight shot at a stationary turret or core.
+ *
+ * This is the **player's** consumer of the shared intercept solver — the third
+ * alongside the turrets (`buildings.ts`) and the bots (`bots/steering.ts`), all
+ * three calling the ONE {@link leadAim} in `./projectiles`, never a fork. The
+ * player's auto-aim (the stick's Auto-aim fire mode, and the Tap Commander pilot
+ * once its scheme rides this same Auto path) leads the ladder's current target
+ * with a CLEAN solve and no artificial error — it is an assist mode, so the cost
+ * of auto-aim is target *choice* (the ladder picks), not induced misses. Manual
+ * aim is untouched: leading a shot by hand stays the skill-ceiling option.
+ *
+ * The solve is a stationary-muzzle intercept because a ship's shot does NOT
+ * inherit the shooter's velocity (`fireShipProjectile` sets `vel = dir·speed`),
+ * so there is no own-velocity to compound in — `leadAim(origin, targetPos,
+ * targetVel, speed)` is exact for our shot and the shared solver needs no
+ * ship-side variation.
  */
 function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
   const t = targetPos(world, hit);
@@ -558,7 +574,26 @@ function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
  * is mined only when the field is otherwise empty of reachable foes.
  */
 function acquireAimTarget(world: World, ship: Ship): AimTarget | null {
-  return acquireEnemy(world, ship) ?? acquireAsteroid(world, ship);
+  const enemy = acquireEnemy(world, ship);
+  if (enemy) return enemy;
+  // A FULL hold drops asteroids out of tier 2 entirely (developer, p9): the
+  // chunks a shot would chip have nowhere to go — the tractor leaves a full
+  // hold's chunks where they are for anyone (GDD §2.3, `holdFull`) — so auto-aim
+  // (stick mode and the tap pilot alike) never wastes a shot on a rock it cannot
+  // profit from. Enemies are unaffected: they are tier 1, resolved above. The
+  // tick the hold has room again, rocks re-enter the ladder.
+  if (holdFull(ship)) return null;
+  return acquireAsteroid(world, ship);
+}
+
+/**
+ * Whether `ship`'s hold has no room left — the single "full hold" predicate the
+ * tractor (a full hold exerts no pull, GDD §2.3) and the p9 auto-aim suppression
+ * (a full hold stops targeting rocks) both read, so the two can never disagree
+ * about when a rock stops being worth mining.
+ */
+function holdFull(ship: Ship): boolean {
+  return ship.cargoCap - ship.cargo <= 1e-9;
 }
 
 /**
@@ -721,7 +756,7 @@ function updateChunks(world: World, dt: number): void {
     let bestD2 = range2;
     for (const ship of world.ships) {
       if (!ship.alive) continue;
-      if (ship.cargoCap - ship.cargo <= 1e-9) continue;
+      if (holdFull(ship)) continue;
       const d2 = dist2(chunk.pos, ship.pos);
       if (d2 < bestD2) {
         bestD2 = d2;
@@ -766,23 +801,23 @@ function updateChunks(world: World, dt: number): void {
 
 /**
  * While a ship is inside its own living planet's atmosphere (`DEPOSIT_RANGE`),
- * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, on a
- * fixed tick cadence, spin off a courier chunk that flies ship→planet to show
- * it. Leave the atmosphere (or empty the hold, or lose the planet) and the drain
- * simply stops the next tick — the transfer is readable and interruptible,
- * exactly as the field report asks. There is no dock or park gate any more
- * (ratified p4: "just be in that atmosphere").
+ * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, for each
+ * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
+ * flies ship→planet to show it. Leave the atmosphere (or empty the hold, or lose
+ * the planet) and the drain simply stops the next tick — the transfer is readable
+ * and interruptible, exactly as the field report asks. There is no dock or park
+ * gate any more (ratified p4: "just be in that atmosphere").
  *
  * The transfer is authoritative here (hold and bank are the truth the HUD ticks
- * off); the couriers are cosmetic and carry no ore, so this can never bank more
- * than the hold held. Deterministic: the cadence is keyed to the integer tick,
- * the courier's heading is pure geometry, and no RNG is drawn.
+ * off) and the couriers CONSERVE it: one flight sprite per unit banked, so the
+ * chunks flying home always total the ore that actually moved — never more (field
+ * report p8: the atmosphere drain used to spawn couriers on a free-running time
+ * cadence, ~3 per ore at `drainRate`, so the developer saw "more ore flying than
+ * you hold"). Deterministic: the spawn count is a pure function of the hold's
+ * integer boundary crossings, the courier's heading is pure geometry, and no RNG
+ * is drawn.
  */
 function updateDeposits(world: World, dt: number): void {
-  // Interval → whole ticks on the canonical grid, so the cadence is the same
-  // whatever `dt` a caller steps at (part of the determinism contract).
-  const flightEvery = Math.max(1, Math.round(DEPOSIT.flightInterval / TICK_DT));
-  const emitThisTick = world.tick % flightEvery === 0;
   for (const ship of world.ships) {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
     // Ratified p4: just be in the atmosphere. No dock and no park gate — the
@@ -792,13 +827,20 @@ function updateDeposits(world: World, dt: number): void {
     if (!planet || !planet.alive || !inAtmosphere(ship, planet)) continue;
 
     // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
+    const cargoBefore = ship.cargo;
     const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
 
-    // The telegraph: a courier chunk leaves the hull for the planet.
-    if (emitThisTick) spawnDepositFlight(world, ship, planet);
+    // The telegraph, CONSERVED: exactly one courier per whole unit that left the
+    // hold this tick. Summed across a drain this equals the whole ore banked — the
+    // single unit-keyed spawner that replaces the old rate-based emitter (field
+    // report p8). Keyed to the HOLD's integer boundaries (which the terminal
+    // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
+    // `banked` can never invent or drop a courier at the exact end of a drain.
+    const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
+    for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, planet);
   }
 }
 

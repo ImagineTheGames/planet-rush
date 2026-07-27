@@ -1036,6 +1036,15 @@ export const TRACTOR = {
 } as const;
 
 /**
+ * TRACTOR_PICKUP_RADIUS — the tractor grab range as a standalone named constant
+ * for consumers outside the sim (the platform tap-pilot, p9-02: it reads how
+ * close a mined rock's chunks must be to drift into the hold). SINGLE SOURCE: it
+ * *is* `TRACTOR.range`, never a copied literal, so tuning the tractor moves the
+ * pilot's read in lockstep — the pilot must import this, not hardcode 120. TUNABLE
+ */
+export const TRACTOR_PICKUP_RADIUS: Tunable<number> = TRACTOR.range;
+
+/**
  * DEPOSIT_RANGE — the atmosphere radius (world units, centre-to-centre) inside
  * which a ship auto-deposits its hold at its OWN living planet. Ratified p4
  * (developer): "You shouldn't need to touch your planet to deposit — just be in
@@ -1070,9 +1079,10 @@ export const DEPOSIT_RANGE: Tunable<number> = PLANET.radius * 4;
  *
  * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
  * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
- * the *telegraph*, pooled ore sprites emitted on a fixed cadence and reabsorbed
- * at the planet — the same discipline as the firing tell, and they reuse the ore
- * chunk the renderer already draws, so the visual needs no new render path.
+ * the *telegraph*, pooled ore sprites emitted **one per whole unit banked** and
+ * reabsorbed at the planet — a conserved stream, never more chunks than the ore
+ * that moved (field report p8). They reuse the ore chunk the renderer already
+ * draws, so the visual needs no new render path.
  *
  * You deposit by **being in the atmosphere**, not by touching down: no dock,
  * no park requirement (ratified p4 — the old dock+park gate is retired). The
@@ -1085,10 +1095,6 @@ export const DEPOSIT = {
    *  2-slot hold empties in ~1 s — brisk enough not to be a chore, slow enough
    *  to read the chunks fly and to cut short by pulling away. */
   drainRate: 2,
-  /** Seconds between deposit-flight chunks spun off for the visual. One every
-   *  ~0.15 s reads as a steady stream at the drain rate without flooding the
-   *  chunk pool; realised on the sim tick grid so it stays deterministic. */
-  flightInterval: 0.15,
   /** Speed a deposit-flight chunk travels toward the planet (units/s) — fast
    *  enough to arrive within the drain, so a chunk is a courier, not clutter. */
   flightSpeed: 220,

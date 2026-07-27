@@ -121,11 +121,24 @@ export class SettingsView extends Container {
     }
   }
 
-  /** A toggle's value as a pill: plasma when engaged, steel when off. */
+  /** A toggle's value as a pill: plasma when engaged, steel when off. The pill
+   *  sizes to its word so a long value ("TAP COMMANDER") reads inside its chrome
+   *  rather than spilling past it, while a short one ("ON") stays snug — clamped
+   *  to a floor so every toggle on the screen keeps a common minimum width, and to
+   *  a share of the row so it can never crowd out the label on a narrow column. */
   private drawToggle(nodes: RowNodes, row: SettingsRowView, rect: Rect): void {
     const tint = row.on ? PALETTE.plasma : PALETTE.hullSteel;
-    const pillW = Math.min(120, rect.width * 0.4);
     const pillH = Math.min(28, rect.height - 14);
+
+    // Set the text first so its measured width can drive the pill width.
+    nodes.value.visible = true;
+    nodes.value.text = row.value;
+    nodes.value.style.fill = row.on ? TEXT_PRIMARY : TEXT_DIM;
+
+    const padX = 14;
+    const floor = Math.min(96, rect.width * 0.4);
+    const ceiling = Math.max(floor, rect.width * 0.62);
+    const pillW = Math.min(ceiling, Math.max(floor, nodes.value.width + padX * 2));
     const px = rect.x + rect.width - pillW - 12;
     const py = rect.y + (rect.height - pillH) / 2;
     nodes.body
@@ -134,9 +147,6 @@ export class SettingsView extends Container {
       .roundRect(px, py, pillW, pillH, pillH / 2)
       .stroke({ width: row.on ? 2 : 1, color: tint, alpha: row.on ? 0.9 : 0.5 });
 
-    nodes.value.visible = true;
-    nodes.value.text = row.value;
-    nodes.value.style.fill = row.on ? TEXT_PRIMARY : TEXT_DIM;
     nodes.value.x = px + pillW / 2;
     nodes.value.y = py + pillH / 2;
   }

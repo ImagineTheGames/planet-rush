@@ -20,6 +20,7 @@ import { PALETTE, PLAYER_COLORS } from '@render/index';
 import {
   combatantGetsBar,
   healthBarModel,
+  hpReadout,
   isLocalCombatant,
   HEALTHBAR_FULL_EPSILON,
 } from './healthbar';
@@ -200,6 +201,44 @@ describe('the fill fraction each bar shows', () => {
     expect(over[0]?.fraction).toBe(1);
     const under = healthBarModel([enemy({ hp: -5, maxHp: 50 })], LOCAL);
     expect(under[0]?.fraction).toBe(0);
+  });
+});
+
+describe('the numeric "68/70" readout (field request v0.2.4)', () => {
+  it('reads current/max, both whole, off the sim hp', () => {
+    expect(hpReadout(68, 70)).toBe('68/70');
+  });
+
+  it('rounds a fractional siege-damaged hp to a whole point', () => {
+    // Ships/turrets step in whole hits; only a live siege makes hp fractional.
+    expect(hpReadout(67.4, 70)).toBe('67/70');
+    expect(hpReadout(67.6, 70)).toBe('68/70');
+  });
+
+  it('clamps into [0, max] instead of printing a negative or over-full number', () => {
+    expect(hpReadout(-5, 70)).toBe('0/70'); // mid-explosion, hp went negative
+    expect(hpReadout(80, 70)).toBe('70/70'); // an over-heal/shield never over-reads
+  });
+
+  it('degrades a NaN or degenerate entity to "0/0", never a NaN', () => {
+    expect(hpReadout(Number.NaN, 70)).toBe('0/70');
+    expect(hpReadout(50, Number.NaN)).toBe('0/0');
+    expect(hpReadout(50, 0)).toBe('0/0');
+  });
+
+  it('emits the number on every bar the frame draws, matching hp state', () => {
+    // Whenever the bar shows, the number shows — one rule, ships and turrets alike.
+    const own = enemy({ owner: LOCAL, local: true, hp: 20, maxHp: 70 });
+    const foe = enemy({ owner: 3, hp: 35, maxHp: 50 });
+    const tur = turret({ owner: LOCAL, hp: 5, maxHp: 40 });
+    const bars = healthBarModel([own, foe, tur], LOCAL);
+    expect(bars.map((b) => b.hpText)).toEqual(['20/70', '35/50', '5/40']);
+  });
+
+  it('the number tracks the same hp the fill fraction is built from', () => {
+    const [bar] = healthBarModel([enemy({ hp: 25, maxHp: 50 })], LOCAL);
+    expect(bar?.hpText).toBe('25/50');
+    expect(bar?.fraction).toBeCloseTo(0.5);
   });
 });
 

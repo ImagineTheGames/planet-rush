@@ -20,8 +20,9 @@ import { describe, expect, it } from 'vitest';
 import { TELL, TELL_NAMES, TellQueue, type TellKind } from '../tells';
 import { DeathMoment, HUSH_S } from '../vfx/death-moment';
 import { ENGAGE, LEAK, MIN_HOLD_S, UnderAttackAlarm, WEIGHTS } from './alarm';
-import { WeaponVoices, SustainedVoice } from './weapons';
+import { SustainedVoice } from './weapons';
 import {
+  CUE_SOUND,
   isLayered,
   loops,
   SOUND,
@@ -29,6 +30,7 @@ import {
   SUSTAINED_TELLS,
   soundSpec,
   TELL_SOUND,
+  type AudioCue,
   type SoundName,
 } from './bank';
 import {
@@ -346,15 +348,22 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
         expect(SOUND_NAMES, `${TELL_NAMES[kind]} → ${sound}`).toContain(sound);
       }
     }
-    expect(SUSTAINED_TELLS).toHaveLength(3);
+    // The thruster alone is held now: firing became discrete with amendment v0.3.
+    expect(SUSTAINED_TELLS).toHaveLength(1);
+    expect(SUSTAINED_TELLS).toContain(TELL.thrust);
   });
 
-  it('names both firing voices, because the brief names them (GDD §3.6)', () => {
-    expect(loops(soundSpec(SOUND.mineLoop))).toBe(true);
-    expect(loops(soundSpec(SOUND.weaponLoop))).toBe(true);
+  it('keeps the two firing voices as discrete one-shots after the mining laser retired', () => {
+    // The held rock/hull loops retired with the mining laser (amendment v0.3): a shot is
+    // an event now, so both firing voices are ordinary one-shots, not loops.
+    expect(loops(soundSpec(SOUND.rockChip))).toBe(false);
+    expect(loops(soundSpec(SOUND.hullHit))).toBe(false);
+    // And the tells that used to be "sustained" now route to those one-shots.
+    expect(TELL_SOUND[TELL.mineHit]).toBe(SOUND.rockChip);
+    expect(TELL_SOUND[TELL.weaponHit]).toBe(SOUND.hullHit);
   });
 
-  it('makes rock and hull genuinely distinct, not two takes of one sound', () => {
+  it('makes rock and hull genuinely distinct, not two takes of one sound (GDD §3.6)', () => {
     // A player mid-fight has to know which one they are doing without looking,
     // so the two are far apart in the one dimension that survives a bad phone
     // speaker: spectral centre. Zero crossings stand in for it, cheaply.
@@ -365,8 +374,8 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       }
       return n / samples.length;
     };
-    const rock = crossings(renderSound(soundSpec(SOUND.mineLoop)));
-    const hull = crossings(renderSound(soundSpec(SOUND.weaponLoop)));
+    const rock = crossings(renderSound(soundSpec(SOUND.rockChip)));
+    const hull = crossings(renderSound(soundSpec(SOUND.hullHit)));
     expect(hull).toBeGreaterThan(rock * 1.8);
   });
 
@@ -561,56 +570,21 @@ describe('held voices (`./weapons`)', () => {
     expect(voice.gain).toBeCloseTo(0.9, 5);
   });
 
-  it('crossfades the two firing voices instead of switching between them', () => {
+  it('rides pitch with what is pushed — a heavier state sounds like one', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
-    const weapons = new WeaponVoices(graph);
-
-    for (let i = 0; i < 20; i++) {
-      weapons.onHit(false, 1); // mining
-      weapons.update(1 / 60);
-    }
-    expect(weapons.levels.rock).toBeGreaterThan(0.5);
-    expect(weapons.levels.hull).toBe(0);
-
-    // A shot sweeps off the rock and onto a hull: rock falls, hull rises,
-    // and for a moment both are sounding — that is the slide.
-    weapons.onHit(true, 1);
-    weapons.update(1 / 60);
-    expect(weapons.levels.hull).toBeGreaterThan(0);
-    expect(weapons.levels.rock).toBeGreaterThan(0);
-    expect(weapons.levels.rock).toBeLessThan(0.7);
-
-    for (let i = 0; i < 60; i++) {
-      weapons.onHit(true, 1);
-      weapons.update(1 / 60);
-    }
-    expect(weapons.levels.rock).toBe(0);
-    expect(weapons.levels.hull).toBeGreaterThan(0.5);
+    const voice = new SustainedVoice(graph, SOUND.thruster, { attack: 0 });
+    voice.push(1, 1.2);
+    voice.update(1 / 60);
+    const source = ctx.sources[ctx.sources.length - 1]!;
+    expect(source.playbackRate.value).toBeCloseTo(1.2, 5);
   });
 
-  it('rides pitch with weapon power — a heavier tool sounds like one', () => {
+  it('is a no-op when nothing is ever pushed — a quiet match makes no nodes', () => {
     const ctx = new FakeAudioContext();
-    const graph = new AudioGraph(ctx);
-    const weapons = new WeaponVoices(graph);
-    weapons.onHit(false, 1);
-    weapons.update(1 / 60);
-    const strong = ctx.sources[ctx.sources.length - 1]!.playbackRate.value;
-
-    const ctx2 = new FakeAudioContext();
-    const weapons2 = new WeaponVoices(new AudioGraph(ctx2));
-    weapons2.onHit(false, 0);
-    weapons2.update(1 / 60);
-    const weak = ctx2.sources[ctx2.sources.length - 1]!.playbackRate.value;
-
-    expect(strong).toBeGreaterThan(weak);
-  });
-
-  it('is a no-op when nothing ever fires — a quiet match makes no nodes', () => {
-    const ctx = new FakeAudioContext();
-    const weapons = new WeaponVoices(new AudioGraph(ctx));
-    for (let i = 0; i < 120; i++) weapons.update(1 / 60);
-    expect(weapons.playing).toBe(false);
+    const voice = new SustainedVoice(new AudioGraph(ctx), SOUND.thruster);
+    for (let i = 0; i < 120; i++) voice.update(1 / 60);
+    expect(voice.playing).toBe(false);
     expect(ctx.sources).toHaveLength(0);
   });
 });
@@ -735,10 +709,9 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     }
   });
 
-  it('sustains the three held states instead of retriggering them', () => {
+  it('sustains the one held state (the thruster) instead of retriggering it', () => {
     const { ctx, engine } = engineOn();
     const tells = new TellQueue(8);
-    tells.push(TELL.mineHit, 0, 0, 0, 1, 0);
     tells.push(TELL.thrust, 0, 0, 0, 1, 0);
 
     for (let i = 0; i < 60; i++) {
@@ -746,12 +719,31 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
       engine.update(1 / 60);
       ctx.advance(1 / 60);
     }
-    // A whole second of held fire and throttle: two looping sources, not 120
-    // one-shots. (`preload` makes no sources, so every source here is a loop.)
+    // A whole second of held throttle: one looping source, not 60 one-shots.
     expect(engine.playCount).toBe(0);
-    // Four loops: the two firing voices, the ambient bed, and the soundtrack's
-    // calm drone — mining is not combat, so the theme never joins them here.
-    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(4);
+    // Three loops: the thruster, the ambient bed, and the soundtrack's calm drone
+    // — firing is no longer a held voice, so there are no firing loops here.
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(3);
+  });
+
+  it('sounds firing as discrete shots now, thinned to a stream by the repeat-gap', () => {
+    // Since amendment v0.3 (the mining laser retired) a shot is an event: a held trigger
+    // makes a rapid train of one-shots, which the mix's repeat-gap thins so it
+    // reads as a stream rather than a 60 Hz smear — no firing loop is ever made.
+    const { ctx, engine } = engineOn();
+    const tells = new TellQueue(4);
+    tells.push(TELL.mineHit, 0, 0, 0, 1, 0);
+
+    for (let i = 0; i < 60; i++) {
+      engine.consume(tells);
+      engine.update(1 / 60);
+      ctx.advance(1 / 60);
+    }
+    // Thinned: fewer than the 60 frames, but plainly audible as a stream.
+    expect(engine.playCount).toBeGreaterThan(1);
+    expect(engine.playCount).toBeLessThan(60);
+    // Only the standing loops (ambient + calm drone); firing made none.
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(2);
   });
 
   it('goes quiet for three seconds when a home dies (GDD §4.7)', () => {
@@ -934,6 +926,66 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.alarm.active).toBe(false);
     engine.dispose();
     expect(engine.running).toBe(false);
+  });
+
+  it('scales the projectile impact with damage — a tier-4 shot lands heavier', () => {
+    const gainOf = (magnitude: number): number => {
+      const ctx = new FakeAudioContext();
+      const engine = new AudioEngine({ context: ctx, local: 0 });
+      engine.start();
+      const q = new TellQueue(4);
+      q.push(TELL.shotImpact, 0, 0, 0, magnitude, 1);
+      engine.consume(q);
+      const source = ctx.sources[ctx.sources.length - 1]!;
+      return (source.outputs[0] as FakeGain).gain.value;
+    };
+    expect(gainOf(1)).toBeGreaterThan(gainOf(0));
+  });
+});
+
+describe('the device cues (`./engine` cue — the p4-03 seams)', () => {
+  const engineOn = () => {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine({ context: ctx, local: 0 });
+    engine.start();
+    return { ctx, engine };
+  };
+  const CUES: AudioCue[] = ['press', 'confirm', 'reject', 'deposit', 'respawnBeep', 'respawnGo', 'ping'];
+
+  it('sounds every cue in the vocabulary, into a mapped bank sound', () => {
+    for (const kind of CUES) {
+      const { engine } = engineOn();
+      engine.cue(kind);
+      expect(engine.playCount, `${kind} made no sound`).toBe(1);
+      expect(SOUND_NAMES).toContain(CUE_SOUND[kind]);
+    }
+  });
+
+  it('plays a cue at full level regardless of the listener — a menu is nowhere', () => {
+    const { engine } = engineOn();
+    engine.setListener(0, 0);
+    engine.cue('ping'); // even from "nowhere", a UI cue is not distance-attenuated
+    expect(engine.playCount).toBe(1);
+  });
+
+  it('stays silent through the three-second hush like everything else (GDD §4.7)', () => {
+    const { ctx, engine } = engineOn();
+    const death = new TellQueue(4);
+    death.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    engine.consume(death);
+    run(engine, ctx, 0.3); // let the mix reach zero
+    expect(engine.death.gain).toBe(0);
+
+    const before = engine.playCount;
+    engine.cue('confirm');
+    expect(engine.playCount).toBe(before); // not started — the quiet is protected
+    expect(engine.hushedCount).toBeGreaterThan(0);
+  });
+
+  it('runs silent with no context — a UI cue on the server or the harness is a no-op', () => {
+    const engine = new AudioEngine({ local: 0 });
+    expect(() => engine.cue('press')).not.toThrow();
+    expect(engine.playCount).toBe(0);
   });
 });
 

@@ -88,17 +88,34 @@ describe('the value and how it changes', () => {
   });
 });
 
-describe('the frame model reads its four values from their true sources', () => {
+describe('the frame model reads its values from their true sources', () => {
   it('shows the fire mode passed in, both ways', () => {
-    const manual = settingsModel(createSettings(), FireMode.Manual);
-    const auto = settingsModel(createSettings(), FireMode.AutoAim);
+    const manual = settingsModel(createSettings(), FireMode.Manual, 'sticks');
+    const auto = settingsModel(createSettings(), FireMode.AutoAim, 'sticks');
     expect(manual.rows[0]).toMatchObject({ kind: 'fireMode', value: 'MANUAL', on: false });
     expect(auto.rows[0]).toMatchObject({ kind: 'fireMode', value: 'AUTO-AIM', on: true });
   });
 
+  it('shows the control scheme passed in, the ratified wording, both ways', () => {
+    const sticks = settingsModel(createSettings(), FireMode.Manual, 'sticks');
+    const tap = settingsModel(createSettings(), FireMode.Manual, 'tap');
+    // "CONTROLS: STICKS / TAP COMMANDER" — the label names the setting, the pill
+    // shows the seated scheme; Tap Commander is the engaged (on) state.
+    expect(sticks.rows.find((r) => r.kind === 'controls')).toMatchObject({
+      label: 'CONTROLS',
+      value: 'STICKS',
+      on: false,
+    });
+    expect(tap.rows.find((r) => r.kind === 'controls')).toMatchObject({
+      label: 'CONTROLS',
+      value: 'TAP COMMANDER',
+      on: true,
+    });
+  });
+
   it('shows reduce VFX and carries every volume as filled steps', () => {
     const s = setVolume(toggleReduceVfx(createSettings()), 'master', 0.5);
-    const model = settingsModel(s, FireMode.Manual);
+    const model = settingsModel(s, FireMode.Manual, 'sticks');
     const vfx = model.rows.find((r) => r.kind === 'reduceVfx');
     expect(vfx).toMatchObject({ value: 'ON', on: true });
     const master = model.rows.find((r) => r.channel === 'master');
@@ -106,7 +123,7 @@ describe('the frame model reads its four values from their true sources', () => 
   });
 
   it('lists one row per SETTINGS_ROWS, in order', () => {
-    const model = settingsModel(createSettings(), FireMode.Manual);
+    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks');
     expect(model.rows.map((r) => r.kind)).toEqual(SETTINGS_ROWS.map((r) => r.kind));
     expect(model.rows).toHaveLength(SETTINGS_ROWS.length);
   });
@@ -134,7 +151,11 @@ describe('layout and hit test agree', () => {
     const fireRow = layout.rows[0]!;
     // The far-left of the row (the label) still toggles a toggle.
     expect(settingsHitTest(layout, fireRow.x + 4, center(fireRow).y)).toEqual({ kind: 'fireMode' });
-    const vfxRow = layout.rows[1]!;
+    const controlsIdx = SETTINGS_ROWS.findIndex((r) => r.kind === 'controls');
+    const controlsRow = layout.rows[controlsIdx]!;
+    expect(settingsHitTest(layout, controlsRow.x + 4, center(controlsRow).y)).toEqual({ kind: 'controls' });
+    const vfxIdx = SETTINGS_ROWS.findIndex((r) => r.kind === 'reduceVfx');
+    const vfxRow = layout.rows[vfxIdx]!;
     expect(settingsHitTest(layout, center(vfxRow).x, center(vfxRow).y)).toEqual({ kind: 'reduceVfx' });
   });
 

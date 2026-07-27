@@ -1,37 +1,30 @@
 /**
  * src/art/audio/weapons.ts — held sounds. OWNER: Art & Audio Agent.
  *
- * Most tells are moments: a rock cracks, a turret fires, a shield pops. Three
- * are not — a shot on rock, a shot on hull, and the engine — and those three
- * are *states* that persist for as long as a player holds a control down.
+ * Most tells are moments: a rock cracks, a turret fires, a shield pops. One is
+ * not — the engine — and it is a *state* that persists for as long as a player
+ * holds the throttle open. (Firing used to belong here too, as a held rock/hull
+ * pair; the laser's retirement — amendment v0.3 — made a shot a discrete projectile, so
+ * the two firing voices retired to one-shots in `./bank`. See {@link SOUND.rockChip}.)
  *
- * Retriggering a one-shot per firing tick would play a sound 60 times a second.
- * That is not sustained fire; it is a machine gun, and worse, it is the sound of
- * a synthesized game giving itself away. So held states get a looping voice whose
- * gain follows the state, which is what {@link SustainedVoice} is.
+ * Retriggering a one-shot per throttle tick would play a sound 60 times a second.
+ * That is not a running engine; it is a machine gun, and worse, it is the sound of
+ * a synthesized game giving itself away. So the held state gets a looping voice
+ * whose gain follows it, which is what {@link SustainedVoice} is. The adaptive
+ * soundtrack's stems (`./music`) are the same class under a different name — a bed
+ * that rises and falls with the match rather than restarting.
  *
- * ## The two firing voices (GDD §3.6)
+ * ## One voice, not one per source
  *
- * The brief names *"the distinct rock-vs-hull firing sounds"* specifically,
- * because firing is the inversion the whole game turns on: the same trigger
- * mines and kills. A player mid-fight needs to know which one they are currently
- * doing without taking their eyes off where they are flying — so the two voices
- * are as far apart as the bank can put them (low grinding stone vs. bright
- * cutting torch, `./bank`), and {@link WeaponVoices} crossfades rather than
- * switching, so a shot sweeping off a rock and onto a hull *slides*.
- *
- * ## One voice per material, not one per ship
- *
- * Eight ships could be firing at once, and eight loops of the same grind is
+ * Eight ships could be under power at once, and eight loops of the same engine is
  * eight copies of one sound phase-cancelling into mush — it does not sound like
- * eight miners, it sounds like a fault. So the mix keeps **one** rock voice and
- * **one** hull voice, driven by the strongest shot currently on that material.
- * The information a player needs is *what is being cut*, and that survives the
- * collapse intact.
+ * eight ships, it sounds like a fault. So the engine keeps **one** thruster voice,
+ * on the local ship alone (`./engine`): the one a player needs to feel is the one
+ * under their own thumb.
  */
 
 import type { AudioGraph, Bus, LoopHandle } from './graph';
-import { SOUND, type SoundName } from './bank';
+import type { SoundName } from './bank';
 
 /** Below this the voice is stopped outright rather than left running silently. */
 const SILENCE = 0.004;
@@ -140,75 +133,6 @@ export class SustainedVoice {
       this.handle.stop(0.04);
       this.handle = null;
     }
-  }
-}
-
-/** Options for {@link WeaponVoices}. */
-export interface WeaponVoiceOptions {
-  /** Ceiling on either firing voice, 0..1. */
-  readonly maxGain?: number;
-  /**
-   * How much weapon power moves the pitch. A tier-4 weapon is a heavier tool and
-   * sounds like one — the same number that scales the spark burst (`../vfx/`).
-   */
-  readonly rateSpread?: number;
-}
-
-/**
- * The two firing voices, and the crossfade between them.
- *
- * ```ts
- * // per frame, over the same TellQueue the VFX field reads:
- * weapons.onHit(kind === TELL.weaponHit, power);
- * weapons.update(dt);
- * ```
- */
-export class WeaponVoices {
-  private readonly rock: SustainedVoice;
-  private readonly hull: SustainedVoice;
-  private readonly rateSpread: number;
-
-  constructor(graph: AudioGraph, options: WeaponVoiceOptions = {}) {
-    const maxGain = clamp01(options.maxGain ?? 0.7);
-    // A slower release on rock than on hull: mining is a steady activity and
-    // should not flutter when a shot clips the edge of a tumbling rock, while
-    // a shot coming off a ship should stop sounding like a hit immediately.
-    this.rock = new SustainedVoice(graph, SOUND.mineLoop, { maxGain, release: 0.11, attack: 0.02 });
-    this.hull = new SustainedVoice(graph, SOUND.weaponLoop, { maxGain, release: 0.07, attack: 0.012 });
-    this.rateSpread = options.rateSpread ?? 0.25;
-  }
-
-  /** One firing tell: hull or rock, at this power (0..1). */
-  onHit(onHull: boolean, power: number): void {
-    const p = clamp01(power);
-    // Level tracks power with a floor, so even a tier-0 weapon is clearly audible:
-    // this is the sound that tells a player their trigger is doing something.
-    const level = 0.55 + 0.45 * p;
-    const rate = 1 + (p - 0.5) * this.rateSpread;
-    if (onHull) this.hull.push(level, rate);
-    else this.rock.push(level, rate);
-  }
-
-  /** Advance both voices. */
-  update(dt: number): void {
-    this.rock.update(dt);
-    this.hull.update(dt);
-  }
-
-  /** True while either voice is sounding. */
-  get playing(): boolean {
-    return this.rock.playing || this.hull.playing;
-  }
-
-  /** Gains of the two voices — the crossfade, as a pair of numbers, for tests. */
-  get levels(): { readonly rock: number; readonly hull: number } {
-    return { rock: this.rock.gain, hull: this.hull.gain };
-  }
-
-  /** Stop both. */
-  stop(): void {
-    this.rock.stop();
-    this.hull.stop();
   }
 }
 

@@ -42,6 +42,21 @@ import type { Insets } from './menu-geometry';
 // The value
 // ---------------------------------------------------------------------------
 
+/**
+ * How the player drives the ship (developer §3; GDD §2.4). `'sticks'` is the
+ * default virtual-stick / keyboard / gamepad scheme; `'tap'` is Tap Commander,
+ * where a tap places a move or a lock and the local pilot flies the ship.
+ *
+ * Like the fire mode, this is a real gameplay setting on every platform, not a
+ * touch concession — and like the fire mode, its live value is owned by the
+ * wiring layer (main.ts persists it to `planet-rush:controlScheme`, the same
+ * storage family as the fire mode). The settings screen only shows and toggles
+ * it, so the authority stays in one place; {@link settingsModel} reads it by
+ * argument for exactly that reason. Structurally identical to the platform
+ * lane's private `ControlScheme` so main.ts's live value passes straight in.
+ */
+export type ControlScheme = 'sticks' | 'tap';
+
 /** The three mixer channels the player can set independently. */
 export type VolumeChannel = 'master' | 'sfx' | 'music';
 
@@ -136,13 +151,16 @@ export function volumeLevel(state: SettingsState, channel: VolumeChannel): numbe
  *  all walk this same list, so a re-ordered screen can never mis-route a tap. */
 export type SettingsRowSpec =
   | { readonly kind: 'fireMode' }
+  | { readonly kind: 'controls' }
   | { readonly kind: 'reduceVfx' }
   | { readonly kind: 'volume'; readonly channel: VolumeChannel };
 
-/** The rows, top to bottom. Fire mode first — it is the one that changes how the
- *  game plays, not merely how it sounds. */
+/** The rows, top to bottom. The two that change how the game *plays* — fire mode
+ *  and the control scheme — lead, ahead of the perf hatch and the volumes that
+ *  only change how it looks and sounds. */
 export const SETTINGS_ROWS: readonly SettingsRowSpec[] = [
   { kind: 'fireMode' },
+  { kind: 'controls' },
   { kind: 'reduceVfx' },
   ...VOLUME_CHANNELS.map((channel) => ({ kind: 'volume', channel }) as const),
 ];
@@ -150,6 +168,7 @@ export const SETTINGS_ROWS: readonly SettingsRowSpec[] = [
 /** What a tap on the settings screen changed. */
 export type SettingsTarget =
   | { readonly kind: 'fireMode' }
+  | { readonly kind: 'controls' }
   | { readonly kind: 'reduceVfx' }
   | { readonly kind: 'volume'; readonly channel: VolumeChannel; readonly dir: 1 | -1 }
   | { readonly kind: 'back' };
@@ -184,11 +203,16 @@ export interface SettingsModel {
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
- * Takes the fire mode by argument because the flow owns it (see
- * {@link SettingsState}), so the one screen that shows all four control values
- * still reads them from their single sources of truth.
+ * Takes the fire mode AND the control scheme by argument because the wiring layer
+ * owns each (see {@link SettingsState}, {@link ControlScheme}), so the one screen
+ * that shows every control value still reads them from their single sources of
+ * truth rather than keeping a second, driftable copy.
  */
-export function settingsModel(state: SettingsState, fireMode: FireMode): SettingsModel {
+export function settingsModel(
+  state: SettingsState,
+  fireMode: FireMode,
+  controlScheme: ControlScheme,
+): SettingsModel {
   const rows: SettingsRowView[] = SETTINGS_ROWS.map((spec) => {
     switch (spec.kind) {
       case 'fireMode':
@@ -197,6 +221,16 @@ export function settingsModel(state: SettingsState, fireMode: FireMode): Setting
           label: 'FIRE MODE',
           value: fireMode === FireMode.AutoAim ? 'AUTO-AIM' : 'MANUAL',
           on: fireMode === FireMode.AutoAim,
+        };
+      case 'controls':
+        // The ratified wording (p6-01): "CONTROLS: STICKS / TAP COMMANDER". The
+        // label names the setting; the pill shows the seated scheme. Tap Commander
+        // is the engaged (plasma) state — the opt-in layer over the default sticks.
+        return {
+          kind: 'controls',
+          label: 'CONTROLS',
+          value: controlScheme === 'tap' ? 'TAP COMMANDER' : 'STICKS',
+          on: controlScheme === 'tap',
         };
       case 'reduceVfx':
         return {
@@ -323,6 +357,7 @@ export function settingsHitTest(layout: SettingsLayout, x: number, y: number): S
     const spec = SETTINGS_ROWS[i];
     if (!rect || !spec || !hitRect(rect, x, y)) continue;
     if (spec.kind === 'fireMode') return { kind: 'fireMode' };
+    if (spec.kind === 'controls') return { kind: 'controls' };
     if (spec.kind === 'reduceVfx') return { kind: 'reduceVfx' };
     const { minus, plus } = volumeButtons(rect);
     if (hitRect(plus, x, y)) return { kind: 'volume', channel: spec.channel, dir: 1 };

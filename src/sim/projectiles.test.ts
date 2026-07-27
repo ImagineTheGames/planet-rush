@@ -234,6 +234,104 @@ describe('lead aiming (auto-aim + bots) hits a mover the naive shot misses', () 
   });
 });
 
+// --- field report v0.2.4: the player's auto-aim leads an ORBITER ------------
+//
+// "Same issue with my auto targeting… if an enemy is orbiting around my planet I
+// can never hit him." An orbit is the hardest case for a *linear* intercept: the
+// target's velocity direction turns every tick, so a lead solved this frame is
+// already stale by impact. The design's answer is not a fancier solver but a
+// COMMITTED range — close in and the travel time (and so the arc the target
+// slips through) shrinks until the linear lead lands near-certainly. This pins
+// that the player's auto-fire — the third consumer of the ONE shared `leadAim`
+// alongside the turrets and the bots — connects on an orbiter, and that a naive
+// aim-where-it-is shot does not. The Tap Commander pilot rides this same auto
+// path (once its scheme maps to Auto-aim), so it inherits the lead with no
+// solver of its own.
+
+describe("player auto-aim leads an enemy orbiting the player's planet (field report v0.2.4)", () => {
+  /** Run a shooter (id 0) at the arena centre against an enemy (id 1) driven at
+   *  top speed around a `radius`-circle for `ticks`, calling `onTick` to act each
+   *  frame. Returns the damage the shooter dealt and the final world for
+   *  digesting. The orbit is analytic (constant angular rate), so the run is a
+   *  pure function of its arguments — same args, same result. */
+  function orbitDuel(opts: {
+    radius: number;
+    ticks: number;
+    onTick: (world: World, shooter: Ship, target: Ship) => void;
+  }): { dealt: number; world: World; target: Ship } {
+    const center = { x: 2000, y: 2000 };
+    const shooter = makeShip({ id: 0, pos: { x: center.x, y: center.y }, home: center });
+    const target = makeShip({
+      id: 1,
+      pos: { x: center.x + opts.radius, y: center.y },
+      home: { x: 3500, y: 3500 },
+    });
+    const world = makeWorld({ ships: [shooter, target] });
+    const omega = shipTopSpeed(target) / opts.radius; // tangential top speed
+    const DT = 1 / 60;
+    const before = target.hull;
+    let theta = 0;
+    for (let t = 0; t < opts.ticks; t++) {
+      theta += omega * DT;
+      target.pos.x = center.x + opts.radius * Math.cos(theta);
+      target.pos.y = center.y + opts.radius * Math.sin(theta);
+      target.vel.x = -opts.radius * omega * Math.sin(theta);
+      target.vel.y = opts.radius * omega * Math.cos(theta);
+      opts.onTick(world, shooter, target);
+    }
+    return { dealt: before - target.hull, world, target };
+  }
+
+  const autoFire: Inputs = [{ id: 0, actions: [{ type: 'fire', active: true, auto: true }] }];
+  const perShot = shipWeaponDamage(makeShip({ id: 0 }));
+
+  it('auto-fire lands on the orbiter — the lead solve tracks the curve', () => {
+    const { dealt } = orbitDuel({ radius: 180, ticks: 300, onTick: (w) => step(w, autoFire) });
+    // Five seconds of a committed-range burst connects many times over — well
+    // clear of the "I can never hit him" the field report describes.
+    expect(dealt).toBeGreaterThan(perShot * 3);
+  });
+
+  it('beats the naive aim-where-it-is shot on the same orbit (the lead is what lands it)', () => {
+    // Baseline: perfect aim at where the target *is* each tick — face it, fire
+    // straight down the barrel, no lead — the exact naive shot that misses.
+    const { dealt: naive } = orbitDuel({
+      radius: 180,
+      ticks: 300,
+      onTick: (w, shooter, target) => {
+        shooter.angle = Math.atan2(target.pos.y - shooter.pos.y, target.pos.x - shooter.pos.x);
+        step(w, [{ id: 0, actions: [{ type: 'fire', active: true, auto: false }] }]);
+      },
+    });
+    const { dealt: lead } = orbitDuel({ radius: 180, ticks: 300, onTick: (w) => step(w, autoFire) });
+    expect(lead).toBeGreaterThan(naive);
+  });
+
+  it('leaves the manual path untouched — a manual shot flies straight down the barrel', () => {
+    // Manual aim stays the skill-ceiling option: the shot ignores target motion
+    // entirely and leaves along the ship's facing (no lead injected).
+    const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0.7 });
+    const mover = makeShip({ id: 1, pos: { x: 1000, y: 1200 }, vel: { x: 300, y: 0 } });
+    const world = makeWorld({ ships: [shooter, mover] });
+    step(world, [{ id: 0, actions: [{ type: 'fire', active: true, auto: false }] }]);
+    const shot = world.projectiles.find((p) => p.active && p.owner === 0)!;
+    // Velocity bearing equals the ship's facing, not any intercept of the mover.
+    expect(Math.atan2(shot.vel.y, shot.vel.x)).toBeCloseTo(0.7, 6);
+  });
+
+  it('is deterministic — the same orbit-fire scenario replays byte-identically', () => {
+    const digest = () => {
+      const { dealt, world } = orbitDuel({ radius: 180, ticks: 300, onTick: (w) => step(w, autoFire) });
+      const shots = world.projectiles
+        .filter((p) => p.active)
+        .map((p) => `${p.pos.x},${p.pos.y},${p.vel.x},${p.vel.y},${p.life}`)
+        .join('|');
+      return `${dealt}#${shots}`;
+    };
+    expect(digest()).toBe(digest());
+  });
+});
+
 // --- kind gating: ship shots besiege, turret shots do not ------------------
 
 describe('a ship shot besieges structures; a turret shot hits only ships', () => {

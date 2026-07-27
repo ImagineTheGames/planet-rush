@@ -60,6 +60,7 @@ import type {
   UpgradeSummaryPip,
 } from './upgrade-wheel';
 import { WheelToggle } from './wheel-toggle';
+import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
@@ -173,8 +174,6 @@ interface WedgeDraw {
   /** Draw the "opens a screen" arrow — UPGRADE SHIP on the Build wheel, and the
    *  WEAPON wedge on the upgrade wheel (both open a wheel behind them). */
   readonly arrow: boolean;
-  /** Draw the "go back" chevron (the weapon sub-wheel's BACK wedge). */
-  readonly back: boolean;
 }
 
 /** A weapon track's tiers as filled-vs-empty pip glyphs: `●●○` at tier 2 of 3.
@@ -209,12 +208,30 @@ export class BuildWheelView extends Container {
   private readonly buildWedges: WedgeNodes[] = [];
   private readonly buildHubOre: Text;
   private readonly buildHubLabel: Text;
+  /** The hub's BACK affordance (field report v0.2.4): an up-chevron + a word
+   *  (`CLOSE` at the top level) that a hub tap / ESC acts on. */
+  private readonly buildHubBackChevron = new Graphics();
+  private readonly buildHubBackLabel: Text;
+  /** The hub disc as a tap surface — sized to the hub ring each frame so the HUD
+   *  can register the BACK affordance thumb-sized (field report v0.2.4). Invisible
+   *  fill: the ring is already drawn by {@link drawRings}; this only carries the
+   *  bounds. */
+  private readonly buildHubHit = new Graphics();
 
   // --- Upgrade wheel -------------------------------------------------------
   private readonly upgradeRings = new Graphics();
   private readonly upgradeWedges: WedgeNodes[] = [];
   private readonly upgradeHubOre: Text;
   private readonly upgradeHubLabel: Text;
+  private readonly upgradeHubBackChevron = new Graphics();
+  private readonly upgradeHubBackLabel: Text;
+  private readonly upgradeHubHit = new Graphics();
+
+  /** Whether the last frame was a touch device — decides the hub BACK's key hint
+   *  (`· ESC` on PC only, field report v0.2.4 "ESC mirrors it … legend shows it").
+   *  Fed per frame by {@link update}; defaults to touch so an unwired caller shows
+   *  no dead desktop key. */
+  private isTouch = true;
 
   /** Outer ring radius in CSS px, recomputed on resize. */
   private radius = WHEEL_MIN_RADIUS;
@@ -232,12 +249,23 @@ export class BuildWheelView extends Container {
   constructor(screenWidth: number, screenHeight: number) {
     super();
 
-    // Build wheel hub: the live ore total (GDD §2.5) in signal yellow.
+    // Build wheel hub: the live ore total (GDD §2.5) in signal yellow, under the
+    // hub's BACK affordance (field report v0.2.4 — a tap on the hub goes up a
+    // level; here, the top level, that CLOSES the wheel).
     this.buildHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.buildHubOre.anchor.set(0.5, 0.5);
     this.buildHubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_DIM);
     this.buildHubLabel.anchor.set(0.5, 0);
-    this.buildGroup.addChild(this.buildRings, this.buildHubOre, this.buildHubLabel);
+    this.buildHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
+    this.buildHubBackLabel.anchor.set(0.5, 0);
+    this.buildGroup.addChild(
+      this.buildHubHit,
+      this.buildRings,
+      this.buildHubOre,
+      this.buildHubLabel,
+      this.buildHubBackChevron,
+      this.buildHubBackLabel,
+    );
 
     // Upgrade wheel hub: the same ore total (one purchase draws on the same ore),
     // labelled with the hull whose stats these are — the class is locked at the
@@ -246,7 +274,16 @@ export class BuildWheelView extends Container {
     this.upgradeHubOre.anchor.set(0.5, 0.5);
     this.upgradeHubLabel = makeText('', FONT_HEADING, 10, TEXT_DIM);
     this.upgradeHubLabel.anchor.set(0.5, 0);
-    this.upgradeGroup.addChild(this.upgradeRings, this.upgradeHubOre, this.upgradeHubLabel);
+    this.upgradeHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
+    this.upgradeHubBackLabel.anchor.set(0.5, 0);
+    this.upgradeGroup.addChild(
+      this.upgradeHubHit,
+      this.upgradeRings,
+      this.upgradeHubOre,
+      this.upgradeHubLabel,
+      this.upgradeHubBackChevron,
+      this.upgradeHubBackLabel,
+    );
 
     this.addChild(this.buildGroup, this.upgradeGroup);
     this.visible = false;
@@ -275,6 +312,16 @@ export class BuildWheelView extends Container {
     return this.upgradeGroup;
   }
 
+  /** The hub's BACK tap surface for the wheel currently on top — the disc at the
+   *  wheel's centre a hub tap / ESC acts on (field report v0.2.4), sized to the
+   *  hub ring so it registers thumb-sized. `null` when no wheel is up, so the HUD
+   *  registers it only while it is actually drawn. */
+  get hubBackNode(): Container | null {
+    if (!this.toggle.visible) return null;
+    const active = this.upgradeGroup.visible ? this.upgradeHubHit : this.buildHubHit;
+    return active.visible ? active : null;
+  }
+
   /**
    * Draw one frame.
    *
@@ -286,13 +333,18 @@ export class BuildWheelView extends Container {
    * @param feedback Per-wedge press/confirm motion (field report v0.2.2), sampled
    *                per wedge as it is drawn. Optional — omitted, every wedge draws
    *                neutral, exactly as before the press-feedback pass landed.
+   * @param isTouch Whether the active device is touch — decides the hub BACK's key
+   *                hint (`· ESC` on PC only, field report v0.2.4). Defaults to
+   *                touch, so an unwired caller never prints a dead desktop key.
    */
   update(
     wheel: BuildWheelModel,
     upgrade: UpgradeWheelModel,
     time: number,
     feedback?: PressFeedback,
+    isTouch = true,
   ): void {
+    this.isTouch = isTouch;
     const dt = this.lastTime < 0 ? 0 : Math.max(0, time - this.lastTime);
     this.lastTime = time;
 
@@ -356,9 +408,10 @@ export class BuildWheelView extends Container {
     this.hideWedgesFrom(this.buildWedges, model.segments.length);
 
     this.buildHubOre.text = `${model.ore}`;
-    this.buildHubOre.y = -4;
+    this.buildHubOre.y = 4;
     this.buildHubLabel.y = this.buildHubOre.y + 12;
     this.buildHubLabel.text = 'ORE';
+    this.drawHubBack(this.buildHubBackChevron, this.buildHubBackLabel, this.buildHubHit, hub, model.hubBack);
 
     // Capture what was drawn for the ?debug=1 repair-wedge live-stage seam: the
     // REAL second line each wedge rendered (repair's "+15 HP"/partial/reason),
@@ -392,10 +445,17 @@ export class BuildWheelView extends Container {
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
 
     this.upgradeHubOre.text = `${model.ore}`;
-    this.upgradeHubOre.y = -4;
+    this.upgradeHubOre.y = 4;
     this.upgradeHubLabel.y = this.upgradeHubOre.y + 12;
     // Name the hull whose stats these are — the class is the lobby choice.
     this.upgradeHubLabel.text = model.className;
+    this.drawHubBack(
+      this.upgradeHubBackChevron,
+      this.upgradeHubBackLabel,
+      this.upgradeHubHit,
+      hub,
+      model.hubBack,
+    );
 
     // Capture what was drawn for the ?debug=1 live-stage seam (a bought tier must
     // re-render here). Rebuilt from the model the view just drew from.
@@ -435,6 +495,39 @@ export class BuildWheelView extends Container {
   }
 
   // --- Shared wedge drawing (the field report's "same component family") ----
+
+  /**
+   * The hub's BACK affordance (field report v0.2.4) — an up-chevron above a word,
+   * at the top of the hub. The whole hub disc is the tap target (registered
+   * thumb-sized by the HUD), and ESC mirrors it on PC, so the word carries a `·
+   * ESC` hint on desktop ("the legend shows it"). `null` (a closed wheel) hides
+   * both nodes. The chevron points UP — "go up a level" — and is plasma, the same
+   * accent the forward arrows use, so backward/forward read as one language.
+   */
+  private drawHubBack(chevron: Graphics, label: Text, hit: Graphics, hub: number, hb: HubBack | null): void {
+    if (!hb) {
+      chevron.visible = false;
+      label.visible = false;
+      hit.visible = false;
+      return;
+    }
+    // The tap surface is the whole hub disc — thumb-sized (field report v0.2.4).
+    // Near-invisible: the visible ring is drawRings'; this only carries the bounds
+    // the HUD registers ({@link hubBackNode}).
+    hit.visible = true;
+    hit.clear();
+    hit.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.001 });
+    // CLOSE / BACK, plus the PC key that mirrors the hub tap (field report v0.2.4).
+    label.visible = true;
+    label.text = this.isTouch ? hb.label : `${hb.label} · ESC`;
+    label.y = -18;
+
+    chevron.visible = true;
+    chevron.clear();
+    // A small up-chevron centred over the label — "go up a level".
+    chevron.poly([-5, 3, 0, -3, 5, 3]).stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
+    chevron.y = -25;
+  }
 
   private drawRings(rings: Graphics, r: number, hub: number): void {
     // Backing disc + hub ring. Redrawn per frame: one Graphics, open for seconds.
@@ -522,15 +615,14 @@ export class BuildWheelView extends Container {
       nodes.cost.visible = false;
     }
 
-    // An "opens a screen" arrow points right (UPGRADE SHIP, WEAPON); the BACK
-    // chevron points left, off the label's leading edge — one node, two glyphs.
-    const showArrow = d.arrow || d.back;
-    nodes.arrow.visible = showArrow;
-    if (showArrow) {
+    // An "opens a screen" arrow points right (UPGRADE SHIP, WEAPON), off the
+    // label's trailing edge. (BACK is no longer a wedge — it lives on the hub,
+    // field report v0.2.4 — so a wedge only ever draws the forward arrow.)
+    nodes.arrow.visible = d.arrow;
+    if (d.arrow) {
       nodes.arrow.clear();
-      const glyph = d.back ? [8, -5, 0, 0, 8, 5] : [0, -5, 8, 0, 0, 5];
-      nodes.arrow.poly(glyph).fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
-      nodes.arrow.x = d.back ? -(nodes.label.width / 2 + 18) : nodes.label.width / 2 + 10;
+      nodes.arrow.poly([0, -5, 8, 0, 0, 5]).fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
+      nodes.arrow.x = nodes.label.width / 2 + 10;
       nodes.arrow.y = -9;
     }
   }
@@ -596,14 +688,14 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
     ready: wedgeReady(seg.state),
     costReady: seg.state === 'ready',
     arrow: seg.opensPanel,
-    back: false,
   };
 }
 
 /** An Upgrade-wheel wedge. A `track` wedge carries its current → next stat value
  *  (GDD §2.5 — the one screen a stat value ever shows): `10 → 13`, or `MAX` on a
  *  finished ladder. The WEAPON wedge carries its tier pips and an arrow (it opens
- *  the sub-wheel); the BACK wedge carries a go-back chevron. */
+ *  the sub-wheel). BACK is not a wedge any more — it lives on the hub (field
+ *  report v0.2.4). */
 function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
   if (wedge.kind === 'weapon') {
     // The pips ARE the second line — the main wheel says the weapon tiers at a
@@ -618,19 +710,6 @@ function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
       ready: wedgeReady(wedge.state),
       costReady: false,
       arrow: true,
-      back: false,
-    };
-  }
-  if (wedge.kind === 'back') {
-    return {
-      angle: wedge.angle,
-      label: wedge.label,
-      sub: 'TO SHIP',
-      cost: null,
-      ready: wedgeReady(wedge.state),
-      costReady: false,
-      arrow: false,
-      back: true,
     };
   }
   const sub = wedge.state === 'maxed' ? `${wedge.current} · MAX` : `${wedge.current} → ${wedge.next}`;
@@ -642,7 +721,6 @@ function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
     ready: wedgeReady(wedge.state),
     costReady: wedge.state === 'ready',
     arrow: false,
-    back: false,
   };
 }
 

@@ -246,23 +246,37 @@ describe('deposited ore funds the Build wheel', () => {
 // --- the ore-flight couriers ----------------------------------------------
 
 describe('ore-flight couriers', () => {
-  it('spawns deposit couriers headed for the planet while draining', () => {
-    const { world, ship } = stagedAtHome(2);
+  it('spawns exactly one courier per whole unit banked, each headed for the planet (conserved)', () => {
+    const { world, ship } = stagedAtHome(3);
     const planet = planetOf(world, 0)!;
+    const held = ship.cargo; // three whole ore to deposit
 
-    // One flight cadence's worth of ticks guarantees at least one courier.
-    const cadence = Math.max(1, Math.round(DEPOSIT.flightInterval / TICK_DT));
-    for (let i = 0; i <= cadence; i++) step(world, []);
-
-    const couriers = world.chunks.filter((c) => c.deposit);
-    expect(couriers.length).toBeGreaterThan(0);
-    for (const c of couriers) {
-      expect(c.homeTo).toEqual({ x: planet.pos.x, y: planet.pos.y });
+    // Couriers are absorbed mid-drain, so count DISTINCT spawns by id (the live
+    // count is only ever ~1 at a time). Field report p8: the flight must total the
+    // ore that actually moved — one sprite per whole unit banked, not the old
+    // rate-based time cadence that spawned ~3 couriers per ore ("more ore flying
+    // than you hold"). The spawner is now keyed to the hold's integer boundaries.
+    const seen = new Set<number>();
+    let firstHeadingTowardPlanet = 0;
+    for (let i = 0; i < 300; i++) {
+      step(world, []);
+      for (const c of world.chunks) {
+        if (!c.deposit || seen.has(c.id)) continue;
+        seen.add(c.id);
+        // Every courier is a straight line into this planet's centre.
+        expect(c.homeTo).toEqual({ x: planet.pos.x, y: planet.pos.y });
+        if (seen.size === 1) {
+          // A courier starts at the hull and heads inward toward the planet centre.
+          firstHeadingTowardPlanet =
+            (planet.pos.x - ship.pos.x) * c.vel.x + (planet.pos.y - ship.pos.y) * c.vel.y;
+        }
+      }
     }
-    // A courier starts at the hull and heads inward toward the planet centre.
-    const c0 = couriers[0]!;
-    const towardPlanet = (planet.pos.x - ship.pos.x) * c0.vel.x + (planet.pos.y - ship.pos.y) * c0.vel.y;
-    expect(towardPlanet).toBeGreaterThan(0);
+
+    expect(ship.cargo).toBe(0);
+    // Exactly one courier per whole ore banked — off-by-anything is visible here.
+    expect(seen.size).toBe(held);
+    expect(firstHeadingTowardPlanet).toBeGreaterThan(0);
   });
 
   it('couriers are absorbed at the planet and swept — none outlive the drain', () => {
