@@ -541,8 +541,22 @@ export interface MatchState {
    */
   eliminated: PlayerId[];
   /** The winning slot once `phase === 'ended'`; null until then, and null in the
-   *  degenerate case where a match had nobody to win it. */
+   *  degenerate case where a match had nobody to win it. In TEAMS this is a
+   *  *representative* survivor of the winning team (a real `PlayerId`), so every
+   *  existing consumer that reads `winner === you` keeps working for the slot
+   *  that actually held a core; {@link winningTeam} is the team-level answer. */
   winner: PlayerId | null;
+  /**
+   * The winning **team** once `phase === 'ended'` — the team that owns the last
+   * surviving core(s) (Task D1, TEAMS). In FFA (teams-of-one) it equals `winner`.
+   * Null until the match ends, and null in the degenerate no-winner case.
+   *
+   * Optional, the same backward-compatible discipline as `Ship.team`/`derelict`:
+   * the many hand-built `MatchState` literals other lanes construct (art/vfx, ui,
+   * net/bot fixtures) keep compiling, and a foreign match with no `winningTeam`
+   * reads as "unset". Static result data — never on the per-tick snapshot.
+   */
+  winningTeam?: number | null;
   /** Sim time the match ended, or -1 while it runs. */
   endTime: number;
 }
@@ -783,6 +797,7 @@ function initialMatch(): MatchState {
     collapseTime: -1,
     eliminated: [],
     winner: null,
+    winningTeam: null,
     endTime: -1,
   };
 }

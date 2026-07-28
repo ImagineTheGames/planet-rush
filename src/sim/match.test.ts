@@ -82,6 +82,7 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
     firing: over.firing ?? false,
+    ...(over.team !== undefined ? { team: over.team } : {}),
   };
 }
 
@@ -102,6 +103,7 @@ function makeStation(over: Partial<MiningStation> & Pick<MiningStation, 'id' | '
     turrets: over.turrets ?? [],
     shields: over.shields ?? [],
     builds: over.builds ?? [],
+    ...(over.team !== undefined ? { team: over.team } : {}),
   };
 }
 
@@ -112,6 +114,7 @@ function makeMatch(over: Partial<MatchState> = {}): MatchState {
     collapseTime: over.collapseTime ?? -1,
     eliminated: over.eliminated ?? [],
     winner: over.winner ?? null,
+    winningTeam: over.winningTeam ?? null,
     endTime: over.endTime ?? -1,
   };
 }
@@ -229,6 +232,106 @@ describe('win/loss (GDD §1)', () => {
     for (let t = 0; t < 120; t++) step(world, []);
     expect(world.match.phase).toBe('live');
     expect(world.match.winner).toBeNull();
+  });
+});
+
+// --- 1b. TEAMS: last TEAM standing wins (GDD §1, Task D1) -------------------
+
+describe('team victory (GDD §1, Task D1)', () => {
+  /** A 2v2: slots 0,1 on team 0; slots 2,3 on team 1. Homes spread out so no
+   *  fixture ever drifts into a wall. */
+  function twoVTwo() {
+    return makeWorld({
+      ships: [
+        makeShip({ id: 0, team: 0 }),
+        makeShip({ id: 1, team: 0 }),
+        makeShip({ id: 2, team: 1 }),
+        makeShip({ id: 3, team: 1 }),
+      ],
+      stations: [
+        makeStation({ id: 0, owner: 0, team: 0, pos: at(-600, -600) }),
+        makeStation({ id: 1, owner: 1, team: 0, pos: at(-600, 600) }),
+        makeStation({ id: 2, owner: 2, team: 1, pos: at(600, -600) }),
+        makeStation({ id: 3, owner: 3, team: 1, pos: at(600, 600) }),
+      ],
+    });
+  }
+
+  it('a team wins the instant the other side loses its last core — while still holding two homes', () => {
+    const world = twoVTwo();
+
+    // Team 1 loses one home: still in the fight, its ally's core stands.
+    damageStation(world, world.stations[2]!, CORE_HP);
+    step(world, []);
+    expect(world.match.phase).toBe('live');
+    expect(world.match.winner).toBeNull();
+    expect(world.match.winningTeam).toBeNull();
+
+    // Team 1's second core falls: team 0 wins, though BOTH its homes still stand.
+    damageStation(world, world.stations[3]!, CORE_HP);
+    step(world, []);
+    expect(world.match.phase).toBe('ended');
+    expect(world.match.winningTeam).toBe(0);
+    // `winner` is a real survivor of the winning team (a slot that held a core).
+    expect([0, 1]).toContain(world.match.winner);
+    expect(world.stations[0]!.alive).toBe(true);
+    expect(world.stations[1]!.alive).toBe(true);
+  });
+
+  it('an ally still holding a core keeps a team alive after one home falls', () => {
+    const world = twoVTwo();
+
+    // One home from each team dies: two teams still have a core, match runs on.
+    damageStation(world, world.stations[1]!, CORE_HP); // team 0
+    damageStation(world, world.stations[2]!, CORE_HP); // team 1
+    step(world, []);
+    expect(world.match.phase).toBe('live');
+    expect(world.match.winner).toBeNull();
+  });
+
+  it('when the last cores of both teams die in one tick, the last TEAM to die wins', () => {
+    const world = twoVTwo();
+
+    // Order: team 1 out first (2,3), then team 0 (0,1) — team 0's core dies last.
+    damageStation(world, world.stations[2]!, CORE_HP);
+    damageStation(world, world.stations[3]!, CORE_HP);
+    damageStation(world, world.stations[0]!, CORE_HP);
+    damageStation(world, world.stations[1]!, CORE_HP);
+    step(world, []);
+
+    expect(world.match.eliminated).toEqual([2, 3, 0, 1]);
+    expect(world.match.phase).toBe('ended');
+    expect(world.match.winningTeam).toBe(0);
+    expect(world.match.winner).toBe(1);
+  });
+
+  it('reversing the death order hands the tie to the other team', () => {
+    const world = twoVTwo();
+
+    damageStation(world, world.stations[0]!, CORE_HP);
+    damageStation(world, world.stations[1]!, CORE_HP);
+    damageStation(world, world.stations[2]!, CORE_HP);
+    damageStation(world, world.stations[3]!, CORE_HP);
+    step(world, []);
+
+    expect(world.match.eliminated).toEqual([0, 1, 2, 3]);
+    expect(world.match.winningTeam).toBe(1);
+    expect(world.match.winner).toBe(3);
+  });
+
+  it('FFA sets winningTeam to the winner (teams-of-one)', () => {
+    const world = makeWorld({
+      ships: [makeShip({ id: 0 }), makeShip({ id: 1 })],
+      stations: [
+        makeStation({ id: 0, owner: 0, pos: at(-400, 0) }),
+        makeStation({ id: 1, owner: 1, pos: at(400, 0) }),
+      ],
+    });
+
+    damageStation(world, world.stations[0]!, CORE_HP);
+    step(world, []);
+    expect(world.match.winner).toBe(1);
+    expect(world.match.winningTeam).toBe(1);
   });
 });
 
