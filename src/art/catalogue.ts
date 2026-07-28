@@ -21,14 +21,14 @@ import {
   atmosphereHaloSprite,
   beaconRingSprite,
   damageRingSprite,
-  planetSprite,
-  planetVariantNote,
+  stationSprite,
+  stationVariantNote,
   repairAuraSprite,
-  PLANET_VARIANT_COUNT,
-} from './planets';
+  STATION_VARIANT_COUNT,
+} from './stations';
 import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
 import type { SpriteDef } from './shapes';
-import { debrisFieldSprite, planetWreckSprite } from './wrecks';
+import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
 import { SHOT_FAMILIES, SHOT_TIERS, shotSprite } from './vfx/shots';
 
@@ -75,21 +75,21 @@ function entries(): CatalogueEntry[] {
     out.push({ group: 'Ships — states', label: `${c} hulk`, def: shipHulkSprite(c) });
   }
 
-  // --- Planets --------------------------------------------------------------
-  for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-    out.push({ group: 'Planets — four variants', label: `v${v}: ${planetVariantNote(v)}`, def: planetSprite(v) });
+  // --- Stations --------------------------------------------------------------
+  for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+    out.push({ group: 'Stations — four variants', label: `v${v}: ${stationVariantNote(v)}`, def: stationSprite(v) });
   }
   for (const slot of ALL_SLOTS) {
-    out.push({ group: 'Planets — ownership beacons', label: `P${slot + 1}`, def: beaconRingSprite(slot) });
+    out.push({ group: 'Stations — ownership beacons', label: `P${slot + 1}`, def: beaconRingSprite(slot) });
   }
   for (const slot of ALL_SLOTS) {
-    out.push({ group: 'Planets — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
+    out.push({ group: 'Stations — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
   }
   for (const f of [1, 0.75, 0.5, 0.25, 0]) {
     // Owner-colour base, red filling as HP is lost (p11) — P1's colour here.
-    out.push({ group: 'Planets — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(0, f) });
+    out.push({ group: 'Stations — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(0, f) });
   }
-  out.push({ group: 'Planets — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
+  out.push({ group: 'Stations — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
 
   // --- Asteroids: the ratified pool (docs/art-direction §5.5) ----------------
   // Every one of the six by name, across its three crack stages, and rich-vs-poor
@@ -143,8 +143,8 @@ function entries(): CatalogueEntry[] {
   }
 
   // --- Wrecks ---------------------------------------------------------------
-  for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-    out.push({ group: 'Wrecks — the quiet', label: `wreck v${v}`, def: planetWreckSprite(v) });
+  for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+    out.push({ group: 'Wrecks — the quiet', label: `wreck v${v}`, def: stationWreckSprite(v) });
   }
   for (const seed of [0, 4]) {
     out.push({ group: 'Wrecks — the quiet', label: `debris ${seed}`, def: debrisFieldSprite(seed) });

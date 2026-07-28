@@ -3,7 +3,7 @@
  * (GDD §2.1 match setup; §5 the picker labels the maps; map registry m8-01).
  *
  * The player picks the arena before a match: four cards, each a **mini layout
- * preview drawn from the registry's own planet positions** — never a hand-drawn
+ * preview drawn from the registry's own station positions** — never a hand-drawn
  * thumbnail, which could drift from the real board (m8-02 brief). `octagon`
  * ("The Ring") is preselected as the fair default; `diamond` ("Double Diamond")
  * carries a small VETERAN tag.
@@ -15,7 +15,7 @@
  * view that draws exactly what this returns. Nothing here imports PixiJS.
  *
  * The one rule this file keeps: **the preview cannot lie.** Every card's dots are
- * `map.planets(...)` normalised into the card box, so the picture a player reads
+ * `map.stations(...)` normalised into the card box, so the picture a player reads
  * is the board the sim will build — a new map is a registry entry and its preview
  * follows for free (`../sim/maps` MapDef). The chosen id is fed to
  * `bootOfflineMatch(seed, mapId)` and persisted like the fire-mode key, so a
@@ -58,9 +58,9 @@ export const MAP_PREVIEW_SLOTS = 8;
 
 /**
  * The seed a preview (and the registry-position readout) is computed with. The
- * four shipped maps place their planets by pure geometry and ignore the seed
+ * four shipped maps place their stations by pure geometry and ignore the seed
  * (`../sim/maps`), so any fixed value draws the same board the seeded match does —
- * which is what lets a test compare a booted world's planets to this readout.
+ * which is what lets a test compare a booted world's stations to this readout.
  */
 export const MAP_PREVIEW_SEED = 0;
 
@@ -70,15 +70,15 @@ export const MAP_PREVIEW_SEED = 0;
 
 /**
  * A map's layout, reduced to what a preview needs: the arena's aspect ratio and
- * each home planet's centre **normalised into `[0,1]×[0,1]`** within the arena
+ * each home station's centre **normalised into `[0,1]×[0,1]`** within the arena
  * box. The view letterboxes this into a card so a wide arena (oval/diamond) reads
  * as wide and a square one (octagon/compass) reads as square.
  */
 export interface MapPreview {
   /** Arena width ÷ height — the box the dots are placed in. */
   readonly aspect: number;
-  /** Home planet centres, normalised to the arena box. In slot order. */
-  readonly planets: readonly Vec2[];
+  /** Home station centres, normalised to the arena box. In slot order. */
+  readonly stations: readonly Vec2[];
 }
 
 /** One card, as the view draws it: words and a preview, and whether it is chosen.
@@ -91,7 +91,7 @@ export interface MapCardModel {
   readonly veteran: boolean;
   /** Drawn as the selected card (plasma border). Exactly one is true. */
   readonly selected: boolean;
-  /** The mini layout, from the registry's real planet positions. */
+  /** The mini layout, from the registry's real station positions. */
   readonly preview: MapPreview;
 }
 
@@ -127,28 +127,28 @@ export function mapIdAt(index: number): string {
 }
 
 /**
- * The registry's home planet centres for a map, in **world units**, slot order.
- * Drawn from `map.planets(seed, count, bounds)` on the map's own bounds — the
+ * The registry's home station centres for a map, in **world units**, slot order.
+ * Drawn from `map.stations(seed, count, bounds)` on the map's own bounds — the
  * exact call `createWorld` makes offline — so this is the board a booted match
  * builds, readable without a sim. The live-stage spec compares a real world's
- * planets to this (m8-02 brief: "planet positions match that registry entry
+ * stations to this (m8-02 brief: "station positions match that registry entry
  * exactly").
  */
-export function registryPlanets(id: string, count = MAP_PREVIEW_SLOTS): Vec2[] {
+export function registryStations(id: string, count = MAP_PREVIEW_SLOTS): Vec2[] {
   const map = getMap(id);
-  return map.planets(MAP_PREVIEW_SEED, count, map.bounds).map((p) => ({ x: p.planet.x, y: p.planet.y }));
+  return map.stations(MAP_PREVIEW_SEED, count, map.bounds).map((p) => ({ x: p.station.x, y: p.station.y }));
 }
 
-/** The mini layout for a card — normalised planet dots + arena aspect, from the
+/** The mini layout for a card — normalised station dots + arena aspect, from the
  *  registry itself so the picture can never drift from the board. */
 export function mapPreview(map: MapDef): MapPreview {
   const bounds = map.bounds;
-  const placements = map.planets(MAP_PREVIEW_SEED, MAP_PREVIEW_SLOTS, bounds);
-  const planets = placements.map((p) => ({
-    x: bounds.width > 0 ? p.planet.x / bounds.width : 0.5,
-    y: bounds.height > 0 ? p.planet.y / bounds.height : 0.5,
+  const placements = map.stations(MAP_PREVIEW_SEED, MAP_PREVIEW_SLOTS, bounds);
+  const stations = placements.map((p) => ({
+    x: bounds.width > 0 ? p.station.x / bounds.width : 0.5,
+    y: bounds.height > 0 ? p.station.y / bounds.height : 0.5,
   }));
-  return { aspect: bounds.height > 0 ? bounds.width / bounds.height : 1, planets };
+  return { aspect: bounds.height > 0 ? bounds.width / bounds.height : 1, stations };
 }
 
 /** Build the frame model for a given selection. Pure: the view draws exactly this

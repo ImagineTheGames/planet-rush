@@ -24,12 +24,12 @@ import {
   shipTopSpeed,
   step,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Ship,
   type Turret,
   type World,
 } from './index';
-import { CORE_HP, PLANET, SHIELD, SHIP_RADIUS, SHIP_WEAPON, TURRET } from './constants';
+import { CORE_HP, STATION, SHIELD, SHIP_RADIUS, SHIP_WEAPON, TURRET } from './constants';
 import {
   maxTier,
   shipCargoCap,
@@ -84,12 +84,12 @@ function makeTurret(over: Partial<Turret> & Pick<Turret, 'id' | 'owner'>): Turre
   };
 }
 
-function makePlanet(over: Partial<Planet> & Pick<Planet, 'id' | 'owner' | 'pos'>): Planet {
+function makeStation(over: Partial<MiningStation> & Pick<MiningStation, 'id' | 'owner' | 'pos'>): MiningStation {
   return {
     id: over.id,
     owner: over.owner,
     pos: over.pos,
-    radius: over.radius ?? PLANET.radius,
+    radius: over.radius ?? STATION.radius,
     coreHp: over.coreHp ?? CORE_HP,
     maxCoreHp: over.maxCoreHp ?? CORE_HP,
     alive: over.alive ?? true,
@@ -113,7 +113,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -236,7 +236,7 @@ describe('lead aiming (auto-aim + bots) hits a mover the naive shot misses', () 
 
 // --- field report v0.2.4: the player's auto-aim leads an ORBITER ------------
 //
-// "Same issue with my auto targeting… if an enemy is orbiting around my planet I
+// "Same issue with my auto targeting… if an enemy is orbiting around my station I
 // can never hit him." An orbit is the hardest case for a *linear* intercept: the
 // target's velocity direction turns every tick, so a lead solved this frame is
 // already stale by impact. The design's answer is not a fancier solver but a
@@ -248,7 +248,7 @@ describe('lead aiming (auto-aim + bots) hits a mover the naive shot misses', () 
 // path (once its scheme maps to Auto-aim), so it inherits the lead with no
 // solver of its own.
 
-describe("player auto-aim leads an enemy orbiting the player's planet (field report v0.2.4)", () => {
+describe("player auto-aim leads an enemy orbiting the player's station (field report v0.2.4)", () => {
   /** Run a shooter (id 0) at the arena centre against an enemy (id 1) driven at
    *  top speed around a `radius`-circle for `ticks`, calling `onTick` to act each
    *  frame. Returns the damage the shooter dealt and the final world for
@@ -338,8 +338,8 @@ describe('a ship shot besieges structures; a turret shot hits only ships', () =>
   it('a ship weapon shot damages an enemy turret and core', () => {
     const shooter = makeShip({ id: 0, pos: { x: 1000, y: 1000 }, angle: 0 });
     const turret = makeTurret({ id: 5, owner: 1, pos: { x: 1120, y: 1000 } });
-    const planet = makePlanet({ id: 0, owner: 1, pos: { x: 1400, y: 1000 }, turrets: [turret] });
-    const world = makeWorld({ ships: [shooter], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 1, pos: { x: 1400, y: 1000 }, turrets: [turret] });
+    const world = makeWorld({ ships: [shooter], stations: [station] });
 
     // One shot at the turret (nearest structure ahead).
     fireShipProjectile(world, shooter, normalize({ x: 1, y: 0 }));
@@ -349,18 +349,18 @@ describe('a ship shot besieges structures; a turret shot hits only ships', () =>
 
   it('a turret shot flying through an enemy structure leaves it intact (only ships, p1-14)', () => {
     const enemyTurret = makeTurret({ id: 5, owner: 2, pos: { x: 1200, y: 1000 } });
-    const planet = makePlanet({ id: 0, owner: 2, pos: { x: 1400, y: 1000 }, turrets: [enemyTurret] });
+    const station = makeStation({ id: 0, owner: 2, pos: { x: 1400, y: 1000 }, turrets: [enemyTurret] });
     // A turret owned by player 1 looses a shot straight at player 2's turret.
     const shooter = makeTurret({ id: 9, owner: 1, pos: { x: 1000, y: 1000 } });
-    const world = makeWorld({ planets: [planet] });
+    const world = makeWorld({ stations: [station] });
 
     fireTurretProjectile(world, shooter, 0); // bearing +x, toward the enemy turret
-    const beforeCore = planet.coreHp;
+    const beforeCore = station.coreHp;
     for (let t = 0; t < 40; t++) step(world, []);
 
     // The turret shot passed over the structure — turret shots hit ships only.
     expect(enemyTurret.hp).toBe(TURRET.hp);
-    expect(planet.coreHp).toBe(beforeCore);
+    expect(station.coreHp).toBe(beforeCore);
   });
 });
 

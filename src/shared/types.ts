@@ -169,7 +169,7 @@ export interface FireAction {
   auto: boolean;
 }
 
-/** Open the Build & Upgrade wheel at the player's own planet (GDD §2.5). */
+/** Open the Build & Upgrade wheel at the player's own station (GDD §2.5). */
 export interface BuildAction {
   type: 'build';
   active: boolean;
@@ -201,7 +201,7 @@ export type BuildItem = 'turret' | 'shield' | 'repair' | 'bank';
  *
  * Bots issue it through the same action interface a human uses (GDD §2.9), and
  * the simulation validates it: it never trusts the sender for ownership,
- * proximity, cost, or per-planet caps.
+ * proximity, cost, or per-station caps.
  */
 export interface BuildOrderAction {
   type: 'buildOrder';
@@ -215,7 +215,7 @@ export interface BuildOrderAction {
  * A sibling of {@link BuildOrderAction} and one-shot for the same reason: it is
  * acted on for the tick it appears in and never held, so a row press can never
  * double-charge by being latched. The simulation validates it exactly as it
- * validates a wheel order — own planet, docked, alive, affordable, not already
+ * validates a wheel order — own station, docked, alive, affordable, not already
  * at max tier — and never trusts the sender for any of it (GDD §2.9).
  *
  * There is no "sell" and no tier argument: a tier is bought one step at a time,

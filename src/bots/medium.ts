@@ -14,7 +14,7 @@
  *    information printed on every HUD (GDD §2.2), and is already at the centre
  *    when the next wave lands. Every wave spawns closer to the middle than the
  *    last (GDD §2.3), so being early is a real edge and needs no map knowledge.
- *  - **gangs up on the current leader** — `leaderPlanet` (`./targeting`) picks
+ *  - **gangs up on the current leader** — `leaderStation` (`./targeting`) picks
  *    the strongest rival *from what this bot has scouted*, which is a guess, and
  *    is meant to be: "a global HP scoreboard would let everyone free-ride on
  *    every attack; fog makes third-party awareness a skill" (GDD §2.2). Several
@@ -51,10 +51,10 @@ import {
   bestRock,
   homeIntruder,
   isWounded,
-  leaderPlanet,
+  leaderStation,
   nearestEnemy,
   nearestLivingRival,
-  scorePlanet,
+  scoreStation,
   scoreShip,
 } from './targeting';
 import type { TargetScore } from './targeting';
@@ -79,24 +79,24 @@ export const WAVE_CONTEST_LEAD = 14;
  * stock ship, and nothing left to mine (GDD §2.6).
  */
 export function mediumSpendPlan(ctx: BotCtx): Purchase | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
+  const station = ctx.self.station;
+  if (!station) return null;
   const spendable = ctx.self.spendable;
 
   if (
     !ctx.view.collapsed &&
-    !planet.repairing &&
-    !planet.underAttack &&
-    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, MEDIUM_REPAIR_AT) &&
+    !station.repairing &&
+    !station.underAttack &&
+    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, MEDIUM_REPAIR_AT) &&
     spendable >= 2
   ) {
     return order('repair');
   }
 
-  if (planet.turrets + planet.builds < MEDIUM_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
+  if (station.turrets + station.builds < MEDIUM_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
   if (
-    planet.turrets >= 1 &&
-    planet.shields + planet.builds < MEDIUM_SHIELD_TARGET &&
+    station.turrets >= 1 &&
+    station.shields + station.builds < MEDIUM_SHIELD_TARGET &&
     spendable >= SHIELD.cost
   ) {
     return order('shield');
@@ -132,9 +132,9 @@ export const MEDIUM_UPGRADE_ORDER: readonly UpgradeTrack[] = [
  * back to the field will guess wrong — and that is the design (GDD §2.2).
  */
 export function mediumTarget(ctx: BotCtx): TargetScore | null {
-  const leader = leaderPlanet(ctx);
+  const leader = leaderStation(ctx);
   if (leader && leader.distance - leader.radius <= ctx.view.perception.visualRange) {
-    const scored = scorePlanet(ctx, leader);
+    const scored = scoreStation(ctx, leader);
     if (scored.score > 0) return scored;
   }
   const enemy = nearestEnemy(ctx);
@@ -171,9 +171,9 @@ export const mediumTree: Node = selector('medium', [
   when(
     'defend',
     (ctx) => {
-      const planet = ctx.self.planet;
-      if (!planet || !planet.alive || ctx.view.collapsed) return false;
-      return planet.underAttack || homeIntruder(ctx) !== null;
+      const station = ctx.self.station;
+      if (!station || !station.alive || ctx.view.collapsed) return false;
+      return station.underAttack || homeIntruder(ctx) !== null;
     },
     (ctx) => defendHome(ctx),
   ),

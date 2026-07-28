@@ -117,7 +117,7 @@ function emptyWorld(ships: Ship[]): World {
     ships,
     asteroids: [],
     chunks: [],
-    planets: [],
+    stations: [],
     projectiles: [],
     bounds: { width: 4000, height: 4000 },
     fieldRadius: 600,

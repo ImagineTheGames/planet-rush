@@ -1,7 +1,7 @@
 /**
- * src/art/planets.ts — home worlds, generated. OWNER: Art & Audio Agent.
+ * src/art/stations.ts — home worlds, generated. OWNER: Art & Audio Agent.
  *
- * Style-guide §5, and the rules are tight because a planet is the one thing in
+ * Style-guide §5, and the rules are tight because a station is the one thing in
  * the match that does not respawn (GDD §2.7):
  *
  *  - **Oceans steel-blue, continents patina-green** — "Earth" stays inside the
@@ -14,7 +14,7 @@
  *    variants are four seeds through one generator, not four hand-drawn worlds.
  *  - **Ownership is a beacon ring** in the player's colour, always visible.
  *  - **Health is a damage ring**, drawn only inside sensor range (GDD §2.2) —
- *    enemy planet HP is scouted, never broadcast, and this file gives the
+ *    enemy station HP is scouted, never broadcast, and this file gives the
  *    renderer no way to draw a ring it wasn't asked for.
  *
  * Continents come from the ratified `mulberry32` (`@shared/types`) seeded by
@@ -23,7 +23,7 @@
  */
 
 import { mulberry32 } from '@shared/types';
-import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
+import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { DERIVED, PALETTE, playerColor } from './palette';
 import { ringDamageShapes } from './rings';
 import {
@@ -42,15 +42,15 @@ import {
 } from './shapes';
 
 /** How many home-world looks exist (style-guide §5). Randomised per player. */
-export const PLANET_VARIANT_COUNT = 4;
+export const STATION_VARIANT_COUNT = 4;
 
 /** Per-variant arrangement: the only thing that differs between worlds. */
 interface VariantSpec {
   /** Landmass count. */
   readonly continents: number;
-  /** Base landmass radius, as a fraction of the planet radius. */
+  /** Base landmass radius, as a fraction of the station radius. */
   readonly landRadius: number;
-  /** How far a landmass centre may sit from the planet centre. */
+  /** How far a landmass centre may sit from the station centre. */
   readonly spread: number;
   /** Human-readable, for the preview sheet and failing-test messages. */
   readonly note: string;
@@ -64,13 +64,13 @@ const VARIANTS: readonly VariantSpec[] = [
 ];
 
 /** The variant a player's home world uses. Wraps, so any slot is safe. */
-export function planetVariantFor(playerId: number): number {
+export function stationVariantFor(playerId: number): number {
   const n = Math.trunc(playerId);
-  return ((n % PLANET_VARIANT_COUNT) + PLANET_VARIANT_COUNT) % PLANET_VARIANT_COUNT;
+  return ((n % STATION_VARIANT_COUNT) + STATION_VARIANT_COUNT) % STATION_VARIANT_COUNT;
 }
 
 /** The one-line description of a variant's arrangement. */
-export function planetVariantNote(variant: number): string {
+export function stationVariantNote(variant: number): string {
   return VARIANTS[variant % VARIANTS.length]!.note;
 }
 
@@ -133,8 +133,8 @@ export function continentPolygons(variant: number): number[][] {
  * the signal-yellow core at the centre. No ownership and no health — those are
  * separate rings (below) so the renderer can obey the fog rule (GDD §2.2).
  */
-export function planetSprite(variant: number): SpriteDef {
-  const v = variant % PLANET_VARIANT_COUNT;
+export function stationSprite(variant: number): SpriteDef {
+  const v = variant % STATION_VARIANT_COUNT;
   const shapes: Shape[] = [
     // Ocean.
     circle(0, 0, 1, fill(DERIVED.oceanSteel, 'material')),
@@ -159,12 +159,12 @@ export function planetSprite(variant: number): SpriteDef {
     circle(0, 0, 0.22, fill(PALETTE.signalYellow, 'core')),
     circle(0, 0, 0.11, fill(DERIVED.coreHot, 'core')),
   ];
-  return sprite(`planet/v${v}`, 1, shapes);
+  return sprite(`station/v${v}`, 1, shapes);
 }
 
 /**
  * The ownership beacon (style-guide §5): a ring in the player's colour outside
- * the planet's limb, **always visible**. Four gaps make it read as a beacon
+ * the station's limb, **always visible**. Four gaps make it read as a beacon
  * rather than an outline, and give it a shape a colourblind player can still
  * pick out next to a neighbouring slot's ring.
  */
@@ -181,7 +181,7 @@ export function beaconRingSprite(playerId: number): SpriteDef {
     const a = i * (Math.PI / 2);
     shapes.push(circle(round(Math.cos(a) * 1.125), round(Math.sin(a) * 1.125), 0.05, fill(color, 'identity')));
   }
-  return sprite(`planet/beacon/p${playerId}`, 1.2, shapes);
+  return sprite(`station/beacon/p${playerId}`, 1.2, shapes);
 }
 
 /**
@@ -204,7 +204,7 @@ export function damageRingSprite(playerId: number, fraction: number): SpriteDef 
   // defeat the texture pool (GDD §4.3), and no player reads finer than that.
   const step = Math.round(f * 20) / 20;
   const shapes = ringDamageShapes({ playerId, lost: 1 - step, outer: 1.06, inner: 0.98 });
-  return sprite(`planet/damage/p${playerId}/${Math.round(step * 100)}`, 1.1, shapes);
+  return sprite(`station/damage/p${playerId}/${Math.round(step * 100)}`, 1.1, shapes);
 }
 
 /**
@@ -213,7 +213,7 @@ export function damageRingSprite(playerId: number, fraction: number): SpriteDef 
  * contract (style-guide §1, "corrosion, continents, **the repair channel**").
  */
 export function repairAuraSprite(): SpriteDef {
-  return sprite('planet/repair-aura', 1.1, [
+  return sprite('station/repair-aura', 1.1, [
     circle(0, 0, 1.04, fill(PALETTE.patina, 'material', 0.14)),
     poly(annulusPoints(0, 0, 1.04, 0.96, 0, Math.PI * 2, 40), fill(PALETTE.patina, 'material', 0.5)),
     ...[0, 1, 2].map((i) =>
@@ -230,31 +230,31 @@ export function repairAuraSprite(): SpriteDef {
 // ---------------------------------------------------------------------------
 
 /**
- * The halo's outer edge, in **unit space** (planet radius = 1) — derived from
+ * The halo's outer edge, in **unit space** (station radius = 1) — derived from
  * the sim's `DEPOSIT_RANGE` and nothing else, so the air the player sees and the
  * radius the rule uses are one number. The renderer draws the sprite scaled by
- * the planet radius (`spriteGraphics(def, planet.radius)`), which lands this edge
+ * the station radius (`spriteGraphics(def, station.radius)`), which lands this edge
  * on exactly `DEPOSIT_RANGE` world units; `generators.test.ts` asserts the
  * product, and the `DEPOSIT_RANGE` doc-comment (sim) promises the same. Change
  * the sim constant and the halo follows — the two can never drift apart.
  *
- * `PLANET.radius` is the same unit the sim measures `DEPOSIT_RANGE` in (both are
+ * `STATION.radius` is the same unit the sim measures `DEPOSIT_RANGE` in (both are
  * centre-to-centre world units), so the ratio is exact for a home world.
  */
-export const ATMOSPHERE_HALO_RADIUS = DEPOSIT_RANGE / PLANET.radius;
+export const ATMOSPHERE_HALO_RADIUS = DEPOSIT_RANGE / STATION.radius;
 
 /**
  * The atmosphere halo (p4-12; GDD §2.3): a soft, low-opacity air-glow around a
- * player's **own** planet, reaching to exactly `DEPOSIT_RANGE` — the radius
+ * player's **own** station, reaching to exactly `DEPOSIT_RANGE` — the radius
  * inside which a ship's hold auto-deposits (ratified p4: "just be in that
- * atmosphere"). The halo *is* the affordance: enemy planets get none, because
+ * atmosphere"). The halo *is* the affordance: enemy stations get none, because
  * you cannot deposit there, so a ring of your own colour is the visible answer
  * to "where do I unload?".
  *
  * It reads as air, not a UI circle (the brief): concentric discs in the player's
- * colour, densest at the planet limb and thinning to nothing at the atmosphere
+ * colour, densest at the station limb and thinning to nothing at the atmosphere
  * edge — a radial gradient approximated in the flat-fill IR. Drawn behind the
- * planet, so only the outward glow past the limb is seen; the dense inner discs
+ * station, so only the outward glow past the limb is seen; the dense inner discs
  * fall behind the ocean body. Player colour ⇒ role `identity` (style-guide §3),
  * the same channel the beacon ring wears.
  *
@@ -281,7 +281,7 @@ export function atmosphereHaloSprite(playerId: number, reduced = false): SpriteD
     // The reduced tier: a soft double band hugging the atmosphere edge, marking
     // exactly where the deposit range ends. Two thin annuli (not a filled disc)
     // so the fill is a hair of the gradient's — the whole point of the tier.
-    return sprite(`planet/atmosphere/p${playerId}/reduced`, round(r), [
+    return sprite(`station/atmosphere/p${playerId}/reduced`, round(r), [
       poly(annulusPoints(0, 0, round(r), round(r * 0.9), 0, Math.PI * 2, 44), fill(color, 'identity', 0.09)),
       poly(annulusPoints(0, 0, round(r * 0.88), round(r * 0.82), 0, Math.PI * 2, 44), fill(color, 'identity', 0.06)),
     ]);
@@ -294,10 +294,10 @@ export function atmosphereHaloSprite(playerId: number, reduced = false): SpriteD
     [0.8, 0.05],
     [0.6, 0.065],
     [0.4, 0.08],
-    [0.26, 0.1], // 0.26·4 ≈ r 1.04: laps just over the planet limb, no seam
+    [0.26, 0.1], // 0.26·4 ≈ r 1.04: laps just over the station limb, no seam
   ];
   return sprite(
-    `planet/atmosphere/p${playerId}`,
+    `station/atmosphere/p${playerId}`,
     round(r),
     stops.map(([frac, alpha]) => circle(0, 0, round(r * frac), fill(color, 'identity', alpha))),
   );

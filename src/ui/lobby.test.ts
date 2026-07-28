@@ -288,10 +288,10 @@ describe('arena select and the lock at start (p2 — the map picker moved into t
 });
 
 // ---------------------------------------------------------------------------
-// 2b. Player name (field request v0.2.1 — names over ships and planets)
+// 2b. Player name (field request v0.2.1 — names over ships and stations)
 // ---------------------------------------------------------------------------
 
-describe('player name (field request v0.2.1 — the local name over ship + planet)', () => {
+describe('player name (field request v0.2.1 — the local name over ship + station)', () => {
   it('defaults a fresh lobby to "YOU"', () => {
     expect(lobby().name).toBe(DEFAULT_PLAYER_NAME);
     expect(lobbyModel(lobby()).name).toBe(DEFAULT_PLAYER_NAME);

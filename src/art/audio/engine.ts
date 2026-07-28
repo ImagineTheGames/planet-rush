@@ -312,12 +312,12 @@ export class AudioEngine {
           break;
 
         // --- The one serious thing -----------------------------------------
-        case TELL.planetDeath:
+        case TELL.stationDeath:
           // Fire the sound *before* triggering the hush, so the fall is what
           // the quiet lands on top of rather than being cut off by it. The one
           // serious thing is a sting, not a located hit: full and centred, heard
           // wherever on the map a home dies (ratified a3-03).
-          this.flat(SOUND.planetDeath, 1);
+          this.flat(SOUND.stationDeath, 1);
           if (this.ownsDeath) this.death.trigger();
           if (player === this.local) this.alarm.silence();
           break;
@@ -528,7 +528,7 @@ function levelFor(kind: TellKind, magnitude: number): number {
     case TELL.upgradeBought:
     case TELL.collapseBegin:
     case TELL.matchEnd:
-    case TELL.planetDeath:
+    case TELL.stationDeath:
       return 1;
     default:
       return 1;

@@ -433,13 +433,13 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     }
   });
 
-  it('gives the planet death the longest tail in the bank (GDD §4.7)', () => {
+  it('gives the station death the longest tail in the bank (GDD §4.7)', () => {
     const length = (name: SoundName) => renderSound(soundSpec(name)).length;
-    const death = length(SOUND.planetDeath);
+    const death = length(SOUND.stationDeath);
     for (const name of SOUND_NAMES) {
       const spec = soundSpec(name);
       if (loops(spec)) continue; // loops are bodies, not tails
-      if (name === SOUND.planetDeath || name === SOUND.collapseBegin) continue;
+      if (name === SOUND.stationDeath || name === SOUND.collapseBegin) continue;
       expect(death, `${name} outlasts the death`).toBeGreaterThanOrEqual(length(name));
     }
   });
@@ -890,7 +890,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
   it('goes quiet for three seconds when a home dies (GDD §4.7)', () => {
     const { ctx, engine } = engineOn();
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     const noise = new TellQueue(4);
     noise.push(TELL.turretFire, 0, 0, 0, 1, 1);
 
@@ -921,7 +921,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     engine.start();
 
     const tells = new TellQueue(4);
-    tells.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    tells.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     engine.consume(tells);
     // The field owns the trigger in that arrangement; the engine must not
     // double-count it, and must not advance it either.
@@ -995,10 +995,10 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.alarm.active).toBe(true);
 
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 2);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 2);
     engine.consume(death);
     engine.update(1 / 60);
-    // An alarm over a dead planet would tell a player to defend a wreck — and
+    // An alarm over a dead station would tell a player to defend a wreck — and
     // it would ring straight through the three seconds nobody jokes in.
     expect(engine.alarm.active).toBe(false);
   });
@@ -1074,7 +1074,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     const { ctx, engine } = engineOn({ local: 0 });
     engine.setListener(0, 0);
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, EARSHOT_FAR * 4, 0, 0, 1, 1); // way off-screen
+    death.push(TELL.stationDeath, EARSHOT_FAR * 4, 0, 0, 1, 1); // way off-screen
     engine.consume(death);
     expect(engine.playCount).toBe(1); // heard, not culled
     expect(ctx.panners).toHaveLength(0); // and not panned — it is a sting
@@ -1086,10 +1086,10 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.graph).toBeNull();
 
     const q = new TellQueue(64);
-    // Every kind except the death — a planet dying every frame would silence
+    // Every kind except the death — a station dying every frame would silence
     // the alarm every frame, which is correct behaviour and a useless test.
     for (const kind of ALL_KINDS) {
-      if (kind !== TELL.planetDeath) q.push(kind, 0, 0, 0, 0.5, 0);
+      if (kind !== TELL.stationDeath) q.push(kind, 0, 0, 0, 0.5, 0);
     }
     for (let i = 0; i < 120; i++) {
       engine.consume(q);
@@ -1167,7 +1167,7 @@ describe('the device cues (`./engine` cue — the p4-03 seams)', () => {
   it('stays silent through the three-second hush like everything else (GDD §4.7)', () => {
     const { ctx, engine } = engineOn();
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     engine.consume(death);
     run(engine, ctx, 0.3); // let the mix reach zero
     expect(engine.death.gain).toBe(0);
@@ -1393,7 +1393,7 @@ describe('the adaptive soundtrack (`./music`) — following the match', () => {
     expect(engine.musicScore.phase).toBe('collapse');
 
     feed(TELL.matchEnd, 1, -1); // a win
-    // No planet death in this synthetic arc, so the hush is not down: the sting
+    // No station death in this synthetic arc, so the hush is not down: the sting
     // lands on the next frame.
     step();
     expect(engine.musicScore.phase).toBe('over');

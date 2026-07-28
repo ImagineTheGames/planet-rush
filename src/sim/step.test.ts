@@ -87,7 +87,7 @@ function emptyWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -680,7 +680,7 @@ describe('ship physics (GDD §2.11, §4.1)', () => {
     });
     expect(world.ships).toHaveLength(2);
     // The field is now two parts (field rule v0.1.2, `RESOURCE_FIELD`): an
-    // identical home neighbourhood per planet (tagged by owner) and the
+    // identical home neighbourhood per station (tagged by owner) and the
     // contested commons (`home == null`).
     const home = world.asteroids.filter((a) => a.home != null);
     const commons = world.asteroids.filter((a) => a.home == null);

@@ -29,7 +29,7 @@
  *
  * The purchase itself lives in `./buildings` next to the rest of the Build &
  * Upgrade wheel's spending, because it needs the same validation every wheel
- * order gets: own planet, docked, alive, affordable (GDD §2.5).
+ * order gets: own station, docked, alive, affordable (GDD §2.5).
  */
 
 import { UpgradeTrack, type ShipClass } from '@shared/types';

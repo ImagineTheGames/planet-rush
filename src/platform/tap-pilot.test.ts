@@ -47,10 +47,10 @@ describe('pickTapTarget — tap → lock or empty-space move (developer §2)', (
   });
 
   it('overlapping hits resolve to the nearest centre', () => {
-    const planet = cand({ kind: 'planet', id: 1, pos: { x: 0, y: 0 }, radius: 64, hostile: false });
+    const station = cand({ kind: 'station', id: 1, pos: { x: 0, y: 0 }, radius: 64, hostile: false });
     const rock = cand({ kind: 'asteroid', id: 2, pos: { x: 20, y: 0 }, radius: 20 });
     // A tap right on the rock centre is inside both, but nearer the rock.
-    expect(pickTapTarget([planet, rock], { x: 20, y: 0 })).toBe(rock);
+    expect(pickTapTarget([station, rock], { x: 20, y: 0 })).toBe(rock);
   });
 });
 
@@ -188,12 +188,12 @@ describe('TapPilot — target (tap an entity → lock, close, hold, fire)', () =
     expect(state.thrust.y).toBe(0);
   });
 
-  it('an own-planet fly-to holds at its atmosphere and never fires', () => {
+  it('an own-station fly-to holds at its atmosphere and never fires', () => {
     const pilot = new TapPilot();
-    pilot.lockTarget({ kind: 'planet', id: 0 });
+    pilot.lockTarget({ kind: 'station', id: 0 });
     const friendly: ResolvedTarget = { pos: { x: 600, y: 0 }, radius: 64, hostile: false, standoff: 40 };
     const out = fly(pilot, { x: 0, y: 0 }, () => friendly, 300);
-    // Flew to the planet's atmosphere (near it), fired nothing on the way.
+    // Flew to the station's atmosphere (near it), fired nothing on the way.
     expect(Math.abs(600 - out.pos.x) - 64 - 16).toBeLessThan(120);
     expect(out.lastFire).toBe(false);
     // A friendly hold emits no aim (nothing to shoot at).
@@ -240,9 +240,9 @@ describe('TapPilot — auto-engage is the default (no lock → fly/idle + fire t
     expect(pilot.currentOrder).toBeNull();
   });
 
-  it('a friendly own-planet fly-to is a lock, not auto-engage: it never fires', () => {
+  it('a friendly own-station fly-to is a lock, not auto-engage: it never fires', () => {
     const pilot = new TapPilot();
-    pilot.lockTarget({ kind: 'planet', id: 0 });
+    pilot.lockTarget({ kind: 'station', id: 0 });
     const friendly: ResolvedTarget = { pos: { x: 600, y: 0 }, radius: 64, hostile: false, standoff: 40 };
     const state = createControlState();
     pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, friendly);
@@ -308,23 +308,23 @@ describe('TapPilot — a lock overrides the auto-engage ladder (developer p9-02 
   });
 });
 
-describe('TapPilot.resolveTap — tap your planet to open the build wheel (developer p10 §1–2)', () => {
-  const planet = (over: Partial<TapCandidate> = {}): TapCandidate =>
-    cand({ kind: 'planet', id: 0, pos: { x: 600, y: 0 }, radius: 64, hostile: false, ...over });
+describe('TapPilot.resolveTap — tap your station to open the build wheel (developer p10 §1–2)', () => {
+  const station = (over: Partial<TapCandidate> = {}): TapCandidate =>
+    cand({ kind: 'station', id: 0, pos: { x: 600, y: 0 }, radius: 64, hostile: false, ...over });
   const closedFar = { wheelOpen: false, insideWheel: false, inBuildRange: false };
   const closedNear = { wheelOpen: false, insideWheel: false, inBuildRange: true };
 
-  it('near-tap on your own planet opens the wheel and sets NO order (§1)', () => {
+  it('near-tap on your own station opens the wheel and sets NO order (§1)', () => {
     const pilot = new TapPilot();
-    const res = pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear);
+    const res = pilot.resolveTap(station(), { x: 600, y: 0 }, closedNear);
     expect(res.kind).toBe('openWheel');
     // The ship holds while the menu is up — the tap placed no waypoint or lock.
     expect(pilot.currentOrder).toBeNull();
   });
 
-  it('far-tap on your own planet is a plain move toward it — no lock, no surprise wheel (§1)', () => {
+  it('far-tap on your own station is a plain move toward it — no lock, no surprise wheel (§1)', () => {
     const pilot = new TapPilot();
-    const res = pilot.resolveTap(planet(), { x: 600, y: 0 }, closedFar);
+    const res = pilot.resolveTap(station(), { x: 600, y: 0 }, closedFar);
     expect(res.kind).toBe('move');
     expect(pilot.waypoint).toEqual({ x: 600, y: 0 }); // a normal waypoint...
     expect(pilot.lockedRef).toBeNull(); // ...not a fly-to lock
@@ -332,9 +332,9 @@ describe('TapPilot.resolveTap — tap your planet to open the build wheel (devel
 
   it('far → move, then the same tap in range opens (a second tap when close opens, §1)', () => {
     const pilot = new TapPilot();
-    expect(pilot.resolveTap(planet(), { x: 600, y: 0 }, closedFar).kind).toBe('move');
+    expect(pilot.resolveTap(station(), { x: 600, y: 0 }, closedFar).kind).toBe('move');
     // The ship flew there; docked now, the same tap opens the wheel instead.
-    expect(pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear).kind).toBe('openWheel');
+    expect(pilot.resolveTap(station(), { x: 600, y: 0 }, closedNear).kind).toBe('openWheel');
   });
 
   it('outside-tap on an OPEN wheel closes it and does NOT double as a move (§2)', () => {
@@ -376,7 +376,7 @@ describe('TapPilot.resolveTap — tap your planet to open the build wheel (devel
     // Opening the wheel leaves the order holding; while it is up the wiring does not
     // call writeInto (menus over motion). On close the pilot resumes: no lock → it
     // auto-engages, holding the trigger for the sim's Auto-aim ladder (p9-02 §1).
-    pilot.resolveTap(planet(), { x: 600, y: 0 }, closedNear);
+    pilot.resolveTap(station(), { x: 600, y: 0 }, closedNear);
     const state = createControlState();
     resetState(state);
     pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null);

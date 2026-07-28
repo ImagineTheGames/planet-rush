@@ -6,7 +6,7 @@
  * `Hud` owns both and feeds this a {@link MinimapFrame} each frame.
  *
  * **What it shows (sim-driven — GDD §2.2 "a minimap (bottom right)").** Arena
- * bounds, planets as owner-coloured dots (a derelict wreck goes neutral steel —
+ * bounds, stations as owner-coloured dots (a derelict wreck goes neutral steel —
  * it is no longer owned, GDD §2.7), ships as smaller dots (the local ship
  * highlighted, a spawn-protected ship dimmed — GDD §2.1), the collapse ring while
  * it is active (GDD §2.3), and faint ore-field hints. **Dots and colours only** —
@@ -39,7 +39,7 @@
 import type { PlayerId } from '@shared/types';
 import type { Rect } from '@platform/layout-registry';
 import { PALETTE } from '@render/index';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
 // The keyboard shortcut (PC) — docs/input-parity.md
@@ -58,7 +58,7 @@ export const MINIMAP_TOGGLE_KEY = 'KeyM';
 // ---------------------------------------------------------------------------
 
 /**
- * How many sim ticks between rebuilds of the (heavy) map content — planets,
+ * How many sim ticks between rebuilds of the (heavy) map content — stations,
  * enemy ships, ore hints, collapse ring — into the view's cached texture. The
  * field request calls for "low-frequency redraw … every N ticks to an offscreen
  * texture, never per-frame". ~6 ticks ≈ 10 Hz at 60 Hz, fast enough that a moving
@@ -132,8 +132,8 @@ export const MINIMAP_THUMB_RESERVE_FRACTION = 0.16;
 // scales — a collapsed dot is tiny, the same dot expanded is readable)
 // ---------------------------------------------------------------------------
 
-const PLANET_DOT_FRACTION = 0.04;
-const PLANET_DOT_MIN = 2;
+const STATION_DOT_FRACTION = 0.04;
+const STATION_DOT_MIN = 2;
 const SHIP_DOT_FRACTION = 0.026;
 const SHIP_DOT_MIN = 1.5;
 /** The local ship's dot is drawn larger than an enemy's so it reads as *mine* at
@@ -142,16 +142,16 @@ const OWN_SHIP_DOT_MULTIPLIER = 1.55;
 const ORE_DOT_FRACTION = 0.011;
 const ORE_DOT_MIN = 0.5;
 
-/** Full opacity of an owned planet / live ship dot. */
+/** Full opacity of an owned station / live ship dot. */
 export const MINIMAP_DOT_ALPHA = 0.95;
-/** A derelict planet's dot (a wreck — no longer owned, GDD §2.7): neutral and
+/** A derelict station's dot (a wreck — no longer owned, GDD §2.7): neutral and
  *  dimmer, so the map reads it as spent, not as somebody's home. */
 export const MINIMAP_DERELICT_ALPHA = 0.55;
 /** A spawn-protected ship (GDD §2.1) reads dimmed — it cannot be shot yet, so it
  *  is not a live threat/target on the glance map. */
 export const MINIMAP_SPAWN_PROTECT_ALPHA = 0.4;
 /** Faint ore-field hints — present enough to read where the field is, quiet
- *  enough never to compete with the planet/ship dots. Signal yellow is correct
+ *  enough never to compete with the station/ship dots. Signal yellow is correct
  *  here: it is the RESERVED ore colour (style-guide §2), and this *is* ore. */
 export const MINIMAP_ORE_ALPHA = 0.28;
 
@@ -162,8 +162,8 @@ export const MINIMAP_ORE_ALPHA = 0.28;
 /** The two states of the minimap; the toggle flips between them. */
 export type MinimapState = 'collapsed' | 'expanded';
 
-/** A home planet as the minimap sees it (map/world space). */
-export interface MinimapPlanet {
+/** A home station as the minimap sees it (map/world space). */
+export interface MinimapStation {
   readonly owner: PlayerId;
   /** Centre in map space. */
   readonly x: number;
@@ -194,12 +194,12 @@ export interface MinimapRing {
 
 /** Everything the minimap draws for one frame, all in **map (world) space** — the
  *  view projects it into the active rect itself. Every field bar `bounds` is
- *  optional so an early (pre-planets) feed still renders an empty arena. */
+ *  optional so an early (pre-stations) feed still renders an empty arena. */
 export interface MinimapFrame {
   /** The arena play bounds (`world.bounds`) — the box the fit letterboxes into. */
   readonly bounds: { readonly width: number; readonly height: number };
-  /** Home planets (GDD §2.1). */
-  readonly planets?: readonly MinimapPlanet[];
+  /** Home stations (GDD §2.1). */
+  readonly stations?: readonly MinimapStation[];
   /** Ships (GDD §2.2). */
   readonly ships?: readonly MinimapShip[];
   /** The collapse ring, present only while collapse is active (GDD §2.3). */
@@ -244,7 +244,7 @@ export interface MinimapScene {
   /** The map → rect transform, so the view can place the per-frame own-ship dot
    *  without recomputing the whole scene ({@link MINIMAP_REDRAW_TICKS}). */
   readonly transform: FitTransform;
-  readonly planetDots: readonly MinimapDot[];
+  readonly stationDots: readonly MinimapDot[];
   /** Enemy / non-local ship dots (the local ship is {@link ownDot}, drawn every
    *  frame by the view rather than folded into the throttled content). */
   readonly shipDots: readonly MinimapDot[];
@@ -410,24 +410,24 @@ function dotRadius(rectSize: number, fraction: number, min: number): number {
 
 /**
  * Project a {@link MinimapFrame} into `rect`: fit the arena, then place every
- * planet, ship, ore hint and the collapse ring as screen-space dots with the
+ * station, ship, ore hint and the collapse ring as screen-space dots with the
  * right colour and dim/highlight rules. Pure — the whole "what the minimap shows"
  * decision, so it is asserted headless (./minimap.test.ts) and the view only paints.
  */
 export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false): MinimapScene {
   const transform = fitBounds(frame.bounds, rect);
   const size = Math.min(rect.width, rect.height);
-  const planetR = dotRadius(size, PLANET_DOT_FRACTION, PLANET_DOT_MIN);
+  const stationR = dotRadius(size, STATION_DOT_FRACTION, STATION_DOT_MIN);
   const shipR = dotRadius(size, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
   const oreR = dotRadius(size, ORE_DOT_FRACTION, ORE_DOT_MIN);
 
-  const planetDots: MinimapDot[] = [];
-  for (const p of frame.planets ?? []) {
+  const stationDots: MinimapDot[] = [];
+  for (const p of frame.stations ?? []) {
     const s = mapPoint(transform, p.x, p.y);
-    planetDots.push({
+    stationDots.push({
       x: s.x,
       y: s.y,
-      radius: planetR,
+      radius: stationR,
       // A wreck is no longer owned (GDD §2.7): neutral steel, dimmer.
       color: p.alive ? playerColor(p.owner) : PALETTE.hullSteel,
       alpha: p.alive ? MINIMAP_DOT_ALPHA : MINIMAP_DERELICT_ALPHA,
@@ -463,7 +463,7 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     collapseRing = { x: c.x, y: c.y, radius: frame.collapse.radius * transform.scale, color: PALETTE.threatRed };
   }
 
-  return { rect, transform, planetDots, shipDots, oreDots, ownDot, collapseRing };
+  return { rect, transform, stationDots, shipDots, oreDots, ownDot, collapseRing };
 }
 
 // ---------------------------------------------------------------------------

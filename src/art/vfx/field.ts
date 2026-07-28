@@ -8,7 +8,7 @@
  * exhaustive switches over one enum rather than a promise.
  *
  * Owning both halves of the routing here also means the tone contract's quiet
- * has a single owner: the planet-death tell is what starts {@link DeathMoment},
+ * has a single owner: the station-death tell is what starts {@link DeathMoment},
  * and both the mix and the moment read the same object.
  *
  * ## Wiring it up (for the Platform Engineer's frame loop)
@@ -43,7 +43,7 @@ import {
   matchEnd,
   muzzleFlash,
   oreCollect,
-  planetDeath,
+  stationDeath,
   repairPulse,
   shieldDown,
   shieldShimmer,
@@ -68,8 +68,8 @@ const HIT_BURST_INTERVAL = 0.05;
 /** Player slots the firing throttle tracks (the 8-slot roster, GDD §2.1, plus air). */
 const SLOTS = 16;
 
-/** Planet radius the tells' normalised magnitudes are unpacked against. */
-const PLANET_RADIUS_REF = 64;
+/** Station radius the tells' normalised magnitudes are unpacked against. */
+const STATION_RADIUS_REF = 64;
 
 /** Ship radius the explosion magnitude is unpacked against. */
 const SHIP_RADIUS_REF = 16;
@@ -90,7 +90,7 @@ export interface VfxFieldOptions {
 
 /**
  * The visible half of the tell system: owns the particle pool, the scatter RNG,
- * and the planet-death moment.
+ * and the station-death moment.
  */
 export class VfxField {
   /** The pool. Public so the draw layer can walk the columns (`./layer`). */
@@ -157,13 +157,13 @@ export class VfxField {
           shotImpact(pool, rng, x, y, angle, q);
           break;
         case TELL.shieldHit:
-          shieldShimmer(pool, rng, x, y, PLANET_RADIUS_REF * 1.35, mag, q);
+          shieldShimmer(pool, rng, x, y, STATION_RADIUS_REF * 1.35, mag, q);
           break;
         case TELL.shieldDown:
-          shieldDown(pool, rng, x, y, Math.max(20, mag * PLANET_RADIUS_REF), q);
+          shieldDown(pool, rng, x, y, Math.max(20, mag * STATION_RADIUS_REF), q);
           break;
         case TELL.coreHit:
-          coreHit(pool, rng, x, y, PLANET_RADIUS_REF * 0.5, q);
+          coreHit(pool, rng, x, y, STATION_RADIUS_REF * 0.5, q);
           break;
         case TELL.turretDown:
           turretDown(pool, rng, x, y, q);
@@ -188,7 +188,7 @@ export class VfxField {
           buildComplete(pool, rng, x, y, angle, q);
           break;
         case TELL.repairTick:
-          repairPulse(pool, rng, x, y, PLANET_RADIUS_REF * 0.6, q);
+          repairPulse(pool, rng, x, y, STATION_RADIUS_REF * 0.6, q);
           break;
         case TELL.bankOre:
           bankOre(pool, rng, x, y, mag, q);
@@ -200,9 +200,9 @@ export class VfxField {
         case TELL.collapseBegin:
           collapsePulse(pool, x, y, 420);
           break;
-        case TELL.planetDeath:
+        case TELL.stationDeath:
           // The moment, and the quiet that goes with it (GDD §4.7).
-          planetDeath(pool, rng, x, y, Math.max(24, mag * PLANET_RADIUS_REF), q);
+          stationDeath(pool, rng, x, y, Math.max(24, mag * STATION_RADIUS_REF), q);
           this.death.trigger();
           break;
         case TELL.matchEnd:

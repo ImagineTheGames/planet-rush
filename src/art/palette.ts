@@ -53,7 +53,7 @@ export const WHITE = TOKEN_WHITE;
  * The 8-slot player identity roster (style-guide §3.1), indexed by `PlayerId`.
  * Identity is an **additive trim layer** over the steel fleet, never a repaint:
  * these appear only on wing tips, cockpit glass, engine flame, weapon tint,
- * planet beacon ring and HP bar — and always alongside the hull number decal,
+ * station beacon ring and HP bar — and always alongside the hull number decal,
  * so no player is ever identified by hue alone. Sourced from {@link ./tokens}.
  */
 export const PLAYER_COLORS = PLAYER_ROSTER;
@@ -119,20 +119,20 @@ export interface Recipe {
 export const DERIVED_RECIPES = {
   hullLight: { base: 'hullSteel', toward: 'white', t: 0.3, why: 'Lit edge / top plating on hulls and turrets.' },
   hullShadow: { base: 'hullSteel', toward: 'vacuum', t: 0.4, why: 'Underside plating; separates overlapping hull parts.' },
-  hullDark: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Panel gaps, thruster wells, a dead planet core.' },
+  hullDark: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Panel gaps, thruster wells, a dead station core.' },
   decalInk: { base: 'hullSteel', toward: 'vacuum', t: 0.78, why: 'The player-number hull decal, stencilled into the steel.' },
 
   rockBody: { base: 'hullSteel', toward: 'white', t: 0.16, why: 'Asteroid mineral body — neutral steel-grey (§6).' },
   rockShadow: { base: 'hullSteel', toward: 'vacuum', t: 0.32, why: 'Asteroid facets, so a rock reads as a solid at 24px.' },
   rockFissure: { base: 'hullSteel', toward: 'vacuum', t: 0.72, why: 'Crack lines across the three mining stages (§6).' },
 
-  oceanSteel: { base: 'hullSteel', toward: 'vacuum', t: 0.42, why: 'Planet oceans — steel-blue, inside the palette (§5).' },
-  oceanDeep: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Limb darkening / night side of a planet.' },
+  oceanSteel: { base: 'hullSteel', toward: 'vacuum', t: 0.42, why: 'MiningStation oceans — steel-blue, inside the palette (§5).' },
+  oceanDeep: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Limb darkening / night side of a station.' },
   continentShade: { base: 'patina', toward: 'vacuum', t: 0.38, why: 'Coastline under-shadow on patina continents.' },
   continentLight: { base: 'patina', toward: 'white', t: 0.2, why: 'Sunward continent highlight.' },
 
   oreDeep: { base: 'signalYellow', toward: 'vacuum', t: 0.38, why: 'Shadowed facet of an ore vein or chunk — still ore.' },
-  coreHot: { base: 'signalYellow', toward: 'white', t: 0.35, why: 'The lit centre of a planet core — still the win condition.' },
+  coreHot: { base: 'signalYellow', toward: 'white', t: 0.35, why: 'The lit centre of a station core — still the win condition.' },
   plasmaDim: { base: 'plasma', toward: 'vacuum', t: 0.45, why: 'Unpowered energy parts: cold barrel, idle shield ring.' },
   plasmaHot: { base: 'plasma', toward: 'white', t: 0.45, why: 'The hot centre of a torch/muzzle flare.' },
 
@@ -149,7 +149,7 @@ export const DERIVED_RECIPES = {
   shotEnemy2: { base: 'threatRed', toward: 'white', t: 0.32, why: 'DAMAGE tier 2, enemy fire — threat red climbing toward white-hot, never yellow.' },
   shotEnemy3: { base: 'threatRed', toward: 'white', t: 0.45, why: 'DAMAGE tier 3, enemy fire — the fiercest incoming shot: bright, still red.' },
 
-  wreckBody: { base: 'hullSteel', toward: 'vacuum', t: 0.7, why: 'A dead planet: ash-grey and cold. The game goes quiet (§8).' },
+  wreckBody: { base: 'hullSteel', toward: 'vacuum', t: 0.7, why: 'A dead station: ash-grey and cold. The game goes quiet (§8).' },
   wreckCrust: { base: 'hullSteel', toward: 'vacuum', t: 0.55, why: 'Broken crust plates on a wreck.' },
 } as const satisfies Record<string, Recipe>;
 

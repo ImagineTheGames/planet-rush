@@ -8,7 +8,7 @@
  * the sim instrument. Staged truth and play truth disagreed, and play wins.
  *
  * This test refuses the staged shortcut. It spins a **full natural bot-vs-bot
- * match** through the headless harness — the real eight-planet ring (GDD §2.1),
+ * match** through the headless harness — the real eight-station ring (GDD §2.1),
  * bots deciding for themselves, *no debug placement anywhere* — and watches what
  * the turrets actually do while the ring fights.
  *
@@ -22,7 +22,7 @@
  * still up. The old sim let it bombard the core with total impunity *and* kept it
  * invisible to the turret, so the turret sat parked at its mount angle for
  * seconds at a time: "turrets do not slide to engage." The instrumented repro of
- * this exact match showed planet 0's turret pinned at its home angle (orbit ≈ π/2)
+ * this exact match showed station 0's turret pinned at its home angle (orbit ≈ π/2)
  * with `targetId = null` for ~8 s while a `spawnProtect ≈ 8 → 0` attacker sat
  * inside threat range shooting the core.
  *
@@ -35,7 +35,7 @@
  * target, and the turret slides onto it — which is what this test asserts.
  *
  * The assertions, all read off natural play:
- *   1. **Acquisition.** No defended planet is besieged by an enemy for longer than
+ *   1. **Acquisition.** No defended station is besieged by an enemy for longer than
  *      `MAX_UNANSWERED_S` without a turret acquiring *that* enemy. On the old sim
  *      this window ran to seconds (a full protected bombardment); the fix caps it
  *      at one shot's flight time.
@@ -48,9 +48,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { TICK_DT, planetTargetRadius, type World } from '../../src/sim';
+import { TICK_DT, stationTargetRadius, type World } from '../../src/sim';
 import { runMatch, roundRobinLineup } from '../../harness/match';
-import type { Ship, Planet, Turret } from '../../src/sim';
+import type { Ship, MiningStation, Turret } from '../../src/sim';
 
 // --- geometry helpers ------------------------------------------------------
 
@@ -62,21 +62,21 @@ function angleDiff(a: number, b: number): number {
   return d;
 }
 
-/** Bearing from a planet's centre to a ship — the rim angle whose outward normal
+/** Bearing from a station's centre to a ship — the rim angle whose outward normal
  *  faces that ship, i.e. the orbit angle a turret converging on it aims for. */
-function bearing(planet: Planet, ship: Ship): number {
-  return Math.atan2(ship.pos.y - planet.pos.y, ship.pos.x - planet.pos.x);
+function bearing(station: MiningStation, ship: Ship): number {
+  return Math.atan2(ship.pos.y - station.pos.y, ship.pos.x - station.pos.x);
 }
 
 /**
- * Is `ship` **firing on** `planet` this tick — does it own a live ship-weapon
- * shot whose forward path still reaches the planet's shield/core surface? This is
+ * Is `ship` **firing on** `station` this tick — does it own a live ship-weapon
+ * shot whose forward path still reaches the station's shield/core surface? This is
  * the play-truth signal of a besieger: shots actually inbound on the core, read
  * from the projectile pool, never from a placed fixture. Mirrors the sim's own
- * `isAttackingPlanet` closest-approach test (`src/sim/buildings.ts`).
+ * `isAttackingStation` closest-approach test (`src/sim/buildings.ts`).
  */
-function firesOnCore(world: World, planet: Planet, ship: Ship): boolean {
-  const targetR = planetTargetRadius(planet);
+function firesOnCore(world: World, station: MiningStation, ship: Ship): boolean {
+  const targetR = stationTargetRadius(station);
   for (const p of world.projectiles) {
     if (!p.active || p.kind !== 'ship' || p.owner !== ship.id) continue;
     const speed = Math.sqrt(p.vel.x * p.vel.x + p.vel.y * p.vel.y);
@@ -84,25 +84,25 @@ function firesOnCore(world: World, planet: Planet, ship: Ship): boolean {
     const dx = p.vel.x / speed;
     const dy = p.vel.y / speed;
     const reach = speed * p.life;
-    let t = (planet.pos.x - p.pos.x) * dx + (planet.pos.y - p.pos.y) * dy;
+    let t = (station.pos.x - p.pos.x) * dx + (station.pos.y - p.pos.y) * dy;
     if (t < 0) t = 0;
     else if (t > reach) t = reach;
-    const ex = p.pos.x + dx * t - planet.pos.x;
-    const ey = p.pos.y + dy * t - planet.pos.y;
+    const ex = p.pos.x + dx * t - station.pos.x;
+    const ey = p.pos.y + dy * t - station.pos.y;
     if (ex * ex + ey * ey <= targetR * targetR) return true;
   }
   return false;
 }
 
-/** Live turrets on a planet (dead-but-not-yet-swept entries excluded). */
-function liveTurrets(planet: Planet): Turret[] {
-  return planet.turrets.filter((t) => t.hp > 0);
+/** Live turrets on a station (dead-but-not-yet-swept entries excluded). */
+function liveTurrets(station: MiningStation): Turret[] {
+  return station.turrets.filter((t) => t.hp > 0);
 }
 
 // --- thresholds ------------------------------------------------------------
 
 /**
- * How long a defended planet may be besieged by one enemy before a turret must
+ * How long a defended station may be besieged by one enemy before a turret must
  * have acquired *that* enemy. A respawned besieger voids its protection on its
  * first landed shot, so the only unanswered window is that first shot's flight
  * time (~0.4 s here). One second gives that comfortable headroom while staying
@@ -113,7 +113,7 @@ const MAX_UNANSWERED_S = 1.0;
 
 /**
  * How long a besieger's shots may lapse before we stop counting it as an active
- * besieger of a planet. A besieging ship fires several times a second, so 1.5 s
+ * besieger of a station. A besieging ship fires several times a second, so 1.5 s
  * of grace bridges the gaps between individual shots (and a shot briefly eaten by
  * a shield or a rock) without ever bridging across it leaving and coming back.
  */
@@ -131,7 +131,7 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
   it('acquires every besieger within a second and slides onto the threat — no debug placement', () => {
     // A natural siege: half the ring turtles (banks ore, builds turrets and
     // shields) and half rushes an enemy home. Bots only, decided fog-honestly by
-    // the harness; nothing is placed. The real eight-planet ring is the point —
+    // the harness; nothing is placed. The real eight-station ring is the point —
     // it is what puts a respawned attacker back on a neighbour's core while it is
     // still spawn-protected, the exact condition the staged round-8 test skipped.
     const lineup = roundRobinLineup(
@@ -146,13 +146,13 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
     const maxUnansweredTicks = Math.round(MAX_UNANSWERED_S / TICK_DT);
     const besiegeGraceTicks = Math.round(BESIEGE_GRACE_S / TICK_DT);
 
-    // Per (planet, besieger) episode bookkeeping, keyed planetOwner*100 + shipId.
+    // Per (station, besieger) episode bookkeeping, keyed stationOwner*100 + shipId.
     const lastFiredTick = new Map<number, number>();
     const unansweredTicks = new Map<number, number>();
 
     // Worst offence seen, kept for a readable failure message.
     let worstUnanswered = 0;
-    let worstAt = { time: 0, planet: -1, ship: -1, orbit: 0, bearing: 0 };
+    let worstAt = { time: 0, station: -1, ship: -1, orbit: 0, bearing: 0 };
 
     // Preconditions — the scenario must actually happen.
     let anyTurretBuilt = false;
@@ -173,17 +173,17 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
       {
         maxSeconds: 300,
         onTick: (world, tick) => {
-          for (const planet of world.planets) {
-            if (!planet.alive) continue;
-            const turrets = liveTurrets(planet);
+          for (const station of world.stations) {
+            if (!station.alive) continue;
+            const turrets = liveTurrets(station);
             if (turrets.length === 0) continue;
             anyTurretBuilt = true;
 
             for (const ship of world.ships) {
-              if (ship.id === planet.owner || !ship.alive) continue;
+              if (ship.id === station.owner || !ship.alive) continue;
 
-              const key = planet.owner * 100 + ship.id;
-              if (firesOnCore(world, planet, ship)) lastFiredTick.set(key, tick);
+              const key = station.owner * 100 + ship.id;
+              if (firesOnCore(world, station, ship)) lastFiredTick.set(key, tick);
 
               const besieging = tick - (lastFiredTick.get(key) ?? -1e9) <= besiegeGraceTicks;
               if (!besieging) {
@@ -203,10 +203,10 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
                   const t0 = turrets[0]!;
                   worstAt = {
                     time: world.time,
-                    planet: planet.owner,
+                    station: station.owner,
                     ship: ship.id,
                     orbit: t0.orbitAngle ?? NaN,
-                    bearing: bearing(planet, ship),
+                    bearing: bearing(station, ship),
                   };
                 }
               }
@@ -223,9 +223,9 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
               }
               const target = world.ships.find((s) => s.id === tid);
               // Only score a slide against an enemy that is actually besieging
-              // this planet — that is the "converging on the threat" the report
+              // this station — that is the "converging on the threat" the report
               // asks for, not a turret drifting toward a passing loiterer.
-              const key = planet.owner * 100 + tid;
+              const key = station.owner * 100 + tid;
               const besieging =
                 target !== undefined &&
                 target.alive &&
@@ -234,7 +234,7 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
                 slides.delete(turret.id);
                 continue;
               }
-              const err = Math.abs(angleDiff(orbit, bearing(planet, target!)));
+              const err = Math.abs(angleDiff(orbit, bearing(station, target!)));
               const prev = slides.get(turret.id);
               if (prev === undefined || prev.target !== tid) {
                 slides.set(turret.id, { target: tid, maxErr: err, lastErr: err });
@@ -261,7 +261,7 @@ describe('turrets slide to engage besiegers in a natural match (field report v0.
     const worstSeconds = worstUnanswered * TICK_DT;
     expect(
       worstUnanswered,
-      `planet ${worstAt.planet}'s turret left besieger ${worstAt.ship} unanswered for ` +
+      `station ${worstAt.station}'s turret left besieger ${worstAt.ship} unanswered for ` +
         `${worstSeconds.toFixed(2)}s at t≈${worstAt.time.toFixed(1)}s ` +
         `(orbit ${worstAt.orbit.toFixed(2)} vs bearing ${worstAt.bearing.toFixed(2)}) — ` +
         `a turret that will not slide to engage (field report v0.2.1)`,

@@ -28,7 +28,7 @@ import {
   asteroidCrack,
   explosion,
   muzzleFlash,
-  planetDeath,
+  stationDeath,
   shieldShimmer,
   spawnGlow,
   thrusterTrail,
@@ -49,7 +49,7 @@ describe('particle kinds (style-guide §1, §2, §3)', () => {
     PARTICLE_KINDS.forEach((spec, i) => expect(spec.kind).toBe(i));
   });
 
-  it('passes the same palette audit as every hull and planet', () => {
+  it('passes the same palette audit as every hull and station', () => {
     const violations = auditAll(PARTICLE_SPRITES);
     expect(formatViolations(violations)).toBe('');
     expect(violations).toEqual([]);
@@ -128,7 +128,7 @@ describe('emitters (GDD §3.6 — the set, by name)', () => {
       ['explosion', (p) => explosion(p, mulberry32(1), 0, 0, 1)],
       ['thruster trail', (p) => thrusterTrail(p, mulberry32(1), 0, 0, 0, 1, 3)],
       ['spawn glow', (p) => spawnGlow(p, mulberry32(1), 0, 0, 18)],
-      ['planet death', (p) => planetDeath(p, mulberry32(1), 0, 0, 64)],
+      ['station death', (p) => stationDeath(p, mulberry32(1), 0, 0, 64)],
     ];
     for (const [name, emit] of named) {
       const p = pool();
@@ -155,7 +155,7 @@ describe('emitters (GDD §3.6 — the set, by name)', () => {
       explosion(p, mulberry32(5), 0, 0, 1, quality);
       asteroidBurst(p, mulberry32(5), 0, 0, 14, quality);
       muzzleFlash(p, mulberry32(5), 0, 0, 0, quality);
-      planetDeath(p, mulberry32(5), 0, 0, 64, quality);
+      stationDeath(p, mulberry32(5), 0, 0, 64, quality);
       expect(p.count, `quality ${quality} drew nothing`).toBeGreaterThan(0);
     }
     const full = pool();
@@ -200,10 +200,10 @@ describe('emitters (GDD §3.6 — the set, by name)', () => {
     expect(weak.alpha[0]!).toBeLessThan(strong.alpha[0]!);
   });
 
-  it('makes the planet death slow and grey, not a firework (GDD §4.7)', () => {
+  it('makes the station death slow and grey, not a firework (GDD §4.7)', () => {
     const home = pool();
     const ship = pool();
-    planetDeath(home, mulberry32(6), 0, 0, 64);
+    stationDeath(home, mulberry32(6), 0, 0, 64);
     explosion(ship, mulberry32(6), 0, 0, 1);
 
     const longest = (p: ParticlePool) => Math.max(...[...p.ttl.subarray(0, p.count)]);
@@ -275,10 +275,10 @@ describe('VfxField — the routing table', () => {
     expect(field.count).toBe(both);
   });
 
-  it('holds the beat when a planet dies, and hands the same object to the mix', () => {
+  it('holds the beat when a station dies, and hands the same object to the mix', () => {
     const field = new VfxField({ seed: 1 });
     const tells = new TellQueue(8);
-    tells.push(TELL.planetDeath, 500, 500, 0, 1, 2);
+    tells.push(TELL.stationDeath, 500, 500, 0, 1, 2);
     field.consume(tells);
     expect(field.death.active).toBe(true);
     expect(field.death.gain).toBe(1); // the cut has not started yet
@@ -313,7 +313,7 @@ describe('VfxField — the routing table', () => {
   });
 });
 
-describe('the planet-death moment (GDD §4.7 — the tone contract)', () => {
+describe('the station-death moment (GDD §4.7 — the tone contract)', () => {
   it('is three seconds of silence, cut fast and returned slowly', () => {
     const death = new DeathMoment();
     expect(death.gain).toBe(1);

@@ -5,7 +5,7 @@
  * tone contract rather than the arcade half (style-guide §8, GDD §4.7):
  *
  * > *Ships are toys, explosions are fireworks … But homes are the one serious
- * > thing in it — when a planet dies, the game goes briefly quiet, the wreck
+ * > thing in it — when a station dies, the game goes briefly quiet, the wreck
  * > stays on the map all match, and nobody jokes for three seconds.*
  *
  * So the wreck is **cold**. No fire, no embers, no threat red: red is the
@@ -19,7 +19,7 @@
  */
 
 import { mulberry32 } from '@shared/types';
-import { continentPolygons } from './planets';
+import { continentPolygons } from './stations';
 import { DERIVED, PALETTE } from './palette';
 import {
   annulusPoints,
@@ -37,15 +37,15 @@ import {
 } from './shapes';
 
 /**
- * A dead planet, at the same unit radius as the living one — the wreck keeps
+ * A dead station, at the same unit radius as the living one — the wreck keeps
  * its position and radius and stays solid (GDD §2.7), so the two sprites are
  * interchangeable at the same scale and the death is a straight swap.
  *
  * The variant is carried through so a wreck is recognisably *that* world: the
- * same coastlines, ashed over. Losing a stranger's planet and losing the one
+ * same coastlines, ashed over. Losing a stranger's station and losing the one
  * you spent the match next to should not look identical.
  */
-export function planetWreckSprite(variant: number): SpriteDef {
+export function stationWreckSprite(variant: number): SpriteDef {
   const v = Math.abs(Math.trunc(variant)) % 4;
   const rng = mulberry32((0x1b873593 ^ (v * 0xc2b2ae35)) >>> 0);
   const crust = fill(DERIVED.wreckCrust, 'material');
@@ -98,7 +98,7 @@ export function planetWreckSprite(variant: number): SpriteDef {
     circle(0, 0, 0.12, fill(PALETTE.vacuum, 'material')),
   );
 
-  return sprite(`wreck/planet/v${v}`, 1, shapes);
+  return sprite(`wreck/station/v${v}`, 1, shapes);
 }
 
 /**

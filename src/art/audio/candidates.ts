@@ -22,7 +22,7 @@
  * For each slot the three candidates are distinct *characters* — e.g. for a weapon:
  * a sharp zap, a meaty thud, an airy pulse — not micro-variations of one idea, so the
  * review is a real choice. Where the tone contract constrains a slot (homes are the one
- * serious thing — {@link SOUND.coreHit}, {@link SOUND.planetDeath} — and the alarm must
+ * serious thing — {@link SOUND.coreHit}, {@link SOUND.stationDeath} — and the alarm must
  * be an unmistakable klaxon, GDD §2.2/§4.7), all three candidates honour it.
  *
  * Generated in bank order; see `sound-review/render.ts` for how previews are rendered.
@@ -77,7 +77,7 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
   'upgradeBought',
   'waveArrive',
   'collapseBegin',
-  'planetDeath',
+  'stationDeath',
   'matchEnd',
   'alarm',
   'ambient',
@@ -328,14 +328,14 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       { id: 'c', character: "crumbling stepped structural groan", spec: {"name":"collapseBegin_c","layers":[{"spec":{"name":"collapseBegin_c_crumble","wave":"noise","attack":0.2,"hold":0.3,"decay":1.1,"freq":200,"freqEnd":60,"lowPass":600,"repeat":0.35,"gain":0.32,"seed":20599}},{"spec":{"name":"collapseBegin_c_groan","wave":"triangle","attack":0.3,"hold":0.4,"decay":1,"freq":65,"freqEnd":48,"gain":0.26,"seed":20600},"at":0.05}]} },
     ],
   },
-  planetDeath: {
-    label: "Planet Death",
-    context: "A planet dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
-    current: 'planetDeath',
+  stationDeath: {
+    label: "MiningStation Death",
+    context: "A station dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
+    current: 'stationDeath',
     candidates: [
-      { id: 'a', character: "deep collapsing sine descent", spec: {"name":"planetDeath_a","layers":[{"spec":{"name":"planetDeath_a_coreFall","wave":"sine","attack":0.02,"hold":0.3,"decay":1.3,"punch":0.3,"freq":180,"freqEnd":28,"gain":0.42,"seed":20601}},{"spec":{"name":"planetDeath_a_dustNoise","wave":"noise","attack":0.05,"hold":0.4,"decay":1.2,"freq":150,"freqEnd":35,"lowPass":600,"gain":0.28,"seed":20602},"at":0.1},{"spec":{"name":"planetDeath_a_subToll","wave":"triangle","attack":0.01,"hold":0.1,"decay":1.4,"freq":80,"freqEnd":70,"gain":0.2,"seed":20603},"at":0.15}]} },
-      { id: 'b', character: "muffled noise implosion, sub-bass swallow", spec: {"name":"planetDeath_b","layers":[{"spec":{"name":"planetDeath_b_implode","wave":"noise","attack":0.03,"hold":0.35,"decay":1.25,"freq":130,"freqEnd":25,"lowPass":350,"gain":0.5,"seed":20604}},{"spec":{"name":"planetDeath_b_subDrone","wave":"sine","attack":0.4,"hold":0.5,"decay":0.8,"freq":55,"freqEnd":42,"gain":0.3,"seed":20605},"at":0.05},{"spec":{"name":"planetDeath_b_crackle","wave":"noise","attack":0.15,"hold":0.2,"decay":0.9,"freq":200,"freqEnd":60,"highPass":400,"lowPass":1200,"gain":0.12,"seed":20606},"at":0.3}]} },
-      { id: 'c', character: "slow tolling drone, cracking decay", spec: {"name":"planetDeath_c","layers":[{"spec":{"name":"planetDeath_c_toll","wave":"triangle","attack":0.02,"hold":0.15,"decay":1.5,"freq":110,"freqEnd":85,"gain":0.4,"seed":20607}},{"spec":{"name":"planetDeath_c_rumbleBed","wave":"sine","attack":0.3,"hold":0.4,"decay":1,"freq":48,"freqEnd":38,"gain":0.3,"seed":20608},"at":0.05},{"spec":{"name":"planetDeath_c_crustNoise","wave":"noise","attack":0.05,"hold":0.3,"decay":1.1,"freq":160,"freqEnd":50,"lowPass":700,"gain":0.25,"seed":20609},"at":0.15}]} },
+      { id: 'a', character: "deep collapsing sine descent", spec: {"name":"stationDeath_a","layers":[{"spec":{"name":"stationDeath_a_coreFall","wave":"sine","attack":0.02,"hold":0.3,"decay":1.3,"punch":0.3,"freq":180,"freqEnd":28,"gain":0.42,"seed":20601}},{"spec":{"name":"stationDeath_a_dustNoise","wave":"noise","attack":0.05,"hold":0.4,"decay":1.2,"freq":150,"freqEnd":35,"lowPass":600,"gain":0.28,"seed":20602},"at":0.1},{"spec":{"name":"stationDeath_a_subToll","wave":"triangle","attack":0.01,"hold":0.1,"decay":1.4,"freq":80,"freqEnd":70,"gain":0.2,"seed":20603},"at":0.15}]} },
+      { id: 'b', character: "muffled noise implosion, sub-bass swallow", spec: {"name":"stationDeath_b","layers":[{"spec":{"name":"stationDeath_b_implode","wave":"noise","attack":0.03,"hold":0.35,"decay":1.25,"freq":130,"freqEnd":25,"lowPass":350,"gain":0.5,"seed":20604}},{"spec":{"name":"stationDeath_b_subDrone","wave":"sine","attack":0.4,"hold":0.5,"decay":0.8,"freq":55,"freqEnd":42,"gain":0.3,"seed":20605},"at":0.05},{"spec":{"name":"stationDeath_b_crackle","wave":"noise","attack":0.15,"hold":0.2,"decay":0.9,"freq":200,"freqEnd":60,"highPass":400,"lowPass":1200,"gain":0.12,"seed":20606},"at":0.3}]} },
+      { id: 'c', character: "slow tolling drone, cracking decay", spec: {"name":"stationDeath_c","layers":[{"spec":{"name":"stationDeath_c_toll","wave":"triangle","attack":0.02,"hold":0.15,"decay":1.5,"freq":110,"freqEnd":85,"gain":0.4,"seed":20607}},{"spec":{"name":"stationDeath_c_rumbleBed","wave":"sine","attack":0.3,"hold":0.4,"decay":1,"freq":48,"freqEnd":38,"gain":0.3,"seed":20608},"at":0.05},{"spec":{"name":"stationDeath_c_crustNoise","wave":"noise","attack":0.05,"hold":0.3,"decay":1.1,"freq":160,"freqEnd":50,"lowPass":700,"gain":0.25,"seed":20609},"at":0.15}]} },
     ],
   },
   matchEnd: {

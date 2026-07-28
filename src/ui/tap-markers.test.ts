@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { tapMarkersModel } from './tap-markers';
 import type { TapMarkerInput } from './tap-markers';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 const base: TapMarkerInput = {
   owner: 0,

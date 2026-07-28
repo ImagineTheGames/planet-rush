@@ -4,7 +4,7 @@
  *
  * GDD §4.3 states the performance budget as a scene, not a feeling:
  *
- * > "8 ships, up to 32 turrets (design cap 4 × 8 planets), ~200 asteroids, hundreds
+ * > "8 ships, up to 32 turrets (design cap 4 × 8 stations), ~200 asteroids, hundreds
  * > of projectiles at 60 fps on integrated graphics … **Mobile gate:** 60 fps on the
  * > developer's own phone … with a 30 fps floor on a 3-year-old mid-range Android."
  *
@@ -72,10 +72,10 @@ export const SIM_BUDGET_30_MS = FRAME_BUDGET_30_MS * SIM_FRAME_SHARE;
  *  feasible" (GDD §4.3). */
 export const STRESS_SCENE = {
   ships: 8,
-  /** 4 turrets × 8 planets — the design cap, all of it built. */
-  turrets: TURRET.capPerPlanet * 8,
-  /** 2 shields × 8 planets — the design cap, all of it built. */
-  shields: SHIELD.capPerPlanet * 8,
+  /** 4 turrets × 8 stations — the design cap, all of it built. */
+  turrets: TURRET.capPerStation * 8,
+  /** 2 shields × 8 stations — the design cap, all of it built. */
+  shields: SHIELD.capPerStation * 8,
   asteroids: 200,
   /**
    * "Hundreds of projectiles" is a budget line, not a reachable state: 32
@@ -100,12 +100,12 @@ export interface StressOptions {
   readonly asteroids?: number;
   readonly projectiles?: number;
   readonly chunks?: number;
-  /** Build the full turret/shield caps on every planet. Default true. */
+  /** Build the full turret/shield caps on every station. Default true. */
   readonly maxDefenses?: boolean;
 }
 
 /**
- * Build the GDD §4.3 scene: a full 8-planet ring, every planet at its turret and
+ * Build the GDD §4.3 scene: a full 8-station ring, every station at its turret and
  * shield cap, ~200 asteroids, a seeded drift of ore chunks, and a projectile pool
  * filled to the budget.
  *
@@ -127,7 +127,7 @@ export function stressWorld(options: StressOptions = {}): World {
     })),
     asteroidCount: requested,
   });
-  // `createWorld` now seeds each planet's identical home field on top of the
+  // `createWorld` now seeds each station's identical home field on top of the
   // commons wave (fair-resources field rule v0.1.2), so the opening field is a
   // little larger than `asteroidCount`. This is a synthetic profiling scene that
   // wants an exact rock count — the home/commons mix is immaterial to frame
@@ -135,29 +135,29 @@ export function stressWorld(options: StressOptions = {}): World {
   if (world.asteroids.length > requested) world.asteroids.length = requested;
 
   if (options.maxDefenses !== false) {
-    for (const planet of world.planets) {
-      for (let slot = 0; slot < TURRET.capPerPlanet; slot++) {
-        const pos = turretMountPos(planet, slot);
-        planet.turrets.push({
+    for (const station of world.stations) {
+      for (let slot = 0; slot < TURRET.capPerStation; slot++) {
+        const pos = turretMountPos(station, slot);
+        station.turrets.push({
           id: world.nextEntityId++,
-          owner: planet.owner,
+          owner: station.owner,
           slot,
           pos: { x: pos.x, y: pos.y },
           radius: TURRET.radius,
           hp: TURRET.hp,
           maxHp: TURRET.hp,
-          angle: planet.angle,
+          angle: station.angle,
           cooldown: 0,
           targetId: null,
         });
       }
-      for (let i = 0; i < SHIELD.capPerPlanet; i++) {
-        planet.shields.push({ id: world.nextEntityId++, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius });
+      for (let i = 0; i < SHIELD.capPerStation; i++) {
+        station.shields.push({ id: world.nextEntityId++, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius });
       }
       // Spawn protection would make every core untargetable for the first ten
       // seconds, so the turrets would have nothing to shoot at during the
       // profile. The scene starts as a mid-match snapshot.
-      planet.spawnProtect = 0;
+      station.spawnProtect = 0;
     }
   }
 
@@ -340,7 +340,7 @@ export function profile(label: string, ticks = 600, options: StressOptions = {})
   // measurement, not the scene the measurement was taken on.
   let turrets = 0;
   let shields = 0;
-  for (const p of world.planets) {
+  for (const p of world.stations) {
     turrets += p.turrets.length;
     shields += p.shields.length;
   }

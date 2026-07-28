@@ -73,9 +73,9 @@ function board(): World {
     // neither enters the view nor sits on anybody's approach path.
     if (ship.id >= 2) ship.pos = { x: -3000, y: -3000 };
   }
-  for (const planet of world.planets) {
-    planet.spawnProtect = 0;
-    planet.sinceDamage = 999;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
   }
   return world;
 }
@@ -251,13 +251,13 @@ describe('the scenario, driven end to end (p11 point 4)', () => {
     const B = { x: 670, y: 1200 };
     // The threat parks dead on the eastward run to A — well past the bot's own
     // break-off range, so the bot re-sites rather than flees — and on its own
-    // planet, so it reads as defended, not exposed.
+    // station, so it reads as defended, not exposed.
     const threatPos = { x: 1680, y: 1200 };
-    world.planets[0]!.pos = { x: 220, y: 220 }; // the bot's home, out of the way
-    world.planets[1]!.pos = { x: threatPos.x, y: threatPos.y };
-    for (const planet of world.planets) {
-      planet.spawnProtect = 0;
-      planet.sinceDamage = 999;
+    world.stations[0]!.pos = { x: 220, y: 220 }; // the bot's home, out of the way
+    world.stations[1]!.pos = { x: threatPos.x, y: threatPos.y };
+    for (const station of world.stations) {
+      station.spawnProtect = 0;
+      station.sinceDamage = 999;
     }
 
     const [bot] = createBots([{ id: 0, personality: 'sable' }], { seed: 7 });

@@ -257,7 +257,7 @@ export interface Confirmation {
  *
  * Only spends are celebrated on the wheel. Banking is no longer one of them: ore
  * auto-deposits in the atmosphere (p4-11), an ambient event whose tell is the
- * planet's atmosphere halo brightening and the top-left TOTAL climbing — not a
+ * station's atmosphere halo brightening and the top-left TOTAL climbing — not a
  * wheel float, which would have nowhere to launch from now the BANK wedge is gone.
  * A rejected press moves nothing, which is the whole point.
  */
@@ -474,7 +474,7 @@ export class PressFeedback {
   }
 
   /** The strongest core-shimmer alpha this frame (repair confirmations only), for
-   *  the planet-HP bar / core tell. 0 when no repair is confirming. */
+   *  the station-HP bar / core tell. 0 when no repair is confirming. */
   coreShimmer(time: number): number {
     this.prune(time);
     let best = 0;

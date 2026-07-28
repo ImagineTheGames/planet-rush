@@ -20,7 +20,7 @@ describe('buildButtonVisible — the persistence rule', () => {
     expect(buildButtonVisible({ docked: true, isTouch: true })).toBe(true);
   });
 
-  it('is hidden away from the planet (undocked) — the one thing that hides it', () => {
+  it('is hidden away from the station (undocked) — the one thing that hides it', () => {
     expect(buildButtonVisible({ docked: false, isTouch: true })).toBe(false);
   });
 

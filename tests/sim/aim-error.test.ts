@@ -96,7 +96,7 @@ function makeWorld(ships: Ship[]): World {
     ships,
     asteroids: [],
     chunks: [],
-    planets: [],
+    stations: [],
     projectiles: [],
     bounds: { width: 20000, height: 20000 },
     fieldRadius: 600,

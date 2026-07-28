@@ -16,8 +16,8 @@
  * — above the bar's own top, using the same bar geometry the bar layer draws with
  * ({@link ./healthbar} `HEALTHBAR_*`), so the name can *never* cover the bar
  * (rule 3); the number sits beside the bar and so stays out of this vertical stack
- * entirely. A planet label sits above the planet, clear of its HP pin / damage
- * ring, by the planet's own screen radius plus a gap.
+ * entirely. A station label sits above the station, clear of its HP pin / damage
+ * ring, by the station's own screen radius plus a gap.
  *
  * **Pooling (GDD §4.3, risk 5).** Text objects are allocated once and reused: a
  * frame with N labels touches the first N pooled Texts (set text/tint/position —
@@ -57,8 +57,8 @@ const FONT_SIZE = 12;
 /** Clearance above a ship's health-bar cluster to the label's baseline, CSS px —
  *  so name, bar and ship stack as one unit without touching. */
 export const NAMEPLATE_SHIP_GAP = 3;
-/** Clearance above a planet's screen radius (its HP pin) to the label, CSS px. */
-export const NAMEPLATE_PLANET_GAP = 8;
+/** Clearance above a station's screen radius (its HP pin) to the label, CSS px. */
+export const NAMEPLATE_STATION_GAP = 8;
 
 /** Horizontal gap between the name and its difficulty suffix, CSS px — enough to
  *  read "SABLE (HARD)" as name-then-metadata, not one run-on word. */
@@ -73,7 +73,7 @@ export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
  * {@link NameplateView.enableDebugCapture} has been called — the ?debug=1
  * live-stage seam behind {@link NameplateView.debugPlates}. It lets a Playwright
  * test read back that a *drawn* label, with the lobby's text and the owner's
- * colour, tracks a given ship/planet on a real boot (the same discipline the
+ * colour, tracks a given ship/station on a real boot (the same discipline the
  * health bars needed after shipping dead twice). Never written in a normal build.
  */
 export interface DrawnNameplate {
@@ -179,10 +179,10 @@ export class NameplateView extends Container {
   }
 
   /** Vertical clearance from the entity centre to the label's bottom edge, so the
-   *  label clears the entity's status cluster (a ship's health bar, a planet's HP
+   *  label clears the entity's status cluster (a ship's health bar, a station's HP
    *  pin) and the three stack as one unit (field request rule 1). */
   private clusterClearance(plate: Nameplate): number {
-    if (plate.kind === 'planet') return plate.radius + NAMEPLATE_PLANET_GAP;
+    if (plate.kind === 'station') return plate.radius + NAMEPLATE_STATION_GAP;
     // Ship: clear the sprite, the bar gap, and the bar itself, then a hair more.
     const barHeight = plate.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
     return plate.radius + HEALTHBAR_GAP + barHeight + NAMEPLATE_SHIP_GAP;
@@ -199,7 +199,7 @@ export class NameplateView extends Container {
 
   /** The labels that actually drew last frame (post-cull) — owner, text, colour,
    *  kind and screen position — for a live-stage test to assert a real label
-   *  tracks a ship/planet. Empty unless {@link enableDebugCapture} was called. */
+   *  tracks a ship/station. Empty unless {@link enableDebugCapture} was called. */
   debugPlates(): DrawnNameplate[] {
     return this.debugDrawn.slice(0, this.debugCount).map((d) => ({ ...d }));
   }

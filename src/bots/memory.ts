@@ -24,14 +24,14 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
-import type { BotView, PerceivedPlanet, PerceivedShip } from './perception';
+import type { BotView, PerceivedStation, PerceivedShip } from './perception';
 
 // ---------------------------------------------------------------------------
 // Remembered facts
 // ---------------------------------------------------------------------------
 
 /** What a bot last knew about a rival's home. */
-export interface PlanetMemo {
+export interface StationMemo {
   readonly owner: PlayerId;
   /** Position and wreck state are public at any range (GDD §2.2), so these are
    *  always current rather than remembered. */
@@ -79,7 +79,7 @@ export interface LootMemo {
  * own `view.time`.
  */
 export class BotMemory {
-  private readonly planets = new Map<PlayerId, PlanetMemo>();
+  private readonly stations = new Map<PlayerId, StationMemo>();
   private readonly ships = new Map<PlayerId, ShipMemo>();
   private loot: LootMemo | null = null;
   /** Sim time of the most recent `observe`. */
@@ -92,15 +92,15 @@ export class BotMemory {
    */
   observe(view: BotView): void {
     this.time = view.time;
-    for (const planet of view.planets) this.notePlanet(planet, view.time);
+    for (const station of view.stations) this.noteStation(station, view.time);
     for (const ship of view.ships) this.noteShip(ship, view.time);
     this.noteLoot(view);
   }
 
-  private notePlanet(seen: PerceivedPlanet, now: number): void {
-    const memo = this.planets.get(seen.owner);
+  private noteStation(seen: PerceivedStation, now: number): void {
+    const memo = this.stations.get(seen.owner);
     if (!memo) {
-      this.planets.set(seen.owner, {
+      this.stations.set(seen.owner, {
         owner: seen.owner,
         pos: { x: seen.pos.x, y: seen.pos.y },
         radius: seen.radius,
@@ -176,8 +176,8 @@ export class BotMemory {
   }
 
   /** The remembered home of a slot, or null if this bot has never seen it. */
-  planet(owner: PlayerId): PlanetMemo | null {
-    return this.planets.get(owner) ?? null;
+  station(owner: PlayerId): StationMemo | null {
+    return this.stations.get(owner) ?? null;
   }
 
   /**
@@ -191,10 +191,10 @@ export class BotMemory {
     return this.time - memo.seenAt <= window ? memo : null;
   }
 
-  /** How stale a planet's scouted numbers are, in seconds; `Infinity` if never
+  /** How stale a station's scouted numbers are, in seconds; `Infinity` if never
    *  scouted. The number Hard bots discount an opportunity by. */
-  planetAge(owner: PlayerId): number {
-    const memo = this.planets.get(owner);
+  stationAge(owner: PlayerId): number {
+    const memo = this.stations.get(owner);
     if (!memo || memo.coreFraction === null) return Number.POSITIVE_INFINITY;
     return this.time - memo.scoutedAt;
   }

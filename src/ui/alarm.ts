@@ -33,7 +33,7 @@
  * screen-edge arrow, the haptic `alarm` pattern, and the audio alarm all key off
  * it, so they can never disagree (GDD §2.2 pairs the alarm and the arrow in one
  * sentence — one sentence, one state machine). It is fed **only** damage to the
- * local player's own planet; a bot war three planets away is none of its
+ * local player's own station; a bot war three stations away is none of its
  * business, and the endgame's collapse decay is entropy, not an attacker, so the
  * caller filters both out before feeding it (see `hud.updateAlarm`).
  *
@@ -67,24 +67,24 @@ export const ALARM_DRAIN_HP_PER_S = 2;
 
 /**
  * Seconds the alarm stays up after the pressure falls away. Weapon damage arrives
- * one tick at a time and an attacker circling a planet has gaps; without a hold
+ * one tick at a time and an attacker circling a station has gaps; without a hold
  * the alarm would flicker, and a flickering alarm is one a player learns to
  * ignore. TUNABLE.
  */
 export const ALARM_HOLD_S = 5;
 
-/** Which part of your planet drove the alarm this tick — the three the GDD names
+/** Which part of your station drove the alarm this tick — the three the GDD names
  *  ("your core, your shields, your turrets"), or nothing on a quiet tick. */
 export type AlarmSource = 'core' | 'shield' | 'turret' | 'none';
 
 /**
- * Per-tick damage to your **own** planet, split by where it landed so the alarm
+ * Per-tick damage to your **own** station, split by where it landed so the alarm
  * can name its cause. A plain `number` is still accepted by
  * {@link UnderAttackAlarm.update} and is treated as core-equivalent damage.
  *
  * All fields are HP lost this tick; a caller passes the *fall* in each pool, so
  * negatives (repair, shield regen) never appear — only being hurt is an attack.
- * The caller is also responsible for feeding only the local player's planet and
+ * The caller is also responsible for feeding only the local player's station and
  * for subtracting collapse decay (entropy is not an attacker — GDD §2.3 vs §2.2).
  */
 export interface AlarmDamage {
@@ -120,7 +120,7 @@ export interface AlarmCause {
   readonly reason: AlarmReason;
   /** Which pool took the most damage this tick (the alarm's prime suspect). */
   readonly source: AlarmSource;
-  /** Attack HP counted against your planet this tick — after the caller's
+  /** Attack HP counted against your station this tick — after the caller's
    *  ownership and collapse filtering, so a phantom shows up as `0` here. */
   readonly damage: number;
   /** Bucket fill toward the threshold, 0..1. */
@@ -159,8 +159,8 @@ function splitDamage(damage: number | AlarmDamage): {
 
 /**
  * The under-attack alarm's trigger state (GDD §2.2). Feed it every frame with
- * the damage your **planet** took this tick — core, shields, and turrets all
- * count, because all three are "your planet is being attacked."
+ * the damage your **station** took this tick — core, shields, and turrets all
+ * count, because all three are "your station is being attacked."
  *
  * Deliberately a small mutable object rather than a pure function: "sustained"
  * is a statement about history, and history has to live somewhere. Everything
@@ -184,7 +184,7 @@ export class UnderAttackAlarm {
    * Advance one tick and return whether the alarm is sounding.
    *
    * @param dt     Seconds elapsed (the sim's fixed timestep).
-   * @param damage HP of damage your planet took this tick. Either the total (a
+   * @param damage HP of damage your station took this tick. Either the total (a
    *               `number`), or an {@link AlarmDamage} split by core/shield/turret
    *               so the recorded {@link cause} can name what rang the alarm.
    *               Zero / omitted on a quiet tick.
@@ -261,7 +261,7 @@ export class UnderAttackAlarm {
     return Math.min(1, this.bucket / ALARM_THRESHOLD_HP);
   }
 
-  /** Clear everything — a fresh match, or a planet that just died. */
+  /** Clear everything — a fresh match, or a station that just died. */
   reset(): void {
     this.bucket = 0;
     this.hold = 0;
@@ -296,8 +296,8 @@ export interface HomeArrow {
   readonly angle: number;
   /**
    * True when home is already visible inside the inset rect. The arrow is a
-   * *pointer to somewhere you can't see*; once you can see the planet, the
-   * planet is the tell and the arrow is clutter — the view hides it.
+   * *pointer to somewhere you can't see*; once you can see the station, the
+   * station is the tell and the arrow is clutter — the view hides it.
    */
   readonly onScreen: boolean;
   /** World distance from the ship to home. The view fades/scales with this, and
@@ -319,7 +319,7 @@ export const ARROW_EDGE_INSET = 28;
  * needed, and the arrow can be computed from sim positions alone.
  *
  * @param ship   The local ship's world position (the camera target).
- * @param home   The player's own planet's world position.
+ * @param home   The player's own station's world position.
  * @param vp     The visible viewport size, CSS px.
  * @param inset  Safe-area inset from each edge; defaults to {@link ARROW_EDGE_INSET}.
  */
@@ -335,7 +335,7 @@ export function homeArrow(
   const dy = home.y - ship.y;
   const distance = Math.hypot(dx, dy);
 
-  // Standing on your own planet: no direction to point in, nothing to point at.
+  // Standing on your own station: no direction to point in, nothing to point at.
   if (distance < 1e-6) {
     return { x: cx, y: cy, angle: 0, onScreen: true, distance: 0 };
   }

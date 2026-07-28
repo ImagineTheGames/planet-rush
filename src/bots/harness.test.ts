@@ -52,7 +52,7 @@ describe('harness — filling the lobby', () => {
     const seats = fillEmptySlots([0, 3]);
     expect(seats.map((s) => s.id)).toEqual([1, 2, 4, 5, 6, 7]);
     expect(seats).toEqual(fillEmptySlots([0, 3]));
-    // A 3-human classroom match is still an 8-planet war (GDD §4.2).
+    // A 3-human classroom match is still an 8-station war (GDD §4.2).
     expect(fillEmptySlots([0, 1, 2])).toHaveLength(5);
   });
 

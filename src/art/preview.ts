@@ -73,7 +73,7 @@ export function buildContactSheet(entries: readonly CatalogueEntry[] = ART_CATAL
   let y = PAD;
 
   parts.push(
-    `<text x="${PAD}" y="${y + 20}" font-family="Audiowide, ui-sans-serif, sans-serif" font-size="22" fill="${hex(PALETTE.hullSteel)}">PLANET RUSH — procedural sprite set</text>`,
+    `<text x="${PAD}" y="${y + 20}" font-family="Audiowide, ui-sans-serif, sans-serif" font-size="22" fill="${hex(PALETTE.hullSteel)}">STATION RUSH — procedural sprite set</text>`,
     caption(
       'Cold Vacuum · generated from src/art/ · regenerate with UPDATE_ART_PREVIEW=1 npx vitest run src/art/preview.test.ts',
       PAD + 320,

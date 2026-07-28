@@ -20,7 +20,7 @@
  * *larger* style from every other bar — including the player's own **turrets**.
  *
  * **Turrets show health when damaged (field request v0.2.2).** The first cut had
- * the player's own turrets read off the planet's aggregate HOME HP readout and so
+ * the player's own turrets read off the station's aggregate HOME HP readout and so
  * carry no bar. Playing a live build overruled that: *a turret taking fire is a
  * fight, and a turret is a thing you defend* — you want to see which of your
  * defences is nearly dead, not just an aggregate. So now **every** turret, yours
@@ -30,7 +30,7 @@
  * by ownership. Its bar is the enemy-sized narrow bar in the **owner's colour**
  * (so a local turret is your player colour, smaller than the own-ship bar), never
  * the larger `local` own-ship style. And because a turret now slides around its
- * planet's rim (sim orbit, P1), the caller projects the turret's live orbit
+ * station's rim (sim orbit, P1), the caller projects the turret's live orbit
  * position each frame, so the bar rides along with it.
  *
  * **What gets a bar** (the decision this module owns and unit-tests):
@@ -56,7 +56,7 @@
  *
  * **Colour** is the owner's identity colour (style-guide §3 rule 2 — hull/HP bars
  * are one of the few places player colour is allowed), read through the same
- * roster resolver [[planet-hp]] uses so a ship's trim and its bar can never
+ * roster resolver [[station-hp]] uses so a ship's trim and its bar can never
  * disagree. Threat red is deliberately **not** used here: red is *your* danger
  * (the under-attack alarm, your critical core), never a neutral tell over someone
  * else's ship (style-guide §2), so a low-HP enemy simply shows a short bar in its
@@ -71,7 +71,7 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
 // Geometry (CSS px; the Application handles devicePixelRatio) — the bar is
@@ -150,7 +150,7 @@ export interface Combatant {
    *  the player colour, not the own-ship style. Absent/false for every enemy and
    *  hostile. */
   readonly local?: boolean;
-  /** True for a turret — a planet-mounted defence, yours or an enemy's (field
+  /** True for a turret — a station-mounted defence, yours or an enemy's (field
    *  request v0.2.2). A turret gets a bar by the same damaged-or-in-combat rule as
    *  a ship; the flag is what lifts a *local* turret out of the ownership
    *  suppression (own turrets used to read off the HOME HP readout and show
@@ -191,8 +191,8 @@ export interface HealthBar {
 
 /**
  * The compact `"68/70"` current/max HP readout drawn beside a health bar (field
- * request v0.2.4) — the same treatment the planet core got in
- * {@link ./planet-hp} `coreHpReadout`, now for every ship and turret so there is
+ * request v0.2.4) — the same treatment the station core got in
+ * {@link ./station-hp} `coreHpReadout`, now for every ship and turret so there is
  * one health-bar component and one rule. Current HP **ceils** for a living
  * entity (field report — a living thing never displays 0: 0.4 hp reads `"1"`, not
  * `"0"`, because the floored readout made a ship at 0.4 hull read `0/70` and lied
@@ -215,8 +215,8 @@ export function hpReadout(hp: number, maxHp: number): string {
  * Current HP as the whole number a readout shows: a living entity (`hp > 0`)
  * **ceils** so it never rounds down to a lie — 0.4 → 1 — and clamps to `max`;
  * exactly-dead (`hp <= 0`) and non-finite hp are the only `0`. This is the one
- * "living things never display 0" rule the ship/turret readout and the planet
- * core readout ([[planet-hp]] `coreHpReadout`) both apply.
+ * "living things never display 0" rule the ship/turret readout and the station
+ * core readout ([[station-hp]] `coreHpReadout`) both apply.
  */
 export function livingWhole(hp: number, max: number): number {
   if (!Number.isFinite(hp) || hp <= 0) return 0;

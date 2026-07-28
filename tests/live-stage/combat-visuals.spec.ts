@@ -104,7 +104,7 @@ test.describe('combat visuals — every turret draws, not just the local player'
     )) as DrawnMuzzle[];
 
     // --- The turret firing: a muzzle flash on stage (the round-2 "turret never
-    //     visibly fires" bug). It is owned by a non-local planet here. ---
+    //     visibly fires" bug). It is owned by a non-local station here. ---
     expect(
       muzzles.length,
       'at least one turret muzzle flash is drawn (the round-2 "turret never fires" bug)',

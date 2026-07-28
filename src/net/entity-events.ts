@@ -3,7 +3,7 @@
  * how a client applies it. OWNER: Netcode Engineer (GDD §3.5, §4.2).
  *
  * Only ships and projectiles ride the 30 Hz binary snapshot (`./snapshot`).
- * Asteroids, planets, turrets, shields and wrecks are **events, sent on join and
+ * Asteroids, stations, turrets, shields and wrecks are **events, sent on join and
  * on change** (GDD §4.2) — they change a few times a minute, not sixty times a
  * second. This module owns both ends of that contract: the payload shapes (the
  * server's producer, `server/static-events.ts`, fills them in) and the client's
@@ -19,7 +19,7 @@
  * they report (a turret builds over ten seconds; a wave lands every two and a
  * half minutes).
  *
- * **Fog is honored by having nothing to honor** (GDD §2.2): a rival planet's
+ * **Fog is honored by having nothing to honor** (GDD §2.2): a rival station's
  * health is only *sent* while this client's ship is inside sensor range of it,
  * so a client that never receives the number cannot draw it. The applier below
  * writes whatever health it is given and asks no questions — the wire already
@@ -27,16 +27,16 @@
  */
 
 import type { PlayerId } from '@shared/types';
-import type { Asteroid, Planet, Shield, Turret, World } from '../sim';
+import type { Asteroid, MiningStation, Shield, Turret, World } from '../sim';
 import type { EntityEventMessage } from './transport';
 
 // ---------------------------------------------------------------------------
 // Payload shapes — plain data, one per entity kind
 // ---------------------------------------------------------------------------
 
-/** A planet's structure: where it is, whose it is, and whether it is a wreck.
- *  Deliberately **no HP** — that is {@link PlanetHealthData}'s job. */
-export interface PlanetEventData {
+/** A station's structure: where it is, whose it is, and whether it is a wreck.
+ *  Deliberately **no HP** — that is {@link StationHealthData}'s job. */
+export interface StationEventData {
   id: number;
   owner: PlayerId;
   x: number;
@@ -81,11 +81,11 @@ export interface ShieldEventData {
 }
 
 /**
- * The scouted half: one planet's live health, sent only to a client entitled to
+ * The scouted half: one station's live health, sent only to a client entitled to
  * see it. Turret and shield HP ride along, because a defender's alarm and a
  * scout's read of a siege are the same information (GDD §2.2, §2.6).
  */
-export interface PlanetHealthData {
+export interface StationHealthData {
   id: number;
   coreHp: number;
   shields: { id: number; hp: number }[];
@@ -108,7 +108,7 @@ export interface DestroyEventData {
  * Every branch is **idempotent and id-keyed**: the client predicts wave spawns
  * from the same seed the server used, so the authoritative spawn for an asteroid
  * it already has must correct that rock rather than deal a second one onto the
- * map. Anything it cannot place — an event for a planet that does not exist, a
+ * map. Anything it cannot place — an event for a station that does not exist, a
  * shape it does not recognize — is dropped rather than guessed at.
  */
 export function applyEntityEvent(world: World, message: EntityEventMessage): boolean {
@@ -128,14 +128,14 @@ export function applyEntityEvent(world: World, message: EntityEventMessage): boo
       return message.op === 'destroy'
         ? removeShield(world, data['id'])
         : applyShield(world, data as unknown as ShieldEventData);
-    case 'planet':
+    case 'station':
     case 'wreck':
-      // One `kind`, two payloads: structure (where the planet is, whether it is
+      // One `kind`, two payloads: structure (where the station is, whether it is
       // a wreck) and the scouted health the fog tracker sends. They are told
       // apart by the one field only health carries.
       return 'coreHp' in data
-        ? applyPlanetHealth(world, data as unknown as PlanetHealthData)
-        : applyPlanet(world, data as unknown as PlanetEventData);
+        ? applyStationHealth(world, data as unknown as StationHealthData)
+        : applyStation(world, data as unknown as StationEventData);
   }
 }
 
@@ -154,10 +154,10 @@ export function applyEntityEvent(world: World, message: EntityEventMessage): boo
 export function resetStaticEntities(world: World): void {
   world.asteroids.length = 0;
   world.chunks.length = 0;
-  for (const planet of world.planets) {
-    planet.turrets.length = 0;
-    planet.shields.length = 0;
-    planet.builds.length = 0;
+  for (const station of world.stations) {
+    station.turrets.length = 0;
+    station.shields.length = 0;
+    station.builds.length = 0;
   }
 }
 
@@ -202,9 +202,9 @@ function removeAsteroid(world: World, id: number): boolean {
 // --- Turrets and shields ---------------------------------------------------
 
 function applyTurret(world: World, data: TurretEventData): boolean {
-  const planet = world.planets.find((p) => p.owner === data.owner);
-  if (!planet) return false;
-  const existing = planet.turrets.find((t) => t.id === data.id);
+  const station = world.stations.find((p) => p.owner === data.owner);
+  if (!station) return false;
+  const existing = station.turrets.find((t) => t.id === data.id);
   if (existing) {
     existing.pos.x = data.x;
     existing.pos.y = data.y;
@@ -226,15 +226,15 @@ function applyTurret(world: World, data: TurretEventData): boolean {
     cooldown: 0,
     targetId: null,
   };
-  planet.turrets.push(turret);
+  station.turrets.push(turret);
   return true;
 }
 
 function removeTurret(world: World, id: number): boolean {
-  for (const planet of world.planets) {
-    const index = planet.turrets.findIndex((t) => t.id === id);
+  for (const station of world.stations) {
+    const index = station.turrets.findIndex((t) => t.id === id);
     if (index >= 0) {
-      planet.turrets.splice(index, 1);
+      station.turrets.splice(index, 1);
       return true;
     }
   }
@@ -242,62 +242,62 @@ function removeTurret(world: World, id: number): boolean {
 }
 
 function applyShield(world: World, data: ShieldEventData): boolean {
-  const planet = world.planets.find((p) => p.owner === data.owner);
-  if (!planet) return false;
-  const existing = planet.shields.find((s) => s.id === data.id);
+  const station = world.stations.find((p) => p.owner === data.owner);
+  if (!station) return false;
+  const existing = station.shields.find((s) => s.id === data.id);
   if (existing) {
     existing.radius = data.radius;
     existing.maxHp = data.maxHp;
     return true;
   }
   const shield: Shield = { id: data.id, hp: data.maxHp, maxHp: data.maxHp, radius: data.radius };
-  planet.shields.push(shield);
+  station.shields.push(shield);
   return true;
 }
 
 function removeShield(world: World, id: number): boolean {
-  for (const planet of world.planets) {
-    const index = planet.shields.findIndex((s) => s.id === id);
+  for (const station of world.stations) {
+    const index = station.shields.findIndex((s) => s.id === id);
     if (index >= 0) {
-      planet.shields.splice(index, 1);
+      station.shields.splice(index, 1);
       return true;
     }
   }
   return false;
 }
 
-// --- Planets ---------------------------------------------------------------
+// --- Stations ---------------------------------------------------------------
 
-function applyPlanet(world: World, data: PlanetEventData): boolean {
-  const planet = findPlanet(world, data.id);
-  if (!planet) return false;
-  planet.pos.x = data.x;
-  planet.pos.y = data.y;
-  planet.radius = data.radius;
-  planet.deathTime = data.deathTime;
-  // The wreck is the planet (GDD §2.7) — it keeps its place on the map for the
+function applyStation(world: World, data: StationEventData): boolean {
+  const station = findStation(world, data.id);
+  if (!station) return false;
+  station.pos.x = data.x;
+  station.pos.y = data.y;
+  station.radius = data.radius;
+  station.deathTime = data.deathTime;
+  // The wreck is the station (GDD §2.7) — it keeps its place on the map for the
   // rest of the match, so death is a flag flipping, never an entity leaving.
-  planet.alive = data.alive;
+  station.alive = data.alive;
   return true;
 }
 
-function applyPlanetHealth(world: World, data: PlanetHealthData): boolean {
-  const planet = findPlanet(world, data.id);
-  if (!planet) return false;
-  planet.coreHp = data.coreHp;
+function applyStationHealth(world: World, data: StationHealthData): boolean {
+  const station = findStation(world, data.id);
+  if (!station) return false;
+  station.coreHp = data.coreHp;
   for (const row of data.shields) {
-    const shield = planet.shields.find((s) => s.id === row.id);
+    const shield = station.shields.find((s) => s.id === row.id);
     if (shield) shield.hp = row.hp;
   }
   for (const row of data.turrets) {
-    const turret = planet.turrets.find((t) => t.id === row.id);
+    const turret = station.turrets.find((t) => t.id === row.id);
     if (turret) turret.hp = row.hp;
   }
   return true;
 }
 
-function findPlanet(world: World, id: number): Planet | undefined {
-  return world.planets.find((p) => p.id === id);
+function findStation(world: World, id: number): MiningStation | undefined {
+  return world.stations.find((p) => p.id === id);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

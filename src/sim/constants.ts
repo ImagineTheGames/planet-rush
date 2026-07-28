@@ -76,7 +76,7 @@ export const CARGO_PER_TIER: Tunable<number> = 2;
 /** Cargo hold hard cap across all upgrades (GDD §2.8). TUNABLE */
 export const CARGO_CAP_MAX: Tunable<number> = 8;
 
-/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-planet cap, plus
+/** Turret (GDD §2.8): cost · HP · DPS · build time (s) · per-station cap, plus
  *  the geometry and rate of fire the sim needs to actually shoot. `dps` stays
  *  the single balance number: per-shot damage is *derived* (`dps *
  *  fireInterval`), so retuning DPS retunes the turret and nothing else drifts.
@@ -86,7 +86,7 @@ export const TURRET = {
   hp: 30,
   dps: 4,
   buildTime: 10,
-  capPerPlanet: 4,
+  capPerStation: 4,
   /** Engagement radius (world units). Deliberately *under* `WEAPON_RANGE` (260):
    *  GDD §2.6 — "a patient attacker can pick off turrets from the edge of their
    *  range." That only exists as a skill if the ship out-ranges the turret. */
@@ -98,17 +98,17 @@ export const TURRET = {
   projectileSpeed: 700,
   /** Turret collision radius (it is a shot target — GDD §2.6 "turrets deter"). */
   radius: 12,
-  /** Mount height above the planet surface; turret slots ring the planet. */
+  /** Mount height above the station surface; turret slots ring the station. */
   mountOffset: 12,
   /** Rotation rate (rad/s) tracking its target — the "telegraph its threat while
    *  spinning" read (style-guide §5.5). Aim never gates the shot; DPS is DPS. */
   turnRate: 3.0,
   /**
-   * How fast a turret *slides around its planet's rim* toward the point whose
+   * How fast a turret *slides around its station's rim* toward the point whose
    * outward surface normal faces its target (field report P1). This is the whole
    * turret moving, not just the barrel (`turnRate`), so it is deliberately slower:
    * the turret **glides**, it never teleports. Because the target bearing is
-   * measured from the planet centre it does not depend on where the turret
+   * measured from the station centre it does not depend on where the turret
    * currently sits, so `turnToward` converges monotonically and then *stops* —
    * the cap is what guarantees a glide with no oscillation (rad/s). TUNABLE
    */
@@ -155,7 +155,7 @@ export const PROJECTILE = {
 /**
  * The **turret tier ladder** (parity field report v0.2.2). The enemy fields
  * turrets; so can the player — and once a turret stands, the player can make it
- * *better* (GDD §2.5 "built at your own planet", §2.6 "turrets deter"). Each
+ * *better* (GDD §2.5 "built at your own station", §2.6 "turrets deter"). Each
  * `Mk` is a fuller combat profile than the last: tankier (`hp`), harder-hitting
  * (`dps`, and so per-shot `dps × fireInterval`), faster (`fireInterval`), and
  * with a touch more reach (`range`).
@@ -360,7 +360,7 @@ export const PROJECTILE_CORE_FACTOR: Tunable<number> = WEAPON_DPS_CORE / WEAPON_
 export const MINING_YIELD_PER_HIT: Tunable<number> = MINING_RATE * SHIP_WEAPON.fireInterval;
 
 /** Shield generator (GDD §2.8): cost · HP · regen/s · regen delay after last
- *  hit (s) · build time (s) · per-planet cap. Regenerates only after
+ *  hit (s) · build time (s) · per-station cap. Regenerates only after
  *  `regenDelay` undamaged seconds (GDD §2.6 "pressure beats regeneration"). TUNABLE */
 export const SHIELD = {
   cost: 5,
@@ -368,7 +368,7 @@ export const SHIELD = {
   regenPerSecond: 2,
   regenDelay: 8,
   buildTime: 15,
-  capPerPlanet: 2,
+  capPerStation: 2,
   /** Bubble radius over the core; sensor range is defined as 2× this. TUNABLE */
   radius: 90,
 } as const;
@@ -377,7 +377,7 @@ export const SHIELD = {
  * Repair core — a DISCRETE purchase (developer, 2026-07-26; supersedes the
  * GDD §2.5 channel — see docs/design-amendments.md). One wheel press = one
  * purchase: spend `REPAIR_ORE_COST` ore, restore `REPAIR_HP_PER_ORE` core HP,
- * clamped at the core max. Planet core only, never the ship. No channel, no
+ * clamped at the core max. Station core only, never the ship. No channel, no
  * continuous drain, no stacking — N taps are N independent, individually
  * affordable-checked purchases. A core missing less than `REPAIR_HP_PER_ORE`
  * still costs the full ore and heals to full (the wheel SHOWS the real number,
@@ -403,19 +403,19 @@ export const REPAIR_TELL_HOLD: Tunable<number> = REPAIR_HP_PER_ORE / 2;
  * Default arena side length (world units). The bounds are a square this big
  * unless `WorldConfig.bounds` overrides them (the QA harness runs cramped
  * worlds on purpose). Grown from the v0.1 1920 (field report P1: at 1920 the
- * 8-planet ring sat hard against the wall) to give the ring generous breathing
- * room — the arena should feel like space, not a box the planets touch. The
- * ring is a *fraction* of the bounds (`PLANET.ringFraction`), so the ring scales
+ * 8-station ring sat hard against the wall) to give the ring generous breathing
+ * room — the arena should feel like space, not a box the stations touch. The
+ * ring is a *fraction* of the bounds (`STATION.ringFraction`), so the ring scales
  * with this; `WORLD_EDGE_MARGIN` is what actually guarantees the clearance. TUNABLE
  */
 export const WORLD_SIZE: Tunable<number> = 2400;
 
 /**
  * Breathing room between anything the sim spawns and the arena wall (world
- * units). **Nothing** — planet, ship, asteroid, ore chunk, wreck debris — is
+ * units). **Nothing** — station, ship, asteroid, ore chunk, wreck debris — is
  * placed within this distance of the bounds (field report P1). It is the hard
- * clearance guarantee: `createWorld` clamps the planet ring so the outermost
- * planet point clears the wall by this margin, and the spawners
+ * clearance guarantee: `createWorld` clamps the station ring so the outermost
+ * station point clears the wall by this margin, and the spawners
  * (`./waves`, wreck debris in `./match`) clamp every position through
  * `clampToMargin` below. Comfortably larger than any entity's own radius plus a
  * wreck's debris-ring reach (`WRECK.debrisRingOffset` + `CHUNK.radius`), so the
@@ -443,26 +443,26 @@ export function clampToMargin(
   return Math.min(Math.max(coord, lo), hi);
 }
 
-/** The home planet (GDD §2.1 ring layout, §2.5 "built at your own planet").
+/** The home station (GDD §2.1 ring layout, §2.5 "built at your own station").
  *  Not a §2.8 table row — the table prices the buildings, not the rock they sit
  *  on — but the sim cannot place a core without it. TUNABLE */
-export const PLANET = {
+export const STATION = {
   /** Core body radius: the collision/shot target and the mount ring for turrets. */
   radius: 64,
-  /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: planets
+  /** Ring radius as a fraction of the smaller arena dimension (GDD §2.1: stations
    *  in a ring around the central asteroid field). Lowered from the v0.1 0.42
    *  (field report P1): at 0.42 the ring sat at 0.84×halfMin and, once the
-   *  planet radius was added, touched the wall. At 0.32 the ring clears the wall
+   *  station radius was added, touched the wall. At 0.32 the ring clears the wall
    *  by more than `WORLD_EDGE_MARGIN` on the default arena while staying outboard
    *  of the ship ring. */
   ringFraction: 0.32,
-  /** How far outboard of the ship's spawn point the planet sits — the ship
-   *  spawns *orbiting* its home planet, between the planet and the field
+  /** How far outboard of the ship's spawn point the station sits — the ship
+   *  spawns *orbiting* its home station, between the station and the field
    *  (GDD §2.1). */
   orbitOffset: 96,
-  /** Ship-to-planet distance inside which the Build & Upgrade wheel is live:
+  /** Ship-to-station distance inside which the Build & Upgrade wheel is live:
    *  ordering, banking, and holding the repair channel all require it
-   *  (GDD §2.5 "your ship must sit at your planet"). Measured centre-to-centre. */
+   *  (GDD §2.5 "your ship must sit at your station"). Measured centre-to-centre. */
   dockRange: 160,
 } as const;
 
@@ -499,16 +499,16 @@ export const WAVE = {
 
 /**
  * Fair resource layout (developer field rule v0.1.2: "equally located resources
- * for every planet, before the fight begins — with neighbor resources and
+ * for every station, before the fight begins — with neighbor resources and
  * central ones as well"). Resource placement is a **fairness invariant**, not
  * scatter: the whole asteroid field is invariant under rotation by `2π / N`
  * about the arena centre, where `N` is the player count. See the invariant note
  * in `./waves`. Every value TUNABLE.
  *
- *  - **Home fields** are the per-planet "neighbour resources": one seeded
- *    canonical pattern, stamped around each planet rotated by that planet's ring
+ *  - **Home fields** are the per-station "neighbour resources": one seeded
+ *    canonical pattern, stamped around each station rotated by that station's ring
  *    angle, so all `N` home fields are IDENTICAL by construction — equal totals
- *    need no tolerance. They sit inboard of the planet (between it and the ring
+ *    need no tolerance. They sit inboard of the station (between it and the ring
  *    midline), OUTSIDE turret range, and clear of `WORLD_EDGE_MARGIN`.
  *  - **The commons** is the contested centre: a richer central field delivered
  *    by the asteroid waves, itself `N`-fold symmetric so mid-map favours nobody.
@@ -516,7 +516,7 @@ export const WAVE = {
 export const RESOURCE_FIELD = {
   /** Share of `FIELD_YIELD` delivered as the contested central commons — the
    *  rest (`1 - commonsShare`) funds the equal home neighbourhoods, split evenly
-   *  across the `N` planets. The commons holds this whole share; each home holds
+   *  across the `N` stations. The commons holds this whole share; each home holds
    *  `(1 - commonsShare) / N`, so the commons is richer than any single home
    *  field by construction. TUNABLE */
   commonsShare: 0.6,
@@ -551,7 +551,7 @@ export const RESOURCE_FIELD = {
    *  stronger — and costs the fairness invariant nothing (still `N`-fold
    *  symmetric, still the same `WAVE_ORE`). TUNABLE */
   commonsHoleFraction: 0.85,
-  /** Angular clearance (radians) kept around every planet spoke WITHIN the
+  /** Angular clearance (radians) kept around every station spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
    *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
@@ -559,30 +559,30 @@ export const RESOURCE_FIELD = {
   /** Canonical rocks per home field (before the `N`-fold stamp). TUNABLE */
   homeCount: 3,
   /**
-   * Home-field centre-radius band, as fractions of the planet ring radius:
-   * inboard of the planet (between it and the ring midline). Pulled in from the
+   * Home-field centre-radius band, as fractions of the station ring radius:
+   * inboard of the station (between it and the ring midline). Pulled in from the
    * v0.1.2 0.52–0.64 (field report P1: at 0.64 the nearest rock sat only ~215 u
    * from the ship's spawn point, so a ship leaving spawn bumped rock — the mobile
    * drag test measured 0.6–0.8 u/tick where open flight is expected). At
    * 0.44–0.47 the field sits well inboard of `SPAWN_CLEAR_POCKET`, and — with the
    * angular cone below — off the launch spoke entirely, so the outermost rock
-   * (~473 u from its planet) still clears turret range and the innermost still
+   * (~473 u from its station) still clears turret range and the innermost still
    * fits inside the measure radius `R`. TUNABLE
    */
   homeInnerFraction: 0.44,
   homeOuterFraction: 0.47,
   /**
-   * The home field is a two-lobe cone straddling its planet's spoke, NOT a blob
+   * The home field is a two-lobe cone straddling its station's spoke, NOT a blob
    * centred on it: every rock's angular offset from the spoke has magnitude in
    * `[homeConeInner, homeConeOuter]` radians (drawn per side), leaving a clear
    * wedge of half-angle `homeConeInner` along the spoke itself. That wedge is the
-   * launch corridor (field report P1): a ship spawns orbiting its planet and, on
+   * launch corridor (field report P1): a ship spawns orbiting its station and, on
    * the drag test, thrusts straight inboard *along its spoke* toward the centre —
    * so a rock sitting ON the spoke is one the launching ship rams. Under a slow
    * renderer (the CI software-WebGL profile) the test's gesture ramp alone flies
    * the ship a few hundred units before the measured window even opens, so the
    * spoke must be clear well past the field, not merely a pocket around the
-   * planet. `homeConeInner` is sized so the nearest lobe rock clears the ship's
+   * station. `homeConeInner` is sized so the nearest lobe rock clears the ship's
    * straight path by more than a ship+rock radius at the field's radius
    * (`homeInnerFraction × ring × sin(homeConeInner)` ≈ 75 u > ~62 u). The cone is
    * still symmetric about the spoke, so the field stays equidistant from both
@@ -591,29 +591,29 @@ export const RESOURCE_FIELD = {
   homeConeInner: 0.2,
   homeConeOuter: 0.3,
   /** Radius R around a home within which its local ore is measured for the
-   *  fairness invariant, as a fraction of the planet ring radius. Sized to
+   *  fairness invariant, as a fraction of the station ring radius. Sized to
    *  enclose the whole (now more-inboard, off-spoke) home field yet exclude both
    *  the commons and any neighbour's field, so "ore within R of each home" is
-   *  exactly one home field per planet — all `N` equal. The window is (max
+   *  exactly one home field per station — all `N` equal. The window is (max
    *  home-rock dist ≈ 513 u, min commons dist 557 u, min N=8 neighbour dist
    *  ≈ 539 u); R ≈ 527 u sits inside all three with room. TUNABLE */
   homeMeasureFraction: 0.61,
 } as const;
 
 /**
- * SPAWN_CLEAR_POCKET — the launch pocket kept clear around every home planet, as
- * a fraction of the planet ring radius (field report P1). **No asteroid body is
- * stamped within this radius of a planet centre**, so a ship can leave its spawn
- * (which orbits its planet by `PLANET.orbitOffset`) and manoeuvre in open space
+ * SPAWN_CLEAR_POCKET — the launch pocket kept clear around every home station, as
+ * a fraction of the station ring radius (field report P1). **No asteroid body is
+ * stamped within this radius of a station centre**, so a ship can leave its spawn
+ * (which orbits its station by `STATION.orbitOffset`) and manoeuvre in open space
  * before it reaches the first rock — the drag test's "open flight," and what a
  * real player feels launching out of a home that is no longer a rock garden.
  *
  * The home field is placed comfortably *beyond* the pocket: its nearest rock's
  * centre sits at `ringRadius × (1 - homeOuterFraction)` ≈ 0.53 of the ring from
- * the planet, well outside this 0.44, so the pocket is empty by construction and
+ * the station, well outside this 0.44, so the pocket is empty by construction and
  * `./waves` additionally clamps the field's outer edge to it as a structural
  * floor (the invariant survives a retune of the band fractions). Because the
- * pocket is part of the per-planet stamp — a rigid rotation of one pattern — it
+ * pocket is part of the per-station stamp — a rigid rotation of one pattern — it
  * is automatically identical for every home, so it costs the fairness invariant
  * nothing (`resource-fairness.test.ts`). TUNABLE
  */
@@ -627,7 +627,7 @@ export const WAVE_ORE: Tunable<number> =
   (FIELD_YIELD * RESOURCE_FIELD.commonsShare) / WAVE_COUNT;
 
 /** Ore in one home neighbourhood — `(1 - commonsShare)` of `FIELD_YIELD`, split
- *  evenly across the `N` planets. All `N` home fields carry exactly this (the
+ *  evenly across the `N` stations. All `N` home fields carry exactly this (the
  *  fairness invariant, `RESOURCE_FIELD`). */
 export function homeFieldOre(playerCount: number): number {
   const n = Math.max(1, playerCount);
@@ -675,7 +675,7 @@ export function waveRadiusFraction(n: number): number {
 export const COLLAPSE_GRACE_S: Tunable<number> = WAVE_INTERVAL_S;
 
 /**
- * Core HP lost per second, per planet, during collapse — "entropy finishes
+ * Core HP lost per second, per station, during collapse — "entropy finishes
  * whoever the players don't" (GDD §1).
  *
  * **Ratified 1** (Director, M5). The v0.1 release check
@@ -865,7 +865,7 @@ export const COLLAPSE_GRACE_FLOOR_S: Tunable<number> = 60;
 export const RESPAWN_S: Tunable<number> = 5;
 
 /**
- * The wreck a dead planet leaves behind (GDD §2.7): it "persists for the rest of
+ * The wreck a dead station leaves behind (GDD §2.7): it "persists for the rest of
  * the match, surrounded by ore-laden debris that *anyone* can scavenge." The
  * dead player's *banked* ore is what funds the debris field — the fortune they
  * were saving becomes the thing their killers fight over — plus a floor so a
@@ -874,17 +874,17 @@ export const RESPAWN_S: Tunable<number> = 5;
 export const WRECK = {
   /** Ore scattered on top of the dead owner's banked total. */
   baseDebrisOre: 8,
-  /** How far outboard of the planet surface the debris ring sits. */
+  /** How far outboard of the station surface the debris ring sits. */
   debrisRingOffset: 40,
   /** Hard cap on debris chunks from one wreck — a hoarder's bank cannot flood
-   *  the map with collectables (the excess dies with the planet). */
+   *  the map with collectables (the excess dies with the station). */
   maxDebrisChunks: 40,
 } as const;
 
 /** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
 export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
 
-/** Sensor range: distance at which an enemy planet's damage ring becomes
+/** Sensor range: distance at which an enemy station's damage ring becomes
  *  visible (GDD §2.8) — defined as 2× shield radius. Fog is a mechanic
  *  (GDD §2.2); the sim exposes the range, the UI/bots honor it. TUNABLE */
 export const SENSOR_RANGE: Tunable<number> = 2 * SHIELD.radius;
@@ -1213,41 +1213,41 @@ export const TRACTOR_PICKUP_RADIUS: Tunable<number> = TRACTOR.range;
 
 /**
  * DEPOSIT_RANGE — the atmosphere radius (world units, centre-to-centre) inside
- * which a ship auto-deposits its hold at its OWN living planet. Ratified p4
- * (developer): "You shouldn't need to touch your planet to deposit — just be in
- * that atmosphere." A generous **planet-radius multiple** (4× ⇒ 256 u),
- * comfortably larger than `PLANET.dockRange` (160): a ship orbiting its home
+ * which a ship auto-deposits its hold at its OWN living station. Ratified p4
+ * (developer): "You shouldn't need to touch your station to deposit — just be in
+ * that atmosphere." A generous **station-radius multiple** (4× ⇒ 256 u),
+ * comfortably larger than `STATION.dockRange` (160): a ship orbiting its home
  * sits inside the atmosphere without having to close to docking distance, so
  * orbiting comfortably inside it is easy — depositing costs no precision.
  *
  * The drain runs whenever the ship is inside this radius at its own living
- * planet, with **no dock and no park gate** (`updateDeposits`): cross in and it
+ * station, with **no dock and no park gate** (`updateDeposits`): cross in and it
  * starts the same tick, cross out and it stops — interruptible exactly as
- * before, the boundary counting as inside (`≤`). Docking (`PLANET.dockRange`)
+ * before, the boundary counting as inside (`≤`). Docking (`STATION.dockRange`)
  * still gates the build/upgrade/repair wheel and, being the tighter radius,
  * trivially implies being in the atmosphere. The render layer draws the
  * atmosphere halo from this exact radius (p4-12 asserts the drawn radius equals
  * the sim radius), so the visual tell and the rule can never drift. TUNABLE
  */
-export const DEPOSIT_RANGE: Tunable<number> = PLANET.radius * 4;
+export const DEPOSIT_RANGE: Tunable<number> = STATION.radius * 4;
 
 /**
- * Auto-deposit inside your own planet's atmosphere (field report v0.1.2; GDD
+ * Auto-deposit inside your own station's atmosphere (field report v0.1.2; GDD
  * §2.3 "fly home and convert ore … or bank it", §2.5; ratified p4).
  *
  * The developer flew home with a full hold and nothing happened: mining fills
  * the hold, but the *only* thing that emptied it into the safe banked total was
  * an explicit BANK wheel press, which a first-time player never finds. The rule:
- * while a ship is inside its own living planet's **atmosphere** (`DEPOSIT_RANGE`),
+ * while a ship is inside its own living station's **atmosphere** (`DEPOSIT_RANGE`),
  * its hold auto-transfers into the bank at a steady, readable, interruptible
  * rate — leave the atmosphere and it stops. Not instant (that is what the BANK
  * segment stays, for a one-tap dump): the drain is a beat the player watches, as
- * ore chunks visibly fly ship→planet.
+ * ore chunks visibly fly ship→station.
  *
  * The transfer is authoritative and smooth (`drainRate * dt` every tick, so the
  * HUD hold and bank readouts tick down/up in lockstep); the flying chunks are
  * the *telegraph*, pooled ore sprites emitted **one per whole unit banked** and
- * reabsorbed at the planet — a conserved stream, never more chunks than the ore
+ * reabsorbed at the station — a conserved stream, never more chunks than the ore
  * that moved (field report p8). They reuse the ore chunk the renderer already
  * draws, so the visual needs no new render path.
  *
@@ -1255,14 +1255,14 @@ export const DEPOSIT_RANGE: Tunable<number> = PLANET.radius * 4;
  * no park requirement (ratified p4 — the old dock+park gate is retired). The
  * wheel's instant BANK press still wins the arrival tick for a one-tap dump, but
  * a pilot who simply orbits home unloads without ever having to settle onto the
- * planet. TUNABLE
+ * station. TUNABLE
  */
 export const DEPOSIT = {
   /** Ore per second moved hold→bank while inside the atmosphere. At 2/s a base
    *  2-slot hold empties in ~1 s — brisk enough not to be a chore, slow enough
    *  to read the chunks fly and to cut short by pulling away. */
   drainRate: 2,
-  /** Speed a deposit-flight chunk travels toward the planet (units/s) — fast
+  /** Speed a deposit-flight chunk travels toward the station (units/s) — fast
    *  enough to arrive within the drain, so a chunk is a courier, not clutter. */
   flightSpeed: 220,
 } as const;

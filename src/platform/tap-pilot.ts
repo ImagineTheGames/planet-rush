@@ -34,10 +34,10 @@ import type { ControlState } from './actions';
 /**
  * What a tap can lock onto (developer ratification §2). An enemy ship / turret /
  * core is an attack; an asteroid is a mine ("a rock is just a target"); the
- * player's own planet is a fly-to-atmosphere. Hostility is decided per frame by
+ * player's own station is a fly-to-atmosphere. Hostility is decided per frame by
  * the wiring (see {@link ResolvedTarget.hostile}), not baked into the kind.
  */
-export type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'planet';
+export type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'station';
 
 /**
  * A stable handle to a locked entity: its kind and sim id. The wiring re-resolves
@@ -59,8 +59,8 @@ export type Order =
 /**
  * A candidate a tap could select, in world space. The wiring builds this list
  * from the live `World` (every asteroid, every enemy ship/turret/core, the
- * player's own planet) and hands it to {@link pickTapTarget}. `hostile` marks
- * an attack/mine target apart from the friendly own-planet fly-to.
+ * player's own station) and hands it to {@link pickTapTarget}. `hostile` marks
+ * an attack/mine target apart from the friendly own-station fly-to.
  */
 export interface TapCandidate {
   readonly kind: TargetKind;
@@ -74,7 +74,7 @@ export interface TapCandidate {
  * The live snapshot of the locked entity, re-resolved from the world each frame
  * by the wiring. `null` (from the resolver) means the entity is gone — the pilot
  * clears the lock. `standoff` overrides the config's engage distance for this
- * target (the own planet holds at its atmosphere, not weapon range).
+ * target (the own station holds at its atmosphere, not weapon range).
  */
 export interface ResolvedTarget {
   readonly pos: Vec2;
@@ -156,7 +156,7 @@ const DEFAULT_CONFIG: TapPilotConfig = {
  * Which entity a tap at world point `at` locks onto, or `null` for empty space
  * (§2). A candidate is hit when the tap lands within its radius plus {@link TAP_SLOP};
  * of overlapping hits the nearest centre wins, so a tap on a rock in front of a
- * planet selects the rock the thumb is actually over. Pure — no world access.
+ * station selects the rock the thumb is actually over. Pure — no world access.
  */
 export function pickTapTarget(
   candidates: readonly TapCandidate[],
@@ -180,13 +180,13 @@ export function pickTapTarget(
 /**
  * What a Tap Commander primary tap MEANS (developer p10). The pilot decides this
  * from the tap and the two facts only the wiring knows — is the wheel open, and is
- * the ship within build-wheel range of the tapped own-planet — and applies the
+ * the ship within build-wheel range of the tapped own-station — and applies the
  * movement/lock cases to its own order in place; the wheel-family cases (`openWheel`
  * / `closeWheel`) it hands back for the wiring to carry out, because the pilot never
  * touches the wheel or the DOM.
  */
 export type TapResult =
-  /** Tap your own planet within build range: OPEN the build wheel (§1). The pilot
+  /** Tap your own station within build range: OPEN the build wheel (§1). The pilot
    *  leaves its standing order untouched — the ship holds while the menu is up. */
   | { readonly kind: 'openWheel' }
   /** A tap that landed OUTSIDE an open wheel: CLOSE it, and do NOT move (§2). One
@@ -195,7 +195,7 @@ export type TapResult =
   /** A tap the open wheel owns (a wedge / its hub): the pilot does not touch it —
    *  the wheel handles it exactly as it expects (§2). No order, no wheel change. */
   | { readonly kind: 'passThrough' }
-  /** Fly to a point: empty space, or an own planet too far to build at (§1–2). The
+  /** Fly to a point: empty space, or an own station too far to build at (§1–2). The
    *  pilot has already set this waypoint as its standing order. */
   | { readonly kind: 'move'; readonly at: Vec2 }
   /** Lock a hostile entity — attack a rival ship/turret/core, mine a rock (§2). The
@@ -204,7 +204,7 @@ export type TapResult =
 
 /** The facts only the wiring knows, handed to {@link TapPilot.resolveTap}: the live
  *  wheel state and whether the ship is within build-wheel range of the tapped
- *  own-planet — the SAME `isDocked`/atmosphere answer the wheel itself gates on,
+ *  own-station — the SAME `isDocked`/atmosphere answer the wheel itself gates on,
  *  passed in rather than re-derived here (developer p10 §1, "reuse, never re-derive"). */
 export interface TapContext {
   /** Is the build wheel currently up? */
@@ -212,8 +212,8 @@ export interface TapContext {
   /** Did the tap land inside the open wheel's geometry (a wedge / its hub)? Only
    *  meaningful when `wheelOpen`; the wheel's own hit-test provides it. */
   readonly insideWheel: boolean;
-  /** Is the ship within build-wheel range of the tapped own-planet (the wheel's own
-   *  `isDocked` answer)? Only consulted for an own-planet tap. */
+  /** Is the ship within build-wheel range of the tapped own-station (the wheel's own
+   *  `isDocked` answer)? Only consulted for an own-station tap. */
   readonly inBuildRange: boolean;
 }
 
@@ -239,10 +239,10 @@ export interface TapContext {
  * ladder until it is cleared.
  *
  * The pilot never TOUCHES the build wheel — it holds no `WheelInput` and never
- * reaches the DOM. But under the p10 ratification ("tap your planet to open the
+ * reaches the DOM. But under the p10 ratification ("tap your station to open the
  * build wheel") it is the one place tap semantics live, so it *classifies* a tap
  * into an intent the wiring carries out ({@link TapPilot.resolveTap}): tapping your
- * own planet within build-wheel range asks the wiring to OPEN the wheel; a tap that
+ * own station within build-wheel range asks the wiring to OPEN the wheel; a tap that
  * lands outside an open wheel asks it to CLOSE (the wheel family's own close
  * gesture, executed by the wiring); a wheel-internal tap passes straight through
  * untouched. Movement/lock intents the pilot applies to its own order directly.
@@ -299,10 +299,10 @@ export class TapPilot {
    *     through (the wheel's own wedges handle it); a tap outside CLOSES it and is
    *     NOT also a move order (§2, "one tap to dismiss, the next tap acts"). Either
    *     way the pilot sets no order — menus over motion.
-   *  2. **Own planet, in build range** — OPEN the wheel (§1). The pilot leaves its
+   *  2. **Own station, in build range** — OPEN the wheel (§1). The pilot leaves its
    *     standing order alone so the ship holds while the menu is up; the wiring opens
    *     the same wheel E / Y / the BUILD button drive.
-   *  3. **Own planet, too far** — a normal move order toward it (§1). No lock, no
+   *  3. **Own station, too far** — a normal move order toward it (§1). No lock, no
    *     "surprise wheel later": it just flies you there, and a second tap when close
    *     opens the wheel.
    *  4. **Any other entity** — a lock: attack a rival ship/turret/core, mine a rock.
@@ -314,8 +314,8 @@ export class TapPilot {
       // Neither becomes a move — the pilot's order is untouched while the menu is up.
       return ctx.insideWheel ? { kind: 'passThrough' } : { kind: 'closeWheel' };
     }
-    if (hit?.kind === 'planet') {
-      // Your own planet: in build range opens the wheel; too far it is a plain move
+    if (hit?.kind === 'station') {
+      // Your own station: in build range opens the wheel; too far it is a plain move
       // toward it (a second tap when close opens — no lock, no surprise wheel later).
       if (ctx.inBuildRange) return { kind: 'openWheel' };
       this.orderMove(at);
@@ -337,7 +337,7 @@ export class TapPilot {
    *
    * A **lock** (target order) aims at the locked entity, closes to and holds firing
    * range, and fires while in range — a rock holds INSIDE the tractor pickup radius
-   * so its ore reaches the hold, an own-planet fly-to holds at its atmosphere and
+   * so its ore reaches the hold, an own-station fly-to holds at its atmosphere and
    * never fires. A lock overrides the auto-engage ladder until it is cleared
    * (developer p9-02 §1). A lock whose `resolved` came back `null` — the entity died
    * — is dropped, and the ship reverts to auto-engage rather than going passive.
@@ -406,7 +406,7 @@ export class TapPilot {
       if (target.hostile) state.aim = { x: dx, y: dy };
 
       // Steer on the *surface* gap so the standoff reads the same for a rock, a
-      // ship, and a planet core regardless of their very different radii.
+      // ship, and a station core regardless of their very different radii.
       const surface = centreDist - target.radius - ship.radius;
       const stop = this.holdStandoff(target, ship);
       const gap = surface - stop;
@@ -432,7 +432,7 @@ export class TapPilot {
 
   /**
    * The surface-gap standoff the pilot holds at for `target`. An explicit `standoff`
-   * (the own-planet atmosphere) always wins. A **rock** (`mineable`) holds the ship's
+   * (the own-station atmosphere) always wins. A **rock** (`mineable`) holds the ship's
    * centre inside the tractor pickup radius so the ore a shot chips off reaches the
    * hold — the p9-02 range fix: a combat `engageRange` would sit the ship well
    * outside the grab range for a rock ("it moves back to a range where it can't pick

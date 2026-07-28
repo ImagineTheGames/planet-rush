@@ -17,7 +17,7 @@
  *      stat and hull class is armour *total*, never damage resistance, so the
  *      delta depends on the shooter and never on the victim.
  *
- *  §B  SHIELDED TARGETS bleed their pool by the same accounting: a planet's shield
+ *  §B  SHIELDED TARGETS bleed their pool by the same accounting: a station's shield
  *      loses exactly the core-rate damage dealt before the core takes a scratch,
  *      for every attacker class — the "shields stand in front of the core" rule
  *      measured HP-for-HP (GDD §2.6).
@@ -44,7 +44,7 @@ import {
   SHIELD,
   SPAWN_PROTECTION_S,
   TICK_DT,
-  PLANET,
+  STATION,
   CORE_HP,
   classWeaponDps,
   classCoreDps,
@@ -56,7 +56,7 @@ import {
   step,
   stockTiers,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Shield,
   type Ship,
   type World,
@@ -101,15 +101,15 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   };
 }
 
-/** A planet owned by slot `owner`, optionally carrying `shields`. Core is deep
+/** A station owned by slot `owner`, optionally carrying `shields`. Core is deep
  *  enough to outlast the short shots these tests fire; spawn protection off so it
  *  is a live target (GDD §2.1). */
-function makePlanet(owner: number, x: number, y: number, shields: Shield[] = []): Planet {
+function makeStation(owner: number, x: number, y: number, shields: Shield[] = []): MiningStation {
   return {
     id: 0,
     owner,
     pos: { x, y },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: CORE_HP,
     maxCoreHp: CORE_HP,
     alive: true,
@@ -139,7 +139,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -231,18 +231,18 @@ describe('§A damage matrix — every class × every class, no pair zeroes (GDD 
 describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
   const N = 63;
 
-  /** Fire `attacker`'s weapon at a planet (with `shields`) directly ahead for
+  /** Fire `attacker`'s weapon at a station (with `shields`) directly ahead for
    *  `fireTicks`, then drain so the last shots land. */
-  function weaponPlanet(attacker: ShipClass, shields: Shield[], fireTicks: number) {
-    // Shooter faces +x at 300; planet centre at 500 (owner slot 1). Centre gap
+  function weaponStation(attacker: ShipClass, shields: Shield[], fireTicks: number) {
+    // Shooter faces +x at 300; station centre at 500 (owner slot 1). Centre gap
     // 200, shield bubble r=90 → shots bite the bubble at 110 u, well in range.
     const shooter = makeShip({ id: 0, shipClass: attacker, pos: { x: 300, y: 500 }, angle: 0 });
-    const planet = makePlanet(1, 500, 500, shields);
-    const world = makeWorld({ ships: [shooter], planets: [planet] });
+    const station = makeStation(1, 500, 500, shields);
+    const world = makeWorld({ ships: [shooter], stations: [station] });
     const firing: Inputs = [{ id: 0, actions: [fire()] }];
     for (let t = 0; t < fireTicks; t++) step(world, firing);
     for (let t = 0; t < 30; t++) step(world, []);
-    return world.planets[0]!;
+    return world.stations[0]!;
   }
 
   for (const atk of CLASSES) {
@@ -253,21 +253,21 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
       // core:ship ratio (GDD §2.8). Kept short so the 40 HP bubble never breaks.
       const perShot = classCoreDps(atk) * SHIP_WEAPON.fireInterval;
 
-      const planet = weaponPlanet(atk, [shield], N);
-      const drop = before - shieldPool(planet);
+      const station = weaponStation(atk, [shield], N);
+      const drop = before - shieldPool(station);
 
       expectWholeShots(drop, perShot);
       expect(drop).toBeLessThan(SHIELD.hp); // the bubble held
       // Not a single point leaked past the bubble to the core.
-      expect(planet.coreHp).toBe(CORE_HP);
+      expect(station.coreHp).toBe(CORE_HP);
     });
   }
 
   it('a naked core (no shield) takes the same core-rate damage the shield would have', () => {
     for (const atk of CLASSES) {
-      const planet = weaponPlanet(atk, [], N); // no shield: core is the surface
+      const station = weaponStation(atk, [], N); // no shield: core is the surface
       const perShot = classCoreDps(atk) * SHIP_WEAPON.fireInterval;
-      expectWholeShots(CORE_HP - planet.coreHp, perShot);
+      expectWholeShots(CORE_HP - station.coreHp, perShot);
     }
   });
 
@@ -277,15 +277,15 @@ describe('§B shields bleed HP-for-HP before the core (GDD §2.6)', () => {
     const first = makeShield(1);
     const second = makeShield(2);
     const shooter = makeShip({ id: 0, shipClass: ShipClass.Excavator, pos: { x: 300, y: 500 }, angle: 0 });
-    const planet = makePlanet(1, 500, 500, [first, second]);
-    const world = makeWorld({ ships: [shooter], planets: [planet] });
+    const station = makeStation(1, 500, 500, [first, second]);
+    const world = makeWorld({ ships: [shooter], stations: [station] });
     const firing: Inputs = [{ id: 0, actions: [fire()] }];
 
-    const startPool = shieldPool(planet);
+    const startPool = shieldPool(station);
     for (let t = 0; t < 8 * 60; t++) step(world, firing);
     for (let t = 0; t < 30; t++) step(world, []);
 
-    const p = world.planets[0]!;
+    const p = world.stations[0]!;
     const totalDrop = startPool - shieldPool(p);
     // All damage went into the pool, none skipped a bubble: the first is empty,
     // the second has taken the overflow, and the accounting is a whole shot count.

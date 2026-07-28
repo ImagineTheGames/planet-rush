@@ -100,7 +100,7 @@ export class LobbyEntryView extends Container {
     super();
     this.layout = entryLayout({ width: screenWidth, height: screenHeight }, opts(isTouch, insets));
 
-    this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 26, TEXT_PRIMARY);
+    this.wordmark = makeText('STATION RUSH', FONT_HEADING, 26, TEXT_PRIMARY);
     this.wordmark.anchor.set(0.5, 0.5);
     this.message = makeText('', FONT_BODY, 12, TEXT_DIM);
     this.message.anchor.set(0.5, 0);

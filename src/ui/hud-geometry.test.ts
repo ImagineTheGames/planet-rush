@@ -5,7 +5,7 @@
  * registers sits inside its declared anchor. It can only assert that for
  * elements the frozen golden scene actually *draws* — and the golden scene is a
  * ship two seconds into a match, so the Build & Upgrade wheel is closed, the
- * upgrade panel behind it is closed, and nothing has shot the player's planet.
+ * upgrade panel behind it is closed, and nothing has shot the player's station.
  * The three loudest M2 elements are therefore invisible to it.
  *
  * This file closes that hole from the other side: it takes the same geometry the
@@ -26,7 +26,7 @@ import {
   wheelBounds,
   panelBounds,
   panelSize,
-  planetHpBounds,
+  stationHpBounds,
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
@@ -101,10 +101,10 @@ describe('build-wheel placement', () => {
     });
   }
 
-  it('is centred on the screen — where the follow camera puts your planet', () => {
-    // GDD §2.2: the wheel appears "near your own planet". The camera keeps the
+  it('is centred on the screen — where the follow camera puts your station', () => {
+    // GDD §2.2: the wheel appears "near your own station". The camera keeps the
     // local ship centred, and the wheel opens only while docked at home, so
-    // "near your planet" is the screen centre.
+    // "near your station" is the screen centre.
     for (const { name, vp } of PROFILES) {
       const b = wheelBounds(vp.width, vp.height);
       expect(b.x + b.width / 2, name).toBeCloseTo(vp.width / 2, 6);
@@ -180,10 +180,10 @@ describe('upgrade hit-region geometry (legacy panel — platform hit-test)', () 
 });
 
 // ---------------------------------------------------------------------------
-// Your own planet's HP (GDD §2.2) — registered `top-right`, margin HUD_PAD
+// Your own station's HP (GDD §2.2) — registered `top-right`, margin HUD_PAD
 // ---------------------------------------------------------------------------
 
-describe('planet-hp placement', () => {
+describe('station-hp placement', () => {
   const TOP_RIGHT: AnchorSpec = { region: 'top-right', margin: HUD_PAD };
   /** Measured width of the widest label the element ever draws ("HOME LOST" at
    *  11px Audiowide ≈ 62px). Generous on purpose: the assertion should survive a
@@ -192,13 +192,13 @@ describe('planet-hp placement', () => {
 
   for (const { name, vp } of PROFILES) {
     it(`stays in the top-right corner at ${name}`, () => {
-      expectWithin(planetHpBounds(vp.width, LABEL_WIDTH), TOP_RIGHT, vp, 'planet-hp');
+      expectWithin(stationHpBounds(vp.width, LABEL_WIDTH), TOP_RIGHT, vp, 'station-hp');
     });
   }
 
   it('hugs the right margin exactly — a corner element, not a floating box', () => {
     for (const { name, vp } of PROFILES) {
-      const b = planetHpBounds(vp.width, LABEL_WIDTH);
+      const b = stationHpBounds(vp.width, LABEL_WIDTH);
       expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
       expect(b.y, name).toBeCloseTo(HUD_PAD, 6);
     }
@@ -208,7 +208,7 @@ describe('planet-hp placement', () => {
     // This is the constraint that makes HP_BAR_WIDTH a decision rather than a
     // number. `top-right`'s zone starts at W/2, so the bar's budget is
     // W/2 − HUD_PAD: 144px on the narrowest screen the game claims (GDD §4.3),
-    // against a 140px bar. Widen the bar and own-planet HP silently leaves its
+    // against a 140px bar. Widen the bar and own-station HP silently leaves its
     // anchor — and because the day-2 HUD fields are not fed at runtime yet, QA's
     // layout contract cannot see it happen. This assertion is that guard.
     const narrowest = Math.min(...PROFILES.map((p) => p.vp.width));
@@ -226,7 +226,7 @@ describe('planet-hp placement', () => {
 
 // The own-ship HULL readout that used to stack under HOME was removed (field
 // report v0.2 — the over-ship bar is the truth now), so its top-right placement
-// block went with it. The corner now carries only `planet-hp`, tested above.
+// block went with it. The corner now carries only `station-hp`, tested above.
 
 // ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10) — registered `full`, margin HUD_PAD
@@ -379,7 +379,7 @@ describe('alarm-arrow placement', () => {
     expect(ARROW_EDGE_INSET).toBeGreaterThan(ARROW_SIZE);
   });
 
-  it('is not drawn at all once home is on screen — the planet is its own tell', () => {
+  it('is not drawn at all once home is on screen — the station is its own tell', () => {
     const vp: Viewport = { width: 844, height: 390 };
     const arrow = homeArrow({ x: 0, y: 0 }, { x: 20, y: 10 }, vp, ARROW_EDGE_INSET);
     expect(arrow.onScreen).toBe(true);

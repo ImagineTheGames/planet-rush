@@ -33,11 +33,11 @@
  * any point in a life or between lives, save the one life-state gate below.
  *
  * The dead-order decision (report §3d), documented and pinned here: a purchase
- * is an action a *live* hull takes at its planet, so an order issued while dead
+ * is an action a *live* hull takes at its station, so an order issued while dead
  * is **cleanly refused, never queued** — `buyUpgrade` answers `'dead'` (loud, not
  * a misleading `not-docked`), and the wheel path's `step()` drops it on the same
  * `!alive` gate every wheel action shares. It is not banked for later: the ship
- * reaches its planet again on respawn and buys for real.
+ * reaches its station again on respawn and buys for real.
  *
  * Cargo is *not* our concern here — it stays on the death-drop rules (p4-14);
  * these pins keep hold/bank incidental and assert only the upgrade contract.
@@ -57,7 +57,7 @@ import {
   killShip,
   nextUpgradeCost,
   oreSpentOnUpgrades,
-  planetOf,
+  stationOf,
   shipMaxHull,
   shipOf,
   shipTopSpeed,
@@ -65,7 +65,7 @@ import {
   stockTiers,
   tierOf,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Ship,
   type World,
 } from '../../src/sim';
@@ -87,25 +87,25 @@ const buyOrder = (track: UpgradeTrack): Inputs => [
 
 /**
  * A real match, mid-flight: the local ship parked and docked at its own live
- * planet, spawn protection cleared so it can be killed like any other moment,
+ * station, spawn protection cleared so it can be killed like any other moment,
  * and a fat bank so the wallet is never the thing under test. The enemy is idle
  * half the ring away and never touches the local core; no rocks drift in.
  */
-function freshMatch(banked = 9999): { world: World; ship: Ship; planet: Planet } {
+function freshMatch(banked = 9999): { world: World; ship: Ship; station: MiningStation } {
   const world = createWorld({ seed: 11, players, asteroidCount: 0 });
   world.asteroids = []; // drop the home fields too — an inert, isolated fixture
   const ship = shipOf(world, LOCAL)!;
-  const planet = planetOf(world, LOCAL)!;
+  const station = stationOf(world, LOCAL)!;
 
   ship.spawnProtect = 0; // mid-match: killable now
-  planet.spawnProtect = 0;
+  station.spawnProtect = 0;
   ship.cargo = 0;
   ship.banked = banked;
 
-  // The fixture's whole premise: the ship spawns orbiting its planet, docked and
+  // The fixture's whole premise: the ship spawns orbiting its station, docked and
   // at rest. If the ring geometry ever drifts, fail here rather than downstream.
-  expect(isDocked(ship, planet)).toBe(true);
-  return { world, ship, planet };
+  expect(isDocked(ship, station)).toBe(true);
+  return { world, ship, station };
 }
 
 /** Kill the local ship through the real death path (`killShip` — the one both
@@ -221,7 +221,7 @@ describe('an order issued while DEAD is cleanly refused, never queued', () => {
     expect(ship.alive).toBe(false);
 
     // Loud and precise: `dead`, not a misleading `not-docked` (the wreck is
-    // physically at its planet — the reason it cannot buy is that it is dead).
+    // physically at its station — the reason it cannot buy is that it is dead).
     expect(buyUpgrade(world, ship, UpgradeTrack.Hull)).toBe('dead');
     expect(tierOf(ship, UpgradeTrack.Hull)).toBe(0); // no state moved
   });

@@ -138,7 +138,7 @@ function intersectRegions(a: Region, b: Region): Region | null {
  * id `minimap`) — authoritative, never a hardcoded corner. Null if the entry is
  * absent (the minimap was expanded, or the seam is off). Field report v0.2.4 moved
  * the collapsed map into the bottom-right corner, so it now overlaps `REGION_FIRE`
- * and legitimately paints team-plasma dots there (own ship + own home planet); the
+ * and legitimately paints team-plasma dots there (own ship + own home station); the
  * desktop FIRE-absent check subtracts this square so a real leaked FIRE ring — which
  * lights the corner well beyond the small map — is still what trips the guard.
  */
@@ -425,7 +425,7 @@ test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, t
 
   // No hold-to-FIRE button on desktop (mouse/keyboard). The collapsed minimap now
   // hugs the bottom-right corner (field report v0.2.4) and legitimately paints
-  // team-plasma dots (own ship + own home planet) inside REGION_FIRE — so subtract
+  // team-plasma dots (own ship + own home station) inside REGION_FIRE — so subtract
   // its own square (read from the layout registry, not hardcoded) and assert the
   // plasma that REMAINS is absent. A real leaked FIRE ring lights the corner well
   // beyond that small map square, so the "no touch FIRE on desktop" invariant is

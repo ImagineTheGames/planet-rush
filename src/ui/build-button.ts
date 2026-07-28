@@ -3,7 +3,7 @@
  *
  * The "BUILD" button is the touch E-equivalent (GDD §2.4) and, per the field
  * report that spawned this module, **a permanent HUD fixture whenever the player
- * is near their own planet** (GDD §2.2). It is *drawn* by the touch layer
+ * is near their own station** (GDD §2.2). It is *drawn* by the touch layer
  * (`@platform/touch-visuals`, which owns the thumb-reachable affordance geometry),
  * but the two things that were unowned — *when it may vanish* and *how a test
  * proves it didn't* — are HUD contract, and live here.
@@ -14,15 +14,15 @@
  * button still there, clickable, opens the wheel again. So its visibility is
  * pinned to exactly one thing:
  *
- *   visible  ⇔  the ship is docked at its own planet  (and this is a touch build).
+ *   visible  ⇔  the ship is docked at its own station  (and this is a touch build).
  *
  * {@link buildButtonVisible} takes **neither** the wheel's open/closed state
  * **nor** any onboarding flag — not as a matter of style, but so that "the button
  * hid because the wheel opened" or "…because the first-build prompt fired once"
  * is *unrepresentable*: those aren't inputs. Docking is the sim's own `isDocked`
  * answer, the same signal that gates the wheel itself (GDD §2.5, "opened at your
- * own planet and nowhere else"), so the button and the wheel appear and disappear
- * together at the planet's edge, and building — which never undocks you — cannot
+ * own station and nowhere else"), so the button and the wheel appear and disappear
+ * together at the station's edge, and building — which never undocks you — cannot
  * take the button away.
  *
  * ── THE LAYOUT CONTRACT ─────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export const BUILD_BUTTON_ANCHOR: AnchorSpec = { region: 'full', margin: 0 };
 /** The inputs that decide whether the build button is on screen. Note what is
  *  **absent**: wheel state and onboarding flags. See the file header. */
 export interface BuildButtonSignals {
-  /** The ship is within `PLANET.dockRange` of its own planet — the sim's own
+  /** The ship is within `STATION.dockRange` of its own station — the sim's own
    *  `isDocked`. The button (and the wheel) live here and nowhere else. */
   readonly docked: boolean;
   /** This is a touch build — the button is the touch-only E-equivalent; on

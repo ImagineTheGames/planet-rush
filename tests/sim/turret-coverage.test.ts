@@ -1,17 +1,17 @@
 /**
- * tests/sim/turret-coverage.test.ts — turrets cover the WHOLE planet, not just
+ * tests/sim/turret-coverage.test.ts — turrets cover the WHOLE station, not just
  * the arc they happen to be sitting in. OWNER: Gameplay Engineer (field report
  * v0.1.3; GDD §2.6).
  *
- * The bug, verbatim: "another enemy came on the other side of the planet and the
+ * The bug, verbatim: "another enemy came on the other side of the station and the
  * turret didn't engage." A turret fought one attacker and ignored a second on
- * the planet's far side. Root cause against the p1-03 orbit rules — threat
+ * the station's far side. Root cause against the p1-03 orbit rules — threat
  * detection was measured from the turret's *current* rim spot, so anything
  * outside weapon range of where it happened to be sitting was invisible, even
  * though the whole point of orbiting is to slide around and reach it.
  *
  * These pins hold the fix, one field-report clause each:
- *   §1 detection is PLANET-centric — a far-side enemy inside the planet's threat
+ *   §1 detection is STATION-centric — a far-side enemy inside the station's threat
  *      radius is a target even outside weapon range of the turret's current spot;
  *   §2 the turret slides to the facing-normal point (clear line of sight) and the
  *      damage actually lands — the exact field scenario, end to end;
@@ -26,17 +26,17 @@ import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
   WEAPON_RANGE,
-  PLANET,
+  STATION,
   SHIP_RADIUS,
   TICK_DT,
   TURRET,
-  planetThreatRadius,
+  stationThreatRadius,
   step,
   stockTiers,
   turretHomeAngle,
   turretOrbitPos,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Ship,
   type Turret,
   type World,
@@ -44,7 +44,7 @@ import {
 
 // --- builders --------------------------------------------------------------
 //
-// One planet at the arena centre; everything is placed planet-relative so the
+// One station at the arena centre; everything is placed station-relative so the
 // bearing arithmetic reads straight off the numbers. Enemies get a huge hull so
 // a multi-second slide never resolves by the target simply dying under fire.
 
@@ -52,8 +52,8 @@ const CENTER = 2000;
 
 /** A sliding turret mounted on `slot`, born on its home rim angle. */
 function makeTurret(id: number, slot: number): Turret {
-  const home = turretHomeAngle({ angle: 0 } as Planet, slot);
-  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: PLANET.radius } as Planet, home);
+  const home = turretHomeAngle({ angle: 0 } as MiningStation, slot);
+  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: STATION.radius } as MiningStation, home);
   return {
     id,
     owner: 0,
@@ -70,13 +70,13 @@ function makeTurret(id: number, slot: number): Turret {
   };
 }
 
-/** A planet owned by slot 0, its core deep enough to outlast any test. */
-function makePlanet(turrets: Turret[]): Planet {
+/** A station owned by slot 0, its core deep enough to outlast any test. */
+function makeStation(turrets: Turret[]): MiningStation {
   return {
     id: 0,
     owner: 0,
     pos: { x: CENTER, y: CENTER },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: 1e6,
     maxCoreHp: 1e6,
     alive: true,
@@ -91,7 +91,7 @@ function makePlanet(turrets: Turret[]): Planet {
   };
 }
 
-/** An enemy ship (id != 0, the planet owner) parked at a planet-relative point. */
+/** An enemy ship (id != 0, the station owner) parked at a station-relative point. */
 function enemyAt(id: number, x: number, y: number): Ship {
   return {
     id,
@@ -115,7 +115,7 @@ function enemyAt(id: number, x: number, y: number): Ship {
   };
 }
 
-/** A world of one planet's turrets against a set of enemy ships. Zero rocks per
+/** A world of one station's turrets against a set of enemy ships. Zero rocks per
  *  wave so the metronome never drops asteroids into the fixture. */
 function makeWorld(turrets: Turret[], enemies: Ship[]): World {
   return {
@@ -126,7 +126,7 @@ function makeWorld(turrets: Turret[], enemies: Ship[]): World {
     ships: enemies,
     asteroids: [],
     chunks: [],
-    planets: [makePlanet(turrets)],
+    stations: [makeStation(turrets)],
     projectiles: [],
     bounds: { width: 2 * CENTER, height: 2 * CENTER },
     fieldRadius: 600,
@@ -144,18 +144,18 @@ function angleDiff(a: number, b: number): number {
 }
 
 const NO_INPUT: Inputs = [];
-const planetOf = (w: World): Planet => w.planets[0]!;
-const turretsOf = (w: World): Turret[] => w.planets[0]!.turrets;
+const stationOf = (w: World): MiningStation => w.stations[0]!;
+const turretsOf = (w: World): Turret[] => w.stations[0]!.turrets;
 const shipById = (w: World, id: number): Ship => w.ships.find((s) => s.id === id)!;
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
   Math.hypot(a.x - b.x, a.y - b.y);
 
 // --- §1/§2: the exact field scenario ---------------------------------------
 
-describe('a far-side attacker is engaged: slides, clears the planet, damage lands', () => {
-  it('detects a threat inside the planet radius even outside the turret spot range (§1)', () => {
+describe('a far-side attacker is engaged: slides, clears the station, damage lands', () => {
+  it('detects a threat inside the station radius even outside the turret spot range (§1)', () => {
     // Turret born on slot 0's home (the +x rim). Enemy on the FAR side (−x), well
-    // inside the planet threat radius but beyond weapon range of where the turret
+    // inside the station threat radius but beyond weapon range of where the turret
     // currently sits — the turret-centric scan the field report indicts would
     // never see it.
     const turret = makeTurret(1, 0);
@@ -164,8 +164,8 @@ describe('a far-side attacker is engaged: slides, clears the planet, damage land
 
     // Precondition: the enemy really is out of weapon range of the turret's spot…
     expect(dist(turret.pos, enemy.pos)).toBeGreaterThan(TURRET.range);
-    // …yet inside the planet's threat radius, which is what a turret can slide to.
-    expect(dist(planetOf(world).pos, enemy.pos)).toBeLessThan(planetThreatRadius(planetOf(world)));
+    // …yet inside the station's threat radius, which is what a turret can slide to.
+    expect(dist(stationOf(world).pos, enemy.pos)).toBeLessThan(stationThreatRadius(stationOf(world)));
 
     step(world, NO_INPUT);
     // Engaged this tick, not ignored — the whole point of the fix.
@@ -184,8 +184,8 @@ describe('a far-side attacker is engaged: slides, clears the planet, damage land
     // The turret has slid around to the enemy's bearing (−x, π) — the facing
     // normal, the rim point with clear line of sight to the far side.
     expect(Math.abs(angleDiff(tt.orbitAngle!, Math.PI))).toBeLessThan(1e-3);
-    // It stands on the same side as the enemy, the planet body no longer between
-    // them (turret at −ORBIT_R, enemy at −250, planet centred at 0).
+    // It stands on the same side as the enemy, the station body no longer between
+    // them (turret at −ORBIT_R, enemy at −250, station centred at 0).
     expect(tt.pos.x).toBeLessThan(CENTER);
     // And the damage actually landed: the field report's "didn't engage" is now
     // "engaged and hurt it."
@@ -222,7 +222,7 @@ describe('retarget is immediate and threat-ranked (§3)', () => {
 
     // The attacker is inside weapon range of the core and the core is its nearest
     // target, so auto-aim puts its shots on the core.
-    expect(dist(attacker.pos, planetOf(world).pos)).toBeLessThan(WEAPON_RANGE);
+    expect(dist(attacker.pos, stationOf(world).pos)).toBeLessThan(WEAPON_RANGE);
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: true }] }];
     step(world, fire);
@@ -317,8 +317,8 @@ describe('determinism (GDD §4.8)', () => {
       step(a, NO_INPUT);
       step(b, NO_INPUT);
     }
-    // Full end-state agreement — planets (turret angles + targets) and ships.
-    expect(JSON.stringify(a.planets)).toBe(JSON.stringify(b.planets));
+    // Full end-state agreement — stations (turret angles + targets) and ships.
+    expect(JSON.stringify(a.stations)).toBe(JSON.stringify(b.stations));
     expect(JSON.stringify(a.ships)).toBe(JSON.stringify(b.ships));
   });
 });

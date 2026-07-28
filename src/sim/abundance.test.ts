@@ -56,10 +56,10 @@ function world(abundance?: Abundance, seed = 7) {
   });
 }
 
-/** Local ore per home: sum of a planet's own home-field rocks (`home === owner`).
+/** Local ore per home: sum of a station's own home-field rocks (`home === owner`).
  *  All `N` must be equal — the fairness invariant, at any abundance. */
 function homeTotals(w: ReturnType<typeof createWorld>): number[] {
-  return w.planets
+  return w.stations
     .filter((p) => !p.derelict)
     .map((p) => w.asteroids.filter((a) => a.home === p.owner).reduce((s, a) => s + a.ore, 0));
 }

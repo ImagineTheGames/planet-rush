@@ -51,7 +51,7 @@
  *   |--------------------|---------------------------------------------------|
  *   | `top-left`         | left  ∩ top      — corner HUD (ore, banked total) |
  *   | `top-center`       | h-center ∩ top   — the asteroid-wave clock        |
- *   | `top-right`        | right ∩ top      — own-planet HP (day 2+)          |
+ *   | `top-right`        | right ∩ top      — own-station HP (day 2+)          |
  *   | `bottom-left`      | left  ∩ bottom                                    |
  *   | `bottom-right`     | right ∩ bottom   — minimap (day 2+)               |
  *   | `bottom-center`    | h-center ∩ bottom                                 |

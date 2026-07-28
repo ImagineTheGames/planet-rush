@@ -206,7 +206,7 @@ function headlineFor(screen: PauseScreen): string {
 }
 
 function subheadFor(screen: PauseScreen): string {
-  if (screen === 'confirm') return 'Your planet falls the moment you go.';
+  if (screen === 'confirm') return 'Your station falls the moment you go.';
   return '';
 }
 

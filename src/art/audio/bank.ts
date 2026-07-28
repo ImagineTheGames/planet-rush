@@ -14,7 +14,7 @@
  *
  * So the arcade half is deliberately synthetic and unembarrassed — square waves,
  * blips that arpeggio upward, a firework rather than a war film — while the two
- * sounds attached to homes ({@link SOUND.coreHit}, {@link SOUND.planetDeath})
+ * sounds attached to homes ({@link SOUND.coreHit}, {@link SOUND.stationDeath})
  * drop an octave, lose their brightness and take their time. The death sound is
  * the only one in the bank with a tail longer than a second, and the only one
  * that is followed by nothing at all (`../vfx/death-moment`).
@@ -147,7 +147,7 @@ export const SOUND = {
   collapseBegin: 'collapseBegin',
 
   // --- The one serious thing ----------------------------------------------
-  planetDeath: 'planetDeath',
+  stationDeath: 'stationDeath',
   matchEnd: 'matchEnd',
 
   // --- Mechanics that are not moments -------------------------------------
@@ -895,18 +895,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- The one serious thing ----------------------------------------------
 
   /**
-   * The planet-death sound (GDD §4.7). Everything the arcade half of the bank
+   * The station-death sound (GDD §4.7). Everything the arcade half of the bank
    * does, this one refuses to do: it does not blip, it does not sparkle, and it
    * does not resolve. A long fall and a low tail — and then the mix goes to
    * zero underneath it for three seconds (`../vfx/death-moment`), so the sound
    * a player actually remembers is the silence after it.
    */
-  [SOUND.planetDeath]: {
-    name: 'planetDeath',
+  [SOUND.stationDeath]: {
+    name: 'stationDeath',
     layers: [
       {
         spec: {
-          name: 'planetDeath.fall',
+          name: 'stationDeath.fall',
           wave: 'sine',
           attack: 0.01,
           hold: 0.2,
@@ -920,7 +920,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       },
       {
         spec: {
-          name: 'planetDeath.crust',
+          name: 'stationDeath.crust',
           wave: 'noise',
           attack: 0.02,
           hold: 0.3,
@@ -934,7 +934,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       },
       {
         spec: {
-          name: 'planetDeath.toll',
+          name: 'stationDeath.toll',
           wave: 'triangle',
           attack: 0.006,
           hold: 0.06,
@@ -1236,7 +1236,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    * The full theme: a short A-minor riff over a sustained pad, in during a siege
    * (GDD §2.6). Arcade but restrained — square notes for the tune, a triangle pad
    * to sit them on — because the theme has to lift a fight without becoming a
-   * cartoon over a planet that is dying.
+   * cartoon over a station that is dying.
    */
   [SOUND.musicTheme]: {
     name: 'musicTheme',
@@ -1587,7 +1587,7 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
   [TELL.upgradeBought]: SOUND.upgradeBought,
   [TELL.waveArrive]: SOUND.waveArrive,
   [TELL.collapseBegin]: SOUND.collapseBegin,
-  [TELL.planetDeath]: SOUND.planetDeath,
+  [TELL.stationDeath]: SOUND.stationDeath,
   [TELL.matchEnd]: SOUND.matchEnd,
   [TELL.turretDown]: SOUND.turretDown,
 };

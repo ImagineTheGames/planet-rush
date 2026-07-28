@@ -56,8 +56,8 @@ export interface MuzzleFlash extends Muzzle {
 export function muzzleFlashes(world: World): MuzzleFlash[] {
   const out: MuzzleFlash[] = [];
 
-  for (const planet of world.planets) {
-    for (const turret of planet.turrets) {
+  for (const station of world.stations) {
+    for (const turret of station.turrets) {
       const muzzle = turret.muzzle;
       if (turret.hp <= 0 || !muzzle) continue;
       out.push({

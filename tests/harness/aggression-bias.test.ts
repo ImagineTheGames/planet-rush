@@ -8,7 +8,7 @@
  *  1. **Slot-position bias (a bug if present).** Instrument aggression *received*
  *     per SLOT INDEX: a scripted neutral probe seat is rotated through every one
  *     of the eight slots, across many seeds, against a homogeneous cast in the
- *     symmetric planet ring, and the damage the bots deal that probe is tallied
+ *     symmetric station ring, and the damage the bots deal that probe is tallied
  *     by slot. If the trees are fair the distribution is flat; if the targeting
  *     code prefers low indices, low slots draw more fire than they earned.
  *
@@ -28,7 +28,7 @@
  * But the audit turned up a **latent** index bias in the targeting *tie-breaks*
  * (§ "decision-level"). Every scoring term in `targeting.ts` is continuous, so an
  * exact tie is a real dead heat — and an *unscouted* rival core reads as full
- * with no turrets, so `leaderPlanet` scored every un-visited home at one
+ * with no turrets, so `leaderStation` scored every un-visited home at one
  * identical standing and the old `a.id < b.id` tie-break handed the whole board
  * to slot 0: 7 of 8 observers crowned slot 0 the "leader", slots 2–7 never. It
  * did not surface as match damage today (proximity dominates), but it is a real
@@ -49,7 +49,7 @@ import { botInputs, createBots, runHeadlessMatch } from '../../src/bots/harness'
 import { perceive } from '../../src/bots/perception';
 import { PERSONALITIES, ROSTER } from '../../src/bots/personalities';
 import { context, createBrain } from '../../src/bots/tree';
-import { bestTarget, breaksTie, leaderPlanet, tiebreakKey } from '../../src/bots/targeting';
+import { bestTarget, breaksTie, leaderStation, tiebreakKey } from '../../src/bots/targeting';
 
 const SLOTS = 8;
 
@@ -69,7 +69,7 @@ function tiedBoard(seed: number): World {
   const world = createWorld({ seed, players, bounds: { width: 6000, height: 6000 }, asteroidCount: 0 });
   world.time = SPAWN_PROTECTION_S + 5;
   for (const s of world.ships) s.spawnProtect = 0;
-  for (const p of world.planets) {
+  for (const p of world.stations) {
     p.spawnProtect = 0;
     p.sinceDamage = 999;
   }
@@ -77,7 +77,7 @@ function tiedBoard(seed: number): World {
 }
 
 /** A decision context for the bot in slot `id` over `world`. Foreman (Medium) —
- *  the tier whose `leaderPlanet` guess runs straight into the tied-board case. */
+ *  the tier whose `leaderStation` guess runs straight into the tied-board case. */
 function ctxOf(world: World, id: number) {
   return context(perceive(world, id), createBrain(PERSONALITIES.foreman, { next: () => 0.5 }));
 }
@@ -121,10 +121,10 @@ describe('the targeting tie-break is index-blind (p8 bias fix)', () => {
     expect(share).toBeLessThan(0.65);
   });
 
-  it('leaderPlanet spreads a dead heat across slots instead of onto slot 0', () => {
+  it('leaderStation spreads a dead heat across slots instead of onto slot 0', () => {
     const world = tiedBoard(1);
     const { tally, distinct } = crownings(world, (w, o) => {
-      const leader = leaderPlanet(ctxOf(w, o));
+      const leader = leaderStation(ctxOf(w, o));
       return leader ? leader.owner : null;
     });
 
@@ -152,7 +152,7 @@ describe('the targeting tie-break is index-blind (p8 bias fix)', () => {
         s.firing = false;
         k++;
       }
-      for (const p of world.planets) p.pos = { x: -9000, y: -9000 };
+      for (const p of world.stations) p.pos = { x: -9000, y: -9000 };
       const target = bestTarget(ctxOf(world, observer), 0);
       return target ? target.id : null;
     };
@@ -200,13 +200,13 @@ interface Absorbed {
 
 function sampleDamage(world: World, slot: number, prev: Absorbed): void {
   const ship = world.ships.find((s) => s.id === slot)!;
-  const planet = world.planets.find((p) => p.owner === slot)!;
-  const shield = shieldPool(planet);
+  const station = world.stations.find((p) => p.owner === slot)!;
+  const shield = shieldPool(station);
   if (ship.hull < prev.hull) prev.total += prev.hull - ship.hull;
-  if (planet.coreHp < prev.core) prev.total += prev.core - planet.coreHp;
+  if (station.coreHp < prev.core) prev.total += prev.core - station.coreHp;
   if (shield < prev.shield) prev.total += prev.shield - shield;
   prev.hull = ship.hull;
-  prev.core = planet.coreHp;
+  prev.core = station.coreHp;
   prev.shield = shield;
 }
 
@@ -228,7 +228,7 @@ function damageToProbe(seed: number, probeSlot: number, active: boolean): number
   const probeBot = active ? createBot({ id: probeSlot, personality: CAST }, { seed }) : null;
 
   const probe = world.ships.find((s) => s.id === probeSlot)!;
-  const home = world.planets.find((p) => p.owner === probeSlot)!;
+  const home = world.stations.find((p) => p.owner === probeSlot)!;
   const absorbed: Absorbed = { hull: probe.hull, core: home.coreHp, shield: shieldPool(home), total: 0 };
 
   const turtle: Inputs = [

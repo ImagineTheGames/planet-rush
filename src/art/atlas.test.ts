@@ -14,7 +14,7 @@ import {
   buildProgressTexture,
   damageRingTexture,
   oreChunkTexture,
-  planetTexture,
+  stationTexture,
   shieldTexture,
   shipTexture,
   turretTexture,
@@ -39,11 +39,11 @@ describe('atlas', () => {
     const baker = bakerSpy();
     const cache = new SpriteTextureCache(baker);
 
-    // A full 8-planet match at the GDD's entity counts.
+    // A full 8-station match at the GDD's entity counts.
     for (let frame = 0; frame < 3; frame++) {
       for (let i = 0; i < 8; i++) {
         shipTexture(cache, ship(i), 48);
-        planetTexture(cache, { id: i, owner: i, alive: true, coreHp: 100, maxCoreHp: 100 }, 128);
+        stationTexture(cache, { id: i, owner: i, alive: true, coreHp: 100, maxCoreHp: 100 }, 128);
         beaconTexture(cache, i, 160);
         for (let t = 0; t < 4; t++) turretTexture(cache, i, 'idle', 32);
       }
@@ -52,7 +52,7 @@ describe('atlas', () => {
       }
     }
 
-    // Ships 8 + planets 4 variants + beacons 8 + turrets 8, and the ~200-rock
+    // Ships 8 + stations 4 variants + beacons 8 + turrets 8, and the ~200-rock
     // field bounded by 12 shapes × 3 crack stages × 4 payout bands.
     expect(cache.size).toBeLessThan(12 * 3 * 4 + 30);
     expect(baker.calls).toBe(cache.size);
@@ -72,11 +72,11 @@ describe('atlas', () => {
     expect(baker.calls).toBe(2);
   });
 
-  it('swaps a dead planet to its wreck — and the wreck keeps the same world', () => {
+  it('swaps a dead station to its wreck — and the wreck keeps the same world', () => {
     const baker = bakerSpy();
     const cache = new SpriteTextureCache(baker);
-    const alive = planetTexture(cache, { id: 1, owner: 1, alive: true, coreHp: 40, maxCoreHp: 100 }, 128);
-    const dead = planetTexture(cache, { id: 1, owner: 1, alive: false, coreHp: 0, maxCoreHp: 100 }, 128);
+    const alive = stationTexture(cache, { id: 1, owner: 1, alive: true, coreHp: 40, maxCoreHp: 100 }, 128);
+    const dead = stationTexture(cache, { id: 1, owner: 1, alive: false, coreHp: 0, maxCoreHp: 100 }, 128);
     expect(alive).not.toBe(dead);
     expect(cache.has('wreck:1:128')).toBe(true);
   });

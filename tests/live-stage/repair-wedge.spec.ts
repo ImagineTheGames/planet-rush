@@ -35,7 +35,7 @@ const REPAIR_ORE = 1;
  *  in `src/main.ts`). */
 interface RepairStage {
   /** Siege the local core down by `damage`, bank `banked`, park docked, open the
-   *  Build wheel. Returns the staged core/bank, or null if there is no ship/planet. */
+   *  Build wheel. Returns the staged core/bank, or null if there is no ship/station. */
   siege(damage: number, banked: number): { coreHp: number; maxCoreHp: number; banked: number } | null;
   /** Set the local core to exactly `hp` — stage the near-full / full cases. */
   setCore(hp: number): { coreHp: number; maxCoreHp: number } | null;
@@ -109,7 +109,7 @@ test('the REPAIR wedge shows "+15 HP" and a real click heals the core and spends
   // Siege the core down a comfortable 30 HP (only a siege damages a core — GDD
   // §2.6) and bank 5 ore, then open the wheel.
   const staged = await page.evaluate(() => window.__repairStage!.siege(30, 5));
-  expect(staged, 'the local ship and its planet were available to stage').not.toBeNull();
+  expect(staged, 'the local ship and its station were available to stage').not.toBeNull();
   const coreAtStart = staged!.coreHp;
   expect(coreAtStart, 'the core was sieged down by the staged damage').toBeCloseTo(
     staged!.maxCoreHp - 30,

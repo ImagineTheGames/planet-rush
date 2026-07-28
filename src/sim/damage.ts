@@ -8,7 +8,7 @@
  * half-hold ore drop, and the respawn clock (GDD §2.1, §2.3, §2.7). One
  * implementation, two callers, no drift.
  *
- * Planet damage (shields, then core) is *not* here: it carries the repair
+ * Station damage (shields, then core) is *not* here: it carries the repair
  * interruption and shield-regen window with it, so it lives with the buildings
  * it belongs to (`buildings.ts`).
  */

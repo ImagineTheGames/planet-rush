@@ -58,7 +58,7 @@ export interface OreLedger {
   /** The share of a hold destroyed rather than dropped when a ship dies
    *  (`killShip`: `1 − DEATH_ORE_DROP_FRACTION` of the hold). */
   deathLoss: number;
-  /** Banked ore beyond a wreck's debris cap, lost with the planet (`scatterWreck`). */
+  /** Banked ore beyond a wreck's debris cap, lost with the station (`scatterWreck`). */
   capLoss: number;
 }
 

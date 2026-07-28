@@ -19,11 +19,11 @@
  *   1. "Hold {fire} on the asteroid — your shots chip the rock" (teaches mining)
  *   2. "Hold full — fly home and press {build}"                (teaches the haul)
  *   3. "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
- *   4. "Your planet is under attack — follow the arrow"
+ *   4. "Your station is under attack — follow the arrow"
  *
- * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside planets, the
+ * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside stations, the
  * build wheel and the under-attack alarm, and completes (2)'s copy — it now has
- * a planet to fly home *to*, so the clause GDD §2.10 quotes ("and press E")
+ * a station to fly home *to*, so the clause GDD §2.10 quotes ("and press E")
  * joins it, resolved through the action layer like every other binding.
  *
  * (3) is the one GDD §2.10 singles out: it "fires the first time the wheel
@@ -51,7 +51,7 @@ export enum PromptId {
    *  first time the wheel opens: upgrades are the half of the economy a player
    *  can most easily miss (GDD §2.10, §2.5). */
   Spend = 'spend',
-  /** "Your planet is under attack — follow the arrow." The alarm's lesson: the
+  /** "Your station is under attack — follow the arrow." The alarm's lesson: the
    *  triangle decision, made audible (GDD §2.2, §2.10). */
   UnderAttack = 'under-attack',
 }
@@ -91,7 +91,7 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // No token: the arrow is the instruction, and it is device-agnostic already.
   [PromptId.UnderAttack]: {
     id: PromptId.UnderAttack,
-    template: 'Your planet is under attack — follow the arrow',
+    template: 'Your station is under attack — follow the arrow',
   },
 };
 

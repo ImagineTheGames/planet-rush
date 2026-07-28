@@ -12,7 +12,7 @@
  *   • one segment-vs-circle shot raycast per ship against nearby asteroids,
  *   • turrets firing pooled projectiles at the nearest ship.
  * Entity counts are the GDD budget (§4.3): ~200 asteroids, 8 ships, 32 turrets
- * (4 × 8 planets), 64 projectiles.
+ * (4 × 8 stations), 64 projectiles.
  *
  * Deterministic (mulberry32-seeded, no Math.random) so the workload is stable
  * run-to-run. A running checksum defeats dead-code elimination. Pure module,
@@ -110,7 +110,7 @@ export function createStandInSim(
     sHull[i] = 70;
   }
 
-  // --- Turrets (static; 32 = 4 per planet × 8 planets) ---
+  // --- Turrets (static; 32 = 4 per station × 8 stations) ---
   const nt = cfg.turrets;
   const tx = new Float64Array(nt);
   const ty = new Float64Array(nt);

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 import {
   endButtons,
   endKind,

@@ -60,7 +60,7 @@ import { PLAYER_COLORS } from '@render/index';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 import { CLASS_NAMES } from './upgrade-wheel';
 import { normalizeMapId } from './map-picker';
 
@@ -130,7 +130,7 @@ export const CLASS_ORDER: readonly ShipClass[] = [
 export const DEFAULT_SHIP_CLASS = ShipClass.Vanguard;
 
 /**
- * The name the local player shows over their ship and planet until they set one
+ * The name the local player shows over their ship and station until they set one
  * (field request v0.2.1). "YOU" is the same word the roster row already uses for
  * the local seat, so a fresh player sees one consistent identity everywhere.
  */
@@ -315,7 +315,7 @@ export interface LobbyState {
   /** Your hull pick. Mirrored onto your seat; locked once counting starts. */
   readonly shipClass: ShipClass;
   /**
-   * The local player's name, shown over their ship and planet (field request
+   * The local player's name, shown over their ship and station (field request
    * v0.2.1). Persisted like the hull; defaults to {@link DEFAULT_PLAYER_NAME}.
    * When online lands (m9) each *remote* seat's name arrives via the same slot
    * seam ({@link playerNameTable}) — this field is only ever the LOCAL name.
@@ -706,7 +706,7 @@ export interface LobbyModel {
   /** Your hull — the tile drawn as selected. */
   readonly shipClass: ShipClass;
   /** Your name (field request v0.2.1) — shown on your roster row and over your
-   *  ship and planet in the match. */
+   *  ship and station in the match. */
   readonly name: string;
   /** The arena — the map card drawn as selected (`../sim/maps` id). */
   readonly mapId: string;

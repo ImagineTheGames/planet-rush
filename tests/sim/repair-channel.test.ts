@@ -15,7 +15,7 @@
  * the channel-era end-to-end suite, updated deliberately to the ratified model.
  *
  * Faithful reproduction: everything here runs through the **real** match — a
- * `createWorld` ring, the ship spawned docked at its own planet, and the repair
+ * `createWorld` ring, the ship spawned docked at its own station, and the repair
  * order delivered as a `buildOrder` **action through `step()`**, exactly the
  * verb the wheel funnels (`@platform/wheel-input` → `@platform/actions` →
  * `wire` → the sim). Nothing calls the sim directly except the pins that assert
@@ -24,7 +24,7 @@
  *
  * The pins, one field-report clause each:
  *   §1 the order REACHES the sim — a `buildOrder: 'repair'` action heals the
- *      core (`planet.coreHp` rises, the one-tick tell `planet.repairing` flips
+ *      core (`station.coreHp` rises, the one-tick tell `station.repairing` flips
  *      true); this is the "never reaches the sim / wrong verb" suspect, killed;
  *   §2 damaged core + funded bank → HP rises by REPAIR_HP_PER_ORE and the bank
  *      falls by REPAIR_ORE_COST, ON the order tick — one press, one purchase;
@@ -51,11 +51,11 @@ import {
   createWorld,
   isDocked,
   placeOrder,
-  planetOf,
+  stationOf,
   shipOf,
   step,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type PlayerSpec,
   type Ship,
   type World,
@@ -78,37 +78,37 @@ const repairOrder = (): Inputs => [{ id: LOCAL, actions: [{ type: 'buildOrder', 
  * A real match a few seconds in: spawn protection has expired (so a core can be
  * damaged and repaired like any other mid-match moment), the field is empty of
  * commons so nothing drifts into the fixture, and the local ship sits parked and
- * docked at its own planet with `coreHp`/`banked` set to the scenario. The enemy
+ * docked at its own station with `coreHp`/`banked` set to the scenario. The enemy
  * is idle and half the ring away, so it never touches the local core.
  */
-function setup(coreHp: number, banked: number, cargo = 0): { world: World; ship: Ship; planet: Planet } {
+function setup(coreHp: number, banked: number, cargo = 0): { world: World; ship: Ship; station: MiningStation } {
   const world = createWorld({ seed: 7, players, asteroidCount: 0 });
   world.asteroids = []; // drop the home fields too: an inert, isolated core
   const ship = shipOf(world, LOCAL)!;
-  const planet = planetOf(world, LOCAL)!;
+  const station = stationOf(world, LOCAL)!;
 
   // Mid-match: protection gone on both the hull and the home, so damage lands
   // and a repair is a normal purchase (not a tick-0 special case).
   ship.spawnProtect = 0;
-  planet.spawnProtect = 0;
+  station.spawnProtect = 0;
 
   ship.banked = banked;
   ship.cargo = cargo;
-  planet.coreHp = coreHp;
+  station.coreHp = coreHp;
 
-  // The ship spawns orbiting its planet — docked — and parked (zero velocity),
+  // The ship spawns orbiting its station — docked — and parked (zero velocity),
   // which is the state the wheel opens in. Assert it rather than assume it.
-  expect(isDocked(ship, planet)).toBe(true);
-  return { world, ship, planet };
+  expect(isDocked(ship, station)).toBe(true);
+  return { world, ship, station };
 }
 
-/** The wheel model's read of a planet+ship this frame, docked and asking. */
+/** The wheel model's read of a station+ship this frame, docked and asking. */
 function signals(over: Partial<BuildWheelSignals>): BuildWheelSignals {
   return {
     requested: true,
     docked: true,
     shipAlive: true,
-    planetAlive: true,
+    stationAlive: true,
     cargo: 0,
     banked: 0,
     turrets: 0,
@@ -125,30 +125,30 @@ function signals(over: Partial<BuildWheelSignals>): BuildWheelSignals {
 describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix)', () => {
   // §1 — the "order never reaches the sim / fires the wrong verb" suspect.
   it('a buildOrder:repair action heals the core — the order reaches the sim', () => {
-    const { world, planet } = setup(CORE_HP - 20, 10);
-    const hp0 = planet.coreHp;
-    expect(planet.repairing).toBe(false);
+    const { world, station } = setup(CORE_HP - 20, 10);
+    const hp0 = station.coreHp;
+    expect(station.repairing).toBe(false);
 
     step(world, repairOrder());
 
     // The wheel press, funnelled as a `buildOrder` action, landed on the sim's
     // repair verb and moved state. Not a no-op, not the wrong verb.
-    expect(planet.coreHp).toBe(hp0 + REPAIR_HP_PER_ORE);
-    expect(planet.repairing).toBe(true); // the one-tick repair tell
+    expect(station.coreHp).toBe(hp0 + REPAIR_HP_PER_ORE);
+    expect(station.repairing).toBe(true); // the one-tick repair tell
   });
 
   // §2 — the core symptom, refuted: HP rises and ore is spent, at the ratified
   // amounts, ON the order tick — one press is one purchase.
   it('one press spends REPAIR_ORE_COST and restores REPAIR_HP_PER_ORE, on the order tick', () => {
-    const { world, ship, planet } = setup(CORE_HP - 20, 10);
-    const hp0 = planet.coreHp;
+    const { world, ship, station } = setup(CORE_HP - 20, 10);
+    const hp0 = station.coreHp;
     const bank0 = ship.banked;
 
     step(world, repairOrder());
 
     // Discrete: the purchase resolves the tick the order lands — HP up by
     // REPAIR_HP_PER_ORE, bank down by REPAIR_ORE_COST, no waiting, no channel.
-    expect(planet.coreHp - hp0).toBeCloseTo(REPAIR_HP_PER_ORE, 9);
+    expect(station.coreHp - hp0).toBeCloseTo(REPAIR_HP_PER_ORE, 9);
     expect(bank0 - ship.banked).toBeCloseTo(REPAIR_ORE_COST, 9);
   });
 
@@ -161,8 +161,8 @@ describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix
       step(viaHold.world, repairOrder());
     }
 
-    const healedBank = viaBank.planet.coreHp - (CORE_HP - 50);
-    const healedHold = viaHold.planet.coreHp - (CORE_HP - 50);
+    const healedBank = viaBank.station.coreHp - (CORE_HP - 50);
+    const healedHold = viaHold.station.coreHp - (CORE_HP - 50);
     expect(healedBank).toBeCloseTo(3 * REPAIR_HP_PER_ORE, 6);
     expect(healedHold).toBeCloseTo(3 * REPAIR_HP_PER_ORE, 6);
     // Three purchases cost exactly three ore, whichever wallet paid.
@@ -171,26 +171,26 @@ describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix
   });
 
   it('a single press heals ONCE — no held channel, no drain across idle ticks', () => {
-    const { world, ship, planet } = setup(CORE_HP - 30, 10);
+    const { world, ship, station } = setup(CORE_HP - 30, 10);
     step(world, repairOrder()); // ONE order
-    const hpAfter = planet.coreHp;
+    const hpAfter = station.coreHp;
     const bankAfter = ship.banked;
     expect(hpAfter).toBe(CORE_HP - 30 + REPAIR_HP_PER_ORE);
 
     for (let t = 0; t < 30; t++) step(world, []); // no further presses
-    expect(planet.coreHp).toBe(hpAfter); // not one more HP — no channel drains it up
+    expect(station.coreHp).toBe(hpAfter); // not one more HP — no channel drains it up
     expect(ship.banked).toBe(bankAfter); // not one more ore — no continuous drain
     // The tell holds ("patched, not hit since") across the idle ticks; it just
     // signals — it never heals a point past the single purchase above.
-    expect(planet.repairing).toBe(true);
+    expect(station.repairing).toBe(true);
   });
 
   it('clamps at the core max — a near-full core costs a whole ore and heals to full', () => {
     // Missing 10 < REPAIR_HP_PER_ORE (15): the purchase still costs a whole ore
     // and clamps to max, never overshooting (developer p5-08).
-    const { world, ship, planet } = setup(CORE_HP - 10, 10);
+    const { world, ship, station } = setup(CORE_HP - 10, 10);
     step(world, repairOrder());
-    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(station.coreHp).toBe(station.maxCoreHp);
     expect(ship.banked).toBeCloseTo(10 - REPAIR_ORE_COST, 6);
   });
 });
@@ -198,7 +198,7 @@ describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix
 describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
   // §3 — unfunded: nothing moves, AND the refusal has a reason the wheel shows.
   it('unfunded — nothing changes and the wedge is dimmed with a reason', () => {
-    const { world, ship, planet } = setup(CORE_HP - 20, 0, 0);
+    const { world, ship, station } = setup(CORE_HP - 20, 0, 0);
 
     // The sim refuses with a REASON, not a silent shrug.
     expect(placeOrder(world, ship, 'repair')).toBe('cannot-afford');
@@ -206,10 +206,10 @@ describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
     // And driven through the action funnel: no heal, and after a stretch of ticks
     // the core and the (empty) bank are untouched.
     step(world, repairOrder());
-    expect(planet.repairing).toBe(false);
-    const hp = planet.coreHp;
+    expect(station.repairing).toBe(false);
+    const hp = station.coreHp;
     for (let t = 0; t < 60; t++) step(world, []);
-    expect(planet.coreHp).toBe(hp);
+    expect(station.coreHp).toBe(hp);
     expect(ship.banked).toBe(0);
 
     // The loud half: the wheel dims REPAIR CORE `unaffordable` — not a live
@@ -219,14 +219,14 @@ describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
 
   // §4 — full core: the press is a no-op, and both layers say so.
   it('full core — refused `core-full`, and the wedge reads inactive', () => {
-    const { world, ship, planet } = setup(CORE_HP, 10);
+    const { world, ship, station } = setup(CORE_HP, 10);
 
     expect(placeOrder(world, ship, 'repair')).toBe('core-full');
 
     step(world, repairOrder());
-    expect(planet.repairing).toBe(false);
+    expect(station.repairing).toBe(false);
     for (let t = 0; t < 30; t++) step(world, []);
-    expect(planet.coreHp).toBe(CORE_HP);
+    expect(station.coreHp).toBe(CORE_HP);
     expect(ship.banked).toBe(10); // a full core spends nothing
 
     expect(segmentState('repair', signals({ coreHp: CORE_HP, maxCoreHp: CORE_HP, banked: 10 }))).toBe('inactive');
@@ -234,14 +234,14 @@ describe('REPAIR CORE no-ops LOUDLY, never silently (GDD §2.5)', () => {
 
   // §5 — collapse (GDD §2.3): repair is off for the rest of the match.
   it('collapse — refused `collapsed`, no ore spent, and the wedge reads inactive', () => {
-    const { world, ship, planet } = setup(CORE_HP - 20, 10);
+    const { world, ship, station } = setup(CORE_HP - 20, 10);
     // The field is spent: `isCollapsed` reads `collapseTime >= 0`.
     world.match.collapseTime = world.time;
 
     expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
 
     step(world, repairOrder());
-    expect(planet.repairing).toBe(false);
+    expect(station.repairing).toBe(false);
     // Collapse decays the core on its own (GDD §2.3); what repair must never do
     // is spend the bank or heal it back up. The bank is untouched.
     expect(ship.banked).toBe(10);

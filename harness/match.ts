@@ -24,7 +24,7 @@
  * Nothing in here throws on a bad match, because "the match hung" is a *result*
  * QA reports, not an exception that loses the run that produced it.
  *
- * Runs a full 8-slot match by default (GDD §2.1 — eight planets, always). Imports
+ * Runs a full 8-slot match by default (GDD §2.1 — eight stations, always). Imports
  * `src/sim/` and `src/bots/` headless; never PixiJS, never a DOM, never a wall
  * clock inside the simulation (the wall clock here is the *guard*, and it is
  * read outside `step`, so it can never influence the world).
@@ -401,19 +401,19 @@ function summarize(
   const winner = ended ? world.match.winner : null;
   const bySlot = new Map<PlayerId, SlotSpec>(seats.map((s) => [s.spec.id, s.spec]));
 
-  const slots: SlotResult[] = world.planets.map((planet) => {
-    const spec = bySlot.get(planet.owner);
-    const ship = world.ships.find((s) => s.id === planet.owner);
+  const slots: SlotResult[] = world.stations.map((station) => {
+    const spec = bySlot.get(station.owner);
+    const ship = world.ships.find((s) => s.id === station.owner);
     return {
-      id: planet.owner,
+      id: station.owner,
       shipClass: spec?.shipClass ?? ShipClass.Vanguard,
       strategy: spec?.strategy ?? 'idle',
-      survived: planet.alive,
-      survivedSeconds: planet.alive ? world.time : planet.deathTime,
-      coreFraction: planet.maxCoreHp > 0 ? Math.max(0, planet.coreHp) / planet.maxCoreHp : 0,
+      survived: station.alive,
+      survivedSeconds: station.alive ? world.time : station.deathTime,
+      coreFraction: station.maxCoreHp > 0 ? Math.max(0, station.coreHp) / station.maxCoreHp : 0,
       banked: ship?.banked ?? 0,
-      turrets: planet.turrets.length,
-      shields: planet.shields.length,
+      turrets: station.turrets.length,
+      shields: station.shields.length,
     };
   });
 

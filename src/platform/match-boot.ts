@@ -11,7 +11,7 @@
  *
  * What it assembles (GDD §2.1, §2.9, §4.2):
  *
- *  - Eight slots, eight planets. This client flies one; the other seven are the
+ *  - Eight slots, eight stations. This client flies one; the other seven are the
  *    cast (`src/bots`), each bringing its character's hull.
  *  - A `LocalLoopback` holding the authoritative sim in this process — no
  *    server, no internet, and the same protocol the online match speaks.

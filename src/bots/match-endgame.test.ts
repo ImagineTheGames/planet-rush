@@ -52,7 +52,7 @@ import { botLobby, fillEmptySlots, runHeadlessMatch } from './harness';
 import { createDoNothingBot, type Bot } from './bot';
 
 /**
- * The offline match a solo player gets: eight planets, a full cast, no humans
+ * The offline match a solo player gets: eight stations, a full cast, no humans
  * (GDD §3.3) — with a small field, because nobody is going to mine it.
  *
  * **The cast runs the do-nothing baseline on purpose** (`./bot`). Day 4 gave the
@@ -72,13 +72,13 @@ function accelerated(seed = 42): { world: World; bots: Bot[] } {
 describe('an eight-slot bot match reaches a win state', () => {
   it('runs to a winner with a survivor, and nobody ever touched a control', () => {
     const { world, bots } = accelerated();
-    expect(world.planets).toHaveLength(8);
+    expect(world.stations).toHaveLength(8);
     expect(bots).toHaveLength(8);
 
     // One home built to outlast the collapse, so the match ends the ordinary
     // way — seven eliminations and a survivor — rather than in a mutual
     // extinction resolved by the tiebreak (that is the next test).
-    const tough = world.planets[3]!;
+    const tough = world.stations[3]!;
     tough.coreHp = 400;
     tough.maxCoreHp = 400;
 

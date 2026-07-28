@@ -46,12 +46,12 @@ export function controlsStripRows(
 }
 
 /**
- * The away-from-planet hint for the Build & Upgrade row: the legend must never
+ * The away-from-station hint for the Build & Upgrade row: the legend must never
  * promise a key that does nothing (field report v0.2.2 — "'E to build' shows
  * always"). Named in full (never just "BUILD" — GDD §2.5) and worded like the
  * touch affordance, which simply isn't there until you're home (build-button.ts).
  */
-export const BUILD_AWAY_HINT = 'Build & Upgrade — get closer to your planet';
+export const BUILD_AWAY_HINT = 'Build & Upgrade — get closer to your station';
 
 /** One rendered strip row: an action, its label, the key to print (or `null`
  *  when the action is contextually unavailable and has no live key to promise),
@@ -68,8 +68,8 @@ export interface StripRow {
 /**
  * The strip rows to DRAW, with the Build & Upgrade row made **contextual on
  * docking** — the desktop twin of the touch BUILD button, which only appears at
- * your own planet (build-button.ts, GDD §2.2, §2.4). The wheel opens "near your
- * own planet and nowhere else" (GDD §2.5), so a legend that always advertises the
+ * your own station (build-button.ts, GDD §2.2, §2.4). The wheel opens "near your
+ * own station and nowhere else" (GDD §2.5), so a legend that always advertises the
  * key promises an action the player mostly cannot take (field report v0.2.2).
  *
  *  - **Docked** — the row is live: its real key ("E") and its full name.

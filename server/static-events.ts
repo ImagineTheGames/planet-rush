@@ -3,7 +3,7 @@
  * OWNER: Netcode Engineer (GDD §3.5, §4.2).
  *
  * Only ships and projectiles ride the 30 Hz binary snapshot (`src/net/snapshot`).
- * Asteroids, planets, turrets, shields and wrecks are **events, sent on join and
+ * Asteroids, stations, turrets, shields and wrecks are **events, sent on join and
  * on change** (GDD §4.2) — they change a few times a minute, not sixty times a
  * second, and streaming them every tick would cost more than the entire ship
  * stream to say nothing new.
@@ -13,14 +13,14 @@
  *
  *  - {@link StaticEntityTracker} — **structure, broadcast to everyone.** What
  *    exists and where: a rock spawned by a wave, a rock mined out, a turret
- *    finished building, a shield popped, a planet becoming a wreck. All of it is
+ *    finished building, a shield popped, a station becoming a wreck. All of it is
  *    plainly visible on the map to anyone who flies past, so all of it is public.
  *
  *  - {@link FogTracker} — **health, sent only to eyes that earned it.** "Enemy
- *    planet health is scouted, not broadcast" (GDD §2.2), and the honest place to
+ *    station health is scouted, not broadcast" (GDD §2.2), and the honest place to
  *    enforce that is the wire, not the HUD: a client that is never sent a rival's
  *    core HP cannot draw it, cannot leak it to a modified client, and cannot
- *    free-ride on someone else's siege. You always get your own planet's numbers;
+ *    free-ride on someone else's siege. You always get your own station's numbers;
  *    you get a rival's only while your ship is inside sensor range of it.
  *
  * Both trackers hold their own last-known state and emit only differences, so an
@@ -30,14 +30,14 @@
 import type { PlayerId } from '@shared/types';
 import type {
   AsteroidEventData,
-  PlanetEventData,
-  PlanetHealthData,
+  StationEventData,
+  StationHealthData,
   ShieldEventData,
   TurretEventData,
 } from '../src/net/entity-events';
 import type { EntityEventMessage, Tick } from '../src/net/transport';
 import { SENSOR_RANGE } from '../src/sim';
-import type { Planet, World } from '../src/sim';
+import type { MiningStation, World } from '../src/sim';
 
 // ---------------------------------------------------------------------------
 // Event payloads
@@ -52,17 +52,17 @@ import type { Planet, World } from '../src/sim';
 // Full state — what a client gets on join, and on reclaim
 // ---------------------------------------------------------------------------
 
-function planetEvent(planet: Planet, tick: Tick, op: 'spawn' | 'update'): EntityEventMessage {
-  const data: PlanetEventData = {
-    id: planet.id,
-    owner: planet.owner,
-    x: planet.pos.x,
-    y: planet.pos.y,
-    radius: planet.radius,
-    alive: planet.alive,
-    deathTime: planet.deathTime,
+function stationEvent(station: MiningStation, tick: Tick, op: 'spawn' | 'update'): EntityEventMessage {
+  const data: StationEventData = {
+    id: station.id,
+    owner: station.owner,
+    x: station.pos.x,
+    y: station.pos.y,
+    radius: station.radius,
+    alive: station.alive,
+    deathTime: station.deathTime,
   };
-  return { type: 'entityEvent', tick, kind: planet.alive ? 'planet' : 'wreck', op, data };
+  return { type: 'entityEvent', tick, kind: station.alive ? 'station' : 'wreck', op, data };
 }
 
 function asteroidEvent(
@@ -83,7 +83,7 @@ function asteroidEvent(
 }
 
 function turretEvent(
-  turret: Planet['turrets'][number],
+  turret: MiningStation['turrets'][number],
   tick: Tick,
   op: 'spawn' | 'update',
 ): EntityEventMessage {
@@ -100,7 +100,7 @@ function turretEvent(
 }
 
 function shieldEvent(
-  shield: Planet['shields'][number],
+  shield: MiningStation['shields'][number],
   owner: PlayerId,
   tick: Tick,
   op: 'spawn' | 'update',
@@ -131,11 +131,11 @@ function destroyEvent(
 export function fullEntityState(world: World): EntityEventMessage[] {
   const tick = world.tick;
   const events: EntityEventMessage[] = [];
-  for (const planet of world.planets) {
-    events.push(planetEvent(planet, tick, 'spawn'));
-    for (const turret of planet.turrets) events.push(turretEvent(turret, tick, 'spawn'));
-    for (const shield of planet.shields) {
-      events.push(shieldEvent(shield, planet.owner, tick, 'spawn'));
+  for (const station of world.stations) {
+    events.push(stationEvent(station, tick, 'spawn'));
+    for (const turret of station.turrets) events.push(turretEvent(turret, tick, 'spawn'));
+    for (const shield of station.shields) {
+      events.push(shieldEvent(shield, station.owner, tick, 'spawn'));
     }
   }
   for (const asteroid of world.asteroids) events.push(asteroidEvent(asteroid, tick, 'spawn'));
@@ -194,25 +194,25 @@ export class StaticEntityTracker {
 
     const liveTurrets = new Set<number>();
     const liveShields = new Set<number>();
-    for (const planet of world.planets) {
-      for (const turret of planet.turrets) {
+    for (const station of world.stations) {
+      for (const turret of station.turrets) {
         liveTurrets.add(turret.id);
         if (this.turrets.has(turret.id)) continue;
         this.turrets.add(turret.id);
         events.push(turretEvent(turret, tick, 'spawn'));
       }
-      for (const shield of planet.shields) {
+      for (const shield of station.shields) {
         liveShields.add(shield.id);
         if (this.shields.has(shield.id)) continue;
         this.shields.add(shield.id);
-        events.push(shieldEvent(shield, planet.owner, tick, 'spawn'));
+        events.push(shieldEvent(shield, station.owner, tick, 'spawn'));
       }
       // A dead core is announced once, as the wreck it becomes: the wreck stays
       // on the map for the rest of the match (GDD §2.7), so this is the event
       // the death moment and the debris field hang off.
-      if (!planet.alive && !this.wrecked.has(planet.id)) {
-        this.wrecked.add(planet.id);
-        events.push(planetEvent(planet, tick, 'update'));
+      if (!station.alive && !this.wrecked.has(station.id)) {
+        this.wrecked.add(station.id);
+        events.push(stationEvent(station, tick, 'update'));
       }
     }
     for (const id of this.turrets) {
@@ -235,13 +235,13 @@ export class StaticEntityTracker {
 // ---------------------------------------------------------------------------
 
 /**
- * Per-client planet health. One tracker per connected player: it remembers what
+ * Per-client station health. One tracker per connected player: it remembers what
  * that client was last told, and it will only tell them what they are allowed
  * to know.
  *
- * The rule, straight from the GDD: your own planet's numbers are always yours;
+ * The rule, straight from the GDD: your own station's numbers are always yours;
  * a rival's numbers exist for you only while your ship is within sensor range of
- * their planet (§2.2 — "information you *earn* by scouting"). When a scouting
+ * their station (§2.2 — "information you *earn* by scouting"). When a scouting
  * ship leaves range, the client keeps its last read and grows stale, exactly
  * like a human's memory of what they saw — the server simply stops updating it.
  */
@@ -260,29 +260,29 @@ export class FogTracker {
     const range2 = this.sensorRange * this.sensorRange;
     const events: EntityEventMessage[] = [];
 
-    for (const planet of world.planets) {
-      const own = planet.owner === this.viewer;
+    for (const station of world.stations) {
+      const own = station.owner === this.viewer;
       if (!own) {
         // No ship in the sky, no scouting: a dead or eliminated player's client
         // learns nothing new about anyone else's core.
         if (!looking) continue;
-        const dx = planet.pos.x - eye.pos.x;
-        const dy = planet.pos.y - eye.pos.y;
+        const dx = station.pos.x - eye.pos.x;
+        const dy = station.pos.y - eye.pos.y;
         if (dx * dx + dy * dy > range2) continue;
       }
 
-      const data: PlanetHealthData = {
-        id: planet.id,
-        coreHp: planet.coreHp,
-        shields: planet.shields.map((s) => ({ id: s.id, hp: s.hp })),
-        turrets: planet.turrets.map((t) => ({ id: t.id, hp: t.hp })),
+      const data: StationHealthData = {
+        id: station.id,
+        coreHp: station.coreHp,
+        shields: station.shields.map((s) => ({ id: s.id, hp: s.hp })),
+        turrets: station.turrets.map((t) => ({ id: t.id, hp: t.hp })),
       };
       // Health is continuous and mostly unchanging; a signature keeps a besieged
-      // planet reporting every sample and a quiet one reporting nothing.
+      // station reporting every sample and a quiet one reporting nothing.
       const signature = JSON.stringify(data);
-      if (this.lastSent.get(planet.id) === signature) continue;
-      this.lastSent.set(planet.id, signature);
-      events.push({ type: 'entityEvent', tick: world.tick, kind: 'planet', op: 'update', data });
+      if (this.lastSent.get(station.id) === signature) continue;
+      this.lastSent.set(station.id, signature);
+      events.push({ type: 'entityEvent', tick: world.tick, kind: 'station', op: 'update', data });
     }
 
     return events;
