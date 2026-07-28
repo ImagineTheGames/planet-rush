@@ -30,6 +30,7 @@ import {
   runMatch,
   runSeeds,
   seedRange,
+  teamsLineup,
 } from '../../harness/match';
 import { STRATEGIES, STRATEGY_IDS } from '../../harness/strategies';
 
@@ -153,6 +154,44 @@ describe('lineups', () => {
 
   it('refuses an empty lineup rather than producing an unplayable match', () => {
     expect(() => roundRobinLineup([])).toThrow(/no entries/);
+  });
+});
+
+describe('team lineups (Task D1)', () => {
+  const raider = { strategy: 'raider', shipClass: ShipClass.Vanguard } as const;
+  const turtle = { strategy: 'turtle', shipClass: ShipClass.Vanguard } as const;
+
+  it('numbers seats across teams and stamps each with its team', () => {
+    const lineup = teamsLineup([[raider, turtle], [raider, turtle]]);
+    expect(lineup.map((s) => s.id)).toEqual([0, 1, 2, 3]);
+    expect(lineup.map((s) => s.team)).toEqual([0, 0, 1, 1]);
+  });
+
+  it('allows any split — a 3v1 is a lineup, not an error', () => {
+    const lineup = teamsLineup([[raider, raider, raider], [turtle]]);
+    expect(lineup.map((s) => s.team)).toEqual([0, 0, 0, 1]);
+  });
+
+  it('refuses fewer than two teams, an empty team, and an over-full table', () => {
+    expect(() => teamsLineup([[raider]])).toThrow(/two teams/);
+    expect(() => teamsLineup([[raider], []])).toThrow(/no members/);
+    expect(() => teamsLineup([Array(5).fill(raider), Array(5).fill(raider)])).toThrow(/ceiling/);
+  });
+
+  it('runs a 2v2 to a team result: one team survives, its seats share the winning team', () => {
+    // raiders (team 0) vs turtles (team 1): a decisive composition so the match
+    // ends inside the window rather than timing out.
+    const result = runMatch({ seed: 7, lineup: teamsLineup([[raider, raider], [turtle, turtle]]) });
+    expect(result.ok).toBe(true);
+    expect(result.winnerTeam).not.toBeNull();
+    // The reported winner is a real seat on the winning team.
+    const winnerSlot = result.slots.find((s) => s.id === result.winner);
+    expect(winnerSlot?.team).toBe(result.winnerTeam);
+    // Friendly fire is off, so a team is only out once BOTH its homes fall: every
+    // surviving home belongs to the winning team.
+    for (const slot of result.slots) {
+      if (slot.survived) expect(slot.team).toBe(result.winnerTeam);
+    }
   });
 });
 

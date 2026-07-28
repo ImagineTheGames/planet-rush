@@ -19,9 +19,13 @@
  *    the repair channel in `./buildings`, wave spawning in `./waves` — and this
  *    module owns the transition and the one flag they all read.
  *
- *  - **Win/loss, last to die.** One station left standing wins. If the final
- *    cores die in the *same tick*, the last core to reach zero in the
- *    simulation's resolution order wins — `match.eliminated` is that order,
+ *  - **Win/loss, last TEAM to die.** The last *team* with a core standing wins
+ *    (Task D1). In FFA every player is a team of one, so this is the familiar
+ *    "one home left standing"; in TEAMS a side keeps playing while any ally's
+ *    core survives, and wins the instant the opposing team's last core falls —
+ *    even while two of its own homes still stand. If the final cores of the last
+ *    two teams die in the *same tick*, the team whose core reached zero last in
+ *    the simulation's resolution order wins — `match.eliminated` is that order,
  *    recorded as it happens, so the tiebreak is a lookup rather than a guess.
  *
  * Determinism (GDD §4.8): fixed iteration order, no RNG (debris scatters on an
@@ -269,33 +273,72 @@ function applyCollapseDecay(world: World, dt: number): void {
 }
 
 /**
- * Win condition: own the last surviving station core (GDD §1).
+ * Win condition: the last **team** with a surviving core wins (GDD §1, Task D1).
  *
- * The tie rule is the interesting half. If the final cores die in the same
- * instant — two attackers finishing two homes on one tick, or the collapse
- * taking the last two together — there is no survivor to crown, so the match
- * goes to **whoever died last** in the simulation's resolution order. That
- * order is `match.eliminated`, appended to as each core reaches zero.
+ * We count distinct surviving *teams*, not surviving cores. A team with two
+ * homes still standing is one surviving team, so a 2v2 ends the moment the
+ * opposing side loses its last core — while the winners may still hold two. FFA
+ * is teams-of-one (`team` defaults to `owner`, see {@link teamOfStation}), so
+ * this reduces to "one home left standing", byte-for-byte the old rule.
+ *
+ * The tie rule is the interesting half. If the final cores of the last two teams
+ * die in the same instant — attackers finishing both homes on one tick, or the
+ * collapse taking the last two together — there is no survivor to crown, so the
+ * match goes to **whoever's core reached zero last** in the simulation's
+ * resolution order. That order is `match.eliminated`, appended to as each core
+ * dies; the last entry's *team* wins.
  *
  * A world with fewer than two stations is not a match (the render/test harnesses
- * run single-slot worlds); it never ends and never declares a winner.
+ * run single-slot worlds); it never ends and never declares a winner. Derelict
+ * wrecks (`alive === false` from birth) are nobody's team and are skipped here,
+ * so the `8-N` fillers on a derelict-fill map never keep a match alive.
  */
 function resolveWinner(world: World): void {
   const m = world.match;
   if (m.phase === 'ended' || world.stations.length < 2) return;
 
-  let alive = 0;
+  const survivingTeams = new Set<number>();
   let survivor: PlayerId | null = null;
+  let survivorTeam: number | null = null;
   for (const station of world.stations) {
     if (!station.alive) continue;
-    alive++;
+    const team = teamOfStation(station);
+    survivingTeams.add(team);
     survivor = station.owner;
+    survivorTeam = team;
   }
-  if (alive > 1) return;
+  if (survivingTeams.size > 1) return;
 
-  m.winner = alive === 1 ? survivor : lastToDie(m.eliminated);
+  if (survivingTeams.size === 1) {
+    // One team still holds a core — even if it holds several. It wins.
+    m.winner = survivor;
+    m.winningTeam = survivorTeam;
+  } else {
+    // Every core is gone: the last team to lose its last core takes it.
+    const last = lastToDie(m.eliminated);
+    m.winner = last;
+    m.winningTeam = last === null ? null : teamOfOwner(world, last);
+  }
   m.phase = 'ended';
   m.endTime = world.time;
+}
+
+/** The team a station fights for — its stamped `team`, or (for the pre-Teams
+ *  fixtures other lanes build without one) its owner id, i.e. FFA teams-of-one.
+ *  The station-level twin of `allegiance.teamOf`, read here off the core that
+ *  actually decides the match rather than off a ship that may be a wreck. */
+function teamOfStation(station: MiningStation): number {
+  return station.team ?? station.owner;
+}
+
+/** The team a given slot fought for, found by its home station — used only for
+ *  the same-tick tiebreak, where the winning `PlayerId` is already known and its
+ *  team must be reported. Falls back to the id itself (teams-of-one). */
+function teamOfOwner(world: World, owner: PlayerId): number {
+  for (const station of world.stations) {
+    if (station.owner === owner) return teamOfStation(station);
+  }
+  return owner;
 }
 
 /** Whoever died last — the tiebreak, and null if nobody ever did. */
