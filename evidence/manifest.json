@@ -1108,5 +1108,55 @@
     "buildSha": "6a7fbc8",
     "attestation": "Three-panel strip, live desktop bundle (?debug=1), player on auto-aim (Tap Commander, no lock — so the sim's lead solver aims the ladder's pick). A bot ('Rusty') traces an arc around a planet while the local ship (white box, screen-centred) fires on it. Each panel is a captured LANDED shot: the orbiter is ringed white at successive points along the arc, its recent path drawn in cyan, the shot span in yellow, and the planet it circles boxed blue with a faint orbit ring. Across 170 frames (the firing tell true on all 170) the bot swept a ~50° arc at ~237px radius and its hull stepped DOWN 7 times — the three panels catch it at 95% → 75% → 60% as the arc sweeps up-left → up → up-right. Panel 2 carries the game's own 'Your planet is under attack — follow the arrow' warning. Seven landed shots on a moving orbiter: the developer's field report ('I can never hit an enemy orbiting my planet') answered by the auto-aim lead solver. Zero page errors.",
     "verdict": "verified"
+  },
+  {
+    "id": "damage-fills-red",
+    "title": "Siege ring grammar — shield reddens & dies before the core fills red",
+    "area": "match",
+    "image": "images/p11-damage-fills-red.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Four-panel siege of ONE owner-0 (blue) home, every pixel drawn by the SHIPPED ring code (src/render drawDamageFill / drawShieldBubble) via the QA render harness (evidence/harness/scene.js) — a fresh home has no shields and no ?debug seam grants one, so the shield layer is staged on the real Planet and the core hp set through the sim's own field, then drawn by the real Renderer. FRAME 1 (shield 40/40, core 100/100): a whole cyan shield bubble outside a whole BLUE core ring — healthy is entirely the owner's colour. FRAME 2 (shield 8/40, core 100/100): the OUTER shield ring is now mostly threat-RED (~80% of it, filling clockwise from twelve o'clock) while the inner core ring is still fully blue — the shield reddens while the core is untouched. FRAME 3 (shield 0/40, core 58/100): the shield is GONE (no outer ring) and the single core ring shows a ~42% red arc from twelve o'clock clockwise, the rest blue — the shield died BEFORE the core began to fill. FRAME 4 (shield 0/40, core 22/100): the core ring is ~78% red. Throughout, red = damage/lost and owner-blue = remaining, growing clockwise from the top; the old inverted ring (red meaning health) is gone. Each panel is captioned with the exact shield/core HP it was drawn at. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "scarce-default",
+    "title": "Ore abundance — SCARCE (default) vs RICH, same seed, obvious field difference",
+    "area": "match",
+    "image": "images/p11-scarce-default.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Two wide shots of the SAME map seed (20250728, octagon 8-home ring), each built by the real createWorld({abundance}) and drawn by the real Renderer via the QA harness. LEFT 'ABUNDANCE: SCARCE (p11 default)' — multipliers totalOre x0.55 / density x0.75 / respawn x1.1; field now 32 rocks, 114 ore total, economy.abundance=scarce. RIGHT 'ABUNDANCE: RICH' — x1.6 / x1.25 / x0.85; 56 rocks, 333 ore total, economy.abundance=rich. The eight owner-coloured homes sit in the identical ring in both (same seed); the SCARCE commons field is visibly sparser and its rocks leaner, the RICH field visibly denser with larger, richer rocks — the difference is obvious. Ore-per-minute table (p11-01 PR, all-miner mirror, world.ledger.mined / match-minutes): scarce 16.7, standard 32.3, rich 56.8 ore/min — SCARCE is 48.4% below STANDARD, RICH 76% above. FINDING (why the harness, not the shipped client): the offline boot path (platform bootOfflineMatch) never threads `abundance`, so the shipped client's createWorld defaults to STANDARD (economy.abundance='standard') — SCARCE is only the default of MatchConfig, which the offline boot bypasses, and there is no in-app scarce/rich selector yet. The p11 economy code itself resolves each level correctly, as shown. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "bot-resites",
+    "title": "Bot re-sites off a contested field to a clean one and arrives — ping-pong dead",
+    "area": "match",
+    "image": "images/p11-bot-resites.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Four-frame sequence driving the ratified resite.test.ts 'end to end' scenario with the REAL bot brain (src/bots) + real step(), drawn by the real Renderer via the harness (bots are not exposed on window.__planetRush and the camera cannot lock to a bot, so this is the only way to SEE it with the bot's intent readable). A Vanguard bot (arrow) starts centred, ~530 units from BOTH field A (east, contested — a hostile Hauler parked on its approach: the teal planet with the red-ringed rock) and field B (west, clean: the green-ringed rock). Every frame's caption reads `brain.mineSite = 200 -> field B (clean)` — the bot commits to the clean field on the FIRST decision and never re-picks the contested one (no oscillation). Across t = 0.1 / 1.6 / 3.7 / 5.9 s: dist->B falls 529 -> 337 -> 110 -> 115 (it flies to B and parks at mining range) while dist->A climbs 531 -> 723 -> 954 -> 1108, and min-ever-A stays 530 — the bot never once approaches the field the hostile blocks. The developer's 'it just kept going back and forth' is dead: a single clean re-site to the other field, and arrival. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "zero-means-dead",
+    "title": "A living ship at 0.28 HP reads '1/70' (never 0) with a sliver of bar",
+    "area": "match",
+    "image": "images/p11-zero-means-dead.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "LIVE shipped desktop bundle (?debug=1&freeze=1), enemy hull staged through the real over-ship health-bar path via window.__healthbarStage.damageEnemy(0.004). LEFT: the full running-game frame — HUD 'WAVE 1/5 . Outer Drift', ore readout, the round minimap and the controls strip — with a bot parked beside the local ship. RIGHT: a crisp zoom on that enemy ship (nameplate 'Rusty ...', a Hauler, maxHull 70) — its over-ship health bar is nearly empty with a single cyan SLIVER pinned at the left edge and the numeric readout '1/70' beside it. The seam set the hull to 0.004 x 70 = 0.28 HP (proven by the returned staged fraction 0.004 and the maxHull 70 read back from the drawn bar); the drawn bar floors to the minimum-fill sliver (fraction 0.06) and the number ceils to 1 — so a ship still alive at 0.28 HP shows '1/70', never '0/70'. Zero means dead: any HP above zero reads at least 1 and keeps a visible sliver. Shipped client, zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "shot-tier-colors",
+    "title": "Shot colours ramp by DAMAGE tier — own plasma & enemy threat-red families",
+    "area": "match",
+    "image": "images/p11-shot-tier-colors.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Six real Projectiles drawn by the shipped Renderer.drawShots through the p11 shotSprite ramp (src/art/vfx/shots.ts), via the harness. TOP ROW 'OWN fire - plasma family', tiers 0/1/2: the dots brighten cyan -> paler cyan and the glow halo grows each rung — pixels sampled off the PNG at each dot centre read #4bbdf7 -> #6ac7f7 -> #82cff7 (the art's SHOT_TIER_COLORS.own = #4dc3ff / #6dceff / #86d6ff). BOTTOM ROW 'ENEMY fire - threat-red family', tiers 0/1/2: dark-red -> pink-red, halo growing — sampled #ac3939 -> #ba5a5a -> #c47575 (art enemy = #b23a3a / #c05d5d / #cb7979). Both families climb WITHIN their own palette (own stays plasma/energy, enemy stays threat-red/danger) so 'whose shot' never changes hands, and neither ramp passes through signal yellow. The tint reads the shooter's owner.tiers[Power], so tiers 0/1/2 are staged as three allied shooters (own) and three enemy shooters (enemy) each at its rung. The shipped client can raise the LOCAL ship's Power tier live via __upgradeWheelStage (own ramp), but has no seam to set an enemy ship's or turret's tier, so the enemy threat-family ramp is only visible through the harness. Zero page errors.",
+    "verdict": "verified"
   }
 ]
