@@ -49,9 +49,30 @@ export interface AudioNodeLike {
   disconnect(): unknown;
 }
 
-/** A gain node — the only processing node the mix uses. */
+/** A gain node — the workhorse processing node of the mix. */
 export interface GainNodeLike extends AudioNodeLike {
   readonly gain: AudioParamLike;
+}
+
+/**
+ * A stereo panner — the one spatial node the mix uses. Placing a sound left or
+ * right of the camera is the audible half of *"I can hear every single thing on
+ * the map"* (ratified a3-03); `../spatial` computes the value, this applies it.
+ */
+export interface StereoPannerNodeLike extends AudioNodeLike {
+  /** −1 hard left … 0 centred … +1 hard right. */
+  readonly pan: AudioParamLike;
+}
+
+/**
+ * A lowpass biquad — the optional distance filter (`../spatial`). Far things lose
+ * their highs, so distance *feels* like distance; the mix only builds one once a
+ * sound is far enough to actually muffle, so the near field pays nothing for it.
+ */
+export interface BiquadFilterNodeLike extends AudioNodeLike {
+  /** Set to `'lowpass'`. Typed as a plain string so the subset names no enum. */
+  type: string;
+  readonly frequency: AudioParamLike;
 }
 
 /** A rendered mono sound, ready to play. */
@@ -89,6 +110,10 @@ export interface AudioContextLike {
   createGain(): GainNodeLike;
   createBufferSource(): BufferSourceLike;
   createBuffer(numberOfChannels: number, length: number, sampleRate: number): AudioBufferLike;
+  /** Spatial pan (`../spatial`). Universally supported; no webkit-prefix dance. */
+  createStereoPanner(): StereoPannerNodeLike;
+  /** The optional distance lowpass (`../spatial`), built only when it muffles. */
+  createBiquadFilter(): BiquadFilterNodeLike;
   resume(): Promise<void>;
 }
 

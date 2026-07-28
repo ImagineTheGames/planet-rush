@@ -3415,6 +3415,14 @@ async function boot(): Promise<void> {
          *  disabled one → reject, a landed spend → confirm). Null in a normal build
          *  (the tally is ?debug=1 only). */
         uiCues: { press: number; confirm: number; reject: number; last: UiCue | null } | null;
+        /** The placement of the last spatial one-shot (`./art/audio/spatial`) — the
+         *  gain a far siege was heard at and the pan a shot flew in on. Sound cannot
+         *  screenshot, so the spatial-audio attestation is these numbers (a3-03). */
+        lastGain: number;
+        lastPan: number;
+        /** Where the mix is listening from (the camera), world units — the anchor a
+         *  spatial probe measures against. `has` false before the first listener. */
+        listener: { x: number; y: number; has: boolean };
       } {
         return {
           contextState: audioCtx ? audioCtx.state : null,
@@ -3427,7 +3435,17 @@ async function boot(): Promise<void> {
           hushedCount: audio.hushedCount,
           sfxBusGain: audio.graph ? audio.graph.buses.sfx.gain.value : null,
           uiCues: uiSfxLog ? { ...uiSfxLog } : null,
+          lastGain: audio.lastPlacement.gain,
+          lastPan: audio.lastPlacement.pan,
+          listener: { ...audio.listener },
         };
+      },
+      /** What the spatial model would do to a sound at world (x, y) right now,
+       *  given the live listener — pure, plays nothing. A live-stage test probes a
+       *  point left and right of the camera to attest that pan flips sign and a
+       *  distant one falls to near-silence (a3-03). Behind ?debug=1 only. */
+      probe(x: number, y: number): { gain: number; pan: number; cutoff: number; culled: boolean } {
+        return audio.probe(x, y);
       },
       /** Resume the context by hand — the exact call the unlock makes from a
        *  gesture. The spec still drives sound through a REAL tap; this is only the
