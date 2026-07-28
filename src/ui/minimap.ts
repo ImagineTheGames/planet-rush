@@ -8,9 +8,20 @@
  * **What it shows (sim-driven — GDD §2.2 "a minimap (bottom right)").** Arena
  * bounds, stations as owner-coloured dots (a derelict wreck goes neutral steel —
  * it is no longer owned, GDD §2.7), ships as smaller dots (the local ship
- * highlighted, a spawn-protected ship dimmed — GDD §2.1), the collapse ring while
- * it is active (GDD §2.3), and faint ore-field hints. **Dots and colours only** —
- * no nameplates, no health numbers (those are scouted / over-ship, GDD §2.2).
+ * highlighted, a spawn-protected ship dimmed — GDD §2.1), radar satellites as
+ * small dots (feature f1), the collapse ring while it is active (GDD §2.3), and
+ * faint ore-field hints. **Dots and colours only** — no nameplates, no health
+ * numbers (those are scouted / over-ship, GDD §2.2).
+ *
+ * **Fog of war (RATIFIED feature f1).** The map renders ONLY the player's
+ * sensed-state (`../sim/sensing`): fogged regions read dark, static geography a
+ * player has scouted stays DIMMED (remembered), and LIVE dots show only under
+ * CURRENT sensor coverage — so a killed radar satellite collapses its coverage
+ * and everything only under it drops the same tick. The coverage discs are faintly
+ * visible ("you see what your radar buys you"). The fog decision (the coverage
+ * math + the tri-state) lives here and unit-tests headless; the dark/reveal look
+ * is the view's ({@link ./minimap-view}). See {@link minimapScene} and
+ * {@link MinimapFog}.
  *
  * **Two states, one gesture (the developer's spec).**
  *   - COLLAPSED — a small corner square, bottom-right (GDD §2.2). On mobile it is
@@ -136,6 +147,10 @@ const STATION_DOT_FRACTION = 0.04;
 const STATION_DOT_MIN = 2;
 const SHIP_DOT_FRACTION = 0.026;
 const SHIP_DOT_MIN = 1.5;
+/** A radar satellite reads a touch smaller than a ship — a small orbiting body,
+ *  not a combatant (feature f1). */
+const SATELLITE_DOT_FRACTION = 0.02;
+const SATELLITE_DOT_MIN = 1.25;
 /** The local ship's dot is drawn larger than an enemy's so it reads as *mine* at
  *  a glance — the minimap counterpart of the own-ship health bar's larger size. */
 const OWN_SHIP_DOT_MULTIPLIER = 1.55;
@@ -156,6 +171,35 @@ export const MINIMAP_SPAWN_PROTECT_ALPHA = 0.4;
 export const MINIMAP_ORE_ALPHA = 0.28;
 
 // ---------------------------------------------------------------------------
+// Fog of war (RATIFIED feature f1 — the minimap renders ONLY the player's
+// sensed-state, `../sim/sensing`). Three visual states, item 1 of the brief:
+//   - FOGGED regions read dark (Cold Vacuum) — no coverage, so nothing shows;
+//   - REMEMBERED static geography (a station scouted at least once) stays on the
+//     map but DIMMED, because a home does not move (GDD §2.7);
+//   - LIVE dots (ships, satellites, ore) show ONLY under CURRENT coverage — the
+//     instant a satellite dies its disc is gone and everything only under it
+//     drops the same tick (the "satellite-killed moment").
+// The pure model here decides WHICH of the three a body is in (the coverage math
+// + the tri-state), from the sim's own coverage discs; the view (./minimap-view)
+// decides how the dark/reveal reads. Own stations and the collapse ring are the
+// documented always-visible exceptions (see {@link minimapScene}).
+// ---------------------------------------------------------------------------
+
+/** A remembered-but-not-currently-covered station: dimmer than a live dot, so the
+ *  map reads it as "known geography", not as something you sense right now. Below
+ *  a derelict's dim so remembered wrecks recede further still. */
+export const MINIMAP_REMEMBERED_ALPHA = 0.3;
+/** How dark a FOGGED region reads — the near-opaque Cold-Vacuum veil the view lays
+ *  over the whole map, punched back through by the coverage discs. */
+export const MINIMAP_FOG_ALPHA = 0.9;
+/** The faint reveal wash inside a coverage disc — sensed vacuum reads a touch
+ *  lighter than the fog around it (you can see into what your radar covers). */
+export const MINIMAP_COVERAGE_FILL_ALPHA = 0.16;
+/** The coverage-disc edge ring — faintly visible, so "you see what your radar
+ *  buys you" is legible on the map (feature f1, item 1). */
+export const MINIMAP_COVERAGE_RING_ALPHA = 0.34;
+
+// ---------------------------------------------------------------------------
 // Model I/O
 // ---------------------------------------------------------------------------
 
@@ -170,6 +214,23 @@ export interface MinimapStation {
   readonly y: number;
   /** False once the core is destroyed — a wreck, drawn neutral (GDD §2.7). */
   readonly alive: boolean;
+  /** The station's board id (`MiningStation.id`, 0..7) — indexes the fog
+   *  remembered-mask ({@link MinimapFog}). Optional so a fog-less feed (no
+   *  sensing) still type-checks; required only when fog is active. */
+  readonly id?: number;
+}
+
+/** A radar satellite as the minimap sees it (map/world space, feature f1). It
+ *  reads like a small ship dot — an enemy satellite appears when sensed, the
+ *  viewer's own always shows (it is a high-value thing to spot / defend). */
+export interface MinimapSatellite {
+  readonly owner: PlayerId;
+  readonly x: number;
+  readonly y: number;
+  /** hp > 0 — a dead satellite is gone from the map (and its coverage collapsed). */
+  readonly alive: boolean;
+  /** The viewer's own satellite — always shown (cockpit knowledge). */
+  readonly local: boolean;
 }
 
 /** A ship as the minimap sees it (map/world space). */
@@ -192,6 +253,29 @@ export interface MinimapRing {
   readonly radius: number;
 }
 
+/** One sensor-coverage disc the viewer projects this tick (map space) — a ship's
+ *  own sensor, a station's short local sensor, or a radar satellite's LARGE
+ *  sensor. The union of these is the viewer's current sight (`../sim/sensing`
+ *  `SensorSource`); the minimap reveals inside them and fogs everything else. */
+export interface MinimapCoverage {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+}
+
+/** The fog-of-war input for a frame (feature f1). Present ⇒ the minimap renders
+ *  ONLY the sensed-state: dark outside `coverage`, dimmed for stations the mask
+ *  remembers, live dots only inside coverage. ABSENT ⇒ no fog (the pre-sensing
+ *  feed and every fixture render everything, unchanged). */
+export interface MinimapFog {
+  /** The viewer's current coverage discs (map space) — the union is their sight. */
+  readonly coverage: readonly MinimapCoverage[];
+  /** Bitmask of REMEMBERED station board-ids: bit `id` set ⇒ that station has been
+   *  sensed at least once, so its static geography persists on the map even after
+   *  coverage moves off it (`../sim/sensing` `SensoryMemory`). */
+  readonly rememberedMask: number;
+}
+
 /** Everything the minimap draws for one frame, all in **map (world) space** — the
  *  view projects it into the active rect itself. Every field bar `bounds` is
  *  optional so an early (pre-stations) feed still renders an empty arena. */
@@ -202,10 +286,16 @@ export interface MinimapFrame {
   readonly stations?: readonly MinimapStation[];
   /** Ships (GDD §2.2). */
   readonly ships?: readonly MinimapShip[];
+  /** Radar satellites (feature f1) — enemy ones show only when sensed, own always. */
+  readonly satellites?: readonly MinimapSatellite[];
   /** The collapse ring, present only while collapse is active (GDD §2.3). */
   readonly collapse?: MinimapRing | null;
   /** Faint ore-field hints — asteroid centres, map space (GDD §2.3, §5.5). */
   readonly oreHints?: readonly { readonly x: number; readonly y: number }[];
+  /** Fog-of-war coverage (feature f1). Present ⇒ the whole scene is fog-gated
+   *  (dark outside coverage, remembered geography dimmed, live dots only under
+   *  coverage). Absent / null ⇒ no fog, everything renders (backward compatible). */
+  readonly fog?: MinimapFog | null;
 }
 
 /** Safe-area / thumb insets, CSS px. All optional, default 0 — so a desktop or an
@@ -236,6 +326,14 @@ export interface MinimapRingDraw {
   readonly color: number;
 }
 
+/** A projected coverage disc (screen space) — the view reveals inside it (a faint
+ *  wash) and strokes its edge (the radar-reach ring). */
+export interface MinimapCoverageDraw {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+}
+
 /** The whole projected scene the view draws, decided here so it unit-tests
  *  headless. Positions are screen space (CSS px), already fit into `rect`. */
 export interface MinimapScene {
@@ -248,11 +346,19 @@ export interface MinimapScene {
   /** Enemy / non-local ship dots (the local ship is {@link ownDot}, drawn every
    *  frame by the view rather than folded into the throttled content). */
   readonly shipDots: readonly MinimapDot[];
+  /** Radar-satellite dots (feature f1) — sensed enemies + the viewer's own. */
+  readonly satelliteDots: readonly MinimapDot[];
   readonly oreDots: readonly MinimapDot[];
   /** The local ship's dot, or null when it is dead / absent this frame. */
   readonly ownDot: MinimapDot | null;
   /** The collapse ring, or null while the field still has something in it. */
   readonly collapseRing: MinimapRingDraw | null;
+  /** Whether fog is active this frame — the view lays the Cold-Vacuum veil only
+   *  when true (feature f1). False for a fog-less feed / every fixture. */
+  readonly fogged: boolean;
+  /** The projected coverage discs (screen space) the view reveals + rings. Empty
+   *  when {@link fogged} is false. */
+  readonly coverage: readonly MinimapCoverageDraw[];
 }
 
 // ---------------------------------------------------------------------------
@@ -409,28 +515,80 @@ function dotRadius(rectSize: number, fraction: number, min: number): number {
 }
 
 /**
+ * Whether a map-space point lies inside ANY current coverage disc — the union
+ * sight test, squared throughout (no sqrt), mirroring the sim seam's
+ * `pointSensed` (`../sim/sensing`). A body's `bodyRadius` lets its SURFACE count
+ * as sensed (a home is large). Empty coverage ⇒ nothing is sensed (full fog).
+ */
+function pointInCoverage(
+  coverage: readonly MinimapCoverage[],
+  x: number,
+  y: number,
+  bodyRadius = 0,
+): boolean {
+  for (const c of coverage) {
+    const dx = c.x - x;
+    const dy = c.y - y;
+    const reach = c.radius + bodyRadius;
+    if (dx * dx + dy * dy <= reach * reach) return true;
+  }
+  return false;
+}
+
+/**
  * Project a {@link MinimapFrame} into `rect`: fit the arena, then place every
- * station, ship, ore hint and the collapse ring as screen-space dots with the
- * right colour and dim/highlight rules. Pure — the whole "what the minimap shows"
- * decision, so it is asserted headless (./minimap.test.ts) and the view only paints.
+ * station, ship, satellite, ore hint and the collapse ring as screen-space dots
+ * with the right colour and dim/highlight rules. Pure — the whole "what the
+ * minimap shows" decision, so it is asserted headless (./minimap.test.ts) and the
+ * view only paints.
+ *
+ * **Fog of war (feature f1).** When `frame.fog` is present the minimap renders
+ * ONLY the sensed-state:
+ *   - a station NEVER sensed (not in the remembered mask, not under coverage now)
+ *     is FOGGED — it does not draw at all;
+ *   - a station REMEMBERED but not currently covered draws DIMMED
+ *     ({@link MINIMAP_REMEMBERED_ALPHA}) — known geography that persists;
+ *   - a station currently under coverage draws at full (a wreck still derelict-dim);
+ *   - live ships / satellites / ore draw ONLY under CURRENT coverage — so the tick
+ *     a radar satellite dies its disc vanishes and anything only under it drops.
+ * **Always-visible exceptions** (documented, brief item 3): the viewer's OWN ship
+ * is always its {@link ownDot} (cockpit knowledge), the viewer's OWN stations sit
+ * inside their own sensor disc so they are always covered, and the collapse ring
+ * is drawn regardless of coverage (match-critical, broadcast in-fiction). When
+ * `frame.fog` is ABSENT nothing is gated — the pre-sensing feed and every fixture
+ * render the whole scene, unchanged.
  */
 export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false): MinimapScene {
   const transform = fitBounds(frame.bounds, rect);
   const size = Math.min(rect.width, rect.height);
   const stationR = dotRadius(size, STATION_DOT_FRACTION, STATION_DOT_MIN);
   const shipR = dotRadius(size, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
+  const satR = dotRadius(size, SATELLITE_DOT_FRACTION, SATELLITE_DOT_MIN);
   const oreR = dotRadius(size, ORE_DOT_FRACTION, ORE_DOT_MIN);
+
+  const fog = frame.fog ?? null;
+  const coverage = fog?.coverage ?? [];
 
   const stationDots: MinimapDot[] = [];
   for (const p of frame.stations ?? []) {
     const s = mapPoint(transform, p.x, p.y);
+    // Fog tri-state. Without fog every station draws (unchanged). With fog: a
+    // station currently under coverage draws full; one only in the remembered
+    // mask draws dimmed; one neither remembered nor covered is fogged out.
+    let alpha = p.alive ? MINIMAP_DOT_ALPHA : MINIMAP_DERELICT_ALPHA;
+    if (fog) {
+      const rememberedBit = p.id !== undefined && (fog.rememberedMask & (1 << p.id)) !== 0;
+      const sensedNow = pointInCoverage(coverage, p.x, p.y, 0);
+      if (!rememberedBit && !sensedNow) continue; // fogged — never seen
+      if (!sensedNow) alpha = MINIMAP_REMEMBERED_ALPHA; // remembered, dimmed
+    }
     stationDots.push({
       x: s.x,
       y: s.y,
       radius: stationR,
       // A wreck is no longer owned (GDD §2.7): neutral steel, dimmer.
       color: p.alive ? playerColor(p.owner) : PALETTE.hullSteel,
-      alpha: p.alive ? MINIMAP_DOT_ALPHA : MINIMAP_DERELICT_ALPHA,
+      alpha,
     });
   }
 
@@ -438,6 +596,9 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
   let ownDot: MinimapDot | null = null;
   for (const sh of frame.ships ?? []) {
     if (!sh.alive) continue; // dead-and-respawning → off the map
+    // Live entities show only under CURRENT coverage; the viewer's own ship is
+    // always its own dot (cockpit knowledge, an always-visible exception).
+    if (fog && !sh.local && !pointInCoverage(coverage, sh.x, sh.y, 0)) continue;
     const s = mapPoint(transform, sh.x, sh.y);
     const dot: MinimapDot = {
       x: s.x,
@@ -451,10 +612,34 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     else shipDots.push(dot);
   }
 
+  const satelliteDots: MinimapDot[] = [];
+  for (const sat of frame.satellites ?? []) {
+    if (!sat.alive) continue; // a dead satellite is gone (its coverage collapsed)
+    if (fog && !sat.local && !pointInCoverage(coverage, sat.x, sat.y, 0)) continue;
+    const s = mapPoint(transform, sat.x, sat.y);
+    satelliteDots.push({
+      x: s.x,
+      y: s.y,
+      radius: satR,
+      color: playerColor(sat.owner),
+      alpha: MINIMAP_DOT_ALPHA,
+      own: sat.local,
+    });
+  }
+
   const oreDots: MinimapDot[] = [];
   for (const o of frame.oreHints ?? []) {
+    if (fog && !pointInCoverage(coverage, o.x, o.y, 0)) continue; // ore only where you sense
     const s = mapPoint(transform, o.x, o.y);
     oreDots.push({ x: s.x, y: s.y, radius: oreR, color: PALETTE.signalYellow, alpha: MINIMAP_ORE_ALPHA });
+  }
+
+  // Coverage discs → screen space, for the view to reveal + ring ("you see what
+  // your radar buys you"). Only when fog is active.
+  const coverageDraw: MinimapCoverageDraw[] = [];
+  for (const c of coverage) {
+    const s = mapPoint(transform, c.x, c.y);
+    coverageDraw.push({ x: s.x, y: s.y, radius: c.radius * transform.scale });
   }
 
   let collapseRing: MinimapRingDraw | null = null;
@@ -463,7 +648,18 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     collapseRing = { x: c.x, y: c.y, radius: frame.collapse.radius * transform.scale, color: PALETTE.threatRed };
   }
 
-  return { rect, transform, stationDots, shipDots, oreDots, ownDot, collapseRing };
+  return {
+    rect,
+    transform,
+    stationDots,
+    shipDots,
+    satelliteDots,
+    oreDots,
+    ownDot,
+    collapseRing,
+    fogged: !!fog,
+    coverage: coverageDraw,
+  };
 }
 
 // ---------------------------------------------------------------------------

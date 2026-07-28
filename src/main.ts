@@ -38,11 +38,15 @@ import {
   shieldCount,
   shieldPool,
   turretCount,
+  sensorSources,
 } from './sim';
-import type { MuzzleFlash, MiningStation, Turret, World } from './sim';
+import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
-import { buyUpgrade, turretTier } from './sim/buildings';
+import { buyUpgrade, turretTier, satelliteOrbitPos } from './sim/buildings';
+// SATELLITE tunables — used only by the ?debug=1 minimap-fog live-stage seam to
+// stage a radar satellite (build → coverage appears; kill → coverage collapses).
+import { SATELLITE } from './sim';
 import { bootOfflineMatch } from '@platform/match-boot';
 import type { MatchBoot } from '@platform/match-boot';
 import {
@@ -163,6 +167,9 @@ import type {
   DifficultyTable,
   MinimapStation,
   MinimapShip,
+  MinimapSatellite,
+  MinimapCoverage,
+  MinimapFog,
   Nameable,
   NameTable,
   SettingsState,
@@ -1155,16 +1162,39 @@ async function boot(): Promise<void> {
   const minimapStations: MinimapStation[] = [];
   const minimapShipPool: MutMinimapShip[] = [];
   const minimapShips: MinimapShip[] = [];
+  const minimapSatellitePool: MutMinimapSatellite[] = [];
+  const minimapSatellites: MinimapSatellite[] = [];
   const minimapOrePool: { x: number; y: number }[] = [];
   const minimapOre: { x: number; y: number }[] = [];
   const minimapCollapse: { x: number; y: number; radius: number } = { x: 0, y: 0, radius: 0 };
+  // --- Fog of war (feature f1): the viewer's current sensor-coverage discs +
+  //     the remembered-station bitmask, fed each frame so the minimap renders ONLY
+  //     the sensed-state (`../sim/sensing`). Discs are pooled; the mask is a plain
+  //     number. The fog GATING (what's dark / dimmed / live) is the pure model's
+  //     job (src/ui/minimap.ts) — main only supplies the raw coverage geometry.
+  const minimapCoveragePool: MutMinimapCoverage[] = [];
+  const minimapCoverage: MinimapCoverage[] = [];
+  const minimapFog: { -readonly [K in keyof MinimapFog]: MinimapFog[K] } = {
+    coverage: minimapCoverage,
+    rememberedMask: 0,
+  };
   const minimapFrame: {
     bounds: { width: number; height: number };
     stations: MinimapStation[];
     ships: MinimapShip[];
+    satellites: MinimapSatellite[];
     oreHints: { x: number; y: number }[];
     collapse: { x: number; y: number; radius: number } | null;
-  } = { bounds: { width: 0, height: 0 }, stations: minimapStations, ships: minimapShips, oreHints: minimapOre, collapse: null };
+    fog: MinimapFog | null;
+  } = {
+    bounds: { width: 0, height: 0 },
+    stations: minimapStations,
+    ships: minimapShips,
+    satellites: minimapSatellites,
+    oreHints: minimapOre,
+    collapse: null,
+    fog: null,
+  };
   /** Rebuild the per-slot name table (and its mirror difficulty table) from the
    *  live match: the local player's chosen name (from the lobby, or persisted
    *  default under ?debug=1) plus each seated bot's personality name (GDD §2.9),
@@ -2232,15 +2262,29 @@ async function boot(): Promise<void> {
     minimapFrame.bounds.height = world.bounds.height;
 
     let pn = 0;
+    let satn = 0;
     for (const p of world.stations) {
       const r = minimapStationSlot(pn++);
       r.owner = p.owner;
       r.x = p.pos.x;
       r.y = p.pos.y;
       r.alive = p.alive;
+      r.id = p.id;
+      // Radar satellites orbiting this station (feature f1): enemy ones are fog-
+      // gated by the pure model, the viewer's own always show (local flag).
+      for (const sat of p.satellites ?? []) {
+        const sr = minimapSatelliteSlot(satn++);
+        sr.owner = sat.owner;
+        sr.x = sat.pos.x;
+        sr.y = sat.pos.y;
+        sr.alive = sat.hp > 0;
+        sr.local = sat.owner === LOCAL_PLAYER;
+      }
     }
     minimapStations.length = 0;
     for (let i = 0; i < pn; i++) minimapStations.push(minimapStationPool[i]!);
+    minimapSatellites.length = 0;
+    for (let i = 0; i < satn; i++) minimapSatellites.push(minimapSatellitePool[i]!);
 
     let sn = 0;
     for (const s of world.ships) {
@@ -2280,15 +2324,44 @@ async function boot(): Promise<void> {
       minimapFrame.collapse = null;
     }
 
+    // Fog of war (feature f1): the minimap renders ONLY the local player's sensed-
+    // state. Consume the sim's own sensing truth — the CURRENT coverage discs
+    // (`sensorSources`, the union of the ship / stations / alive satellites the
+    // player projects this tick) and the persistent remembered-station bitmask.
+    // The pure model (src/ui/minimap.ts) does the gating from these; a killed
+    // satellite simply stops appearing here, collapsing its disc the same tick.
+    feedMinimapFog();
+
     hudFrame.minimap = minimapFrame;
     hudFrame.tick = world.tick;
+  }
+
+  /** Fill the fog feed for the local player (feature f1): copy the sim's current
+   *  coverage discs into the pooled array and read the remembered-station mask. A
+   *  short-lived `sensorSources` allocation (≤ ~17 tiny records) each frame is the
+   *  honest cost of consuming the ratified seam rather than duplicating its
+   *  three-source union here — the same off-hot-path selector pattern as
+   *  `muzzleFlashes`. */
+  function feedMinimapFog(): void {
+    const sources: SensorSource[] = sensorSources(world, LOCAL_PLAYER);
+    let cn = 0;
+    for (const s of sources) {
+      const r = minimapCoverageSlot(cn++);
+      r.x = s.pos.x;
+      r.y = s.pos.y;
+      r.radius = s.range;
+    }
+    minimapCoverage.length = 0;
+    for (let i = 0; i < cn; i++) minimapCoverage.push(minimapCoveragePool[i]!);
+    minimapFog.rememberedMask = world.sensory?.seenStations[LOCAL_PLAYER] ?? 0;
+    minimapFrame.fog = minimapFog;
   }
 
   /** Pooled minimap station record `i`, grown to fit and reused (GDD §4.3). */
   function minimapStationSlot(i: number): MutMinimapStation {
     let r = minimapStationPool[i];
     if (!r) {
-      r = { owner: 0, x: 0, y: 0, alive: true };
+      r = { owner: 0, x: 0, y: 0, alive: true, id: 0 };
       minimapStationPool[i] = r;
     }
     return r;
@@ -2310,6 +2383,26 @@ async function boot(): Promise<void> {
     if (!r) {
       r = { x: 0, y: 0 };
       minimapOrePool[i] = r;
+    }
+    return r;
+  }
+
+  /** Pooled minimap satellite record `i`, grown to fit and reused (feature f1). */
+  function minimapSatelliteSlot(i: number): MutMinimapSatellite {
+    let r = minimapSatellitePool[i];
+    if (!r) {
+      r = { owner: 0, x: 0, y: 0, alive: false, local: false };
+      minimapSatellitePool[i] = r;
+    }
+    return r;
+  }
+
+  /** Pooled minimap coverage-disc record `i`, grown to fit and reused (feature f1). */
+  function minimapCoverageSlot(i: number): MutMinimapCoverage {
+    let r = minimapCoveragePool[i];
+    if (!r) {
+      r = { x: 0, y: 0, radius: 0 };
+      minimapCoveragePool[i] = r;
     }
     return r;
   }
@@ -3347,14 +3440,82 @@ async function boot(): Promise<void> {
    * layer redraws the dots on the real client. A Playwright test reads the active
    * rect from {@link Hud.debugMinimap} (so it knows where to tap), dispatches a
    * real pointer at its centre, and reads back the flipped state + the moved dot.
+   *
+   * **Fog of war (feature f1).** The unit tests assert the sensed-state gating (a
+   * live dot vanishes when its coverage dies); what they cannot reach is the whole
+   * wiring — that the shipped bundle threads the sim's `sensorSources` into the
+   * map, so building a radar satellite paints a LARGE coverage disc and reveals a
+   * distant enemy, and killing it collapses that disc and the enemy drops the same
+   * tick. `buildSatellite`/`killSatellite` STAGE the sim data (push / zero a
+   * satellite, park a distant enemy under the satellite-only band) exactly as
+   * `__healthbarStage` stages a bot — the fog itself is computed by the real
+   * pipeline, so the seam cannot fake the wiring it proves. Best paired with
+   * `?freeze=1` (deterministic: no bot drift, the pinned scene holds still).
+   *
    * Behind ?debug=1 only; a normal build never installs it.
    */
   function installMinimapStage(): void {
     const stage = {
       /** The minimap state the HUD's minimap layer actually drew last frame — the
-       *  active rect (where to tap), the toggle state, and the own-ship dot. */
+       *  active rect (where to tap), the toggle state, and the own-ship dot, plus
+       *  the fog-gated counts (coverage discs + sensed enemy ships). */
       state(): ReturnType<typeof hud.debugMinimap> {
         return hud.debugMinimap();
+      },
+      /**
+       * Stage a radar satellite on the local station (feature f1) and park a
+       * distant enemy in the band only that satellite's LARGE sensor can reach —
+       * so building it must reveal both a new coverage disc and the enemy dot. A
+       * no-op-safe return of null when there is no local station / no enemy to
+       * park. Idempotent on the satellite (one per station cap); re-parks the enemy
+       * each call. Returns the satellite range + the enemy's distance from the
+       * station so the test knows the geometry is honest (enemy inside sat range,
+       * outside the ship/station baseline).
+       */
+      buildSatellite(): { satRange: number; enemyDist: number } | null {
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!station) return null;
+        if (!station.satellites) station.satellites = [];
+        // One per station — reuse an existing staged satellite, else mint one born
+        // in its orbit band (mirrors the sim's makeSatellite geometry).
+        if (station.satellites.length === 0) {
+          const orbitAngle = station.angle + Math.PI;
+          const pos = satelliteOrbitPos(station, orbitAngle);
+          station.satellites.push({
+            id: world.nextEntityId++,
+            owner: station.owner,
+            pos: { x: pos.x, y: pos.y },
+            radius: SATELLITE.radius,
+            hp: SATELLITE.hp,
+            maxHp: SATELLITE.hp,
+            orbitAngle,
+          });
+        } else {
+          // Revive a previously-killed staged satellite for a fresh cycle.
+          const sat = station.satellites[0]!;
+          sat.hp = SATELLITE.hp;
+        }
+        // Park an enemy in the satellite-only band: outside the ship's own sensor
+        // and the station's, comfortably inside the satellite's LARGE reach.
+        const enemyDist = SATELLITE.sensorRange * 0.75; // < range, > ship/station sensors
+        const enemy = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
+        if (!enemy) return null;
+        enemy.pos.x = station.pos.x + enemyDist;
+        enemy.pos.y = station.pos.y;
+        enemy.alive = true;
+        enemy.spawnProtect = 0;
+        return { satRange: SATELLITE.sensorRange, enemyDist };
+      },
+      /** Kill the staged satellite (feature f1): zero its HP, so it is no longer a
+       *  sensor source (`../sim/sensing` reads only hp > 0) — its coverage disc
+       *  collapses the same tick and the distant enemy it revealed drops off the
+       *  map. Returns true if a satellite was there to kill. */
+      killSatellite(): boolean {
+        const station = stationOf(world, LOCAL_PLAYER);
+        const sat = station?.satellites?.[0];
+        if (!sat) return false;
+        sat.hp = 0;
+        return true;
       },
     };
     try {
@@ -3900,6 +4061,26 @@ interface MutMinimapStation {
   x: number;
   y: number;
   alive: boolean;
+  /** Board id — indexes the fog remembered-mask (feature f1). */
+  id: number;
+}
+
+/** A mutable {@link MinimapSatellite} — pooled radar-satellite records
+ *  `feedMinimap()` overwrites in place each frame (feature f1). */
+interface MutMinimapSatellite {
+  owner: PlayerId;
+  x: number;
+  y: number;
+  alive: boolean;
+  local: boolean;
+}
+
+/** A mutable {@link MinimapCoverage} — pooled sensor-disc records `feedMinimap()`
+ *  copies the sim's current {@link SensorSource} discs into (feature f1). */
+interface MutMinimapCoverage {
+  x: number;
+  y: number;
+  radius: number;
 }
 
 /** A mutable {@link MinimapShip} — the pooled records `feedMinimap()` overwrites in
