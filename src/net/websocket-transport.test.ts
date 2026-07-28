@@ -51,7 +51,13 @@ class FakeSocket implements WebSocketLike {
 }
 
 /** A transport wired to fakes, plus the levers to drive them. */
-function harness(options: { reconnectWindowMs?: number } = {}): {
+function harness(
+  options: {
+    reconnectWindowMs?: number;
+    ticket?: string;
+    checkRoomAlive?: () => Promise<'live' | 'gone' | 'unknown'>;
+  } = {},
+): {
   transport: WebSocketTransport;
   sockets: FakeSocket[];
   latest: () => FakeSocket;
@@ -84,6 +90,8 @@ function harness(options: { reconnectWindowMs?: number } = {}): {
     ...(options.reconnectWindowMs !== undefined
       ? { reconnectWindowMs: options.reconnectWindowMs }
       : {}),
+    ...(options.ticket !== undefined ? { ticket: options.ticket } : {}),
+    ...(options.checkRoomAlive !== undefined ? { checkRoomAlive: options.checkRoomAlive } : {}),
   });
 
   const states: string[] = [];
@@ -206,8 +214,87 @@ describe('WebSocketTransport', () => {
     h.transport.close();
 
     expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('left');
     expect(h.sockets[0]?.closedByClient).toBe(true);
     h.tick(60_000);
     expect(h.sockets).toHaveLength(1);
+  });
+
+  it('carries the allocator ticket on the first join and on every reclaim (M9 fleet)', () => {
+    const h = harness({ ticket: 'payload.sig' });
+    h.latest().open();
+    expect(h.latest().messages()).toEqual([{ type: 'join', room: 'QK7P', ticket: 'payload.sig' }]);
+
+    h.latest().deliver({ type: 'welcome', you: 4, room: 'QK7P', tick: 0, reclaimToken: 'tok-4' });
+    h.latest().drop();
+    h.tick(500);
+    h.latest().open();
+    // A redial is still a join, and in a fleet it must still prove membership.
+    expect(h.latest().messages()).toEqual([
+      { type: 'join', room: 'QK7P', reclaim: 4, reclaimToken: 'tok-4', ticket: 'payload.sig' },
+    ]);
+  });
+
+  it('omits the ticket entirely on the direct-connect path (no allocator)', () => {
+    const h = harness();
+    h.latest().open();
+    expect(h.latest().messages()[0]).toEqual({ type: 'join', room: 'QK7P' });
+  });
+
+  it('records grace-elapsed when the window closes on a room it could not disprove', () => {
+    const h = harness({ reconnectWindowMs: 3_000 });
+    h.latest().open();
+    h.latest().drop();
+    h.tick(4_000);
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('grace-elapsed');
+  });
+
+  it('stops early with room-gone when the allocator says the room has ended (Task 9b)', async () => {
+    // The Machine died; a 404 from the allocator is the witness. Retrying the full
+    // window would be pointless — stop the instant the probe answers.
+    let resolveProbe: (v: 'gone') => void = () => {};
+    const probe = new Promise<'gone'>((r) => {
+      resolveProbe = r;
+    });
+    const h = harness({ checkRoomAlive: () => probe });
+    h.latest().open();
+    h.latest().drop();
+    expect(h.transport.state).toBe('reconnecting');
+    const dialled = h.sockets.length;
+
+    resolveProbe('gone');
+    await probe; // let the .then run
+    await Promise.resolve();
+
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('room-gone');
+    // The pending redial was cancelled: no socket opens against the dead room.
+    h.tick(60_000);
+    expect(h.sockets).toHaveLength(dialled);
+  });
+
+  it('keeps retrying when the probe says the room is still live', async () => {
+    const h = harness({ checkRoomAlive: () => Promise.resolve('live') });
+    h.latest().open();
+    h.latest().drop();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(h.transport.state).toBe('reconnecting');
+    h.tick(500);
+    expect(h.sockets).toHaveLength(2); // it redialled, the room being alive
+  });
+
+  it('keeps retrying when the probe itself fails — an unreachable allocator is not a dead room', async () => {
+    const h = harness({ checkRoomAlive: () => Promise.reject(new Error('allocator down')) });
+    h.latest().open();
+    h.latest().drop();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(h.transport.state).toBe('reconnecting');
+    h.tick(500);
+    expect(h.sockets).toHaveLength(2);
   });
 });
