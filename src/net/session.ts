@@ -45,6 +45,8 @@ import type {
 } from './transport';
 import { WebSocketTransport } from './websocket-transport';
 import type { WebSocketTransportConfig } from './websocket-transport';
+import { probeRoomLiveness } from './allocator-client';
+import type { AllocatorClientConfig, ResolvedConnection } from './allocator-client';
 
 /** What the game loop needs from the network, and nothing more. */
 export interface MatchSession {
@@ -391,4 +393,33 @@ export function createOnlineSession(config: OnlineSessionConfig): OnlineSession 
   if (transport.state === 'open') sendLobbyChoice();
 
   return session;
+}
+
+/**
+ * Carry an allocator's decision into an online session (M9 Task 9 + 9b). Given a
+ * connection the allocator client resolved (`./allocator-client`), this returns
+ * the two transport overrides that make it a *fleet* connection rather than a
+ * direct one, to spread across {@link OnlineSessionConfig.transport}:
+ *
+ *   • the signed **ticket**, presented on every `join` so the Machine accepts a
+ *     connection the allocator sent it (and refuses one it did not);
+ *   • a room-liveness **probe**, bound to *this resolved room* — the code the
+ *     allocator minted for an allocate, not whatever the caller typed — so a
+ *     reconnect asks about the right room and can tell "the room ended" (stop)
+ *     from "my connection dropped" (keep trying) (`./reconnect`).
+ *
+ * Binding the probe to the wrong room is the one easy mistake here (a freshly
+ * minted code is not the code the player entered), which is exactly why this
+ * lives in one tested place instead of at each call site. Without an allocator
+ * there is no ticket and no probe — the direct-connect path passes neither and is
+ * untouched.
+ */
+export function allocatorTransport(
+  connection: ResolvedConnection,
+  client: AllocatorClientConfig,
+): Pick<WebSocketTransportConfig, 'ticket' | 'checkRoomAlive'> {
+  return {
+    ticket: connection.ticket,
+    checkRoomAlive: () => probeRoomLiveness(client, connection.room),
+  };
 }
