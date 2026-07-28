@@ -39,6 +39,7 @@ import {
 } from './stations';
 import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { shipSprite } from './ships';
+import { satelliteSprite, satelliteWreckSprite, type SatelliteState } from './satellite';
 import { spriteKey, type SpriteDef } from './shapes';
 import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 
@@ -57,6 +58,8 @@ const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => stationWreckSprite(1),
   () => debrisFieldSprite(2),
   () => atmosphereHaloSprite(0),
+  () => satelliteSprite({ playerId: 2, state: 'sweeping' }),
+  () => satelliteWreckSprite(3),
 ];
 
 describe('determinism (GDD §4.1)', () => {
@@ -321,6 +324,63 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
   it('quantises build progress so a 10-second build is not 600 textures', () => {
     expect(buildProgressSprite(0.41)).toEqual(buildProgressSprite(0.44));
     expect(buildProgressSprite(0.4)).not.toEqual(buildProgressSprite(0.9));
+  });
+});
+
+describe('radar satellite — the eyes (f1)', () => {
+  const STATES: readonly SatelliteState[] = ['building', 'idle', 'sweeping', 'pinging'];
+
+  it('reads as its own structure, distinct across every sensor state', () => {
+    const defs = STATES.map((state) => satelliteSprite({ playerId: 0, state }));
+    for (let i = 0; i < defs.length; i++) {
+      for (let j = i + 1; j < defs.length; j++) expect(defs[i]).not.toEqual(defs[j]);
+    }
+  });
+
+  it('scans in plasma and never fires — no threat red on a live dish', () => {
+    // A satellite is a sensor, not a gun: red stays enemy fire (style-guide §2).
+    for (const state of ['idle', 'sweeping', 'pinging'] as const) {
+      const def = satelliteSprite({ playerId: 0, state });
+      expect(def.shapes.some((s) => s.role === 'danger')).toBe(false);
+      expect(def.shapes.some((s) => s.role === 'energy')).toBe(true);
+    }
+  });
+
+  it('is a scaffold until the build finishes — the art does not lie about readiness', () => {
+    const building = satelliteSprite({ playerId: 0, state: 'building' });
+    const idle = satelliteSprite({ playerId: 0, state: 'idle' });
+    // Hazard stripes are the one legal yellow (style-guide §2), per the a2-05
+    // scaffold grammar; a finished, scanning dish never carries them.
+    expect(building.shapes.some((s) => s.role === 'danger')).toBe(true);
+    expect(idle.shapes.some((s) => s.role === 'danger')).toBe(false);
+    // And a scaffold is not yet an eye: no live plasma feed the way idle glows.
+    expect(building.shapes.some((s) => s.role === 'energy')).toBe(false);
+    expect(idle.shapes.some((s) => s.role === 'energy')).toBe(true);
+  });
+
+  it('wears its owner colour on trim only, and pings reach past the rim', () => {
+    // Owner identity moves the sprite (colour and cache key both) — two owners
+    // are two dishes; and identity paint lives only on trim (§3).
+    expect(satelliteSprite({ playerId: 0, state: 'idle' })).not.toEqual(
+      satelliteSprite({ playerId: 1, state: 'idle' }),
+    );
+    // The ping's return pulse overhangs the collision radius, so the extent grows
+    // to hold it — pooling must never clip a contact.
+    const ping = satelliteSprite({ playerId: 0, state: 'pinging' });
+    const idle = satelliteSprite({ playerId: 0, state: 'idle' });
+    expect(ping.extent).toBeGreaterThan(idle.extent);
+    expect(ping.extent).toBeGreaterThan(1);
+  });
+
+  it('leaves a cold death remnant — no yellow, no red, nothing to loot (§8)', () => {
+    // Losing your eyes is an absence, not a threat, and a satellite banks no ore:
+    // its wreck is pure cold hull — the one place the wreck language drops even
+    // the ore-laden debris a station wreck keeps.
+    for (const seed of [0, 1, 2, 3]) {
+      const def = satelliteWreckSprite(seed);
+      expect(def.shapes.some((s) => s.role === 'danger' || s.role === 'ore' || s.role === 'core')).toBe(false);
+    }
+    expect(satelliteWreckSprite(0)).not.toEqual(satelliteWreckSprite(1));
   });
 });
 
