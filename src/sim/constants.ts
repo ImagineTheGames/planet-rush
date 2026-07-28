@@ -398,6 +398,27 @@ export const REPAIR_ORE_COST: Tunable<number> = 1;
  * across the discrete-repair amendment. TUNABLE.
  */
 export const REPAIR_TELL_HOLD: Tunable<number> = REPAIR_HP_PER_ORE / 2;
+/**
+ * Repair cooldown (RATIFIED developer, 2026-07-28) — after a successful repair
+ * purchase on a station, that station refuses further repair orders until this
+ * many seconds have elapsed. Per STATION, not per player, so an ally docked at a
+ * captured/shared core inherits the same lockout, and (someday) an N>1-station
+ * owner cools each core independently. Unlike `REPAIR_TELL_HOLD` — a signalling
+ * hold that never gates a press — THIS one genuinely refuses `placeOrder`
+ * (`'cooling-down'`), so a human can no longer tap 15 HP back every frame: repair
+ * is now a rationed emergency patch, not a heal-tank. Bots inherit it through the
+ * same order path, so their p5-07b repair rationing composes on top (turtle
+ * survivability drops slightly, by design).
+ *
+ * Named `_SECONDS` and stored as seconds on `MiningStation.repairGate`,
+ * dt-decremented each tick like every other clock in this file — the "stored in
+ * ticks" phrasing in the brief is honoured as "held as remaining sim-time on
+ * station state", because this table is dt-parametric by contract (see the file
+ * header: "never assume a tick length here"). The Build wheel reads the remaining
+ * seconds straight off station state for its live "REPAIR in 12s" countdown — no
+ * UI-side timer (the p4-17 rule). TUNABLE.
+ */
+export const REPAIR_COOLDOWN_SECONDS: Tunable<number> = 15;
 
 /**
  * Default arena side length (world units). The bounds are a square this big

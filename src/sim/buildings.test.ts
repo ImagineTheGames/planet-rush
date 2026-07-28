@@ -21,6 +21,7 @@ import {
   damageStation,
   isDocked,
   placeOrder,
+  updateStations,
   stationOf,
   stationTargetRadius,
   shieldPool,
@@ -34,6 +35,7 @@ import {
   STATION,
   PROJECTILE,
   PROJECTILE_CORE_FACTOR,
+  REPAIR_COOLDOWN_SECONDS,
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
   REPAIR_TELL_HOLD,
@@ -426,13 +428,16 @@ describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => 
     expect(ship.banked).toBeCloseTo(5 - REPAIR_ORE_COST, 6);
   });
 
-  it('five rapid taps are five distinct purchases: 5 ore, +75 HP, then zero further drain', () => {
-    // The developer's loop bug killed: one press must map to exactly one
-    // ore-spend, and N presses are N independent, individually-checked spends.
+  it('one tap heals once; the four rapid re-taps behind it are refused, cooling down', () => {
+    // The developer's loop bug stayed killed — one press is exactly one
+    // ore-spend — but the ratified cooldown (2026-07-28) now RATIONS the re-tap:
+    // the first press buys 15 HP, and the four presses chasing it inside
+    // REPAIR_COOLDOWN_SECONDS are refused `cooling-down`, spending nothing.
     const { ship, station, world } = dockedRepairWorld(20, 10);
-    for (let i = 0; i < 5; i++) expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    expect(station.coreHp).toBe(20 + 5 * REPAIR_HP_PER_ORE); // 95, still under the cap
-    expect(ship.banked).toBeCloseTo(10 - 5 * REPAIR_ORE_COST, 6); // exactly 5 spent, no more
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    for (let i = 0; i < 4; i++) expect(placeOrder(world, ship, 'repair')).toBe('cooling-down');
+    expect(station.coreHp).toBe(20 + REPAIR_HP_PER_ORE); // just the one heal
+    expect(ship.banked).toBeCloseTo(10 - REPAIR_ORE_COST, 6); // just the one ore
 
     // No channel: time passing with no press moves neither HP nor ore.
     const hp = station.coreHp;
@@ -548,6 +553,121 @@ describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => 
       const { ship, world } = dockedRepairWorld(20, 10);
       for (let i = 0; i < 3; i++) placeOrder(world, ship, 'repair');
       return { coreHp: world.stations[0]!.coreHp, banked: ship.banked };
+    };
+    expect(run()).toEqual(run());
+  });
+});
+
+// --- 5b. repair cooldown (RATIFIED developer, 2026-07-28) -------------------
+
+describe('repair cooldown (per station, 15 s: repair is a rationed patch, not a heal-tank)', () => {
+  /** A ship docked at its own damaged core, banked with plenty of ore. */
+  const docked = (coreHp = 50, ore = 100) => {
+    const ship = makeShip({ id: 0, pos: at(80, 0), banked: ore });
+    const station = makeStation({ id: 0, owner: 0, coreHp });
+    return { ship, station, world: makeWorld({ ships: [ship], stations: [station] }) };
+  };
+
+  it('arms the gate to REPAIR_COOLDOWN_SECONDS and refuses the very next order, spending nothing', () => {
+    const { ship, station, world } = docked(50, 100);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    expect(station.repairGate).toBeCloseTo(REPAIR_COOLDOWN_SECONDS, 9);
+
+    const bank = ship.banked;
+    const hp = station.coreHp;
+    expect(placeOrder(world, ship, 'repair')).toBe('cooling-down');
+    expect(ship.banked).toBe(bank); // a cooling core never charges the bank
+    expect(station.coreHp).toBe(hp); // and never heals
+  });
+
+  it('exposes a live, ticking remaining time on the station — the wheel countdown source (p4-17)', () => {
+    // No UI-side timer: the "REPAIR in Ns" copy reads `station.repairGate` straight
+    // from sim state, so it must fall by exactly `dt` each tick.
+    const { ship, station, world } = docked(50, 100);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    const before = station.repairGate!;
+    step(world, []);
+    step(world, []);
+    expect(station.repairGate!).toBeLessThan(before);
+    expect(station.repairGate!).toBeCloseTo(REPAIR_COOLDOWN_SECONDS - 2 * TICK_DT, 6);
+    expect(placeOrder(world, ship, 'repair')).toBe('cooling-down'); // still refused mid-countdown
+  });
+
+  it('re-allows on the exact tick the gate drains, and refuses the tick before', () => {
+    const { ship, station, world } = docked(50, 100);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok'); // arms the 15 s gate
+
+    // Idle-step until a single tick of cooldown remains.
+    let guard = 0;
+    while ((station.repairGate ?? 0) > TICK_DT + 1e-9 && guard++ < 5000) step(world, []);
+    const bank = ship.banked;
+    expect(placeOrder(world, ship, 'repair')).toBe('cooling-down'); // one tick still on the clock
+    expect(ship.banked).toBe(bank);
+
+    // The tick that drains the last of the gate re-arms the wedge.
+    step(world, []);
+    expect(station.repairGate ?? 0).toBeLessThanOrEqual(1e-9);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+  });
+
+  it('is a pure time lockout: the gate drains even while the owner is undocked and away', () => {
+    const { ship, station, world } = docked(50, 100);
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+    ship.pos = at(5000, 0); // fly off — the core is alone, no one docked to heal it
+    expect(isDocked(ship, station)).toBe(false);
+
+    // A full cooldown of sim-time passes with the owner gone (dt-parametric).
+    updateStations(world, REPAIR_COOLDOWN_SECONDS);
+    expect(station.repairGate ?? 0).toBeLessThanOrEqual(1e-9);
+
+    ship.pos = at(80, 0); // dock again — the gate is clear, repair is armed
+    expect(placeOrder(world, ship, 'repair')).toBe('ok');
+  });
+
+  it('cools each station independently — one cooling core never blocks another (encoded now for N>1)', () => {
+    const shipA = makeShip({ id: 0, pos: at(80, 0), banked: 100 });
+    const stationA = makeStation({ id: 0, owner: 0, pos: at(0, 0), coreHp: 50 });
+    const shipB = makeShip({ id: 1, pos: at(80, 500), banked: 100 });
+    const stationB = makeStation({ id: 1, owner: 1, pos: at(0, 500), coreHp: 50 });
+    const world = makeWorld({ ships: [shipA, shipB], stations: [stationA, stationB] });
+
+    expect(placeOrder(world, shipA, 'repair')).toBe('ok'); // A repairs -> A cooling
+    expect(placeOrder(world, shipA, 'repair')).toBe('cooling-down');
+    // B is untouched by A's cooldown — its gate is its own.
+    expect(placeOrder(world, shipB, 'repair')).toBe('ok');
+    expect(stationA.repairGate).toBeCloseTo(REPAIR_COOLDOWN_SECONDS, 9);
+    expect(stationB.repairGate).toBeCloseTo(REPAIR_COOLDOWN_SECONDS, 9);
+  });
+
+  it('rations a repair-spamming defender to about one heal per cooldown — stall-free (composes with p5-07b)', () => {
+    // Bots inherit the gate through this same order path (their p5-07b rationing
+    // sits on top). A defender pressing repair every tick under fire must still get
+    // a DEFINITE answer every tick — never a stall — and bank at most one heal per
+    // 15 s window, so turtle survivability drops slightly rather than snapping.
+    const { ship, world, station } = docked(30, 1000);
+    let heals = 0;
+    const ticks = Math.round((REPAIR_COOLDOWN_SECONDS * 2) / TICK_DT);
+    for (let t = 0; t < ticks; t++) {
+      const r = placeOrder(world, ship, 'repair');
+      expect(['ok', 'cooling-down', 'core-full']).toContain(r); // always resolved, never hung
+      if (r === 'ok') heals++;
+      station.sinceDamage = 0; // under continuous fire — the tell can never pace it
+      step(world, []);
+    }
+    // Two cooldown windows of spam buy ~two heals, not 15 HP every tick.
+    expect(heals).toBeGreaterThanOrEqual(2);
+    expect(heals).toBeLessThanOrEqual(3);
+  });
+
+  it('is deterministic: two identical repair-then-wait-then-repair runs deep-equal', () => {
+    const run = (): World => {
+      const { ship, world } = docked(20, 100);
+      placeOrder(world, ship, 'repair');
+      for (let t = 0; t < 40; t++) step(world, []); // still cooling
+      placeOrder(world, ship, 'repair'); // refused, still cooling
+      for (let t = 0; t < 900; t++) step(world, []); // past the gate
+      placeOrder(world, ship, 'repair'); // allowed again
+      return world;
     };
     expect(run()).toEqual(run());
   });
