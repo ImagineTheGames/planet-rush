@@ -64,6 +64,11 @@
       "milestone": "v0.2 patch 4 - the fair fight",
       "title": "v0.2.4 — fights you can dodge, bots that behave",
       "test_notes": "On your phone: enemy shots MISS now - strafe an EASY bot and feel clever (their names carry (EASY)/(MEDIUM)/(HARD) tags). Low-HP bots commit to fleeing somewhere real instead of twitching; none ever wedge on planet rims. No more phantom turret lasers. Repair is a clean purchase: +15 HP per ore, real numbers on the wedge, 75/100 on your core. The MINIMAP is in - tiny corner square, tap to expand. Tap Commander has its lock reticle. Boost and ping are gone (you asked, they cluttered). Six fresh evidence gates on the EVIDENCE page."
+    },
+    "v0.2.5": {
+      "milestone": "v0.2 patch 5 - the world update",
+      "title": "v0.2.5 — a world that makes sense, sounds real, and plays fair",
+      "test_notes": "On your phone: ore is SCARCE now (pick abundance in the lobby), matches at any size 2-8 with lootable derelict stations, rooms advertise their config. Damage FILLS the ring red (full red = death), living things never read 0 HP, upgraded shots burn hotter colours. Sound is spatial - distant fights are distant. The phantom alarm is dead, loot banks under a conservation ledger, bots re-route around threats. Pause works (ESC / corner tap). The lore: you are defending a MINING STATION on a contested claim. Evidence for all of it on the EVIDENCE page."
     }
   },
   "days": [
