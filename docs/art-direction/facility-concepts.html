@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planet Rush — Facility Concept Board (3 directions)</title>
+<!--
+  Facility concept board — the lore-pivot pick (GDD v0.7 §5.4, the flagged Art follow-up).
+  The round "planet" body is re-fictioned as a mining FACILITY; this board shows THREE
+  directions for the industrial dressing on the claimed planetoid, for the developer to
+  choose from (the maps-r2 / sound-review pattern) before the build brief follows the pick.
+
+  DISCIPLINE — generator aesthetic, not fantasy render. Every mark here is buildable by
+  src/art code: flat fills inside a crisp ink outline (decalInk #262A31), glow is a
+  BRIGHTER INNER PASS on the same shape (never a gaussian blur — tokens.ts GLOW.principle),
+  colours are the six frozen tokens + their declared value-ramp shades + one owner roster
+  hue (P1 Azure #3D7BFF, the identity example). No gradients, no drop-shadows, no bloom.
+  Damage rings use pathLength=100 so a red fill of N% is exactly N% of the ring, clockwise
+  from twelve o'clock — the ratified p11 grammar, drawn honestly.
+-->
+<style>
+  :root{
+    --vacuum:#0D1015; --panel:#141A22; --panel2:#10151c; --rule:#252D3A; --hair:#1c2430;
+    --text:#DCE3EC; --muted:#8B95A5; --steel:#7E8894; --azure:#3D7BFF; --plasma:#4DC3FF;
+    --yellow:#F2D24B; --red:#B23A3A; --patina:#4FA08B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--vacuum);color:var(--text);
+    font-family:"Oxanium","Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px;line-height:1.6}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 26px}
+  header{padding:60px 0 30px}
+  .eyebrow{font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--plasma);margin:0 0 14px}
+  h1{font-size:38px;margin:0 0 12px;letter-spacing:.01em;font-weight:800}
+  h1 .accent{color:var(--yellow)}
+  .sub{color:var(--muted);margin:0;max-width:80ch;font-size:16.5px}
+  .sub strong{color:var(--text)}
+  section{padding:44px 0;border-top:1px solid var(--rule)}
+  h2{font-size:27px;margin:0 0 2px;letter-spacing:.01em}
+  h2 .tag{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px;font-weight:600}
+  .lede{color:var(--muted);max-width:82ch;margin:6px 0 22px}
+  .lede b{color:var(--text)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px}
+  .card.wide{grid-column:1 / -1}
+  .card h3{margin:0 0 3px;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text);font-weight:700}
+  .card .cap{margin:0 0 10px;font-size:13px;color:var(--muted)}
+  svg{display:block;width:100%;height:auto;background:var(--vacuum);border-radius:6px;border:1px solid var(--hair)}
+  .palette{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px}
+  .swatch{width:104px}
+  .chip{height:44px;border-radius:6px;border:1px solid rgba(255,255,255,.09)}
+  .swatch p{margin:6px 0 0;font-size:11.5px;color:var(--muted);line-height:1.35}
+  .swatch code{color:var(--text);font-size:11.5px;display:block}
+  .notes{color:var(--muted);font-size:14.5px;margin:18px 0 0;max-width:88ch}
+  .notes b, .notes strong{color:var(--text)}
+  .layout{background:var(--panel2);border:1px solid var(--rule);border-left:3px solid var(--plasma);
+    border-radius:8px;padding:13px 16px;margin:16px 0 0;font-size:14px;color:var(--muted)}
+  .layout b{color:var(--plasma);text-transform:uppercase;letter-spacing:.1em;font-size:12px}
+  .layout ul{margin:8px 0 0;padding-left:18px}
+  .layout li{margin:4px 0}
+  .layout li b{color:var(--text);text-transform:none;letter-spacing:0;font-size:14px}
+  .keeps{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+  .keep{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--rule);
+    border-radius:999px;padding:5px 12px}
+  .keep b{color:var(--text)}
+  .pick{background:linear-gradient(180deg,#141A22,#10151c);border:1px solid var(--rule);border-radius:10px;padding:22px 24px}
+  .pick h3{margin:0 0 8px;color:var(--yellow);letter-spacing:.02em;font-size:18px}
+  table{border-collapse:collapse;width:100%;margin-top:10px;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+  td b{color:var(--text)}
+  footer{border-top:1px solid var(--rule);padding:34px 0 70px;color:var(--muted);font-size:13.5px}
+  .mono{font-family:"Oxanium",ui-monospace,monospace}
+</style>
+</head>
+<body>
+
+<!-- ============================ MASTER DEFS (shared symbols, generator-faithful) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+
+  <!-- Turret pool silhouettes: barrel/slit along +x, drum centre at origin (mirrors
+       src/art/buildings.ts). Steel hull, azure player-trim collar, ink outline. -->
+  <g id="tur-breech">
+    <rect x="-9" y="-3" width="5" height="6" fill="#383E45"/>
+    <circle cx="0" cy="0" r="7" fill="#7E8894" stroke="#262A31" stroke-width="1.3"/>
+    <rect x="5" y="-3" width="11" height="6" fill="#515861" stroke="#262A31" stroke-width="0.9"/>
+    <rect x="15.5" y="-4.6" width="3.4" height="9.2" fill="#383E45" stroke="#262A31" stroke-width="0.8"/>
+    <rect x="1" y="-6.2" width="2.6" height="12.4" fill="#3D7BFF"/>
+  </g>
+  <g id="tur-twin">
+    <rect x="-9" y="-3" width="5" height="6" fill="#383E45"/>
+    <circle cx="0" cy="0" r="7" fill="#7E8894" stroke="#262A31" stroke-width="1.3"/>
+    <rect x="5" y="-5.6" width="11" height="4" fill="#515861" stroke="#262A31" stroke-width="0.8"/>
+    <rect x="5" y="1.6" width="11" height="4" fill="#515861" stroke="#262A31" stroke-width="0.8"/>
+    <rect x="15.5" y="-6.4" width="2.6" height="5" fill="#383E45"/>
+    <rect x="15.5" y="1.4" width="2.6" height="5" fill="#383E45"/>
+    <rect x="1" y="-6.4" width="2.6" height="12.8" fill="#3D7BFF"/>
+  </g>
+  <g id="tur-rail">
+    <circle cx="0" cy="0" r="6" fill="#7E8894" stroke="#262A31" stroke-width="1.3"/>
+    <rect x="3" y="-3.4" width="20" height="1.8" fill="#7E8894" stroke="#A5ACB4" stroke-width="0.5"/>
+    <rect x="3" y="1.6" width="20" height="1.8" fill="#7E8894" stroke="#A5ACB4" stroke-width="0.5"/>
+    <rect x="1.6" y="-4.6" width="2.4" height="9.2" fill="#383E45"/>
+    <circle cx="8" cy="0" r="1.5" fill="#4DC3FF"/><circle cx="13" cy="0" r="1.7" fill="#4DC3FF"/>
+    <circle cx="18.5" cy="0" r="1.9" fill="#9DDEFF"/>
+    <rect x="0.4" y="-5" width="2" height="10" fill="#3D7BFF"/>
+  </g>
+  <!-- Dome Bunker: barrel-less fortified emplacement — the reserved derelict / enemy-field variant. -->
+  <g id="tur-dome">
+    <path d="M0 -9 A9 9 0 0 1 0 9 Z" fill="#7E8894" stroke="#262A31" stroke-width="1.3"/>
+    <path d="M0 -6 A6 6 0 0 1 0 6 Z" fill="#A5ACB4" opacity="0.5"/>
+    <rect x="6.5" y="-2.4" width="3.4" height="4.8" fill="#383E45"/>
+    <rect x="-1.5" y="-7" width="2.4" height="14" fill="#3D7BFF" opacity="0.9"/>
+  </g>
+
+  <!-- muzzle states (shared telegraph grammar) -->
+  <g id="mz-fire"><polygon points="17,-4 27,-1.4 30,0 27,1.4 17,4" fill="#B23A3A" opacity="0.92"/>
+    <polygon points="18,-2 24,-0.7 26,0 24,0.7 18,2" fill="#9DDEFF" opacity="0.85"/></g>
+  <g id="mz-track"><circle cx="19" cy="0" r="4" fill="#4DC3FF" opacity="0.35"/><circle cx="19" cy="0" r="2" fill="#9DDEFF" opacity="0.9"/></g>
+
+  <!-- ============ DIRECTION BODIES (unit radius 60, centred at origin) ============ -->
+
+  <!-- A · RING-RIG: claimed planetoid inside a rotating refinery gantry ring. -->
+  <g id="bodyA">
+    <circle r="60" fill="#4F565F"/>
+    <path d="M-30 -18 q12 -11 25 -3 q9 10 -2 21 q-14 6 -25 -4 q-6 -8 2 -14 Z" fill="#4FA08B"/>
+    <path d="M12 20 q11 -4 19 5 q4 9 -6 13 q-13 2 -18 -6 q-2 -7 5 -12 Z" fill="#4FA08B"/>
+    <path d="M-30 -18 q12 -11 25 -3" fill="none" stroke="#72B3A2" stroke-width="1.4" opacity="0.7"/>
+    <path d="M45 -20 A60 60 0 0 1 20 55" fill="none" stroke="#383E45" stroke-width="7" opacity="0.5"/>
+    <circle r="60" fill="none" stroke="#262A31" stroke-width="2"/>
+    <!-- gantry ring + spokes -->
+    <circle r="46" fill="none" stroke="#7E8894" stroke-width="7"/>
+    <circle r="46" fill="none" stroke="#262A31" stroke-width="1" opacity="0.55"/>
+    <circle r="49.5" fill="none" stroke="#515861" stroke-width="1.4" opacity="0.7"/>
+    <g stroke="#515861" stroke-width="2.2">
+      <line x1="28" y1="0" x2="40" y2="0"/><line x1="-28" y1="0" x2="-40" y2="0"/>
+      <line x1="0" y1="28" x2="0" y2="40"/><line x1="0" y1="-28" x2="0" y2="-40"/>
+      <line x1="20" y1="20" x2="28" y2="28"/><line x1="-20" y1="-20" x2="-28" y2="-28"/>
+      <line x1="20" y1="-20" x2="28" y2="-28"/><line x1="-20" y1="20" x2="-28" y2="28"/>
+    </g>
+    <!-- docking arms + silos on the gantry -->
+    <rect x="44" y="-4" width="14" height="8" fill="#515861" stroke="#262A31" stroke-width="0.8"/>
+    <rect x="-58" y="-4" width="14" height="8" fill="#515861" stroke="#262A31" stroke-width="0.8"/>
+    <circle cx="0" cy="46" r="5.5" fill="#A5ACB4" stroke="#262A31" stroke-width="0.8"/>
+    <circle cx="0" cy="-46" r="5.5" fill="#A5ACB4" stroke="#262A31" stroke-width="0.8"/>
+    <!-- reactor: yellow core, brighter inner pass (win condition) -->
+    <circle r="20" fill="#F2D24B" opacity="0.16"/>
+    <circle r="12.5" fill="#F2D24B"/>
+    <circle r="6" fill="#F7E28A"/>
+  </g>
+
+  <!-- B · REFINERY PLATFORM: angular hex deck bolted over the sunward hemisphere. -->
+  <g id="bodyB">
+    <circle r="60" fill="#4F565F"/>
+    <path d="M45 -20 A60 60 0 0 1 20 55" fill="none" stroke="#383E45" stroke-width="7" opacity="0.5"/>
+    <circle r="60" fill="none" stroke="#262A31" stroke-width="2"/>
+    <!-- hexagonal refinery deck (inscribed within the limb) -->
+    <polygon points="50,0 25,43.3 -25,43.3 -50,0 -25,-43.3 25,-43.3" fill="#7E8894" stroke="#262A31" stroke-width="2"/>
+    <polygon points="50,0 25,43.3 -25,43.3 -50,0 -25,-43.3 25,-43.3" fill="none" stroke="#A5ACB4" stroke-width="1" opacity="0.5"/>
+    <!-- deck panel lines / catwalks -->
+    <g stroke="#515861" stroke-width="1.6" opacity="0.85">
+      <line x1="-50" y1="0" x2="50" y2="0"/><line x1="-25" y1="-43.3" x2="25" y2="43.3"/>
+      <line x1="25" y1="-43.3" x2="-25" y2="43.3"/>
+    </g>
+    <!-- storage tanks + cracking stack -->
+    <circle cx="-30" cy="16" r="7" fill="#A5ACB4" stroke="#262A31" stroke-width="0.9"/>
+    <circle cx="30" cy="-16" r="7" fill="#A5ACB4" stroke="#262A31" stroke-width="0.9"/>
+    <circle cx="26" cy="20" r="5" fill="#A5ACB4" stroke="#262A31" stroke-width="0.9"/>
+    <rect x="-38" y="-30" width="11" height="11" fill="#515861" stroke="#262A31" stroke-width="0.9"/>
+    <!-- reactor well: hexagonal, sunk into a dark rim -->
+    <polygon points="19,0 9.5,16.5 -9.5,16.5 -19,0 -9.5,-16.5 9.5,-16.5" fill="#383E45"/>
+    <polygon points="15,0 7.5,13 -7.5,13 -15,0 -7.5,-13 7.5,-13" fill="#F2D24B" opacity="0.22"/>
+    <polygon points="11,0 5.5,9.5 -5.5,9.5 -11,0 -5.5,-9.5 5.5,-9.5" fill="#F2D24B"/>
+    <circle r="4.5" fill="#F7E28A"/>
+  </g>
+
+  <!-- C · EXTRACTOR BASTION: gothic-brutalist armour + buttress spurs, deep reactor shaft. -->
+  <g id="bodyC">
+    <circle r="60" fill="#383E45"/>
+    <circle r="60" fill="none" stroke="#262A31" stroke-width="2"/>
+    <!-- faceted armour cladding (octagon) -->
+    <polygon points="56,0 39.6,39.6 0,56 -39.6,39.6 -56,0 -39.6,-39.6 0,-56 39.6,-39.6"
+      fill="#383E45" stroke="#262A31" stroke-width="1.6"/>
+    <!-- buttress spurs to the four mount diagonals -->
+    <g fill="#515861" stroke="#262A31" stroke-width="1.2">
+      <polygon points="30,30 52,38 38,52"/><polygon points="-30,30 -38,52 -52,38"/>
+      <polygon points="30,-30 38,-52 52,-38"/><polygon points="-30,-30 -52,-38 -38,-52"/>
+    </g>
+    <!-- gothic radial ribs -->
+    <g stroke="#2D3239" stroke-width="2.4">
+      <line x1="0" y1="0" x2="54" y2="0"/><line x1="0" y1="0" x2="-54" y2="0"/>
+      <line x1="0" y1="0" x2="0" y2="54"/><line x1="0" y1="0" x2="0" y2="-54"/>
+      <line x1="0" y1="0" x2="38" y2="38"/><line x1="0" y1="0" x2="-38" y2="-38"/>
+      <line x1="0" y1="0" x2="38" y2="-38"/><line x1="0" y1="0" x2="-38" y2="38"/>
+    </g>
+    <!-- deep extraction shaft: dark rings stepping down to the glowing reactor -->
+    <circle r="27" fill="#383E45" stroke="#262A31" stroke-width="1.4"/>
+    <circle r="20" fill="#2D3239"/>
+    <circle r="14" fill="#1a1e24"/>
+    <circle r="13" fill="#F2D24B" opacity="0.18"/>
+    <circle r="8.5" fill="#F2D24B"/>
+    <circle r="4" fill="#F7E28A"/>
+  </g>
+
+  <!-- Wreck bodies: ash-grey, reactor OUT, dressing broken, no threat red (an absence). -->
+  <g id="wreckA">
+    <circle r="60" fill="#2F343B"/>
+    <circle r="60" fill="none" stroke="#2D3239" stroke-width="2.2"/>
+    <path d="M-30 -18 q12 -11 25 -3 q9 10 -2 21 q-14 6 -25 -4 z" fill="#40464E"/>
+    <path d="M12 20 q11 -4 19 5 q4 9 -6 13 q-13 2 -18 -6 z" fill="#40464E"/>
+    <path d="M-46 0 A46 46 0 0 1 8 -45" fill="none" stroke="#40464E" stroke-width="6"/>
+    <path d="M18 43 A46 46 0 0 1 -40 22" fill="none" stroke="#40464E" stroke-width="6"/>
+    <g stroke="#2D3239" stroke-width="1.6" opacity="0.9">
+      <path d="M0 0 L34 -12 M0 0 L-28 24 M0 0 L12 40 M0 0 L-38 -10"/>
+    </g>
+    <circle r="13" fill="#383E45" stroke="#2D3239" stroke-width="2"/>
+    <circle r="6" fill="#0D1015"/>
+  </g>
+  <g id="wreckB">
+    <circle r="60" fill="#2F343B"/>
+    <circle r="60" fill="none" stroke="#2D3239" stroke-width="2.2"/>
+    <polygon points="50,0 25,43.3 -25,43.3 -50,0 -25,-43.3 25,-43.3" fill="#40464E" stroke="#2D3239" stroke-width="1.8"/>
+    <g stroke="#2D3239" stroke-width="1.6" opacity="0.85">
+      <line x1="-50" y1="0" x2="50" y2="0"/><line x1="-25" y1="-43.3" x2="25" y2="43.3"/><line x1="25" y1="-43.3" x2="-25" y2="43.3"/>
+    </g>
+    <circle cx="-30" cy="16" r="7" fill="#2F343B" stroke="#2D3239" stroke-width="1"/>
+    <polygon points="19,0 9.5,16.5 -9.5,16.5 -19,0 -9.5,-16.5 9.5,-16.5" fill="#2D3239"/>
+    <circle r="6" fill="#0D1015"/>
+  </g>
+  <g id="wreckC">
+    <circle r="60" fill="#2F343B"/>
+    <circle r="60" fill="none" stroke="#2D3239" stroke-width="2.2"/>
+    <polygon points="56,0 39.6,39.6 0,56 -39.6,39.6 -56,0 -39.6,-39.6 0,-56 39.6,-39.6" fill="#40464E" stroke="#2D3239" stroke-width="1.6"/>
+    <g fill="#2F343B" stroke="#2D3239" stroke-width="1">
+      <polygon points="30,30 52,38 38,52"/><polygon points="-30,-30 -52,-38 -38,-52"/>
+    </g>
+    <g stroke="#2D3239" stroke-width="2" opacity="0.9">
+      <path d="M0 0 L40 6 M0 0 L-30 26 M0 0 L16 -38 M0 0 L-34 -18"/>
+    </g>
+    <circle r="20" fill="#2D3239"/>
+    <circle r="12" fill="#1a1e24"/>
+    <circle r="5" fill="#0D1015"/>
+  </g>
+
+  <!-- shared debris ring (ore-laden loot around a wreck; the only yellow left — legal) -->
+  <g id="debris">
+    <circle r="86" fill="none" stroke="#40464E" stroke-width="0.8" opacity="0.35" stroke-dasharray="2 5"/>
+    <g fill="#40464E"><circle cx="80" cy="-14" r="3.5"/><circle cx="-70" cy="46" r="3"/><circle cx="30" cy="82" r="3.2"/><circle cx="-84" cy="-20" r="2.6"/><circle cx="62" cy="60" r="2.4"/></g>
+    <g fill="#F2D24B"><circle cx="-40" cy="-76" r="3.4"/><circle cx="76" cy="34" r="3"/><circle cx="10" cy="-84" r="2.8"/><circle cx="-82" cy="16" r="3.2"/><circle cx="48" cy="-70" r="2.6"/></g>
+  </g>
+
+</defs></svg>
+
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">Planet Rush · Concept Board · Facility Directions (M0 pattern, like maps r2)</p>
+  <h1>The home is now a <span class="accent">mining facility</span>.<br>Pick the direction before we rebuild the biggest sprite.</h1>
+  <p class="sub">GDD v0.7 lifts the fiction from "planets" to deliberately-sited <strong>mining facilities</strong> on a
+  contested claim — a fiction-only pivot, no mechanic moved (§0). §5.4 keeps the round <strong>claimed-planetoid</strong>
+  as the body and flags one open Art call: <strong>does the facility gain industrial dressing — rigs, gantries, docking
+  arms — beyond that body?</strong> This board answers with three buildable directions. Each keeps the planetoid at its
+  heart (so every readability contract survives) and dresses it differently. <strong>You pick one on the board; the build
+  brief follows the pick.</strong> Nothing here changes shipped game art — it is a decision aid.</p>
+</header>
+
+<!-- ======================================================= SHARED CONTRACT -->
+<section>
+  <h2><span class="tag">The contract every direction keeps</span>What must still read at a glance</h2>
+  <p class="lede">These are not negotiable per direction — they are the readability contracts (style-guide §9, GDD §2.2/§5.4).
+  Whatever dressing wins, the reactor is still the yellow win-condition, the rings are still owner-colour + red-fill, the
+  halo still lands on <b>DEPOSIT_RANGE</b>, and the derelict still goes cold. A direction is judged on whether its
+  silhouette <b>hosts</b> all of this naturally.</p>
+
+  <div class="grid">
+
+    <!-- radial stack schematic -->
+    <div class="card">
+      <h3>The radial stack</h3>
+      <p class="cap">Every gauge on a facility is concentric. A direction must sit inside this envelope.</p>
+      <svg viewBox="0 0 300 300">
+        <!-- collection field lap -->
+        <circle cx="150" cy="150" r="128" fill="#3D7BFF" opacity="0.04"/>
+        <circle cx="150" cy="150" r="128" fill="none" stroke="#3D7BFF" stroke-width="1" opacity="0.4" stroke-dasharray="3 5"/>
+        <!-- beacon -->
+        <circle cx="150" cy="150" r="82" fill="none" stroke="#3D7BFF" stroke-width="4" stroke-dasharray="24 10"/>
+        <!-- damage ring -->
+        <circle cx="150" cy="150" r="72" fill="none" stroke="#3D7BFF" stroke-width="5" opacity="0.9"/>
+        <circle cx="150" cy="150" r="72" fill="none" stroke="#B23A3A" stroke-width="5" pathLength="100" stroke-dasharray="30 100" transform="rotate(-90 150 150)"/>
+        <!-- shield -->
+        <circle cx="150" cy="150" r="66" fill="#4DC3FF" opacity="0.08"/>
+        <circle cx="150" cy="150" r="66" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.85"/>
+        <!-- body + turret orbit rim -->
+        <circle cx="150" cy="150" r="60" fill="#4F565F" stroke="#262A31" stroke-width="2"/>
+        <circle cx="150" cy="150" r="73" fill="none" stroke="#8B95A5" stroke-width="0.8" opacity="0.5" stroke-dasharray="1 4"/>
+        <!-- reactor -->
+        <circle cx="150" cy="150" r="20" fill="#F2D24B" opacity="0.16"/><circle cx="150" cy="150" r="12" fill="#F2D24B"/><circle cx="150" cy="150" r="6" fill="#F7E28A"/>
+        <!-- labels -->
+        <g font-size="8" fill="#8B95A5" font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="16" fill="#3D7BFF" opacity="0.7">collection field → 4R</text>
+          <text x="150" y="28" fill="#3D7BFF">beacon ring</text>
+          <text x="150" y="40" fill="#B23A3A">damage ring · red fills</text>
+          <text x="150" y="52" fill="#4DC3FF">shield stack ×2</text>
+          <text x="150" y="154" fill="#0D1015" font-weight="800" font-size="9">R</text>
+          <text x="150" y="292" opacity="0.85">turret orbit rim ≈1.2R · reactor core r=1</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- collection field (DEPOSIT_RANGE) -->
+    <div class="card">
+      <h3>Collection field · DEPOSIT_RANGE</h3>
+      <p class="cap">Owner-only air-glow to exactly 4× the body radius (256u). This is where you bank.</p>
+      <svg viewBox="0 0 300 300">
+        <circle cx="150" cy="150" r="120" fill="#3D7BFF" opacity="0.035"/>
+        <circle cx="150" cy="150" r="96"  fill="#3D7BFF" opacity="0.05"/>
+        <circle cx="150" cy="150" r="72"  fill="#3D7BFF" opacity="0.065"/>
+        <circle cx="150" cy="150" r="48"  fill="#3D7BFF" opacity="0.08"/>
+        <circle cx="150" cy="150" r="120" fill="none" stroke="#3D7BFF" stroke-width="1.2" opacity="0.55"/>
+        <!-- sensor & dock reference rings -->
+        <circle cx="150" cy="150" r="84" fill="none" stroke="#8B95A5" stroke-width="0.8" opacity="0.5" stroke-dasharray="2 4"/>
+        <circle cx="150" cy="150" r="75" fill="none" stroke="#8B95A5" stroke-width="0.8" opacity="0.5" stroke-dasharray="6 5"/>
+        <!-- body -->
+        <circle cx="150" cy="150" r="30" fill="#4F565F" stroke="#262A31" stroke-width="1.5"/>
+        <circle cx="150" cy="150" r="6" fill="#F2D24B"/>
+        <!-- ore couriers flying in -->
+        <g fill="#F2D24B"><circle cx="108" cy="108" r="2.4"/><circle cx="120" cy="120" r="2.4"/><circle cx="132" cy="132" r="2.4" opacity="0.7"/></g>
+        <circle cx="96" cy="96" r="4" fill="#7E8894" stroke="#262A31" stroke-width="0.8"/>
+        <g font-size="9" fill="#8B95A5" font-family="Oxanium,sans-serif">
+          <text x="150" y="42" text-anchor="middle" fill="#3D7BFF">collection field edge · 256u</text>
+          <text x="150" y="72" text-anchor="middle">sensor ~180u</text>
+          <text x="150" y="82" text-anchor="middle">dock 160u</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- ring grammar + nameplate -->
+    <div class="card">
+      <h3>Ring grammar &amp; nameplate stack</h3>
+      <p class="cap">Owner ring = HP remaining; red fills clockwise from 12 o'clock = HP lost. Shields before reactor.</p>
+      <svg viewBox="0 0 300 300">
+        <!-- nameplate stack -->
+        <g font-family="Oxanium,sans-serif">
+          <text x="150" y="34" text-anchor="middle" font-size="13" font-weight="800" fill="#3D7BFF" letter-spacing="1.5">AZURE · RIG-1</text>
+          <line x1="108" y1="42" x2="192" y2="42" stroke="#3D7BFF" stroke-width="2"/>
+          <text x="150" y="56" text-anchor="middle" font-size="8" fill="#8B95A5">nameplate · owner colour · teams = underline</text>
+        </g>
+        <!-- two shield gauges (outer) + reactor gauge (inner), sharing the primitive -->
+        <circle cx="150" cy="170" r="92" fill="none" stroke="#3D7BFF" stroke-width="4" opacity="0.9"/>
+        <circle cx="150" cy="170" r="92" fill="none" stroke="#B23A3A" stroke-width="4" pathLength="100" stroke-dasharray="80 100" transform="rotate(-90 150 170)"/>
+        <circle cx="150" cy="170" r="80" fill="none" stroke="#3D7BFF" stroke-width="4" opacity="0.9"/>
+        <circle cx="150" cy="170" r="80" fill="none" stroke="#B23A3A" stroke-width="4" pathLength="100" stroke-dasharray="45 100" transform="rotate(-90 150 170)"/>
+        <circle cx="150" cy="170" r="68" fill="none" stroke="#3D7BFF" stroke-width="5" opacity="0.9"/>
+        <circle cx="150" cy="170" r="68" fill="none" stroke="#B23A3A" stroke-width="5" pathLength="100" stroke-dasharray="15 100" transform="rotate(-90 150 170)"/>
+        <circle cx="150" cy="170" r="55" fill="#4F565F" stroke="#262A31" stroke-width="1.5"/>
+        <circle cx="150" cy="170" r="10" fill="#F2D24B"/>
+        <g font-size="8" fill="#8B95A5" font-family="Oxanium,sans-serif">
+          <text x="246" y="120">shield 80%↓</text><text x="246" y="152">shield 45%↓</text><text x="246" y="184">reactor 15%↓</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- turret pool legend -->
+    <div class="card wide">
+      <h3>The turret pool (the "§5.5 pool") — 4 mounts per facility, one escalating story</h3>
+      <p class="cap">Mk I→III ride the upgrade ladder as more-gun silhouettes; the barrel-less Dome is the reserved
+      enemy-field / derelict variant. Every direction must seat these naturally on its 4 mount points.</p>
+      <svg viewBox="0 0 560 130">
+        <g transform="translate(70,70)"><circle r="26" fill="#515861"/><circle r="21" fill="#7E8894"/><circle r="15" fill="#383E45"/>
+          <g transform="scale(1.7)"><use href="#tur-breech"/></g></g>
+        <g transform="translate(210,70)"><circle r="26" fill="#515861"/><circle r="21" fill="#7E8894"/><circle r="15" fill="#383E45"/>
+          <g transform="scale(1.7)"><use href="#tur-twin"/></g></g>
+        <g transform="translate(350,70)"><circle r="26" fill="#515861"/><circle r="21" fill="#7E8894"/><circle r="15" fill="#383E45"/>
+          <g transform="scale(1.55)"><use href="#tur-rail"/></g></g>
+        <g transform="translate(490,70)"><circle r="26" fill="#515861"/><circle r="21" fill="#7E8894"/><circle r="15" fill="#383E45"/>
+          <g transform="scale(1.7)"><use href="#tur-dome"/></g></g>
+        <g font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="70"  y="24" font-size="12" font-weight="800" fill="#DCE3EC">BREECH</text><text x="70"  y="120" font-size="10" fill="#8B95A5">Mk I · baseline cannon</text>
+          <text x="210" y="24" font-size="12" font-weight="800" fill="#DCE3EC">TWIN</text><text x="210" y="120" font-size="10" fill="#8B95A5">Mk II · "more gun"</text>
+          <text x="350" y="24" font-size="12" font-weight="800" fill="#DCE3EC">RAIL</text><text x="350" y="120" font-size="10" fill="#8B95A5">Mk III · longest reach</text>
+          <text x="490" y="24" font-size="12" font-weight="800" fill="#8B95A5">DOME</text><text x="490" y="120" font-size="10" fill="#8B95A5">reserved · derelict/enemy</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="card wide" style="margin-top:16px">
+    <h3>Palette — the only colours any direction may use</h3>
+    <div class="palette">
+      <div class="swatch"><div class="chip" style="background:#0D1015"></div><p>Vacuum<code>#0D1015</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#7E8894"></div><p>Hull steel<code>#7E8894</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#4FA08B"></div><p>Patina<code>#4FA08B</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#F2D24B"></div><p>Signal yellow · reactor<code>#F2D24B</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#4DC3FF"></div><p>Plasma · shield<code>#4DC3FF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#B23A3A"></div><p>Threat red · damage<code>#B23A3A</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#3D7BFF"></div><p>Owner (P1 Azure)<code>#3D7BFF</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#4F565F"></div><p>Ocean steel<code>#4F565F</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#383E45"></div><p>Hull dark<code>#383E45</code></p></div>
+      <div class="swatch"><div class="chip" style="background:#2F343B"></div><p>Wreck ash<code>#2F343B</code></p></div>
+    </div>
+    <p class="notes">Signal yellow appears on <b>the reactor only</b> (win condition, RESERVED §2); threat red is <b>damage
+    only</b>. Owner azure lives on beacon, nameplate, HP ring and turret trim — never on the hull. Derived greys are pure
+    value ramps of the six (no seventh hue). A wreck carries no red and no owner colour: it is an absence, not a threat.</p>
+  </div>
+</section>
+
+
+<!-- ======================================================= DIRECTION A -->
+<section>
+  <h2><span class="tag">Direction A</span>The Ring-Rig <span style="color:var(--muted);font-size:16px">— orbital refinery ring around the claimed core</span></h2>
+  <p class="lede">A rotating <b>refinery gantry</b> encircles the planetoid; the reactor glows at the rock's heart, silos
+  and docking arms hang off the ring. The most <b>circular</b> of the three — it inherits the radial stack almost for
+  free, and the gantry nodes are natural turret mounts. Reads instantly as "a station built onto a rock." The safe,
+  production-first pick.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>At rest</h3><p class="cap">Beacon + nameplate + 4 seated turrets + reactor + collection-field lap.</p>
+      <svg viewBox="0 0 300 260">
+        <!-- collection field inner lap -->
+        <circle cx="150" cy="140" r="98" fill="#3D7BFF" opacity="0.04"/>
+        <!-- nameplate -->
+        <g font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="24" font-size="12.5" font-weight="800" fill="#3D7BFF" letter-spacing="1.4">AZURE · RIG-1</text>
+          <line x1="112" y1="31" x2="188" y2="31" stroke="#3D7BFF" stroke-width="1.8"/>
+        </g>
+        <!-- beacon ring (gapped, always visible) -->
+        <g transform="translate(150,140)"><circle r="82" fill="none" stroke="#3D7BFF" stroke-width="4" stroke-dasharray="26 11"/>
+          <circle cx="82" cy="0" r="3" fill="#3D7BFF"/><circle cx="-82" cy="0" r="3" fill="#3D7BFF"/><circle cx="0" cy="82" r="3" fill="#3D7BFF"/><circle cx="0" cy="-82" r="3" fill="#3D7BFF"/></g>
+        <!-- full shield ghost (dim, at rest) -->
+        <circle cx="150" cy="140" r="66" fill="#4DC3FF" opacity="0.05"/>
+        <circle cx="150" cy="140" r="66" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <use href="#bodyA" x="150" y="140"/>
+        <!-- turrets on gantry nodes (pool mix), barrels radial-out -->
+        <use href="#tur-rail"   transform="translate(205.9,181.9) rotate(40)"/>
+        <use href="#tur-breech" transform="translate(94.1,181.9) rotate(140)"/>
+        <use href="#tur-twin"   transform="translate(94.1,98.1) rotate(220)"/>
+        <use href="#tur-breech" transform="translate(205.9,98.1) rotate(320)"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">gantry nodes host the 4 mounts · reactor at the rock's heart</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Under siege</h3><p class="cap">Damage ring fills red (40% lost) · shield failing &amp; holed · turrets firing · red edge-pulse.</p>
+      <svg viewBox="0 0 300 260">
+        <!-- threat-red edge pulse (facility alarm tell) -->
+        <circle cx="150" cy="140" r="88" fill="none" stroke="#B23A3A" stroke-width="6" opacity="0.16"/>
+        <use href="#bodyA" x="150" y="140"/>
+        <!-- failing shield: gapped plasma shimmer + red gauge -->
+        <g transform="translate(150,140)">
+          <circle r="66" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.34" stroke-dasharray="14 9"/>
+          <circle r="72" fill="none" stroke="#3D7BFF" stroke-width="4" opacity="0.9"/>
+          <circle r="72" fill="none" stroke="#B23A3A" stroke-width="4" pathLength="100" stroke-dasharray="80 100" transform="rotate(-90)"/>
+        </g>
+        <!-- reactor damage ring: owner base + 40% red from 12 o'clock -->
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#3D7BFF" stroke-width="5" opacity="0.9"/>
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#B23A3A" stroke-width="5" pathLength="100" stroke-dasharray="40 100" transform="rotate(-90 150 140)"/>
+        <!-- turrets defending: one firing, one tracking -->
+        <g transform="translate(205.9,181.9) rotate(40)"><use href="#tur-rail"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,181.9) rotate(140)"><use href="#tur-breech"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,98.1) rotate(220)"><use href="#tur-twin"/><use href="#mz-track"/></g>
+        <g transform="translate(205.9,98.1) rotate(320)"><use href="#tur-breech"/></g>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#B23A3A" font-family="Oxanium,sans-serif">shields redden &amp; die before the reactor begins to fill</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Reactor &amp; shield fit</h3><p class="cap">Yellow win-condition core inside the ring; shield clears the gantry cleanly.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="130" r="96" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.8"/>
+        <circle cx="150" cy="130" r="87" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <g stroke="#9DDEFF" stroke-width="2" fill="none" opacity="0.7"><path d="M78 100 A96 96 0 0 1 120 60"/><path d="M210 190 A96 96 0 0 1 168 210"/></g>
+        <circle cx="150" cy="130" r="72" fill="#7E8894"/><circle cx="150" cy="130" r="72" fill="none" stroke="#262A31" stroke-width="2"/>
+        <circle cx="150" cy="130" r="55" fill="none" stroke="#515861" stroke-width="6"/>
+        <circle cx="150" cy="130" r="34" fill="#F2D24B" opacity="0.16"/>
+        <circle cx="150" cy="130" r="22" fill="#F2D24B"/>
+        <circle cx="150" cy="130" r="11" fill="#F7E28A"/>
+        <g font-size="9" fill="#8B95A5" font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="133" fill="#0D1015" font-weight="800" font-size="8">REACTOR</text>
+          <text x="150" y="244">shield sits proud of the gantry · two-stack to +18%</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Derelict — "abandoned rig"</h3><p class="cap">Ash body, reactor out, gantry snapped, ore-laden debris. No red, no owner colour.</p>
+      <svg viewBox="0 0 300 260">
+        <use href="#debris" x="150" y="135"/>
+        <use href="#wreckA" x="150" y="135"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">nobody's enemy · takes no siege damage · scavenge the yellow</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="layout">
+    <b>Layout-registry implications</b>
+    <ul>
+      <li><b>Cleanest fit of the three.</b> Body stays a true disc of radius R, so beacon / damage / shield / halo rings and the turret orbit rim need <b>zero</b> registry change — the dressing lives entirely <em>inside</em> R.</li>
+      <li><b>Gantry must sit inboard of the turret orbit rim (≈1.2R).</b> Turrets glide around the rim (sim <span class="mono">orbitSpeed</span>); keep the outermost gantry element ≤ R so a gliding Mk III never clips a docking arm. Silos/arms drawn at ≤0.97R here.</li>
+      <li><b>Mount points = 4 gantry nodes</b> at the diagonals, clear of the top (nameplate) — matches <span class="mono">capPerPlanet:4</span>. No new hit-test geometry; turrets still mount on the rim.</li>
+      <li>Four planetoid variants become <b>four gantry-rotation seeds</b> (spoke phase + arm count) — variety from arrangement, no new hue, same determinism discipline as the current planet variants.</li>
+    </ul>
+  </div>
+  <p class="notes"><b>Read &amp; tone:</b> arcade-legible and busy in a good way — clearly a working rig. Risk: the ring can
+  read as "just a station" and lose the planetoid; mitigated by keeping the reactor + patina continents visible through
+  the gantry. <b>Cheapest to build</b> and the lowest-risk on every contract.</p>
+</section>
+
+
+<!-- ======================================================= DIRECTION B -->
+<section>
+  <h2><span class="tag">Direction B</span>The Refinery Platform <span style="color:var(--muted);font-size:16px">— an angular deck bolted onto the planetoid</span></h2>
+  <p class="lede">A hard-edged <b>hexagonal refinery deck</b> is clamped over the sunward face of the rock: tanks, a
+  cracking stack, catwalks, and a <b>reactor well</b> sunk into the deck centre. Semi-angular — it breaks the pure circle
+  for a stronger industrial read, while the dark planetoid still shows at the limb so the rings keep a round envelope.
+  The middle option: more character than A, less risk than C.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>At rest</h3><p class="cap">Beacon + nameplate + 4 corner-bastion turrets + reactor well + halo lap.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="140" r="98" fill="#3D7BFF" opacity="0.04"/>
+        <g font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="24" font-size="12.5" font-weight="800" fill="#3D7BFF" letter-spacing="1.4">AZURE · RIG-1</text>
+          <line x1="112" y1="31" x2="188" y2="31" stroke="#3D7BFF" stroke-width="1.8"/>
+        </g>
+        <g transform="translate(150,140)"><circle r="82" fill="none" stroke="#3D7BFF" stroke-width="4" stroke-dasharray="26 11"/>
+          <circle cx="82" cy="0" r="3" fill="#3D7BFF"/><circle cx="-82" cy="0" r="3" fill="#3D7BFF"/><circle cx="0" cy="82" r="3" fill="#3D7BFF"/><circle cx="0" cy="-82" r="3" fill="#3D7BFF"/></g>
+        <circle cx="150" cy="140" r="66" fill="#4DC3FF" opacity="0.05"/>
+        <circle cx="150" cy="140" r="66" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <use href="#bodyB" x="150" y="140"/>
+        <use href="#tur-breech" transform="translate(205.9,181.9) rotate(40)"/>
+        <use href="#tur-rail"   transform="translate(94.1,181.9) rotate(140)"/>
+        <use href="#tur-breech" transform="translate(94.1,98.1) rotate(220)"/>
+        <use href="#tur-twin"   transform="translate(205.9,98.1) rotate(320)"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">turrets mount on the deck's corner bastions · well = reactor</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Under siege</h3><p class="cap">Damage ring 40% · deck shield holed · stack &amp; tanks take fire · red edge-pulse.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="140" r="88" fill="none" stroke="#B23A3A" stroke-width="6" opacity="0.16"/>
+        <use href="#bodyB" x="150" y="140"/>
+        <g transform="translate(150,140)">
+          <circle r="66" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.34" stroke-dasharray="14 9"/>
+          <circle r="72" fill="none" stroke="#3D7BFF" stroke-width="4" opacity="0.9"/>
+          <circle r="72" fill="none" stroke="#B23A3A" stroke-width="4" pathLength="100" stroke-dasharray="80 100" transform="rotate(-90)"/>
+        </g>
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#3D7BFF" stroke-width="5" opacity="0.9"/>
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#B23A3A" stroke-width="5" pathLength="100" stroke-dasharray="40 100" transform="rotate(-90 150 140)"/>
+        <g transform="translate(205.9,181.9) rotate(40)"><use href="#tur-breech"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,181.9) rotate(140)"><use href="#tur-rail"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,98.1) rotate(220)"><use href="#tur-breech"/><use href="#mz-track"/></g>
+        <g transform="translate(205.9,98.1) rotate(320)"><use href="#tur-twin"/></g>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#B23A3A" font-family="Oxanium,sans-serif">angular deck still hosts a round shield &amp; ring cleanly</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Reactor &amp; shield fit</h3><p class="cap">Reactor well glows up out of a dark rim; shield rounds off the hex corners.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="130" r="96" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.8"/>
+        <circle cx="150" cy="130" r="87" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <g stroke="#9DDEFF" stroke-width="2" fill="none" opacity="0.7"><path d="M78 100 A96 96 0 0 1 120 60"/><path d="M210 190 A96 96 0 0 1 168 210"/></g>
+        <polygon points="150,58 212,94 212,166 150,202 88,166 88,94" fill="#7E8894" stroke="#262A31" stroke-width="2"/>
+        <polygon points="150,90 185,110 185,150 150,170 115,150 115,110" fill="#383E45"/>
+        <polygon points="150,102 176,117 176,143 150,158 124,143 124,117" fill="#F2D24B" opacity="0.22"/>
+        <polygon points="150,112 168,122 168,138 150,148 132,138 132,122" fill="#F2D24B"/>
+        <circle cx="150" cy="130" r="7" fill="#F7E28A"/>
+        <g font-size="9" fill="#8B95A5" font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="244">reactor well sunk below the deck plane · shield rounds the hex</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Derelict — "abandoned rig"</h3><p class="cap">Cold deck, dead well, scorched tanks, ore debris. Nothing burns.</p>
+      <svg viewBox="0 0 300 260">
+        <use href="#debris" x="150" y="135"/>
+        <use href="#wreckB" x="150" y="135"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">the deck goes ash-grey · the well is a hole where the yellow was</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="layout">
+    <b>Layout-registry implications</b>
+    <ul>
+      <li><b>Deck must inscribe within radius R</b> (hex circum-radius ≤ R = 0.83R across the flats). The rings hug the <em>planetoid limb</em>, not the deck edge — so the round envelope is untouched and the beacon/damage/halo generators are unchanged.</li>
+      <li><b>Turret orbit rim stays circular and clear.</b> Turrets mount on the four corner bastions but <em>glide on the round rim</em> (as today), so a bastion is a visual seat, not a hit-test change; keep bastions ≤ R so a gliding turret never overlaps the deck.</li>
+      <li><b>Deck orientation is per-facility fixed</b> (flat edge to sunward). A rotating deck would fight the gliding turrets; lock it, and let turrets slide over it — one registry note for the renderer, no sim change.</li>
+      <li>Four variants = <b>four deck layouts</b> (tank/stack arrangement) over the same hex — arrangement variety, palette-clean.</li>
+    </ul>
+  </div>
+  <p class="notes"><b>Read &amp; tone:</b> the strongest "industrial refinery" read while staying arcade-bright; the sunk
+  reactor well is a distinctive focal. Risk: the flat-to-round transition at the limb needs care so the deck doesn't look
+  like a sticker — solved with the dark planetoid crescent showing past the deck. <b>Moderate build cost.</b></p>
+</section>
+
+
+<!-- ======================================================= DIRECTION C -->
+<section>
+  <h2><span class="tag">Direction C</span>The Extractor Bastion <span style="color:var(--muted);font-size:16px">— gothic-brutalist fortress over a deep reactor shaft</span></h2>
+  <p class="lede">Heavy faceted <b>armour cladding</b> with four <b>buttress spurs</b> (a top-down star-fort) and a deep
+  central <b>extraction shaft</b> stepping down to the reactor glowing at the bottom. The most <b>serious</b> silhouette —
+  it leans hardest into "homes are the one serious thing" (§8), and the spurs make the most menacing turret bastions. The
+  highest drama, and the highest registry risk.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>At rest</h3><p class="cap">Beacon + nameplate + 4 spur-mounted turrets + shaft reactor + halo lap.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="140" r="98" fill="#3D7BFF" opacity="0.04"/>
+        <g font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="24" font-size="12.5" font-weight="800" fill="#3D7BFF" letter-spacing="1.4">AZURE · RIG-1</text>
+          <line x1="112" y1="31" x2="188" y2="31" stroke="#3D7BFF" stroke-width="1.8"/>
+        </g>
+        <g transform="translate(150,140)"><circle r="82" fill="none" stroke="#3D7BFF" stroke-width="4" stroke-dasharray="26 11"/>
+          <circle cx="82" cy="0" r="3" fill="#3D7BFF"/><circle cx="-82" cy="0" r="3" fill="#3D7BFF"/><circle cx="0" cy="82" r="3" fill="#3D7BFF"/><circle cx="0" cy="-82" r="3" fill="#3D7BFF"/></g>
+        <circle cx="150" cy="140" r="66" fill="#4DC3FF" opacity="0.05"/>
+        <circle cx="150" cy="140" r="66" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <use href="#bodyC" x="150" y="140"/>
+        <use href="#tur-twin"   transform="translate(205.9,181.9) rotate(40)"/>
+        <use href="#tur-breech" transform="translate(94.1,181.9) rotate(140)"/>
+        <use href="#tur-rail"   transform="translate(94.1,98.1) rotate(220)"/>
+        <use href="#tur-breech" transform="translate(205.9,98.1) rotate(320)"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">buttress spurs are the turret bastions · reactor down the shaft</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Under siege</h3><p class="cap">Damage ring 40% · shield holed · spur guns firing · red edge-pulse. The fortress bleeds.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="140" r="88" fill="none" stroke="#B23A3A" stroke-width="6" opacity="0.16"/>
+        <use href="#bodyC" x="150" y="140"/>
+        <g transform="translate(150,140)">
+          <circle r="66" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.34" stroke-dasharray="14 9"/>
+          <circle r="72" fill="none" stroke="#3D7BFF" stroke-width="4" opacity="0.9"/>
+          <circle r="72" fill="none" stroke="#B23A3A" stroke-width="4" pathLength="100" stroke-dasharray="80 100" transform="rotate(-90)"/>
+        </g>
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#3D7BFF" stroke-width="5" opacity="0.9"/>
+        <circle cx="150" cy="140" r="63" fill="none" stroke="#B23A3A" stroke-width="5" pathLength="100" stroke-dasharray="40 100" transform="rotate(-90 150 140)"/>
+        <g transform="translate(205.9,181.9) rotate(40)"><use href="#tur-twin"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,181.9) rotate(140)"><use href="#tur-breech"/><use href="#mz-fire"/></g>
+        <g transform="translate(94.1,98.1) rotate(220)"><use href="#tur-rail"/><use href="#mz-track"/></g>
+        <g transform="translate(205.9,98.1) rotate(320)"><use href="#tur-breech"/></g>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#B23A3A" font-family="Oxanium,sans-serif">heaviest read · the "small ache underneath" when it finally falls</text>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Reactor &amp; shield fit</h3><p class="cap">The shaft: dark rings stepping down to a hot core; shield caps the fortress.</p>
+      <svg viewBox="0 0 300 260">
+        <circle cx="150" cy="130" r="96" fill="none" stroke="#4DC3FF" stroke-width="2.5" opacity="0.8"/>
+        <circle cx="150" cy="130" r="87" fill="none" stroke="#4DC3FF" stroke-width="2" opacity="0.5"/>
+        <g stroke="#9DDEFF" stroke-width="2" fill="none" opacity="0.7"><path d="M78 100 A96 96 0 0 1 120 60"/><path d="M210 190 A96 96 0 0 1 168 210"/></g>
+        <polygon points="150,58 212,94 212,166 150,202 88,166 88,94" fill="#383E45" stroke="#262A31" stroke-width="2"/>
+        <circle cx="150" cy="130" r="55" fill="#383E45" stroke="#262A31" stroke-width="1.4"/>
+        <circle cx="150" cy="130" r="42" fill="#2D3239"/>
+        <circle cx="150" cy="130" r="29" fill="#1a1e24"/>
+        <circle cx="150" cy="130" r="27" fill="#F2D24B" opacity="0.18"/>
+        <circle cx="150" cy="130" r="17" fill="#F2D24B"/>
+        <circle cx="150" cy="130" r="8" fill="#F7E28A"/>
+        <g font-size="9" fill="#8B95A5" font-family="Oxanium,sans-serif" text-anchor="middle">
+          <text x="150" y="244">reactor reads as depth — a furnace down the shaft</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>Derelict — "abandoned rig"</h3><p class="cap">Gutted fortress, shaft gone dark, spurs broken, ore debris. Coldest of the three.</p>
+      <svg viewBox="0 0 300 260">
+        <use href="#debris" x="150" y="135"/>
+        <use href="#wreckC" x="150" y="135"/>
+        <text x="150" y="252" text-anchor="middle" font-size="8.5" fill="#8B95A5" font-family="Oxanium,sans-serif">a dead fort reads as a hole in the map from a long way off</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="layout">
+    <b>Layout-registry implications</b>
+    <ul>
+      <li><b>Highest registry risk of the three.</b> The spurs are the only elements that want to push past R. They must be <b>clamped inside R</b> (spur tips ≤ 0.97R here) or the beacon / damage / halo rings float off a non-circular mass and stop reading as clean gauges. This is the one direction where "keep it inside the disc" needs active discipline.</li>
+      <li><b>Turret orbit rim vs. fixed bastions.</b> The fantasy is guns <em>on</em> the spurs, but the sim glides turrets around the rim. Two honest options for the brief: <b>(a)</b> keep gliding and let a turret slide <em>across</em> spur tops (spurs ≤ R, decorative), or <b>(b)</b> propose a sim amendment to pin turrets to 4 fixed bastion slots (a real rule change — separate, flagged commit, not unilateral). A picks the pick.</li>
+      <li><b>Deep reactor shaft reads as depth, not a flat disc</b> — strongest reactor focal, but the dark shaft rim eats contrast; keep the hot core ≥ the current core radius so it still reads at 24px and minimap scale.</li>
+      <li>Four variants = <b>four cladding facet + rib seeds</b>. Nameplate must clear the tallest spur (top mount kept off 12 o'clock).</li>
+    </ul>
+  </div>
+  <p class="notes"><b>Read &amp; tone:</b> the most memorable and the most on-tone for the "serious home" beat — a burning
+  fortress and a gutted one both land hard. Risk: it is the least arcade-cheeky, the most expensive to build, and the only
+  one that may want a sim conversation about fixed mounts. <b>Highest ceiling, highest cost.</b></p>
+</section>
+
+
+<!-- ======================================================= THE PICK -->
+<section>
+  <div class="pick">
+    <h3>Your call — pick one (the build brief follows the pick)</h3>
+    <p style="color:var(--muted);margin:0;max-width:82ch">Same decision shape as maps r2: choose a direction on this board and
+    the follow-up brief rebuilds <span class="mono">planetSprite</span> (+ the wreck) to it. All three keep every
+    readability contract; they differ in silhouette, tone, build cost, and registry risk.</p>
+    <table>
+      <tr><th>Direction</th><th>Read / tone</th><th>Registry risk</th><th>Build cost</th></tr>
+      <tr><td><b>A · Ring-Rig</b></td><td>Busy working station; arcade-bright</td><td>None (true disc)</td><td>Low</td></tr>
+      <tr><td><b>B · Refinery Platform</b></td><td>Strong industrial refinery; distinct well</td><td>Low (deck inscribed)</td><td>Moderate</td></tr>
+      <tr><td><b>C · Extractor Bastion</b></td><td>Serious fortress; most memorable</td><td>High (spurs / possible fixed mounts)</td><td>High</td></tr>
+    </table>
+    <div class="keeps">
+      <span class="keep">Reactor = <b>signal yellow</b> win-condition</span>
+      <span class="keep">Owner <b>beacon</b> + <b>nameplate</b> stack</span>
+      <span class="keep"><b>Ring grammar</b>: owner ring, red fills CW from 12</span>
+      <span class="keep">Shield <b>stacks to 2</b>, plasma</span>
+      <span class="keep"><b>4 turret mounts</b> (breech/twin/rail + dome)</span>
+      <span class="keep">Halo = <b>DEPOSIT_RANGE</b> (4R)</span>
+      <span class="keep">Derelict goes <b>cold</b>, no red</span>
+    </div>
+    <p style="color:var(--muted);margin:16px 0 0;max-width:82ch;font-size:14px"><b style="color:var(--text)">Art recommendation:</b>
+    <b style="color:var(--text)">B (Refinery Platform)</b> as the sweet spot — it delivers the "mining facility" premise the
+    pivot is buying (a refinery, not just a rock), keeps registry risk low, and gives the reactor a distinctive well focal;
+    <b style="color:var(--text)">A</b> if the priority is ship-it-safe, <b style="color:var(--text)">C</b> if the priority is
+    the "serious home" ache (accepting the cost and the fixed-mount conversation). Your pick decides.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Concept board · no shipped game art changed · generator-faithful SVG (flat fills, ink outline, brighter-inner-pass
+  glow — no bloom). Colours are the six frozen tokens + declared value-ramp shades + one owner roster hue. Damage rings
+  drawn with <span class="mono">pathLength=100</span> so a red fill of N% is exactly N% of the ring, clockwise from twelve
+  o'clock — the ratified §2.2 grammar. Contract values: <span class="mono">PLANET.radius=64</span>,
+  <span class="mono">DEPOSIT_RANGE=256 (4R)</span>, <span class="mono">capPerPlanet:4</span>, sensor ~180u, dock 160u.</p>
+</footer>
+
+</div>
+</body>
+</html>
