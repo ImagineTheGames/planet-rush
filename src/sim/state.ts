@@ -19,7 +19,7 @@ import type { Muzzle, PlayerId, ShipClass, Vec2 } from '@shared/types';
 import type { Abundance, ResolvedEconomy } from './constants';
 import {
   CORE_HP,
-  PLANET,
+  STATION,
   RESOURCE_FIELD,
   SHIELD,
   SHIP_RADIUS,
@@ -64,8 +64,8 @@ export interface Ship {
   tiers: UpgradeTiers;
   pos: Vec2;
   vel: Vec2;
-  /** Home spawn point — where the player's planet sits; respawn returns here
-   *  (GDD §2.7). Day 1 has no planets, so this is just the ring spawn. */
+  /** Home spawn point — where the player's station sits; respawn returns here
+   *  (GDD §2.7). Day 1 has no stations, so this is just the ring spawn. */
   home: Vec2;
   /** Facing, radians. A manual weapon shot fires along this. Resolved once per
    *  tick by the facing ladder (aim input → auto-aim target → velocity → hold)
@@ -156,24 +156,24 @@ export interface OreChunk {
   amount: number;
   radius: number;
   /**
-   * Deposit-flight chunk (field report v0.1.2): a ship docked at its own planet
+   * Deposit-flight chunk (field report v0.1.2): a ship docked at its own station
    * spins these off as its hold drains into the bank, and they fly to `homeTo`
    * and vanish on arrival. They are the *telegraph*, not the ore — the drain
    * itself is authoritative on `Ship.cargo`/`banked`, so a flight chunk carries
    * no economic weight: the tractor never grabs it, no ship ever collects it,
-   * and it is absorbed silently at the planet. Optional and unset on a normal
+   * and it is absorbed silently at the station. Optional and unset on a normal
    * mined chunk, so the renderer (which draws every chunk by `pos`) and the net
    * codec keep working unchanged — the same backward-compatible discipline as
    * `Turret.muzzle`.
    */
   deposit?: boolean;
-  /** Where a `deposit` flight is headed — its planet's centre. Unset otherwise. */
+  /** Where a `deposit` flight is headed — its station's centre. Unset otherwise. */
   homeTo?: Vec2;
 }
 
-// --- Planets and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
+// --- Stations and what gets built on them (GDD §2.1, §2.5, §2.6) ------------
 
-/** An auto-firing turret mounted on a planet (GDD §2.5, §2.6: "turrets deter;
+/** An auto-firing turret mounted on a station (GDD §2.5, §2.6: "turrets deter;
  *  the ship defends"). Cheap, killable, and a shot target in its own right. */
 /**
  * A turret's committed intercept aim, re-solved on a tier cadence (turret-lead
@@ -199,10 +199,10 @@ export interface TurretAim {
 
 export interface Turret {
   readonly id: number;
-  /** The planet owner's slot — turrets never shoot their own fleet. */
+  /** The station owner's slot — turrets never shoot their own fleet. */
   readonly owner: PlayerId;
-  /** Mount slot 0..`TURRET.capPerPlanet`-1. Fixes the mount angle around the
-   *  planet and frees for re-use when the turret dies, so a rebuilt turret
+  /** Mount slot 0..`TURRET.capPerStation`-1. Fixes the mount angle around the
+   *  station and frees for re-use when the turret dies, so a rebuilt turret
    *  lands in a hole rather than on top of a survivor. */
   readonly slot: number;
   pos: Vec2;
@@ -213,7 +213,7 @@ export interface Turret {
    *  the visible telegraph: alignment never gates the shot (DPS is DPS). */
   angle: number;
   /**
-   * Angular position of the turret **around its planet's rim**, radians (field
+   * Angular position of the turret **around its station's rim**, radians (field
    * report P1). A turret is no longer pinned to its build spot: it slides along
    * the surface ring toward the point whose outward normal faces its target,
    * capped at `TURRET.orbitSpeed` so it glides. `pos` is derived from this every
@@ -312,16 +312,16 @@ export interface BuildJob {
   total: number;
 }
 
-/** A player's home planet: the win condition, and the only thing in the match
+/** A player's home station: the win condition, and the only thing in the match
  *  that does not respawn (GDD §2.1, §2.7). One per slot. */
-export interface Planet {
+export interface MiningStation {
   readonly id: number;
   readonly owner: PlayerId;
   /**
-   * The side this planet belongs to (variable-slots Task A2) — matches its
+   * The side this station belongs to (variable-slots Task A2) — matches its
    * owner's ship `team`, so a shot never sieges an ally's home. FFA sets it to
    * the owner id (teams-of-one). Optional, same backward-compatible reasoning as
-   * `Ship.team`: `Planet` literals other agents build without a team read as
+   * `Ship.team`: `MiningStation` literals other agents build without a team read as
    * FFA. Static config, never on the per-tick snapshot (spike Trap 7).
    */
   team?: number;
@@ -338,7 +338,7 @@ export interface Planet {
    * snapshot (static match layout — the client rebuilds it from map + roster).
    */
   derelict?: boolean;
-  /** Static — planets do not move. */
+  /** Static — stations do not move. */
   pos: Vec2;
   radius: number;
   /** Core HP. Zero ends this player's match (GDD §1 loss condition). */
@@ -346,7 +346,7 @@ export interface Planet {
   maxCoreHp: number;
   /** false once the core has been destroyed; the wreck stays on the map. */
   alive: boolean;
-  /** Sim time the core died, or -1 while it lives. The dead planet *is* the
+  /** Sim time the core died, or -1 while it lives. The dead station *is* the
    *  wreck (GDD §2.7): it keeps its position and radius, stays solid, and never
    *  leaves the world — this is the timestamp the renderer's death moment and
    *  the wreck sprite swap hang off. */
@@ -373,7 +373,7 @@ export interface Planet {
   repairing: boolean;
   /** Seconds left on the repair-tell hold before `repairing` releases — the
    *  bot-pacing cooldown behind the tell (`maintainRepairTell`). Optional and
-   *  treated as `0` when absent, so hand-built `Planet` fixtures need not set it;
+   *  treated as `0` when absent, so hand-built `MiningStation` fixtures need not set it;
    *  `createWorld` seeds it to `0`. Never gates a human's `placeOrder`. */
   repairCooldown?: number;
   turrets: Turret[];
@@ -429,7 +429,7 @@ export interface Projectile {
 // World
 // ---------------------------------------------------------------------------
 
-/** Rectangular play bounds; the ring of planets and the field sit inside. */
+/** Rectangular play bounds; the ring of stations and the field sit inside. */
 export interface Bounds {
   width: number;
   height: number;
@@ -441,7 +441,7 @@ export interface Bounds {
  *  - `live`     — waves are still arriving or ore is still in the field.
  *  - `collapse` — the field is spent: no shield regeneration, no repair, no new
  *                 ore. Entropy finishes whoever the players don't (GDD §1).
- *  - `ended`    — one planet left standing (or none, resolved last-to-die).
+ *  - `ended`    — one station left standing (or none, resolved last-to-die).
  */
 export type MatchPhase = 'live' | 'collapse' | 'ended';
 
@@ -485,8 +485,8 @@ export interface World {
   ships: Ship[];
   asteroids: Asteroid[];
   chunks: OreChunk[];
-  /** Home planets, one per slot, in the ring layout (GDD §2.1). */
-  planets: Planet[];
+  /** Home stations, one per slot, in the ring layout (GDD §2.1). */
+  stations: MiningStation[];
   /** Turret shot pool — dense array, sparse liveness (see {@link Projectile}). */
   projectiles: Projectile[];
   bounds: Bounds;
@@ -564,7 +564,7 @@ export interface WorldConfig {
   readonly players: readonly PlayerSpec[];
   /**
    * Which ratified layout to build (`./maps`) — the arena bounds and where the
-   * home planets sit. Defaults to `octagon` ("The Ring"), the hardwired default
+   * home stations sit. Defaults to `octagon` ("The Ring"), the hardwired default
    * until the picker (m8-02) lands. An unknown id falls back to the default, so
    * a stale saved key can never crash boot.
    */
@@ -620,15 +620,15 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
   };
 }
 
-/** Build a player's home planet at its ring station (GDD §2.1, §2.8). */
-function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): Planet {
+/** Build a player's home station at its ring station (GDD §2.1, §2.8). */
+function makeStation(spec: PlayerSpec, index: number, pos: Vec2, angle: number): MiningStation {
   return {
     id: index,
     owner: spec.id,
     // Same side as its owner's ship — FFA teams-of-one defaults to the owner id.
     team: spec.team ?? spec.id,
     pos: { x: pos.x, y: pos.y },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: CORE_HP,
     maxCoreHp: CORE_HP,
     alive: true,
@@ -650,21 +650,21 @@ function makePlanet(spec: PlayerSpec, index: number, pos: Vec2, angle: number): 
  * Build a **derelict wreck** at an unused board position (the derelict-fill maps,
  * Milestone B). It is born dead — `alive: false`, `coreHp: 0`, `deathTime: 0` —
  * so every combat path treats it exactly like a home whose core was destroyed:
- * `damagePlanet`/siege collision/auto-aim all skip a dead core, and it carries no
+ * `damageStation`/siege collision/auto-aim all skip a dead core, and it carries no
  * turrets, shields, or builds to defend or lose. `owner`/`team` are its board
  * index, which is `>= N` (the live roster is the dense `0..N-1`), so no ship
  * shares them and `areEnemies` reads it as everyone's foe — harmless, since a
  * dead core is untargetable regardless. Its lootable debris is scattered
  * separately at world-build (`scatterDerelictLoot`).
  */
-function makeDerelictPlanet(index: number, pos: Vec2, angle: number): Planet {
+function makeDerelictStation(index: number, pos: Vec2, angle: number): MiningStation {
   return {
     id: index,
     owner: index,
     team: index,
     derelict: true,
     pos: { x: pos.x, y: pos.y },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: 0,
     maxCoreHp: CORE_HP,
     alive: false,
@@ -693,9 +693,9 @@ function initialMatch(): MatchState {
 }
 
 /**
- * Construct a fresh, deterministic match world. Planets sit evenly around a
+ * Construct a fresh, deterministic match world. Stations sit evenly around a
  * ring with each player's ship spawning in orbit of its own — inboard of the
- * planet, facing the field (GDD §2.1); the opening field is **asteroid wave 1**,
+ * station, facing the field (GDD §2.1); the opening field is **asteroid wave 1**,
  * scattered in the central disc from the seeded RNG (GDD §2.3 — the remaining
  * four waves arrive on the metronome, each closer to centre). Same config ⇒
  * byte-identical world.
@@ -710,19 +710,19 @@ export function createWorld(config: WorldConfig): World {
   const cy = bounds.height / 2;
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
   // The commons scatter radius is a fraction of the arena, independent of the
-  // map's planet arrangement — mid-map is the centre for every layout.
-  const ringRadius = halfMin * 2 * PLANET.ringFraction;
+  // map's station arrangement — mid-map is the centre for every layout.
+  const ringRadius = halfMin * 2 * STATION.ringFraction;
 
-  // The map's per-slot placements: planet centre, inboard ship spawn, spoke
+  // The map's per-slot placements: station centre, inboard ship spawn, spoke
   // angle. Deterministic geometry (no RNG); the seed threads into the asteroid
   // scatter below, not the layout. NOTHING hugs the wall — each map sizes its
-  // outermost planets to clear the bounds by `WORLD_EDGE_MARGIN` (field report
+  // outermost stations to clear the bounds by `WORLD_EDGE_MARGIN` (field report
   // P1), and the spawners clamp everything else through the same margin.
   // A map returns one placement per board position: exactly `N` live homes for a
   // regenerate map (`octagon`/`oval`), or all eight for a derelict-fill map
   // (`compass`/`diamond`) with the `8-N` unused ones marked derelict. The live
   // homes come first, so they line up with the dense `0..N-1` player roster.
-  const placements = map.planets(config.seed, config.players.length, bounds);
+  const placements = map.stations(config.seed, config.players.length, bounds);
   const homes = placements.filter((p) => !p.derelict);
 
   // Ships spawn orbiting their live home, one per lobby slot — deterministic, no
@@ -735,18 +735,18 @@ export function createWorld(config: WorldConfig): World {
     return ship;
   });
 
-  // A planet per board position: a live home for each player (on the same spoke
+  // A station per board position: a live home for each player (on the same spoke
   // as its ship, outboard of it), and an unowned wreck for each derelict position
-  // — so the layout keeps its shape at any N. The planet's array index is its
+  // — so the layout keeps its shape at any N. The station's array index is its
   // board id; live homes take ids `0..N-1` (actives are first), matching each
   // owner id, and derelicts take the remaining ids `>= N`.
-  const planets: Planet[] = [];
+  const stations: MiningStation[] = [];
   let liveIndex = 0;
   placements.forEach((place, index) => {
     if (place.derelict) {
-      planets.push(makeDerelictPlanet(index, place.planet, place.angle));
+      stations.push(makeDerelictStation(index, place.station, place.angle));
     } else {
-      planets.push(makePlanet(config.players[liveIndex]!, index, place.planet, place.angle));
+      stations.push(makeStation(config.players[liveIndex]!, index, place.station, place.angle));
       liveIndex++;
     }
   });
@@ -769,7 +769,7 @@ export function createWorld(config: WorldConfig): World {
     ships,
     asteroids: [],
     chunks: [],
-    planets,
+    stations,
     projectiles: [],
     bounds,
     // The commons scatter disc — a fraction of the ring, kept clear of every
@@ -782,7 +782,7 @@ export function createWorld(config: WorldConfig): World {
   };
 
   // The fair opening layout, before the fight begins (field rule v0.1.2): the
-  // identical per-planet home neighbourhoods first, then wave 1 of the contested
+  // identical per-station home neighbourhoods first, then wave 1 of the contested
   // commons. Waves 2..5 land on the metronome — the rock a player mines at t=0
   // and the rock that lands at t=600 come from one code path (`./waves`).
   spawnHomeFields(world);

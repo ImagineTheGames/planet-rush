@@ -29,7 +29,7 @@ import {
   CARGO_PER_TIER,
   CORE_HP,
   MINING_RATE,
-  PLANET,
+  STATION,
   SHIELD,
   SHIP_RADIUS,
   SHIP_STATS,
@@ -62,11 +62,11 @@ import {
   type ShipLoadout,
   type UpgradeTiers,
 } from './upgrades';
-import type { Asteroid, Planet, Ship, World } from './state';
+import type { Asteroid, MiningStation, Ship, World } from './state';
 
 // --- builders --------------------------------------------------------------
 //
-// Same conventions as the day-1/day-2 fixtures: planet-relative coordinates well
+// Same conventions as the day-1/day-2 fixtures: station-relative coordinates well
 // inside the arena (the walls are real and would quietly move a ship), and zero
 // rocks per wave so the metronome cannot drop asteroids into a test.
 
@@ -121,12 +121,12 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   };
 }
 
-function makePlanet(over: Partial<Planet> & Pick<Planet, 'id' | 'owner'>): Planet {
+function makeStation(over: Partial<MiningStation> & Pick<MiningStation, 'id' | 'owner'>): MiningStation {
   return {
     id: over.id,
     owner: over.owner,
     pos: over.pos ?? at(0, 0),
-    radius: over.radius ?? PLANET.radius,
+    radius: over.radius ?? STATION.radius,
     coreHp: over.coreHp ?? CORE_HP,
     maxCoreHp: over.maxCoreHp ?? CORE_HP,
     alive: over.alive ?? true,
@@ -163,7 +163,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -179,7 +179,7 @@ function makeWorld(over: Partial<World> = {}): World {
   };
 }
 
-/** A ship docked at its own live planet with `ore` banked — the state every
+/** A ship docked at its own live station with `ore` banked — the state every
  *  purchase test needs, since the wheel and the panel are only live at home. */
 function dockedWorld(shipClass: ShipClass, ore: number, tiers?: UpgradeTiers): { world: World; ship: Ship } {
   const ship = makeShip({
@@ -190,7 +190,7 @@ function dockedWorld(shipClass: ShipClass, ore: number, tiers?: UpgradeTiers): {
     shipClass,
     ...(tiers ? { tiers } : {}),
   });
-  const world = makeWorld({ ships: [ship], planets: [makePlanet({ id: 0, owner: 0, pos: at(0, 0) })] });
+  const world = makeWorld({ ships: [ship], stations: [makeStation({ id: 0, owner: 0, pos: at(0, 0) })] });
   return { world, ship };
 }
 
@@ -633,25 +633,25 @@ describe('buying an upgrade (GDD §2.5)', () => {
     expect(spendableOre(ship)).toBe(cost - 1);
   });
 
-  it('requires the ship to be at its own living planet', () => {
+  it('requires the ship to be at its own living station', () => {
     const cost = UPGRADES[UpgradeTrack.Power].costs[0]!;
 
     // Out in the field, far from home: the panel is not live (GDD §2.5).
     const away = dockedWorld(ShipClass.Vanguard, cost);
-    away.ship.pos = at(PLANET.dockRange + 50, 0);
+    away.ship.pos = at(STATION.dockRange + 50, 0);
     expect(buyUpgrade(away.world, away.ship, UpgradeTrack.Power)).toBe('not-docked');
 
     // Docked, but the home is a wreck: this player's match is over.
     const dead = dockedWorld(ShipClass.Vanguard, cost);
-    dead.world.planets[0]!.alive = false;
-    expect(buyUpgrade(dead.world, dead.ship, UpgradeTrack.Power)).toBe('planet-dead');
+    dead.world.stations[0]!.alive = false;
+    expect(buyUpgrade(dead.world, dead.ship, UpgradeTrack.Power)).toBe('station-dead');
 
-    // No planet at all (a spectator, or a slot with no home).
+    // No station at all (a spectator, or a slot with no home).
     const homeless = dockedWorld(ShipClass.Vanguard, cost);
-    homeless.world.planets = [];
-    expect(buyUpgrade(homeless.world, homeless.ship, UpgradeTrack.Power)).toBe('no-planet');
+    homeless.world.stations = [];
+    expect(buyUpgrade(homeless.world, homeless.ship, UpgradeTrack.Power)).toBe('no-station');
 
-    // A dead ship buys nothing, even sitting on top of its planet — and the
+    // A dead ship buys nothing, even sitting on top of its station — and the
     // refusal names the true reason, `dead`, not a misleading `not-docked`: a
     // purchase is a live action, and a wreck on the respawn clock takes none
     // (v0.2.2 field report, ratified; see tests/sim/upgrade-after-respawn).

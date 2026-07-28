@@ -13,7 +13,7 @@
  * velocity → hold), and ship-vs-asteroid reflection — all over a uniform-grid
  * spatial-hash broad phase.
  *
- * Day-2 scope (GDD §2.1, §2.5, §2.6): home planets and their cores in the ring
+ * Day-2 scope (GDD §2.1, §2.5, §2.6): home stations and their cores in the ring
  * layout, the Build & Upgrade orders (turret, shield, repair channel, bank),
  * construction timers, shield regeneration, turret auto-fire with pooled
  * projectiles, and the ship weapon's full target list — turrets, shields and
@@ -45,7 +45,7 @@ import {
   DRAG,
   FACE_VELOCITY_MIN_SPEED,
   HASH_CELL_SIZE,
-  PLANET,
+  STATION,
   SHIP_ASTEROID_RESTITUTION,
   SHIP_WEAPON,
   SPAWN_PROTECTION_S,
@@ -56,10 +56,10 @@ import {
   buyUpgrade,
   inAtmosphere,
   placeOrder,
-  planetOf,
-  planetTargetRadius,
+  stationOf,
+  stationTargetRadius,
   sweepDeadTurrets,
-  updatePlanets,
+  updateStations,
   updateTurrets,
 } from './buildings';
 import { areEnemies } from './allegiance';
@@ -67,7 +67,7 @@ import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
 import { ledgerAdd } from './ore-ledger';
 import { SpatialHash } from './spatial-hash';
-import type { Asteroid, OreChunk, Planet, Ship, World } from './state';
+import type { Asteroid, OreChunk, MiningStation, Ship, World } from './state';
 import {
   refreshDerivedStats,
   shipAccel,
@@ -201,11 +201,11 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   //     so a rock that arrives this tick is collidable and minable this tick.
   spawnDueWaves(world);
 
-  // 1b. Planets: core spawn protection, the undamaged clock, construction
+  // 1b. Stations: core spawn protection, the undamaged clock, construction
   //     timers, shield regen, and the repair channel (GDD §2.5, §2.6). Ahead of
   //     this tick's damage, so a hit landing now is felt next tick — never
   //     retroactively cancelling a repair that already ticked.
-  updatePlanets(world, dt);
+  updateStations(world, dt);
 
   // 2. Resolve intents once, indexed to ships by id.
   const intents = world.ships.map((s) => intentFor(s.id, inputs));
@@ -213,7 +213,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 2b. Wheel orders — validated and paid for here, so a job ordered this tick
   //     starts its clock next tick and a 10 s turret takes exactly 10 s. Then the
   //     upgrade panel's row presses, from the same wallet: a tick carrying both
-  //     spends on the planet first and the ship second, which is arbitrary but
+  //     spends on the station first and the ship second, which is arbitrary but
   //     fixed, and part of the determinism contract (GDD §4.8). In practice they
   //     are one-shot presses on two different screens, so a tick carries one.
   for (let i = 0; i < world.ships.length; i++) {
@@ -233,11 +233,11 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 4. Broad phase over the (static) asteroid field, reused by collision + shots.
   const hash = SpatialHash.from(world.asteroids.map((a) => a.pos), HASH_CELL_SIZE);
 
-  // 5. Ship-vs-asteroid and ship-vs-planet reflection (GDD §4.1).
+  // 5. Ship-vs-asteroid and ship-vs-station reflection (GDD §4.1).
   for (const ship of world.ships) {
     if (!ship.alive) continue;
     reflectOffAsteroids(ship, world.asteroids, hash);
-    reflectOffPlanets(ship, world);
+    reflectOffStations(ship, world);
   }
 
   // 6. Facing — one priority ladder per ship, always turn-rate-limited. The
@@ -269,7 +269,7 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   updateTurrets(world, dt);
   updateProjectiles(world, hash, dt);
 
-  // 8b. Auto-deposit: a ship docked at its own planet drains its hold into the
+  // 8b. Auto-deposit: a ship docked at its own station drains its hold into the
   //     safe bank at a steady rate and spins off the ore-flight chunks that show
   //     it (field report v0.1.2; GDD §2.3, §2.5). Before the chunk update, so a
   //     courier emitted this tick starts its flight home this tick.
@@ -427,12 +427,12 @@ function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHas
   }
 }
 
-/** Planets are solid bodies too — you dock *at* your world, you do not fly
+/** Stations are solid bodies too — you dock *at* your world, you do not fly
  *  through it. Same contact response as a rock (GDD §4.1: every colliding body
  *  is a circle); the shield bubble is energy and is not a collider. */
-function reflectOffPlanets(ship: Ship, world: World): void {
-  for (const planet of world.planets) {
-    reflectOffCircle(ship, planet.pos, planet.radius);
+function reflectOffStations(ship: Ship, world: World): void {
+  for (const station of world.stations) {
+    reflectOffCircle(ship, station.pos, station.radius);
   }
 }
 
@@ -466,7 +466,7 @@ function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
 /**
  * A target auto-aim can acquire across the full 360° (GDD §2.4) — the full
  * target list "asteroid, ship, turret, shield, or core". Shield and core are one
- * `planet` hit: the bubble stands in front of the core and `damagePlanet` decides
+ * `station` hit: the bubble stands in front of the core and `damageStation` decides
  * which pool takes the damage (GDD §2.6). Used for *facing* and for the auto-aim
  * lead; the actual hit is resolved by the projectile against live geometry.
  *
@@ -477,8 +477,8 @@ function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
 type AimTarget =
   | { kind: 'asteroid'; index: number }
   | { kind: 'ship'; index: number }
-  | { kind: 'turret'; planet: number; index: number }
-  | { kind: 'planet'; planet: number };
+  | { kind: 'turret'; station: number; index: number }
+  | { kind: 'station'; station: number };
 
 /**
  * One trigger, one verb (ratified amendment v0.3 — "projectiles for everything").
@@ -532,7 +532,7 @@ function fireWeapon(world: World, ship: Ship, dir: Vec2): void {
  * The unit aim for an auto-aim weapon shot at a non-asteroid target: an
  * intercept lead on a moving ship (so a strafing *or orbiting* enemy is actually
  * hit, design amendment v0.2 item 5; field report v0.2.4 "I can never hit an
- * enemy orbiting my planet"), or a straight shot at a stationary turret or core.
+ * enemy orbiting my station"), or a straight shot at a stationary turret or core.
  *
  * This is the **player's** consumer of the shared intercept solver — the third
  * alongside the turrets (`buildings.ts`) and the bots (`bots/steering.ts`), all
@@ -567,7 +567,7 @@ function weaponLead(world: World, ship: Ship, hit: AimTarget): Vec2 {
  *
  *   TIER 1 — the closest **hittable enemy** (ship, turret, or core): an enemy per
  *     the same friend/foe + spawn-protection predicates the shot obeys, with a
- *     clear line of sight (a planet body or an asteroid across the path eats the
+ *     clear line of sight (a station body or an asteroid across the path eats the
  *     shot, so it is not hittable — GDD §2.4 "you cannot shoot through things").
  *   TIER 2 — only when no enemy is hittable, the closest **asteroid** (mining).
  *
@@ -605,11 +605,11 @@ function holdFull(ship: Ship): boolean {
  * collision skips both, GDD §2.1) — acquiring one would aim auto-fire at an
  * invulnerable hull with no tell (field report "some ships would not take damage
  * from me") and lock off a live enemy beside it. An occluded enemy is skipped for
- * the same reason: the shot would die on the rock or planet in the way, so the
+ * the same reason: the shot would die on the rock or station in the way, so the
  * closest *unblocked* enemy is the one the ladder engages.
  *
  * Hittability is not a second rule set: it reuses the collision/protection
- * predicates (`areEnemies`, spawn protection, `planetTargetRadius`) so the aimer
+ * predicates (`areEnemies`, spawn protection, `stationTargetRadius`) so the aimer
  * and the shot can never disagree about what can be struck.
  */
 function acquireEnemy(world: World, ship: Ship): AimTarget | null {
@@ -626,24 +626,24 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
     best = { kind: 'ship', index: i };
   }
 
-  for (let p = 0; p < world.planets.length; p++) {
-    const planet = world.planets[p]!;
-    if (!areEnemies(world, ship.id, planet.owner)) continue;
-    for (let i = 0; i < planet.turrets.length; i++) {
-      const turret = planet.turrets[i]!;
+  for (let p = 0; p < world.stations.length; p++) {
+    const station = world.stations[p]!;
+    if (!areEnemies(world, ship.id, station.owner)) continue;
+    for (let i = 0; i < station.turrets.length; i++) {
+      const turret = station.turrets[i]!;
       if (turret.hp <= 0) continue;
       const d2 = dist2(ship.pos, turret.pos);
       if (d2 >= bestD2) continue;
       if (losBlocked(world, ship.pos, turret.pos)) continue;
       bestD2 = d2;
-      best = { kind: 'turret', planet: p, index: i };
+      best = { kind: 'turret', station: p, index: i };
     }
-    if (!planet.alive || planet.spawnProtect > 0) continue;
-    const d2 = dist2(ship.pos, planet.pos);
+    if (!station.alive || station.spawnProtect > 0) continue;
+    const d2 = dist2(ship.pos, station.pos);
     if (d2 >= bestD2) continue;
-    if (losBlocked(world, ship.pos, planet.pos)) continue;
+    if (losBlocked(world, ship.pos, station.pos)) continue;
     bestD2 = d2;
-    best = { kind: 'planet', planet: p };
+    best = { kind: 'station', station: p };
   }
   return best;
 }
@@ -671,13 +671,13 @@ function acquireAsteroid(world: World, ship: Ship): AimTarget | null {
  * Whether a straight shot from `from` to `to` is eaten before it arrives — "you
  * cannot shoot through things" (GDD §2.4, amendment v0.3) applied to acquisition,
  * so auto-aim never locks an enemy a shot could not actually reach. A blocker is
- * an **asteroid** or a **planet body** (its shield/core surface — the same
- * `planetTargetRadius` the projectile collides against) whose center's closest
+ * an **asteroid** or a **station body** (its shield/core surface — the same
+ * `stationTargetRadius` the projectile collides against) whose center's closest
  * approach falls strictly *between* the endpoints and within its radius.
  *
  * Enemy ships are never blockers: the ladder already picks the closest enemy, so a
- * nearer enemy never has to hide a farther one. A planet the segment ends *on* (an
- * enemy core, whose aim point is the planet center) is not self-occluding — its
+ * nearer enemy never has to hide a farther one. A station the segment ends *on* (an
+ * enemy core, whose aim point is the station center) is not self-occluding — its
  * closest approach is the endpoint (t == 1), outside the open interval — so a core
  * stays hittable while a body squarely across the path does not.
  */
@@ -685,8 +685,8 @@ function losBlocked(world: World, from: Vec2, to: Vec2): boolean {
   for (const a of world.asteroids) {
     if (segmentCrossesCircle(from, to, a.pos, a.radius)) return true;
   }
-  for (const planet of world.planets) {
-    if (segmentCrossesCircle(from, to, planet.pos, planetTargetRadius(planet))) return true;
+  for (const station of world.stations) {
+    if (segmentCrossesCircle(from, to, station.pos, stationTargetRadius(station))) return true;
   }
   return false;
 }
@@ -719,9 +719,9 @@ function targetPos(world: World, hit: AimTarget): Vec2 {
     case 'ship':
       return world.ships[hit.index]!.pos;
     case 'turret':
-      return world.planets[hit.planet]!.turrets[hit.index]!.pos;
-    case 'planet':
-      return world.planets[hit.planet]!.pos;
+      return world.stations[hit.station]!.turrets[hit.index]!.pos;
+    case 'station':
+      return world.stations[hit.station]!.pos;
   }
 }
 
@@ -800,16 +800,16 @@ function updateChunks(world: World, dt: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-deposit inside your own planet's atmosphere
+// Auto-deposit inside your own station's atmosphere
 // (field report v0.1.2; GDD §2.3, §2.5; ratified p4)
 // ---------------------------------------------------------------------------
 
 /**
- * While a ship is inside its own living planet's atmosphere (`DEPOSIT_RANGE`),
+ * While a ship is inside its own living station's atmosphere (`DEPOSIT_RANGE`),
  * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, for each
  * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
- * flies ship→planet to show it. Leave the atmosphere (or empty the hold, or lose
- * the planet) and the drain simply stops the next tick — the transfer is readable
+ * flies ship→station to show it. Leave the atmosphere (or empty the hold, or lose
+ * the station) and the drain simply stops the next tick — the transfer is readable
  * and interruptible, exactly as the field report asks. There is no dock or park
  * gate any more (ratified p4: "just be in that atmosphere").
  *
@@ -827,9 +827,9 @@ function updateDeposits(world: World, dt: number): void {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
     // Ratified p4: just be in the atmosphere. No dock and no park gate — the
     // drain runs the tick a ship crosses into `DEPOSIT_RANGE` at its own living
-    // planet and stops the tick it crosses back out (interruptible as before).
-    const planet = planetOf(world, ship.id);
-    if (!planet || !planet.alive || !inAtmosphere(ship, planet)) continue;
+    // station and stops the tick it crosses back out (interruptible as before).
+    const station = stationOf(world, ship.id);
+    if (!station || !station.alive || !inAtmosphere(ship, station)) continue;
 
     // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
     const cargoBefore = ship.cargo;
@@ -848,15 +848,15 @@ function updateDeposits(world: World, dt: number): void {
     // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
     // `banked` can never invent or drop a courier at the exact end of a drain.
     const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
-    for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, planet);
+    for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, station);
   }
 }
 
-/** Spin off one ore-flight courier from `ship` toward `planet`. Pooled through
+/** Spin off one ore-flight courier from `ship` toward `station`. Pooled through
  *  the same chunk array (and the same renderer) as mined ore; flagged `deposit`
  *  so it is homed and absorbed rather than tractored (see {@link updateChunks}). */
-function spawnDepositFlight(world: World, ship: Ship, planet: Planet): void {
-  const dir = normalize({ x: planet.pos.x - ship.pos.x, y: planet.pos.y - ship.pos.y });
+function spawnDepositFlight(world: World, ship: Ship, station: MiningStation): void {
+  const dir = normalize({ x: station.pos.x - ship.pos.x, y: station.pos.y - ship.pos.y });
   world.chunks.push({
     id: world.nextEntityId++,
     pos: { x: ship.pos.x, y: ship.pos.y },
@@ -866,11 +866,11 @@ function spawnDepositFlight(world: World, ship: Ship, planet: Planet): void {
     amount: CHUNK.ore,
     radius: CHUNK.radius,
     deposit: true,
-    homeTo: { x: planet.pos.x, y: planet.pos.y },
+    homeTo: { x: station.pos.x, y: station.pos.y },
   });
 }
 
-/** Fly a deposit courier straight at its planet and mark it spent on arrival.
+/** Fly a deposit courier straight at its station and mark it spent on arrival.
  *  Re-homed every tick because the docked ship it left may still be drifting to
  *  rest, so the stream reads as a clean line into the core. */
 function updateDepositFlight(chunk: OreChunk, dt: number): void {
@@ -882,9 +882,9 @@ function updateDepositFlight(chunk: OreChunk, dt: number): void {
   const dx = home.x - chunk.pos.x;
   const dy = home.y - chunk.pos.y;
   const d2 = dx * dx + dy * dy;
-  // Reached the planet surface: the bank already holds this ore, so the courier
+  // Reached the station surface: the bank already holds this ore, so the courier
   // is absorbed — zero its amount for the end-of-tick sweep in `updateChunks`.
-  if (d2 <= PLANET.radius * PLANET.radius) {
+  if (d2 <= STATION.radius * STATION.radius) {
     chunk.amount = 0;
     return;
   }
@@ -900,7 +900,7 @@ function updateDepositFlight(chunk: OreChunk, dt: number): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Come back at your home planet, five seconds later, with **everything you
+ * Come back at your home station, five seconds later, with **everything you
  * bought still on the hull** (GDD §2.7: "free and fast … upgrades intact").
  *
  * Upgrade persistence is *structural*, not a promise that this function happens

@@ -7,7 +7,7 @@
  * server and the QA harness both import it headless (GDD §4.1).
  *
  * Public surface: build a world with `createWorld`, advance it with `step`,
- * read plain-data `World`/`Ship`/`Asteroid`/`OreChunk`/`Planet`/`Turret`/
+ * read plain-data `World`/`Ship`/`Asteroid`/`OreChunk`/`MiningStation`/`Turret`/
  * `Shield`/`Projectile`, and read the match's own state off `world.match`
  * (waves, collapse, winner). Building is driven entirely through the action
  * stream (`buildOrder`), so a caller never has to reach into `./buildings` to

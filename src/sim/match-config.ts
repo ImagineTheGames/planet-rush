@@ -33,7 +33,7 @@ export type MatchMode = 'ffa' | 'teams';
  *               human seat is still an open competitive slot in the sim's eyes).
  *  - `bot`    — filled by AI.
  *  - `closed` — holds no player and is excluded from the world ENTIRELY: no ship,
- *               no planet, no colour, no wire seat. `N = count(state !== closed)`.
+ *               no station, no colour, no wire seat. `N = count(state !== closed)`.
  *
  * Extends the lobby's `SeatOccupant = 'human' | 'bot' | 'open'` (`src/ui/lobby`)
  * with `closed`; reconciling the two names is Milestone E (UI).
@@ -112,7 +112,7 @@ export function isValidSize(cfg: MatchConfig): boolean {
  *
  * Closed slots are dropped and the survivors are re-indexed to a contiguous
  * `0..N-1` roster (spike §S2, Trap 6): the sparse lobby ids {0,2,5} never enter
- * the sim, so `PLAYER_COLORS[id]`, planet ids, and the wire all stay contiguous
+ * the sim, so `PLAYER_COLORS[id]`, station ids, and the wire all stay contiguous
  * and nothing that treats a `PlayerId` as an array index can trip.
  *
  * `team` is resolved per mode: FFA is teams-of-one, so each player's team is its
