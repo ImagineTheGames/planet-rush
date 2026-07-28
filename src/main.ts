@@ -132,6 +132,9 @@ import {
   selectCodexEntry,
   activeEntries,
   CODEX_TABS,
+  CodexHintView,
+  codexBotHint,
+  codexShipHint,
   mapIdAt,
   normalizeMapId,
   registryStations,
@@ -209,6 +212,17 @@ import { TellQueue, TELL_CAPACITY } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
 
 const LOCAL_PLAYER = 0;
+
+/** The parsed CODEX content (GDD §2.10), vetted once at module load — shared by
+ *  the main-menu reference screen ({@link openMainMenu}) and the lobby's codex
+ *  tooltips ({@link openLobby}). The JSON is imported above (Vite inlines it);
+ *  the pure model normalises it. */
+const CODEX_DATA = normalizeCodex({
+  bots: codexBots,
+  ships: codexShips,
+  systems: codexSystems,
+  strategy: codexStrategy,
+});
 
 // Haptics feel tuning (field request v0.2.2; TUNABLE — feel owns these). A hull
 // change under this many HP is noise, not a hit. `hit` debounces to one knock per
@@ -4506,16 +4520,10 @@ function openMainMenu(
   const menu0 = ctx.logicalSize();
   const menuView = new MainMenuView(menu0.w, menu0.h, isTouch);
   const settingsView = new SettingsView(menu0.w, menu0.h, isTouch);
-  // The CODEX reference (GDD §2.10) — the parsed content handed to the pure model
-  // as a value (the ./ui/codex seam). Opened from the menu, never a gate: it
+  // The CODEX reference (GDD §2.10) — the shared parsed content handed to the pure
+  // model as a value (the ./ui/codex seam). Opened from the menu, never a gate: it
   // builds no world, and BACK returns to the menu.
-  const codexData = normalizeCodex({
-    bots: codexBots,
-    ships: codexShips,
-    systems: codexSystems,
-    strategy: codexStrategy,
-  });
-  let codexState: CodexState = createCodex(codexData);
+  let codexState: CodexState = createCodex(CODEX_DATA);
   const codexView = new CodexView(menu0.w, menu0.h, isTouch);
   // Drag-to-scroll tracking for the codex (touch); a tap fires on pointer-up only
   // if the finger did not travel far enough to be a scroll.
@@ -4926,6 +4934,13 @@ interface LobbySeam {
   /** The hull the built world gave the local ship, or null until the match boots
    *  — the debug hook that proves the pick reached the sim (GDD §2.11). */
   localShipClass: ShipClass | null;
+  /** The title of the codex hint (hull description / bot dossier) currently shown,
+   *  or null when none is up — readback proof the lobby reuse (GDD §2.10 point 2)
+   *  fires on hover / long-press. */
+  hintTitle: string | null;
+  /** The hull tiles' physical centres, so a live-stage run can hover one and watch
+   *  the codex hull description appear. */
+  classControls: readonly { index: number; physicalCenter: { x: number; y: number } }[];
   /** Select the hull tile at `index` in {@link classOrder} — a tap on a tile. */
   selectClass(index: number): void;
   /** Press RUSH! — starts the countdown that boots the match. */
@@ -4998,7 +5013,10 @@ function openLobby(
 
   const size0 = ctx.logicalSize();
   const view = new LobbyView(size0.w, size0.h, isTouch);
-  ctx.root.addChild(view);
+  // The codex tooltip (GDD §2.10 point 2) — a passive overlay above the roster,
+  // shown on hover / long-press of a hull tile or a bot seat, dismissed on any tap.
+  const hintView = new CodexHintView();
+  ctx.root.addChild(view, hintView);
 
   const seam: LobbySeam = {
     visible: true,
@@ -5015,6 +5033,8 @@ function openLobby(
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
+    hintTitle: null,
+    classControls: [],
     selectClass: (index: number): void => selectClassAt(index),
     rush: (): void => rush(),
     // The arena picker (p2), computed once from the bundled registry — the same
@@ -5062,6 +5082,54 @@ function openLobby(
       physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
     };
     seam.counting = model.countdown.active;
+    // The hull tiles' physical centres — the codex hull-description hover targets.
+    seam.classControls = layout.classOptions.map((r, i) => ({
+      index: i,
+      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+    }));
+  }
+
+  // --- Codex reuse (GDD §2.10 point 2): the hint under the pointer ------------
+
+  /** The codex hint for the lobby row at `(x, y)`, plus the logical point to
+   *  anchor its tooltip at — a hull description for a class tile, a bot dossier for
+   *  a cast bot seat, or null for anything else (an empty seat, your own row, the
+   *  arena cards). */
+  function resolveHint(
+    x: number,
+    y: number,
+  ): { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number } | null {
+    const hit = view.hitTest(x, y);
+    if (!hit) return null;
+    const { w, h } = ctx.logicalSize();
+    const layout = lobbyLayout({ width: w, height: h }, { isTouch });
+    if (hit.kind === 'class') {
+      const cls = CLASS_ORDER[hit.index];
+      const rect = layout.classOptions[hit.index];
+      const hint = cls ? codexShipHint(CODEX_DATA, cls) : null;
+      if (!hint || !rect) return null;
+      return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
+    }
+    if (hit.kind === 'seat') {
+      const seat = state.seats.find((s) => s.player === hit.index);
+      const rect = layout.seats[hit.index];
+      if (!seat || seat.occupant === 'human' || !seat.personality || !rect) return null;
+      const hint = codexBotHint(CODEX_DATA, seat.personality);
+      if (!hint) return null;
+      return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
+    }
+    return null;
+  }
+
+  function showHint(resolved: { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number }): void {
+    const { w, h } = ctx.logicalSize();
+    hintView.show(resolved.hint, resolved.ax, resolved.ay, w, h);
+    seam.hintTitle = resolved.hint.title;
+  }
+
+  function hideHint(): void {
+    hintView.hide();
+    seam.hintTitle = null;
   }
 
   /** Pick the hull tile at `index` (a tap on a tile). Refused after RUSH!, where
@@ -5110,12 +5178,11 @@ function openLobby(
     }
   }
 
-  function onPointerDown(e: PointerEvent): void {
-    // Un-rotate the physical tap into the logical space the lobby is drawn in
-    // (landscape lock), then test it against the same geometry the view drew.
-    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
-    const hit = view.hitTest(x, y);
-    if (!hit) return;
+  /** Perform a real tap on a lobby control (fired on pointer-UP, so a long-press
+   *  that opened a codex dossier does not also act — GDD §2.10 point 2's
+   *  "non-blocking"). Hit-tested at the press-DOWN point, which is robust when a
+   *  synthetic touchEnd carries no coordinates (landscape-lock physical taps). */
+  function act(hit: NonNullable<ReturnType<typeof view.hitTest>>): void {
     switch (hit.kind) {
       case 'class':
         selectClassAt(hit.index);
@@ -5135,7 +5202,64 @@ function openLobby(
       case 'roomCode':
         break; // hidden offline; nothing to copy
     }
+  }
+
+  /** Long-press hold (ms) that opens a codex dossier, and the move slop past which
+   *  a press is a scroll/drag, not a tap or a hold. */
+  const LOBBY_HOLD_MS = 350;
+  const LOBBY_SLOP = 10;
+  let press: { x: number; y: number; moved: boolean; hold: boolean; timer: ReturnType<typeof setTimeout> | null } | null =
+    null;
+
+  function onPointerDown(e: PointerEvent): void {
+    // Un-rotate the physical tap into the logical space the lobby is drawn in
+    // (landscape lock), then test it against the same geometry the view drew.
+    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+    hideHint();
+    press = { x, y, moved: false, hold: false, timer: null };
+    // Arm the long-press dossier: after a held moment on a hull tile or bot seat,
+    // its codex hint appears (the touch equivalent of a desktop hover).
+    press.timer = setTimeout(() => {
+      if (!press || press.moved) return;
+      const resolved = resolveHint(x, y);
+      if (resolved) {
+        press.hold = true;
+        showHint(resolved);
+      }
+    }, LOBBY_HOLD_MS);
     e.preventDefault();
+  }
+
+  function onPointerMove(e: PointerEvent): void {
+    const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+    if (press) {
+      if (!press.moved && (Math.abs(x - press.x) > LOBBY_SLOP || Math.abs(y - press.y) > LOBBY_SLOP)) {
+        press.moved = true;
+        if (press.timer) {
+          clearTimeout(press.timer);
+          press.timer = null;
+        }
+        hideHint();
+      }
+      return;
+    }
+    // No button down — desktop hover: the codex hint for the row under the cursor.
+    const resolved = resolveHint(x, y);
+    if (resolved) showHint(resolved);
+    else hideHint();
+  }
+
+  function onPointerUp(): void {
+    const p = press;
+    press = null;
+    if (p?.timer) clearTimeout(p.timer);
+    if (!p || p.hold || p.moved) return; // a dossier long-press or a drag, not a tap
+    const hit = view.hitTest(p.x, p.y);
+    if (hit) act(hit);
+  }
+
+  function onPointerLeave(): void {
+    if (!press) hideHint();
   }
 
   function onKeyDown(e: KeyboardEvent): void {
@@ -5148,22 +5272,32 @@ function openLobby(
     ctx.recomputeTransform();
     const { w, h } = ctx.logicalSize();
     view.resize(w, h, isTouch);
+    hideHint(); // a stale tooltip is anchored to the old layout — drop it on a flip
     render();
   }
 
   function teardown(): void {
     app.ticker.remove(onTick);
     app.canvas.removeEventListener('pointerdown', onPointerDown);
+    app.canvas.removeEventListener('pointermove', onPointerMove);
+    app.canvas.removeEventListener('pointerup', onPointerUp);
+    app.canvas.removeEventListener('pointercancel', onPointerUp);
+    app.canvas.removeEventListener('pointerleave', onPointerLeave);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
     window.visualViewport?.removeEventListener('resize', relayout);
-    ctx.root.removeChild(view);
+    ctx.root.removeChild(view, hintView);
     view.destroy({ children: true });
+    hintView.destroy({ children: true });
   }
 
   app.ticker.add(onTick);
   app.canvas.addEventListener('pointerdown', onPointerDown);
+  app.canvas.addEventListener('pointermove', onPointerMove);
+  app.canvas.addEventListener('pointerup', onPointerUp);
+  app.canvas.addEventListener('pointercancel', onPointerUp);
+  app.canvas.addEventListener('pointerleave', onPointerLeave);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);

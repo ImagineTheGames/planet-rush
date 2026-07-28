@@ -772,6 +772,12 @@ export type {
 
 export { CodexView, CODEX_ANCHOR } from './codex-view';
 
+// The lobby's codex tooltip (GDD §2.10 point 2) — a passive, dismissible overlay
+// the lobby shows on hover / long-press of a bot seat or a hull tile, resolved
+// via codexBotHint / codexShipHint. It never hit-tests, so it can never eat a
+// lobby tap ("non-blocking").
+export { CodexHintView } from './codex-hint-view';
+
 // --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
 //
 // Four cards on the PLAY flow, each a mini layout preview drawn from the
