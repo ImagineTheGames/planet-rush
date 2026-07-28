@@ -29,6 +29,57 @@ A two-player match against a server started exactly this way is what
 two predicting clients — so "it works locally" is a test result rather than a
 memory.
 
+## Deploying to Fly.io
+
+The public host is Fly.io, one region — the day-0 spike (`docs/netcode-spike.md`)
+optimised for zero-cost classroom scale and chose Oracle's free tier; the scope
+then changed to public multiplayer, and Fly won on giving `wss://` for free at
+its anycast edge with no certificate plumbing (`docs/hosting-plan.md` §1). The
+image is unchanged — still the plain Node container above — so the portability
+contract holds: this redeploys to a VPS in an afternoon.
+
+Two apps, both in this repo's root:
+
+| App | Config | What it is |
+|---|---|---|
+| `planet-rush-gameserver` | `fly.gameserver.toml` | The authoritative match fleet — two always-on Machines, autostop OFF (the fleet controller owns their lifecycle). |
+| `planet-rush-allocator` | `fly.allocator.toml` | The always-on control plane — one Machine, never sleeps, places rooms. |
+
+**The one shared secret.** The allocator signs each ticket with `ALLOCATOR_SECRET`;
+this server verifies it with `TICKET_SECRET`. They must be the *same value*. Both
+apps fail closed, so a mismatch refuses every join with no other symptom.
+
+```bash
+# First deploy (from the repo root; FLY_API_TOKEN is in Actions secrets)
+fly apps create planet-rush-gameserver
+fly apps create planet-rush-allocator
+
+SECRET=$(openssl rand -hex 32)                       # one value, both apps
+fly secrets set --app planet-rush-gameserver TICKET_SECRET="$SECRET"
+fly secrets set --app planet-rush-allocator ALLOCATOR_SECRET="$SECRET"
+
+fly deploy --config fly.allocator.toml               # control plane first
+fly deploy --config fly.gameserver.toml
+fly scale count 2 --app planet-rush-gameserver       # the always-on floor
+```
+
+**Redeploying the match fleet — never hard-restart a Machine holding live
+matches.** Cordon and drain each Machine first, so it stops taking new rooms and
+its running matches finish, *then* roll:
+
+```bash
+# For each running Machine (fly machines list --app planet-rush-gameserver):
+fly ssh console --app planet-rush-gameserver --machine <id> \
+  -C "node -e \"fetch('http://127.0.0.1:8080/drain',{method:'POST'})\""
+# …wait for its /health to report rooms: 0, then:
+fly deploy --config fly.gameserver.toml              # strategy = rolling
+```
+
+The `[deploy] strategy = "rolling"` in `fly.gameserver.toml` replaces Machines one
+at a time rather than all at once; the drain step is what keeps a replacement from
+landing on players mid-match. The allocator carries no match state, so it
+redeploys with a plain `fly deploy --config fly.allocator.toml`.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8080` | Listen port |
