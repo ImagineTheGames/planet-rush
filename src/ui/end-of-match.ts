@@ -149,11 +149,11 @@ export function endOfMatchModel(outcome: MatchOutcome): EndOfMatchModel {
 function subheadFor(kind: EndKind, outcome: MatchOutcome): string {
   switch (kind) {
     case 'victory':
-      return 'You took the system.';
+      return 'You took the claim.';
     case 'defeat':
-      return `${playerLabel(outcome.winner)} took the system.`;
+      return `${playerLabel(outcome.winner)} took the claim.`;
     case 'draw':
-      return 'No core survived the collapse.';
+      return 'No reactor survived the collapse.';
     case 'eliminated':
       return eliminatedSubhead(outcome);
   }
@@ -174,7 +174,7 @@ function eliminatedSubhead(outcome: MatchOutcome): string {
   if (place && cause) return `${place} — ${cause}`;
   if (place) return place;
   if (cause) return capitalize(cause);
-  return 'Your core is gone — but the fight goes on.';
+  return 'Your reactor is gone — but the fight goes on.';
 }
 
 /** The cause half of the elimination line, lower-case so it reads as the tail of
@@ -182,9 +182,9 @@ function eliminatedSubhead(outcome: MatchOutcome): string {
 function causePhrase(cause: DeathCause | undefined): string | null {
   switch (cause) {
     case 'destroyed':
-      return 'your core was destroyed.';
+      return 'your reactor was destroyed.';
     case 'collapse':
-      return 'the collapse closed over your core.';
+      return 'the collapse closed over your reactor.';
     default:
       return null;
   }
