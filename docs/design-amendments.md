@@ -8,6 +8,48 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## REPAIR has a 15-second COOLDOWN (per station)
+
+**Date:** 2026-07-28 · branch `agent/gameplay/p12-repair-cooldown`
+**Ratified by:** Developer (Reinaldo)
+**Amends by reference:** GDD §2.5, the *Repair reactor* bullet — specifically the
+claim that "N taps are N independent purchases … resolving in full the instant
+they're bought." A tap still resolves in full, but the *next* tap on that station
+is now gated.
+
+### The ratification, verbatim
+
+> "Planet repair should have a cooldown of 15 seconds."
+
+### What changed
+
+- **`REPAIR_COOLDOWN_SECONDS = 15`** (new tunable in `src/sim/constants.ts`,
+  held as seconds on `MiningStation.repairGate` and dt-decremented each tick like
+  every other clock — the sim table is dt-parametric, so "stored in ticks" is
+  honoured as "remaining sim-time on station state").
+- After a **successful** repair purchase, `placeOrder` arms the station's
+  `repairGate`. While it is `> 0`, further repair orders on THAT station are
+  refused with a new `OrderResult`, **`'cooling-down'`**, spending nothing. The
+  gate ticks down every tick in `updateStations`, independent of docking, damage,
+  or the pre-existing repair *tell* — it is a pure time lockout.
+- **Per station, not per player** (encoded now for the N>1-station future): one
+  cooling reactor never blocks another; an ally at a shared reactor waits on the
+  same clock.
+- **Distinct from `repairCooldown`** (the 7.5 s `REPAIR_TELL_HOLD` that only paces
+  bots and glows the renderer and never gated a press). The new `repairGate`
+  genuinely refuses `placeOrder`, so a human can no longer tap 15 HP back every
+  frame — repair is now a *rationed emergency patch*.
+- **Bots inherit it** through the same order path; their p5-07b repair rationing
+  composes on top. Turtle survivability drops slightly, by design; a harness
+  sanity test (`buildings.test.ts`) shows a repair-spamming defender is rationed to
+  ~one heal per 15 s window and resolution never stalls.
+- **The wedge tells the truth (p4-17):** the Build wheel reads the remaining
+  seconds straight off `station.repairGate` for a live "REPAIR in 12s" countdown,
+  then re-arms to "+15 HP / 1 ORE" — no UI-side timer. *(Cross-lane follow-up: the
+  UI wheel model / live-stage spec wire this readout; the sim seam is shipped.)*
+
+---
+
 ## BOOST and PING are CUT
 
 **Date:** 2026-07-27 · branch `agent/gameplay/p7-remove-boost-ping`

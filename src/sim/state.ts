@@ -406,6 +406,17 @@ export interface MiningStation {
    *  treated as `0` when absent, so hand-built `MiningStation` fixtures need not set it;
    *  `createWorld` seeds it to `0`. Never gates a human's `placeOrder`. */
   repairCooldown?: number;
+  /** Seconds left on the repair COOLDOWN before this station will accept another
+   *  repair order (RATIFIED developer, 2026-07-28). Unlike `repairCooldown` above
+   *  — the tell-hold that never blocks a press — this one DOES gate `placeOrder`:
+   *  while it is `> 0`, a repair press is refused `'cooling-down'`, spending
+   *  nothing. Armed to `REPAIR_COOLDOWN_SECONDS` on a successful repair and
+   *  ticked down every tick in `updateStations` (independent of docking, damage,
+   *  or the tell, so it is a pure time lockout). Per STATION, so one cooling core
+   *  never blocks another. Optional and treated as `0` when absent, so hand-built
+   *  `MiningStation` fixtures need not set it; `createWorld` seeds it to `0`. The
+   *  Build wheel reads it for the live "REPAIR in Ns" countdown. */
+  repairGate?: number;
   turrets: Turret[];
   shields: Shield[];
   /**
@@ -713,6 +724,7 @@ function makeStation(spec: PlayerSpec, index: number, pos: Vec2, angle: number):
     sinceDamage: SHIELD.regenDelay,
     repairing: false,
     repairCooldown: 0,
+    repairGate: 0,
     turrets: [],
     shields: [],
     satellites: [],
@@ -748,6 +760,7 @@ function makeDerelictStation(index: number, pos: Vec2, angle: number): MiningSta
     sinceDamage: SHIELD.regenDelay,
     repairing: false,
     repairCooldown: 0,
+    repairGate: 0,
     turrets: [],
     shields: [],
     satellites: [],

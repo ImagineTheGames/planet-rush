@@ -41,6 +41,7 @@ import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/ty
 import {
   DEPOSIT_RANGE,
   STATION,
+  REPAIR_COOLDOWN_SECONDS,
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
   REPAIR_TELL_HOLD,
@@ -275,7 +276,11 @@ export type OrderResult =
   | 'core-full'
   | 'nothing-to-bank'
   /** Repair only: the collapse phase has shut it off for good (GDD §2.3). */
-  | 'collapsed';
+  | 'collapsed'
+  /** Repair only: this station repaired within the last `REPAIR_COOLDOWN_SECONDS`
+   *  and is still cooling down (RATIFIED developer, 2026-07-28). The remaining
+   *  seconds live on `station.repairGate` for the wheel's live countdown. */
+  | 'cooling-down';
 
 /** Ore cost of a wheel segment. Repair is now a flat 1-ore purchase; bank is
  *  free (it moves ore, never spends it). */
@@ -320,6 +325,14 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // core is permanent and the only defence left is the ship in front of it.
       if (isCollapsed(world)) return 'collapsed';
       if (station.coreHp >= station.maxCoreHp - 1e-9) return 'core-full';
+      // The repair COOLDOWN (RATIFIED developer, 2026-07-28): a station that
+      // repaired within the last REPAIR_COOLDOWN_SECONDS refuses the next order,
+      // spending nothing, until `repairGate` ticks to zero. Checked BEFORE
+      // `spendOre` so a cooling core never charges the player, and after
+      // `core-full` so a full core reads "nothing to heal" rather than a countdown.
+      // This is what makes repair a rationed patch: unlike the tell-hold, it truly
+      // gates the press. Per station — `repairGate` lives on this core alone.
+      if ((station.repairGate ?? 0) > 1e-9) return 'cooling-down';
       // ONE press = ONE purchase (developer, 2026-07-26, supersedes the GDD
       // channel): spend REPAIR_ORE_COST and restore REPAIR_HP_PER_ORE, clamped.
       // No channel, no drain — the affordability check is `spendOre`, so N taps
@@ -336,6 +349,11 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       station.coreHp = Math.min(station.maxCoreHp, station.coreHp + REPAIR_HP_PER_ORE);
       station.repairing = true;
       station.repairCooldown = REPAIR_TELL_HOLD;
+      // Arm the repair cooldown (RATIFIED developer, 2026-07-28): from here the
+      // gate above refuses every repair order on this station until `repairGate`
+      // ticks back to zero (`updateStations`). Distinct from `repairCooldown`
+      // (the 7.5 s tell-hold) — this is the 15 s hard lockout the wheel counts down.
+      station.repairGate = REPAIR_COOLDOWN_SECONDS;
       return 'ok';
     }
     case 'turret': {
@@ -494,6 +512,14 @@ export function updateStations(world: World, dt: number): void {
     if (!station.alive) continue;
     if (station.spawnProtect > 0) station.spawnProtect = Math.max(0, station.spawnProtect - dt);
     station.sinceDamage += dt;
+    // The repair cooldown counts down every tick, independent of docking, damage,
+    // or the tell — it is a pure time lockout, so it keeps draining even while the
+    // owner is off fighting (RATIFIED developer, 2026-07-28). `placeOrder` re-arms
+    // it on the next successful repair; the wheel reads the remainder for its
+    // "REPAIR in Ns" countdown.
+    if (station.repairGate && station.repairGate > 0) {
+      station.repairGate = Math.max(0, station.repairGate - dt);
+    }
 
     advanceConstruction(world, station, dt);
     // Collapse: shields stop regenerating (GDD §2.3). Construction still

@@ -46,8 +46,10 @@ import { ShipClass } from '@shared/types';
 import type { Action } from '@shared/types';
 import {
   CORE_HP,
+  REPAIR_COOLDOWN_SECONDS,
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
+  TICK_DT,
   createWorld,
   isDocked,
   placeOrder,
@@ -152,13 +154,22 @@ describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix
     expect(bank0 - ship.banked).toBeCloseTo(REPAIR_ORE_COST, 9);
   });
 
-  it('N presses are N purchases; hold and bank fund them identically', () => {
-    // Start 50 HP down so three whole purchases (+45) never clip the cap.
+  it('N spaced presses are N purchases; hold and bank fund them identically', () => {
+    // The ratified repair cooldown (2026-07-28) rations rapid re-taps, so three
+    // purchases must be SPACED a cooldown apart to all land — inside one window
+    // only the first would take. Start 50 HP down so three whole purchases (+45)
+    // never clip the cap.
     const viaBank = setup(CORE_HP - 50, 10, 0);
     const viaHold = setup(CORE_HP - 50, 0, 10);
-    for (let t = 0; t < 3; t++) {
+    // Enough idle ticks to fully drain the per-station gate between presses.
+    const cooldownTicks = Math.ceil(REPAIR_COOLDOWN_SECONDS / TICK_DT) + 1;
+    for (let n = 0; n < 3; n++) {
       step(viaBank.world, repairOrder());
       step(viaHold.world, repairOrder());
+      for (let t = 0; t < cooldownTicks; t++) {
+        step(viaBank.world, []);
+        step(viaHold.world, []);
+      }
     }
 
     const healedBank = viaBank.station.coreHp - (CORE_HP - 50);
@@ -168,6 +179,16 @@ describe('REPAIR CORE reaches the sim and heals (GDD §2.5, the field-report fix
     // Three purchases cost exactly three ore, whichever wallet paid.
     expect(10 - (viaBank.ship.banked + viaBank.ship.cargo)).toBeCloseTo(3 * REPAIR_ORE_COST, 6);
     expect(10 - (viaHold.ship.banked + viaHold.ship.cargo)).toBeCloseTo(3 * REPAIR_ORE_COST, 6);
+  });
+
+  it('rations rapid re-taps: inside one cooldown window only the first press heals', () => {
+    // The other half of the ratified change — three presses a tick apart are NOT
+    // three purchases any more: the gate refuses the chasers, so the core rises by
+    // exactly one REPAIR_HP_PER_ORE and exactly one ore is spent.
+    const { world, ship, station } = setup(CORE_HP - 50, 10, 0);
+    for (let t = 0; t < 3; t++) step(world, repairOrder());
+    expect(station.coreHp - (CORE_HP - 50)).toBeCloseTo(REPAIR_HP_PER_ORE, 6);
+    expect(10 - (ship.banked + ship.cargo)).toBeCloseTo(REPAIR_ORE_COST, 6);
   });
 
   it('a single press heals ONCE — no held channel, no drain across idle ticks', () => {
