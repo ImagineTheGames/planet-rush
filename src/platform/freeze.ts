@@ -22,8 +22,8 @@
  */
 
 import { ShipClass } from '@shared/types';
-import { createWorld, step } from '../sim';
-import type { World, PlayerSpec } from '../sim';
+import { createWorld, step, turretHomeAngle, turretOrbitPos, TURRET, SHIELD } from '../sim';
+import type { World, PlayerSpec, Planet } from '../sim';
 
 /** The seed the frozen world is built from. Matches the day-1 boot world so the
  *  frozen frame is the same scene the game normally opens on. */
@@ -76,6 +76,81 @@ export function advanceToFreezeTick(world: World, tick: number = FREEZE_TICK): v
 
 /** No player acts while freezing — the frozen frame is input-independent. */
 const EMPTY_INPUTS = [] as const;
+
+/**
+ * Stamp a **defence showcase** onto the local player's home for the frozen
+ * golden — a review surface for the structure art (a2-05). Structures never
+ * appear in a natural two-second opening (a build takes ~10 s, GDD §2.5), so a
+ * golden that only froze the day-1 scene could never show a turret or a shield;
+ * this stages one deterministically so the ratified turret pool (Breech Mk I,
+ * Twin Mk II, Rail Mk III), a construction scaffold, and a stacked shield bubble
+ * are all on screen and reviewable, the same way the ship and asteroid art landed
+ * in the golden because they are simply *there*.
+ *
+ * Pure and deterministic (no RNG, no clock), so the frozen frame stays
+ * byte-stable across boots. It writes only `Turret`/`Shield`/`BuildJob` literals
+ * onto the local planet — the exact plain-data shapes the sim itself builds — and
+ * touches nothing the world hash covers (turrets/shields/builds are not hashed),
+ * so freeze determinism is unchanged. Applied *after* the freeze advance, and
+ * only under `?freeze=1`, so it can never reach a live match.
+ */
+export function stampDefenseShowcase(world: World, localOwner = 0): void {
+  const planet = world.planets.find((p) => p.owner === localOwner && p.alive);
+  if (!planet) return;
+  if (planet.turrets.length > 0 || planet.shields.length > 0 || planet.builds.length > 0) return;
+
+  // Three standing turrets, one per Mk, so the pool's escalation reads at a glance;
+  // the Mk II is tracking (plasma charge at the muzzle), the others idle.
+  const stand = [
+    { slot: 0, tier: 0, targetId: null as number | null },
+    { slot: 1, tier: 1, targetId: firstRival(world, localOwner) },
+    { slot: 2, tier: 2, targetId: null as number | null },
+  ];
+  for (const s of stand) {
+    const home = turretHomeAngle(planet, s.slot);
+    const pos = turretOrbitPos(planet, home);
+    planet.turrets.push({
+      id: world.nextEntityId++,
+      owner: planet.owner,
+      slot: s.slot,
+      pos: { x: pos.x, y: pos.y },
+      radius: TURRET.radius,
+      hp: TURRET.hp,
+      maxHp: TURRET.hp,
+      tier: s.tier,
+      angle: home,
+      orbitAngle: home,
+      cooldown: 0,
+      targetId: s.targetId,
+      aim: null,
+      muzzle: null,
+    });
+  }
+
+  // A fourth mount mid-build — the scaffold, ~60% done, so "defences are bought
+  // before the attack" has a picture (GDD §2.5).
+  planet.builds.push({
+    id: world.nextEntityId++,
+    kind: 'turret',
+    slot: 3,
+    total: TURRET.buildTime,
+    remaining: TURRET.buildTime * 0.4,
+  });
+
+  // A stacked shield: a full inner bubble and a half-drained outer one, so the
+  // "pressure beats regeneration" banding (GDD §2.6) is on the sheet too.
+  planet.shields.push(
+    { id: world.nextEntityId++, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius },
+    { id: world.nextEntityId++, hp: SHIELD.hp * 0.5, maxHp: SHIELD.hp, radius: SHIELD.radius },
+  );
+}
+
+/** The first enemy home's owner, so a tracking turret has a real slot to face —
+ *  or `1` if the roster somehow has no rival (never in the 8-home freeze). */
+function firstRival(world: World, localOwner: number): number {
+  const rival = world.planets.find((p: Planet) => p.owner !== localOwner);
+  return rival ? rival.owner : 1;
+}
 
 /**
  * A stable, compact fingerprint of a world's placement-relevant state. Two

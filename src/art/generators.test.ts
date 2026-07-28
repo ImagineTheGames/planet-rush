@@ -248,7 +248,7 @@ describe('planets — four variants, arrangement only (style-guide §5)', () => 
 });
 
 describe('turrets and shields — the siege tells (GDD §2.6)', () => {
-  it('telegraphs four distinct barrel states', () => {
+  it('telegraphs four distinct muzzle states', () => {
     const states = (['building', 'idle', 'tracking', 'firing'] as const).map((state) =>
       turretSprite({ playerId: 0, state }),
     );
@@ -257,12 +257,36 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
     }
   });
 
-  it('has no barrel until the build finishes — the art does not lie about readiness', () => {
+  it('reads as a distinct silhouette per Mk — the pool escalates (art-direction §5.5)', () => {
+    // The three ladder silhouettes plus the reserved dome are four different guns
+    // at the same state, so an upgrade reads as *more gun* at a glance.
+    const pool = (['breech', 'twin', 'rail', 'dome'] as const).map((silhouette) =>
+      turretSprite({ playerId: 0, state: 'idle', silhouette }),
+    );
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) expect(pool[i]).not.toEqual(pool[j]);
+    }
+    // The tier ladder resolves to the ratified map: I=breech, II=twin, III=rail.
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 0 })).toEqual(pool[0]);
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 1 })).toEqual(pool[1]);
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 2 })).toEqual(pool[2]);
+    // A tier past the top clamps to Mk III (mirrors the sim's tier clamp).
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 9 })).toEqual(pool[2]);
+  });
+
+  it('is a scaffold until the build finishes — the art does not lie about readiness', () => {
     const building = turretSprite({ playerId: 0, state: 'building' });
     const idle = turretSprite({ playerId: 0, state: 'idle' });
-    expect(building.shapes.length).toBeLessThan(idle.shapes.length);
-    // Hazard stripes are the one legal yellow on a turret (style-guide §2).
+    // Hazard stripes are the one legal yellow on a turret (style-guide §2), and a
+    // scaffold carries them; a standing, ready turret never does.
     expect(building.shapes.some((s) => s.role === 'danger')).toBe(true);
+    expect(idle.shapes.some((s) => s.role === 'danger')).toBe(false);
+    // The scaffold has no live bore or muzzle charge — no energy the way a ready
+    // turret's cold bore glows.
+    expect(building.shapes.some((s) => s.role === 'energy')).toBe(false);
+    expect(idle.shapes.some((s) => s.role === 'energy')).toBe(true);
+    // A build is always a fresh Mk I, so the scaffold is one look across the pool.
+    expect(turretSprite({ playerId: 0, state: 'building', silhouette: 'rail' })).toEqual(building);
   });
 
   it('fires in threat red, and only when firing', () => {
@@ -270,6 +294,11 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
     const tracking = turretSprite({ playerId: 0, state: 'tracking' });
     expect(firing.shapes.some((s) => s.role === 'danger')).toBe(true);
     expect(tracking.shapes.some((s) => s.role === 'danger')).toBe(false);
+    // The twin fires from BOTH barrels — more red than the single-barrel breech.
+    const twinFire = turretSprite({ playerId: 0, state: 'firing', silhouette: 'twin' });
+    const breechFire = turretSprite({ playerId: 0, state: 'firing', silhouette: 'breech' });
+    const reds = (d: typeof firing) => d.shapes.filter((s) => s.role === 'danger').length;
+    expect(reds(twinFire)).toBeGreaterThan(reds(breechFire));
   });
 
   it('shows pressure working: three visible shield strengths', () => {

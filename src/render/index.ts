@@ -27,12 +27,13 @@ import { Container, Graphics } from 'pixi.js';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { SENSOR_RANGE } from '../sim/constants';
-import { inAtmosphere } from '../sim/buildings';
+import { SENSOR_RANGE, TURRET } from '../sim/constants';
+import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
 import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
 import { atmosphereHaloSprite } from '../art/planets';
 import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
+import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
 import { drawSprite, spriteGraphics } from '../art/textures';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,11 @@ function makeUnitRock(): Graphics {
  */
 const ROCK_ART_SCALE = 64;
 
+/** Pixels-per-unit the turret/scaffold art is rasterised at before the per-frame
+ *  `scale.set` back down to `turret.radius`. Above 1 so the thin trim/panel
+ *  strokes (~0.03–0.05 unit) clear `drawSprite`'s 0.5px floor and stay crisp. */
+const TURRET_ART_SCALE = 48;
+
 function makeUnitChunk(): Graphics {
   // Ore chunk — signal yellow (RESERVED rule: ore, style-guide §2).
   return new Graphics().circle(0, 0, 1).fill(PALETTE.signalYellow);
@@ -166,14 +172,11 @@ function makeImpactGlow(): Graphics {
   return g;
 }
 
-function makeUnitTurret(): Graphics {
-  // Placeholder cannon at unit radius, barrel along +x (matching `turret.angle`).
-  // Steel, like every hull — ownership is read off the planet it stands on
-  // (style-guide §3 rule 2: player colour never lands on structure).
-  const g = new Graphics();
-  g.rect(0, -0.3, 2.0, 0.6).fill(0x5d6672); // barrel, darker steel
-  g.circle(0, 0, 1).fill(PALETTE.hullSteel); // mount
-  return g;
+/** An empty pooled Graphics whose geometry is (re)drawn from the art pipeline on
+ *  demand — the turret and the build scaffold both fill their slot this way, so
+ *  the factory is just a blank canvas (cf. the asteroid pool). */
+function makeArtSlot(): Graphics {
+  return new Graphics();
 }
 
 function makeUnitShot(): Graphics {
@@ -248,6 +251,14 @@ export class Renderer {
   private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
   private readonly turretPool: GraphicsPool;
+  /** The (silhouette, state, owner, damage-band) drawn into each turret slot, so
+   *  its vector geometry rebuilds only when the read changes — steady state stays
+   *  allocation-free, the same discipline the rock pool uses (GDD §4.3). */
+  private readonly turretKeys: string[] = [];
+  /** Construction scaffolds (the `building` art) — one per in-progress turret job,
+   *  placed on the reserved mount so the finished gun lands where the frame stood. */
+  private readonly scaffoldPool: GraphicsPool;
+  private readonly scaffoldKeys: string[] = [];
   private readonly shotPool: GraphicsPool;
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
@@ -327,7 +338,8 @@ export class Renderer {
     this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
     this.muzzlePool = new GraphicsPool(this.muzzleLayer, () => new Graphics());
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
-    this.turretPool = new GraphicsPool(this.turretLayer, makeUnitTurret);
+    this.turretPool = new GraphicsPool(this.turretLayer, makeArtSlot);
+    this.scaffoldPool = new GraphicsPool(this.turretLayer, makeArtSlot);
     this.shotPool = new GraphicsPool(this.shotLayer, makeUnitShot);
   }
 
@@ -426,6 +438,7 @@ export class Renderer {
   private drawPlanets(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
     let turrets = 0;
+    let scaffolds = 0;
 
     for (let i = 0; i < world.planets.length; i++) {
       const planet = world.planets[i]!;
@@ -449,18 +462,55 @@ export class Renderer {
 
       for (const turret of planet.turrets) {
         if (turret.hp <= 0) continue; // killed this tick, swept at end of step
-        const g = this.turretPool.at(turrets++);
+        const g = this.turretPool.at(turrets);
+        // The barrel state is the threat telegraph (style-guide §5.5): a fired
+        // muzzle this tick is `firing`; a committed target is `tracking`; else
+        // the barrel is cold. The tier picks the ratified pool silhouette.
+        const state: TurretState =
+          turret.muzzle != null ? 'firing' : turret.targetId != null ? 'tracking' : 'idle';
+        const tier = turret.tier ?? 0;
+        // Rebuild geometry only when the read changes — steady state is a
+        // transform-only frame (GDD §4.3), exactly like the rock pool.
+        const key = `${turret.owner}:${tier}:${state}`;
+        if (this.turretKeys[turrets] !== key) {
+          g.clear();
+          drawSprite(g, turretSprite({ playerId: turret.owner, state, tier }), TURRET_ART_SCALE);
+          this.turretKeys[turrets] = key;
+        }
         g.x = turret.pos.x;
         g.y = turret.pos.y;
         g.rotation = turret.angle;
-        g.scale.set(turret.radius);
+        // Art is authored at TURRET_ART_SCALE px/unit; divide it back out to land
+        // the turret at its collision radius in world units.
+        g.scale.set(turret.radius / TURRET_ART_SCALE);
         // Damaged turrets fade toward the vacuum rather than recolouring —
         // threat red is reserved for damage *events*, not for standing objects.
         g.alpha = 0.45 + 0.55 * clamp01(turret.hp / turret.maxHp);
+        turrets++;
+      }
+
+      // A turret build-in-progress reads as a scaffold on its reserved mount, so
+      // the finished gun lands exactly where the frame stood (GDD §2.5, §2.6).
+      for (const job of planet.builds) {
+        if (job.kind !== 'turret') continue; // a shield builds centred — arc only
+        const pos = turretOrbitPos(planet, turretHomeAngle(planet, job.slot));
+        const g = this.scaffoldPool.at(scaffolds);
+        const key = `${planet.owner}`;
+        if (this.scaffoldKeys[scaffolds] !== key) {
+          g.clear();
+          drawSprite(g, turretSprite({ playerId: planet.owner, state: 'building' }), TURRET_ART_SCALE);
+          this.scaffoldKeys[scaffolds] = key;
+        }
+        g.x = pos.x;
+        g.y = pos.y;
+        g.rotation = turretHomeAngle(planet, job.slot);
+        g.scale.set(TURRET.radius / TURRET_ART_SCALE);
+        scaffolds++;
       }
     }
 
     this.turretPool.hideFrom(turrets);
+    this.scaffoldPool.hideFrom(scaffolds);
   }
 
   /**
@@ -608,7 +658,10 @@ export class Renderer {
     // The base: the owner's colour, whole — full health is your colour, entire.
     g.circle(0, 0, radius).stroke({ width, color: playerColor(owner), alpha });
     if (l > 0) {
-      // The damage: threat red, filling clockwise from twelve o'clock.
+      // The damage: threat red, filling clockwise from twelve o'clock. `moveTo`
+      // the arc's start first so `arc` never draws a connecting spoke from the
+      // path's lingering current point (a Pixi arc-after-circle gotcha).
+      g.moveTo(0, -radius);
       g.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + l * 2 * Math.PI).stroke({
         width,
         color: PALETTE.threatRed,
@@ -617,12 +670,23 @@ export class Renderer {
     }
   }
 
-  /** The shield bubble over the core (GDD §2.5) — one gauge ring per generator,
-   *  so a stacked pair reads as two, each filling red as its pool drains (p11). */
+  /** The shield bubble over the core (GDD §2.5): the real plasma sphere from the
+   *  art pipeline (style-guide §5.5 — banded full/weakened/failing so pressure
+   *  reads), with the ratified CONTINUOUS p11 gauge ring drawn on top so the
+   *  health read stays smooth rather than three-step. A stacked pair reads as two,
+   *  each wider and each filling red as its own pool drains. */
   private drawShieldBubble(g: Graphics, planet: Planet): void {
     for (let i = 0; i < planet.shields.length; i++) {
       const shield = planet.shields[i]!;
       if (shield.hp <= 1e-9) continue;
+      const strength = shieldStrength(shield.maxHp > 0 ? shield.hp / shield.maxHp : 0);
+      // The bubble, authored at unit radius; `gauge: false` leaves the gauge to
+      // the continuous fill below so there is one ring, not two.
+      drawSprite(
+        g,
+        shieldSprite({ playerId: planet.owner, strength, stackIndex: i, gauge: false }),
+        shield.radius,
+      );
       const lost = clamp01(1 - shield.hp / shield.maxHp);
       this.drawDamageFill(g, shield.radius + i * 6, planet.owner, lost, 2, 0.7);
     }
@@ -638,6 +702,8 @@ export class Renderer {
     const r = planet.radius + 12;
     g.circle(0, 0, r).stroke({ width: 2, color: PALETTE.hullSteel, alpha: 0.25 });
     if (done <= 0) return;
+    // `moveTo` the arc start so `arc` never spokes back to the current point.
+    g.moveTo(0, -r);
     g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + done * 2 * Math.PI).stroke({
       width: 3,
       color: PALETTE.plasma,
