@@ -212,6 +212,27 @@ describe('ArtPresenter — one object, two calls a frame', () => {
         numberOfChannels: 1,
         getChannelData: () => new Float32Array(length),
       }),
+      createStereoPanner: () => ({
+        pan: {
+          value: 0,
+          setValueAtTime: () => undefined,
+          linearRampToValueAtTime: () => undefined,
+          cancelScheduledValues: () => undefined,
+        },
+        connect: () => undefined,
+        disconnect: () => undefined,
+      }),
+      createBiquadFilter: () => ({
+        type: 'lowpass',
+        frequency: {
+          value: 20000,
+          setValueAtTime: () => undefined,
+          linearRampToValueAtTime: () => undefined,
+          cancelScheduledValues: () => undefined,
+        },
+        connect: () => undefined,
+        disconnect: () => undefined,
+      }),
       resume: async () => undefined,
     };
 

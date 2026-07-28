@@ -65,11 +65,27 @@ interface AudioReadout {
   sfxBusGain: number | null;
   /** UI cues fired through the shared seam since boot, per KIND (?debug=1 only). */
   uiCues: { press: number; confirm: number; reject: number; last: string | null } | null;
+  /** The distance gain the last spatial one-shot was heard at, 0..1 (a3-03). */
+  lastGain: number;
+  /** The stereo pan the last spatial one-shot flew in on, −1..+1 (a3-03). */
+  lastPan: number;
+  /** Where the mix listens from (the camera), world units — the probe's anchor. */
+  listener: { x: number; y: number; has: boolean };
+}
+/** How the spatial model would place a sound at a world point, given the live
+ *  listener (`src/art/audio/spatial`) — the audio spy's numbers. */
+interface Placement {
+  gain: number;
+  pan: number;
+  cutoff: number;
+  culled: boolean;
 }
 interface AudioStage {
   read(): AudioReadout;
   /** Set the SFX bus level, 0..1 — the settings slider's call, for the slider-at-0 case. */
   setSfx(value: number): void;
+  /** Pure spatial readback: place a world point against the live camera-listener. */
+  probe(x: number, y: number): Placement;
 }
 interface UpgradeWheelStageLite {
   openUpgrade(ore?: number): { open: boolean } | null;
@@ -310,4 +326,55 @@ test('the shared control seam names the RIGHT voice: a live press ticks, a disab
   expect(muted.sfxBusGain, 'but the SFX bus the cue rides is silent (slider at 0)').toBe(0);
 
   expect(pageErrors, 'no page errors while the UI cues sounded').toEqual([]);
+});
+
+test('spatial audio is wired on a real boot: own fire is full and centred, a far fight is near-silent, and pan flips with side (a3-03)', async ({
+  page,
+}) => {
+  const pageErrors = await boot(page);
+  // A real gesture so the mix is live — the same door the other tests use.
+  await page.mouse.click(200, 400);
+  await page.waitForFunction(() => window.__audioStage!.read().contextState === 'running', undefined, {
+    timeout: 10_000,
+  });
+
+  // The camera-listener is following the local ship in the frozen match. Probe is
+  // PURE geometry against that live listener — it plays nothing, so the readout is
+  // deterministic under ?freeze. Sound cannot screenshot; these numbers are the
+  // spatial-audio attestation for the qa-manager (a3-03 evidence note).
+  const spy = await page.evaluate(() => {
+    const stage = window.__audioStage!;
+    const { x, y, has } = stage.read().listener;
+    const FAR = 6000; // well past R_FAR (~1400) — over the horizon on any arena
+    const NEAR = 120; // inside R_NEAR (~260) — full level, gently panned
+    return {
+      has,
+      here: stage.probe(x, y), // own gun, at the camera
+      nearRight: stage.probe(x + NEAR, y),
+      farRight: stage.probe(x + FAR, y), // a bot war far to the right
+      farLeft: stage.probe(x - FAR, y), // …and far to the left
+    };
+  });
+  // eslint-disable-next-line no-console -- captioned spatial readout for the PR evidence.
+  console.log('[audio-alive] spatial probe:', JSON.stringify(spy));
+
+  expect(spy.has, 'the mix has a camera-listener in a live match').toBe(true);
+
+  // Own fire, at the listener: full and dead-centre.
+  expect(spy.here.gain, 'own fire is at full level').toBeCloseTo(1, 5);
+  expect(spy.here.pan, 'own fire is centred').toBeCloseTo(0, 5);
+
+  // A distant fight on either side: culled to near-silence — off-screen wars cost
+  // nothing (the whole point of the falloff).
+  expect(spy.farRight.gain, 'a far fight to the right is near-silent').toBeLessThan(0.001);
+  expect(spy.farRight.culled, 'and is culled before synthesis').toBe(true);
+  expect(spy.farLeft.gain, 'a far fight to the left is near-silent').toBeLessThan(0.001);
+
+  // Pan flips sign with the side of the ship, and matches in magnitude.
+  expect(spy.farRight.pan, 'a fight to the right pans right (+)').toBeGreaterThan(0.9);
+  expect(spy.farLeft.pan, 'a fight to the left pans left (−)').toBeLessThan(-0.9);
+  expect(spy.nearRight.pan, 'even a near fight to the right pans right').toBeGreaterThan(0);
+  expect(spy.nearRight.gain, 'but a near fight is still full level').toBeCloseTo(1, 5);
+
+  expect(pageErrors, 'no page errors on the spatial-probe path').toEqual([]);
 });

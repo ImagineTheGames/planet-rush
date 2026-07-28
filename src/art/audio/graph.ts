@@ -51,6 +51,7 @@ import {
   type BufferSourceLike,
   type GainNodeLike,
 } from './context';
+import { LP_BYPASS_HZ } from './spatial';
 import { DEFAULT_SAMPLE_RATE, renderLayered, renderVoice, seamless } from './synth';
 
 /** The four buses. */
@@ -83,6 +84,18 @@ export const MIX_DEFAULTS = {
   maxVoices: 24,
   repeatGap: 0.035,
 } as const;
+
+/**
+ * Where in the world a one-shot is, relative to the listener — the numbers
+ * `../spatial` computes, applied here as a `StereoPannerNode` and an optional
+ * lowpass. Omit it and a sound plays centred and unfiltered (a UI cue, a sting).
+ */
+export interface Spatial {
+  /** Stereo pan, −1…+1. A non-zero value inserts a panner; 0 stays centred. */
+  readonly pan: number;
+  /** Lowpass cutoff Hz. Below {@link LP_BYPASS_HZ} inserts a filter; above skips it. */
+  readonly cutoff?: number;
+}
 
 /** A held voice — the thruster, the alarm, the ambient bed, the soundtrack stems. */
 export interface LoopHandle {
@@ -254,8 +267,12 @@ export class AudioGraph {
    *
    * @param gain  Level 0..1 over the bank's own; scale it with the tell's magnitude.
    * @param rate  Playback rate. 1 is as rendered; {@link jitter} adds variety.
+   * @param bus   Which bus to sum into. Default `sfx`.
+   * @param spatial Where it is relative to the listener (`../spatial`) — a panner
+   *   is inserted only when it is off-centre, a lowpass only when it muffles, so a
+   *   centred near sound (and every UI cue) still costs a single gain node.
    */
-  play(name: SoundName, gain = 1, rate = 1, bus: Bus = 'sfx'): boolean {
+  play(name: SoundName, gain = 1, rate = 1, bus: Bus = 'sfx', spatial?: Spatial): boolean {
     if (!this.live) return false;
     const now = this.ctx.currentTime;
     this.prune();
@@ -276,13 +293,32 @@ export class AudioGraph {
 
     const node = this.ctx.createGain();
     node.gain.value = level;
-    node.connect(this.buses[bus]);
+    // Off-centre → through a panner into the bus; centred → straight in. The pan
+    // is the audible half of "hear every single thing on the map" (a3-03).
+    if (spatial && spatial.pan !== 0) {
+      const panner = this.ctx.createStereoPanner();
+      panner.pan.value = clampPan(spatial.pan);
+      node.connect(panner);
+      panner.connect(this.buses[bus]);
+    } else {
+      node.connect(this.buses[bus]);
+    }
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     const speed = rate > 0 ? rate : 1;
     source.playbackRate.value = speed;
-    source.connect(node);
+    // A distant sound loses its highs through a lowpass — but only far enough out
+    // to actually colour it, so the near field never allocates a filter node.
+    if (spatial && spatial.cutoff !== undefined && spatial.cutoff < LP_BYPASS_HZ) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = Math.max(200, spatial.cutoff);
+      source.connect(filter);
+      filter.connect(node);
+    } else {
+      source.connect(node);
+    }
     source.start(now);
 
     this.lastPlayed.set(name, now);
@@ -471,4 +507,10 @@ function ramp(param: AudioParamLike, value: number, now: number, seconds: number
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return n < 0 ? 0 : n > 1 ? 1 : n;
+}
+
+/** Clamp a pan to the panner's [−1, +1]; a stray NaN centres rather than throws. */
+function clampPan(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return n < -1 ? -1 : n > 1 ? 1 : n;
 }
