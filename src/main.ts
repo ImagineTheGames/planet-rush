@@ -42,7 +42,7 @@ import {
 import type { MuzzleFlash, Planet, Turret, World } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
-import { buyUpgrade } from './sim/buildings';
+import { buyUpgrade, turretTier } from './sim/buildings';
 import { bootOfflineMatch } from '@platform/match-boot';
 import type { MatchBoot } from '@platform/match-boot';
 import {
@@ -3669,7 +3669,7 @@ async function boot(): Promise<void> {
     // Reflect the drawn set for the live-boot suite (?debug=1 only, else a no-op).
     if (combatDebug.enabled) combatDebug.update(flashes);
     if (flashes.length === 0) return EMPTY_MUZZLES;
-    return fillMuzzleViews(flashes);
+    return fillMuzzleViews(flashes, world);
   }
 
   // --- Viewport: keep renderer, touch halves, HUD, and overlay in sync with the
@@ -3914,6 +3914,7 @@ interface MutableMuzzleView {
   to: Vec2;
   color: number;
   hit: Vec2 | null;
+  width: number;
 }
 
 // A grow-once pool: one scratch MuzzleView per concurrent flash. Bounded by the
@@ -3924,17 +3925,39 @@ interface MutableMuzzleView {
 const muzzleViewPool: MutableMuzzleView[] = [];
 const muzzleViewList: MuzzleView[] = [];
 
+/** Base muzzle-flare stroke width (world units) — the Mk I blast, and the width
+ *  the renderer falls back to for an untiered flash. */
+const MUZZLE_BASE_WIDTH = 3;
+/** Extra flare width per DAMAGE tier — the muzzle scales with the shot it looses
+ *  (RATIFIED p11-06): Mk I → 3, Mk II → 4.5, Mk III → 6, a fatter blast per rung. */
+const MUZZLE_TIER_GAIN = 0.5;
+
+/** The DAMAGE tier of the turret whose flash this is — matched by the origin the
+ *  sim's `muzzleFlashes` aliases straight off `Turret.muzzle` (reference identity,
+ *  so no float compare). A flash whose turret is somehow gone reads as Mk I. The
+ *  walk is bounded by the turret cap (≤32, GDD §4.3), off the render hot path. */
+function firingTurretTier(w: World, flash: MuzzleFlash): number {
+  for (const planet of w.planets) {
+    for (const t of planet.turrets) {
+      if (t.muzzle && t.muzzle.origin === flash.origin) return turretTier(t);
+    }
+  }
+  return 0;
+}
+
 /** Map every muzzle flash this tick into the pooled MuzzleView list the renderer
  *  draws. Endpoint `to` = origin + dir·length (the sim's clamp to what the shot is
  *  aimed at, or full range on a miss); colour is the owner's identity hue
- *  (style-guide §3), so each rival turret's flash reads in its own colour. */
-function fillMuzzleViews(flashes: readonly MuzzleFlash[]): readonly MuzzleView[] {
+ *  (style-guide §3), so each rival turret's flash reads in its own colour; the
+ *  flare width scales with the firing turret's DAMAGE tier (p11-06), so a Mk III
+ *  spits a fatter blast than a Mk I. */
+function fillMuzzleViews(flashes: readonly MuzzleFlash[], w: World): readonly MuzzleView[] {
   const n = flashes.length;
   for (let i = 0; i < n; i++) {
     const m = flashes[i]!;
     let v = muzzleViewPool[i];
     if (!v) {
-      v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null };
+      v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null, width: MUZZLE_BASE_WIDTH };
       muzzleViewPool[i] = v;
     }
     v.from = m.origin; // alias the sim's origin (read synchronously this frame)
@@ -3942,6 +3965,7 @@ function fillMuzzleViews(flashes: readonly MuzzleFlash[]): readonly MuzzleView[]
     v.to.y = m.origin.y + m.dir.y * m.length;
     v.hit = m.hitPoint; // null on a clean miss → no impact glow
     v.color = PLAYER_COLORS[m.shooter % PLAYER_COLORS.length] ?? 0x4dc3ff;
+    v.width = MUZZLE_BASE_WIDTH * (1 + firingTurretTier(w, m) * MUZZLE_TIER_GAIN);
     muzzleViewList[i] = v;
   }
   muzzleViewList.length = n; // reuse the objects; just retract the tail

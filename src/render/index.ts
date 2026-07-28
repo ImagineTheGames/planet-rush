@@ -24,16 +24,19 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
+import { UpgradeTrack } from '@shared/types';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { SENSOR_RANGE, TURRET } from '../sim/constants';
+import { SENSOR_RANGE, TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
 import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
+import { areEnemies } from '../sim/allegiance';
 import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
 import { atmosphereHaloSprite } from '../art/planets';
 import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
+import { shotSprite, type ShotFamily } from '../art/vfx/shots';
 import { drawSprite, spriteGraphics } from '../art/textures';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +82,11 @@ export interface MuzzleView {
    *  miss that runs the full range. A pooled plasma impact glow is drawn here
    *  when present; `to` already ends at this point (sim clamps it — GDD §4.1). */
   readonly hit: Vec2 | null;
+  /** Flare stroke width (world units) — the muzzle scales with the firing turret's
+   *  DAMAGE tier (RATIFIED p11-06, "muzzle flash scales with it"): a Mk III barrel
+   *  spits a fatter blast than a Mk I. Optional so an untiered caller (a test
+   *  fixture, a wire-decoded flash) still reads as the base flare. */
+  readonly width?: number;
 }
 
 /** What the renderer needs beyond the world to draw one frame. */
@@ -179,10 +187,14 @@ function makeArtSlot(): Graphics {
   return new Graphics();
 }
 
-function makeUnitShot(): Graphics {
-  // Turret shot — threat red, the colour of enemy fire (style-guide §1).
-  return new Graphics().circle(0, 0, 1).fill(PALETTE.threatRed);
-}
+/**
+ * Pixels-per-unit a shot's ramp sprite is baked at before the per-frame
+ * `scale.set`. Its unit space is authored so radius `1` is the projectile's
+ * collision radius (the glow overhangs it); `drawShots` divides this back out so
+ * the shot still lands at `projectile.radius` world units. Above 1 for the same
+ * reason the ship/rock scales are: keep the baked geometry off any sub-pixel floor.
+ */
+const SHOT_ART_SCALE = 16;
 
 /**
  * Pixels-per-unit the ship hull is drawn at before the per-frame `scale.set`.
@@ -207,6 +219,28 @@ const TARGET_SCRATCH: Vec2 = { x: 0, y: 0 };
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/**
+ * The shooter's DAMAGE tier for a shot (RATIFIED p11-06) — what the ramp tints by.
+ * Read from sim state, so the tint is stamped from the truth at spawn and never
+ * from input: a **ship** shot wears its owner's DAMAGE (`Power`) upgrade tier; a
+ * **turret** shot wears the Mk the barrel fired at, recovered from the per-shot
+ * `damage` the sim derived from that tier (`turretTierShotDamage`, ≤3 rungs, an
+ * exact match since both sides compute it from the same constants). An untagged /
+ * wire-decoded shot (`kind` absent) reads as a turret shot, the sim's own default,
+ * and a shot whose shooter is somehow gone reads as tier 0 — never a crash. The
+ * art ramp clamps whatever tier this returns into its rungs.
+ */
+function shotTier(world: World, p: Projectile): number {
+  if (p.kind === 'ship') {
+    const owner = world.ships.find((s) => s.id === p.owner);
+    return owner ? owner.tiers[UpgradeTrack.Power] : 0;
+  }
+  for (let tier = TURRET_MAX_TIER; tier >= 0; tier--) {
+    if (turretTierShotDamage(tier) === p.damage) return tier;
+  }
+  return 0;
 }
 
 /** Whether `viewer` is close enough to read `planet`'s health (GDD §2.2, §2.8 —
@@ -260,6 +294,10 @@ export class Renderer {
   private readonly scaffoldPool: GraphicsPool;
   private readonly scaffoldKeys: string[] = [];
   private readonly shotPool: GraphicsPool;
+  /** The `${family}:${tier}` shot look baked into each shot slot, so the DAMAGE-tier
+   *  ramp geometry is rebuilt only when a slot's shot changes side or tier (the
+   *  asteroid-pool discipline) — a firefight stays transform-only per frame. */
+  private readonly shotKeys: string[] = [];
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
   /** A planet's static body: disc, beacon ring, core. Keyed by planet index
@@ -340,7 +378,7 @@ export class Renderer {
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
     this.turretPool = new GraphicsPool(this.turretLayer, makeArtSlot);
     this.scaffoldPool = new GraphicsPool(this.turretLayer, makeArtSlot);
-    this.shotPool = new GraphicsPool(this.shotLayer, makeUnitShot);
+    this.shotPool = new GraphicsPool(this.shotLayer, makeArtSlot);
   }
 
   /** Point the camera at a new visible viewport (resize / orientationchange /
@@ -374,7 +412,7 @@ export class Renderer {
     this.drawAsteroids(world.asteroids);
     this.drawChunks(world.chunks);
     this.drawShips(world.ships);
-    this.drawShots(world.projectiles);
+    this.drawShots(world, view.cameraTarget);
     this.drawMuzzles(view.muzzles);
   }
 
@@ -719,16 +757,36 @@ export class Renderer {
     this.drawDamageFill(g, planet.radius + 5, planet.owner, lost, 4, 0.95);
   }
 
-  /** Turret shots — the pool is sparse, so skip inactive slots rather than
-   *  assuming the array is dense (see {@link Projectile}). */
-  private drawShots(projectiles: readonly Projectile[]): void {
+  /**
+   * Ship and turret shots, tinted by the shooter's DAMAGE tier (RATIFIED p11-06,
+   * "power you can see"). Each shot reads in its side's family — the viewer's (and
+   * any ally's) fire climbs the plasma family, an enemy's climbs threat red — and
+   * brightens with the shooter's weapon tier, so "whose shot" and "how strong" both
+   * read at a glance. The `${family}:${tier}` look is baked from the art ramp
+   * (`shotSprite`) and rebuilt into a slot only when that slot's shot changes side
+   * or tier, so the sparse pool stays transform-only in a steady firefight (GDD
+   * §4.3). The pool is sparse — skip inactive slots rather than assume density
+   * (see {@link Projectile}).
+   */
+  private drawShots(world: World, viewer: PlayerId): void {
     let live = 0;
-    for (const p of projectiles) {
+    for (const p of world.projectiles) {
       if (!p.active) continue;
-      const g = this.shotPool.at(live++);
+      const family: ShotFamily = areEnemies(world, viewer, p.owner) ? 'enemy' : 'own';
+      const tier = shotTier(world, p);
+      const key = `${family}:${tier}`;
+      const g = this.shotPool.at(live);
+      if (this.shotKeys[live] !== key) {
+        g.clear();
+        drawSprite(g, shotSprite(family, tier), SHOT_ART_SCALE);
+        this.shotKeys[live] = key;
+      }
       g.x = p.pos.x;
       g.y = p.pos.y;
-      g.scale.set(p.radius);
+      // Art is baked at SHOT_ART_SCALE px/unit; divide it back out so unit radius 1
+      // lands at the shot's collision radius (the glow overhangs from there).
+      g.scale.set(p.radius / SHOT_ART_SCALE);
+      live++;
     }
     this.shotPool.hideFrom(live);
   }
@@ -798,7 +856,7 @@ export class Renderer {
       const m = muzzles[i]!;
       const g = this.muzzlePool.at(i);
       g.clear();
-      g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: 3, color: m.color, cap: 'round' });
+      g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: m.width ?? 3, color: m.color, cap: 'round' });
       // The flash line always draws (it is the turret-fire tell); the impact
       // glow is decoration, so it is the first thing reduce-VFX sheds (§4.3).
       if (m.hit && !this.reduceVfx) {
