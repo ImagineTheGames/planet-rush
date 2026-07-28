@@ -1,0 +1,252 @@
+/**
+ * src/sim/sensing.test.ts — the minimap fog-of-war sensed-set (RATIFIED feature
+ * f1: "the minimap should be a fog-of-war thing, until players build a radar
+ * satellite … and can be attacked").
+ *
+ * The contract checks from the brief:
+ *   1. sensed-set math per source — coverage is the union of the ship's LOCAL
+ *      sensor, the station's SHORT one, and each ALIVE satellite's LARGE one;
+ *   2. remembered-vs-live split — static geography (stations) is remembered once
+ *      seen and persists; live entities (ships, satellites, projectiles) show
+ *      only under CURRENT coverage;
+ *   3. coverage collapse on satellite death — a satellite's death removes its
+ *      disc the same tick, so anything only it covered drops off at once;
+ *   4. own entities are always sensed (cockpit / home knowledge);
+ *   5. determinism — the memory fold reproduces exactly.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { ShipClass } from '@shared/types';
+import {
+  pointSensed,
+  rememberedStationMask,
+  sensedState,
+  sensorSources,
+  updateSensory,
+} from './sensing';
+import { SATELLITE, SHIP_SENSOR_RANGE, STATION_SENSOR_RANGE, CORE_HP, STATION, SHIP_RADIUS, SHIELD } from './constants';
+import { stockTiers } from './upgrades';
+import type { MiningStation, RadarSatellite, Ship, SensoryMemory, World } from './state';
+
+// --- builders (hand-built worlds, station-relative so geometry reads direct) --
+
+function makeShip(id: number, pos: { x: number; y: number }, alive = true): Ship {
+  return {
+    id,
+    shipClass: ShipClass.Vanguard,
+    tiers: stockTiers(),
+    pos: { ...pos },
+    vel: { x: 0, y: 0 },
+    home: { ...pos },
+    angle: 0,
+    hull: 50,
+    maxHull: 50,
+    cargo: 0,
+    cargoCap: 2,
+    banked: 0,
+    alive,
+    respawnTimer: 0,
+    spawnProtect: 0,
+    eliminated: false,
+    radius: SHIP_RADIUS,
+    firing: false,
+  };
+}
+
+function makeStation(id: number, owner: number, pos: { x: number; y: number }, alive = true): MiningStation {
+  return {
+    id,
+    owner,
+    pos: { ...pos },
+    radius: STATION.radius,
+    coreHp: alive ? CORE_HP : 0,
+    maxCoreHp: CORE_HP,
+    alive,
+    deathTime: alive ? -1 : 0,
+    spawnProtect: 0,
+    angle: 0,
+    sinceDamage: SHIELD.regenDelay,
+    repairing: false,
+    turrets: [],
+    shields: [],
+    satellites: [],
+    builds: [],
+  };
+}
+
+function makeSat(id: number, owner: number, pos: { x: number; y: number }, hp = SATELLITE.hp): RadarSatellite {
+  return { id, owner, pos: { ...pos }, radius: SATELLITE.radius, hp, maxHp: SATELLITE.hp, orbitAngle: 0 };
+}
+
+function makeWorld(ships: Ship[], stations: MiningStation[], sensory?: SensoryMemory): World {
+  return {
+    time: 0,
+    tick: 0,
+    rngState: 1,
+    nextEntityId: 1000,
+    ships,
+    asteroids: [],
+    chunks: [],
+    stations,
+    projectiles: [],
+    bounds: { width: 8000, height: 8000 },
+    fieldRadius: 600,
+    asteroidsPerWave: 0,
+    match: { phase: 'live', wavesSpawned: 0, collapseTime: -1, eliminated: [], winner: null, endTime: -1 },
+    ...(sensory ? { sensory } : {}),
+  };
+}
+
+// --- 1. sensed-set math per source -----------------------------------------
+
+describe('sensor sources — the union of ship + station + alive satellites (f1)', () => {
+  it('a live ship and station each cast one disc, at their named ranges', () => {
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [makeStation(0, 0, { x: 0, y: 0 })]);
+    const sources = sensorSources(world, 0);
+    expect(sources).toHaveLength(2);
+    const ship = sources.find((s) => s.kind === 'ship')!;
+    const station = sources.find((s) => s.kind === 'station')!;
+    expect(ship.range).toBe(SHIP_SENSOR_RANGE);
+    expect(station.range).toBe(STATION_SENSOR_RANGE);
+  });
+
+  it('an ALIVE satellite adds its LARGE disc; a dead one contributes nothing', () => {
+    const station = makeStation(0, 0, { x: 0, y: 0 });
+    station.satellites = [makeSat(50, 0, { x: 114, y: 0 })];
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [station]);
+
+    let sources = sensorSources(world, 0);
+    expect(sources).toHaveLength(3);
+    expect(sources.find((s) => s.kind === 'satellite')!.range).toBe(SATELLITE.sensorRange);
+
+    station.satellites![0]!.hp = 0; // killed — coverage collapses
+    sources = sensorSources(world, 0);
+    expect(sources).toHaveLength(2);
+    expect(sources.some((s) => s.kind === 'satellite')).toBe(false);
+  });
+
+  it('a wrecked own station and a dead own ship cast nothing', () => {
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 }, false)], [makeStation(0, 0, { x: 0, y: 0 }, false)]);
+    expect(sensorSources(world, 0)).toHaveLength(0);
+  });
+
+  it('pointSensed is the union test, surface-aware for a sized body', () => {
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], []);
+    const sources = sensorSources(world, 0);
+    expect(pointSensed(sources, { x: SHIP_SENSOR_RANGE - 1, y: 0 })).toBe(true);
+    expect(pointSensed(sources, { x: SHIP_SENSOR_RANGE + 10, y: 0 })).toBe(false);
+    // A 20-radius body whose centre is just outside still counts (surface inside).
+    expect(pointSensed(sources, { x: SHIP_SENSOR_RANGE + 10, y: 0 }, 20)).toBe(true);
+  });
+});
+
+// --- 2. live entities under current coverage; own always sensed ------------
+
+describe('live entities — visible only under current coverage; own always (f1)', () => {
+  it('an enemy ship in range is sensed; out of range it is not', () => {
+    const near = makeWorld(
+      [makeShip(0, { x: 0, y: 0 }), makeShip(1, { x: SHIP_SENSOR_RANGE - 50, y: 0 })],
+      [makeStation(0, 0, { x: 0, y: 0 })],
+    );
+    expect(sensedState(near, 0).ships).toContain(1);
+
+    const far = makeWorld(
+      [makeShip(0, { x: 0, y: 0 }), makeShip(1, { x: 3000, y: 0 })],
+      [makeStation(0, 0, { x: 0, y: 0 })],
+    );
+    expect(sensedState(far, 0).ships).not.toContain(1);
+    expect(sensedState(far, 0).ships).toContain(0); // own ship always sensed
+  });
+
+  it("own station and own satellite are always in the viewer's sensed-set", () => {
+    const station = makeStation(0, 0, { x: 0, y: 0 });
+    station.satellites = [makeSat(50, 0, { x: 114, y: 0 })];
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [station]);
+    const sensed = sensedState(world, 0);
+    expect(sensed.rememberedStations).toContain(0);
+    expect(sensed.satellites).toContain(50);
+  });
+});
+
+// --- 3. coverage collapse on satellite death (the headline) ----------------
+
+describe('coverage collapse on satellite death (f1, item 2)', () => {
+  it('an enemy ship seen ONLY through a satellite drops off the instant it dies', () => {
+    const station = makeStation(0, 0, { x: 0, y: 0 });
+    const sat = makeSat(50, 0, { x: 114, y: 0 });
+    station.satellites = [sat];
+    // Enemy ship at 900,0: out of the ship (520) and station (300) discs, but
+    // inside the satellite's 900 disc (dist from the sat ≈ 786).
+    const world = makeWorld(
+      [makeShip(0, { x: 0, y: 0 }), makeShip(1, { x: 900, y: 0 })],
+      [station],
+    );
+    expect(sensedState(world, 0).ships).toContain(1);
+
+    sat.hp = 0; // the satellite is destroyed
+    expect(sensedState(world, 0).ships).not.toContain(1); // coverage gone, same read
+  });
+});
+
+// --- 4. remembered-vs-live split, and persistence --------------------------
+
+describe('remembered static geography vs live entities (f1, item 1)', () => {
+  it('a station is remembered once its coverage is seen, and stays remembered after', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const enemy = makeStation(1, 1, { x: 900, y: 0 });
+    const sensory: SensoryMemory = { seenStations: [0] };
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own, enemy], sensory);
+
+    // Before any coverage reaches it: the far enemy home is NOT remembered.
+    updateSensory(world);
+    expect(rememberedStationMask(world, 0) & (1 << 1)).toBe(0);
+    expect(sensedState(world, 0).rememberedStations).not.toContain(1);
+    expect(sensedState(world, 0).rememberedStations).toContain(0); // own, always
+
+    // Build a satellite whose LARGE disc reaches the enemy home, and fold memory.
+    own.satellites = [makeSat(50, 0, { x: 114, y: 0 })];
+    updateSensory(world);
+    expect(rememberedStationMask(world, 0) & (1 << 1)).not.toBe(0);
+    expect(sensedState(world, 0).rememberedStations).toContain(1);
+
+    // Kill the satellite: LIVE coverage of the enemy home collapses, but the
+    // REMEMBERED bit persists — a scouted home stays on the minimap.
+    own.satellites![0]!.hp = 0;
+    updateSensory(world); // monotonic: never un-remembers
+    expect(sensedState(world, 0).rememberedStations).toContain(1);
+    // …and yet a live entity there is no longer sensed once its cover is gone.
+    const withEnemyShip = makeWorld(
+      [makeShip(0, { x: 0, y: 0 }), makeShip(1, { x: 900, y: 0 })],
+      [own, enemy],
+      sensory,
+    );
+    expect(sensedState(withEnemyShip, 0).ships).not.toContain(1);
+    expect(sensedState(withEnemyShip, 0).rememberedStations).toContain(1);
+  });
+
+  it('sensedState degrades gracefully with no stored memory (currently-covered + own)', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const enemyClose = makeStation(1, 1, { x: STATION_SENSOR_RANGE - 10, y: 0 });
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own, enemyClose]); // no sensory
+    const sensed = sensedState(world, 0);
+    expect(sensed.rememberedStations).toContain(0); // own
+    expect(sensed.rememberedStations).toContain(1); // currently covered by the station disc
+  });
+});
+
+// --- 5. determinism --------------------------------------------------------
+
+describe('sensory memory — determinism (f1, GDD §4.8)', () => {
+  it('the memory fold reproduces exactly from the same world', () => {
+    const build = (): SensoryMemory => {
+      const own = makeStation(0, 0, { x: 0, y: 0 });
+      own.satellites = [makeSat(50, 0, { x: 114, y: 0 })];
+      const enemy = makeStation(1, 1, { x: 800, y: 0 });
+      const sensory: SensoryMemory = { seenStations: [0] };
+      const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own, enemy], sensory);
+      updateSensory(world);
+      return world.sensory!;
+    };
+    expect(build()).toEqual(build());
+  });
+});

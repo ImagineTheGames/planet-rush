@@ -41,7 +41,14 @@ import {
   clampToMargin,
   turretTierShotDamage,
 } from './constants';
-import { damageStation, damageTurret, stationTargetRadius, turretRange, turretTier } from './buildings';
+import {
+  damageSatellite,
+  damageStation,
+  damageTurret,
+  stationTargetRadius,
+  turretRange,
+  turretTier,
+} from './buildings';
 import { damageShip } from './damage';
 import { ledgerAdd } from './ore-ledger';
 import type { SpatialHash } from './spatial-hash';
@@ -277,6 +284,20 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       damageTurret(turret, p.damage);
       forfeitProtection(world, p.owner);
       return true;
+    }
+    // Radar satellites are attackable structures (feature f1): a ship weapon shot
+    // bites an enemy's orbiting sensor exactly as it does a turret. Killing it
+    // collapses that coverage (`./sensing` reads only alive satellites).
+    if (station.satellites) {
+      for (let si = 0; si < station.satellites.length; si++) {
+        const sat = station.satellites[si]!;
+        if (sat.hp <= 0) continue;
+        const rr = sat.radius + p.radius;
+        if (dist2(p.pos, sat.pos) > rr * rr) continue;
+        damageSatellite(sat, p.damage);
+        forfeitProtection(world, p.owner);
+        return true;
+      }
     }
     // A dead or spawn-protected core is not a target — the shot flies over it
     // (GDD §2.1). `damageStation` guards this too, but omitting it here keeps the
