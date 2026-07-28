@@ -27,6 +27,7 @@ import {
   STATION_VARIANT_COUNT,
 } from './stations';
 import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
+import { satelliteSprite, satelliteWreckSprite } from './satellite';
 import type { SpriteDef } from './shapes';
 import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
@@ -140,6 +141,20 @@ function entries(): CatalogueEntry[] {
   out.push({ group: 'Shields — pressure beats regeneration', label: 'stacked #2', def: shieldSprite({ playerId: 0, strength: 'full', stackIndex: 1 }) });
   for (const p of [0.2, 0.6, 1]) {
     out.push({ group: 'Shields — pressure beats regeneration', label: `build ${Math.round(p * 100)}%`, def: buildProgressSprite(p) });
+  }
+
+  // --- Satellites -----------------------------------------------------------
+  // The radar eye (f1): a DISH in the 5.5 structure language, distinct from every
+  // turret in the pool. Its live sensor states sit next to an enemy-colour read
+  // and the scaffold, and its cold death remnant sits below — the wreck language,
+  // with nothing to loot (a satellite carries no ore bank).
+  for (const state of ['idle', 'sweeping', 'pinging'] as const) {
+    out.push({ group: 'Satellites — the radar eye', label: state, def: satelliteSprite({ playerId: 0, state }) });
+  }
+  out.push({ group: 'Satellites — build & identity', label: 'P5 sweeping', def: satelliteSprite({ playerId: 4, state: 'sweeping' }) });
+  out.push({ group: 'Satellites — build & identity', label: 'building scaffold', def: satelliteSprite({ playerId: 0, state: 'building' }) });
+  for (const seed of [0, 2]) {
+    out.push({ group: 'Satellites — build & identity', label: `downed dish ${seed}`, def: satelliteWreckSprite(seed) });
   }
 
   // --- Wrecks ---------------------------------------------------------------
