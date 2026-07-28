@@ -30,6 +30,7 @@ import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ship
 import type { SpriteDef } from './shapes';
 import { debrisFieldSprite, planetWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
+import { SHOT_FAMILIES, SHOT_TIERS, shotSprite } from './vfx/shots';
 
 /** One catalogued sprite: what it is, and a caption for the contact sheet. */
 export interface CatalogueEntry {
@@ -157,6 +158,21 @@ function entries(): CatalogueEntry[] {
   // a hull or thrown by an explosion.
   for (const spec of PARTICLE_KINDS) {
     out.push({ group: 'VFX — the eleven particle looks', label: spec.name, def: particleSprite(spec.kind) });
+  }
+
+  // The DAMAGE-tier shot ramp (p11-06): a shooter's weapon tier tints its shot,
+  // brightening within its own family — `own` fire up the plasma family, `enemy`
+  // fire up the threat-red family — so "how strong" reads at a glance without ever
+  // spending signal yellow. Every rung sits on the review surface next to the
+  // turret pool it escalates alongside, and goes through the same palette audit.
+  for (const family of SHOT_FAMILIES) {
+    for (const tier of SHOT_TIERS) {
+      out.push({
+        group: `Shots — DAMAGE-tier ramp (${family} fire)`,
+        label: `tier ${tier}`,
+        def: shotSprite(family, tier),
+      });
+    }
   }
 
   return out;

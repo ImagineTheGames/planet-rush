@@ -136,6 +136,19 @@ export const DERIVED_RECIPES = {
   plasmaDim: { base: 'plasma', toward: 'vacuum', t: 0.45, why: 'Unpowered energy parts: cold barrel, idle shield ring.' },
   plasmaHot: { base: 'plasma', toward: 'white', t: 0.45, why: 'The hot centre of a torch/muzzle flare.' },
 
+  // The DAMAGE-tier shot ramp (p11-06): a shooter's weapon tier tints its shot,
+  // brightening WITHIN its own family toward white so "how strong" reads at a
+  // glance without spending a reserved hue. `own` fire climbs the plasma family
+  // (energy), `enemy` fire climbs the threat-red family (danger) — the tier tell
+  // never leaves the side's palette and never drifts toward signal yellow. Tier 0
+  // is the family base (plasma / threat red); these are rungs 1–2 (own) and 1–3
+  // (enemy). `own` rung 3 reuses `plasmaHot`, the hottest plasma already declared.
+  shotOwn1: { base: 'plasma', toward: 'white', t: 0.18, why: 'DAMAGE tier 1, own fire — a hotter plasma shot, still cold energy blue.' },
+  shotOwn2: { base: 'plasma', toward: 'white', t: 0.32, why: 'DAMAGE tier 2, own fire — plasma climbing toward the white-hot core.' },
+  shotEnemy1: { base: 'threatRed', toward: 'white', t: 0.18, why: 'DAMAGE tier 1, enemy fire — a hotter incoming shot, unmistakably threat red.' },
+  shotEnemy2: { base: 'threatRed', toward: 'white', t: 0.32, why: 'DAMAGE tier 2, enemy fire — threat red climbing toward white-hot, never yellow.' },
+  shotEnemy3: { base: 'threatRed', toward: 'white', t: 0.45, why: 'DAMAGE tier 3, enemy fire — the fiercest incoming shot: bright, still red.' },
+
   wreckBody: { base: 'hullSteel', toward: 'vacuum', t: 0.7, why: 'A dead planet: ash-grey and cold. The game goes quiet (§8).' },
   wreckCrust: { base: 'hullSteel', toward: 'vacuum', t: 0.55, why: 'Broken crust plates on a wreck.' },
 } as const satisfies Record<string, Recipe>;
@@ -166,6 +179,12 @@ export const DERIVED = {
   coreHot: 0xf7e28a,
   plasmaDim: 0x307296,
   plasmaHot: 0x9ddeff,
+
+  shotOwn1: 0x6dceff,
+  shotOwn2: 0x86d6ff,
+  shotEnemy1: 0xc05d5d,
+  shotEnemy2: 0xcb7979,
+  shotEnemy3: 0xd59393,
 
   wreckBody: 0x2f343b,
   wreckCrust: 0x40464e,
