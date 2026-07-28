@@ -1,6 +1,6 @@
 # Lore copy sweep — "planets" → mining facilities
 
-**Status:** delivered spike (branch `agent/architect/l1-facility-lore`). This is the
+**Status:** delivered spike (branch `agent/architect/l1-station-lore`). This is the
 execution list the **UI Engineer** runs in a follow-up: every *player-facing* string
 that says "planet" or leans on the old fiction, with its replacement. The fiction
 rewrite of the GDD itself is already done (GDD v0.7, §0 glossary + section sweep);
@@ -22,7 +22,7 @@ made in this spike and can be used immediately.
 
 | Old fiction word (on screen) | New fiction word | Placeholder? |
 |---|---|---|
-| planet (your home) | **facility** | **YES** — see §2 |
+| planet (your home) | **station** | **YES** — see §2 |
 | core / planet core (win object) | **reactor** | no — fixed |
 | atmosphere (bank radius) | **collection field** | no — fixed |
 | repair core (the ore tap) | **repair reactor** | no — fixed |
@@ -31,7 +31,7 @@ made in this spike and can be used immediately.
 | collapse (end phase) | keep **COLLAPSE** *(flavor: "the Crush")* | no — fixed |
 | asteroid wave | keep — already on-theme (ore surges of the belt) | no |
 
-> Wherever a replacement below reads **facility / FACILITY**, substitute the ratified
+> Wherever a replacement below reads **station / FACILITY**, substitute the ratified
 > home-noun (§2) at execution time. Everything else is final.
 
 ---
@@ -86,7 +86,7 @@ of this branch — the UI agent should match on the string, not the line.
 ### `src/ui/onboarding.ts` — coach prompt
 | Line | Old | New | |
 |---|---|---|---|
-| 94 | `'Your planet is under attack — follow the arrow'` | `'Your facility is under attack — follow the arrow'` | [REQ] |
+| 94 | `'Your planet is under attack — follow the arrow'` | `'Your station is under attack — follow the arrow'` | [REQ] |
 
 > Line 74 (`'Hold {fire} on the asteroid — your shots chip the rock'`) is **on-theme —
 > keep.** Comments at lines 22/24/26/54 are not rendered — leave them.
@@ -94,12 +94,12 @@ of this branch — the UI agent should match on the string, not the line.
 ### `src/ui/pause-menu.ts` — exit confirm line
 | Line | Old | New | |
 |---|---|---|---|
-| 209 | `'Your planet falls the moment you go.'` | `'Your facility falls the moment you go.'` | [REQ] |
+| 209 | `'Your planet falls the moment you go.'` | `'Your station falls the moment you go.'` | [REQ] |
 
 ### `src/ui/controls-strip.ts` — desktop legend hint
 | Line | Old | New | |
 |---|---|---|---|
-| 54 | `'Build & Upgrade — get closer to your planet'` (`BUILD_AWAY_HINT`) | `'Build & Upgrade — get closer to your facility'` | [REQ] |
+| 54 | `'Build & Upgrade — get closer to your planet'` (`BUILD_AWAY_HINT`) | `'Build & Upgrade — get closer to your station'` | [REQ] |
 
 > Comments at 49/71/72 reference `planet` — not rendered, leave.
 
@@ -141,10 +141,10 @@ These are tester/ntfy notes. Most are **archival** (past tags already pinged); t
 is in *future* tags and re-tags. Apply the word swaps below to any note that will be
 re-pinged; normalizing the archival ones is [OPT] consistency. Swap rules:
 
-- `planet` → `facility` (e.g. `:20`/`:50` titles "planets, turrets, war" → "facilities, turrets, war"; `:41` "every home planet" → "every home facility"; `:56` "over every ship and planet" → "over every ship and facility"; `:66` "wedge on planet rims" → "wedge on facility rims").
-- `your planet atmosphere` (`:61`) → `your facility's collection field`.
+- `planet` → `station` (e.g. `:20`/`:50` titles "planets, turrets, war" → "facilities, turrets, war"; `:41` "every home planet" → "every home station"; `:56` "over every ship and planet" → "over every ship and station"; `:66` "wedge on planet rims" → "wedge on station rims").
+- `your planet atmosphere` (`:61`) → `your station's collection field`.
 - `core` (win object) → `reactor` (`:21`/`:26`/`:41`/`:56`/`:66`/`:31` "last core standing" → "last reactor standing"; "your core" → "your reactor").
-- **Keep** `asteroid`, `wreck` (a wreck is a facility wreck — on-theme), map/field words.
+- **Keep** `asteroid`, `wreck` (a wreck is a station wreck — on-theme), map/field words.
 
 > **Bonus catch for QA (out of my lore scope, flagged not fixed):** several of these notes
 > also carry *stale mechanics* words from before ratified amendments — `beam` (`:16`),
@@ -185,7 +185,7 @@ re-pinged; normalizing the archival ones is [OPT] consistency. Swap rules:
 5. **`WAVE_NAMES` is a ratified interface** — QA/Art may key off the array; announce the
    `Core Fall`→`Claim Fall` change in the PR body.
 6. **Do the placeholder substitution last** — pick the home-noun (§2) first, then a single
-   find/replace of `facility`/`FACILITY` in the *new* column resolves every home string at
+   find/replace of `station`/`FACILITY` in the *new* column resolves every home string at
    once.
 
 ---
@@ -203,8 +203,8 @@ re-pinged; normalizing the archival ones is [OPT] consistency. Swap rules:
    marketing — a bigger call than this sweep.)
 4. **HUD collapse label** — keep `COLLAPSE`, or show `THE CRUSH` (the named antagonist)?
    Architect pick: keep `COLLAPSE` for legibility.
-5. **Facility art dressing** — GDD §5.4 keeps the round claimed-planetoid body as the
-   facility's visual. Do you want Art to add industrial dressing (rigs/gantries/docking
+5. **Station art dressing** — GDD §5.4 keeps the round claimed-planetoid body as the
+   station's visual. Do you want Art to add industrial dressing (rigs/gantries/docking
    arms), or is the claimed-planetoid look enough? (Art follow-up, not this sweep.)
 6. **Sibling docs still speak the old fiction** — `style-guide.md` (tone paragraph +
    "repair channel") and `docs/mobile-cross-platform-amendment.md` need the same sweep.
