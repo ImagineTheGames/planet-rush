@@ -34,6 +34,15 @@ jobs:
       - name: Install flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Token presence check (value never printed)
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is EMPTY in this run — the repo secret exists but has no value (a paste likely failed). Re-set it: gh secret set FLY_API_TOKEN --repo ImagineTheGames/planet-rush"
+            exit 1
+          fi
+          echo "token present (${#FLY_API_TOKEN} chars)"
+          flyctl auth whoami
+
       - name: Ensure apps exist
         run: |
           flyctl apps create planet-rush-allocator  2>/dev/null || echo "allocator app exists"
