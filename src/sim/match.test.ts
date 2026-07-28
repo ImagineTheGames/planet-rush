@@ -333,6 +333,34 @@ describe('team victory (GDD §1, Task D1)', () => {
     expect(world.match.winner).toBe(1);
     expect(world.match.winningTeam).toBe(1);
   });
+
+  it('collapse resolves a team match: entropy chews the low team out, the survivors win', () => {
+    // The metronome is mode-agnostic (plan S5): collapse decays *cores*, and a
+    // team simply has more than one to lose. Team 1's homes come in with barely
+    // any core; team 0's are near-full. With the field spent and the last wave
+    // delivered, collapse opens and COLLAPSE_CORE_DECAY grinds both teams down —
+    // but team 1's thin cores fall first, so team 0 wins while still holding two.
+    const world = twoVTwo();
+    world.match = makeMatch({ wavesSpawned: WAVE_COUNT });
+    world.stations[0]!.coreHp = 90; // team 0
+    world.stations[1]!.coreHp = 90;
+    world.stations[2]!.coreHp = 3; //  team 1 — one step of entropy from death
+    world.stations[3]!.coreHp = 3;
+
+    step(world, []); // collapse opens at the end of this tick
+    expect(isCollapsed(world)).toBe(true);
+
+    // A few seconds of entropy: 3-HP cores die (decay = 1 HP/s), 90-HP cores live.
+    for (let t = 0; t < Math.ceil(4 / TICK_DT); t++) step(world, []);
+    expect(world.match.phase).toBe('ended');
+    expect(world.match.winningTeam).toBe(0);
+    expect([0, 1]).toContain(world.match.winner);
+    expect(world.stations[0]!.alive).toBe(true);
+    expect(world.stations[1]!.alive).toBe(true);
+    // Both of the losing team's cores were taken by entropy, not a siege.
+    expect(world.stations[2]!.alive).toBe(false);
+    expect(world.stations[3]!.alive).toBe(false);
+  });
 });
 
 // --- 2. elimination, the wreck, and its debris (GDD §2.7) ------------------
