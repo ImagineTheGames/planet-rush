@@ -59,8 +59,15 @@ import type { HubBack } from './wheel-nav';
  * `bank` is a {@link BuildItem} the sim still honours (bots deposit through it),
  * but the wheel does **not** expose it: ore auto-deposits in the atmosphere, so
  * a manual bank verb is obsolete. It is excluded here on purpose.
+ *
+ * `satellite` is the ratified radar-satellite build order (feature f1). The sim
+ * honours it as a `BuildItem`, but adding its *visible* wheel segment reflows the
+ * radial layout (four wedges → five) and its hit-test, which is a UI follow-up —
+ * so, like `bank`, it is excluded from this derived union for now to keep the
+ * current four-segment wheel and its geometry unchanged (mechanical: track the
+ * widened shared contract without reshaping the wheel).
  */
-export type WheelSegmentId = Exclude<BuildItem, 'bank'> | 'upgrade';
+export type WheelSegmentId = Exclude<BuildItem, 'bank' | 'satellite'> | 'upgrade';
 
 /** What a segment spends on: your station, or your ship (GDD §2.5 — "every label
  *  names which", because the economy *is* the choice between the two). */

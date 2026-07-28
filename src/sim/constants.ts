@@ -890,6 +890,84 @@ export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
 export const SENSOR_RANGE: Tunable<number> = 2 * SHIELD.radius;
 
 // ---------------------------------------------------------------------------
+// Sensor coverage — the minimap fog-of-war model (RATIFIED developer feature f1)
+// ---------------------------------------------------------------------------
+//
+// "The minimap should be a fog-of-war thing, until players build a radar
+// satellite (it orbits around the mining station) and can be attacked." A
+// player's sensed-set is the union of three coverage discs — their own ship's
+// LOCAL sensor, their own stations' SHORT local sensor, and each ALIVE radar
+// satellite's LARGE sensor (`SATELLITE.sensorRange`). Static geography (station
+// positions) is REMEMBERED once seen; live entities (ships, projectiles,
+// satellites) are visible only under CURRENT coverage — so a satellite's death
+// collapses its coverage immediately (`./sensing`). These are distinct from
+// `SENSOR_RANGE` above, which is the narrower "read an enemy core's HP" scout
+// radius, not the minimap-presence radius.
+
+/**
+ * A ship's own LOCAL sensor radius — the modest baseline coverage every player
+ * carries around their cockpit (feature f1, item 1). Deliberately modest: it is
+ * the reason a lone ship's minimap is a small bright bubble in a dark arena, and
+ * why a radar satellite (with its far larger reach) is worth the ore. Sits
+ * comfortably under a satellite's `sensorRange`. TUNABLE
+ */
+export const SHIP_SENSOR_RANGE: Tunable<number> = 520;
+
+/**
+ * A station's SHORT local sensor radius — a home always sees its own
+ * neighbourhood (feature f1, item 1). Shorter than the ship's own sensor: a
+ * parked home is not a scout. Measured from the station centre; the home body and
+ * its collection field sit inside it. TUNABLE
+ */
+export const STATION_SENSOR_RANGE: Tunable<number> = 300;
+
+/**
+ * The **radar satellite** (RATIFIED developer feature f1) — a buildable body that
+ * ORBITS its owner's station (reusing the turret orbit ring geometry, in its own
+ * outboard band), has HP, is ATTACKABLE, and — while alive — provides the LARGE
+ * sensor coverage that lifts the minimap fog. Its destruction collapses that
+ * coverage the same tick (`./sensing` reads only ALIVE satellites).
+ *
+ * ONE per station is the ratified call (`capPerStation: 1`): a station stacks
+ * turrets and shields, but a second satellite would only duplicate coverage a
+ * player already has — later work can add upgrade TIERS that extend one
+ * satellite's range instead. The array on the station (`MiningStation.satellites`)
+ * mirrors turrets/shields so the build-cap, construction, damage, and sweep paths
+ * are the same shape; the cap holds it to one.
+ *
+ * Balance (feature f1, item 3): priced ABOVE a shield (6 vs 5) — a satellite is a
+ * high-value, undefended-by-default structure, so building one is a real
+ * opportunity cost against a turret ring or a second shield, and hunting an
+ * enemy's satellite is a legitimate strategy. All TUNABLE (QA owns the table).
+ */
+export const SATELLITE = {
+  /** Ore to build one — above a shield's 5 (feature f1 balance note). */
+  cost: 6,
+  /** Body HP — killable but not trivial: between a turret (30) and a ship (50). */
+  hp: 35,
+  /** Construction time (s) — between a turret (10) and a shield (15). */
+  buildTime: 12,
+  /** One per station (ratified — see the block doc). */
+  capPerStation: 1,
+  /** Collision / shot-target radius (it is an attackable body, feature f1 item 2). */
+  radius: 10,
+  /** Orbit height above the station surface. Set OUTBOARD of the turret ring
+   *  (`TURRET.mountOffset` = 12) and clear of the shield bubble (`SHIELD.radius`
+   *  = 90) so the satellite orbits in its own band and is attackable from outside
+   *  the shield: orbit radius = `STATION.radius` + this + `radius` = 114. */
+  mountOffset: 40,
+  /** Angular orbit speed (rad/s) — a slow, legible orbit around the station, the
+   *  visible tell that it is a moving body, not a fixed turret. It never stops
+   *  (unlike a turret, which slides to face a threat), so `orbitAngle` advances
+   *  every tick. TUNABLE */
+  orbitSpeed: 0.35,
+  /** The LARGE sensor coverage radius while alive (world units) — the whole point
+   *  of building one. Comfortably larger than a ship's own `SHIP_SENSOR_RANGE`, so
+   *  a live satellite reveals a big slice of the arena on the minimap. TUNABLE */
+  sensorRange: 900,
+} as const;
+
+// ---------------------------------------------------------------------------
 // GDD §2.4 — Fire mode
 // ---------------------------------------------------------------------------
 

@@ -44,6 +44,7 @@ import {
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
   REPAIR_TELL_HOLD,
+  SATELLITE,
   SHIELD,
   TURRET,
   TURRET_MAX_TIER,
@@ -54,7 +55,7 @@ import { destroyCore, isCollapsed } from './match';
 import { ledgerAdd } from './ore-ledger';
 import { fireTurretProjectile, leadAim } from './projectiles';
 import { advanceRng } from './rng';
-import type { MiningStation, Ship, Shield, Turret, World } from './state';
+import type { MiningStation, RadarSatellite, Ship, Shield, Turret, World } from './state';
 import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
 
@@ -136,6 +137,15 @@ export function turretCount(station: MiningStation): number {
 export function shieldCount(station: MiningStation): number {
   let n = station.shields.length;
   for (const b of station.builds) if (b.kind === 'shield') n++;
+  return n;
+}
+
+/** Radar satellites that exist or are being built (feature f1; same rule as
+ *  {@link turretCount}, so a player cannot queue two past the cap of 1). A
+ *  station with no `satellites` array (a foreign literal) counts zero built. */
+export function satelliteCount(station: MiningStation): number {
+  let n = station.satellites?.length ?? 0;
+  for (const b of station.builds) if (b.kind === 'satellite') n++;
   return n;
 }
 
@@ -275,6 +285,8 @@ export function orderCost(item: BuildItem): number {
       return TURRET.cost;
     case 'shield':
       return SHIELD.cost;
+    case 'satellite':
+      return SATELLITE.cost;
     case 'repair':
       return REPAIR_ORE_COST;
     case 'bank':
@@ -363,6 +375,23 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
         slot: 0,
         remaining: SHIELD.buildTime,
         total: SHIELD.buildTime,
+      });
+      return 'ok';
+    }
+    case 'satellite': {
+      // One radar satellite per station (feature f1) — validated exactly like a
+      // shield: under cap, affordable, then the ore is spent now and construction
+      // takes time (`SATELLITE.buildTime`), so the sensor is bought before the
+      // fight, not conjured mid-siege. Queued jobs count against the cap, so a
+      // player cannot buy their way past 1 by ordering two on one tick.
+      if (satelliteCount(station) >= SATELLITE.capPerStation) return 'cap-reached';
+      if (!spendOre(world, ship, SATELLITE.cost)) return 'cannot-afford';
+      station.builds.push({
+        id: world.nextEntityId++,
+        kind: 'satellite',
+        slot: 0,
+        remaining: SATELLITE.buildTime,
+        total: SATELLITE.buildTime,
       });
       return 'ok';
     }
@@ -529,10 +558,20 @@ function advanceConstruction(world: World, station: MiningStation, dt: number): 
       job.remaining = 0;
       completed = true;
       if (job.kind === 'turret') station.turrets.push(makeTurret(world, station, job.slot));
+      else if (job.kind === 'satellite') satellitesOf(station).push(makeSatellite(world, station));
       else station.shields.push(makeShield(world));
     }
   }
   if (completed) station.builds = station.builds.filter((j) => j.remaining > 0);
+}
+
+/** The station's satellite array, materialised if a foreign literal omitted it —
+ *  so a completed build has somewhere to land. The sim's own stations always
+ *  carry `[]` (`makeStation`); this only ever fires for a hand-built fixture that
+ *  then had a satellite constructed on it. */
+function satellitesOf(station: MiningStation): RadarSatellite[] {
+  if (!station.satellites) station.satellites = [];
+  return station.satellites;
 }
 
 function makeTurret(world: World, station: MiningStation, slot: number): Turret {
@@ -581,6 +620,94 @@ function regenShields(station: MiningStation, dt: number): void {
 // Repair is no longer a per-tick channel — a purchase resolves in full inside
 // `placeOrder` (spend 1 ore, add REPAIR_HP_PER_ORE, clamp), so there is nothing
 // to advance here each tick (developer amendment, 2026-07-26).
+
+// ---------------------------------------------------------------------------
+// Radar satellites — build, orbit, damage, sweep (RATIFIED feature f1)
+// ---------------------------------------------------------------------------
+
+/** The orbit radius a satellite rides at: the station surface plus its outboard
+ *  mount band (`SATELLITE.mountOffset`) plus its own radius — clear of the turret
+ *  ring and the shield bubble, so it is attackable from outside the shield. */
+export function satelliteOrbitRadius(station: MiningStation): number {
+  return station.radius + SATELLITE.mountOffset + SATELLITE.radius;
+}
+
+/** The world position of a satellite at rim angle `angle` around a station — its
+ *  orbit point. `pos` is recomputed from `orbitAngle` every tick, so the sprite
+ *  and sensor origin track the orbit. Mirrors `turretOrbitPos`, one band out. */
+export function satelliteOrbitPos(station: MiningStation, angle: number): { x: number; y: number } {
+  const r = satelliteOrbitRadius(station);
+  return { x: station.pos.x + Math.cos(angle) * r, y: station.pos.y + Math.sin(angle) * r };
+}
+
+/** Build one radar satellite for `station`, born in its orbit band (feature f1).
+ *  Its start angle is offset a half-turn from the station's outward spoke so it
+ *  sits angularly clear of turret slot 0 (which starts on the spoke) — the
+ *  "angular separation from turrets" the brief asks for; it then orbits from
+ *  there. Byte-for-byte deterministic (no RNG): the angle is pure geometry. */
+function makeSatellite(world: World, station: MiningStation): RadarSatellite {
+  const orbitAngle = station.angle + Math.PI;
+  const pos = satelliteOrbitPos(station, orbitAngle);
+  return {
+    id: world.nextEntityId++,
+    owner: station.owner,
+    pos: { x: pos.x, y: pos.y },
+    radius: SATELLITE.radius,
+    hp: SATELLITE.hp,
+    maxHp: SATELLITE.hp,
+    orbitAngle,
+  };
+}
+
+/**
+ * Advance every live satellite one tick: it simply ORBITS its station at
+ * `SATELLITE.orbitSpeed` (unlike a turret, which slides to face a threat), so
+ * `orbitAngle` steps forward and `pos` is rederived from it (feature f1).
+ * Zero per-frame allocation — `pos` is written in place (GDD §4.3). A dead
+ * station's satellites were zeroed by `destroyCore`, and a satellite killed this
+ * tick (hp ≤ 0) stops orbiting until `sweepDeadSatellites` removes it at end of
+ * step — it is also no longer a sensor source the instant its HP hits zero
+ * (`./sensing` reads only hp > 0), so its coverage collapses the same tick.
+ */
+export function updateSatellites(world: World, dt: number): void {
+  const step = SATELLITE.orbitSpeed * dt;
+  for (const station of world.stations) {
+    if (!station.alive || !station.satellites) continue;
+    for (const sat of station.satellites) {
+      if (sat.hp <= 0) continue;
+      let a = sat.orbitAngle + step;
+      if (a >= 2 * Math.PI) a -= 2 * Math.PI;
+      sat.orbitAngle = a;
+      sat.pos.x = station.pos.x + Math.cos(a) * satelliteOrbitRadius(station);
+      sat.pos.y = station.pos.y + Math.sin(a) * satelliteOrbitRadius(station);
+    }
+  }
+}
+
+/**
+ * Apply `amount` damage to a satellite (feature f1 — it is ATTACKABLE). Left in
+ * the array at zero HP until {@link sweepDeadSatellites} runs at end of step, so
+ * two shots landing on it in one tick index a stable array — the same discipline
+ * as {@link damageTurret}. Returns true if the hit landed.
+ */
+export function damageSatellite(sat: RadarSatellite, amount: number): boolean {
+  if (amount <= 0 || sat.hp <= 0) return false;
+  sat.hp -= amount;
+  if (sat.hp < 0) sat.hp = 0;
+  return true;
+}
+
+/** End-of-tick cleanup: drop satellites killed this tick (feature f1), mirroring
+ *  {@link sweepDeadTurrets}. Allocates only on the ticks a satellite actually
+ *  died; its coverage already collapsed the tick its HP hit zero. */
+export function sweepDeadSatellites(world: World): void {
+  for (const station of world.stations) {
+    if (!station.satellites) continue;
+    let dead = false;
+    for (const s of station.satellites) if (s.hp <= 0) dead = true;
+    if (dead) station.satellites = station.satellites.filter((s) => s.hp > 0);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Damage routing — shields stand in front of the core

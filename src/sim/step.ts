@@ -58,13 +58,16 @@ import {
   placeOrder,
   stationOf,
   stationTargetRadius,
+  sweepDeadSatellites,
   sweepDeadTurrets,
+  updateSatellites,
   updateStations,
   updateTurrets,
 } from './buildings';
 import { areEnemies } from './allegiance';
 import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
+import { updateSensory } from './sensing';
 import { ledgerAdd } from './ore-ledger';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, OreChunk, MiningStation, Ship, World } from './state';
@@ -267,6 +270,10 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   //    shot off, and a ship shot fired this tick advances and can strike this
   //    tick. The asteroid broad phase (`hash`) narrows each shot's rock test.
   updateTurrets(world, dt);
+  // 8a. Radar satellites orbit their stations (feature f1) — advanced here, with
+  //     the other station bodies and before the projectile sweep, so a shot this
+  //     tick collides with each satellite at its fresh orbit position.
+  updateSatellites(world, dt);
   updateProjectiles(world, hash, dt);
 
   // 8b. Auto-deposit: a ship docked at its own station drains its hold into the
@@ -284,11 +291,21 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   //     stable array (GDD §4.8).
   world.asteroids = world.asteroids.filter((a) => a.ore > 1e-9);
   sweepDeadTurrets(world);
+  // Drop radar satellites killed this tick (feature f1); their coverage already
+  // collapsed the tick their HP hit zero (`./sensing` reads only hp > 0).
+  sweepDeadSatellites(world);
 
   // 11. The match itself: enter collapse when the field is spent, and resolve a
   //     winner when one home is left standing (GDD §1, §2.3). Last, so a core
   //     that died anywhere in this tick is counted in this tick's result.
   updateMatch(world, dt);
+
+  // 12. Fold this tick's sensor coverage into the per-player "remembered
+  //     geography" memory (feature f1) — the minimap fog's persistent half. Last,
+  //     after every body (including a core `updateMatch` just took) has its final
+  //     tick position/liveness, so what a player remembers matches what they could
+  //     see this tick. A pure read-model fold: it writes only `world.sensory`.
+  updateSensory(world);
 
   return world;
 }
@@ -478,6 +495,7 @@ type AimTarget =
   | { kind: 'asteroid'; index: number }
   | { kind: 'ship'; index: number }
   | { kind: 'turret'; station: number; index: number }
+  | { kind: 'satellite'; station: number; index: number }
   | { kind: 'station'; station: number };
 
 /**
@@ -598,8 +616,9 @@ function holdFull(ship: Ship): boolean {
 }
 
 /**
- * TIER 1 — the closest enemy ship, turret, or core within engagement range whose
- * line of sight is clear, across the full 360° with no front arc (GDD §2.4). Your
+ * TIER 1 — the closest enemy ship, turret, radar satellite, or core within
+ * engagement range whose line of sight is clear, across the full 360° with no
+ * front arc (GDD §2.4; the satellite is a f1 target). Your
  * own/allied fleet and home are never targets (`areEnemies`); a spawn-protected
  * ship or core is skipped exactly as a shot passes over it (the projectile
  * collision skips both, GDD §2.1) — acquiring one would aim auto-fire at an
@@ -637,6 +656,20 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
       if (losBlocked(world, ship.pos, turret.pos)) continue;
       bestD2 = d2;
       best = { kind: 'turret', station: p, index: i };
+    }
+    // Radar satellites are legitimate high-value targets (feature f1, item 2): a
+    // besieger can pick off an enemy's sensor the same way it picks off a turret.
+    // A structure, so it ranks in tier 1 alongside turrets/core by proximity.
+    if (station.satellites) {
+      for (let i = 0; i < station.satellites.length; i++) {
+        const sat = station.satellites[i]!;
+        if (sat.hp <= 0) continue;
+        const d2 = dist2(ship.pos, sat.pos);
+        if (d2 >= bestD2) continue;
+        if (losBlocked(world, ship.pos, sat.pos)) continue;
+        bestD2 = d2;
+        best = { kind: 'satellite', station: p, index: i };
+      }
     }
     if (!station.alive || station.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, station.pos);
@@ -720,6 +753,8 @@ function targetPos(world: World, hit: AimTarget): Vec2 {
       return world.ships[hit.index]!.pos;
     case 'turret':
       return world.stations[hit.station]!.turrets[hit.index]!.pos;
+    case 'satellite':
+      return world.stations[hit.station]!.satellites![hit.index]!.pos;
     case 'station':
       return world.stations[hit.station]!.pos;
   }

@@ -40,3 +40,5 @@ export * from './projectiles';
 export * from './damage';
 // Read model: every firing ship + turret this tick, for the renderer / audio.
 export * from './combat-view';
+// Read model: the per-player minimap fog-of-war sensed-set (radar satellite, f1).
+export * from './sensing';

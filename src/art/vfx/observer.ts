@@ -115,10 +115,12 @@ export interface ShieldView {
   readonly radius: number;
 }
 
-/** What the observer reads off a build job. */
+/** What the observer reads off a build job. `satellite` is the ratified radar
+ *  satellite (feature f1) — widened here so a sim `World` still satisfies
+ *  `WorldView`; art's construction tell handles it like the other kinds. */
 export interface BuildJobView {
   readonly id: number;
-  readonly kind: 'turret' | 'shield';
+  readonly kind: 'turret' | 'shield' | 'satellite';
   readonly remaining: number;
 }
 

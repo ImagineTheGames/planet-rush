@@ -286,6 +286,36 @@ export interface Turret {
   muzzle?: Muzzle | null;
 }
 
+/**
+ * A **radar satellite** — a buildable body that orbits its owner's station and,
+ * while alive, projects the LARGE sensor coverage that lifts the minimap fog
+ * (RATIFIED developer feature f1: "build a radar satellite … it orbits around the
+ * mining station and can be attacked"). It reuses the turret orbit-ring geometry
+ * (`turretOrbitPos`-style), in its own outboard band (`SATELLITE.mountOffset`),
+ * but — unlike a turret, which slides to face a threat — it simply ORBITS at a
+ * constant angular speed, so `orbitAngle` advances every tick.
+ *
+ * It has HP and is a legitimate high-value siege target (the ship weapon's target
+ * ladder and the auto-aim include it); killing it removes it as a sensor source
+ * the same tick, collapsing that coverage (`./sensing` reads only alive
+ * satellites). One per station (`SATELLITE.capPerStation`), stored in an array on
+ * the {@link MiningStation} so the build-cap/construction/damage/sweep paths match
+ * turrets and shields exactly.
+ */
+export interface RadarSatellite {
+  readonly id: number;
+  /** The station owner's slot — a satellite is only ever your own until it dies. */
+  readonly owner: PlayerId;
+  pos: Vec2;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  /** Angular position around the station rim (radians), advanced every tick at
+   *  `SATELLITE.orbitSpeed`. `pos` is derived from this each tick, so the sprite
+   *  and the sensor origin track the orbit (`updateSatellites`). */
+  orbitAngle: number;
+}
+
 /** A shield generator's bubble over the core (GDD §2.5). Stacks to two; each
  *  generator is its own HP pool and regenerates independently, so the second
  *  shield doubles both the buffer and the recovery rate. */
@@ -302,7 +332,7 @@ export interface Shield {
  *  remains. */
 export interface BuildJob {
   readonly id: number;
-  readonly kind: 'turret' | 'shield';
+  readonly kind: 'turret' | 'shield' | 'satellite';
   /** Reserved mount slot (turrets only; 0 for shields) — held for the whole
    *  build so two queued turrets can never claim the same mount. */
   readonly slot: number;
@@ -378,6 +408,17 @@ export interface MiningStation {
   repairCooldown?: number;
   turrets: Turret[];
   shields: Shield[];
+  /**
+   * Radar satellites orbiting this station (RATIFIED feature f1) — one per station
+   * (`SATELLITE.capPerStation`), an array so the build/damage/sweep paths mirror
+   * `turrets`/`shields`. Optional so the `MiningStation` literals other agents build
+   * (net decode, render/bot fixtures) keep compiling — an absent array reads as
+   * "no satellites", the same backward-compatible discipline as `team`; the sim's
+   * own stations always carry it (`makeStation` sets `[]`). Never on the per-tick
+   * snapshot — a satellite is a static-ish structure the client rebuilds from
+   * entity events (like turrets/shields), same as `derelict`.
+   */
+  satellites?: RadarSatellite[];
   builds: BuildJob[];
 }
 
@@ -433,6 +474,29 @@ export interface Projectile {
 export interface Bounds {
   width: number;
   height: number;
+}
+
+/**
+ * Per-player sensory MEMORY — the "remembered once seen" half of the minimap
+ * fog-of-war (RATIFIED feature f1, item 1). Live entities (ships, projectiles,
+ * satellites) are recomputed from CURRENT coverage every read, so they need no
+ * memory; but static geography a player has scouted stays on the minimap after
+ * their coverage moves off it, and that persistence has to be stored.
+ *
+ * Kept deliberately tiny and serializable: `seenStations[playerId]` is a BITMASK
+ * of station board-ids (`MiningStation.id`, 0..7 — well under 32 bits) that player
+ * has ever sensed. Monotonic — bits are only ever set, never cleared — so
+ * "remembered" grows as a match is explored. Plain numbers, so it hashes and
+ * snapshots with the rest of the world and can never desync a replay
+ * (`./sensing` `updateSensory` writes it; `sensedState` reads it).
+ *
+ * Determinism: derived purely from world state each tick, so a replay from the
+ * same inputs reproduces it exactly. It is sim-internal read-model support, not on
+ * the per-tick network snapshot — a client runs the same sim and recomputes it.
+ */
+export interface SensoryMemory {
+  /** `seenStations[playerId]` = bitmask of remembered `MiningStation.id`s. */
+  seenStations: number[];
 }
 
 /**
@@ -525,6 +589,15 @@ export interface World {
    * a determinism hash.
    */
   ledger?: OreLedger;
+  /**
+   * Per-player sensory memory — the "remembered once seen" static geography of the
+   * minimap fog (RATIFIED feature f1; see {@link SensoryMemory}). Optional so the
+   * hand-built worlds other lanes construct keep satisfying the interface;
+   * `createWorld` always attaches one, `./sensing` `updateSensory` maintains it, and
+   * `sensedState` degrades gracefully when it is absent (it still reports currently
+   * covered + own stations, just without cross-tick memory).
+   */
+  sensory?: SensoryMemory;
 }
 
 // ---------------------------------------------------------------------------
@@ -642,6 +715,7 @@ function makeStation(spec: PlayerSpec, index: number, pos: Vec2, angle: number):
     repairCooldown: 0,
     turrets: [],
     shields: [],
+    satellites: [],
     builds: [],
   };
 }
@@ -676,8 +750,16 @@ function makeDerelictStation(index: number, pos: Vec2, angle: number): MiningSta
     repairCooldown: 0,
     turrets: [],
     shields: [],
+    satellites: [],
     builds: [],
   };
+}
+
+/** A fresh per-player sensory memory: nobody has scouted anything yet (every
+ *  mask starts at 0). One slot per live player (`./sensing` `updateSensory` fills
+ *  them each tick, own station included on the first pass). */
+function initialSensory(playerCount: number): SensoryMemory {
+  return { seenStations: new Array<number>(playerCount).fill(0) };
 }
 
 /** A fresh match's clock: nothing has spawned, collapsed, or been won yet. */
@@ -779,6 +861,10 @@ export function createWorld(config: WorldConfig): World {
     economy,
     match: initialMatch(),
     ledger: makeLedger(),
+    // Per-player minimap fog memory (feature f1): one slot per live player, all
+    // masks 0 (nothing scouted yet). `step`'s sensory pass fills them from tick 1,
+    // starting with each player's own station (always in its own coverage).
+    sensory: initialSensory(config.players.length),
   };
 
   // The fair opening layout, before the fight begins (field rule v0.1.2): the

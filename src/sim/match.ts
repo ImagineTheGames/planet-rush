@@ -113,6 +113,10 @@ export function destroyCore(world: World, station: MiningStation): void {
   station.repairing = false;
   for (const t of station.turrets) t.hp = 0;
   for (const s of station.shields) s.hp = 0;
+  // Radar satellites die with the station (feature f1): zero their HP so their
+  // sensor coverage collapses this tick and `sweepDeadSatellites` clears them at
+  // end of step, exactly as the turrets above are handled.
+  if (station.satellites) for (const sat of station.satellites) sat.hp = 0;
   station.builds.length = 0;
   for (const p of world.projectiles) {
     if (p.active && p.owner === station.owner) p.active = false;
