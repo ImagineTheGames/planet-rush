@@ -1198,5 +1198,25 @@
     "buildSha": "18d31de",
     "attestation": "Same continuous booted session, final state. The staged satellite was killed through __minimapStage.killSatellite (zeroes its HP; src/sim/sensing counts only a satellite with hp>0 as a sensor source). VISIBLE: the LARGE coverage disc is GONE — the overlay is dark vacuum again, back to only the own ship + station discs; the enemy dots the satellite had bought have VANISHED, leaving just the highlighted own-ship dot and the one near-enemy dot inside the surviving own sensors. Counts collapse: coverageCount 3→2, enemy dots shipCount 3→1, satelliteCount 1→0. CAPTIONED TICK NUMBERS: the satellite died at tick 152 and the drawn map showed the collapse by tick 164 — the sim drops the sensor source the same tick the satellite dies, and the minimap's own redraw is throttled to ~1/sec, which accounts for the small tick window between the kill and the drawn collapse. Sight was bought and then shot down; the strategic map went dark with it. Zero page errors.",
     "verdict": "verified"
+  },
+  {
+    "id": "repair-cooldown",
+    "title": "Station repair has a 15s cooldown — a repair lands, taps do nothing for 15s, then it re-arms and a second repair lands (p12)",
+    "area": "build-wheel",
+    "image": "images/repair-cooldown.png",
+    "capturedAt": "2026-07-28T21:05:00Z",
+    "buildSha": "35c2595",
+    "attestation": "Three frames from ONE continuous cooldown timeline on the live booted client (?debug=1, NO freeze); every press is a REAL pointerdown on the drawn REPAIR REACTOR wedge via the shipped __repairStage seam (the seam only sieged the local core to 10/100 and funded 10 ore — the repairs and the gate are the real sim). PANEL 1 (LAND, tick 480): one real tap lands a repair — the HOME core bar reads 25/100 (up from 10, +15 HP) and the wheel hub reads 9 ORE (down from 10, -1); the REPAIR REACTOR wedge shows '+15 HP' over cost '1'. PANEL 2 (GATED, 1.63s into the window): four rapid real taps land ZERO effect — the core bar is STILL 25/100 and the hub is STILL 9 ORE (coreFrozen=true, bankFrozen=true in the readback); the sim refused every tap 'cooling-down', spending nothing. PANEL 3 (RE-ARM, 15.52s elapsed by sim ticks, tick 1443): after the 15s gate drains, a real tap lands a SECOND repair — the core bar reads 40/100 (up from 25, +15 HP, now blue-filled) and the hub reads 8 ORE (down from 9, -1). Elapsed-seconds are derived from fixed sim ticks (TICK_DT 1/60), not wall-clock; the MATCH clock corroborates (0:09 -> 0:11 -> 0:25). This proves the 15s per-station cooldown is real and enforced: repair is one purchase every 15s, not one every frame. FINDING (see repair-cooldown-countdown-ui): the gate is INVISIBLE in the wedge — during the lockout (panel 2) the wedge is pixel-indistinguishable from the pressable state (panel 1), still drawing '+15 HP' ready=true with no 'REPAIR in Ns' countdown; the enforcement is entirely sim-side. Zero page errors across the run.",
+    "verdict": "verified"
+  },
+  {
+    "id": "repair-cooldown-countdown-ui",
+    "title": "FINDING: the 15s repair lockout is INVISIBLE in the wheel — no \"REPAIR in Ns\" countdown, the wedge stays \"+15 HP\" ready while every tap is silently refused",
+    "area": "build-wheel",
+    "image": "images/p12-cooldown-B-gated.png",
+    "capturedAt": "2026-07-28T21:05:00Z",
+    "buildSha": "35c2595",
+    "attestation": "Standalone gated frame (?debug=1, live), 1.63s into a 15s repair cooldown, after four rapid REAL taps on the REPAIR REACTOR wedge that the sim refused 'cooling-down' (core frozen at 25/100, hub frozen at 9 ORE — confirmed against the p12-cooldown-A-land frame where the same wedge/hub read identically before any tap was refused). What is VISIBLE: the REPAIR REACTOR wedge draws '+15 HP' over cost '1', full-brightness, exactly as it does when a repair is actually available. What is NOT visible: any countdown ('REPAIR in Ns'), any dimming, greying, or reason copy indicating the station is on cooldown. A player looking at this frame has no way to know the repair is locked out — they see a ready, pressable '+15 HP' deal that silently does nothing. This matches the shipped code: src/ui/build-wheel.ts repairWedgeInfo()/segmentState() have NO cooling-down branch (they only handle collapsed / reactor-full / affordability), and the sim's per-station station.repairGate is not read by any UI accessor. The 15s cooldown (PR #203, sim p12) is fully enforced in the sim but its player-facing 'REPAIR in Ns' countdown is a cross-lane follow-up that is NOT YET WIRED. Verdict failed: the countdown affordance the brief calls for does not exist on the shipped client.",
+    "verdict": "failed"
   }
 ]
