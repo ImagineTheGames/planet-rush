@@ -186,12 +186,21 @@ export interface BuildAction {
  * {@link UpgradeOrderAction}.
  *
  * - `turret` / `shield` — pay the cost now, construction takes time.
+ * - `satellite` — a **radar satellite**: a buildable body that orbits the
+ *               station and provides LARGE sensor coverage; pay the cost now,
+ *               construction takes time (RATIFIED developer feature f1 — "build a
+ *               radar satellite … it orbits around the mining station and can be
+ *               attacked"). One per station (upgrade tiers may extend range
+ *               later); it has HP and is a legitimate high-value siege target, so
+ *               killing it collapses that coverage. Data-driven: the sim owns the
+ *               cost/build-time/orbit tunables (`SATELLITE`), the wheel appears for
+ *               free off this entry.
  * - `repair`  — open the repair channel on your own core (a channel, not a
  *               purchase: it consumes ore as it ticks and any core/shield
  *               damage interrupts it).
  * - `bank`    — move the ship's held ore into the safe banked total.
  */
-export type BuildItem = 'turret' | 'shield' | 'repair' | 'bank';
+export type BuildItem = 'turret' | 'shield' | 'satellite' | 'repair' | 'bank';
 
 /**
  * Confirm a Build & Upgrade wheel segment (GDD §2.5). Distinct from
