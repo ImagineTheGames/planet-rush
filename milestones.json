@@ -92,7 +92,7 @@
     },
     {
       "day": 2,
-      "title": "Planets, defenses, win/loss",
+      "title": "Stations, defenses, win/loss",
       "test_notes": "Build turrets, a shield, and run the repair channel at your station; trigger the under-attack alarm. Win/loss and the last-to-die rule fire against do-nothing bots.",
       "done": true
     },
