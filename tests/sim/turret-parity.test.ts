@@ -92,6 +92,9 @@ const BUILD_PATHS: Record<BuildItem, PlayerPath> = {
   // bot uses. (Its tier ladder gets its own reachability sweep below.)
   turret: ({ world, ship }) => expect(placeOrder(world, ship, 'turret')).toBe('ok'),
   shield: ({ world, ship }) => expect(placeOrder(world, ship, 'shield')).toBe('ok'),
+  // The radar satellite (feature f1) is fielded through the SAME order path a bot
+  // uses — one per station, built at your docked home like a turret/shield.
+  satellite: ({ world, ship }) => expect(placeOrder(world, ship, 'satellite')).toBe('ok'),
   repair: ({ world, ship, station }) => {
     damageStation(world, station, 10); // a repair purchase needs a wound to heal
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
