@@ -8,7 +8,7 @@
  * built in from M1 rather than retrofitted. Particles are where a VFX set breaks
  * that promise, because the natural way to write them (`particles.push({...})`
  * per spark) allocates on exactly the frames that are already the worst ones:
- * an explosion, a wave landing, a planet dying.
+ * an explosion, a wave landing, a station dying.
  *
  * So this pool buys its storage **once**, in the constructor, and never again:
  *

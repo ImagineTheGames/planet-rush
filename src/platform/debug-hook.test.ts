@@ -274,7 +274,7 @@ describe('installDebugStage — armed path (?debug=1)', () => {
     const stage = stageOf(win)!;
     expect(stage.coreHp(0)).toBe(1000);
     expect(stage.coreHp(5)).toBe(400);
-    expect(stage.coreHp(7), 'null for a player with no planet').toBeNull();
+    expect(stage.coreHp(7), 'null for a player with no station').toBeNull();
   });
 
   it('applied write and read agree: a drained damageCore drops the core HP the read reports', () => {

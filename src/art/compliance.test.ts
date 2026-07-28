@@ -112,7 +112,7 @@ describe('the RESERVED rule across the whole catalogue (style-guide §2)', () =>
     // Every generator family is represented, so "compliant" means the art set,
     // not a sample of it.
     const names = ALL_SPRITES.map((d) => d.name).join(' ');
-    for (const family of ['ship/', 'planet/', 'asteroid/', 'ore/', 'turret/', 'shield/', 'wreck/', 'build/']) {
+    for (const family of ['ship/', 'station/', 'asteroid/', 'ore/', 'turret/', 'shield/', 'wreck/', 'build/']) {
       expect(names, `catalogue has no ${family} sprites`).toContain(family);
     }
   });

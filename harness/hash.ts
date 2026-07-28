@@ -4,7 +4,7 @@
  * The determinism contract is one sentence — "same inputs, same final state
  * hash" (GDD §4.1, §4.8) — and this file is the second half of it. A hash is
  * only as strong as the state it covers, so this one covers **the whole world
- * tree**: every ship field, every asteroid, every chunk, every planet with its
+ * tree**: every ship field, every asteroid, every chunk, every station with its
  * turrets, shields and build jobs, every live projectile, and the match clock
  * itself.
  *
@@ -27,7 +27,7 @@
  * only — this file never edits `src/sim/`.
  */
 
-import type { Planet, Projectile, Ship, World } from '../src/sim';
+import type { MiningStation, Projectile, Ship, World } from '../src/sim';
 
 /** Quantisation applied to every float before hashing (see the module note). */
 const MICRO = 1e6;
@@ -93,8 +93,8 @@ function mixShip(f: Fnv, s: Ship): void {
   f.flag(s.firing);
 }
 
-/** Fold one planet, its defenses, and everything under construction. */
-function mixPlanet(f: Fnv, p: Planet): void {
+/** Fold one station, its defenses, and everything under construction. */
+function mixStation(f: Fnv, p: MiningStation): void {
   f.num(p.id);
   f.num(p.owner);
   f.num(p.pos.x);
@@ -186,8 +186,8 @@ export function hashState(world: World): string {
     f.num(c.amount);
   }
 
-  f.num(world.planets.length);
-  for (const p of world.planets) mixPlanet(f, p);
+  f.num(world.stations.length);
+  for (const p of world.stations) mixStation(f, p);
 
   f.num(world.projectiles.length);
   for (const p of world.projectiles) mixProjectile(f, p);
@@ -218,14 +218,14 @@ export interface StateDigest {
   readonly ships: string;
   readonly asteroids: string;
   readonly chunks: string;
-  readonly planets: string;
+  readonly stations: string;
   readonly projectiles: string;
   readonly match: string;
   readonly counts: {
     readonly ships: number;
     readonly asteroids: number;
     readonly chunks: number;
-    readonly planets: number;
+    readonly stations: number;
     readonly liveProjectiles: number;
   };
 }
@@ -268,8 +268,8 @@ export function stateDigest(world: World): StateDigest {
         f.num(c.amount);
       }
     }),
-    planets: sub((f) => {
-      for (const p of world.planets) mixPlanet(f, p);
+    stations: sub((f) => {
+      for (const p of world.stations) mixStation(f, p);
     }),
     projectiles: sub((f) => {
       for (const p of world.projectiles) mixProjectile(f, p);
@@ -286,7 +286,7 @@ export function stateDigest(world: World): StateDigest {
       ships: world.ships.length,
       asteroids: world.asteroids.length,
       chunks: world.chunks.length,
-      planets: world.planets.length,
+      stations: world.stations.length,
       liveProjectiles: live,
     },
   };
@@ -295,7 +295,7 @@ export function stateDigest(world: World): StateDigest {
 /** The fields of two digests that disagree — the replay test's failure message. */
 export function digestDiff(a: StateDigest, b: StateDigest): string[] {
   const out: string[] = [];
-  const keys = ['ships', 'asteroids', 'chunks', 'planets', 'projectiles', 'match'] as const;
+  const keys = ['ships', 'asteroids', 'chunks', 'stations', 'projectiles', 'match'] as const;
   for (const k of keys) {
     if (a[k] !== b[k]) out.push(`${k}: ${a[k]} != ${b[k]}`);
   }

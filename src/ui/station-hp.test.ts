@@ -1,5 +1,5 @@
 /**
- * Own-planet HP tests (GDD §2.2, style-guide §3). The load-bearing contracts:
+ * Own-station HP tests (GDD §2.2, style-guide §3). The load-bearing contracts:
  *  - the bar is drawn in the **player's identity colour**, from the ratified
  *    8-slot roster — never a colour of its own;
  *  - shields read separately from the core, because shields stand in front of
@@ -10,12 +10,12 @@
 import { describe, it, expect } from 'vitest';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
 import {
-  planetHpModel,
-  planetHpFlashOn,
+  stationHpModel,
+  stationHpFlashOn,
   coreHpReadout,
   playerColor,
-  PLANET_CRITICAL_FRACTION,
-} from './planet-hp';
+  STATION_CRITICAL_FRACTION,
+} from './station-hp';
 import { CORE_HP, SHIELD } from '../sim/constants';
 
 describe('player colour (style-guide §3 — HP bars carry identity colour)', () => {
@@ -23,7 +23,7 @@ describe('player colour (style-guide §3 — HP bars carry identity colour)', ()
     for (let slot = 0; slot < PLAYER_COLORS.length; slot++) {
       expect(playerColor(slot)).toBe(PLAYER_COLORS[slot]);
     }
-    expect(planetHpModel(3, CORE_HP, CORE_HP).color).toBe(PLAYER_COLORS[3]);
+    expect(stationHpModel(3, CORE_HP, CORE_HP).color).toBe(PLAYER_COLORS[3]);
   });
 
   it('never picks signal yellow or threat red for identity (style-guide §3.1)', () => {
@@ -44,65 +44,65 @@ describe('player colour (style-guide §3 — HP bars carry identity colour)', ()
   });
 });
 
-describe('the core bar (GDD §2.2 — your own planet, top right)', () => {
+describe('the core bar (GDD §2.2 — your own station, top right)', () => {
   it('reads full at full HP and empty at zero', () => {
-    expect(planetHpModel(0, CORE_HP, CORE_HP).coreFraction).toBe(1);
-    expect(planetHpModel(0, 0, CORE_HP).coreFraction).toBe(0);
-    expect(planetHpModel(0, CORE_HP / 2, CORE_HP).coreFraction).toBeCloseTo(0.5);
+    expect(stationHpModel(0, CORE_HP, CORE_HP).coreFraction).toBe(1);
+    expect(stationHpModel(0, 0, CORE_HP).coreFraction).toBe(0);
+    expect(stationHpModel(0, CORE_HP / 2, CORE_HP).coreFraction).toBeCloseTo(0.5);
   });
 
   it('clamps out-of-range and degenerate inputs instead of overdrawing', () => {
-    expect(planetHpModel(0, 500, CORE_HP).coreFraction).toBe(1);
-    expect(planetHpModel(0, -20, CORE_HP).coreFraction).toBe(0);
-    expect(planetHpModel(0, 10, 0).coreFraction).toBe(0);
+    expect(stationHpModel(0, 500, CORE_HP).coreFraction).toBe(1);
+    expect(stationHpModel(0, -20, CORE_HP).coreFraction).toBe(0);
+    expect(stationHpModel(0, 10, 0).coreFraction).toBe(0);
   });
 
-  it('flags a destroyed core — the planet is a wreck now (GDD §2.7)', () => {
-    expect(planetHpModel(0, 0, CORE_HP).destroyed).toBe(true);
-    expect(planetHpModel(0, 1, CORE_HP).destroyed).toBe(false);
+  it('flags a destroyed core — the station is a wreck now (GDD §2.7)', () => {
+    expect(stationHpModel(0, 0, CORE_HP).destroyed).toBe(true);
+    expect(stationHpModel(0, 1, CORE_HP).destroyed).toBe(false);
   });
 });
 
 describe('the critical tell (threat red — style-guide §2)', () => {
   it('goes critical at or below a quarter core, and not above it', () => {
-    expect(planetHpModel(0, CORE_HP * 0.26, CORE_HP).critical).toBe(false);
-    expect(planetHpModel(0, CORE_HP * PLANET_CRITICAL_FRACTION, CORE_HP).critical).toBe(true);
-    expect(planetHpModel(0, CORE_HP * 0.1, CORE_HP).critical).toBe(true);
+    expect(stationHpModel(0, CORE_HP * 0.26, CORE_HP).critical).toBe(false);
+    expect(stationHpModel(0, CORE_HP * STATION_CRITICAL_FRACTION, CORE_HP).critical).toBe(true);
+    expect(stationHpModel(0, CORE_HP * 0.1, CORE_HP).critical).toBe(true);
   });
 
   it('stops flashing once the core is gone — there is nothing left to warn about', () => {
-    const dead = planetHpModel(0, 0, CORE_HP);
+    const dead = stationHpModel(0, 0, CORE_HP);
     expect(dead.critical).toBe(false);
-    expect(planetHpFlashOn(dead, 0)).toBe(false);
+    expect(stationHpFlashOn(dead, 0)).toBe(false);
   });
 
   it('uses threat red for the tell and identity colour for everything else', () => {
-    const m = planetHpModel(2, CORE_HP * 0.1, CORE_HP);
+    const m = stationHpModel(2, CORE_HP * 0.1, CORE_HP);
     expect(m.criticalColor).toBe(PALETTE.threatRed);
     expect(m.color).toBe(PLAYER_COLORS[2]);
   });
 
   it('blinks deterministically off match time, with no wall clock', () => {
-    const m = planetHpModel(0, CORE_HP * 0.1, CORE_HP);
-    expect(planetHpFlashOn(m, 0)).toBe(true);
-    expect(planetHpFlashOn(m, 1 / 6)).toBe(false);
-    expect(planetHpFlashOn(m, 2 / 6)).toBe(true);
+    const m = stationHpModel(0, CORE_HP * 0.1, CORE_HP);
+    expect(stationHpFlashOn(m, 0)).toBe(true);
+    expect(stationHpFlashOn(m, 1 / 6)).toBe(false);
+    expect(stationHpFlashOn(m, 2 / 6)).toBe(true);
     // A healthy core never flashes at all.
-    expect(planetHpFlashOn(planetHpModel(0, CORE_HP, CORE_HP), 0)).toBe(false);
+    expect(stationHpFlashOn(stationHpModel(0, CORE_HP, CORE_HP), 0)).toBe(false);
   });
 });
 
 describe('shields stand in front of the core (GDD §2.5)', () => {
   it('reports no shield when no generator is built', () => {
-    const m = planetHpModel(0, CORE_HP, CORE_HP);
+    const m = stationHpModel(0, CORE_HP, CORE_HP);
     expect(m.hasShield).toBe(false);
     expect(m.shieldFraction).toBe(0);
   });
 
   it('reports the pooled shield separately from the core', () => {
     // Two generators up, one of them half gone (GDD §2.5 — shields stack to 2).
-    const pool = SHIELD.hp * SHIELD.capPerPlanet;
-    const m = planetHpModel(0, CORE_HP, CORE_HP, pool * 0.75, pool);
+    const pool = SHIELD.hp * SHIELD.capPerStation;
+    const m = stationHpModel(0, CORE_HP, CORE_HP, pool * 0.75, pool);
     expect(m.hasShield).toBe(true);
     expect(m.shieldFraction).toBeCloseTo(0.75);
     expect(m.coreFraction).toBe(1);
@@ -111,7 +111,7 @@ describe('shields stand in front of the core (GDD §2.5)', () => {
   it('does not raise the critical tell while a shield is the thing being shot', () => {
     // The core is what "critical" is about; a full core behind a torn shield is
     // taking pressure, not dying.
-    const m = planetHpModel(0, CORE_HP, CORE_HP, 1, SHIELD.hp);
+    const m = stationHpModel(0, CORE_HP, CORE_HP, 1, SHIELD.hp);
     expect(m.critical).toBe(false);
   });
 });

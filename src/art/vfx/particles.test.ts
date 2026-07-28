@@ -7,7 +7,7 @@
  * per-frame allocations**"* — and risk 5 says that discipline is built in from
  * M1 rather than retrofitted. Particles are where a VFX set breaks it, because
  * the natural way to write them allocates on exactly the frames that are already
- * the worst: an explosion, a wave landing, a planet dying.
+ * the worst: an explosion, a wave landing, a station dying.
  *
  * So this file does two things a comment cannot:
  *
@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import { mulberry32 } from '@shared/types';
 import { PARTICLE_CAPACITY, ParticlePool } from './particles';
-import { asteroidBurst, explosion, planetDeath, thrusterTrail } from './emitters';
+import { asteroidBurst, explosion, stationDeath, thrusterTrail } from './emitters';
 import { TELL, TELL_COUNT, TellQueue } from '../tells';
 import { VfxField } from './field';
 
@@ -190,10 +190,10 @@ describe('TellQueue — the same discipline, one layer up', () => {
 describe('the busiest frame in the game', () => {
   /**
    * The scenario the capacity was chosen for, run end to end: a wave landing on
-   * a firefight next to a dying planet. If the pool were going to allocate, this
+   * a firefight next to a dying station. If the pool were going to allocate, this
    * is the frame it would do it on.
    */
-  it('a wave, a firefight and a planet death allocate nothing', () => {
+  it('a wave, a firefight and a station death allocate nothing', () => {
     const pool = new ParticlePool(PARTICLE_CAPACITY);
     const rng = mulberry32(7);
     const before = columns(pool);
@@ -203,7 +203,7 @@ describe('the busiest frame in the game', () => {
         for (let ship = 0; ship < 8; ship++) thrusterTrail(pool, rng, ship * 40, 0, 0, 1, ship, 1);
         for (let rock = 0; rock < 4; rock++) asteroidBurst(pool, rng, rock * 60, 100, 16, 1);
         explosion(pool, rng, 300, 300, 1, 1);
-        planetDeath(pool, rng, 900, 900, 64, 1);
+        stationDeath(pool, rng, 900, 900, 64, 1);
         pool.update(1 / 60);
       }
     });

@@ -10,7 +10,7 @@
  * This file is that assertion. It is not a smoke test with a hash bolted on: it
  * records a real eight-slot bot-vs-bot match tick by tick, rebuilds the world
  * **from the seed**, replays the recorded input stream into it, and compares the
- * full-state hash (`harness/hash.ts` — every ship, rock, chunk, planet, turret,
+ * full-state hash (`harness/hash.ts` — every ship, rock, chunk, station, turret,
  * shield, build job, projectile, and the match clock).
  *
  * Three properties are asserted, and the third is the one that makes the first
@@ -108,10 +108,10 @@ describe('the state hash can fail (negative controls)', () => {
     expect(hashState(w)).not.toBe(before);
   });
 
-  it('differs when a planet takes a single point of core damage', () => {
+  it('differs when a station takes a single point of core damage', () => {
     const w = createWorld({ seed: 4, players });
     const before = hashState(w);
-    w.planets[0]!.coreHp -= 1;
+    w.stations[0]!.coreHp -= 1;
     expect(hashState(w)).not.toBe(before);
   });
 

@@ -12,8 +12,8 @@
  *
  * The scrambler (below) rewrites, on a clone of a real mid-match world:
  *
- *   - the core and shield HP of every planet outside sensor range;
- *   - the turret count of every planet outside visual range;
+ *   - the core and shield HP of every station outside sensor range;
+ *   - the turret count of every station outside visual range;
  *   - every rival's held ore, banked ore and upgrade tiers — numbers the game
  *     never draws for anyone (GDD §2.2);
  *   - the hull, facing and velocity of every ship outside visual range;
@@ -39,7 +39,7 @@ import { botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harnes
 import { DEFAULT_PERCEPTION, perceive } from './perception';
 import { ROSTER } from './personalities';
 
-/** A full offline match, mid-flight: eight planets, the whole cast. */
+/** A full offline match, mid-flight: eight stations, the whole cast. */
 function match(seed: number): { world: World; bots: ReturnType<typeof createBots> } {
   const seats = fillEmptySlots();
   const world = createWorld({ seed, players: botLobby(seats) });
@@ -67,19 +67,19 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 
-  for (const planet of world.planets) {
-    if (planet.owner === id) continue;
-    const surface = Math.max(0, dist(eye, planet.pos) - planet.radius);
+  for (const station of world.stations) {
+    if (station.owner === id) continue;
+    const surface = Math.max(0, dist(eye, station.pos) - station.radius);
     if (surface > SENSOR_RANGE) {
       // Not scouted: the numbers are invisible, so they may be anything.
-      planet.coreHp = 1 + noise(rng, planet.maxCoreHp - 1);
-      planet.sinceDamage = noise(rng, 30);
-      planet.repairing = rng.next() < 0.5;
-      for (const shield of planet.shields) shield.hp = noise(rng, shield.maxHp);
+      station.coreHp = 1 + noise(rng, station.maxCoreHp - 1);
+      station.sinceDamage = noise(rng, 30);
+      station.repairing = rng.next() < 0.5;
+      for (const shield of station.shields) shield.hp = noise(rng, shield.maxHp);
     }
-    if (surface > DEFAULT_PERCEPTION.visualRange && planet.turrets.length > 0) {
+    if (surface > DEFAULT_PERCEPTION.visualRange && station.turrets.length > 0) {
       // Too far to count barrels: drop them all.
-      planet.turrets = [];
+      station.turrets = [];
     }
   }
 
@@ -166,7 +166,7 @@ describe('fog-honesty — the trees decide on the view, and only the view', () =
     // Hurt everyone: the retreat, defend and opportunity branches all become
     // live, so the comparison covers the parts of each tree that read HP.
     for (const ship of world.ships) ship.hull = ship.maxHull * 0.3;
-    for (const planet of world.planets) planet.coreHp = planet.maxCoreHp * 0.4;
+    for (const station of world.stations) station.coreHp = station.maxCoreHp * 0.4;
 
     for (const personality of ROSTER) {
       for (const id of [0, 3, 6]) {
@@ -190,7 +190,7 @@ describe('fog-honesty — the trees decide on the view, and only the view', () =
     expect(changed((w) => w.ships.reduce((sum, s) => sum + (s.id === 0 ? 0 : s.cargo + s.banked), 0))).toBe(true);
     expect(changed((w) => w.asteroids.reduce((sum, a) => sum + a.ore, 0))).toBe(true);
     // And at least one unscouted core is now telling a different story.
-    const cores = (w: World): number[] => w.planets.filter((p) => p.owner !== 0).map((p) => p.coreHp);
+    const cores = (w: World): number[] => w.stations.filter((p) => p.owner !== 0).map((p) => p.coreHp);
     expect(cores(lied)).not.toEqual(cores(world));
 
     // Meanwhile the view a bot is *given* is unchanged — which is the whole

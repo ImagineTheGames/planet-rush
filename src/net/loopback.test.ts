@@ -25,7 +25,7 @@ import { createLocalSession } from './session';
 import { decodeSnapshot, SHIP_FLAG } from './snapshot';
 import type { InputMessage, ServerMessage, SnapshotMessage } from './transport';
 
-// A four-slot match on a small field: enough ships, rocks, and planets for the
+// A four-slot match on a small field: enough ships, rocks, and stations for the
 // weapon, the tractor, and the build economy to all be in play, small enough that
 // a full deep-equal of two worlds is cheap.
 const MATCH: WorldConfig = {
@@ -59,7 +59,7 @@ function scriptedInput(player: number, tick: number): Action[] {
     { type: 'fire', active: rng.next() < 0.75, auto: player % 2 === 0 },
   ];
   // A wheel press every so often — validated and paid for by the sim, which is
-  // free to refuse it (wrong planet, no ore, cap reached). Either way both runs
+  // free to refuse it (wrong station, no ore, cap reached). Either way both runs
   // must refuse it the same way.
   if (tick % 97 === 0) actions.push({ type: 'buildOrder', item: 'turret' });
   return actions;

@@ -44,15 +44,15 @@ describe('controlsStripRows (GDD §2.4)', () => {
 });
 
 describe('controlsStripView — the Build row is contextual on docking (field report v0.2.2)', () => {
-  it('shows the live E key + full name when docked at your planet', () => {
+  it('shows the live E key + full name when docked at your station', () => {
     const rows = controlsStripView('keyboard', FireMode.Manual, false, true);
     const build = rows.find((r) => r.action === 'build');
-    expect(build?.binding, 'the key is live at the planet').toBe('E');
+    expect(build?.binding, 'the key is live at the station').toBe('E');
     expect(build?.label, 'named in full, never just BUILD (GDD §2.5)').toBe('Build & Upgrade');
     expect(build?.dimmed, 'a usable affordance is not dimmed').toBe(false);
   });
 
-  it('NEVER promises a dead key away from the planet — no key, dimmed hint instead', () => {
+  it('NEVER promises a dead key away from the station — no key, dimmed hint instead', () => {
     const rows = controlsStripView('keyboard', FireMode.Manual, false, false);
     const build = rows.find((r) => r.action === 'build');
     expect(build?.binding, 'no live "E" is advertised when the wheel cannot open').toBeNull();

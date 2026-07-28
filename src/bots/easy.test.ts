@@ -32,7 +32,7 @@ const NEUTRAL_WEIGHTS = { ...PERSONALITIES.rusty.weights, caution: 1 };
 /**
  * A quiet two-slot arena with the opening-seconds noise turned off: no rocks to
  * distract a miner, no spawn protection making the rival untouchable, and no
- * match-start alarm ringing on either home (a fresh planet's `sinceDamage` is
+ * match-start alarm ringing on either home (a fresh station's `sinceDamage` is
  * zero, which reads as "under attack" until the first two seconds have passed).
  */
 function arena(): World {
@@ -46,9 +46,9 @@ function arena(): World {
     asteroidCount: 0,
   });
   for (const ship of world.ships) ship.spawnProtect = 0;
-  for (const planet of world.planets) {
-    planet.spawnProtect = 0;
-    planet.sinceDamage = 999;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
   }
   return world;
 }
@@ -110,7 +110,7 @@ describe('Easy — retreats at half hull (GDD §2.9)', () => {
     const threshold = retreatThreshold(DIFFICULTY_TUNING[Difficulty.Easy], PERSONALITIES.rusty.weights);
     const { world, actions } = standoff(threshold - 0.2, 'rusty');
 
-    const home = world.planets.find((p) => p.owner === 0)!.pos;
+    const home = world.stations.find((p) => p.owner === 0)!.pos;
     const me = world.ships[0]!.pos;
     const dir = thrustOf(actions);
     // Thrust has a positive component toward home…
@@ -130,8 +130,8 @@ describe('Easy — over-defends, and attacks rarely (GDD §2.9)', () => {
   it('buys three turrets and a shield before it will touch the upgrade panel', () => {
     const world = arena();
     const me = world.ships[0]!;
-    const planet = world.planets.find((p) => p.owner === 0)!;
-    me.pos = { x: planet.pos.x, y: planet.pos.y - 100 }; // docked
+    const station = world.stations.find((p) => p.owner === 0)!;
+    me.pos = { x: station.pos.x, y: station.pos.y - 100 }; // docked
     me.banked = 100; // rich enough to buy anything on the list
 
     const plan = (): string => {
@@ -142,11 +142,11 @@ describe('Easy — over-defends, and attacks rarely (GDD §2.9)', () => {
 
     expect(plan()).toBe('turret');
     // Three turrets up: now the bubble.
-    planet.turrets = [0, 1, 2].map((slot) => ({
+    station.turrets = [0, 1, 2].map((slot) => ({
       id: 100 + slot,
       owner: 0,
       slot,
-      pos: { x: planet.pos.x, y: planet.pos.y },
+      pos: { x: station.pos.x, y: station.pos.y },
       radius: TURRET.radius,
       hp: TURRET.hp,
       maxHp: TURRET.hp,
@@ -157,7 +157,7 @@ describe('Easy — over-defends, and attacks rarely (GDD §2.9)', () => {
     expect(plan()).toBe('shield');
 
     // Guns and bubble both up, hold empty, ore to spare — only now the ship.
-    planet.shields = [{ id: 200, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius }];
+    station.shields = [{ id: 200, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius }];
     expect(plan()).toBe('cargo');
 
     // And a poor bot with the same fortress banks instead of overspending.

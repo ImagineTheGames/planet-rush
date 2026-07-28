@@ -1,16 +1,16 @@
 /**
- * src/ui/planet-hp.ts — your own planet's HP. OWNER: UI Engineer.
+ * src/ui/station-hp.ts — your own station's HP. OWNER: UI Engineer.
  *
- * Top-right of the HUD (GDD §2.2): "**your own planet's HP** (top right, in your
- * player color, mirrored as a bar over the planet itself)". It is one of the
+ * Top-right of the HUD (GDD §2.2): "**your own station's HP** (top right, in your
+ * player color, mirrored as a bar over the station itself)". It is one of the
  * five things the HUD shows at all times, because it is the loss condition
  * (GDD §1) and therefore something the player acts on.
  *
- * **Your own planet only.** Enemy planet health is scouted, never broadcast
+ * **Your own station only.** Enemy station health is scouted, never broadcast
  * (GDD §2.2, style-guide §5): a rival's HP appears as a damage ring on that
- * planet within sensor range, and never as a HUD bar. This module models one
- * bar, for one planet — the local player's — and there is deliberately no code
- * path here that takes another player's planet.
+ * station within sensor range, and never as a HUD bar. This module models one
+ * bar, for one station — the local player's — and there is deliberately no code
+ * path here that takes another player's station.
  *
  * Colour: **the player's identity colour** (style-guide §3 rule 2 — HP bars are
  * one of the six places identity colour is allowed). The roster is read from the
@@ -27,10 +27,10 @@ import { livingWhole } from './healthbar';
 
 /** Core fraction at or below which the bar reads as critical and flashes. The
  *  fraction, not an HP number: a damage ring is a shape, not a readout. TUNABLE */
-export const PLANET_CRITICAL_FRACTION = 0.25;
+export const STATION_CRITICAL_FRACTION = 0.25;
 
-/** The own-planet HP element for one frame. */
-export interface PlanetHpModel {
+/** The own-station HP element for one frame. */
+export interface StationHpModel {
   /** Core HP as a fraction 0..1 — the bar's fill. */
   readonly coreFraction: number;
   /** Pooled shield HP as a fraction of full shields, 0..1. Shields stand in
@@ -42,9 +42,9 @@ export interface PlanetHpModel {
   readonly color: number;
   /** Colour of the critical tell — threat red (style-guide §2). */
   readonly criticalColor: number;
-  /** True at or below {@link PLANET_CRITICAL_FRACTION}: the bar flashes. */
+  /** True at or below {@link STATION_CRITICAL_FRACTION}: the bar flashes. */
   readonly critical: boolean;
-  /** True once the core is gone — the planet is a wreck (GDD §2.7). */
+  /** True once the core is gone — the station is a wreck (GDD §2.7). */
   readonly destroyed: boolean;
 }
 
@@ -57,7 +57,7 @@ export function playerColor(id: PlayerId): number {
 }
 
 /**
- * Build the own-planet HP model.
+ * Build the own-station HP model.
  *
  * @param owner       The local player's slot — selects the identity colour.
  * @param coreHp      Current core HP.
@@ -65,13 +65,13 @@ export function playerColor(id: PlayerId): number {
  * @param shieldHp    Pooled shield HP standing over the core, 0 when none.
  * @param maxShieldHp Pooled shield HP at full, 0 when no generator is built.
  */
-export function planetHpModel(
+export function stationHpModel(
   owner: PlayerId,
   coreHp: number,
   maxCoreHp: number,
   shieldHp = 0,
   maxShieldHp = 0,
-): PlanetHpModel {
+): StationHpModel {
   const coreFraction = maxCoreHp > 0 ? clamp01(coreHp / maxCoreHp) : 0;
   const shieldFraction = maxShieldHp > 0 ? clamp01(shieldHp / maxShieldHp) : 0;
   return {
@@ -82,7 +82,7 @@ export function planetHpModel(
     criticalColor: PALETTE.threatRed,
     // A core standing behind a shield is not yet in danger — the shield is what
     // is being shot (GDD §2.5), so the critical tell waits until it is the core.
-    critical: coreFraction > 0 && coreFraction <= PLANET_CRITICAL_FRACTION,
+    critical: coreFraction > 0 && coreFraction <= STATION_CRITICAL_FRACTION,
     destroyed: coreFraction <= 0,
   };
 }
@@ -101,7 +101,7 @@ export function planetHpModel(
  *
  * This is a *readout*, not a rate — the "no numbers but cost on the wheel" rule
  * (build-wheel.ts) is about the Build wheel; the HP bar has always been allowed to
- * state your own planet's health (GDD §2.2, the loss condition).
+ * state your own station's health (GDD §2.2, the loss condition).
  */
 export function coreHpReadout(coreHp: number, maxCoreHp: number): string {
   const max = Math.max(0, Number.isFinite(maxCoreHp) ? Math.round(maxCoreHp) : 0);
@@ -114,7 +114,7 @@ export function coreHpReadout(coreHp: number, maxCoreHp: number): string {
  * as the ore HUD's full-hold blink. ~3 Hz: faster than the ore flash, because
  * this one means something worse.
  */
-export function planetHpFlashOn(model: PlanetHpModel, timeSeconds: number): boolean {
+export function stationHpFlashOn(model: StationHpModel, timeSeconds: number): boolean {
   if (!model.critical) return false;
   return Math.floor(timeSeconds * 6) % 2 === 0;
 }

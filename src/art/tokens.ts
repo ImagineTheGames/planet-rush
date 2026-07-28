@@ -46,7 +46,7 @@ export const PALETTE = {
   hullSteel: 0x7e8894,
   /** Corrosion, continents, the repair channel. The "old system" tint. */
   patina: 0x4fa08b,
-  /** Ore, hazard stripes, costs, the planet core. **RESERVED** (§2). */
+  /** Ore, hazard stripes, costs, the station core. **RESERVED** (§2). */
   signalYellow: 0xf2d24b,
   /** Weapon fire, cockpits, energy. The cold cutting-torch blue. */
   plasma: 0x4dc3ff,
@@ -141,9 +141,9 @@ export const MATERIALS = {
   ember: {
     bases: ['signalYellow', 'threatRed'],
     reads:
-      'The two warm signals, both load-bearing: signal yellow = ore and the planet core ("this matters"), threat red = damage, alarm and enemy fire ("this hurts"). Warmth is rationed to meaning — there is no decorative amber in Cold Vacuum (both hues are RESERVED, §2).',
+      'The two warm signals, both load-bearing: signal yellow = ore and the station core ("this matters"), threat red = damage, alarm and enemy fire ("this hurts"). Warmth is rationed to meaning — there is no decorative amber in Cold Vacuum (both hues are RESERVED, §2).',
     shades: [
-      { hex: 0xfff6c8, where: 'The hot lit centre of the planet core' },
+      { hex: 0xfff6c8, where: 'The hot lit centre of the station core' },
       { hex: 0xffd9d3, where: 'Bright inner pass of enemy-fire / the alarm tell' },
     ],
   },
@@ -166,14 +166,14 @@ export const MATERIALS = {
 
 /**
  * Stroke weights, in px at the concept-board reference scale (a hero ship ≈ 90px
- * wide, a planet ≈ 130px across — ui-mockup viewBox 1280×720, element studies
+ * wide, a station ≈ 130px across — ui-mockup viewBox 1280×720, element studies
  * 230×130). Generators express these relative to sprite size; a form brief scales
  * from the ratios below. Cold Vacuum's read comes from a crisp, consistent ink
  * outline, not from detail — so the weight scale is short on purpose.
  */
 export const LINE = {
   /** Reference scale the px weights below are quoted at. */
-  referenceScale: 'hero ship ≈ 90px wide · planet ≈ 130px across',
+  referenceScale: 'hero ship ≈ 90px wide · station ≈ 130px across',
   /** Callout leaders, minimap rings, faint interior detail. */
   hairline: 1,
   /** UI element strokes, HP-bar frame, small turret detail. */
@@ -205,14 +205,14 @@ export const GLOW = {
     'No bloom. Glow is a brighter inner pass on a crisp silhouette, never a gaussian blur — so effects stay cheap, instanced and legible at 24px on the void.',
   /** Weapon fire, torch, cockpit: a plasma body with a white-tinted inner core. */
   energy: { base: 'plasma', innerTowardWhite: 0.45, inner: 0xdff4ff },
-  /** Planet core: signal-yellow disc, hot near-white centre. Obeys RESERVED (§2). */
+  /** Station core: signal-yellow disc, hot near-white centre. Obeys RESERVED (§2). */
   core: { base: 'signalYellow', innerTowardWhite: 0.35, inner: 0xfff6c8 },
   /** Frost veins on an ice-cored asteroid, brightening toward the break. */
   frost: { base: 'plasma' },
   /**
    * The under-attack tell: a threat-red edge that pulses — slow near 50% core HP,
    * fast near 25% (element studies HP bar). Pairs with the audible alarm (GDD §3.6);
-   * the planet-death beat then goes quiet (§8).
+   * the station-death beat then goes quiet (§8).
    */
   alarm: { base: 'threatRed', behaviour: 'edge-pulse', pulseSlowAt: 0.5, pulseFastAt: 0.25 },
 } as const;

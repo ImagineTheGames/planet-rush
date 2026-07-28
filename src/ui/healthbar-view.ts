@@ -9,7 +9,7 @@
  * size regardless of camera zoom (GDD field report).
  *
  * **The number (field request v0.2.4).** Every bar carries a compact "68/70"
- * current/max readout — the same treatment the planet core got — floated just to
+ * current/max readout — the same treatment the station core got — floated just to
  * the RIGHT of the bar and vertically centred on it. So the over-ship cluster now
  * reads as two rows: **name + difficulty-tag** on top (the nameplate layer) and
  * **bar + number** below it, with the ship under that. Placing the number beside

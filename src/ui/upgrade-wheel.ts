@@ -10,7 +10,7 @@
  *
  * ── WHY THIS IS A WHEEL AND NOT A PANEL (the field report) ──────────────────
  * A developer reported the upgrade screen *"is not immediately readable, and
- * it's very different from the planet's wheel menu — it should be a wheel menu as
+ * it's very different from the station's wheel menu — it should be a wheel menu as
  * well."* So it is one now: the same component family, gestures, and visual
  * language as the Build wheel ({@link ./build-wheel}). One **wedge per upgrade
  * track**, laid out clockwise from twelve o'clock exactly as the Build wheel's

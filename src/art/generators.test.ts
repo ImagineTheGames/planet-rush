@@ -10,7 +10,7 @@
  * already quantised to 1e-4.
  *
  * The other half of the file is the design-visible behaviour each generator
- * owes the ruleset: three crack stages that actually differ, four planet
+ * owes the ruleset: three crack stages that actually differ, four station
  * variants that actually differ, richer rocks that actually look richer.
  */
 
@@ -31,21 +31,21 @@ import {
   beaconRingSprite,
   continentPolygons,
   damageRingSprite,
-  planetSprite,
-  planetVariantFor,
+  stationSprite,
+  stationVariantFor,
   repairAuraSprite,
   ATMOSPHERE_HALO_RADIUS,
-  PLANET_VARIANT_COUNT,
-} from './planets';
-import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
+  STATION_VARIANT_COUNT,
+} from './stations';
+import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { shipSprite } from './ships';
 import { spriteKey, type SpriteDef } from './shapes';
-import { debrisFieldSprite, planetWreckSprite } from './wrecks';
+import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 
 /** Everything that has to be reproducible, with a second identical call. */
 const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => shipSprite({ shipClass: ShipClass.Excavator, playerId: 5 }),
-  () => planetSprite(2),
+  () => stationSprite(2),
   () => beaconRingSprite(6),
   () => damageRingSprite(6, 0.42),
   () => repairAuraSprite(),
@@ -54,7 +54,7 @@ const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => turretSprite({ playerId: 3, state: 'tracking' }),
   () => shieldSprite({ playerId: 3, strength: 'weakened' }),
   () => buildProgressSprite(0.4),
-  () => planetWreckSprite(1),
+  () => stationWreckSprite(1),
   () => debrisFieldSprite(2),
   () => atmosphereHaloSprite(0),
 ];
@@ -178,46 +178,46 @@ describe('asteroids — the payout read (style-guide §6)', () => {
   });
 });
 
-describe('planets — four variants, arrangement only (style-guide §5)', () => {
+describe('stations — four variants, arrangement only (style-guide §5)', () => {
   it('makes four distinct worlds', () => {
-    const defs = [0, 1, 2, 3].map(planetSprite);
+    const defs = [0, 1, 2, 3].map(stationSprite);
     for (let i = 0; i < defs.length; i++) {
       for (let j = i + 1; j < defs.length; j++) expect(defs[i]).not.toEqual(defs[j]);
     }
   });
 
   it('varies by continent layout and land ratio, not by colour', () => {
-    const palettes = [0, 1, 2, 3].map((v) => new Set(planetSprite(v).shapes.map((s) => s.fill?.color)));
+    const palettes = [0, 1, 2, 3].map((v) => new Set(stationSprite(v).shapes.map((s) => s.fill?.color)));
     for (const p of palettes) expect(p).toEqual(palettes[0]);
     expect(continentPolygons(0).length).not.toBe(continentPolygons(3).length);
   });
 
   it('puts the signal-yellow core on every world — the win condition (§2)', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      expect(planetSprite(v).shapes.some((s) => s.role === 'core')).toBe(true);
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationSprite(v).shapes.some((s) => s.role === 'core')).toBe(true);
     }
   });
 
   it('assigns a variant per player and wraps safely', () => {
-    expect(planetVariantFor(0)).toBe(0);
-    expect(planetVariantFor(4)).toBe(0);
-    expect(planetVariantFor(-1)).toBe(3);
+    expect(stationVariantFor(0)).toBe(0);
+    expect(stationVariantFor(4)).toBe(0);
+    expect(stationVariantFor(-1)).toBe(3);
   });
 
   it('draws the atmosphere halo at exactly DEPOSIT_RANGE — visual and rule never drift (p4-12)', () => {
-    // The unit-space edge is DEPOSIT_RANGE / PLANET.radius and nothing else, so
+    // The unit-space edge is DEPOSIT_RANGE / STATION.radius and nothing else, so
     // the halo is the sim constant, expressed as art.
-    expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / PLANET.radius);
+    expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / STATION.radius);
 
     const def = atmosphereHaloSprite(0);
-    // The outermost disc *is* the atmosphere edge; scaled by the planet radius
+    // The outermost disc *is* the atmosphere edge; scaled by the station radius
     // (how the renderer draws it) it lands on DEPOSIT_RANGE world units exactly.
     const outerUnit = Math.max(
       ...def.shapes.map((s) => (s.path.kind === 'circle' ? s.path.r : 0)),
     );
     expect(outerUnit).toBe(ATMOSPHERE_HALO_RADIUS);
-    expect(outerUnit * PLANET.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
-    // The sprite's own square is sized to the halo, not clipped to the planet.
+    expect(outerUnit * STATION.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
+    // The sprite's own square is sized to the halo, not clipped to the station.
     expect(def.extent).toBe(ATMOSPHERE_HALO_RADIUS);
   });
 
@@ -325,21 +325,21 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
 });
 
 describe('wrecks — the quiet (style-guide §8)', () => {
-  it('puts the core out: no yellow anywhere on a dead planet', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      const def = planetWreckSprite(v);
+  it('puts the core out: no yellow anywhere on a dead station', () => {
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      const def = stationWreckSprite(v);
       expect(def.shapes.some((s) => s.role === 'core' || s.role === 'ore')).toBe(false);
     }
   });
 
   it('stays cold — no threat red on a wreck; a wreck is an absence, not a threat', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      expect(planetWreckSprite(v).shapes.some((s) => s.role === 'danger')).toBe(false);
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationWreckSprite(v).shapes.some((s) => s.role === 'danger')).toBe(false);
     }
   });
 
-  it('keeps the same coastlines as the world it was — you lose *that* planet', () => {
-    const wreck = planetWreckSprite(2);
+  it('keeps the same coastlines as the world it was — you lose *that* station', () => {
+    const wreck = stationWreckSprite(2);
     const crust = wreck.shapes.filter((s) => s.path.kind === 'poly' && s.path.closed);
     expect(crust.length).toBeGreaterThanOrEqual(continentPolygons(2).length);
   });

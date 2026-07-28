@@ -267,10 +267,10 @@ export interface DebugSimBridge {
    *  "attributed to the local player" is nominal today — this is the same code
    *  path a real hit uses, spawn protection included. */
   damageShip(owner: number, amount: number): void;
-  /** Apply `amount` sim damage to `player`'s planet (shields first, then core —
+  /** Apply `amount` sim damage to `player`'s station (shields first, then core —
    *  the sim's real rule; a fresh home has no shields, so it hits the core). */
   damageCore(player: number, amount: number): void;
-  /** Read `player`'s current core HP, or null if they have no planet. */
+  /** Read `player`'s current core HP, or null if they have no station. */
   coreHp(player: number): number | null;
 }
 

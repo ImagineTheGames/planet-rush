@@ -72,7 +72,7 @@ describe('the trigger — sustained damage, not a stray shot (GDD §2.2)', () =>
   });
 
   it('counts damage to shields and turrets the same as damage to the core', () => {
-    // The trigger takes one number — HP lost off the planet this tick — because
+    // The trigger takes one number — HP lost off the station this tick — because
     // "your core, shield, or turrets" are all the same event to a defender.
     const alarm = new UnderAttackAlarm();
     expect(fire(alarm, 2, 10)).toBe(true);
@@ -118,7 +118,7 @@ describe('the latch — an alarm that flickers is one players learn to ignore', 
     expect(alarm.update(TICK_DT, 2)).toBe(false);
   });
 
-  it('resets completely on demand (fresh match, or a planet that just died)', () => {
+  it('resets completely on demand (fresh match, or a station that just died)', () => {
     const alarm = new UnderAttackAlarm();
     fire(alarm, 3, WEAPON_DPS_CORE);
     expect(alarm.active).toBe(true);
@@ -137,7 +137,7 @@ describe('pressure — the tell builds instead of snapping on', () => {
     expect(alarm.pressure).toBeLessThan(0.6);
   });
 
-  it('never exceeds 1, however hard the planet is hit', () => {
+  it('never exceeds 1, however hard the station is hit', () => {
     const alarm = new UnderAttackAlarm();
     alarm.update(TICK_DT, ALARM_THRESHOLD_HP * 20);
     expect(alarm.pressure).toBe(1);
@@ -156,10 +156,10 @@ describe('dt-independence — the threshold means the same at any timestep', () 
   });
 });
 
-describe('only YOUR planet, and not the collapse (the phantom-alarm field report)', () => {
-  it('a bot war three planets away never rings your alarm', () => {
-    // The alarm is fed ONLY the local player's own-planet damage; another
-    // planet's fight is simply never handed to it. Encode that: a long run of
+describe('only YOUR station, and not the collapse (the phantom-alarm field report)', () => {
+  it('a bot war three stations away never rings your alarm', () => {
+    // The alarm is fed ONLY the local player's own-station damage; another
+    // station's fight is simply never handed to it. Encode that: a long run of
     // quiet ticks (no own damage) is silence, forever.
     const alarm = new UnderAttackAlarm();
     expect(quiet(alarm, 120)).toBe(false);
@@ -333,7 +333,7 @@ describe('determinism — the one predicate replays identically', () => {
 const VP = { width: 800, height: 600 };
 
 describe('the screen-edge arrow home (GDD §2.2)', () => {
-  it('hides itself when home is already on screen — the planet is the tell', () => {
+  it('hides itself when home is already on screen — the station is the tell', () => {
     const a = homeArrow({ x: 1000, y: 1000 }, { x: 1040, y: 1010 }, VP);
     expect(a.onScreen).toBe(true);
     // Drawn at home's actual screen position: centre plus the world offset.
@@ -382,7 +382,7 @@ describe('the screen-edge arrow home (GDD §2.2)', () => {
     expect(a.distance).toBeCloseTo(500);
   });
 
-  it('degrades safely when the ship is standing on its own planet', () => {
+  it('degrades safely when the ship is standing on its own station', () => {
     const a = homeArrow({ x: 500, y: 500 }, { x: 500, y: 500 }, VP);
     expect(a.onScreen).toBe(true);
     expect(a.distance).toBe(0);

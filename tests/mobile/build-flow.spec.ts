@@ -4,7 +4,7 @@
  * Regression guard for a field report on a live build: *"after building, the
  * build menu button disappeared (the one you click to show the build menu)."*
  * The open-build-wheel button is a permanent HUD fixture whenever the player is
- * near their own planet (GDD §2.2, §2.4), and it must survive the full cycle:
+ * near their own station (GDD §2.2, §2.4), and it must survive the full cycle:
  * open the wheel → choose a structure → build completes → the button is still
  * there, still hittable, and a second tap opens the wheel again.
  *
@@ -183,7 +183,7 @@ test.describe('build button persists through the whole build cycle', () => {
 
     const label = `${testInfo.project.name}/landscape`;
 
-    // The ship spawns orbiting its own planet, i.e. docked (state.ts), so the
+    // The ship spawns orbiting its own station, i.e. docked (state.ts), so the
     // button is a fixture from the first frame — no need to fly home first.
     const before = await snapshot(page);
     expect(before.present, `[${label}] __planetRush absent — served with ?debug=1?`).toBe(true);
@@ -193,7 +193,7 @@ test.describe('build button persists through the whole build cycle', () => {
 
     // (1) BEFORE — the button is on screen, and the wheel is not yet.
     const btn0 = find(before, 'build-button');
-    expect(btn0, `[${label}] BEFORE: build-button not registered — the button is not on screen at the planet`).toBeTruthy();
+    expect(btn0, `[${label}] BEFORE: build-button not registered — the button is not on screen at the station`).toBeTruthy();
     expect(has(before, 'build-wheel'), `[${label}] BEFORE: the wheel should be closed`).toBe(false);
 
     // Position asserted via the layout contract (registry data), not pixels: the

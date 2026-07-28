@@ -189,7 +189,7 @@ function touchActions(): Set<ActionType> {
     tc.writeInto(s);
     addActive(got, mapActions(s, FireMode.AutoAim));
   }
-  // build — the touch BUILD button affordance exists at your own planet.
+  // build — the touch BUILD button affordance exists at your own station.
   if (buildButtonRect(true, /* docked */ true, W, H)) got.add('build');
   // buildOrder + upgradeOrder — the wheel the BUILD button opens (device-agnostic).
   addWheelOrders(got);

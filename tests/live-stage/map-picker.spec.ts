@@ -9,7 +9,7 @@
  * selection all unit-tested in `src/ui/map-picker.test.ts`) but never actually
  * threads its choice into the world the sim builds. A headless unit test cannot
  * catch a missing *wire* from a card tap to `createWorld`; only booting the real
- * bundle, picking a map in the lobby, and reading the booted world's own planets
+ * bundle, picking a map in the lobby, and reading the booted world's own stations
  * can.
  *
  * So this spec boots the production build at a **phone-landscape, touch** viewport
@@ -18,11 +18,11 @@
  * read-only `window.__mainMenu` / `__lobby` seams `main.ts` installs:
  *
  *   MAIN MENU → PLAY → LOBBY (four arena cards, octagon selected, diamond VETERAN)
- *   → pick an arena → RUSH! → the booted world's home planets ARE that map's
+ *   → pick an arena → RUSH! → the booted world's home stations ARE that map's
  *   registry layout, exactly.
  *
- * The last step is the one that matters: `worldPlanets` is read back off the
- * *actual* sim world `bootOfflineMatch` built, and compared to `expectedPlanets` —
+ * The last step is the one that matters: `worldStations` is read back off the
+ * *actual* sim world `bootOfflineMatch` built, and compared to `expectedStations` —
  * the same registry the bundle ships — so a picker that looked right but booted the
  * default arena would fail here. Persistence across a reload is checked too
  * (localStorage, same seam as the fire mode). The sibling `lobby-flow.spec.ts`
@@ -42,9 +42,9 @@ interface LobbySeam {
   mapOrder: readonly string[];
   mapCards: readonly { x: number; y: number; width: number; height: number }[];
   logicalViewport: { width: number; height: number };
-  expectedPlanets: Record<string, { x: number; y: number }[]>;
+  expectedStations: Record<string, { x: number; y: number }[]>;
   worldMapId: string | null;
-  worldPlanets: { x: number; y: number }[] | null;
+  worldStations: { x: number; y: number }[] | null;
   selectMap(index: number): void;
   rush(): void;
 }
@@ -133,7 +133,7 @@ test('the lobby shows four arena cards — octagon selected, diamond VETERAN —
   expect(pageErrors, 'no page errors on the lobby').toEqual([]);
 });
 
-test('picking each arena then RUSH boots that arena — the world planets ARE the registry layout', async ({
+test('picking each arena then RUSH boots that arena — the world stations ARE the registry layout', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -157,34 +157,34 @@ test('picking each arena then RUSH boots that arena — the world planets ARE th
     // RUSH! → the countdown boots the world.
     await page.evaluate(() => window.__lobby!.rush());
 
-    // Wait for the built world's planets to be reported onto the lobby seam.
-    await page.waitForFunction(() => window.__lobby?.worldPlanets != null, undefined, {
+    // Wait for the built world's stations to be reported onto the lobby seam.
+    await page.waitForFunction(() => window.__lobby?.worldStations != null, undefined, {
       timeout: 20_000,
     });
 
     const built = await page.evaluate(() => ({
       worldMapId: window.__lobby!.worldMapId,
-      worldPlanets: window.__lobby!.worldPlanets,
-      expected: window.__lobby!.expectedPlanets,
+      worldStations: window.__lobby!.worldStations,
+      expected: window.__lobby!.expectedStations,
     }));
 
     // The arena the sim built IS the one that was picked…
     expect(built.worldMapId, `the sim built ${mapId}`).toBe(mapId);
-    const planets = built.worldPlanets!;
+    const stations = built.worldStations!;
     const registry = built.expected[mapId]!;
-    expect(planets, 'one home planet per slot (GDD §2.1)').toHaveLength(registry.length);
-    // …and every home planet sits exactly where the registry places it (m8-02/p2:
-    // "planet positions match that registry entry exactly").
+    expect(stations, 'one home station per slot (GDD §2.1)').toHaveLength(registry.length);
+    // …and every home station sits exactly where the registry places it (m8-02/p2:
+    // "station positions match that registry entry exactly").
     for (let i = 0; i < registry.length; i++) {
-      expect(planets[i]!.x, `${mapId} planet ${i} x`).toBeCloseTo(registry[i]!.x, 3);
-      expect(planets[i]!.y, `${mapId} planet ${i} y`).toBeCloseTo(registry[i]!.y, 3);
+      expect(stations[i]!.x, `${mapId} station ${i} x`).toBeCloseTo(registry[i]!.x, 3);
+      expect(stations[i]!.y, `${mapId} station ${i} y`).toBeCloseTo(registry[i]!.y, 3);
     }
 
     // The anti-fallback guard: a non-default map must NOT have quietly booted the
     // default arena (the exact bug a missing mapId wire would cause).
     if (mapId !== 'octagon') {
       const octagon = built.expected['octagon']!;
-      const same = planets.every(
+      const same = stations.every(
         (p, i) => Math.abs(p.x - octagon[i]!.x) < 1 && Math.abs(p.y - octagon[i]!.y) < 1,
       );
       expect(same, `${mapId} did not silently boot the default octagon board`).toBe(false);

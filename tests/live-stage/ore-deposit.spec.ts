@@ -3,18 +3,18 @@
  * REAL booted client. OWNER: Gameplay Engineer (field report v0.1.2).
  *
  * The developer's report: "there's no way to deposit ore … it should fly from my
- * ship to the planet but it doesn't, it just stays on my ship." Mining filled the
+ * ship to the station but it doesn't, it just stays on my ship." Mining filled the
  * hold; nothing emptied it into the safe bank the Build wheel spends — the human
  * had no path the bots' instant BANK press gave them. The fix is a sim rule
- * (`src/sim`): a ship **docked and parked at its own planet** auto-transfers its
- * hold into the bank at a steady rate, and ore-flight couriers fly ship→planet to
+ * (`src/sim`): a ship **docked and parked at its own station** auto-transfers its
+ * hold into the bank at a steady rate, and ore-flight couriers fly ship→station to
  * show it. The unit suite pins the rule; this pins that it actually happens on a
  * real boot — the hold falls, the bank rises, and flight sprites exist while it
  * does — the full path sim state → the chunk layer the renderer already draws.
  *
  * It runs WITHOUT `?freeze=1` on purpose: the point is to watch the LIVE sim drain
  * the hold over about a second, which a pinned frame cannot show. The local ship
- * is parked at its own planet by the `?debug=1` seam and given no input, so the
+ * is parked at its own station by the `?debug=1` seam and given no input, so the
  * only thing moving its ore is the deposit rule under test.
  */
 import { test, expect } from '@playwright/test';
@@ -22,7 +22,7 @@ import { test, expect } from '@playwright/test';
 /** The `?debug=1`-only seam this spec drives — installed in `src/main.ts`
  *  (`installOreDepositStage`), mutating only plain sim data behind the flag. */
 interface OreDepositStage {
-  /** Park the LOCAL ship at rest at its own planet with `ore` in the hold (the
+  /** Park the LOCAL ship at rest at its own station with `ore` in the hold (the
    *  bay is widened to fit), starting the drain; returns the staged hold/bank. */
   stage(ore: number): { cargo: number; banked: number } | null;
   /** The live hold and bank the sim holds this frame — what the HUD ticks off. */
@@ -36,7 +36,7 @@ interface StageWindow {
 }
 declare const window: Window & StageWindow;
 
-test('a docked ship deposits its hold into the bank, ore flying to the planet, in the real client', async ({
+test('a docked ship deposits its hold into the bank, ore flying to the station, in the real client', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -51,17 +51,17 @@ test('a docked ship deposits its hold into the bank, ore flying to the planet, i
     timeout: 20_000,
   });
 
-  // Stage a full-ish hold at the planet: 6 ore drains over ~3 s at 2 ore/s, a
+  // Stage a full-ish hold at the station: 6 ore drains over ~3 s at 2 ore/s, a
   // comfortable window to watch the hold fall, the bank rise, and couriers fly.
   const STAGED = 6;
   const staged = await page.evaluate((ore) => window.__oreDepositStage!.stage(ore), STAGED);
-  expect(staged, 'the local ship and its planet were available to stage').not.toBeNull();
+  expect(staged, 'the local ship and its station were available to stage').not.toBeNull();
   expect(staged!.cargo, 'the hold was loaded with the staged ore').toBeCloseTo(STAGED, 5);
   const bankAtStart = staged!.banked;
 
   // Watch the LIVE sim: the hold must fall below where it was staged while ore is
-  // in flight to the planet — the developer's "it should fly from my ship to the
-  // planet" made real, read straight off sim state and the drawn chunk layer.
+  // in flight to the station — the developer's "it should fly from my ship to the
+  // station" made real, read straight off sim state and the drawn chunk layer.
   const midDrain = await page
     .waitForFunction(
       (start) => {
@@ -83,7 +83,7 @@ test('a docked ship deposits its hold into the bank, ore flying to the planet, i
   expect(midDrain!.banked, 'the bank has risen above where it started').toBeGreaterThan(bankAtStart);
   expect(midDrain!.flights, 'ore-flight courier sprites exist while the hold drains').toBeGreaterThan(0);
 
-  // Screenshot the flight for the PR body — ore streaming from ship to planet.
+  // Screenshot the flight for the PR body — ore streaming from ship to station.
   await page.screenshot({ path: 'tests/live-stage/ore-deposit-evidence.png' });
 
   // And the drain completes: the whole hold ends up banked, conserved to the ore.

@@ -18,9 +18,9 @@
  *   MAIN MENU → PLAY → LOBBY (8 slots, four hull tiles, four ARENA cards, all
  *   thumb-sized inside the safe viewport) → pick a NON-default hull AND a
  *   NON-default arena → RUSH! → the booted world's local ship IS that hull AND its
- *   home planets ARE that arena's registry layout.
+ *   home stations ARE that arena's registry layout.
  *
- * The last steps are the ones that matter: `localShipClass` and `worldPlanets` are
+ * The last steps are the ones that matter: `localShipClass` and `worldStations` are
  * read back off the *actual* sim world `bootOfflineMatch` built, so a lobby that
  * looked right but never reached the sim would fail here (GDD §2.11 — "the ship you
  * fly IS the hull you picked"; p2 — the arena moved off the PLAY flow into this one
@@ -54,9 +54,9 @@ interface LobbySeam {
   veteranMapId: string;
   mapOrder: readonly string[];
   mapCards: readonly { x: number; y: number; width: number; height: number }[];
-  expectedPlanets: Record<string, { x: number; y: number }[]>;
+  expectedStations: Record<string, { x: number; y: number }[]>;
   worldMapId: string | null;
-  worldPlanets: { x: number; y: number }[] | null;
+  worldStations: { x: number; y: number }[] | null;
   selectMap(index: number): void;
 }
 interface MainMenuSeam {
@@ -203,37 +203,37 @@ test('PLAY → lobby → pick a non-default hull AND arena → RUSH → the sim 
 
   // The countdown runs, the world is built, and — the assertions the milestone
   // turns on — the local ship the sim built IS the hull that was picked, and the
-  // home planets ARE the arena that was picked. Read back off the actual booted
+  // home stations ARE the arena that was picked. Read back off the actual booted
   // world, not the lobby's own belief.
   await page.waitForFunction(() => window.__lobby?.localShipClass != null, undefined, {
     timeout: 20_000,
   });
-  await page.waitForFunction(() => window.__lobby?.worldPlanets != null, undefined, {
+  await page.waitForFunction(() => window.__lobby?.worldStations != null, undefined, {
     timeout: 20_000,
   });
   const built = await page.evaluate(() => ({
     flown: window.__lobby!.localShipClass,
     worldMapId: window.__lobby!.worldMapId,
-    worldPlanets: window.__lobby!.worldPlanets,
-    expectedPlanets: window.__lobby!.expectedPlanets,
+    worldStations: window.__lobby!.worldStations,
+    expectedStations: window.__lobby!.expectedStations,
   }));
   expect(built.flown, 'the ship the sim flies IS the hull the player picked (GDD §2.11)').toBe(picked);
 
-  // The arena the sim built IS the one that was picked, and every home planet sits
+  // The arena the sim built IS the one that was picked, and every home station sits
   // exactly where that map's registry entry places it (p2 — "the booted world
   // matches that registry entry via the debug hook").
   expect(built.worldMapId, `the sim built the picked arena (${pickedMap})`).toBe(pickedMap);
-  const registry = built.expectedPlanets[pickedMap]!;
-  const worldPlanets = built.worldPlanets!;
-  expect(worldPlanets, 'one home planet per slot (GDD §2.1)').toHaveLength(registry.length);
+  const registry = built.expectedStations[pickedMap]!;
+  const worldStations = built.worldStations!;
+  expect(worldStations, 'one home station per slot (GDD §2.1)').toHaveLength(registry.length);
   for (let i = 0; i < registry.length; i++) {
-    expect(worldPlanets[i]!.x, `${pickedMap} planet ${i} x`).toBeCloseTo(registry[i]!.x, 3);
-    expect(worldPlanets[i]!.y, `${pickedMap} planet ${i} y`).toBeCloseTo(registry[i]!.y, 3);
+    expect(worldStations[i]!.x, `${pickedMap} station ${i} x`).toBeCloseTo(registry[i]!.x, 3);
+    expect(worldStations[i]!.y, `${pickedMap} station ${i} y`).toBeCloseTo(registry[i]!.y, 3);
   }
   // The anti-fallback guard: a non-default arena must NOT have quietly booted the
   // default octagon board (the exact bug a missing mapId wire would cause).
-  const octagon = built.expectedPlanets['octagon']!;
-  const bootedDefault = worldPlanets.every(
+  const octagon = built.expectedStations['octagon']!;
+  const bootedDefault = worldStations.every(
     (p, i) => Math.abs(p.x - octagon[i]!.x) < 1 && Math.abs(p.y - octagon[i]!.y) < 1,
   );
   expect(bootedDefault, `${pickedMap} did not silently boot the default octagon board`).toBe(false);

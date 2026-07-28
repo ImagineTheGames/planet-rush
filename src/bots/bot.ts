@@ -27,7 +27,7 @@
  *
  * {@link doNothing} stays, because it is the baseline the harness and the QA
  * match loop are proven against: a match of eight bots that do nothing still has
- * to spawn eight planets, run five waves, enter collapse, and produce a winner,
+ * to spawn eight stations, run five waves, enter collapse, and produce a winner,
  * and that claim is about the simulation rather than about the bots.
  */
 

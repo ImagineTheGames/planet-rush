@@ -1,15 +1,15 @@
 /**
  * src/art/rings.ts — the ring-damage primitive. OWNER: Art & Audio Agent.
  *
- * ONE grammar for every gauge ring on a planet (developer-ratified, p11):
+ * ONE grammar for every gauge ring on a station (developer-ratified, p11):
  *
- *   > "It should be the colour of the planet, and a red segment FILLS it;
+ *   > "It should be the colour of the station, and a red segment FILLS it;
  *   >  completely red means death."
  *
  * A whole ring in the OWNER's colour is the health you still have; a threat-red
  * segment grows over it, from twelve o'clock CLOCKWISE, proportional to the pool
  * LOST. A fully red ring is death, exactly. The core ring and every shield layer
- * configure this same primitive, so a besieged planet reads outermost-first:
+ * configure this same primitive, so a besieged station reads outermost-first:
  * shields redden and die before the core has begun to fill — the siege's whole
  * progress, legible at a glance, in one visual verb.
  *

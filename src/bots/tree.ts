@@ -66,7 +66,7 @@ export interface Brain {
   lastPos: Vec2 | null;
   /**
    * Consecutive decisions this bot has asked to move and barely moved — the
-   * wedged counter. Asteroids and planets are solid, the late waves land in a
+   * wedged counter. Asteroids and stations are solid, the late waves land in a
    * tight cluster (GDD §2.3: every wave closer to the centre than the last), and
    * two rocks five units apart make a gap no hull fits through. A bot that keeps
    * asking to fly through that gap is not thinking, it is grinding, and
@@ -76,7 +76,7 @@ export interface Brain {
   /**
    * Magnitude of the thrust the last decision actually asked for (0..1), written
    * by `./behaviors`'s `go`. The wedged counter reads it so that *deliberately*
-   * holding station — a miner parked at its rock, a bot orbiting its own planet
+   * holding station — a miner parked at its rock, a bot orbiting its own station
    * with the wheel open — never reads as being stuck.
    */
   lastThrust: number;

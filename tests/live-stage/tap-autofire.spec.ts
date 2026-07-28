@@ -20,7 +20,7 @@ interface Vec2 {
   x: number;
   y: number;
 }
-type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'planet';
+type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'station';
 
 interface TapCommanderStage {
   setScheme(scheme: 'sticks' | 'tap'): void;

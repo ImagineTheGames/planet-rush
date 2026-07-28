@@ -4,10 +4,10 @@
  *
  * The model tests (`src/ui/nameplates.test.ts`) prove *which* entities get a label
  * and *what* it says — but they cannot prove the label is WIRED: that on a real
- * boot the feed hands the layer every ship + owned planet, projected to screen,
+ * boot the feed hands the layer every ship + owned station, projected to screen,
  * with the lobby's names, and the layer draws them. The health bars shipped dead
  * twice for exactly that gap, so — same discipline — this boots the production
- * bundle, stages a bot's ship and home planet on-screen through the `?debug=1`
+ * bundle, stages a bot's ship and home station on-screen through the `?debug=1`
  * live-stage seam (`window.__nameplateStage`, installed in `main.ts`), and asserts
  * a real label display object tracks each, carrying the name the match's own slot
  * table resolved.
@@ -20,12 +20,12 @@ import { test, expect } from '@playwright/test';
 /** The shape of the `?debug=1`-only globals this spec drives (mirrors the seams
  *  installed in `src/main.ts`: `installNameplateStage`, and the layout hook). */
 interface NameplateStage {
-  /** Park the first bot's ship + home planet on-screen beside the local ship;
+  /** Park the first bot's ship + home station on-screen beside the local ship;
    *  returns the bot's slot, the name the table resolved, and its difficulty tier,
    *  or null. */
   stageBot(): { owner: number; name: string; difficulty: string | undefined } | null;
   /** The labels the real layer drew last frame — owner, kind, text, suffix, colour, pos. */
-  plates(): Array<{ owner: number; kind: 'ship' | 'planet'; text: string; suffix: string; color: number; x: number; y: number; local: boolean }>;
+  plates(): Array<{ owner: number; kind: 'ship' | 'station'; text: string; suffix: string; color: number; x: number; y: number; local: boolean }>;
   /** The per-slot name table the match built (data-driven source of the labels). */
   names(): Array<string | undefined>;
   /** The per-slot difficulty table (mirror of `names`), source of the suffixes. */
@@ -40,7 +40,7 @@ interface StageWindow {
 }
 declare const window: Window & StageWindow;
 
-test('name labels render over a bot ship and its planet in the real booted client', async ({ page }) => {
+test('name labels render over a bot ship and its station in the real booted client', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
 
@@ -62,7 +62,7 @@ test('name labels render over a bot ship and its planet in the real booted clien
     'the local ship carries no own-name label by default',
   ).toBe(false);
 
-  // Stage the first bot's ship + home planet beside the centred local ship.
+  // Stage the first bot's ship + home station beside the centred local ship.
   const staged = await page.evaluate(() => window.__nameplateStage!.stageBot());
   expect(staged, 'a bot was available to stage').not.toBeNull();
   expect(staged!.name, 'the bot resolved to a real name').toBeTruthy();
@@ -74,8 +74,8 @@ test('name labels render over a bot ship and its planet in the real booted clien
       (owner) => {
         const p = window.__nameplateStage!.plates();
         const hasShip = p.some((x) => x.owner === owner && x.kind === 'ship');
-        const hasPlanet = p.some((x) => x.owner === owner && x.kind === 'planet');
-        return hasShip && hasPlanet ? p : null;
+        const hasStation = p.some((x) => x.owner === owner && x.kind === 'station');
+        return hasShip && hasStation ? p : null;
       },
       staged!.owner,
       { timeout: 20_000 },
@@ -83,25 +83,25 @@ test('name labels render over a bot ship and its planet in the real booted clien
     .then((h) => h.jsonValue());
 
   const shipLabel = plates!.find((p) => p.owner === staged!.owner && p.kind === 'ship');
-  const planetLabel = plates!.find((p) => p.owner === staged!.owner && p.kind === 'planet');
+  const stationLabel = plates!.find((p) => p.owner === staged!.owner && p.kind === 'station');
   expect(shipLabel, 'a drawn label tracks the bot ship').toBeDefined();
-  expect(planetLabel, 'a drawn label tracks the bot planet').toBeDefined();
+  expect(stationLabel, 'a drawn label tracks the bot station').toBeDefined();
 
   // The text is the lobby/match name for that slot — data-driven, not invented.
   const names = await page.evaluate(() => window.__nameplateStage!.names());
   expect(shipLabel!.text, 'the ship label matches the slot name').toBe(staged!.name);
-  expect(planetLabel!.text, 'the planet label matches the slot name').toBe(staged!.name);
+  expect(stationLabel!.text, 'the station label matches the slot name').toBe(staged!.name);
   expect(names[staged!.owner], 'the name table is the source of the label text').toBe(staged!.name);
 
   // The bot's difficulty rides along as a recessive suffix — `(EASY|MEDIUM|HARD)`
-  // — on BOTH its ship and its planet, sourced from the mirror difficulty table
+  // — on BOTH its ship and its station, sourced from the mirror difficulty table
   // (field request v0.2.2). Human seats never carry one (asserted below).
   const difficulties = await page.evaluate(() => window.__nameplateStage!.difficulties());
   const tier = (staged!.difficulty ?? '').toUpperCase();
   expect(tier, 'the staged bot resolved to a difficulty tier').toBeTruthy();
   const expectedSuffix = `(${tier})`;
   expect(shipLabel!.suffix, 'the ship label carries the bot difficulty suffix').toBe(expectedSuffix);
-  expect(planetLabel!.suffix, 'the planet label carries the bot difficulty suffix').toBe(expectedSuffix);
+  expect(stationLabel!.suffix, 'the station label carries the bot difficulty suffix').toBe(expectedSuffix);
   expect(
     (difficulties[staged!.owner] ?? '').toUpperCase(),
     'the difficulty table is the source of the suffix',
@@ -113,7 +113,7 @@ test('name labels render over a bot ship and its planet in the real booted clien
   }
 
   // Both are tinted the same owner identity colour (ship trim, bar and name agree).
-  expect(planetLabel!.color, 'ship and planet labels share the owner colour').toBe(shipLabel!.color);
+  expect(stationLabel!.color, 'ship and station labels share the owner colour').toBe(shipLabel!.color);
 
   // They TRACK their entities: both were parked to the right of the centred local
   // ship, so both labels sit right of the viewport centre.
@@ -121,7 +121,7 @@ test('name labels render over a bot ship and its planet in the real booted clien
   expect(shipLabel!.x, 'the ship label is over the bot ship, right of the local ship').toBeGreaterThan(
     viewport.width / 2,
   );
-  expect(planetLabel!.x, 'the planet label is over the bot planet, right of the local ship').toBeGreaterThan(
+  expect(stationLabel!.x, 'the station label is over the bot station, right of the local ship').toBeGreaterThan(
     viewport.width / 2,
   );
 

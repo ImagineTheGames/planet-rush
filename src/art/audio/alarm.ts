@@ -121,7 +121,7 @@ export class UnderAttackAlarm {
    * Deposit one damage tell against the player's own home.
    *
    * The caller filters for ownership — this class is told about *your* home and
-   * nothing else, so a siege three planets away can never ring your alarm.
+   * nothing else, so a siege three stations away can never ring your alarm.
    *
    * @returns the weight deposited (0 for a kind that is not damage).
    */
@@ -152,7 +152,7 @@ export class UnderAttackAlarm {
   /**
    * Stop now, whatever the pressure — the home is gone.
    *
-   * An alarm still ringing over a dead planet would be the game telling a player
+   * An alarm still ringing over a dead station would be the game telling a player
    * to defend something that no longer exists, and it would ring straight
    * through the three seconds the tone contract reserves for that death
    * (GDD §4.7). It stops.

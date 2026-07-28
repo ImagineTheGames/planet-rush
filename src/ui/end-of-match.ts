@@ -10,8 +10,8 @@
  *   to a plain winner screen, and the Rematch button *stays*).
  *
  *   *You* are eliminated but the match goes on — your core is destroyed, your
- *   wreck is now ore for the living to scavenge, and the other planets fight on
- *   (GDD §2 "when a planet's core is destroyed … an immediate Rematch button plus
+ *   wreck is now ore for the living to scavenge, and the other stations fight on
+ *   (GDD §2 "when a station's core is destroyed … an immediate Rematch button plus
  *   spectate if they want to watch"). You get Rematch **and Spectate**, because
  *   there is still a match to watch.
  *
@@ -26,7 +26,7 @@
 
 import type { PlayerId } from '@shared/types';
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 import { centeredColumn, hitRect, menuContent } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 

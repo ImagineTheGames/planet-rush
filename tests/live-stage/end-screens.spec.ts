@@ -3,7 +3,7 @@
  * wired into boot, verified in the REAL booted client. OWNER: UI Engineer (field
  * report v0.1.2).
  *
- * The developer's report: "there was no end match screen after my planet died."
+ * The developer's report: "there was no end match screen after my station died."
  * The home core died and NOTHING happened. The d7-01 end-of-match views (PR #45)
  * merged and unit-passed, but `main.ts` boot never wired them onto sim state — the
  * exact M2 dark-matter class the healthbars, the main menu, and the ore deposit

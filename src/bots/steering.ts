@@ -111,15 +111,15 @@ export const NEUTRAL: readonly Action[] = Object.freeze([
 
 /**
  * Distance at which a bot starts easing off the throttle instead of arriving at
- * full speed. Wide enough that a Hauler stops at its own planet rather than
- * bouncing off it (planets are solid — `step.ts` reflects). TUNABLE
+ * full speed. Wide enough that a Hauler stops at its own station rather than
+ * bouncing off it (stations are solid — `step.ts` reflects). TUNABLE
  */
 export const ARRIVE_RADIUS = 220;
 
 /**
  * Thrust that flies to a point and *stops there*: steer toward the velocity the
  * bot wants (full speed far out, tapering inside `arriveRadius`) rather than
- * toward the point itself. Without the taper every bot overshoots its own planet
+ * toward the point itself. Without the taper every bot overshoots its own station
  * at top speed, which reads as a bot that cannot park.
  */
 export function arrive(self: SelfView, target: Vec2, arriveRadius: number = ARRIVE_RADIUS): ThrustAction {
@@ -199,7 +199,7 @@ export const AVOID_TURN = 1.6;
 /**
  * Steer a desired direction around one circular body.
  *
- * Everything in this game is a circle (GDD §4.1), asteroids and planets are
+ * Everything in this game is a circle (GDD §4.1), asteroids and stations are
  * solid, and a ship that drives into one is *stopped* by it — position pushed
  * out, inward velocity killed. Without this, a bot whose target sits behind a
  * rock thrusts into that rock forever: the collision response cancels exactly

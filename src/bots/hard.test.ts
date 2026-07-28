@@ -3,7 +3,7 @@
  *
  * > **Hard** … evaluates targets by *threat, proximity, and opportunity* — it
  * > punishes whoever it can profitably punish (the miner far from home, the
- * > planet whose alarm went unanswered, the wreck nobody is guarding).
+ * > station whose alarm went unanswered, the wreck nobody is guarding).
  *
  * Each named term gets a test that moves *only* that term and asserts it moved
  * the score the right way, and then one test asserts the sentence as a whole:
@@ -20,9 +20,9 @@ import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { SPAWN_PROTECTION_S, createWorld, type World } from '../sim';
 import { perceive } from './perception';
-import type { PerceivedPlanet, PerceivedShip } from './perception';
+import type { PerceivedStation, PerceivedShip } from './perception';
 import { PERSONALITIES } from './personalities';
-import { bestTarget, scorePlanet, scoreShip } from './targeting';
+import { bestTarget, scoreStation, scoreShip } from './targeting';
 import { context, createBrain } from './tree';
 import type { BotCtx } from './tree';
 
@@ -43,9 +43,9 @@ function board(): World {
   });
   world.time = SPAWN_PROTECTION_S + 5;
   for (const ship of world.ships) ship.spawnProtect = 0;
-  for (const planet of world.planets) {
-    planet.spawnProtect = 0;
-    planet.sinceDamage = 999;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
   }
   return world;
 }
@@ -65,10 +65,10 @@ function seen(ctx: BotCtx, id: number): PerceivedShip {
 }
 
 /** The perceived home of this slot. */
-function home(ctx: BotCtx, owner: number): PerceivedPlanet {
-  const planet = ctx.view.planets.find((p) => p.owner === owner);
-  expect(planet, `planet ${owner} should be in view`).toBeDefined();
-  return planet!;
+function home(ctx: BotCtx, owner: number): PerceivedStation {
+  const station = ctx.view.stations.find((p) => p.owner === owner);
+  expect(station, `station ${owner} should be in view`).toBeDefined();
+  return station!;
 }
 
 describe('Hard — proximity', () => {
@@ -113,7 +113,7 @@ describe('Hard — opportunity', () => {
     // moves is how far it is from its own front door. Where that door is is
     // public knowledge at any range (GDD §2.2 — the beacon ring).
     const rival = world.ships[1]!;
-    const theirHome = world.planets.find((p) => p.owner === 1)!;
+    const theirHome = world.stations.find((p) => p.owner === 1)!;
     rival.pos = { x: 2200, y: 2000 };
 
     theirHome.pos = { x: 2240, y: 2000 }; // parked on its own doorstep
@@ -142,7 +142,7 @@ describe('Hard — opportunity', () => {
 describe('Hard — threat', () => {
   it("rises for a rival that is over this bot's own house", () => {
     const world = board();
-    const myHome = world.planets.find((p) => p.owner === 0)!.pos;
+    const myHome = world.stations.find((p) => p.owner === 0)!.pos;
     world.ships[0]!.pos = { x: myHome.x + 200, y: myHome.y };
 
     // On the doorstep…
@@ -172,36 +172,36 @@ describe('Hard — threat', () => {
 describe('Hard — the fog holds inside the scoring function', () => {
   it('scores an unscouted home identically whatever its core is really at', () => {
     const world = board();
-    const target = world.planets.find((p) => p.owner === 2)!;
+    const target = world.stations.find((p) => p.owner === 2)!;
     // Well outside sensor range: the damage ring is not drawn (GDD §2.2).
     world.ships[0]!.pos = { x: target.pos.x + 700, y: target.pos.y };
 
-    const healthy = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
+    const healthy = scoreStation(ctxOf(world), home(ctxOf(world), 2));
     target.coreHp = 3; // one weapon-second from dead, and invisible from here
-    const dying = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
+    const dying = scoreStation(ctxOf(world), home(ctxOf(world), 2));
 
     expect(dying).toEqual(healthy);
   });
 
   it('acts on it the moment it has been scouted — which is the trip', () => {
     const world = board();
-    const target = world.planets.find((p) => p.owner === 2)!;
+    const target = world.stations.find((p) => p.owner === 2)!;
     target.coreHp = target.maxCoreHp * 0.15;
 
     // Parked on the surface: inside sensor range, so the ring is readable.
     world.ships[0]!.pos = { x: target.pos.x + target.radius + 40, y: target.pos.y };
-    const scouted = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
+    const scouted = scoreStation(ctxOf(world), home(ctxOf(world), 2));
 
     // The same wounded core, seen from outside sensor range.
     world.ships[0]!.pos = { x: target.pos.x + 700, y: target.pos.y };
-    const rumour = scorePlanet(ctxOf(world), home(ctxOf(world), 2));
+    const rumour = scoreStation(ctxOf(world), home(ctxOf(world), 2));
 
     expect(scouted.opportunity).toBeGreaterThan(rumour.opportunity);
   });
 
   it('never offers a wreck as a target — there is no core left to kill', () => {
     const world = board();
-    const dead = world.planets.find((p) => p.owner === 2)!;
+    const dead = world.stations.find((p) => p.owner === 2)!;
     world.ships[0]!.pos = { x: dead.pos.x + 200, y: dead.pos.y };
     dead.alive = false;
     dead.coreHp = 0;
@@ -209,7 +209,7 @@ describe('Hard — the fog holds inside the scoring function', () => {
     for (const ship of world.ships) if (ship.id !== 0) ship.alive = false;
 
     const ctx = ctxOf(world);
-    expect(scorePlanet(ctx, home(ctx, 2)).score).toBe(0);
+    expect(scoreStation(ctx, home(ctx, 2)).score).toBe(0);
     expect(bestTarget(ctx, 0)?.id).not.toBe(2);
   });
 });
@@ -223,8 +223,8 @@ describe('Hard — the sentence, executed', () => {
     world.ships[1]!.pos = { x: 2250, y: 2000 };
     world.ships[1]!.hull = world.ships[1]!.maxHull * 0.2;
 
-    // The one to leave alone: whole, and sitting on its own planet.
-    const theirHome = world.planets.find((p) => p.owner === 3)!.pos;
+    // The one to leave alone: whole, and sitting on its own station.
+    const theirHome = world.stations.find((p) => p.owner === 3)!.pos;
     world.ships[3]!.pos = { x: theirHome.x + 30, y: theirHome.y };
     world.ships[3]!.hull = world.ships[3]!.maxHull;
     world.ships[2]!.alive = false;
@@ -238,7 +238,7 @@ describe('Hard — the sentence, executed', () => {
 
   it('gives two Hard characters different answers on the same board', () => {
     const world = board();
-    const myHome = world.planets.find((p) => p.owner === 0)!.pos;
+    const myHome = world.stations.find((p) => p.owner === 0)!.pos;
     world.ships[0]!.pos = { x: myHome.x + 150, y: myHome.y };
 
     // One rival loitering over this bot's own house (threat), one wounded and

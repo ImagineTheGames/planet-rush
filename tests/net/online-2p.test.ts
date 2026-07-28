@@ -284,7 +284,7 @@ describe('a two-player online match', () => {
 
     // --- Play: both ships fly, at 60 Hz, in opposite directions -------------
     // Thrust is tangential to the ring on purpose: pointed outward, each ship
-    // would fly straight into its own planet and the test would be measuring
+    // would fly straight into its own station and the test would be measuring
     // collision response rather than the network.
     const start = [{ ...shipOf(authority, 0).pos }, { ...shipOf(authority, 1).pos }];
     // Sampled while the hands are on the controls, because that is the only

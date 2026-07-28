@@ -16,7 +16,7 @@
  *  - **A5 GEODE** — a dark matrix studded with exposed ore crystals you can
  *    *count before you shoot* (three crystals = three ore). The strategic read.
  *  - **A6 PATINA** — a weathered drifter banded with teal oxidation that matches
- *    the planets, tying world and economy together.
+ *    the stations, tying world and economy together.
  *
  * Two board requirements carry across every one of them (style-guide §6):
  *

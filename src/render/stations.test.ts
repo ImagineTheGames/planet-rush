@@ -1,5 +1,5 @@
 /**
- * Planet render tests (GDD §2.1, §2.2, §2.5, §2.7). The eight homes are the
+ * Station render tests (GDD §2.1, §2.2, §2.5, §2.7). The eight homes are the
  * thing M2 is about, and three of their properties are contracts rather than
  * decoration:
  *
@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import { Renderer } from './index';
-import { createWorld, damagePlanet, placeOrder, SENSOR_RANGE } from '../sim';
+import { createWorld, damageStation, placeOrder, SENSOR_RANGE } from '../sim';
 import type { World } from '../sim';
 
 const VIEW = { width: 800, height: 600, originX: 0, originY: 0 };
@@ -28,9 +28,9 @@ function arena(slots = 8): World {
   });
 }
 
-function planetLayer(stage: Container): Container {
-  const layer = stage.getChildByLabel('planets', true);
-  if (!layer) throw new Error('planets layer missing');
+function stationLayer(stage: Container): Container {
+  const layer = stage.getChildByLabel('stations', true);
+  if (!layer) throw new Error('stations layer missing');
   return layer as Container;
 }
 
@@ -48,8 +48,8 @@ function instructionCount(stage: Container, label: string): number {
   return (node as Graphics).context.instructions.length;
 }
 
-describe('planets are on screen at all (the M2 integration gap)', () => {
-  it('draws a body for every slot in an eight-planet ring', () => {
+describe('stations are on screen at all (the M2 integration gap)', () => {
+  it('draws a body for every slot in an eight-station ring', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
@@ -57,7 +57,7 @@ describe('planets are on screen at all (the M2 integration gap)', () => {
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     for (let i = 0; i < 8; i++) {
-      expect(drewSomething(stage, `planet-${i}`)).toBe(true);
+      expect(drewSomething(stage, `station-${i}`)).toBe(true);
     }
   });
 
@@ -67,23 +67,23 @@ describe('planets are on screen at all (the M2 integration gap)', () => {
     const world = arena();
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    const after = planetLayer(stage).children.length;
+    const after = stationLayer(stage).children.length;
     r.draw(world, { cameraTarget: 0, muzzles: [] });
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
-    expect(planetLayer(stage).children.length).toBe(after);
+    expect(stationLayer(stage).children.length).toBe(after);
   });
 
-  it('puts each body at its planet\'s world position', () => {
+  it('puts each body at its station\'s world position', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
-    const body = stage.getChildByLabel('planet-3', true) as Graphics;
-    expect(body.x).toBe(world.planets[3]!.pos.x);
-    expect(body.y).toBe(world.planets[3]!.pos.y);
+    const body = stage.getChildByLabel('station-3', true) as Graphics;
+    expect(body.x).toBe(world.stations[3]!.pos.x);
+    expect(body.y).toBe(world.stations[3]!.pos.y);
   });
 });
 
@@ -92,36 +92,36 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
-    const rival = world.planets[4]!;
+    const rival = world.stations[4]!;
     rival.spawnProtect = 0;
-    damagePlanet(world, rival, 40);
+    damageStation(world, rival, 40);
 
     // Viewer parked at its own home, half the map away: nothing to read.
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    expect(drewSomething(stage, 'planet-overlay-4')).toBe(false);
+    expect(drewSomething(stage, 'station-overlay-4')).toBe(false);
 
     // Fly to it — the ring is information you earn by scouting.
     const viewer = world.ships[0]!;
     viewer.pos.x = rival.pos.x;
     viewer.pos.y = rival.pos.y - (SENSOR_RANGE + rival.radius) * 0.5;
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    expect(drewSomething(stage, 'planet-overlay-4')).toBe(true);
+    expect(drewSomething(stage, 'station-overlay-4')).toBe(true);
   });
 
   it('always shows your own home, at any distance', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
-    const home = world.planets[0]!;
+    const home = world.stations[0]!;
     home.spawnProtect = 0;
-    damagePlanet(world, home, 30);
+    damageStation(world, home, 30);
     // Deep in the field, nowhere near home — the alarm's whole scenario.
     world.ships[0]!.pos.x = world.bounds.width / 2;
     world.ships[0]!.pos.y = world.bounds.height / 2;
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
-    expect(drewSomething(stage, 'planet-overlay-0')).toBe(true);
+    expect(drewSomething(stage, 'station-overlay-0')).toBe(true);
   });
 
   it('rings an untouched core whole in the owner colour, filling red only once hurt (p11)', () => {
@@ -133,15 +133,15 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     // drawn, and a full core carries no red. So an untouched own home shows its
     // ring (unlike the old grammar, where a full core drew nothing).
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    const whole = instructionCount(stage, 'planet-overlay-0');
+    const whole = instructionCount(stage, 'station-overlay-0');
     expect(whole).toBeGreaterThan(0);
 
     // Wound it: the red fill is an *added* segment over the same base ring, so
     // "how much is gone" grows on top of "your colour, whole".
-    world.planets[0]!.spawnProtect = 0;
-    damagePlanet(world, world.planets[0]!, 30);
+    world.stations[0]!.spawnProtect = 0;
+    damageStation(world, world.stations[0]!, 30);
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    expect(instructionCount(stage, 'planet-overlay-0')).toBeGreaterThan(whole);
+    expect(instructionCount(stage, 'station-overlay-0')).toBeGreaterThan(whole);
   });
 });
 
@@ -155,7 +155,7 @@ describe('the atmosphere halo is the deposit affordance (p4-12, GDD §2.3)', () 
 
     r.draw(arena(), { cameraTarget: 0, muzzles: [] });
 
-    // Own planet has a visible halo; every rival planet has none drawn.
+    // Own station has a visible halo; every rival station has none drawn.
     const own = haloFor(stage, 0);
     expect(own).not.toBeNull();
     expect(own!.visible).toBe(true);
@@ -181,7 +181,7 @@ describe('the atmosphere halo is the deposit affordance (p4-12, GDD §2.3)', () 
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
-    const home = world.planets[0]!;
+    const home = world.stations[0]!;
     const ship = world.ships[0]!;
     // Park the ship inside its own atmosphere so `world.time` is the only thing
     // differing between the two frames — the brighten must come from the cargo.
@@ -208,8 +208,8 @@ describe('construction is visible (GDD §2.5)', () => {
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
-    expect(drewSomething(stage, 'planet-overlay-0')).toBe(true);
-    expect(world.planets[0]!.builds).toHaveLength(1);
+    expect(drewSomething(stage, 'station-overlay-0')).toBe(true);
+    expect(world.stations[0]!.builds).toHaveLength(1);
   });
 });
 
@@ -218,19 +218,19 @@ describe('a wreck stays on the map (GDD §2.7)', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
-    const doomed = world.planets[2]!;
+    const doomed = world.stations[2]!;
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
-    const before = planetLayer(stage).children.length;
+    const before = stationLayer(stage).children.length;
 
     doomed.spawnProtect = 0;
-    damagePlanet(world, doomed, doomed.maxCoreHp);
+    damageStation(world, doomed, doomed.maxCoreHp);
     expect(doomed.alive).toBe(false);
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
 
     // Still drawn, still the same pooled child — the wreck does not leave.
-    expect(drewSomething(stage, 'planet-2')).toBe(true);
-    expect(planetLayer(stage).children.length).toBe(before);
+    expect(drewSomething(stage, 'station-2')).toBe(true);
+    expect(stationLayer(stage).children.length).toBe(before);
   });
 });

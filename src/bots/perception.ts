@@ -4,7 +4,7 @@
  * **Fog-honesty is enforced structurally, not by good manners.** A behavior tree
  * never receives a `World`. It receives a {@link BotView}: a flat snapshot of
  * exactly what a human in that cockpit could see this tick — its own ship and
- * planet in full, everything else filtered by range and stripped of the numbers
+ * station in full, everything else filtered by range and stripped of the numbers
  * the HUD does not draw. A tree cannot peek at a hidden core's HP because the
  * field it would read is `null` (GDD §2.2, §2.9).
  *
@@ -12,15 +12,15 @@
  *
  *  - **Visual range** — near enough to be on screen at all. Ships, their hull
  *    bars (GDD §2.2: "a narrow hull bar … floating over every ship"), asteroids,
- *    chunks, and the turrets ringing a planet are drawn here.
+ *    chunks, and the turrets ringing a station are drawn here.
  *  - **Sensor range** (`SENSOR_RANGE`, the sim's own constant) — near enough to
- *    scout. "Enemy planet health is scouted, not broadcast": a rival's core and
+ *    scout. "Enemy station health is scouted, not broadcast": a rival's core and
  *    shield HP appear only inside this radius, and nowhere else.
  *
  * Three things are deliberately public at any distance, because the game draws
- * them that way: a planet's **position** and its owner's **beacon ring**
- * (style-guide §5, "ownership … always visible"), whether a planet has become a
- * **wreck** (GDD §2.2 — "a burning planet is visible from further away than its
+ * them that way: a station's **position** and its owner's **beacon ring**
+ * (style-guide §5, "ownership … always visible"), whether a station has become a
+ * **wreck** (GDD §2.2 — "a burning station is visible from further away than its
  * numbers are"), and the **asteroid-wave clock** (GDD §2.2, top centre).
  *
  * Determinism note (GDD §4.8): distances use `Math.sqrt(dx*dx + dy*dy)` rather
@@ -34,7 +34,7 @@ import { ShipClass } from '@shared/types';
 import type { PlayerId, Vec2 } from '@shared/types';
 import {
   ASTEROID,
-  PLANET,
+  STATION,
   SENSOR_RANGE,
   WAVE_COUNT,
   isCollapsed,
@@ -43,7 +43,7 @@ import {
   stockTiers,
   waveTime,
 } from '../sim';
-import type { Asteroid, Bounds, MatchPhase, Planet, Ship, UpgradeTiers, World } from '../sim';
+import type { Asteroid, Bounds, MatchPhase, MiningStation, Ship, UpgradeTiers, World } from '../sim';
 
 // ---------------------------------------------------------------------------
 // The perception envelope
@@ -59,9 +59,9 @@ import type { Asteroid, Bounds, MatchPhase, Planet, Ship, UpgradeTiers, World } 
 export interface Perception {
   /** Radius within which entities are perceived at all (world units). */
   readonly visualRange: number;
-  /** Radius within which an enemy planet's core and shields can be read. */
+  /** Radius within which an enemy station's core and shields can be read. */
   readonly sensorRange: number;
-  /** Seconds since a planet last took damage that still count as "under
+  /** Seconds since a station last took damage that still count as "under
    *  attack" — the bot's half of the alarm (GDD §2.2). */
   readonly alarmWindow: number;
 }
@@ -94,10 +94,10 @@ export function resolvePerception(p?: Partial<Perception>): Perception {
 // View types — plain readonly data, no `World` anywhere in the tree
 // ---------------------------------------------------------------------------
 
-/** The bot's own planet: full knowledge, exactly like the HUD's top-right panel
- *  (GDD §2.2 — "your own planet's HP"). `null` once it is not this bot's any
+/** The bot's own station: full knowledge, exactly like the HUD's top-right panel
+ *  (GDD §2.2 — "your own station's HP"). `null` once it is not this bot's any
  *  more, which never happens; the wreck is still reported here. */
-export interface OwnPlanetView {
+export interface OwnStationView {
   readonly pos: Vec2;
   readonly radius: number;
   readonly alive: boolean;
@@ -138,16 +138,16 @@ export interface PerceivedShip {
   readonly spawnProtected: boolean | null;
 }
 
-/** Another player's home planet, as seen. Position and ownership are public;
+/** Another player's home station, as seen. Position and ownership are public;
  *  the numbers are scouted. */
-export interface PerceivedPlanet {
+export interface PerceivedStation {
   readonly owner: PlayerId;
   readonly pos: Vec2;
   readonly radius: number;
   /** False for a wreck. Public at any range — smoke carries (GDD §2.2). */
   readonly alive: boolean;
   readonly distance: number;
-  /** True when this planet is inside sensor range this tick, i.e. its numbers
+  /** True when this station is inside sensor range this tick, i.e. its numbers
    *  below are real rather than `null`. */
   readonly scouted: boolean;
   readonly coreHp: number | null;
@@ -207,11 +207,11 @@ export interface SelfView {
   readonly spendable: number;
   readonly respawnTimer: number;
   readonly spawnProtect: number;
-  /** Close enough to its own planet for the wheel to be live (GDD §2.5). */
+  /** Close enough to its own station for the wheel to be live (GDD §2.5). */
   readonly docked: boolean;
-  /** Distance to its own planet; `Infinity` if it somehow has none. */
+  /** Distance to its own station; `Infinity` if it somehow has none. */
   readonly homeDistance: number;
-  readonly planet: OwnPlanetView | null;
+  readonly station: OwnStationView | null;
 }
 
 /**
@@ -233,7 +233,7 @@ export interface BotView {
   readonly nextWaveIn: number | null;
   readonly self: SelfView;
   readonly ships: readonly PerceivedShip[];
-  readonly planets: readonly PerceivedPlanet[];
+  readonly stations: readonly PerceivedStation[];
   readonly asteroids: readonly PerceivedAsteroid[];
   readonly chunks: readonly PerceivedChunk[];
   /** The envelope this view was built with — trees read ranges from here rather
@@ -261,34 +261,34 @@ function shipIn(world: World, id: PlayerId): Ship | null {
   return null;
 }
 
-/** The planet owned by a slot, or null. */
-function planetIn(world: World, id: PlayerId): Planet | null {
-  for (const p of world.planets) {
+/** The station owned by a slot, or null. */
+function stationIn(world: World, id: PlayerId): MiningStation | null {
+  for (const p of world.stations) {
     if (p.owner === id) return p;
   }
   return null;
 }
 
 /**
- * A bot's own planet, in full. The one place in this module that reads numbers
+ * A bot's own station, in full. The one place in this module that reads numbers
  * without a range check — it is the bot's own home, and the HUD shows it
  * permanently (GDD §2.2).
  */
-function ownPlanetView(planet: Planet, from: Vec2, env: Perception): OwnPlanetView {
+function ownStationView(station: MiningStation, from: Vec2, env: Perception): OwnStationView {
   return {
-    pos: { x: planet.pos.x, y: planet.pos.y },
-    radius: planet.radius,
-    alive: planet.alive,
-    coreHp: planet.coreHp,
-    maxCoreHp: planet.maxCoreHp,
-    shieldHp: shieldPool(planet),
-    shields: planet.shields.length,
-    turrets: planet.turrets.length,
-    builds: planet.builds.length,
-    repairing: planet.repairing,
-    sinceDamage: planet.sinceDamage,
-    underAttack: planet.alive && planet.sinceDamage < env.alarmWindow,
-    distance: distance(from, planet.pos),
+    pos: { x: station.pos.x, y: station.pos.y },
+    radius: station.radius,
+    alive: station.alive,
+    coreHp: station.coreHp,
+    maxCoreHp: station.maxCoreHp,
+    shieldHp: shieldPool(station),
+    shields: station.shields.length,
+    turrets: station.turrets.length,
+    builds: station.builds.length,
+    repairing: station.repairing,
+    sinceDamage: station.sinceDamage,
+    underAttack: station.alive && station.sinceDamage < env.alarmWindow,
+    distance: distance(from, station.pos),
   };
 }
 
@@ -317,25 +317,25 @@ function perceiveShip(ship: Ship, from: Vec2, env: Perception): PerceivedShip {
  * core and shield numbers require sensor range, and the turret count requires
  * being close enough to see the barrels.
  */
-function perceivePlanet(planet: Planet, from: Vec2, env: Perception): PerceivedPlanet {
-  const d = distance(from, planet.pos);
-  // Measured to the planet's surface, not its centre: a 64-unit rock you are
+function perceiveStation(station: MiningStation, from: Vec2, env: Perception): PerceivedStation {
+  const d = distance(from, station.pos);
+  // Measured to the station's surface, not its centre: a 64-unit rock you are
   // standing on must not read as out of sensor range.
-  const surface = Math.max(0, d - planet.radius);
+  const surface = Math.max(0, d - station.radius);
   const scouted = surface <= env.sensorRange;
   const seen = surface <= env.visualRange;
   return {
-    owner: planet.owner,
-    pos: { x: planet.pos.x, y: planet.pos.y },
-    radius: planet.radius,
-    alive: planet.alive,
+    owner: station.owner,
+    pos: { x: station.pos.x, y: station.pos.y },
+    radius: station.radius,
+    alive: station.alive,
     distance: d,
     scouted,
-    coreHp: scouted ? planet.coreHp : null,
-    maxCoreHp: planet.maxCoreHp,
-    shieldHp: scouted ? shieldPool(planet) : null,
-    turrets: seen ? planet.turrets.length : null,
-    underAttack: scouted ? planet.alive && planet.sinceDamage < env.alarmWindow : null,
+    coreHp: scouted ? station.coreHp : null,
+    maxCoreHp: station.maxCoreHp,
+    shieldHp: scouted ? shieldPool(station) : null,
+    turrets: seen ? station.turrets.length : null,
+    underAttack: scouted ? station.alive && station.sinceDamage < env.alarmWindow : null,
   };
 }
 
@@ -350,11 +350,11 @@ function perceivePlanet(planet: Planet, from: Vec2, env: Perception): PerceivedP
  */
 export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_PERCEPTION): BotView {
   const self = shipIn(world, id);
-  const ownPlanet = planetIn(world, id);
-  const eye: Vec2 = self ? self.pos : (ownPlanet?.pos ?? { x: 0, y: 0 });
+  const ownStation = stationIn(world, id);
+  const eye: Vec2 = self ? self.pos : (ownStation?.pos ?? { x: 0, y: 0 });
 
   const ships: PerceivedShip[] = [];
-  const planets: PerceivedPlanet[] = [];
+  const stations: PerceivedStation[] = [];
   const asteroids: PerceivedAsteroid[] = [];
   const chunks: PerceivedChunk[] = [];
 
@@ -366,12 +366,12 @@ export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_P
       if (other.id === id) continue;
       const p = perceiveShip(other, eye, env);
       // Out of visual range: the ship is not on screen, so it is not in the
-      // view at all. (Its planet still is — planets are landmarks.)
+      // view at all. (Its station still is — stations are landmarks.)
       if (p.distance <= env.visualRange) ships.push(p);
     }
-    for (const planet of world.planets) {
-      if (planet.owner === id) continue;
-      planets.push(perceivePlanet(planet, eye, env));
+    for (const station of world.stations) {
+      if (station.owner === id) continue;
+      stations.push(perceiveStation(station, eye, env));
     }
     for (const a of world.asteroids) {
       const d = distance(eye, a.pos);
@@ -394,9 +394,9 @@ export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_P
     collapsed: isCollapsed(world),
     wavesSpawned: world.match.wavesSpawned,
     nextWaveIn: nextWaveIn(world),
-    self: selfView(self, ownPlanet, env),
+    self: selfView(self, ownStation, env),
     ships,
-    planets,
+    stations,
     asteroids,
     chunks,
     perception: env,
@@ -414,9 +414,9 @@ function perceivedAsteroid(a: Asteroid, d: number): PerceivedAsteroid {
 }
 
 /** The cockpit half of the view. */
-function selfView(ship: Ship | null, planet: Planet | null, env: Perception): SelfView {
+function selfView(ship: Ship | null, station: MiningStation | null, env: Perception): SelfView {
   if (!ship) {
-    const pos: Vec2 = planet ? { x: planet.pos.x, y: planet.pos.y } : { x: 0, y: 0 };
+    const pos: Vec2 = station ? { x: station.pos.x, y: station.pos.y } : { x: 0, y: 0 };
     return {
       id: -1,
       shipClass: ShipClass.Vanguard,
@@ -439,7 +439,7 @@ function selfView(ship: Ship | null, planet: Planet | null, env: Perception): Se
       spawnProtect: 0,
       docked: false,
       homeDistance: Number.POSITIVE_INFINITY,
-      planet: planet ? ownPlanetView(planet, pos, env) : null,
+      station: station ? ownStationView(station, pos, env) : null,
     };
   }
   return {
@@ -462,9 +462,9 @@ function selfView(ship: Ship | null, planet: Planet | null, env: Perception): Se
     spendable: ship.cargo + ship.banked,
     respawnTimer: ship.respawnTimer,
     spawnProtect: ship.spawnProtect,
-    docked: planet !== null && isDocked(ship, planet),
-    homeDistance: planet ? distance(ship.pos, planet.pos) : Number.POSITIVE_INFINITY,
-    planet: planet ? ownPlanetView(planet, ship.pos, env) : null,
+    docked: station !== null && isDocked(ship, station),
+    homeDistance: station ? distance(ship.pos, station.pos) : Number.POSITIVE_INFINITY,
+    station: station ? ownStationView(station, ship.pos, env) : null,
   };
 }
 
@@ -493,9 +493,9 @@ export function estimateOre(a: PerceivedAsteroid): number {
   return full * remaining;
 }
 
-/** Docking distance to a planet — the wheel's radius (GDD §2.5), for trees that
+/** Docking distance to a station — the wheel's radius (GDD §2.5), for trees that
  *  plan a trip home. */
-export const DOCK_RANGE = PLANET.dockRange;
+export const DOCK_RANGE = STATION.dockRange;
 
 /** The nearest element of `list`, or null when it is empty. Every perceived
  *  entity carries its own `distance`, so this is a min over a field. */

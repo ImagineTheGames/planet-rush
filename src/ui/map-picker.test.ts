@@ -22,7 +22,7 @@ import {
   mapPickerModel,
   mapPreview,
   normalizeMapId,
-  registryPlanets,
+  registryStations,
 } from './map-picker';
 import { DEFAULT_MAP_ID, MAPS, getMap } from '../sim/maps';
 import { MATCH_SLOTS } from '../bots';
@@ -73,11 +73,11 @@ describe('the model', () => {
 });
 
 describe('the preview — it cannot lie', () => {
-  it('draws one dot per home planet, normalised into the arena box', () => {
+  it('draws one dot per home station, normalised into the arena box', () => {
     for (const map of MAPS) {
       const preview = mapPreview(map);
-      expect(preview.planets).toHaveLength(MAP_PREVIEW_SLOTS);
-      for (const p of preview.planets) {
+      expect(preview.stations).toHaveLength(MAP_PREVIEW_SLOTS);
+      for (const p of preview.stations) {
         expect(p.x).toBeGreaterThanOrEqual(0);
         expect(p.x).toBeLessThanOrEqual(1);
         expect(p.y).toBeGreaterThanOrEqual(0);
@@ -96,10 +96,10 @@ describe('the preview — it cannot lie', () => {
   it('normalised dots re-scale to the registry board (the picture is the board)', () => {
     for (const map of MAPS) {
       const preview = mapPreview(map);
-      const raw = registryPlanets(map.id);
+      const raw = registryStations(map.id);
       for (let i = 0; i < raw.length; i++) {
-        expect(preview.planets[i]!.x * map.bounds.width).toBeCloseTo(raw[i]!.x, 3);
-        expect(preview.planets[i]!.y * map.bounds.height).toBeCloseTo(raw[i]!.y, 3);
+        expect(preview.stations[i]!.x * map.bounds.width).toBeCloseTo(raw[i]!.x, 3);
+        expect(preview.stations[i]!.y * map.bounds.height).toBeCloseTo(raw[i]!.y, 3);
       }
     }
   });
@@ -109,13 +109,13 @@ describe('the preview — it cannot lie', () => {
   });
 });
 
-describe('registryPlanets — the board a booted match builds', () => {
+describe('registryStations — the board a booted match builds', () => {
   it('equals the map registry call createWorld makes, in slot order', () => {
     for (const map of MAPS) {
       const expected = map
-        .planets(MAP_PREVIEW_SEED, MAP_PREVIEW_SLOTS, map.bounds)
-        .map((p) => p.planet);
-      const got = registryPlanets(map.id);
+        .stations(MAP_PREVIEW_SEED, MAP_PREVIEW_SLOTS, map.bounds)
+        .map((p) => p.station);
+      const got = registryStations(map.id);
       expect(got).toHaveLength(expected.length);
       for (let i = 0; i < expected.length; i++) {
         expect(got[i]!.x).toBeCloseTo(expected[i]!.x, 6);
@@ -125,8 +125,8 @@ describe('registryPlanets — the board a booted match builds', () => {
   });
 
   it('a different map yields a different board (so a picker bug cannot pass unseen)', () => {
-    const ring = registryPlanets('octagon');
-    const diamond = registryPlanets('diamond');
+    const ring = registryStations('octagon');
+    const diamond = registryStations('diamond');
     const same = ring.every((p, i) => p.x === diamond[i]?.x && p.y === diamond[i]?.y);
     expect(same).toBe(false);
   });

@@ -33,8 +33,8 @@
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { UpgradeTrack } from '@shared/types';
-import type { BotView, PerceivedAsteroid, PerceivedPlanet, PerceivedShip } from '../src/bots';
-import { WEAPON_RANGE, PLANET, SPAWN_PROTECTION_S, TURRET, SHIELD } from '../src/sim';
+import type { BotView, PerceivedAsteroid, PerceivedStation, PerceivedShip } from '../src/bots';
+import { WEAPON_RANGE, STATION, SPAWN_PROTECTION_S, TURRET, SHIELD } from '../src/sim';
 
 // ---------------------------------------------------------------------------
 // The strategy contract
@@ -120,11 +120,11 @@ function nearestAsteroid(view: BotView): PerceivedAsteroid | null {
   return best;
 }
 
-/** Nearest enemy home still standing, by public position (GDD §2.2: a planet's
+/** Nearest enemy home still standing, by public position (GDD §2.2: a station's
  *  position and beacon ring are public at any range). */
-function nearestEnemyPlanet(view: BotView): PerceivedPlanet | null {
-  let best: PerceivedPlanet | null = null;
-  for (const p of view.planets) {
+function nearestEnemyStation(view: BotView): PerceivedStation | null {
+  let best: PerceivedStation | null = null;
+  for (const p of view.stations) {
     if (p.owner === view.self.id || !p.alive) continue;
     if (!best || p.distance < best.distance || (p.distance === best.distance && p.owner < best.owner)) {
       best = p;
@@ -202,7 +202,7 @@ function miner(): (view: BotView) => readonly Action[] {
       return IDLE;
     }
 
-    const home = self.planet;
+    const home = self.station;
     if (self.cargoFull || (view.collapsed && self.cargo > 0)) goingHome = true;
 
     if (goingHome && home) {
@@ -214,7 +214,7 @@ function miner(): (view: BotView) => readonly Action[] {
           HOLD_FIRE,
         ];
       }
-      return [approach(view, home.pos, PLANET.dockRange * 0.6), HOLD_FIRE];
+      return [approach(view, home.pos, STATION.dockRange * 0.6), HOLD_FIRE];
     }
 
     // Loose chunks are free ore and closer than a rock's worth of weapon time.
@@ -230,15 +230,15 @@ function miner(): (view: BotView) => readonly Action[] {
   };
 }
 
-/** Mine close to home and pour everything into the planet: turrets, then a
- *  shield, then repair. Tests GDD §2.6's "an undefended planet falls; a defended
- *  planet is nearly uncrackable" from the defender's side, and §2.6's warning
+/** Mine close to home and pour everything into the station: turrets, then a
+ *  shield, then repair. Tests GDD §2.6's "an undefended station falls; a defended
+ *  station is nearly uncrackable" from the defender's side, and §2.6's warning
  *  that "a turtle spends ore to stand still". */
 function turtle(): (view: BotView) => readonly Action[] {
   return (view) => {
     const self = view.self;
     if (!self.alive) return IDLE;
-    const home = self.planet;
+    const home = self.station;
     if (!home) return IDLE;
 
     // Home is being hit: come back and defend it in person. Turrets deter, the
@@ -247,12 +247,12 @@ function turtle(): (view: BotView) => readonly Action[] {
 
     // What this tick's ore could buy, in priority order. Computed before the
     // docking check, because "is there anything to do at home?" is what decides
-    // whether the ship should be at home at all — a ship parked on a planet it
+    // whether the ship should be at home at all — a ship parked on a station it
     // has nothing to spend at is a turtle that has forgotten to earn.
     const wants: Action[] = [];
-    if (home.turrets + home.builds < TURRET.capPerPlanet && self.spendable >= TURRET.cost) {
+    if (home.turrets + home.builds < TURRET.capPerStation && self.spendable >= TURRET.cost) {
       wants.push({ type: 'buildOrder', item: 'turret' });
-    } else if (home.shields < SHIELD.capPerPlanet && self.spendable >= SHIELD.cost) {
+    } else if (home.shields < SHIELD.capPerStation && self.spendable >= SHIELD.cost) {
       wants.push({ type: 'buildOrder', item: 'shield' });
     } else if (home.coreHp < home.maxCoreHp && !view.collapsed && self.spendable > 0) {
       wants.push({ type: 'buildOrder', item: 'repair' });
@@ -265,7 +265,7 @@ function turtle(): (view: BotView) => readonly Action[] {
       return [...bankAndSpend(view, wants), { type: 'thrust', dir: { x: 0, y: 0 } }, fire];
     }
 
-    if (defending) return [approach(view, home.pos, PLANET.dockRange * 0.6), HOLD_FIRE];
+    if (defending) return [approach(view, home.pos, STATION.dockRange * 0.6), HOLD_FIRE];
 
     // Otherwise mine — but only rocks it can get home from quickly. A turtle
     // that chases the field is not a turtle.
@@ -273,7 +273,7 @@ function turtle(): (view: BotView) => readonly Action[] {
     if (rock && dist(rock.pos, home.pos) < view.perception.visualRange) {
       return [approach(view, rock.pos, WEAPON_RANGE * 0.7), rock.distance < WEAPON_RANGE ? FIRE : HOLD_FIRE];
     }
-    return [approach(view, home.pos, PLANET.dockRange * 0.6), HOLD_FIRE];
+    return [approach(view, home.pos, STATION.dockRange * 0.6), HOLD_FIRE];
   };
 }
 
@@ -294,7 +294,7 @@ function rusher(): (view: BotView) => readonly Action[] {
       return [approach(view, view.center, 0), HOLD_FIRE];
     }
 
-    const target = nearestEnemyPlanet(view);
+    const target = nearestEnemyStation(view);
     if (!target) return [approach(view, view.center, 0), HOLD_FIRE];
 
     // Park at the edge of weapon range: outside turret range (240 < 260) is the
@@ -304,7 +304,7 @@ function rusher(): (view: BotView) => readonly Action[] {
   };
 }
 
-/** Hunt ships, not planets: chase whatever is on screen and shoot it, and mine
+/** Hunt ships, not stations: chase whatever is on screen and shoot it, and mine
  *  when the screen is empty. Tests GDD §2.6's "pulling the owner away … is the
  *  skill" and §2.9's Hard-bot thesis that punishing the miner far from home is
  *  the profitable play. */
@@ -353,7 +353,7 @@ export const STRATEGIES: Readonly<Record<StrategyId, Strategy>> = {
   },
   rusher: {
     id: 'rusher',
-    hypothesis: 'Pure siege. GDD §2.6 says attacking an occupied planet is a mistake.',
+    hypothesis: 'Pure siege. GDD §2.6 says attacking an occupied station is a mistake.',
     create: () => rusher(),
   },
   raider: {

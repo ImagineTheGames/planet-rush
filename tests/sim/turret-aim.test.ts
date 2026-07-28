@@ -17,7 +17,7 @@
  *      tightest.
  *
  * This file is the instrument. A lone turret of each tier fires at the exact
- * scenario the report names — a full-speed probe **orbiting a defended planet** —
+ * scenario the report names — a full-speed probe **orbiting a defended station** —
  * and the hits are counted off real projectile physics, pooled over several orbit
  * radii so the number is not a knife-edge on one orbit rhythm. It pins the design
  * bands the report asked for:
@@ -40,7 +40,7 @@ import { describe, it, expect } from 'vitest';
 import type { Action } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import {
-  PLANET,
+  STATION,
   SHIP_RADIUS,
   TICK_DT,
   TURRET,
@@ -53,7 +53,7 @@ import {
   turretHomeAngle,
   turretOrbitPos,
   turretTierShotDamage,
-  type Planet,
+  type MiningStation,
   type Ship,
   type Turret,
   type World,
@@ -61,15 +61,15 @@ import {
 
 // --- fixtures --------------------------------------------------------------
 //
-// One planet at the arena centre with a single turret of the tier under test,
+// One station at the arena centre with a single turret of the tier under test,
 // against one indestructible probe (huge hull, so hull loss counts hits cleanly).
-// Everything is placed planet-relative so the geometry reads directly.
+// Everything is placed station-relative so the geometry reads directly.
 
 const CENTER = 3000;
 
 function makeTurret(tier: number): Turret {
-  const home = turretHomeAngle({ angle: 0 } as Planet, 0);
-  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: PLANET.radius } as Planet, home);
+  const home = turretHomeAngle({ angle: 0 } as MiningStation, 0);
+  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: STATION.radius } as MiningStation, home);
   const hp = TURRET_TIERS[tier]!.hp;
   return {
     id: 1,
@@ -89,12 +89,12 @@ function makeTurret(tier: number): Turret {
   };
 }
 
-function makePlanet(turret: Turret): Planet {
+function makeStation(turret: Turret): MiningStation {
   return {
     id: 0,
     owner: 0,
     pos: { x: CENTER, y: CENTER },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: 100,
     maxCoreHp: 100,
     alive: true,
@@ -112,7 +112,7 @@ function makePlanet(turret: Turret): Planet {
 const HUGE = 1e9; // an indestructible probe: hull loss is a clean hit counter.
 
 // The orbiter is an Interceptor — the fast scout / miner-hunter (GDD §2.11) that
-// actually strafes a defended planet: the "smart about it" attacker the report
+// actually strafes a defended station: the "smart about it" attacker the report
 // names. Its speed is what a turret's stale lead has to keep up with.
 const PROBE_CLASS = ShipClass.Interceptor;
 
@@ -149,7 +149,7 @@ function makeWorld(turret: Turret, probe: Ship): World {
     ships: [probe],
     asteroids: [],
     chunks: [],
-    planets: [makePlanet(turret)],
+    stations: [makeStation(turret)],
     projectiles: [],
     bounds: { width: 2 * CENTER, height: 2 * CENTER },
     fieldRadius: 600,
@@ -169,7 +169,7 @@ const TOP = shipTopSpeed({ shipClass: PROBE_CLASS, tiers: stockTiers() });
 // --- one measurement -------------------------------------------------------
 
 /**
- * Fly a probe on a **kinematic circular orbit** of radius `R` around the planet
+ * Fly a probe on a **kinematic circular orbit** of radius `R` around the station
  * at full ship speed and count what the tier's turret lands off real projectile
  * physics. The probe's pos/vel are set analytically each tick (the "smart
  * orbiter" that holds a perfect circle) and the sim is stepped with no probe
@@ -247,7 +247,7 @@ const TIERS = TURRET_TIERS.map((_, i) => i);
 
 // --- the table -------------------------------------------------------------
 
-describe('turret aim model — measured hit-rate vs a planet-orbiting probe (v0.2.4)', () => {
+describe('turret aim model — measured hit-rate vs a station-orbiting probe (v0.2.4)', () => {
   const orbitRate = TIERS.map((t) => orbit(t));
   const sitRate = TIERS.map((t) => stationary(t));
 
@@ -341,14 +341,14 @@ describe('the lead is where the target WILL be, not where it was (v0.2.4)', () =
     let leadAhead = false;
     const ticks = Math.round(3.5 / TICK_DT);
     for (let t = 0; t < ticks; t++) {
-      const beforeMuzzle = world.planets[0]!.turrets[0]!.muzzle;
+      const beforeMuzzle = world.stations[0]!.turrets[0]!.muzzle;
       step(world, [{ id: 1, actions: [] }]);
       // constant-velocity straight line: re-assert so integration/drag can't bend it
       probe.pos.y = startY + TOP * (world.time);
       probe.vel.x = 0;
       probe.vel.y = TOP;
 
-      const tt = world.planets[0]!.turrets[0]!;
+      const tt = world.stations[0]!.turrets[0]!;
       if (!beforeMuzzle && tt.muzzle) {
         const fired = Math.atan2(tt.muzzle.dir.y, tt.muzzle.dir.x);
         const straight = Math.atan2(probe.pos.y - tt.pos.y, probe.pos.x - tt.pos.x);
@@ -383,8 +383,8 @@ describe('determinism (GDD §4.8)', () => {
     for (let t = 0; t < 300; t++) {
       step(wA, [{ id: 1, actions: probeInput }]);
       step(wB, [{ id: 1, actions: probeInput }]);
-      const ta = wA.planets[0]!.turrets[0]!;
-      const tb = wB.planets[0]!.turrets[0]!;
+      const ta = wA.stations[0]!.turrets[0]!;
+      const tb = wB.stations[0]!.turrets[0]!;
       expect(ta.aim?.error).toBe(tb.aim?.error);
       expect(ta.aim?.vel.x).toBe(tb.aim?.vel.x);
       expect(ta.angle).toBe(tb.angle);

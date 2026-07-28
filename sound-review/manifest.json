@@ -602,28 +602,28 @@
       ]
     },
     {
-      "id": "planetDeath",
-      "label": "Planet Death",
-      "context": "A planet dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
-      "current": "previews/planetDeath/current.wav",
+      "id": "stationDeath",
+      "label": "Station Death",
+      "context": "A station dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
+      "current": "previews/stationDeath/current.wav",
       "candidates": [
         {
           "id": "a",
-          "wav": "previews/planetDeath/a.wav",
+          "wav": "previews/stationDeath/a.wav",
           "character": "deep collapsing sine descent",
-          "params": "src/art/audio/candidates.ts#planetDeath.a"
+          "params": "src/art/audio/candidates.ts#stationDeath.a"
         },
         {
           "id": "b",
-          "wav": "previews/planetDeath/b.wav",
+          "wav": "previews/stationDeath/b.wav",
           "character": "muffled noise implosion, sub-bass swallow",
-          "params": "src/art/audio/candidates.ts#planetDeath.b"
+          "params": "src/art/audio/candidates.ts#stationDeath.b"
         },
         {
           "id": "c",
-          "wav": "previews/planetDeath/c.wav",
+          "wav": "previews/stationDeath/c.wav",
           "character": "slow tolling drone, cracking decay",
-          "params": "src/art/audio/candidates.ts#planetDeath.c"
+          "params": "src/art/audio/candidates.ts#stationDeath.c"
         }
       ]
     },

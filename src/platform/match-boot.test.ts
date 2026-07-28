@@ -3,7 +3,7 @@
  * evidence.**
  *
  * M2's features were all merged and all unit-tested, and none of them were in
- * the game: the client booted a sandbox, so "planets exist" and "planets are in
+ * the game: the client booted a sandbox, so "stations exist" and "stations are in
  * the match you are playing" were two different facts and only the first was
  * tested. These tests assert the second, on the same composition `main.ts`
  * boots through ({@link bootOfflineMatch}) and the same funnel its input goes
@@ -12,7 +12,7 @@
  * The chain each build test walks, end to end:
  *
  *   wheel press → ControlState.order → mapActions → session.sendInput
- *     → LocalLoopback → InputQueue → step → placeOrder → a turret on your planet
+ *     → LocalLoopback → InputQueue → step → placeOrder → a turret on your station
  *
  * If any link in that is unwired, one of these goes red.
  */
@@ -22,7 +22,7 @@ import type { Action } from '@shared/types';
 import { bootOfflineMatch } from './match-boot';
 import { FireMode, createControlState, mapActions, resetControlState } from './actions';
 import { PANEL_ROWS_TOP, WheelInput, writeWheelOrders } from './wheel-input';
-import { TURRET, isCollapsed, isDocked, planetOf, turretCount } from '../sim';
+import { TURRET, isCollapsed, isDocked, stationOf, turretCount } from '../sim';
 import { WHEEL_ORDER, TRACK_ORDER, buildWheelModel } from '../ui';
 
 const LOCAL = 0;
@@ -42,14 +42,14 @@ function run(match: ReturnType<typeof boot>, ticks: number, actions: () => Actio
 }
 
 describe('the client boots a real match, not a sandbox (GDD §2.1)', () => {
-  it('stands up eight planets, one per slot, with the local player owning one', () => {
+  it('stands up eight stations, one per slot, with the local player owning one', () => {
     const match = boot();
 
-    expect(match.world.planets).toHaveLength(8);
+    expect(match.world.stations).toHaveLength(8);
     expect(match.world.ships).toHaveLength(8);
-    expect(planetOf(match.world, LOCAL)).not.toBeNull();
+    expect(stationOf(match.world, LOCAL)).not.toBeNull();
     for (let id = 0; id < 8; id++) {
-      expect(planetOf(match.world, id)?.owner).toBe(id);
+      expect(stationOf(match.world, id)?.owner).toBe(id);
     }
   });
 
@@ -83,37 +83,37 @@ describe('the client boots a real match, not a sandbox (GDD §2.1)', () => {
     const b = boot();
     run(a, 60);
     run(b, 60);
-    expect(a.world.planets.map((p) => p.pos)).toEqual(b.world.planets.map((p) => p.pos));
+    expect(a.world.stations.map((p) => p.pos)).toEqual(b.world.stations.map((p) => p.pos));
     expect(a.world.ships.map((s) => s.pos)).toEqual(b.world.ships.map((s) => s.pos));
   });
 });
 
 describe('the Build & Upgrade wheel actually spends (GDD §2.5)', () => {
-  it('opens at your own planet — the ship spawns docked at home', () => {
+  it('opens at your own station — the ship spawns docked at home', () => {
     const match = boot();
     const ship = match.world.ships[LOCAL]!;
-    const planet = planetOf(match.world, LOCAL)!;
+    const station = stationOf(match.world, LOCAL)!;
 
-    expect(isDocked(ship, planet)).toBe(true);
+    expect(isDocked(ship, station)).toBe(true);
     expect(
       buildWheelModel({
         requested: true,
         docked: true,
         shipAlive: ship.alive,
-        planetAlive: planet.alive,
+        stationAlive: station.alive,
         cargo: ship.cargo,
         banked: ship.banked,
         turrets: 0,
         shields: 0,
-        coreHp: planet.coreHp,
-        maxCoreHp: planet.maxCoreHp,
+        coreHp: station.coreHp,
+        maxCoreHp: station.maxCoreHp,
       }).open,
     ).toBe(true);
   });
 
-  it('presses TURRET and a turret is standing on the planet ten seconds later', () => {
+  it('presses TURRET and a turret is standing on the station ten seconds later', () => {
     const match = boot();
-    const planet = planetOf(match.world, LOCAL)!;
+    const station = stationOf(match.world, LOCAL)!;
     const wheel = new WheelInput();
     const state = createControlState();
 
@@ -129,18 +129,18 @@ describe('the Build & Upgrade wheel actually spends (GDD §2.5)', () => {
 
     // Ore is spent the moment the order lands; only time remains (GDD §2.5).
     expect(match.world.ships[LOCAL]!.banked).toBe(banked - TURRET.cost);
-    expect(planet.builds).toHaveLength(1);
-    expect(planet.turrets).toHaveLength(0);
+    expect(station.builds).toHaveLength(1);
+    expect(station.turrets).toHaveLength(0);
 
     // Construction visibly progresses, then finishes.
     resetControlState(state);
     run(match, 60);
-    const midway = planet.builds[0]!;
+    const midway = station.builds[0]!;
     expect(midway.remaining).toBeLessThan(midway.total);
 
     run(match, 60 * TURRET.buildTime);
-    expect(planet.turrets).toHaveLength(1);
-    expect(turretCount(planet)).toBe(1);
+    expect(station.turrets).toHaveLength(1);
+    expect(turretCount(station)).toBe(1);
   });
 
   it('charges exactly once for one press — the order never latches', () => {
@@ -162,7 +162,7 @@ describe('the Build & Upgrade wheel actually spends (GDD §2.5)', () => {
     run(match, 30);
 
     expect(match.world.ships[LOCAL]!.banked).toBe(banked - TURRET.cost);
-    expect(turretCount(planetOf(match.world, LOCAL)!)).toBe(1);
+    expect(turretCount(stationOf(match.world, LOCAL)!)).toBe(1);
   });
 
   it('buys a ship upgrade from a panel row (GDD §2.5, the fifth segment)', () => {
@@ -202,10 +202,10 @@ describe('the Build & Upgrade wheel actually spends (GDD §2.5)', () => {
   it('refuses an order the sim does not honour, without the client having to know', () => {
     const match = boot();
     const ship = match.world.ships[LOCAL]!;
-    const planet = planetOf(match.world, LOCAL)!;
+    const station = stationOf(match.world, LOCAL)!;
     // Fly out of dock range: the wheel would be closed, but even a forged order
     // is refused — the sim never trusts the sender (GDD §2.9).
-    ship.pos.x = planet.pos.x + 10_000;
+    ship.pos.x = station.pos.x + 10_000;
     const banked = ship.banked;
 
     const state = createControlState();
@@ -213,7 +213,7 @@ describe('the Build & Upgrade wheel actually spends (GDD §2.5)', () => {
     match.tick(mapActions(state, FireMode.Manual));
 
     expect(ship.banked).toBe(banked);
-    expect(planet.builds).toHaveLength(0);
+    expect(station.builds).toHaveLength(0);
   });
 });
 

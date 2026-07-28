@@ -30,15 +30,15 @@ import {
   TURRET_MAX_TIER,
   buyUpgrade,
   createWorld,
-  damagePlanet,
+  damageStation,
   isDocked,
   placeOrder,
-  planetOf,
+  stationOf,
   shipOf,
   step,
   turretTier,
   turretUpgradeTarget,
-  type Planet,
+  type MiningStation,
   type Ship,
   type World,
 } from '../../src/sim';
@@ -55,23 +55,23 @@ const players = [
 interface Ctx {
   world: World;
   ship: Ship;
-  planet: Planet;
+  station: MiningStation;
 }
 
-/** A docked, well-funded player at a live planet — the state in which every
+/** A docked, well-funded player at a live station — the state in which every
  *  wheel order is legal, so a refusal here means the *path* is broken, not the
  *  setup. Each `who` gets its own isolated fixture. */
 function dockedPlayer(who: number): Ctx {
   const world = createWorld({ seed: 3, players, asteroidCount: 0 });
   world.asteroids = [];
   const ship = shipOf(world, who)!;
-  const planet = planetOf(world, who)!;
+  const station = stationOf(world, who)!;
   ship.spawnProtect = 0;
-  planet.spawnProtect = 0;
+  station.spawnProtect = 0;
   ship.cargo = 0;
   ship.banked = 9999;
-  expect(isDocked(ship, planet)).toBe(true);
-  return { world, ship, planet };
+  expect(isDocked(ship, station)).toBe(true);
+  return { world, ship, station };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +92,8 @@ const BUILD_PATHS: Record<BuildItem, PlayerPath> = {
   // bot uses. (Its tier ladder gets its own reachability sweep below.)
   turret: ({ world, ship }) => expect(placeOrder(world, ship, 'turret')).toBe('ok'),
   shield: ({ world, ship }) => expect(placeOrder(world, ship, 'shield')).toBe('ok'),
-  repair: ({ world, ship, planet }) => {
-    damagePlanet(world, planet, 10); // a repair purchase needs a wound to heal
+  repair: ({ world, ship, station }) => {
+    damageStation(world, station, 10); // a repair purchase needs a wound to heal
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
   },
   bank: ({ world, ship }) => {
@@ -131,13 +131,13 @@ describe('parity — every wheel order a bot can file, a player can file', () =>
 
 describe('parity — the turret tier ladder is reachable end to end by a player', () => {
   it('a player can climb the whole ring through the top of the ladder', () => {
-    const { world, ship, planet } = dockedPlayer(LOCAL);
+    const { world, ship, station } = dockedPlayer(LOCAL);
 
     // Fill the ring the real way, so the TURRET wedge flips to its upgrade state.
-    for (let i = 0; i < TURRET.capPerPlanet; i++) expect(placeOrder(world, ship, 'turret')).toBe('ok');
+    for (let i = 0; i < TURRET.capPerStation; i++) expect(placeOrder(world, ship, 'turret')).toBe('ok');
     const cap = Math.ceil(TURRET.buildTime / TICK_DT) + 2;
-    for (let t = 0; t < cap && planet.turrets.length < TURRET.capPerPlanet; t++) step(world, []);
-    expect(planet.turrets.length).toBe(TURRET.capPerPlanet);
+    for (let t = 0; t < cap && station.turrets.length < TURRET.capPerStation; t++) step(world, []);
+    expect(station.turrets.length).toBe(TURRET.capPerStation);
 
     // Keep filing the SAME 'turret' order until the ladder is exhausted. The
     // upgrade targets the weakest turret first (breadth before depth), so the
@@ -145,15 +145,15 @@ describe('parity — the turret tier ladder is reachable end to end by a player'
     // reaching the top means every intermediate tier was occupied on the way.
     let guard = 0;
     let orders = 0;
-    while (turretUpgradeTarget(planet) !== null) {
+    while (turretUpgradeTarget(station) !== null) {
       expect(placeOrder(world, ship, 'turret')).toBe('ok');
       orders++;
       expect(guard++).toBeLessThan(200); // the ladder is finite — this must halt
     }
     // The whole ring reached the top of whatever ladder is configured, in exactly
     // one order per Mk per turret.
-    expect(planet.turrets.every((t) => turretTier(t) === TURRET_MAX_TIER)).toBe(true);
-    expect(orders).toBe(TURRET.capPerPlanet * TURRET_MAX_TIER);
+    expect(station.turrets.every((t) => turretTier(t) === TURRET_MAX_TIER)).toBe(true);
+    expect(orders).toBe(TURRET.capPerStation * TURRET_MAX_TIER);
     expect(placeOrder(world, ship, 'turret')).toBe('cap-reached'); // nothing left to field
   });
 });
@@ -163,18 +163,18 @@ describe('parity — the enemy fields nothing through an order the player cannot
     // The literal field-report scenario: a bot enemy builds a "laser turret".
     const enemy = dockedPlayer(ENEMY);
     expect(placeOrder(enemy.world, enemy.ship, 'turret')).toBe('ok');
-    expect(enemy.planet.builds.some((b) => b.kind === 'turret')).toBe(true);
+    expect(enemy.station.builds.some((b) => b.kind === 'turret')).toBe(true);
 
     // The player builds the very same hardware, through the very same call — the
     // one order interface both a human and a bot file through (GDD §2.9).
     const local = dockedPlayer(LOCAL);
     expect(placeOrder(local.world, local.ship, 'turret')).toBe('ok');
-    expect(local.planet.builds.some((b) => b.kind === 'turret')).toBe(true);
+    expect(local.station.builds.some((b) => b.kind === 'turret')).toBe(true);
   });
 
   it('a naked, un-upgraded core is exactly CORE_HP — the fixture is honest', () => {
-    // A guard that the parity setups are not accidentally trivial: the planet the
+    // A guard that the parity setups are not accidentally trivial: the station the
     // orders act on is a real, full-health home, not a pre-broken stub.
-    expect(dockedPlayer(LOCAL).planet.coreHp).toBe(CORE_HP);
+    expect(dockedPlayer(LOCAL).station.coreHp).toBe(CORE_HP);
   });
 });

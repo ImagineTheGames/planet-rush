@@ -72,7 +72,7 @@ import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 export interface DrawnBuildWedge {
   readonly id: WheelSegment['id'];
   readonly label: string;
-  /** The second line the wedge drew — a target ("YOUR PLANET") or, for repair,
+  /** The second line the wedge drew — a target ("YOUR STATION") or, for repair,
    *  its effect/reason line. */
   readonly sub: string;
   readonly cost: number | null;
@@ -153,7 +153,7 @@ interface WedgeNodes {
    *  at offsets from there. */
   readonly cluster: Container;
   readonly label: Text;
-  /** The second line: a build target ("YOUR PLANET") or a stat value ("10 → 13"). */
+  /** The second line: a build target ("YOUR STATION") or a stat value ("10 → 13"). */
   readonly sub: Text;
   readonly cost: Text;
   /** The arrow that marks UPGRADE SHIP as the one that opens a screen. */
@@ -192,7 +192,7 @@ function pipRow(pip: UpgradeSummaryPip): string {
  * The Build wheel and the Upgrade wheel behind its arrow. Add once to the HUD;
  * call {@link update} each frame with the two models and the frame time. The
  * container hides itself entirely once the wheel is fully closed, so away from
- * your own planet it costs one boolean per frame.
+ * your own station it costs one boolean per frame.
  */
 export class BuildWheelView extends Container {
   private readonly buildGroup = new Container();
@@ -682,8 +682,8 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
     // REPAIR CORE is the one wedge that names its effect: the HP a tap buys, or the
     // reason it's refused (p5-08 — a discrete purchase, so the deal must be legible
     // before the tap). Every other wedge's second line names its target instead —
-    // "every label names which" (GDD §2.5), planet or ship, words not a number.
-    sub: seg.repair ? seg.repair.line : seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR PLANET',
+    // "every label names which" (GDD §2.5), station or ship, words not a number.
+    sub: seg.repair ? seg.repair.line : seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR STATION',
     cost: seg.cost,
     ready: wedgeReady(seg.state),
     costReady: seg.state === 'ready',

@@ -33,7 +33,7 @@ interface DrawnMinimap {
   expanded: boolean;
   rect: Rect;
   ownDot: { x: number; y: number } | null;
-  planetCount: number;
+  stationCount: number;
   shipCount: number;
   oreCount: number;
   collapseRing: boolean;
@@ -54,11 +54,11 @@ async function bootMinimap(page: Page): Promise<DrawnMinimap> {
   await page.waitForFunction(() => typeof window.__minimapStage?.state === 'function', undefined, {
     timeout: 20_000,
   });
-  // Wait until the world is wired (planets fed) and the minimap is actually drawing.
+  // Wait until the world is wired (stations fed) and the minimap is actually drawing.
   await page.waitForFunction(
     () => {
       const s = window.__minimapStage?.state();
-      return !!s && s.rect.width > 0 && s.planetCount > 0;
+      return !!s && s.rect.width > 0 && s.stationCount > 0;
     },
     undefined,
     { timeout: 20_000 },

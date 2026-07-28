@@ -280,7 +280,7 @@ export function seamless(samples: Float32Array, sampleRate: number, crossfade = 
 /**
  * Mix one signal into another at an offset, in place.
  *
- * The layered sounds — the two-tone alarm, the planet-death fall, the ambient
+ * The layered sounds — the two-tone alarm, the station-death fall, the ambient
  * bed — are built by rendering their parts and stacking them here, rather than
  * by growing the voice model into a small modular synth nobody can tune.
  */

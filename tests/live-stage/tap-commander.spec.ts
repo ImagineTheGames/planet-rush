@@ -24,7 +24,7 @@ interface Vec2 {
   x: number;
   y: number;
 }
-type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'planet';
+type TargetKind = 'ship' | 'turret' | 'core' | 'asteroid' | 'station';
 
 /** The `?debug=1`-only seam this spec drives — installed in `src/main.ts`
  *  (`installTapCommanderStage`), staging through the client's real pilot and

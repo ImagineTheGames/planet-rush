@@ -75,12 +75,12 @@ describe('ArtPresenter — one object, two calls a frame', () => {
     const world = match();
     art.observe(world, 1 / 60);
 
-    const planet = world.planets[1]!;
-    planet.coreHp = 0;
-    planet.alive = false;
+    const station = world.stations[1]!;
+    station.coreHp = 0;
+    station.alive = false;
     art.observe(world, 1 / 60);
 
-    expect(art.tells.has(TELL.planetDeath)).toBe(true);
+    expect(art.tells.has(TELL.stationDeath)).toBe(true);
     expect(art.field.death).toBe(art.audio.death); // literally the same object
     expect(art.field.death.count).toBe(1); // triggered once, not twice
     for (let t = 0; t < 0.2; t += 1 / 60) art.observe(world, 1 / 60);
@@ -94,7 +94,7 @@ describe('ArtPresenter — one object, two calls a frame', () => {
     const world = match();
     art.observe(world, 1 / 60);
 
-    const home = world.planets.find((p) => p.owner === 0)!;
+    const home = world.stations.find((p) => p.owner === 0)!;
     // Sustained fire held on the core: sustained, not a taunt-tap.
     for (let tick = 0; tick < 120; tick++) {
       home.coreHp -= 0.1;
@@ -102,11 +102,11 @@ describe('ArtPresenter — one object, two calls a frame', () => {
     }
     expect(art.underAttack).toBe(true);
 
-    // …and it does not ring for a siege three planets away.
+    // …and it does not ring for a siege three stations away.
     const other = new ArtPresenter({ local: 1 });
     const world2 = match();
     other.observe(world2, 1 / 60);
-    const notMine = world2.planets.find((p) => p.owner === 0)!;
+    const notMine = world2.stations.find((p) => p.owner === 0)!;
     for (let tick = 0; tick < 120; tick++) {
       notMine.coreHp -= 0.1;
       other.observe(world2, 1 / 60);

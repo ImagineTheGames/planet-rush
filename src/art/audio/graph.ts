@@ -10,7 +10,7 @@
  *   sfx ─────┐
  *   alarm ───┼──► master ──► duck ──► destination
  *   ambient ─┘                 ▲
- *                              └── the planet-death hush (../vfx/death-moment)
+ *                              └── the station-death hush (../vfx/death-moment)
  * ```
  *
  * **Why the duck is its own node.** The tone contract's three seconds of quiet
@@ -127,7 +127,7 @@ export class AudioGraph {
   readonly ctx: AudioContextLike;
   /** Everything sums here; this is the player's volume. */
   readonly master: GainNodeLike;
-  /** Downstream of master: the planet-death hush multiplies the whole mix. */
+  /** Downstream of master: the station-death hush multiplies the whole mix. */
   readonly duck: GainNodeLike;
   readonly buses: Readonly<Record<Bus, GainNodeLike>>;
 
@@ -241,7 +241,7 @@ export class AudioGraph {
   }
 
   /**
-   * The whole-mix multiplier: 1 normally, 0 through the planet-death hush.
+   * The whole-mix multiplier: 1 normally, 0 through the station-death hush.
    *
    * Set from `DeathMoment.gain` every frame (`../vfx/death-moment`). Assigned
    * rather than ramped because the moment already *is* a ramp — a shaped one,

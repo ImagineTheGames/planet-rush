@@ -359,5 +359,5 @@ export function entryModel(state: EntryState): EntryModel {
  *  is being waited on, so a slow server never reads as a dead screen. */
 function entryPrompt(state: EntryState): string {
   if (state.status === 'connecting') return 'CONNECTING…';
-  return state.screen === 'join' ? 'ENTER THE ROOM CODE' : 'PLANET RUSH';
+  return state.screen === 'join' ? 'ENTER THE ROOM CODE' : 'STATION RUSH';
 }

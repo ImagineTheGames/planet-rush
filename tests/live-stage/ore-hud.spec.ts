@@ -90,7 +90,7 @@ test('the under-ship hold indicator appears, drains to the top-left TOTAL, then 
   // --- 1. MINE: stage a carried hold away from home so it does not drain. ----
   const MINED = 3;
   const staged = await page.evaluate((ore) => window.__oreHudStage!.mine(ore), MINED);
-  expect(staged, 'the local ship and its planet were available to stage').not.toBeNull();
+  expect(staged, 'the local ship and its station were available to stage').not.toBeNull();
   expect(staged!.cargo, 'the hold was loaded with the mined ore').toBeCloseTo(MINED, 5);
   const bankAtStart = staged!.banked;
 
@@ -143,12 +143,12 @@ test('the under-ship hold indicator appears, drains to the top-left TOTAL, then 
 
   // --- 2. DEPOSIT: park at home; watch the hold drain and the TOTAL rise. -----
   //
-  // The deposit flies ore-flight couriers ship→planet ([[ore-deposit-rule]]): the
+  // The deposit flies ore-flight couriers ship→station ([[ore-deposit-rule]]): the
   // hold empties as they *depart*, but the bank only rises as they *land*, so the
   // key on the drawn total rising is what proves both ends of the transfer.
   const DOCKED = 6;
   const docked = await page.evaluate((ore) => window.__oreHudStage!.dock(ore), DOCKED);
-  expect(docked, 'the ship re-parked at its own planet').not.toBeNull();
+  expect(docked, 'the ship re-parked at its own station').not.toBeNull();
   const bankBeforeDeposit = docked!.banked;
 
   // Mid-drain: the under-ship indicator has fewer filled pips than staged AND the

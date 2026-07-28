@@ -2,11 +2,11 @@
  * Nameplate model tests (field request v0.2.1, GDD §2.9, style-guide §2 / §3).
  * The load-bearing contracts, straight from the field request:
  *
- *  - **Who gets a label:** every live ship and every owned (live) planet; a dead
- *    ship and a destroyed planet (a wreck — no longer owned) get none; un-owned
+ *  - **Who gets a label:** every live ship and every owned (live) station; a dead
+ *    ship and a destroyed station (a wreck — no longer owned) get none; un-owned
  *    hostiles are never named.
  *  - **The local ship's own label is optional-off** and defaults off, while the
- *    local PLANET is still labelled.
+ *    local STATION is still labelled.
  *  - **What text:** the lobby/room name for a slot, falling back to a `P{n}` tag
  *    when a slot has no name — identity never vanishes.
  *  - **Which colour:** the owner's identity colour from the ratified roster, never
@@ -32,9 +32,9 @@ import type { DifficultyTable, Nameable, NameTable } from './nameplates';
 function ship(over: Partial<Nameable> = {}): Nameable {
   return { owner: 3, kind: 'ship', alive: true, pos: { x: 100, y: 100 }, radius: 12, ...over };
 }
-/** A live OWNED planet at owner 3. */
-function planet(over: Partial<Nameable> = {}): Nameable {
-  return { owner: 3, kind: 'planet', alive: true, pos: { x: 400, y: 400 }, radius: 40, ...over };
+/** A live OWNED station at owner 3. */
+function station(over: Partial<Nameable> = {}): Nameable {
+  return { owner: 3, kind: 'station', alive: true, pos: { x: 400, y: 400 }, radius: 40, ...over };
 }
 
 /** Names indexed by slot — local player 0 named "YOU", a couple of bots named. */
@@ -49,16 +49,16 @@ describe('who gets a label', () => {
     expect(nameplateGetsLabel(ship())).toBe(true);
   });
 
-  it('labels a live owned planet', () => {
-    expect(nameplateGetsLabel(planet())).toBe(true);
+  it('labels a live owned station', () => {
+    expect(nameplateGetsLabel(station())).toBe(true);
   });
 
   it('never labels a dead ship', () => {
     expect(nameplateGetsLabel(ship({ alive: false }))).toBe(false);
   });
 
-  it('never labels a destroyed planet (a wreck is no longer owned)', () => {
-    expect(nameplateGetsLabel(planet({ alive: false }))).toBe(false);
+  it('never labels a destroyed station (a wreck is no longer owned)', () => {
+    expect(nameplateGetsLabel(station({ alive: false }))).toBe(false);
   });
 
   it('never labels an un-owned hostile wave unit', () => {
@@ -73,8 +73,8 @@ describe('who gets a label', () => {
     expect(nameplateGetsLabel(ship({ owner: 0, local: true }), { showOwnShipLabel: true })).toBe(true);
   });
 
-  it('always labels the local player’s own PLANET (no local flag on a planet)', () => {
-    expect(nameplateGetsLabel(planet({ owner: 0 }))).toBe(true);
+  it('always labels the local player’s own STATION (no local flag on a station)', () => {
+    expect(nameplateGetsLabel(station({ owner: 0 }))).toBe(true);
   });
 });
 
@@ -127,16 +127,16 @@ describe('difficulty suffix (field request v0.2.2)', () => {
     expect(resolveDifficultySuffix(DIFFS, -1)).toBe('');
   });
 
-  it('carries the suffix onto a bot’s SHIP and its PLANET plate, per difficulty', () => {
+  it('carries the suffix onto a bot’s SHIP and its STATION plate, per difficulty', () => {
     const [botShip] = nameplateModel([ship({ owner: 3 })], NAMES, {}, DIFFS);
-    const [botPlanet] = nameplateModel([planet({ owner: 1 })], NAMES, {}, DIFFS);
+    const [botStation] = nameplateModel([station({ owner: 1 })], NAMES, {}, DIFFS);
     expect(botShip!.suffix).toBe('(HARD)');
-    expect(botPlanet!.suffix).toBe('(EASY)');
+    expect(botStation!.suffix).toBe('(EASY)');
   });
 
-  it('never suffixes a human’s own PLANET label', () => {
-    const [humanPlanet] = nameplateModel([planet({ owner: 0 })], NAMES, {}, DIFFS);
-    expect(humanPlanet!.suffix).toBe('');
+  it('never suffixes a human’s own STATION label', () => {
+    const [humanStation] = nameplateModel([station({ owner: 0 })], NAMES, {}, DIFFS);
+    expect(humanStation!.suffix).toBe('');
   });
 
   it('emits an empty suffix when no difficulty table is fed (back-compat)', () => {
@@ -182,7 +182,7 @@ describe('the whole frame', () => {
     const plates = nameplateModel(
       [
         ship({ owner: 1, pos: { x: 10, y: 20 }, radius: 12 }),
-        planet({ owner: 1, pos: { x: 30, y: 40 }, radius: 40 }),
+        station({ owner: 1, pos: { x: 30, y: 40 }, radius: 40 }),
         ship({ owner: 0, local: true }), // suppressed by default
         ship({ owner: 2, alive: false }), // dead → dropped
       ],
@@ -190,20 +190,20 @@ describe('the whole frame', () => {
     );
     expect(plates.map((p) => ({ owner: p.owner, kind: p.kind, text: p.text }))).toEqual([
       { owner: 1, kind: 'ship', text: 'Rusty' },
-      { owner: 1, kind: 'planet', text: 'Rusty' },
+      { owner: 1, kind: 'station', text: 'Rusty' },
     ]);
     expect(plates[0]!.x).toBe(10);
     expect(plates[0]!.y).toBe(20);
     expect(plates[0]!.radius).toBe(12);
   });
 
-  it('marks only the local ship’s label local (when shown), never a planet’s', () => {
-    const [shipPlate, planetPlate] = nameplateModel(
-      [ship({ owner: 0, local: true }), planet({ owner: 0 })],
+  it('marks only the local ship’s label local (when shown), never a station’s', () => {
+    const [shipPlate, stationPlate] = nameplateModel(
+      [ship({ owner: 0, local: true }), station({ owner: 0 })],
       NAMES,
       { showOwnShipLabel: true },
     );
     expect(shipPlate!.local).toBe(true);
-    expect(planetPlate!.local).toBe(false);
+    expect(stationPlate!.local).toBe(false);
   });
 });

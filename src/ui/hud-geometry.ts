@@ -9,7 +9,7 @@
  * anchor and its *actual* rendered rect with the layout registry
  * (`@platform/layout-registry`), and QA's layout contract asserts the second
  * sits inside the first. But that contract can only see elements the frozen
- * golden scene actually draws — the wheel opens at your planet, the alarm fires
+ * golden scene actually draws — the wheel opens at your station, the alarm fires
  * under sustained damage, and neither is happening in a screenshot of a ship two
  * seconds into a match. Keeping the geometry pure means the placement of those
  * elements is still asserted, headless, against the registry's own resolver, at
@@ -29,7 +29,7 @@ import type { HomeArrow } from './alarm';
 
 /** Reference wheel size as a fraction of the smaller viewport dimension. Big
  *  enough to hit with a thumb, small enough to leave the field readable behind
- *  it — the wheel is opened *at* your planet, so the world under it is calm. */
+ *  it — the wheel is opened *at* your station, so the world under it is calm. */
 export const WHEEL_SCALE = 0.36;
 /** Clamp so the wheel is neither unreadable on a small phone nor absurd on a
  *  4K desktop. CSS px radius of the outer ring. */
@@ -50,9 +50,9 @@ export function wheelRadius(viewportWidth: number, viewportHeight: number): numb
 
 /**
  * The wheel's drawn footprint: a `2r` square centred on the screen. The follow
- * camera keeps the local ship — and so the planet it is docked at — at the
+ * camera keeps the local ship — and so the station it is docked at — at the
  * viewport centre, which is what GDD §2.2's "the wheel when near your own
- * planet" resolves to in screen space.
+ * station" resolves to in screen space.
  */
 export function wheelBounds(viewportWidth: number, viewportHeight: number): Rect {
   const r = wheelRadius(viewportWidth, viewportHeight);
@@ -111,15 +111,15 @@ export function panelBounds(
 }
 
 // ---------------------------------------------------------------------------
-// Your own planet's HP (GDD §2.2 — top-right, in your player colour)
+// Your own station's HP (GDD §2.2 — top-right, in your player colour)
 // ---------------------------------------------------------------------------
 
 /** The HUD's corner margin, CSS px — and the `margin` of the anchors the corner
  *  elements register under, so the two can never drift apart. */
 export const HUD_PAD = 16;
 
-/** Own-planet HP bar. Wide enough to read a quarter-core loss at arm's length on
- *  a phone (GDD §2.2). See {@link planetHpBounds} for why 140 is not free. */
+/** Own-station HP bar. Wide enough to read a quarter-core loss at arm's length on
+ *  a phone (GDD §2.2). See {@link stationHpBounds} for why 140 is not free. */
 export const HP_BAR_WIDTH = 140;
 export const HP_BAR_HEIGHT = 10;
 /** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
@@ -128,7 +128,7 @@ export const SHIELD_BAR_HEIGHT = 4;
 export const HP_BAR_TOP = 16;
 
 /**
- * The own-planet HP element's drawn footprint: the right-aligned `HOME` label
+ * The own-station HP element's drawn footprint: the right-aligned `HOME` label
  * stacked over the core bar, hugging the top-right corner (GDD §2.2).
  *
  * Vertical placement does not depend on the viewport height — the element hangs
@@ -140,10 +140,10 @@ export const HP_BAR_TOP = 16;
  * starts at the viewport's half-width line, so the bar must satisfy
  * `HP_BAR_WIDTH ≤ viewportWidth / 2 − HUD_PAD` — a 144 px budget on the 320 px
  * phone the game claims to run on (GDD §4.3). Widening the bar past that puts
- * own-planet HP into the left half of the screen and breaks the anchor;
+ * own-station HP into the left half of the screen and breaks the anchor;
  * `hud-geometry.test.ts` pins it.
  */
-export function planetHpBounds(viewportWidth: number, labelWidth = 0): Rect {
+export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
   const width = Math.max(HP_BAR_WIDTH, labelWidth);
   return {
     x: viewportWidth - HUD_PAD - width,
@@ -157,7 +157,7 @@ export function planetHpBounds(viewportWidth: number, labelWidth = 0): Rect {
 // (Removed: the own-ship HULL readout that used to stack under HOME — field
 // report v0.2, "I don't need to see hull on top right — it's already appearing
 // on my ship." The over-ship bar (./healthbar-view) is the single truth for
-// own-ship hull now, so this corner carries only `planet-hp` again. Its geometry
+// own-ship hull now, so this corner carries only `station-hp` again. Its geometry
 // and layout test went with it; nothing references the old `HULL_*`/`hullHudBounds`.)
 
 // ---------------------------------------------------------------------------

@@ -62,7 +62,7 @@ export interface ControlState {
   aim: Vec2 | null;
   /** Fire / Mine held (GDD §2.3 — one weapon mines and shoots). */
   fire: boolean;
-  /** Build & Upgrade wheel requested near own planet (GDD §2.5). */
+  /** Build & Upgrade wheel requested near own station (GDD §2.5). */
   build: boolean;
   /**
    * A **confirmed** wheel segment this frame — the press that spends, as opposed

@@ -23,13 +23,13 @@
 
 import { ShipClass } from '@shared/types';
 import { createWorld, step, turretHomeAngle, turretOrbitPos, TURRET, SHIELD } from '../sim';
-import type { World, PlayerSpec, Planet } from '../sim';
+import type { World, PlayerSpec, MiningStation } from '../sim';
 
 /** The seed the frozen world is built from. Matches the day-1 boot world so the
  *  frozen frame is the same scene the game normally opens on. */
 export const FREEZE_SEED = 1;
 
-/** Player roster for the frozen world: a full 8-planet ring of Vanguards (the
+/** Player roster for the frozen world: a full 8-station ring of Vanguards (the
  *  onboarding default, GDD §2.11), mirroring `main.ts`'s boot world. */
 export const FREEZE_PLAYER_COUNT = 8;
 
@@ -89,15 +89,15 @@ const EMPTY_INPUTS = [] as const;
  *
  * Pure and deterministic (no RNG, no clock), so the frozen frame stays
  * byte-stable across boots. It writes only `Turret`/`Shield`/`BuildJob` literals
- * onto the local planet — the exact plain-data shapes the sim itself builds — and
+ * onto the local station — the exact plain-data shapes the sim itself builds — and
  * touches nothing the world hash covers (turrets/shields/builds are not hashed),
  * so freeze determinism is unchanged. Applied *after* the freeze advance, and
  * only under `?freeze=1`, so it can never reach a live match.
  */
 export function stampDefenseShowcase(world: World, localOwner = 0): void {
-  const planet = world.planets.find((p) => p.owner === localOwner && p.alive);
-  if (!planet) return;
-  if (planet.turrets.length > 0 || planet.shields.length > 0 || planet.builds.length > 0) return;
+  const station = world.stations.find((p) => p.owner === localOwner && p.alive);
+  if (!station) return;
+  if (station.turrets.length > 0 || station.shields.length > 0 || station.builds.length > 0) return;
 
   // Three standing turrets, one per Mk, so the pool's escalation reads at a glance;
   // the Mk II is tracking (plasma charge at the muzzle), the others idle.
@@ -107,11 +107,11 @@ export function stampDefenseShowcase(world: World, localOwner = 0): void {
     { slot: 2, tier: 2, targetId: null as number | null },
   ];
   for (const s of stand) {
-    const home = turretHomeAngle(planet, s.slot);
-    const pos = turretOrbitPos(planet, home);
-    planet.turrets.push({
+    const home = turretHomeAngle(station, s.slot);
+    const pos = turretOrbitPos(station, home);
+    station.turrets.push({
       id: world.nextEntityId++,
-      owner: planet.owner,
+      owner: station.owner,
       slot: s.slot,
       pos: { x: pos.x, y: pos.y },
       radius: TURRET.radius,
@@ -129,7 +129,7 @@ export function stampDefenseShowcase(world: World, localOwner = 0): void {
 
   // A fourth mount mid-build — the scaffold, ~60% done, so "defences are bought
   // before the attack" has a picture (GDD §2.5).
-  planet.builds.push({
+  station.builds.push({
     id: world.nextEntityId++,
     kind: 'turret',
     slot: 3,
@@ -139,7 +139,7 @@ export function stampDefenseShowcase(world: World, localOwner = 0): void {
 
   // A stacked shield: a full inner bubble and a half-drained outer one, so the
   // "pressure beats regeneration" banding (GDD §2.6) is on the sheet too.
-  planet.shields.push(
+  station.shields.push(
     { id: world.nextEntityId++, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius },
     { id: world.nextEntityId++, hp: SHIELD.hp * 0.5, maxHp: SHIELD.hp, radius: SHIELD.radius },
   );
@@ -148,7 +148,7 @@ export function stampDefenseShowcase(world: World, localOwner = 0): void {
 /** The first enemy home's owner, so a tracking turret has a real slot to face —
  *  or `1` if the roster somehow has no rival (never in the 8-home freeze). */
 function firstRival(world: World, localOwner: number): number {
-  const rival = world.planets.find((p: Planet) => p.owner !== localOwner);
+  const rival = world.stations.find((p: MiningStation) => p.owner !== localOwner);
   return rival ? rival.owner : 1;
 }
 

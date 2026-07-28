@@ -5,7 +5,7 @@
  *  - the wording is input-agnostic *via the action layer* (touch ≠ keyboard).
  * Day-1 covered the first two prompts; day 2 adds SPEND (fires the first time
  * the wheel opens) and UNDER-ATTACK (rides the alarm), and completes the
- * haul-home copy now that there is a planet to fly home to.
+ * haul-home copy now that there is a station to fly home to.
  */
 import { describe, it, expect } from 'vitest';
 import { Onboarding, PromptId, resolvePromptText } from './onboarding';
@@ -121,7 +121,7 @@ describe('Onboarding — UNDER-ATTACK prompt (GDD §2.2, §2.10)', () => {
     expect(ob.update(sig({ underAttack: true }))).toBeNull();
   });
 
-  it('does not fire on a quiet planet', () => {
+  it('does not fire on a quiet station', () => {
     const ob = new Onboarding();
     expect(ob.update(sig({ underAttack: false }))).toBeNull();
     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
@@ -203,7 +203,7 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
     // The under-attack prompt points at the arrow, which is device-agnostic.
     const a = resolvePromptText(PromptId.UnderAttack, 'keyboard', FireMode.Manual);
     const b = resolvePromptText(PromptId.UnderAttack, 'touch', FireMode.AutoAim);
-    expect(a).toBe('Your planet is under attack — follow the arrow');
+    expect(a).toBe('Your station is under attack — follow the arrow');
     expect(b).toBe(a);
   });
 

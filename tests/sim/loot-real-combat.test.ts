@@ -27,7 +27,7 @@ import {
   createWorld,
   step,
   inAtmosphere,
-  planetOf,
+  stationOf,
   oreResidual,
   type Asteroid,
   type PlayerInput,
@@ -44,9 +44,9 @@ const thrustAt = (from: Ship, tx: number, ty: number): Action => ({ type: 'thrus
 const FIRE: Action = { type: 'fire', active: true, auto: false };
 const looseOre = (w: World) => w.chunks.filter((c) => !c.deposit).reduce((n, c) => n + c.amount, 0);
 
-/** Park `ship` a hair inside its own planet's atmosphere so the drain runs. */
+/** Park `ship` a hair inside its own station's atmosphere so the drain runs. */
 function parkInHomeAtmosphere(world: World, ship: Ship): void {
-  const home = planetOf(world, ship.id)!;
+  const home = stationOf(world, ship.id)!;
   ship.pos = { x: home.pos.x, y: home.pos.y };
   ship.vel = { x: 0, y: 0 };
 }
@@ -117,7 +117,7 @@ describe('a dead ship’s ore counts — real combat kill, no seams (p2c)', () =
     for (let t = 0; t < 600 && killer.cargo > 1e-9; t++) {
       parkInHomeAtmosphere(world, killer);
       step(world, []);
-      expect(inAtmosphere(killer, planetOf(world, 0)!)).toBe(true);
+      expect(inAtmosphere(killer, stationOf(world, 0)!)).toBe(true);
     }
     const bankGain = killer.banked - bankBefore;
 

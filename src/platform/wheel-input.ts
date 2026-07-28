@@ -49,7 +49,7 @@ export const PANEL_ROWS_TOP = 64;
  *  from `src/ui`'s `wheelRadius()` so the hit target is exactly what was drawn. */
 export interface WheelLayout {
   /** Wheel centre — the viewport centre, where the follow camera holds the
-   *  docked ship and so the planet (GDD §2.2). */
+   *  docked ship and so the station (GDD §2.2). */
   readonly centerX: number;
   readonly centerY: number;
   /** Outer ring radius. */
@@ -170,7 +170,7 @@ export class WheelInput {
   }
 
   /**
-   * The wheel opens at your own planet **and nowhere else** (GDD §2.5). The
+   * The wheel opens at your own station **and nowhere else** (GDD §2.5). The
    * caller passes the sim's own answer (alive, docked, live core); a wheel that
    * was open when the ship undocked closes itself, so flying away is a way out.
    */

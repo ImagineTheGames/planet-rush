@@ -3,7 +3,7 @@
  *
  * > **Hard** plays like a good human: it evaluates targets by *threat,
  * > proximity, and opportunity* — it punishes whoever it can profitably punish
- * > (the miner far from home, the planet whose alarm went unanswered, the wreck
+ * > (the miner far from home, the station whose alarm went unanswered, the wreck
  * > nobody is guarding), times attacks to when you're seen mining far from home,
  * > and scavenges kill sites.
  *
@@ -27,7 +27,7 @@
  * The three Hard characters read differently out of the same tree because the
  * weights lean the same score: Sable (opportunism 0.9) chases the punishable,
  * Vulture (scavenge 1.0) takes the wreck first, Warden (homebody 1.0) treats the
- * space around its planet as its own.
+ * space around its station as its own.
  */
 
 import { UpgradeTrack } from '@shared/types';
@@ -94,37 +94,37 @@ export const HARD_UPGRADE_ORDER: readonly UpgradeTrack[] = [
 /**
  * The wallet of a bot that intends to still be dangerous at the collapse phase:
  * a working minimum of defence, then the ship, then the bank. It repairs only
- * when nothing is hitting the planet, because "a defender cannot out-repair an
+ * when nothing is hitting the station, because "a defender cannot out-repair an
  * attacker who keeps shooting" (GDD §2.6) — the ore would be thrown away.
  */
 export function hardSpendPlan(ctx: BotCtx): Purchase | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
+  const station = ctx.self.station;
+  if (!station) return null;
   const spendable = ctx.self.spendable;
 
   // Under siege right now: a turret is the only purchase that helps, and only
   // if there is a slot for it. Everything else waits.
-  if (planet.underAttack) {
-    if (planet.turrets + planet.builds < TURRET.capPerPlanet && spendable >= TURRET.cost) {
+  if (station.underAttack) {
+    if (station.turrets + station.builds < TURRET.capPerStation && spendable >= TURRET.cost) {
       return order('turret');
     }
     return null;
   }
 
-  if (planet.turrets + planet.builds < HARD_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
+  if (station.turrets + station.builds < HARD_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
 
   if (
     !ctx.view.collapsed &&
-    !planet.repairing &&
-    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, HARD_REPAIR_AT) &&
+    !station.repairing &&
+    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, HARD_REPAIR_AT) &&
     spendable >= 2
   ) {
     return order('repair');
   }
 
   if (
-    planet.turrets >= 1 &&
-    planet.shields + planet.builds < HARD_SHIELD_TARGET &&
+    station.turrets >= 1 &&
+    station.shields + station.builds < HARD_SHIELD_TARGET &&
     spendable >= SHIELD.cost
   ) {
     return order('shield');
@@ -193,9 +193,9 @@ export const hardTree: Node = selector('hard', [
   when(
     'defend',
     (ctx) => {
-      const planet = ctx.self.planet;
-      if (!planet || !planet.alive || ctx.view.collapsed) return false;
-      return planet.underAttack || homeIntruder(ctx) !== null;
+      const station = ctx.self.station;
+      if (!station || !station.alive || ctx.view.collapsed) return false;
+      return station.underAttack || homeIntruder(ctx) !== null;
     },
     (ctx) => defendHome(ctx),
   ),
@@ -214,14 +214,14 @@ export const hardTree: Node = selector('hard', [
 
   // The paragraph, executed: score every visible ship and home by threat,
   // proximity and opportunity, take the best one if it clears the floor, and
-  // strip the guns off a planet before going for its core (GDD §2.6).
+  // strip the guns off a station before going for its core (GDD §2.6).
   when(
     'attack',
     (ctx) => bestTarget(ctx, hardAttackFloor(ctx)) !== null,
     (ctx) => {
       const target = bestTarget(ctx, hardAttackFloor(ctx));
       if (!target) return null;
-      if (target.kind === 'planet') {
+      if (target.kind === 'station') {
         const suppress = suppressTurrets(ctx, target);
         if (suppress) return suppress;
       }

@@ -92,9 +92,9 @@ describe('a full 8-slot match', () => {
   const setup = { seed: 3, lineup: roundRobinLineup(FIELD) };
   const result = runMatch(setup);
 
-  it('runs eight planets and eight ships (GDD §2.1)', () => {
+  it('runs eight stations and eight ships (GDD §2.1)', () => {
     expect(setup.lineup).toHaveLength(MATCH_SLOTS);
-    expect(result.world.planets).toHaveLength(MATCH_SLOTS);
+    expect(result.world.stations).toHaveLength(MATCH_SLOTS);
     expect(result.world.ships).toHaveLength(MATCH_SLOTS);
     expect(result.slots).toHaveLength(MATCH_SLOTS);
   });
@@ -103,11 +103,11 @@ describe('a full 8-slot match', () => {
     expect(result.failure).toBeNull();
     expect(result.ok).toBe(true);
     expect(result.winner).not.toBeNull();
-    expect(result.world.planets.filter((p) => p.alive)).toHaveLength(1);
+    expect(result.world.stations.filter((p) => p.alive)).toHaveLength(1);
   });
 
   it('crowns the survivor, and records the elimination order behind them', () => {
-    const survivor = result.world.planets.find((p) => p.alive);
+    const survivor = result.world.stations.find((p) => p.alive);
     expect(result.winner).toBe(survivor?.owner);
     expect(result.eliminated).toHaveLength(MATCH_SLOTS - 1);
     expect(new Set(result.eliminated).size).toBe(MATCH_SLOTS - 1);
@@ -215,7 +215,7 @@ describe('QA probe strategies', () => {
     // The turtle is the probe that touches the most of the ruleset: it mines,
     // banks, builds turrets and shields, and repairs.
     const r = runMatch({ seed: 1, lineup: mirrorLineup('turtle', ShipClass.Vanguard) }, { maxSeconds: 240 });
-    const built = r.world.planets.reduce((n, p) => n + p.turrets.length + p.shields.length, 0);
+    const built = r.world.stations.reduce((n, p) => n + p.turrets.length + p.shields.length, 0);
     expect(built).toBeGreaterThan(8);
     // And the field is being worked: the finite yield has gone down.
     expect(r.fieldOreLeft).toBeLessThan(400);
