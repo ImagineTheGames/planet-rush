@@ -12,7 +12,7 @@
  *        the sim (spike Trap 6). FFA sets each team to the dense id (teams-of-one);
  *        TEAMS carries the authored team through unchanged.
  *   A2 — a default `createWorld` (no explicit teams) gives every ship
- *        `team === id` and every planet `team === owner` — FFA is byte-identical
+ *        `team === id` and every station `team === owner` — FFA is byte-identical
  *        to the pre-team world.
  */
 
@@ -111,10 +111,10 @@ describe('A2 — team threads through world build, FFA default', () => {
     for (const ship of w.ships) expect(ship.team).toBe(ship.id);
   });
 
-  it('createWorld with no explicit teams gives planet.team === planet.owner', () => {
+  it('createWorld with no explicit teams gives station.team === station.owner', () => {
     const specs = [0, 1, 2, 3].map((id) => ({ id, shipClass: ShipClass.Vanguard }));
     const w = createWorld({ seed: 7, players: specs });
-    for (const planet of w.planets) expect(planet.team).toBe(planet.owner);
+    for (const station of w.stations) expect(station.team).toBe(station.owner);
   });
 
   it('a TEAMS roster from configToPlayers stamps allies with a shared team', () => {
@@ -122,6 +122,6 @@ describe('A2 — team threads through world build, FFA default', () => {
     const cfg = lobby('teams', ['open', 'open', 'open', 'open'], [0, 0, 1, 1]);
     const w = createWorld({ seed: 3, players: configToPlayers(cfg) });
     expect(w.ships.map((s) => s.team)).toEqual([0, 0, 1, 1]);
-    expect(w.planets.map((p) => p.team)).toEqual([0, 0, 1, 1]);
+    expect(w.stations.map((p) => p.team)).toEqual([0, 0, 1, 1]);
   });
 });

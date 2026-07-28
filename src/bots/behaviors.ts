@@ -14,7 +14,7 @@
  */
 
 import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { CORE_HP, REPAIR_HP_PER_ORE, WEAPON_RANGE, PLANET, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
+import { CORE_HP, REPAIR_HP_PER_ORE, WEAPON_RANGE, STATION, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
@@ -49,14 +49,14 @@ import type { BotCtx } from './tree';
  *  the miner instead of being left for whoever passes (GDD §2.3). TUNABLE */
 export const MINE_STANDOFF = WEAPON_RANGE * 0.45;
 
-/** The ring a defender holds around its own planet: outside the core body,
+/** The ring a defender holds around its own station: outside the core body,
  *  comfortably inside its turrets' range, so ship and turrets focus the same
  *  attacker (GDD §2.6 — "two beats one", and the defender counts). TUNABLE */
-export const GUARD_RADIUS = PLANET.radius + 70;
+export const GUARD_RADIUS = STATION.radius + 70;
 
-/** Station-keeping ring while docked and spending. Inside `PLANET.dockRange`,
+/** Station-keeping ring while docked and spending. Inside `STATION.dockRange`,
  *  so the wheel stays live and a repair channel is not broken by drift. TUNABLE */
-export const DOCK_RADIUS = PLANET.radius + 45;
+export const DOCK_RADIUS = STATION.radius + 45;
 
 /** Stand-off for picking a turret apart: past its range (240), inside the
  *  weapon's (260). That twenty-unit window *is* GDD §2.6's "a patient attacker
@@ -97,7 +97,7 @@ export const SIEGE_STANDOFF = (SHIELD.radius + WEAPON_RANGE) / 2;
  * Returns the fraction; a tier gates `coreHp < maxCoreHp * repairTargetFraction`.
  */
 export function repairTargetFraction(ctx: BotCtx, baseAt: number): number {
-  const maxHp = ctx.self.planet?.maxCoreHp ?? CORE_HP;
+  const maxHp = ctx.self.station?.maxCoreHp ?? CORE_HP;
   // One repair chunk lands `REPAIR_HP_PER_ORE` HP; keep the target a further 5%
   // below `maxHp - one chunk` so the last chunk before the bot stops can never
   // reach — let alone clamp onto — the ceiling. (100/15 ⇒ cap ≈ 0.80.)
@@ -141,7 +141,7 @@ export function combatLatency(ctx: BotCtx): number {
  * Every thrust a tree emits goes through here: the desired direction, curved
  * around anything solid in front of it (`dodge` in `./steering`).
  *
- * Asteroids and planets are solid bodies that stop a ship dead, so "fly at the
+ * Asteroids and stations are solid bodies that stop a ship dead, so "fly at the
  * target" is not a navigation policy — it is a way to get wedged against a rock
  * with the collision response cancelling exactly the thrust the bot keeps
  * asking for. One place, so no branch can forget.
@@ -170,15 +170,15 @@ export function go(ctx: BotCtx, want: ThrustAction, ignoreRock?: number): Thrust
       worstRadius = rock.radius;
     }
   }
-  for (const planet of ctx.view.planets) {
-    const slack = planet.distance - planet.radius;
+  for (const station of ctx.view.stations) {
+    const slack = station.distance - station.radius;
     if (slack < worstSlack) {
       worstSlack = slack;
-      worstPos = planet.pos;
-      worstRadius = planet.radius;
+      worstPos = station.pos;
+      worstRadius = station.radius;
     }
   }
-  const own = ctx.self.planet;
+  const own = ctx.self.station;
   if (own && own.distance - own.radius < worstSlack) {
     worstPos = own.pos;
     worstRadius = own.radius;
@@ -279,8 +279,8 @@ export function openDirection(ctx: BotCtx, fallback: Vec2, ignoreRock?: number):
     if (rock.id === ignoreRock) continue;
     vote(rock.pos, rock.radius, rock.distance);
   }
-  for (const planet of ctx.view.planets) vote(planet.pos, planet.radius, planet.distance);
-  const own = ctx.self.planet;
+  for (const station of ctx.view.stations) vote(station.pos, station.radius, station.distance);
+  const own = ctx.self.station;
   if (own) vote(own.pos, own.radius, own.distance);
 
   // The arena edge is a hard wall (`sim/step.ts` clamps position and kills the
@@ -344,8 +344,8 @@ export function purchaseAction(purchase: Purchase): Action {
  * tree falls through to whatever it would rather be doing.
  */
 export function spendAtHome(ctx: BotCtx, plan: (ctx: BotCtx) => Purchase | null): readonly Action[] | null {
-  const planet = ctx.self.planet;
-  if (!planet || !planet.alive || !ctx.self.docked) return null;
+  const station = ctx.self.station;
+  if (!station || !station.alive || !ctx.self.docked) return null;
   // A stand-in never spends the ore it inherited — that is the dropped pilot's
   // to reclaim (GDD §4.2). Only what this bot has mined since it sat down lifts
   // `spendable` past its endowment; an opening bot's endowment is zero, so this
@@ -353,7 +353,7 @@ export function spendAtHome(ctx: BotCtx, plan: (ctx: BotCtx) => Purchase | null)
   if (ctx.self.spendable <= ctx.brain.endowment + 1e-9) return null;
   const purchase = plan(ctx);
   if (!purchase) return null;
-  return [go(ctx, orbit(ctx.self, planet.pos, DOCK_RADIUS, 0.2)), fire(false), purchaseAction(purchase)];
+  return [go(ctx, orbit(ctx.self, station.pos, DOCK_RADIUS, 0.2)), fire(false), purchaseAction(purchase)];
 }
 
 // ---------------------------------------------------------------------------
@@ -385,8 +385,13 @@ export function wantsToHaul(ctx: BotCtx): boolean {
  * mechanism, visible competence, no cheat in either direction (GDD §2.9).
  */
 export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number } | null): readonly Action[] | null {
-  if (!rock) return null;
-  if (ctx.self.cargoFull) return null;
+  if (!rock || ctx.self.cargoFull) {
+    ctx.brain.mineSite = -1;
+    return null;
+  }
+  // Book the site this decision commits to (p11). Read on the tick a retreat
+  // breaks off this approach ({@link wantsRetreat}) and by the oscillation soak.
+  ctx.brain.mineSite = rock.id;
   return [
     go(ctx, standOff(ctx.self, rock.pos, MINE_STANDOFF), rock.id),
     aimAt(ctx.self, rock.pos, ctx.tuning.aimJitter, ctx.rng),
@@ -401,9 +406,9 @@ export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number 
 /** Fly home with a load. Trigger up: a hauling bot opening fire is a bot
  *  advertising a full hold (GDD §2.2). */
 export function haulHome(ctx: BotCtx): readonly Action[] | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
-  return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
+  const station = ctx.self.station;
+  if (!station) return null;
+  return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
 }
 
 // ---------------------------------------------------------------------------
@@ -418,10 +423,10 @@ export function haulHome(ctx: BotCtx): readonly Action[] | null {
  * chasing the attacker out into the dark.
  */
 export function defendHome(ctx: BotCtx): readonly Action[] | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
+  const station = ctx.self.station;
+  if (!station) return null;
   const intruder = homeIntruder(ctx);
-  if (!intruder) return [go(ctx, orbit(ctx.self, planet.pos, GUARD_RADIUS)), fire(false)];
+  if (!intruder) return [go(ctx, orbit(ctx.self, station.pos, GUARD_RADIUS)), fire(false)];
   return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
 }
 
@@ -476,17 +481,17 @@ export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
 }
 
 /**
- * Take the turrets off a planet first, from outside their range — the patient
+ * Take the turrets off a station first, from outside their range — the patient
  * siege (GDD §2.6). Returns null when the bot cannot see any turret on the
  * target, which includes "it is too far away to count barrels": a bot that
  * cannot see the guns does not get to plan around them.
  */
 export function suppressTurrets(ctx: BotCtx, target: TargetScore): readonly Action[] | null {
-  const memo = ctx.memory.planet(target.id);
+  const memo = ctx.memory.station(target.id);
   if (!memo || memo.turrets === null || memo.turrets <= 0) return null;
-  // Turrets ring the planet; the nearest arc of that ring is the first barrel.
+  // Turrets ring the station; the nearest arc of that ring is the first barrel.
   const out = toward(memo.pos, ctx.self.pos);
-  const mount = PLANET.radius + TURRET.mountOffset;
+  const mount = STATION.radius + TURRET.mountOffset;
   const barrel: Vec2 = { x: memo.pos.x + out.x * mount, y: memo.pos.y + out.y * mount };
   return engage(ctx, barrel, TURRET.radius, TURRET_STANDOFF);
 }
@@ -520,6 +525,30 @@ export const RETREAT_CLEAR_RANGE = WEAPON_RANGE * 2.6;
  * second threshold, and it is here for the day hull repair exists. TUNABLE
  */
 export const RETREAT_RECOVER_MARGIN = 0.15;
+
+/**
+ * How long a mining site stays tabu after an approach to it was broken off by a
+ * retreat (p11 field report point 2). Long enough to outlast a threat that is
+ * merely passing through the approach corridor, so the bot commits to another
+ * field rather than wheeling straight back at the same rock the instant the flee
+ * latch releases — and short enough that a site abandoned to a threat that has
+ * since *left* is a candidate again within one mining errand. It sits at the
+ * same order as the flee band's own commitment (`./commitment`) on purpose: the
+ * tabu is the *spatial* commitment that outlives the flee's, so a released flee
+ * does not re-select the goal the flee was escaping. TUNABLE */
+export const TABU_SECONDS = 12;
+
+/**
+ * Book this bot's committed mine site (`Brain.mineSite`) as tabu until
+ * {@link TABU_SECONDS} from now. Called the instant a retreat *commits* off a
+ * mining approach — the one transition where the site the bot was flying at is
+ * the site the threat is sitting on (`wantsRetreat`).
+ */
+function tabuMineSite(ctx: BotCtx): void {
+  const site = ctx.brain.mineSite;
+  if (site < 0) return;
+  ctx.brain.tabu.set(site, ctx.view.time + TABU_SECONDS);
+}
 
 /** Core fraction below which self-preservation yields to home defence — the
  *  priority exception the field report names ("your core under final assault
@@ -558,9 +587,9 @@ export function retreatRecoverFraction(ctx: BotCtx): number {
  *  pre-empts fleeing (see {@link CORE_FINAL_ASSAULT})? False in collapse, where a
  *  core cannot be repaired and defending it is a losing trade (`./hard`). */
 export function coreUnderFinalAssault(ctx: BotCtx): boolean {
-  const planet = ctx.self.planet;
-  if (!planet || !planet.alive || ctx.view.collapsed) return false;
-  return planet.underAttack && planet.coreHp < planet.maxCoreHp * CORE_FINAL_ASSAULT;
+  const station = ctx.self.station;
+  if (!station || !station.alive || ctx.view.collapsed) return false;
+  return station.underAttack && station.coreHp < station.maxCoreHp * CORE_FINAL_ASSAULT;
 }
 
 /**
@@ -591,7 +620,16 @@ export function wantsRetreat(ctx: BotCtx): boolean {
   const enter = wounded && incomingThreat(ctx) !== null;
   const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
   const escaped = nearestThreat(ctx, RETREAT_CLEAR_RANGE) === null;
-  return commit(latch, enter, recovered || escaped);
+  const wasFleeing = latch.on;
+  const fleeing = commit(latch, enter, recovered || escaped);
+  // The retreat just *committed* off a mining approach: cool the site down so the
+  // next mining decision picks another field rather than re-litigating this rock
+  // with the threat still on the path (p11). `lastBehavior` holds the *previous*
+  // decision's leaf here — the tree evaluates this test before the mine leaf runs
+  // — so gating on it scopes the tabu to a break-off from mining, never from a
+  // duel or a haul that happened to leave `mineSite` set from earlier.
+  if (fleeing && !wasFleeing && ctx.brain.lastBehavior === 'mine') tabuMineSite(ctx);
+  return fleeing;
 }
 
 /**
@@ -621,10 +659,10 @@ export function wantsRetreat(ctx: BotCtx): boolean {
  * does not advertise (GDD §2.2).
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
-  const planet = ctx.self.planet;
+  const station = ctx.self.station;
   const threatAtHome =
-    planet !== null && planet.alive && threat !== null && dist(threat.pos, planet.pos) < GUARD_RADIUS * 2;
-  if (planet && planet.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, planet.pos, ARRIVE_RADIUS)), fire(false)];
+    station !== null && station.alive && threat !== null && dist(threat.pos, station.pos) < GUARD_RADIUS * 2;
+  if (station && station.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
   if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false)];
   return [thrust({ x: 0, y: 0 }), fire(false)];
 }

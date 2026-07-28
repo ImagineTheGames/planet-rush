@@ -40,7 +40,7 @@ import {
   damageTurret,
   isDocked,
   placeOrder,
-  planetOf,
+  stationOf,
   shipOf,
   step,
   turretRange,
@@ -50,7 +50,7 @@ import {
   turretUpgradeCost,
   turretUpgradeTarget,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Ship,
   type Turret,
   type World,
@@ -66,28 +66,28 @@ const players = [
 ];
 
 /** A real match, mid-flight: the local ship parked and docked at its own live
- *  planet, spawn protection cleared, and a fat bank so the wallet is never what
+ *  station, spawn protection cleared, and a fat bank so the wallet is never what
  *  is under test. No rocks; the enemy sits idle half the ring away. */
-function freshMatch(banked = 9999): { world: World; ship: Ship; planet: Planet } {
+function freshMatch(banked = 9999): { world: World; ship: Ship; station: MiningStation } {
   const world = createWorld({ seed: 7, players, asteroidCount: 0 });
   world.asteroids = [];
   const ship = shipOf(world, LOCAL)!;
-  const planet = planetOf(world, LOCAL)!;
+  const station = stationOf(world, LOCAL)!;
   ship.spawnProtect = 0;
-  planet.spawnProtect = 0;
+  station.spawnProtect = 0;
   ship.cargo = 0;
   ship.banked = banked;
-  expect(isDocked(ship, planet)).toBe(true);
-  return { world, ship, planet };
+  expect(isDocked(ship, station)).toBe(true);
+  return { world, ship, station };
 }
 
 /** Build `n` turrets the real way — order them, then run the sim until their
  *  construction timers finish — so the ring holds `n` STANDING turrets. */
-function buildTurrets(world: World, ship: Ship, planet: Planet, n: number): void {
+function buildTurrets(world: World, ship: Ship, station: MiningStation, n: number): void {
   for (let i = 0; i < n; i++) expect(placeOrder(world, ship, 'turret')).toBe('ok');
   const cap = Math.ceil(TURRET.buildTime / TICK_DT) + 2;
-  for (let t = 0; t < cap && planet.turrets.length < n; t++) step(world, []);
-  expect(planet.turrets.length).toBe(n);
+  for (let t = 0; t < cap && station.turrets.length < n; t++) step(world, []);
+  expect(station.turrets.length).toBe(n);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,9 +96,9 @@ function buildTurrets(world: World, ship: Ship, planet: Planet, n: number): void
 
 describe('§1 Mk I baseline — the ladder cannot regress the existing turret', () => {
   it('a freshly built turret is tier 0 with the exact shipped TURRET numbers', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, 1);
-    const t = planet.turrets[0]!;
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, 1);
+    const t = station.turrets[0]!;
     expect(turretTier(t)).toBe(0);
     expect(t.hp).toBe(TURRET.hp);
     expect(t.maxHp).toBe(TURRET.hp);
@@ -151,30 +151,30 @@ describe('§2 the ladder is a real, monotonic climb inside the GDD §2.6 rail', 
 
 describe('§3 the TURRET wedge builds, then upgrades the weakest turret', () => {
   it('a full ring turns the TURRET order into an upgrade of the lowest-tier turret', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, TURRET.capPerPlanet);
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, TURRET.capPerStation);
     // Ring full: no turret has climbed yet, and the wedge is now in upgrade state.
-    expect(planet.turrets.every((t) => turretTier(t) === 0)).toBe(true);
-    expect(turretUpgradeCost(planet)).toBe(TURRET_TIERS[1]!.upgradeCost);
+    expect(station.turrets.every((t) => turretTier(t) === 0)).toBe(true);
+    expect(turretUpgradeCost(station)).toBe(TURRET_TIERS[1]!.upgradeCost);
 
     const before = ship.banked;
     // Upgrade the whole ring to Mk II, one order each — the weakest (lowest slot
     // among equals) is picked deterministically, so all four climb in turn.
-    for (let i = 0; i < TURRET.capPerPlanet; i++) {
-      const target = turretUpgradeTarget(planet)!;
+    for (let i = 0; i < TURRET.capPerStation; i++) {
+      const target = turretUpgradeTarget(station)!;
       expect(placeOrder(world, ship, 'turret')).toBe('ok');
       expect(turretTier(target)).toBe(1);
     }
-    expect(planet.turrets.every((t) => turretTier(t) === 1)).toBe(true);
-    expect(planet.builds).toHaveLength(0); // an upgrade queues no construction job
+    expect(station.turrets.every((t) => turretTier(t) === 1)).toBe(true);
+    expect(station.builds).toHaveLength(0); // an upgrade queues no construction job
     // Exactly four Mk II upgrades were charged, hold-first then bank.
-    expect(before - ship.banked).toBeCloseTo(TURRET.capPerPlanet * TURRET_TIERS[1]!.upgradeCost!, 9);
+    expect(before - ship.banked).toBeCloseTo(TURRET.capPerStation * TURRET_TIERS[1]!.upgradeCost!, 9);
   });
 
   it('drives all the way to the top through the real wheel action (step + buildOrder)', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, 1);
-    const t = planet.turrets[0]!;
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, 1);
+    const t = station.turrets[0]!;
     const order: Inputs = [{ id: LOCAL, actions: [{ type: 'buildOrder', item: 'turret' } as Action] }];
 
     // One turret, three free slots: the first three TURRET presses BUILD (the
@@ -182,11 +182,11 @@ describe('§3 the TURRET wedge builds, then upgrades the weakest turret', () => 
     for (let climb = 0; climb < TURRET_MAX_TIER; ) {
       step(world, order);
       // Skip past the ticks that are still building out the ring.
-      if (planet.turrets.length < TURRET.capPerPlanet) continue;
+      if (station.turrets.length < TURRET.capPerStation) continue;
       climb = turretTier(t);
     }
     expect(turretTier(t)).toBe(TURRET_MAX_TIER);
-    expect(turretUpgradeTarget(planet)).not.toBeNull(); // three slot-mates still climb
+    expect(turretUpgradeTarget(station)).not.toBeNull(); // three slot-mates still climb
   });
 });
 
@@ -196,9 +196,9 @@ describe('§3 the TURRET wedge builds, then upgrades the weakest turret', () => 
 
 describe('§4 an upgrade is new armor, not a repair (mirrors ship hull, GDD §2.5)', () => {
   it('adds the tier HP difference to a damaged turret without healing the damage', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, TURRET.capPerPlanet);
-    const t = planet.turrets[0]!;
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, TURRET.capPerStation);
+    const t = station.turrets[0]!;
 
     // Carve it down to 10/30, then climb it to Mk II.
     damageTurret(t, TURRET.hp - 10);
@@ -223,21 +223,21 @@ describe('§4 an upgrade is new armor, not a repair (mirrors ship hull, GDD §2.
 
 describe('§5 refusals — a full, maxed, or unaffordable ring answers truthfully', () => {
   it('a fully Mk III ring refuses further TURRET orders as cap-reached', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, TURRET.capPerPlanet);
-    for (const t of planet.turrets) applyTurretTier(t, TURRET_MAX_TIER);
-    expect(turretUpgradeTarget(planet)).toBeNull();
-    expect(turretUpgradeCost(planet)).toBeNull();
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, TURRET.capPerStation);
+    for (const t of station.turrets) applyTurretTier(t, TURRET_MAX_TIER);
+    expect(turretUpgradeTarget(station)).toBeNull();
+    expect(turretUpgradeCost(station)).toBeNull();
     expect(placeOrder(world, ship, 'turret')).toBe('cap-reached');
   });
 
   it('an upgrade you cannot afford is refused and charges nothing', () => {
-    const { world, ship, planet } = freshMatch();
-    buildTurrets(world, ship, planet, TURRET.capPerPlanet);
+    const { world, ship, station } = freshMatch();
+    buildTurrets(world, ship, station, TURRET.capPerStation);
     ship.banked = 0;
     ship.cargo = 0;
     expect(placeOrder(world, ship, 'turret')).toBe('cannot-afford');
-    expect(planet.turrets.every((t) => turretTier(t) === 0)).toBe(true);
+    expect(station.turrets.every((t) => turretTier(t) === 0)).toBe(true);
   });
 });
 

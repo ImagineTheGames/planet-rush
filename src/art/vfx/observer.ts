@@ -10,7 +10,7 @@
  * So art reads the world instead of being told about it: this class holds the
  * previous tick's numbers and turns the differences into {@link TellQueue}
  * entries. A crack stage that went up, a rock that vanished with its ore spent,
- * a turret whose cooldown just reset, a core that lost HP, a planet whose
+ * a turret whose cooldown just reset, a core that lost HP, a station whose
  * `alive` flipped — each is a moment, and each becomes one tell that the VFX
  * field draws and the audio engine sounds.
  *
@@ -115,15 +115,17 @@ export interface ShieldView {
   readonly radius: number;
 }
 
-/** What the observer reads off a build job. */
+/** What the observer reads off a build job. `satellite` is the ratified radar
+ *  satellite (feature f1) — widened here so a sim `World` still satisfies
+ *  `WorldView`; art's construction tell handles it like the other kinds. */
 export interface BuildJobView {
   readonly id: number;
-  readonly kind: 'turret' | 'shield';
+  readonly kind: 'turret' | 'shield' | 'satellite';
   readonly remaining: number;
 }
 
-/** What the observer reads off a planet. */
-export interface PlanetView {
+/** What the observer reads off a station. */
+export interface StationView {
   readonly id: number;
   readonly owner: number;
   readonly pos: PointView;
@@ -161,7 +163,7 @@ export interface WorldView {
   readonly bounds: { readonly width: number; readonly height: number };
   readonly ships: readonly ShipView[];
   readonly asteroids: readonly AsteroidView[];
-  readonly planets: readonly PlanetView[];
+  readonly stations: readonly StationView[];
   readonly projectiles: readonly ProjectileView[];
   readonly match: MatchView;
 }
@@ -223,7 +225,7 @@ interface RockMemo {
   seen: number;
 }
 
-interface PlanetMemo {
+interface StationMemo {
   coreHp: number;
   alive: boolean;
   repairTimer: number;
@@ -236,7 +238,7 @@ interface TurretMemo {
   y: number;
   angle: number;
   radius: number;
-  /** The planet owner's slot. Kept because a dead turret has no planet to ask:
+  /** The station owner's slot. Kept because a dead turret has no station to ask:
    *  the `turretDown` tell is emitted from the memo, and the under-attack alarm
    *  needs to know whose deterrent just died (GDD §2.2, `../audio/alarm`). */
   owner: number;
@@ -278,7 +280,7 @@ export interface ObserverOptions {
 export class WorldObserver {
   private readonly ships = new Map<number, ShipMemo>();
   private readonly rocks = new Map<number, RockMemo>();
-  private readonly planets = new Map<number, PlanetMemo>();
+  private readonly stations = new Map<number, StationMemo>();
   private readonly turrets = new Map<number, TurretMemo>();
   private readonly shields = new Map<number, ShieldMemo>();
   private readonly builds = new Map<number, { seen: number }>();
@@ -302,7 +304,7 @@ export class WorldObserver {
   reset(): void {
     this.ships.clear();
     this.rocks.clear();
-    this.planets.clear();
+    this.stations.clear();
     this.turrets.clear();
     this.shields.clear();
     this.builds.clear();
@@ -345,7 +347,7 @@ export class WorldObserver {
 
     this.observeShips(world, step, out, silent, pulse);
     this.observeRocks(world, out, silent);
-    this.observePlanets(world, step, out, silent);
+    this.observeStations(world, step, out, silent);
     this.observeMuzzles(world, out, silent);
     this.observeShots(world, step, out, silent);
     this.observeMatch(world, out, silent);
@@ -459,8 +461,8 @@ export class WorldObserver {
    */
   private observeMuzzles(world: WorldView, out: TellQueue, silent: boolean): void {
     if (silent) return;
-    for (const planet of world.planets) {
-      for (const turret of planet.turrets) {
+    for (const station of world.stations) {
+      for (const turret of station.turrets) {
         const muzzle = turret.muzzle;
         if (!muzzle || !muzzle.hitPoint || turret.hp <= 0) continue;
         const hx = muzzle.hitPoint.x;
@@ -469,7 +471,7 @@ export class WorldObserver {
         // Firing power reads as mining speed and weapon damage alike — one stat
         // (GDD §2.5), so one number scales both the spark burst and the gain.
         const kind = hitsHull(world, -1, hx, hy) ? TELL.weaponHit : TELL.mineHit;
-        out.push(kind, hx, hy, dir, MUZZLE_POWER, planet.owner);
+        out.push(kind, hx, hy, dir, MUZZLE_POWER, station.owner);
       }
     }
   }
@@ -534,63 +536,63 @@ export class WorldObserver {
   }
 
   // -------------------------------------------------------------------------
-  // Planets: the siege, the build economy, and the one serious thing
+  // Stations: the siege, the build economy, and the one serious thing
   // -------------------------------------------------------------------------
 
-  private observePlanets(world: WorldView, dt: number, out: TellQueue, silent: boolean): void {
-    for (const planet of world.planets) {
-      let memo = this.planets.get(planet.id);
+  private observeStations(world: WorldView, dt: number, out: TellQueue, silent: boolean): void {
+    for (const station of world.stations) {
+      let memo = this.stations.get(station.id);
       if (!memo) {
-        memo = { coreHp: planet.coreHp, alive: planet.alive, repairTimer: 0, seen: this.frame };
-        this.planets.set(planet.id, memo);
+        memo = { coreHp: station.coreHp, alive: station.alive, repairTimer: 0, seen: this.frame };
+        this.stations.set(station.id, memo);
       }
       memo.seen = this.frame;
 
       if (!silent) {
-        const fraction = planet.maxCoreHp > 0 ? clamp01(planet.coreHp / planet.maxCoreHp) : 0;
-        if (planet.coreHp < memo.coreHp - 1e-6 && planet.alive) {
-          out.push(TELL.coreHit, planet.pos.x, planet.pos.y, 0, fraction, planet.owner);
+        const fraction = station.maxCoreHp > 0 ? clamp01(station.coreHp / station.maxCoreHp) : 0;
+        if (station.coreHp < memo.coreHp - 1e-6 && station.alive) {
+          out.push(TELL.coreHit, station.pos.x, station.pos.y, 0, fraction, station.owner);
         }
-        if (memo.alive && !planet.alive) {
+        if (memo.alive && !station.alive) {
           // The tone paragraph's moment (GDD §4.7). Everything downstream of
           // this tell — the hush, the smoke, the slow shards — hangs off it.
           out.push(
-            TELL.planetDeath,
-            planet.pos.x,
-            planet.pos.y,
-            planet.angle,
-            clamp01(planet.radius / 64),
-            planet.owner,
+            TELL.stationDeath,
+            station.pos.x,
+            station.pos.y,
+            station.angle,
+            clamp01(station.radius / 64),
+            station.owner,
           );
         }
 
         // The repair channel is a held state, not an event: pulse it so it has
         // a heartbeat a player can hear stop when a hit interrupts it (§2.5).
-        if (planet.repairing && planet.alive) {
+        if (station.repairing && station.alive) {
           memo.repairTimer += dt;
           if (memo.repairTimer >= REPAIR_PULSE_S) {
             memo.repairTimer %= REPAIR_PULSE_S;
-            out.push(TELL.repairTick, planet.pos.x, planet.pos.y, 0, fraction, planet.owner);
+            out.push(TELL.repairTick, station.pos.x, station.pos.y, 0, fraction, station.owner);
           }
         } else {
           memo.repairTimer = REPAIR_PULSE_S; // next channel opens on its first tick
         }
       }
 
-      memo.coreHp = planet.coreHp;
-      memo.alive = planet.alive;
+      memo.coreHp = station.coreHp;
+      memo.alive = station.alive;
 
-      this.observeTurrets(planet, out, silent);
-      this.observeShields(planet, out, silent);
-      this.observeBuilds(planet, out, silent);
+      this.observeTurrets(station, out, silent);
+      this.observeShields(station, out, silent);
+      this.observeBuilds(station, out, silent);
     }
 
-    this.forget(this.planets);
+    this.forget(this.stations);
     this.forget(this.builds);
   }
 
-  private observeTurrets(planet: PlanetView, out: TellQueue, silent: boolean): void {
-    for (const turret of planet.turrets) {
+  private observeTurrets(station: StationView, out: TellQueue, silent: boolean): void {
+    for (const turret of station.turrets) {
       let memo = this.turrets.get(turret.id);
       if (!memo) {
         memo = {
@@ -599,19 +601,19 @@ export class WorldObserver {
           y: turret.pos.y,
           angle: turret.angle,
           radius: turret.radius,
-          owner: planet.owner,
+          owner: station.owner,
           seen: this.frame,
         };
         this.turrets.set(turret.id, memo);
         // A turret that appears is a build job that just finished (GDD §2.5).
         if (!silent) {
-          out.push(TELL.buildComplete, turret.pos.x, turret.pos.y, turret.angle, 1, planet.owner);
+          out.push(TELL.buildComplete, turret.pos.x, turret.pos.y, turret.angle, 1, station.owner);
         }
       } else if (!silent && turret.cooldown > memo.cooldown + 1e-6 && memo.cooldown <= 1e-6) {
         // The cooldown resetting is the shot: muzzle flash at the barrel tip.
         const mx = turret.pos.x + Math.cos(turret.angle) * turret.radius;
         const my = turret.pos.y + Math.sin(turret.angle) * turret.radius;
-        out.push(TELL.turretFire, mx, my, turret.angle, 1, planet.owner);
+        out.push(TELL.turretFire, mx, my, turret.angle, 1, station.owner);
       }
       memo.seen = this.frame;
       memo.cooldown = turret.cooldown;
@@ -619,7 +621,7 @@ export class WorldObserver {
       memo.y = turret.pos.y;
       memo.angle = turret.angle;
       memo.radius = turret.radius;
-      memo.owner = planet.owner;
+      memo.owner = station.owner;
     }
 
     for (const [id, memo] of this.turrets) {
@@ -633,19 +635,19 @@ export class WorldObserver {
     }
   }
 
-  private observeShields(planet: PlanetView, out: TellQueue, silent: boolean): void {
-    for (const shield of planet.shields) {
+  private observeShields(station: StationView, out: TellQueue, silent: boolean): void {
+    for (const shield of station.shields) {
       let memo = this.shields.get(shield.id);
       if (!memo) {
         memo = { hp: shield.hp, maxHp: shield.maxHp, radius: shield.radius, seen: this.frame };
         this.shields.set(shield.id, memo);
         if (!silent) {
-          out.push(TELL.buildComplete, planet.pos.x, planet.pos.y, planet.angle, 0.5, planet.owner);
+          out.push(TELL.buildComplete, station.pos.x, station.pos.y, station.angle, 0.5, station.owner);
         }
       } else if (!silent && shield.hp < memo.hp - 1e-6) {
         // Shimmer scales with what is left: a failing bubble flickers thin.
         const strength = shield.maxHp > 0 ? clamp01(shield.hp / shield.maxHp) : 0;
-        out.push(TELL.shieldHit, planet.pos.x, planet.pos.y, 0, strength, planet.owner);
+        out.push(TELL.shieldHit, station.pos.x, station.pos.y, 0, strength, station.owner);
       }
       memo.seen = this.frame;
       memo.hp = shield.hp;
@@ -657,7 +659,7 @@ export class WorldObserver {
       if (memo.seen === this.frame) continue;
       // Pressure beat regeneration (GDD §2.6): the bubble is gone.
       if (!silent) {
-        out.push(TELL.shieldDown, planet.pos.x, planet.pos.y, 0, clamp01(memo.radius / 64), planet.owner);
+        out.push(TELL.shieldDown, station.pos.x, station.pos.y, 0, clamp01(memo.radius / 64), station.owner);
       }
       this.shields.delete(id);
     }
@@ -665,15 +667,15 @@ export class WorldObserver {
 
   /**
    * Construction orders. A job id is world-unique, so the memo map spans every
-   * planet and is pruned once per frame by {@link forget} — pruning it per
-   * planet would drop the other seven planets' jobs and re-announce them on the
+   * station and is pruned once per frame by {@link forget} — pruning it per
+   * station would drop the other seven stations' jobs and re-announce them on the
    * next frame.
    *
    * Only the *placing* is announced here. A job finishing is announced by the
    * turret or shield appearing, which is the moment the player can act on.
    */
-  private observeBuilds(planet: PlanetView, out: TellQueue, silent: boolean): void {
-    for (const job of planet.builds) {
+  private observeBuilds(station: StationView, out: TellQueue, silent: boolean): void {
+    for (const job of station.builds) {
       const memo = this.builds.get(job.id);
       if (memo) {
         memo.seen = this.frame;
@@ -684,11 +686,11 @@ export class WorldObserver {
       if (!silent) {
         out.push(
           TELL.buildPlaced,
-          planet.pos.x,
-          planet.pos.y,
-          planet.angle,
+          station.pos.x,
+          station.pos.y,
+          station.angle,
           job.kind === 'turret' ? 1 : 0.5,
-          planet.owner,
+          station.owner,
         );
       }
     }
@@ -771,7 +773,7 @@ function clamp01(n: number): number {
 
 /**
  * Did this shot land on something with a hull? Ships (other than the firer),
- * turrets, shield bubbles and planet cores all sound like metal; everything
+ * turrets, shield bubbles and station cores all sound like metal; everything
  * else in weapon range is rock.
  */
 function hitsHull(world: WorldView, firerId: number, x: number, y: number): boolean {
@@ -779,12 +781,12 @@ function hitsHull(world: WorldView, firerId: number, x: number, y: number): bool
     if (!ship.alive || ship.id === firerId) continue;
     if (within(x, y, ship.pos, ship.radius)) return true;
   }
-  for (const planet of world.planets) {
-    if (within(x, y, planet.pos, planet.radius)) return true;
-    for (const shield of planet.shields) {
-      if (shield.hp > 0 && within(x, y, planet.pos, shield.radius)) return true;
+  for (const station of world.stations) {
+    if (within(x, y, station.pos, station.radius)) return true;
+    for (const shield of station.shields) {
+      if (shield.hp > 0 && within(x, y, station.pos, shield.radius)) return true;
     }
-    for (const turret of planet.turrets) {
+    for (const turret of station.turrets) {
       if (within(x, y, turret.pos, turret.radius)) return true;
     }
   }

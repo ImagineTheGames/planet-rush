@@ -324,3 +324,34 @@ saved beside them (`wheel-real-readback.json`, `legend-readback.json`).
 The developer's report that buying in the WEAPON sub-wheel bounced back to the build
 wheel does NOT reproduce on `986b11e`: in one unbroken real-input session, BACK after
 a purchase returned to the upgrade main wheel every time.
+
+## Evidence round p11 — the ring grammar, scarcity, and bots that go elsewhere (build `468ef72`)
+
+Five p11 gates, shot from two surfaces (each frame says which):
+
+| Gate | Shot | Surface | Verdict |
+| --- | --- | --- | --- |
+| Siege ring: shield reddens & dies before core fills red | `damage-fills-red` | harness | **verified** |
+| Ore abundance SCARCE (default) vs RICH, same seed | `scarce-default` | harness | **verified** |
+| Bot re-sites off a contested field to a clean one, arrives | `bot-resites` | harness | **verified** |
+| Living ship at 0.28 HP reads `1/70`, never 0 | `zero-means-dead` | LIVE `?debug=1` | **verified** |
+| Shot colours ramp by DAMAGE tier (own + enemy families) | `shot-tier-colors` | harness | **verified** |
+
+**The render harness (`evidence/harness/scene.{html,js}`, camera `evidence/capture-p11.mjs`).**
+Four of these five are p11 states the shipped CLIENT cannot currently reach through the
+boot path or a `?debug=1` seam: the offline boot never threads `abundance` (so it always
+runs STANDARD — see the finding below), no seam sets an enemy's Power tier or grants a
+home a shield, and bots are not exposed on `window.__planetRush`. The harness renders the
+**real `src` modules** — `createWorld`/`step`/the bots brain + the real `Renderer` — on a
+`vite dev` server, so the p11 CODE's own output is on screen and every caption number is
+read straight off the real `World`. It is not a mock: `drawDamageFill`, `shotSprite`/
+`shotTier`, `resolveEconomy` and `bestRock` are the shipped functions. `zero-means-dead`
+needs none of this and is shot on the LIVE preview build.
+
+**FINDING — the shipped offline client boots STANDARD, not the ratified SCARCE default.**
+`bootOfflineMatch` (src/platform) builds its `LocalLoopback` match config with only
+`{seed, players, mapId}` and never sets `abundance`; `createWorld` therefore defaults to
+`standard`. SCARCE is only the default of `MatchConfig.abundance` (`matchAbundance`), and
+the offline boot bypasses `MatchConfig` entirely — there is also no in-app scarce/rich
+selector yet. So "by default more scarce" is not what the shipped offline game runs today.
+The p11 economy code itself resolves each level correctly (proven in `scarce-default`).

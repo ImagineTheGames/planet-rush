@@ -10,7 +10,7 @@
  * Then the close-ups: one test per clause of GDD §2.9 that the tier tests
  * (`./easy.test.ts`, `./hard.test.ts`) do not already own — Medium contesting a
  * wave off the public clock, Medium ganging the *leader* rather than the
- * weakest, Hard taking the guns off a planet before its core, and Vulture doing
+ * weakest, Hard taking the guns off a station before its core, and Vulture doing
  * what its name says.
  */
 
@@ -22,11 +22,11 @@ import { DEFAULT_MATCH_TIMEOUT_S, botLobby, createBots, fillEmptySlots, runHeadl
 import { mediumTarget } from './medium';
 import { perceive } from './perception';
 import { PERSONALITIES } from './personalities';
-import { scorePlanet } from './targeting';
+import { scoreStation } from './targeting';
 import { context, createBrain } from './tree';
 import type { BotCtx } from './tree';
 
-/** The offline match a solo player gets: eight planets, the whole cast, real
+/** The offline match a solo player gets: eight stations, the whole cast, real
  *  trees, shipped constants (GDD §3.3). */
 function offlineMatch(seed: number): { world: World; bots: ReturnType<typeof createBots> } {
   const seats = fillEmptySlots();
@@ -45,9 +45,9 @@ function board(seed = 4): World {
   });
   world.time = SPAWN_PROTECTION_S + 10;
   for (const ship of world.ships) ship.spawnProtect = 0;
-  for (const planet of world.planets) {
-    planet.spawnProtect = 0;
-    planet.sinceDamage = 999;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
   }
   return world;
 }
@@ -99,7 +99,7 @@ describe('the three trees, playing a whole match', () => {
       .reduce((sum, a) => sum + a.ore, 0);
     expect(waveOneLeft).toBeLessThan(oreAtStart);
     // …and turned into defences and hulls (GDD §2.5: ore has five competing uses).
-    expect(world.planets.some((p) => p.turrets.length + p.builds.length > 0)).toBe(true);
+    expect(world.stations.some((p) => p.turrets.length + p.builds.length > 0)).toBe(true);
     expect(world.ships.some((s) => s.banked > 0 || s.cargo > 0)).toBe(true);
   });
 
@@ -107,12 +107,12 @@ describe('the three trees, playing a whole match', () => {
     const { world, bots } = offlineMatch(3);
     runHeadlessMatch(world, bots, { maxSeconds: 240 });
 
-    // Per-planet caps are the sim's to enforce, but a bot that latched a wheel
+    // Per-station caps are the sim's to enforce, but a bot that latched a wheel
     // press would sit on the cap with a queue behind it and an empty bank
     // (`holdable` in `./harness`).
-    for (const planet of world.planets) {
-      expect(planet.turrets.length).toBeLessThanOrEqual(TURRET.capPerPlanet);
-      expect(planet.turrets.length + planet.builds.length).toBeLessThanOrEqual(TURRET.capPerPlanet + 2);
+    for (const station of world.stations) {
+      expect(station.turrets.length).toBeLessThanOrEqual(TURRET.capPerStation);
+      expect(station.turrets.length + station.builds.length).toBeLessThanOrEqual(TURRET.capPerStation + 2);
     }
   });
 });
@@ -144,28 +144,28 @@ describe('Medium — contests ore waves and gangs the leader (GDD §2.9)', () =>
 
     // Two homes close enough to scout, one healthy and one nearly dead. The
     // wounded one is the easier kill; the design says gang the *leader*.
-    const strong = world.planets.find((p) => p.owner === 1)!;
-    const weak = world.planets.find((p) => p.owner === 2)!;
+    const strong = world.stations.find((p) => p.owner === 1)!;
+    const weak = world.stations.find((p) => p.owner === 2)!;
     strong.pos = { x: 2000 - 240, y: 2000 };
     weak.pos = { x: 2000 + 240, y: 2000 };
     strong.coreHp = strong.maxCoreHp;
     weak.coreHp = weak.maxCoreHp * 0.25;
     for (const ship of world.ships) if (ship.id !== 0) ship.alive = false;
-    world.planets.find((p) => p.owner === 3)!.alive = false;
+    world.stations.find((p) => p.owner === 3)!.alive = false;
 
     const ctx = ctxOf(world, 0, 'foreman');
     const target = mediumTarget(ctx);
     expect(target).not.toBeNull();
-    expect(target!.kind).toBe('planet');
+    expect(target!.kind).toBe('station');
     expect(target!.id).toBe(strong.owner);
   });
 });
 
 describe('Hard — the patient siege, and the wreck (GDD §2.6, §2.7)', () => {
-  it('takes the guns off a planet it can see them on, and not one it cannot', () => {
+  it('takes the guns off a station it can see them on, and not one it cannot', () => {
     const world = board();
     const me = world.ships[0]!;
-    const target = world.planets.find((p) => p.owner === 1)!;
+    const target = world.stations.find((p) => p.owner === 1)!;
     target.pos = { x: 2300, y: 2000 };
     me.pos = { x: 2000, y: 2000 };
     target.turrets = [
@@ -184,13 +184,13 @@ describe('Hard — the patient siege, and the wreck (GDD §2.6, §2.7)', () => {
     ];
 
     const close = ctxOf(world, 0, 'sable');
-    const scored = scorePlanet(close, close.view.planets.find((p) => p.owner === 1)!);
+    const scored = scoreStation(close, close.view.stations.find((p) => p.owner === 1)!);
     expect(suppressTurrets(close, scored)).not.toBeNull();
 
-    // The same planet, its barrels never counted: a bot that cannot see the guns
+    // The same station, its barrels never counted: a bot that cannot see the guns
     // does not get to plan around them.
     const blind = ctxOf(world, 0, 'sable');
-    blind.memory.planet(1)!.turrets = null;
+    blind.memory.station(1)!.turrets = null;
     expect(suppressTurrets(blind, scored)).toBeNull();
   });
 

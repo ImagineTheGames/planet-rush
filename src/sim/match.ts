@@ -4,7 +4,7 @@
  * The three rules that turn a firefight into a match with a result (GDD §1,
  * §2.3, §2.7):
  *
- *  - **Elimination.** A core at zero ends its owner's match. The planet becomes
+ *  - **Elimination.** A core at zero ends its owner's match. The station becomes
  *    a **wreck** that stays on the map for the rest of the match, its defenses
  *    die with it, its owner's ship is destroyed and never respawns — and its
  *    banked fortune bursts into **debris anyone can scavenge**. Small holds mean
@@ -19,7 +19,7 @@
  *    the repair channel in `./buildings`, wave spawning in `./waves` — and this
  *    module owns the transition and the one flag they all read.
  *
- *  - **Win/loss, last to die.** One planet left standing wins. If the final
+ *  - **Win/loss, last to die.** One station left standing wins. If the final
  *    cores die in the *same tick*, the last core to reach zero in the
  *    simulation's resolution order wins — `match.eliminated` is that order,
  *    recorded as it happens, so the tiebreak is a lookup rather than a guess.
@@ -32,14 +32,17 @@ import type { PlayerId } from '@shared/types';
 import {
   CHUNK,
   COLLAPSE_CORE_DECAY,
+  COLLAPSE_GRACE_FLOOR_S,
   COLLAPSE_GRACE_S,
   WAVE_COUNT,
+  WAVE_INTERVAL_S,
   WRECK,
   clampToMargin,
   waveTime,
 } from './constants';
 import { killShip } from './damage';
-import type { Planet, World } from './state';
+import { ledgerAdd } from './ore-ledger';
+import type { MiningStation, World } from './state';
 import { allWavesSpawned, fieldExhausted } from './waves';
 
 // ---------------------------------------------------------------------------
@@ -60,15 +63,31 @@ export function isOver(world: World): boolean {
   return world.match.phase === 'ended';
 }
 
-/** True for a planet that has become a wreck: dead, but still on the map for
+/** True for a station that has become a wreck: dead, but still on the map for
  *  the rest of the match, still solid, still worth flying to (GDD §2.7). */
-export function isWreck(planet: Planet): boolean {
-  return !planet.alive;
+export function isWreck(station: MiningStation): boolean {
+  return !station.alive;
 }
 
-/** Sim time at which collapse begins no matter what is left in the field. */
-export function collapseDeadline(): number {
-  return waveTime(WAVE_COUNT) + COLLAPSE_GRACE_S;
+/**
+ * Sim time at which collapse begins no matter what is left in the field. Reads
+ * the match's abundance-resolved wave interval (`world.economy.waveInterval`) and
+ * re-anchors the deadline so match length holds regardless of abundance
+ * (`collapseDeadlineFor`) — a SCARCE match's waves being further apart never
+ * pushes the ending past the 10–15 min target (GDD §1). A world without a
+ * resolved economy (legacy/foreign) reads the baseline interval, so the pre-p11
+ * deadline is unchanged.
+ */
+export function collapseDeadline(world?: World): number {
+  const interval = world?.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  // The pre-p11 anchor — the baseline deadline (750 s at shipped constants); a
+  // longer SCARCE interval must not push the ending past it.
+  const anchored = waveTime(WAVE_COUNT) + COLLAPSE_GRACE_S;
+  // …but collapse can never be forced before the final wave has actually landed,
+  // so keep a floor of grace after it (bounded by the base grace, so a mocked
+  // accelerated match with a tiny grace still forces on schedule).
+  const floor = Math.min(COLLAPSE_GRACE_FLOOR_S, COLLAPSE_GRACE_S);
+  return Math.max(anchored, waveTime(WAVE_COUNT, interval) + floor);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,29 +95,33 @@ export function collapseDeadline(): number {
 // ---------------------------------------------------------------------------
 
 /**
- * The core is gone. The planet stops being a planet and becomes a wreck that
+ * The core is gone. The station stops being a station and becomes a wreck that
  * stays on the map for the rest of the match (GDD §2.7): its defenses die with
  * it, unfinished construction is lost, shots already in the air from its
  * turrets stop being a threat — and its owner is eliminated.
  *
  * Called the instant a core reaches zero, from whichever source took it there
- * (`damagePlanet`, or collapse decay). Idempotent, because two shots can land on
+ * (`damageStation`, or collapse decay). Idempotent, because two shots can land on
  * the same core in the same tick.
  *
  * Turrets are zeroed rather than spliced — `sweepDeadTurrets` removes them at
  * end of step, so indices stay stable for every shot already resolved this tick.
  */
-export function destroyCore(world: World, planet: Planet): void {
-  planet.coreHp = 0;
-  planet.alive = false;
-  planet.repairing = false;
-  for (const t of planet.turrets) t.hp = 0;
-  for (const s of planet.shields) s.hp = 0;
-  planet.builds.length = 0;
+export function destroyCore(world: World, station: MiningStation): void {
+  station.coreHp = 0;
+  station.alive = false;
+  station.repairing = false;
+  for (const t of station.turrets) t.hp = 0;
+  for (const s of station.shields) s.hp = 0;
+  // Radar satellites die with the station (feature f1): zero their HP so their
+  // sensor coverage collapses this tick and `sweepDeadSatellites` clears them at
+  // end of step, exactly as the turrets above are handled.
+  if (station.satellites) for (const sat of station.satellites) sat.hp = 0;
+  station.builds.length = 0;
   for (const p of world.projectiles) {
-    if (p.active && p.owner === planet.owner) p.active = false;
+    if (p.active && p.owner === station.owner) p.active = false;
   }
-  eliminate(world, planet);
+  eliminate(world, station);
 }
 
 /**
@@ -106,15 +129,15 @@ export function destroyCore(world: World, planet: Planet): void {
  * `match.eliminated` *is* the last-to-die order, so it happens here, in
  * resolution order, rather than being reconstructed later from timestamps.
  */
-function eliminate(world: World, planet: Planet): void {
-  if (world.match.eliminated.includes(planet.owner)) return;
-  world.match.eliminated.push(planet.owner);
-  planet.deathTime = world.time;
+function eliminate(world: World, station: MiningStation): void {
+  if (world.match.eliminated.includes(station.owner)) return;
+  world.match.eliminated.push(station.owner);
+  station.deathTime = world.time;
 
   // The owner is out (GDD §2.7): their ship dies where it stands — shedding
   // half its hold like any death — and it never respawns. The Rematch button is
   // the UI's answer to this flag.
-  const ship = shipOwnedBy(world, planet.owner);
+  const ship = shipOwnedBy(world, station.owner);
   let banked = 0;
   if (ship) {
     if (ship.alive) killShip(world, ship);
@@ -124,7 +147,13 @@ function eliminate(world: World, planet: Planet): void {
     ship.banked = 0;
   }
 
-  scatterWreckDebris(world, planet, banked + WRECK.baseDebrisOre);
+  // The wreck pays out the dead player's bank PLUS a floor minted from nothing so
+  // even a broke player leaves something to scavenge (GDD §2.7). The banked share
+  // is a transfer (bank → chunks, conserved); the floor is a fresh source, so the
+  // ledger records only the floor here — `scatterWreckDebris` records the chunks
+  // it actually lays down as `dropped` and any capped overflow as `capLoss`.
+  ledgerAdd(world, 'debrisFloor', WRECK.baseDebrisOre);
+  scatterWreckDebris(world, station, banked + WRECK.baseDebrisOre);
 }
 
 /** The ship in a given slot, or null (slots and ships are 1:1 in a match).
@@ -142,16 +171,16 @@ function shipOwnedBy(world: World, owner: PlayerId) {
  * fortune, loose on the map for anyone (GDD §2.7). Deterministic: the ring
  * angle comes from the chunk index, never the RNG, so two runs scatter debris
  * identically. Capped at `WRECK.maxDebrisChunks`; the excess dies with the
- * planet rather than carpeting the arena with collectables.
+ * station rather than carpeting the arena with collectables.
  */
-function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
+function scatterWreckDebris(world: World, station: MiningStation, ore: number): void {
   if (ore <= 1e-9) return;
   const whole = Math.min(Math.floor(ore / CHUNK.ore), WRECK.maxDebrisChunks);
   const remainder = whole < WRECK.maxDebrisChunks ? ore - whole * CHUNK.ore : 0;
   const pieces = whole + (remainder > 1e-9 ? 1 : 0);
   if (pieces <= 0) return;
 
-  const ring = planet.radius + WRECK.debrisRingOffset;
+  const ring = station.radius + WRECK.debrisRingOffset;
   for (let i = 0; i < pieces; i++) {
     const theta = (2 * Math.PI * i) / pieces;
     const dx = Math.cos(theta);
@@ -161,14 +190,21 @@ function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
     world.chunks.push({
       id: world.nextEntityId++,
       pos: {
-        x: clampToMargin(planet.pos.x + dx * ring, CHUNK.radius, world.bounds.width),
-        y: clampToMargin(planet.pos.y + dy * ring, CHUNK.radius, world.bounds.height),
+        x: clampToMargin(station.pos.x + dx * ring, CHUNK.radius, world.bounds.width),
+        y: clampToMargin(station.pos.y + dy * ring, CHUNK.radius, world.bounds.height),
       },
       vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
       amount: i < whole ? CHUNK.ore : remainder,
       radius: CHUNK.radius,
     });
   }
+
+  // Ledger: the chunks laid down are `dropped` ore (loot on the map); anything the
+  // `maxDebrisChunks` cap refused to scatter died with the station — a real sink
+  // (`capLoss`), so a hoarder's over-cap fortune is accounted, not silently gone.
+  const scattered = whole * CHUNK.ore + (remainder > 1e-9 ? remainder : 0);
+  ledgerAdd(world, 'dropped', scattered);
+  ledgerAdd(world, 'capLoss', ore - scattered);
 }
 
 /**
@@ -181,8 +217,8 @@ function scatterWreckDebris(world: World, planet: Planet, ore: number): void {
  * RNG (the debris ring is index-derived), so the board stays deterministic.
  */
 export function scatterDerelictLoot(world: World): void {
-  for (const planet of world.planets) {
-    if (planet.derelict) scatterWreckDebris(world, planet, WRECK.baseDebrisOre);
+  for (const station of world.stations) {
+    if (station.derelict) scatterWreckDebris(world, station, WRECK.baseDebrisOre);
   }
 }
 
@@ -210,13 +246,13 @@ export function updateMatch(world: World, dt: number): void {
  */
 function enterCollapseIfDue(world: World): void {
   if (isCollapsed(world) || !allWavesSpawned(world)) return;
-  if (!fieldExhausted(world) && world.time < collapseDeadline()) return;
+  if (!fieldExhausted(world) && world.time < collapseDeadline(world)) return;
 
   world.match.collapseTime = world.time;
   if (world.match.phase === 'live') world.match.phase = 'collapse';
   // Clear any lingering repair tell as the phase turns: repair shuts off
   // (GDD §2.3). `placeOrder` refuses every repair purchase from here on.
-  for (const planet of world.planets) planet.repairing = false;
+  for (const station of world.stations) station.repairing = false;
 }
 
 /** "Entropy finishes whoever the players don't" (GDD §1) — every surviving core
@@ -225,15 +261,15 @@ function enterCollapseIfDue(world: World): void {
  *  hits zero here is destroyed like any other kill. */
 function applyCollapseDecay(world: World, dt: number): void {
   if (COLLAPSE_CORE_DECAY <= 0 || !isCollapsed(world)) return;
-  for (const planet of world.planets) {
-    if (!planet.alive || planet.spawnProtect > 0) continue;
-    planet.coreHp -= COLLAPSE_CORE_DECAY * dt;
-    if (planet.coreHp <= 0) destroyCore(world, planet);
+  for (const station of world.stations) {
+    if (!station.alive || station.spawnProtect > 0) continue;
+    station.coreHp -= COLLAPSE_CORE_DECAY * dt;
+    if (station.coreHp <= 0) destroyCore(world, station);
   }
 }
 
 /**
- * Win condition: own the last surviving planet core (GDD §1).
+ * Win condition: own the last surviving station core (GDD §1).
  *
  * The tie rule is the interesting half. If the final cores die in the same
  * instant — two attackers finishing two homes on one tick, or the collapse
@@ -241,19 +277,19 @@ function applyCollapseDecay(world: World, dt: number): void {
  * goes to **whoever died last** in the simulation's resolution order. That
  * order is `match.eliminated`, appended to as each core reaches zero.
  *
- * A world with fewer than two planets is not a match (the render/test harnesses
+ * A world with fewer than two stations is not a match (the render/test harnesses
  * run single-slot worlds); it never ends and never declares a winner.
  */
 function resolveWinner(world: World): void {
   const m = world.match;
-  if (m.phase === 'ended' || world.planets.length < 2) return;
+  if (m.phase === 'ended' || world.stations.length < 2) return;
 
   let alive = 0;
   let survivor: PlayerId | null = null;
-  for (const planet of world.planets) {
-    if (!planet.alive) continue;
+  for (const station of world.stations) {
+    if (!station.alive) continue;
     alive++;
-    survivor = planet.owner;
+    survivor = station.owner;
   }
   if (alive > 1) return;
 

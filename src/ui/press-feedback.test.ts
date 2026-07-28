@@ -26,6 +26,7 @@ import {
   NEUTRAL_FEEDBACK,
 } from './press-feedback';
 import type { WheelSnapshot } from './press-feedback';
+import type { UiCue } from './sfx';
 import { REPAIR_ENTRY_ORE } from './build-wheel';
 import { STOCK_TIERS, UPGRADE_LADDER, UpgradeTrack, upgradeWheelSlots } from './upgrade-wheel';
 import { SHIELD, TURRET } from '../sim/constants';
@@ -235,5 +236,46 @@ describe('PressFeedback — the per-view driver', () => {
     fb.reset();
     expect(fb.active(0)).toBe(false);
     expect(fb.feedback('build', TURRET_I, 0)).toBe(NEUTRAL_FEEDBACK);
+  });
+});
+
+describe('PressFeedback — the UI sound seam (field report v0.2.4+)', () => {
+  it('a live press ticks, a disabled press buzzes — the same state that drives the tell', () => {
+    const cues: UiCue[] = [];
+    const fb = new PressFeedback((c) => cues.push(c));
+    fb.press('build', TURRET_I, true, 0); // ready → the press tick
+    fb.press('build', REPAIR, false, 0.2); // disabled → the buzzer
+    expect(cues).toEqual(['press', 'reject']);
+  });
+
+  it('a fresh confirmation chimes; a throttled repeat is silent', () => {
+    const cues: UiCue[] = [];
+    const fb = new PressFeedback((c) => cues.push(c));
+    // A repair heals every frame; only the first inside the gap should chime.
+    fb.confirm({ surface: 'build', index: REPAIR, amount: 1, deposit: false, core: true }, 0);
+    fb.confirm({ surface: 'build', index: REPAIR, amount: 1, deposit: false, core: true }, CONFIRM_REPEAT_GAP / 2);
+    expect(cues).toEqual(['confirm']); // the throttled repeat made no sound
+    // Past the gap it chimes again, matching the float that ticks.
+    fb.confirm({ surface: 'build', index: REPAIR, amount: 1, deposit: false, core: true }, CONFIRM_REPEAT_GAP + 0.01);
+    expect(cues).toEqual(['confirm', 'confirm']);
+  });
+
+  it('confirm() reports whether it registered, so a caller can gate its own sound', () => {
+    const fb = new PressFeedback();
+    expect(fb.confirm({ surface: 'build', index: TURRET_I, amount: 3, deposit: false, core: false }, 0)).toBe(true);
+    // A same-wedge repeat inside the gap is throttled — and says so.
+    expect(
+      fb.confirm({ surface: 'build', index: TURRET_I, amount: 3, deposit: false, core: false }, CONFIRM_REPEAT_GAP / 2),
+    ).toBe(false);
+  });
+
+  it('defaults to silent, so a headless view (Node, the QA harness) makes no sound', () => {
+    // No seam passed: press/confirm must not throw and must be a no-op audibly —
+    // the visual tell still works, which the driver tests above cover.
+    const fb = new PressFeedback();
+    expect(() => {
+      fb.press('build', TURRET_I, true, 0);
+      fb.confirm({ surface: 'build', index: TURRET_I, amount: 3, deposit: false, core: false }, 0);
+    }).not.toThrow();
   });
 });

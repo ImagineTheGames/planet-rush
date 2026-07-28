@@ -66,12 +66,12 @@ function ffaSlots(size: number): MatchStartSlot[] {
 }
 
 describe('the client builds the match from matchStart (Task C4)', () => {
-  it('rebuilds a 4-planet world for a 4-player match', () => {
+  it('rebuilds a 4-station world for a 4-player match', () => {
     const { session, transport } = seatedSession();
     transport.deliver({ type: 'matchStart', tick: 0, seed: 1, slots: ffaSlots(4) });
 
-    // Size rode in the roster length: four seats → four planets, four ships.
-    expect(session.world?.planets).toHaveLength(4);
+    // Size rode in the roster length: four seats → four stations, four ships.
+    expect(session.world?.stations).toHaveLength(4);
     expect(session.world?.ships).toHaveLength(4);
     // A dense FFA roster, each its own team — byte-identical to the server's.
     expect(session.world?.ships.map((s) => s.id)).toEqual([0, 1, 2, 3]);
@@ -90,8 +90,8 @@ describe('the client builds the match from matchStart (Task C4)', () => {
     transport.deliver({ type: 'matchStart', tick: 0, seed: 1, slots });
 
     expect(session.world?.ships.map((s) => s.team)).toEqual([0, 0, 1, 1]);
-    // Planets carry the same allegiance as their owner's ship.
-    expect(session.world?.planets.map((p) => p.team)).toEqual([0, 0, 1, 1]);
+    // Stations carry the same allegiance as their owner's ship.
+    expect(session.world?.stations.map((p) => p.team)).toEqual([0, 0, 1, 1]);
   });
 
   it('defaults an absent team to the seat\'s own id — a pre-teams roster is unchanged', () => {

@@ -1,9 +1,9 @@
 /**
- * src/ui/nameplates.ts — player-name labels over ships and owned planets.
+ * src/ui/nameplates.ts — player-name labels over ships and owned stations.
  * OWNER: UI Engineer (field request v0.2.1, GDD §2.9, style-guide §3).
  *
  * The developer, playing a live build: *"I want to see player names over their
- * planets and their ships."* So every **ship** and every **owned planet** carries
+ * stations and their ships."* So every **ship** and every **owned station** carries
  * a small name label — the local player's chosen lobby name over their own home
  * and (optionally) ship, and each bot's **personality name** (the seven cast
  * characters, GDD §2.9 — Rusty, Bolt, Foreman, Patch, Sable, Vulture, Warden)
@@ -21,20 +21,20 @@
  *
  * **The rules (field request v0.2.1), each unit-tested here:**
  *
- *  - **Who.** Every live **ship** and every **owned (live) planet** gets a label.
- *    A dead/eliminated ship and a destroyed planet (a wreck, GDD §2.7 — no longer
+ *  - **Who.** Every live **ship** and every **owned (live) station** gets a label.
+ *    A dead/eliminated ship and a destroyed station (a wreck, GDD §2.7 — no longer
  *    *owned*) get none. Un-owned hostile wave units are never named.
  *  - **The local ship's own label is optional-off** ({@link NameplateOptions
  *    .showOwnShipLabel}). It defaults **off**: the follow camera pins the local
  *    ship to screen-centre with its own distinct health bar, so a name glued there
  *    reads as noise (field request rule 3 — "your call"). The local player's
- *    **planet** is still labelled; only the centre-screen ship is suppressed.
+ *    **station** is still labelled; only the centre-screen ship is suppressed.
  *  - **What text.** From the `names` table, indexed by slot ({@link resolveName}).
  *    A missing/blank name degrades to a `P{n}` slot tag — identity never vanishes,
  *    the same fallback discipline as the identity decal (style-guide §3 rule 3).
  *  - **Which colour.** The owner's identity colour (style-guide §3 rule 2 — HP
  *    bars and *labels* are trim, one of the few places player colour is allowed),
- *    read through the SAME roster resolver [[planet-hp]] and [[healthbar]] use, so
+ *    read through the SAME roster resolver [[station-hp]] and [[healthbar]] use, so
  *    a ship's trim, its bar and its name can never disagree. Never signal yellow
  *    or threat red — those are RESERVED (style-guide §2).
  *  - **Fade under combat clutter.** A label over an entity that is damaged or
@@ -48,7 +48,7 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
 // Text policy
@@ -73,11 +73,11 @@ export const NAMEPLATE_FADE_ALPHA = 0.4;
 // ---------------------------------------------------------------------------
 
 /** What a name label can sit over. */
-export type NameplateKind = 'ship' | 'planet';
+export type NameplateKind = 'ship' | 'station';
 
 /**
  * One label-bearing entity as the model sees it, built by the caller from sim
- * state (a {@link Ship} or a home {@link Planet}). The decision reads only the
+ * state (a {@link Ship} or a home {@link MiningStation}). The decision reads only the
  * ownership / kind / liveness / combat fields; `pos`/`radius` are passed straight
  * through to the view.
  *
@@ -90,9 +90,9 @@ export interface Nameable {
   /** The entity's owner slot — selects the name and the identity colour. A
    *  non-slot value (`-1`, an un-owned hostile) is never named. */
   readonly owner: PlayerId;
-  /** Ship or owned planet — the view stacks the label differently for each. */
+  /** Ship or owned station — the view stacks the label differently for each. */
   readonly kind: NameplateKind;
-  /** False for a dead/eliminated ship or a destroyed planet (a wreck) — no label. */
+  /** False for a dead/eliminated ship or a destroyed station (a wreck) — no label. */
   readonly alive: boolean;
   /** Entity centre in screen space (already projected by the caller), CSS px. */
   readonly pos: Vec2;
@@ -100,9 +100,9 @@ export interface Nameable {
    *  (and, for a ship, clear of its health-bar cluster above it). */
   readonly radius: number;
   /** True **only** for the camera-followed local ship — suppressed by default
-   *  ({@link NameplateOptions.showOwnShipLabel}). Never set on a planet. */
+   *  ({@link NameplateOptions.showOwnShipLabel}). Never set on a station. */
   readonly local?: boolean;
-  /** The entity is actively fighting this tick (a ship firing, a turreted planet
+  /** The entity is actively fighting this tick (a ship firing, a turreted station
    *  under attack) ⇒ the label fades. Default false. */
   readonly inCombat?: boolean;
   /** HP as a fraction 0..1 (default 1 = full). Below full ⇒ a health bar is up ⇒
@@ -114,7 +114,7 @@ export interface Nameable {
 export interface Nameplate {
   /** Owner slot — for the view/test to reason about identity if it wants. */
   readonly owner: PlayerId;
-  /** Ship or planet — the view stacks it above the bar cluster or above the HP pin. */
+  /** Ship or station — the view stacks it above the bar cluster or above the HP pin. */
   readonly kind: NameplateKind;
   /** The resolved, length-clamped label text. */
   readonly text: string;
@@ -163,7 +163,7 @@ export type DifficultyTable = readonly (string | undefined)[];
  *  field-request calls (own-ship label off, the two alpha levels above). */
 export interface NameplateOptions {
   /** Show the local player's OWN ship label. Default **false** — a name pinned to
-   *  screen-centre reads as noise (field request rule 3; the own planet is still
+   *  screen-centre reads as noise (field request rule 3; the own station is still
    *  labelled either way). Wire this to a settings toggle if a player disagrees. */
   readonly showOwnShipLabel?: boolean;
   /** Resting opacity. Default {@link NAMEPLATE_FULL_ALPHA}. */
@@ -223,7 +223,7 @@ export function resolveDifficultySuffix(difficulties: DifficultyTable, owner: Pl
 export function nameplateGetsLabel(e: Nameable, opts: NameplateOptions = {}): boolean {
   if (!isOwnedSlot(e.owner)) return false;
   if (!e.alive) return false;
-  // The local ship's own label is off unless explicitly enabled; a local PLANET
+  // The local ship's own label is off unless explicitly enabled; a local STATION
   // (no `local` flag) is always labelled.
   if (e.kind === 'ship' && e.local && !(opts.showOwnShipLabel ?? false)) return false;
   return true;

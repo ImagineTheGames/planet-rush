@@ -46,7 +46,7 @@ export class MainMenuView extends Container {
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
     this.layout = mainMenuLayout({ width: screenWidth, height: screenHeight }, opts(isTouch, insets));
-    this.heading = makeText('PLANET RUSH', FONT_HEADING, 40, TEXT_PRIMARY);
+    this.heading = makeText('STATION RUSH', FONT_HEADING, 40, TEXT_PRIMARY);
     this.heading.anchor.set(0.5, 0.5);
     this.addChild(this.backdrop, this.heading);
   }

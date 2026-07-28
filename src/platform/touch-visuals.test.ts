@@ -175,7 +175,7 @@ describe('the BUILD button — the touch E-equivalent (GDD §2.4, §2.5)', () =>
     expect(buildButtonRect(false, true, 1280, 720)).toBeNull();
   });
 
-  it('appears only at your own planet — docked is the whole rule (GDD §2.5)', () => {
+  it('appears only at your own station — docked is the whole rule (GDD §2.5)', () => {
     expect(buildButtonRect(true, false, 1280, 720)).toBeNull();
     expect(buildButtonRect(true, true, 1280, 720)).not.toBeNull();
   });

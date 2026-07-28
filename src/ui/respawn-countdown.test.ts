@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownInput } from './respawn-countdown';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 /** A dead-with-respawn-pending frame; tweak per case. */
 function dead(over: Partial<RespawnCountdownInput> = {}): RespawnCountdownInput {

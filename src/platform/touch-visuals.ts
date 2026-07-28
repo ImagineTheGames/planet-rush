@@ -204,8 +204,8 @@ function assign(r: Rect | null, x: number, y: number, width: number, height: num
 /**
  * The BUILD button's screen rect, or `null` when it is not on screen.
  *
- * GDD §2.4 gives touch "a dedicated BUILD button near the player's own planet
- * (the E-equivalent)", and §2.5 opens the wheel at your own planet and nowhere
+ * GDD §2.4 gives touch "a dedicated BUILD button near the player's own station
+ * (the E-equivalent)", and §2.5 opens the wheel at your own station and nowhere
  * else — so `docked` is the whole visibility rule, and it is the sim's own
  * `isDocked` answer rather than a distance this layer re-derives.
  *
@@ -272,7 +272,7 @@ export class TouchVisuals extends Container {
   private readonly fireFill = new Graphics();
   private readonly fireRing = new Graphics();
 
-  // BUILD button — the touch E-equivalent, shown only at your own planet.
+  // BUILD button — the touch E-equivalent, shown only at your own station.
   private readonly buildGroup = new Container();
 
   /** Reused visibility scratch — the frame path allocates nothing. */
@@ -397,7 +397,7 @@ export class TouchVisuals extends Container {
     this.fireFill.alpha = pressed ? FIRE_PRESSED_FILL : FIRE_IDLE_FILL;
     this.fireGroup.scale.set(pressed ? 0.94 : 1);
 
-    // --- BUILD button: contextual, at your own planet and nowhere else. ------
+    // --- BUILD button: contextual, at your own station and nowhere else. ------
     this.buildGroup.visible = docked;
     if (docked) {
       const c = buildButtonCenter(w, h);

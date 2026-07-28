@@ -40,11 +40,25 @@ import {
   type AudioContextLike,
   type AudioNodeLike,
   type AudioParamLike,
+  type BiquadFilterNodeLike,
   type BufferSourceLike,
   type GainNodeLike,
+  type StereoPannerNodeLike,
 } from './context';
 import { AudioEngine, EARSHOT_FAR, EARSHOT_NEAR } from './engine';
 import { AudioGraph, MIX_DEFAULTS, renderSound } from './graph';
+import {
+  cutoffFor,
+  falloff,
+  panFor,
+  place,
+  LP_BYPASS_HZ,
+  LP_FAR_HZ,
+  LP_NEAR_HZ,
+  PAN_WIDTH,
+  R_FAR,
+  R_NEAR,
+} from './spatial';
 import { MusicDirector, MusicScore, MUSIC_COMBAT, SIEGE_ON, STING_GATE } from './music';
 import { DEFAULT_SAMPLE_RATE, peak, renderVoice, rms, seamless, voiceDuration, type VoiceSpec } from './synth';
 import { AudioUnlock, defaultUnlockTarget, UNLOCK_EVENTS, type UnlockTarget } from './unlock';
@@ -93,6 +107,15 @@ class FakeGain extends FakeNode implements GainNodeLike {
   readonly gain = new FakeParam(1);
 }
 
+class FakePanner extends FakeNode implements StereoPannerNodeLike {
+  readonly pan = new FakeParam(0);
+}
+
+class FakeBiquad extends FakeNode implements BiquadFilterNodeLike {
+  type = 'lowpass';
+  readonly frequency = new FakeParam(20000);
+}
+
 class FakeSource extends FakeNode implements BufferSourceLike {
   buffer: AudioBufferLike | null = null;
   loop = false;
@@ -138,6 +161,8 @@ class FakeAudioContext implements AudioContextLike {
   readonly destination = new FakeNode();
   readonly gains: FakeGain[] = [];
   readonly sources: FakeSource[] = [];
+  readonly panners: FakePanner[] = [];
+  readonly filters: FakeBiquad[] = [];
   resumes = 0;
 
   createGain(): GainNodeLike {
@@ -149,6 +174,18 @@ class FakeAudioContext implements AudioContextLike {
   createBufferSource(): BufferSourceLike {
     const node = new FakeSource();
     this.sources.push(node);
+    return node;
+  }
+
+  createStereoPanner(): StereoPannerNodeLike {
+    const node = new FakePanner();
+    this.panners.push(node);
+    return node;
+  }
+
+  createBiquadFilter(): BiquadFilterNodeLike {
+    const node = new FakeBiquad();
+    this.filters.push(node);
     return node;
   }
 
@@ -396,13 +433,13 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     }
   });
 
-  it('gives the planet death the longest tail in the bank (GDD §4.7)', () => {
+  it('gives the station death the longest tail in the bank (GDD §4.7)', () => {
     const length = (name: SoundName) => renderSound(soundSpec(name)).length;
-    const death = length(SOUND.planetDeath);
+    const death = length(SOUND.stationDeath);
     for (const name of SOUND_NAMES) {
       const spec = soundSpec(name);
       if (loops(spec)) continue; // loops are bodies, not tails
-      if (name === SOUND.planetDeath || name === SOUND.collapseBegin) continue;
+      if (name === SOUND.stationDeath || name === SOUND.collapseBegin) continue;
       expect(death, `${name} outlasts the death`).toBeGreaterThanOrEqual(length(name));
     }
   });
@@ -411,6 +448,69 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(isLayered(soundSpec(SOUND.rockCrack))).toBe(false);
     expect(isLayered(soundSpec(SOUND.shipExplode))).toBe(true);
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
+  });
+});
+
+describe('the listener model (`./spatial`) — hear every thing on the map (a3-03)', () => {
+  it('is full within R_NEAR, a straight line to zero at R_FAR', () => {
+    // The exact curve, checked by hand: 1 up to the near radius, linear down,
+    // 0 at and past the far one. A siege one screen away is background, not gone.
+    expect(falloff(0)).toBe(1);
+    expect(falloff(R_NEAR)).toBe(1);
+    expect(falloff(R_NEAR - 10)).toBe(1);
+    const mid = R_NEAR + (R_FAR - R_NEAR) / 2;
+    expect(falloff(mid)).toBeCloseTo(0.5, 6);
+    expect(falloff(R_FAR)).toBe(0);
+    expect(falloff(R_FAR + 1000)).toBe(0);
+    // Monotone non-increasing across the whole range.
+    let prev = 1;
+    for (let d = 0; d <= R_FAR + 200; d += 50) {
+      const g = falloff(d);
+      expect(g).toBeLessThanOrEqual(prev + 1e-9);
+      prev = g;
+    }
+  });
+
+  it('pans from the horizontal offset, and the sign flips across the ship', () => {
+    expect(panFor(0)).toBe(0);
+    expect(panFor(PAN_WIDTH / 2)).toBeCloseTo(0.5, 6); // to the right → +
+    expect(panFor(-PAN_WIDTH / 2)).toBeCloseTo(-0.5, 6); // to the left → −
+    // Clamped hard at the panner's rails, never past them.
+    expect(panFor(PAN_WIDTH * 3)).toBe(1);
+    expect(panFor(-PAN_WIDTH * 3)).toBe(-1);
+    // The one property the live-stage spy attests: same distance, opposite side,
+    // opposite sign, equal magnitude.
+    expect(panFor(700)).toBe(-panFor(-700));
+  });
+
+  it('opens the lowpass near and closes it gently with distance', () => {
+    expect(cutoffFor(0)).toBe(LP_NEAR_HZ);
+    expect(cutoffFor(R_NEAR)).toBe(LP_NEAR_HZ);
+    expect(cutoffFor(R_FAR)).toBe(LP_FAR_HZ);
+    expect(cutoffFor(R_FAR + 500)).toBe(LP_FAR_HZ);
+    // Monotone falling, so nothing gets brighter as it recedes.
+    expect(cutoffFor(R_NEAR + 100)).toBeGreaterThan(cutoffFor(R_FAR - 100));
+    // The near field stays open past the bypass threshold, so it pays no filter.
+    expect(cutoffFor(R_NEAR + 1)).toBeGreaterThan(LP_BYPASS_HZ);
+  });
+
+  it('places a point: gain, pan, cutoff and the cull flag together', () => {
+    // Directly right, at the near radius: full gain, panned right, still open.
+    const right = place(R_NEAR, 0, 0, 0);
+    expect(right.culled).toBe(false);
+    expect(right.gain).toBe(1);
+    expect(right.pan).toBeGreaterThan(0);
+    // Directly left of the listener (listener at 500,0; sound at 0,0) → pan left.
+    expect(place(0, 0, 500, 0).pan).toBeLessThan(0);
+    // Well past the far radius: culled, zero gain — synthesise nothing.
+    const gone = place(R_FAR + 500, 0, 0, 0);
+    expect(gone.culled).toBe(true);
+    expect(gone.gain).toBe(0);
+  });
+
+  it('survives a NaN offset by centring rather than throwing', () => {
+    expect(panFor(Number.NaN)).toBe(0);
+    expect(falloff(Number.NaN)).toBe(1);
   });
 });
 
@@ -452,6 +552,47 @@ describe('the mix (`./graph`) — built headless', () => {
     const node = source.outputs[0] as FakeGain;
     expect(node.gain.value).toBe(0.5);
     expect(node.outputs).toEqual([graph.buses.sfx]);
+  });
+
+  it('routes an off-centre sound through a stereo panner into the bus (a3-03)', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    expect(graph.play(SOUND.turretFire, 1, 1, 'sfx', { pan: -0.6, cutoff: LP_NEAR_HZ })).toBe(true);
+
+    expect(ctx.panners).toHaveLength(1);
+    const panner = ctx.panners[0]!;
+    expect(panner.pan.value).toBeCloseTo(-0.6, 6);
+    // source → gain → panner → bus. The panner sits between the gain and the bus.
+    const source = ctx.sources[ctx.sources.length - 1]!;
+    const gain = source.outputs[0] as FakeGain;
+    expect(gain.outputs).toEqual([panner]);
+    expect(panner.outputs).toEqual([graph.buses.sfx]);
+    // Near enough that the lowpass is bypassed — no filter node was spent.
+    expect(ctx.filters).toHaveLength(0);
+  });
+
+  it('leaves a centred sound panner-free — a cue costs one gain node, not three', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    graph.play(SOUND.turretFire, 1, 1, 'sfx', { pan: 0, cutoff: LP_NEAR_HZ });
+    expect(ctx.panners).toHaveLength(0);
+    expect(ctx.filters).toHaveLength(0);
+    const source = ctx.sources[ctx.sources.length - 1]!;
+    expect((source.outputs[0] as FakeGain).outputs).toEqual([graph.buses.sfx]);
+  });
+
+  it('inserts a lowpass only once a sound is far enough to muffle', () => {
+    const ctx = new FakeAudioContext();
+    const graph = new AudioGraph(ctx);
+    graph.play(SOUND.turretFire, 1, 1, 'sfx', { pan: 0.4, cutoff: LP_FAR_HZ });
+    expect(ctx.filters).toHaveLength(1);
+    const filter = ctx.filters[0]!;
+    expect(filter.type).toBe('lowpass');
+    expect(filter.frequency.value).toBeCloseTo(LP_FAR_HZ, 6);
+    // source → filter → gain → panner → bus.
+    const source = ctx.sources[ctx.sources.length - 1]!;
+    expect(source.outputs).toEqual([filter]);
+    expect((filter.outputs[0] as FakeGain).outputs).toEqual([ctx.panners[0]!]);
   });
 
   it('refuses a repeat of the same sound inside the gap, and counts it', () => {
@@ -749,7 +890,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
   it('goes quiet for three seconds when a home dies (GDD §4.7)', () => {
     const { ctx, engine } = engineOn();
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     const noise = new TellQueue(4);
     noise.push(TELL.turretFire, 0, 0, 0, 1, 1);
 
@@ -780,7 +921,7 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     engine.start();
 
     const tells = new TellQueue(4);
-    tells.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    tells.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     engine.consume(tells);
     // The field owns the trigger in that arrangement; the engine must not
     // double-count it, and must not advance it either.
@@ -854,10 +995,10 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.alarm.active).toBe(true);
 
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 2);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 2);
     engine.consume(death);
     engine.update(1 / 60);
-    // An alarm over a dead planet would tell a player to defend a wreck — and
+    // An alarm over a dead station would tell a player to defend a wreck — and
     // it would ring straight through the three seconds nobody jokes in.
     expect(engine.alarm.active).toBe(false);
   });
@@ -884,16 +1025,71 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.playCount).toBe(1);
   });
 
+  it('places world sound around the listener: own fire full, a far fight silent, pan by side (a3-03)', () => {
+    const { engine } = engineOn({ local: 0 });
+    engine.setListener(0, 0);
+    // Own gun, at the camera: full and centred.
+    const here = engine.probe(0, 0);
+    expect(here.gain).toBe(1);
+    expect(here.pan).toBe(0);
+    // A fight to the right vs the left, same distance: opposite pan, equal weight.
+    const right = engine.probe(700, 0);
+    const left = engine.probe(-700, 0);
+    expect(right.pan).toBeGreaterThan(0);
+    expect(left.pan).toBeLessThan(0);
+    expect(right.pan).toBeCloseTo(-left.pan, 6);
+    // A siege on the far side of the claim: culled to silence.
+    const farFight = engine.probe(EARSHOT_FAR * 2, 0);
+    expect(farFight.gain).toBe(0);
+    expect(farFight.culled).toBe(true);
+  });
+
+  it('actually pans a placed one-shot and records it for the audio spy', () => {
+    const { ctx, engine } = engineOn({ local: 0 });
+    engine.setListener(0, 0);
+    const q = new TellQueue(4);
+    q.push(TELL.turretFire, -700, 0, 0, 1, 1); // an enemy turret, off to the left
+    engine.consume(q);
+
+    expect(engine.playCount).toBe(1);
+    expect(engine.lastPlacement.pan).toBeLessThan(0); // the spy sees the direction
+    expect(ctx.panners).toHaveLength(1);
+    expect(ctx.panners[0]!.pan.value).toBeLessThan(0); // and the mix applied it
+  });
+
+  it('keeps the wave klaxon, the collapse and the match-end non-spatial (GDD §2.3)', () => {
+    // Emitted "at the arena centre", these must not fall off for a player at the
+    // rim of an eight-facility claim: the wave clock is a mechanic everyone hears.
+    for (const kind of [TELL.waveArrive, TELL.collapseBegin, TELL.matchEnd]) {
+      const { engine } = engineOn({ local: 0 });
+      engine.setListener(0, 0);
+      const q = new TellQueue(4);
+      q.push(kind, EARSHOT_FAR * 4, 0, 0, 0.6, -1); // far past the horizon
+      engine.consume(q);
+      expect(engine.playCount, `${TELL_NAMES[kind]} was culled`).toBe(1);
+    }
+  });
+
+  it('plays the death sting full and centred wherever the home died (GDD §4.7, a3-03)', () => {
+    const { ctx, engine } = engineOn({ local: 0 });
+    engine.setListener(0, 0);
+    const death = new TellQueue(4);
+    death.push(TELL.stationDeath, EARSHOT_FAR * 4, 0, 0, 1, 1); // way off-screen
+    engine.consume(death);
+    expect(engine.playCount).toBe(1); // heard, not culled
+    expect(ctx.panners).toHaveLength(0); // and not panned — it is a sting
+  });
+
   it('runs silent with no context at all — the server, the harness (GDD §4.1)', () => {
     const engine = new AudioEngine({ local: 0 });
     expect(engine.audible).toBe(false);
     expect(engine.graph).toBeNull();
 
     const q = new TellQueue(64);
-    // Every kind except the death — a planet dying every frame would silence
+    // Every kind except the death — a station dying every frame would silence
     // the alarm every frame, which is correct behaviour and a useless test.
     for (const kind of ALL_KINDS) {
-      if (kind !== TELL.planetDeath) q.push(kind, 0, 0, 0, 0.5, 0);
+      if (kind !== TELL.stationDeath) q.push(kind, 0, 0, 0, 0.5, 0);
     }
     for (let i = 0; i < 120; i++) {
       engine.consume(q);
@@ -971,7 +1167,7 @@ describe('the device cues (`./engine` cue — the p4-03 seams)', () => {
   it('stays silent through the three-second hush like everything else (GDD §4.7)', () => {
     const { ctx, engine } = engineOn();
     const death = new TellQueue(4);
-    death.push(TELL.planetDeath, 0, 0, 0, 1, 1);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 1);
     engine.consume(death);
     run(engine, ctx, 0.3); // let the mix reach zero
     expect(engine.death.gain).toBe(0);
@@ -1197,7 +1393,7 @@ describe('the adaptive soundtrack (`./music`) — following the match', () => {
     expect(engine.musicScore.phase).toBe('collapse');
 
     feed(TELL.matchEnd, 1, -1); // a win
-    // No planet death in this synthetic arc, so the hush is not down: the sting
+    // No station death in this synthetic arc, so the hush is not down: the sting
     // lands on the next frame.
     step();
     expect(engine.musicScore.phase).toBe('over');

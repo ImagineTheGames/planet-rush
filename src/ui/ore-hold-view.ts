@@ -9,7 +9,7 @@
  *
  * **One Graphics, redrawn (not a per-pip pool).** The row is a single element of
  * at most `cargoCap` (≤ 8) pips, so it is drawn as one cleared-and-redrawn
- * Graphics — the allocation-free idiom the planet-HP / hull bars already use —
+ * Graphics — the allocation-free idiom the station-HP / hull bars already use —
  * rather than a pool of per-pip objects. The layer allocates nothing per frame.
  *
  * **Registered under `full`.** The indicator follows the ship anywhere on screen,

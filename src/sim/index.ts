@@ -7,7 +7,7 @@
  * server and the QA harness both import it headless (GDD §4.1).
  *
  * Public surface: build a world with `createWorld`, advance it with `step`,
- * read plain-data `World`/`Ship`/`Asteroid`/`OreChunk`/`Planet`/`Turret`/
+ * read plain-data `World`/`Ship`/`Asteroid`/`OreChunk`/`MiningStation`/`Turret`/
  * `Shield`/`Projectile`, and read the match's own state off `world.match`
  * (waves, collapse, winner). Building is driven entirely through the action
  * stream (`buildOrder`), so a caller never has to reach into `./buildings` to
@@ -26,6 +26,7 @@ export * from './maps';
 export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
 export * from './state';
+export * from './ore-ledger';
 // The one match-config model (mode + slots) and its dense compaction to a roster.
 export * from './match-config';
 // The one friend/foe predicate every targeting/collision/siege site routes through.
@@ -39,3 +40,5 @@ export * from './projectiles';
 export * from './damage';
 // Read model: every firing ship + turret this tick, for the renderer / audio.
 export * from './combat-view';
+// Read model: the per-player minimap fog-of-war sensed-set (radar satellite, f1).
+export * from './sensing';

@@ -4,11 +4,11 @@
  * "Everything is bought from one place" (GDD §2.5). **Four segments**, each
  * labeled in words and each naming its target — TURRET, SHIELD, REPAIR CORE,
  * UPGRADE SHIP — with the player's live ore total in the hub. Three spend
- * on the **planet**, one on the **ship**; the economy is the choice between
+ * on the **station**, one on the **ship**; the economy is the choice between
  * those two, so every label names which.
  *
  * There is no manual "bank" segment: ore auto-deposits the instant a ship enters
- * its own planet's atmosphere (p4-11), so a deposit verb on the wheel would name
+ * its own station's atmosphere (p4-11), so a deposit verb on the wheel would name
  * an action the player never has to take. The atmosphere does the banking; the
  * wheel is purely for *spending* the safe total.
  *
@@ -24,8 +24,8 @@
  * that opens a second screen, the upgrade wheel ({@link ./upgrade-wheel}), which
  * is the only place ship stats are ever shown.
  *
- * **The wheel opens at your own planet, and only there** (GDD §2.5, §2.4 "E
- * (near own planet)") — {@link buildWheelModel} returns `open: false` anywhere
+ * **The wheel opens at your own station, and only there** (GDD §2.5, §2.4 "E
+ * (near own station)") — {@link buildWheelModel} returns `open: false` anywhere
  * else, so the view has one boolean to obey and the rule is unit-tested rather
  * than eyeballed.
  *
@@ -59,19 +59,26 @@ import type { HubBack } from './wheel-nav';
  * `bank` is a {@link BuildItem} the sim still honours (bots deposit through it),
  * but the wheel does **not** expose it: ore auto-deposits in the atmosphere, so
  * a manual bank verb is obsolete. It is excluded here on purpose.
+ *
+ * `satellite` is the ratified radar-satellite build order (feature f1). The sim
+ * honours it as a `BuildItem`, but adding its *visible* wheel segment reflows the
+ * radial layout (four wedges → five) and its hit-test, which is a UI follow-up —
+ * so, like `bank`, it is excluded from this derived union for now to keep the
+ * current four-segment wheel and its geometry unchanged (mechanical: track the
+ * widened shared contract without reshaping the wheel).
  */
-export type WheelSegmentId = Exclude<BuildItem, 'bank'> | 'upgrade';
+export type WheelSegmentId = Exclude<BuildItem, 'bank' | 'satellite'> | 'upgrade';
 
-/** What a segment spends on: your planet, or your ship (GDD §2.5 — "every label
+/** What a segment spends on: your station, or your ship (GDD §2.5 — "every label
  *  names which", because the economy *is* the choice between the two). */
-export type SegmentTarget = 'planet' | 'ship';
+export type SegmentTarget = 'station' | 'ship';
 
 /**
  * Whether a segment can be pressed right now.
  *
  * - `ready`        — affordable, under cap, and it would do something.
  * - `unaffordable` — costs more ore than hold + bank hold (GDD §2.5).
- * - `capped`       — the per-planet cap is reached: 4 turrets, 2 shields
+ * - `capped`       — the per-station cap is reached: 4 turrets, 2 shields
  *                    (GDD §2.5 — "design rules, not renderer limits"). Queued
  *                    construction counts, so a player cannot buy past the cap.
  * - `inactive`     — the press would be a no-op: REPAIR CORE on a core that is
@@ -163,20 +170,20 @@ export function segmentAtDirection(dx: number, dy: number, deadzone = 0.25): Whe
 
 /**
  * Everything the wheel needs for one frame, derived by the caller from the local
- * ship and its planet. Deliberately plain data — no sim types, no Pixi — so the
+ * ship and its station. Deliberately plain data — no sim types, no Pixi — so the
  * model tests headless and the netcode path can feed it from a snapshot just as
  * easily as the local sim can.
  */
 export interface BuildWheelSignals {
   /** The player is asking for the wheel (the `build` action, held). */
   readonly requested: boolean;
-  /** The ship is inside `PLANET.dockRange` of its **own** planet — the sim's
-   *  `isDocked`. The wheel opens at your own planet and nowhere else. */
+  /** The ship is inside `STATION.dockRange` of its **own** station — the sim's
+   *  `isDocked`. The wheel opens at your own station and nowhere else. */
   readonly docked: boolean;
   /** The local ship is alive. */
   readonly shipAlive: boolean;
-  /** The local player's planet still has a core (GDD §2.7: a wreck buys nothing). */
-  readonly planetAlive: boolean;
+  /** The local player's station still has a core (GDD §2.7: a wreck buys nothing). */
+  readonly stationAlive: boolean;
   /** Ore in the hold — spent first (sim `spendOre`: hold before bank). */
   readonly cargo: number;
   /** Banked ore — safe, and the second half of what a purchase can draw on. */
@@ -229,7 +236,7 @@ export interface WheelSegment {
   readonly id: WheelSegmentId;
   /** The words on the segment. Named in full, never abbreviated. */
   readonly label: string;
-  /** Planet or ship — every label names which (GDD §2.5). */
+  /** Station or ship — every label names which (GDD §2.5). */
   readonly target: SegmentTarget;
   /** The **only** number on the segment, or `null` where there is no price. */
   readonly cost: number | null;
@@ -247,7 +254,7 @@ export interface WheelSegment {
 
 /** The wheel for one frame. */
 export interface BuildWheelModel {
-  /** Whether the wheel is on screen at all — false away from your own planet. */
+  /** Whether the wheel is on screen at all — false away from your own station. */
   readonly open: boolean;
   /** Live ore total shown in the hub (GDD §2.5): everything a press can draw on,
    *  floored to whole ore because costs are whole ore. */
@@ -266,11 +273,11 @@ export interface BuildWheelModel {
 
 /** Static per-segment copy. Words only — the numbers come from `segmentCost`. */
 const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: SegmentTarget }>> = {
-  turret: { label: 'TURRET', target: 'planet' },
-  shield: { label: 'SHIELD', target: 'planet' },
-  // Named in full: "REPAIR CORE", never "REPAIR" — it repairs the planet's core
+  turret: { label: 'TURRET', target: 'station' },
+  shield: { label: 'SHIELD', target: 'station' },
+  // Named in full: "REPAIR CORE", never "REPAIR" — it repairs the station's core
   // and never the ship, and the label is the only place that is ever said.
-  repair: { label: 'REPAIR CORE', target: 'planet' },
+  repair: { label: 'REPAIR CORE', target: 'station' },
   // The one segment that spends on the ship, and the one that opens a screen.
   upgrade: { label: 'UPGRADE SHIP', target: 'ship' },
 };
@@ -283,11 +290,11 @@ export function spendableOre(signals: BuildWheelSignals): number {
 
 /**
  * Whether the wheel may be open this frame (GDD §2.5: "opened at your own
- * planet"; §2.4: "E (near own planet)"). Alive ship, live core, docked, asked
+ * station"; §2.4: "E (near own station)"). Alive ship, live core, docked, asked
  * for — all four, or the wheel stays shut.
  */
 export function canOpenWheel(signals: BuildWheelSignals): boolean {
-  return signals.requested && signals.shipAlive && signals.planetAlive && signals.docked;
+  return signals.requested && signals.shipAlive && signals.stationAlive && signals.docked;
 }
 
 /** Build the wheel model for one frame. */
@@ -336,7 +343,7 @@ export function repairWedgeInfo(signals: BuildWheelSignals, ore = spendableOre(s
 
 /**
  * Whether one segment can be pressed, and if not, why. The caps and the
- * cost are the sim's (`TURRET.capPerPlanet`, `SHIELD.capPerPlanet`,
+ * cost are the sim's (`TURRET.capPerStation`, `SHIELD.capPerStation`,
  * `placeOrder`); this only *shows* the same answer a press would get, so the
  * wheel never dangles a segment the sim will refuse.
  *
@@ -350,10 +357,10 @@ export function segmentState(
 ): SegmentState {
   switch (id) {
     case 'turret':
-      if (signals.turrets >= TURRET.capPerPlanet) return 'capped';
+      if (signals.turrets >= TURRET.capPerStation) return 'capped';
       return affordable(ore, TURRET.cost) ? 'ready' : 'unaffordable';
     case 'shield':
-      if (signals.shields >= SHIELD.capPerPlanet) return 'capped';
+      if (signals.shields >= SHIELD.capPerStation) return 'capped';
       return affordable(ore, SHIELD.cost) ? 'ready' : 'unaffordable';
     case 'repair':
       // Collapse shuts repair off for the rest of the match (GDD §2.3) — the

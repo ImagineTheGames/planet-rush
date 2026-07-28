@@ -335,7 +335,7 @@ export const PERSONALITIES: Readonly<Record<PersonalityId, Personality>> = {
     name: 'Warden',
     difficulty: Difficulty.Hard,
     shipClass: ShipClass.Excavator,
-    blurb: 'Territorial enforcer — treats the space around its planet as its own.',
+    blurb: 'Territorial enforcer — treats the space around its station as its own.',
     weights: {
       triangle: { mine: 0.3, defend: 0.45, attack: 0.25 },
       greed: 0.4,

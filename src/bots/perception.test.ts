@@ -6,7 +6,7 @@
  * future tree started peeking, so they check the *absence* of information as
  * hard as they check its presence:
  *
- *   1. a bot knows its own ship and its own planet completely;
+ *   1. a bot knows its own ship and its own station completely;
  *   2. an enemy core's HP is `null` until the bot flies inside sensor range;
  *   3. a wreck is visible from any distance (smoke carries) while its numbers
  *      are not;
@@ -42,10 +42,10 @@ function world2(): World {
 }
 
 const ship = (w: World, id: number) => w.ships.find((s) => s.id === id)!;
-const planet = (w: World, owner: number) => w.planets.find((p) => p.owner === owner)!;
+const station = (w: World, owner: number) => w.stations.find((p) => p.owner === owner)!;
 
 describe('perception — the cockpit', () => {
-  it('gives a bot its own ship and its own planet in full', () => {
+  it('gives a bot its own ship and its own station in full', () => {
     const w = world2();
     const me = ship(w, 0);
     me.cargo = 1.5;
@@ -55,9 +55,9 @@ describe('perception — the cockpit', () => {
     expect(view.self.pos).toEqual(me.pos);
     expect(view.self.cargo).toBe(1.5);
     expect(view.self.spendable).toBe(me.cargo + me.banked);
-    expect(view.self.planet).not.toBeNull();
-    expect(view.self.planet!.coreHp).toBe(planet(w, 0).coreHp);
-    // Its own planet's HP is on the HUD permanently (GDD §2.2) — no scouting.
+    expect(view.self.station).not.toBeNull();
+    expect(view.self.station!.coreHp).toBe(station(w, 0).coreHp);
+    // Its own station's HP is on the HUD permanently (GDD §2.2) — no scouting.
     expect(view.self.homeDistance).toBeLessThan(Number.POSITIVE_INFINITY);
   });
 
@@ -79,19 +79,19 @@ describe('perception — the cockpit', () => {
     const view = perceive(w, 0);
     expect(view.self.alive).toBe(false);
     expect(view.ships).toHaveLength(0);
-    expect(view.planets).toHaveLength(0);
+    expect(view.stations).toHaveLength(0);
   });
 });
 
-describe('perception — enemy planets are scouted, not broadcast', () => {
+describe('perception — enemy stations are scouted, not broadcast', () => {
   it("hides a rival's core HP until the bot is inside sensor range", () => {
     const w = world2();
-    const target = planet(w, 1);
+    const target = station(w, 1);
     const me = ship(w, 0);
 
     // Parked far away: position and ownership are public, the numbers are not.
     me.pos = { x: target.pos.x + 2000, y: target.pos.y };
-    const far = perceive(w, 0).planets.find((p) => p.owner === 1)!;
+    const far = perceive(w, 0).stations.find((p) => p.owner === 1)!;
     expect(far.pos).toEqual(target.pos);
     expect(far.scouted).toBe(false);
     expect(far.coreHp).toBeNull();
@@ -102,7 +102,7 @@ describe('perception — enemy planets are scouted, not broadcast', () => {
     // Flown in: sensor range is measured to the surface, so standing on the
     // rock always reads as scouted.
     me.pos = { x: target.pos.x + target.radius + SENSOR_RANGE - 1, y: target.pos.y };
-    const near = perceive(w, 0).planets.find((p) => p.owner === 1)!;
+    const near = perceive(w, 0).stations.find((p) => p.owner === 1)!;
     expect(near.scouted).toBe(true);
     expect(near.coreHp).toBe(target.coreHp);
     expect(near.shieldHp).toBe(0);
@@ -111,11 +111,11 @@ describe('perception — enemy planets are scouted, not broadcast', () => {
 
   it('shows a wreck from any distance but never its numbers', () => {
     const w = world2();
-    const target = planet(w, 1);
+    const target = station(w, 1);
     target.alive = false;
     ship(w, 0).pos = { x: target.pos.x + 3000, y: target.pos.y };
 
-    const seen = perceive(w, 0).planets.find((p) => p.owner === 1)!;
+    const seen = perceive(w, 0).stations.find((p) => p.owner === 1)!;
     expect(seen.alive).toBe(false); // smoke carries (GDD §2.2)
     expect(seen.coreHp).toBeNull();
   });

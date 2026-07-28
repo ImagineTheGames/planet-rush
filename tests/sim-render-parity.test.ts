@@ -4,20 +4,20 @@
  *
  * ── WHY THIS TEST IS PERMANENT ──────────────────────────────────────────────
  * A live build shipped an *invisible blocking volume*: a player flew into
- * something solid beside their planet that the renderer never drew, with an
+ * something solid beside their station that the renderer never drew, with an
  * enemy just out of reach behind it. Root cause (agent/platform/m2-invisible-
  * blocker): the simulation clamps every ship inside `world.bounds` — the arena
- * wall is as solid as a planet — but the render layer only *read* the bounds for
+ * wall is as solid as a station — but the render layer only *read* the bounds for
  * the camera and never drew them. The play-field edge was a wall you crash into
- * and cannot see. Planets are pinned right against that wall (`createWorld`
- * clamps them to `halfMin − radius`), so "the invisible thing beside my planet"
- * was the undrawn boundary the planet sits on.
+ * and cannot see. Stations are pinned right against that wall (`createWorld`
+ * clamps them to `halfMin − radius`), so "the invisible thing beside my station"
+ * was the undrawn boundary the station sits on.
  *
  * The class of bug is "you can hit what you cannot see", and it must never ship
  * again. This test is the guard, in two halves:
  *
  *  1. **Every collidable entity type the world can spawn** — ship, asteroid, ore
- *     chunk, planet, turret, shield, turret projectile — is rendered as a
+ *     chunk, station, turret, shield, turret projectile — is rendered as a
  *     *visible* display object whose drawn size is within 2× of its collision
  *     radius. A new collider added without a sprite (or drawn far smaller than it
  *     collides) fails here.
@@ -42,8 +42,8 @@ const VIEW = { width: 1200, height: 900, originX: 0, originY: 0 };
 /**
  * A world holding **one of every collidable entity type** (GDD §4.1 — every
  * colliding body is a circle; the arena bounds are the one non-circular wall).
- * Ships, asteroids and planets come from `createWorld`; a turret, a shield, an
- * ore chunk and a live turret projectile are seated on/around planet 0 as the
+ * Ships, asteroids and stations come from `createWorld`; a turret, a shield, an
+ * ore chunk and a live turret projectile are seated on/around station 0 as the
  * plain data the sim spawns them as, so the renderer sees exactly what a real
  * match would hand it.
  */
@@ -53,32 +53,32 @@ function worldWithEveryCollidable(): World {
     players: Array.from({ length: 8 }, (_, id) => ({ id, shipClass: ShipClass.Vanguard })),
   });
 
-  const planet = world.planets[0]!;
+  const station = world.stations[0]!;
   // Clear spawn protection so nothing about the draw path is gated by it.
-  planet.spawnProtect = 0;
+  station.spawnProtect = 0;
   for (const s of world.ships) s.spawnProtect = 0;
 
-  const mount = turretMountPos(planet, 0);
+  const mount = turretMountPos(station, 0);
   const turret: Turret = {
     id: world.nextEntityId++,
-    owner: planet.owner,
+    owner: station.owner,
     slot: 0,
     pos: { x: mount.x, y: mount.y },
     radius: TURRET.radius,
     hp: TURRET.hp,
     maxHp: TURRET.hp,
-    angle: planet.angle,
+    angle: station.angle,
     cooldown: 0,
     targetId: null,
   };
-  planet.turrets.push(turret);
+  station.turrets.push(turret);
 
   const shield: Shield = { id: world.nextEntityId++, hp: SHIELD.hp, maxHp: SHIELD.hp, radius: SHIELD.radius };
-  planet.shields.push(shield);
+  station.shields.push(shield);
 
   const chunk: OreChunk = {
     id: world.nextEntityId++,
-    pos: { x: planet.pos.x - 200, y: planet.pos.y },
+    pos: { x: station.pos.x - 200, y: station.pos.y },
     vel: { x: 0, y: 0 },
     amount: CHUNK.ore,
     radius: CHUNK.radius,
@@ -88,8 +88,8 @@ function worldWithEveryCollidable(): World {
   const projectile: Projectile = {
     id: world.nextEntityId++,
     active: true,
-    owner: planet.owner,
-    pos: { x: planet.pos.x - 120, y: planet.pos.y },
+    owner: station.owner,
+    pos: { x: station.pos.x - 120, y: station.pos.y },
     vel: { x: 0, y: 0 },
     damage: PROJECTILE.damage,
     radius: PROJECTILE.radius,
@@ -172,14 +172,14 @@ describe('sim/render parity — every collidable entity type is drawn to size', 
     }
   });
 
-  it('planets (GDD §2.1 — solid homes; you dock at your world, not through it)', () => {
+  it('stations (GDD §2.1 — solid homes; you dock at your world, not through it)', () => {
     const world = worldWithEveryCollidable();
     const stage = render(world);
-    for (let i = 0; i < world.planets.length; i++) {
-      const body = stage.getChildByLabel(`planet-${i}`, true) as Graphics | null;
-      expect(body, `planet ${i}: no body drawn`).not.toBeNull();
+    for (let i = 0; i < world.stations.length; i++) {
+      const body = stage.getChildByLabel(`station-${i}`, true) as Graphics | null;
+      expect(body, `station ${i}: no body drawn`).not.toBeNull();
       expect(body!.visible).toBe(true);
-      expectParity(`planet ${i}`, body, world.planets[i]!.radius);
+      expectParity(`station ${i}`, body, world.stations[i]!.radius);
     }
   });
 
@@ -187,7 +187,7 @@ describe('sim/render parity — every collidable entity type is drawn to size', 
     const world = worldWithEveryCollidable();
     const turrets = layer(render(world), 'turrets');
     let count = 0;
-    for (const p of world.planets) {
+    for (const p of world.stations) {
       for (const t of p.turrets) {
         if (t.hp <= 0) continue;
         count++;
@@ -200,16 +200,16 @@ describe('sim/render parity — every collidable entity type is drawn to size', 
   it('shields (GDD §2.5 — the bubble that stands in front of the core)', () => {
     const world = worldWithEveryCollidable();
     const stage = render(world);
-    for (let i = 0; i < world.planets.length; i++) {
-      const planet = world.planets[i]!;
-      const up = planet.shields.find((s) => s.hp > 1e-9);
+    for (let i = 0; i < world.stations.length; i++) {
+      const station = world.stations[i]!;
+      const up = station.shields.find((s) => s.hp > 1e-9);
       if (!up) continue;
-      // The bubble is drawn into the planet's live overlay; with a full core and
+      // The bubble is drawn into the station's live overlay; with a full core and
       // no construction, the overlay is the shield ring and nothing else.
-      const overlay = stage.getChildByLabel(`planet-overlay-${i}`, true) as Graphics | null;
-      expect(overlay, `planet ${i}: shield up but no overlay drawn`).not.toBeNull();
-      expect(overlay!.context.instructions.length, `planet ${i}: shield overlay drew nothing`).toBeGreaterThan(0);
-      expectParity(`shield on planet ${i}`, overlay, up.radius);
+      const overlay = stage.getChildByLabel(`station-overlay-${i}`, true) as Graphics | null;
+      expect(overlay, `station ${i}: shield up but no overlay drawn`).not.toBeNull();
+      expect(overlay!.context.instructions.length, `station ${i}: shield overlay drew nothing`).toBeGreaterThan(0);
+      expectParity(`shield on station ${i}`, overlay, up.radius);
     }
   });
 

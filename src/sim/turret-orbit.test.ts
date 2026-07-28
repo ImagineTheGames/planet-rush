@@ -1,7 +1,7 @@
 /**
- * src/sim/turret-orbit.test.ts — turrets orbit the planet rim toward the threat
+ * src/sim/turret-orbit.test.ts — turrets orbit the station rim toward the threat
  * (field report P1). A turret is no longer pinned to its build spot: it slides
- * along its planet's surface ring toward the point whose outward normal faces
+ * along its station's surface ring toward the point whose outward normal faces
  * its current target, and the whole design turns on the "don't go crazy" clause.
  *
  * The contract checks from the brief:
@@ -12,31 +12,31 @@
  *      (no endless orbiting);
  *   4. the slide speed cap is never exceeded;
  *   5. determinism — same seed / same fixture, same trajectory;
- *   plus: multiple turrets on one planet keep an angular separation, and the
+ *   plus: multiple turrets on one station keep an angular separation, and the
  *   turret's `pos` (sprite + muzzle origin) tracks the orbit angle.
  */
 
 import { describe, it, expect } from 'vitest';
 import { step, type Inputs } from './index';
 import { turretHomeAngle, turretOrbitPos } from './buildings';
-import { PLANET, SHIP_RADIUS, TICK_DT, TURRET } from './constants';
+import { STATION, SHIP_RADIUS, TICK_DT, TURRET } from './constants';
 import { ShipClass } from '@shared/types';
 import { stockTiers } from './upgrades';
-import type { Planet, Ship, Turret, World } from './state';
+import type { MiningStation, Ship, Turret, World } from './state';
 
 // --- builders --------------------------------------------------------------
 //
-// Planets sit at the arena centre; everything is placed planet-relative so the
+// Stations sit at the arena centre; everything is placed station-relative so the
 // bearing arithmetic reads directly. Enemies get a huge hull so a multi-second
 // slide never resolves by the target simply dying under turret fire.
 
 const CENTER = 2000;
-const ORBIT_R = PLANET.radius + TURRET.mountOffset + TURRET.radius;
+const ORBIT_R = STATION.radius + TURRET.mountOffset + TURRET.radius;
 
 /** A turret mounted on `slot`, born on its home rim angle, ready to slide. */
-function makeTurret(id: number, slot: number, planetAngle = 0): Turret {
-  const home = turretHomeAngle({ angle: planetAngle } as Planet, slot);
-  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: PLANET.radius } as Planet, home);
+function makeTurret(id: number, slot: number, stationAngle = 0): Turret {
+  const home = turretHomeAngle({ angle: stationAngle } as MiningStation, slot);
+  const pos = turretOrbitPos({ pos: { x: CENTER, y: CENTER }, radius: STATION.radius } as MiningStation, home);
   return {
     id,
     owner: 0,
@@ -53,12 +53,12 @@ function makeTurret(id: number, slot: number, planetAngle = 0): Turret {
   };
 }
 
-function makePlanet(turrets: Turret[]): Planet {
+function makeStation(turrets: Turret[]): MiningStation {
   return {
     id: 0,
     owner: 0,
     pos: { x: CENTER, y: CENTER },
-    radius: PLANET.radius,
+    radius: STATION.radius,
     coreHp: 100,
     maxCoreHp: 100,
     alive: true,
@@ -98,7 +98,7 @@ function enemyAt(id: number, x: number, y: number): Ship {
   };
 }
 
-/** A world holding one planet's turrets against a set of enemy ships. Zero
+/** A world holding one station's turrets against a set of enemy ships. Zero
  *  asteroids-per-wave so the metronome never drops rocks into the fixture. */
 function makeWorld(turrets: Turret[], enemies: Ship[]): World {
   return {
@@ -109,7 +109,7 @@ function makeWorld(turrets: Turret[], enemies: Ship[]): World {
     ships: enemies,
     asteroids: [],
     chunks: [],
-    planets: [makePlanet(turrets)],
+    stations: [makeStation(turrets)],
     projectiles: [],
     bounds: { width: 2 * CENTER, height: 2 * CENTER },
     fieldRadius: 600,
@@ -127,13 +127,13 @@ function angleDiff(a: number, b: number): number {
 }
 
 const NO_INPUT: Inputs = [];
-const turretOf = (w: World): Turret => w.planets[0]!.turrets[0]!;
+const turretOf = (w: World): Turret => w.stations[0]!.turrets[0]!;
 
 // --- 1. converges to the facing-normal point -------------------------------
 
 describe('single enemy: the turret slides to the facing-normal point', () => {
-  it('converges its orbit angle to the bearing from the planet to the enemy', () => {
-    // Enemy straight "up" from the planet centre — bearing +π/2. The turret is
+  it('converges its orbit angle to the bearing from the station to the enemy', () => {
+    // Enemy straight "up" from the station centre — bearing +π/2. The turret is
     // born on slot 0 (home angle 0, the +x side of the rim), so it has a quarter
     // turn to slide.
     const turret = makeTurret(1, 0);
@@ -193,7 +193,7 @@ describe('hysteresis holds the target (the "don\'t go crazy" clause)', () => {
   // (≈ ORBIT_R out along +x). Enemies below sit along +x too, so the turret's
   // desired bearing stays ~0 and it does not slide — distances are then measured
   // cleanly from a stationary turret, exactly what a hysteresis test wants.
-  const rimX = ORBIT_R; // turret's x offset from the planet centre at home angle 0
+  const rimX = ORBIT_R; // turret's x offset from the station centre at home angle 0
 
   it('keeps its target against a newcomer that is only marginally closer', () => {
     // Current target A is 150 out from the turret; newcomer B is 140 out — ~7%
@@ -330,13 +330,13 @@ describe('determinism (GDD §4.8)', () => {
     }
     expect(trajA).toEqual(trajB);
     // Full end-state agreement, not just the angle.
-    expect(JSON.stringify(a.planets)).toBe(JSON.stringify(b.planets));
+    expect(JSON.stringify(a.stations)).toBe(JSON.stringify(b.stations));
   });
 });
 
 // --- 6. multiple turrets keep an angular separation ------------------------
 
-describe('two turrets on one planet fan out instead of stacking (§3)', () => {
+describe('two turrets on one station fan out instead of stacking (§3)', () => {
   it('holds an angular gap when both slide toward the same enemy', () => {
     // Two turrets, one enemy. Both want the same bearing; the fan must keep them
     // apart by about TURRET.orbitSeparation rather than landing on one point.
@@ -346,7 +346,7 @@ describe('two turrets on one planet fan out instead of stacking (§3)', () => {
 
     for (let t = 0; t < Math.round(4 / TICK_DT); t++) step(world, NO_INPUT);
 
-    const [a0, a1] = world.planets[0]!.turrets.map((t) => t.orbitAngle!);
+    const [a0, a1] = world.stations[0]!.turrets.map((t) => t.orbitAngle!);
     const gap = Math.abs(angleDiff(a0!, a1!));
     expect(gap).toBeGreaterThan(TURRET.orbitSeparation - 1e-6);
     // Symmetric about the bearing (+π/2): the pair straddles the facing normal.
@@ -359,9 +359,9 @@ describe('two turrets on one planet fan out instead of stacking (§3)', () => {
   it('is stable — once fanned and settled the pair stops moving', () => {
     const world = makeWorld([makeTurret(1, 0), makeTurret(2, 1)], [enemyAt(1, 0, 200)]);
     for (let t = 0; t < Math.round(4 / TICK_DT); t++) step(world, NO_INPUT);
-    const snap = world.planets[0]!.turrets.map((t) => t.orbitAngle!);
+    const snap = world.stations[0]!.turrets.map((t) => t.orbitAngle!);
     for (let t = 0; t < Math.round(3 / TICK_DT); t++) step(world, NO_INPUT);
-    const after = world.planets[0]!.turrets.map((t) => t.orbitAngle!);
+    const after = world.stations[0]!.turrets.map((t) => t.orbitAngle!);
     for (let i = 0; i < snap.length; i++) expect(Math.abs(angleDiff(after[i]!, snap[i]!))).toBeLessThan(1e-6);
   });
 });

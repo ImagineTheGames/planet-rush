@@ -66,7 +66,7 @@ export interface Brain {
   lastPos: Vec2 | null;
   /**
    * Consecutive decisions this bot has asked to move and barely moved — the
-   * wedged counter. Asteroids and planets are solid, the late waves land in a
+   * wedged counter. Asteroids and stations are solid, the late waves land in a
    * tight cluster (GDD §2.3: every wave closer to the centre than the last), and
    * two rocks five units apart make a gap no hull fits through. A bot that keeps
    * asking to fly through that gap is not thinking, it is grinding, and
@@ -76,7 +76,7 @@ export interface Brain {
   /**
    * Magnitude of the thrust the last decision actually asked for (0..1), written
    * by `./behaviors`'s `go`. The wedged counter reads it so that *deliberately*
-   * holding station — a miner parked at its rock, a bot orbiting its own planet
+   * holding station — a miner parked at its rock, a bot orbiting its own station
    * with the wheel open — never reads as being stuck.
    */
   lastThrust: number;
@@ -103,6 +103,37 @@ export interface Brain {
    * assault) {@link release}s it (`./behaviors` `wantsRetreat`).
    */
   readonly fleeing: Latch;
+  /**
+   * The asteroid id this bot committed to mining on its last mining decision, or
+   * `-1` when it is not mining (`./behaviors`'s `mine`). Two things read it, both
+   * from the re-site work (p11 field report — "kept going back and forth" to a
+   * contested rock while other fields sat open):
+   *
+   *  - the **tabu** below, so a retreat that broke off an *approach* knows which
+   *    site to cool down (`./behaviors`'s `wantsRetreat`);
+   *  - the oscillation soak (`tests/harness/oscillation.test.ts`), so a standing
+   *    gate can watch a bot make net progress toward the rock it chose.
+   *
+   * Written by the tree, never read by a branch to change what it does — the
+   * same debug-affordance discipline as {@link Brain.lastBehavior}.
+   */
+  mineSite: number;
+  /**
+   * **Contested-site memory** (p11 field report point 2): asteroid id → the sim
+   * time its mining cool-down lifts. A site whose *approach* triggered a retreat
+   * is booked here, and `bestRock` excludes it while the cool-down is live
+   * (`./targeting`), so the bot commits to the next-best field instead of
+   * re-litigating the same rock with the threat still parked on the path. The
+   * entry expires on its own — once the threat leaves and the clock passes, the
+   * site is a candidate again. Lives on the brain (bot-private, beside the sim)
+   * for the same reason every other commitment does: it is memory that must
+   * persist across decisions and must never desync a replay (GDD §4.8).
+   *
+   * It is *not* {@link BotMemory}: that notebook takes only what the view shows
+   * (`./memory`), and a tabu is the bot's own decision history, not a perceived
+   * fact.
+   */
+  readonly tabu: Map<number, number>;
   /**
    * Spendable ore that was already aboard when this bot first took the controls
    * — ore it did not earn, and will not spend (`./behaviors`'s `spendAtHome`).
@@ -133,6 +164,8 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     escapeDir: { x: 0, y: 0 },
     aim: newAimTrack(),
     fleeing: newLatch(),
+    mineSite: -1,
+    tabu: new Map(),
     endowment: -1,
   };
 }

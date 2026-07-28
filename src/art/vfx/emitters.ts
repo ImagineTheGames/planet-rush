@@ -3,14 +3,14 @@
  *
  * GDD §3.6 does not ask for "some effects", it names them: *"shot impacts,
  * asteroid crack-and-burst, shield shimmer, turret muzzle flashes, explosions,
- * thruster trails, spawn-protection glow, and the planet-death moment."* Each
+ * thruster trails, spawn-protection glow, and the station-death moment."* Each
  * one is a function here, each writes into the fixed-capacity pool
  * (`./particles`), and each is judged against the tone contract (style-guide §8):
  *
  * > *Arcade on the surface:* shot impacts, muzzle flashes, thruster trails and
  * > spawn glow lean **fun and readable** — bright, punchy, generous.
- * > *A small ache underneath:* the planet-death moment is the exception, and it
- * > is deliberately **not** a firework. See {@link planetDeath}.
+ * > *A small ache underneath:* the station-death moment is the exception, and it
+ * > is deliberately **not** a firework. See {@link stationDeath}.
  *
  * ## Determinism
  *
@@ -31,7 +31,7 @@
  *
  * ## Budget
  *
- * The costly bursts, at `quality = 1`: explosion ≈ 34, planet death ≈ 96,
+ * The costly bursts, at `quality = 1`: explosion ≈ 34, station death ≈ 96,
  * asteroid burst ≈ 20, muzzle flash ≈ 5, shot impact ≈ 4 per firing tick. Eight
  * ships firing, four turrets firing and two rocks bursting on the same frame is
  * ≈ 120 particles against a 1600 capacity, so the pool only starts recycling in
@@ -544,7 +544,7 @@ export function coreHit(
  * fireworks."* So: a bright flare, embers thrown wide, a shockwave ring, and a
  * little debris — generous and quickly over. Ships are cheap and respawn free
  * (GDD §2.7); this is a firework, not a funeral. The funeral is
- * {@link planetDeath}.
+ * {@link stationDeath}.
  *
  * @param scale 0..1, from the hull that made it.
  */
@@ -870,23 +870,23 @@ export function upgradeBought(pool: ParticlePool, rng: Rng, x: number, y: number
 // ---------------------------------------------------------------------------
 
 /**
- * **The planet-death moment** (GDD §3.6, §4.7 tone paragraph).
+ * **The station-death moment** (GDD §3.6, §4.7 tone paragraph).
  *
- * > *"But homes are the one serious thing in it — when a planet dies, the game
+ * > *"But homes are the one serious thing in it — when a station dies, the game
  * > goes briefly quiet, the wreck stays on the map all match, and nobody jokes
  * > for three seconds."*
  *
  * This is the one effect in the set that is deliberately **not** a firework. A
  * ship exploding is bright, fast and over; a home dying is slow, grey and long:
  * a single wide shockwave, crust shards thrown lazily, and smoke that keeps
- * rising for seconds afterwards — the burning planet that "reads from further
+ * rising for seconds afterwards — the burning station that "reads from further
  * away than its numbers do" (style-guide §5). The colour drains out of it too:
  * shards and smoke are ash, not plasma.
  *
  * The audible half is the *absence* of sound — see `./death-moment` for the
  * three-second hush this fires alongside.
  */
-export function planetDeath(
+export function stationDeath(
   pool: ParticlePool,
   rng: Rng,
   x: number,
@@ -894,7 +894,7 @@ export function planetDeath(
   radius: number,
   quality = 1,
 ): void {
-  // One slow shockwave, four times the planet's own size. It expands over most
+  // One slow shockwave, four times the station's own size. It expands over most
   // of the hush, so the moment has a shape a player can watch end.
   ring(pool, x, y, radius * 0.8, radius * 4.5, 2.4, 0.5);
 

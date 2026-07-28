@@ -35,7 +35,7 @@
  *  - `identity` — player colour trim: wing tips, cockpit, beacon ring, HP bar.
  *  - `energy`   — plasma: weapon fire, cockpit glass glow, shield bubbles, muzzles.
  *  - `ore`      — ore chunks and the veins in a rock. Signal yellow, legally.
- *  - `core`     — the planet core: the win condition, so it earns yellow (§2).
+ *  - `core`     — the station core: the win condition, so it earns yellow (§2).
  *  - `danger`   — damage, alarms, hazard stripes, enemy fire. Threat red, and
  *                 the only other place signal yellow may appear.
  */
@@ -183,7 +183,7 @@ export function arcPoints(
 
 /**
  * A closed ring segment — an outer arc and an inner arc joined into one
- * polygon. Beacon rings, damage rings, shield bubbles and planet limb shading
+ * polygon. Beacon rings, damage rings, shield bubbles and station limb shading
  * are all this shape, so it lives here rather than four times over.
  */
 export function annulusPoints(

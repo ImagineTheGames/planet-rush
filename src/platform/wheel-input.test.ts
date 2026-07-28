@@ -85,7 +85,7 @@ describe('hitPanel', () => {
   });
 });
 
-describe('WheelInput — opening at your own planet, and only there', () => {
+describe('WheelInput — opening at your own station, and only there', () => {
   it('opens and closes on the build action, panel and all', () => {
     const w = new WheelInput();
     expect(w.open).toBe(false);
@@ -98,7 +98,7 @@ describe('WheelInput — opening at your own planet, and only there', () => {
     expect(w.panelOpen).toBe(false);
   });
 
-  it('closes itself the moment the planet stops being available (GDD §2.5)', () => {
+  it('closes itself the moment the station stops being available (GDD §2.5)', () => {
     const w = new WheelInput();
     w.toggle();
     w.setAvailable(false);

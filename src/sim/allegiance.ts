@@ -13,7 +13,7 @@
  * the old behaviour. TEAMS simply hands two slots the same `team`.
  *
  * Pure reads over plain-data state; no RNG, no allocation. `team` is stored on
- * `Ship`/`Planet` as a plain int, so this never touches the per-tick snapshot
+ * `Ship`/`MiningStation` as a plain int, so this never touches the per-tick snapshot
  * (allegiance is static match config, fixed at match start — spike Trap 7).
  */
 
@@ -22,15 +22,15 @@ import type { World } from './state';
 
 /**
  * The team a player belongs to. Reads the `team` stamped on that player's ship
- * (its planet as a fallback), and — for the pre-Teams fixtures other agents
+ * (its station as a fallback), and — for the pre-Teams fixtures other agents
  * build without a `team` — falls back to the player id itself, i.e. teams-of-one
  * (the same backward-compatible discipline `Ship.weaponCooldown` uses). An id
- * with no ship and no planet (should never happen in a live world) also reads as
+ * with no ship and no station (should never happen in a live world) also reads as
  * its own team, so a stray lookup can never crash a match.
  */
 export function teamOf(world: World, id: PlayerId): number {
   for (const s of world.ships) if (s.id === id) return s.team ?? s.id;
-  for (const p of world.planets) if (p.owner === id) return p.team ?? p.owner;
+  for (const p of world.stations) if (p.owner === id) return p.team ?? p.owner;
   return id;
 }
 

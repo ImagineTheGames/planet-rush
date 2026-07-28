@@ -1,7 +1,7 @@
 /**
  * tests/combat-visibility.test.ts — every shooter is seen (GDD §2.3, §2.6, §4.1).
  *
- * Field report against build 5254cfe: "another enemy attacking my planet but I
+ * Field report against build 5254cfe: "another enemy attacking my station but I
  * didn't see his shots… I also don't think my turret was firing." Two shooters
  * the player could not see: a rival ship's fire, and a friendly turret's fire.
  *
@@ -13,7 +13,7 @@
  * single source a renderer draws turret flashes from, so an enemy ship, a bot, a
  * remote player, and a turret all show up regardless of who the camera follows.
  *
- * This test steps a world where (a) an enemy ship fires at a planet and (b) a
+ * This test steps a world where (a) an enemy ship fires at a station and (b) a
  * friendly turret engages an in-range enemy, and asserts that the sim reports
  * both shots and that the render layer registers both — the ship as a projectile,
  * the turret as a muzzle flash sourced from sim state, origin at the barrel and a
@@ -29,7 +29,7 @@ import { ShipClass } from '@shared/types';
 import { Renderer, PLAYER_COLORS, type MuzzleView } from '../src/render/index';
 import {
   CORE_HP,
-  PLANET,
+  STATION,
   TURRET,
   muzzleFlashes,
   createWorld,
@@ -45,8 +45,8 @@ import {
 // the ring layout is irrelevant to what this test measures.
 // ---------------------------------------------------------------------------
 
-/** How far short of the planet the attacker parks: comfortably inside weapon
- *  range, so the shot reaches the core surface (planet radius + this < range). */
+/** How far short of the station the attacker parks: comfortably inside weapon
+ *  range, so the shot reaches the core surface (station radius + this < range). */
 const ATTACK_STANDOFF = 100;
 /** How far the turret's prey sits from the muzzle — well inside `TURRET.range`. */
 const TURRET_STANDOFF = 150;
@@ -56,7 +56,7 @@ interface Fixture {
   turret: Turret;
   attackerPos: { x: number; y: number };
   preyPos: { x: number; y: number };
-  planetPos: { x: number; y: number };
+  stationPos: { x: number; y: number };
 }
 
 function combatFixture(): Fixture {
@@ -70,30 +70,30 @@ function combatFixture(): Fixture {
     bounds: { width: 4000, height: 4000 },
   });
   // Hand-built siege fixture: clear the field so the only thing the attacker's
-  // shot can strike is the planet it is aimed at (a stray rock scattered in the
+  // shot can strike is the station it is aimed at (a stray rock scattered in the
   // central disc would otherwise intercept the shot and steal the hit).
   world.asteroids = [];
 
   const attacker = world.ships[0]!;
   const prey = world.ships[2]!;
-  const targetPlanet = world.planets[2]!; // owned by player 2 — the attacker's mark
-  const turretPlanet = world.planets[1]!; // owned by player 1 — mounts the turret
+  const targetStation = world.stations[2]!; // owned by player 2 — the attacker's mark
+  const turretStation = world.stations[1]!; // owned by player 1 — mounts the turret
 
-  // (a) Enemy ship firing at a planet. Park the attacker one standoff short of
-  //     planet 2, nose straight on it, and drop the core's spawn shield so it is
+  // (a) Enemy ship firing at a station. Park the attacker one standoff short of
+  //     station 2, nose straight on it, and drop the core's spawn shield so it is
   //     a legal target (GDD §2.1).
-  const planetPos = { x: 1000, y: 1000 };
-  targetPlanet.pos = { x: planetPos.x, y: planetPos.y };
-  targetPlanet.spawnProtect = 0;
-  const attackerPos = { x: planetPos.x - (PLANET.radius + ATTACK_STANDOFF), y: planetPos.y };
+  const stationPos = { x: 1000, y: 1000 };
+  targetStation.pos = { x: stationPos.x, y: stationPos.y };
+  targetStation.spawnProtect = 0;
+  const attackerPos = { x: stationPos.x - (STATION.radius + ATTACK_STANDOFF), y: stationPos.y };
   attacker.pos = { x: attackerPos.x, y: attackerPos.y };
   attacker.vel = { x: 0, y: 0 };
-  attacker.angle = 0; // facing +x, straight at the planet
+  attacker.angle = 0; // facing +x, straight at the station
   attacker.spawnProtect = 0;
 
   // (b) Friendly turret engaging an in-range enemy. Mount a live, loaded turret
-  //     on planet 1 and drop its prey (ship 2) inside range, unprotected.
-  turretPlanet.pos = { x: 3000, y: 3000 };
+  //     on station 1 and drop its prey (ship 2) inside range, unprotected.
+  turretStation.pos = { x: 3000, y: 3000 };
   const turret: Turret = {
     id: 9001,
     owner: 1,
@@ -107,13 +107,13 @@ function combatFixture(): Fixture {
     targetId: null,
     muzzle: null,
   };
-  turretPlanet.turrets = [turret];
+  turretStation.turrets = [turret];
   const preyPos = { x: 3000 + TURRET_STANDOFF, y: 3000 };
   prey.pos = { x: preyPos.x, y: preyPos.y };
   prey.vel = { x: 0, y: 0 };
   prey.spawnProtect = 0;
 
-  return { world, turret, attackerPos, preyPos, planetPos };
+  return { world, turret, attackerPos, preyPos, stationPos };
 }
 
 /** The attacker holds fire in Manual mode; nobody else sends input. */
@@ -160,14 +160,14 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }): number 
 // ---------------------------------------------------------------------------
 
 describe('combat visibility — every shooter is seen from sim state', () => {
-  it('an enemy ship attacking a planet is seen — its weapon fire streams as a projectile', () => {
+  it('an enemy ship attacking a station is seen — its weapon fire streams as a projectile', () => {
     const { world, attackerPos } = combatFixture();
     step(world, ATTACKER_FIRES);
 
     // Combat is a projectile now (design amendment v0.2), not a hitscan ray:
     // the attacker fired a ship-kind shot owned by the NON-local shooter — the
     // whole point of the original bug. It is born at the attacker's muzzle,
-    // heading +x straight at the planet.
+    // heading +x straight at the station.
     const shots = world.projectiles.filter((p) => p.active && p.owner === 0 && p.kind === 'ship');
     expect(shots).toHaveLength(1);
     expect(dist(shots[0]!.pos, attackerPos)).toBeLessThan(30);
@@ -182,8 +182,8 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(1);
 
     // And it is a real attack, not a light show: the shot reaches and bites the core.
-    for (let t = 0; t < 40 && world.planets[2]!.coreHp >= CORE_HP; t++) step(world, []);
-    expect(world.planets[2]!.coreHp).toBeLessThan(CORE_HP);
+    for (let t = 0; t < 40 && world.stations[2]!.coreHp >= CORE_HP; t++) step(world, []);
+    expect(world.stations[2]!.coreHp).toBeLessThan(CORE_HP);
   });
 
   it('a friendly turret engaging an in-range enemy fires, deals damage, and publishes a muzzle flash', () => {

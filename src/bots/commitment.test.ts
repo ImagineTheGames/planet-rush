@@ -3,7 +3,7 @@
  * v0.2.2 field report — "low-HP bot stuck flapping between attack and flee").
  *
  * The field report is one photograph: a low-health Warden "oscillating between
- * attacking and fleeing … twitching in place beside its own planet, never
+ * attacking and fleeing … twitching in place beside its own station, never
  * actually went anywhere." That is textbook threshold flapping — FLEE and ATTACK
  * share one boundary with no memory between them — and the fix is decision
  * hysteresis (`./commitment`): dual thresholds and a latched commitment.
@@ -51,9 +51,9 @@ function board(seed = 8): World {
   });
   world.time = SPAWN_PROTECTION_S + 10;
   for (const ship of world.ships) ship.spawnProtect = 0;
-  for (const planet of world.planets) {
-    planet.spawnProtect = 0;
-    planet.sinceDamage = 999;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
   }
   return world;
 }
@@ -168,17 +168,17 @@ describe('the flee band holds — a committed retreat does not flap', () => {
 
 describe('a committed retreat goes somewhere (the screenshot scenario)', () => {
   /**
-   * The photograph, staged: a low-HP Warden beside its own planet with an
-   * attacker sitting on that planet — home is the danger, so the bot must break
+   * The photograph, staged: a low-HP Warden beside its own station with an
+   * attacker sitting on that station — home is the danger, so the bot must break
    * contact rather than run into the siege. Its core is whole, so this is
    * self-preservation, not the last stand.
    */
   function siegedAtHome(seed = 8): { world: World; me: number; threat: number } {
     const world = board(seed);
-    const myHome = world.planets.find((p) => p.owner === 0)!;
+    const myHome = world.stations.find((p) => p.owner === 0)!;
     const me = world.ships[0]!;
     const threat = world.ships[1]!;
-    // Beside the planet; the attacker on its far side.
+    // Beside the station; the attacker on its far side.
     me.pos = { x: myHome.pos.x - 40, y: myHome.pos.y };
     me.vel = { x: 0, y: 0 };
     me.hull = me.maxHull * 0.15; // low-health, past every nerve
@@ -241,7 +241,7 @@ describe('a committed retreat goes somewhere (the screenshot scenario)', () => {
 describe('the priority exception interrupts a committed retreat', () => {
   it('drops the flee when the core comes under final assault, and re-commits after', () => {
     const world = board();
-    const myHome = world.planets.find((p) => p.owner === 0)!;
+    const myHome = world.stations.find((p) => p.owner === 0)!;
     const me = world.ships[0]!;
     const threat = world.ships[1]!;
     me.pos = { x: myHome.pos.x - 200, y: myHome.pos.y };

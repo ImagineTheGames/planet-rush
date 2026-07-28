@@ -11,6 +11,7 @@ import { FireMode } from '@platform/actions';
 import {
   DEFAULT_VOLUMES,
   SETTINGS_ROWS,
+  SETTINGS_ROW_HEIGHT_TOUCH,
   VOLUME_CHANNELS,
   VOLUME_STEPS,
   adjustVolume,
@@ -185,5 +186,54 @@ describe('layout and hit test agree', () => {
       expect(row.height).toBeGreaterThanOrEqual(0);
     }
     expect(layout.content.width).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// The phone case the field report was actually on: under the landscape lock a
+// portrait phone hands the screen a WIDE, SHORT logical viewport. A single stack
+// of every row would have to crush each one to a sub-thumb sliver to fit that
+// height — which is why the CONTROLS row "wasn't there" on the developer's phone
+// (it was, just too thin to read as a control). The screen must spend the width
+// to keep every row at its full thumb height instead.
+describe('short, wide touch viewport (portrait phone under the landscape lock)', () => {
+  // iPhone 390×844 held portrait → the root rotates to a 844×390 landscape logical
+  // viewport. Pixel 412×915 → 915×412. Both are far too short for six thumb rows
+  // stacked in one column.
+  const PHONE = { width: 844, height: 390 };
+
+  it('keeps every row at its FULL thumb height rather than compressing it', () => {
+    const layout = settingsLayout(PHONE, { isTouch: true });
+    expect(layout.rows).toHaveLength(SETTINGS_ROWS.length);
+    for (const row of layout.rows) {
+      // No sliver: each row is its intended thumb height, to the pixel.
+      expect(row.height).toBeCloseTo(SETTINGS_ROW_HEIGHT_TOUCH, 5);
+    }
+    // It could only manage that by using more than one column.
+    const distinctX = new Set(layout.rows.map((r) => Math.round(r.x)));
+    expect(distinctX.size).toBeGreaterThan(1);
+  });
+
+  it('the CONTROLS row is present, on-screen, and tappable across its whole width', () => {
+    const layout = settingsLayout(PHONE, { isTouch: true });
+    const idx = SETTINGS_ROWS.findIndex((r) => r.kind === 'controls');
+    const controls = layout.rows[idx]!;
+    // Inside the content box, both axes — not stranded off a fold.
+    expect(controls.x).toBeGreaterThanOrEqual(layout.content.x - 0.5);
+    expect(controls.x + controls.width).toBeLessThanOrEqual(layout.content.x + layout.content.width + 0.5);
+    expect(controls.y).toBeGreaterThanOrEqual(layout.content.y - 0.5);
+    expect(controls.y + controls.height).toBeLessThanOrEqual(layout.content.y + layout.content.height + 0.5);
+    // A tap anywhere on it flips the scheme — the whole row is live, as on desktop.
+    expect(settingsHitTest(layout, controls.x + 4, center(controls).y)).toEqual({ kind: 'controls' });
+    expect(settingsHitTest(layout, center(controls).x, center(controls).y)).toEqual({ kind: 'controls' });
+  });
+
+  it('every row stays inside the content box — nothing wraps off an edge', () => {
+    const layout = settingsLayout(PHONE, { isTouch: true });
+    for (const row of layout.rows) {
+      expect(row.x).toBeGreaterThanOrEqual(layout.content.x - 0.5);
+      expect(row.x + row.width).toBeLessThanOrEqual(layout.content.x + layout.content.width + 0.5);
+      expect(row.y).toBeGreaterThanOrEqual(layout.title.y + layout.title.height - 0.5);
+      expect(row.y + row.height).toBeLessThanOrEqual(layout.back.y + 0.5);
+    }
   });
 });

@@ -112,7 +112,7 @@ export class LobbyView extends Container {
     super();
     this.layout = lobbyLayout({ width: screenWidth, height: screenHeight }, touchOpts(isTouch, insets));
 
-    this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 22, TEXT_PRIMARY);
+    this.wordmark = makeText('STATION RUSH', FONT_HEADING, 22, TEXT_PRIMARY);
     // The room code is the thing that gets read across a classroom, so it is the
     // largest text on the screen after the wordmark — and it is set in the body
     // face, because it is a code to be read character by character (§7).

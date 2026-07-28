@@ -14,7 +14,7 @@
  * emits no events — it is a plain, hashable state tree, deliberately (GDD §4.1).
  * So tells are **derived by diffing successive world states** (`./vfx/observer`):
  * a crack stage that went up, a rock that vanished with its ore spent, a turret
- * whose cooldown just reset, a planet whose `alive` flipped. Nothing in the sim
+ * whose cooldown just reset, a station whose `alive` flipped. Nothing in the sim
  * changes to make art possible, which also means the same derivation works on a
  * client watching *server snapshots* it did not simulate (GDD §4.2).
  *
@@ -24,7 +24,7 @@
  * numbers written into preallocated columns. That is the same discipline the
  * renderer works under — "zero per-frame allocations" (GDD §4.3, risk 5) — and
  * it holds through the busiest frame in the game (a wave landing on a firefight
- * next to a dying planet), because the storage was bought once at construction.
+ * next to a dying station), because the storage was bought once at construction.
  *
  * ## The payload convention
  *
@@ -103,11 +103,11 @@ export const TELL = {
 
   // --- The one serious thing (GDD §4.7) ------------------------------------
   /**
-   * A planet core died. The tell that owns the tone paragraph: the game goes
+   * A station core died. The tell that owns the tone paragraph: the game goes
    * quiet for three seconds and nobody jokes (see `./vfx/death-moment`).
    */
-  planetDeath: 22,
-  /** The match resolved — one planet left standing (§1). */
+  stationDeath: 22,
+  /** The match resolved — one station left standing (§1). */
   matchEnd: 23,
 
   /** A turret was picked off — the deterrent the attacker paid for (§2.6). */
@@ -155,14 +155,14 @@ export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
   [TELL.shipSpawn]: { at: 'the spawn point', angle: 'facing', magnitude: '1' },
   [TELL.spawnPulse]: { at: 'the ship', angle: 'facing', magnitude: 'protection left 0..1' },
   [TELL.thrust]: { at: 'the engine bell (behind the hull)', angle: 'exhaust direction', magnitude: 'throttle 0..1' },
-  [TELL.buildPlaced]: { at: 'the planet', angle: 'unused (0)', magnitude: '1 turret, 0.5 shield' },
+  [TELL.buildPlaced]: { at: 'the station', angle: 'unused (0)', magnitude: '1 turret, 0.5 shield' },
   [TELL.buildComplete]: { at: 'the finished building', angle: 'mount facing', magnitude: '1 turret, 0.5 shield' },
   [TELL.repairTick]: { at: 'the core', angle: 'unused (0)', magnitude: 'core fraction 0..1' },
-  [TELL.bankOre]: { at: 'the planet', angle: 'unused (0)', magnitude: 'ore banked / 8, clamped' },
+  [TELL.bankOre]: { at: 'the station', angle: 'unused (0)', magnitude: 'ore banked / 8, clamped' },
   [TELL.upgradeBought]: { at: 'the ship', angle: 'unused (0)', magnitude: 'new tier / 4, clamped' },
   [TELL.waveArrive]: { at: 'the arena centre', angle: 'unused (0)', magnitude: 'wave number / 5' },
   [TELL.collapseBegin]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1' },
-  [TELL.planetDeath]: { at: 'the dying planet', angle: 'outward angle from centre', magnitude: 'planet radius / 64' },
+  [TELL.stationDeath]: { at: 'the dying station', angle: 'outward angle from centre', magnitude: 'station radius / 64' },
   [TELL.matchEnd]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1 win, 0 loss' },
   [TELL.turretDown]: { at: 'the turret mount', angle: 'barrel facing', magnitude: '1 (player = the owner whose deterrent died)' },
 };
@@ -171,7 +171,7 @@ export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
 // The queue
 // ---------------------------------------------------------------------------
 
-/** Default capacity: a wave landing on a firefight next to a dying planet. */
+/** Default capacity: a wave landing on a firefight next to a dying station. */
 export const TELL_CAPACITY = 512;
 
 /**

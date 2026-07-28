@@ -3,10 +3,10 @@
  * Engineer.
  *
  * Four maps, `octagon` the default. A map is a layout — arena bounds + where the
- * home planets sit — and everything downstream is the same code for every map,
+ * home stations sit — and everything downstream is the same code for every map,
  * so the suite proves two things of ALL four and a shape claim of each:
  *
- *   1. **Every map honours the world rules.** Eight planets; nothing spawns
+ *   1. **Every map honours the world rules.** Eight stations; nothing spawns
  *      within `WORLD_EDGE_MARGIN` of the wall (field report P1); the board is
  *      deterministic per seed (GDD §4.8).
  *   2. **Every map honours the resource-fairness invariant** (p1-09 field rule
@@ -14,7 +14,7 @@
  *      default, re-run on each layout: identical stamped home fields (equal local
  *      ore, EXACTLY, by construction), a contested commons holding at least its
  *      named share and `N`-fold symmetric, and every home field outside its own
- *      turret range. This holds even for `diamond`, whose planets are NOT
+ *      turret range. This holds even for `diamond`, whose stations are NOT
  *      congruent but whose resources are — the map is unfair in ground, never in
  *      ore.
  *   3. **Each map's own shape.** octagon/compass/oval: equal neighbour gaps
@@ -28,7 +28,7 @@ import { describe, it, expect } from 'vitest';
 import { ShipClass, type Vec2 } from '@shared/types';
 import {
   createWorld,
-  damagePlanet,
+  damageStation,
   getMap,
   homeFieldOre,
   spawnWave,
@@ -85,12 +85,12 @@ function fullField(mapId: string, seed: number, n = 8): World {
   return w;
 }
 
-/** The LIVE homes of a world — the non-derelict planets. On a regenerate map
- *  (octagon/oval) this is every planet; on a derelict-fill map (compass/diamond)
+/** The LIVE homes of a world — the non-derelict stations. On a regenerate map
+ *  (octagon/oval) this is every station; on a derelict-fill map (compass/diamond)
  *  it is the `N` owned homes, the `8-N` derelict wrecks excluded. The fairness
  *  invariants are claims about live homes; derelicts are unowned loot. */
 function liveHomes(w: World) {
-  return w.planets.filter((p) => !p.derelict);
+  return w.stations.filter((p) => !p.derelict);
 }
 
 /** Assert every spawned body keeps its whole extent (centre ± radius) at least
@@ -103,15 +103,15 @@ function assertAllInsideMargin(w: World, label: string): void {
     expect(pos.y - radius, `${what} — top`).toBeGreaterThanOrEqual(WORLD_EDGE_MARGIN - EPS);
     expect(pos.y + radius, `${what} — bottom`).toBeLessThanOrEqual(height - WORLD_EDGE_MARGIN + EPS);
   };
-  for (const p of w.planets) check(p.pos, p.radius, `${label}: planet ${p.id}`);
+  for (const p of w.stations) check(p.pos, p.radius, `${label}: station ${p.id}`);
   for (const s of w.ships) check(s.pos, s.radius, `${label}: ship ${s.id}`);
   for (const a of w.asteroids) check(a.pos, a.radius, `${label}: asteroid ${a.id}`);
   for (const c of w.chunks) check(c.pos, c.radius, `${label}: chunk ${c.id}`);
 }
 
-/** Planet centres in slot order. */
-function planetPositions(w: World): Vec2[] {
-  return w.planets.map((p) => p.pos);
+/** Station centres in slot order. */
+function stationPositions(w: World): Vec2[] {
+  return w.stations.map((p) => p.pos);
 }
 
 // --- the registry itself ---------------------------------------------------
@@ -149,9 +149,9 @@ describe('the map registry', () => {
 // --- rules every map honours -----------------------------------------------
 
 describe.each(MAPS)('map "$id" honours the world rules', (map: MapDef) => {
-  it('places exactly eight home planets at a full lobby', () => {
+  it('places exactly eight home stations at a full lobby', () => {
     const w = createWorld({ seed: 1, players: players(), mapId: map.id });
-    expect(w.planets).toHaveLength(8);
+    expect(w.stations).toHaveLength(8);
     expect(w.ships).toHaveLength(8);
     // A full lobby has no derelicts — every board position is a live home.
     expect(liveHomes(w)).toHaveLength(8);
@@ -163,11 +163,11 @@ describe.each(MAPS)('map "$id" honours the world rules', (map: MapDef) => {
       // One ship and one LIVE home per player, always.
       expect(w.ships, `${map.id} × ${n}: ships`).toHaveLength(n);
       expect(liveHomes(w), `${map.id} × ${n}: live homes`).toHaveLength(n);
-      // Regenerate maps drop to N planets; derelict-fill maps keep all eight
+      // Regenerate maps drop to N stations; derelict-fill maps keep all eight
       // board positions with the extras as unowned wrecks — either way the shape
-      // is intact and every planet is accounted for.
-      const derelicts = w.planets.filter((p) => p.derelict);
-      expect(w.planets.length, `${map.id} × ${n}: total planets`).toBe(n + derelicts.length);
+      // is intact and every station is accounted for.
+      const derelicts = w.stations.filter((p) => p.derelict);
+      expect(w.stations.length, `${map.id} × ${n}: total stations`).toBe(n + derelicts.length);
       for (const d of derelicts) {
         // A derelict is born a wreck: dead core, no defenders, its own board id as
         // owner (>= N, so no ship shares it), lootable but never a win-condition.
@@ -182,7 +182,7 @@ describe.each(MAPS)('map "$id" honours the world rules', (map: MapDef) => {
   it('spawns nothing within WORLD_EDGE_MARGIN of the wall — construction and full field, every N', () => {
     for (const seed of SEEDS) {
       for (const n of COUNTS) {
-        // At construction (planets incl. derelict wrecks, ships, home fields,
+        // At construction (stations incl. derelict wrecks, ships, home fields,
         // derelict debris, wave 1)…
         assertAllInsideMargin(
           createWorld({ seed, players: players(n), mapId: map.id }),
@@ -224,13 +224,13 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
           .sort((x, y) => x - y);
         for (const p of homes) {
           const h = homeOf(p.owner);
-          expect(h, `${map.id} seed ${seed} × ${n}: planet ${p.id} home count`).toHaveLength(
+          expect(h, `${map.id} seed ${seed} × ${n}: station ${p.id} home count`).toHaveLength(
             RESOURCE_FIELD.homeCount,
           );
           // Ore is a literal copy of the canonical pattern → equal multiset, exactly.
           expect(h.map((a) => a.ore).sort((x, y) => x - y)).toEqual(refOre);
-          // Positions are a rigid rotation-plus-translation → distances-to-own-planet
-          // match to float precision, even where the planets themselves do not.
+          // Positions are a rigid rotation-plus-translation → distances-to-own-station
+          // match to float precision, even where the stations themselves do not.
           const d = h.map((a) => dist(a.pos, p.pos)).sort((x, y) => x - y);
           for (let i = 0; i < d.length; i++) expect(d[i]).toBeCloseTo(refDist[i]!, 6);
         }
@@ -246,7 +246,7 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
           w.asteroids.filter((a) => a.home === p.owner).reduce((s, a) => s + a.ore, 0),
         );
         for (let i = 1; i < totals.length; i++) {
-          expect(totals[i], `${map.id} seed ${seed} × ${n}: planet ${i} local ore`).toBe(totals[0]);
+          expect(totals[i], `${map.id} seed ${seed} × ${n}: station ${i} local ore`).toBe(totals[0]);
         }
         expect(totals[0], `${map.id} seed ${seed} × ${n}: local ore positive`).toBeGreaterThan(0);
       }
@@ -254,7 +254,7 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
   });
 
   it('keeps every home field outside its own turret range, at every N', () => {
-    // A home field must not sit under the guns of its own planet, or "your
+    // A home field must not sit under the guns of its own station, or "your
     // neighbourhood" would be a free defended pantry (p1-09 §1).
     for (const seed of SEEDS) {
       for (const n of COUNTS) {
@@ -264,7 +264,7 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
             if (a.home !== p.owner) continue;
             expect(
               dist(a.pos, p.pos),
-              `${map.id} seed ${seed} × ${n}: planet ${p.id} home rock inside turret range`,
+              `${map.id} seed ${seed} × ${n}: station ${p.id} home rock inside turret range`,
             ).toBeGreaterThan(TURRET.range);
           }
         }
@@ -307,7 +307,7 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
       for (const n of COUNTS) {
         const w = fullField(map.id, seed, n);
         const c = center(w);
-        const sectors = w.planets.length;
+        const sectors = w.stations.length;
         const sectorWidth = (2 * Math.PI) / sectors;
         const perSector = new Array<number>(sectors).fill(0);
         for (const a of w.asteroids) {
@@ -331,12 +331,12 @@ describe.each(MAPS)('map "$id" honours the resource-fairness invariant', (map: M
 // --- variable N: regenerate vs derelict-fill (Milestone B) -----------------
 
 describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', () => {
-  it('octagon and oval REGENERATE — exactly N planets, no derelicts, at every N', () => {
+  it('octagon and oval REGENERATE — exactly N stations, no derelicts, at every N', () => {
     for (const id of ['octagon', 'oval']) {
       for (const n of COUNTS) {
         const w = createWorld({ seed: 1, players: players(n), mapId: id });
-        expect(w.planets, `${id} × ${n}: regenerated planet count`).toHaveLength(n);
-        expect(w.planets.some((p) => p.derelict), `${id} × ${n}: no derelicts`).toBe(false);
+        expect(w.stations, `${id} × ${n}: regenerated station count`).toHaveLength(n);
+        expect(w.stations.some((p) => p.derelict), `${id} × ${n}: no derelicts`).toBe(false);
       }
     }
   });
@@ -345,15 +345,15 @@ describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', 
     for (const id of ['compass', 'diamond']) {
       for (const n of COUNTS) {
         const w = createWorld({ seed: 1, players: players(n), mapId: id });
-        expect(w.planets, `${id} × ${n}: keeps all eight positions`).toHaveLength(8);
-        expect(w.planets.filter((p) => p.derelict), `${id} × ${n}: derelict count`).toHaveLength(
+        expect(w.stations, `${id} × ${n}: keeps all eight positions`).toHaveLength(8);
+        expect(w.stations.filter((p) => p.derelict), `${id} × ${n}: derelict count`).toHaveLength(
           8 - n,
         );
         // The live homes are the first N board positions, so slot 0 keeps its
         // identity (compass slot 0 = an edge home; diamond slot 0 = an outer home)
         // at every N — actives come first, derelicts fill the tail.
         for (let i = 0; i < 8; i++) {
-          expect(!!w.planets[i]!.derelict, `${id} × ${n}: position ${i} derelict?`).toBe(i >= n);
+          expect(!!w.stations[i]!.derelict, `${id} × ${n}: position ${i} derelict?`).toBe(i >= n);
         }
       }
     }
@@ -365,10 +365,10 @@ describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', 
     // damage seam refuses it outright (siege collision and auto-aim skip dead cores
     // for the same reason).
     const w = createWorld({ seed: 1, players: players(3), mapId: 'diamond' });
-    const derelicts = w.planets.filter((p) => p.derelict);
+    const derelicts = w.stations.filter((p) => p.derelict);
     expect(derelicts.length).toBeGreaterThan(0);
     for (const d of derelicts) {
-      expect(damagePlanet(w, d, 100), `derelict ${d.id} rejects damage`).toBe(false);
+      expect(damageStation(w, d, 100), `derelict ${d.id} rejects damage`).toBe(false);
       expect(d.coreHp, `derelict ${d.id} stays at zero`).toBe(0);
       expect(d.alive, `derelict ${d.id} stays a wreck`).toBe(false);
     }
@@ -379,7 +379,7 @@ describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', 
     // N<8 rings each wreck with loose ore anyone can scavenge.
     expect(createWorld({ seed: 1, players: players(4), mapId: 'octagon' }).chunks).toHaveLength(0);
     const w = createWorld({ seed: 1, players: players(4), mapId: 'compass' });
-    expect(w.planets.filter((p) => p.derelict).length).toBe(4);
+    expect(w.stations.filter((p) => p.derelict).length).toBe(4);
     // Debris is loose chunks (not asteroids), one ring per wreck — a positive,
     // scavengeable pile the finite-field asteroid budget never counts.
     expect(w.chunks.length, 'compass ×4 derelict debris chunks').toBeGreaterThan(0);
@@ -389,7 +389,7 @@ describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', 
 
   it('live homes stay rich at small N — home ore divides by ACTIVE N, not the board size', () => {
     // A compass duel (N=2) must give each of its two players the SAME neighbourhood
-    // richness a 2-planet octagon would — the six derelict positions do not dilute
+    // richness a 2-station octagon would — the six derelict positions do not dilute
     // the home share. Every live home carries exactly homeFieldOre(N) worth of ore.
     for (const id of ['compass', 'diamond', 'octagon', 'oval']) {
       for (const n of COUNTS) {
@@ -410,10 +410,10 @@ describe('maps at any N — regenerate vs derelict-fill (ratified 2026-07-26)', 
 
 // --- each map's own shape --------------------------------------------------
 
-/** Adjacent-slot planet gaps (slots are ordered around the layout, so slot i
+/** Adjacent-slot station gaps (slots are ordered around the layout, so slot i
  *  and i+1 are neighbours; the last wraps to the first). */
 function neighbourGaps(w: World): number[] {
-  const pts = planetPositions(w);
+  const pts = stationPositions(w);
   return pts.map((p, i) => dist(p, pts[(i + 1) % pts.length]!));
 }
 
@@ -441,16 +441,16 @@ describe('each map has its own shape', () => {
     const c = center(w);
     // Slots alternate outer/inner (slot 0 outer, 1 inner, …), so the local player
     // (slot 0) always spawns on an outer home.
-    const outer = w.planets.filter((_, i) => i % 2 === 0);
-    const inner = w.planets.filter((_, i) => i % 2 === 1);
+    const outer = w.stations.filter((_, i) => i % 2 === 0);
+    const inner = w.stations.filter((_, i) => i % 2 === 1);
     expect(outer).toHaveLength(4);
     expect(inner).toHaveLength(4);
 
-    const radiusOf = (p: (typeof w.planets)[number]) => dist(p.pos, c);
+    const radiusOf = (p: (typeof w.stations)[number]) => dist(p.pos, c);
     const rOut = radiusOf(outer[0]!);
     const rIn = radiusOf(inner[0]!);
 
-    // Each diamond: four planets at ONE radius, at exact 90° steps → 4-fold
+    // Each diamond: four stations at ONE radius, at exact 90° steps → 4-fold
     // symmetric about the centre.
     for (const [ring, r] of [
       [outer, rOut],

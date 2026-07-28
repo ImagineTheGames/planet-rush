@@ -5,7 +5,7 @@
  * The design's one sentence about Hard bots is a scoring function:
  *
  * > it evaluates targets by *threat, proximity, and opportunity* — it punishes
- * > whoever it can profitably punish (the miner far from home, the planet whose
+ * > whoever it can profitably punish (the miner far from home, the station whose
  * > alarm went unanswered, the wreck nobody is guarding). (GDD §2.9)
  *
  * So the three terms are named, each is computed in [0, 1] from the fog-honest
@@ -17,15 +17,15 @@
  * Hard bots with the same tree pick different fights.
  *
  * **Nothing in this file can see anything a human could not.** Every input is a
- * `PerceivedShip`/`PerceivedPlanet` field or a memo taken from one. An unscouted
+ * `PerceivedShip`/`PerceivedStation` field or a memo taken from one. An unscouted
  * core reads as `null` and the score falls back to an *assumption* — which is
  * exactly what a player does, and exactly why scouting is worth the trip.
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { PLANET, SPAWN_PROTECTION_S, TURRET } from '../sim';
-import type { PerceivedAsteroid, PerceivedPlanet, PerceivedShip } from './perception';
+import { STATION, SPAWN_PROTECTION_S, TURRET, WEAPON_RANGE } from '../sim';
+import type { PerceivedAsteroid, PerceivedStation, PerceivedShip } from './perception';
 import { estimateOre } from './perception';
 import type { DifficultyTuning, PersonalityWeights } from './personalities';
 import { dist } from './steering';
@@ -47,7 +47,7 @@ export function clamp01(x: number): number {
  * The scoring terms are continuous, so an exact score tie is a genuine dead heat
  * — two rivals a bot has no honest reason to separate. The obvious `a.id < b.id`
  * hands every such tie to the **lowest slot id**, and that is not a rare corner:
- * an *unscouted* rival core reads as full with no turrets, so `leaderPlanet`
+ * an *unscouted* rival core reads as full with no turrets, so `leaderStation`
  * scores every un-visited home at one identical standing, and early-match a bot's
  * whole board is tied there — "gang the leader" then silently means "gang slot
  * 0". Measured, the lowest-id tie-break sends 7 of 8 observers at slot 0 with
@@ -136,21 +136,21 @@ export function classThreat(cls: ShipClass): number {
 export const HOME_ALARM_RANGE = 520;
 
 export function homeProximity(ctx: BotCtx, pos: Vec2): number {
-  const planet = ctx.self.planet;
-  if (!planet) return 0;
-  return 1 - clamp01(dist(planet.pos, pos) / HOME_ALARM_RANGE);
+  const station = ctx.self.station;
+  if (!station) return 0;
+  return 1 - clamp01(dist(station.pos, pos) / HOME_ALARM_RANGE);
 }
 
 /** The nearest enemy ship inside the home alarm ring — the intruder a defender
  *  turns to meet (GDD §2.6: "turrets deter; the ship defends"). */
 export function homeIntruder(ctx: BotCtx): PerceivedShip | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
+  const station = ctx.self.station;
+  if (!station) return null;
   let best: PerceivedShip | null = null;
   let bestD = HOME_ALARM_RANGE;
   for (const ship of ctx.view.ships) {
     if (!isEngageable(ship)) continue;
-    const d = dist(planet.pos, ship.pos);
+    const d = dist(station.pos, ship.pos);
     if (d < bestD) {
       bestD = d;
       best = ship;
@@ -169,18 +169,94 @@ export function nearestEnemy(ctx: BotCtx): PerceivedShip | null {
   return best;
 }
 
+/** Half-width of the approach corridor a hostile has to sit inside to spoil a
+ *  mining site (p11 field report point 1). One weapon-range-and-a-bit either
+ *  side of the straight line to the rock: a ship this close to the path can open
+ *  fire on the miner before it ever reaches the standoff, which is exactly the
+ *  "threat on the path" the report describes. TUNABLE */
+export const PATH_THREAT_RADIUS = WEAPON_RANGE * 1.4;
+
+/** How hard a fully-blocked approach divides a site's score down. At 3, a rock
+ *  whose path runs straight through a hostile is worth a quarter of the same
+ *  rock on a clean line — enough that a clean field one corridor further out
+ *  wins the pick, which is the developer's scenario resolving itself. TUNABLE */
+export const PATH_THREAT_PENALTY = 3;
+
+/** Shortest distance from point `p` to segment `a`→`b`. The approach path is a
+ *  segment, not a ray, so a hostile behind the miner or past the rock does not
+ *  count as "on the path". IEEE-exact sqrt, for the determinism reason
+ *  `./perception` gives. */
+function segmentDist(a: Vec2, b: Vec2, p: Vec2): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const apx = p.x - a.x;
+  const apy = p.y - a.y;
+  const len2 = abx * abx + aby * aby;
+  const t = len2 > 1e-9 ? clamp01((apx * abx + apy * aby) / len2) : 0;
+  const cx = a.x + abx * t;
+  const cy = a.y + aby * t;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * How clear the run to a rock is, in (0, 1]: 1 for a path no hostile is near,
+ * shrinking toward `1 / (1 + PATH_THREAT_PENALTY)` as a ship closes on the line
+ * the miner would fly. The worst single hostile sets it — a corridor with two
+ * threats is not twice as bad as one, it is just blocked (p11).
+ */
+function pathClearance(ctx: BotCtx, to: Vec2): number {
+  const from = ctx.self.pos;
+  let worst = 0;
+  for (const ship of ctx.view.ships) {
+    if (!isEngageable(ship)) continue;
+    const d = segmentDist(from, to, ship.pos);
+    if (d >= PATH_THREAT_RADIUS) continue;
+    const near = 1 - d / PATH_THREAT_RADIUS;
+    if (near > worst) worst = near;
+  }
+  return 1 / (1 + PATH_THREAT_PENALTY * worst);
+}
+
+/** Drop tabu sites whose cool-down has lifted (`Brain.tabu`, p11). Deletes
+ *  during iteration, which a `Map` allows and which stays deterministic because
+ *  the map is insertion-ordered and the clock is the sim's own `view.time`. */
+function pruneTabu(ctx: BotCtx): void {
+  const now = ctx.view.time;
+  for (const [id, until] of ctx.brain.tabu) {
+    if (until <= now) ctx.brain.tabu.delete(id);
+  }
+}
+
 /**
  * The rock worth mining: estimated payout against the trip to reach it
- * (GDD §5.5 — "let a player judge a payout before committing weapon time").
- * Fog-honest — {@link estimateOre} reads size and crack stage, never `ore`.
- * Ties break on the lower id so the choice is stable frame to frame and a bot
- * never dithers between two identical rocks.
+ * (GDD §5.5 — "let a player judge a payout before committing weapon time"),
+ * **discounted by the threat along the approach and excluding sites on
+ * cool-down** (p11 field report).
+ *
+ * Fog-honest — {@link estimateOre} reads size and crack stage, never `ore`, and
+ * the path threat is read off ships already filtered to visual range. Ties break
+ * on the lower id so the choice is stable frame to frame and a bot never dithers
+ * between two identical rocks.
+ *
+ * A site whose approach a retreat just broke off is booked tabu on the brain
+ * (`./behaviors`), so this skips it and commits to the next-best field — no
+ * re-litigating the same rock while the threat sits on the path. When *every*
+ * visible rock is tabu the bot mines nothing this decision and the tree falls
+ * through to roam, which carries it somewhere new to look — deliberately not a
+ * fall-back that re-includes the cooled sites, because flying back at them is
+ * the exact loop the tabu exists to break.
  */
 export function bestRock(ctx: BotCtx): PerceivedAsteroid | null {
+  pruneTabu(ctx);
+  const tabu = ctx.brain.tabu;
   let best: PerceivedAsteroid | null = null;
   let bestScore = 0;
   for (const rock of ctx.view.asteroids) {
-    const score = estimateOre(rock) / (1 + rock.distance / 150);
+    if (tabu.has(rock.id)) continue;
+    const payout = estimateOre(rock) / (1 + rock.distance / 150);
+    const score = payout * pathClearance(ctx, rock.pos);
     if (score > bestScore || (best !== null && score === bestScore && rock.id < best.id)) {
       bestScore = score;
       best = rock;
@@ -196,7 +272,7 @@ export function bestRock(ctx: BotCtx): PerceivedAsteroid | null {
 /** One scored candidate. The three terms are kept alongside the total because
  *  they are the explanation — and because the tests assert on them directly. */
 export interface TargetScore {
-  readonly kind: 'ship' | 'planet';
+  readonly kind: 'ship' | 'station';
   /** The slot that owns the target (its ship, or its home). */
   readonly id: PlayerId;
   readonly pos: Vec2;
@@ -204,7 +280,7 @@ export interface TargetScore {
   readonly radius: number;
   /** The target's velocity when last seen, for intercept lead (design amendment
    *  v0.2: combat is a projectile, so a bot must aim where a mover *will be*).
-   *  Present for ships; a home never moves, so it is omitted for planets and the
+   *  Present for ships; a home never moves, so it is omitted for stations and the
    *  lead collapses to a straight shot. */
   readonly vel?: Vec2;
   readonly threat: number;
@@ -254,7 +330,7 @@ function total(
  * Score an enemy **ship**.
  *
  *  - *threat* — what it is (hull class), whether it is firing, and how close
- *    it is to this bot's own planet. A firing Interceptor over your house is the
+ *    it is to this bot's own station. A firing Interceptor over your house is the
  *    highest-threat thing in the game.
  *  - *proximity* — how cheap it is to reach, as a fraction of visual range.
  *  - *opportunity* — how profitably it can be punished *now*: how wounded it
@@ -274,7 +350,7 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
   // Wounded: only from the hull bar, which is a visual-range read. Out of range
   // it is null and the bot assumes an average target rather than a soft one.
   const wounded = ship.hull !== null ? 1 - clamp01(ship.hull / Math.max(1e-9, ship.maxHull)) : 0.25;
-  const home = ctx.memory.planet(ship.id);
+  const home = ctx.memory.station(ship.id);
   const exposed = home ? clamp01(dist(home.pos, ship.pos) / EXPOSED_RANGE) : 0.5;
   const engageable = isEngageable(ship);
   const opportunity = engageable ? clamp01(0.55 * wounded + 0.45 * exposed) : 0;
@@ -309,41 +385,41 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
  * A wreck scores zero — it has no core left to kill (GDD §2.7). Its *debris* is
  * a separate, scavenger-shaped errand (`./behaviors`).
  */
-export function scorePlanet(ctx: BotCtx, planet: PerceivedPlanet): TargetScore {
-  const memo = ctx.memory.planet(planet.owner);
-  const surface = Math.max(0, planet.distance - planet.radius);
+export function scoreStation(ctx: BotCtx, station: PerceivedStation): TargetScore {
+  const memo = ctx.memory.station(station.owner);
+  const surface = Math.max(0, station.distance - station.radius);
   const proximity = 1 - clamp01(surface / ctx.view.perception.visualRange);
 
   // Standing: an unscouted core is assumed *healthy*, which is the pessimistic
   // reading and the one that makes a bot go and look.
   const coreFraction = memo?.coreFraction ?? 1;
   const turrets = memo?.turrets ?? null;
-  const standing = clamp01(0.6 * coreFraction + 0.4 * clamp01((turrets ?? TURRET.capPerPlanet / 2) / TURRET.capPerPlanet));
-  const threat = clamp01(0.55 * standing + 0.45 * homeProximity(ctx, planet.pos));
+  const standing = clamp01(0.6 * coreFraction + 0.4 * clamp01((turrets ?? TURRET.capPerStation / 2) / TURRET.capPerStation));
+  const threat = clamp01(0.55 * standing + 0.45 * homeProximity(ctx, station.pos));
 
   // Freshness of the scouting behind the opportunity terms (GDD §2.2: fog).
-  const age = ctx.memory.planetAge(planet.owner);
+  const age = ctx.memory.stationAge(station.owner);
   const freshness = Number.isFinite(age) ? clamp01(1 - age / Math.max(1e-9, ctx.tuning.memorySeconds)) : 0;
 
   const wounded = memo?.coreFraction !== null && memo?.coreFraction !== undefined ? 1 - memo.coreFraction : 0.3;
-  const ownerHome = ctx.memory.ship(planet.owner, ctx.tuning.memorySeconds);
-  const defended = ownerHome ? (dist(ownerHome.pos, planet.pos) < PLANET.dockRange * 1.5 ? 1 : 0) : 0.5;
+  const ownerHome = ctx.memory.ship(station.owner, ctx.tuning.memorySeconds);
+  const defended = ownerHome ? (dist(ownerHome.pos, station.pos) < STATION.dockRange * 1.5 ? 1 : 0) : 0.5;
   const alarmUnanswered = memo?.underAttack === true && defended < 1 ? 1 : 0;
-  const thinCover = 1 - clamp01((turrets ?? TURRET.capPerPlanet / 2) / TURRET.capPerPlanet);
+  const thinCover = 1 - clamp01((turrets ?? TURRET.capPerStation / 2) / TURRET.capPerStation);
 
   // Spawn protection is match-start-wide and the match clock is public (GDD §2.2
   // — the wave clock), so a bot knows without peeking that nothing is crackable
   // in the opening seconds.
-  const crackable = planet.alive && ctx.view.time >= SPAWN_PROTECTION_S;
+  const crackable = station.alive && ctx.view.time >= SPAWN_PROTECTION_S;
   const opportunity = crackable
     ? clamp01(0.4 * wounded * freshness + 0.3 * alarmUnanswered + 0.15 * (1 - defended) + 0.15 * thinCover)
     : 0;
 
   return {
-    kind: 'planet',
-    id: planet.owner,
-    pos: planet.pos,
-    radius: planet.radius,
+    kind: 'station',
+    id: station.owner,
+    pos: station.pos,
+    radius: station.radius,
     threat,
     proximity,
     opportunity,
@@ -373,12 +449,12 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
   };
 
   for (const ship of ctx.view.ships) consider(scoreShip(ctx, ship));
-  for (const planet of ctx.view.planets) {
-    if (!planet.alive) continue;
+  for (const station of ctx.view.stations) {
+    if (!station.alive) continue;
     // Homes are only candidates once they are on screen: a bot does not lay
     // siege to a rumour.
-    if (planet.distance - planet.radius > ctx.view.perception.visualRange) continue;
-    consider(scorePlanet(ctx, planet));
+    if (station.distance - station.radius > ctx.view.perception.visualRange) continue;
+    consider(scoreStation(ctx, station));
   }
   return best;
 }
@@ -389,7 +465,7 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
 
 /**
  * The nearest home still standing that is not this bot's own. Position and
- * wreck state are public at any range — "a burning planet is visible from
+ * wreck state are public at any range — "a burning station is visible from
  * further away than its numbers are" (GDD §2.2) — so this is a legal read
  * without scouting, and it is the only map-wide fact any tree uses.
  *
@@ -399,11 +475,11 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
  * two-survivor match can sit at opposite ends of the ring forever, each one
  * defending a doorstep nobody is standing on.
  */
-export function nearestLivingRival(ctx: BotCtx): PerceivedPlanet | null {
-  let best: PerceivedPlanet | null = null;
-  for (const planet of ctx.view.planets) {
-    if (!planet.alive) continue;
-    if (best === null || planet.distance < best.distance) best = planet;
+export function nearestLivingRival(ctx: BotCtx): PerceivedStation | null {
+  let best: PerceivedStation | null = null;
+  for (const station of ctx.view.stations) {
+    if (!station.alive) continue;
+    if (best === null || station.distance < best.distance) best = station;
   }
   return best;
 }
@@ -423,21 +499,21 @@ export function nearestLivingRival(ctx: BotCtx): PerceivedPlanet | null {
  * index-blind ({@link breaksTie}), not toward slot 0: without that, "gang the
  * leader" quietly means "gang the lowest slot" (p8 aggression-bias fix).
  */
-export function leaderPlanet(ctx: BotCtx): PerceivedPlanet | null {
-  let best: PerceivedPlanet | null = null;
+export function leaderStation(ctx: BotCtx): PerceivedStation | null {
+  let best: PerceivedStation | null = null;
   let bestStanding = -1;
-  for (const planet of ctx.view.planets) {
-    if (!planet.alive) continue;
-    const memo = ctx.memory.planet(planet.owner);
+  for (const station of ctx.view.stations) {
+    if (!station.alive) continue;
+    const memo = ctx.memory.station(station.owner);
     const core = memo?.coreFraction ?? 1;
     const turrets = memo?.turrets ?? 0;
-    const standing = 0.7 * core + 0.3 * clamp01(turrets / TURRET.capPerPlanet);
+    const standing = 0.7 * core + 0.3 * clamp01(turrets / TURRET.capPerStation);
     if (
       standing > bestStanding ||
-      (best !== null && standing === bestStanding && breaksTie(ctx.self.id, planet.owner, best.owner))
+      (best !== null && standing === bestStanding && breaksTie(ctx.self.id, station.owner, best.owner))
     ) {
       bestStanding = standing;
-      best = planet;
+      best = station;
     }
   }
   return best;

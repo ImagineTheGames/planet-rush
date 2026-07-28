@@ -227,7 +227,7 @@ export interface SnapshotMessage {
 export interface EntityEventMessage {
   type: 'entityEvent';
   tick: Tick;
-  kind: 'asteroid' | 'turret' | 'shield' | 'wreck' | 'planet';
+  kind: 'asteroid' | 'turret' | 'shield' | 'wreck' | 'station';
   op: 'spawn' | 'update' | 'destroy';
   data: unknown;
 }

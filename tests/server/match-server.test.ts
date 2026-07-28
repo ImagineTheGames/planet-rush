@@ -123,7 +123,7 @@ describe('the authoritative match server', () => {
     expect(late.connection.room).toBe(host.connection.room);
   });
 
-  it('refuses a ninth client — eight planets, eight seats (GDD §2.1)', () => {
+  it('refuses a ninth client — eight stations, eight seats (GDD §2.1)', () => {
     const code = server.createCode();
     for (let i = 0; i < 8; i++) join(connect(), code);
     const ninth = connect();
@@ -148,7 +148,7 @@ describe('the authoritative match server', () => {
 
   // --- Starting the match -------------------------------------------------
 
-  it('fills every empty seat with a bot server-side, so three humans still fight an eight-planet war', () => {
+  it('fills every empty seat with a bot server-side, so three humans still fight an eight-station war', () => {
     const code = server.createCode();
     const host = connect();
     join(host, code);
@@ -160,7 +160,7 @@ describe('the authoritative match server', () => {
 
     expect(room.state).toBe('live');
     expect(room.world?.ships).toHaveLength(8);
-    expect(room.world?.planets).toHaveLength(8);
+    expect(room.world?.stations).toHaveLength(8);
     const lobby = room.lobbyState();
     expect(lobby.filter((s) => s.isBot)).toHaveLength(5);
     expect(lobby.filter((s) => !s.isBot).map((s) => s.player)).toEqual([0, 1, 2]);
@@ -334,7 +334,7 @@ describe('the authoritative match server', () => {
     // it changed (GDD §4.2 "reclaim their ship, with all upgrades intact").
     expect(room.world!.ships[1]).toBe(ship);
     // The ship's WEALTH is intact across the reclaim — but the split can shift:
-    // while the substitute bot parks the seat at its own planet, the v0.1.2
+    // while the substitute bot parks the seat at its own station, the v0.1.2
     // auto-deposit rule bleeds a little of the hold into the safe bank (field
     // report ore-deposit). Reclaim preserves the ship, not a frozen hold/bank
     // ledger, so assert the conserved total rather than the exact halves.
@@ -358,9 +358,9 @@ describe('the authoritative match server', () => {
     expect(messages[0]?.type).toBe('welcome');
     expect(messages.some((m) => m.type === 'matchStart')).toBe(true);
     // Static entities are events on join, not a stream (GDD §4.2): a returning
-    // client is handed every planet and every rock still on the map.
+    // client is handed every station and every rock still on the map.
     const events = messages.filter((m) => m.type === 'entityEvent');
-    expect(events.some((m) => m.kind === 'planet')).toBe(true);
+    expect(events.some((m) => m.kind === 'station')).toBe(true);
     expect(events.some((m) => m.kind === 'asteroid')).toBe(true);
     expect(messages.some((m) => m.type === 'snapshot')).toBe(true);
   });
@@ -444,8 +444,8 @@ describe('the authoritative match server', () => {
 
   describe('variable match size', () => {
     it('opens two rooms at different sizes on one server, simultaneously (C1)', () => {
-      // The size is per-room now, not a process-global default: a four-planet
-      // duel-plus and a full eight-planet war coexist in one process.
+      // The size is per-room now, not a process-global default: a four-station
+      // duel-plus and a full eight-station war coexist in one process.
       const four = server.openRoom('SML4', { size: 4 })!;
       const eight = server.openRoom('BIG8', { size: 8 })!;
       expect(four.size).toBe(4);
@@ -466,16 +466,16 @@ describe('the authoritative match server', () => {
       expect(fifth.socket.errors()[0]?.reason).toBe('room-full');
     });
 
-    it('builds an N-planet world and seats no bot beyond N (C2)', () => {
+    it('builds an N-station world and seats no bot beyond N (C2)', () => {
       const code = 'FOUR';
       const room = server.openRoom(code, { size: 4 })!;
       const host = connect();
       join(host, code);
       host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
 
-      // Four seats: one human, three bots — a four-planet war, not an eight.
+      // Four seats: one human, three bots — a four-station war, not an eight.
       expect(room.world?.ships).toHaveLength(4);
-      expect(room.world?.planets).toHaveLength(4);
+      expect(room.world?.stations).toHaveLength(4);
       const lobby = room.lobbyState();
       expect(lobby).toHaveLength(4);
       expect(lobby.filter((s) => s.isBot)).toHaveLength(3);

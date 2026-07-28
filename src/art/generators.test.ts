@@ -10,13 +10,19 @@
  * already quantised to 1e-4.
  *
  * The other half of the file is the design-visible behaviour each generator
- * owes the ruleset: three crack stages that actually differ, four planet
+ * owes the ruleset: three crack stages that actually differ, four station
  * variants that actually differ, richer rocks that actually look richer.
  */
 
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { asteroidOutline, asteroidSprite, oreChunkSprite } from './asteroids';
+import {
+  asteroidKindFor,
+  asteroidOutline,
+  asteroidSprite,
+  oreChunkSprite,
+  ASTEROID_KINDS,
+} from './asteroids';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite } from './buildings';
 import { ALL_SPRITES } from './catalogue';
 import { decalDigit, decalStrokes } from './decals';
@@ -25,30 +31,30 @@ import {
   beaconRingSprite,
   continentPolygons,
   damageRingSprite,
-  planetSprite,
-  planetVariantFor,
+  stationSprite,
+  stationVariantFor,
   repairAuraSprite,
   ATMOSPHERE_HALO_RADIUS,
-  PLANET_VARIANT_COUNT,
-} from './planets';
-import { DEPOSIT_RANGE, PLANET } from '../sim/constants';
+  STATION_VARIANT_COUNT,
+} from './stations';
+import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { shipSprite } from './ships';
 import { spriteKey, type SpriteDef } from './shapes';
-import { debrisFieldSprite, planetWreckSprite } from './wrecks';
+import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 
 /** Everything that has to be reproducible, with a second identical call. */
 const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => shipSprite({ shipClass: ShipClass.Excavator, playerId: 5 }),
-  () => planetSprite(2),
+  () => stationSprite(2),
   () => beaconRingSprite(6),
-  () => damageRingSprite(0.42),
+  () => damageRingSprite(6, 0.42),
   () => repairAuraSprite(),
   () => asteroidSprite({ seed: 41, crackStage: 1 }),
   () => oreChunkSprite(9),
   () => turretSprite({ playerId: 3, state: 'tracking' }),
   () => shieldSprite({ playerId: 3, strength: 'weakened' }),
   () => buildProgressSprite(0.4),
-  () => planetWreckSprite(1),
+  () => stationWreckSprite(1),
   () => debrisFieldSprite(2),
   () => atmosphereHaloSprite(0),
 ];
@@ -134,48 +140,84 @@ describe('asteroids — the payout read (style-guide §6)', () => {
     expect(asteroidOutline(1)).not.toEqual(asteroidOutline(2));
     expect(oreChunkSprite(0)).not.toEqual(oreChunkSprite(1));
   });
+
+  it('builds all six ratified pool types, each visibly its own (docs/art-direction §5.5)', () => {
+    expect(ASTEROID_KINDS).toEqual(['shard', 'ice', 'rubble', 'husk', 'geode', 'patina']);
+    // The kind is a total, deterministic function of the pooling seed.
+    for (let seed = 0; seed < 6; seed++) expect(asteroidKindFor(seed)).toBe(ASTEROID_KINDS[seed]);
+    expect(asteroidKindFor(6)).toBe('shard'); // wraps
+    expect(asteroidKindFor(-1)).toBe('patina'); // and wraps the other way
+
+    // Six distinct sprites at the same seed/stage — six looks, not one rock recoloured.
+    const looks = ASTEROID_KINDS.map((kind) => spriteKey(asteroidSprite({ seed: 4, crackStage: 0, kind })));
+    expect(new Set(looks).size).toBe(ASTEROID_KINDS.length);
+
+    // And every one of them cracks across three stages.
+    for (const kind of ASTEROID_KINDS) {
+      const s = [0, 1, 2].map((crackStage) => asteroidSprite({ seed: 4, crackStage, kind }));
+      expect(s[0]).not.toEqual(s[1]);
+      expect(s[1]).not.toEqual(s[2]);
+    }
+  });
+
+  it('makes the geode payout countable — crystal count tracks the ore left (A5)', () => {
+    const crystals = (richness: number): number =>
+      // Each crystal is a signal-yellow kite; count the yellow bodies.
+      asteroidSprite({ seed: 4, crackStage: 0, richness, kind: 'geode' }).shapes.filter(
+        (s) => s.role === 'ore' && s.fill?.color === 0xf2d24b,
+      ).length;
+    expect(crystals(1)).toBeGreaterThan(crystals(0.5));
+    expect(crystals(0.5)).toBeGreaterThan(crystals(0.2));
+    expect(crystals(0)).toBe(0);
+  });
+
+  it('spends no yellow on an empty rock, whichever type it is (payout honesty)', () => {
+    const ore = (kind: (typeof ASTEROID_KINDS)[number]): number =>
+      asteroidSprite({ seed: 4, crackStage: 0, richness: 0, kind }).shapes.filter((s) => s.role === 'ore').length;
+    for (const kind of ASTEROID_KINDS) expect(ore(kind)).toBe(0);
+  });
 });
 
-describe('planets — four variants, arrangement only (style-guide §5)', () => {
+describe('stations — four variants, arrangement only (style-guide §5)', () => {
   it('makes four distinct worlds', () => {
-    const defs = [0, 1, 2, 3].map(planetSprite);
+    const defs = [0, 1, 2, 3].map(stationSprite);
     for (let i = 0; i < defs.length; i++) {
       for (let j = i + 1; j < defs.length; j++) expect(defs[i]).not.toEqual(defs[j]);
     }
   });
 
   it('varies by continent layout and land ratio, not by colour', () => {
-    const palettes = [0, 1, 2, 3].map((v) => new Set(planetSprite(v).shapes.map((s) => s.fill?.color)));
+    const palettes = [0, 1, 2, 3].map((v) => new Set(stationSprite(v).shapes.map((s) => s.fill?.color)));
     for (const p of palettes) expect(p).toEqual(palettes[0]);
     expect(continentPolygons(0).length).not.toBe(continentPolygons(3).length);
   });
 
   it('puts the signal-yellow core on every world — the win condition (§2)', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      expect(planetSprite(v).shapes.some((s) => s.role === 'core')).toBe(true);
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationSprite(v).shapes.some((s) => s.role === 'core')).toBe(true);
     }
   });
 
   it('assigns a variant per player and wraps safely', () => {
-    expect(planetVariantFor(0)).toBe(0);
-    expect(planetVariantFor(4)).toBe(0);
-    expect(planetVariantFor(-1)).toBe(3);
+    expect(stationVariantFor(0)).toBe(0);
+    expect(stationVariantFor(4)).toBe(0);
+    expect(stationVariantFor(-1)).toBe(3);
   });
 
   it('draws the atmosphere halo at exactly DEPOSIT_RANGE — visual and rule never drift (p4-12)', () => {
-    // The unit-space edge is DEPOSIT_RANGE / PLANET.radius and nothing else, so
+    // The unit-space edge is DEPOSIT_RANGE / STATION.radius and nothing else, so
     // the halo is the sim constant, expressed as art.
-    expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / PLANET.radius);
+    expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / STATION.radius);
 
     const def = atmosphereHaloSprite(0);
-    // The outermost disc *is* the atmosphere edge; scaled by the planet radius
+    // The outermost disc *is* the atmosphere edge; scaled by the station radius
     // (how the renderer draws it) it lands on DEPOSIT_RANGE world units exactly.
     const outerUnit = Math.max(
       ...def.shapes.map((s) => (s.path.kind === 'circle' ? s.path.r : 0)),
     );
     expect(outerUnit).toBe(ATMOSPHERE_HALO_RADIUS);
-    expect(outerUnit * PLANET.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
-    // The sprite's own square is sized to the halo, not clipped to the planet.
+    expect(outerUnit * STATION.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
+    // The sprite's own square is sized to the halo, not clipped to the station.
     expect(def.extent).toBe(ATMOSPHERE_HALO_RADIUS);
   });
 
@@ -189,19 +231,24 @@ describe('planets — four variants, arrangement only (style-guide §5)', () => 
     expect(atmosphereHaloSprite(0)).not.toEqual(atmosphereHaloSprite(1));
   });
 
-  it('scales the damage ring by remaining core HP, quantised so the pool holds', () => {
-    expect(damageRingSprite(1).shapes.length).toBeGreaterThan(damageRingSprite(0).shapes.length);
+  it('fills red as core HP is LOST, quantised so the pool holds (p11 grammar)', () => {
+    // Ratified p11: a full core is the owner ring alone (one shape); a dead core
+    // adds the red fill on top (two). The red grows with damage — the reverse of
+    // the old "arc == remaining" grammar the developer called backwards.
+    expect(damageRingSprite(0, 0).shapes.length).toBeGreaterThan(damageRingSprite(0, 1).shapes.length);
     // 5% quantisation: two nearby fractions share a sprite (and so a texture).
-    expect(damageRingSprite(0.51)).toEqual(damageRingSprite(0.52));
-    expect(damageRingSprite(0.5)).not.toEqual(damageRingSprite(0.9));
+    expect(damageRingSprite(0, 0.51)).toEqual(damageRingSprite(0, 0.52));
+    expect(damageRingSprite(0, 0.5)).not.toEqual(damageRingSprite(0, 0.9));
+    // The owner is in the sprite: two owners at the same HP are two rings.
+    expect(damageRingSprite(0, 0.5)).not.toEqual(damageRingSprite(1, 0.5));
     // Out-of-range input is clamped, never thrown.
-    expect(damageRingSprite(-1)).toEqual(damageRingSprite(0));
-    expect(damageRingSprite(2)).toEqual(damageRingSprite(1));
+    expect(damageRingSprite(0, -1)).toEqual(damageRingSprite(0, 0));
+    expect(damageRingSprite(0, 2)).toEqual(damageRingSprite(0, 1));
   });
 });
 
 describe('turrets and shields — the siege tells (GDD §2.6)', () => {
-  it('telegraphs four distinct barrel states', () => {
+  it('telegraphs four distinct muzzle states', () => {
     const states = (['building', 'idle', 'tracking', 'firing'] as const).map((state) =>
       turretSprite({ playerId: 0, state }),
     );
@@ -210,12 +257,36 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
     }
   });
 
-  it('has no barrel until the build finishes — the art does not lie about readiness', () => {
+  it('reads as a distinct silhouette per Mk — the pool escalates (art-direction §5.5)', () => {
+    // The three ladder silhouettes plus the reserved dome are four different guns
+    // at the same state, so an upgrade reads as *more gun* at a glance.
+    const pool = (['breech', 'twin', 'rail', 'dome'] as const).map((silhouette) =>
+      turretSprite({ playerId: 0, state: 'idle', silhouette }),
+    );
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) expect(pool[i]).not.toEqual(pool[j]);
+    }
+    // The tier ladder resolves to the ratified map: I=breech, II=twin, III=rail.
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 0 })).toEqual(pool[0]);
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 1 })).toEqual(pool[1]);
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 2 })).toEqual(pool[2]);
+    // A tier past the top clamps to Mk III (mirrors the sim's tier clamp).
+    expect(turretSprite({ playerId: 0, state: 'idle', tier: 9 })).toEqual(pool[2]);
+  });
+
+  it('is a scaffold until the build finishes — the art does not lie about readiness', () => {
     const building = turretSprite({ playerId: 0, state: 'building' });
     const idle = turretSprite({ playerId: 0, state: 'idle' });
-    expect(building.shapes.length).toBeLessThan(idle.shapes.length);
-    // Hazard stripes are the one legal yellow on a turret (style-guide §2).
+    // Hazard stripes are the one legal yellow on a turret (style-guide §2), and a
+    // scaffold carries them; a standing, ready turret never does.
     expect(building.shapes.some((s) => s.role === 'danger')).toBe(true);
+    expect(idle.shapes.some((s) => s.role === 'danger')).toBe(false);
+    // The scaffold has no live bore or muzzle charge — no energy the way a ready
+    // turret's cold bore glows.
+    expect(building.shapes.some((s) => s.role === 'energy')).toBe(false);
+    expect(idle.shapes.some((s) => s.role === 'energy')).toBe(true);
+    // A build is always a fresh Mk I, so the scaffold is one look across the pool.
+    expect(turretSprite({ playerId: 0, state: 'building', silhouette: 'rail' })).toEqual(building);
   });
 
   it('fires in threat red, and only when firing', () => {
@@ -223,6 +294,11 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
     const tracking = turretSprite({ playerId: 0, state: 'tracking' });
     expect(firing.shapes.some((s) => s.role === 'danger')).toBe(true);
     expect(tracking.shapes.some((s) => s.role === 'danger')).toBe(false);
+    // The twin fires from BOTH barrels — more red than the single-barrel breech.
+    const twinFire = turretSprite({ playerId: 0, state: 'firing', silhouette: 'twin' });
+    const breechFire = turretSprite({ playerId: 0, state: 'firing', silhouette: 'breech' });
+    const reds = (d: typeof firing) => d.shapes.filter((s) => s.role === 'danger').length;
+    expect(reds(twinFire)).toBeGreaterThan(reds(breechFire));
   });
 
   it('shows pressure working: three visible shield strengths', () => {
@@ -249,21 +325,21 @@ describe('turrets and shields — the siege tells (GDD §2.6)', () => {
 });
 
 describe('wrecks — the quiet (style-guide §8)', () => {
-  it('puts the core out: no yellow anywhere on a dead planet', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      const def = planetWreckSprite(v);
+  it('puts the core out: no yellow anywhere on a dead station', () => {
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      const def = stationWreckSprite(v);
       expect(def.shapes.some((s) => s.role === 'core' || s.role === 'ore')).toBe(false);
     }
   });
 
   it('stays cold — no threat red on a wreck; a wreck is an absence, not a threat', () => {
-    for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-      expect(planetWreckSprite(v).shapes.some((s) => s.role === 'danger')).toBe(false);
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationWreckSprite(v).shapes.some((s) => s.role === 'danger')).toBe(false);
     }
   });
 
-  it('keeps the same coastlines as the world it was — you lose *that* planet', () => {
-    const wreck = planetWreckSprite(2);
+  it('keeps the same coastlines as the world it was — you lose *that* station', () => {
+    const wreck = stationWreckSprite(2);
     const crust = wreck.shapes.filter((s) => s.path.kind === 'poly' && s.path.closed);
     expect(crust.length).toBeGreaterThanOrEqual(continentPolygons(2).length);
   });

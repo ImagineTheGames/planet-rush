@@ -5,7 +5,7 @@
  *
  * Two field reports, one accuracy contract:
  *   1. "Sometimes the ore held in ship indicator isn't accurate."
- *   2. "When depositing it shows a bunch of ore going into the planet and doesn't
+ *   2. "When depositing it shows a bunch of ore going into the station and doesn't
  *      represent actual amounts."
  *
  * The fix the reports demand — and what this spec locks — is that **every ore
@@ -117,7 +117,7 @@ test('ore readouts are exact projections of sim state, conserved across mine →
   // === 1. MINE — carry a hold away from home; the indicator is EXACT and stable ===
   const MINED = 4;
   const staged = await page.evaluate((ore) => window.__oreHudStage!.mine(ore), MINED);
-  expect(staged, 'the local ship and its planet were available to stage').not.toBeNull();
+  expect(staged, 'the local ship and its station were available to stage').not.toBeNull();
   expect(staged!.cargo, 'the hold was loaded with the mined ore').toBeCloseTo(MINED, 5);
   const bank0 = staged!.banked;
 
@@ -149,7 +149,7 @@ test('ore readouts are exact projections of sim state, conserved across mine →
   // === 2. DEPOSIT — park at home; hold drains, TOTAL rises, ore CONSERVED ===
   const DEP = 6;
   const docked = await page.evaluate((ore) => window.__oreHudStage!.dock(ore), DEP);
-  expect(docked, 'the ship re-parked at its own planet with the deposit hold').not.toBeNull();
+  expect(docked, 'the ship re-parked at its own station with the deposit hold').not.toBeNull();
   const bankBeforeDeposit = docked!.banked;
   // The conserved quantity for the whole rest of the run: hold + bank never changes.
   const CONSERVED = docked!.cargo + docked!.banked;
@@ -172,7 +172,7 @@ test('ore readouts are exact projections of sim state, conserved across mine →
   await page.screenshot({ path: 'tests/live-stage/ore-conservation-evidence.png' });
 
   // === 3. UNDOCK MID-DRAIN — the interrupt case (the likely bug) ===
-  // Yank the ship off its planet (mine() re-parks it far away without touching the
+  // Yank the ship off its station (mine() re-parks it far away without touching the
   // bank), stopping the transfer mid-flight. An indicator that ACCUMULATED deposit
   // deltas would keep ticking or freeze on a stale value here; a pure projection
   // simply holds on the exact ore still in the hold.
@@ -280,7 +280,7 @@ test('atmosphere drain flies exactly one courier per ore banked — and stops co
   const drain = await page.evaluate(async (hold) => {
     const s = window.__oreHudStage!;
     const d = window.__oreDepositStage!;
-    if (!s.dock(hold)) return null; // no local ship/planet to stage
+    if (!s.dock(hold)) return null; // no local ship/station to stage
     let spawned = 0;
     let prev = 0; // baseline BEFORE the first courier, so the first one is counted
     let maxConcurrent = 0;

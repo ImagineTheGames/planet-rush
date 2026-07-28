@@ -3,23 +3,23 @@
  * Engineer (field report v0.1.2; GDD §2.3, §2.5).
  *
  * The bug: "there's no way to deposit ore … it should fly from my ship to the
- * planet but it doesn't, it just stays on my ship." Mining filled the hold, but
+ * station but it doesn't, it just stays on my ship." Mining filled the hold, but
  * the only thing that emptied it into the safe banked total — the ore the Build
  * wheel actually spends — was an explicit BANK press a first-time player never
- * finds. The fix is a sim rule: while a ship is inside its own living planet's
+ * finds. The fix is a sim rule: while a ship is inside its own living station's
  * **atmosphere** (`DEPOSIT_RANGE`), its hold auto-transfers into the bank at
- * `DEPOSIT.drainRate`, and ore-flight couriers fly ship→planet to show it. Leave
+ * `DEPOSIT.drainRate`, and ore-flight couriers fly ship→station to show it. Leave
  * the atmosphere and the drain stops.
  *
- * Ratified p4 (developer): "You shouldn't need to touch your planet to deposit —
+ * Ratified p4 (developer): "You shouldn't need to touch your station to deposit —
  * just be in that atmosphere." The old rule gated deposit on docking *and*
  * parking (near-rest inside the tight `dockRange`); the new rule is purely
- * geometric — inside `DEPOSIT_RANGE`, at your own living planet, moving or not.
+ * geometric — inside `DEPOSIT_RANGE`, at your own living station, moving or not.
  *
  * These pins hold every half of that rule: the drain rate, that it starts the
  * tick the ship crosses into the atmosphere (moving, undocked, boundary exact)
  * and stops the tick it crosses out, that it empties the whole hold, that every
- * other gate (wrong planet, dead planet) still stops it, that the banked ore is
+ * other gate (wrong station, dead station) still stops it, that the banked ore is
  * then spendable, that the couriers are cosmetic (they never add or steal ore,
  * and are never tractored back), and that the whole thing is deterministic.
  */
@@ -29,14 +29,14 @@ import { ShipClass } from '@shared/types';
 import {
   DEPOSIT,
   DEPOSIT_RANGE,
-  PLANET,
+  STATION,
   TICK_DT,
   TURRET,
   createWorld,
   inAtmosphere,
   isDocked,
   placeOrder,
-  planetOf,
+  stationOf,
   step,
   type PlayerSpec,
   type Ship,
@@ -51,19 +51,19 @@ const PLAYERS: readonly PlayerSpec[] = [
 ];
 
 /** A fresh match with the local ship (slot 0) parked cleanly docked at its own
- *  planet with a full hold — outside the planet's collider so nothing nudges it,
+ *  station with a full hold — outside the station's collider so nothing nudges it,
  *  well inside `dockRange`, at rest. The exact opening the field report is about:
  *  home, full, and expecting the hold to empty. */
 function stagedAtHome(cargo?: number): { world: World; ship: Ship } {
   const world = createWorld({ seed: 7, players: PLAYERS });
   const ship = world.ships[0]!;
-  const planet = planetOf(world, 0)!;
-  // A clean docked spot: on the +x side of the planet, clear of its collider.
-  ship.pos = { x: planet.pos.x + (PLANET.radius + ship.radius + 30), y: planet.pos.y };
+  const station = stationOf(world, 0)!;
+  // A clean docked spot: on the +x side of the station, clear of its collider.
+  ship.pos = { x: station.pos.x + (STATION.radius + ship.radius + 30), y: station.pos.y };
   ship.vel = { x: 0, y: 0 };
   ship.cargo = cargo ?? ship.cargoCap;
   ship.banked = 0;
-  expect(isDocked(ship, planet)).toBe(true);
+  expect(isDocked(ship, station)).toBe(true);
   return { world, ship };
 }
 
@@ -75,7 +75,7 @@ function realOre(ship: Ship): number {
 
 // --- the drain -------------------------------------------------------------
 
-describe('auto-deposit while docked at your own planet', () => {
+describe('auto-deposit while docked at your own station', () => {
   it('drains the hold into the bank at the tunable rate', () => {
     const { world, ship } = stagedAtHome(2);
     const before = ship.cargo;
@@ -126,19 +126,19 @@ describe('auto-deposit while docked at your own planet', () => {
 describe('the drain runs on atmosphere presence alone', () => {
   it('does nothing outside the atmosphere, then starts the tick the ship crosses in', () => {
     const { world, ship } = stagedAtHome(2);
-    const planet = planetOf(world, 0)!;
+    const station = stationOf(world, 0)!;
     const total = realOre(ship);
 
     // Park just OUTSIDE the atmosphere — a hair past DEPOSIT_RANGE.
-    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE + 1, y: planet.pos.y };
-    expect(inAtmosphere(ship, planet)).toBe(false);
+    ship.pos = { x: station.pos.x + DEPOSIT_RANGE + 1, y: station.pos.y };
+    expect(inAtmosphere(ship, station)).toBe(false);
     step(world, []);
     expect(ship.cargo).toBe(total); // untouched: not in the atmosphere yet
     expect(ship.banked).toBe(0);
 
     // Cross the boundary; the very next tick drains.
-    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE - 1, y: planet.pos.y };
-    expect(inAtmosphere(ship, planet)).toBe(true);
+    ship.pos = { x: station.pos.x + DEPOSIT_RANGE - 1, y: station.pos.y };
+    expect(inAtmosphere(ship, station)).toBe(true);
     step(world, []);
     expect(ship.cargo).toBeCloseTo(total - DEPOSIT.drainRate * TICK_DT, 9);
     expect(realOre(ship)).toBeCloseTo(total, 9);
@@ -146,15 +146,15 @@ describe('the drain runs on atmosphere presence alone', () => {
 
   it('deposits while orbiting fast (no park gate) and past dock range (no dock gate)', () => {
     const { world, ship } = stagedAtHome(2);
-    const planet = planetOf(world, 0)!;
+    const station = stationOf(world, 0)!;
     const before = ship.cargo;
 
     // In the atmosphere but OUTSIDE dockRange, and moving well above the old
     // parkSpeed — the two gates the ratified rule retired.
-    ship.pos = { x: planet.pos.x + (PLANET.dockRange + DEPOSIT_RANGE) / 2, y: planet.pos.y };
+    ship.pos = { x: station.pos.x + (STATION.dockRange + DEPOSIT_RANGE) / 2, y: station.pos.y };
     ship.vel = { x: 0, y: 200 };
-    expect(isDocked(ship, planet)).toBe(false);
-    expect(inAtmosphere(ship, planet)).toBe(true);
+    expect(isDocked(ship, station)).toBe(false);
+    expect(inAtmosphere(ship, station)).toBe(true);
 
     step(world, []);
     expect(ship.cargo).toBeLessThan(before); // drained despite undocked + moving
@@ -162,11 +162,11 @@ describe('the drain runs on atmosphere presence alone', () => {
 
   it('treats the exact boundary as inside (≤ DEPOSIT_RANGE)', () => {
     const { world, ship } = stagedAtHome(2);
-    const planet = planetOf(world, 0)!;
+    const station = stationOf(world, 0)!;
     const before = ship.cargo;
 
-    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE, y: planet.pos.y };
-    expect(inAtmosphere(ship, planet)).toBe(true);
+    ship.pos = { x: station.pos.x + DEPOSIT_RANGE, y: station.pos.y };
+    expect(inAtmosphere(ship, station)).toBe(true);
 
     step(world, []);
     expect(ship.cargo).toBeCloseTo(before - DEPOSIT.drainRate * TICK_DT, 9);
@@ -178,7 +178,7 @@ describe('the drain runs on atmosphere presence alone', () => {
 describe('the drain is interruptible', () => {
   it('stops the moment the ship leaves the atmosphere', () => {
     const { world, ship } = stagedAtHome(2);
-    const planet = planetOf(world, 0)!;
+    const station = stationOf(world, 0)!;
 
     step(world, []); // drain a little
     const banked = ship.banked;
@@ -186,35 +186,35 @@ describe('the drain is interruptible', () => {
     expect(cargo).toBeLessThan(2);
 
     // Fly the ship a full ring away — well outside the atmosphere.
-    ship.pos = { x: planet.pos.x + DEPOSIT_RANGE * 2, y: planet.pos.y };
-    expect(inAtmosphere(ship, planet)).toBe(false);
+    ship.pos = { x: station.pos.x + DEPOSIT_RANGE * 2, y: station.pos.y };
+    expect(inAtmosphere(ship, station)).toBe(false);
 
     for (let i = 0; i < 60; i++) step(world, []);
     expect(ship.cargo).toBeCloseTo(cargo, 9); // hold frozen where it was
     expect(ship.banked).toBeCloseTo(banked, 9);
   });
 
-  it('does not deposit at a planet that is not your own', () => {
+  it('does not deposit at a station that is not your own', () => {
     const world = createWorld({ seed: 7, players: PLAYERS });
     const ship = world.ships[0]!;
-    const rival = planetOf(world, 1)!;
-    // Park slot 0 docked at slot 1's planet, holding ore.
-    ship.pos = { x: rival.pos.x + (PLANET.radius + ship.radius + 30), y: rival.pos.y };
+    const rival = stationOf(world, 1)!;
+    // Park slot 0 docked at slot 1's station, holding ore.
+    ship.pos = { x: rival.pos.x + (STATION.radius + ship.radius + 30), y: rival.pos.y };
     ship.vel = { x: 0, y: 0 };
     ship.cargo = 2;
     ship.banked = 0;
     expect(isDocked(ship, rival)).toBe(true);
 
     for (let i = 0; i < 120; i++) step(world, []);
-    // Not their planet ⇒ nothing banks; the hold is untouched.
+    // Not their station ⇒ nothing banks; the hold is untouched.
     expect(ship.cargo).toBe(2);
     expect(ship.banked).toBe(0);
   });
 
-  it('does not deposit once the home planet is dead', () => {
+  it('does not deposit once the home station is dead', () => {
     const { world, ship } = stagedAtHome(2);
-    const planet = planetOf(world, 0)!;
-    planet.alive = false; // wreck — no bank behind it
+    const station = stationOf(world, 0)!;
+    station.alive = false; // wreck — no bank behind it
     for (let i = 0; i < 120; i++) step(world, []);
     expect(ship.cargo).toBe(2);
     expect(ship.banked).toBe(0);
@@ -246,9 +246,9 @@ describe('deposited ore funds the Build wheel', () => {
 // --- the ore-flight couriers ----------------------------------------------
 
 describe('ore-flight couriers', () => {
-  it('spawns exactly one courier per whole unit banked, each headed for the planet (conserved)', () => {
+  it('spawns exactly one courier per whole unit banked, each headed for the station (conserved)', () => {
     const { world, ship } = stagedAtHome(3);
-    const planet = planetOf(world, 0)!;
+    const station = stationOf(world, 0)!;
     const held = ship.cargo; // three whole ore to deposit
 
     // Couriers are absorbed mid-drain, so count DISTINCT spawns by id (the live
@@ -257,18 +257,18 @@ describe('ore-flight couriers', () => {
     // rate-based time cadence that spawned ~3 couriers per ore ("more ore flying
     // than you hold"). The spawner is now keyed to the hold's integer boundaries.
     const seen = new Set<number>();
-    let firstHeadingTowardPlanet = 0;
+    let firstHeadingTowardStation = 0;
     for (let i = 0; i < 300; i++) {
       step(world, []);
       for (const c of world.chunks) {
         if (!c.deposit || seen.has(c.id)) continue;
         seen.add(c.id);
-        // Every courier is a straight line into this planet's centre.
-        expect(c.homeTo).toEqual({ x: planet.pos.x, y: planet.pos.y });
+        // Every courier is a straight line into this station's centre.
+        expect(c.homeTo).toEqual({ x: station.pos.x, y: station.pos.y });
         if (seen.size === 1) {
-          // A courier starts at the hull and heads inward toward the planet centre.
-          firstHeadingTowardPlanet =
-            (planet.pos.x - ship.pos.x) * c.vel.x + (planet.pos.y - ship.pos.y) * c.vel.y;
+          // A courier starts at the hull and heads inward toward the station centre.
+          firstHeadingTowardStation =
+            (station.pos.x - ship.pos.x) * c.vel.x + (station.pos.y - ship.pos.y) * c.vel.y;
         }
       }
     }
@@ -276,10 +276,10 @@ describe('ore-flight couriers', () => {
     expect(ship.cargo).toBe(0);
     // Exactly one courier per whole ore banked — off-by-anything is visible here.
     expect(seen.size).toBe(held);
-    expect(firstHeadingTowardPlanet).toBeGreaterThan(0);
+    expect(firstHeadingTowardStation).toBeGreaterThan(0);
   });
 
-  it('couriers are absorbed at the planet and swept — none outlive the drain', () => {
+  it('couriers are absorbed at the station and swept — none outlive the drain', () => {
     const { world } = stagedAtHome(2);
     // Drain (~1 s) plus flight time (a short hop) plus generous idle.
     for (let i = 0; i < 300; i++) step(world, []);
@@ -294,8 +294,8 @@ describe('determinism', () => {
     const build = (): World => {
       const world = createWorld({ seed: 42, players: PLAYERS });
       const ship = world.ships[0]!;
-      const planet = planetOf(world, 0)!;
-      ship.pos = { x: planet.pos.x + (PLANET.radius + ship.radius + 30), y: planet.pos.y };
+      const station = stationOf(world, 0)!;
+      ship.pos = { x: station.pos.x + (STATION.radius + ship.radius + 30), y: station.pos.y };
       ship.vel = { x: 0, y: 0 };
       ship.cargo = ship.cargoCap;
       ship.banked = 0;

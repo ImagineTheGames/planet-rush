@@ -10,7 +10,7 @@
  *
  * The rule these pins hold: there is exactly ONE hold pool, `Ship.cargo`.
  * Whatever chipped a chunk loose — an asteroid, a ship's death, a wrecked
- * planet — the moment it lands in the hold it is ore, indistinguishable from
+ * station — the moment it lands in the hold it is ore, indistinguishable from
  * any other ore, and it deposits 1:1 into the bank like any other ore. Loot is
  * not a second counter; it is the same counter.
  *
@@ -28,9 +28,9 @@ import {
   DEATH_ORE_DROP_FRACTION,
   DEPOSIT_RANGE,
   createWorld,
-  damagePlanet,
+  damageStation,
   killShip,
-  planetOf,
+  stationOf,
   step,
   type OreChunk,
   type PlayerSpec,
@@ -80,9 +80,9 @@ function deathDrop(botCargo: number): {
   return { world, collector, drops, dropped };
 }
 
-/** Fly `ship` into its own planet's atmosphere and hold it there. */
+/** Fly `ship` into its own station's atmosphere and hold it there. */
 function parkInHomeAtmosphere(world: World, ship: Ship): void {
-  const home = planetOf(world, ship.id)!;
+  const home = stationOf(world, ship.id)!;
   ship.pos = { x: home.pos.x + DEPOSIT_RANGE - 1, y: home.pos.y };
   ship.vel = { x: 0, y: 0 };
 }
@@ -159,26 +159,26 @@ describe('death-drop loot is ore the moment it enters the hold', () => {
 // --- wreck loot (d5) is the same ore ---------------------------------------
 
 describe('wreck loot deposits exactly like mined ore (d5)', () => {
-  /** Kill slot 1's core so its planet becomes a wreck ringed with scavengeable
+  /** Kill slot 1's core so its station becomes a wreck ringed with scavengeable
    *  debris (GDD §2.7), and drop our collector into that ring, empty-handed. */
   function wreckDrop(): { world: World; collector: Ship; loot: number } {
     const world = createWorld({ seed: 7, players: PLAYERS });
-    const victimPlanet = planetOf(world, 1)!;
+    const victimStation = stationOf(world, 1)!;
     // Strip its defences to the core, drop its match-start protection, and take
     // it to zero in one blow — it wrecks and pays out its debris synchronously.
-    victimPlanet.shields = [];
-    victimPlanet.turrets = [];
-    victimPlanet.builds = [];
-    victimPlanet.spawnProtect = 0;
-    victimPlanet.coreHp = 3;
-    damagePlanet(world, victimPlanet, victimPlanet.coreHp);
-    expect(victimPlanet.alive).toBe(false);
+    victimStation.shields = [];
+    victimStation.turrets = [];
+    victimStation.builds = [];
+    victimStation.spawnProtect = 0;
+    victimStation.coreHp = 3;
+    damageStation(world, victimStation, victimStation.coreHp);
+    expect(victimStation.alive).toBe(false);
 
     const loot = looseOre(world);
     expect(loot).toBeGreaterThan(0);
 
     const collector = world.ships[0]!;
-    collector.pos = { x: victimPlanet.pos.x, y: victimPlanet.pos.y };
+    collector.pos = { x: victimStation.pos.x, y: victimStation.pos.y };
     collector.vel = { x: 0, y: 0 };
     collector.cargo = 0;
     collector.banked = 0;

@@ -53,12 +53,12 @@ import { selector, when } from './tree';
 /**
  * Over-defence, priced. Three turrets and a shield come before anything that
  * makes the *ship* better, which is why an Easy bot is hard to kill at home and
- * harmless anywhere else (GDD §2.6: "an undefended planet falls to a determined
- * siege; a defended planet is nearly uncrackable one-on-one").
+ * harmless anywhere else (GDD §2.6: "an undefended station falls to a determined
+ * siege; a defended station is nearly uncrackable one-on-one").
  */
 export function easySpendPlan(ctx: BotCtx): Purchase | null {
-  const planet = ctx.self.planet;
-  if (!planet) return null;
+  const station = ctx.self.station;
+  if (!station) return null;
   const spendable = ctx.self.spendable;
 
   // Patch the core when nothing is hitting it — a besieged core cannot be
@@ -68,9 +68,9 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   // p5-repair-discrete). Rusty (caution 1.3) patches early; Bolt (0.5) rarely.
   if (
     !ctx.view.collapsed &&
-    !planet.repairing &&
-    !planet.underAttack &&
-    planet.coreHp < planet.maxCoreHp * repairTargetFraction(ctx, EASY_REPAIR_AT) &&
+    !station.repairing &&
+    !station.underAttack &&
+    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, EASY_REPAIR_AT) &&
     spendable >= 1
   ) {
     return order('repair');
@@ -78,8 +78,8 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
 
   // Guns, then the bubble. Jobs in progress count against the target so a bot
   // does not queue four turrets in four consecutive decisions.
-  if (planet.turrets + planet.builds < EASY_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
-  if (planet.shields + planet.builds < EASY_SHIELD_TARGET && spendable >= SHIELD.cost) return order('shield');
+  if (station.turrets + station.builds < EASY_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
+  if (station.shields + station.builds < EASY_SHIELD_TARGET && spendable >= SHIELD.cost) return order('shield');
 
   // Held ore is not safe ore (GDD §2.3). Bank before flying out again.
   if (ctx.self.cargo > 1e-9) return order('bank');
@@ -130,8 +130,8 @@ export const easyTree: Node = selector('easy', [
   when(
     'defend',
     (ctx) => {
-      const planet = ctx.self.planet;
-      return planet !== null && planet.alive && (planet.underAttack || homeIntruder(ctx) !== null);
+      const station = ctx.self.station;
+      return station !== null && station.alive && (station.underAttack || homeIntruder(ctx) !== null);
     },
     (ctx) => defendHome(ctx),
   ),

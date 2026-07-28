@@ -7,7 +7,7 @@
  * pure sibling and unit-tests headless.
  *
  * **Low-frequency redraw (GDD §4.3 — field request "every N ticks … never
- * per-frame").** The heavy content — planets, enemy ships, ore hints, the collapse
+ * per-frame").** The heavy content — stations, enemy ships, ore hints, the collapse
  * ring — is re-tessellated into its `content` Graphics only every
  * {@link MINIMAP_REDRAW_TICKS} ticks (or when the rect/state changes), so a static
  * scene rebuilds ~10×/s, not 60. The **local ship's own dot** is the one
@@ -29,7 +29,7 @@
  * them into logical space itself (`physicalBoundsToLogical` in main.ts).
  *
  * Palette (style-guide §1/§2): a near-vacuum backdrop with a steel border; owner
- * colours on the dots (the roster resolver [[planet-hp]] shares); signal yellow —
+ * colours on the dots (the roster resolver [[station-hp]] shares); signal yellow —
  * the RESERVED ore colour — only on the faint ore hints, which *are* ore; threat
  * red only on the collapse ring, the match's danger state.
  */
@@ -37,7 +37,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 import {
   fitBounds,
   mapPoint,
@@ -87,7 +87,7 @@ export interface DrawnMinimap {
    *  the test moves the ship and asserts this moved across two frames. */
   ownDot: { x: number; y: number } | null;
   /** Counts of the content dots that drew — a cheap "the map is populated" check. */
-  planetCount: number;
+  stationCount: number;
   shipCount: number;
   oreCount: number;
   /** Whether the collapse ring drew this frame (GDD §2.3). */
@@ -99,7 +99,7 @@ export class MinimapView extends Container {
   private readonly frameG = new Graphics();
   /** Everything clipped to the rect (throttled content + the per-frame own dot). */
   private readonly clip = new Container();
-  /** The throttled, cached map content (planets, enemy ships, ore, ring). */
+  /** The throttled, cached map content (stations, enemy ships, ore, ring). */
   private readonly content = new Graphics();
   /** The local ship's dot — redrawn every frame so it tracks motion. */
   private readonly ownDotG = new Graphics();
@@ -119,7 +119,7 @@ export class MinimapView extends Container {
     expanded: false,
     rect: { x: 0, y: 0, width: 0, height: 0 },
     ownDot: null,
-    planetCount: 0,
+    stationCount: 0,
     shipCount: 0,
     oreCount: 0,
     collapseRing: false,
@@ -245,8 +245,8 @@ export class MinimapView extends Container {
       });
     }
 
-    // Planets, then enemy ships over them.
-    for (const p of scene.planetDots) g.circle(p.x, p.y, p.radius).fill({ color: p.color, alpha: p.alpha });
+    // Stations, then enemy ships over them.
+    for (const p of scene.stationDots) g.circle(p.x, p.y, p.radius).fill({ color: p.color, alpha: p.alpha });
     for (const s of scene.shipDots) g.circle(s.x, s.y, s.radius).fill({ color: s.color, alpha: s.alpha });
 
     // NO offscreen texture cache. The field request's "cache to an offscreen
@@ -283,7 +283,7 @@ export class MinimapView extends Container {
       expanded: this.drawn.expanded,
       rect: { ...this.drawn.rect },
       ownDot: this.drawn.ownDot ? { ...this.drawn.ownDot } : null,
-      planetCount: this.drawn.planetCount,
+      stationCount: this.drawn.stationCount,
       shipCount: this.drawn.shipCount,
       oreCount: this.drawn.oreCount,
       collapseRing: this.drawn.collapseRing,
@@ -303,7 +303,7 @@ export class MinimapView extends Container {
     d.rect.width = rect.width;
     d.rect.height = rect.height;
     d.ownDot = ownDot;
-    d.planetCount = (frame.planets ?? []).length;
+    d.stationCount = (frame.stations ?? []).length;
     d.shipCount = (frame.ships ?? []).filter((s) => s.alive && !s.local).length;
     d.oreCount = (frame.oreHints ?? []).length;
     d.collapseRing = !!frame.collapse;

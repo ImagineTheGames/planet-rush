@@ -6,13 +6,13 @@
  * `Action`s here before it crosses into the sim — the sim never sees a device
  * (GDD §2.4).
  *
- * **M2 (GDD §4.6): this boots a real match, not a sandbox.** Eight planets in a
+ * **M2 (GDD §4.6): this boots a real match, not a sandbox.** Eight stations in a
  * ring, the local player owning slot 0's home and do-nothing bots (`src/bots`)
  * filing input for the other seven through the same ordered-input protocol a
  * human uses; the wave metronome, the collapse phase and win/loss running off
- * `world.match`; the Build & Upgrade wheel opening at your own planet and
+ * `world.match`; the Build & Upgrade wheel opening at your own station and
  * spending through the sim's own `buildOrder` / `upgradeOrder`; the under-attack
- * alarm and the own-planet HP bar fed from the real core, shields and turrets.
+ * alarm and the own-station HP bar fed from the real core, shields and turrets.
  *
  * Everything below is *wiring*. Every decision it feeds on belongs to the module
  * that owns it: the sim answers "am I docked" (`isDocked`) and "has the field
@@ -27,22 +27,22 @@ import {
   WEAPON_RANGE,
   TRACTOR_PICKUP_RADIUS,
   muzzleFlashes,
-  damagePlanet,
+  damageStation,
   damageShip,
   killShip,
   destroyCore,
   isCollapsed,
   isDocked,
   isOver,
-  planetOf,
+  stationOf,
   shieldCount,
   shieldPool,
   turretCount,
 } from './sim';
-import type { MuzzleFlash, Planet, Turret, World } from './sim';
+import type { MuzzleFlash, MiningStation, Turret, World } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
-import { buyUpgrade } from './sim/buildings';
+import { buyUpgrade, turretTier } from './sim/buildings';
 import { bootOfflineMatch } from '@platform/match-boot';
 import type { MatchBoot } from '@platform/match-boot';
 import {
@@ -85,7 +85,7 @@ import {
   rectContains,
 } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
-import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
+import { advanceToFreezeTick, hashWorld, stampDefenseShowcase, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
@@ -121,7 +121,7 @@ import {
   MAIN_MENU_ITEMS,
   mapIdAt,
   normalizeMapId,
-  registryPlanets,
+  registryStations,
   VETERAN_MAP_ID,
   MAP_ORDER,
   MAP_STORAGE_KEY,
@@ -147,12 +147,21 @@ import {
   CLASS_ORDER,
   normalizePlayerName,
   MINIMAP_TOGGLE_KEY,
+  PauseMenuView,
+  pauseMenuModel,
+  pauseButtons,
+  pauseButtonRect,
+  pauseButtonVisible,
+  pauseLayout,
+  nextPauseScreen,
+  isPauseOpen,
+  shouldFreezeSim,
 } from './ui';
 import type {
   HudFrame,
   Combatant,
   DifficultyTable,
-  MinimapPlanet,
+  MinimapStation,
   MinimapShip,
   Nameable,
   NameTable,
@@ -163,6 +172,9 @@ import type {
   MatchOutcome,
   DeathCause,
   LobbyState,
+  PauseScreen,
+  PauseButton,
+  UiCue,
 } from './ui';
 import { OFFLINE_ROOM } from './net';
 import { personality } from './bots';
@@ -193,10 +205,10 @@ const CONTROL_SCHEME_KEY = 'planet-rush:controlScheme';
 /** The two control schemes (developer ratification §3). Sticks is default. */
 type ControlScheme = 'sticks' | 'tap';
 /** Surface-gap standoff (world units) the Tap Commander pilot holds a fly-to at
- *  its OWN planet — the "fly to atmosphere" order (developer §2). Sits the ship in
- *  its home's atmosphere, near docking range (PLANET.dockRange), without slamming
+ *  its OWN station — the "fly to atmosphere" order (developer §2). Sits the ship in
+ *  its home's atmosphere, near docking range (STATION.dockRange), without slamming
  *  the core. TUNABLE feel value; not a sim constant. */
-const PLANET_STANDOFF = 60;
+const STATION_STANDOFF = 60;
 /** The Tap Commander order markers (developer §4) — the waypoint marker and the
  *  lock-on reticle. The UI seam (p6-02) owns the DRAWN visual; the Platform lane
  *  owns the state and this registered layout contract: a stable id + anchor + the
@@ -217,7 +229,7 @@ const TAP_RETICLE_PAD = 20;
 const SHIP_CLASS_KEY = 'planet-rush:shipClass';
 /** Where the local player's name is remembered (field request v0.2.1) — the same
  *  storage seam as the hull and fire mode, so a returning player finds their
- *  callsign over their ship and planet. */
+ *  callsign over their ship and station. */
 const PLAYER_NAME_KEY = 'planet-rush:playerName';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
@@ -422,7 +434,7 @@ async function boot(): Promise<void> {
     ? await lobby.untilRush()
     : { shipClass: readShipClass(platform), mapId: readMapId(platform), name: readPlayerName(platform) };
   const chosenShipClass = chosen.shipClass;
-  // The name shown over the local ship and planet (field request v0.2.1) — the
+  // The name shown over the local ship and station (field request v0.2.1) — the
   // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
   const chosenName = normalizePlayerName(chosen.name);
   // Persist all three picks so a returning player finds them pre-selected (GDD
@@ -433,7 +445,7 @@ async function boot(): Promise<void> {
     platform.storage.set(PLAYER_NAME_KEY, chosenName);
   }
 
-  // --- The match. Eight slots, eight planets (GDD §2.1): this client flies one
+  // --- The match. Eight slots, eight stations (GDD §2.1): this client flies one
   //     and the seven empty seats are filled by the cast (`src/bots`), each
   //     bringing its character's hull. The bots are an *action source*, not a
   //     special kind of player — they file input through the same ordered queue
@@ -486,14 +498,14 @@ async function boot(): Promise<void> {
   });
   // Hand the lobby seam the hull AND the arena the sim ACTUALLY built, read back
   // off the world itself — the hull off the local ship, the arena off the world's
-  // own home-planet positions. This is the proof BOTH lobby picks reached the sim
+  // own home-station positions. This is the proof BOTH lobby picks reached the sim
   // (GDD §2.11 "the ship you fly IS the hull you picked"; p2 "the booted world
-  // matches that registry entry" — the live-stage spec compares these planets to
+  // matches that registry entry" — the live-stage spec compares these stations to
   // the bundled registry). A no-op under ?debug=1, where there was no lobby.
   lobby?.matchStarted(
     world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass,
     chosenMapId,
-    world.planets.map((p) => ({ x: p.pos.x, y: p.pos.y })),
+    world.stations.map((p) => ({ x: p.pos.x, y: p.pos.y })),
   );
 
   // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
@@ -546,19 +558,40 @@ async function boot(): Promise<void> {
         if (ship) damageShip(world, ship, amount);
       },
       damageCore(player: PlayerId, amount: number): void {
-        const planet = planetOf(world, player);
-        if (planet) damagePlanet(world, planet, amount);
+        const station = stationOf(world, player);
+        if (station) damageStation(world, station, amount);
       },
       coreHp(player: PlayerId): number | null {
-        const planet = planetOf(world, player);
-        return planet ? planet.coreHp : null;
+        const station = stationOf(world, player);
+        return station ? station.coreHp : null;
       },
     });
   }
 
   // --- HUD overlay: screen-space, added after the world root so it draws on top
   //     of the render layer in the same canvas (ui/hud.ts owns the layout).
-  const hud = new Hud(transform.logicalWidth, transform.logicalHeight);
+  // The UI sound seam (field report v0.2.4+): the HUD's one shared press/confirm
+  // driver names an event — press, confirm, reject — and the audio engine decides
+  // the sound, the SFX-slider gain and the death-hush ducking (`art/audio` cue()).
+  // So every wheel/menu control is heard from the same state that draws its tell,
+  // and a disabled press gets the buzzer main.ts alone could never fire (it does
+  // not know a wedge's `ready` state — the HUD does).
+  //
+  // Under ?debug=1 the seam also tallies the cue KIND, which `__audioStage` reads
+  // back so a live-stage test can attribute a sound to the exact interaction
+  // (a live wedge → press, a disabled one → reject, a landed spend → confirm) —
+  // proof the RIGHT sound fired, not just that the one-shot count moved. Zero-cost
+  // (null) in a normal build.
+  const uiSfxLog: { press: number; confirm: number; reject: number; last: UiCue | null } | null = flags.debug
+    ? { press: 0, confirm: 0, reject: 0, last: null }
+    : null;
+  const hud = new Hud(transform.logicalWidth, transform.logicalHeight, (cue) => {
+    if (uiSfxLog) {
+      uiSfxLog[cue]++;
+      uiSfxLog.last = cue;
+    }
+    audio.cue(cue);
+  });
   gameRoot.addChild(hud);
 
   // --- Health-bar live-stage seam (?debug=1 only). The enemy over-ship health
@@ -588,6 +621,7 @@ async function boot(): Promise<void> {
     installTapMarkerStage();
     installMinimapStage();
     installAudioStage();
+    installPauseStage();
   }
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
@@ -653,6 +687,32 @@ async function boot(): Promise<void> {
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
+
+  // --- Pause menu (developer ratification, p10) ------------------------------
+  //     ESC (desktop) or a touch corner button opens an overlay over a match in
+  //     progress: RESUME / SETTINGS / EXIT TO MENU — EXIT behind a "Leave the
+  //     match?" confirm so one stray tap can never kill a match. The overlay is
+  //     ignorant of HOW a match pauses: `pausable` is the transport's flag —
+  //     offline (this in-process LocalLoopback) the sim FREEZES while it is up
+  //     (the loop below skips its tick and resumes seamlessly); online (m9) it
+  //     shows over a running sim. The whole distinction lives in `shouldFreezeSim`;
+  //     the flag path is built now, offline `true`, so the networked-`false`
+  //     branch is testable before that transport exists (developer §2). Topmost,
+  //     so it draws over the live match and HUD; its visibility is driven by
+  //     `syncPause()` each frame.
+  const pausable = true;
+  let pauseScreen: PauseScreen = 'closed';
+  // The match's live settings, so the pause SETTINGS screen shows and changes the
+  // real values mid-match (reduce-VFX floors the auto-reducer, the volumes drive
+  // the mixer). Seeded to the same DEFAULT_VOLUMES the audio engine booted with.
+  let matchSettings = createSettings();
+  const pauseView = new PauseMenuView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  gameRoot.addChild(pauseView);
+  // The pause SETTINGS screen reuses the real settings view (one settings UI, not
+  // two), shown in the overlay's place while `pauseScreen === 'settings'`.
+  const pauseSettings = new SettingsView(transform.logicalWidth, transform.logicalHeight, isTouch);
+  pauseSettings.visible = false;
+  gameRoot.addChild(pauseSettings);
 
   const merged = createControlState();
   const sources: { source: InputSource; state: ControlState; device: DeviceKind }[] = [
@@ -735,7 +795,7 @@ async function boot(): Promise<void> {
   //     the wheel *says* is `src/ui`'s; what a press *lands on* is here.
   const buildWheel = new WheelInput();
   /** The sim's own docking answer, refreshed each input tick. Read by the touch
-   *  BUILD button (which exists only at your own planet) and the HUD. */
+   *  BUILD button (which exists only at your own station) and the HUD. */
   let docked = false;
   /** Whether the open-build-wheel button is on screen this frame — the UI's own
    *  persistence rule (`buildButtonVisible`, src/ui/build-button.ts): docked, on
@@ -832,6 +892,31 @@ async function boot(): Promise<void> {
     pressPoint.x = lp.x;
     pressPoint.y = lp.y;
 
+    // The pause overlay (developer p10) owns the whole screen while it's up, like
+    // the end overlay: a tap lands on a pause control or on nothing, but never
+    // falls through to the frozen match under it. First refusal, always consumes.
+    if (isPauseOpen(pauseScreen)) {
+      handlePausePointer(lp.x, lp.y);
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
+    // The touch corner pause button — the ESC-equivalent on a device with no
+    // keyboard. On screen only while the match owns it (`pauseAvailable`), so a tap
+    // can only land on a button that is actually there. Opens the overlay.
+    if (isTouch && pauseButtonVisible({ isTouch, available: pauseAvailable() })) {
+      const pb = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+      if (inRect(pressPoint, pb)) {
+        haptics.haptic('tap');
+        audio.cue('press');
+        pauseScreen = nextPauseScreen(pauseScreen, 'toggle');
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
+    }
+
     // The end-of-match / DEFEATED overlay owns the whole screen while it's up: a
     // tap either lands on REMATCH / SPECTATE / BACK TO MENU or on nothing, but it
     // NEVER falls through to fly a dead ship or open the wheel. First refusal,
@@ -862,7 +947,7 @@ async function boot(): Promise<void> {
     }
 
     // The touch BUILD button — the E-equivalent, on screen only at your own
-    // planet (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
+    // station (GDD §2.4). Toggles the wheel exactly as E and Y do. The hit target
     // comes from the same `buildVisible` that draws it, so a tap can only land on
     // a button that is actually there.
     const build = buildButtonRect(isTouch, buildVisible, w, h);
@@ -895,6 +980,11 @@ async function boot(): Promise<void> {
       upgradeWheelLayout.segments = upgradeSlots.length;
 
       const hit = hitWheel(pressPoint.x, pressPoint.y, upgradeWheelLayout);
+      // A wedge sounds itself through the HUD's shared driver (`pressWheelSegment`
+      // → the sfx seam): a live wedge ticks, a disabled one buzzes — matched to
+      // its own drawn state. Only the BACK/dismiss tap (hub or off-wheel) needs a
+      // press tick fired here, so track whether a wedge already sounded.
+      let wedgeSounded = false;
       if (hit.kind === 'outside' || hit.kind === 'hub') {
         // The hub is the BACK affordance (field report v0.2.4), and a tap off the
         // wheel dismisses too — both pop exactly ONE level: WEAPON sub-wheel →
@@ -908,17 +998,19 @@ async function boot(): Promise<void> {
           // close the upgrade wheel back to the Build wheel (field report v0.2.2).
           weaponWheelOpen = true;
           hud.pressWheelSegment('upgrade', hit.index);
+          wedgeSounded = true;
         } else if (slot?.kind === 'track') {
           // Latch the pressed track; `updateBuildWheel` drains it into the funnel
           // as an `upgradeOrder` on the next tick, exactly like a Build segment.
           pendingUpgrade = slot.track;
           hud.pressWheelSegment('upgrade', hit.index);
+          wedgeSounded = true;
         }
       }
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
       haptics.haptic('tap');
-      audio.cue('press'); // a wedge on the OPEN upgrade wheel was pressed
+      if (!wedgeSounded) audio.cue('press'); // the BACK/dismiss tick (a wedge sounded itself)
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -928,6 +1020,7 @@ async function boot(): Promise<void> {
     // tell the HUD which Build-wheel wedge the finger landed on, so it flashes the
     // pressed (scale + glow) or rejected (shake + red flash) visual. The HUD
     // decides which from the wedge's own drawn state.
+    let buildWedgeSounded = false;
     if (buildWheel.open && !buildWheel.panelOpen) {
       const wheelHit = hitWheel(pressPoint.x, pressPoint.y, buildWheelLayout);
       if (wheelHit.kind === 'hub') {
@@ -940,12 +1033,17 @@ async function boot(): Promise<void> {
         e.preventDefault();
         return;
       }
-      if (wheelHit.kind === 'segment') hud.pressWheelSegment('build', wheelHit.index);
+      // A Build wedge sounds itself through the HUD's shared driver (press tick,
+      // or the buzzer if it is disabled) — so a press here does not also cue one.
+      if (wheelHit.kind === 'segment') {
+        hud.pressWheelSegment('build', wheelHit.index);
+        buildWedgeSounded = true;
+      }
     }
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
-      audio.cue('press'); // …and its audible twin (the wheel/menu tick, engine.ts)
+      if (!buildWedgeSounded) audio.cue('press'); // …and its audible twin, unless the wedge sounded itself
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -969,19 +1067,42 @@ async function boot(): Promise<void> {
       return;
     }
 
-    // --- Tap Commander (developer §1–2): a primary tap no affordance claimed places
-    //     the ship's next order. Empty space → move there; an entity → LOCK it —
-    //     attack a rival ship / turret / core, mine an asteroid ("a rock is just a
-    //     target"), or fly to your own planet's atmosphere. `pressPoint` is already
-    //     un-rotated into logical space (the landscape lock); project it back to
-    //     WORLD space through the live camera and hit-test the world. Consumes the
-    //     event so the same tap never also engages a stick under it. A no-op in the
-    //     default 'sticks' scheme, so that path is byte-for-byte unchanged.
+    // --- Tap Commander (developer §1–2, p10): a primary tap no affordance claimed
+    //     places the ship's next order — OR opens the build wheel. Empty space → move
+    //     there; a rival ship / turret / core or an asteroid → LOCK it ("a rock is
+    //     just a target"); YOUR OWN STATION within build range → open the Build wheel
+    //     (developer p10 §1), and too far → a plain move toward it (a second tap when
+    //     close opens). `pressPoint` is already un-rotated into logical space (the
+    //     landscape lock); project it back to WORLD space through the live camera and
+    //     hit-test the world. The pilot is the one place these semantics live
+    //     ({@link TapPilot.resolveTap}) — it applies the move/lock to its own order and
+    //     hands back the wheel intent, which is carried out here. Consumes the event so
+    //     the same tap never also engages a stick under it. A no-op in the default
+    //     'sticks' scheme, so that path is byte-for-byte unchanged.
+    //
+    //     The open wheel claims its own taps FIRST (its `press` closes on an outside
+    //     tap, its wedges consume inside ones — the returns above), so a tap reaching
+    //     here has the wheel closed; `inBuildRange` is the SAME `docked` answer the
+    //     wheel gates on, reused rather than re-derived (developer p10 §1).
     if (controlScheme === 'tap' && e.button === 0) {
       logicalToWorld(pressPoint, worldTapPoint);
       const hit = pickTapTarget(buildTapCandidates(), worldTapPoint);
-      if (hit) tapPilot.lockTarget({ kind: hit.kind, id: hit.id });
-      else tapPilot.orderMove({ x: worldTapPoint.x, y: worldTapPoint.y });
+      const cmd = tapPilot.resolveTap(hit, worldTapPoint, {
+        wheelOpen: buildWheel.open,
+        insideWheel: false,
+        inBuildRange: docked,
+      });
+      if (cmd.kind === 'openWheel') {
+        // Tap your station in build range → open the same wheel E / Y / BUILD open.
+        if (!buildWheel.open) buildWheel.toggle();
+        audio.cue('press'); // the wheel came up — a press tick, like the BUILD button
+      } else if (cmd.kind === 'closeWheel') {
+        // Defensive: the wheel's own `press` already closes on an outside tap before
+        // this block, so this only fires if that path is ever bypassed — pop one
+        // level the wheel family's own way, never a re-derived close.
+        wheelBackOneLevel();
+      }
+      // move / lock: the pilot has already taken the order; passThrough: nothing.
       haptics.haptic('tap');
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -1016,7 +1137,7 @@ async function boot(): Promise<void> {
 
   // --- Name-label feed (field request v0.2.1): the per-slot name table and a
   //     reused pool of mutable label-bearing entities `feedNameplates()` fills
-  //     each render, so labelling every ship + owned planet allocates nothing
+  //     each render, so labelling every ship + owned station allocates nothing
   //     after warm-up (GDD §4.3). The table is (re)built from the match's own
   //     seated cast each boot — local name + each bot's personality name.
   const nameablePool: MutNameable[] = [];
@@ -1025,13 +1146,13 @@ async function boot(): Promise<void> {
   let playerDifficulties: DifficultyTable = [];
 
   // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
-  //     planets, ships, ore-field hints, the collapse ring — pooled and reused so
+  //     stations, ships, ore-field hints, the collapse ring — pooled and reused so
   //     the corner map allocates nothing after warm-up (GDD §4.3). The minimap
   //     does its own fit (map → rect), so unlike the bars/labels this feed is NOT
   //     projected to screen; it hands the HUD live world positions. Redraw cadence
   //     is the VIEW's job (throttled to a cached texture, ./minimap-view).
-  const minimapPlanetPool: MutMinimapPlanet[] = [];
-  const minimapPlanets: MinimapPlanet[] = [];
+  const minimapStationPool: MutMinimapStation[] = [];
+  const minimapStations: MinimapStation[] = [];
   const minimapShipPool: MutMinimapShip[] = [];
   const minimapShips: MinimapShip[] = [];
   const minimapOrePool: { x: number; y: number }[] = [];
@@ -1039,11 +1160,11 @@ async function boot(): Promise<void> {
   const minimapCollapse: { x: number; y: number; radius: number } = { x: 0, y: 0, radius: 0 };
   const minimapFrame: {
     bounds: { width: number; height: number };
-    planets: MinimapPlanet[];
+    stations: MinimapStation[];
     ships: MinimapShip[];
     oreHints: { x: number; y: number }[];
     collapse: { x: number; y: number; radius: number } | null;
-  } = { bounds: { width: 0, height: 0 }, planets: minimapPlanets, ships: minimapShips, oreHints: minimapOre, collapse: null };
+  } = { bounds: { width: 0, height: 0 }, stations: minimapStations, ships: minimapShips, oreHints: minimapOre, collapse: null };
   /** Rebuild the per-slot name table (and its mirror difficulty table) from the
    *  live match: the local player's chosen name (from the lobby, or persisted
    *  default under ?debug=1) plus each seated bot's personality name (GDD §2.9),
@@ -1069,7 +1190,13 @@ async function boot(): Promise<void> {
   //     tick, then hold it there so screenshots are deterministic across boots
   //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
   //     the entry point pins the frame (src/platform/freeze.ts).
-  if (flags.freeze) advanceToFreezeTick(world, FREEZE_TICK);
+  if (flags.freeze) {
+    advanceToFreezeTick(world, FREEZE_TICK);
+    // Stage the defence showcase so the frozen golden reviews the structure art
+    // (a2-05): structures never appear in a natural 2-second opening, so without
+    // this the golden could never show a turret, scaffold or shield bubble.
+    stampDefenseShowcase(world, LOCAL_PLAYER);
+  }
   const frozenHash = flags.freeze ? hashWorld(world) : null;
 
   // --- Layout registry (?debug=1): every positioned visual element registers
@@ -1104,6 +1231,12 @@ async function boot(): Promise<void> {
   const loop = new GameLoop({
     update: () => {
       if (flags.freeze) return; // sim is pinned at the seeded freeze tick
+      // Offline pause (developer §2): while the pause overlay is up over a
+      // `pausable` (offline) match the sim FREEZES — skip the tick entirely, so
+      // no time passes and RESUME picks up exactly where it left off. Render still
+      // runs below, so the overlay is live. Online (m9, not pausable) this is
+      // false and the sim keeps ticking under the overlay.
+      if (shouldFreezeSim(pauseScreen, pausable)) return;
       // One input tick per fixed step, in order — the pulse the whole protocol
       // is built on. Every bot seat files for the same tick first, then this
       // client's input advances the authoritative sim (GDD §4.2, §2.9).
@@ -1122,7 +1255,12 @@ async function boot(): Promise<void> {
       const nowMs = performance.now();
       const frameSeconds = (nowMs - lastRenderMs) / 1000;
       lastRenderMs = nowMs;
-      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds));
+      // Reduce VFX when the auto-reducer engages on a sustained fps drop OR the
+      // player set the floor by hand in settings (GDD §4.8 risk 5 — one flag, two
+      // ways to flip it). `sample` is evaluated first so the frame-time tracker
+      // keeps running even while the manual floor is on. Freeze keeps full VFX so
+      // the golden frame is byte-deterministic.
+      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx);
 
       renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
       // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
@@ -1152,14 +1290,14 @@ async function boot(): Promise<void> {
       // the wiring the M2 field report caught missing — the model and the layer
       // were both right, but nothing ever handed the layer the enemies.
       feedCombatants();
-      // Name labels over every ship + owned planet (field request v0.2.1), fed
+      // Name labels over every ship + owned station (field request v0.2.1), fed
       // AFTER renderer.draw so the camera transform is current — projected to the
       // same screen space the labels draw in, stacked above the health bars.
       feedNameplates();
       // Tap Commander order markers (developer §4): the waypoint pulse + lock-on
       // reticle, projected to screen the same way, drawn UNDER the bars/labels.
       feedTapMarkers();
-      // Minimap content (field request v0.2.2): map-space dots — planets, ships,
+      // Minimap content (field request v0.2.2): map-space dots — stations, ships,
       // ore hints, the collapse ring. Not projected to screen (the minimap fits
       // the arena itself), so its placement in the feed order is free.
       feedMinimap();
@@ -1183,9 +1321,13 @@ async function boot(): Promise<void> {
       fsAffordance.update(fullscreen.affordanceVisible(), transform.logicalWidth, transform.logicalHeight);
       // End-of-match / DEFEATED overlay: read the sim's own result off `world.match`
       // and show the screen that fits — nothing, the DEFEATED overlay, or the final
-      // result. The whole "your planet died and nothing happened" fix (field report
+      // result. The whole "your station died and nothing happened" fix (field report
       // v0.1.2) lives on this one call, fed truth the sim decides.
       syncEndScreen();
+      // Pause overlay (developer p10): draw whichever pause screen is up and the
+      // touch corner button. Runs every rendered frame, including while the sim is
+      // frozen above — so the overlay stays live over a stopped world.
+      syncPause();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -1255,13 +1397,13 @@ async function boot(): Promise<void> {
    * this is the honest limit of what it can say — field report v0.1.2).
    */
   function currentOutcome(over: boolean): MatchOutcome {
-    const total = world.planets.length;
+    const total = world.stations.length;
     if (over) return { you: LOCAL_PLAYER, winner: world.match.winner, matchOver: true };
 
     const k = world.match.eliminated.indexOf(LOCAL_PLAYER);
-    const planet = planetOf(world, LOCAL_PLAYER);
+    const station = stationOf(world, LOCAL_PLAYER);
     const byCollapse =
-      isCollapsed(world) && planet !== null && planet.deathTime >= world.match.collapseTime;
+      isCollapsed(world) && station !== null && station.deathTime >= world.match.collapseTime;
     const cause: DeathCause = byCollapse ? 'collapse' : 'destroyed';
     const base: MatchOutcome = { you: LOCAL_PLAYER, winner: null, matchOver: false, totalPlayers: total, cause };
     // First core to fall places last; the survivor is 1st — so `N − k`. Present
@@ -1289,13 +1431,13 @@ async function boot(): Promise<void> {
   }
 
   /** A living opponent to watch after you're out — its ship if it's flying, else
-   *  any owner whose planet still stands. Null if nobody is left (the match is
+   *  any owner whose station still stands. Null if nobody is left (the match is
    *  about to end, and the result screen takes the camera's place anyway). */
   function firstSurvivor(): PlayerId | null {
     for (const s of world.ships) {
       if (s.id !== LOCAL_PLAYER && !s.eliminated && s.alive) return s.id;
     }
-    for (const p of world.planets) {
+    for (const p of world.stations) {
       if (p.alive && p.owner !== LOCAL_PLAYER) return p.owner;
     }
     return null;
@@ -1324,6 +1466,134 @@ async function boot(): Promise<void> {
     // ended on (the observer's first post-reset frame primes and emits nothing).
     audioObserver.reset();
     audio.reset();
+    pauseScreen = 'closed'; // a fresh match is never mid-pause
+  }
+
+  // --- Pause menu wiring (developer ratification, p10) -----------------------
+
+  /** Whether the match currently owns the screen — nothing else claiming it — so
+   *  ESC / the touch corner button may open the pause overlay, and that button may
+   *  be drawn (developer §1: "clear of everything"). False while a wheel, the end
+   *  overlay, or the pause overlay itself is up. */
+  function pauseAvailable(): boolean {
+    return !isPauseOpen(pauseScreen) && !buildWheel.open && endScreen === 'none';
+  }
+
+  /** ESC on the keyboard: while a wheel is up it pops one wheel level (unchanged,
+   *  field report v0.2.4); otherwise it opens the pause overlay, or backs it out
+   *  one level — the same "one press, one level" gesture, now spanning the wheel
+   *  and the pause menu. Never opens over the end screen (that overlay owns its own
+   *  exits). */
+  function handlePauseKey(): void {
+    if (buildWheel.open) {
+      wheelBackOneLevel();
+      return;
+    }
+    if (!isPauseOpen(pauseScreen) && endScreen !== 'none') return;
+    pauseScreen = nextPauseScreen(pauseScreen, 'toggle');
+  }
+
+  /** Route a tap while the pause overlay (or its settings screen) is up — it owns
+   *  the screen, like the end overlay, so the tap lands on a pause control or on
+   *  nothing, never on the match under it. */
+  function handlePausePointer(lx: number, ly: number): void {
+    if (pauseScreen === 'settings') {
+      const hit = pauseSettings.hitTest(lx, ly);
+      if (hit) applyPauseSettings(hit);
+      return;
+    }
+    const target = pauseView.hitTest(lx, ly);
+    if (target) handlePauseButton(target.kind);
+  }
+
+  /** Apply a pause-overlay button. RESUME/STAY back out; SETTINGS/EXIT step in;
+   *  LEAVE tears the match down to the menu (the confirm is the guard). */
+  function handlePauseButton(kind: PauseButton): void {
+    haptics.haptic('tap');
+    audio.cue('press');
+    switch (kind) {
+      case 'resume':
+        pauseScreen = nextPauseScreen(pauseScreen, 'resume');
+        break;
+      case 'settings':
+        pauseScreen = nextPauseScreen(pauseScreen, 'openSettings');
+        break;
+      case 'exit':
+        pauseScreen = nextPauseScreen(pauseScreen, 'requestExit');
+        break;
+      case 'stay':
+        pauseScreen = nextPauseScreen(pauseScreen, 'cancelExit');
+        break;
+      case 'leave':
+        exitToMenu();
+        break;
+    }
+  }
+
+  /** Apply a tap on the pause SETTINGS screen. Unlike the pre-match menu's copy,
+   *  these fold into the LIVE match: the fire mode and control scheme take effect
+   *  at once and persist, reduce-VFX and the volumes drive the running renderer
+   *  and mixer through {@link applyAudioMix}. DONE steps back to the pause menu. */
+  function applyPauseSettings(target: SettingsTarget): void {
+    switch (target.kind) {
+      case 'back':
+        pauseScreen = nextPauseScreen(pauseScreen, 'closeSettings');
+        return;
+      case 'fireMode':
+        fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
+        touch.setFireMode(fireMode);
+        platform.storage.set(FIRE_MODE_KEY, fireMode);
+        break;
+      case 'controls':
+        controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
+        tapPilot.clear();
+        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        break;
+      case 'reduceVfx':
+        matchSettings = toggleReduceVfx(matchSettings);
+        break;
+      case 'volume':
+        matchSettings = adjustVolume(matchSettings, target.channel, target.dir);
+        applyAudioMix();
+        break;
+    }
+    haptics.haptic('tap');
+    audio.cue('press');
+  }
+
+  /** Push the live match volumes into the mixer (engine.ts). A no-op set of calls
+   *  when running silent (no audio context), so it is safe on every platform. */
+  function applyAudioMix(): void {
+    audio.setMasterVolume(matchSettings.volumes.master);
+    audio.setSfxVolume(matchSettings.volumes.sfx);
+    audio.setMusicVolume(matchSettings.volumes.music);
+  }
+
+  /** EXIT TO MENU (developer §3): tear the world down — the rematch machinery's own
+   *  teardown step ({@link MatchBoot.close}) — and return to the main menu. A clean
+   *  reload is the maximal teardown: no half-dead world and no stale seam can
+   *  survive it, and it lands on the real main menu (which only a clean boot shows),
+   *  where PLAY boots a genuinely fresh match. It mirrors BACK TO MENU on the end
+   *  screen, which reloads for the same reason — the two "go to the menu" exits are
+   *  one mechanism. The target drops any `?debug=1` flag so the menu appears even
+   *  from a harness boot (which otherwise skips it), preserving the app's base path. */
+  function exitToMenu(): void {
+    match.close();
+    const menuUrl = window.location.origin + window.location.pathname;
+    window.location.assign(menuUrl);
+  }
+
+  /** Draw whichever pause screen is up and the touch corner button, once per
+   *  rendered frame. Offline the loop has already frozen the sim; render keeps
+   *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
+  function syncPause(): void {
+    // The pause overlay: the menu or the confirm. While the settings screen is up
+    // the overlay hides (the real settings view takes its place), so feed 'closed'.
+    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    const settingsUp = pauseScreen === 'settings';
+    pauseSettings.visible = settingsUp;
+    if (settingsUp) pauseSettings.update(settingsModel(matchSettings, fireMode, controlScheme));
+    pauseView.updateButton(pauseButtonVisible({ isTouch, available: pauseAvailable() }));
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -1399,7 +1669,7 @@ async function boot(): Promise<void> {
    * centre, radius, and hostility — a moving ship tracks, a besieged core tracks,
    * a mined-out rock vanishes. Returns `null` when the order is a waypoint (no
    * target) or the entity is gone (dead ship, destroyed core, exhausted rock),
-   * which is exactly what tells the pilot to drop the lock. Own planet resolves as
+   * which is exactly what tells the pilot to drop the lock. Own station resolves as
    * a friendly fly-to that holds at its atmosphere and never fires.
    */
   function resolvePilotTarget(): ResolvedTarget | null {
@@ -1419,20 +1689,20 @@ async function boot(): Promise<void> {
         return fillResolved(a.pos, a.radius, true, undefined, true);
       }
       case 'turret': {
-        for (const p of world.planets) {
+        for (const p of world.stations) {
           const t = p.turrets.find((tt) => tt.id === ref.id);
           if (t) return t.hp > 0 ? fillResolved(t.pos, t.radius, true) : null;
         }
         return null;
       }
       case 'core':
-      case 'planet': {
-        const p = world.planets.find((pl) => pl.id === ref.id);
+      case 'station': {
+        const p = world.stations.find((pl) => pl.id === ref.id);
         if (!p || !p.alive) return null;
-        // The player's own planet is a friendly fly-to (hold at atmosphere, no
+        // The player's own station is a friendly fly-to (hold at atmosphere, no
         // fire); a rival's core is an attack.
         const own = p.owner === LOCAL_PLAYER;
-        return fillResolved(p.pos, p.radius, !own, own ? PLANET_STANDOFF : undefined);
+        return fillResolved(p.pos, p.radius, !own, own ? STATION_STANDOFF : undefined);
       }
     }
   }
@@ -1448,7 +1718,7 @@ async function boot(): Promise<void> {
     resolvedTarget.pos = pos;
     resolvedTarget.radius = radius;
     resolvedTarget.hostile = hostile;
-    // exactOptionalPropertyTypes: an own-planet fly-to sets a standoff, every other
+    // exactOptionalPropertyTypes: an own-station fly-to sets a standoff, every other
     // target omits it (the pilot then uses its config engage range).
     if (standoff === undefined) delete resolvedTarget.standoff;
     else resolvedTarget.standoff = standoff;
@@ -1478,11 +1748,28 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Build the tap hit-test candidate list from the live world (developer §2): every
-   * enemy ship, every asteroid (mine), every enemy turret, every standing core, and
-   * the player's own planet (a friendly fly-to). The local ship and the player's own
-   * turrets are not lock targets, and a wreck (dead planet) is neither attackable nor
-   * fly-to-able. Pooled records overwritten in place, so a tap allocates nothing.
+   * The forward of {@link logicalToWorld}: a WORLD point to the LOGICAL screen point
+   * it draws at, through the SAME live camera offset — so a `?debug=1` stage can hand
+   * a Playwright test the exact place to REAL-tap an entity (the p10 station-wheel
+   * front door). Reuses the same camera-inverse scratch, so it allocates nothing but
+   * the small returned record it is asked for. Only ever called off the input path.
+   */
+  function worldToLogical(wx: number, wy: number): { x: number; y: number } {
+    const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
+    camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
+    camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
+    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport);
+    return { x: wx + camOffsetScratch.x, y: wy + camOffsetScratch.y };
+  }
+
+  /**
+   * Build the tap hit-test candidate list from the live world (developer §2, p10):
+   * every enemy ship, every asteroid (mine), every enemy turret, every standing core,
+   * and the player's own station (kind `station` — a tap on it opens the Build wheel in
+   * range, or moves toward it when too far, developer p10 §1). The local ship and the
+   * player's own turrets are not lock targets, and a wreck (dead station) is neither
+   * attackable nor a build target. Pooled records overwritten in place, so a tap
+   * allocates nothing.
    */
   function buildTapCandidates(): TapCandidate[] {
     let n = 0;
@@ -1503,7 +1790,7 @@ async function boot(): Promise<void> {
       c.radius = a.radius;
       c.hostile = true;
     }
-    for (const p of world.planets) {
+    for (const p of world.stations) {
       for (const t of p.turrets) {
         if (t.hp <= 0 || t.owner === LOCAL_PLAYER) continue; // own turrets aren't targets
         const c = tapCandidateSlot(n++);
@@ -1516,11 +1803,11 @@ async function boot(): Promise<void> {
       if (!p.alive) continue; // a wreck is not a lock target
       const own = p.owner === LOCAL_PLAYER;
       const c = tapCandidateSlot(n++);
-      c.kind = own ? 'planet' : 'core';
+      c.kind = own ? 'station' : 'core';
       c.id = p.id;
       c.pos = p.pos;
       c.radius = p.radius;
-      c.hostile = !own; // your own planet is a friendly fly-to, a rival's is an attack
+      c.hostile = !own; // your own station is a friendly fly-to, a rival's is an attack
     }
     tapCandidates.length = 0;
     for (let i = 0; i < n; i++) tapCandidates.push(tapCandidatePool[i]!);
@@ -1543,7 +1830,7 @@ async function boot(): Promise<void> {
    * (`@platform/actions`).
    *
    * Availability is the sim's answer, not a distance re-derived here: alive
-   * ship, live core, `isDocked`. The wheel opens at your own planet and nowhere
+   * ship, live core, `isDocked`. The wheel opens at your own station and nowhere
    * else (GDD §2.5), and it closes itself the moment you fly off — so undocking
    * is always a way out of it.
    *
@@ -1555,10 +1842,10 @@ async function boot(): Promise<void> {
    */
   function updateBuildWheel(): void {
     const ship = world.ships.find(isLocalShip);
-    const planet = planetOf(world, LOCAL_PLAYER);
-    docked = ship !== undefined && planet !== null && isDocked(ship, planet);
+    const station = stationOf(world, LOCAL_PLAYER);
+    docked = ship !== undefined && station !== null && isDocked(ship, station);
     buildVisible = buildButtonVisible({ docked, isTouch });
-    buildWheel.setAvailable(docked && planet !== null && planet.alive && ship !== undefined && ship.alive);
+    buildWheel.setAvailable(docked && station !== null && station.alive && ship !== undefined && ship.alive);
 
     // E / Y / the BUILD button: one press opens, the next closes.
     if (merged.build && !buildHeld && (docked || buildWheel.open)) buildWheel.toggle();
@@ -1603,7 +1890,11 @@ async function boot(): Promise<void> {
     if (ordered) {
       hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
-      audio.cue('confirm'); // the two-beat purchase-landed sound, its audible twin
+      // The confirm CHIME is no longer fired here: an order submitted is not an
+      // order the sim ACCEPTED (it re-validates docking, affordability and max
+      // tier — comment above). The HUD sounds `confirm` off the sim's own state
+      // change (a turret/shield/tier count or core HP actually rising), so a
+      // refused order can never fake the chime (`ui/press-feedback` confirm()).
     }
   }
 
@@ -1615,7 +1906,7 @@ async function boot(): Promise<void> {
    * Three of the M2 elements are fed here and nowhere else, and each is a
    * mechanic rather than a readout (GDD §2.2):
    *
-   *  - **Own-planet HP** comes off the real core, with the shield pool over it.
+   *  - **Own-station HP** comes off the real core, with the shield pool over it.
    *  - **The under-attack alarm** derives its damage from the fall in
    *    core + shields + turrets between frames, so a turret being picked off at
    *    the edge of its range rings it exactly as a shot on the core does — and a
@@ -1639,17 +1930,17 @@ async function boot(): Promise<void> {
     hudFrame.hasOrdered = hasOrdered;
     hudFrame.docked = docked;
 
-    const planet = planetOf(world, LOCAL_PLAYER);
-    if (planet) {
-      hudFrame.coreHp = planet.coreHp;
-      hudFrame.maxCoreHp = planet.maxCoreHp;
-      hudFrame.shieldHp = shieldPool(planet);
-      hudFrame.maxShieldHp = shieldPoolMax(planet);
-      hudFrame.turretHp = turretPool(planet);
-      hudFrame.planetAlive = planet.alive;
-      hudFrame.turrets = turretCount(planet);
-      hudFrame.shields = shieldCount(planet);
-      hudFrame.homePos = planet.pos;
+    const station = stationOf(world, LOCAL_PLAYER);
+    if (station) {
+      hudFrame.coreHp = station.coreHp;
+      hudFrame.maxCoreHp = station.maxCoreHp;
+      hudFrame.shieldHp = shieldPool(station);
+      hudFrame.maxShieldHp = shieldPoolMax(station);
+      hudFrame.turretHp = turretPool(station);
+      hudFrame.stationAlive = station.alive;
+      hudFrame.turrets = turretCount(station);
+      hudFrame.shields = shieldCount(station);
+      hudFrame.homePos = station.pos;
     }
 
     const ship = world.ships.find(isLocalShip);
@@ -1725,9 +2016,9 @@ async function boot(): Promise<void> {
       hapticPrevHull = null;
     }
 
-    const planet = planetOf(world, LOCAL_PLAYER);
-    if (planet) {
-      const defense = planet.coreHp + shieldPool(planet) + turretPool(planet);
+    const station = stationOf(world, LOCAL_PLAYER);
+    if (station) {
+      const defense = station.coreHp + shieldPool(station) + turretPool(station);
       if (hapticPrevDefense !== null && defense < hapticPrevDefense - HAPTIC_HP_EPSILON) {
         hapticAlarmPressure += hapticPrevDefense - defense;
       }
@@ -1780,8 +2071,8 @@ async function boot(): Promise<void> {
       c.radius = ship.radius;
       c.turret = false;
     }
-    for (const planet of world.planets) {
-      for (const turret of planet.turrets) {
+    for (const station of world.stations) {
+      for (const turret of station.turrets) {
         // Field request v0.2.2: EVERY turret gets a bar when damaged, the local
         // player's own included (they used to read off the HOME HP readout). The
         // model still hides a full, idle turret, so passing them all is correct.
@@ -1792,7 +2083,7 @@ async function boot(): Promise<void> {
         c.alive = turret.hp > 0;
         c.inCombat = turret.muzzle != null; // loosing a shot this tick
         // `turret.pos` is derived from the orbit angle each tick, so the bar rides
-        // along as the turret slides around its planet's rim (sim orbit, P1).
+        // along as the turret slides around its station's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
         c.radius = turret.radius;
         c.turret = true;
@@ -1816,17 +2107,17 @@ async function boot(): Promise<void> {
 
   /**
    * Build this frame's name-label feed and hand it to the HUD (field request
-   * v0.2.1): a label over **every ship** and **every owned planet**, tinted the
+   * v0.2.1): a label over **every ship** and **every owned station**, tinted the
    * owner's identity colour and captioned from {@link playerNames}. The pure model
    * ({@link ./ui} `nameplateModel`) decides who is labelled (a dead ship, a
-   * destroyed planet — a wreck — and the local ship's own label are all dropped)
+   * destroyed station — a wreck — and the local ship's own label are all dropped)
    * and fades a label under combat clutter; here we only project world → screen
    * (via the same camera transform the bars use, after `renderer.draw`) and pass
-   * the sim liveness/combat facts through. Planets carry no HP/combat signal, so a
-   * rival planet's label never leaks its scouted-only HP (GDD §2.2).
+   * the sim liveness/combat facts through. Stations carry no HP/combat signal, so a
+   * rival station's label never leaks its scouted-only HP (GDD §2.2).
    *
    * Allocation-free after warm-up (GDD §4.3): the records are pooled and the frame
-   * array reused, bounded by the entity caps (≤8 ships, ≤8 planets).
+   * array reused, bounded by the entity caps (≤8 ships, ≤8 stations).
    */
   function feedNameplates(): void {
     let n = 0;
@@ -1841,19 +2132,19 @@ async function boot(): Promise<void> {
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
     }
-    for (const planet of world.planets) {
+    for (const station of world.stations) {
       const c = nameableSlot(n++);
-      c.owner = planet.owner;
-      c.kind = 'planet';
-      // A standing (owned) planet is labelled; a wreck (`alive` false) is not.
-      c.alive = planet.alive;
+      c.owner = station.owner;
+      c.kind = 'station';
+      // A standing (owned) station is labelled; a wreck (`alive` false) is not.
+      c.alive = station.alive;
       c.local = false;
-      // No combat signal on a planet: a rival's HP is scouted only (GDD §2.2), so
+      // No combat signal on a station: a rival's HP is scouted only (GDD §2.2), so
       // the fade never becomes a back-door HP readout. Full alpha, always.
       c.inCombat = false;
       c.hpFraction = 1;
-      renderer.projectToScreen(planet.pos, c.pos);
-      c.radius = planet.radius;
+      renderer.projectToScreen(station.pos, c.pos);
+      c.radius = station.radius;
     }
     nameableFrame.length = 0;
     for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
@@ -1926,14 +2217,14 @@ async function boot(): Promise<void> {
 
   /**
    * Feed this frame's minimap content to the HUD (field request v0.2.2; GDD §2.2):
-   * arena bounds, planets (owner-coloured, a wreck neutral), ships (own
+   * arena bounds, stations (owner-coloured, a wreck neutral), ships (own
    * highlighted, spawn-protected dimmed), the collapse ring while it is active
    * (GDD §2.3), and faint ore-field hints — all in **map (world) space**, because
    * the minimap does its own fit (unlike the bars/labels, which arrive projected).
    * The minimap's presentation is the UI's; the sim decides the truth this reads.
    *
-   * Pooled + reused (GDD §4.3): planet/ship/ore records and the frame arrays are
-   * overwritten in place, bounded by the entity caps (≤8 planets, ≤8 ships, and
+   * Pooled + reused (GDD §4.3): station/ship/ore records and the frame arrays are
+   * overwritten in place, bounded by the entity caps (≤8 stations, ≤8 ships, and
    * the asteroid field). `hudFrame.tick` drives the view's low-frequency redraw.
    */
   function feedMinimap(): void {
@@ -1941,15 +2232,15 @@ async function boot(): Promise<void> {
     minimapFrame.bounds.height = world.bounds.height;
 
     let pn = 0;
-    for (const p of world.planets) {
-      const r = minimapPlanetSlot(pn++);
+    for (const p of world.stations) {
+      const r = minimapStationSlot(pn++);
       r.owner = p.owner;
       r.x = p.pos.x;
       r.y = p.pos.y;
       r.alive = p.alive;
     }
-    minimapPlanets.length = 0;
-    for (let i = 0; i < pn; i++) minimapPlanets.push(minimapPlanetPool[i]!);
+    minimapStations.length = 0;
+    for (let i = 0; i < pn; i++) minimapStations.push(minimapStationPool[i]!);
 
     let sn = 0;
     for (const s of world.ships) {
@@ -1993,12 +2284,12 @@ async function boot(): Promise<void> {
     hudFrame.tick = world.tick;
   }
 
-  /** Pooled minimap planet record `i`, grown to fit and reused (GDD §4.3). */
-  function minimapPlanetSlot(i: number): MutMinimapPlanet {
-    let r = minimapPlanetPool[i];
+  /** Pooled minimap station record `i`, grown to fit and reused (GDD §4.3). */
+  function minimapStationSlot(i: number): MutMinimapStation {
+    let r = minimapStationPool[i];
     if (!r) {
       r = { owner: 0, x: 0, y: 0, alive: true };
-      minimapPlanetPool[i] = r;
+      minimapStationPool[i] = r;
     }
     return r;
   }
@@ -2083,14 +2374,14 @@ async function boot(): Promise<void> {
       // Field request v0.2.2: damage a turret so its bar must draw (damaged ⇒ a
       // bar), proving own turrets are no longer suppressed. Prefer a LOCAL-owned
       // turret; park it beside the centred local ship so it is on-screen (its
-      // planet may be off-frame at spawn) and un-culled. `turret.pos` is its orbit
+      // station may be off-frame at spawn) and un-culled. `turret.pos` is its orbit
       // position — the same value feedCombatants projects — so the bar rides it.
       damageTurret(fraction: number): { owner: PlayerId; fraction: number; x: number; y: number } | null {
         const local = world.ships.find(isLocalShip);
         if (!local) return null;
-        let target: (typeof world.planets)[number]['turrets'][number] | null = null;
-        for (const planet of world.planets) {
-          for (const t of planet.turrets) {
+        let target: (typeof world.stations)[number]['turrets'][number] | null = null;
+        for (const station of world.stations) {
+          for (const t of station.turrets) {
             if (t.owner === LOCAL_PLAYER) { target = t; break; }
             if (!target) target = t; // remember any turret as a fallback
           }
@@ -2131,14 +2422,14 @@ async function boot(): Promise<void> {
    * test drives to prove the player-name labels are wired on a real boot (field
    * request v0.2.1), the same discipline as `__healthbarStage`. Methods:
    *
-   *  - `stageBot()` — park the first bot's SHIP and its HOME PLANET on-screen
+   *  - `stageBot()` — park the first bot's SHIP and its HOME STATION on-screen
    *    beside the centred local ship, so both must draw a label (a full-ring-away
    *    rival is off-screen and culled in the frozen frame). Returns the bot's slot,
    *    the name the table resolved for it, and its difficulty tier (v0.2.2), or
    *    null if there is no bot.
    *  - `plates()` — the labels the real layer actually drew last frame (owner,
    *    text, suffix, colour, kind, position), so the test can assert a drawn label
-   *    with the lobby's name and difficulty suffix tracks that bot's ship and planet.
+   *    with the lobby's name and difficulty suffix tracks that bot's ship and station.
    *  - `names()` — the per-slot name table the match built, so the test can match a
    *    drawn label's text against the data-driven source.
    *  - `difficulties()` — the per-slot difficulty table (its mirror), so the test
@@ -2154,14 +2445,14 @@ async function boot(): Promise<void> {
         const local = world.ships.find(isLocalShip);
         const bot = world.ships.find((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
         if (!local || !bot) return null;
-        const planet = world.planets.find((p) => p.owner === bot.id);
+        const station = world.stations.find((p) => p.owner === bot.id);
         // Beside the centred local ship so both labels are on-screen and un-culled.
         bot.pos.x = local.pos.x + 120;
         bot.pos.y = local.pos.y - 120;
         bot.alive = true;
-        if (planet) {
-          planet.pos.x = local.pos.x + 120;
-          planet.pos.y = local.pos.y + 140;
+        if (station) {
+          station.pos.x = local.pos.x + 120;
+          station.pos.y = local.pos.y + 140;
         }
         return {
           owner: bot.id,
@@ -2195,14 +2486,14 @@ async function boot(): Promise<void> {
    * Install `window.__oreDepositStage` — the ?debug=1 live-stage seam for the
    * v0.1.2 ore-deposit field report ("there's no way to deposit ore … it just
    * stays on my ship"). The sim now auto-transfers a docked, parked ship's hold
-   * into the bank and flies ore couriers ship→planet to show it; this seam lets
+   * into the bank and flies ore couriers ship→station to show it; this seam lets
    * a Playwright test prove that on a REAL boot, the same way `__healthbarStage`
    * proved the bars. Unlike that one it runs WITHOUT ?freeze=1, because the whole
    * point is to watch the live sim drain the hold over a second or so. Methods:
    *
-   *  - `stage(ore)` — park the LOCAL ship at rest at its own planet with `ore` in
+   *  - `stage(ore)` — park the LOCAL ship at rest at its own station with `ore` in
    *    the hold (widening the bay if needed), so the deposit drain starts. Returns
-   *    the staged hold/bank, or null if there is no local ship/planet.
+   *    the staged hold/bank, or null if there is no local ship/station.
    *  - `readout()` — the live hold and bank the sim holds this frame: the two
    *    numbers the HUD ticks down/up. The test watches the hold fall and the bank
    *    rise off the same source.
@@ -2218,12 +2509,12 @@ async function boot(): Promise<void> {
     const stage = {
       stage(ore: number): { cargo: number; banked: number } | null {
         const ship = world.ships.find(isLocalShip);
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!ship || !planet) return null;
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
         ship.alive = true;
-        // Settle clear of the planet's collider, at rest, inside dock range.
-        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
-        ship.pos.y = planet.pos.y;
+        // Settle clear of the station's collider, at rest, inside dock range.
+        ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+        ship.pos.y = station.pos.y;
         ship.vel.x = 0;
         ship.vel.y = 0;
         if (ore > ship.cargoCap) ship.cargoCap = ore; // widen the bay to fit the stage
@@ -2264,11 +2555,11 @@ async function boot(): Promise<void> {
    * sim drain the hold into the bank. Methods:
    *
    *  - `mine(ore)` — stage a carried hold *away from home* so the deposit rule
-   *    does not touch it: park the LOCAL ship at rest far from its planet with
+   *    does not touch it: park the LOCAL ship at rest far from its station with
    *    `ore` in the hold (widening the bay to fit). The camera still holds it at
    *    screen centre, so the under-ship indicator must appear there. Returns the
-   *    staged hold/cap/bank, or null if there is no local ship/planet.
-   *  - `dock(ore)` — park the LOCAL ship at rest *at* its own planet with `ore` in
+   *    staged hold/cap/bank, or null if there is no local ship/station.
+   *  - `dock(ore)` — park the LOCAL ship at rest *at* its own station with `ore` in
    *    the hold, starting the sim's auto-deposit drain (the same staging the
    *    ore-deposit seam uses). Returns the staged hold/bank.
    *  - `hold()` — the under-ship hold indicator the HUD actually drew this frame
@@ -2287,14 +2578,14 @@ async function boot(): Promise<void> {
     const stage = {
       mine(ore: number): { cargo: number; cargoCap: number; banked: number } | null {
         const ship = world.ships.find(isLocalShip);
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!ship || !planet) return null;
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
         ship.alive = true;
         // Far from home and at rest, so the docked-and-parked deposit rule leaves
         // the staged hold intact — the mine phase asserts the indicator appears
         // with the hold it was given, not one that is already draining.
-        ship.pos.x = planet.pos.x + 900;
-        ship.pos.y = planet.pos.y + 900;
+        ship.pos.x = station.pos.x + 900;
+        ship.pos.y = station.pos.y + 900;
         ship.vel.x = 0;
         ship.vel.y = 0;
         if (ore > ship.cargoCap) ship.cargoCap = ore; // widen the bay to fit the stage
@@ -2303,13 +2594,13 @@ async function boot(): Promise<void> {
       },
       dock(ore: number): { cargo: number; banked: number } | null {
         const ship = world.ships.find(isLocalShip);
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!ship || !planet) return null;
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
         ship.alive = true;
-        // Settle clear of the planet's collider, at rest, inside dock range — the
+        // Settle clear of the station's collider, at rest, inside dock range — the
         // sim's auto-deposit rule takes it from here (same staging as ore-deposit).
-        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
-        ship.pos.y = planet.pos.y;
+        ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+        ship.pos.y = station.pos.y;
         ship.vel.x = 0;
         ship.vel.y = 0;
         if (ore > ship.cargoCap) ship.cargoCap = ore;
@@ -2341,7 +2632,7 @@ async function boot(): Promise<void> {
 
   /**
    * Install `window.__endScreenStage` — the ?debug=1 live-stage seam for the
-   * v0.1.2 end-screen field report ("there was no end match screen after my planet
+   * v0.1.2 end-screen field report ("there was no end match screen after my station
    * died"). The DEFEATED overlay and the result screen (PR #45) were merged and
    * unit-green but never wired into boot; this seam lets a Playwright test prove
    * they now show on a REAL boot, the same way `__healthbarStage` proved the bars.
@@ -2373,9 +2664,9 @@ async function boot(): Promise<void> {
   function installEndScreenStage(): void {
     const stage = {
       eliminateLocal(): boolean {
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!planet || !planet.alive) return false;
-        destroyCore(world, planet); // the sim's own elimination path
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!station || !station.alive) return false;
+        destroyCore(world, station); // the sim's own elimination path
         return true;
       },
       /** Kill the LOCAL ship while its core still stands — a *respawnable* death,
@@ -2386,8 +2677,8 @@ async function boot(): Promise<void> {
        *  staged. */
       killLocalShip(): boolean {
         const ship = world.ships.find(isLocalShip);
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!ship || !ship.alive || ship.eliminated || !planet || !planet.alive) return false;
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !ship.alive || ship.eliminated || !station || !station.alive) return false;
         killShip(world, ship);
         return true;
       },
@@ -2409,9 +2700,9 @@ async function boot(): Promise<void> {
         return { show: m.show, seconds: m.seconds, text: m.text };
       },
       endMatch(): boolean {
-        const survivor = world.planets.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
+        const survivor = world.stations.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
         if (!survivor) return false;
-        for (const p of world.planets) {
+        for (const p of world.stations) {
           if (p.owner !== survivor.owner && p.alive) destroyCore(world, p);
         }
         return true;
@@ -2458,7 +2749,7 @@ async function boot(): Promise<void> {
    * which pins the sim so the staged frame holds still. Methods:
    *
    *  - `openBuild()` / `openUpgrade(ore)` — park the LOCAL ship docked at its own
-   *    planet and open the Build wheel (or the Upgrade wheel behind its arrow),
+   *    station and open the Build wheel (or the Upgrade wheel behind its arrow),
    *    giving it `ore` to spend so wedges read as affordable. Returns whether the
    *    HUD wheel is up.
    *  - `close()` — shut the wheel, the gesture the cycle test mashes.
@@ -2480,13 +2771,13 @@ async function boot(): Promise<void> {
   function installUpgradeWheelStage(): void {
     const parkDocked = () => {
       const ship = world.ships.find(isLocalShip);
-      const planet = planetOf(world, LOCAL_PLAYER);
-      if (!ship || !planet) return null;
+      const station = stationOf(world, LOCAL_PLAYER);
+      if (!ship || !station) return null;
       ship.alive = true;
-      // Settle clear of the planet's collider, at rest, inside dock range — the
-      // same staging the ore-deposit seam uses to sit a ship "at" its planet.
-      ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
-      ship.pos.y = planet.pos.y;
+      // Settle clear of the station's collider, at rest, inside dock range — the
+      // same staging the ore-deposit seam uses to sit a ship "at" its station.
+      ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+      ship.pos.y = station.pos.y;
       ship.vel.x = 0;
       ship.vel.y = 0;
       // Under ?freeze=1 `updateBuildWheel` never runs, so `docked` (which feedHud
@@ -2614,7 +2905,7 @@ async function boot(): Promise<void> {
   /**
    * Install `window.__pressStage` — the ?debug=1 live-stage seam for the press &
    * action feedback (field report v0.2.2), the same discipline as
-   * {@link installUpgradeWheelStage}. It opens the Build wheel at the planet, then
+   * {@link installUpgradeWheelStage}. It opens the Build wheel at the station, then
    * drives the HUD's own press/confirm seams and reads the motion back, so a
    * Playwright test can prove the pressed / rejected / confirmed tells are wired
    * and drawn on the REAL booted client (the derivation itself is unit-tested in
@@ -2626,11 +2917,11 @@ async function boot(): Promise<void> {
        *  wedges draw and can be pressed. */
       openBuild(ore = 999): { open: boolean; banked: number } | null {
         const ship = world.ships.find(isLocalShip);
-        const planet = planetOf(world, LOCAL_PLAYER);
-        if (!ship || !planet) return null;
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
         ship.alive = true;
-        ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
-        ship.pos.y = planet.pos.y;
+        ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+        ship.pos.y = station.pos.y;
         ship.vel.x = 0;
         ship.vel.y = 0;
         ship.cargo = 0;
@@ -2683,7 +2974,7 @@ async function boot(): Promise<void> {
    *
    * It stages the report's real precondition — a core only takes damage from a
    * siege (GDD §2.6) — by damaging the LOCAL core through the sim's own
-   * `damagePlanet`, funding the bank, parking the ship docked, and opening the
+   * `damageStation`, funding the bank, parking the ship docked, and opening the
    * Build wheel so its wedges draw and can be hit. The test then dispatches real
    * pointerdowns at {@link repairWedgePoint} (into the same `main.ts` handler a
    * mouse/thumb uses) and reads the LIVE sim + the DRAWN wedge back. Runs WITHOUT
@@ -2699,47 +2990,47 @@ async function boot(): Promise<void> {
    *  - `readout()` — the live core HP / max / bank / repair tell this frame.
    *
    * Behind ?debug=1, never in a normal build; it mutates only the plain sim data
-   * the boot path already reads, and reaches src/sim only through `damagePlanet`.
+   * the boot path already reads, and reaches src/sim only through `damageStation`.
    */
   function installRepairStage(): void {
     const REPAIR_INDEX = WHEEL_ORDER.indexOf('repair');
-    const localPlanet = () => planetOf(world, LOCAL_PLAYER);
+    const localStation = () => stationOf(world, LOCAL_PLAYER);
     const parkDockedOpen = () => {
       const ship = world.ships.find(isLocalShip);
-      const planet = localPlanet();
-      if (!ship || !planet) return null;
+      const station = localStation();
+      if (!ship || !station) return null;
       ship.alive = true;
-      ship.pos.x = planet.pos.x + (planet.radius + ship.radius + 30);
-      ship.pos.y = planet.pos.y;
+      ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+      ship.pos.y = station.pos.y;
       ship.vel.x = 0;
       ship.vel.y = 0;
-      docked = true; // the wheel opens at your own planet and nowhere else
+      docked = true; // the wheel opens at your own station and nowhere else
       if (!buildWheel.open) buildWheel.toggle();
       buildWheel.closePanel(); // land on the main wheel, where REPAIR CORE lives
-      return { ship, planet };
+      return { ship, station };
     };
     const stage = {
       siege(damage: number, banked: number): { coreHp: number; maxCoreHp: number; banked: number } | null {
         const parked = parkDockedOpen();
         if (!parked) return null;
-        const { ship, planet } = parked;
+        const { ship, station } = parked;
         ship.cargo = 0;
         ship.banked = banked;
-        // Lift the match-start planet spawn protection first (GDD §2.1) — it blocks
-        // `damagePlanet` entirely in the opening seconds, so a staged siege would
+        // Lift the match-start station spawn protection first (GDD §2.1) — it blocks
+        // `damageStation` entirely in the opening seconds, so a staged siege would
         // no-op and leave the core full. Zeroing it here stages the mid-match state
         // the report is about, then the hit lands the REAL way.
-        planet.spawnProtect = 0;
+        station.spawnProtect = 0;
         // Only a siege damages a core (GDD §2.6) — go through the sim's own damage
         // function, the same path a real hit takes, rather than poking coreHp.
-        if (damage > 0) damagePlanet(world, planet, damage);
-        return { coreHp: planet.coreHp, maxCoreHp: planet.maxCoreHp, banked: ship.banked };
+        if (damage > 0) damageStation(world, station, damage);
+        return { coreHp: station.coreHp, maxCoreHp: station.maxCoreHp, banked: ship.banked };
       },
       setCore(hp: number): { coreHp: number; maxCoreHp: number } | null {
-        const planet = localPlanet();
-        if (!planet) return null;
-        planet.coreHp = Math.max(0, Math.min(planet.maxCoreHp, hp));
-        return { coreHp: planet.coreHp, maxCoreHp: planet.maxCoreHp };
+        const station = localStation();
+        if (!station) return null;
+        station.coreHp = Math.max(0, Math.min(station.maxCoreHp, hp));
+        return { coreHp: station.coreHp, maxCoreHp: station.maxCoreHp };
       },
       repairWedgePoint(): { x: number; y: number } | null {
         if (REPAIR_INDEX < 0) return null;
@@ -2760,13 +3051,13 @@ async function boot(): Promise<void> {
       },
       readout(): { coreHp: number; maxCoreHp: number; banked: number; repairing: boolean } | null {
         const ship = world.ships.find(isLocalShip);
-        const planet = localPlanet();
-        if (!ship || !planet) return null;
+        const station = localStation();
+        if (!ship || !station) return null;
         return {
-          coreHp: planet.coreHp,
-          maxCoreHp: planet.maxCoreHp,
+          coreHp: station.coreHp,
+          maxCoreHp: station.maxCoreHp,
           banked: ship.banked,
-          repairing: planet.repairing ?? false,
+          repairing: station.repairing ?? false,
         };
       },
     };
@@ -2906,6 +3197,86 @@ async function boot(): Promise<void> {
         tapPilot.orderMove({ x, y });
         return { locked: false, kind: null, id: null };
       },
+      /**
+       * Stage the p10 "tap your station to open the build wheel" front door (developer
+       * §5): park the local ship DOCKED at its OWN station (inside `STATION.dockRange`,
+       * so the wheel's own `isDocked` gate is true), switch to the tap scheme, fund
+       * the bank so a turret is affordable, clear the field and park every rival far
+       * away so the station tap is unambiguous, and start from a CLOSED wheel — the
+       * real tap must be what opens it. Returns the LOGICAL screen points a Playwright
+       * test REAL-taps: the station centre (opens the wheel), the TURRET wedge (buys),
+       * a point well OUTSIDE the wheel (closes it, no move), and an empty up-field
+       * point (the move that flies again). Runs live (no ?freeze) so the buy actually
+       * drains. Null if there is no local ship / station.
+       */
+      stageStationWheel(): {
+        stationPoint: Vec2;
+        turretWedgePoint: Vec2;
+        outsidePoint: Vec2;
+        movePoint: Vec2;
+        banked: number;
+        turretCount: number;
+      } | null {
+        const ship = world.ships.find(isLocalShip);
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
+        // Dock the ship: sit it a short surface hop off the station — the same close
+        // parking the repair stage uses, well inside `isDocked`'s range — so the
+        // wheel's own docking gate is true every frame (no ?freeze here to prop it up).
+        ship.alive = true;
+        ship.spawnProtect = 0;
+        ship.pos.x = station.pos.x + (station.radius + ship.radius + 20);
+        ship.pos.y = station.pos.y;
+        ship.vel.x = 0;
+        ship.vel.y = 0;
+        ship.cargo = 0;
+        ship.banked = 999; // a turret is a few ore — comfortably affordable
+        station.spawnProtect = 0;
+        world.asteroids.length = 0; // no rock steals the tap near the station
+        for (const other of world.ships) {
+          if (other.id === LOCAL_PLAYER) continue;
+          other.pos.x = 0;
+          other.pos.y = 0;
+          other.vel.x = 0;
+          other.vel.y = 0;
+          other.spawnProtect = 999;
+        }
+        controlScheme = 'tap';
+        tapPilot.clear();
+        if (buildWheel.open) buildWheel.close(); // the tap is what must open it
+
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const radius = wheelRadius(w, h);
+        const turretIndex = WHEEL_ORDER.indexOf('turret');
+        const angle = segmentAngle(turretIndex);
+        return {
+          stationPoint: worldToLogical(station.pos.x, station.pos.y),
+          // 0.6 of the outer radius sits in the wedge's word band — the honest middle
+          // of the pressable TURRET wedge (mirrors `repairWedgePoint`).
+          turretWedgePoint: { x: w / 2 + Math.cos(angle) * radius * 0.6, y: h / 2 + Math.sin(angle) * radius * 0.6 },
+          // Below the wheel, comfortably past its outer ring, on cleared empty space:
+          // an OUTSIDE tap that closes the wheel and does NOT double as a move (§2).
+          outsidePoint: { x: w / 2, y: Math.min(h - 8, h / 2 + radius + 48) },
+          // An empty up-field point (well above the station, clear of the top chrome):
+          // the fresh tap that flies the ship again once the wheel is closed.
+          movePoint: { x: w / 2, y: Math.max(24, h * 0.18) },
+          banked: ship.banked,
+          turretCount: turretCount(station),
+        };
+      },
+      /** The build wheel's live screen state — what a real tap opened or closed. */
+      wheelState(): { open: boolean; panelOpen: boolean } {
+        return { open: buildWheel.open, panelOpen: buildWheel.panelOpen };
+      },
+      /** The local ship's banked ore and its station's turret count (finished + queued):
+       *  the two tells a turret buy moves — banked drops by the cost, the count rises. */
+      buildReadout(): { banked: number; turretCount: number } | null {
+        const ship = world.ships.find(isLocalShip);
+        const station = stationOf(world, LOCAL_PLAYER);
+        if (!ship || !station) return null;
+        return { banked: ship.banked, turretCount: turretCount(station) };
+      },
       /** The pilot's current standing order, as plain data. */
       order(): { kind: 'waypoint' | 'target' | 'none'; at: Vec2 | null; ref: { kind: TargetKind; id: number } | null } {
         const o = tapPilot.currentOrder;
@@ -3035,6 +3406,23 @@ async function boot(): Promise<void> {
         sfxCount: number;
         /** One-shots skipped because the death hush had the mix at zero (§4.7). */
         hushedCount: number;
+        /** The SFX bus gain the cue actually rides, 0..1 (the SFX slider × the
+         *  alarm duck). Zero means the seam still fired but nothing is audible —
+         *  the "slider at 0" case (field report v0.2.4+ point 4). */
+        sfxBusGain: number | null;
+        /** UI cues fired through the shared seam since boot, per KIND — so a test
+         *  can attribute a sound to the interaction (a live wedge → press, a
+         *  disabled one → reject, a landed spend → confirm). Null in a normal build
+         *  (the tally is ?debug=1 only). */
+        uiCues: { press: number; confirm: number; reject: number; last: UiCue | null } | null;
+        /** The placement of the last spatial one-shot (`./art/audio/spatial`) — the
+         *  gain a far siege was heard at and the pan a shot flew in on. Sound cannot
+         *  screenshot, so the spatial-audio attestation is these numbers (a3-03). */
+        lastGain: number;
+        lastPan: number;
+        /** Where the mix is listening from (the camera), world units — the anchor a
+         *  spatial probe measures against. `has` false before the first listener. */
+        listener: { x: number; y: number; has: boolean };
       } {
         return {
           contextState: audioCtx ? audioCtx.state : null,
@@ -3045,7 +3433,19 @@ async function boot(): Promise<void> {
           musicPhase: audio.musicScore.phase,
           sfxCount: audio.playCount,
           hushedCount: audio.hushedCount,
+          sfxBusGain: audio.graph ? audio.graph.buses.sfx.gain.value : null,
+          uiCues: uiSfxLog ? { ...uiSfxLog } : null,
+          lastGain: audio.lastPlacement.gain,
+          lastPan: audio.lastPlacement.pan,
+          listener: { ...audio.listener },
         };
+      },
+      /** What the spatial model would do to a sound at world (x, y) right now,
+       *  given the live listener — pure, plays nothing. A live-stage test probes a
+       *  point left and right of the camera to attest that pan flips sign and a
+       *  distant one falls to near-silence (a3-03). Behind ?debug=1 only. */
+      probe(x: number, y: number): { gain: number; pan: number; cutoff: number; culled: boolean } {
+        return audio.probe(x, y);
       },
       /** Resume the context by hand — the exact call the unlock makes from a
        *  gesture. The spec still drives sound through a REAL tap; this is only the
@@ -3056,9 +3456,99 @@ async function boot(): Promise<void> {
         await audioUnlock.unlockNow();
         return audioCtx ? audioCtx.state : null;
       },
+      /** Set the SFX bus level, 0..1 — the same call the settings slider makes
+       *  through {@link applyAudioMix}. Behind ?debug=1 only, so a live-stage test
+       *  can prove the "slider at 0" case: the UI seam still FIRES (`uiCues`
+       *  climbs) but `sfxBusGain` reads 0, so the cue is inaudible (field report
+       *  v0.2.4+ point 4). The real slider→gain path is the settings test's job. */
+      setSfx(value: number): void {
+        audio.setSfxVolume(value);
+      },
     };
     try {
       Object.defineProperty(window, '__audioStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__pauseStage` — the ?debug=1 live-stage seam that proves, on a
+   * REAL boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
+   * offline sim freezes while it is up and resumes on RESUME, SETTINGS round-trips,
+   * and EXIT+confirm tears the world down to the menu. Pure READBACK plus the
+   * physical press points the client itself drew each control at (through the
+   * landscape-lock remap, the same shape `__mainMenu` uses), so a Playwright test
+   * drives the WHOLE path with real ESC and real clicks — never a hit-test seam —
+   * and reads back only plain state. Behind ?debug=1; absent in a normal build.
+   */
+  function installPauseStage(): void {
+    const physOf = (lx: number, ly: number): { x: number; y: number } => {
+      const p = logicalToPhysical(lx, ly, transform);
+      return { x: p.x, y: p.y };
+    };
+    /** The controls on whichever pause screen is up — pause buttons, confirm
+     *  buttons, or the settings rows + DONE — each with the physical point a real
+     *  press must land on. Empty when the overlay is closed. */
+    const controls = (): { kind: string; physicalCenter: { x: number; y: number } }[] => {
+      const w = transform.logicalWidth;
+      const h = transform.logicalHeight;
+      if (pauseScreen === 'settings') {
+        const l = settingsLayout({ width: w, height: h }, { isTouch });
+        const rows = l.rows.map((r, i) => ({
+          kind: SETTINGS_ROWS[i]?.kind ?? 'row',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        }));
+        rows.push({
+          kind: 'back',
+          physicalCenter: physOf(l.back.x + l.back.width / 2, l.back.y + l.back.height / 2),
+        });
+        return rows;
+      }
+      if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
+        const ids = pauseButtons(pauseScreen);
+        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        return l.buttons.map((r, i) => ({
+          kind: ids[i] ?? 'button',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        }));
+      }
+      return [];
+    };
+    const stage = {
+      read(): {
+        screen: PauseScreen;
+        open: boolean;
+        pausable: boolean;
+        frozen: boolean;
+        simTicks: number;
+        controls: { kind: string; physicalCenter: { x: number; y: number } }[];
+        buttonPoint: { x: number; y: number };
+      } {
+        const r = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+        return {
+          screen: pauseScreen,
+          open: isPauseOpen(pauseScreen),
+          pausable,
+          // The one distinction the whole feature turns on: offline + overlay-up →
+          // frozen. Read live, so a test can watch it flip on ESC and off on RESUME.
+          frozen: shouldFreezeSim(pauseScreen, pausable),
+          // The sim's own step counter — unchanging while frozen, advancing after
+          // RESUME. The executable form of "ticks stop, resume continues."
+          simTicks,
+          controls: controls(),
+          // The touch corner button's physical centre (for the phone-profile path).
+          buttonPoint: physOf(r.x + r.width / 2, r.y + r.height / 2),
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__pauseStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -3122,12 +3612,12 @@ async function boot(): Promise<void> {
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);
 
-    // The open-build-wheel button — a permanent HUD fixture at your own planet
+    // The open-build-wheel button — a permanent HUD fixture at your own station
     // (GDD §2.2, §2.4). Registered from the SAME `buildVisible`/`buildButtonRect`
     // that draw it, so the registry records what is really on screen: present
     // exactly while docked, and unaffected by opening the wheel or building —
     // which is the field-report bug made mechanically checkable. Null (and so
-    // unregistered) off-touch and away from the planet. Its id + anchor are the
+    // unregistered) off-touch and away from the station. Its id + anchor are the
     // UI's contract (`@ui` build-button.ts); see there for why the region is
     // `full` on a short landscape phone.
     const buildBtn = buildButtonRect(isTouch, buildVisible, w, h);
@@ -3145,6 +3635,15 @@ async function boot(): Promise<void> {
     // request v0.1.1) is a placement assertion, not a hope. Registered only while
     // it is actually on screen (the player has backed out of fullscreen).
     if (fsAffordance.visible) reg.register(FS_AFFORDANCE_ID, FS_AFFORDANCE_ANCHOR, fsAffordance.layoutBounds(w, h));
+
+    // Pause menu (developer p10): the overlay (while up) and the touch corner
+    // button (while the match owns the screen) register their own logical rects —
+    // so QA's placement suite can arbitrate that the corner button lands "clear of
+    // everything" and the overlay owns the frame. Self-computed logical bounds, so
+    // no physical→logical conversion (like the ship and the build button).
+    for (const e of pauseView.describeLayout({ width: w, height: h })) {
+      reg.register(e.id, e.anchor, e.bounds);
+    }
 
     // HUD-owned elements (ore HUD, banked total, wave clock, controls strip,
     // onboarding prompt): registered via the Hud's public describeLayout() seam
@@ -3188,7 +3687,7 @@ async function boot(): Promise<void> {
     // Reflect the drawn set for the live-boot suite (?debug=1 only, else a no-op).
     if (combatDebug.enabled) combatDebug.update(flashes);
     if (flashes.length === 0) return EMPTY_MUZZLES;
-    return fillMuzzleViews(flashes);
+    return fillMuzzleViews(flashes, world);
   }
 
   // --- Viewport: keep renderer, touch halves, HUD, and overlay in sync with the
@@ -3207,6 +3706,8 @@ async function boot(): Promise<void> {
     touch.setScreenWidth(w);
     hud.resize(w, h);
     endOverlay.resize(w, h, isTouch);
+    pauseView.resize(w, h, isTouch);
+    pauseSettings.resize(w, h, isTouch);
   }
 
   /** The camera's LOGICAL (landscape) viewport, in the space the world is drawn
@@ -3321,12 +3822,13 @@ async function boot(): Promise<void> {
     if (e.code === MINIMAP_TOGGLE_KEY) {
       hud.toggleMinimap();
     }
-    // ESC mirrors the hub BACK on PC (field report v0.2.4): one press pops one
-    // wheel level — WEAPON → upgrade → Build → closed — the desktop twin of a tap
-    // on the wheel's centre. Only while a wheel is up, so ESC still falls through
-    // to anything else that wants it when the wheel is shut.
-    if (e.code === 'Escape' && buildWheel.open) {
-      wheelBackOneLevel();
+    // ESC (field report v0.2.4 + developer p10): with a wheel up it pops one wheel
+    // level — WEAPON → upgrade → Build → closed; otherwise it opens the pause
+    // overlay, or backs it out one level (settings → menu → closed). One "go back"
+    // gesture spanning the wheel and the pause menu. Never opens over the end
+    // screen, which owns its own exits.
+    if (e.code === 'Escape') {
+      handlePauseKey();
     }
   });
 
@@ -3382,7 +3884,7 @@ interface MutCombatant {
  *  in place each frame (field request v0.2.1), handed over as `Nameable`. */
 interface MutNameable {
   owner: PlayerId;
-  kind: 'ship' | 'planet';
+  kind: 'ship' | 'station';
   alive: boolean;
   local: boolean;
   inCombat: boolean;
@@ -3391,9 +3893,9 @@ interface MutNameable {
   radius: number;
 }
 
-/** A mutable {@link MinimapPlanet} — the pooled records `feedMinimap()` overwrites
- *  in place each frame (field request v0.2.2), handed over as `MinimapPlanet`. */
-interface MutMinimapPlanet {
+/** A mutable {@link MinimapStation} — the pooled records `feedMinimap()` overwrites
+ *  in place each frame (field request v0.2.2), handed over as `MinimapStation`. */
+interface MutMinimapStation {
   owner: PlayerId;
   x: number;
   y: number;
@@ -3430,6 +3932,7 @@ interface MutableMuzzleView {
   to: Vec2;
   color: number;
   hit: Vec2 | null;
+  width: number;
 }
 
 // A grow-once pool: one scratch MuzzleView per concurrent flash. Bounded by the
@@ -3440,17 +3943,39 @@ interface MutableMuzzleView {
 const muzzleViewPool: MutableMuzzleView[] = [];
 const muzzleViewList: MuzzleView[] = [];
 
+/** Base muzzle-flare stroke width (world units) — the Mk I blast, and the width
+ *  the renderer falls back to for an untiered flash. */
+const MUZZLE_BASE_WIDTH = 3;
+/** Extra flare width per DAMAGE tier — the muzzle scales with the shot it looses
+ *  (RATIFIED p11-06): Mk I → 3, Mk II → 4.5, Mk III → 6, a fatter blast per rung. */
+const MUZZLE_TIER_GAIN = 0.5;
+
+/** The DAMAGE tier of the turret whose flash this is — matched by the origin the
+ *  sim's `muzzleFlashes` aliases straight off `Turret.muzzle` (reference identity,
+ *  so no float compare). A flash whose turret is somehow gone reads as Mk I. The
+ *  walk is bounded by the turret cap (≤32, GDD §4.3), off the render hot path. */
+function firingTurretTier(w: World, flash: MuzzleFlash): number {
+  for (const station of w.stations) {
+    for (const t of station.turrets) {
+      if (t.muzzle && t.muzzle.origin === flash.origin) return turretTier(t);
+    }
+  }
+  return 0;
+}
+
 /** Map every muzzle flash this tick into the pooled MuzzleView list the renderer
  *  draws. Endpoint `to` = origin + dir·length (the sim's clamp to what the shot is
  *  aimed at, or full range on a miss); colour is the owner's identity hue
- *  (style-guide §3), so each rival turret's flash reads in its own colour. */
-function fillMuzzleViews(flashes: readonly MuzzleFlash[]): readonly MuzzleView[] {
+ *  (style-guide §3), so each rival turret's flash reads in its own colour; the
+ *  flare width scales with the firing turret's DAMAGE tier (p11-06), so a Mk III
+ *  spits a fatter blast than a Mk I. */
+function fillMuzzleViews(flashes: readonly MuzzleFlash[], w: World): readonly MuzzleView[] {
   const n = flashes.length;
   for (let i = 0; i < n; i++) {
     const m = flashes[i]!;
     let v = muzzleViewPool[i];
     if (!v) {
-      v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null };
+      v = { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, color: 0x4dc3ff, hit: null, width: MUZZLE_BASE_WIDTH };
       muzzleViewPool[i] = v;
     }
     v.from = m.origin; // alias the sim's origin (read synchronously this frame)
@@ -3458,6 +3983,7 @@ function fillMuzzleViews(flashes: readonly MuzzleFlash[]): readonly MuzzleView[]
     v.to.y = m.origin.y + m.dir.y * m.length;
     v.hit = m.hitPoint; // null on a clean miss → no impact glow
     v.color = PLAYER_COLORS[m.shooter % PLAYER_COLORS.length] ?? 0x4dc3ff;
+    v.width = MUZZLE_BASE_WIDTH * (1 + firingTurretTier(w, m) * MUZZLE_TIER_GAIN);
     muzzleViewList[i] = v;
   }
   muzzleViewList.length = n; // reuse the objects; just retract the tail
@@ -3486,7 +4012,7 @@ const STAGE_MUZZLE_LEN = 90;
 /** Debug-only (`?debug=1`) deterministic firefight, driven by the live-boot suite
  *  under `?freeze=1` so the sim never steps to clear it: set the firing flag on a
  *  non-local ship (an enemy trigger down) and publish a `muzzle` on a fresh turret
- *  owned by a non-local planet (a rival turret firing) — the combat tells the
+ *  owned by a non-local station (a rival turret firing) — the combat tells the
  *  round-2 field report found invisible. Since the v0.3 laser funeral a ship has no
  *  shot geometry to stage (its shots stream from the projectile pool), so only the
  *  turret contributes a muzzle flash. Returns what it staged so the test can assert
@@ -3498,19 +4024,19 @@ function stageCombatFor(world: World): StagedCombat {
   const botShip = world.ships.find((s) => s.id !== LOCAL_PLAYER && s.alive) ?? world.ships[0]!;
   botShip.firing = true;
 
-  // A turret with a live muzzle, mounted on a non-local planet so its owner is
+  // A turret with a live muzzle, mounted on a non-local station so its owner is
   // non-local — a rival turret loosing a shot.
-  const planet = world.planets.find((p) => p.owner !== LOCAL_PLAYER) ?? world.planets[0]!;
+  const station = world.stations.find((p) => p.owner !== LOCAL_PLAYER) ?? world.stations[0]!;
   const muzzle: Muzzle = {
-    origin: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 },
+    origin: { x: station.pos.x, y: station.pos.y - station.radius - 12 },
     dir: { x: 0, y: -1 },
-    hitPoint: { x: planet.pos.x, y: planet.pos.y - planet.radius - 12 - STAGE_MUZZLE_LEN },
+    hitPoint: { x: station.pos.x, y: station.pos.y - station.radius - 12 - STAGE_MUZZLE_LEN },
     length: STAGE_MUZZLE_LEN,
   };
   const turret: Turret = {
     id: world.nextEntityId++,
-    owner: planet.owner,
-    slot: planet.turrets.length,
+    owner: station.owner,
+    slot: station.turrets.length,
     pos: { x: muzzle.origin.x, y: muzzle.origin.y },
     radius: 6,
     hp: 10,
@@ -3520,7 +4046,7 @@ function stageCombatFor(world: World): StagedCombat {
     targetId: null,
     muzzle,
   };
-  planet.turrets.push(turret);
+  station.turrets.push(turret);
 
   return {
     firingShip: botShip.id,
@@ -3563,20 +4089,20 @@ function centerRect(out: Rect, c: Vec2, size: number): Rect {
   return out;
 }
 
-/** Shield HP at full over a planet's core — 0 with no generator built, so the
+/** Shield HP at full over a station's core — 0 with no generator built, so the
  *  HUD's shield overbar appears the frame the first one finishes (GDD §2.5).
  *  The sim publishes the *current* pool (`shieldPool`); this is its ceiling. */
-function shieldPoolMax(planet: Planet): number {
+function shieldPoolMax(station: MiningStation): number {
   let hp = 0;
-  for (const s of planet.shields) hp += s.maxHp;
+  for (const s of station.shields) hp += s.maxHp;
   return hp;
 }
 
-/** Summed HP of a planet's live turrets — the third term in the alarm's
- *  "your planet is being hurt" signal (GDD §2.2). */
-function turretPool(planet: Planet): number {
+/** Summed HP of a station's live turrets — the third term in the alarm's
+ *  "your station is being hurt" signal (GDD §2.2). */
+function turretPool(station: MiningStation): number {
   let hp = 0;
-  for (const t of planet.turrets) hp += t.hp;
+  for (const t of station.turrets) hp += t.hp;
   return hp;
 }
 
@@ -3972,7 +4498,7 @@ function installMainMenuSeam(seam: object): void {
 }
 
 /** The choices the player locks in at RUSH! — the hull, the arena (p2), and the
- *  name shown over their ship and planet (field request v0.2.1). */
+ *  name shown over their ship and station (field request v0.2.1). */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
@@ -3987,12 +4513,12 @@ interface LobbyHandle {
    *  and arena — `boot()` builds the world with both (GDD §2.11; p2). */
   untilRush(): Promise<LobbyChoice>;
   /** Report what the built world actually made: the hull the local ship flies and
-   *  the arena's home-planet positions — the proof both picks reached the sim
-   *  (drives `window.__lobby.localShipClass` / `.worldMapId` / `.worldPlanets`). */
+   *  the arena's home-station positions — the proof both picks reached the sim
+   *  (drives `window.__lobby.localShipClass` / `.worldMapId` / `.worldStations`). */
   matchStarted(
     worldShipClass: ShipClass,
     worldMapId: string,
-    worldPlanets: readonly { x: number; y: number }[],
+    worldStations: readonly { x: number; y: number }[],
   ): void;
 }
 
@@ -4052,14 +4578,14 @@ interface LobbySeam {
   mapOrder: readonly string[];
   /** The arena card rects (logical, landscape space) — thumb-size assertion targets. */
   mapCards: readonly Rect[];
-  /** Each map's registry planet positions, from the SAME bundled registry the sim
+  /** Each map's registry station positions, from the SAME bundled registry the sim
    *  builds from — the expected board a booted match must match (p2). */
-  expectedPlanets: Readonly<Record<string, readonly { x: number; y: number }[]>>;
+  expectedStations: Readonly<Record<string, readonly { x: number; y: number }[]>>;
   /** The arena the built world actually used, or null until the match boots. */
   worldMapId: string | null;
-  /** The built world's home-planet positions, or null until the match boots — the
+  /** The built world's home-station positions, or null until the match boots — the
    *  proof the picked arena reached the sim (p2). */
-  worldPlanets: readonly { x: number; y: number }[] | null;
+  worldStations: readonly { x: number; y: number }[] | null;
   /** Select the arena card at `index` in {@link mapOrder} — a tap on a card. */
   selectMap(index: number): void;
 }
@@ -4128,17 +4654,17 @@ function openLobby(
     selectClass: (index: number): void => selectClassAt(index),
     rush: (): void => rush(),
     // The arena picker (p2), computed once from the bundled registry — the same
-    // board the sim builds from, so `expectedPlanets` is the truth a booted match
+    // board the sim builds from, so `expectedStations` is the truth a booted match
     // must match. Layout facts are refreshed each render; `worldMapId`/
-    // `worldPlanets` stay null until `boot()` reports the built world.
+    // `worldStations` stay null until `boot()` reports the built world.
     selectedMapId: state.mapId,
     defaultMapId: normalizeMapId(''),
     veteranMapId: VETERAN_MAP_ID,
     mapOrder: MAP_ORDER,
     mapCards: [],
-    expectedPlanets: Object.fromEntries(MAP_ORDER.map((id) => [id, registryPlanets(id)])),
+    expectedStations: Object.fromEntries(MAP_ORDER.map((id) => [id, registryStations(id)])),
     worldMapId: null,
-    worldPlanets: null,
+    worldStations: null,
     selectMap: (index: number): void => selectMapAt(index),
   };
 
@@ -4287,11 +4813,11 @@ function openLobby(
     matchStarted: (
       worldShipClass: ShipClass,
       worldMapId: string,
-      worldPlanets: readonly { x: number; y: number }[],
+      worldStations: readonly { x: number; y: number }[],
     ): void => {
       seam.localShipClass = worldShipClass;
       seam.worldMapId = worldMapId;
-      seam.worldPlanets = worldPlanets.map((p) => ({ x: p.x, y: p.y }));
+      seam.worldStations = worldStations.map((p) => ({ x: p.x, y: p.y }));
     },
   };
 }

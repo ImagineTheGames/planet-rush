@@ -30,7 +30,7 @@
  */
 
 /** Seconds the wheel takes to pop fully open or fully shut. Short — the wheel is
- *  opened *at* your planet, so it is a confirmation flourish, not a wait. */
+ *  opened *at* your station, so it is a confirmation flourish, not a wait. */
 export const WHEEL_TRANSITION_SECONDS = 0.12;
 
 /** Where the transition is right now. Derived from {@link WheelToggle.progress}

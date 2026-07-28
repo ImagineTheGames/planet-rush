@@ -53,14 +53,32 @@ import { UnderAttackAlarm, type AlarmOptions } from './alarm';
 import { SOUND, TELL_SOUND, CUE_SOUND, type SoundName, type AudioCue } from './bank';
 import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
-import { AudioGraph, type LoopHandle, type MixOptions } from './graph';
+import { AudioGraph, type LoopHandle, type MixOptions, type Spatial } from './graph';
+import { HERE, place, R_NEAR, R_FAR, type Placement } from './spatial';
 import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
 
-/** Distance in world units at which a sound is at full level. */
-export const EARSHOT_NEAR = 260;
+/**
+ * Distance in world units at which a sound is at full level. Re-exported from
+ * `./spatial` (`R_NEAR`) under the earshot name the callers and tests grew up on.
+ */
+export const EARSHOT_NEAR = R_NEAR;
 
-/** Distance beyond which a sound is inaudible. Roughly a screen and a half. */
-export const EARSHOT_FAR = 1400;
+/** Distance beyond which a sound is inaudible (`./spatial` `R_FAR`). A screen and a half. */
+export const EARSHOT_FAR = R_FAR;
+
+/**
+ * World tells heard from anywhere — the wave klaxon, the collapse, the match-end
+ * fanfare. Emitted "at the arena centre", they would fall off (or be culled) for a
+ * player at the rim of an eight-facility claim, yet the wave clock is a mechanic
+ * everyone must hear (GDD §2.3). Like the alarm and the win/loss/death stings
+ * (ratified a3-03), these are cockpit alerts, not located combat: no pan, no
+ * falloff. Everything else the sim emits at a place is spatialised.
+ */
+const GLOBAL_TELLS: ReadonlySet<TellKind> = new Set<TellKind>([
+  TELL.waveArrive,
+  TELL.collapseBegin,
+  TELL.matchEnd,
+]);
 
 /** Below this the mix is treated as silent and one-shots are not started. */
 const HUSHED = 0.001;
@@ -133,6 +151,7 @@ export class AudioEngine {
   private started = false;
   private played = 0;
   private skipped = 0;
+  private lastSpatial: Placement = HERE;
 
   constructor(options: AudioEngineOptions = {}) {
     const ctx = options.context ?? null;
@@ -164,6 +183,35 @@ export class AudioEngine {
   /** One-shots skipped because the hush had the mix at zero (GDD §4.7). */
   get hushedCount(): number {
     return this.skipped;
+  }
+
+  /**
+   * The placement of the most recent spatial one-shot — the audio spy's readout.
+   * Sound cannot screenshot, so the evidence is numbers: the gain a far siege was
+   * heard at, the pan a shot flew in on (ratified a3-03, evidence note). A global
+   * klaxon or a UI cue leaves it untouched.
+   */
+  get lastPlacement(): Placement {
+    return this.lastSpatial;
+  }
+
+  /**
+   * What the spatial model would do to a sound at world (x, y) right now, given
+   * the current listener — pure, plays nothing. The `?debug=1` audio stage reads
+   * this so a live-stage test can attest that a distant fight is near-silent and
+   * that pan flips sign across the ship.
+   */
+  probe(x: number, y: number): Placement {
+    return this.hasListener ? place(x, y, this.listenerX, this.listenerY) : HERE;
+  }
+
+  /**
+   * Where the mix is listening from, in world units — the anchor a spatial probe
+   * measures against. `has` is false before the first {@link setListener} (a
+   * spectator, a test), where every sound plays centred and full.
+   */
+  get listener(): { readonly x: number; readonly y: number; readonly has: boolean } {
+    return { x: this.listenerX, y: this.listenerY, has: this.hasListener };
   }
 
   /** True once {@link start} has run — after the unlock gesture (`./unlock`). */
@@ -264,10 +312,12 @@ export class AudioEngine {
           break;
 
         // --- The one serious thing -----------------------------------------
-        case TELL.planetDeath:
+        case TELL.stationDeath:
           // Fire the sound *before* triggering the hush, so the fall is what
-          // the quiet lands on top of rather than being cut off by it.
-          this.oneShot(SOUND.planetDeath, x, y, 1);
+          // the quiet lands on top of rather than being cut off by it. The one
+          // serious thing is a sting, not a located hit: full and centred, heard
+          // wherever on the map a home dies (ratified a3-03).
+          this.flat(SOUND.stationDeath, 1);
           if (this.ownsDeath) this.death.trigger();
           if (player === this.local) this.alarm.silence();
           break;
@@ -337,6 +387,7 @@ export class AudioEngine {
     this.thruster?.stop();
     this.musicScore.reset();
     this.music?.stop();
+    this.lastSpatial = HERE;
   }
 
   // -------------------------------------------------------------------------
@@ -351,10 +402,18 @@ export class AudioEngine {
   private routine(kind: TellKind, x: number, y: number, magnitude: number): void {
     const sound = TELL_SOUND[kind];
     if (!sound) return;
-    this.oneShot(sound, x, y, levelFor(kind, magnitude));
+    const level = levelFor(kind, magnitude);
+    // A global klaxon plays flat; everything the sim placed is spatialised.
+    if (GLOBAL_TELLS.has(kind)) this.flat(sound, level);
+    else this.spatial(sound, x, y, level);
   }
 
-  private oneShot(sound: SoundName, x: number, y: number, level: number): void {
+  /**
+   * A spatial one-shot: the mix places it against the listener (`./spatial`).
+   * Culled before synthesis past {@link EARSHOT_FAR}, so a bot war on the far side
+   * of the claim costs nothing (ratified a3-03, perf).
+   */
+  private spatial(sound: SoundName, x: number, y: number, level: number): void {
     const graph = this.graph;
     if (!graph) return;
     // The hush is the mechanic: while the mix is at zero, nothing is started at
@@ -363,27 +422,28 @@ export class AudioEngine {
       this.skipped++;
       return;
     }
-    const gain = level * this.earshot(x, y);
+    const placement = this.hasListener ? place(x, y, this.listenerX, this.listenerY) : HERE;
+    this.lastSpatial = placement;
+    if (placement.culled) return; // over the horizon: synthesise nothing
+    const gain = level * placement.gain;
     if (gain <= 0.004) return;
-    if (graph.play(sound, gain, graph.jitter())) this.played++;
+    const pan: Spatial = { pan: placement.pan, cutoff: placement.cutoff };
+    if (graph.play(sound, gain, graph.jitter(), 'sfx', pan)) this.played++;
   }
 
   /**
-   * Distance falloff, 1 near the camera down to 0 past {@link EARSHOT_FAR}.
-   *
-   * Linear in distance rather than inverse-square: inverse-square is physically
-   * right and dramatically wrong here, because it makes anything a screen away
-   * effectively silent — and a siege one screen away is exactly the thing a
-   * player is supposed to notice (GDD §2.6, "two beats one").
+   * A non-spatial one-shot: full level, centred, no falloff — a sting or a global
+   * klaxon (the death fall, the wave horn, the match-end fanfare). Still obeys the
+   * three-second hush like everything else (GDD §4.7).
    */
-  private earshot(x: number, y: number): number {
-    if (!this.hasListener) return 1;
-    const dx = x - this.listenerX;
-    const dy = y - this.listenerY;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= EARSHOT_NEAR) return 1;
-    if (d >= EARSHOT_FAR) return 0;
-    return 1 - (d - EARSHOT_NEAR) / (EARSHOT_FAR - EARSHOT_NEAR);
+  private flat(sound: SoundName, level: number): void {
+    const graph = this.graph;
+    if (!graph) return;
+    if (this.death.gain <= HUSHED) {
+      this.skipped++;
+      return;
+    }
+    if (graph.play(sound, clamp01(level), graph.jitter())) this.played++;
   }
 
   /** Start or stop the alarm loop to match the state machine. */
@@ -468,7 +528,7 @@ function levelFor(kind: TellKind, magnitude: number): number {
     case TELL.upgradeBought:
     case TELL.collapseBegin:
     case TELL.matchEnd:
-    case TELL.planetDeath:
+    case TELL.stationDeath:
       return 1;
     default:
       return 1;

@@ -8,7 +8,7 @@
  *
  *   TIER 1 — the closest **hittable enemy** (ship / turret / core): an enemy per
  *     the same friend/foe + spawn-protection predicates a shot obeys, with a clear
- *     line of sight (a planet body or an asteroid across the path eats the shot).
+ *     line of sight (a station body or an asteroid across the path eats the shot).
  *   TIER 2 — only when no enemy is hittable, the closest **asteroid** (mining).
  *
  * A rock is mined ONLY when the field holds no reachable foe; "near a rock with an
@@ -28,7 +28,7 @@ import {
   step,
   type Asteroid,
   type Inputs,
-  type Planet,
+  type MiningStation,
   type Ship,
   type Turret,
   type World,
@@ -36,7 +36,7 @@ import {
 import {
   ASTEROID,
   CORE_HP,
-  PLANET,
+  STATION,
   SHIELD,
   SHIP_RADIUS,
   TURRET,
@@ -89,12 +89,12 @@ function makeTurret(over: Partial<Turret> & Pick<Turret, 'id' | 'owner'>): Turre
   };
 }
 
-function makePlanet(over: Partial<Planet> & Pick<Planet, 'id' | 'owner' | 'pos'>): Planet {
+function makeStation(over: Partial<MiningStation> & Pick<MiningStation, 'id' | 'owner' | 'pos'>): MiningStation {
   return {
     id: over.id,
     owner: over.owner,
     pos: over.pos,
-    radius: over.radius ?? PLANET.radius,
+    radius: over.radius ?? STATION.radius,
     coreHp: over.coreHp ?? CORE_HP,
     maxCoreHp: over.maxCoreHp ?? CORE_HP,
     alive: over.alive ?? true,
@@ -132,7 +132,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 8000, height: 8000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -244,17 +244,17 @@ describe('auto-aim priority ladder — enemies before rocks (ratified p8)', () =
     expect(aimsAt(aim, ORIGIN, enemy.pos)).toBe(false);
   });
 
-  it('TIER 2 fallback: an enemy occluded by a planet body is not hittable, so the rock is mined', () => {
-    // The enemy sits directly behind a planet on +x; auto-aim treats a planet body
-    // as opaque (you do not shoot an enemy through a planet), so the enemy is not
+  it('TIER 2 fallback: an enemy occluded by a station body is not hittable, so the rock is mined', () => {
+    // The enemy sits directly behind a station on +x; auto-aim treats a station body
+    // as opaque (you do not shoot an enemy through a station), so the enemy is not
     // hittable and the ladder mines the clear rock on +y. The occluder is the
     // shooter's OWN home, so it is never a target in its own right — this isolates
     // the line-of-sight rule from the tier-1 pick.
     const shooter = makeShip({ id: SHOOTER, pos: { ...ORIGIN } });
-    const home = makePlanet({ id: 9, owner: SHOOTER, pos: { x: ORIGIN.x + 110, y: ORIGIN.y } });
+    const home = makeStation({ id: 9, owner: SHOOTER, pos: { x: ORIGIN.x + 110, y: ORIGIN.y } });
     const enemy = makeShip({ id: ENEMY, pos: { x: ORIGIN.x + 220, y: ORIGIN.y }, hull: 1e7, maxHull: 1e7 });
     const rock = makeAsteroid({ id: 5, pos: { x: ORIGIN.x, y: ORIGIN.y + 150 } });
-    const world = makeWorld({ ships: [shooter, enemy], asteroids: [rock], planets: [home] });
+    const world = makeWorld({ ships: [shooter, enemy], asteroids: [rock], stations: [home] });
 
     const aim = fireAim(world, SHOOTER);
     expect(aimsAt(aim, ORIGIN, rock.pos)).toBe(true);
@@ -292,18 +292,18 @@ describe('auto-aim priority ladder — enemies before rocks (ratified p8)', () =
 
   it('a turret and a core each outrank a closer rock (the full tier-1 target list)', () => {
     // No enemy ship: an enemy turret and an enemy core are tier-1 targets too, and
-    // both beat a nearer rock. Turret on +x at 130u, core (planet) on +y at 170u,
+    // both beat a nearer rock. Turret on +x at 130u, core (station) on +y at 170u,
     // a closer rock on −x at 90u; the closest tier-1 target (the turret) is picked.
     const shooter = makeShip({ id: SHOOTER, pos: { ...ORIGIN } });
     const turret = makeTurret({ id: 7, owner: ENEMY, pos: { x: ORIGIN.x + 130, y: ORIGIN.y } });
-    const planet = makePlanet({
+    const station = makeStation({
       id: 9,
       owner: ENEMY,
       pos: { x: ORIGIN.x, y: ORIGIN.y + 170 },
       turrets: [turret],
     });
     const rock = makeAsteroid({ id: 5, pos: { x: ORIGIN.x - 90, y: ORIGIN.y } });
-    const world = makeWorld({ ships: [shooter], planets: [planet], asteroids: [rock] });
+    const world = makeWorld({ ships: [shooter], stations: [station], asteroids: [rock] });
 
     const aim = fireAim(world, SHOOTER);
     expect(aimsAt(aim, ORIGIN, turret.pos)).toBe(true);

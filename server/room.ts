@@ -5,7 +5,7 @@
  * A room is created from the lobby with a shareable code, fills its empty slots
  * with bots server-side, and then holds **all** simulation authority: clients
  * send input ticks, this object runs the one true sim (`src/sim/`, never PixiJS)
- * and broadcasts state. A three-human classroom match is still an eight-planet
+ * and broadcasts state. A three-human classroom match is still an eight-station
  * war, because the five empty seats are bots on this side of the wire (GDD §4.2).
  *
  * **The clock lives here.** {@link MatchRoom.update} is handed a wall-clock
@@ -155,7 +155,7 @@ interface Slot {
    * the ship would visibly stutter backwards (GDD §4.2).
    */
   ackSeq: number;
-  /** Per-client fog of war over planet health (GDD §2.2). */
+  /** Per-client fog of war over station health (GDD §2.2). */
   fog: FogTracker | null;
 }
 
@@ -169,7 +169,7 @@ export interface RoomConfig {
   /** Match seed — the world and every bot derive from it (GDD §4.1). */
   readonly seed: number;
   /** Seats in the match — N, the variable match size (2..8, variable-slots
-   *  Task C1). Default {@link MATCH_SLOTS} (8 planets, GDD §2.1). A room is sized
+   *  Task C1). Default {@link MATCH_SLOTS} (8 stations, GDD §2.1). A room is sized
    *  once, at open; "closing" a lobby slot is resolved to a smaller N *before* it
    *  reaches here (dense-roster discipline, spike §S2 / Trap 6), so the room's
    *  seats are always a contiguous `0..N-1` and no sparse id ever enters the sim. */
@@ -323,7 +323,7 @@ export class MatchRoom {
    *     its grace window: the player takes their ship back (GDD §4.2).
    *  2. **Lobby** — the match has not started: the lowest free seat.
    *  3. **Refused** — the match is live and this is not a reclaim. Joining a
-   *     match in progress would mean spawning a fresh planet into a war that
+   *     match in progress would mean spawning a fresh station into a war that
    *     has already been fought; the lobby is where matches are entered.
    */
   join(
@@ -479,7 +479,7 @@ export class MatchRoom {
 
   /**
    * RUSH! (GDD §2.1). Every seat without a human becomes a bot — server-side,
-   * so a three-human classroom match is still an eight-planet war (GDD §4.2) —
+   * so a three-human classroom match is still an eight-station war (GDD §4.2) —
    * and the world is built from the lobby as it stands, so a hull picked a
    * moment ago is the hull that spawns.
    */
@@ -643,7 +643,7 @@ export class MatchRoom {
    * The character that substitutes for a dropped player. Chosen by slot so the
    * same player always gets the same stand-in, and Medium so the substitute
    * plays the triangle rather than turtling or throwing the seat away
-   * (GDD §2.9) — a bot minding your planet should not be a punishment.
+   * (GDD §2.9) — a bot minding your station should not be a punishment.
    */
   private substituteFor(player: PlayerId): PersonalityId {
     const medium = rosterAt(Difficulty.Medium);

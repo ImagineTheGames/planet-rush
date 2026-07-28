@@ -11,9 +11,9 @@
  *  - The selected card is marked in **plasma** (energy/selection); an unselected
  *    one is steel. No **signal yellow** anywhere — a map card is neither ore nor
  *    danger, and the reserved rule is the one that carries the most weight (§2).
- *  - The mini preview draws each home planet as a **patina** disc, the planet's
+ *  - The mini preview draws each home station as a **patina** disc, the station's
  *    own body colour (§5), inside a steel arena frame. The picture is
- *    `map.planets(...)` normalised into the box, so it is the board the sim will
+ *    `map.stations(...)` normalised into the box, so it is the board the sim will
  *    build — it cannot drift from the registry.
  */
 
@@ -149,7 +149,7 @@ export class MapPickerView extends Container {
     }
   }
 
-  /** Draw the arena frame and its home-planet dots, letterboxed to the arena's
+  /** Draw the arena frame and its home-station dots, letterboxed to the arena's
    *  aspect inside `box` so a wide map reads wide and a square one square. */
   private drawPreview(g: Graphics, preview: MapPreview, box: Rect): void {
     g.clear();
@@ -172,9 +172,9 @@ export class MapPickerView extends Container {
       .roundRect(drawX, drawY, drawW, drawH, 3)
       .stroke({ width: 1, color: PALETTE.hullSteel, alpha: 0.5 });
 
-    // Each home planet: a patina disc (its body colour), scaled to the box.
+    // Each home station: a patina disc (its body colour), scaled to the box.
     const dotR = Math.max(1.5, Math.min(drawW, drawH) * 0.05);
-    for (const p of preview.planets) {
+    for (const p of preview.stations) {
       g.circle(drawX + p.x * drawW, drawY + p.y * drawH, dotR).fill({
         color: PALETTE.patina,
         alpha: 0.95,

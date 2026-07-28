@@ -29,7 +29,7 @@
  *
  *  - `./vfx/` — the specified VFX set (GDD §3.6): shot impacts, crack-and-burst,
  *    shield shimmer, muzzle flashes, explosions, thruster trails, spawn glow,
- *    and the planet-death moment with its three seconds of quiet (§4.7).
+ *    and the station-death moment with its three seconds of quiet (§4.7).
  *  - `./audio/` — synthesized SFX, the two firing voices, the under-attack alarm
  *    (§2.2) and the ambient loop. No binary assets: audio is code too.
  *
@@ -43,7 +43,7 @@ export * from './shapes';
 export * from './raster';
 export * from './decals';
 export * from './ships';
-export * from './planets';
+export * from './stations';
 export * from './asteroids';
 export * from './wrecks';
 export * from './buildings';

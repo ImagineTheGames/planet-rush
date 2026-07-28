@@ -35,7 +35,7 @@
  */
 
 import type { PlayerId } from '@shared/types';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
 // Model I/O

@@ -289,15 +289,37 @@ test('PC: real clicks through SETTINGS → the CONTROLS row switch Tap Commander
   await switchToTapCommanderThroughSettings(page, (x, y) => page.mouse.click(x, y));
 });
 
-test.describe('phone profile', () => {
-  // hasTouch lays the menu + settings out at thumb scale AND makes the CONTROLS
-  // row reachable by a real touch — the exact platform the field report was on.
-  test.use({ hasTouch: true, isMobile: true, viewport: { width: 900, height: 420 } });
+// The exact platform the field report was on: a REAL phone, held in PORTRAIT.
+// A cross-platform feature gets BOTH form factors, always — so the front-door
+// walk that ran with clicks above runs again with real touch taps on each of the
+// two device profiles the mobile matrix contracts (playwright.config.ts), at
+// their real portrait pixel dimensions. Under the landscape lock the portrait
+// viewport rotates to a wide, short logical screen; the seam reports each control
+// through that rotation remap, so a touch at the reported point lands on the row
+// the client actually drew — the same remap the CONTROLS row's thumb height now
+// survives (it wraps to a second column rather than compressing to a sliver).
+const PHONE_PROFILES = [
+  { name: 'iPhone', width: 390, height: 844, dpr: 3 },
+  { name: 'Pixel', width: 412, height: 915, dpr: 2.6 },
+] as const;
 
-  test('phone: real taps through SETTINGS → the CONTROLS row switch Tap Commander on, into the match', async ({
-    page,
-  }) => {
-    test.setTimeout(120_000);
-    await switchToTapCommanderThroughSettings(page, (x, y) => page.touchscreen.tap(x, y));
+for (const profile of PHONE_PROFILES) {
+  test.describe(`phone profile — ${profile.name} (portrait, held)`, () => {
+    // hasTouch + isMobile lays the menu + settings out at thumb scale, rotates the
+    // portrait viewport to the landscape-locked logical screen, AND makes the
+    // CONTROLS row reachable by a real touch — not a mouse click.
+    test.use({
+      hasTouch: true,
+      isMobile: true,
+      deviceScaleFactor: profile.dpr,
+      viewport: { width: profile.width, height: profile.height },
+    });
+
+    test(`${profile.name}: real taps through SETTINGS → the CONTROLS row switches Tap Commander on, into the match`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await switchToTapCommanderThroughSettings(page, (x, y) => page.touchscreen.tap(x, y));
+    });
   });
-});
+}

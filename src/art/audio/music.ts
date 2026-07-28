@@ -26,9 +26,9 @@
  * ## The three seconds are protected (d5-02, GDD §4.7)
  *
  * The soundtrack rides the same master → duck node as everything else, so the
- * planet-death hush zeroes it automatically — no special case. The one place it
+ * station-death hush zeroes it automatically — no special case. The one place it
  * *would* have broken the quiet is the win/loss sting, which lands at match end,
- * right on top of the final planet's death. So the sting is **held back until
+ * right on top of the final station's death. So the sting is **held back until
  * the hush has lifted**: the beat a player remembers is the silence, and then
  * the sting after it. That delay is the whole reason the director is handed the
  * hush gain every frame.

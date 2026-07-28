@@ -18,15 +18,15 @@
  *  - **Onboarding prompts** (GDD §2.10): input-agnostic via the action layer,
  *    each firing once.
  *
- * Day-2 surface, landing with planets, cores and the build economy in the sim:
+ * Day-2 surface, landing with stations, cores and the build economy in the sim:
  *
- *  - **Your own planet's HP** (top-right, in your player colour, GDD §2.2) —
+ *  - **Your own station's HP** (top-right, in your player colour, GDD §2.2) —
  *    your own only; enemy HP is scouted, never broadcast.
  *  - **The under-attack alarm** (GDD §2.2, a *mechanic, not polish*): a threat-
  *    red screen frame plus the screen-edge arrow pointing home, on the
  *    sustained-damage trigger in {@link ./alarm} — never on a taunt-tap.
  *  - **The Build & Upgrade wheel** and the upgrade panel behind its arrow
- *    (GDD §2.5), drawn by {@link ./build-wheel-view}, open at your own planet.
+ *    (GDD §2.5), drawn by {@link ./build-wheel-view}, open at your own station.
  *
  * Over-ship hull bars now land as a pooled, screen-space layer over every
  * non-local combat entity ({@link ./healthbar}, {@link ./healthbar-view}); the
@@ -69,12 +69,15 @@ import { upgradeWheelModel, upgradeWedgeAngle, STOCK_TIERS } from './upgrade-whe
 import type { UpgradeTiers } from './upgrade-wheel';
 import { PressFeedback, detectConfirmations } from './press-feedback';
 import type { CostFloat, ControlFeedback, PressSurface, WheelSnapshot } from './press-feedback';
+import { NO_UI_SFX } from './sfx';
+import type { UiSfx } from './sfx';
 import { UnderAttackAlarm, homeArrow, ARROW_EDGE_INSET } from './alarm';
-import type { Point } from './alarm';
-import { planetHpModel, planetHpFlashOn, coreHpReadout } from './planet-hp';
+import type { Point, AlarmDamage, AlarmCause } from './alarm';
+import { COLLAPSE_CORE_DECAY } from '../sim/constants';
+import { stationHpModel, stationHpFlashOn, coreHpReadout } from './station-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
-import { healthBarModel } from './healthbar';
+import { healthBarModel, HEALTHBAR_MIN_FILL } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
@@ -151,7 +154,7 @@ const TOTAL_LABEL_H = 14;
  * the controls strip and the input-agnostic prompt wording (GDD §2.4, §2.10).
  *
  * **Every day-2 field is optional**, and each has a defined default (documented
- * per field). That is deliberate: the M1 feed in `main.ts` predates planets and
+ * per field). That is deliberate: the M1 feed in `main.ts` predates stations and
  * is the Platform Engineer's file, so the HUD must keep compiling and drawing
  * correctly against a frame that carries none of them. As each field gets wired,
  * its element lights up — nothing here has to change, and nothing outside
@@ -175,24 +178,24 @@ export interface HudFrame {
   /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
-  // --- Day 2: your own planet (GDD §2.2 — your own only, never a rival's) ---
+  // --- Day 2: your own station (GDD §2.2 — your own only, never a rival's) ---
 
   /** The local player's slot — selects the HP bar's identity colour
    *  (style-guide §3.1). Default 0. */
   readonly owner?: PlayerId;
-  /** Own planet's current core HP. Default: full (the bar reads healthy). */
+  /** Own station's current core HP. Default: full (the bar reads healthy). */
   readonly coreHp?: number;
-  /** Own planet's max core HP. Default 0 ⇒ the HP element is hidden entirely. */
+  /** Own station's max core HP. Default 0 ⇒ the HP element is hidden entirely. */
   readonly maxCoreHp?: number;
   /** Pooled shield HP standing over the core. Default 0. */
   readonly shieldHp?: number;
   /** Pooled shield HP at full — 0 when no generator is built. Default 0. */
   readonly maxShieldHp?: number;
-  /** Summed HP of the planet's live turrets. Feeds the alarm only: turret damage
-   *  is your planet being attacked too (GDD §2.2). Default 0. */
+  /** Summed HP of the station's live turrets. Feeds the alarm only: turret damage
+   *  is your station being attacked too (GDD §2.2). Default 0. */
   readonly turretHp?: number;
   /** False once the core is destroyed (GDD §2.7). Default true. */
-  readonly planetAlive?: boolean;
+  readonly stationAlive?: boolean;
 
   // --- Day 2: the Build & Upgrade wheel (GDD §2.5) --------------------------
 
@@ -208,7 +211,7 @@ export interface HudFrame {
    *  down entirely; the sim answers which death this is, the UI never guesses.
    *  Default false. */
   readonly eliminated?: boolean;
-  /** The ship is within `PLANET.dockRange` of its own planet — the sim's
+  /** The ship is within `STATION.dockRange` of its own station — the sim's
    *  `isDocked`. The wheel opens here and nowhere else. Default false. */
   readonly docked?: boolean;
   /** The `build` action is held (GDD §2.4). Default false. */
@@ -254,7 +257,7 @@ export interface HudFrame {
   /** The local ship's world position — the follow camera's target. Together with
    *  `homePos` this drives the screen-edge arrow. Default: no arrow. */
   readonly shipPos?: Point;
-  /** The local player's planet's world position. Default: no arrow. */
+  /** The local player's station's world position. Default: no arrow. */
   readonly homePos?: Point;
 
   // --- Day 2: the endgame (GDD §2.3) ---------------------------------------
@@ -274,9 +277,9 @@ export interface HudFrame {
    *  Default: none ⇒ no bars (the M1 feed predates enemies). */
   readonly combatants?: readonly Combatant[];
 
-  // --- Field request v0.2.1: name labels over ships and owned planets --------
+  // --- Field request v0.2.1: name labels over ships and owned stations --------
 
-  /** Label-bearing entities — every ship and every owned planet — each with its
+  /** Label-bearing entities — every ship and every owned station — each with its
    *  owner slot, kind, liveness and **screen-space** position (the caller projects
    *  world → screen). The nameplate layer draws a name over each; the local ship's
    *  own label is filtered unless {@link showOwnShipLabel}. Default: none ⇒ no
@@ -309,7 +312,7 @@ export interface HudFrame {
 
   // --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
 
-  /** The minimap's content in **map (world) space** — arena bounds, planets,
+  /** The minimap's content in **map (world) space** — arena bounds, stations,
    *  ships, the collapse ring, ore hints. Absent before the world exists (the M1
    *  feed) ⇒ the minimap hides entirely; present ⇒ it draws. Unlike the rest of
    *  the HUD this is NOT pre-projected to screen: the minimap does its own fit
@@ -409,28 +412,36 @@ export class Hud extends Container {
    *  respawn. */
   private lastRespawn: RespawnCountdownModel = { show: false, seconds: 0, text: '', color: 0 };
 
-  // --- Own planet HP (top-right, player colour — GDD §2.2) ----------------
-  private readonly planetGroup = new Container();
-  private readonly planetLabel: Text;
+  // --- Own station HP (top-right, player colour — GDD §2.2) ----------------
+  private readonly stationGroup = new Container();
+  private readonly stationLabel: Text;
   /** Numeric core HP beside the bar — a "75/100" readout (developer request,
    *  p5-08). Sim-driven off the same coreHp/maxCoreHp the bar fills from, so the
    *  number and the bar can never disagree. */
   private readonly coreLabel: Text;
-  private readonly planetBar = new Graphics();
+  private readonly stationBar = new Graphics();
 
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
   private readonly alarmGroup = new Container();
   private readonly alarmFrame = new Graphics();
   private readonly alarmArrow = new Graphics();
-  /** The sustained-damage trigger. A taunt-tap never reaches it (GDD §2.2). */
+  /** The sustained-damage trigger. A taunt-tap never reaches it (GDD §2.2). This
+   *  is the ONE under-attack predicate: the frame, the arrow, and (through the
+   *  shared seam) the haptic and audio alarm all read its verdict. */
   private readonly alarm = new UnderAttackAlarm();
-  /** Previous frame's total planet HP (core + shields + turrets) and match time.
-   *  The HUD derives "damage this tick" from the drop rather than asking the
-   *  caller for a damage event, so the alarm needs no new sim plumbing. */
-  private lastDefenseHp = -1;
+  /** Previous frame's station HP, split by pool so the alarm can name which of
+   *  core/shield/turret rang it (the field report's cause). The HUD derives
+   *  "damage this tick" from the drop rather than asking the caller for a damage
+   *  event, so the alarm needs no new sim plumbing. */
+  private lastCoreHp = 0;
+  private lastShieldHp = 0;
+  private lastTurretHp = 0;
+  /** Whether {@link lastCoreHp} et al. hold a real prior frame yet — the first
+   *  frame with a station establishes a baseline, never a phantom hit. */
+  private hasDefenseBaseline = false;
   private lastTime = -1;
   /** Whether the screen-edge arrow actually drew this frame. The arrow is hidden
-   *  while home is already on screen (the planet is its own tell), and the
+   *  while home is already on screen (the station is its own tell), and the
    *  registry records what is drawn, never what would have been. */
   private arrowDrawn = false;
 
@@ -495,7 +506,7 @@ export class Hud extends Container {
   //     sim numbers this HUD already receives — a turret queued, a tier bought,
   //     ore banked, the core healing under a repair channel — so pressing REPAIR
   //     and watching the core tick up needs no new plumbing (press-feedback.ts).
-  private readonly pressFeedback = new PressFeedback();
+  private readonly pressFeedback: PressFeedback;
   /** Last frame's wheel-relevant sim numbers + whether the wheel was open, so a
    *  confirmation is the *change* between two open frames (never a spawn/wiring
    *  jump, which happens with the wheel shut). Null until the first frame. */
@@ -519,8 +530,17 @@ export class Hud extends Container {
   constructor(
     private screenWidth: number,
     private screenHeight: number,
+    /** The UI sound seam (field report v0.2.4+). Fed to the one shared control
+     *  component so every wheel/menu control is heard as it is seen; defaults to
+     *  silent so a headless Hud (Node, the QA harness) makes no sound. */
+    sfx: UiSfx = NO_UI_SFX,
   ) {
     super();
+
+    // The one press/confirm driver for the whole wheel family, wired to the
+    // sound seam: a press ticks (or buzzes, if disabled) and a sim-confirmed
+    // spend chimes, all from the same state that drives the visual tell.
+    this.pressFeedback = new PressFeedback(sfx);
 
     // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
     // yellow. The heading names it as the safe bank total, distinct in both form
@@ -558,19 +578,19 @@ export class Hud extends Container {
     this.respawnGroup.addChild(this.respawnPanel, this.respawnText);
     this.respawnGroup.visible = false;
 
-    // Own planet HP: a right-anchored label above a bar in the player's colour,
+    // Own station HP: a right-anchored label above a bar in the player's colour,
     // with the numeric core HP ("75/100") sitting left-aligned on the same row,
     // opposite HOME and above the left end of the bar — a numeral, so Oxanium
     // (style-guide §5.6). It rides within the bar's own x-span, so it never widens
     // the top-right footprint the layout registry records (see hud-geometry.ts).
-    this.planetLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
-    this.planetLabel.anchor.set(1, 0);
+    this.stationLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
+    this.stationLabel.anchor.set(1, 0);
     this.coreLabel = this.makeText('', FONT_NUMERAL, 11, TEXT_PRIMARY);
     this.coreLabel.anchor.set(0, 0);
     this.coreLabel.x = -HP_BAR_WIDTH;
     this.coreLabel.y = 1;
-    this.planetGroup.addChild(this.planetBar, this.planetLabel, this.coreLabel);
-    this.planetGroup.visible = false;
+    this.stationGroup.addChild(this.stationBar, this.stationLabel, this.coreLabel);
+    this.stationGroup.visible = false;
 
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
     // Both are drawn only while the alarm is sounding — threat red is never a
@@ -598,7 +618,7 @@ export class Hud extends Container {
       this.oreHold,
       this.oreGroup,
       this.waveGroup,
-      this.planetGroup,
+      this.stationGroup,
       this.stripGroup,
       // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
       // the collapse frame and the danger tells must read over it, and the wheel
@@ -633,8 +653,8 @@ export class Hud extends Container {
   private layout(): void {
     this.waveGroup.x = this.screenWidth / 2;
     this.waveGroup.y = PAD;
-    this.planetGroup.x = this.screenWidth - PAD;
-    this.planetGroup.y = PAD;
+    this.stationGroup.x = this.screenWidth - PAD;
+    this.stationGroup.y = PAD;
     this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
     this.promptGroup.x = this.screenWidth / 2;
     // Below the ship (the follow camera holds it at the centre) and above the
@@ -665,7 +685,7 @@ export class Hud extends Container {
     this.updateNameplates(frame);
     this.updateTapMarkers(frame);
     this.updateMinimap(frame);
-    this.updatePlanetHp(frame);
+    this.updateStationHp(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
@@ -744,7 +764,7 @@ export class Hud extends Container {
     if (!show) return;
 
     // The Build & Upgrade row is contextual on docking (field report v0.2.2): its
-    // live key shows only at your own planet, matching the touch BUILD button.
+    // live key shows only at your own station, matching the touch BUILD button.
     const rows = controlsStripView(frame.device, frame.fireMode, frame.isTouch, frame.docked ?? false);
     this.lastStripRows = rows; // captured for the ?debug=1 legend seam
     // Rebuild the label objects only when the binding set changes, not per frame —
@@ -765,7 +785,7 @@ export class Hud extends Container {
     // Lay out "KEY action" pairs left→right along the bottom. Keys in plasma,
     // actions in grey — NOT yellow (style-guide §2 overrides GDD §2.4 prose;
     // see ./controls-strip for the reconciliation). A dimmed row (an affordance
-    // you can't use here — e.g. Build away from your planet) drops its key
+    // you can't use here — e.g. Build away from your station) drops its key
     // entirely, so the legend never prints a dead one, and draws at reduced alpha.
     const DIM_ALPHA = 0.5;
     let x = STRIP_PAD;
@@ -789,23 +809,23 @@ export class Hud extends Container {
     }
   }
 
-  // --- Own planet HP (top-right, GDD §2.2) ---------------------------------
+  // --- Own station HP (top-right, GDD §2.2) ---------------------------------
 
-  /** Your own planet's HP, in your player colour. **Your own only** — a rival's
-   *  health is scouted on their planet within sensor range, never broadcast to
+  /** Your own station's HP, in your player colour. **Your own only** — a rival's
+   *  health is scouted on their station within sensor range, never broadcast to
    *  a HUD bar (GDD §2.2), and there is no code path here that takes another
-   *  player's planet. */
-  private updatePlanetHp(frame: HudFrame): void {
+   *  player's station. */
+  private updateStationHp(frame: HudFrame): void {
     const maxCore = frame.maxCoreHp ?? 0;
     // Nothing wired yet (M1 feed) ⇒ nothing drawn. The element appears the frame
-    // the planet does.
+    // the station does.
     if (maxCore <= 0) {
-      this.planetGroup.visible = false;
+      this.stationGroup.visible = false;
       return;
     }
-    this.planetGroup.visible = true;
+    this.stationGroup.visible = true;
 
-    const model = planetHpModel(
+    const model = stationHpModel(
       frame.owner ?? 0,
       frame.coreHp ?? maxCore,
       maxCore,
@@ -815,25 +835,30 @@ export class Hud extends Container {
 
     // Critical cores flash threat red over the identity colour; a healthy bar is
     // pure player colour, so red on this bar always means the same thing.
-    const flash = planetHpFlashOn(model, frame.time);
+    const flash = stationHpFlashOn(model, frame.time);
     const fill = model.critical && flash ? model.criticalColor : model.color;
 
     const y = HP_BAR_TOP;
-    this.planetBar.clear();
+    this.stationBar.clear();
     // Track: the full width, so the missing part is visible as absence.
-    this.planetBar
+    this.stationBar
       .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, 2)
       .fill({ color: PALETTE.hullSteel, alpha: 0.22 })
       .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, 2)
       .stroke({ width: 1, color: model.color, alpha: 0.55 });
     if (model.coreFraction > 0) {
-      const w = HP_BAR_WIDTH * model.coreFraction;
-      this.planetBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: fill, alpha: 0.95 });
+      // A standing core keeps at least a sliver of fill — a living thing never
+      // renders as an empty bar (field report; full-empty means the core is gone,
+      // which the `coreFraction > 0` gate already excludes). The true fraction
+      // still drives `destroyed`/`critical` in the model.
+      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
+      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: fill, alpha: 0.95 });
     }
-    // Shield overbar: plasma, and only while a generator stands (GDD §2.5).
+    // Shield overbar: plasma, and only while a generator stands (GDD §2.5). A
+    // standing shield pool keeps its sliver too, by the same living-never-empty rule.
     if (model.hasShield && model.shieldFraction > 0) {
-      const sw = HP_BAR_WIDTH * model.shieldFraction;
-      this.planetBar
+      const sw = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.shieldFraction);
+      this.stationBar
         .roundRect(-sw, y - SHIELD_BAR_HEIGHT - 2, sw, SHIELD_BAR_HEIGHT, 1)
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
     }
@@ -844,12 +869,12 @@ export class Hud extends Container {
     // the bar sees it move, not just a silent number.
     const shimmer = this.pressFeedback.coreShimmer(this.frameTime);
     if (shimmer > 0 && model.coreFraction > 0) {
-      const w = HP_BAR_WIDTH * model.coreFraction;
-      this.planetBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
+      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
+      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
     }
 
-    this.planetLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
-    this.planetLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+    this.stationLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
+    this.stationLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
 
     // Numeric core HP ("75/100") beside the bar, off the SAME numbers the bar
     // fills from so the two can never drift. It flashes threat red in step with the
@@ -966,7 +991,7 @@ export class Hud extends Container {
 
   // --- Player-name labels (field request v0.2.1) --------------------------
 
-  /** Draw a name label over every ship and every owned planet (field request
+  /** Draw a name label over every ship and every owned station (field request
    *  v0.2.1). The pure model in {@link ./nameplates} owns "who, what text, which
    *  colour, how faded"; this hands it the frame's already-projected entities and
    *  the lobby's per-slot name table, and draws the result in the screen-space
@@ -1115,6 +1140,17 @@ export class Hud extends Container {
     return this.lastLocalHullFraction;
   }
 
+  /**
+   * Why the under-attack alarm is in its current state — the field report's
+   * cause seam ("the alarm fired out of nowhere"). Read back under ?debug=1 so a
+   * phantom is diagnosed from a screenshot: `damage: 0` while `firing: true`
+   * means a stale latch; a `source`/`reason` names what rang it. This is the ONE
+   * predicate the frame, the arrow, the haptic and the audio alarm all share.
+   */
+  debugAlarmCause(): AlarmCause {
+    return this.alarm.cause;
+  }
+
   // --- Build/Upgrade wheel ?debug=1 live-stage seam (field report v0.2) ------
 
   /** Whether the wheel view accepts input this frame — read by the cycle
@@ -1139,7 +1175,7 @@ export class Hud extends Container {
 
   /** The controls-strip rows resolved for this frame (empty on touch), so a
    *  live-stage test can prove the Build & Upgrade legend is contextual on the
-   *  real client — a live key at your planet, a dimmed hint (never a dead key)
+   *  real client — a live key at your station, a dimmed hint (never a dead key)
    *  away from it (field report v0.2.2). */
   debugControlsStrip(): readonly StripRow[] {
     return this.lastStripRows;
@@ -1202,30 +1238,52 @@ export class Hud extends Container {
    * around the screen plus the arrow pointing home. Returns whether the alarm is
    * sounding, which the onboarding prompt reads.
    *
-   * Damage is *derived*, not reported: the drop in total planet HP (core +
+   * Damage is *derived*, not reported: the drop in total station HP (core +
    * shields + turrets) since last frame is the damage this frame took. Repair
    * and shield regen move it the other way and are ignored — only the fall
-   * counts, which is exactly the "your planet is being hurt" signal.
+   * counts, which is exactly the "your station is being hurt" signal.
    */
   private updateAlarm(frame: HudFrame): boolean {
     const maxCore = frame.maxCoreHp ?? 0;
-    if (maxCore <= 0 || frame.planetAlive === false) {
+    if (maxCore <= 0 || frame.stationAlive === false) {
       this.alarmGroup.visible = false;
       this.alarm.reset();
-      this.lastDefenseHp = -1;
+      this.hasDefenseBaseline = false;
       this.lastTime = frame.time;
       return false;
     }
 
-    const defenseHp = (frame.coreHp ?? maxCore) + (frame.shieldHp ?? 0) + (frame.turretHp ?? 0);
-    // First frame with a planet: establish a baseline, never a phantom hit.
-    const damage = this.lastDefenseHp < 0 ? 0 : Math.max(0, this.lastDefenseHp - defenseHp);
-    this.lastDefenseHp = defenseHp;
+    const coreHp = frame.coreHp ?? maxCore;
+    const shieldHp = frame.shieldHp ?? 0;
+    const turretHp = frame.turretHp ?? 0;
 
     // dt from match time, clamped: a tab that was backgrounded must not dump a
     // multi-second drain into the bucket and silence a live siege.
     const dt = this.lastTime < 0 ? 0 : Math.min(0.25, Math.max(0, frame.time - this.lastTime));
     this.lastTime = frame.time;
+
+    // Damage this tick is the FALL in each pool — repair and shield regen move
+    // the other way and are ignored. Split by pool so the recorded cause names
+    // what rang the alarm. The first frame with a station only sets the baseline.
+    let damage: AlarmDamage = {};
+    if (this.hasDefenseBaseline) {
+      let coreDrop = Math.max(0, this.lastCoreHp - coreHp);
+      // Collapse decays every core at COLLAPSE_CORE_DECAY HP/s (GDD §2.3, the
+      // backstop that guarantees an ending). That is entropy, not an attacker —
+      // subtract the expected bleed so the endgame does not phantom-ring the
+      // alarm; only real fire ON TOP of the decay counts (GDD §2.2). Attacker
+      // fire during collapse still rings it, because it exceeds the decay.
+      if (frame.collapsed) coreDrop = Math.max(0, coreDrop - COLLAPSE_CORE_DECAY * dt);
+      damage = {
+        core: coreDrop,
+        shield: Math.max(0, this.lastShieldHp - shieldHp),
+        turret: Math.max(0, this.lastTurretHp - turretHp),
+      };
+    }
+    this.lastCoreHp = coreHp;
+    this.lastShieldHp = shieldHp;
+    this.lastTurretHp = turretHp;
+    this.hasDefenseBaseline = true;
 
     const active = this.alarm.update(dt, damage);
     this.alarmGroup.visible = active;
@@ -1248,7 +1306,7 @@ export class Hud extends Container {
   }
 
   /** The screen-edge arrow pointing home (GDD §2.2). Hidden when home is already
-   *  on screen — at that point the planet itself is the tell. */
+   *  on screen — at that point the station itself is the tell. */
   private drawHomeArrow(frame: HudFrame, pulse: number): void {
     const ship = frame.shipPos;
     const home = frame.homePos;
@@ -1282,7 +1340,7 @@ export class Hud extends Container {
       requested: frame.buildRequested ?? false,
       docked: frame.docked ?? false,
       shipAlive: frame.shipAlive ?? true,
-      planetAlive: frame.planetAlive ?? true,
+      stationAlive: frame.stationAlive ?? true,
       cargo: frame.cargo,
       banked: frame.banked,
       turrets: frame.turrets ?? 0,
@@ -1467,17 +1525,17 @@ export class Hud extends Container {
    *
    * **Every M2 element is here.** The wheel, the upgrade panel behind its arrow,
    * the under-attack frame and the screen-edge arrow home all register the frame
-   * they are drawn, alongside the own-planet HP bar. Their anchors are argued in
+   * they are drawn, alongside the own-station HP bar. Their anchors are argued in
    * the table below rather than picked for convenience:
    *
    * | id              | anchor        | why that region                        |
    * |-----------------|---------------|----------------------------------------|
-   * | `planet-hp`     | `top-right`   | GDD §2.2 puts own-planet HP top-right. The only M2 element with a *narrow* anchor, so it is the only one whose width is a real constraint: `top-right`'s zone starts at the half-width line, giving the bar a `W/2 − PAD` budget — 144px on a 320px phone against a 140px bar. `hud-geometry.ts` owns that number and `hud-geometry.test.ts` pins it. |
-   * | `build-wheel`   | `full` + 0    | GDD §2.2 opens the wheel "near your own planet"; the follow camera keeps your ship — and so your docked planet — at the screen centre, and the wheel is drawn there. It is an **overlay**: at thumb scale it is ~72% of the shorter screen dimension (GDD §2.4 makes it a touch target first), so no third-width band can hold it and `full` is the region the vocabulary reserves for overlays. The assertion that bites is the real failure mode — a thumb-scaled radial menu spilling off a phone's edge. |
+   * | `station-hp`     | `top-right`   | GDD §2.2 puts own-station HP top-right. The only M2 element with a *narrow* anchor, so it is the only one whose width is a real constraint: `top-right`'s zone starts at the half-width line, giving the bar a `W/2 − PAD` budget — 144px on a 320px phone against a 140px bar. `hud-geometry.ts` owns that number and `hud-geometry.test.ts` pins it. |
+   * | `build-wheel`   | `full` + 0    | GDD §2.2 opens the wheel "near your own station"; the follow camera keeps your ship — and so your docked station — at the screen centre, and the wheel is drawn there. It is an **overlay**: at thumb scale it is ~72% of the shorter screen dimension (GDD §2.4 makes it a touch target first), so no third-width band can hold it and `full` is the region the vocabulary reserves for overlays. The assertion that bites is the real failure mode — a thumb-scaled radial menu spilling off a phone's edge. |
    * | `upgrade-wheel` | `full` + 0    | Same overlay, one wheel deeper (GDD §2.5). Now a radial wheel like the Build wheel (field report v0.2), it shares the Build wheel's centred `2r` square, so the same overlay reasoning and edge assertion hold. |
    *
    * The top-right own-**ship** `hull-hud` readout that used to stack under
-   * `planet-hp` was **removed** (field report v0.2: *"I don't need to see hull on
+   * `station-hp` was **removed** (field report v0.2: *"I don't need to see hull on
    * top right — it's already appearing on my ship"*). The over-ship bar is the
    * single truth for own-ship hull now, so nothing registers beneath HOME any
    * more — the anchor hole is closed, not left orphaned.
@@ -1583,7 +1641,7 @@ export class Hud extends Container {
     push('controls-strip', 'bottom-strip', 0, this.stripGroup);
 
     // M2 (see the table above).
-    push('planet-hp', 'top-right', PAD, this.planetGroup);
+    push('station-hp', 'top-right', PAD, this.stationGroup);
     // The top-right own-ship HULL readout was removed (field report v0.2 — the
     // over-ship bar is the truth now), so nothing registers under `top-right`
     // beneath HOME any more: the layout hole is closed, not orphaned.

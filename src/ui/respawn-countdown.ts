@@ -22,7 +22,7 @@
  */
 
 import type { PlayerId } from '@shared/types';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 
 /** What the countdown overlay should draw this frame (or that it is hidden). */
 export interface RespawnCountdownModel {

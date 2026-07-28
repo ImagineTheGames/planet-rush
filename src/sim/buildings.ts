@@ -1,11 +1,11 @@
 /**
- * src/sim/buildings.ts — the planet economy. OWNER: Gameplay Engineer.
+ * src/sim/buildings.ts — the station economy. OWNER: Gameplay Engineer.
  *
- * Everything the Build & Upgrade wheel spends on and everything a planet does
+ * Everything the Build & Upgrade wheel spends on and everything a station does
  * with it (GDD §2.5, §2.6):
  *
  *  - **Orders** — TURRET (3), SHIELD (5), REPAIR CORE, BANK. Validated by the
- *    sim, never trusted from the sender: own planet, docked, alive, affordable,
+ *    sim, never trusted from the sender: own station, docked, alive, affordable,
  *    under cap. Ore is spent the moment the order lands; construction is time.
  *  - **Construction timers** — a turret assembles over 10 s, a shield over 15,
  *    so defenses are bought *before* the attack, not during it (GDD §2.5).
@@ -17,19 +17,19 @@
  *  - **Turrets** — auto-fire at enemy ships in range with pooled projectiles at
  *    a design DPS of 4.
  *  - **UPGRADE SHIP** — the fifth segment, and the only one that spends on the
- *    *ship* instead of the planet (GDD §2.5). It lands here because the wheel and
- *    the panel behind its arrow are one purchase point at your own planet, so a
+ *    *ship* instead of the station (GDD §2.5). It lands here because the wheel and
+ *    the panel behind its arrow are one purchase point at your own station, so a
  *    row press gets the same validation a wheel order does; the tier ladder and
  *    every stat it derives live in `./upgrades`.
  *
  * GDD §2.6's "pressure beats regeneration" now rides one field for shields only:
- * `planet.sinceDamage`. A hit zeroes it, closing the shield-regen window — so a
+ * `station.sinceDamage`. A hit zeroes it, closing the shield-regen window — so a
  * defender cannot out-regen an attacker who keeps shooting, they have to drive
  * them off first. Repair no longer rides this field: it is a discrete ore-for-HP
  * purchase (below), so pressure beats it through the *finite ore pool*, not an
  * interrupt — every HP bought back is an upgrade or a turret not bought.
  *
- * Determinism (GDD §4.8): fixed iteration order (planets, then their turrets,
+ * Determinism (GDD §4.8): fixed iteration order (stations, then their turrets,
  * then the projectile pool), every rate `* dt`. The turret aim model's seeded
  * deviance (turret-lead field report v0.2.4) draws from a per-turret, per-tick
  * hash of the ratified mulberry32 (`turretAimError`) — deterministic, and
@@ -40,10 +40,11 @@
 import type { Muzzle, PlayerId, BuildItem, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   DEPOSIT_RANGE,
-  PLANET,
+  STATION,
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
   REPAIR_TELL_HOLD,
+  SATELLITE,
   SHIELD,
   TURRET,
   TURRET_MAX_TIER,
@@ -51,9 +52,10 @@ import {
 } from './constants';
 import { areEnemies } from './allegiance';
 import { destroyCore, isCollapsed } from './match';
+import { ledgerAdd } from './ore-ledger';
 import { fireTurretProjectile, leadAim } from './projectiles';
 import { advanceRng } from './rng';
-import type { Planet, Ship, Shield, Turret, World } from './state';
+import type { MiningStation, RadarSatellite, Ship, Shield, Turret, World } from './state';
 import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
 import { dist2, turnToward } from './vec';
 
@@ -61,9 +63,9 @@ import { dist2, turnToward } from './vec';
 // Lookups and the ore wallet
 // ---------------------------------------------------------------------------
 
-/** A player's home planet, or null if they have none (eliminated / no slot). */
-export function planetOf(world: World, owner: PlayerId): Planet | null {
-  for (const p of world.planets) {
+/** A player's home station, or null if they have none (eliminated / no slot). */
+export function stationOf(world: World, owner: PlayerId): MiningStation | null {
+  for (const p of world.stations) {
     if (p.owner === owner) return p;
   }
   return null;
@@ -77,20 +79,20 @@ export function shipOf(world: World, owner: PlayerId): Ship | null {
   return null;
 }
 
-/** True while a ship is close enough to its planet to use the wheel
- *  (GDD §2.5: "opened at your own planet"). Centre-to-centre. */
-export function isDocked(ship: Ship, planet: Planet): boolean {
-  return ship.alive && dist2(ship.pos, planet.pos) <= PLANET.dockRange * PLANET.dockRange;
+/** True while a ship is close enough to its station to use the wheel
+ *  (GDD §2.5: "opened at your own station"). Centre-to-centre. */
+export function isDocked(ship: Ship, station: MiningStation): boolean {
+  return ship.alive && dist2(ship.pos, station.pos) <= STATION.dockRange * STATION.dockRange;
 }
 
-/** True while a ship is inside a planet's atmosphere — the `DEPOSIT_RANGE` halo
- *  within which its hold auto-deposits at its own living planet (ratified p4:
+/** True while a ship is inside a station's atmosphere — the `DEPOSIT_RANGE` halo
+ *  within which its hold auto-deposits at its own living station (ratified p4:
  *  "just be in that atmosphere"). Centre-to-centre, boundary counting as inside.
- *  `DEPOSIT_RANGE > PLANET.dockRange`, so a docked ship is always in-atmosphere.
+ *  `DEPOSIT_RANGE > STATION.dockRange`, so a docked ship is always in-atmosphere.
  *  The caller checks ownership/liveness (see `updateDeposits`); the renderer
  *  draws the halo from the same `DEPOSIT_RANGE` this reads. */
-export function inAtmosphere(ship: Ship, planet: Planet): boolean {
-  return ship.alive && dist2(ship.pos, planet.pos) <= DEPOSIT_RANGE * DEPOSIT_RANGE;
+export function inAtmosphere(ship: Ship, station: MiningStation): boolean {
+  return ship.alive && dist2(ship.pos, station.pos) <= DEPOSIT_RANGE * DEPOSIT_RANGE;
 }
 
 /** Ore a player can actually spend: what's in the hold plus what's banked. */
@@ -104,7 +106,7 @@ export function spendableOre(ship: Ship): number {
  * total — banking then remains a real decision rather than a free upgrade.
  * Returns false and charges nothing if the player cannot afford it.
  */
-export function spendOre(ship: Ship, cost: number): boolean {
+export function spendOre(world: World, ship: Ship, cost: number): boolean {
   if (cost <= 0) return true;
   if (spendableOre(ship) + 1e-9 < cost) return false;
   const fromHold = Math.min(ship.cargo, cost);
@@ -112,36 +114,49 @@ export function spendOre(ship: Ship, cost: number): boolean {
   ship.banked -= cost - fromHold;
   if (ship.cargo < 1e-9) ship.cargo = 0;
   if (ship.banked < 1e-9) ship.banked = 0;
+  // Ore paid out of the economy for good — the one sink every purchase funnels
+  // through, so the conservation ledger sees all spending in one place
+  // (`./ore-ledger`).
+  ledgerAdd(world, 'spent', cost);
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// Per-planet caps (GDD §2.5 — "design rules, not renderer limits")
+// Per-station caps (GDD §2.5 — "design rules, not renderer limits")
 // ---------------------------------------------------------------------------
 
 /** Turrets that exist or are being built — queued jobs count against the cap,
  *  so a player cannot buy their way past 4 by ordering them all at once. */
-export function turretCount(planet: Planet): number {
-  let n = planet.turrets.length;
-  for (const b of planet.builds) if (b.kind === 'turret') n++;
+export function turretCount(station: MiningStation): number {
+  let n = station.turrets.length;
+  for (const b of station.builds) if (b.kind === 'turret') n++;
   return n;
 }
 
 /** Shields that exist or are being built (same rule as {@link turretCount}). */
-export function shieldCount(planet: Planet): number {
-  let n = planet.shields.length;
-  for (const b of planet.builds) if (b.kind === 'shield') n++;
+export function shieldCount(station: MiningStation): number {
+  let n = station.shields.length;
+  for (const b of station.builds) if (b.kind === 'shield') n++;
+  return n;
+}
+
+/** Radar satellites that exist or are being built (feature f1; same rule as
+ *  {@link turretCount}, so a player cannot queue two past the cap of 1). A
+ *  station with no `satellites` array (a foreign literal) counts zero built. */
+export function satelliteCount(station: MiningStation): number {
+  let n = station.satellites?.length ?? 0;
+  for (const b of station.builds) if (b.kind === 'satellite') n++;
   return n;
 }
 
 /** The lowest turret mount slot not held by a live turret or a queued job, or
  *  -1 when the ring is full. Slots are re-used, so a rebuilt turret fills the
  *  hole a dead one left instead of stacking on a survivor. */
-function freeTurretSlot(planet: Planet): number {
-  for (let slot = 0; slot < TURRET.capPerPlanet; slot++) {
+function freeTurretSlot(station: MiningStation): number {
+  for (let slot = 0; slot < TURRET.capPerStation; slot++) {
     let taken = false;
-    for (const t of planet.turrets) if (t.slot === slot) taken = true;
-    for (const b of planet.builds) if (b.kind === 'turret' && b.slot === slot) taken = true;
+    for (const t of station.turrets) if (t.slot === slot) taken = true;
+    for (const b of station.builds) if (b.kind === 'turret' && b.slot === slot) taken = true;
     if (!taken) return slot;
   }
   return -1;
@@ -179,9 +194,9 @@ export function turretFireInterval(turret: Turret): number {
  * every one already Mk III). The UI reads this to know the wedge is in its
  * upgrade state and which turret it targets (parity field report v0.2.2).
  */
-export function turretUpgradeTarget(planet: Planet): Turret | null {
+export function turretUpgradeTarget(station: MiningStation): Turret | null {
   let best: Turret | null = null;
-  for (const t of planet.turrets) {
+  for (const t of station.turrets) {
     if (t.hp <= 0 || turretTier(t) >= TURRET_MAX_TIER) continue;
     const tt = turretTier(t);
     if (best === null || tt < turretTier(best) || (tt === turretTier(best) && t.slot < best.slot)) {
@@ -191,11 +206,11 @@ export function turretUpgradeTarget(planet: Planet): Turret | null {
   return best;
 }
 
-/** Ore price of the next TURRET-wedge upgrade on a planet — advancing its
+/** Ore price of the next TURRET-wedge upgrade on a station — advancing its
  *  {@link turretUpgradeTarget} one Mk up — or `null` when nothing can be
  *  upgraded. The UI prices the wedge's upgrade state from this. */
-export function turretUpgradeCost(planet: Planet): number | null {
-  const target = turretUpgradeTarget(planet);
+export function turretUpgradeCost(station: MiningStation): number | null {
+  const target = turretUpgradeTarget(station);
   if (target === null) return null;
   return turretTierSpec(turretTier(target) + 1).upgradeCost;
 }
@@ -218,27 +233,27 @@ export function applyTurretTier(turret: Turret, tier: number): void {
   if (turret.hp > turret.maxHp) turret.hp = turret.maxHp;
 }
 
-/** The rim angle a turret in `slot` mounts at: the planet's outward angle plus
+/** The rim angle a turret in `slot` mounts at: the station's outward angle plus
  *  an even share of the ring, so slot 0 always starts facing away from the
  *  field. This is the turret's *home* orbit angle — where it is born and where
  *  it slides back to when nothing is in range (field report P1). */
-export function turretHomeAngle(planet: Planet, slot: number): number {
-  return planet.angle + (2 * Math.PI * slot) / TURRET.capPerPlanet;
+export function turretHomeAngle(station: MiningStation, slot: number): number {
+  return station.angle + (2 * Math.PI * slot) / TURRET.capPerStation;
 }
 
-/** The world position of a point at rim angle `angle` around a planet — the
+/** The world position of a point at rim angle `angle` around a station — the
  *  turret's surface-ring orbit at that angle. A turret slides its `orbitAngle`
  *  and its `pos` is this, recomputed every tick. */
-export function turretOrbitPos(planet: Planet, angle: number): { x: number; y: number } {
-  const r = planet.radius + TURRET.mountOffset + TURRET.radius;
-  return { x: planet.pos.x + Math.cos(angle) * r, y: planet.pos.y + Math.sin(angle) * r };
+export function turretOrbitPos(station: MiningStation, angle: number): { x: number; y: number } {
+  const r = station.radius + TURRET.mountOffset + TURRET.radius;
+  return { x: station.pos.x + Math.cos(angle) * r, y: station.pos.y + Math.sin(angle) * r };
 }
 
-/** Where a turret in `slot` sits at rest: on the planet's surface ring, at its
+/** Where a turret in `slot` sits at rest: on the station's surface ring, at its
  *  mount-slot home angle. The build-spot position, and the orbit position of a
  *  turret whose `orbitAngle` still equals its home angle. */
-export function turretMountPos(planet: Planet, slot: number): { x: number; y: number } {
-  return turretOrbitPos(planet, turretHomeAngle(planet, slot));
+export function turretMountPos(station: MiningStation, slot: number): { x: number; y: number } {
+  return turretOrbitPos(station, turretHomeAngle(station, slot));
 }
 
 // ---------------------------------------------------------------------------
@@ -252,8 +267,8 @@ export function turretMountPos(planet: Planet, slot: number): { x: number; y: nu
  */
 export type OrderResult =
   | 'ok'
-  | 'no-planet'
-  | 'planet-dead'
+  | 'no-station'
+  | 'station-dead'
   | 'not-docked'
   | 'cap-reached'
   | 'cannot-afford'
@@ -270,6 +285,8 @@ export function orderCost(item: BuildItem): number {
       return TURRET.cost;
     case 'shield':
       return SHIELD.cost;
+    case 'satellite':
+      return SATELLITE.cost;
     case 'repair':
       return REPAIR_ORE_COST;
     case 'bank':
@@ -283,14 +300,17 @@ export function orderCost(item: BuildItem): number {
  * Pure state mutation — no allocation beyond the job/entity it creates.
  */
 export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResult {
-  const planet = planetOf(world, ship.id);
-  if (!planet) return 'no-planet';
-  if (!planet.alive) return 'planet-dead';
-  if (!isDocked(ship, planet)) return 'not-docked';
+  const station = stationOf(world, ship.id);
+  if (!station) return 'no-station';
+  if (!station.alive) return 'station-dead';
+  if (!isDocked(ship, station)) return 'not-docked';
 
   switch (item) {
     case 'bank': {
       if (ship.cargo <= 1e-9) return 'nothing-to-bank';
+      // Hold → bank, all at once (the dock-bank order, vs the atmosphere drain).
+      // A transfer within the live economy — recorded for the ledger.
+      ledgerAdd(world, 'deposited', ship.cargo);
       ship.banked += ship.cargo;
       ship.cargo = 0;
       return 'ok';
@@ -299,13 +319,13 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // Collapse shuts repair off entirely (GDD §2.3): from here on, damage to a
       // core is permanent and the only defence left is the ship in front of it.
       if (isCollapsed(world)) return 'collapsed';
-      if (planet.coreHp >= planet.maxCoreHp - 1e-9) return 'core-full';
+      if (station.coreHp >= station.maxCoreHp - 1e-9) return 'core-full';
       // ONE press = ONE purchase (developer, 2026-07-26, supersedes the GDD
       // channel): spend REPAIR_ORE_COST and restore REPAIR_HP_PER_ORE, clamped.
       // No channel, no drain — the affordability check is `spendOre`, so N taps
       // are N independent, individually-checked spends. An empty/short bank is
       // refused loudly, spending nothing (`spendOre` charges only on success).
-      if (!spendOre(ship, REPAIR_ORE_COST)) return 'cannot-afford';
+      if (!spendOre(world, ship, REPAIR_ORE_COST)) return 'cannot-afford';
       // A core missing less than REPAIR_HP_PER_ORE still costs the full ore and
       // heals to full — the wheel SHOWS the real number, so the choice is
       // informed (p5-08). `repairing` is the repair TELL, lit here and held for
@@ -313,18 +333,18 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // on it and an AI defender paces its next order off it, but it drains
       // nothing and heals nothing beyond this one purchase. It does NOT gate this
       // call — a human taps as fast as they like, one purchase per tap.
-      planet.coreHp = Math.min(planet.maxCoreHp, planet.coreHp + REPAIR_HP_PER_ORE);
-      planet.repairing = true;
-      planet.repairCooldown = REPAIR_TELL_HOLD;
+      station.coreHp = Math.min(station.maxCoreHp, station.coreHp + REPAIR_HP_PER_ORE);
+      station.repairing = true;
+      station.repairCooldown = REPAIR_TELL_HOLD;
       return 'ok';
     }
     case 'turret': {
-      const slot = freeTurretSlot(planet);
+      const slot = freeTurretSlot(station);
       if (slot >= 0) {
         // A mount is free: BUILD a new Mk I turret. Construction takes time, so
         // the defense is bought before the attack, not during it (GDD §2.5).
-        if (!spendOre(ship, TURRET.cost)) return 'cannot-afford';
-        planet.builds.push({
+        if (!spendOre(world, ship, TURRET.cost)) return 'cannot-afford';
+        station.builds.push({
           id: world.nextEntityId++,
           kind: 'turret',
           slot,
@@ -338,23 +358,40 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // a ship upgrade (`buyUpgrade`): the defense already stands, so the
       // build-time gate — which exists to stop a *new* defense appearing
       // mid-attack — does not apply. Ore is drawn hold-first then bank, as ever.
-      const target = turretUpgradeTarget(planet);
+      const target = turretUpgradeTarget(station);
       if (target === null) return 'cap-reached'; // full ring, every turret maxed
       const cost = turretTierSpec(turretTier(target) + 1).upgradeCost;
       if (cost === null) return 'cap-reached';
-      if (!spendOre(ship, cost)) return 'cannot-afford';
+      if (!spendOre(world, ship, cost)) return 'cannot-afford';
       applyTurretTier(target, turretTier(target) + 1);
       return 'ok';
     }
     case 'shield': {
-      if (shieldCount(planet) >= SHIELD.capPerPlanet) return 'cap-reached';
-      if (!spendOre(ship, SHIELD.cost)) return 'cannot-afford';
-      planet.builds.push({
+      if (shieldCount(station) >= SHIELD.capPerStation) return 'cap-reached';
+      if (!spendOre(world, ship, SHIELD.cost)) return 'cannot-afford';
+      station.builds.push({
         id: world.nextEntityId++,
         kind: 'shield',
         slot: 0,
         remaining: SHIELD.buildTime,
         total: SHIELD.buildTime,
+      });
+      return 'ok';
+    }
+    case 'satellite': {
+      // One radar satellite per station (feature f1) — validated exactly like a
+      // shield: under cap, affordable, then the ore is spent now and construction
+      // takes time (`SATELLITE.buildTime`), so the sensor is bought before the
+      // fight, not conjured mid-siege. Queued jobs count against the cap, so a
+      // player cannot buy their way past 1 by ordering two on one tick.
+      if (satelliteCount(station) >= SATELLITE.capPerStation) return 'cap-reached';
+      if (!spendOre(world, ship, SATELLITE.cost)) return 'cannot-afford';
+      station.builds.push({
+        id: world.nextEntityId++,
+        kind: 'satellite',
+        slot: 0,
+        remaining: SATELLITE.buildTime,
+        total: SATELLITE.buildTime,
       });
       return 'ok';
     }
@@ -373,13 +410,13 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
 export type UpgradeResult =
   | 'ok'
   /** The ship is dead, waiting on the respawn clock — a purchase is an action a
-   *  live hull takes at its planet, and a wreck between lives takes none (GDD
+   *  live hull takes at its station, and a wreck between lives takes none (GDD
    *  §2.5, §2.7). The refusal is loud (not a misleading `not-docked`) so the
-   *  upgrade screen can say "respawning" rather than "fly to your planet". The
+   *  upgrade screen can say "respawning" rather than "fly to your station". The
    *  order is refused, never queued — see the `!ship.alive` decision below. */
   | 'dead'
-  | 'no-planet'
-  | 'planet-dead'
+  | 'no-station'
+  | 'station-dead'
   | 'not-docked'
   | 'cannot-afford'
   /** The ladder on that track is finished — there is no next tier to sell. */
@@ -388,7 +425,7 @@ export type UpgradeResult =
 /**
  * Buy one tier on one track (GDD §2.5) — the press on a row of the upgrade
  * panel. Validated exactly like a wheel order and for the same reason: the wheel
- * and the panel are one purchase point, "opened at your own planet", and the sim
+ * and the panel are one purchase point, "opened at your own station", and the sim
  * never trusts the sender (GDD §2.5, §2.9).
  *
  * Deliberately **not** blocked by the collapse phase. Collapse is spelled out as
@@ -403,7 +440,7 @@ export type UpgradeResult =
  * `cargoCap` can never disagree with the tiers that produced them.
  *
  * **Upgrades are the player's, not the hull's** (v0.2.2 field report, ratified):
- * `ship.id` — a stable {@link PlayerId} — keys the planet lookup, and `ship.tiers`
+ * `ship.id` — a stable {@link PlayerId} — keys the station lookup, and `ship.tiers`
  * is match-lifetime state the respawn path never clears (`./step` `respawn`). So a
  * purchase resolves the same before a death and after a respawn: the same wallet,
  * the same ladder, no reference to a "previous" hull, because the sim mutates one
@@ -413,20 +450,20 @@ export type UpgradeResult =
  * The one life-state gate is `alive`: a dead ship (between lives) is refused
  * `'dead'` *before* the docking check, so the reason is the true one — you are a
  * wreck on the respawn clock, not merely out of dock range. The order is refused,
- * never queued: a purchase is a live action, and the ship reaches its planet again
+ * never queued: a purchase is a live action, and the ship reaches its station again
  * on respawn to buy for real (`isDocked` also short-circuits on `alive`, but the
  * explicit gate makes the documented precondition legible and refactor-proof).
  */
 export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): UpgradeResult {
   if (!ship.alive) return 'dead';
-  const planet = planetOf(world, ship.id);
-  if (!planet) return 'no-planet';
-  if (!planet.alive) return 'planet-dead';
-  if (!isDocked(ship, planet)) return 'not-docked';
+  const station = stationOf(world, ship.id);
+  if (!station) return 'no-station';
+  if (!station.alive) return 'station-dead';
+  if (!isDocked(ship, station)) return 'not-docked';
 
   const cost = nextUpgradeCost(ship, track);
   if (cost === null) return 'maxed';
-  if (!spendOre(ship, cost)) return 'cannot-afford';
+  if (!spendOre(world, ship, cost)) return 'cannot-afford';
 
   ship.tiers[track] += 1;
   applyPurchasedStats(ship);
@@ -438,7 +475,7 @@ export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): Upgra
 // ---------------------------------------------------------------------------
 
 /**
- * Advance every planet one tick: spawn protection, the undamaged clock,
+ * Advance every station one tick: spawn protection, the undamaged clock,
  * construction timers, shield regeneration, and the repair tell — in that
  * order, which is part of the determinism contract.
  *
@@ -448,22 +485,22 @@ export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): Upgra
  * after this pass) which then survives to the post-step snapshot.
  *
  * Under collapse, shield regen stops for the rest of the match (GDD §2.3) — the
- * phase is read once per tick, not per planet, because it is a property of the
+ * phase is read once per tick, not per station, because it is a property of the
  * match rather than of anyone's home.
  */
-export function updatePlanets(world: World, dt: number): void {
+export function updateStations(world: World, dt: number): void {
   const collapsed = isCollapsed(world);
-  for (const planet of world.planets) {
-    if (!planet.alive) continue;
-    if (planet.spawnProtect > 0) planet.spawnProtect = Math.max(0, planet.spawnProtect - dt);
-    planet.sinceDamage += dt;
+  for (const station of world.stations) {
+    if (!station.alive) continue;
+    if (station.spawnProtect > 0) station.spawnProtect = Math.max(0, station.spawnProtect - dt);
+    station.sinceDamage += dt;
 
-    advanceConstruction(world, planet, dt);
+    advanceConstruction(world, station, dt);
     // Collapse: shields stop regenerating (GDD §2.3). Construction still
     // finishes — the ore was already spent, and a turret half-built when the
     // field ran dry is the player's money, not entropy's.
-    if (!collapsed) regenShields(planet, dt);
-    maintainRepairTell(world, planet, collapsed, dt);
+    if (!collapsed) regenShields(station, dt);
+    maintainRepairTell(world, station, collapsed, dt);
   }
 }
 
@@ -486,64 +523,74 @@ export function updatePlanets(world: World, dt: number): void {
  * The tell also clears early — cooldown and all — when there is nothing to hold
  * for: the core is full, the owner has left or died, or collapse began.
  */
-function maintainRepairTell(world: World, planet: Planet, collapsed: boolean, dt: number): void {
-  if (!planet.repairing) return;
+function maintainRepairTell(world: World, station: MiningStation, collapsed: boolean, dt: number): void {
+  if (!station.repairing) return;
 
-  const owner = shipOf(world, planet.owner);
+  const owner = shipOf(world, station.owner);
   if (
     collapsed ||
-    planet.coreHp >= planet.maxCoreHp - 1e-9 ||
+    station.coreHp >= station.maxCoreHp - 1e-9 ||
     !owner ||
     !owner.alive ||
-    !isDocked(owner, planet)
+    !isDocked(owner, station)
   ) {
-    planet.repairing = false;
-    planet.repairCooldown = 0;
+    station.repairing = false;
+    station.repairCooldown = 0;
     return;
   }
 
-  planet.repairCooldown = Math.max(0, (planet.repairCooldown ?? 0) - dt);
+  station.repairCooldown = Math.max(0, (station.repairCooldown ?? 0) - dt);
   // Release the tell only once the pacing cooldown has elapsed AND the core has
   // been quiet for that long — so an AI defender resumes repairing only off the
   // firing line. While hits keep landing, `sinceDamage` stays low and the tell
   // holds, which is "pressure beats regeneration" for repair (GDD §2.6): you
   // drive the attacker off first, exactly as the retired channel demanded.
-  if (planet.repairCooldown <= 0 && planet.sinceDamage >= REPAIR_TELL_HOLD) planet.repairing = false;
+  if (station.repairCooldown <= 0 && station.sinceDamage >= REPAIR_TELL_HOLD) station.repairing = false;
 }
 
 /** Tick construction timers; a job that reaches zero becomes the real thing
  *  (GDD §2.5 — the ore was already spent when the order was placed). */
-function advanceConstruction(world: World, planet: Planet, dt: number): void {
+function advanceConstruction(world: World, station: MiningStation, dt: number): void {
   let completed = false;
-  for (const job of planet.builds) {
+  for (const job of station.builds) {
     job.remaining -= dt;
     if (job.remaining <= 0) {
       job.remaining = 0;
       completed = true;
-      if (job.kind === 'turret') planet.turrets.push(makeTurret(world, planet, job.slot));
-      else planet.shields.push(makeShield(world));
+      if (job.kind === 'turret') station.turrets.push(makeTurret(world, station, job.slot));
+      else if (job.kind === 'satellite') satellitesOf(station).push(makeSatellite(world, station));
+      else station.shields.push(makeShield(world));
     }
   }
-  if (completed) planet.builds = planet.builds.filter((j) => j.remaining > 0);
+  if (completed) station.builds = station.builds.filter((j) => j.remaining > 0);
 }
 
-function makeTurret(world: World, planet: Planet, slot: number): Turret {
-  const home = turretHomeAngle(planet, slot);
-  const pos = turretOrbitPos(planet, home);
+/** The station's satellite array, materialised if a foreign literal omitted it —
+ *  so a completed build has somewhere to land. The sim's own stations always
+ *  carry `[]` (`makeStation`); this only ever fires for a hand-built fixture that
+ *  then had a satellite constructed on it. */
+function satellitesOf(station: MiningStation): RadarSatellite[] {
+  if (!station.satellites) station.satellites = [];
+  return station.satellites;
+}
+
+function makeTurret(world: World, station: MiningStation, slot: number): Turret {
+  const home = turretHomeAngle(station, slot);
+  const pos = turretOrbitPos(station, home);
   // Built at Mk I. `turretTierSpec(0).hp` is `TURRET.hp` by construction, so a
   // fresh turret is byte-for-byte the pre-ladder turret — the upgrade path is
   // the only thing that ever moves it off tier 0.
   const spec = turretTierSpec(0);
   return {
     id: world.nextEntityId++,
-    owner: planet.owner,
+    owner: station.owner,
     slot,
     pos: { x: pos.x, y: pos.y },
     radius: TURRET.radius,
     hp: spec.hp,
     maxHp: spec.hp,
     tier: 0,
-    // Barrel starts pointing outward, away from the planet it defends.
+    // Barrel starts pointing outward, away from the station it defends.
     angle: home,
     // Born on its mount slot; it slides from here toward the threat (field
     // report P1). Deriving `pos` from this keeps the two in lockstep.
@@ -562,9 +609,9 @@ function makeShield(world: World): Shield {
 
 /** Shields recover only past `SHIELD.regenDelay` undamaged seconds — the
  *  regeneration half of GDD §2.6. Each generator regenerates its own pool. */
-function regenShields(planet: Planet, dt: number): void {
-  if (planet.sinceDamage < SHIELD.regenDelay) return;
-  for (const shield of planet.shields) {
+function regenShields(station: MiningStation, dt: number): void {
+  if (station.sinceDamage < SHIELD.regenDelay) return;
+  for (const shield of station.shields) {
     if (shield.hp >= shield.maxHp) continue;
     shield.hp = Math.min(shield.maxHp, shield.hp + SHIELD.regenPerSecond * dt);
   }
@@ -575,27 +622,115 @@ function regenShields(planet: Planet, dt: number): void {
 // to advance here each tick (developer amendment, 2026-07-26).
 
 // ---------------------------------------------------------------------------
+// Radar satellites — build, orbit, damage, sweep (RATIFIED feature f1)
+// ---------------------------------------------------------------------------
+
+/** The orbit radius a satellite rides at: the station surface plus its outboard
+ *  mount band (`SATELLITE.mountOffset`) plus its own radius — clear of the turret
+ *  ring and the shield bubble, so it is attackable from outside the shield. */
+export function satelliteOrbitRadius(station: MiningStation): number {
+  return station.radius + SATELLITE.mountOffset + SATELLITE.radius;
+}
+
+/** The world position of a satellite at rim angle `angle` around a station — its
+ *  orbit point. `pos` is recomputed from `orbitAngle` every tick, so the sprite
+ *  and sensor origin track the orbit. Mirrors `turretOrbitPos`, one band out. */
+export function satelliteOrbitPos(station: MiningStation, angle: number): { x: number; y: number } {
+  const r = satelliteOrbitRadius(station);
+  return { x: station.pos.x + Math.cos(angle) * r, y: station.pos.y + Math.sin(angle) * r };
+}
+
+/** Build one radar satellite for `station`, born in its orbit band (feature f1).
+ *  Its start angle is offset a half-turn from the station's outward spoke so it
+ *  sits angularly clear of turret slot 0 (which starts on the spoke) — the
+ *  "angular separation from turrets" the brief asks for; it then orbits from
+ *  there. Byte-for-byte deterministic (no RNG): the angle is pure geometry. */
+function makeSatellite(world: World, station: MiningStation): RadarSatellite {
+  const orbitAngle = station.angle + Math.PI;
+  const pos = satelliteOrbitPos(station, orbitAngle);
+  return {
+    id: world.nextEntityId++,
+    owner: station.owner,
+    pos: { x: pos.x, y: pos.y },
+    radius: SATELLITE.radius,
+    hp: SATELLITE.hp,
+    maxHp: SATELLITE.hp,
+    orbitAngle,
+  };
+}
+
+/**
+ * Advance every live satellite one tick: it simply ORBITS its station at
+ * `SATELLITE.orbitSpeed` (unlike a turret, which slides to face a threat), so
+ * `orbitAngle` steps forward and `pos` is rederived from it (feature f1).
+ * Zero per-frame allocation — `pos` is written in place (GDD §4.3). A dead
+ * station's satellites were zeroed by `destroyCore`, and a satellite killed this
+ * tick (hp ≤ 0) stops orbiting until `sweepDeadSatellites` removes it at end of
+ * step — it is also no longer a sensor source the instant its HP hits zero
+ * (`./sensing` reads only hp > 0), so its coverage collapses the same tick.
+ */
+export function updateSatellites(world: World, dt: number): void {
+  const step = SATELLITE.orbitSpeed * dt;
+  for (const station of world.stations) {
+    if (!station.alive || !station.satellites) continue;
+    for (const sat of station.satellites) {
+      if (sat.hp <= 0) continue;
+      let a = sat.orbitAngle + step;
+      if (a >= 2 * Math.PI) a -= 2 * Math.PI;
+      sat.orbitAngle = a;
+      sat.pos.x = station.pos.x + Math.cos(a) * satelliteOrbitRadius(station);
+      sat.pos.y = station.pos.y + Math.sin(a) * satelliteOrbitRadius(station);
+    }
+  }
+}
+
+/**
+ * Apply `amount` damage to a satellite (feature f1 — it is ATTACKABLE). Left in
+ * the array at zero HP until {@link sweepDeadSatellites} runs at end of step, so
+ * two shots landing on it in one tick index a stable array — the same discipline
+ * as {@link damageTurret}. Returns true if the hit landed.
+ */
+export function damageSatellite(sat: RadarSatellite, amount: number): boolean {
+  if (amount <= 0 || sat.hp <= 0) return false;
+  sat.hp -= amount;
+  if (sat.hp < 0) sat.hp = 0;
+  return true;
+}
+
+/** End-of-tick cleanup: drop satellites killed this tick (feature f1), mirroring
+ *  {@link sweepDeadTurrets}. Allocates only on the ticks a satellite actually
+ *  died; its coverage already collapsed the tick its HP hit zero. */
+export function sweepDeadSatellites(world: World): void {
+  for (const station of world.stations) {
+    if (!station.satellites) continue;
+    let dead = false;
+    for (const s of station.satellites) if (s.hp <= 0) dead = true;
+    if (dead) station.satellites = station.satellites.filter((s) => s.hp > 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Damage routing — shields stand in front of the core
 // ---------------------------------------------------------------------------
 
 /** The radius an attacker's shot actually strikes: the shield bubble
- *  while any shield is up, the planet body once they are all down. */
-export function planetTargetRadius(planet: Planet): number {
-  for (const s of planet.shields) {
+ *  while any shield is up, the station body once they are all down. */
+export function stationTargetRadius(station: MiningStation): number {
+  for (const s of station.shields) {
     if (s.hp > 1e-9) return s.radius;
   }
-  return planet.radius;
+  return station.radius;
 }
 
 /** Total shield HP standing over the core right now. */
-export function shieldPool(planet: Planet): number {
+export function shieldPool(station: MiningStation): number {
   let hp = 0;
-  for (const s of planet.shields) hp += s.hp;
+  for (const s of station.shields) hp += s.hp;
   return hp;
 }
 
 /**
- * Apply `amount` damage to a planet: shields first (in build order, one bubble
+ * Apply `amount` damage to a station: shields first (in build order, one bubble
  * at a time), then the core. Spawn protection blocks it entirely (GDD §2.1).
  *
  * Any damage that lands zeroes `sinceDamage`, closing the shield-regen window
@@ -606,29 +741,29 @@ export function shieldPool(planet: Planet): number {
  * The discrete heal already applied is never undone — there is no channel to
  * interrupt. Returns true if the hit landed.
  */
-export function damagePlanet(world: World, planet: Planet, amount: number): boolean {
-  if (!planet.alive || planet.spawnProtect > 0 || amount <= 0) return false;
+export function damageStation(world: World, station: MiningStation, amount: number): boolean {
+  if (!station.alive || station.spawnProtect > 0 || amount <= 0) return false;
 
   let left = amount;
-  for (const shield of planet.shields) {
+  for (const shield of station.shields) {
     if (left <= 0) break;
     if (shield.hp <= 0) continue;
     const absorbed = Math.min(shield.hp, left);
     shield.hp -= absorbed;
     left -= absorbed;
   }
-  if (left > 0) planet.coreHp -= left;
+  if (left > 0) station.coreHp -= left;
 
-  planet.sinceDamage = 0;
+  station.sinceDamage = 0;
 
-  if (planet.coreHp <= 0) destroyCore(world, planet);
+  if (station.coreHp <= 0) destroyCore(world, station);
   return true;
 }
 
 /**
  * Apply `amount` damage to a turret. A turret at zero HP is *dead but still in
  * the array* until {@link sweepDeadTurrets} runs at the end of the tick: two
- * ships can be shooting the same planet in one tick, and removing an entry
+ * ships can be shooting the same station in one tick, and removing an entry
  * mid-tick would shift the indices the other ship's shot already resolved.
  * Same discipline as asteroids, which are also filtered only at end of step.
  */
@@ -642,10 +777,10 @@ export function damageTurret(turret: Turret, amount: number): boolean {
 /** End-of-tick cleanup: drop turrets killed this tick, freeing their mount
  *  slots for a rebuild. Allocates only on the ticks a turret actually died. */
 export function sweepDeadTurrets(world: World): void {
-  for (const planet of world.planets) {
+  for (const station of world.stations) {
     let dead = false;
-    for (const t of planet.turrets) if (t.hp <= 0) dead = true;
-    if (dead) planet.turrets = planet.turrets.filter((t) => t.hp > 0);
+    for (const t of station.turrets) if (t.hp <= 0) dead = true;
+    if (dead) station.turrets = station.turrets.filter((t) => t.hp > 0);
   }
 }
 
@@ -671,31 +806,31 @@ export function sweepDeadTurrets(world: World): void {
  * the barrel/fire, so both originate from the turret's position *this* tick.
  */
 export function updateTurrets(world: World, dt: number): void {
-  for (const planet of world.planets) {
-    if (!planet.alive) continue;
+  for (const station of world.stations) {
+    if (!station.alive) continue;
 
     // 1. Resolve every turret's sticky target first, so the slide can fan
     //    turrets that share one target and the barrel aims at a settled pick.
-    for (const turret of planet.turrets) {
+    for (const turret of station.turrets) {
       if (turret.hp <= 0) continue; // killed this tick, swept at end of step
       // The muzzle tell is a per-tick event: assume not firing, and only the
       // branch that actually looses a shot below sets it. Cleared here so a
       // renderer never draws a stale flash a tick after the shot left.
       turret.muzzle = null;
-      const target = acquireTarget(world, planet, turret);
+      const target = acquireTarget(world, station, turret);
       turret.targetId = target ? target.id : null;
     }
 
     // 1b. Coverage split: never stack two turrets on one threat while another
-    //     valid threat goes unengaged (field report P1, §4). A planet-level pass
+    //     valid threat goes unengaged (field report P1, §4). A station-level pass
     //     because the split is a property of the *set* of turrets, not any one.
-    splitThreats(world, planet);
+    splitThreats(world, station);
 
     // 2. Slide each turret along the rim toward its target's facing normal.
-    slideTurrets(world, planet, dt);
+    slideTurrets(world, station, dt);
 
     // 3./4. Track the barrel and fire, from the position the slide left us at.
-    for (const turret of planet.turrets) {
+    for (const turret of station.turrets) {
       if (turret.hp <= 0) continue;
       if (turret.cooldown > 0) turret.cooldown = Math.max(0, turret.cooldown - dt);
       const target = turret.targetId !== null ? shipOf(world, turret.targetId) : null;
@@ -768,35 +903,35 @@ function turretAimError(turret: Turret, world: World, spread: number): number {
 /**
  * The far edge of the ring a **sliding** turret can bring a shot onto: the orbit
  * radius plus `TURRET.range` (field report P1, §1). Threat detection is measured
- * from the *planet centre*, not the turret's current rim spot — the whole point
+ * from the *station centre*, not the turret's current rim spot — the whole point
  * of orbiting is to slide around and reach a far-side attacker, so a threat this
  * close to the core is engageable even when it sits outside firing range of where
  * the turret happens to be sitting *right now*. Once the turret slides to the
  * facing-normal point it has line of sight and closes to `range` (§2).
  */
-export function planetThreatRadius(planet: Planet): number {
-  // The planet's overall threat envelope is its *longest-reaching* live turret,
+export function stationThreatRadius(station: MiningStation): number {
+  // The station's overall threat envelope is its *longest-reaching* live turret,
   // so a mixed-tier ring gathers every threat any of its turrets could engage
   // (the per-turret reach still gates each turret's own acquire — `acquireTarget`
   // — and the projectile's finite life caps where a shot actually lands). A ring
   // with nothing standing falls back to the Mk I base reach.
   let range: number = TURRET.range;
-  for (const t of planet.turrets) {
+  for (const t of station.turrets) {
     if (t.hp > 0) range = Math.max(range, turretRange(t));
   }
-  return planet.radius + TURRET.mountOffset + TURRET.radius + range;
+  return station.radius + TURRET.mountOffset + TURRET.radius + range;
 }
 
-/** The reach of ONE sliding turret from its planet's centre — the rim orbit
+/** The reach of ONE sliding turret from its station's centre — the rim orbit
  *  radius plus this turret's own tier range. A sliding turret is engaged against
  *  a threat inside this even when the threat sits outside firing range of where
  *  it currently sits, because it slides to close the gap (field report P1). */
-export function turretThreatRadius(planet: Planet, turret: Turret): number {
-  return planet.radius + TURRET.mountOffset + TURRET.radius + turretRange(turret);
+export function turretThreatRadius(station: MiningStation, turret: Turret): number {
+  return station.radius + TURRET.mountOffset + TURRET.radius + turretRange(turret);
 }
 
 /**
- * True when `ship` is actively shooting this planet — it owns a live weapon
+ * True when `ship` is actively shooting this station — it owns a live weapon
  * projectile whose forward path reaches the shield/core surface (field report
  * P1, §3; design amendment v0.2). This is the signal that ranks an attacker over
  * a mere loiterer: a ship putting shots on the core is a threat to answer even
@@ -809,15 +944,15 @@ export function turretThreatRadius(planet: Planet, turret: Turret): number {
  * and the detection never blinks between shots. `updateTurrets` runs after the
  * ship fire step, so this tick's fresh shots are already visible here.
  */
-function isAttackingPlanet(world: World, planet: Planet, ship: Ship): boolean {
-  const targetR = planetTargetRadius(planet);
+function isAttackingStation(world: World, station: MiningStation, ship: Ship): boolean {
+  const targetR = stationTargetRadius(station);
   for (const p of world.projectiles) {
     if (!p.active || p.owner !== ship.id || p.kind !== 'ship') continue;
     const speed = Math.sqrt(p.vel.x * p.vel.x + p.vel.y * p.vel.y);
     if (speed < 1e-9) continue;
     const dir = { x: p.vel.x / speed, y: p.vel.y / speed };
     // How far the shot can still travel before it despawns — its remaining reach.
-    if (segmentHitsCircle(p.pos, dir, speed * p.life, planet.pos, targetR)) return true;
+    if (segmentHitsCircle(p.pos, dir, speed * p.life, station.pos, targetR)) return true;
   }
   return false;
 }
@@ -835,11 +970,11 @@ function segmentHitsCircle(o: Vec2, dir: Vec2, len: number, c: Vec2, r: number):
 
 /**
  * The enemy ship a turret engages this tick — **sticky**, the "don't go crazy"
- * rule (field report P1, §2), now scanned from the planet so far-side threats
+ * rule (field report P1, §2), now scanned from the station so far-side threats
  * are visible (§1) and ranked so a core-attacker outranks a loiterer (§3).
  *
- * Detection is planet-centric for a sliding turret — a threat inside
- * `planetThreatRadius` is a valid target even outside firing range of the turret's
+ * Detection is station-centric for a sliding turret — a threat inside
+ * `stationThreatRadius` is a valid target even outside firing range of the turret's
  * current rim spot, because the turret slides to reach it. A hand-built turret
  * with no `orbitAngle` can't slide, so it keeps the old turret-centric `range`.
  *
@@ -851,14 +986,14 @@ function segmentHitsCircle(o: Vec2, dir: Vec2, len: number, c: Vec2, r: number):
  * on the far side is switched to at once, and a nearby loiterer never steals a
  * turret off the ship shooting the core.
  */
-function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | null {
-  // A sliding turret measures threats from the planet centre; a fixed one (no
+function acquireTarget(world: World, station: MiningStation, turret: Turret): Ship | null {
+  // A sliding turret measures threats from the station centre; a fixed one (no
   // `orbitAngle`) from itself, since it cannot slide to close the gap.
   const sliding = turret.orbitAngle !== undefined;
-  const ref = sliding ? planet.pos : turret.pos;
+  const ref = sliding ? station.pos : turret.pos;
   // Reach is this turret's own tier range (GDD §2.6): a sliding turret measures
-  // it from the planet centre (it slides to close), a fixed one from itself.
-  const reach = sliding ? turretThreatRadius(planet, turret) : turretRange(turret);
+  // it from the station centre (it slides to close), a fixed one from itself.
+  const reach = sliding ? turretThreatRadius(station, turret) : turretRange(turret);
   const reach2 = reach * reach;
 
   // Best valid enemy this tick — attacker-first, then nearest — the switch
@@ -867,10 +1002,10 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
   let bestAtk = false;
   let bestD2 = Infinity;
   for (const ship of world.ships) {
-    if (!ship.alive || !areEnemies(world, planet.owner, ship.id) || ship.spawnProtect > 0) continue;
+    if (!ship.alive || !areEnemies(world, station.owner, ship.id) || ship.spawnProtect > 0) continue;
     const d2 = dist2(ref, ship.pos);
     if (d2 > reach2) continue;
-    const atk = isAttackingPlanet(world, planet, ship);
+    const atk = isAttackingStation(world, station, ship);
     if (best === null || (atk && !bestAtk) || (atk === bestAtk && d2 < bestD2)) {
       best = ship;
       bestAtk = atk;
@@ -883,7 +1018,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
   const currentValid =
     current !== null &&
     current.alive &&
-    areEnemies(world, planet.owner, current.id) &&
+    areEnemies(world, station.owner, current.id) &&
     current.spawnProtect <= 0 &&
     dist2(ref, current.pos) <= reach2;
 
@@ -892,7 +1027,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
 
   // Priority class trumps distance and hysteresis: switch to an attacker over a
   // loiterer at once, and never abandon an attacker for a merely-closer loiterer.
-  const curAtk = isAttackingPlanet(world, planet, current!);
+  const curAtk = isAttackingStation(world, station, current!);
   if (bestAtk !== curAtk) return bestAtk ? best : current;
 
   // Same class: only defect if the newcomer is meaningfully closer, i.e. within
@@ -903,7 +1038,7 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
 }
 
 /**
- * Split a planet's turrets across distinct threats (field report P1, §4). After
+ * Split a station's turrets across distinct threats (field report P1, §4). After
  * every turret has made its sticky pick, no two turrets should stack on one
  * attacker while another valid threat goes unengaged — two turrets, two
  * attackers on opposite sides, means one turret each.
@@ -915,14 +1050,14 @@ function acquireTarget(world: World, planet: Planet, turret: Turret): Ship | nul
  * that has slid onto a threat's bearing stays the nearest one for it. Only
  * sliding turrets take part; a fixed turret cannot cover a far threat anyway.
  */
-function splitThreats(world: World, planet: Planet): void {
-  const turrets = planet.turrets;
-  const reach2 = planetThreatRadius(planet) ** 2;
+function splitThreats(world: World, station: MiningStation): void {
+  const turrets = station.turrets;
+  const reach2 = stationThreatRadius(station) ** 2;
 
   const threats: Ship[] = [];
   for (const ship of world.ships) {
-    if (!ship.alive || !areEnemies(world, planet.owner, ship.id) || ship.spawnProtect > 0) continue;
-    if (dist2(planet.pos, ship.pos) <= reach2) threats.push(ship);
+    if (!ship.alive || !areEnemies(world, station.owner, ship.id) || ship.spawnProtect > 0) continue;
+    if (dist2(station.pos, ship.pos) <= reach2) threats.push(ship);
   }
   if (threats.length < 2) return; // nothing to spread across
 
@@ -933,7 +1068,7 @@ function splitThreats(world: World, planet: Planet): void {
     for (const recip of threats) {
       if (coverCount(turrets, recip.id) > 0) continue; // already engaged
 
-      const bearing = Math.atan2(recip.pos.y - planet.pos.y, recip.pos.x - planet.pos.x);
+      const bearing = Math.atan2(recip.pos.y - station.pos.y, recip.pos.x - station.pos.x);
       let donor: Turret | null = null;
       let donorDelta = Infinity;
       for (const t of turrets) {
@@ -973,9 +1108,9 @@ function shortestAngle(a: number, b: number): number {
 }
 
 /**
- * Slide each of a planet's turrets one tick toward the rim point whose outward
+ * Slide each of a station's turrets one tick toward the rim point whose outward
  * surface normal faces its target (field report P1). The desired rim angle is
- * simply the bearing from the planet centre to the target — which does *not*
+ * simply the bearing from the station centre to the target — which does *not*
  * depend on where the turret currently sits, so `turnToward` converges and then
  * halts, a glide with no orbiting. Turrets sharing one target fan out around
  * that bearing so they never stack (§3); a turret with no target drifts back to
@@ -985,34 +1120,34 @@ function shortestAngle(a: number, b: number): number {
  * keeps its authoritative `pos` (see the field's doc). Zero per-frame allocation:
  * `pos` is written in place (GDD §4.3).
  */
-function slideTurrets(world: World, planet: Planet, dt: number): void {
-  const turrets = planet.turrets;
+function slideTurrets(world: World, station: MiningStation, dt: number): void {
+  const turrets = station.turrets;
   const maxStep = TURRET.orbitSpeed * dt;
-  const r = planet.radius + TURRET.mountOffset + TURRET.radius;
+  const r = station.radius + TURRET.mountOffset + TURRET.radius;
   for (let i = 0; i < turrets.length; i++) {
     const turret = turrets[i]!;
     if (turret.hp <= 0 || turret.orbitAngle === undefined) continue;
-    const desired = desiredOrbitAngle(world, planet, turrets, i);
+    const desired = desiredOrbitAngle(world, station, turrets, i);
     turret.orbitAngle = turnToward(turret.orbitAngle, desired, maxStep);
-    turret.pos.x = planet.pos.x + Math.cos(turret.orbitAngle) * r;
-    turret.pos.y = planet.pos.y + Math.sin(turret.orbitAngle) * r;
+    turret.pos.x = station.pos.x + Math.cos(turret.orbitAngle) * r;
+    turret.pos.y = station.pos.y + Math.sin(turret.orbitAngle) * r;
   }
 }
 
 /**
  * The rim angle turret `i` wants this tick. With a target it is the bearing from
- * the planet centre to that ship, plus a symmetric fan offset so turrets sharing
+ * the station centre to that ship, plus a symmetric fan offset so turrets sharing
  * the target spread apart instead of stacking (`TURRET.orbitSeparation`, §3).
  * With no target it is the turret's mount-slot home angle. Fan rank is keyed on
  * `slot` (a stable per-turret key), so the spread is deterministic (GDD §4.8).
  */
-function desiredOrbitAngle(world: World, planet: Planet, turrets: Turret[], i: number): number {
+function desiredOrbitAngle(world: World, station: MiningStation, turrets: Turret[], i: number): number {
   const turret = turrets[i]!;
-  if (turret.targetId === null) return turretHomeAngle(planet, turret.slot);
+  if (turret.targetId === null) return turretHomeAngle(station, turret.slot);
   const target = shipOf(world, turret.targetId);
-  if (target === null) return turretHomeAngle(planet, turret.slot);
+  if (target === null) return turretHomeAngle(station, turret.slot);
 
-  const bearing = Math.atan2(target.pos.y - planet.pos.y, target.pos.x - planet.pos.x);
+  const bearing = Math.atan2(target.pos.y - station.pos.y, target.pos.x - station.pos.x);
 
   // Rank this turret among the sliders converging on the same target, ordered by
   // slot (index breaks a tie), and offset it symmetrically about the bearing.

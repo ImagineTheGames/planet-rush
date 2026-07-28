@@ -19,6 +19,8 @@
  */
 
 import type { ShipClass } from '@shared/types';
+import type { Abundance } from './constants';
+import { DEFAULT_ABUNDANCE } from './constants';
 import type { PlayerSpec } from './state';
 
 /** The two match modes (GDD §2.1). FFA is teams-of-one; TEAMS groups slots by
@@ -31,7 +33,7 @@ export type MatchMode = 'ffa' | 'teams';
  *               human seat is still an open competitive slot in the sim's eyes).
  *  - `bot`    — filled by AI.
  *  - `closed` — holds no player and is excluded from the world ENTIRELY: no ship,
- *               no planet, no colour, no wire seat. `N = count(state !== closed)`.
+ *               no station, no colour, no wire seat. `N = count(state !== closed)`.
  *
  * Extends the lobby's `SeatOccupant = 'human' | 'bot' | 'open'` (`src/ui/lobby`)
  * with `closed`; reconciling the two names is Milestone E (UI).
@@ -62,6 +64,24 @@ export interface MatchConfig {
   /** The physical slots — the lobby view is always length 8; `closed` slots are
    *  dropped at world-build. */
   slots: SlotConfig[];
+  /**
+   * Ore scarcity for this match (ratified developer, p11): `scarce | standard |
+   * rich`, a named multiplier set over the economy (`./constants` `ABUNDANCE`).
+   * The one pre-match economy control — authored in the lobby, carried in the room
+   * ad (Milestone C's config rides whole), consumed at world-build via
+   * {@link matchAbundance}. Optional so pre-p11 configs (and the lobby before the
+   * n1-05 control lands) keep validating; an absent value reads as the ratified
+   * SCARCE default ({@link matchAbundance}, `DEFAULT_ABUNDANCE`) — "by default
+   * more scarce."
+   */
+  abundance?: Abundance;
+}
+
+/** The abundance a config runs at: its authored level, or the ratified SCARCE
+ *  default when the lobby has not set one (`DEFAULT_ABUNDANCE`, "by default more
+ *  scarce"). The world-build wiring passes this to `createWorld`. */
+export function matchAbundance(cfg: MatchConfig): Abundance {
+  return cfg.abundance ?? DEFAULT_ABUNDANCE;
 }
 
 /** A match needs at least two live players to be a match (GDD §1 win condition
@@ -92,7 +112,7 @@ export function isValidSize(cfg: MatchConfig): boolean {
  *
  * Closed slots are dropped and the survivors are re-indexed to a contiguous
  * `0..N-1` roster (spike §S2, Trap 6): the sparse lobby ids {0,2,5} never enter
- * the sim, so `PLAYER_COLORS[id]`, planet ids, and the wire all stay contiguous
+ * the sim, so `PLAYER_COLORS[id]`, station ids, and the wire all stay contiguous
  * and nothing that treats a `PlayerId` as an array index can trip.
  *
  * `team` is resolved per mode: FFA is teams-of-one, so each player's team is its

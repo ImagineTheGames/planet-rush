@@ -3,9 +3,9 @@
  *
  * Four maps, ratified by the developer off the layout board (map-layouts.html
  * r1+r2), `octagon` the default. A map is a *layout*, nothing more: it owns the
- * arena bounds and where the `N` home planets sit, and hands those to
+ * arena bounds and where the `N` home stations sit, and hands those to
  * `createWorld` (`./state`). Everything downstream — the ships that orbit each
- * planet, the fair home neighbourhoods stamped around them, the contested
+ * station, the fair home neighbourhoods stamped around them, the contested
  * central commons, collapse, win/loss — is the same code for every map
  * (`./waves`, `./match`). That is the whole point of the boundary: a new map is
  * geometry, not gameplay.
@@ -13,16 +13,16 @@
  * Two invariants every map honours, so the registry can never smuggle in an
  * unfair or wall-hugging layout:
  *
- *  1. **Margin (field report P1).** Every planet — and, downstream, every ship,
+ *  1. **Margin (field report P1).** Every station — and, downstream, every ship,
  *     asteroid, chunk and wreck stamped around it — clears the arena wall by
- *     `WORLD_EDGE_MARGIN`. Each layout sizes its outermost planets to hug that
+ *     `WORLD_EDGE_MARGIN`. Each layout sizes its outermost stations to hug that
  *     margin, so the arena reads as space with a steel frame, not a box the
- *     planets touch.
+ *     stations touch.
  *  2. **Resource fairness (p1-09 field rule v0.1.2).** The home neighbourhoods
- *     are stamped as one seeded canonical pattern rotated onto each planet
+ *     are stamped as one seeded canonical pattern rotated onto each station
  *     (`spawnHomeFields`), so every player's local ore is identical *by
  *     construction* — even on a deliberately asymmetric layout like `diamond`,
- *     where the planets are NOT congruent but their resources are. The commons
+ *     where the stations are NOT congruent but their resources are. The commons
  *     is `N`-fold symmetric about the centre for every map. `maps.test.ts`
  *     proves both against the same seeded suite p1-09 established.
  *
@@ -47,13 +47,13 @@
  *    homes; each gets `homeFieldOre(activeN)`, and the commons stays symmetric
  *    about every board position (eight-fold), so it is fair from every live spoke.
  *
- * Fully deterministic and RNG-free: planet placement is pure geometry (the seed
+ * Fully deterministic and RNG-free: station placement is pure geometry (the seed
  * threads through to the asteroid scatter in `./waves`, not to the layout), so
  * the same map builds the same board every time (GDD §4.8).
  */
 
 import type { Vec2 } from '@shared/types';
-import { PLANET, WORLD_EDGE_MARGIN, WORLD_SIZE } from './constants';
+import { STATION, WORLD_EDGE_MARGIN, WORLD_SIZE } from './constants';
 import type { Bounds } from './state';
 
 // ---------------------------------------------------------------------------
@@ -61,15 +61,15 @@ import type { Bounds } from './state';
 // ---------------------------------------------------------------------------
 
 /**
- * Where one player's home sits: the planet centre, the ship's spawn point
- * (orbiting its planet inboard, GDD §2.1), and the outward spoke angle the
+ * Where one player's home sits: the station centre, the ship's spawn point
+ * (orbiting its station inboard, GDD §2.1), and the outward spoke angle the
  * turret mount ring starts from. `createWorld` reads exactly this per slot and
  * builds the rest.
  */
-export interface PlanetPlacement {
-  /** Planet centre. */
-  readonly planet: Vec2;
-  /** Ship spawn — inboard of the planet, toward the field. */
+export interface StationPlacement {
+  /** Station centre. */
+  readonly station: Vec2;
+  /** Ship spawn — inboard of the station, toward the field. */
   readonly ship: Vec2;
   /** Outward angle from the arena centre (radians). */
   readonly angle: number;
@@ -81,7 +81,7 @@ export interface PlanetPlacement {
    * `octagon`/`oval` regenerate exactly `count` live homes and never set this, so
    * an absent flag reads as "a live home" — the same backward-compatible optional
    * discipline the sim uses everywhere. `createWorld` (`./state`) builds a live
-   * ship + planet for every non-derelict placement and a match-start wreck for
+   * ship + station for every non-derelict placement and a match-start wreck for
    * each derelict one.
    */
   readonly derelict?: boolean;
@@ -104,7 +104,7 @@ export interface MapDef {
    * by seed; the four shipped maps are pure geometry and ignore it. `bounds` is
    * the arena actually in play (may differ from `this.bounds` on a QA world).
    */
-  planets(seed: number, count: number, bounds: Bounds): PlanetPlacement[];
+  stations(seed: number, count: number, bounds: Bounds): StationPlacement[];
 }
 
 /** The default map until the picker (m8-02) lands: "The Ring". */
@@ -131,18 +131,18 @@ function centre(bounds: Bounds): Vec2 {
 
 /**
  * Turn a list of polar home positions (radius from centre + outward angle) into
- * placements, spawning each ship inboard of its planet by `PLANET.orbitOffset`
- * along the same spoke — the ship "orbiting its home planet, between the planet
+ * placements, spawning each ship inboard of its station by `STATION.orbitOffset`
+ * along the same spoke — the ship "orbiting its home station, between the station
  * and the field" (GDD §2.1). The layout-agnostic path every map but `octagon`
  * uses; `octagon` reproduces the historical ring math directly so the default
  * board is byte-for-byte what it always was.
  */
-function fromPolar(bounds: Bounds, homes: readonly { r: number; angle: number }[]): PlanetPlacement[] {
+function fromPolar(bounds: Bounds, homes: readonly { r: number; angle: number }[]): StationPlacement[] {
   const c = centre(bounds);
   return homes.map(({ r, angle }) => {
-    const shipR = Math.max(0, r - PLANET.orbitOffset);
+    const shipR = Math.max(0, r - STATION.orbitOffset);
     return {
-      planet: { x: c.x + Math.cos(angle) * r, y: c.y + Math.sin(angle) * r },
+      station: { x: c.x + Math.cos(angle) * r, y: c.y + Math.sin(angle) * r },
       ship: { x: c.x + Math.cos(angle) * shipR, y: c.y + Math.sin(angle) * shipR },
       angle,
     };
@@ -158,20 +158,20 @@ function fromPolar(bounds: Bounds, homes: readonly { r: number; angle: number }[
  * slot 0's board position never moves as N changes. `count` is clamped to the
  * board size; config validation (`./match-config`) already caps N at eight.
  */
-function derelictFill(full: PlanetPlacement[], count: number): PlanetPlacement[] {
+function derelictFill(full: StationPlacement[], count: number): StationPlacement[] {
   const active = Math.max(0, Math.min(count, full.length));
   return full.map((p, i) => (i < active ? p : { ...p, derelict: true }));
 }
 
 /**
- * Largest planet-centre radius that still clears the arena wall by
+ * Largest station-centre radius that still clears the arena wall by
  * `WORLD_EDGE_MARGIN` on the tighter arena dimension — what a map's outermost
- * planets sit at to "hug the spawn margin." Uses `halfMin` so a wide arena's
+ * stations sit at to "hug the spawn margin." Uses `halfMin` so a wide arena's
  * outer ring is bounded by its short side, never poking through the top/bottom.
  */
 function marginRadius(bounds: Bounds): number {
   const halfMin = Math.min(bounds.width, bounds.height) / 2;
-  return halfMin - PLANET.radius - WORLD_EDGE_MARGIN;
+  return halfMin - STATION.radius - WORLD_EDGE_MARGIN;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,29 +236,29 @@ function ellipseEqualChord(a: number, b: number, count: number): readonly number
 // ---------------------------------------------------------------------------
 
 /**
- * "The Ring" (DEFAULT). Square arena; the historical 8-planet ring. Planets sit
+ * "The Ring" (DEFAULT). Square arena; the historical 8-station ring. Stations sit
  * on one circle at exact `2π/count` steps, the ring sized to hug the spawn
- * margin (`PLANET.ringFraction`, clamped to the wall margin). Equality is by
+ * margin (`STATION.ringFraction`, clamped to the wall margin). Equality is by
  * construction — equal neighbour gaps, equal centre distance — which is why it
  * is the fair default. Reproduces `createWorld`'s original placement exactly
- * (planets on `planetRing`, ships on the inner `ringRadius`), so adopting the
+ * (stations on `stationRing`, ships on the inner `ringRadius`), so adopting the
  * registry changed no pixel of the shipped board.
  */
 const octagon: MapDef = {
   id: 'octagon',
   name: 'The Ring',
-  blurb: 'Eight planets, one circle, equal gaps — fair by construction.',
+  blurb: 'Eight stations, one circle, equal gaps — fair by construction.',
   bounds: SQUARE,
-  planets(_seed, count, bounds) {
+  stations(_seed, count, bounds) {
     const c = centre(bounds);
     const halfMin = Math.min(bounds.width, bounds.height) / 2;
-    const ringRadius = halfMin * 2 * PLANET.ringFraction;
-    const planetRing = Math.min(ringRadius + PLANET.orbitOffset, marginRadius(bounds));
-    const out: PlanetPlacement[] = [];
+    const ringRadius = halfMin * 2 * STATION.ringFraction;
+    const stationRing = Math.min(ringRadius + STATION.orbitOffset, marginRadius(bounds));
+    const out: StationPlacement[] = [];
     for (let i = 0; i < count; i++) {
       const theta = (2 * Math.PI * i) / Math.max(1, count);
       out.push({
-        planet: { x: c.x + Math.cos(theta) * planetRing, y: c.y + Math.sin(theta) * planetRing },
+        station: { x: c.x + Math.cos(theta) * stationRing, y: c.y + Math.sin(theta) * stationRing },
         ship: { x: c.x + Math.cos(theta) * ringRadius, y: c.y + Math.sin(theta) * ringRadius },
         angle: theta,
       });
@@ -268,7 +268,7 @@ const octagon: MapDef = {
 };
 
 /**
- * "The Compass". Square arena; planets at the 4 corners + 4 edge midpoints of an
+ * "The Compass". Square arena; stations at the 4 corners + 4 edge midpoints of an
  * inner square, so every adjacent step is exactly half a side — neighbour gaps
  * are equal *exactly*, not just to tolerance. The eight sit on the same 45°
  * spokes as the octagon but at two radii: corners hug the spawn margin, edge
@@ -280,7 +280,7 @@ const compass: MapDef = {
   name: 'The Compass',
   blurb: 'Corners for cover, edges for lanes — every gap the same.',
   bounds: SQUARE,
-  planets(_seed, count, bounds) {
+  stations(_seed, count, bounds) {
     // Inner square: corners at radius `rc` (hug the margin), so its side is
     // `rc·√2` and the edge midpoints sit at `rc/√2`. Adjacent corner↔edge steps
     // are then all exactly `rc/√2` = half the side.
@@ -304,9 +304,9 @@ const compass: MapDef = {
  * "The Oval". Wide arena; 8 points on an ellipse solved so all neighbour chords
  * are equal (`ellipseEqualChord`, iterative — no hardcoded approximation). The
  * ellipse is sized to hug the spawn margin on both axes, so it fills the wide
- * arena without touching the walls. Planets sit at varying centre distances (an
+ * arena without touching the walls. Stations sit at varying centre distances (an
  * ellipse is not a circle), so their home fields are stamped congruently in each
- * planet's own frame (`spawnHomeFields`) — resources stay equal even though the
+ * station's own frame (`spawnHomeFields`) — resources stay equal even though the
  * distances to the commons differ.
  */
 const oval: MapDef = {
@@ -314,11 +314,11 @@ const oval: MapDef = {
   name: 'The Oval',
   blurb: 'A wide ellipse, eight equal strides around the rim.',
   bounds: WIDE,
-  planets(_seed, count, bounds) {
-    const a = bounds.width / 2 - WORLD_EDGE_MARGIN - PLANET.radius;
-    const b = bounds.height / 2 - WORLD_EDGE_MARGIN - PLANET.radius;
+  stations(_seed, count, bounds) {
+    const a = bounds.width / 2 - WORLD_EDGE_MARGIN - STATION.radius;
+    const b = bounds.height / 2 - WORLD_EDGE_MARGIN - STATION.radius;
     // Regenerate (ratified): the equal-chord solver is parametric, so the oval is
-    // a true `count`-planet ellipse at any N — solve directly for `count` points
+    // a true `count`-station ellipse at any N — solve directly for `count` points
     // whose neighbour chords are all equal, not eight-then-slice (which would
     // cluster contiguous slots and break the equal-stride shape below eight).
     const ts = ellipseEqualChord(a, b, count);
@@ -344,7 +344,7 @@ const oval: MapDef = {
  * spawns on an outer home and the bots fill the rest alternating.
  *
  * The resource-fairness invariant still holds: home fields are stamped
- * congruently per planet, so every player's local ore is identical even though
+ * congruently per station, so every player's local ore is identical even though
  * their positions are not — the map is unfair in *ground*, never in *ore*.
  */
 const diamond: MapDef = {
@@ -352,7 +352,7 @@ const diamond: MapDef = {
   name: 'Double Diamond',
   blurb: 'Outer wall-backs and exposed inner homes — for veterans.',
   bounds: WIDE,
-  planets(_seed, count, bounds) {
+  stations(_seed, count, bounds) {
     const rOut = marginRadius(bounds);
     // Inner ring at ~2/3 of the outer — pulled out from a literal half so the
     // inner homes' neighbourhood (stamped inboard) still clears turret range;

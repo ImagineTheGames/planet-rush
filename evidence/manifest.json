@@ -621,13 +621,13 @@
   },
   {
     "area": "hud",
-    "capturedAt": "2026-07-27T18:45:00Z",
-    "buildSha": "d8f9a7a",
+    "capturedAt": "2026-07-26T14:20:00Z",
+    "buildSha": "82c5c30",
     "verdict": "verified",
     "id": "ore-count-conservation",
-    "title": "Ore conservation on the ATMOSPHERE path — exactly 2 ore in the halo makes exactly 2 courier chunks, bank +2 (p8 re-verify)",
-    "image": "images/ore-conservation-strip.png",
-    "attestation": "RE-VERIFIED on the live preview bundle (build d8f9a7a, no ?freeze) with the smallest legible number so a miscount cannot hide. Exactly 2 ore was parked AT REST inside the local ship’s own atmosphere halo via __oreDepositStage.stage(2) (≈110u from the planet centre, well within the 256u DEPOSIT_RANGE); the sim’s own auto-deposit then drained the hold and flew the couriers home — nothing about the courier count was staged. The courier tally is isolated from the seven rival bots (which deposit at THEIR own planets, so a GLOBAL courier count is contaminated) by counting the LOCAL ship’s spawns the way the sim itself spawns them: one courier per whole unit the hold sheds, keyed to floor(cargo) integer-boundary crossings (src/sim/step.ts:842). Across the drain the local hold crossed EXACTLY TWO boundaries — 2→1 (at cargo 1.967, one courier) then 1→0 (one courier) — localCourierSpawns=2, and the local bank rose 3.000 → 4.99999999999999 (the full +2 ore banked; the residue is one float ULP below 5). THE STRIP (top→bottom): FRAME 1 (the 2→1 crossing) — the blue-ringed home planet labelled ‘YOU’, the ship just off its right rim, and a SINGLE yellow courier chunk streaming ship→planet, with the under-ship hold indicator showing one filled yellow pip + one empty (1 ore still aboard); TOTAL reads 3 top-left. FRAME 2 (the 1→0 crossing) — again a SINGLE yellow courier in flight, the hold now two empty pips (0 aboard). FRAME 3 (settled) — no courier at centre, the hold indicator gone. At no captured frame did more than one courier ride the local ship→planet lane: the p8 ‘~3 couriers per ore’ lie (more ore flying than you hold) is dead — two ore, two chunks, one apiece. HONEST DISCLOSURE (float residue): because the HUD floors the banked value and the two ore land at 4.99999999999999, the drawn top-left TOTAL reads 3→4 across the deposit rather than 3→5 — the +2 is fully present in the sim bank but the display floors 4.9999 to 4 (the same residue the earlier natural-mine ore-truth capture documented). The full-frame courier-1 shot confirms the isolation: only one yellow courier near my ship, the grey shapes far to the left are asteroids, and rival deposits are hundreds of units off at the arena rim (minimap bottom-right). No page errors. VERIFIED: exactly 2 chunks for 2 ore, bank +2."
+    "title": "Ore numbers tell the truth — natural mine → dock → interrupt → re-dock → finish (the interrupt frame)",
+    "image": "images/ore-truth-interrupt.png",
+    "attestation": "The full ore cycle run NATURALLY on the live preview bundle (build 82c5c30, no ?freeze), driven entirely through real keyboard/mouse input and read back only through the ratified ?debug=1 seams (__oreHudStage.hold()/total()/readout(), __oreDepositStage.flights()). The local ship boots docked at its home planet ('YOU', the blue-ringed disc, banked 3). It was flown out into the asteroid field, mined a real rock to a full 2/2 hold by firing projectiles and tractoring the chipped chunks (sim cargo climbed 0 -> 2.000), flown home and parked inside dock range where the sim's own auto-deposit drained the hold into the bank; mid-drain it was BOOSTED back out of range to interrupt the deposit, then re-docked to finish. Across 35 captured frames the three numbers agreed on EVERY frame: under-ship filled pips == floor(sim hold), top-left TOTAL == floor(sim bank), sim hold+bank constant — with only the documented <=1-frame draw lag while a drain is actively moving, and zero disagreements anywhere. THIS image is the interrupt itself: the ship is clearly UNDOCKED (well clear of its 'YOU' planet, now up and to the right), exactly one yellow hold pip is filled beneath it (1.333 ore held -> one whole pip), and the top-left reads TOTAL 3. Held right there for 18 consecutive sampled frames the sim hold stayed EXACTLY 1.333 (peak drift 0.0000), the sim bank stayed 3.667, the drawn pips stayed 1, the drawn TOTAL stayed 3, and the deposit-courier count fell to 0 and stayed 0 — no phantom banking, no phantom couriers while undocked. That is precisely where the field report said the readouts used to lie, and here they do not move. Conservation held end to end: the sim bank rose 3.000 -> 4.99999999999999 (5 within float dust) as the mined 2.000 hold emptied to 0, hold+bank pinned at 5 the whole run. No page errors. VERIFIED."
   },
   {
     "area": "hud",
@@ -1028,5 +1028,145 @@
     "title": "Auto-aim puts a hittable enemy ahead of a rock (tier 1 > tier 2), and returns to the rock when no enemy is hittable — proven by effect (enemy bar drains vs cargo rises)",
     "image": "images/autoaim-enemies-strip.png",
     "attestation": "On the live preview bundle (build 4f3f25f, ?debug=1, NO freeze, tap scheme) I proved the player auto-aim ladder (src/sim/step.ts acquireAimTarget: a hittable enemy is tier 1, a rock tier 2). HONEST SCOPE: there is no live-stage seam that reads back the auto-aim TARGET, and none can place a hittable enemy AND a rock in ONE frame — stageRockOnly() parks every enemy far out with spawnProtect=999 (that is 999 SECONDS, effectively permanent) and stageAutoEngage() clears the asteroid field. So the target is proven by its unfakeable EFFECT — an enemy hit makes its health-bar fraction/hpText fall (read off __healthbarStage.bars()); a mined rock makes the hold cargo rise (read off __oreDepositStage.readout()) — and the ladder's two tiers are shown deterministically while the developer's enemy-amid-rock scenario is shown live. I LOOKED at three committed frames + the captioned strip. CLUSTER (autoaim-cluster.png): the local ship (blue hull 42/50) sits in the natural dense asteroid field — grey rock in every direction, the game itself prompting 'Hold Left mouse on the asteroid - your shots chip the rock' - with a real enemy in weapon range, Rusty (EASY) 23/30, ~109px off. Ground truth over the 90-frame hold: the ship fired on 81 frames, an ENEMY bar drained on 13 of them, a rock was mined on only 2; the captured frame shows that enemy dropping 26/30->23/30 while cargo held flat. Surrounded by minable rock, the shots go to the enemy: enemies-first. ENEMY alone (autoaim-enemy.png, stageAutoEngage): one bot in weapon range, the field cleared, no rock; the ship auto-fires the bot, Rusty (EASY) draining 70->53/70 over 8 frames (frame shown 60/70), no ore squares under the hull, cargo pinned 0 — tier 1 taken when it is the only target. ROCK alone (autoaim-rock.png, stageRockOnly false): one rock in weapon range, every enemy parked far out and spawn-protected (no enemy bar anywhere on screen); with no hittable enemy the ladder falls to the rock — the ship mines it, one YELLOW ore square banked under the hull (cargo 0->1), firing the whole time. That is the 'aim returns to the rock' fallback the CLUSTER frame withholds while an enemy is up. HONEST BOUNDARIES: because the seams cannot combine, the enemies-first frame (CLUSTER) and the returns-to-rock frame (ROCK) are separate scenes on the same live boot rather than one continuous switch, and the fallback trigger shown is 'no hittable enemy present' (the general tier-1-empty rule) rather than specifically an enemy ducking behind a planet; the losBlocked occlusion path is the same rule (an occluded enemy is skipped exactly like an absent one) but is not the trigger captured here. No page errors during capture. VERIFIED: on a real boot the player's auto-aim drains an in-range enemy while ignoring the rock field around it, and mines the rock when no enemy is hittable."
+  },
+  {
+    "id": "pause-menu-offline",
+    "title": "Pause — real ESC freezes the offline match; settings round-trip; EXIT re-boots",
+    "area": "match",
+    "image": "images/pause-menu-offline.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Six-panel montage from the real desktop bundle over an offline ?debug=1 match; every control pressed at the physical point the client itself drew it (through the read-only __pauseStage seam). Panels 1–2 show the PAUSED overlay (RESUME / SETTINGS / EXIT TO MENU) after a REAL ESC, both captioned TICK 122 — the two captures were taken 500ms apart (≈30 ticks would pass at 60Hz) yet the sim tick counter is identical (Δticks=0, frozen=true): the offline sim is genuinely FROZEN, not merely visually paused. Panel 3 is the real SETTINGS screen (FIRE MODE / CONTROLS / REDUCE VFX / MASTER·SFX·MUSIC VOLUME / DONE), still frozen, reached from and returned to the overlay — a clean round trip. Panel 4 is the 'LEAVE THE MATCH?' confirm (LEAVE / STAY) — one accidental tap can't kill a match. Panel 5 is the clean PLANET RUSH main menu after LEAVE (menuVisible=true, matchStarted=false, and __pauseStage gone — no stale match seam survived the teardown). Panel 6 is a brand-new live arena after PLAY→RUSH (matchStarted=true). Zero page errors across the whole path.",
+    "verdict": "verified"
+  },
+  {
+    "id": "tap-planet-wheel",
+    "title": "Tap Commander — tap your planet to open the build wheel, buy, close, and fly again",
+    "area": "build-wheel",
+    "image": "images/tap-planet-wheel.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Four-panel montage, real desktop bundle, Tap Commander scheme, ship docked at its own planet (?debug=1, LIVE sim). Every press is a REAL synthesized pointerdown at the logical point the client drew, into the same main.ts handler a thumb hits. Panel 1: the wheel was closed, then a real tap on the planet OPENED the build wheel (TURRET / UPGRADE SHIP / SHIELD / REPAIR CORE segments visible); the bank reads 999 ore in the wheel hub, 0 turrets at the planet. Panel 2: a real tap on the TURRET wedge bought one through the wheel's own funnel — the hub number visibly drops 999→996 (spent exactly 3 = TURRET.cost) and the planet's turret count rises 0→1. Panel 3: a real tap OUTSIDE the wheel closed it (open→false) and placed NO move order (order='none') — one tap dismisses, it does not double as a move. Panel 4: the very NEXT real tap on empty space is a move order ('waypoint') and the ship flew up-field (y 1200→1143). Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "game-has-sound",
+    "title": "The game SOUNDS — a real gesture resumes the context, the mix runs, the soundtrack plays",
+    "area": "audio",
+    "image": "images/game-has-sound.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Three-panel montage, real desktop bundle (?debug=1&freeze=1), read through the pure-readback __audioStage seam (it drives no sound — audio is invisible, so the readback IS the evidence). BEFORE: prior to any gesture the standing voices have NOT started (running=false) and the unlock has NOT latched (unlocked=false) — the game is silent; the raw context state reads 'running' only because headless Chromium starts its AudioContext running (a real browser reports 'suspended' here), so the honest proof is running/unlocked flipping. RUNNING: after a REAL TRUSTED mouse click (the unlock's 'tap on PLAY') the context is running, unlocked=true, standing voices running=true, the master gain the player hears through = 0.8 (>0, audible), and the adaptive soundtrack is playing (musicPlaying=true, phase 'calm'). SFX FIRES: a real wheel-wedge tap bumped the SFX one-shot count 6→7 in the SAME page turn (no background frame between the two reads, so the rise is the tap's own sound node), on an SFX bus gain of 0.8. The game was silent for a day because nothing asserted this; now the record shows it makes sound from a real gesture. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "ui-sfx-audible",
+    "title": "UI SFX — the shared control driver names the RIGHT voice: press ticks, disabled buzzes, spend chimes",
+    "area": "audio",
+    "image": "images/ui-sfx-audible.png",
+    "capturedAt": "2026-07-27T20:28:03Z",
+    "buildSha": "58a4e89",
+    "attestation": "Three-panel montage, real desktop bundle (?debug=1&freeze=1), context woken by a real gesture first; presses then go through the HUD's ONE shared control driver (__pressStage — the same call a real thumb's press reaches) and the per-kind SFX-spy tally (uiCues) is read back through __audioStage and captioned. PRESS TICK: a LIVE affordable upgrade wedge (drawn 'ready', hub 999) → the press tally rose 1→2 and the last cue was 'press' — a live control ticks. REJECT BUZZ: with the bank zeroed (hub 0) a DISABLED wedge (lit red) → the reject tally rose 0→1, last cue 'reject' — main.ts alone can't know a wedge's ready state, the HUD does, so a disabled press BUZZES. CONFIRM CHIME: a sim-confirmed landed spend through the driver's confirm path → the confirm tally rose 0→1, last cue 'confirm'. Three distinct voices, each married to its exact interaction; SFX bus gain 0.8. The voices sat unwired in the bank for a day — this gate keeps callers and voices married. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "tap-autofire-in-motion",
+    "title": "Tap Commander — auto-fires while you fly (no lock)",
+    "area": "touch",
+    "image": "images/tap-autofire-in-motion.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Two-panel figure, real desktop bundle (?debug=1). Tap Commander was engaged through the REAL pause Settings → Controls row — a real click on the point __pauseStage reports the client drew that row at, never a hit-test seam — and the scheme read back as 'tap'. STAGED: the local ship (steel triangle, hull bar 50/50) sits screen-centred with the bot 'Rusty (EASY)' parked 140u to its right and the asteroid field cleared. MID-FLIGHT · FIRING: a real left-click on empty space up-field placed a MOVE order (order kind 'waypoint', ref null — there is NO target lock); the ship has thrust ~40% of the way to the waypoint (visibly in motion, thrust flare below it, world y 1200→1101), and a single red projectile is streaming down-right toward Rusty, which is the nearest enemy on screen (~120px) and whose hull has fallen to 60/70 (85%). Three other bots (Sable/Warden/Patch) sit at the frame edges, untargeted. The ship fights while flying with no lock — the target is the auto-aim ladder's pick. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "tap-mining-in-tractor-range",
+    "title": "Tap Commander — mines from INSIDE the tractor radius (ore reaches the hold)",
+    "area": "touch",
+    "image": "images/tap-mining-in-tractor-range.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Single annotated frame, real desktop bundle (?debug=1), Tap Commander. A real left-click LOCKED the rock (order read back = target, asteroid #900001). The overlay marks the local ship (white box, screen-centred), the locked rock (the large tan asteroid, orange box at its centre), a dashed CYAN ring at the 120u tractor pickup radius and a grey ring at the old 150u engage standoff, and a yellow line = the measured hold. The rock centre sits plainly INSIDE the cyan tractor ring: the ship settled 81u from the rock centre (measured), well short of the old 150u standoff. Two yellow ore pips sit under the ship and the hold climbed 0→2 over the run as chipped chunks drifted into it. This is the p9-02 fix visible on a real boot — the pilot holds a mined rock's centre inside the tractor pickup radius so the ore is actually collected, instead of parking at engage range (150u) and stranding it. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "full-hold-no-rock-fire",
+    "title": "Tap Commander — a FULL hold silences rock fire, but never enemy fire",
+    "area": "touch",
+    "image": "images/full-hold-no-rock-fire.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Two-panel figure, ONE continuous live scene, real desktop bundle (?debug=1), Tap Commander. The ship first mined a natural rock to a full hold. FULL HOLD · SILENT: the ship sits amid a dense field of grey asteroids with two yellow ore pips under it (hold full, cargo 2/2) and the game's own 'Hold full — fly home and press E' prompt showing; with no lock (pure auto-aim), across 12 sampled frames the sim's firing tell was FALSE on all 12 — the weapon is SILENT, not one shot toward the surrounding minable rock. ENEMY ARRIVES · FIRES: a bot ('Rusty (EASY)', hull 67/70) is brought into range and the weapon speaks at once — several red projectiles stream toward it (firing on 26 of 26 sampled frames), its hull draining — while the hold is STILL full (2/2, the 'Hold full' prompt still shown) and the rock is still ignored. A full hold drops asteroids from the auto-aim ladder entirely, yet an enemy (tier 1) is engaged the instant it is in range. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "autoaim-hits-orbiter",
+    "title": "Tap Commander — auto-aim LEADS an orbiter: a sequence of shots lands on the arc",
+    "area": "touch",
+    "image": "images/autoaim-hits-orbiter.png",
+    "capturedAt": "2026-07-27T21:07:00Z",
+    "buildSha": "6a7fbc8",
+    "attestation": "Three-panel strip, live desktop bundle (?debug=1), player on auto-aim (Tap Commander, no lock — so the sim's lead solver aims the ladder's pick). A bot ('Rusty') traces an arc around a planet while the local ship (white box, screen-centred) fires on it. Each panel is a captured LANDED shot: the orbiter is ringed white at successive points along the arc, its recent path drawn in cyan, the shot span in yellow, and the planet it circles boxed blue with a faint orbit ring. Across 170 frames (the firing tell true on all 170) the bot swept a ~50° arc at ~237px radius and its hull stepped DOWN 7 times — the three panels catch it at 95% → 75% → 60% as the arc sweeps up-left → up → up-right. Panel 2 carries the game's own 'Your planet is under attack — follow the arrow' warning. Seven landed shots on a moving orbiter: the developer's field report ('I can never hit an enemy orbiting my planet') answered by the auto-aim lead solver. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "damage-fills-red",
+    "title": "Siege ring grammar — shield reddens & dies before the core fills red",
+    "area": "match",
+    "image": "images/p11-damage-fills-red.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Four-panel siege of ONE owner-0 (blue) home, every pixel drawn by the SHIPPED ring code (src/render drawDamageFill / drawShieldBubble) via the QA render harness (evidence/harness/scene.js) — a fresh home has no shields and no ?debug seam grants one, so the shield layer is staged on the real Planet and the core hp set through the sim's own field, then drawn by the real Renderer. FRAME 1 (shield 40/40, core 100/100): a whole cyan shield bubble outside a whole BLUE core ring — healthy is entirely the owner's colour. FRAME 2 (shield 8/40, core 100/100): the OUTER shield ring is now mostly threat-RED (~80% of it, filling clockwise from twelve o'clock) while the inner core ring is still fully blue — the shield reddens while the core is untouched. FRAME 3 (shield 0/40, core 58/100): the shield is GONE (no outer ring) and the single core ring shows a ~42% red arc from twelve o'clock clockwise, the rest blue — the shield died BEFORE the core began to fill. FRAME 4 (shield 0/40, core 22/100): the core ring is ~78% red. Throughout, red = damage/lost and owner-blue = remaining, growing clockwise from the top; the old inverted ring (red meaning health) is gone. Each panel is captioned with the exact shield/core HP it was drawn at. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "scarce-default",
+    "title": "Ore abundance — SCARCE (default) vs RICH, same seed, obvious field difference",
+    "area": "match",
+    "image": "images/p11-scarce-default.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Two wide shots of the SAME map seed (20250728, octagon 8-home ring), each built by the real createWorld({abundance}) and drawn by the real Renderer via the QA harness. LEFT 'ABUNDANCE: SCARCE (p11 default)' — multipliers totalOre x0.55 / density x0.75 / respawn x1.1; field now 32 rocks, 114 ore total, economy.abundance=scarce. RIGHT 'ABUNDANCE: RICH' — x1.6 / x1.25 / x0.85; 56 rocks, 333 ore total, economy.abundance=rich. The eight owner-coloured homes sit in the identical ring in both (same seed); the SCARCE commons field is visibly sparser and its rocks leaner, the RICH field visibly denser with larger, richer rocks — the difference is obvious. Ore-per-minute table (p11-01 PR, all-miner mirror, world.ledger.mined / match-minutes): scarce 16.7, standard 32.3, rich 56.8 ore/min — SCARCE is 48.4% below STANDARD, RICH 76% above. FINDING (why the harness, not the shipped client): the offline boot path (platform bootOfflineMatch) never threads `abundance`, so the shipped client's createWorld defaults to STANDARD (economy.abundance='standard') — SCARCE is only the default of MatchConfig, which the offline boot bypasses, and there is no in-app scarce/rich selector yet. The p11 economy code itself resolves each level correctly, as shown. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "bot-resites",
+    "title": "Bot re-sites off a contested field to a clean one and arrives — ping-pong dead",
+    "area": "match",
+    "image": "images/p11-bot-resites.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Four-frame sequence driving the ratified resite.test.ts 'end to end' scenario with the REAL bot brain (src/bots) + real step(), drawn by the real Renderer via the harness (bots are not exposed on window.__planetRush and the camera cannot lock to a bot, so this is the only way to SEE it with the bot's intent readable). A Vanguard bot (arrow) starts centred, ~530 units from BOTH field A (east, contested — a hostile Hauler parked on its approach: the teal planet with the red-ringed rock) and field B (west, clean: the green-ringed rock). Every frame's caption reads `brain.mineSite = 200 -> field B (clean)` — the bot commits to the clean field on the FIRST decision and never re-picks the contested one (no oscillation). Across t = 0.1 / 1.6 / 3.7 / 5.9 s: dist->B falls 529 -> 337 -> 110 -> 115 (it flies to B and parks at mining range) while dist->A climbs 531 -> 723 -> 954 -> 1108, and min-ever-A stays 530 — the bot never once approaches the field the hostile blocks. The developer's 'it just kept going back and forth' is dead: a single clean re-site to the other field, and arrival. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "zero-means-dead",
+    "title": "A living ship at 0.28 HP reads '1/70' (never 0) with a sliver of bar",
+    "area": "match",
+    "image": "images/p11-zero-means-dead.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "LIVE shipped desktop bundle (?debug=1&freeze=1), enemy hull staged through the real over-ship health-bar path via window.__healthbarStage.damageEnemy(0.004). LEFT: the full running-game frame — HUD 'WAVE 1/5 . Outer Drift', ore readout, the round minimap and the controls strip — with a bot parked beside the local ship. RIGHT: a crisp zoom on that enemy ship (nameplate 'Rusty ...', a Hauler, maxHull 70) — its over-ship health bar is nearly empty with a single cyan SLIVER pinned at the left edge and the numeric readout '1/70' beside it. The seam set the hull to 0.004 x 70 = 0.28 HP (proven by the returned staged fraction 0.004 and the maxHull 70 read back from the drawn bar); the drawn bar floors to the minimum-fill sliver (fraction 0.06) and the number ceils to 1 — so a ship still alive at 0.28 HP shows '1/70', never '0/70'. Zero means dead: any HP above zero reads at least 1 and keeps a visible sliver. Shipped client, zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "shot-tier-colors",
+    "title": "Shot colours ramp by DAMAGE tier — own plasma & enemy threat-red families",
+    "area": "match",
+    "image": "images/p11-shot-tier-colors.png",
+    "capturedAt": "2026-07-28T02:26:21Z",
+    "buildSha": "468ef72",
+    "attestation": "Six real Projectiles drawn by the shipped Renderer.drawShots through the p11 shotSprite ramp (src/art/vfx/shots.ts), via the harness. TOP ROW 'OWN fire - plasma family', tiers 0/1/2: the dots brighten cyan -> paler cyan and the glow halo grows each rung — pixels sampled off the PNG at each dot centre read #4bbdf7 -> #6ac7f7 -> #82cff7 (the art's SHOT_TIER_COLORS.own = #4dc3ff / #6dceff / #86d6ff). BOTTOM ROW 'ENEMY fire - threat-red family', tiers 0/1/2: dark-red -> pink-red, halo growing — sampled #ac3939 -> #ba5a5a -> #c47575 (art enemy = #b23a3a / #c05d5d / #cb7979). Both families climb WITHIN their own palette (own stays plasma/energy, enemy stays threat-red/danger) so 'whose shot' never changes hands, and neither ramp passes through signal yellow. The tint reads the shooter's owner.tiers[Power], so tiers 0/1/2 are staged as three allied shooters (own) and three enemy shooters (enemy) each at its rung. The shipped client can raise the LOCAL ship's Power tier live via __upgradeWheelStage (own ramp), but has no seam to set an enemy ship's or turret's tier, so the enemy threat-family ramp is only visible through the harness. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "spatial-audio",
+    "title": "Distance sounds like distance — the listener is the camera (a3-03)",
+    "area": "match",
+    "image": "images/spatial-audio.png",
+    "capturedAt": "2026-07-28T00:00:00Z",
+    "buildSha": "0d76842",
+    "attestation": "Shipped preview bundle booted at ?debug=1&freeze=1 (real live game behind the panel: 'WAVE 1/5 · Outer Drift', the arena with asteroid clusters, the own-ship glow ring centre-right, the corner minimap dotted with the eight ships, the desktop controls strip). A REAL mouse click resumed the AudioContext — the panel header reads context 'running' and listener has=true at world (1968, 1200), so the mix genuinely has a camera-listener on the followed ship, not a suspended stub. The panel then prints ONE event probed through the shipped __audioStage.probe seam at a distance ladder along the horizon (dy=0), so pan is purely horizontal and distance = |dx|. What is VISIBLE in the table: HERE (dx 0) reads gain 1.000, pan 0.000, cutoff 20000 — own fire at full presence, dead-centre, unfiltered. To the RIGHT the pan is POSITIVE and grows (+0.144 at 130, +0.289 at 260, +0.500 at 450, saturating at +1.000 by 900); gain holds 1.000 inside R_NEAR (dx 130/260) then falls (0.833 at 450, 0.439 at 900) while the lowpass closes (cutoff 20000 → 16900 → 9558). At dx +1400 (R_FAR) and +6000 the gain is 0.000 and the row is marked CULLED (red) — the off-screen war is not synthesised at all. The LEFT block is the exact mirror: identical distances, identical gains, cutoff and CULLED flags, but every pan value carries the OPPOSITE sign (−0.144, −0.289, −0.500, −1.000) — the pan flips across the ship. This is the numeric proof that 'I can hear the whole map from one screen' is gone: full only at the camera, panned to the side an event is on, and silent (culled) past earshot. Numbers are pure geometry from the live listener via probe(); they play no sound. Zero page errors.",
+    "verdict": "verified"
   }
 ]

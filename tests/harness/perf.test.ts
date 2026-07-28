@@ -42,9 +42,9 @@ describe('the GDD §4.3 stress scene', () => {
 
   it('is the scene the GDD names: 8 ships, 32 turrets, ~200 asteroids', () => {
     expect(world.ships).toHaveLength(STRESS_SCENE.ships);
-    expect(world.planets).toHaveLength(8);
-    const turrets = world.planets.reduce((n, p) => n + p.turrets.length, 0);
-    const shields = world.planets.reduce((n, p) => n + p.shields.length, 0);
+    expect(world.stations).toHaveLength(8);
+    const turrets = world.stations.reduce((n, p) => n + p.turrets.length, 0);
+    const shields = world.stations.reduce((n, p) => n + p.shields.length, 0);
     expect(turrets).toBe(STRESS_SCENE.turrets); // 4 × 8 — the design cap, fully built
     expect(shields).toBe(STRESS_SCENE.shields); // 2 × 8
     expect(world.asteroids).toHaveLength(STRESS_SCENE.asteroids);
@@ -58,7 +58,7 @@ describe('the GDD §4.3 stress scene', () => {
   });
 
   it('starts past spawn protection, so the turrets have something to shoot', () => {
-    expect(world.planets.every((p) => p.spawnProtect === 0)).toBe(true);
+    expect(world.stations.every((p) => p.spawnProtect === 0)).toBe(true);
     expect(world.ships.every((s) => s.spawnProtect === 0)).toBe(true);
   });
 

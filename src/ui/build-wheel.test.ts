@@ -5,7 +5,7 @@
  *  - **the only number on a segment is its cost** — and the costs are the sim's;
  *  - affordability, caps, and no-op presses are shown honestly, so the wheel
  *    never dangles a segment `placeOrder` would refuse;
- *  - the wheel opens **at your own planet and nowhere else**.
+ *  - the wheel opens **at your own station and nowhere else**.
  * These are the day-2 DoD tests: wheel affordability states.
  */
 import { describe, it, expect } from 'vitest';
@@ -25,13 +25,13 @@ import {
 import type { BuildWheelSignals, WheelSegmentId } from './build-wheel';
 import { REPAIR_HP_PER_ORE, SHIELD, TURRET } from '../sim/constants';
 
-/** A docked player at a healthy planet with `ore` banked, plus overrides. */
+/** A docked player at a healthy station with `ore` banked, plus overrides. */
 function sig(over: Partial<BuildWheelSignals> = {}): BuildWheelSignals {
   return {
     requested: true,
     docked: true,
     shipAlive: true,
-    planetAlive: true,
+    stationAlive: true,
     cargo: 0,
     banked: 0,
     turrets: 0,
@@ -62,14 +62,14 @@ describe('the wheel itself (GDD §2.5 — four segments, words + target)', () =>
     const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
     expect(byId.get('turret')?.label).toBe('TURRET');
     expect(byId.get('shield')?.label).toBe('SHIELD');
-    // Named in full — it repairs the planet's core, never the ship (GDD §2.5).
+    // Named in full — it repairs the station's core, never the ship (GDD §2.5).
     expect(byId.get('repair')?.label).toBe('REPAIR CORE');
     expect(byId.get('upgrade')?.label).toBe('UPGRADE SHIP');
 
-    // "Three spend on your planet, one on your ship" (GDD §2.5).
-    const planetSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'planet');
+    // "Three spend on your station, one on your ship" (GDD §2.5).
+    const stationSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'station');
     const shipSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'ship');
-    expect(planetSegments).toHaveLength(3);
+    expect(stationSegments).toHaveLength(3);
     expect(shipSegments).toHaveLength(1);
     expect(shipSegments[0]?.id).toBe('upgrade');
   });
@@ -198,15 +198,15 @@ describe('affordability (GDD §2.5 — hold plus bank, the sim\'s spendableOre)'
   });
 });
 
-describe('per-planet caps (GDD §2.5 — 4 turrets, 2 shields)', () => {
+describe('per-station caps (GDD §2.5 — 4 turrets, 2 shields)', () => {
   it('caps turrets at four and shields at two', () => {
-    expect(stateOf('turret', { banked: 99, turrets: TURRET.capPerPlanet - 1 })).toBe('ready');
-    expect(stateOf('turret', { banked: 99, turrets: TURRET.capPerPlanet })).toBe('capped');
-    expect(stateOf('shield', { banked: 99, shields: SHIELD.capPerPlanet })).toBe('capped');
+    expect(stateOf('turret', { banked: 99, turrets: TURRET.capPerStation - 1 })).toBe('ready');
+    expect(stateOf('turret', { banked: 99, turrets: TURRET.capPerStation })).toBe('capped');
+    expect(stateOf('shield', { banked: 99, shields: SHIELD.capPerStation })).toBe('capped');
   });
 
   it('says "capped" before "unaffordable" — the ring is full, not the wallet', () => {
-    expect(stateOf('turret', { banked: 0, turrets: TURRET.capPerPlanet })).toBe('capped');
+    expect(stateOf('turret', { banked: 0, turrets: TURRET.capPerStation })).toBe('capped');
   });
 
   it('counts queued construction against the cap (the caller passes the sim count)', () => {
@@ -244,13 +244,13 @@ describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)'
   });
 });
 
-describe('the wheel opens at your own planet and nowhere else (GDD §2.5, §2.4)', () => {
+describe('the wheel opens at your own station and nowhere else (GDD §2.5, §2.4)', () => {
   it('opens when asked for, docked, alive, at a live core', () => {
     expect(canOpenWheel(sig())).toBe(true);
     expect(buildWheelModel(sig()).open).toBe(true);
   });
 
-  it('stays shut away from the planet, however much ore is held', () => {
+  it('stays shut away from the station, however much ore is held', () => {
     expect(canOpenWheel(sig({ docked: false, cargo: 99 }))).toBe(false);
     expect(buildWheelModel(sig({ docked: false })).open).toBe(false);
   });
@@ -258,8 +258,8 @@ describe('the wheel opens at your own planet and nowhere else (GDD §2.5, §2.4)
   it('stays shut when it was not asked for, when dead, and at a wreck', () => {
     expect(canOpenWheel(sig({ requested: false }))).toBe(false);
     expect(canOpenWheel(sig({ shipAlive: false }))).toBe(false);
-    // A destroyed planet buys nothing — it is a wreck now (GDD §2.7).
-    expect(canOpenWheel(sig({ planetAlive: false }))).toBe(false);
+    // A destroyed station buys nothing — it is a wreck now (GDD §2.7).
+    expect(canOpenWheel(sig({ stationAlive: false }))).toBe(false);
   });
 
   it('still describes all four segments while closed, so the view pools once', () => {

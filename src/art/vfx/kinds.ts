@@ -16,7 +16,7 @@
  *
  * Particles can be tinted per emission — a thruster trail has to be the pilot's
  * colour. Style-guide §3 is strict about where identity colour may live ("wing
- * tips, cockpit glass, engine flame, weapon tint, planet beacon ring, HP bar"), so
+ * tips, cockpit glass, engine flame, weapon tint, station beacon ring, HP bar"), so
  * each kind declares whether it may take one:
  *
  *  - `fixed`    — the kind's own palette colour, always. A rock chip is rock.
@@ -48,9 +48,9 @@ export const PARTICLE = {
   flare: 4,
   /** An expanding ring: shield shimmer, spawn glow, shockwaves. */
   ring: 5,
-  /** Slow grey smoke: a burning planet, visible from further than its numbers. */
+  /** Slow grey smoke: a burning station, visible from further than its numbers. */
   smoke: 6,
-  /** Hull/crust shard: a dead planet's crust, a turret coming apart. */
+  /** Hull/crust shard: a dead station's crust, a turret coming apart. */
   shard: 7,
   /** Engine flame: the thruster trail, in the pilot's colour. */
   trail: 8,
@@ -218,7 +218,7 @@ export const PARTICLE_KINDS: readonly ParticleKindSpec[] = [
     fade: 'linear',
     tint: 'fixed',
     additive: false,
-    why: 'A burning planet reads from further away than its numbers do (§5).',
+    why: 'A burning station reads from further away than its numbers do (§5).',
   },
   {
     kind: PARTICLE.shard,

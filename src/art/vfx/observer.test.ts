@@ -43,7 +43,7 @@ describe('WorldObserver — the sim shape it reads', () => {
     const world = newWorld();
     const view = asView(world);
     expect(view.ships.length).toBe(2);
-    expect(view.planets.length).toBe(2);
+    expect(view.stations.length).toBe(2);
     expect(view.asteroids.length).toBeGreaterThan(0);
     expect(view.match.phase).toBe('live');
     expect(typeof view.bounds.width).toBe('number');
@@ -57,9 +57,9 @@ describe('WorldObserver — the sim shape it reads', () => {
     for (const key of ['id', 'pos', 'vel', 'angle', 'radius', 'alive', 'hull', 'maxHull', 'cargo', 'cargoCap', 'banked', 'spawnProtect', 'tiers', 'firing']) {
       expect(ship, `Ship.${key}`).toHaveProperty(key);
     }
-    const planet = world.planets[0]!;
+    const station = world.stations[0]!;
     for (const key of ['id', 'owner', 'pos', 'radius', 'coreHp', 'maxCoreHp', 'alive', 'angle', 'repairing', 'turrets', 'shields', 'builds']) {
-      expect(planet, `Planet.${key}`).toHaveProperty(key);
+      expect(station, `MiningStation.${key}`).toHaveProperty(key);
     }
     const rock = world.asteroids[0]!;
     for (const key of ['id', 'pos', 'radius', 'ore', 'crackStage']) {
@@ -69,7 +69,7 @@ describe('WorldObserver — the sim shape it reads', () => {
 
   it('runs a real match without ever overflowing the tell queue', () => {
     // The capacity claim in `../tells` — "a wave landing on a firefight next to
-    // a dying planet" — against an actual match rather than an estimate.
+    // a dying station" — against an actual match rather than an estimate.
     const world = newWorld();
     const observer = new WorldObserver({ local: 0 });
     const tells = new TellQueue();
@@ -96,7 +96,7 @@ interface Mutable {
   bounds: { width: number; height: number };
   ships: unknown[];
   asteroids: unknown[];
-  planets: unknown[];
+  stations: unknown[];
   projectiles: unknown[];
   match: { phase: string; wavesSpawned: number; winner: number | null };
 }
@@ -121,7 +121,7 @@ function ship(over: Record<string, unknown> = {}): unknown {
   };
 }
 
-function planet(over: Record<string, unknown> = {}): unknown {
+function station(over: Record<string, unknown> = {}): unknown {
   return {
     id: 0,
     owner: 0,
@@ -145,7 +145,7 @@ function world(over: Partial<Mutable> = {}): Mutable {
     bounds: { width: 1000, height: 1000 },
     ships: [],
     asteroids: [],
-    planets: [],
+    stations: [],
     projectiles: [],
     match: { phase: 'live', wavesSpawned: 1, winner: null },
     ...over,
@@ -175,7 +175,7 @@ describe('WorldObserver — deriving the moments', () => {
     // siege it missed the instant it connects.
     const observer = new WorldObserver();
     const tells = new TellQueue();
-    observer.observe(world({ ships: [ship()], planets: [planet()] }) as unknown as WorldView, 1 / 60, tells);
+    observer.observe(world({ ships: [ship()], stations: [station()] }) as unknown as WorldView, 1 / 60, tells);
     expect(tells.length).toBe(0);
     expect(observer.ready).toBe(true);
   });
@@ -192,7 +192,7 @@ describe('WorldObserver — deriving the moments', () => {
   });
 
   const firingTurret = (m: unknown, over: Record<string, unknown> = {}) =>
-    planet({ turrets: [{ id: 5, pos: { x: 0, y: 0 }, radius: 8, angle: 0, cooldown: 0, hp: 30, muzzle: m }], ...over });
+    station({ turrets: [{ id: 5, pos: { x: 0, y: 0 }, radius: 8, angle: 0, cooldown: 0, hp: 30, muzzle: m }], ...over });
 
   it('splits the muzzle flash into rock and hull voices (GDD §3.6)', () => {
     const muzzle = (hit: { x: number; y: number }) => ({
@@ -204,15 +204,15 @@ describe('WorldObserver — deriving the moments', () => {
     const target = ship({ id: 1, pos: { x: 300, y: 100 } });
 
     const onRock = diff(
-      world({ ships: [target], planets: [firingTurret(null)] }),
-      world({ ships: [target], planets: [firingTurret(muzzle({ x: 200, y: 100 }))] }),
+      world({ ships: [target], stations: [firingTurret(null)] }),
+      world({ ships: [target], stations: [firingTurret(muzzle({ x: 200, y: 100 }))] }),
     );
     expect(onRock.has(TELL.mineHit)).toBe(true);
     expect(onRock.has(TELL.weaponHit)).toBe(false);
 
     const onHull = diff(
-      world({ ships: [target], planets: [firingTurret(null)] }),
-      world({ ships: [target], planets: [firingTurret(muzzle({ x: 300, y: 100 }))] }),
+      world({ ships: [target], stations: [firingTurret(null)] }),
+      world({ ships: [target], stations: [firingTurret(muzzle({ x: 300, y: 100 }))] }),
     );
     expect(onHull.has(TELL.weaponHit)).toBe(true);
     expect(onHull.has(TELL.mineHit)).toBe(false);
@@ -220,7 +220,7 @@ describe('WorldObserver — deriving the moments', () => {
 
   it('says nothing for a muzzle flash that reaches full range unobstructed', () => {
     const clear = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: null, length: 400 };
-    const tells = diff(world({ planets: [firingTurret(null)] }), world({ planets: [firingTurret(clear)] }));
+    const tells = diff(world({ stations: [firingTurret(null)] }), world({ stations: [firingTurret(clear)] }));
     expect(tells.has(TELL.mineHit)).toBe(false);
     expect(tells.has(TELL.weaponHit)).toBe(false);
   });
@@ -228,8 +228,8 @@ describe('WorldObserver — deriving the moments', () => {
   it('carries the firing power and the turret owner on the muzzle voice (GDD §2.5)', () => {
     const m = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, hitPoint: { x: 200, y: 100 }, length: 200 };
     const tells = diff(
-      world({ planets: [firingTurret(null, { owner: 2 })] }),
-      world({ planets: [firingTurret(m, { owner: 2 })] }),
+      world({ stations: [firingTurret(null, { owner: 2 })] }),
+      world({ stations: [firingTurret(m, { owner: 2 })] }),
     );
     expect(magnitudeOf(tells, TELL.mineHit)).toBeGreaterThan(0);
     expect(tells.player[tells.indexOf(TELL.mineHit)]).toBe(2); // the turret owner
@@ -295,19 +295,19 @@ describe('WorldObserver — deriving the moments', () => {
   });
 
   it('hits the core, and holds the death for the tone contract (GDD §4.7)', () => {
-    const hit = diff(world({ planets: [planet()] }), world({ planets: [planet({ coreHp: 60 })] }));
+    const hit = diff(world({ stations: [station()] }), world({ stations: [station({ coreHp: 60 })] }));
     expect(magnitudeOf(hit, TELL.coreHit)).toBeCloseTo(0.6, 5);
 
-    const died = diff(world({ planets: [planet()] }), world({ planets: [planet({ coreHp: 0, alive: false })] }));
-    expect(died.count(TELL.planetDeath)).toBe(1);
+    const died = diff(world({ stations: [station()] }), world({ stations: [station({ coreHp: 0, alive: false })] }));
+    expect(died.count(TELL.stationDeath)).toBe(1);
     expect(died.has(TELL.coreHit)).toBe(false); // the death is the tell, not a hit
-    expect(died.player[died.indexOf(TELL.planetDeath)]).toBe(0);
+    expect(died.player[died.indexOf(TELL.stationDeath)]).toBe(0);
   });
 
   it('beats the repair channel and stops the instant it is interrupted (GDD §2.5)', () => {
     const observer = new WorldObserver();
     const tells = new TellQueue();
-    const repairing = world({ planets: [planet({ repairing: true })] }) as unknown as WorldView;
+    const repairing = world({ stations: [station({ repairing: true })] }) as unknown as WorldView;
 
     observer.observe(repairing, 0, tells);
     tells.clear();
@@ -316,55 +316,55 @@ describe('WorldObserver — deriving the moments', () => {
 
     tells.clear();
     // Any damage interrupts the channel; the heartbeat stops with it.
-    observer.observe(world({ planets: [planet({ repairing: false })] }) as unknown as WorldView, REPAIR_PULSE_S, tells);
+    observer.observe(world({ stations: [station({ repairing: false })] }) as unknown as WorldView, REPAIR_PULSE_S, tells);
     expect(tells.has(TELL.repairTick)).toBe(false);
   });
 
   it('flashes a turret on the cooldown reset that is the shot', () => {
-    const turret = (cooldown: number) => planet({ turrets: [{ id: 5, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown, hp: 30 }] });
-    const fired = diff(world({ planets: [turret(0)] }), world({ planets: [turret(0.25)] }));
+    const turret = (cooldown: number) => station({ turrets: [{ id: 5, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown, hp: 30 }] });
+    const fired = diff(world({ stations: [turret(0)] }), world({ stations: [turret(0.25)] }));
     expect(fired.has(TELL.turretFire)).toBe(true);
     // At the barrel tip, not the mount: the flash is where the shot leaves.
     expect(fired.x[fired.indexOf(TELL.turretFire)]).toBeCloseTo(528, 5);
 
-    const cooling = diff(world({ planets: [turret(0.25)] }), world({ planets: [turret(0.2)] }));
+    const cooling = diff(world({ stations: [turret(0.25)] }), world({ stations: [turret(0.2)] }));
     expect(cooling.has(TELL.turretFire)).toBe(false);
   });
 
   it('carries the owner on a turret death, so the right alarm rings (GDD §2.2)', () => {
-    const withTurret = planet({ owner: 3, turrets: [{ id: 5, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown: 0, hp: 30 }] });
-    const tells = diff(world({ planets: [withTurret] }), world({ planets: [planet({ owner: 3 })] }));
+    const withTurret = station({ owner: 3, turrets: [{ id: 5, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown: 0, hp: 30 }] });
+    const tells = diff(world({ stations: [withTurret] }), world({ stations: [station({ owner: 3 })] }));
     expect(tells.has(TELL.turretDown)).toBe(true);
     expect(tells.player[tells.indexOf(TELL.turretDown)]).toBe(3);
   });
 
   it('announces a build placed once, and its completion when the thing appears', () => {
-    const job = planet({ builds: [{ id: 7, kind: 'turret', remaining: 10 }] });
-    const placed = diff(world({ planets: [planet()] }), world({ planets: [job] }));
+    const job = station({ builds: [{ id: 7, kind: 'turret', remaining: 10 }] });
+    const placed = diff(world({ stations: [station()] }), world({ stations: [job] }));
     expect(placed.count(TELL.buildPlaced)).toBe(1);
 
     const observer = new WorldObserver();
     const tells = new TellQueue();
-    observer.observe(world({ planets: [job] }) as unknown as WorldView, 0, tells);
+    observer.observe(world({ stations: [job] }) as unknown as WorldView, 0, tells);
     tells.clear();
-    observer.observe(world({ planets: [job] }) as unknown as WorldView, 1 / 60, tells);
+    observer.observe(world({ stations: [job] }) as unknown as WorldView, 1 / 60, tells);
     expect(tells.has(TELL.buildPlaced)).toBe(false); // …and only once
 
     const done = diff(
-      world({ planets: [job] }),
-      world({ planets: [planet({ turrets: [{ id: 8, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown: 0, hp: 30 }] })] }),
+      world({ stations: [job] }),
+      world({ stations: [station({ turrets: [{ id: 8, pos: { x: 520, y: 500 }, radius: 8, angle: 0, cooldown: 0, hp: 30 }] })] }),
     );
     expect(done.has(TELL.buildComplete)).toBe(true);
   });
 
-  it('keeps the build jobs of one planet from cancelling those of another', () => {
-    // The bug this guards: pruning the job memo per planet drops the other
-    // seven planets' jobs and re-announces them on the next frame, forever.
-    const a = planet({ id: 0, owner: 0, builds: [{ id: 1, kind: 'turret', remaining: 9 }] });
-    const b = planet({ id: 1, owner: 1, pos: { x: 800, y: 800 }, builds: [{ id: 2, kind: 'shield', remaining: 14 }] });
+  it('keeps the build jobs of one station from cancelling those of another', () => {
+    // The bug this guards: pruning the job memo per station drops the other
+    // seven stations' jobs and re-announces them on the next frame, forever.
+    const a = station({ id: 0, owner: 0, builds: [{ id: 1, kind: 'turret', remaining: 9 }] });
+    const b = station({ id: 1, owner: 1, pos: { x: 800, y: 800 }, builds: [{ id: 2, kind: 'shield', remaining: 14 }] });
     const observer = new WorldObserver();
     const tells = new TellQueue();
-    const both = world({ planets: [a, b] }) as unknown as WorldView;
+    const both = world({ stations: [a, b] }) as unknown as WorldView;
 
     observer.observe(both, 0, tells);
     for (let i = 0; i < 5; i++) {
@@ -375,11 +375,11 @@ describe('WorldObserver — deriving the moments', () => {
   });
 
   it('shimmers a shield on damage and collapses it when the bubble goes', () => {
-    const withShield = (hp: number) => planet({ shields: [{ id: 3, hp, maxHp: 40, radius: 80 }] });
-    const hit = diff(world({ planets: [withShield(40)] }), world({ planets: [withShield(28)] }));
+    const withShield = (hp: number) => station({ shields: [{ id: 3, hp, maxHp: 40, radius: 80 }] });
+    const hit = diff(world({ stations: [withShield(40)] }), world({ stations: [withShield(28)] }));
     expect(magnitudeOf(hit, TELL.shieldHit)).toBeCloseTo(0.7, 5); // what is left
 
-    const popped = diff(world({ planets: [withShield(4)] }), world({ planets: [planet()] }));
+    const popped = diff(world({ stations: [withShield(4)] }), world({ stations: [station()] }));
     expect(popped.has(TELL.shieldDown)).toBe(true);
   });
 

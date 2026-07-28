@@ -23,6 +23,7 @@ import {
   hpReadout,
   isLocalCombatant,
   HEALTHBAR_FULL_EPSILON,
+  HEALTHBAR_MIN_FILL,
 } from './healthbar';
 import type { Combatant } from './healthbar';
 
@@ -202,6 +203,18 @@ describe('the fill fraction each bar shows', () => {
     const under = healthBarModel([enemy({ hp: -5, maxHp: 50 })], LOCAL);
     expect(under[0]?.fraction).toBe(0);
   });
+
+  it('never renders an empty bar for a living hull — a minimum sliver (the field report)', () => {
+    // 0.4/70 ≈ 0.006 raw would draw an invisible fill that reads as an empty
+    // track — the same "looks dead but isn't" lie the number had. The fill floors
+    // to a visible sliver while alive, so an empty bar means exactly one thing: dead.
+    const [bar] = healthBarModel([enemy({ hp: 0.4, maxHp: 70 })], LOCAL);
+    expect(bar?.fraction).toBe(HEALTHBAR_MIN_FILL);
+    expect(bar?.fraction).toBeGreaterThan(0);
+    // A healthy fraction well above the floor is untouched — the true HP fraction.
+    const [half] = healthBarModel([enemy({ hp: 25, maxHp: 50 })], LOCAL);
+    expect(half?.fraction).toBeCloseTo(0.5);
+  });
 });
 
 describe('the numeric "68/70" readout (field request v0.2.4)', () => {
@@ -209,10 +222,20 @@ describe('the numeric "68/70" readout (field request v0.2.4)', () => {
     expect(hpReadout(68, 70)).toBe('68/70');
   });
 
-  it('rounds a fractional siege-damaged hp to a whole point', () => {
-    // Ships/turrets step in whole hits; only a live siege makes hp fractional.
-    expect(hpReadout(67.4, 70)).toBe('67/70');
+  it('CEILS a fractional siege-damaged hp — a living thing never reads down', () => {
+    // Ships/turrets step in whole hits; only a live siege makes hp fractional, and
+    // that fraction ceils so the readout can never round a standing hull down.
+    expect(hpReadout(67.4, 70)).toBe('68/70');
     expect(hpReadout(67.6, 70)).toBe('68/70');
+  });
+
+  it('reads a barely-alive hull as "1", never "0" — zero means dead (the field report)', () => {
+    // The whole point: 0.4/70 is ALIVE (death is hp <= 0), so it must not read the
+    // "0/70" that made a living enemy look dead. Ceiling turns 0.4 into 1.
+    expect(hpReadout(0.4, 70)).toBe('1/70');
+    expect(hpReadout(0.001, 70)).toBe('1/70');
+    // Exactly dead is the only 0 — and such an entity draws no bar at all anyway.
+    expect(hpReadout(0, 70)).toBe('0/70');
   });
 
   it('clamps into [0, max] instead of printing a negative or over-full number', () => {

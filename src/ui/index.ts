@@ -17,7 +17,7 @@
  *
  * M2 surface: the **Build & Upgrade wheel** (§2.5 — words plus cost, and cost is
  * the only number), the **upgrade panel** behind its arrow (the only place ship
- * stats appear), **your own planet's HP** in your player colour (§2.2), the
+ * stats appear), **your own station's HP** in your player colour (§2.2), the
  * **under-attack alarm** with its sustained-damage trigger and screen-edge arrow
  * home (§2.2, a mechanic and not polish), and the remaining two onboarding
  * prompts (§2.10).
@@ -101,7 +101,7 @@ export { BuildWheelView } from './build-wheel-view';
 export type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 
 // --- Open-build-wheel button — the touch E-equivalent, a permanent HUD ------
-//     fixture near your own planet (GDD §2.2, §2.4); drawn by touch-visuals,
+//     fixture near your own station (GDD §2.2, §2.4); drawn by touch-visuals,
 //     its persistence rule + layout contract owned here.
 
 export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
@@ -204,6 +204,16 @@ export type {
   WheelSnapshot,
 } from './press-feedback';
 
+// --- UI sound seam (field report v0.2.4+) ----------------------------------
+//
+// The narrow seam a UI control calls to make a sound — the shape haptics uses.
+// The UI names an event (press / confirm / reject); the audio module behind the
+// seam decides the sound, the SFX-slider gain and the death-hush ducking. Wired
+// into the ONE shared control component (PressFeedback) so every wheel/menu
+// control is heard exactly as it is seen (sfx.ts).
+export { NO_UI_SFX } from './sfx';
+export type { UiCue, UiSfx } from './sfx';
+
 // --- Under-attack alarm (GDD §2.2 — a mechanic, not polish) ----------------
 
 export {
@@ -216,10 +226,10 @@ export {
 } from './alarm';
 export type { HomeArrow, ArrowViewport, Point } from './alarm';
 
-// --- Own-planet HP, in the player's colour (GDD §2.2) ----------------------
+// --- Own-station HP, in the player's colour (GDD §2.2) ----------------------
 
-export { planetHpModel, planetHpFlashOn, coreHpReadout, playerColor, PLANET_CRITICAL_FRACTION } from './planet-hp';
-export type { PlanetHpModel } from './planet-hp';
+export { stationHpModel, stationHpFlashOn, coreHpReadout, playerColor, STATION_CRITICAL_FRACTION } from './station-hp';
+export type { StationHpModel } from './station-hp';
 
 // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) --------------
 //
@@ -264,14 +274,14 @@ export type { Combatant, HealthBar } from './healthbar';
 
 export { HealthBarView, HEALTHBAR_ID, HEALTHBAR_ANCHOR } from './healthbar-view';
 
-// --- Player-name labels over ships and owned planets (field request v0.2.1) --
+// --- Player-name labels over ships and owned stations (field request v0.2.1) --
 //
 // The same pure-model / pooled-view split as the health bars, stacked with them
 // so a ship's name, bar and hull read as one unit ([[nameplates]] rule 1): the
 // pure `nameplateModel` decides who gets a label, its text (from a per-slot
 // `NameTable`) and its identity colour; `NameplateView` paints and self-registers
 // under `full`. The label-bearing entities are fed to the `Hud` on `nameables`
-// (ships + owned planets, screen-space) with a `names` table off the lobby
+// (ships + owned stations, screen-space) with a `names` table off the lobby
 // (`playerNameTable`); the local ship's own label is optional-off (default off).
 
 export {
@@ -291,7 +301,7 @@ export {
   NAMEPLATE_ID,
   NAMEPLATE_ANCHOR,
   NAMEPLATE_SHIP_GAP,
-  NAMEPLATE_PLANET_GAP,
+  NAMEPLATE_STATION_GAP,
 } from './nameplates-view';
 export type { DrawnNameplate } from './nameplates-view';
 
@@ -605,6 +615,46 @@ export type {
 
 export { EndOfMatchView, END_OF_MATCH_ANCHOR } from './end-of-match-view';
 
+// --- The pause menu — exit / settings mid-match, offline-only pause (p10) ----
+//
+// ESC (or a touch corner button) opens an overlay over a match in progress:
+// RESUME / SETTINGS / EXIT TO MENU, with EXIT behind a "Leave the match?"
+// confirm. Offline the sim FREEZES while it is up (loop-gated in `src/main.ts`);
+// online it shows over a running sim — that distinction is the `pausable` flag
+// routed through `shouldFreezeSim`, nothing the overlay itself knows.
+
+export {
+  PAUSE_ANCHOR,
+  PAUSE_BUTTON_ANCHOR,
+  PAUSE_BUTTON_ID,
+  PAUSE_BUTTON_LEFT,
+  PAUSE_BUTTON_MARGIN,
+  PAUSE_BUTTON_SIZE,
+  PAUSE_ID,
+  isPauseOpen,
+  nextPauseScreen,
+  pauseButtonRect,
+  pauseButtonVisible,
+  pauseButtons,
+  pauseHitTest,
+  pauseLayout,
+  pauseMenuModel,
+  shouldFreezeSim,
+} from './pause-menu';
+export type {
+  PauseAction,
+  PauseButton,
+  PauseButtonSignals,
+  PauseButtonView,
+  PauseLayout,
+  PauseLayoutOptions,
+  PauseMenuModel,
+  PauseScreen,
+  PauseTarget,
+} from './pause-menu';
+
+export { PauseMenuView } from './pause-menu-view';
+
 export {
   CONNECTION_STATUS_ID,
   connectionStatusHitTest,
@@ -654,7 +704,7 @@ export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
 // --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
 //
 // Four cards on the PLAY flow, each a mini layout preview drawn from the
-// registry's own planet positions so the picture can never drift from the board.
+// registry's own station positions so the picture can never drift from the board.
 // `octagon` preselected; `diamond` carries a VETERAN tag. The chosen id is
 // persisted (same seam as the fire mode) and fed to `bootOfflineMatch(seed, mapId)`.
 // Same three-piece shape as every screen here: a pure model with co-located
@@ -679,7 +729,7 @@ export {
   normalizeMapId,
   mapIndexOf,
   mapIdAt,
-  registryPlanets,
+  registryStations,
 } from './map-picker';
 export type {
   MapCardModel,
@@ -694,7 +744,7 @@ export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
 // --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
 //
 // Bottom-right corner square that taps/clicks open to a centred overlay (same
-// gesture PC + mobile, `M` on PC), drawing sim-driven dots — planets, ships, the
+// gesture PC + mobile, `M` on PC), drawing sim-driven dots — stations, ships, the
 // collapse ring, faint ore hints. Same pure-model / Pixi-view split as the rest:
 // `./minimap` decides (toggle, fit, scene), `./minimap-view` draws (throttled
 // cached content + a per-frame own-ship dot). The `Hud` owns both.
@@ -724,7 +774,7 @@ export {
 export type {
   MinimapState,
   MinimapFrame,
-  MinimapPlanet,
+  MinimapStation,
   MinimapShip,
   MinimapRing,
   MinimapInsets,

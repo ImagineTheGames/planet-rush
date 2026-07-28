@@ -41,8 +41,16 @@ import {
   clampToMargin,
   turretTierShotDamage,
 } from './constants';
-import { damagePlanet, damageTurret, planetTargetRadius, turretRange, turretTier } from './buildings';
+import {
+  damageSatellite,
+  damageStation,
+  damageTurret,
+  stationTargetRadius,
+  turretRange,
+  turretTier,
+} from './buildings';
 import { damageShip } from './damage';
+import { ledgerAdd } from './ore-ledger';
 import type { SpatialHash } from './spatial-hash';
 import type { Asteroid, Projectile, Ship, Turret, World } from './state';
 import { shipMineYield, shipProjectileLife, shipProjectileSpeed, shipWeaponDamage } from './upgrades';
@@ -265,11 +273,11 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
     return true;
   }
 
-  for (let pi = 0; pi < world.planets.length; pi++) {
-    const planet = world.planets[pi]!;
-    if (!areEnemies(world, p.owner, planet.owner)) continue; // never your own/allied home
-    for (let ti = 0; ti < planet.turrets.length; ti++) {
-      const turret = planet.turrets[ti]!;
+  for (let pi = 0; pi < world.stations.length; pi++) {
+    const station = world.stations[pi]!;
+    if (!areEnemies(world, p.owner, station.owner)) continue; // never your own/allied home
+    for (let ti = 0; ti < station.turrets.length; ti++) {
+      const turret = station.turrets[ti]!;
       if (turret.hp <= 0) continue;
       const rr = turret.radius + p.radius;
       if (dist2(p.pos, turret.pos) > rr * rr) continue;
@@ -277,17 +285,31 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       forfeitProtection(world, p.owner);
       return true;
     }
+    // Radar satellites are attackable structures (feature f1): a ship weapon shot
+    // bites an enemy's orbiting sensor exactly as it does a turret. Killing it
+    // collapses that coverage (`./sensing` reads only alive satellites).
+    if (station.satellites) {
+      for (let si = 0; si < station.satellites.length; si++) {
+        const sat = station.satellites[si]!;
+        if (sat.hp <= 0) continue;
+        const rr = sat.radius + p.radius;
+        if (dist2(p.pos, sat.pos) > rr * rr) continue;
+        damageSatellite(sat, p.damage);
+        forfeitProtection(world, p.owner);
+        return true;
+      }
+    }
     // A dead or spawn-protected core is not a target — the shot flies over it
-    // (GDD §2.1). `damagePlanet` guards this too, but omitting it here keeps the
+    // (GDD §2.1). `damageStation` guards this too, but omitting it here keeps the
     // shot alive to hit something real behind it.
-    if (!planet.alive || planet.spawnProtect > 0) continue;
-    const targetR = planetTargetRadius(planet);
+    if (!station.alive || station.spawnProtect > 0) continue;
+    const targetR = stationTargetRadius(station);
     const rr = targetR + p.radius;
-    if (dist2(p.pos, planet.pos) > rr * rr) continue;
+    if (dist2(p.pos, station.pos) > rr * rr) continue;
     // Shields and cores take the core rate, not the hull rate (GDD §2.8): the
     // projectile carries its ship-damage, scaled down here the way the weapon's
     // core DPS was scaled from its ship DPS.
-    damagePlanet(world, planet, p.damage * PROJECTILE_CORE_FACTOR);
+    damageStation(world, station, p.damage * PROJECTILE_CORE_FACTOR);
     forfeitProtection(world, p.owner);
     return true;
   }
@@ -378,4 +400,7 @@ function spawnMinedChunk(world: World, a: Asteroid, toward: Ship | null, amount:
     amount,
     radius: CHUNK.radius,
   });
+  // Rock → chunk: a transfer within the live economy, recorded so the ledger can
+  // attribute every chunk's ore to where it came from (`./ore-ledger`).
+  ledgerAdd(world, 'mined', amount);
 }

@@ -64,7 +64,7 @@ export const MAX_SHIPS = 8;
  * Worst-case concurrent shots in one snapshot. Re-derived for two shooters after
  * combat became a projectile (design amendment v0.2):
  *
- *  - **Turrets** — 4 per planet × 8 planets = 32, each with a shot life
+ *  - **Turrets** — 4 per station × 8 stations = 32, each with a shot life
  *    (`TURRET.range / TURRET.projectileSpeed` ≈ 0.34 s) shorter than its fire
  *    interval (0.5 s), so at most one in flight per turret: **≤ 32**.
  *  - **Ships** — 8, firing on `SHIP_WEAPON.fireInterval` (0.35 s) with a shot

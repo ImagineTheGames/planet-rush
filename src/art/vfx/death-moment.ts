@@ -4,12 +4,12 @@
  * The tone paragraph is quoted into the GDD (§4.7) and into `style-guide.md`
  * (§8) as a contract, and one sentence of it is a *mechanic*:
  *
- * > *"But homes are the one serious thing in it — when a planet dies, the game
+ * > *"But homes are the one serious thing in it — when a station dies, the game
  * > goes briefly quiet, the wreck stays on the map all match, and **nobody jokes
  * > for three seconds**."*
  *
  * The style guide's operational reading spells out what that costs the audio:
- * *"the planet-death moment goes briefly quiet — audio drops out, the beat holds
+ * *"the station-death moment goes briefly quiet — audio drops out, the beat holds
  * for ~3 seconds … This quiet is a mechanic of tone, not polish, and cannot be
  * cut."* So it is not a mixer preference living in the audio engine where a
  * later optimisation could quietly disable it. It is this: a tiny state machine
@@ -30,11 +30,11 @@
  * being fixed rather than a beat being held. The alarm is not exempt — during
  * these three seconds nothing plays, which is the entire point.
  *
- * Overlapping deaths **refresh** rather than stack: two planets dying a second
+ * Overlapping deaths **refresh** rather than stack: two stations dying a second
  * apart is one long quiet, not six seconds of it.
  */
 
-/** Seconds of quiet after a planet dies. The tone contract's number (GDD §4.7). */
+/** Seconds of quiet after a station dies. The tone contract's number (GDD §4.7). */
 export const HUSH_S = 3;
 
 /** Seconds to cut the mix. Fast — a slow drop reads as a mistake. */
@@ -44,7 +44,7 @@ export const HUSH_CUT_S = 0.12;
 export const HUSH_RETURN_S = 0.9;
 
 /**
- * The planet-death moment: fire it when a home dies, multiply the mix by
+ * The station-death moment: fire it when a home dies, multiply the mix by
  * {@link gain} every frame.
  *
  * Pure and headless — it advances only by the `dt` it is handed, with no timers
@@ -52,7 +52,7 @@ export const HUSH_RETURN_S = 0.9;
  * replay as in a live match (GDD §4.1).
  */
 export class DeathMoment {
-  /** Seconds since the most recent planet death, or -1 when nothing is held. */
+  /** Seconds since the most recent station death, or -1 when nothing is held. */
   private elapsed = -1;
   private deaths = 0;
 

@@ -215,9 +215,9 @@ test('the top-right HULL readout is gone from the layout registry (field report 
   const ids = layout!.map((e) => e.id);
   // The own-ship hull readout used to register here; it must be gone now.
   expect(ids, 'no hull-hud entry — the top-right readout was removed').not.toContain('hull-hud');
-  // …and its old top-right neighbour (own-planet HP) is untouched, so the corner
+  // …and its old top-right neighbour (own-station HP) is untouched, so the corner
   // is tidied, not blown away.
-  expect(ids, 'own-planet HP still registers top-right').toContain('planet-hp');
+  expect(ids, 'own-station HP still registers top-right').toContain('station-hp');
 
   expect(pageErrors, 'no page errors on a clean boot').toEqual([]);
 });
@@ -554,7 +554,7 @@ test('REAL TAP on WEAPON opens the sub-wheel (it does NOT fall back to the main/
   expect(pageErrors, 'no page errors drilling the WEAPON sub-wheel by real tap').toEqual([]);
 });
 
-test('the PC controls legend is contextual: no dead "E" away from your planet, live "E" when docked (field report #3)', async ({
+test('the PC controls legend is contextual: no dead "E" away from your station, live "E" when docked (field report #3)', async ({
   page,
 }) => {
   const pageErrors = await boot(page);
@@ -571,11 +571,11 @@ test('the PC controls legend is contextual: no dead "E" away from your planet, l
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(away!.binding, 'away from the planet the Build legend shows NO live key').toBeNull();
+  expect(away!.binding, 'away from the station the Build legend shows NO live key').toBeNull();
   expect(away!.dimmed, 'it is dimmed — visible, but not a live affordance').toBe(true);
   expect(away!.label, 'and it says how to make it live').toContain('get closer');
 
-  // Dock at the planet (the stage parks the ship home); now the key is live.
+  // Dock at the station (the stage parks the ship home); now the key is live.
   await page.evaluate(() => window.__upgradeWheelStage!.openBuild());
   const home = await page
     .waitForFunction(
@@ -587,7 +587,7 @@ test('the PC controls legend is contextual: no dead "E" away from your planet, l
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(home!.binding, 'docked at the planet the Build key ("E") is live').toBe('E');
+  expect(home!.binding, 'docked at the station the Build key ("E") is live').toBe('E');
   expect(home!.dimmed, 'a live affordance is not dimmed').toBe(false);
   expect(home!.label, 'named in full — never just "BUILD" (GDD §2.5)').toBe('Build & Upgrade');
 
@@ -750,7 +750,7 @@ test('pressing an affordable wedge shows the pressed tell on the real client (re
 
   // Open the Build wheel with ore to spend, so TURRET is a live wedge.
   const opened = await page.evaluate(() => window.__pressStage!.openBuild(999));
-  expect(opened?.open, 'the Build wheel opened at the planet').toBe(true);
+  expect(opened?.open, 'the Build wheel opened at the station').toBe(true);
 
   // Press the wedge and read the motion back — a live press scales it down and
   // glows it, and never red-flashes it (that is the rejected tell).

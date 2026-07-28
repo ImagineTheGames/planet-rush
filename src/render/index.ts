@@ -14,25 +14,30 @@
  * Placeholder shapes stand in until art lands (GDD §2.4 day-1: "placeholder
  * triangle ok"): a steel triangle ship with a player-colour cockpit, grey rocks
  * that darken as they crack, signal-yellow ore chunks, plasma muzzle flashes, and
- * planets as patina discs with a player-colour beacon ring and a signal-yellow
+ * stations as patina discs with a player-colour beacon ring and a signal-yellow
  * core (GDD §5.4 — the art pass replaces the shapes, not the layers).
  *
- * **Fog is drawn, not just simulated.** A rival planet's damage ring appears
+ * **Fog is drawn, not just simulated.** A rival station's damage ring appears
  * only while the camera's ship is inside `SENSOR_RANGE` of it (GDD §2.2:
- * "enemy planet health is scouted, not broadcast"). Your own home always shows
+ * "enemy station health is scouted, not broadcast"). Your own home always shows
  * its ring — it is your home.
  */
 
 import { Container, Graphics } from 'pixi.js';
+import { UpgradeTrack } from '@shared/types';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { SENSOR_RANGE } from '../sim/constants';
-import { inAtmosphere } from '../sim/buildings';
-import type { Asteroid, OreChunk, Planet, Projectile, Ship, World } from '../sim/state';
-import { atmosphereHaloSprite } from '../art/planets';
+import { SENSOR_RANGE, TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
+import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
+import { areEnemies } from '../sim/allegiance';
+import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
+import { atmosphereHaloSprite } from '../art/stations';
+import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
-import { spriteGraphics } from '../art/textures';
+import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
+import { shotSprite, type ShotFamily } from '../art/vfx/shots';
+import { drawSprite, spriteGraphics } from '../art/textures';
 
 // ---------------------------------------------------------------------------
 // Palette (frozen — style-guide.md §1 / §3.1). Hex as PixiJS numbers.
@@ -77,6 +82,11 @@ export interface MuzzleView {
    *  miss that runs the full range. A pooled plasma impact glow is drawn here
    *  when present; `to` already ends at this point (sim clamps it — GDD §4.1). */
   readonly hit: Vec2 | null;
+  /** Flare stroke width (world units) — the muzzle scales with the firing turret's
+   *  DAMAGE tier (RATIFIED p11-06, "muzzle flash scales with it"): a Mk III barrel
+   *  spits a fatter blast than a Mk I. Optional so an untiered caller (a test
+   *  fixture, a wire-decoded flash) still reads as the base flare. */
+  readonly width?: number;
 }
 
 /** What the renderer needs beyond the world to draw one frame. */
@@ -125,10 +135,26 @@ class GraphicsPool {
 // ---------------------------------------------------------------------------
 
 function makeUnitRock(): Graphics {
-  // Unit circle (r=1); neutral grey mineral body (style-guide §6). Crack stage
-  // reads as a darker rock via alpha against near-black Vacuum.
-  return new Graphics().circle(0, 0, 1).fill(0x9199a1);
+  // An empty shell. The rock's real geometry — one of the six ratified pool
+  // types (docs/art-direction §5.5) at its crack stage and payout band — is
+  // played into it per look-change by `drawAsteroids`, via the art pipeline
+  // (`asteroidArt` / `drawSprite`), the same way ship hulls are drawn. Pooling
+  // is unchanged: geometry is rebuilt only when a rock's look actually moves.
+  return new Graphics();
 }
+
+/**
+ * Pixels-per-unit asteroid art is drawn at before the per-frame `scale.set`,
+ * matching the ships' trick: drawing above 1 keeps thin vein/crack strokes off
+ * `drawSprite`'s 0.5px floor, and `drawAsteroids` divides it back out so the
+ * rock still lands at `asteroid.radius` world units.
+ */
+const ROCK_ART_SCALE = 64;
+
+/** Pixels-per-unit the turret/scaffold art is rasterised at before the per-frame
+ *  `scale.set` back down to `turret.radius`. Above 1 so the thin trim/panel
+ *  strokes (~0.03–0.05 unit) clear `drawSprite`'s 0.5px floor and stay crisp. */
+const TURRET_ART_SCALE = 48;
 
 function makeUnitChunk(): Graphics {
   // Ore chunk — signal yellow (RESERVED rule: ore, style-guide §2).
@@ -154,20 +180,21 @@ function makeImpactGlow(): Graphics {
   return g;
 }
 
-function makeUnitTurret(): Graphics {
-  // Placeholder cannon at unit radius, barrel along +x (matching `turret.angle`).
-  // Steel, like every hull — ownership is read off the planet it stands on
-  // (style-guide §3 rule 2: player colour never lands on structure).
-  const g = new Graphics();
-  g.rect(0, -0.3, 2.0, 0.6).fill(0x5d6672); // barrel, darker steel
-  g.circle(0, 0, 1).fill(PALETTE.hullSteel); // mount
-  return g;
+/** An empty pooled Graphics whose geometry is (re)drawn from the art pipeline on
+ *  demand — the turret and the build scaffold both fill their slot this way, so
+ *  the factory is just a blank canvas (cf. the asteroid pool). */
+function makeArtSlot(): Graphics {
+  return new Graphics();
 }
 
-function makeUnitShot(): Graphics {
-  // Turret shot — threat red, the colour of enemy fire (style-guide §1).
-  return new Graphics().circle(0, 0, 1).fill(PALETTE.threatRed);
-}
+/**
+ * Pixels-per-unit a shot's ramp sprite is baked at before the per-frame
+ * `scale.set`. Its unit space is authored so radius `1` is the projectile's
+ * collision radius (the glow overhangs it); `drawShots` divides this back out so
+ * the shot still lands at `projectile.radius` world units. Above 1 for the same
+ * reason the ship/rock scales are: keep the baked geometry off any sub-pixel floor.
+ */
+const SHOT_ART_SCALE = 16;
 
 /**
  * Pixels-per-unit the ship hull is drawn at before the per-frame `scale.set`.
@@ -185,9 +212,6 @@ function makeShip(id: number, shipClass: ShipClass): Graphics {
   return spriteGraphics(shipSprite({ shipClass, playerId: id }), SHIP_ART_SCALE);
 }
 
-// Crack-stage alpha: an intact rock is solid; a cracked one reads darker
-// against Vacuum as it's mined out (style-guide §5.5, three stages).
-const CRACK_ALPHA = [1, 0.78, 0.56];
 
 // Module-level scratch point for the camera target, so centerCamera passes the
 // target to the pure camera math without allocating a Vec2 each frame (GDD §4.3).
@@ -197,14 +221,36 @@ function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
-/** Whether `viewer` is close enough to read `planet`'s health (GDD §2.2, §2.8 —
+/**
+ * The shooter's DAMAGE tier for a shot (RATIFIED p11-06) — what the ramp tints by.
+ * Read from sim state, so the tint is stamped from the truth at spawn and never
+ * from input: a **ship** shot wears its owner's DAMAGE (`Power`) upgrade tier; a
+ * **turret** shot wears the Mk the barrel fired at, recovered from the per-shot
+ * `damage` the sim derived from that tier (`turretTierShotDamage`, ≤3 rungs, an
+ * exact match since both sides compute it from the same constants). An untagged /
+ * wire-decoded shot (`kind` absent) reads as a turret shot, the sim's own default,
+ * and a shot whose shooter is somehow gone reads as tier 0 — never a crash. The
+ * art ramp clamps whatever tier this returns into its rungs.
+ */
+function shotTier(world: World, p: Projectile): number {
+  if (p.kind === 'ship') {
+    const owner = world.ships.find((s) => s.id === p.owner);
+    return owner ? owner.tiers[UpgradeTrack.Power] : 0;
+  }
+  for (let tier = TURRET_MAX_TIER; tier >= 0; tier--) {
+    if (turretTierShotDamage(tier) === p.damage) return tier;
+  }
+  return 0;
+}
+
+/** Whether `viewer` is close enough to read `station`'s health (GDD §2.2, §2.8 —
  *  sensor range is 2× the shield radius). Squared compare, no square roots
- *  (GDD §4.1). Measured to the planet's surface, so a big body is legible from
+ *  (GDD §4.1). Measured to the station's surface, so a big body is legible from
  *  the same standoff distance a small one is. */
-function withinSensorRange(viewer: { pos: Vec2 }, planet: Planet): boolean {
-  const dx = planet.pos.x - viewer.pos.x;
-  const dy = planet.pos.y - viewer.pos.y;
-  const reach = SENSOR_RANGE + planet.radius;
+function withinSensorRange(viewer: { pos: Vec2 }, station: MiningStation): boolean {
+  const dx = station.pos.x - viewer.pos.x;
+  const dy = station.pos.y - viewer.pos.y;
+  const reach = SENSOR_RANGE + station.radius;
   return dx * dx + dy * dy <= reach * reach;
 }
 
@@ -216,14 +262,14 @@ export class Renderer {
   /** World-space root; the camera moves this so the target ship stays centered. */
   private readonly worldRoot = new Container();
   /** The arena boundary — the wall the sim clamps every ship against
-   *  (`step.ts` integrate). It is a blocking volume like a planet, so it is
+   *  (`step.ts` integrate). It is a blocking volume like a station, so it is
    *  drawn like one: without it the play-field edge is an invisible wall a
-   *  player crashes into "beside their planet" (which sits right on it). */
+   *  player crashes into "beside their station" (which sits right on it). */
   private readonly boundaryLayer = new Container();
-  /** The atmosphere halos — behind the planets they ring, so a home's air sits
-   *  under its own furniture (body, turrets, overlay). Only own planets fill it. */
+  /** The atmosphere halos — behind the stations they ring, so a home's air sits
+   *  under its own furniture (body, turrets, overlay). Only own stations fill it. */
   private readonly atmosphereLayer = new Container();
-  private readonly planetLayer = new Container();
+  private readonly stationLayer = new Container();
   private readonly turretLayer = new Container();
   private readonly asteroidLayer = new Container();
   private readonly chunkLayer = new Container();
@@ -233,34 +279,48 @@ export class Renderer {
   private readonly shotLayer = new Container();
 
   private readonly asteroidPool: GraphicsPool;
+  /** The look-key drawn into each pooled rock, so geometry rebuilds only on change. */
+  private readonly asteroidKeys: string[] = [];
   private readonly chunkPool: GraphicsPool;
   private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
   private readonly turretPool: GraphicsPool;
+  /** The (silhouette, state, owner, damage-band) drawn into each turret slot, so
+   *  its vector geometry rebuilds only when the read changes — steady state stays
+   *  allocation-free, the same discipline the rock pool uses (GDD §4.3). */
+  private readonly turretKeys: string[] = [];
+  /** Construction scaffolds (the `building` art) — one per in-progress turret job,
+   *  placed on the reserved mount so the finished gun lands where the frame stood. */
+  private readonly scaffoldPool: GraphicsPool;
+  private readonly scaffoldKeys: string[] = [];
   private readonly shotPool: GraphicsPool;
+  /** The `${family}:${tier}` shot look baked into each shot slot, so the DAMAGE-tier
+   *  ramp geometry is rebuilt only when a slot's shot changes side or tier (the
+   *  asteroid-pool discipline) — a firefight stays transform-only per frame. */
+  private readonly shotKeys: string[] = [];
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
-  /** A planet's static body: disc, beacon ring, core. Keyed by planet index
-   *  (≤ 8, and planets never move), redrawn only when the planet becomes a
+  /** A station's static body: disc, beacon ring, core. Keyed by station index
+   *  (≤ 8, and stations never move), redrawn only when the station becomes a
    *  wreck — which happens at most once each, all match (GDD §2.7). */
-  private readonly planetGfx: Graphics[] = [];
-  /** Whether `planetGfx[i]` was last drawn as a wreck, so the redraw above
+  private readonly stationGfx: Graphics[] = [];
+  /** Whether `stationGfx[i]` was last drawn as a wreck, so the redraw above
    *  happens on the transition and on no other frame. */
-  private readonly planetDrawnDead: boolean[] = [];
-  /** A planet's live overlay: shield bubble, construction arc, damage ring.
-   *  One Graphics per planet, redrawn per frame — eight of them, and every one
+  private readonly stationDrawnDead: boolean[] = [];
+  /** A station's live overlay: shield bubble, construction arc, damage ring.
+   *  One Graphics per station, redrawn per frame — eight of them, and every one
    *  is a handful of arcs. */
-  private readonly planetOverlay: Graphics[] = [];
-  /** A planet's atmosphere halo, keyed by planet index. Only the viewer's OWN
-   *  planet gets one (the halo is the deposit affordance — you cannot deposit at
+  private readonly stationOverlay: Graphics[] = [];
+  /** A station's atmosphere halo, keyed by station index. Only the viewer's OWN
+   *  station gets one (the halo is the deposit affordance — you cannot deposit at
    *  a rival's). Built once from the art pipeline, then only positioned and faded
    *  per frame; the owner it was built for is remembered so it is never rebuilt. */
-  private readonly planetHalo: (Graphics | null)[] = [];
-  private readonly planetHaloOwner: PlayerId[] = [];
+  private readonly stationHalo: (Graphics | null)[] = [];
+  private readonly stationHaloOwner: PlayerId[] = [];
   /** The VFX tier each halo was baked at (0 full, 1 reduced), so a flip of
    *  {@link reduceVfx} rebuilds it into the other look (full gradient ⇄ simpler
    *  ring) instead of leaving a stale texture. `undefined` = never built. */
-  private readonly planetHaloReduced: number[] = [];
+  private readonly stationHaloReduced: number[] = [];
   /** The arena boundary, drawn once. Static — the play bounds never move — so it
    *  is redrawn only if the bounds themselves change (they don't mid-match). */
   private boundaryGfx: Graphics | null = null;
@@ -283,14 +343,14 @@ export class Renderer {
   constructor(stage: Container, viewport: Viewport) {
     this.viewport = viewport;
 
-    // Back to front: your home's atmosphere halo (behind its own planet),
-    // planets (the map's furniture — big, static, and behind
+    // Back to front: your home's atmosphere halo (behind its own station),
+    // stations (the map's furniture — big, static, and behind
     // everything that moves over them), turrets mounted on them, rocks, chunks,
     // muzzle flashes, impact glows (over the flash end), ships, turret shots.
     // Labels aid the layout registry + render tests.
     this.boundaryLayer.label = 'boundary';
     this.atmosphereLayer.label = 'atmosphere';
-    this.planetLayer.label = 'planets';
+    this.stationLayer.label = 'stations';
     this.turretLayer.label = 'turrets';
     this.asteroidLayer.label = 'asteroids';
     this.chunkLayer.label = 'chunks';
@@ -300,8 +360,8 @@ export class Renderer {
     this.shotLayer.label = 'shots';
     this.worldRoot.addChild(
       this.boundaryLayer, // behind everything: the wall the arena is drawn inside
-      this.atmosphereLayer, // your home's air, under its planet furniture
-      this.planetLayer,
+      this.atmosphereLayer, // your home's air, under its station furniture
+      this.stationLayer,
       this.turretLayer,
       this.asteroidLayer,
       this.chunkLayer,
@@ -316,8 +376,9 @@ export class Renderer {
     this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
     this.muzzlePool = new GraphicsPool(this.muzzleLayer, () => new Graphics());
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
-    this.turretPool = new GraphicsPool(this.turretLayer, makeUnitTurret);
-    this.shotPool = new GraphicsPool(this.shotLayer, makeUnitShot);
+    this.turretPool = new GraphicsPool(this.turretLayer, makeArtSlot);
+    this.scaffoldPool = new GraphicsPool(this.turretLayer, makeArtSlot);
+    this.shotPool = new GraphicsPool(this.shotLayer, makeArtSlot);
   }
 
   /** Point the camera at a new visible viewport (resize / orientationchange /
@@ -347,11 +408,11 @@ export class Renderer {
   draw(world: World, view: RenderView): void {
     this.centerCamera(world, view.cameraTarget);
     this.drawBoundary(world.bounds);
-    this.drawPlanets(world, view.cameraTarget);
+    this.drawStations(world, view.cameraTarget);
     this.drawAsteroids(world.asteroids);
     this.drawChunks(world.chunks);
     this.drawShips(world.ships);
-    this.drawShots(world.projectiles);
+    this.drawShots(world, view.cameraTarget);
     this.drawMuzzles(view.muzzles);
   }
 
@@ -370,9 +431,9 @@ export class Renderer {
 
   /**
    * The arena wall (GDD §4.1 — the sim clamps every ship inside `world.bounds`).
-   * It is as much a blocking volume as a planet, so it gets a drawn surface: the
+   * It is as much a blocking volume as a station, so it gets a drawn surface: the
    * field report was a ship crashing into the invisible right edge "beside my
-   * planet" — planets are pinned right against this wall (`createWorld`), so the
+   * station" — stations are pinned right against this wall (`createWorld`), so the
    * boundary and the home read as one place, and one of them was never drawn.
    *
    * Static, so it is stroked once and only redrawn if the bounds change (they do
@@ -409,53 +470,91 @@ export class Renderer {
    * in progress, and the scouted damage ring.
    *
    * `viewerId`'s ship is the eye: a rival's damage ring is drawn only while that
-   * ship is inside `SENSOR_RANGE` of the planet (GDD §2.2 — health you earn by
+   * ship is inside `SENSOR_RANGE` of the station (GDD §2.2 — health you earn by
    * scouting). Your own home is always legible, because it is yours.
    */
-  private drawPlanets(world: World, viewerId: PlayerId): void {
+  private drawStations(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
     let turrets = 0;
+    let scaffolds = 0;
 
-    for (let i = 0; i < world.planets.length; i++) {
-      const planet = world.planets[i]!;
-      this.drawAtmosphere(i, planet, viewerId, viewer, world.time);
-      this.planetBody(i, planet);
+    for (let i = 0; i < world.stations.length; i++) {
+      const station = world.stations[i]!;
+      this.drawAtmosphere(i, station, viewerId, viewer, world.time);
+      this.stationBody(i, station);
 
       const overlay = this.overlayFor(i);
       overlay.clear();
-      overlay.x = planet.pos.x;
-      overlay.y = planet.pos.y;
+      overlay.x = station.pos.x;
+      overlay.y = station.pos.y;
 
-      if (planet.alive) {
-        this.drawShieldBubble(overlay, planet);
-        this.drawConstruction(overlay, planet);
-        // Own planet always; a rival's only from inside sensor range.
+      if (station.alive) {
+        this.drawShieldBubble(overlay, station);
+        this.drawConstruction(overlay, station);
+        // Own station always; a rival's only from inside sensor range.
         const scouted =
-          planet.owner === viewerId ||
-          (viewer !== undefined && withinSensorRange(viewer, planet));
-        if (scouted) this.drawDamageRing(overlay, planet, planet.owner === viewerId);
+          station.owner === viewerId ||
+          (viewer !== undefined && withinSensorRange(viewer, station));
+        if (scouted) this.drawDamageRing(overlay, station);
       }
 
-      for (const turret of planet.turrets) {
+      for (const turret of station.turrets) {
         if (turret.hp <= 0) continue; // killed this tick, swept at end of step
-        const g = this.turretPool.at(turrets++);
+        const g = this.turretPool.at(turrets);
+        // The barrel state is the threat telegraph (style-guide §5.5): a fired
+        // muzzle this tick is `firing`; a committed target is `tracking`; else
+        // the barrel is cold. The tier picks the ratified pool silhouette.
+        const state: TurretState =
+          turret.muzzle != null ? 'firing' : turret.targetId != null ? 'tracking' : 'idle';
+        const tier = turret.tier ?? 0;
+        // Rebuild geometry only when the read changes — steady state is a
+        // transform-only frame (GDD §4.3), exactly like the rock pool.
+        const key = `${turret.owner}:${tier}:${state}`;
+        if (this.turretKeys[turrets] !== key) {
+          g.clear();
+          drawSprite(g, turretSprite({ playerId: turret.owner, state, tier }), TURRET_ART_SCALE);
+          this.turretKeys[turrets] = key;
+        }
         g.x = turret.pos.x;
         g.y = turret.pos.y;
         g.rotation = turret.angle;
-        g.scale.set(turret.radius);
+        // Art is authored at TURRET_ART_SCALE px/unit; divide it back out to land
+        // the turret at its collision radius in world units.
+        g.scale.set(turret.radius / TURRET_ART_SCALE);
         // Damaged turrets fade toward the vacuum rather than recolouring —
         // threat red is reserved for damage *events*, not for standing objects.
         g.alpha = 0.45 + 0.55 * clamp01(turret.hp / turret.maxHp);
+        turrets++;
+      }
+
+      // A turret build-in-progress reads as a scaffold on its reserved mount, so
+      // the finished gun lands exactly where the frame stood (GDD §2.5, §2.6).
+      for (const job of station.builds) {
+        if (job.kind !== 'turret') continue; // a shield builds centred — arc only
+        const pos = turretOrbitPos(station, turretHomeAngle(station, job.slot));
+        const g = this.scaffoldPool.at(scaffolds);
+        const key = `${station.owner}`;
+        if (this.scaffoldKeys[scaffolds] !== key) {
+          g.clear();
+          drawSprite(g, turretSprite({ playerId: station.owner, state: 'building' }), TURRET_ART_SCALE);
+          this.scaffoldKeys[scaffolds] = key;
+        }
+        g.x = pos.x;
+        g.y = pos.y;
+        g.rotation = turretHomeAngle(station, job.slot);
+        g.scale.set(TURRET.radius / TURRET_ART_SCALE);
+        scaffolds++;
       }
     }
 
     this.turretPool.hideFrom(turrets);
+    this.scaffoldPool.hideFrom(scaffolds);
   }
 
   /**
    * The atmosphere halo (GDD §2.3, p4-12): the deposit range, made visible. A
    * soft, low-opacity air-glow at exactly `DEPOSIT_RANGE`, drawn only around the
-   * viewer's OWN living planet — the halo *is* the affordance, so a rival's world
+   * viewer's OWN living station — the halo *is* the affordance, so a rival's world
    * (where you cannot deposit) gets none. The radius derives from `DEPOSIT_RANGE`
    * inside the sprite (`atmosphereHaloSprite`), so the air and the rule are one
    * number; here we only place and fade it.
@@ -485,62 +584,62 @@ export class Renderer {
    */
   private drawAtmosphere(
     index: number,
-    planet: Planet,
+    station: MiningStation,
     viewerId: PlayerId,
     viewer: Ship | undefined,
     time: number,
   ): void {
-    const own = planet.alive && planet.owner === viewerId;
-    let g = this.planetHalo[index];
+    const own = station.alive && station.owner === viewerId;
+    let g = this.stationHalo[index];
     if (!own) {
       if (g) g.visible = false;
       return;
     }
     const reduced = this.reduceVfx ? 1 : 0;
-    if (!g || this.planetHaloOwner[index] !== planet.owner || this.planetHaloReduced[index] !== reduced) {
+    if (!g || this.stationHaloOwner[index] !== station.owner || this.stationHaloReduced[index] !== reduced) {
       g?.destroy();
-      g = spriteGraphics(atmosphereHaloSprite(planet.owner, reduced === 1), planet.radius);
+      g = spriteGraphics(atmosphereHaloSprite(station.owner, reduced === 1), station.radius);
       g.label = `atmosphere-${index}`;
       // Full gradient: bake it to one texture so the five discs blend once, ever.
       // The ring tier stays vector — its thin band is cheaper drawn than blitted.
       if (reduced === 0) g.cacheAsTexture(true);
-      this.planetHalo[index] = g;
-      this.planetHaloOwner[index] = planet.owner;
-      this.planetHaloReduced[index] = reduced;
+      this.stationHalo[index] = g;
+      this.stationHaloOwner[index] = station.owner;
+      this.stationHaloReduced[index] = reduced;
       this.atmosphereLayer.addChild(g);
     }
     g.visible = true;
-    g.x = planet.pos.x;
-    g.y = planet.pos.y;
+    g.x = station.pos.x;
+    g.y = station.pos.y;
     // 0..1 breath; flowing lifts the whole band up toward full opacity.
     const breath = 0.5 + 0.5 * Math.sin(time * ATMOSPHERE_BREATH_RATE);
-    const flowing = viewer !== undefined && viewer.cargo > 1e-6 && inAtmosphere(viewer, planet);
+    const flowing = viewer !== undefined && viewer.cargo > 1e-6 && inAtmosphere(viewer, station);
     const lo = flowing ? 0.82 : 0.42;
     const hi = flowing ? 1 : 0.56;
     g.alpha = lo + (hi - lo) * breath;
   }
 
-  /** A planet's static body, drawn once — and again the one time it becomes a
+  /** A station's static body, drawn once — and again the one time it becomes a
    *  wreck (GDD §2.7: the wreck stays on the map for the rest of the match). */
-  private planetBody(index: number, planet: Planet): void {
-    let g = this.planetGfx[index];
-    const dead = !planet.alive;
-    if (g && this.planetDrawnDead[index] === dead) {
-      g.alpha = planet.spawnProtect > 0 ? 0.75 : 1;
+  private stationBody(index: number, station: MiningStation): void {
+    let g = this.stationGfx[index];
+    const dead = !station.alive;
+    if (g && this.stationDrawnDead[index] === dead) {
+      g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
       return;
     }
     if (!g) {
       g = new Graphics();
-      g.label = `planet-${index}`;
-      this.planetGfx[index] = g;
-      this.planetLayer.addChild(g);
+      g.label = `station-${index}`;
+      this.stationGfx[index] = g;
+      this.stationLayer.addChild(g);
     }
-    this.planetDrawnDead[index] = dead;
+    this.stationDrawnDead[index] = dead;
 
-    const r = planet.radius;
+    const r = station.radius;
     g.clear();
-    g.x = planet.pos.x;
-    g.y = planet.pos.y;
+    g.x = station.pos.x;
+    g.y = station.pos.y;
 
     if (dead) {
       // A wreck: the ocean has gone out, the beacon is off, the core is spent.
@@ -559,47 +658,90 @@ export class Renderer {
     g.circle(-r * 0.3, -r * 0.25, r * 0.42).fill({ color: PALETTE.patina, alpha: 0.85 });
     g.circle(r * 0.34, r * 0.22, r * 0.3).fill({ color: PALETTE.patina, alpha: 0.7 });
     // Beacon ring: ownership, always visible (style-guide §5.4).
-    g.circle(0, 0, r + 5).stroke({ width: 3, color: playerColor(planet.owner), alpha: 0.9 });
+    g.circle(0, 0, r + 5).stroke({ width: 3, color: playerColor(station.owner), alpha: 0.9 });
     g.circle(0, 0, r * 0.28).fill(PALETTE.signalYellow); // core
-    g.alpha = planet.spawnProtect > 0 ? 0.75 : 1;
+    g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
   }
 
   private overlayFor(index: number): Graphics {
-    let g = this.planetOverlay[index];
+    let g = this.stationOverlay[index];
     if (!g) {
       g = new Graphics();
-      g.label = `planet-overlay-${index}`;
-      this.planetOverlay[index] = g;
-      this.planetLayer.addChild(g);
+      g.label = `station-overlay-${index}`;
+      this.stationOverlay[index] = g;
+      this.stationLayer.addChild(g);
     }
     return g;
   }
 
-  /** The shield bubble over the core (GDD §2.5) — one ring per generator, so a
-   *  stacked pair reads as two. Brightness is the pool that is left. */
-  private drawShieldBubble(g: Graphics, planet: Planet): void {
-    for (let i = 0; i < planet.shields.length; i++) {
-      const shield = planet.shields[i]!;
-      if (shield.hp <= 1e-9) continue;
-      const frac = clamp01(shield.hp / shield.maxHp);
-      g.circle(0, 0, shield.radius + i * 6).stroke({
-        width: 2,
-        color: PALETTE.plasma,
-        alpha: 0.18 + 0.5 * frac,
+  /**
+   * The ratified ring-damage grammar (p11), for core and shields alike: a whole
+   * ring in the OWNER's colour is the health that remains; a threat-red segment
+   * FILLS it — from twelve o'clock, clockwise — proportional to the pool LOST.
+   * Full red is death. One primitive so a besieged station reads outermost-first:
+   * shields redden and die before the core starts to fill.
+   *
+   * Screen space is +y down, so `-π/2` is the top and an increasing sweep runs
+   * clockwise. `lost` is `1 - remaining` — the arc grows as the pool drains.
+   */
+  private drawDamageFill(
+    g: Graphics,
+    radius: number,
+    owner: number,
+    lost: number,
+    width: number,
+    alpha: number,
+  ): void {
+    const l = clamp01(lost);
+    // The base: the owner's colour, whole — full health is your colour, entire.
+    g.circle(0, 0, radius).stroke({ width, color: playerColor(owner), alpha });
+    if (l > 0) {
+      // The damage: threat red, filling clockwise from twelve o'clock. `moveTo`
+      // the arc's start first so `arc` never draws a connecting spoke from the
+      // path's lingering current point (a Pixi arc-after-circle gotcha).
+      g.moveTo(0, -radius);
+      g.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + l * 2 * Math.PI).stroke({
+        width,
+        color: PALETTE.threatRed,
+        alpha: Math.max(alpha, 0.9),
       });
+    }
+  }
+
+  /** The shield bubble over the core (GDD §2.5): the real plasma sphere from the
+   *  art pipeline (style-guide §5.5 — banded full/weakened/failing so pressure
+   *  reads), with the ratified CONTINUOUS p11 gauge ring drawn on top so the
+   *  health read stays smooth rather than three-step. A stacked pair reads as two,
+   *  each wider and each filling red as its own pool drains. */
+  private drawShieldBubble(g: Graphics, station: MiningStation): void {
+    for (let i = 0; i < station.shields.length; i++) {
+      const shield = station.shields[i]!;
+      if (shield.hp <= 1e-9) continue;
+      const strength = shieldStrength(shield.maxHp > 0 ? shield.hp / shield.maxHp : 0);
+      // The bubble, authored at unit radius; `gauge: false` leaves the gauge to
+      // the continuous fill below so there is one ring, not two.
+      drawSprite(
+        g,
+        shieldSprite({ playerId: station.owner, strength, stackIndex: i, gauge: false }),
+        shield.radius,
+      );
+      const lost = clamp01(1 - shield.hp / shield.maxHp);
+      this.drawDamageFill(g, shield.radius + i * 6, station.owner, lost, 2, 0.7);
     }
   }
 
   /** Construction in progress (GDD §2.5: "a turret assembles over ~10 seconds").
    *  A plasma arc just outside the body, filling as the job completes — the
    *  visible answer to "defenses are bought before the attack, not during it". */
-  private drawConstruction(g: Graphics, planet: Planet): void {
-    if (planet.builds.length === 0) return;
-    const job = planet.builds[0]!;
+  private drawConstruction(g: Graphics, station: MiningStation): void {
+    if (station.builds.length === 0) return;
+    const job = station.builds[0]!;
     const done = job.total > 0 ? clamp01(1 - job.remaining / job.total) : 1;
-    const r = planet.radius + 12;
+    const r = station.radius + 12;
     g.circle(0, 0, r).stroke({ width: 2, color: PALETTE.hullSteel, alpha: 0.25 });
     if (done <= 0) return;
+    // `moveTo` the arc start so `arc` never spokes back to the current point.
+    g.moveTo(0, -r);
     g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + done * 2 * Math.PI).stroke({
       width: 3,
       color: PALETTE.plasma,
@@ -607,30 +749,44 @@ export class Renderer {
     });
   }
 
-  /** The damage ring (GDD §2.2, §5.4): how much core is left, as an arc over the
-   *  planet. Player colour on your own home, threat red on a scouted rival's —
-   *  the same information, but yours is identity and theirs is a target. */
-  private drawDamageRing(g: Graphics, planet: Planet, own: boolean): void {
-    const frac = clamp01(planet.coreHp / planet.maxCoreHp);
-    const r = planet.radius + 5;
-    if (frac >= 1) return; // a full core says nothing worth drawing
-    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + frac * 2 * Math.PI).stroke({
-      width: 4,
-      color: own ? playerColor(planet.owner) : PALETTE.threatRed,
-      alpha: 0.95,
-    });
+  /** The damage ring (GDD §2.2, §5.4): the owner's colour whole, a threat-red
+   *  segment filling it as core HP is lost (p11). Enemy stations read in THEIR
+   *  colour by exactly this verb — red is the damage, never the station. */
+  private drawDamageRing(g: Graphics, station: MiningStation): void {
+    const lost = clamp01(1 - station.coreHp / station.maxCoreHp);
+    this.drawDamageFill(g, station.radius + 5, station.owner, lost, 4, 0.95);
   }
 
-  /** Turret shots — the pool is sparse, so skip inactive slots rather than
-   *  assuming the array is dense (see {@link Projectile}). */
-  private drawShots(projectiles: readonly Projectile[]): void {
+  /**
+   * Ship and turret shots, tinted by the shooter's DAMAGE tier (RATIFIED p11-06,
+   * "power you can see"). Each shot reads in its side's family — the viewer's (and
+   * any ally's) fire climbs the plasma family, an enemy's climbs threat red — and
+   * brightens with the shooter's weapon tier, so "whose shot" and "how strong" both
+   * read at a glance. The `${family}:${tier}` look is baked from the art ramp
+   * (`shotSprite`) and rebuilt into a slot only when that slot's shot changes side
+   * or tier, so the sparse pool stays transform-only in a steady firefight (GDD
+   * §4.3). The pool is sparse — skip inactive slots rather than assume density
+   * (see {@link Projectile}).
+   */
+  private drawShots(world: World, viewer: PlayerId): void {
     let live = 0;
-    for (const p of projectiles) {
+    for (const p of world.projectiles) {
       if (!p.active) continue;
-      const g = this.shotPool.at(live++);
+      const family: ShotFamily = areEnemies(world, viewer, p.owner) ? 'enemy' : 'own';
+      const tier = shotTier(world, p);
+      const key = `${family}:${tier}`;
+      const g = this.shotPool.at(live);
+      if (this.shotKeys[live] !== key) {
+        g.clear();
+        drawSprite(g, shotSprite(family, tier), SHOT_ART_SCALE);
+        this.shotKeys[live] = key;
+      }
       g.x = p.pos.x;
       g.y = p.pos.y;
-      g.scale.set(p.radius);
+      // Art is baked at SHOT_ART_SCALE px/unit; divide it back out so unit radius 1
+      // lands at the shot's collision radius (the glow overhangs from there).
+      g.scale.set(p.radius / SHOT_ART_SCALE);
+      live++;
     }
     this.shotPool.hideFrom(live);
   }
@@ -639,10 +795,19 @@ export class Renderer {
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i]!;
       const g = this.asteroidPool.at(i);
+      // Rebuild geometry only when this slot's rock changes its look — a crack
+      // stage or a payout band — so steady state stays allocation-free (GDD §4.3).
+      const art = asteroidArt(a);
+      if (this.asteroidKeys[i] !== art.key) {
+        g.clear();
+        drawSprite(g, art.build(), ROCK_ART_SCALE);
+        this.asteroidKeys[i] = art.key;
+      }
       g.x = a.pos.x;
       g.y = a.pos.y;
-      g.scale.set(a.radius);
-      g.alpha = CRACK_ALPHA[a.crackStage] ?? CRACK_ALPHA[0]!;
+      // Art is authored at ROCK_ART_SCALE px/unit; divide it back out to land the
+      // rock at its collision radius. The crack stage is in the art now, not alpha.
+      g.scale.set(a.radius / ROCK_ART_SCALE);
     }
     this.asteroidPool.hideFrom(asteroids.length);
   }
@@ -691,7 +856,7 @@ export class Renderer {
       const m = muzzles[i]!;
       const g = this.muzzlePool.at(i);
       g.clear();
-      g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: 3, color: m.color, cap: 'round' });
+      g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: m.width ?? 3, color: m.color, cap: 'round' });
       // The flash line always draws (it is the turret-fire tell); the impact
       // glow is decoration, so it is the first thing reduce-VFX sheds (§4.3).
       if (m.hit && !this.reduceVfx) {

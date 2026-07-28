@@ -15,21 +15,22 @@
  */
 
 import { ShipClass } from '@shared/types';
-import { asteroidSprite, oreChunkSprite } from './asteroids';
+import { asteroidSprite, oreChunkSprite, ASTEROID_KINDS, type AsteroidKind } from './asteroids';
 import { buildProgressSprite, shieldSprite, turretSprite } from './buildings';
 import {
   atmosphereHaloSprite,
   beaconRingSprite,
   damageRingSprite,
-  planetSprite,
-  planetVariantNote,
+  stationSprite,
+  stationVariantNote,
   repairAuraSprite,
-  PLANET_VARIANT_COUNT,
-} from './planets';
+  STATION_VARIANT_COUNT,
+} from './stations';
 import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
 import type { SpriteDef } from './shapes';
-import { debrisFieldSprite, planetWreckSprite } from './wrecks';
+import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
+import { SHOT_FAMILIES, SHOT_TIERS, shotSprite } from './vfx/shots';
 
 /** One catalogued sprite: what it is, and a caption for the contact sheet. */
 export interface CatalogueEntry {
@@ -74,38 +75,65 @@ function entries(): CatalogueEntry[] {
     out.push({ group: 'Ships — states', label: `${c} hulk`, def: shipHulkSprite(c) });
   }
 
-  // --- Planets --------------------------------------------------------------
-  for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-    out.push({ group: 'Planets — four variants', label: `v${v}: ${planetVariantNote(v)}`, def: planetSprite(v) });
+  // --- Stations --------------------------------------------------------------
+  for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+    out.push({ group: 'Stations — four variants', label: `v${v}: ${stationVariantNote(v)}`, def: stationSprite(v) });
   }
   for (const slot of ALL_SLOTS) {
-    out.push({ group: 'Planets — ownership beacons', label: `P${slot + 1}`, def: beaconRingSprite(slot) });
+    out.push({ group: 'Stations — ownership beacons', label: `P${slot + 1}`, def: beaconRingSprite(slot) });
   }
   for (const slot of ALL_SLOTS) {
-    out.push({ group: 'Planets — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
+    out.push({ group: 'Stations — atmosphere halo (deposit range)', label: `P${slot + 1}`, def: atmosphereHaloSprite(slot) });
   }
   for (const f of [1, 0.75, 0.5, 0.25, 0]) {
-    out.push({ group: 'Planets — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(f) });
+    // Owner-colour base, red filling as HP is lost (p11) — P1's colour here.
+    out.push({ group: 'Stations — scouted damage ring', label: `${Math.round(f * 100)}% core`, def: damageRingSprite(0, f) });
   }
-  out.push({ group: 'Planets — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
+  out.push({ group: 'Stations — scouted damage ring', label: 'repair channel', def: repairAuraSprite() });
 
-  // --- Asteroids ------------------------------------------------------------
-  for (const seed of [1, 7, 23]) {
+  // --- Asteroids: the ratified pool (docs/art-direction §5.5) ----------------
+  // Every one of the six by name, across its three crack stages, and rich-vs-poor
+  // so the payout read is on the review surface next to the silhouette.
+  const KIND_NOTE: Record<AsteroidKind, string> = {
+    shard: 'A1 · veins along the fractures',
+    ice: 'A2 · frost brightens near breaking',
+    rubble: 'A3 · pebbles pop first',
+    husk: 'A4 · ore-rimmed cavity',
+    geode: 'A5 · crystals countable',
+    patina: 'A6 · teal oxidation bands',
+  };
+  ASTEROID_KINDS.forEach((kind, k) => {
+    const group = `Asteroids — A${k + 1} ${kind.toUpperCase()} (${KIND_NOTE[kind]})`;
+    const seed = k; // asteroidKindFor(k) === kind, so a natural rock of this type
+    // Three crack stages at their natural richness (stage 0 is the full, rich read).
     for (let stage = 0; stage < 3; stage++) {
-      out.push({ group: 'Asteroids — three crack stages', label: `rock ${seed} · stage ${stage}`, def: asteroidSprite({ seed, crackStage: stage }) });
+      out.push({ group, label: `stage ${stage}`, def: asteroidSprite({ seed, crackStage: stage, kind }) });
     }
-  }
-  out.push({ group: 'Asteroids — three crack stages', label: 'rich rock', def: asteroidSprite({ seed: 5, crackStage: 0, richness: 1 }) });
-  out.push({ group: 'Asteroids — three crack stages', label: 'poor rock', def: asteroidSprite({ seed: 5, crackStage: 0, richness: 0.2 }) });
+    // A poor intact rock beside the full one, so the payout read is on the sheet.
+    out.push({ group, label: 'stage 0 · poor', def: asteroidSprite({ seed, crackStage: 0, richness: 0.2, kind }) });
+  });
   for (const seed of [0, 3]) {
-    out.push({ group: 'Asteroids — three crack stages', label: `ore chunk ${seed}`, def: oreChunkSprite(seed) });
+    out.push({ group: 'Asteroids — loose ore chunks', label: `ore chunk ${seed}`, def: oreChunkSprite(seed) });
   }
 
   // --- Buildings ------------------------------------------------------------
-  for (const state of ['building', 'idle', 'tracking', 'firing'] as const) {
-    out.push({ group: 'Turrets — threat telegraph', label: state, def: turretSprite({ playerId: 0, state }) });
+  // The ratified turret pool (docs/art-direction §5.5), mapped onto the Mk ladder
+  // so the body and the shot-tier ramp tell one escalating story. Each silhouette
+  // shows its three live telegraph states; the scaffold and an enemy-colour read
+  // sit below (`building` is one look — a fresh build is always Mk I).
+  const TURRET_POOL = [
+    { sil: 'breech', title: 'T5 Breech Cannon · Mk I' },
+    { sil: 'twin', title: 'T7 Twin Cannon · Mk II' },
+    { sil: 'rail', title: 'T3b Rail Spike · Mk III' },
+    { sil: 'dome', title: 'T6 Dome Bunker · reserve' },
+  ] as const;
+  for (const t of TURRET_POOL) {
+    for (const state of ['idle', 'tracking', 'firing'] as const) {
+      out.push({ group: `Turrets — ${t.title}`, label: state, def: turretSprite({ playerId: 0, state, silhouette: t.sil }) });
+    }
   }
-  out.push({ group: 'Turrets — threat telegraph', label: 'tracking P5', def: turretSprite({ playerId: 4, state: 'tracking' }) });
+  out.push({ group: 'Turrets — build & identity', label: 'building scaffold', def: turretSprite({ playerId: 0, state: 'building' }) });
+  out.push({ group: 'Turrets — build & identity', label: 'Mk II · P5 tracking', def: turretSprite({ playerId: 4, state: 'tracking', tier: 1 }) });
   for (const strength of ['full', 'weakened', 'failing'] as const) {
     out.push({ group: 'Shields — pressure beats regeneration', label: strength, def: shieldSprite({ playerId: 0, strength }) });
   }
@@ -115,8 +143,8 @@ function entries(): CatalogueEntry[] {
   }
 
   // --- Wrecks ---------------------------------------------------------------
-  for (let v = 0; v < PLANET_VARIANT_COUNT; v++) {
-    out.push({ group: 'Wrecks — the quiet', label: `wreck v${v}`, def: planetWreckSprite(v) });
+  for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+    out.push({ group: 'Wrecks — the quiet', label: `wreck v${v}`, def: stationWreckSprite(v) });
   }
   for (const seed of [0, 4]) {
     out.push({ group: 'Wrecks — the quiet', label: `debris ${seed}`, def: debrisFieldSprite(seed) });
@@ -130,6 +158,21 @@ function entries(): CatalogueEntry[] {
   // a hull or thrown by an explosion.
   for (const spec of PARTICLE_KINDS) {
     out.push({ group: 'VFX — the eleven particle looks', label: spec.name, def: particleSprite(spec.kind) });
+  }
+
+  // The DAMAGE-tier shot ramp (p11-06): a shooter's weapon tier tints its shot,
+  // brightening within its own family — `own` fire up the plasma family, `enemy`
+  // fire up the threat-red family — so "how strong" reads at a glance without ever
+  // spending signal yellow. Every rung sits on the review surface next to the
+  // turret pool it escalates alongside, and goes through the same palette audit.
+  for (const family of SHOT_FAMILIES) {
+    for (const tier of SHOT_TIERS) {
+      out.push({
+        group: `Shots — DAMAGE-tier ramp (${family} fire)`,
+        label: `tier ${tier}`,
+        def: shotSprite(family, tier),
+      });
+    }
   }
 
   return out;

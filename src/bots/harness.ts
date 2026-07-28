@@ -4,9 +4,9 @@
  *
  * Two jobs, one file:
  *
- *  1. **Filling the lobby.** "A solo player offline still gets a full 8-planet
+ *  1. **Filling the lobby.** "A solo player offline still gets a full 8-station
  *     match with a memorable cast" (GDD §3.3), and online "bots fill empty slots
- *     server-side, so a 3-human classroom match is still an 8-planet war"
+ *     server-side, so a 3-human classroom match is still an 8-station war"
  *     (GDD §4.2). {@link fillEmptySlots} is that rule, and it is deterministic:
  *     the same humans always meet the same cast in the same seats.
  *
@@ -32,7 +32,7 @@ import { DEFAULT_PERCEPTION, perceive } from './perception';
 import type { PersonalityId } from './personalities';
 import { PERSONALITIES, ROSTER } from './personalities';
 
-/** Slots in a match — eight planets, always (GDD §2.1). */
+/** Slots in a match — eight stations, always (GDD §2.1). */
 export const MATCH_SLOTS = 8;
 
 // ---------------------------------------------------------------------------

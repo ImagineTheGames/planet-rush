@@ -1,5 +1,5 @@
 /**
- * src/sim/buildings.test.ts — day-2 coverage: planets, the build economy, and
+ * src/sim/buildings.test.ts — day-2 coverage: stations, the build economy, and
  * the siege rules that hang off them (GDD §2.1, §2.5, §2.6, §2.8).
  *
  * The five contract checks from the brief:
@@ -8,7 +8,7 @@
  *      2026-07-26, supersedes the GDD §2.5 channel — see design-amendments.md);
  *   3. the shield regen window — nothing for 8 s, then 2 HP/s;
  *   4. turret target acquisition — nearest enemy in range, and nobody else;
- *   5. per-planet caps — 4 turrets, 2 shields, queued jobs included.
+ *   5. per-station caps — 4 turrets, 2 shields, queued jobs included.
  * Plus the economy around them (cost, docking, banking), the weapon's new
  * targets, turret DPS end to end, and determinism with all of it running.
  */
@@ -18,11 +18,11 @@ import type { Action, BuildItem } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { createWorld, step, type Inputs } from './index';
 import {
-  damagePlanet,
+  damageStation,
   isDocked,
   placeOrder,
-  planetOf,
-  planetTargetRadius,
+  stationOf,
+  stationTargetRadius,
   shieldPool,
   spendOre,
   turretCount,
@@ -31,7 +31,7 @@ import {
 } from './buildings';
 import {
   CORE_HP,
-  PLANET,
+  STATION,
   PROJECTILE,
   PROJECTILE_CORE_FACTOR,
   REPAIR_HP_PER_ORE,
@@ -43,12 +43,12 @@ import {
   TURRET,
 } from './constants';
 import { shipCargoCap, shipMaxHull, shipWeaponDamage, stockTiers } from './upgrades';
-import type { Planet, Projectile, Shield, Ship, Turret, World } from './state';
+import type { MiningStation, Projectile, Shield, Ship, Turret, World } from './state';
 
 // --- builders --------------------------------------------------------------
 
 /**
- * Fixtures are written in planet-relative coordinates and placed around this
+ * Fixtures are written in station-relative coordinates and placed around this
  * point, well inside the test arena. The arena walls are real — a ship at a
  * negative x is clamped to the wall by `integrate`, which would quietly move
  * the attacker in every siege test below.
@@ -86,14 +86,14 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
   };
 }
 
-/** A planet with spawn protection already expired and the regen window open —
+/** A station with spawn protection already expired and the regen window open —
  *  the state a match is in for all but its first 10 seconds. */
-function makePlanet(over: Partial<Planet> & Pick<Planet, 'id' | 'owner'>): Planet {
+function makeStation(over: Partial<MiningStation> & Pick<MiningStation, 'id' | 'owner'>): MiningStation {
   return {
     id: over.id,
     owner: over.owner,
     pos: over.pos ?? at(0, 0),
-    radius: over.radius ?? PLANET.radius,
+    radius: over.radius ?? STATION.radius,
     coreHp: over.coreHp ?? CORE_HP,
     maxCoreHp: over.maxCoreHp ?? CORE_HP,
     alive: over.alive ?? true,
@@ -142,7 +142,7 @@ function makeWorld(over: Partial<World> = {}): World {
     ships: over.ships ?? [],
     asteroids: over.asteroids ?? [],
     chunks: over.chunks ?? [],
-    planets: over.planets ?? [],
+    stations: over.stations ?? [],
     projectiles: over.projectiles ?? [],
     bounds: over.bounds ?? { width: 4000, height: 4000 },
     fieldRadius: over.fieldRadius ?? 600,
@@ -180,97 +180,98 @@ function stepUntil(world: World, done: () => boolean, limit: number, inputs: Inp
 describe('construction timers (GDD §2.5: "bought before the attack, not during it")', () => {
   it('a turret assembles over exactly TURRET.buildTime, then stands up', () => {
     const ship = makeShip({ id: 0, pos: at(100, 0), banked: 10 });
-    const planet = makePlanet({ id: 0, owner: 0, pos: at(0, 0) });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0, pos: at(0, 0) });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     step(world, order(0, 'turret'));
     // Paid immediately, built later — the whole point of the mechanic.
     expect(ship.banked).toBe(10 - TURRET.cost);
-    expect(planet.builds).toHaveLength(1);
-    expect(planet.turrets).toHaveLength(0);
+    expect(station.builds).toHaveLength(1);
+    expect(station.turrets).toHaveLength(0);
 
     const started = world.time;
-    const ticks = stepUntil(world, () => planet.turrets.length === 1, 2000);
+    const ticks = stepUntil(world, () => station.turrets.length === 1, 2000);
     const elapsed = world.time - started;
 
     expect(ticks).toBeLessThanOrEqual(2000);
     expect(Math.abs(elapsed - TURRET.buildTime)).toBeLessThanOrEqual(TICK_DT + 1e-9);
-    expect(planet.builds).toHaveLength(0);
-    expect(planet.turrets[0]!.hp).toBe(TURRET.hp);
-    // It stands on its reserved mount slot, on the planet's surface ring.
-    const mount = turretMountPos(planet, 0);
-    expect(planet.turrets[0]!.pos).toEqual(mount);
+    expect(station.builds).toHaveLength(0);
+    expect(station.turrets[0]!.hp).toBe(TURRET.hp);
+    // It stands on its reserved mount slot, on the station's surface ring.
+    const mount = turretMountPos(station, 0);
+    expect(station.turrets[0]!.pos).toEqual(mount);
   });
 
   it('a shield takes its own, longer build time and arrives at full HP', () => {
     const ship = makeShip({ id: 0, pos: at(100, 0), banked: 10 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     step(world, order(0, 'shield'));
     expect(ship.banked).toBe(10 - SHIELD.cost);
 
     const started = world.time;
-    const ticks = stepUntil(world, () => planet.shields.length === 1, 2000);
+    const ticks = stepUntil(world, () => station.shields.length === 1, 2000);
     const elapsed = world.time - started;
 
     expect(ticks).toBeLessThanOrEqual(2000);
     expect(Math.abs(elapsed - SHIELD.buildTime)).toBeLessThanOrEqual(TICK_DT + 1e-9);
     expect(SHIELD.buildTime).toBeGreaterThan(TURRET.buildTime);
-    expect(planet.shields[0]!.hp).toBe(SHIELD.hp);
+    expect(station.shields[0]!.hp).toBe(SHIELD.hp);
   });
 
   it('nothing is built while the order is still refused (no ore, no charge)', () => {
     const ship = makeShip({ id: 0, pos: at(100, 0), banked: 1, cargo: 1 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     expect(placeOrder(world, ship, 'turret')).toBe('cannot-afford');
     expect(ship.banked + ship.cargo).toBe(2);
-    expect(planet.builds).toHaveLength(0);
+    expect(station.builds).toHaveLength(0);
   });
 });
 
 // --- 2. the ore wallet, docking, and banking -------------------------------
 
 describe('the wheel is validated by the sim, never trusted (GDD §2.5)', () => {
-  it('refuses an order from a ship that is not at its own planet', () => {
-    const ship = makeShip({ id: 0, pos: at(PLANET.dockRange + 1, 0), banked: 10 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+  it('refuses an order from a ship that is not at its own station', () => {
+    const ship = makeShip({ id: 0, pos: at(STATION.dockRange + 1, 0), banked: 10 });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
-    expect(isDocked(ship, planet)).toBe(false);
+    expect(isDocked(ship, station)).toBe(false);
     expect(placeOrder(world, ship, 'turret')).toBe('not-docked');
     expect(ship.banked).toBe(10);
 
-    ship.pos.x = at(PLANET.dockRange - 1, 0).x;
-    expect(isDocked(ship, planet)).toBe(true);
+    ship.pos.x = at(STATION.dockRange - 1, 0).x;
+    expect(isDocked(ship, station)).toBe(true);
     expect(placeOrder(world, ship, 'turret')).toBe('ok');
   });
 
-  it('refuses a build on a planet that is not yours', () => {
+  it('refuses a build on a station that is not yours', () => {
     const ship = makeShip({ id: 1, pos: at(0, 0), banked: 10 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
-    expect(placeOrder(world, ship, 'turret')).toBe('no-planet');
+    expect(placeOrder(world, ship, 'turret')).toBe('no-station');
     expect(ship.banked).toBe(10);
   });
 
   it('spends the hold before the bank, so banking stays a real decision', () => {
     const ship = makeShip({ id: 0, cargo: 2, banked: 5 });
-    expect(spendOre(ship, 3)).toBe(true);
+    const world = makeWorld({ ships: [ship] });
+    expect(spendOre(world, ship, 3)).toBe(true);
     expect(ship.cargo).toBe(0);
     expect(ship.banked).toBe(4);
 
-    expect(spendOre(ship, 99)).toBe(false);
+    expect(spendOre(world, ship, 99)).toBe(false);
     expect(ship.banked).toBe(4); // refused costs nothing
   });
 
   it('BANK moves the whole hold into the safe total', () => {
     const ship = makeShip({ id: 0, pos: at(50, 0), cargo: 2, banked: 1 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     step(world, order(0, 'bank'));
     expect(ship.cargo).toBe(0);
@@ -279,65 +280,65 @@ describe('the wheel is validated by the sim, never trusted (GDD §2.5)', () => {
   });
 });
 
-// --- 3. per-planet caps ----------------------------------------------------
+// --- 3. per-station caps ----------------------------------------------------
 
-describe('per-planet caps are design rules (GDD §2.5)', () => {
+describe('per-station caps are design rules (GDD §2.5)', () => {
   it('stops at 4 turrets, counting jobs still under construction', () => {
     const ship = makeShip({ id: 0, pos: at(50, 0), banked: 100 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
-    for (let i = 0; i < TURRET.capPerPlanet; i++) expect(placeOrder(world, ship, 'turret')).toBe('ok');
+    for (let i = 0; i < TURRET.capPerStation; i++) expect(placeOrder(world, ship, 'turret')).toBe('ok');
     // The cap binds against the queue, not just against finished turrets.
     expect(placeOrder(world, ship, 'turret')).toBe('cap-reached');
-    expect(ship.banked).toBe(100 - TURRET.capPerPlanet * TURRET.cost);
-    expect(turretCount(planet)).toBe(TURRET.capPerPlanet);
+    expect(ship.banked).toBe(100 - TURRET.capPerStation * TURRET.cost);
+    expect(turretCount(station)).toBe(TURRET.capPerStation);
     // Every queued job holds a distinct mount slot.
-    expect(new Set(planet.builds.map((b) => b.slot)).size).toBe(TURRET.capPerPlanet);
+    expect(new Set(station.builds.map((b) => b.slot)).size).toBe(TURRET.capPerStation);
 
-    stepUntil(world, () => planet.builds.length === 0, 2000);
-    expect(planet.turrets).toHaveLength(TURRET.capPerPlanet);
+    stepUntil(world, () => station.builds.length === 0, 2000);
+    expect(station.turrets).toHaveLength(TURRET.capPerStation);
     // The cap still binds — the ring never grows past four — but a built-out ring
     // does not dead-end the wedge: the same TURRET order now UPGRADES the weakest
     // turret one Mk (parity field report v0.2.2), so it answers 'ok', the count
     // holds at four, and a turret has climbed off Mk I.
     expect(placeOrder(world, ship, 'turret')).toBe('ok');
-    expect(turretCount(planet)).toBe(TURRET.capPerPlanet);
-    expect(Math.max(...planet.turrets.map(turretTier))).toBe(1);
+    expect(turretCount(station)).toBe(TURRET.capPerStation);
+    expect(Math.max(...station.turrets.map(turretTier))).toBe(1);
   });
 
   it('stops at 2 shields ("stacks to two")', () => {
     const ship = makeShip({ id: 0, pos: at(50, 0), banked: 100 });
-    const planet = makePlanet({ id: 0, owner: 0 });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
-    for (let i = 0; i < SHIELD.capPerPlanet; i++) expect(placeOrder(world, ship, 'shield')).toBe('ok');
+    for (let i = 0; i < SHIELD.capPerStation; i++) expect(placeOrder(world, ship, 'shield')).toBe('ok');
     expect(placeOrder(world, ship, 'shield')).toBe('cap-reached');
-    expect(ship.banked).toBe(100 - SHIELD.capPerPlanet * SHIELD.cost);
+    expect(ship.banked).toBe(100 - SHIELD.capPerStation * SHIELD.cost);
 
-    stepUntil(world, () => planet.shields.length === SHIELD.capPerPlanet, 2000);
-    expect(shieldPool(planet)).toBe(SHIELD.capPerPlanet * SHIELD.hp);
+    stepUntil(world, () => station.shields.length === SHIELD.capPerStation, 2000);
+    expect(shieldPool(station)).toBe(SHIELD.capPerStation * SHIELD.hp);
   });
 
   it('a dead turret frees its slot for a rebuild', () => {
     const ship = makeShip({ id: 0, pos: at(50, 0), banked: 100 });
-    const planet = makePlanet({
+    const station = makeStation({
       id: 0,
       owner: 0,
       turrets: [0, 1, 2, 3].map((slot) => makeTurret({ id: slot, owner: 0, slot })),
     });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     // A full standing ring builds no fifth turret — the order upgrades instead
     // ('ok', count unchanged). Killing a turret frees its slot, and the very next
     // order goes back to BUILDING (a free slot always builds before it upgrades).
     expect(placeOrder(world, ship, 'turret')).toBe('ok');
-    expect(turretCount(planet)).toBe(TURRET.capPerPlanet);
-    planet.turrets[2]!.hp = 0;
+    expect(turretCount(station)).toBe(TURRET.capPerStation);
+    station.turrets[2]!.hp = 0;
     step(world, []); // end-of-tick sweep removes it
-    expect(planet.turrets).toHaveLength(3);
+    expect(station.turrets).toHaveLength(3);
     expect(placeOrder(world, ship, 'turret')).toBe('ok');
-    expect(planet.builds[0]!.slot).toBe(2);
+    expect(station.builds[0]!.slot).toBe(2);
   });
 });
 
@@ -346,8 +347,8 @@ describe('per-planet caps are design rules (GDD §2.5)', () => {
 describe('shield regeneration (GDD §2.6: "pressure beats regeneration")', () => {
   it('regenerates nothing inside the 8 s window, then 2 HP/s', () => {
     const shield = makeShield({ id: 1, hp: 10 });
-    const planet = makePlanet({ id: 0, owner: 0, shields: [shield], sinceDamage: 0 });
-    const world = makeWorld({ planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0, shields: [shield], sinceDamage: 0 });
+    const world = makeWorld({ stations: [station] });
 
     // One tick short of the delay: still nothing.
     const insideWindow = Math.round((SHIELD.regenDelay - TICK_DT) / TICK_DT);
@@ -362,12 +363,12 @@ describe('shield regeneration (GDD §2.6: "pressure beats regeneration")', () =>
 
   it('a hit re-closes the window: the clock restarts from that hit', () => {
     const shield = makeShield({ id: 1, hp: 20 });
-    const planet = makePlanet({ id: 0, owner: 0, shields: [shield] });
-    const world = makeWorld({ planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0, shields: [shield] });
+    const world = makeWorld({ stations: [station] });
 
-    damagePlanet(world, planet, 5);
+    damageStation(world, station, 5);
     expect(shield.hp).toBe(15);
-    expect(planet.sinceDamage).toBe(0);
+    expect(station.sinceDamage).toBe(0);
 
     for (let t = 0; t < Math.round((SHIELD.regenDelay - TICK_DT) / TICK_DT); t++) step(world, []);
     expect(shield.hp).toBe(15);
@@ -376,8 +377,8 @@ describe('shield regeneration (GDD §2.6: "pressure beats regeneration")', () =>
   it('never regenerates past its cap, and each generator regenerates its own', () => {
     const a = makeShield({ id: 1, hp: SHIELD.hp - 1 });
     const b = makeShield({ id: 2, hp: 0 });
-    const planet = makePlanet({ id: 0, owner: 0, shields: [a, b] });
-    const world = makeWorld({ planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0, shields: [a, b] });
+    const world = makeWorld({ stations: [station] });
 
     for (let t = 0; t < Math.round(2 / TICK_DT); t++) step(world, []);
     expect(a.hp).toBe(SHIELD.hp);
@@ -395,104 +396,104 @@ describe('shield regeneration (GDD §2.6: "pressure beats regeneration")', () =>
 describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => {
   const dockedRepairWorld = (coreHp = 50, ore = 10) => {
     const ship = makeShip({ id: 0, pos: at(80, 0), banked: ore });
-    const planet = makePlanet({ id: 0, owner: 0, coreHp });
-    return { ship, planet, world: makeWorld({ ships: [ship], planets: [planet] }) };
+    const station = makeStation({ id: 0, owner: 0, coreHp });
+    return { ship, station, world: makeWorld({ ships: [ship], stations: [station] }) };
   };
 
   it('one tap spends exactly 1 ore and restores REPAIR_HP_PER_ORE core HP', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    const { ship, station, world } = dockedRepairWorld(50, 10);
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
+    expect(station.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
     expect(ship.banked).toBeCloseTo(10 - REPAIR_ORE_COST, 6);
   });
 
   it('draws the ore hold-first, then the bank — like every other purchase', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 0);
+    const { ship, station, world } = dockedRepairWorld(50, 0);
     ship.cargo = 3;
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
     expect(ship.cargo).toBeCloseTo(3 - REPAIR_ORE_COST, 6);
     expect(ship.banked).toBe(0);
-    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
+    expect(station.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
   });
 
   it('clamps at the core max: a near-full core costs the full ore and heals to full', () => {
     // Missing 10 HP < REPAIR_HP_PER_ORE (15): the tap still costs a whole ore and
     // the core clamps to max, never overshooting — the wedge SHOWS the real
     // number, so the player chooses informed (developer p5-08).
-    const { ship, planet, world } = dockedRepairWorld(CORE_HP - 10, 5);
+    const { ship, station, world } = dockedRepairWorld(CORE_HP - 10, 5);
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(station.coreHp).toBe(station.maxCoreHp);
     expect(ship.banked).toBeCloseTo(5 - REPAIR_ORE_COST, 6);
   });
 
   it('five rapid taps are five distinct purchases: 5 ore, +75 HP, then zero further drain', () => {
     // The developer's loop bug killed: one press must map to exactly one
     // ore-spend, and N presses are N independent, individually-checked spends.
-    const { ship, planet, world } = dockedRepairWorld(20, 10);
+    const { ship, station, world } = dockedRepairWorld(20, 10);
     for (let i = 0; i < 5; i++) expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    expect(planet.coreHp).toBe(20 + 5 * REPAIR_HP_PER_ORE); // 95, still under the cap
+    expect(station.coreHp).toBe(20 + 5 * REPAIR_HP_PER_ORE); // 95, still under the cap
     expect(ship.banked).toBeCloseTo(10 - 5 * REPAIR_ORE_COST, 6); // exactly 5 spent, no more
 
     // No channel: time passing with no press moves neither HP nor ore.
-    const hp = planet.coreHp;
+    const hp = station.coreHp;
     const ore = ship.banked;
     for (let t = 0; t < 120; t++) step(world, []);
-    expect(planet.coreHp).toBe(hp);
+    expect(station.coreHp).toBe(hp);
     expect(ship.banked).toBeCloseTo(ore, 6);
   });
 
   it('refuses a full core, spending nothing', () => {
-    const { ship, planet, world } = dockedRepairWorld(CORE_HP, 10);
+    const { ship, station, world } = dockedRepairWorld(CORE_HP, 10);
     expect(placeOrder(world, ship, 'repair')).toBe('core-full');
     expect(ship.banked).toBe(10);
-    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(station.coreHp).toBe(station.maxCoreHp);
   });
 
   it('refuses an empty bank, and a bank short of one whole ore, spending nothing', () => {
     const empty = dockedRepairWorld(50, 0);
     expect(placeOrder(empty.world, empty.ship, 'repair')).toBe('cannot-afford');
-    expect(empty.planet.coreHp).toBe(50);
+    expect(empty.station.coreHp).toBe(50);
 
     const short = dockedRepairWorld(50, 0);
     short.ship.cargo = 0.5; // less than one whole ore
     expect(placeOrder(short.world, short.ship, 'repair')).toBe('cannot-afford');
     expect(short.ship.cargo).toBe(0.5); // untouched
-    expect(short.planet.coreHp).toBe(50);
+    expect(short.station.coreHp).toBe(50);
   });
 
   it('refuses once collapse has begun — repair shuts off (GDD §2.3)', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    const { ship, station, world } = dockedRepairWorld(50, 10);
     world.match.collapseTime = 0; // isCollapsed(world) is now true
     expect(placeOrder(world, ship, 'repair')).toBe('collapsed');
     expect(ship.banked).toBe(10);
-    expect(planet.coreHp).toBe(50);
+    expect(station.coreHp).toBe(50);
   });
 
   it('refuses an undocked ship, spending nothing', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    const { ship, station, world } = dockedRepairWorld(50, 10);
     ship.pos = at(1000, 0);
     expect(placeOrder(world, ship, 'repair')).toBe('not-docked');
     expect(ship.banked).toBe(10);
-    expect(planet.coreHp).toBe(50);
+    expect(station.coreHp).toBe(50);
   });
 
   it('damage does not cancel a heal that already resolved — no channel to interrupt', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 10);
+    const { ship, station, world } = dockedRepairWorld(50, 10);
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    const healed = planet.coreHp; // 65: the 15 HP is banked into the core
-    damagePlanet(world, planet, 5);
+    const healed = station.coreHp; // 65: the 15 HP is banked into the core
+    damageStation(world, station, 5);
     // The hit takes its 5 off the top; it does not "drop" a repair, because
     // the purchase is done — there is nothing left running to interrupt.
-    expect(planet.coreHp).toBe(healed - 5);
+    expect(station.coreHp).toBe(healed - 5);
   });
 
   it('a shield stands in front of the core during a repair, exactly as always', () => {
-    const { ship, planet, world } = dockedRepairWorld(50, 10);
-    planet.shields.push(makeShield({ id: 9 }));
+    const { ship, station, world } = dockedRepairWorld(50, 10);
+    station.shields.push(makeShield({ id: 9 }));
     expect(placeOrder(world, ship, 'repair')).toBe('ok');
-    damagePlanet(world, planet, 3);
-    expect(shieldPool(planet)).toBe(SHIELD.hp - 3); // the core never felt it
-    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // and kept its heal
+    damageStation(world, station, 3);
+    expect(shieldPool(station)).toBe(SHIELD.hp - 3); // the core never felt it
+    expect(station.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // and kept its heal
   });
 
   it('lights a repair TELL that holds for the pacing window, then releases when quiet', () => {
@@ -500,19 +501,19 @@ describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => 
     // beyond the one purchase, but it holds for REPAIR_TELL_HOLD seconds so a
     // renderer can glow and a bot paces its next order rather than buying 15 HP
     // every tick.
-    const { planet, world } = dockedRepairWorld(50, 10);
+    const { station, world } = dockedRepairWorld(50, 10);
     step(world, order(0, 'repair'));
-    expect(planet.repairing).toBe(true);
-    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
+    expect(station.repairing).toBe(true);
+    expect(station.coreHp).toBe(50 + REPAIR_HP_PER_ORE);
 
     for (let t = 0; t < 30; t++) step(world, []); // still inside the hold window…
-    expect(planet.repairing).toBe(true);
-    expect(planet.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // …and no channel heals it further
+    expect(station.repairing).toBe(true);
+    expect(station.coreHp).toBe(50 + REPAIR_HP_PER_ORE); // …and no channel heals it further
 
     // Once the hold has fully elapsed on a quiet core, the tell releases.
     const settle = Math.round(REPAIR_TELL_HOLD / TICK_DT) + 5;
     for (let t = 0; t < settle; t++) step(world, []);
-    expect(planet.repairing).toBe(false);
+    expect(station.repairing).toBe(false);
   });
 
   it('holds the tell while the core stays under fire — pressure beats repair (GDD §2.6)', () => {
@@ -520,33 +521,33 @@ describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => 
     // bot reading `!repairing` holds off resuming repair under fire — it must
     // drive the attacker off first. (A human is never gated: `placeOrder` above
     // ignores the tell entirely.)
-    const { planet, world } = dockedRepairWorld(50, 10);
+    const { station, world } = dockedRepairWorld(50, 10);
     step(world, order(0, 'repair'));
-    expect(planet.repairing).toBe(true);
+    expect(station.repairing).toBe(true);
 
     const underFire = Math.round((REPAIR_TELL_HOLD * 2) / TICK_DT);
     for (let t = 0; t < underFire; t++) {
-      planet.sinceDamage = 0; // a fresh hit landed this tick — the core is under fire
+      station.sinceDamage = 0; // a fresh hit landed this tick — the core is under fire
       step(world, []);
     }
-    expect(planet.repairing).toBe(true); // held: a defender cannot repair under fire
+    expect(station.repairing).toBe(true); // held: a defender cannot repair under fire
   });
 
   it('clears the repair TELL once the core is topped back to full', () => {
-    const { planet, world } = dockedRepairWorld(CORE_HP - 5, 10); // one tap fills it
+    const { station, world } = dockedRepairWorld(CORE_HP - 5, 10); // one tap fills it
     step(world, order(0, 'repair'));
-    expect(planet.coreHp).toBe(planet.maxCoreHp);
+    expect(station.coreHp).toBe(station.maxCoreHp);
     // The purchase lit the tell; the next maintenance pass sees a full core and
     // drops it — nothing left to repair, nothing to glow.
     step(world, []);
-    expect(planet.repairing).toBe(false);
+    expect(station.repairing).toBe(false);
   });
 
   it('is deterministic: two identical repair sequences deep-equal', () => {
     const run = () => {
       const { ship, world } = dockedRepairWorld(20, 10);
       for (let i = 0; i < 3; i++) placeOrder(world, ship, 'repair');
-      return { coreHp: world.planets[0]!.coreHp, banked: ship.banked };
+      return { coreHp: world.stations[0]!.coreHp, banked: ship.banked };
     };
     expect(run()).toEqual(run());
   });
@@ -557,10 +558,10 @@ describe('repair core (discrete: 1 tap = 1 ore -> REPAIR_HP_PER_ORE HP)', () => 
 describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () => {
   const turretWorld = (enemyAt: { x: number; y: number }, over: Partial<Ship> = {}) => {
     const turret = makeTurret({ id: 1, owner: 0, pos: at(0, 0) });
-    const planet = makePlanet({ id: 0, owner: 0, turrets: [turret] });
+    const station = makeStation({ id: 0, owner: 0, turrets: [turret] });
     const defender = makeShip({ id: 0, pos: at(0, 40) });
     const enemy = makeShip({ id: 1, pos: at(enemyAt.x, enemyAt.y), hull: 1000, maxHull: 1000, ...over });
-    return { turret, planet, enemy, world: makeWorld({ ships: [defender, enemy], planets: [planet] }) };
+    return { turret, station, enemy, world: makeWorld({ ships: [defender, enemy], stations: [station] }) };
   };
 
   it('acquires an enemy ship inside range and ignores its own fleet', () => {
@@ -677,7 +678,7 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
     turret.hp = 0;
     step(world, []);
     expect(live(world)).toHaveLength(0);
-    expect(world.planets[0]!.turrets).toHaveLength(0); // swept at end of tick
+    expect(world.stations[0]!.turrets).toHaveLength(0); // swept at end of tick
   });
 });
 
@@ -685,19 +686,19 @@ describe('turret auto-fire (GDD §2.6: "turrets deter; the ship defends")', () =
 
 describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)', () => {
   it('a shot strips the shield before the core, at the core rate', () => {
-    const planet = makePlanet({ id: 0, owner: 0, shields: [makeShield({ id: 9 })] });
+    const station = makeStation({ id: 0, owner: 0, shields: [makeShield({ id: 9 })] });
     const attacker = makeShip({ id: 1, pos: at(-(SHIELD.radius + 60), 0), angle: 0 });
-    const world = makeWorld({ ships: [attacker], planets: [planet] });
+    const world = makeWorld({ ships: [attacker], stations: [station] });
 
-    expect(planetTargetRadius(planet)).toBe(SHIELD.radius);
+    expect(stationTargetRadius(station)).toBe(SHIELD.radius);
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
     const perShot = shipWeaponDamage(attacker) * PROJECTILE_CORE_FACTOR; // core rate
     for (let t = 0; t < Math.round(2 / TICK_DT); t++) step(world, fire);
 
     // Shots land on the bubble; the core behind it never feels them (GDD §2.6).
-    expect(planet.coreHp).toBe(CORE_HP);
-    const drained = SHIELD.hp - shieldPool(planet);
+    expect(station.coreHp).toBe(CORE_HP);
+    const drained = SHIELD.hp - shieldPool(station);
     expect(drained).toBeGreaterThan(0);
     expect(drained / perShot).toBeCloseTo(Math.round(drained / perShot), 6); // whole shots
     // The trigger is held against the bubble, so the firing tell is set.
@@ -706,48 +707,48 @@ describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)
 
   it('a shot kills a turret at the ship rate and leaves the core alone', () => {
     const turret = makeTurret({ id: 5, owner: 0, pos: at(-200, 0) });
-    const planet = makePlanet({ id: 0, owner: 0, turrets: [turret] });
+    const station = makeStation({ id: 0, owner: 0, turrets: [turret] });
     const attacker = makeShip({ id: 1, pos: at(-200 - 120, 0), angle: 0 });
-    const world = makeWorld({ ships: [attacker], planets: [planet] });
+    const world = makeWorld({ ships: [attacker], stations: [station] });
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
-    const ticks = stepUntil(world, () => planet.turrets.length === 0, 2000, fire);
+    const ticks = stepUntil(world, () => station.turrets.length === 0, 2000, fire);
 
     // 30 HP at the Vanguard's 10 DPS ≈ 3 s of landed shots, plus a little
     // projectile travel — the shots block on the turret, never reaching the core.
     expect(ticks * TICK_DT).toBeGreaterThan(2.5);
     expect(ticks * TICK_DT).toBeLessThan(4.5);
-    expect(planet.coreHp).toBe(CORE_HP);
+    expect(station.coreHp).toBe(CORE_HP);
   });
 
-  it('never shoots its owner\'s own planet or turrets', () => {
+  it('never shoots its owner\'s own station or turrets', () => {
     const turret = makeTurret({ id: 5, owner: 0, pos: at(100, 0) });
-    const planet = makePlanet({ id: 0, owner: 0, pos: at(200, 0), turrets: [turret] });
+    const station = makeStation({ id: 0, owner: 0, pos: at(200, 0), turrets: [turret] });
     const owner = makeShip({ id: 0, pos: at(0, 0), angle: 0 });
-    const world = makeWorld({ ships: [owner], planets: [planet] });
+    const world = makeWorld({ ships: [owner], stations: [station] });
 
     const fire: Inputs = [{ id: 0, actions: [{ type: 'fire', active: true, auto: true }] }];
     for (let t = 0; t < 60; t++) step(world, fire);
 
     expect(turret.hp).toBe(TURRET.hp);
-    expect(planet.coreHp).toBe(CORE_HP);
+    expect(station.coreHp).toBe(CORE_HP);
     // Auto-aim found no valid enemy target, so nothing was mined or fired.
     expect(owner.firing).toBe(false);
     expect(live(world)).toHaveLength(0);
   });
 
   it('spawn protection covers the core for its 10 seconds (GDD §2.1)', () => {
-    const planet = makePlanet({ id: 0, owner: 0, spawnProtect: 10 });
-    const attacker = makeShip({ id: 1, pos: at(-(PLANET.radius + 60), 0), angle: 0 });
-    const world = makeWorld({ ships: [attacker], planets: [planet] });
+    const station = makeStation({ id: 0, owner: 0, spawnProtect: 10 });
+    const attacker = makeShip({ id: 1, pos: at(-(STATION.radius + 60), 0), angle: 0 });
+    const world = makeWorld({ ships: [attacker], stations: [station] });
 
     const fire: Inputs = [{ id: 1, actions: [{ type: 'fire', active: true, auto: false }] }];
     for (let t = 0; t < 60; t++) step(world, fire);
-    expect(planet.coreHp).toBe(CORE_HP);
+    expect(station.coreHp).toBe(CORE_HP);
   });
 
   it('a core taken to zero becomes a wreck that cannot shoot, shield or repair', () => {
-    const planet = makePlanet({
+    const station = makeStation({
       id: 0,
       owner: 0,
       coreHp: 4,
@@ -755,15 +756,15 @@ describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)
       shields: [makeShield({ id: 6, hp: 0 })],
       repairing: true,
     });
-    const world = makeWorld({ ships: [makeShip({ id: 0, banked: 10 })], planets: [planet] });
+    const world = makeWorld({ ships: [makeShip({ id: 0, banked: 10 })], stations: [station] });
 
-    damagePlanet(world, planet, 4);
-    expect(planet.alive).toBe(false);
-    expect(planet.coreHp).toBe(0);
-    expect(planet.repairing).toBe(false);
+    damageStation(world, station, 4);
+    expect(station.alive).toBe(false);
+    expect(station.coreHp).toBe(0);
+    expect(station.repairing).toBe(false);
 
     step(world, []);
-    expect(planet.turrets).toHaveLength(0);
+    expect(station.turrets).toHaveLength(0);
     expect(live(world)).toHaveLength(0);
   });
 });
@@ -771,7 +772,7 @@ describe('the weapon finishes its target list (GDD §2.4, design amendment v0.2)
 // --- 8. the ring layout and determinism ------------------------------------
 
 describe('the ring layout (GDD §2.1)', () => {
-  it('gives every slot a planet on its own spoke, outboard of its ship', () => {
+  it('gives every slot a station on its own spoke, outboard of its ship', () => {
     const world = createWorld({
       seed: 5,
       players: [
@@ -782,42 +783,42 @@ describe('the ring layout (GDD §2.1)', () => {
       asteroidCount: 8,
     });
 
-    expect(world.planets).toHaveLength(3);
+    expect(world.stations).toHaveLength(3);
     const cx = world.bounds.width / 2;
     const cy = world.bounds.height / 2;
-    const radii = world.planets.map((p) => Math.hypot(p.pos.x - cx, p.pos.y - cy));
+    const radii = world.stations.map((p) => Math.hypot(p.pos.x - cx, p.pos.y - cy));
 
-    for (const p of world.planets) {
+    for (const p of world.stations) {
       expect(p.coreHp).toBe(CORE_HP);
       expect(p.spawnProtect).toBeGreaterThan(0);
       const ship = world.ships.find((s) => s.id === p.owner)!;
-      // The ship spawns between the field and its planet, inside dock range.
+      // The ship spawns between the field and its station, inside dock range.
       expect(Math.hypot(ship.pos.x - cx, ship.pos.y - cy)).toBeLessThan(
         Math.hypot(p.pos.x - cx, p.pos.y - cy),
       );
       expect(isDocked(ship, p)).toBe(true);
-      expect(planetOf(world, p.owner)).toBe(p);
+      expect(stationOf(world, p.owner)).toBe(p);
       // Wholly inside the arena, so nothing is built outside the play area.
       expect(p.pos.x - p.radius).toBeGreaterThanOrEqual(0);
       expect(p.pos.x + p.radius).toBeLessThanOrEqual(world.bounds.width);
     }
-    // One ring: every planet the same distance from the centre.
+    // One ring: every station the same distance from the centre.
     for (const r of radii) expect(r).toBeCloseTo(radii[0]!, 6);
   });
 
-  it('a planet is a solid body — you dock at your world, you do not fly through it', () => {
-    const planet = makePlanet({ id: 0, owner: 0, pos: at(0, 0) });
+  it('a station is a solid body — you dock at your world, you do not fly through it', () => {
+    const station = makeStation({ id: 0, owner: 0, pos: at(0, 0) });
     const ship = makeShip({ id: 0, pos: at(-200, 0), vel: { x: 400, y: 0 } });
-    const world = makeWorld({ ships: [ship], planets: [planet] });
+    const world = makeWorld({ ships: [ship], stations: [station] });
 
     const thrust: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: 1, y: 0 } }] }];
     for (let t = 0; t < Math.round(3 / TICK_DT); t++) {
       step(world, thrust);
-      const gap = Math.hypot(ship.pos.x - planet.pos.x, ship.pos.y - planet.pos.y);
-      expect(gap).toBeGreaterThanOrEqual(planet.radius + ship.radius - 1e-6);
+      const gap = Math.hypot(ship.pos.x - station.pos.x, ship.pos.y - station.pos.y);
+      expect(gap).toBeGreaterThanOrEqual(station.radius + ship.radius - 1e-6);
     }
     // Still docked at the surface it bounced off, which is the point.
-    expect(isDocked(ship, planet)).toBe(true);
+    expect(isDocked(ship, station)).toBe(true);
   });
 
   it('two runs with orders, turret fire and repair deep-equal (GDD §4.8)', () => {
@@ -852,6 +853,6 @@ describe('the ring layout (GDD §2.1)', () => {
     }
     expect(a).toEqual(b);
     // Sanity: the script actually built something.
-    expect(a.planets.some((p) => p.turrets.length + p.builds.length > 0)).toBe(true);
+    expect(a.stations.some((p) => p.turrets.length + p.builds.length > 0)).toBe(true);
   });
 });

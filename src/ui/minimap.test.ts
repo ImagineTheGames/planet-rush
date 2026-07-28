@@ -8,7 +8,7 @@
  *    band and the expanded overlay inside `full`+margin, asserted against the
  *    registry's OWN resolver on both phone profiles, so "it appears where it's
  *    supposed to" is a test, not a hope (field request rule 3).
- *  - **The scene** — planets are owner-coloured (a wreck neutral), the local
+ *  - **The scene** — stations are owner-coloured (a wreck neutral), the local
  *    ship is highlighted and separated from the enemy dots, a spawn-protected
  *    ship dims, a dead ship drops off, ore hints are faint signal-yellow, and the
  *    collapse ring scales with the fit.
@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { PALETTE } from '@render/index';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { AnchorSpec } from '@platform/layout-registry';
-import { playerColor } from './planet-hp';
+import { playerColor } from './station-hp';
 import {
   Minimap,
   collapsedRect,
@@ -62,7 +62,7 @@ const ARENA = { width: 1000, height: 1000 };
 function frame(over: Partial<MinimapFrame> = {}): MinimapFrame {
   return {
     bounds: ARENA,
-    planets: [{ owner: 0, x: 100, y: 100, alive: true }],
+    stations: [{ owner: 0, x: 100, y: 100, alive: true }],
     ships: [],
     ...over,
   };
@@ -194,20 +194,20 @@ describe('placement — the drawn rect sits inside its declared anchor zone', ()
 const RECT = { x: 0, y: 0, width: 200, height: 200 };
 
 describe('minimapScene — sim state → dots', () => {
-  it('an owned planet takes its owner colour; a wreck goes neutral steel + dim', () => {
+  it('an owned station takes its owner colour; a wreck goes neutral steel + dim', () => {
     const scene = minimapScene(
       frame({
-        planets: [
+        stations: [
           { owner: 2, x: 0, y: 0, alive: true },
           { owner: 3, x: 1000, y: 1000, alive: false },
         ],
       }),
       RECT,
     );
-    expect(scene.planetDots[0]!.color).toBe(playerColor(2));
-    expect(scene.planetDots[0]!.alpha).toBe(MINIMAP_DOT_ALPHA);
-    expect(scene.planetDots[1]!.color).toBe(PALETTE.hullSteel);
-    expect(scene.planetDots[1]!.alpha).toBe(MINIMAP_DERELICT_ALPHA);
+    expect(scene.stationDots[0]!.color).toBe(playerColor(2));
+    expect(scene.stationDots[0]!.alpha).toBe(MINIMAP_DOT_ALPHA);
+    expect(scene.stationDots[1]!.color).toBe(PALETTE.hullSteel);
+    expect(scene.stationDots[1]!.alpha).toBe(MINIMAP_DERELICT_ALPHA);
   });
 
   it('the local ship is separated into ownDot, highlighted (larger + own flag)', () => {
@@ -263,11 +263,11 @@ describe('minimapScene — sim state → dots', () => {
     expect(ringed.collapseRing!.y).toBeCloseTo(100);
   });
 
-  it('places a planet dot at the projected map position', () => {
-    const scene = minimapScene(frame({ planets: [{ owner: 0, x: 250, y: 750, alive: true }] }), RECT);
+  it('places a station dot at the projected map position', () => {
+    const scene = minimapScene(frame({ stations: [{ owner: 0, x: 250, y: 750, alive: true }] }), RECT);
     // scale 0.2, offset 0 → (50, 150).
-    expect(scene.planetDots[0]!.x).toBeCloseTo(50);
-    expect(scene.planetDots[0]!.y).toBeCloseTo(150);
+    expect(scene.stationDots[0]!.x).toBeCloseTo(50);
+    expect(scene.stationDots[0]!.y).toBeCloseTo(150);
   });
 });
 

@@ -19,7 +19,8 @@ import {
   ALARM_THRESHOLD_HP,
   ARROW_EDGE_INSET,
 } from './alarm';
-import { WEAPON_DPS_CORE, TICK_DT } from '../sim/constants';
+import type { AlarmCause, AlarmDamage } from './alarm';
+import { WEAPON_DPS_CORE, TICK_DT, COLLAPSE_CORE_DECAY } from '../sim/constants';
 
 /** Run `seconds` of sim ticks, dealing `dps` damage per second. */
 function fire(alarm: UnderAttackAlarm, seconds: number, dps: number): boolean {
@@ -71,7 +72,7 @@ describe('the trigger — sustained damage, not a stray shot (GDD §2.2)', () =>
   });
 
   it('counts damage to shields and turrets the same as damage to the core', () => {
-    // The trigger takes one number — HP lost off the planet this tick — because
+    // The trigger takes one number — HP lost off the station this tick — because
     // "your core, shield, or turrets" are all the same event to a defender.
     const alarm = new UnderAttackAlarm();
     expect(fire(alarm, 2, 10)).toBe(true);
@@ -117,7 +118,7 @@ describe('the latch — an alarm that flickers is one players learn to ignore', 
     expect(alarm.update(TICK_DT, 2)).toBe(false);
   });
 
-  it('resets completely on demand (fresh match, or a planet that just died)', () => {
+  it('resets completely on demand (fresh match, or a station that just died)', () => {
     const alarm = new UnderAttackAlarm();
     fire(alarm, 3, WEAPON_DPS_CORE);
     expect(alarm.active).toBe(true);
@@ -136,7 +137,7 @@ describe('pressure — the tell builds instead of snapping on', () => {
     expect(alarm.pressure).toBeLessThan(0.6);
   });
 
-  it('never exceeds 1, however hard the planet is hit', () => {
+  it('never exceeds 1, however hard the station is hit', () => {
     const alarm = new UnderAttackAlarm();
     alarm.update(TICK_DT, ALARM_THRESHOLD_HP * 20);
     expect(alarm.pressure).toBe(1);
@@ -155,6 +156,176 @@ describe('dt-independence — the threshold means the same at any timestep', () 
   });
 });
 
+describe('only YOUR station, and not the collapse (the phantom-alarm field report)', () => {
+  it('a bot war three stations away never rings your alarm', () => {
+    // The alarm is fed ONLY the local player's own-station damage; another
+    // station's fight is simply never handed to it. Encode that: a long run of
+    // quiet ticks (no own damage) is silence, forever.
+    const alarm = new UnderAttackAlarm();
+    expect(quiet(alarm, 120)).toBe(false);
+    expect(alarm.active).toBe(false);
+    expect(alarm.cause.reason).toBe('quiet');
+    expect(alarm.cause.damage).toBe(0);
+  });
+
+  it('collapse core-decay alone is entropy, not an attack — it never rings', () => {
+    // The endgame decays every core at COLLAPSE_CORE_DECAY HP/s. The HUD
+    // subtracts that expected bleed before feeding the alarm, so the residual it
+    // sees during a quiet collapse is 0 — nothing to ring.
+    const alarm = new UnderAttackAlarm();
+    const ticks = Math.round(100 / TICK_DT); // a full 100 s collapse
+    let firing = false;
+    for (let i = 0; i < ticks; i++) {
+      const raw = COLLAPSE_CORE_DECAY * TICK_DT;
+      const residual = Math.max(0, raw - COLLAPSE_CORE_DECAY * TICK_DT); // == 0
+      firing = alarm.update(TICK_DT, { core: residual });
+    }
+    expect(firing).toBe(false);
+    expect(alarm.active).toBe(false);
+  });
+
+  it('an attacker firing DURING collapse still rings it — decay is not cover', () => {
+    // Real fire lands on top of the decay: after the HUD subtracts the expected
+    // bleed, weapon damage still exceeds it and reaches the threshold.
+    const alarm = new UnderAttackAlarm();
+    const ticks = Math.round(2.5 / TICK_DT);
+    let firing = false;
+    for (let i = 0; i < ticks; i++) {
+      const raw = (WEAPON_DPS_CORE + COLLAPSE_CORE_DECAY) * TICK_DT;
+      const residual = Math.max(0, raw - COLLAPSE_CORE_DECAY * TICK_DT);
+      firing = alarm.update(TICK_DT, { core: residual });
+    }
+    expect(firing).toBe(true);
+  });
+
+  it('an attack that ends clears the alarm — and it STAYS cleared', () => {
+    const alarm = new UnderAttackAlarm();
+    expect(fire(alarm, 3, WEAPON_DPS_CORE)).toBe(true);
+    // The attacker leaves for good.
+    expect(quiet(alarm, ALARM_HOLD_S + 1)).toBe(false);
+    // Minutes pass with nothing landing: it must not re-arm on its own.
+    expect(quiet(alarm, 300)).toBe(false);
+    expect(alarm.active).toBe(false);
+    expect(alarm.pressure).toBe(0);
+  });
+});
+
+describe('the cause — a phantom is diagnosed from a value, not a hunt', () => {
+  it('names which of your core, shields, or turrets took the damage', () => {
+    const core = new UnderAttackAlarm();
+    core.update(TICK_DT, { core: 1 });
+    expect(core.cause.source).toBe('core');
+
+    const shield = new UnderAttackAlarm();
+    shield.update(TICK_DT, { shield: 1 });
+    expect(shield.cause.source).toBe('shield');
+
+    const turret = new UnderAttackAlarm();
+    turret.update(TICK_DT, { turret: 1 });
+    expect(turret.cause.source).toBe('turret');
+  });
+
+  it('counts core, shield, and turret damage into one bucket, blaming the largest', () => {
+    // A shield taking the brunt while the core is grazed: the alarm still fires
+    // on the sum, and the cause fingers the shield.
+    const alarm = new UnderAttackAlarm();
+    let firing = false;
+    for (let i = 0; i < Math.round(2 / TICK_DT); i++) {
+      firing = alarm.update(TICK_DT, { core: 1 * TICK_DT, shield: 5 * TICK_DT });
+    }
+    expect(firing).toBe(true);
+    expect(alarm.cause.source).toBe('shield');
+    expect(alarm.cause.reason).toBe('sustained');
+  });
+
+  it('walks reason quiet → building → sustained → holding → released', () => {
+    const alarm = new UnderAttackAlarm();
+    const seen = new Set<AlarmCause['reason']>();
+    // 'released' lives on a single tick before reverting to 'quiet', so record
+    // the reason on EVERY tick, not just at the end of each phase.
+    const step = (damage: number): void => {
+      alarm.update(TICK_DT, damage);
+      seen.add(alarm.cause.reason);
+    };
+    step(0); // quiet
+    for (let i = 0; i < Math.round(3 / TICK_DT); i++) step(WEAPON_DPS_CORE * TICK_DT); // building→sustained
+    for (let i = 0; i < Math.round(0.5 / TICK_DT); i++) step(0); // holding
+    for (let i = 0; i < Math.round((ALARM_HOLD_S + 1) / TICK_DT); i++) step(0); // released→quiet
+    expect(seen.has('quiet')).toBe(true);
+    expect(seen.has('building')).toBe(true);
+    expect(seen.has('sustained')).toBe(true);
+    expect(seen.has('holding')).toBe(true);
+    expect(seen.has('released')).toBe(true);
+  });
+
+  it('a stale latch is visible: firing while nothing lands reads as damage 0', () => {
+    // The signature of the phantom the field report chased — sound with no cause.
+    const alarm = new UnderAttackAlarm();
+    fire(alarm, 3, WEAPON_DPS_CORE);
+    alarm.update(TICK_DT, 0); // a quiet tick mid-hold
+    expect(alarm.cause.firing).toBe(true);
+    expect(alarm.cause.reason).toBe('holding');
+    expect(alarm.cause.damage).toBe(0);
+  });
+
+  it('logs the cause on the ignition and the all-clear, and nowhere between', () => {
+    const alarm = new UnderAttackAlarm();
+    const log: AlarmCause[] = [];
+    alarm.onCause((c) => log.push(c));
+    fire(alarm, 3, WEAPON_DPS_CORE); // one rising edge
+    expect(log.length).toBe(1);
+    expect(log[0]!.firing).toBe(true);
+    expect(log[0]!.reason).toBe('sustained');
+    quiet(alarm, ALARM_HOLD_S + 1); // one falling edge
+    expect(log.length).toBe(2);
+    expect(log[1]!.firing).toBe(false);
+    expect(log[1]!.reason).toBe('released');
+  });
+
+  it('reset wipes the cause back to quiet', () => {
+    const alarm = new UnderAttackAlarm();
+    fire(alarm, 3, WEAPON_DPS_CORE);
+    alarm.reset();
+    expect(alarm.cause.firing).toBe(false);
+    expect(alarm.cause.reason).toBe('quiet');
+    expect(alarm.cause.damage).toBe(0);
+  });
+});
+
+describe('determinism — the one predicate replays identically', () => {
+  it('two alarms fed the same component sequence agree tick for tick', () => {
+    const a = new UnderAttackAlarm();
+    const b = new UnderAttackAlarm();
+    // A varied siege: shield, then turret, then core, with gaps.
+    const script: AlarmDamage[] = [];
+    for (let i = 0; i < 400; i++) {
+      const phase = i % 40;
+      if (phase < 10) script.push({ shield: 4 * TICK_DT });
+      else if (phase < 20) script.push({});
+      else if (phase < 30) script.push({ turret: 6 * TICK_DT, core: 1 * TICK_DT });
+      else script.push({ core: WEAPON_DPS_CORE * TICK_DT });
+    }
+    for (const d of script) {
+      const fa = a.update(TICK_DT, d);
+      const fb = b.update(TICK_DT, d);
+      expect(fa).toBe(fb);
+      expect(a.cause.reason).toBe(b.cause.reason);
+      expect(a.cause.source).toBe(b.cause.source);
+      expect(a.pressure).toBe(b.pressure);
+    }
+  });
+
+  it('a scalar total and an equivalent core-only split ring the same', () => {
+    const scalar = new UnderAttackAlarm();
+    const split = new UnderAttackAlarm();
+    for (let i = 0; i < Math.round(2.5 / TICK_DT); i++) {
+      const d = WEAPON_DPS_CORE * TICK_DT;
+      expect(scalar.update(TICK_DT, d)).toBe(split.update(TICK_DT, { core: d }));
+    }
+    expect(scalar.active).toBe(split.active);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The screen-edge arrow
 // ---------------------------------------------------------------------------
@@ -162,7 +333,7 @@ describe('dt-independence — the threshold means the same at any timestep', () 
 const VP = { width: 800, height: 600 };
 
 describe('the screen-edge arrow home (GDD §2.2)', () => {
-  it('hides itself when home is already on screen — the planet is the tell', () => {
+  it('hides itself when home is already on screen — the station is the tell', () => {
     const a = homeArrow({ x: 1000, y: 1000 }, { x: 1040, y: 1010 }, VP);
     expect(a.onScreen).toBe(true);
     // Drawn at home's actual screen position: centre plus the world offset.
@@ -211,7 +382,7 @@ describe('the screen-edge arrow home (GDD §2.2)', () => {
     expect(a.distance).toBeCloseTo(500);
   });
 
-  it('degrades safely when the ship is standing on its own planet', () => {
+  it('degrades safely when the ship is standing on its own station', () => {
     const a = homeArrow({ x: 500, y: 500 }, { x: 500, y: 500 }, VP);
     expect(a.onScreen).toBe(true);
     expect(a.distance).toBe(0);

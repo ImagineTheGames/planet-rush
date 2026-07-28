@@ -19,12 +19,13 @@
  */
 
 import type { Texture } from 'pixi.js';
-import { asteroidSprite, oreChunkSprite } from './asteroids';
+import { asteroidKindFor, asteroidSprite, oreChunkSprite, CRACK_STAGES } from './asteroids';
+import type { SpriteDef } from './shapes';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite, type TurretState } from './buildings';
-import { beaconRingSprite, damageRingSprite, planetSprite, planetVariantFor } from './planets';
+import { beaconRingSprite, damageRingSprite, stationSprite, stationVariantFor } from './stations';
 import { damageStateFor, shipSprite } from './ships';
 import type { SpriteTextureCache } from './textures';
-import { planetWreckSprite } from './wrecks';
+import { stationWreckSprite } from './wrecks';
 
 /** What the atlas needs to know about a ship. A `Ship` satisfies it. */
 export interface ShipLike {
@@ -46,8 +47,8 @@ export interface AsteroidLike {
   readonly maxOre: number;
 }
 
-/** What the atlas needs from a planet. A `Planet` satisfies it. */
-export interface PlanetLike {
+/** What the atlas needs from a station. A `MiningStation` satisfies it. */
+export interface StationLike {
   readonly id: number;
   readonly owner: number;
   readonly alive: boolean;
@@ -95,6 +96,37 @@ export function asteroidTexture(cache: SpriteTextureCache, rock: AsteroidLike, s
   );
 }
 
+/**
+ * A rock's look as a **cheap key plus a build thunk** — the seam a `Graphics`
+ * renderer uses to pool the ratified pool (docs/art-direction §5.5) without
+ * rebuilding geometry every frame.
+ *
+ * The `key` is derived from the pooling parameters *without* generating the
+ * sprite, so a renderer can compare it against the look already drawn into a
+ * pooled `Graphics` and only call `build()` when the rock's stage or payout band
+ * has actually moved. Two rocks that read the same (same seed fold, same crack
+ * stage, same richness band) share a key — and so a texture, per GDD §4.3.
+ */
+export interface AsteroidArt {
+  /** Cheap identity of the look — build only when this changes between frames. */
+  readonly key: string;
+  /** Generate the sprite for this look. Call only on a key change. */
+  build(): SpriteDef;
+}
+
+/** The pooled art for a rock: which of the six, at what crack stage and payout. */
+export function asteroidArt(rock: AsteroidLike): AsteroidArt {
+  // Same fold the texture path uses: a dozen silhouettes carry the whole field.
+  const seed = ((rock.id % 12) + 12) % 12;
+  const stage = Math.max(0, Math.min(CRACK_STAGES - 1, Math.trunc(rock.crackStage)));
+  const richness = richnessBand(rock.ore, rock.maxOre);
+  const kind = asteroidKindFor(seed);
+  return {
+    key: `${kind}:${seed}:${stage}:${Math.round(richness * 10)}`,
+    build: () => asteroidSprite({ seed, crackStage: stage, richness }),
+  };
+}
+
 /** A drifting ore chunk. Four shapes, chosen by id. */
 export function oreChunkTexture(cache: SpriteTextureCache, chunkId: number, size: number): Texture {
   const seed = chunkId % 4;
@@ -102,11 +134,11 @@ export function oreChunkTexture(cache: SpriteTextureCache, chunkId: number, size
 }
 
 /** The home world — or its wreck, once the core is gone (GDD §2.7). */
-export function planetTexture(cache: SpriteTextureCache, planet: PlanetLike, size: number): Texture {
-  const variant = planetVariantFor(planet.owner);
-  return planet.alive
-    ? cache.getBy(`planet:${variant}:${size}`, () => planetSprite(variant), size)
-    : cache.getBy(`wreck:${variant}:${size}`, () => planetWreckSprite(variant), size);
+export function stationTexture(cache: SpriteTextureCache, station: StationLike, size: number): Texture {
+  const variant = stationVariantFor(station.owner);
+  return station.alive
+    ? cache.getBy(`station:${variant}:${size}`, () => stationSprite(variant), size)
+    : cache.getBy(`wreck:${variant}:${size}`, () => stationWreckSprite(variant), size);
 }
 
 /** The ownership beacon, always visible (style-guide §5). */
@@ -116,14 +148,16 @@ export function beaconTexture(cache: SpriteTextureCache, owner: number, size: nu
 
 /**
  * The scouted damage ring. **Call this only when the viewer is inside sensor
- * range** — enemy planet HP is earned by scouting, never broadcast (GDD §2.2).
+ * range** — enemy station HP is earned by scouting, never broadcast (GDD §2.2).
  * The atlas cannot enforce that; it just refuses to make it convenient to draw
  * a ring nobody asked for.
  */
-export function damageRingTexture(cache: SpriteTextureCache, planet: PlanetLike, size: number): Texture {
-  const fraction = planet.maxCoreHp > 0 ? planet.coreHp / planet.maxCoreHp : 0;
+export function damageRingTexture(cache: SpriteTextureCache, station: StationLike, size: number): Texture {
+  const fraction = station.maxCoreHp > 0 ? station.coreHp / station.maxCoreHp : 0;
   const band = Math.round(Math.max(0, Math.min(1, fraction)) * 20) / 20;
-  return cache.getBy(`damage:${band}:${size}`, () => damageRingSprite(band), size);
+  // Owner is in the key now: the base ring wears the owner's colour (p11), so
+  // two owners at the same HP are two different textures.
+  return cache.getBy(`damage:${station.owner}:${band}:${size}`, () => damageRingSprite(station.owner, band), size);
 }
 
 /** A turret in one of its four telegraph states. */

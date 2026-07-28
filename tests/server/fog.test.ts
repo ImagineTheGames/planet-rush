@@ -2,7 +2,7 @@
  * tests/server/fog.test.ts — a rival's health is scouted, not broadcast, and
  * the server is where that is true. OWNER: Netcode Engineer (GDD §2.2, §4.2).
  *
- * "Enemy planet health is scouted, not broadcast … Knowing who is winning, who
+ * "Enemy station health is scouted, not broadcast … Knowing who is winning, who
  * is wounded, and who is under siege is information you *earn* by scouting"
  * (GDD §2.2). A HUD that merely declines to draw a number it was sent is not
  * fog — it is an honour system, and it survives exactly as long as the first
@@ -17,7 +17,7 @@ import type { EntityEventMessage, ServerMessage } from '../../src/net/transport'
 import { SENSOR_RANGE } from '../../src/sim';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
-import type { PlanetHealthData } from '../../src/net/entity-events';
+import type { StationHealthData } from '../../src/net/entity-events';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -26,15 +26,15 @@ class FakeSocket implements ServerSocket {
   }
   close(): void {}
 
-  /** Planet-health events this client has been told about, by planet id. */
-  healthUpdates(): PlanetHealthData[] {
-    const out: PlanetHealthData[] = [];
+  /** Station-health events this client has been told about, by station id. */
+  healthUpdates(): StationHealthData[] {
+    const out: StationHealthData[] = [];
     for (const frame of this.frames) {
       const message: ServerMessage | null = parseServerMessage(frame);
       if (!message || message.type !== 'entityEvent') continue;
       const event: EntityEventMessage = message;
-      if (event.kind !== 'planet' || event.op !== 'update') continue;
-      out.push(event.data as PlanetHealthData);
+      if (event.kind !== 'station' || event.op !== 'update') continue;
+      out.push(event.data as StationHealthData);
     }
     return out;
   }
@@ -44,7 +44,7 @@ class FakeSocket implements ServerSocket {
   }
 }
 
-describe('planet health on the wire', () => {
+describe('station health on the wire', () => {
   let server: MatchServer;
   let now = 500_000;
   let socket: FakeSocket;
@@ -69,9 +69,9 @@ describe('planet health on the wire', () => {
     advance(300);
   });
 
-  it('tells a player their own planet’s numbers, and nobody else’s', () => {
+  it('tells a player their own station’s numbers, and nobody else’s', () => {
     const seen = new Set(socket.healthUpdates().map((p) => p.id));
-    const own = client.room!.world!.planets.find((p) => p.owner === 0)!;
+    const own = client.room!.world!.stations.find((p) => p.owner === 0)!;
 
     expect(seen.has(own.id)).toBe(true);
     // Seven rivals, all of them across the map, none of them scouted.
@@ -81,7 +81,7 @@ describe('planet health on the wire', () => {
   it('starts telling them a rival’s numbers once they fly over and look', () => {
     const room = client.room!;
     const world = room.world!;
-    const target = world.planets.find((p) => p.owner === 4)!;
+    const target = world.stations.find((p) => p.owner === 4)!;
     expect(new Set(socket.healthUpdates().map((p) => p.id)).has(target.id)).toBe(false);
 
     // Fly the scout to the rival's doorstep — inside sensor range (GDD §2.2).
@@ -106,7 +106,7 @@ describe('planet health on the wire', () => {
   it('says nothing new to a client whose ship is not in the sky', () => {
     const world = client.room!.world!;
     const ship = world.ships.find((s) => s.id === 0)!;
-    const target = world.planets.find((p) => p.owner === 4)!;
+    const target = world.stations.find((p) => p.owner === 4)!;
     // Parked next to a rival, but dead: a wrecked cockpit scouts nothing.
     ship.pos = { x: target.pos.x, y: target.pos.y };
     ship.alive = false;
