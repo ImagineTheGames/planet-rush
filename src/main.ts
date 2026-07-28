@@ -85,7 +85,7 @@ import {
   rectContains,
 } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
-import { advanceToFreezeTick, hashWorld, FREEZE_TICK } from '@platform/freeze';
+import { advanceToFreezeTick, hashWorld, stampDefenseShowcase, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
@@ -1190,7 +1190,13 @@ async function boot(): Promise<void> {
   //     tick, then hold it there so screenshots are deterministic across boots
   //     (GDD §4.8). The world is plain seeded data + a pure `step`, so pinning
   //     the entry point pins the frame (src/platform/freeze.ts).
-  if (flags.freeze) advanceToFreezeTick(world, FREEZE_TICK);
+  if (flags.freeze) {
+    advanceToFreezeTick(world, FREEZE_TICK);
+    // Stage the defence showcase so the frozen golden reviews the structure art
+    // (a2-05): structures never appear in a natural 2-second opening, so without
+    // this the golden could never show a turret, scaffold or shield bubble.
+    stampDefenseShowcase(world, LOCAL_PLAYER);
+  }
   const frozenHash = flags.freeze ? hashWorld(world) : null;
 
   // --- Layout registry (?debug=1): every positioned visual element registers

@@ -116,10 +116,23 @@ function entries(): CatalogueEntry[] {
   }
 
   // --- Buildings ------------------------------------------------------------
-  for (const state of ['building', 'idle', 'tracking', 'firing'] as const) {
-    out.push({ group: 'Turrets — threat telegraph', label: state, def: turretSprite({ playerId: 0, state }) });
+  // The ratified turret pool (docs/art-direction §5.5), mapped onto the Mk ladder
+  // so the body and the shot-tier ramp tell one escalating story. Each silhouette
+  // shows its three live telegraph states; the scaffold and an enemy-colour read
+  // sit below (`building` is one look — a fresh build is always Mk I).
+  const TURRET_POOL = [
+    { sil: 'breech', title: 'T5 Breech Cannon · Mk I' },
+    { sil: 'twin', title: 'T7 Twin Cannon · Mk II' },
+    { sil: 'rail', title: 'T3b Rail Spike · Mk III' },
+    { sil: 'dome', title: 'T6 Dome Bunker · reserve' },
+  ] as const;
+  for (const t of TURRET_POOL) {
+    for (const state of ['idle', 'tracking', 'firing'] as const) {
+      out.push({ group: `Turrets — ${t.title}`, label: state, def: turretSprite({ playerId: 0, state, silhouette: t.sil }) });
+    }
   }
-  out.push({ group: 'Turrets — threat telegraph', label: 'tracking P5', def: turretSprite({ playerId: 4, state: 'tracking' }) });
+  out.push({ group: 'Turrets — build & identity', label: 'building scaffold', def: turretSprite({ playerId: 0, state: 'building' }) });
+  out.push({ group: 'Turrets — build & identity', label: 'Mk II · P5 tracking', def: turretSprite({ playerId: 4, state: 'tracking', tier: 1 }) });
   for (const strength of ['full', 'weakened', 'failing'] as const) {
     out.push({ group: 'Shields — pressure beats regeneration', label: strength, def: shieldSprite({ playerId: 0, strength }) });
   }
