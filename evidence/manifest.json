@@ -1168,5 +1168,35 @@
     "buildSha": "0d76842",
     "attestation": "Shipped preview bundle booted at ?debug=1&freeze=1 (real live game behind the panel: 'WAVE 1/5 · Outer Drift', the arena with asteroid clusters, the own-ship glow ring centre-right, the corner minimap dotted with the eight ships, the desktop controls strip). A REAL mouse click resumed the AudioContext — the panel header reads context 'running' and listener has=true at world (1968, 1200), so the mix genuinely has a camera-listener on the followed ship, not a suspended stub. The panel then prints ONE event probed through the shipped __audioStage.probe seam at a distance ladder along the horizon (dy=0), so pan is purely horizontal and distance = |dx|. What is VISIBLE in the table: HERE (dx 0) reads gain 1.000, pan 0.000, cutoff 20000 — own fire at full presence, dead-centre, unfiltered. To the RIGHT the pan is POSITIVE and grows (+0.144 at 130, +0.289 at 260, +0.500 at 450, saturating at +1.000 by 900); gain holds 1.000 inside R_NEAR (dx 130/260) then falls (0.833 at 450, 0.439 at 900) while the lowpass closes (cutoff 20000 → 16900 → 9558). At dx +1400 (R_FAR) and +6000 the gain is 0.000 and the row is marked CULLED (red) — the off-screen war is not synthesised at all. The LEFT block is the exact mirror: identical distances, identical gains, cutoff and CULLED flags, but every pan value carries the OPPOSITE sign (−0.144, −0.289, −0.500, −1.000) — the pan flips across the ship. This is the numeric proof that 'I can hear the whole map from one screen' is gone: full only at the camera, panned to the side an event is on, and silent (culled) past earshot. Numbers are pure geometry from the live listener via probe(); they play no sound. Zero page errors.",
     "verdict": "verified"
+  },
+  {
+    "id": "minimap-fog",
+    "title": "The minimap is fog-of-war — no satellite, the distant enemy is unseen (f1)",
+    "area": "match",
+    "image": "images/radar-1-minimap-fog.png",
+    "capturedAt": "2026-07-28T09:18:00Z",
+    "buildSha": "18d31de",
+    "attestation": "Shipped preview bundle (npm run build → vite preview :4173) booted at ?debug=1 on desktop 1280×800. A REAL mouse click on the collapsed corner square EXPANDED the minimap overlay (the p1a real-input rule); state read back through the shipped __minimapStage seam. VISIBLE in the expanded overlay: most of the rect is a dark Cold-Vacuum veil with a faint diagonal hatch — the unsensed vacuum. A single lit region sits on the right: two nested faint discs (the own ship's ~520u sensor + the own station's ~300u reach) washed lighter with a plasma rim, holding the highlighted blue own-ship dot and ONE nearby enemy dot (teal, inside the own sensor). Everywhere else the strategic map is unlit — no dots. coverageCount=2 (own ship + station only), satelliteCount=0, enemy dots shipCount=1, tick 74. The debug seam had parked an enemy contact at 675u from the station (> ship sensor 520, > station 300); with no live satellite that contact is NOT placed on the map. The world render at right plainly shows an enemy ship ('Rusty (EASY)') — the arena is not empty — yet the fogged minimap will not reveal a contact its own sensors cannot reach. This is fog-of-war: the map honestly shows only what your radar buys you. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "radar-coverage",
+    "title": "A radar satellite BUYS sight — a LARGE coverage disc reveals the hidden enemy (f1)",
+    "area": "match",
+    "image": "images/radar-2-radar-coverage.png",
+    "capturedAt": "2026-07-28T09:18:00Z",
+    "buildSha": "18d31de",
+    "attestation": "Same continuous booted session (?debug=1, expanded overlay), next state. A radar satellite was staged on the local station through the shipped __minimapStage.buildSatellite seam — the seam stages sim DATA only; the fog itself is computed by the real src/sim/sensing → feedMinimapFog → minimap-scene pipeline, so this frame proves the shipped wiring, not the seam. VISIBLE, in direct contrast to the minimap-fog frame: a LARGE lit coverage disc now fills most of the overlay (the satellite's 900u sensor reach), nested around the smaller own ship/station discs, its rim a faint plasma ring. Where the fog frame was dark, the map blooms — ore dots jump from 8 to 29 and multiple enemy dots now appear inside the disc, including the 675u contact that was previously hidden. Counts: coverageCount 2→3, enemy dots shipCount 1→3, satelliteCount 0→1 (the satellite itself draws as a dot on the map), tick 115. HONEST SCOPE: the in-world orbiting satellite BODY with its dish sweep is NOT yet wired into src/render (the art exists at src/art/satellite.ts; render wiring is a flagged cross-lane follow-up) — on the live client the satellite reads as a minimap dot + coverage disc, which is exactly what this frame shows. Zero page errors.",
+    "verdict": "verified"
+  },
+  {
+    "id": "satellite-killable",
+    "title": "Sight can be SHOT DOWN — kill the satellite, the coverage collapses, the dots vanish (f1)",
+    "area": "match",
+    "image": "images/radar-3-satellite-killable.png",
+    "capturedAt": "2026-07-28T09:18:00Z",
+    "buildSha": "18d31de",
+    "attestation": "Same continuous booted session, final state. The staged satellite was killed through __minimapStage.killSatellite (zeroes its HP; src/sim/sensing counts only a satellite with hp>0 as a sensor source). VISIBLE: the LARGE coverage disc is GONE — the overlay is dark vacuum again, back to only the own ship + station discs; the enemy dots the satellite had bought have VANISHED, leaving just the highlighted own-ship dot and the one near-enemy dot inside the surviving own sensors. Counts collapse: coverageCount 3→2, enemy dots shipCount 3→1, satelliteCount 1→0. CAPTIONED TICK NUMBERS: the satellite died at tick 152 and the drawn map showed the collapse by tick 164 — the sim drops the sensor source the same tick the satellite dies, and the minimap's own redraw is throttled to ~1/sec, which accounts for the small tick window between the kill and the drawn collapse. Sight was bought and then shot down; the strategic map went dark with it. Zero page errors.",
+    "verdict": "verified"
   }
 ]
