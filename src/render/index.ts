@@ -38,6 +38,7 @@ import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
 import { shotSprite, type ShotFamily } from '../art/vfx/shots';
 import { drawSprite, spriteGraphics } from '../art/textures';
+import { ARENA_WALL_BANDS, VoidBackdrop } from '../art/backdrop';
 
 // ---------------------------------------------------------------------------
 // Palette (frozen — style-guide.md §1 / §3.1). Hex as PixiJS numbers.
@@ -259,6 +260,12 @@ function withinSensorRange(viewer: { pos: Vec2 }, station: MiningStation): boole
 // ---------------------------------------------------------------------------
 
 export class Renderer {
+  /** The void (a2-06): a layered parallax star-field + nebula washes, drawn in
+   *  *screen* space behind the world so it scrolls at a fraction of the camera —
+   *  depth the fleet flies against. The look and the geometry live in the art
+   *  layer (`../art/backdrop`); the renderer only places it behind the world and
+   *  feeds it the camera offset it already computes. */
+  private readonly backdrop = new VoidBackdrop();
   /** World-space root; the camera moves this so the target ship stays centered. */
   private readonly worldRoot = new Container();
   /** The arena boundary — the wall the sim clamps every ship against
@@ -370,6 +377,9 @@ export class Renderer {
       this.shipLayer,
       this.shotLayer,
     );
+    // The void goes in first, so it sits behind the world container and every
+    // HUD layer the caller adds after us — it is the deepest thing on screen.
+    stage.addChild(this.backdrop.view);
     stage.addChild(this.worldRoot);
 
     this.asteroidPool = new GraphicsPool(this.asteroidLayer, makeUnitRock);
@@ -392,6 +402,9 @@ export class Renderer {
    *  in {@link draw}; nothing is created or destroyed, so it can flip any frame. */
   setReduceVfx(on: boolean): void {
     this.reduceVfx = on;
+    // The void sheds its nebula (translucent-disc overdraw) on the same signal;
+    // its stars, near-free once baked, stay. Rebuild happens lazily in draw.
+    this.backdrop.setReduceVfx(on);
   }
 
   /** The screen position (canvas-local CSS px) a world point draws at this frame,
@@ -407,6 +420,11 @@ export class Renderer {
   /** Draw one frame from read-only sim state. Allocation-free on the hot paths. */
   draw(world: World, view: RenderView): void {
     this.centerCamera(world, view.cameraTarget);
+    // The void, behind the world: sized once to cover the arena+viewport (a
+    // cheap no-op when neither changed), then scrolled by the camera offset
+    // centerCamera just wrote — parallax, allocation-free (GDD §4.3).
+    this.backdrop.configure(world.bounds.width, world.bounds.height, this.viewport.width, this.viewport.height);
+    this.backdrop.update(this.offsetScratch.x, this.offsetScratch.y, this.viewport.width, this.viewport.height);
     this.drawBoundary(world.bounds);
     this.drawStations(world, view.cameraTarget);
     this.drawAsteroids(world.asteroids);
@@ -451,17 +469,21 @@ export class Renderer {
     this.boundaryW = bounds.width;
     this.boundaryH = bounds.height;
 
-    // A double steel frame at the play edge: hull steel is structure, never a
-    // player colour (style-guide §3), and never signal yellow (reserved for ore
-    // / danger, §2). Dim, so it marks the limit without competing with the
-    // entities that move against it — the read is "the world ends here."
+    // The wall, integrated into the void (a2-06): a crisp double steel frame at
+    // the play edge, then a short falloff of ever-fainter steel bands stepping
+    // inward — a soft inner glow that ties the wall to the star-field behind it,
+    // so the edge reads as a lit structure the void presses against rather than a
+    // hairline rectangle floating on black. Hull steel is structure, never a
+    // player colour (style-guide §3) and never signal yellow (reserved, §2). The
+    // band recipe is the art layer's (`ARENA_WALL_BANDS`); the renderer places it.
     g.clear();
-    g.rect(0, 0, bounds.width, bounds.height).stroke({ width: 4, color: PALETTE.hullSteel, alpha: 0.5 });
-    g.rect(6, 6, bounds.width - 12, bounds.height - 12).stroke({
-      width: 1,
-      color: PALETTE.hullSteel,
-      alpha: 0.25,
-    });
+    for (const band of ARENA_WALL_BANDS) {
+      g.rect(band.inset, band.inset, bounds.width - band.inset * 2, bounds.height - band.inset * 2).stroke({
+        width: band.width,
+        color: PALETTE.hullSteel,
+        alpha: band.alpha,
+      });
+    }
   }
 
   /**
