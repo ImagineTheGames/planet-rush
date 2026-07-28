@@ -36,10 +36,14 @@ interface DrawnMinimap {
   stationCount: number;
   shipCount: number;
   oreCount: number;
+  satelliteCount: number;
+  coverageCount: number;
   collapseRing: boolean;
 }
 interface MinimapStage {
   state(): DrawnMinimap;
+  buildSatellite(): { satRange: number; enemyDist: number } | null;
+  killSatellite(): boolean;
 }
 interface StageWindow {
   __minimapStage?: MinimapStage;
@@ -132,6 +136,66 @@ test.describe('the minimap draws and toggles on the real booted client', () => {
     const dx = moved!.x - before.x;
     const dy = moved!.y - before.y;
     expect(Math.hypot(dx, dy), 'the own-ship dot moved as the ship thrust').toBeGreaterThan(2);
+
+    expect(pageErrors, `no page errors: ${pageErrors.join('\n')}`).toEqual([]);
+  });
+
+  test('the minimap is fog-of-war: a radar satellite reveals coverage, killing it collapses it', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+    // The map boots as fog-of-war (feature f1): coverage is the local player's own
+    // ship + station discs, so there is always at least one disc. We wait for that,
+    // then STAGE a satellite through the seam — the fog itself is computed by the
+    // real pipeline (`../sim/sensing` → `feedMinimap` → the pure scene), so the
+    // seam cannot fake the wiring it proves.
+    const before = await bootMinimap(page);
+    expect(before.coverageCount, 'fog is active — the local player already senses a slice').toBeGreaterThan(0);
+
+    // --- Build a satellite → a LARGE coverage disc appears + a distant enemy is
+    //     revealed under it (the enemy is parked in the satellite-only band) ------
+    const staged = await page.evaluate(() => window.__minimapStage!.buildSatellite());
+    expect(staged, 'a local station + an enemy were available to stage').not.toBeNull();
+    // The staged geometry is honest: the enemy sits inside the satellite's reach.
+    expect(staged!.enemyDist, 'enemy is within the satellite sensor range').toBeLessThan(staged!.satRange);
+
+    await page.waitForFunction(
+      (b) => {
+        const s = window.__minimapStage!.state();
+        return s.coverageCount > b.coverageCount && s.shipCount > b.shipCount;
+      },
+      before,
+      { timeout: 10_000 },
+    );
+    const withSat = await page.evaluate(() => window.__minimapStage!.state());
+    expect(withSat.coverageCount, 'the satellite adds a coverage disc').toBeGreaterThan(before.coverageCount);
+    expect(withSat.satelliteCount, 'the satellite itself draws as a dot').toBeGreaterThan(before.satelliteCount);
+    expect(withSat.shipCount, 'the distant enemy is revealed under the new coverage').toBeGreaterThan(
+      before.shipCount,
+    );
+
+    await page.screenshot({ path: 'tests/live-stage/minimap-fog-coverage-evidence.png' });
+
+    // --- Kill the satellite → its coverage collapses the same tick; the distant
+    //     enemy it revealed drops off the map (the satellite-killed moment) -------
+    const killed = await page.evaluate(() => window.__minimapStage!.killSatellite());
+    expect(killed, 'the staged satellite was there to kill').toBe(true);
+
+    await page.waitForFunction(
+      (w) => {
+        const s = window.__minimapStage!.state();
+        return s.coverageCount < w.coverageCount && s.shipCount < w.shipCount;
+      },
+      withSat,
+      { timeout: 10_000 },
+    );
+    const afterKill = await page.evaluate(() => window.__minimapStage!.state());
+    expect(afterKill.coverageCount, 'the satellite coverage disc is gone').toBeLessThan(withSat.coverageCount);
+    expect(afterKill.shipCount, 'the distant enemy vanished with its coverage').toBeLessThan(withSat.shipCount);
+
+    await page.screenshot({ path: 'tests/live-stage/minimap-fog-collapsed-evidence.png' });
 
     expect(pageErrors, `no page errors: ${pageErrors.join('\n')}`).toEqual([]);
   });
