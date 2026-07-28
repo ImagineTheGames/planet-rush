@@ -200,3 +200,107 @@ test.describe('the minimap draws and toggles on the real booted client', () => {
     expect(pageErrors, `no page errors: ${pageErrors.join('\n')}`).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The TOUCH profile — brief item 4, "Real input, both profiles". The fog wiring
+// is device-independent (feedMinimap does not branch on touch), but the toggle
+// GESTURE and the collapsed-corner geometry are: a phone gets a *really small*
+// corner left of the FIRE column, and the toggle is a tap, not a click. This block
+// overrides the project's desktop `use` with a landscape-phone touch context — the
+// spec owns which profiles ITS tests exercise, so the shared live-stage config
+// (Platform's lane) stays desktop — and drives the SAME build→reveal→kill cycle
+// with a REAL TAP toggle, proving the sensed-state reads on touch too and both
+// states fog identically on a phone.
+// ---------------------------------------------------------------------------
+test.describe('the minimap is fog-of-war on TOUCH too (real tap input, brief item 4)', () => {
+  test.use({
+    // A landscape handset (post landscape-lock, so no rotation prompt) — the wider
+    // of the two profiles the model pins the placement on (PHONE_WIDE).
+    viewport: { width: 844, height: 390 },
+    hasTouch: true,
+    isMobile: true,
+    deviceScaleFactor: 2,
+  });
+
+  test('a real tap toggles the fogged corner; a satellite reveals coverage, killing it collapses it', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+    const before = await bootMinimap(page);
+    expect(before.expanded, 'the touch minimap boots collapsed').toBe(false);
+    expect(before.coverageCount, 'fog is active on touch — the player already senses a slice').toBeGreaterThan(0);
+    // The touch corner is the *really small* glance object (the developer spec), so
+    // this is genuinely the phone geometry, not the desktop square.
+    expect(before.rect.width, 'the collapsed corner is the small touch square').toBeLessThan(120);
+
+    // --- Real TOUCH input: tap the collapsed corner → the overlay EXPANDS, and the
+    //     expanded overlay is STILL fog-of-war (both states fog identically) --------
+    const corner = CENTRE(before.rect);
+    await page.touchscreen.tap(corner.x, corner.y);
+    await page.waitForFunction(() => window.__minimapStage!.state().expanded === true, undefined, {
+      timeout: 10_000,
+    });
+    const expanded = await page.evaluate(() => window.__minimapStage!.state());
+    expect(expanded.expanded, 'a real tap on the corner expands the overlay').toBe(true);
+    expect(expanded.rect.width, 'the overlay is bigger than the touch corner').toBeGreaterThan(before.rect.width);
+    expect(expanded.coverageCount, 'the expanded overlay is fog-of-war too — coverage still reads').toBeGreaterThan(
+      0,
+    );
+    // Tap the overlay back to the corner so the reveal cycle plays on the collapsed
+    // glance map (the state a phone player actually lives in).
+    const overlayCentre = CENTRE(expanded.rect);
+    await page.touchscreen.tap(overlayCentre.x, overlayCentre.y);
+    await page.waitForFunction(() => window.__minimapStage!.state().expanded === false, undefined, {
+      timeout: 10_000,
+    });
+    const collapsed = await page.evaluate(() => window.__minimapStage!.state());
+
+    // --- Build a satellite → a coverage disc + a distant enemy appear on the touch
+    //     map, exactly as on desktop (the wiring is one code path) ------------------
+    const staged = await page.evaluate(() => window.__minimapStage!.buildSatellite());
+    expect(staged, 'a local station + an enemy were available to stage').not.toBeNull();
+    expect(staged!.enemyDist, 'enemy is within the satellite sensor range').toBeLessThan(staged!.satRange);
+
+    await page.waitForFunction(
+      (b) => {
+        const s = window.__minimapStage!.state();
+        return s.coverageCount > b.coverageCount && s.shipCount > b.shipCount;
+      },
+      collapsed,
+      { timeout: 10_000 },
+    );
+    const withSat = await page.evaluate(() => window.__minimapStage!.state());
+    expect(withSat.coverageCount, 'the satellite adds a coverage disc on touch').toBeGreaterThan(
+      collapsed.coverageCount,
+    );
+    expect(withSat.shipCount, 'the distant enemy is revealed under the new coverage').toBeGreaterThan(
+      collapsed.shipCount,
+    );
+
+    await page.screenshot({ path: 'tests/live-stage/minimap-fog-touch-coverage-evidence.png' });
+
+    // --- Kill the satellite → its coverage collapses; the distant enemy drops -----
+    const killed = await page.evaluate(() => window.__minimapStage!.killSatellite());
+    expect(killed, 'the staged satellite was there to kill').toBe(true);
+
+    await page.waitForFunction(
+      (w) => {
+        const s = window.__minimapStage!.state();
+        return s.coverageCount < w.coverageCount && s.shipCount < w.shipCount;
+      },
+      withSat,
+      { timeout: 10_000 },
+    );
+    const afterKill = await page.evaluate(() => window.__minimapStage!.state());
+    expect(afterKill.coverageCount, 'the satellite coverage disc is gone on touch').toBeLessThan(
+      withSat.coverageCount,
+    );
+    expect(afterKill.shipCount, 'the distant enemy vanished with its coverage').toBeLessThan(withSat.shipCount);
+
+    await page.screenshot({ path: 'tests/live-stage/minimap-fog-touch-collapsed-evidence.png' });
+
+    expect(pageErrors, `no page errors: ${pageErrors.join('\n')}`).toEqual([]);
+  });
+});

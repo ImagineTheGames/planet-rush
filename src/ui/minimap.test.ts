@@ -425,6 +425,55 @@ describe('minimapScene fog — sensed / remembered / fogged tri-state (feature f
     );
     expect(scene.collapseRing, 'the collapse ring is drawn regardless of coverage').not.toBeNull();
   });
+
+  it('both states fog IDENTICALLY — the same slice is revealed collapsed and expanded (brief item 2)', () => {
+    // A mixed scene: one covered station + one remembered-only + one never-seen; a
+    // covered enemy + a fogged enemy; a covered satellite + a fogged one; ore in and
+    // out of coverage. The fog decision is in MAP space (before the rect projection),
+    // so the SET that survives must not depend on which rect it is drawn into.
+    const scene = frame({
+      stations: [
+        { owner: 0, x: 100, y: 100, alive: true, id: 0 }, // covered
+        { owner: 1, x: 900, y: 900, alive: true, id: 1 }, // remembered only
+        { owner: 2, x: 500, y: 20, alive: true, id: 2 }, // never seen → fogged
+      ],
+      ships: [
+        ship({ owner: 1, x: 120, y: 120 }), // covered
+        ship({ owner: 2, x: 900, y: 900 }), // fogged
+        ship({ owner: 0, x: 500, y: 500, local: true }), // own — always
+      ],
+      satellites: [
+        { owner: 3, x: 110, y: 110, alive: true, local: false }, // covered enemy
+        { owner: 3, x: 950, y: 950, alive: true, local: false }, // fogged enemy
+      ],
+      oreHints: [
+        { x: 130, y: 130 }, // covered
+        { x: 950, y: 100 }, // fogged
+      ],
+      fog: fog([disc(100, 100, 200)], 1 << 1),
+    });
+    const collapsed = minimapScene(scene, minimapRect('collapsed', PHONE_WIDE, true));
+    const expanded = minimapScene(scene, minimapRect('expanded', PHONE_WIDE, true));
+
+    // The rects differ (the whole point of the two states)…
+    expect(collapsed.rect).not.toEqual(expanded.rect);
+    // …but the fog gate reveals the exact same slice in both.
+    expect(collapsed.fogged).toBe(true);
+    expect(expanded.fogged).toBe(true);
+    expect(collapsed.stationDots.length).toBe(expanded.stationDots.length);
+    expect(collapsed.shipDots.length).toBe(expanded.shipDots.length);
+    expect(collapsed.satelliteDots.length).toBe(expanded.satelliteDots.length);
+    expect(collapsed.oreDots.length).toBe(expanded.oreDots.length);
+    expect(collapsed.coverage.length).toBe(expanded.coverage.length);
+    expect(!!collapsed.ownDot).toBe(!!expanded.ownDot);
+    // And it is the right slice: covered + remembered station (not the never-seen);
+    // covered enemy (own is ownDot); covered satellite; covered ore.
+    expect(collapsed.stationDots).toHaveLength(2);
+    expect(collapsed.shipDots).toHaveLength(1);
+    expect(collapsed.ownDot).not.toBeNull();
+    expect(collapsed.satelliteDots).toHaveLength(1);
+    expect(collapsed.oreDots).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
