@@ -26,21 +26,24 @@ const VIEWPORT = { width: 1280, height: 720 };
 const center = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 describe('the model', () => {
-  it('shows the wordmark and exactly PLAY then SETTINGS', () => {
+  it('shows the wordmark and exactly PLAY, CODEX then SETTINGS', () => {
     const model = mainMenuModel();
     expect(model.title).toBe(MAIN_MENU_TITLE);
-    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'SETTINGS']);
+    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'CODEX', 'SETTINGS']);
   });
 
-  it('marks PLAY as the primary action and SETTINGS as secondary', () => {
-    const [play, settings] = mainMenuModel().buttons;
+  it('marks PLAY as the primary action and CODEX/SETTINGS as secondary', () => {
+    const [play, codex, settings] = mainMenuModel().buttons;
     expect(play?.primary).toBe(true);
+    // CODEX and SETTINGS are doors that come back — secondary, but fully active
+    // (never gray): the gray-means-disabled theme rule (GDD §2.10 point 4).
+    expect(codex?.primary).toBe(false);
     expect(settings?.primary).toBe(false);
   });
 
   it('keeps the item list, the model and the hit test in the same order', () => {
     // The three walk one list — a re-order can never mis-route a tap.
-    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'settings']);
+    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'codex', 'settings']);
   });
 });
 
@@ -102,6 +105,9 @@ describe('hit test', () => {
     const layout = mainMenuLayout(VIEWPORT);
     expect(mainMenuHitTest(layout, center(layout.buttons[0]!).x, center(layout.buttons[0]!).y)).toBe('play');
     expect(mainMenuHitTest(layout, center(layout.buttons[1]!).x, center(layout.buttons[1]!).y)).toBe(
+      'codex',
+    );
+    expect(mainMenuHitTest(layout, center(layout.buttons[2]!).x, center(layout.buttons[2]!).y)).toBe(
       'settings',
     );
   });

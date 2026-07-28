@@ -701,6 +701,77 @@ export type {
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
 
+// --- The CODEX — the optional main-menu reference (GDD §2.10) ---------------
+//
+// Four tabs (BOTS / SHIPS / SYSTEMS / STRATEGY) over the four `content/codex/
+// *.json` files: a scrollable entry rail and a detail pane (summary, body, the
+// machine-checked facts, difficulty/hull badges, cross-links), with a BACK
+// button. A door the player opens voluntarily, never a gate before play — it
+// builds no world. Same pure-model + Pixi-view pair as every screen here, but
+// the DATA is handed in rather than imported: `content/codex/` lives outside
+// `src/`, so whoever boots the client imports the JSON (Vite resolves it) and
+// hands over `normalizeCodex({ bots, ships, systems, strategy })`.
+//
+// **Wiring seam** (for `src/main.ts`, the menu owner):
+//
+//   import bots from '../content/codex/codex-bots.json';   // + ships/systems/strategy
+//   const codex = new CodexView(w, h, isTouch);
+//   ctx.root.addChild(codex);
+//   let state = createCodex(normalizeCodex({ bots, ships, systems, strategy }));
+//   // CODEX pressed on the menu → codex.visible = true; menuView.visible = false
+//   // per frame while shown:  codex.update(codexModel(state))
+//   // on tap:   const hit = codex.hitTest(x, y)
+//   //   'back'  → codex.visible = false; back to the menu
+//   //   'tab'   → state = selectCodexTab(state, CODEX_TABS[hit.index].id)
+//   //   'entry' → state = selectCodexEntry(state, hit.index)
+//   // on wheel/drag: codex.scrollRail(dy) over the rail, codex.scrollDetail(dy) over the pane
+export {
+  CODEX_TABS,
+  CODEX_TITLE,
+  CODEX_BACK_LABEL,
+  CODEX_ID,
+  CODEX_ENTRY_GAP,
+  CODEX_TITLE_HEIGHT,
+  CODEX_TAB_HEIGHT,
+  CODEX_TAB_HEIGHT_TOUCH,
+  CODEX_ENTRY_HEIGHT,
+  CODEX_ENTRY_HEIGHT_TOUCH,
+  activeEntries,
+  activeEntry,
+  activeEntryIndex,
+  codexHitTest,
+  codexLayout,
+  codexModel,
+  codexRailContentHeight,
+  createCodex,
+  formatFactValue,
+  normalizeCodex,
+  selectCodexEntry,
+  selectCodexTab,
+  codexBotHint,
+  codexShipHint,
+} from './codex';
+export type {
+  CodexCategory,
+  CodexData,
+  CodexDetailView,
+  CodexEntry,
+  CodexEntryView,
+  CodexFact,
+  CodexFactView,
+  CodexHint,
+  CodexLayout,
+  CodexModel,
+  CodexRaw,
+  CodexSection,
+  CodexState,
+  CodexTab,
+  CodexTabView,
+  CodexTarget,
+} from './codex';
+
+export { CodexView, CODEX_ANCHOR } from './codex-view';
+
 // --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
 //
 // Four cards on the PLAY flow, each a mini layout preview drawn from the

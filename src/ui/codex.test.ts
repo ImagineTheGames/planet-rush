@@ -1,0 +1,373 @@
+/**
+ * src/ui/codex.test.ts — the CODEX screen model, headless.
+ *
+ * The screen decides four things: which four tabs, which entries are in the live
+ * tab, which one's detail is shown, and where a tap lands. All four are pure
+ * functions of the parsed codex data and a viewport, so the whole screen is
+ * asserted here with no Pixi and no canvas. Two data sources: the REAL
+ * `content/codex/*.json` (so a regenerated file that broke the shape would fail
+ * here), and small synthetic fixtures for the deterministic layout/selection/
+ * hit-test cases. The *wiring* (the main menu opens this, BACK leaves) is the
+ * live-stage suite's job — the M2 lesson that a screen can be model-green and
+ * never reached.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import type { Rect } from '@platform/layout-registry';
+import {
+  CODEX_BACK_LABEL,
+  CODEX_ENTRY_HEIGHT,
+  CODEX_ENTRY_HEIGHT_TOUCH,
+  CODEX_TABS,
+  CODEX_TITLE,
+  activeEntries,
+  activeEntry,
+  activeEntryIndex,
+  codexBotHint,
+  codexShipHint,
+  codexHitTest,
+  codexLayout,
+  codexModel,
+  codexRailContentHeight,
+  createCodex,
+  formatFactValue,
+  normalizeCodex,
+  selectCodexEntry,
+  selectCodexTab,
+} from './codex';
+import type { CodexData, CodexLayout } from './codex';
+
+const VIEWPORT = { width: 1280, height: 720 };
+const center = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+
+// --- The real content, loaded the way the pipeline test loads it -----------
+const CODEX_DIR = fileURLToPath(new URL('../../content/codex/', import.meta.url));
+function loadReal(): CodexData {
+  const read = (name: string): unknown =>
+    JSON.parse(readFileSync(`${CODEX_DIR}codex-${name}.json`, 'utf8'));
+  return normalizeCodex({
+    bots: read('bots'),
+    ships: read('ships'),
+    systems: read('systems'),
+    strategy: read('strategy'),
+  });
+}
+const REAL = loadReal();
+
+// --- A tiny synthetic fixture for deterministic geometry -------------------
+function fixture(): CodexData {
+  const entry = (id: string, title: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    title,
+    summary: `${title} summary`,
+    body: `${title} body`,
+    ...extra,
+  });
+  return normalizeCodex({
+    bots: {
+      title: 'Bots',
+      entries: [
+        entry('b1', 'Alpha', { difficulty: 'Easy', hull: 'Hauler', see_also: ['b2'] }),
+        entry('b2', 'Beta', { difficulty: 'Hard', hull: 'Interceptor' }),
+      ],
+    },
+    ships: { title: 'Ships', entries: [entry('s1', 'Vanguard', { facts: [{ label: 'Hull HP', value: 120, unit: 'HP' }] })] },
+    systems: { title: 'Systems', entries: [entry('y1', 'Repair'), entry('y2', 'Ore'), entry('y3', 'Waves')] },
+    strategy: { title: 'Strategy', entries: [entry('t1', 'Triangle')] },
+  });
+}
+
+describe('normalize', () => {
+  it('parses all four real files into non-empty sections', () => {
+    for (const tab of CODEX_TABS) {
+      expect(REAL[tab.id].entries.length, `${tab.id} has entries`).toBeGreaterThan(0);
+      expect(REAL[tab.id].title, `${tab.id} has a file title`).not.toBe('');
+    }
+  });
+
+  it("keeps the bots' difficulty and hull, and the systems' machine-checked facts", () => {
+    // A bot carries its tier + hull; a systems entry carries at least one fact.
+    expect(REAL.bots.entries.some((e) => e.difficulty !== null && e.hull !== null)).toBe(true);
+    expect(REAL.systems.entries.some((e) => e.facts.length > 0)).toBe(true);
+    // Every real fact has a numeric value — the thing the screen renders.
+    for (const e of [...REAL.systems.entries, ...REAL.ships.entries]) {
+      for (const f of e.facts) expect(typeof f.value).toBe('number');
+    }
+  });
+
+  it('drops an entry missing id, title or body, and coerces the rest', () => {
+    const data = normalizeCodex({
+      bots: {
+        title: 'B',
+        entries: [
+          { id: 'ok', title: 'Ok', body: 'has a body' },
+          { id: 'no-body', title: 'No body' }, // dropped
+          { title: 'No id', body: 'x' }, // dropped
+          { id: 'no-title', body: 'x' }, // dropped
+          'not an object', // dropped
+        ],
+      },
+    });
+    expect(data.bots.entries.map((e) => e.id)).toEqual(['ok']);
+    // Absent optional fields normalise to safe empties, never undefined.
+    const only = data.bots.entries[0]!;
+    expect(only.summary).toBe('');
+    expect(only.facts).toEqual([]);
+    expect(only.seeAlso).toEqual([]);
+    expect(only.difficulty).toBeNull();
+    expect(only.hull).toBeNull();
+  });
+
+  it('yields an empty section for a missing or malformed file rather than throwing', () => {
+    const data = normalizeCodex({ bots: null, ships: 42, systems: undefined });
+    for (const tab of CODEX_TABS) {
+      expect(data[tab.id].entries).toEqual([]);
+      expect(data[tab.id].category).toBe(tab.id);
+    }
+  });
+
+  it('skips a fact with no numeric value', () => {
+    const data = normalizeCodex({
+      systems: { title: 'S', entries: [{ id: 'e', title: 'E', body: 'b', facts: [{ label: 'bad', value: 'nope' }, { label: 'ok', value: 5, unit: 's' }] }] },
+    });
+    expect(data.systems.entries[0]!.facts).toEqual([{ label: 'ok', value: 5, unit: 's' }]);
+  });
+});
+
+describe('selection', () => {
+  it('opens on BOTS with the first entry selected', () => {
+    const state = createCodex(fixture());
+    expect(state.activeTab).toBe('bots');
+    expect(state.selectedId).toBe('b1');
+    expect(activeEntry(state)?.title).toBe('Alpha');
+  });
+
+  it('switches tab and selects that tab\'s first entry', () => {
+    const state = selectCodexTab(createCodex(fixture()), 'systems');
+    expect(state.activeTab).toBe('systems');
+    expect(state.selectedId).toBe('y1');
+    expect(activeEntries(state)).toHaveLength(3);
+  });
+
+  it('is identity-stable when re-selecting the live tab or entry', () => {
+    const state = createCodex(fixture());
+    expect(selectCodexTab(state, 'bots')).toBe(state);
+    expect(selectCodexEntry(state, 0)).toBe(state);
+    // Out-of-range entry index is a no-op too.
+    expect(selectCodexEntry(state, 99)).toBe(state);
+  });
+
+  it('selects an entry by index within the active tab', () => {
+    const state = selectCodexEntry(createCodex(fixture()), 1);
+    expect(state.selectedId).toBe('b2');
+    expect(activeEntryIndex(state)).toBe(1);
+  });
+
+  it('carries no selection for an empty tab', () => {
+    const state = createCodex(normalizeCodex({ bots: { title: 'B', entries: [] } }), 'bots');
+    expect(state.selectedId).toBeNull();
+    expect(activeEntry(state)).toBeNull();
+  });
+});
+
+describe('the model', () => {
+  it('names the screen, the back control and the four tabs in order', () => {
+    const model = codexModel(createCodex(fixture()));
+    expect(model.title).toBe(CODEX_TITLE);
+    expect(model.backLabel).toBe(CODEX_BACK_LABEL);
+    expect(model.tabs.map((t) => t.label)).toEqual(['BOTS', 'SHIPS', 'SYSTEMS', 'STRATEGY']);
+    expect(model.tabs.map((t) => t.active)).toEqual([true, false, false, false]);
+  });
+
+  it('marks exactly the selected entry in the rail', () => {
+    const model = codexModel(selectCodexEntry(createCodex(fixture()), 1));
+    expect(model.entries.map((e) => e.title)).toEqual(['Alpha', 'Beta']);
+    expect(model.entries.map((e) => e.selected)).toEqual([false, true]);
+  });
+
+  it('shows difficulty then hull as badges on a bot, and none elsewhere', () => {
+    const bots = codexModel(createCodex(fixture()));
+    expect(bots.detail?.badges).toEqual(['Easy', 'Hauler']);
+    const systems = codexModel(selectCodexTab(createCodex(fixture()), 'systems'));
+    expect(systems.detail?.badges).toEqual([]);
+  });
+
+  it('renders facts with their unit', () => {
+    const ships = codexModel(selectCodexTab(createCodex(fixture()), 'ships'));
+    expect(ships.detail?.facts).toEqual([{ label: 'Hull HP', value: '120 HP' }]);
+  });
+
+  it('formats a unit-less fact as a bare number', () => {
+    expect(formatFactValue({ label: 'x', value: 8, unit: null })).toBe('8');
+    expect(formatFactValue({ label: 'x', value: 10, unit: 's' })).toBe('10 s');
+  });
+
+  it('carries the active file title', () => {
+    expect(codexModel(createCodex(fixture())).sectionTitle).toBe('Bots');
+  });
+
+  it('resolves see-also ids to titles and drops unknown ids', () => {
+    // b1's see_also is ['b2'] → "Beta".
+    expect(codexModel(createCodex(fixture())).detail?.seeAlso).toEqual(['Beta']);
+    const data = normalizeCodex({
+      bots: { title: 'B', entries: [{ id: 'a', title: 'A', body: 'x', see_also: ['ghost', 'a'] }] },
+    });
+    // 'ghost' names nothing and is dropped; 'a' resolves to itself.
+    expect(codexModel(createCodex(data)).detail?.seeAlso).toEqual(['A']);
+  });
+
+  it('has a null detail for an empty tab', () => {
+    const model = codexModel(createCodex(normalizeCodex({ bots: { title: 'B', entries: [] } }), 'bots'));
+    expect(model.detail).toBeNull();
+    expect(model.entries).toEqual([]);
+  });
+});
+
+describe('layout', () => {
+  const layoutFor = (vp = VIEWPORT, count = 3, opts = {}): CodexLayout => codexLayout(vp, count, opts);
+
+  it('keeps every chrome rect inside the viewport', () => {
+    const l = layoutFor();
+    for (const rect of [l.title, l.back, ...l.tabs, l.rail, l.detail]) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(VIEWPORT.width + 0.001);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(VIEWPORT.height + 0.001);
+    }
+  });
+
+  it('sits the rail left of the detail, both below the tabs', () => {
+    const l = layoutFor();
+    expect(l.rail.x + l.rail.width).toBeLessThanOrEqual(l.detail.x);
+    expect(l.rail.y).toBeGreaterThanOrEqual(l.tabs[0]!.y + l.tabs[0]!.height);
+    expect(l.detail.width).toBeGreaterThan(l.rail.width); // detail is the wider pane
+  });
+
+  it('lays out four tabs left-to-right with no overlap', () => {
+    const l = layoutFor();
+    expect(l.tabs).toHaveLength(4);
+    for (let i = 1; i < l.tabs.length; i++) {
+      expect(l.tabs[i]!.x).toBeGreaterThanOrEqual(l.tabs[i - 1]!.x + l.tabs[i - 1]!.width);
+    }
+  });
+
+  it('lays out one rail rect per entry, stacked', () => {
+    const l = layoutFor(VIEWPORT, 5);
+    expect(l.railEntries).toHaveLength(5);
+    for (let i = 1; i < l.railEntries.length; i++) {
+      expect(l.railEntries[i]!.y).toBeGreaterThan(l.railEntries[i - 1]!.y);
+    }
+  });
+
+  it('gives touch a taller tab and taller entries', () => {
+    const desktop = layoutFor(VIEWPORT, 3, { isTouch: false });
+    const touch = layoutFor(VIEWPORT, 3, { isTouch: true });
+    expect(desktop.entryHeight).toBe(CODEX_ENTRY_HEIGHT);
+    expect(touch.entryHeight).toBe(CODEX_ENTRY_HEIGHT_TOUCH);
+    expect(touch.tabs[0]!.height).toBeGreaterThan(desktop.tabs[0]!.height);
+  });
+
+  it('reports the rail content height so the view can clamp its scroll', () => {
+    const l = layoutFor(VIEWPORT, 14, { isTouch: true }); // SYSTEMS-sized
+    const h = codexRailContentHeight(l);
+    expect(h).toBe(14 * l.entryHeight + 13 * 6);
+    // Fourteen thumb-height rows overflow a short landscape rail — the case the
+    // view scrolls.
+    expect(h).toBeGreaterThan(l.rail.height);
+  });
+
+  it('never lets the rail take more than half the width on a narrow viewport', () => {
+    const l = codexLayout({ width: 360, height: 320 }, 3);
+    expect(l.rail.width).toBeLessThanOrEqual(l.content.width / 2 + 0.001);
+    expect(l.detail.width).toBeGreaterThanOrEqual(0);
+  });
+
+  it('yields non-backwards rects on a comically small viewport', () => {
+    const l = codexLayout({ width: 4, height: 4 }, 3);
+    for (const rect of [l.title, l.back, ...l.tabs, l.rail, l.detail, ...l.railEntries]) {
+      expect(rect.width).toBeGreaterThanOrEqual(0);
+      expect(rect.height).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('hit test', () => {
+  const l = codexLayout(VIEWPORT, 5);
+
+  it('lands BACK, then each tab, then each entry', () => {
+    expect(codexHitTest(l, center(l.back).x, center(l.back).y)).toEqual({ kind: 'back' });
+    l.tabs.forEach((rect, i) => {
+      expect(codexHitTest(l, center(rect).x, center(rect).y)).toEqual({ kind: 'tab', index: i });
+    });
+    l.railEntries.forEach((rect, i) => {
+      expect(codexHitTest(l, center(rect).x, center(rect).y)).toEqual({ kind: 'entry', index: i });
+    });
+  });
+
+  it('is null off every control', () => {
+    // The title heading is a label, not a control.
+    expect(codexHitTest(l, l.title.x + 4, center(l.title).y)).toBeNull();
+    expect(codexHitTest(l, -5, -5)).toBeNull();
+  });
+
+  it('shifts entry hits by the rail scroll', () => {
+    const stride = l.entryHeight + 6;
+    const topOfRail = { x: l.rail.x + 4, y: l.rail.y + l.entryHeight / 2 };
+    // Unscrolled, the top of the rail is entry 0.
+    expect(codexHitTest(l, topOfRail.x, topOfRail.y)).toEqual({ kind: 'entry', index: 0 });
+    // Scrolled down by one stride, entry 0 has left the top and entry 1 sits there.
+    expect(codexHitTest(l, topOfRail.x, topOfRail.y, stride)).toEqual({ kind: 'entry', index: 1 });
+    // A fixed lower screen point shows a later entry once content scrolls up.
+    const second = l.railEntries[1]!;
+    expect(codexHitTest(l, center(second).x, center(second).y, stride)).toEqual({ kind: 'entry', index: 2 });
+  });
+
+  it('drops an entry scrolled above the rail top (clipped, so untappable)', () => {
+    const stride = l.entryHeight + 6;
+    // With a full-stride scroll, entry 0's shifted rect is entirely above the
+    // rail, so nothing at a point above the rail top is hit.
+    expect(codexHitTest(l, l.rail.x + 4, l.rail.y - 2, stride)).toBeNull();
+  });
+
+  it('never hits an entry outside the rail clip even at scroll 0', () => {
+    // A y below the rail's bottom edge is off the list.
+    const belowRail = { x: l.rail.x + 4, y: l.rail.y + l.rail.height + 20 };
+    expect(codexHitTest(l, belowRail.x, belowRail.y)).toBeNull();
+  });
+});
+
+describe('lobby reuse (GDD §2.10 point 2)', () => {
+  it('resolves a bot dossier from the REAL data by personality id and by display name', () => {
+    // The lobby seat name IS the character name; the personality id is its
+    // lowercase. Both must land on the same real codex bot entry.
+    const byId = codexBotHint(REAL, 'rusty');
+    const byName = codexBotHint(REAL, 'Rusty');
+    expect(byId).not.toBeNull();
+    expect(byId).toEqual(byName);
+    expect(byId!.title.toLowerCase()).toContain('rusty');
+    expect(byId!.summary.length).toBeGreaterThan(0);
+    // A bot dossier carries its tier and hull as badges.
+    expect(byId!.badges.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('resolves every real bot personality to a dossier', () => {
+    for (const p of ['rusty', 'bolt', 'foreman', 'patch', 'sable', 'vulture', 'warden']) {
+      expect(codexBotHint(REAL, p), `${p} has a dossier`).not.toBeNull();
+    }
+  });
+
+  it('resolves a hull description from the REAL data by ship class', () => {
+    for (const cls of ['interceptor', 'vanguard', 'excavator', 'hauler']) {
+      const hint = codexShipHint(REAL, cls);
+      expect(hint, `${cls} has a hull description`).not.toBeNull();
+      expect(hint!.summary.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('returns null for an unknown bot or hull rather than throwing', () => {
+    expect(codexBotHint(REAL, 'nobody')).toBeNull();
+    expect(codexShipHint(REAL, 'dreadnought')).toBeNull();
+  });
+});
