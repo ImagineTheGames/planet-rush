@@ -1,0 +1,82 @@
+# fly.gameserver.toml — the authoritative match-server fleet. OWNER: Netcode
+# Engineer (docs/hosting-plan.md, Task 11; GDD §4.2).
+#
+# One region, one image: the plain Dockerized Node process from server/Dockerfile
+# (zero vendor-specific APIs — the portability contract, GDD §4.2 risk 1). Fly's
+# anycast edge terminates TLS and gives us `wss://` for free at the app hostname,
+# with no caddy/traefik and no certificate to distribute — the concrete thing
+# this host choice buys over the €4 VPS (docs/hosting-plan.md §1).
+#
+# Deploy / redeploy: see server/README.md → "Deploying to Fly.io". A redeploy of
+# a fleet holding live matches must cordon-and-drain first (POST /drain), never
+# hard-restart — that is what the `[deploy] strategy` and the drain route are for.
+#
+# TICKET_SECRET is NOT in this file. It is a secret, set once with
+#   fly secrets set --app planet-rush-gameserver TICKET_SECRET=<value>
+# and it MUST equal the allocator's ALLOCATOR_SECRET (allocator signs the ticket,
+# this server verifies it). Both apps fail closed, so a mismatch refuses every
+# join with no other symptom (docs/hosting-plan.md, Task 11).
+
+app = "planet-rush-gameserver"
+primary_region = "iad"
+
+[build]
+  # Build context is the repository root (the Dockerfile COPYs src/ and server/).
+  dockerfile = "server/Dockerfile"
+
+[env]
+  PORT = "8080"
+  # Where each Machine beats its rooms + load. Fly 6PN private DNS: `.internal`
+  # resolves to the allocator's Machine(s) on the port it listens on. Presence of
+  # this var is what makes a Machine a *fleet member* (server/index.ts) rather
+  # than a solo server — it joins the fleet and heartbeats.
+  ALLOCATOR_URL = "http://planet-rush-allocator.internal:8080"
+  # Identity (MACHINE_ID / REGION) is left unset on purpose: server/heartbeat.ts
+  # falls back to Fly's own FLY_MACHINE_ID / FLY_REGION, which Fly injects into
+  # every Machine at runtime. One less thing to keep in sync per Machine.
+
+[http_service]
+  internal_port = 8080
+  # wss:// at the edge: redirect any plain-http dial up to https/wss.
+  force_https = true
+
+  # This fleet's lifecycle belongs to the fleet controller (allocator/), which
+  # cordons and drains a Machine before removing it. Fly's autostop would evict a
+  # Machine mid-match, and two systems starting Machines is worse than either one
+  # (docs/hosting-plan.md, Task 11) — so BOTH are OFF.
+  auto_stop_machines = false
+  auto_start_machines = false
+
+  # Two always-on Machines, never one: a single region has no fallback anywhere,
+  # so one Machine would make the whole game a single point of failure. NOTE: with
+  # auto_stop_machines OFF this floor is advisory to Fly (it only clamps autostop),
+  # so the real always-on count is established by deploying two Machines —
+  #   fly scale count 2 --app planet-rush-gameserver
+  # min_machines_running records the intent and takes effect the day autostop is
+  # ever turned on. `fly deploy` may warn that it has no effect today; that is
+  # expected, not a misconfiguration.
+  min_machines_running = 2
+
+  # Fly's own liveness probe. /health is plain HTTP (never WebSocket) and returns
+  # 200 even while draining, so a cordoned Machine that is finishing its matches
+  # still reads healthy and is not culled out from under live players.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+
+# Guest size mirrors allocator/provider-fly.ts DEFAULT_GUEST: a shared-CPU core
+# with 512 MB is ample for one process holding ≤64 rooms (~2.6 ms CPU/s per
+# client, ~510 B snapshots — docs/netcode-spike.md).
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+# Live matches must survive a redeploy: roll Machines one at a time, and only
+# after the operator has drained them (server/README.md). Never restart the whole
+# fleet at once.
+[deploy]
+  strategy = "rolling"
