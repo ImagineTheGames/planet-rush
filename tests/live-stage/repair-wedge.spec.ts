@@ -1,12 +1,12 @@
 /**
- * tests/live-stage/repair-wedge.spec.ts — discrete REPAIR CORE, verified in the
+ * tests/live-stage/repair-wedge.spec.ts — discrete REPAIR REACTOR, verified in the
  * REAL booted client with REAL clicks. OWNER: UI Engineer (p5-07/p5-08, GDD §2.5).
  *
  * p5-07 ratified repair as a DISCRETE purchase (developer amendment, 2026-07-26):
  * one wheel press spends 1 ore and restores `REPAIR_HP_PER_ORE` (15) core HP,
  * clamped — no channel, no drain, no stacking. p5-08 (this deliverable) makes the
- * wedge state the deal before the tap: "REPAIR CORE / +15 HP / 1", the REAL
- * partial ("+7 HP") near full, and disabled-with-a-reason ("CORE FULL", "NO
+ * wedge state the deal before the tap: "REPAIR REACTOR / +15 HP / 1", the REAL
+ * partial ("+7 HP") near full, and disabled-with-a-reason ("REACTOR FULL", "NO
  * REPAIR", "NEED 1 ORE"). The pure model is unit-green (src/ui/build-wheel.test.ts);
  * what only a boot can prove is that the shipped bundle DRAWS that deal and routes
  * a genuine pointer press on the drawn wedge into one discrete order that moves the
@@ -196,7 +196,7 @@ test('near full, the wedge shows the REAL partial number, not a full tap', async
   expect(pageErrors).toEqual([]);
 });
 
-test('at full, the REPAIR wedge is disabled with a reason ("CORE FULL")', async ({ page }) => {
+test('at full, the REPAIR wedge is disabled with a reason ("REACTOR FULL")', async ({ page }) => {
   const pageErrors = await boot(page);
 
   // Open the wheel, then top the core back to full: the tap would be a no-op, so
@@ -215,7 +215,7 @@ test('at full, the REPAIR wedge is disabled with a reason ("CORE FULL")', async 
       { timeout: 20_000 },
     )
     .then((h) => h.jsonValue());
-  expect(wedge!.sub, 'a full core reads CORE FULL, the reason it is refused').toBe('CORE FULL');
+  expect(wedge!.sub, 'a full core reads REACTOR FULL, the reason it is refused').toBe('REACTOR FULL');
   expect(wedge!.ready, 'a full core makes the wedge unpressable').toBe(false);
   expect(pageErrors).toEqual([]);
 });

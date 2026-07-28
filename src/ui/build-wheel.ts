@@ -270,7 +270,7 @@ const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: Seg
   shield: { label: 'SHIELD', target: 'station' },
   // Named in full: "REPAIR CORE", never "REPAIR" — it repairs the station's core
   // and never the ship, and the label is the only place that is ever said.
-  repair: { label: 'REPAIR CORE', target: 'station' },
+  repair: { label: 'REPAIR REACTOR', target: 'station' },
   // The one segment that spends on the ship, and the one that opens a screen.
   upgrade: { label: 'UPGRADE SHIP', target: 'ship' },
 };
@@ -326,7 +326,7 @@ export function repairWedgeInfo(signals: BuildWheelSignals, ore = spendableOre(s
   // Collapse shuts repair off for the rest of the match (GDD §2.3).
   if (signals.collapsed === true) return { restoreHp: 0, line: 'NO REPAIR' };
   // A full core has nothing to heal — the tap would be a no-op (sim `core-full`).
-  if (signals.coreHp >= signals.maxCoreHp - 1e-9) return { restoreHp: 0, line: 'CORE FULL' };
+  if (signals.coreHp >= signals.maxCoreHp - 1e-9) return { restoreHp: 0, line: 'REACTOR FULL' };
   // Damaged but broke: name the price the tap needs (the empty-bank reason).
   if (!affordable(ore, REPAIR_ENTRY_ORE)) return { restoreHp, line: `NEED ${REPAIR_ENTRY_ORE} ORE` };
   // Ready: the REAL HP a tap buys right now — a full tap, or the partial that

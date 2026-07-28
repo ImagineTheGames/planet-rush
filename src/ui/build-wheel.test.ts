@@ -62,8 +62,8 @@ describe('the wheel itself (GDD §2.5 — four segments, words + target)', () =>
     const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
     expect(byId.get('turret')?.label).toBe('TURRET');
     expect(byId.get('shield')?.label).toBe('SHIELD');
-    // Named in full — it repairs the station's core, never the ship (GDD §2.5).
-    expect(byId.get('repair')?.label).toBe('REPAIR CORE');
+    // Named in full — it repairs the station's reactor, never the ship (GDD §2.5).
+    expect(byId.get('repair')?.label).toBe('REPAIR REACTOR');
     expect(byId.get('upgrade')?.label).toBe('UPGRADE SHIP');
 
     // "Three spend on your station, one on your ship" (GDD §2.5).
@@ -88,8 +88,8 @@ describe('costs — the only number on a segment (GDD §2.5)', () => {
     expect(SHIELD.cost).toBe(5);
   });
 
-  it('prints a bare 1 under REPAIR CORE, and never the ore-per-HP rate', () => {
-    // GDD §2.5 spells this out verbatim: "a bare '1' under REPAIR CORE".
+  it('prints a bare 1 under REPAIR REACTOR, and never the ore-per-HP rate', () => {
+    // GDD §2.5 spells this out verbatim: "a bare '1' under REPAIR REACTOR".
     expect(segmentCost('repair')).toBe(1);
     expect(REPAIR_ENTRY_ORE).toBe(1);
   });
@@ -111,7 +111,7 @@ describe('costs — the only number on a segment (GDD §2.5)', () => {
   });
 });
 
-describe('REPAIR CORE names its effect — the informed tap (p5-08)', () => {
+describe('REPAIR REACTOR names its effect — the informed tap (p5-08)', () => {
   it('shows a full tap\'s HP on a comfortably-damaged core', () => {
     // Missing more than a full tap: the wedge shows the whole tap, "+15 HP".
     const info = repairWedgeInfo(sig({ banked: 9, coreHp: 40, maxCoreHp: 100 }));
@@ -127,9 +127,9 @@ describe('REPAIR CORE names its effect — the informed tap (p5-08)', () => {
     expect(info.restoreHp).toBe(7);
   });
 
-  it('reads CORE FULL on a full core, whatever the ore', () => {
+  it('reads REACTOR FULL on a full core, whatever the ore', () => {
     const info = repairWedgeInfo(sig({ banked: 99, coreHp: 100, maxCoreHp: 100 }));
-    expect(info.line).toBe('CORE FULL');
+    expect(info.line).toBe('REACTOR FULL');
     expect(info.restoreHp).toBe(0);
   });
 
@@ -217,7 +217,7 @@ describe('per-station caps (GDD §2.5 — 4 turrets, 2 shields)', () => {
 });
 
 describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)', () => {
-  it('marks REPAIR CORE inactive on a full core, whatever the ore', () => {
+  it('marks REPAIR REACTOR inactive on a full core, whatever the ore', () => {
     expect(stateOf('repair', { banked: 99, coreHp: 100, maxCoreHp: 100 })).toBe('inactive');
     expect(stateOf('repair', { banked: 99, coreHp: 60, maxCoreHp: 100 })).toBe('ready');
   });
@@ -227,7 +227,7 @@ describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)'
     expect(stateOf('repair', { cargo: 1, banked: 0, coreHp: 10 })).toBe('ready');
   });
 
-  it('kills REPAIR CORE once collapse begins (GDD §2.3 — "repair shuts off")', () => {
+  it('kills REPAIR REACTOR once collapse begins (GDD §2.3 — "repair shuts off")', () => {
     // A wounded core and plenty of ore: everything about the press is right
     // except that the match has entered collapse, where `placeOrder` answers
     // `collapsed`. Offering it anyway would be the wheel lying.
