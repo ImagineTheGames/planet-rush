@@ -30,7 +30,7 @@ export const WAVE_NAMES: readonly string[] = [
   'Far Belt',
   'Mid Field',
   'Inner Ring',
-  'Core Fall',
+  'Claim Fall',
 ];
 
 /** A snapshot of the wave clock for one frame. */

@@ -206,7 +206,8 @@ describe('the room tells the server what it chose', () => {
   });
 
   it('sends the host’s difficulties in EMPTY-SEAT order, and only from the host', () => {
-    const host = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 3 });
+    // In FFA the row's trailing chip cycles a bot's difficulty (variable-slots E).
+    const host = flowTapLobby(inLobby(0, 0), { kind: 'seatChip', index: 3 });
     const message = sent(host)[0] as { botDifficulties?: readonly string[] };
     expect(message.botDifficulties).toHaveLength(7); // seven empty seats of eight
 
@@ -217,7 +218,7 @@ describe('the room tells the server what it chose', () => {
   });
 
   it('costs the wire NOTHING for a refused tap', () => {
-    // A guest cycling a difficulty, and a guest pressing RUSH!: both no-ops in
+    // A guest cycling a seat, and a guest pressing RUSH!: both no-ops in
     // ./lobby, and a no-op there must not become a message here.
     const guest = inLobby(4, 0);
     const cycled = flowTapLobby(guest, { kind: 'seat', index: 2 });
@@ -234,6 +235,39 @@ describe('the room tells the server what it chose', () => {
     const tapped = flowTapLobby(state, { kind: 'roomCode' });
     expect(tapped.state).toBe(state);
     expect(tapped.effects).toEqual([]);
+  });
+
+  it('routes the variable-match controls (mode, abundance, seat state, team)', () => {
+    // MODE toggle: FFA ⇄ TEAMS.
+    const teams = flowTapLobby(inLobby(0, 0), { kind: 'mode' });
+    expect(teams.state.lobby?.mode).toBe('teams');
+    expect(flowTapLobby(teams.state, { kind: 'mode' }).state.lobby?.mode).toBe('ffa');
+
+    // ABUNDANCE toggle: SCARCE → STANDARD.
+    const richer = flowTapLobby(inLobby(0, 0), { kind: 'abundance' });
+    expect(richer.state.lobby?.abundance).toBe('standard');
+
+    // Seat state: the row body cycles OPEN → BOT.
+    const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
+    expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
+
+    // The chip in TEAMS assigns a side rather than a difficulty.
+    const assigned = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
+    expect(assigned.state.lobby?.seats[2]?.team).not.toBe(teams.state.lobby?.seats[2]?.team);
+  });
+
+  it('refuses every variable-match control from a guest', () => {
+    const guest = inLobby(4, 0);
+    for (const target of [
+      { kind: 'mode' } as const,
+      { kind: 'abundance' } as const,
+      { kind: 'seat', index: 2 } as const,
+      { kind: 'seatChip', index: 2 } as const,
+    ]) {
+      const tapped = flowTapLobby(guest, target);
+      expect(tapped.state, `${target.kind} from a guest`).toBe(guest);
+      expect(tapped.effects).toEqual([]);
+    }
   });
 
   it('does not answer a lobbyState broadcast — an echo that replied would loop', () => {

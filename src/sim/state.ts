@@ -406,6 +406,17 @@ export interface MiningStation {
    *  treated as `0` when absent, so hand-built `MiningStation` fixtures need not set it;
    *  `createWorld` seeds it to `0`. Never gates a human's `placeOrder`. */
   repairCooldown?: number;
+  /** Seconds left on the repair COOLDOWN before this station will accept another
+   *  repair order (RATIFIED developer, 2026-07-28). Unlike `repairCooldown` above
+   *  — the tell-hold that never blocks a press — this one DOES gate `placeOrder`:
+   *  while it is `> 0`, a repair press is refused `'cooling-down'`, spending
+   *  nothing. Armed to `REPAIR_COOLDOWN_SECONDS` on a successful repair and
+   *  ticked down every tick in `updateStations` (independent of docking, damage,
+   *  or the tell, so it is a pure time lockout). Per STATION, so one cooling core
+   *  never blocks another. Optional and treated as `0` when absent, so hand-built
+   *  `MiningStation` fixtures need not set it; `createWorld` seeds it to `0`. The
+   *  Build wheel reads it for the live "REPAIR in Ns" countdown. */
+  repairGate?: number;
   turrets: Turret[];
   shields: Shield[];
   /**
@@ -530,8 +541,22 @@ export interface MatchState {
    */
   eliminated: PlayerId[];
   /** The winning slot once `phase === 'ended'`; null until then, and null in the
-   *  degenerate case where a match had nobody to win it. */
+   *  degenerate case where a match had nobody to win it. In TEAMS this is a
+   *  *representative* survivor of the winning team (a real `PlayerId`), so every
+   *  existing consumer that reads `winner === you` keeps working for the slot
+   *  that actually held a core; {@link winningTeam} is the team-level answer. */
   winner: PlayerId | null;
+  /**
+   * The winning **team** once `phase === 'ended'` — the team that owns the last
+   * surviving core(s) (Task D1, TEAMS). In FFA (teams-of-one) it equals `winner`.
+   * Null until the match ends, and null in the degenerate no-winner case.
+   *
+   * Optional, the same backward-compatible discipline as `Ship.team`/`derelict`:
+   * the many hand-built `MatchState` literals other lanes construct (art/vfx, ui,
+   * net/bot fixtures) keep compiling, and a foreign match with no `winningTeam`
+   * reads as "unset". Static result data — never on the per-tick snapshot.
+   */
+  winningTeam?: number | null;
   /** Sim time the match ended, or -1 while it runs. */
   endTime: number;
 }
@@ -713,6 +738,7 @@ function makeStation(spec: PlayerSpec, index: number, pos: Vec2, angle: number):
     sinceDamage: SHIELD.regenDelay,
     repairing: false,
     repairCooldown: 0,
+    repairGate: 0,
     turrets: [],
     shields: [],
     satellites: [],
@@ -748,6 +774,7 @@ function makeDerelictStation(index: number, pos: Vec2, angle: number): MiningSta
     sinceDamage: SHIELD.regenDelay,
     repairing: false,
     repairCooldown: 0,
+    repairGate: 0,
     turrets: [],
     shields: [],
     satellites: [],
@@ -770,6 +797,7 @@ function initialMatch(): MatchState {
     collapseTime: -1,
     eliminated: [],
     winner: null,
+    winningTeam: null,
     endTime: -1,
   };
 }

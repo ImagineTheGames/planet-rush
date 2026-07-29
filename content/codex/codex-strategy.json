@@ -1,0 +1,68 @@
+{
+  "codex": "strategy",
+  "title": "Strategy — how to actually win",
+  "gddVersion": "0.7",
+  "generated": { "against": "GDD.md v0.7", "critic_loops": 3, "tone_pinned": true },
+  "entries": [
+    {
+      "id": "strat-triangle",
+      "title": "Read the triangle every few seconds",
+      "category": "strategy",
+      "summary": "The winning skill is knowing which corner to be in right now — and leaving before it's wrong.",
+      "body": "Mine, defend, attack: you can only stand in one corner, and the whole skill is choosing which, then re-choosing as the board moves. Mine when the field is fresh and nobody's hunting you. Rush home the instant your alarm fires or your hold gets fat. Attack when a rival is seen far from an undefended home. The players who lose aren't bad pilots — they're in the wrong corner: mining while their core burns, or besieging a turret ring while their own field gets stripped. Every death, upgrade, and turret shifts where you should be. Keep asking the question.",
+      "tags": ["triangle", "fundamentals", "decision"],
+      "see_also": ["sys-core-loop", "strat-clock"],
+      "facts": []
+    },
+    {
+      "id": "strat-siege",
+      "title": "Attacking a home alone is usually a mistake",
+      "category": "strategy",
+      "summary": "Pull the owner off, wait for the unanswered alarm, or bring a second gun.",
+      "body": "A defended station is nearly uncrackable one-on-one: turrets fighting alongside the owner's ship focus fire and kill attackers fast, and the owner can patch the core between your shots. So don't attack an occupied home head-on. Pull the owner away — threaten their miners, their field, their satellite — and strike the home when the alarm goes unanswered. Or bring a second attacker: because sustained pressure keeps shields suppressed past their eight-second heal delay, two guns crack what one cannot, which is exactly where the eight-player game's unspoken alliances come from. Pick off turrets from the edge of their range first — the ship always out-ranges them — but know that every second you spend on a turtle is a second the clock spends on you.",
+      "tags": ["siege", "attack", "two-beats-one"],
+      "see_also": ["sys-turrets", "sys-shields", "strat-turtle-trap"],
+      "facts": []
+    },
+    {
+      "id": "strat-turtle-trap",
+      "title": "The turtle trap: regeneration doesn't beat a finite field",
+      "category": "strategy",
+      "summary": "Ore spent staying alive is ore not spent winning — and the field runs dry.",
+      "body": "Turtling feels safe: a fortress ring, two shields, and a core you patch every time it dips. But every turret, shield, and repair tap comes out of a finite ore pool, and the repair reactor's cooldown means you can't simply out-heal a determined attacker anyway. A defender pinned under fire is spending ore to stand still while a miner is spending time to get ahead. When the field runs dry and the Crush begins, nothing regenerates, and the stockpile you burned on staying alive is gone. Defense buys you time; only offense and mining buy you a win. Turtle to survive a bad moment, not as a plan.",
+      "tags": ["economy", "turtle", "defense", "finite"],
+      "see_also": ["sys-ore-economy", "sys-repair-reactor", "sys-waves-collapse"],
+      "facts": []
+    },
+    {
+      "id": "strat-scouting",
+      "title": "Scout — because health is fog",
+      "category": "strategy",
+      "summary": "You only see a rival's HP up close; earning that sight is an edge, not a chore.",
+      "body": "There's no scoreboard of who's hurt — a rival core's damage ring only shows when your ship is within sensor range, so knowing who's wounded, who's leading, and who's under siege is intelligence you earn. Use it: a station already burning from someone else's attack is the cheap kill; a rival hauling a full hold far from home is the free spill. A radar satellite widens your minimap read for six ore, and shooting down a rival's satellite blinds them for the cost of a detour. Read the smoke, too — a burning station carries further than its numbers. And remember the fog cuts both ways: the Hard bots scout you exactly as you scout them.",
+      "tags": ["scouting", "fog-of-war", "radar", "intel"],
+      "see_also": ["sys-fog-radar", "bots-sable", "strat-triangle"],
+      "facts": []
+    },
+    {
+      "id": "strat-wrecks",
+      "title": "Fight over the wreck, not just the kill",
+      "category": "strategy",
+      "summary": "A dead station's fortune stays on the map — contested, and small holds keep it that way.",
+      "body": "When a station dies its wreck stays all match, ringed by the dead player's banked fortune as scavengeable debris — and because holds are small, nobody clears it in one trip, so a fresh wreck is a fight, not a payday. If you made the kill, guard the wreck or a Vulture takes your winnings. If someone else made it, the wreck is anyone's — arrive with a big hold (this is the Hauler's hour) and be ready to shoot. On the compass and diamond maps at small counts, the seeded derelicts are free wrecks from the opening whistle: unowned, siege-proof, pure loot. The map is telling you where the fights will be; get there first.",
+      "tags": ["wrecks", "loot", "scavenge", "derelict"],
+      "see_also": ["sys-death-debris", "bots-vulture", "ship-hauler"],
+      "facts": []
+    },
+    {
+      "id": "strat-clock",
+      "title": "Manage the clock — the endgame belongs to whoever did",
+      "category": "strategy",
+      "summary": "Five surges, then the Crush closes in; bank ahead of collapse and you finish standing.",
+      "body": "The match is a clock with a guaranteed ending. Five ore surges arrive on a metronome, each closer to center, herding everyone into a tighter space — so late-game fights are unavoidable and position matters more as the walls come in. When the last surge is spent the Crush begins: no regen, no repair, no new ore, and the contracting claim kills whoever the players didn't. The endgame belongs to whoever banked ahead of the drought and didn't sink their fortune into a fortress that can't regenerate. Read the wave clock like a fuel gauge: spend freely while ore still comes, and don't be caught mid-siege, out of ore, when the claim starts closing.",
+      "tags": ["clock", "collapse", "endgame", "the-crush"],
+      "see_also": ["sys-waves-collapse", "strat-turtle-trap", "sys-ore-economy"],
+      "facts": []
+    }
+  ]
+}

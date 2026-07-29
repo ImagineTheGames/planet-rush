@@ -31,6 +31,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY content ./content
 COPY server ./server
 
 # Typecheck before bundling: a server that does not compile must not build.

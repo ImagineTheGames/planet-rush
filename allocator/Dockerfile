@@ -35,6 +35,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY content ./content
 COPY allocator ./allocator
 
 # Typecheck before bundling: an allocator that does not compile must not build.

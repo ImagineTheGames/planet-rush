@@ -24,6 +24,7 @@ import type { SpriteDef } from './shapes';
 import { buildProgressSprite, shieldSprite, shieldStrength, turretSprite, type TurretState } from './buildings';
 import { beaconRingSprite, damageRingSprite, stationSprite, stationVariantFor } from './stations';
 import { damageStateFor, shipSprite } from './ships';
+import { satelliteSprite, satelliteWreckSprite, type SatelliteState } from './satellite';
 import type { SpriteTextureCache } from './textures';
 import { stationWreckSprite } from './wrecks';
 
@@ -168,6 +169,35 @@ export function turretTexture(
   size: number,
 ): Texture {
   return cache.getBy(`turret:${owner}:${state}:${size}`, () => turretSprite({ playerId: owner, state }), size);
+}
+
+/**
+ * A radar satellite in one of its sensor states (`idle`/`sweeping`/`pinging`), or
+ * its scaffold while building. Pooled on owner × state, exactly like the turret —
+ * a station's eye shares one texture per state, and the sweep animates by the
+ * renderer rotating the pooled quad, never by rebuilding geometry (GDD §4.3).
+ */
+export function satelliteTexture(
+  cache: SpriteTextureCache,
+  owner: number,
+  state: SatelliteState,
+  size: number,
+): Texture {
+  return cache.getBy(
+    `satellite:${owner}:${state}:${size}`,
+    () => satelliteSprite({ playerId: owner, state }),
+    size,
+  );
+}
+
+/** The cold remnant of a destroyed satellite (GDD §2.7 wreck language). */
+export function satelliteWreckTexture(
+  cache: SpriteTextureCache,
+  seed: number,
+  size: number,
+): Texture {
+  const s = ((seed % 4) + 4) % 4;
+  return cache.getBy(`satellite-wreck:${s}:${size}`, () => satelliteWreckSprite(s), size);
 }
 
 /** A shield bubble, banded by remaining strength so pressure reads. */

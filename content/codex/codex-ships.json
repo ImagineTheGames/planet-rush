@@ -1,0 +1,74 @@
+{
+  "codex": "ships",
+  "title": "Ships — the four hulls",
+  "gddVersion": "0.7",
+  "generated": { "against": "GDD.md v0.7", "critic_loops": 3, "tone_pinned": true },
+  "entries": [
+    {
+      "id": "ship-overview",
+      "title": "Four hulls, no others",
+      "category": "ships",
+      "summary": "A rock-paper-scissors around the triangle — your hull is locked for the match.",
+      "body": "You pick a hull in the lobby and it's locked for the match, setting all five core stats: top speed, acceleration, turn rate, armor, and weapon power (which is also mining speed — one weapon, one stat). Four ships and no others, each built to be best at one corner of the triangle and to lose to the ship that owns another. The Interceptor catches miners in the open but melts against turrets. The Excavator out-earns everyone but can't run. The Hauler hauls a bigger hold and tanks a siege but arrives late. The Vanguard does everything second-best and is the pre-selected default, so onboarding never blocks on the choice. Because upgrades multiply your class base, a maxed hull keeps its identity — the fast one stays fastest, the tough one stays toughest. Since each bot personality flies a fixed hull, a silhouette on the minimap is information.",
+      "tags": ["ships", "classes", "overview"],
+      "see_also": ["ship-interceptor", "ship-vanguard", "ship-excavator", "ship-hauler"],
+      "facts": []
+    },
+    {
+      "id": "ship-interceptor",
+      "title": "Interceptor (Quadfin)",
+      "category": "ships",
+      "summary": "The scout and miner-hunter — fastest and nimblest, thinnest hull.",
+      "body": "The Quadfin is a toy dart: 130% speed, 120% acceleration, 140% turn rate off the Vanguard baseline, and the thinnest hull on the roster. It is the scout and the miner-hunter — it catches a fat-holded rival far from home and turns them into a fresh spill of ore, and it lights the fog by simply getting somewhere first. What it cannot do is trade blows with a defended station: its weak hull melts under a turret ring, so an Interceptor pilot lives on picking targets who can't shoot back. Bolt (Easy) and Sable (Hard) both fly one — reckless and calculating versions of the same knife.",
+      "tags": ["interceptor", "quadfin", "scout"],
+      "see_also": ["ship-overview", "bots-bolt", "bots-sable"],
+      "facts": [
+        { "label": "Hull HP", "value": 35, "unit": "HP", "constant": "SHIP_STATS.interceptor.hull" },
+        { "label": "Weapon power (also mining speed)", "value": 8, "unit": "power", "constant": "SHIP_STATS.interceptor.power" },
+        { "label": "Cargo hold", "value": 2, "unit": "slots", "constant": "SHIP_STATS.interceptor.cargo" }
+      ]
+    },
+    {
+      "id": "ship-vanguard",
+      "title": "Vanguard (Anvil)",
+      "category": "ships",
+      "summary": "The all-rounder and onboarding default — everything second-best.",
+      "body": "The Anvil is the baseline every other hull is measured against: 100% across speed, acceleration, and turn, a middling hull, and the roster's reference weapon power. It does everything second-best and nothing worst, which is exactly why it's the pre-selected default — a first-time player is never punished by the lobby's opening choice, and can learn the triangle before learning the trade-offs. A maxed Anvil is a genuinely dangerous generalist. Vulture (Hard), the wreck scavenger, flies one, trusting positioning over any single edge.",
+      "tags": ["vanguard", "anvil", "all-rounder", "default"],
+      "see_also": ["ship-overview", "bots-vulture"],
+      "facts": [
+        { "label": "Hull HP", "value": 50, "unit": "HP", "constant": "SHIP_STATS.vanguard.hull" },
+        { "label": "Weapon power (also mining speed)", "value": 10, "unit": "power", "constant": "SHIP_STATS.vanguard.power" },
+        { "label": "Cargo hold", "value": 2, "unit": "slots", "constant": "SHIP_STATS.vanguard.cargo" }
+      ]
+    },
+    {
+      "id": "ship-excavator",
+      "title": "Excavator (Pincer)",
+      "category": "ships",
+      "summary": "The mining engine and close bruiser — highest power, but it can't run.",
+      "body": "The Pincer is built to eat rock: the highest weapon power on the roster, which — because power is one stat — makes it both the fastest miner and the heaviest close-range puncher, wrapped in a tough hull. The price is legs. At 90% speed and 80% turn it can't disengage, so an Excavator that picks a bad fight is committed to it. It out-earns everyone at the mining face and bruises anything that closes on it there; it just can't chase and can't flee. Foreman (Medium) mines methodically in one; Warden (Hard) uses that same power to enforce territory around its home.",
+      "tags": ["excavator", "pincer", "miner", "bruiser"],
+      "see_also": ["ship-overview", "bots-foreman", "bots-warden"],
+      "facts": [
+        { "label": "Hull HP", "value": 55, "unit": "HP", "constant": "SHIP_STATS.excavator.hull" },
+        { "label": "Weapon power (also mining speed)", "value": 13, "unit": "power", "constant": "SHIP_STATS.excavator.power" },
+        { "label": "Cargo hold", "value": 2, "unit": "slots", "constant": "SHIP_STATS.excavator.cargo" }
+      ]
+    },
+    {
+      "id": "ship-hauler",
+      "title": "Hauler (Hammerhead)",
+      "category": "ships",
+      "summary": "The logistics tank — biggest hull, three cargo slots, slowest to arrive.",
+      "body": "The Hammerhead is the siege tank and the logistics hull: the toughest armor on the roster and the only ship that starts with three cargo slots instead of two, so it hauls half again as much ore per trip and shrugs off punishment at a contested wreck. The trade is tempo — at 85% speed and 80% acceleration it arrives late to every fight, so a Hauler wins by being where the ore and the siege already are, not by racing there. In a long grind over a fat wreck, its extra slot and extra hull decide the trip. Rusty (Easy) hoards timidly in one; Patch (Medium) uses the tankiness to play the defensive fixer.",
+      "tags": ["hauler", "hammerhead", "logistics", "tank"],
+      "see_also": ["ship-overview", "bots-rusty", "bots-patch"],
+      "facts": [
+        { "label": "Hull HP", "value": 70, "unit": "HP", "constant": "SHIP_STATS.hauler.hull" },
+        { "label": "Weapon power (also mining speed)", "value": 9, "unit": "power", "constant": "SHIP_STATS.hauler.power" },
+        { "label": "Cargo hold", "value": 3, "unit": "slots", "constant": "SHIP_STATS.hauler.cargo" }
+      ]
+    }
+  ]
+}

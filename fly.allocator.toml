@@ -1,0 +1,78 @@
+# fly.allocator.toml — the always-on control plane. OWNER: Netcode Engineer
+# (docs/hosting-plan.md, Task 11; GDD §4.2).
+#
+# The allocator places rooms and hands a client its signed ticket; it is NOT in
+# the gameplay path (allocator/index.ts). Once a client holds its ticket and its
+# socket, this process can be redeployed or vanish and every live match carries
+# on — but a *sleeping* allocator is a lobby that cannot create a room, so this
+# app never sleeps.
+#
+# One image: the plain Dockerized Node process from allocator/Dockerfile (zero
+# vendor-specific APIs; the Fly-vs-direct routing choice is the ALLOCATOR_ROUTER
+# env var below, never a build-time dependency).
+#
+# SINGLE INSTANCE. The room registry is in-memory (InMemoryRoomRegistry), so a
+# second allocator Machine would hold a *different* view of the fleet and split
+# heartbeats and reservations between them. Run exactly one — min and max both 1.
+#
+# ALLOCATOR_SECRET is NOT in this file. It is a secret, set once with
+#   fly secrets set --app planet-rush-allocator ALLOCATOR_SECRET=<value>
+# and it MUST equal the game servers' TICKET_SECRET (this allocator signs the
+# ticket, the server verifies it). A mismatch fails closed and refuses every join
+# with no other symptom (docs/hosting-plan.md, Task 11).
+
+app = "planet-rush-allocator"
+primary_region = "iad"
+
+[build]
+  # Build context is the repository root (the Dockerfile COPYs src/ and allocator/).
+  dockerfile = "allocator/Dockerfile"
+
+[env]
+  PORT = "8080"
+  # Route clients to their Machine via Fly's edge (`fly-replay`), not a per-Machine
+  # URL — the allocator names a destination and steps out (allocator/router.ts).
+  ALLOCATOR_ROUTER = "fly"
+  # The match servers run as a SEPARATE Fly app, so the fly-replay directive needs
+  # `app=` to cross the app boundary (MATCH_APP) and the Fly provider needs the
+  # same app name to create/list/stop Machines (FLY_APP). Note: Fly's own auto var
+  # is FLY_APP_NAME and would be *this* app — wrong for both — so set it explicitly.
+  MATCH_APP = "planet-rush-gameserver"
+  FLY_APP = "planet-rush-gameserver"
+  # FLY_REGION is injected by Fly at runtime → the router's cross-region replay
+  # hint and the fleet controller's default region. One region here, so it never
+  # emits a cross-region hint; harmless and correct.
+
+  # The autoscale loop ships OFF: the two always-on Machines from
+  # fly.gameserver.toml carry this first deploy, and arming autoscale is a config
+  # change, not a code change. To arm it later:
+  #   fly secrets set / fly deploy with FLEET_AUTOSCALE=on, and give the fleet the
+  #   game-server image ref via FLEET_IMAGE (registry.fly.io/planet-rush-gameserver:<tag>).
+  # FLY_API_TOKEN (a secret) selects the real Fly provider over the in-memory fake;
+  # set it with `fly secrets set` when autoscale is armed.
+  FLEET_AUTOSCALE = "off"
+  FLEET_REGION = "iad"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # Never sleeps, single instance: no autostop, no autostart, exactly one Machine.
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  # Plain-HTTP liveness, like the match server. /health reports fleet occupancy.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+
+# Same modest guest as a match Machine — the control plane answers a question and
+# hangs up; it holds no match state and needs no more (docs/netcode-spike.md).
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

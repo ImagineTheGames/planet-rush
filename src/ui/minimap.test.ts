@@ -41,8 +41,9 @@ import {
   MINIMAP_DERELICT_ALPHA,
   MINIMAP_SPAWN_PROTECT_ALPHA,
   MINIMAP_ORE_ALPHA,
+  MINIMAP_REMEMBERED_ALPHA,
 } from './minimap';
-import type { MinimapFrame, MinimapShip } from './minimap';
+import type { MinimapFrame, MinimapShip, MinimapFog, MinimapCoverage } from './minimap';
 
 /** The two phone profiles the field request pins the placement on — landscape
  *  logical space (post landscape-lock), a wider and a narrower handset. */
@@ -268,6 +269,210 @@ describe('minimapScene — sim state → dots', () => {
     // scale 0.2, offset 0 → (50, 150).
     expect(scene.stationDots[0]!.x).toBeCloseTo(50);
     expect(scene.stationDots[0]!.y).toBeCloseTo(150);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fog of war (RATIFIED feature f1) — the minimap renders ONLY the sensed-state
+// ---------------------------------------------------------------------------
+
+/** A coverage disc (map space). */
+function disc(x: number, y: number, radius: number): MinimapCoverage {
+  return { x, y, radius };
+}
+
+/** A fog descriptor: coverage discs + a remembered-station bitmask. */
+function fog(coverage: MinimapCoverage[], rememberedMask = 0): MinimapFog {
+  return { coverage, rememberedMask };
+}
+
+describe('minimapScene fog — sensed / remembered / fogged tri-state (feature f1)', () => {
+  it('with NO fog everything renders (backward compatible)', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [
+          { owner: 0, x: 100, y: 100, alive: true, id: 0 },
+          { owner: 1, x: 900, y: 900, alive: true, id: 1 },
+        ],
+        ships: [ship({ owner: 1, x: 900, y: 900 })],
+        oreHints: [{ x: 500, y: 500 }],
+      }),
+      RECT,
+    );
+    expect(scene.fogged).toBe(false);
+    expect(scene.stationDots).toHaveLength(2);
+    expect(scene.shipDots).toHaveLength(1);
+    expect(scene.oreDots).toHaveLength(1);
+    expect(scene.coverage).toHaveLength(0);
+  });
+
+  it('a station under CURRENT coverage draws at full; the scene is flagged fogged', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 0, x: 100, y: 100, alive: true, id: 0 }],
+        fog: fog([disc(100, 100, 300)]),
+      }),
+      RECT,
+    );
+    expect(scene.fogged).toBe(true);
+    expect(scene.stationDots).toHaveLength(1);
+    expect(scene.stationDots[0]!.alpha).toBe(MINIMAP_DOT_ALPHA);
+  });
+
+  it('a REMEMBERED but uncovered station draws DIMMED (persistent geography)', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 1, x: 900, y: 900, alive: true, id: 3 }],
+        // coverage nowhere near (900,900), but the mask remembers station id 3.
+        fog: fog([disc(100, 100, 300)], 1 << 3),
+      }),
+      RECT,
+    );
+    expect(scene.stationDots).toHaveLength(1);
+    expect(scene.stationDots[0]!.alpha).toBe(MINIMAP_REMEMBERED_ALPHA);
+  });
+
+  it('a NEVER-seen station (not remembered, not covered) is FOGGED — no dot', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 1, x: 900, y: 900, alive: true, id: 3 }],
+        fog: fog([disc(100, 100, 300)], 0),
+      }),
+      RECT,
+    );
+    expect(scene.stationDots).toHaveLength(0);
+  });
+
+  it('a live enemy ship shows only under CURRENT coverage; the local ship always shows', () => {
+    const covered = minimapScene(
+      frame({
+        stations: [],
+        ships: [ship({ owner: 1, x: 500, y: 500 }), ship({ owner: 0, x: 100, y: 100, local: true })],
+        fog: fog([disc(500, 500, 200)]),
+      }),
+      RECT,
+    );
+    // Enemy inside the disc → a dot; local ship → its own dot (cockpit knowledge).
+    expect(covered.shipDots).toHaveLength(1);
+    expect(covered.ownDot, 'the local ship is always its own dot even outside coverage').not.toBeNull();
+  });
+
+  it('the satellite-killed moment: a live dot DISAPPEARS the tick its coverage dies', () => {
+    const enemyAt = frame({
+      stations: [],
+      ships: [ship({ owner: 1, x: 800, y: 800 })],
+    });
+    // A satellite's LARGE disc covers the distant enemy → it draws.
+    const withCoverage = minimapScene({ ...enemyAt, fog: fog([disc(800, 800, 300)]) }, RECT);
+    expect(withCoverage.shipDots, 'covered enemy is on the map').toHaveLength(1);
+    // Kill the satellite → coverage collapses to empty → the enemy drops the same read.
+    const afterKill = minimapScene({ ...enemyAt, fog: fog([]) }, RECT);
+    expect(afterKill.shipDots, 'the distant enemy vanishes when its coverage dies').toHaveLength(0);
+  });
+
+  it('radar satellites: enemy shows only when sensed, the viewer own always', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        satellites: [
+          { owner: 0, x: 100, y: 100, alive: true, local: true }, // own → always
+          { owner: 1, x: 500, y: 500, alive: true, local: false }, // enemy, sensed
+          { owner: 2, x: 900, y: 900, alive: true, local: false }, // enemy, fogged
+          { owner: 1, x: 500, y: 500, alive: false, local: false }, // dead → gone
+        ],
+        fog: fog([disc(500, 500, 200)]),
+      }),
+      RECT,
+    );
+    // own (always) + the sensed enemy = 2; the fogged enemy and the dead one drop.
+    expect(scene.satelliteDots).toHaveLength(2);
+    expect(scene.satelliteDots.some((d) => d.own)).toBe(true);
+  });
+
+  it('ore hints show only where the player currently senses', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        oreHints: [
+          { x: 500, y: 500 }, // inside coverage
+          { x: 900, y: 900 }, // fogged
+        ],
+        fog: fog([disc(500, 500, 200)]),
+      }),
+      RECT,
+    );
+    expect(scene.oreDots).toHaveLength(1);
+  });
+
+  it('projects coverage discs into screen space (faintly-visible radar reach)', () => {
+    const scene = minimapScene(frame({ stations: [], fog: fog([disc(500, 500, 400)]) }), RECT);
+    // 200px rect over a 1000-unit arena → scale 0.2, centred origin 0.
+    expect(scene.coverage).toHaveLength(1);
+    expect(scene.coverage[0]!.x).toBeCloseTo(100);
+    expect(scene.coverage[0]!.y).toBeCloseTo(100);
+    expect(scene.coverage[0]!.radius).toBeCloseTo(400 * 0.2);
+  });
+
+  it('the collapse ring stays visible through fog (match-critical exception)', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        collapse: { x: 500, y: 500, radius: 400 },
+        // No coverage anywhere — everything else is fogged, but the ring still draws.
+        fog: fog([]),
+      }),
+      RECT,
+    );
+    expect(scene.collapseRing, 'the collapse ring is drawn regardless of coverage').not.toBeNull();
+  });
+
+  it('both states fog IDENTICALLY — the same slice is revealed collapsed and expanded (brief item 2)', () => {
+    // A mixed scene: one covered station + one remembered-only + one never-seen; a
+    // covered enemy + a fogged enemy; a covered satellite + a fogged one; ore in and
+    // out of coverage. The fog decision is in MAP space (before the rect projection),
+    // so the SET that survives must not depend on which rect it is drawn into.
+    const scene = frame({
+      stations: [
+        { owner: 0, x: 100, y: 100, alive: true, id: 0 }, // covered
+        { owner: 1, x: 900, y: 900, alive: true, id: 1 }, // remembered only
+        { owner: 2, x: 500, y: 20, alive: true, id: 2 }, // never seen → fogged
+      ],
+      ships: [
+        ship({ owner: 1, x: 120, y: 120 }), // covered
+        ship({ owner: 2, x: 900, y: 900 }), // fogged
+        ship({ owner: 0, x: 500, y: 500, local: true }), // own — always
+      ],
+      satellites: [
+        { owner: 3, x: 110, y: 110, alive: true, local: false }, // covered enemy
+        { owner: 3, x: 950, y: 950, alive: true, local: false }, // fogged enemy
+      ],
+      oreHints: [
+        { x: 130, y: 130 }, // covered
+        { x: 950, y: 100 }, // fogged
+      ],
+      fog: fog([disc(100, 100, 200)], 1 << 1),
+    });
+    const collapsed = minimapScene(scene, minimapRect('collapsed', PHONE_WIDE, true));
+    const expanded = minimapScene(scene, minimapRect('expanded', PHONE_WIDE, true));
+
+    // The rects differ (the whole point of the two states)…
+    expect(collapsed.rect).not.toEqual(expanded.rect);
+    // …but the fog gate reveals the exact same slice in both.
+    expect(collapsed.fogged).toBe(true);
+    expect(expanded.fogged).toBe(true);
+    expect(collapsed.stationDots.length).toBe(expanded.stationDots.length);
+    expect(collapsed.shipDots.length).toBe(expanded.shipDots.length);
+    expect(collapsed.satelliteDots.length).toBe(expanded.satelliteDots.length);
+    expect(collapsed.oreDots.length).toBe(expanded.oreDots.length);
+    expect(collapsed.coverage.length).toBe(expanded.coverage.length);
+    expect(!!collapsed.ownDot).toBe(!!expanded.ownDot);
+    // And it is the right slice: covered + remembered station (not the never-seen);
+    // covered enemy (own is ownDot); covered satellite; covered ore.
+    expect(collapsed.stationDots).toHaveLength(2);
+    expect(collapsed.shipDots).toHaveLength(1);
+    expect(collapsed.ownDot).not.toBeNull();
+    expect(collapsed.satelliteDots).toHaveLength(1);
+    expect(collapsed.oreDots).toHaveLength(1);
   });
 });
 

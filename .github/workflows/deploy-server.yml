@@ -1,0 +1,77 @@
+name: Deploy server (Fly.io)
+
+# The online fleet: allocator (control plane) + gameserver (match fleet).
+# Runs on server-side changes and by hand. First run creates the apps and
+# the shared ticket secret; later runs just roll deploys. The README's
+# cordon-and-drain applies to LIVE-match rolls — this workflow deploys;
+# the fleet controller owns machine lifecycle beyond that.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'allocator/**'
+      - 'fly.allocator.toml'
+      - 'fly.gameserver.toml'
+      - 'src/net/**'
+      - 'src/shared/**'
+      - '.github/workflows/deploy-server.yml'
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Token presence check (value never printed)
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is EMPTY in this run — the repo secret exists but has no value (a paste likely failed). Re-set it: gh secret set FLY_API_TOKEN --repo ImagineTheGames/planet-rush"
+            exit 1
+          fi
+          echo "token present (${#FLY_API_TOKEN} chars)"
+          flyctl auth whoami
+
+      - name: Ensure apps exist
+        run: |
+          flyctl apps create planet-rush-allocator  2>/dev/null || echo "allocator app exists"
+          flyctl apps create planet-rush-gameserver 2>/dev/null || echo "gameserver app exists"
+
+      - name: Ensure the shared ticket secret (one value, both apps, fail-closed)
+        run: |
+          has_alloc=$(flyctl secrets list --app planet-rush-allocator  2>/dev/null | grep -c ALLOCATOR_SECRET || true)
+          has_game=$(flyctl secrets list --app planet-rush-gameserver 2>/dev/null | grep -c TICKET_SECRET || true)
+          if [ "$has_alloc" = "0" ] || [ "$has_game" = "0" ]; then
+            echo "Provisioning the shared secret (first deploy or partial state)"
+            SECRET=$(openssl rand -hex 32)
+            flyctl secrets set --app planet-rush-allocator  --stage ALLOCATOR_SECRET="$SECRET"
+            flyctl secrets set --app planet-rush-gameserver --stage TICKET_SECRET="$SECRET"
+          else
+            echo "Shared secret already provisioned on both apps"
+          fi
+
+      - name: Deploy allocator (control plane first)
+        run: flyctl deploy --config fly.allocator.toml --remote-only
+
+      - name: Deploy gameserver fleet
+        run: flyctl deploy --config fly.gameserver.toml --remote-only
+
+      - name: Always-on floor (2 machines)
+        run: flyctl scale count 2 --app planet-rush-gameserver --yes || true
+
+      - name: Health checks
+        run: |
+          sleep 15
+          curl -fsS "https://planet-rush-allocator.fly.dev/health" && echo " allocator healthy"
+          curl -fsS "https://planet-rush-gameserver.fly.dev/health" && echo " gameserver healthy"

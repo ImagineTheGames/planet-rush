@@ -1,0 +1,96 @@
+{
+  "codex": "bots",
+  "title": "Bots — the seven rivals",
+  "gddVersion": "0.7",
+  "generated": { "against": "GDD.md v0.7", "critic_loops": 3, "tone_pinned": true },
+  "entries": [
+    {
+      "id": "bots-overview",
+      "title": "Seven characters, not difficulty labels",
+      "category": "bots",
+      "summary": "Cartoon rivals with names, liveries, and a way of playing — losing to each feels different.",
+      "body": "Open lobby slots fill with bots, and they are characters, not sliders. Seven of them, three difficulty tiers, each a hand-coded behavior tree running the exact same six-verb action interface a human uses — no LLM at runtime, no cheating. They are fog-honest: a bot perceives only what a human in its cockpit could, same sensor range, same hidden enemy HP, so a bot that knows you're wounded scouted you for it. Because combat is a travel-time projectile, they aim on an intercept course, leading a mover by its last-seen velocity — and per-tier aim jitter is the whole difficulty ladder, a Hard bot leading cleanly while an Easy bot leads badly. In Teams they respect allegiance completely: never target an ally, shots pass through allies, turrets ignore them. A solo match has a cast, and losing to Vulture feels nothing like losing to Warden.",
+      "tags": ["bots", "overview", "ai"],
+      "see_also": ["bots-rusty", "bots-bolt", "bots-foreman", "bots-patch", "bots-sable", "bots-vulture", "bots-warden"],
+      "difficulty": null,
+      "hull": null
+    },
+    {
+      "id": "bots-rusty",
+      "title": "Rusty — the timid hoarder",
+      "category": "bots",
+      "summary": "Easy. Mines slowly, over-defends, and clutches its ore. Flies a Hauler.",
+      "body": "Rusty (Easy) is the friendliest way to lose. It mines slowly, over-defends its home, attacks almost never, and turns for home the moment its hull drops to half. It flies a Hauler (Hammerhead), so it hoards a big timid hold and turtles behind whatever it can afford to build — but it spends more ore standing still than winning, and when the field runs dry that stockpile bought nothing that regenerates. A good opponent to learn the collection field on, because Rusty rarely comes to punish a full hold.",
+      "tags": ["rusty", "easy", "hoarder", "hauler"],
+      "see_also": ["bots-overview", "ship-hauler"],
+      "difficulty": "Easy",
+      "hull": "Hauler (Hammerhead)"
+    },
+    {
+      "id": "bots-bolt",
+      "title": "Bolt — the reckless rusher",
+      "category": "bots",
+      "summary": "Easy. All throttle, no plan. Flies an Interceptor.",
+      "body": "Bolt (Easy) is the other Easy tell: all throttle and no plan. It flies an Interceptor (Quadfin), rushes in fast, and picks fights it hasn't scouted, leading its shots badly and dying to turret rings it should have respected. Bolt makes noise and pressure early, which is genuinely dangerous to a player still finding the build wheel — but its recklessness spends its cheap thin hull freely, and a patient defender lets Bolt break itself on a turret ring rather than chasing it.",
+      "tags": ["bolt", "easy", "rusher", "interceptor"],
+      "see_also": ["bots-overview", "ship-interceptor"],
+      "difficulty": "Easy",
+      "hull": "Interceptor (Quadfin)"
+    },
+    {
+      "id": "bots-foreman",
+      "title": "Foreman — the methodical miner",
+      "category": "bots",
+      "summary": "Medium. Works the field, contests waves, gangs the leader. Flies an Excavator.",
+      "body": "Foreman (Medium) plays the triangle honestly. It works the asteroid field methodically in an Excavator (Pincer) — the mining engine — contests every ore surge for its share, and joins the temporary pile-ons against whoever's currently leading. It won't over-commit and it won't panic; it just out-earns the sloppy and shows up where the ore is. Beating Foreman means beating it to the fresh wave and denying it the clean mining time its whole game depends on.",
+      "tags": ["foreman", "medium", "miner", "excavator"],
+      "see_also": ["bots-overview", "ship-excavator", "sys-waves-collapse"],
+      "difficulty": "Medium",
+      "hull": "Excavator (Pincer)"
+    },
+    {
+      "id": "bots-patch",
+      "title": "Patch — the defensive fixer",
+      "category": "bots",
+      "summary": "Medium. Turtles smart, patches its core, punishes over-extension. Flies a Hauler.",
+      "body": "Patch (Medium) is the fixer. It flies a Hauler (Hammerhead), balances the triangle toward defense, keeps its core patched with rationed repair taps, and lets attackers wear themselves out on its turrets and shields before it counters. Unlike Rusty it knows the repair cooldown and doesn't waste ore trying to out-heal pressure — it drives you off first, then patches. Cracking Patch is a two-ship job or a patient siege that keeps its shields suppressed; a lone raider just feeds it turret kills.",
+      "tags": ["patch", "medium", "defender", "hauler"],
+      "see_also": ["bots-overview", "ship-hauler", "sys-repair-reactor"],
+      "difficulty": "Medium",
+      "hull": "Hauler (Hammerhead)"
+    },
+    {
+      "id": "bots-sable",
+      "title": "Sable — the opportunist raider",
+      "category": "bots",
+      "summary": "Hard. Times attacks to when you're seen mining far from home. Flies an Interceptor.",
+      "body": "Sable (Hard) plays like a good human with a raider's instincts. In an Interceptor (Quadfin) it evaluates targets by threat, proximity, and opportunity, and it strikes when you're seen deep in the field, far from a home you left undefended — the miner with a full hold, the station whose alarm went unanswered. It leads its shots cleanly and disengages before your turrets bite. Sable punishes greed: run a full hold too far from home and it is the ship that makes you pay for it.",
+      "tags": ["sable", "hard", "raider", "interceptor"],
+      "see_also": ["bots-overview", "ship-interceptor", "strat-scouting"],
+      "difficulty": "Hard",
+      "hull": "Interceptor (Quadfin)"
+    },
+    {
+      "id": "bots-vulture",
+      "title": "Vulture — the wreck scavenger",
+      "category": "bots",
+      "summary": "Hard. Haunts kill sites and dead stations for the fortune left behind. Flies a Vanguard.",
+      "body": "Vulture (Hard) lets others do the killing and arrives for the debris. In a Vanguard (Anvil) it reads the map for fresh spills and station wrecks — a dead player's own banked fortune, ringed and contestable — and it's already inbound before the explosion fades. It fights when it must and scavenges when it can, and because small holds mean nobody clears a wreck in one trip, Vulture keeps coming back to the same contested pile. Guarding your kills, not just making them, is how you starve it.",
+      "tags": ["vulture", "hard", "scavenger", "vanguard"],
+      "see_also": ["bots-overview", "ship-vanguard", "strat-wrecks"],
+      "difficulty": "Hard",
+      "hull": "Vanguard (Anvil)"
+    },
+    {
+      "id": "bots-warden",
+      "title": "Warden — the territorial enforcer",
+      "category": "bots",
+      "summary": "Hard. Owns its ground, punishes anyone in it. Flies an Excavator.",
+      "body": "Warden (Hard) draws a line around its claim and enforces it. In an Excavator (Pincer) — heavy power, heavy hull, no legs — it doesn't chase across the map; it makes the space around its station lethal, times its punishment to when it can profitably land it, and scavenges the kill sites it makes on its own ground. You beat Warden by not fighting on its ground: bait it out of position, where its lack of speed strands it, rather than trading blows inside its own turret ring where it wants you.",
+      "tags": ["warden", "hard", "enforcer", "excavator"],
+      "see_also": ["bots-overview", "ship-excavator", "strat-siege"],
+      "difficulty": "Hard",
+      "hull": "Excavator (Pincer)"
+    }
+  ]
+}

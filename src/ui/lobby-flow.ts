@@ -82,13 +82,17 @@ import {
   applyLobbySlots,
   botDifficulties,
   createLobby,
+  cycleAbundance,
   cycleBotDifficulty,
+  cycleSeatState,
+  cycleSeatTeam,
   pressRush,
   seatLocalPlayer,
   selectMap,
   selectShipClass,
   startLobbyMatch,
   tickLobby,
+  toggleMode,
 } from './lobby';
 import type { LobbyState } from './lobby';
 import { mapIdAt } from './map-picker';
@@ -398,7 +402,27 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       return shipClass === undefined ? rest(state) : withLobby(state, selectShipClass(lobby, shipClass));
     }
     case 'seat':
-      return withLobby(state, cycleBotDifficulty(lobby, target.index));
+      // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
+      // Milestone E); the host shrinks or shapes the match here. A guest's tap and
+      // a human seat are no-ops in `./lobby`, so a refused tap costs the wire zero.
+      return withLobby(state, cycleSeatState(lobby, target.index));
+    case 'seatChip':
+      // The row's trailing chip is mode-contextual: it assigns the seat's TEAM in
+      // TEAMS, and cycles the bot's difficulty in FFA — the two per-seat host
+      // controls that never both apply at once. The geometry is mode-blind (one
+      // chip); the routing lives here, where the mode is known.
+      return withLobby(
+        state,
+        lobby.mode === 'teams'
+          ? cycleSeatTeam(lobby, target.index)
+          : cycleBotDifficulty(lobby, target.index),
+      );
+    case 'mode':
+      // FFA ⇄ TEAMS. Locked with the hull once RUSH! is pressed (`./lobby`).
+      return withLobby(state, toggleMode(lobby));
+    case 'abundance':
+      // SCARCE → STANDARD → RICH (ratified p11). Locked with the hull at RUSH!.
+      return withLobby(state, cycleAbundance(lobby));
     case 'map':
       // The arena picker moved into the lobby (p2). Folded in like the hull; a
       // refusal (locked after RUSH!) returns the identical lobby, so `withLobby`

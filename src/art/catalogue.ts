@@ -27,10 +27,12 @@ import {
   STATION_VARIANT_COUNT,
 } from './stations';
 import { SHIP_CLASSES, shipHulkSprite, shipSilhouette, shipSprite } from './ships';
+import { satelliteSprite, satelliteWreckSprite } from './satellite';
 import type { SpriteDef } from './shapes';
 import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
 import { SHOT_FAMILIES, SHOT_TIERS, shotSprite } from './vfx/shots';
+import { STAR_LAYERS, VOID_SEED, nebulaWashSprite, starFieldSprite } from './backdrop';
 
 /** One catalogued sprite: what it is, and a caption for the contact sheet. */
 export interface CatalogueEntry {
@@ -142,6 +144,20 @@ function entries(): CatalogueEntry[] {
     out.push({ group: 'Shields — pressure beats regeneration', label: `build ${Math.round(p * 100)}%`, def: buildProgressSprite(p) });
   }
 
+  // --- Satellites -----------------------------------------------------------
+  // The radar eye (f1): a DISH in the 5.5 structure language, distinct from every
+  // turret in the pool. Its live sensor states sit next to an enemy-colour read
+  // and the scaffold, and its cold death remnant sits below — the wreck language,
+  // with nothing to loot (a satellite carries no ore bank).
+  for (const state of ['idle', 'sweeping', 'pinging'] as const) {
+    out.push({ group: 'Satellites — the radar eye', label: state, def: satelliteSprite({ playerId: 0, state }) });
+  }
+  out.push({ group: 'Satellites — build & identity', label: 'P5 sweeping', def: satelliteSprite({ playerId: 4, state: 'sweeping' }) });
+  out.push({ group: 'Satellites — build & identity', label: 'building scaffold', def: satelliteSprite({ playerId: 0, state: 'building' }) });
+  for (const seed of [0, 2]) {
+    out.push({ group: 'Satellites — build & identity', label: `downed dish ${seed}`, def: satelliteWreckSprite(seed) });
+  }
+
   // --- Wrecks ---------------------------------------------------------------
   for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
     out.push({ group: 'Wrecks — the quiet', label: `wreck v${v}`, def: stationWreckSprite(v) });
@@ -174,6 +190,32 @@ function entries(): CatalogueEntry[] {
       });
     }
   }
+
+  // --- The void (a2-06) -----------------------------------------------------
+  // The layered parallax star-field and nebula washes the fleet flies against
+  // (./backdrop). Sampled here at a fixed review tile so the palette audit covers
+  // the void's colours — the live field is the same generator at arena scale.
+  // Steel value-ramp stars, patina/steel nebula: no seventh hue, all role
+  // `material` (style-guide §1). A sample star that went signal yellow would be a
+  // RESERVED-rule violation like any other sprite.
+  const VOID_TILE = { w: 480, h: 300 } as const;
+  const LAYER_NOTE: Record<string, string> = {
+    deep: 'far dust — dim, dense, no white',
+    mid: 'mid field — lit steel + a little white',
+    near: 'near points — the ramp’s white endpoint, faint glints',
+  };
+  for (const spec of STAR_LAYERS) {
+    out.push({
+      group: 'The void — parallax star-field',
+      label: `${spec.key}: ${LAYER_NOTE[spec.key] ?? ''}`,
+      def: starFieldSprite(spec, VOID_SEED, VOID_TILE.w, VOID_TILE.h),
+    });
+  }
+  out.push({
+    group: 'The void — nebula wash',
+    label: 'patina/steel haze, 2–6% alpha',
+    def: nebulaWashSprite(VOID_SEED, VOID_TILE.w, VOID_TILE.h),
+  });
 
   return out;
 }

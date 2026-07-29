@@ -51,6 +51,10 @@ export interface SlotSpec {
   readonly id: PlayerId;
   readonly shipClass: ShipClass;
   readonly strategy: StrategyId;
+  /** The team this seat fights for (TEAMS, Task D1). Omitted in FFA, where the
+   *  sim defaults each player to its own team (teams-of-one) — so a plain FFA
+   *  lineup is byte-for-byte unchanged. Allies share a `team`. */
+  readonly team?: number;
 }
 
 /** A match to run. Everything is explicit and seeded — no defaults are read
@@ -128,6 +132,8 @@ export interface SlotResult {
   readonly id: PlayerId;
   readonly shipClass: ShipClass;
   readonly strategy: StrategyId;
+  /** The team this seat fought for (Task D1). In FFA it equals `id` (teams-of-one). */
+  readonly team: number;
   /** Their home survived to the end. */
   readonly survived: boolean;
   /** Sim seconds their core lasted (the full match, if it survived). */
@@ -146,8 +152,12 @@ export interface MatchResult {
   /** True when the match reached a real ending inside every ceiling. */
   readonly ok: boolean;
   readonly failure: MatchFailure | null;
-  /** The winning slot, or null when there was no result. */
+  /** The winning slot, or null when there was no result. In TEAMS this is a
+   *  representative survivor of {@link winnerTeam}. */
   readonly winner: PlayerId | null;
+  /** The winning team (Task D1), or null when there was no result. In FFA it
+   *  equals `winner` (teams-of-one). The unit a Teams balance sweep tallies. */
+  readonly winnerTeam: number | null;
   readonly winnerStrategy: StrategyId | null;
   readonly winnerClass: ShipClass | null;
   /** Sim seconds elapsed — the match-length target is measured on this (GDD §1). */
@@ -199,9 +209,39 @@ export function roundRobinLineup(
   });
 }
 
-/** The lobby rows `createWorld` wants, from a lineup. */
+/**
+ * A team-composition lineup: each inner array is one team, listed in team order.
+ * Seats are numbered 0..N-1 across the teams and stamped with their team index,
+ * so `teamsLineup([[a, b], [c, d]])` is a 2v2 with slots 0,1 on team 0 and 2,3
+ * on team 1. Any split is allowed (ratified 2026-07-26 — the lobby shows counts,
+ * never blocks); a 3v1 is `teamsLineup([[a, b, c], [d]])`. Balance across
+ * compositions is a sweep over these (GDD §3.8).
+ */
+export function teamsLineup(
+  teams: readonly (readonly { strategy: StrategyId; shipClass: ShipClass }[])[],
+): SlotSpec[] {
+  if (teams.length < 2) throw new Error('teamsLineup: need at least two teams');
+  const lineup: SlotSpec[] = [];
+  teams.forEach((members, team) => {
+    if (members.length === 0) throw new Error(`teamsLineup: team ${team} has no members`);
+    for (const m of members) {
+      lineup.push({ id: lineup.length, shipClass: m.shipClass, strategy: m.strategy, team });
+    }
+  });
+  if (lineup.length > MATCH_SLOTS) {
+    throw new Error(`teamsLineup: ${lineup.length} seats exceeds the ${MATCH_SLOTS}-player ceiling`);
+  }
+  return lineup;
+}
+
+/** The lobby rows `createWorld` wants, from a lineup. A seat's `team` rides along
+ *  when set (TEAMS); an unset team lets the sim default to teams-of-one (FFA). */
 function playerSpecs(lineup: readonly SlotSpec[]): PlayerSpec[] {
-  return lineup.map((s) => ({ id: s.id, shipClass: s.shipClass }));
+  return lineup.map((s) => ({
+    id: s.id,
+    shipClass: s.shipClass,
+    ...(s.team !== undefined ? { team: s.team } : {}),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -408,6 +448,7 @@ function summarize(
       id: station.owner,
       shipClass: spec?.shipClass ?? ShipClass.Vanguard,
       strategy: spec?.strategy ?? 'idle',
+      team: station.team ?? station.owner,
       survived: station.alive,
       survivedSeconds: station.alive ? world.time : station.deathTime,
       coreFraction: station.maxCoreHp > 0 ? Math.max(0, station.coreHp) / station.maxCoreHp : 0,
@@ -424,6 +465,7 @@ function summarize(
     ok: ended && failure === null,
     failure,
     winner,
+    winnerTeam: ended ? world.match.winningTeam ?? null : null,
     winnerStrategy: winnerSpec?.strategy ?? null,
     winnerClass: winnerSpec?.shipClass ?? null,
     seconds: world.time,

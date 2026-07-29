@@ -32,8 +32,9 @@ import type { Insets } from './menu-geometry';
 // ---------------------------------------------------------------------------
 
 /** What a tap on the main menu resolves to. `play` is the one door that builds a
- *  match; `settings` opens the fire-mode / VFX / volume screen and comes back. */
-export type MainMenuOption = 'play' | 'settings';
+ *  match; `codex` opens the optional reference (GDD §2.10) and comes back;
+ *  `settings` opens the fire-mode / VFX / volume screen and comes back. */
+export type MainMenuOption = 'play' | 'codex' | 'settings';
 
 /** One button's identity, in screen order. The layout, the view and the hit test
  *  all walk this same list, so a re-ordered screen can never mis-route a tap —
@@ -46,11 +47,13 @@ export interface MainMenuItem {
   readonly primary: boolean;
 }
 
-/** The buttons, top to bottom. Two, and no more: the field report asked for a
- *  main menu with "play, settings", and the rest of the front-of-match (rooms,
- *  lobby) lives behind its own flow, not on this screen. */
+/** The buttons, top to bottom. PLAY is the one primary door; CODEX and SETTINGS
+ *  are the two secondary screens that open and come back. CODEX is the optional
+ *  reference a player consults voluntarily (GDD §2.10) — a door, never a gate:
+ *  it builds no match and, like SETTINGS, is fully active steel (never gray). */
 export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
   { kind: 'play', label: 'PLAY', primary: true },
+  { kind: 'codex', label: 'CODEX', primary: false },
   { kind: 'settings', label: 'SETTINGS', primary: false },
 ];
 

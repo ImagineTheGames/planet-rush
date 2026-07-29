@@ -139,6 +139,80 @@ describe('Allocator.allocate — region selection', () => {
   });
 });
 
+describe('Allocator.allocate — size-aware fleet density (Task F1)', () => {
+  // A heartbeat whose rooms carry a per-room match size, so the allocator can
+  // weight each by its seats instead of counting one flat unit per room.
+  function sizedBeat(
+    machine: string,
+    rooms: { code: string; size: number }[],
+    capacity: number,
+  ): Heartbeat {
+    return {
+      machine,
+      region: 'iad',
+      capacity,
+      rooms: rooms.map((r) => ({ code: r.code, players: r.size, size: r.size })),
+    };
+  }
+
+  it('prefers a host with free seat capacity over one with fewer rooms-but-full-seats', () => {
+    // m-full holds THREE full 8-seat rooms (24 seats); m-roomy holds FIVE 2-seat
+    // rooms (10 seats). Counting rooms flat would send the next room to m-full
+    // (3 rooms < 5); weighting by seats sends it to m-roomy, which is the host
+    // with real seat headroom. Same room capacity on both, so only the weighting
+    // decides.
+    const { alloc } = withFleet([
+      sizedBeat('m-full', [
+        { code: 'AAAA', size: 8 },
+        { code: 'BBBB', size: 8 },
+        { code: 'CCCC', size: 8 },
+      ], 8),
+      sizedBeat('m-roomy', [
+        { code: 'DDDD', size: 2 },
+        { code: 'EEEE', size: 2 },
+        { code: 'FFFF', size: 2 },
+        { code: 'GGGG', size: 2 },
+        { code: 'HHHH', size: 2 },
+      ], 8),
+    ]);
+    expect(alloc.allocate({}, 1000).machine).toBe('m-roomy');
+  });
+
+  it('packs small rooms past a flat room count — the ceiling is seats, not rooms', () => {
+    // capacity 4 room-equivalents. SIX 2-seat rooms weigh 6·(2/8) = 1.5 < 4, so a
+    // seventh room still places; a flat "6 rooms ≥ 4 capacity" count would have
+    // refused. Small matches genuinely pack tighter onto one host.
+    const { alloc } = withFleet([
+      sizedBeat('m-1', [
+        { code: 'R1', size: 2 },
+        { code: 'R2', size: 2 },
+        { code: 'R3', size: 2 },
+        { code: 'R4', size: 2 },
+        { code: 'R5', size: 2 },
+        { code: 'R6', size: 2 },
+      ], 4),
+    ]);
+    expect(alloc.allocate({}, 1000).machine).toBe('m-1');
+  });
+
+  it('an outstanding reservation weighs its requested size, not one flat room', () => {
+    // A 2-seat room reserved during its boot gap counts as a quarter-room of load,
+    // so a small-room machine is not treated as a full one before it even boots.
+    const { reg, alloc } = withFleet([sizedBeat('m-1', [], 4)]);
+    reg.reserve('BOOT', 'm-1', 1000, { size: 2 });
+    const iad = alloc.regions(1000).find((r) => r.region === 'iad');
+    expect(iad).toEqual({ region: 'iad', machines: 1, capacity: 4, rooms: 0.25, free: 3.75 });
+  });
+
+  it('counts an unknown-size room as a full room — the conservative default', () => {
+    // An older Machine (or a room whose heartbeat omits size) must never be
+    // under-counted into over-packing, so it weighs a whole room. capacity 2 with
+    // two such rooms is therefore full — byte-identical to the pre-F1 flat count.
+    const { alloc } = withFleet([beat('m-1', 'iad', ['AAAA', 'BBBB'], 2)]);
+    expect(reasonOf(() => alloc.allocate({}, 1000))).toBe('no-capacity');
+  });
+});
+
 describe('Allocator.join — reaching an existing room', () => {
   it('issues a ticket for the Machine that hosts the room', () => {
     const { alloc } = withFleet([beat('m-1', 'iad', ['K7QM'])]);

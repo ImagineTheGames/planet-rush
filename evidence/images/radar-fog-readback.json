@@ -1,0 +1,91 @@
+{
+  "geometry": {
+    "satRange": 900,
+    "enemyDist": 675
+  },
+  "fog": {
+    "expanded": true,
+    "rect": {
+      "x": 360,
+      "y": 100,
+      "width": 560,
+      "height": 560
+    },
+    "ownDot": {
+      "x": 819.2,
+      "y": 380
+    },
+    "stationCount": 3,
+    "shipCount": 1,
+    "oreCount": 8,
+    "satelliteCount": 0,
+    "coverageCount": 2,
+    "collapseRing": false,
+    "ticks": 74
+  },
+  "geometry2": {
+    "satRange": 900,
+    "enemyDist": 675
+  },
+  "coverage": {
+    "expanded": true,
+    "rect": {
+      "x": 360,
+      "y": 100,
+      "width": 560,
+      "height": 560
+    },
+    "ownDot": {
+      "x": 819.2,
+      "y": 380
+    },
+    "stationCount": 3,
+    "shipCount": 3,
+    "oreCount": 29,
+    "satelliteCount": 1,
+    "coverageCount": 3,
+    "collapseRing": false,
+    "ticks": 115
+  },
+  "beforeKill": {
+    "expanded": true,
+    "rect": {
+      "x": 360,
+      "y": 100,
+      "width": 560,
+      "height": 560
+    },
+    "ownDot": {
+      "x": 819.2,
+      "y": 380
+    },
+    "stationCount": 3,
+    "shipCount": 3,
+    "oreCount": 29,
+    "satelliteCount": 1,
+    "coverageCount": 3,
+    "collapseRing": false,
+    "ticks": 152
+  },
+  "killed": {
+    "expanded": true,
+    "rect": {
+      "x": 360,
+      "y": 100,
+      "width": 560,
+      "height": 560
+    },
+    "ownDot": {
+      "x": 819.2,
+      "y": 380
+    },
+    "stationCount": 3,
+    "shipCount": 1,
+    "oreCount": 8,
+    "satelliteCount": 0,
+    "coverageCount": 2,
+    "collapseRing": false,
+    "ticks": 164
+  },
+  "pageErrors": []
+}

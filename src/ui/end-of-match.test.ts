@@ -110,11 +110,11 @@ describe('the frame model', () => {
       totalPlayers: 8,
       cause: 'collapse',
     });
-    expect(model.subhead).toBe('2nd of 8 — the collapse closed over your core.');
+    expect(model.subhead).toBe('2nd of 8 — the collapse closed over your reactor.');
   });
 
   it('falls back to the plain elimination line with no placement or cause', () => {
-    expect(endOfMatchModel(eliminated(0)).subhead).toBe('Your core is gone — but the fight goes on.');
+    expect(endOfMatchModel(eliminated(0)).subhead).toBe('Your reactor is gone — but the fight goes on.');
   });
 });
 

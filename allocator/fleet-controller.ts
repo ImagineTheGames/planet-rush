@@ -51,6 +51,7 @@
  */
 
 import type { MachineId } from '../src/net/ticket';
+import { roomSeatWeight } from './allocator';
 import { CapacityError, type Machine, type MachineProvider } from './provider';
 import type { RoomRegistry, MachineView, Reservation } from './registry';
 
@@ -308,16 +309,21 @@ export class FleetController {
     }
   }
 
-  /** Free room slots across the live fleet: total capacity minus rooms in flight
-   *  (heartbeat rooms plus outstanding reservations), the same honest accounting
-   *  the allocator places under. */
+  /** Free capacity across the live fleet, in full-room-equivalents: total capacity
+   *  minus load in flight (heartbeat rooms plus outstanding reservations), each
+   *  **weighted by its seats** ({@link roomSeatWeight}, Task F1) rather than counted
+   *  one flat unit per room — the same honest, seat-aware accounting the allocator
+   *  places under. A fleet of small matches thus reports the real seat headroom a
+   *  flat room count would hide (unknown-size rooms still weigh a whole room, so
+   *  the drain/scale-up thresholds keep their pre-F1 meaning until sizes flow). */
   private freeSlots(views: readonly MachineView[], now: number): number {
     const leases: readonly Reservation[] = this.registry.reservations(now);
     let capacity = 0;
-    let occupied = leases.length;
+    let occupied = 0;
+    for (const lease of leases) occupied += roomSeatWeight(lease.size);
     for (const view of views) {
       capacity += view.capacity;
-      occupied += view.rooms.length;
+      for (const room of view.rooms) occupied += roomSeatWeight(room.size);
     }
     return capacity - occupied;
   }

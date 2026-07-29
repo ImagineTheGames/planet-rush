@@ -1,0 +1,71 @@
+{
+  "build": {
+    "sha": "35c2595",
+    "time": "2026-07-28T20:58:05.960Z",
+    "dirty": true
+  },
+  "staged": {
+    "coreHp": 10,
+    "maxCoreHp": 100,
+    "banked": 10
+  },
+  "read0": {
+    "coreHp": 10,
+    "maxCoreHp": 100,
+    "banked": 10,
+    "repairing": false
+  },
+  "A": {
+    "tick": 480,
+    "read": {
+      "coreHp": 25,
+      "maxCoreHp": 100,
+      "banked": 9,
+      "repairing": true
+    },
+    "wedge": {
+      "sub": "+15 HP",
+      "ready": true,
+      "cost": 1
+    },
+    "coreDelta": 15,
+    "bankDelta": -1
+  },
+  "B": {
+    "tick": 578,
+    "taps": 4,
+    "read": {
+      "coreHp": 25,
+      "maxCoreHp": 100,
+      "banked": 9,
+      "repairing": true
+    },
+    "wedge": {
+      "sub": "+15 HP",
+      "ready": true,
+      "cost": 1
+    },
+    "elapsedSimS": 1.63,
+    "coreFrozen": true,
+    "bankFrozen": true,
+    "wedgeStillReadyDuringLockout": true
+  },
+  "C": {
+    "tick": 1443,
+    "read": {
+      "coreHp": 40,
+      "maxCoreHp": 100,
+      "banked": 8,
+      "repairing": true
+    },
+    "wedge": {
+      "sub": "+15 HP",
+      "ready": true,
+      "cost": 1
+    },
+    "elapsedSimS": 15.52,
+    "coreDelta": 15,
+    "bankDelta": -1
+  },
+  "errors": []
+}

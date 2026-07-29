@@ -47,6 +47,9 @@ import {
   MINIMAP_MARGIN,
   MINIMAP_REDRAW_TICKS,
   MINIMAP_SPAWN_PROTECT_ALPHA,
+  MINIMAP_FOG_ALPHA,
+  MINIMAP_COVERAGE_FILL_ALPHA,
+  MINIMAP_COVERAGE_RING_ALPHA,
 } from './minimap';
 import type { MinimapFrame, MinimapInsets, MinimapState } from './minimap';
 
@@ -86,10 +89,18 @@ export interface DrawnMinimap {
   /** The local ship's dot centre (screen space), or null when it is dead/absent —
    *  the test moves the ship and asserts this moved across two frames. */
   ownDot: { x: number; y: number } | null;
-  /** Counts of the content dots that drew — a cheap "the map is populated" check. */
+  /** Counts of the content dots that drew — a cheap "the map is populated" check.
+   *  These are the FOG-GATED counts: `shipCount` is the enemy ships that survived
+   *  the sensed-state gate, so a distant enemy dropping when its coverage dies is
+   *  observable here (the satellite-killed moment). */
   stationCount: number;
   shipCount: number;
   oreCount: number;
+  /** Sensed radar-satellite dots drawn this frame (feature f1). */
+  satelliteCount: number;
+  /** Current coverage discs drawn this frame — grows when a satellite is built (a
+   *  new LARGE disc appears), collapses to the local baseline when it dies. */
+  coverageCount: number;
   /** Whether the collapse ring drew this frame (GDD §2.3). */
   collapseRing: boolean;
 }
@@ -122,6 +133,8 @@ export class MinimapView extends Container {
     stationCount: 0,
     shipCount: 0,
     oreCount: 0,
+    satelliteCount: 0,
+    coverageCount: 0,
     collapseRing: false,
   };
 
@@ -233,10 +246,20 @@ export class MinimapView extends Container {
     const g = this.content;
     g.clear();
 
-    // Faint ore-field hints first (under everything else).
+    // --- Fog of war (feature f1) ---------------------------------------------
+    // Lay the Cold-Vacuum veil over the whole map, then punch the coverage discs
+    // back through it (a faint reveal + edge ring), so the sensed slice reads lit
+    // against the dark unsensed vacuum. Under everything else so the dots that
+    // survive the fog gate (only the sensed ones — decided in ./minimap) sit on
+    // top. Clipped to the rect by the layer's mask, so the veil never spills.
+    if (scene.fogged) this.drawFog(g, rect, scene.coverage);
+
+    // Faint ore-field hints (under the dots; already fog-gated by the scene).
     for (const o of scene.oreDots) g.circle(o.x, o.y, o.radius).fill({ color: o.color, alpha: o.alpha });
 
-    // The collapse ring (GDD §2.3) — threat red, the match's danger state.
+    // The collapse ring (GDD §2.3) — threat red, the match's danger state. Drawn
+    // regardless of coverage: it is match-critical and its closure is broadcast
+    // in-fiction, so it is a documented always-visible exception to the fog.
     if (scene.collapseRing) {
       g.circle(scene.collapseRing.x, scene.collapseRing.y, scene.collapseRing.radius).stroke({
         width: RING_WIDTH,
@@ -245,9 +268,15 @@ export class MinimapView extends Container {
       });
     }
 
-    // Stations, then enemy ships over them.
+    // Stations, then enemy ships, then satellites over them.
     for (const p of scene.stationDots) g.circle(p.x, p.y, p.radius).fill({ color: p.color, alpha: p.alpha });
     for (const s of scene.shipDots) g.circle(s.x, s.y, s.radius).fill({ color: s.color, alpha: s.alpha });
+    // Satellites: a small owner-coloured dot with a thin outline so a high-value
+    // radar body reads distinct from a ship at a glance (feature f1).
+    for (const sat of scene.satelliteDots) {
+      g.circle(sat.x, sat.y, sat.radius).fill({ color: sat.color, alpha: sat.alpha });
+      g.circle(sat.x, sat.y, sat.radius + 0.75).stroke({ width: 0.75, color: PALETTE.hullSteel, alpha: 0.7 });
+    }
 
     // NO offscreen texture cache. The field request's "cache to an offscreen
     // texture" is a poor trade on the software-WebGL path (the ~1 fps CI runner, and
@@ -265,6 +294,46 @@ export class MinimapView extends Container {
     // build-flow.spec was slow on CI — that is the irreducible cost of its long
     // construction-cycle advance; this just stops the map wasting a pass on the
     // slowest renderers regardless.)
+  }
+
+  /**
+   * Paint the fog-of-war veil + coverage reveals into `g` (feature f1). A near-
+   * opaque Cold-Vacuum fill darkens the whole rect, a sparse diagonal hatch gives
+   * it the "cold vacuum" texture, and each current coverage disc is revealed with
+   * a faint wash + an edge ring — so the sensed slice reads lit against the dark
+   * unsensed vacuum, and "you see what your radar buys you" is legible. All of it
+   * is clipped to the rect by the layer mask, so nothing spills past the frame.
+   */
+  private drawFog(g: Graphics, rect: Rect, coverage: readonly { x: number; y: number; radius: number }[]): void {
+    // The dark veil over the whole map — fogged vacuum.
+    g.rect(rect.x, rect.y, rect.width, rect.height).fill({ color: PALETTE.vacuum, alpha: MINIMAP_FOG_ALPHA });
+
+    // A sparse diagonal hatch for the "cold vacuum" fog texture — faint steel
+    // lines at a fixed pitch across the rect (drawn as a right-leaning family so a
+    // corner-to-corner sweep reads as hatch, not a grid). Cheap: a handful of
+    // strokes on a static rect.
+    const pitch = Math.max(8, Math.min(rect.width, rect.height) / 6);
+    for (let d = -rect.height; d < rect.width; d += pitch) {
+      const x0 = clamp(rect.x + d, rect.x, rect.x + rect.width);
+      const y0 = clamp(rect.y + (rect.x + d - x0), rect.y, rect.y + rect.height);
+      const x1 = clamp(rect.x + d + rect.height, rect.x, rect.x + rect.width);
+      const y1 = clamp(rect.y + (rect.x + d + rect.height - x1), rect.y, rect.y + rect.height);
+      g.moveTo(x0, y0).lineTo(x1, y1);
+    }
+    g.stroke({ width: 0.5, color: PALETTE.hullSteel, alpha: 0.06 });
+
+    // Reveal each coverage disc: a faint wash lightens the sensed vacuum, and a
+    // thin ring marks the radar reach (the satellite's LARGE disc is the tell).
+    for (const c of coverage) {
+      g.circle(c.x, c.y, c.radius).fill({ color: PALETTE.hullSteel, alpha: MINIMAP_COVERAGE_FILL_ALPHA });
+    }
+    for (const c of coverage) {
+      g.circle(c.x, c.y, c.radius).stroke({
+        width: 1,
+        color: PALETTE.plasma,
+        alpha: MINIMAP_COVERAGE_RING_ALPHA,
+      });
+    }
   }
 
   // --- ?debug=1 live-stage seam --------------------------------------------
@@ -286,6 +355,8 @@ export class MinimapView extends Container {
       stationCount: this.drawn.stationCount,
       shipCount: this.drawn.shipCount,
       oreCount: this.drawn.oreCount,
+      satelliteCount: this.drawn.satelliteCount,
+      coverageCount: this.drawn.coverageCount,
       collapseRing: this.drawn.collapseRing,
     };
   }
@@ -303,10 +374,18 @@ export class MinimapView extends Container {
     d.rect.width = rect.width;
     d.rect.height = rect.height;
     d.ownDot = ownDot;
-    d.stationCount = (frame.stations ?? []).length;
-    d.shipCount = (frame.ships ?? []).filter((s) => s.alive && !s.local).length;
-    d.oreCount = (frame.oreHints ?? []).length;
-    d.collapseRing = !!frame.collapse;
+    // Count what actually DREW — i.e. the fog-gated scene, not the raw frame — so
+    // a distant enemy dropping when its coverage dies is observable in shipCount
+    // (the satellite-killed moment). Computed here rather than read from the
+    // throttled rebuild so the counts are current on the frame the test samples.
+    // Only reached under ?debug=1 capture, never in a normal build.
+    const scene = minimapScene(frame, rect);
+    d.stationCount = scene.stationDots.length;
+    d.shipCount = scene.shipDots.length;
+    d.oreCount = scene.oreDots.length;
+    d.satelliteCount = scene.satelliteDots.length;
+    d.coverageCount = scene.coverage.length;
+    d.collapseRing = !!scene.collapseRing;
   }
 
   /**

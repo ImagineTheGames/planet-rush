@@ -32,7 +32,7 @@ import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { buttonStyle } from './button-theme';
-import { DIFFICULTY_LABELS, RUSH_LABEL } from './lobby';
+import { ABUNDANCE_LABELS, DIFFICULTY_LABELS, MODE_LABELS, RUSH_LABEL } from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
@@ -67,8 +67,14 @@ interface SeatNodes {
   readonly name: Text;
   /** Hull and colour name — the words that carry identity without the hue. */
   readonly detail: Text;
-  /** EASY / MEDIUM / HARD on a bot row; the tap target the host cycles. */
-  readonly difficulty: Text;
+  /** The trailing chip's background (variable-slots E) — the TEAM chip in TEAMS,
+   *  the difficulty chip in FFA; the tap target the host cycles. */
+  readonly rightChip: Graphics;
+  /** The team letter (TEAMS) or EASY/MEDIUM/HARD (FFA), centred on the chip. */
+  readonly chipLabel: Text;
+  /** The team underline under the name — the TEAMS grouping motif over the eight
+   *  identity colours (ratified: keep the colours, add a team indicator). */
+  readonly underline: Graphics;
   /** "OPEN" while a bot seat is still claimable by room code. */
   readonly open: Text;
 }
@@ -102,6 +108,12 @@ export class LobbyView extends Container {
    *  come for free — no ship stats, no yellow, exactly the frozen contract the
    *  standalone picker kept. Fed the lobby's own card rects each frame. */
   private readonly mapPicker = new MapPickerView();
+  /** The MODE toggle (FFA / TEAMS) and the ABUNDANCE toggle (SCARCE / STANDARD /
+   *  RICH) — the two match-config controls at the top of the roster (Milestone E). */
+  private readonly modeBody = new Graphics();
+  private readonly modeText: Text;
+  private readonly abundanceBody = new Graphics();
+  private readonly abundanceText: Text;
   private readonly rushBody = new Graphics();
   private readonly rushText: Text;
   private readonly rushHint: Text;
@@ -126,8 +138,14 @@ export class LobbyView extends Container {
     this.rushHint = makeText('', FONT_BODY, 11, TEXT_DIM);
     this.rushHint.anchor.set(0.5, 0);
 
+    this.modeText = makeText('', FONT_HEADING, 12, TEXT_PRIMARY);
+    this.modeText.anchor.set(0.5, 0.5);
+    this.abundanceText = makeText('', FONT_HEADING, 12, TEXT_PRIMARY);
+    this.abundanceText.anchor.set(0.5, 0.5);
+
     this.addChild(this.backdrop, this.wordmark, this.roomLabel, this.roomCode);
     this.addChild(this.mapPicker);
+    this.addChild(this.modeBody, this.modeText, this.abundanceBody, this.abundanceText);
     this.addChild(this.rushBody, this.rushText, this.rushHint);
     this.visible = false;
   }
@@ -163,11 +181,13 @@ export class LobbyView extends Container {
       .fill({ color: PALETTE.vacuum, alpha: 0.92 });
 
     this.drawTitle(model);
+    this.drawControls(model);
     for (let i = 0; i < this.layout.seats.length; i++) {
       const seat = model.seats[i];
       const rect = this.layout.seats[i];
-      if (!seat || !rect) continue;
-      this.drawSeat(this.seatSlot(i), seat, rect, model.phase);
+      const chip = this.layout.seatChips[i];
+      if (!seat || !rect || !chip) continue;
+      this.drawSeat(this.seatSlot(i), seat, rect, chip, model);
     }
     for (let i = 0; i < this.layout.classOptions.length; i++) {
       const option = model.classOptions[i];
@@ -232,17 +252,27 @@ export class LobbyView extends Container {
    * outline rather than by a brighter identity colour, so "which one is me" and
    * "which colour am I" stay two separate reads.
    */
-  private drawSeat(nodes: SeatNodes, seat: LobbySeatView, rect: Rect, phase: LobbyModel['phase']): void {
+  private drawSeat(
+    nodes: SeatNodes,
+    seat: LobbySeatView,
+    rect: Rect,
+    chipRect: Rect,
+    model: LobbyModel,
+  ): void {
     const pad = 8;
     const stripe = 4;
+    const phase = model.phase;
+    // A closed seat is a shut door: drawn faint, no identity, no chip, no team —
+    // it holds no player and takes no field (variable-slots Milestone E).
+    const closed = seat.isClosed;
+    const bodyAlpha = closed ? 0.04 : seat.isBot ? 0.07 : 0.13;
 
     nodes.body.clear();
-    nodes.body
-      .rect(rect.x, rect.y, rect.width, rect.height)
-      .fill({ color: PALETTE.hullSteel, alpha: seat.isBot ? 0.07 : 0.13 })
+    nodes.body.rect(rect.x, rect.y, rect.width, rect.height).fill({ color: PALETTE.hullSteel, alpha: bodyAlpha });
+    if (!closed) {
       // The identity stripe: trim, not body (style-guide §3 rule 2).
-      .rect(rect.x, rect.y, stripe, rect.height)
-      .fill({ color: seat.color, alpha: 0.9 });
+      nodes.body.rect(rect.x, rect.y, stripe, rect.height).fill({ color: seat.color, alpha: 0.9 });
+    }
     if (seat.isYou) {
       nodes.body
         .rect(rect.x, rect.y, rect.width, rect.height)
@@ -250,48 +280,86 @@ export class LobbyView extends Container {
     }
 
     // The identity chip and its decal. The decal is the source of truth and the
-    // colour is the fast read, so they are drawn as one object (§3 rule 3).
+    // colour is the fast read, so they are drawn as one object (§3 rule 3). A
+    // closed seat keeps its decal faint (identity is per-slot) but drops the fill.
     const chipSize = Math.min(26, rect.height - 2 * pad);
     const chipX = rect.x + stripe + pad;
     const chipY = rect.y + (rect.height - chipSize) / 2;
     nodes.chip.clear();
     nodes.chip
       .roundRect(chipX, chipY, chipSize, chipSize, 4)
-      .fill({ color: seat.color, alpha: 0.22 })
+      .fill({ color: seat.color, alpha: closed ? 0.05 : 0.22 })
       .roundRect(chipX, chipY, chipSize, chipSize, 4)
-      .stroke({ width: 1, color: seat.color, alpha: 0.9 });
+      .stroke({ width: 1, color: seat.color, alpha: closed ? 0.3 : 0.9 });
     nodes.decal.text = seat.decal;
     nodes.decal.style.fill = seat.color;
+    nodes.decal.alpha = closed ? 0.4 : 1;
     nodes.decal.x = chipX + chipSize / 2;
     nodes.decal.y = chipY + chipSize / 2;
 
     const textX = chipX + chipSize + pad;
     nodes.name.text = seat.isHost ? `${seat.name}  ★` : seat.name;
-    nodes.name.style.fill = seat.isBot ? TEXT_DIM : TEXT_PRIMARY;
+    nodes.name.style.fill = closed ? TEXT_DIM : seat.isBot ? TEXT_DIM : TEXT_PRIMARY;
+    nodes.name.alpha = closed ? 0.55 : 1;
     nodes.name.x = textX;
     nodes.name.y = rect.y + rect.height / 2 - (rect.height > 46 ? 15 : 8);
 
     // Colour named in words, beside the hull. This is the line that makes the
     // roster readable with the hue removed (style-guide §3 rule 3, §9).
-    nodes.detail.text = `${seat.className} · ${seat.colorName}`;
+    nodes.detail.text = closed ? 'out of the match' : `${seat.className} · ${seat.colorName}`;
     nodes.detail.x = textX;
     nodes.detail.y = nodes.name.y + 14;
     nodes.detail.visible = rect.height > 30;
 
-    const rightX = rect.x + rect.width - pad;
-    nodes.difficulty.visible = seat.isBot;
-    if (seat.isBot && seat.botDifficulty) {
-      nodes.difficulty.text = DIFFICULTY_LABELS[seat.botDifficulty];
-      nodes.difficulty.x = rightX;
-      nodes.difficulty.y = rect.y + rect.height / 2 - (rect.height > 46 ? 15 : 8);
+    // The TEAMS grouping underline under the name (ratified: keep the identity
+    // colours, add a team indicator). Neutral accent — the LETTER on the chip is
+    // the team's identity, not a hue (team colours would be a style-guide change).
+    const teams = model.mode === 'teams';
+    nodes.underline.clear();
+    if (teams && !closed) {
+      nodes.underline
+        .rect(textX, nodes.name.y + 12, 22, 2)
+        .fill({ color: PALETTE.patina, alpha: 0.85 });
     }
 
-    // A bot seat before RUSH is a seat somebody can still take by room code.
-    nodes.open.visible = seat.openToJoin && phase === 'gathering' && rect.height > 30;
+    // The trailing chip: the TEAM (TEAMS) or difficulty (FFA) the host cycles.
+    this.drawSeatChip(nodes, seat, chipRect, teams, closed);
+
+    // A bot seat before RUSH is a seat somebody can still take by room code —
+    // marked just left of the chip so it never fights the tier/team label.
+    nodes.open.visible = seat.openToJoin && phase === 'gathering' && rect.height > 30 && !closed;
     if (nodes.open.visible) {
-      nodes.open.x = rightX;
-      nodes.open.y = nodes.difficulty.y + 14;
+      nodes.open.x = chipRect.x - 4;
+      nodes.open.y = rect.y + rect.height / 2 + 2;
     }
+  }
+
+  /**
+   * A roster row's trailing chip — the ONE per-seat host control that is drawn:
+   * in TEAMS it shows the seat's side (A…D, {@link LobbySeatView.teamLabel}); in
+   * FFA it shows the bot's tier (EASY/MEDIUM/HARD). A human FFA seat and a closed
+   * seat have neither, so the chip is hidden — a tap on it is a no-op in the model
+   * either way, so the geometry can stay mode-blind.
+   */
+  private drawSeatChip(nodes: SeatNodes, seat: LobbySeatView, chip: Rect, teams: boolean, closed: boolean): void {
+    const showTeam = teams && !closed;
+    const showTier = !teams && seat.isBot;
+    const visible = (showTeam || showTier) && chip.width > 0 && chip.height > 8;
+    nodes.rightChip.visible = visible;
+    nodes.chipLabel.visible = visible;
+    nodes.rightChip.clear();
+    if (!visible) return;
+
+    const accent = showTeam ? PALETTE.plasma : PALETTE.patina;
+    nodes.rightChip
+      .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
+      .fill({ color: PALETTE.hullSteel, alpha: 0.16 })
+      .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
+      .stroke({ width: 1, color: accent, alpha: 0.85 });
+    nodes.chipLabel.text = showTeam ? seat.teamLabel : DIFFICULTY_LABELS[seat.botDifficulty ?? 'medium'];
+    nodes.chipLabel.style.fill = showTeam ? TEXT_PRIMARY : accent;
+    nodes.chipLabel.x = chip.x + chip.width / 2;
+    nodes.chipLabel.y = chip.y + chip.height / 2;
   }
 
   private seatSlot(index: number): SeatNodes {
@@ -304,15 +372,57 @@ export class LobbyView extends Container {
     decal.anchor.set(0.5, 0.5);
     const name = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
     const detail = makeText('', FONT_BODY, 11, TEXT_DIM);
-    const difficulty = makeText('', FONT_HEADING, 11, PALETTE.plasma);
-    difficulty.anchor.set(1, 0);
+    const rightChip = new Graphics();
+    const chipLabel = makeText('', FONT_HEADING, 11, PALETTE.plasma);
+    chipLabel.anchor.set(0.5, 0.5);
+    const underline = new Graphics();
     const open = makeText('OPEN', FONT_BODY, 10, TEXT_DIM);
-    open.anchor.set(1, 0);
+    open.anchor.set(1, 0.5);
 
-    this.addChild(body, chip, decal, name, detail, difficulty, open);
-    const nodes: SeatNodes = { body, chip, decal, name, detail, difficulty, open };
+    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, open);
+    const nodes: SeatNodes = { body, chip, decal, name, detail, rightChip, chipLabel, underline, open };
     this.seatNodes[index] = nodes;
     return nodes;
+  }
+
+  // --- The MODE / ABUNDANCE strip (variable-slots Milestone E) --------------
+
+  /**
+   * The two match-config toggles at the top of the roster: MODE (FFA / TEAMS) and
+   * ABUNDANCE (SCARCE / STANDARD / RICH). Both are the host's, and both lock with
+   * the hull at RUSH! ({@link LobbyModel.classLocked}); a guest or a locked lobby
+   * draws them dim, because the value is real but not this client's to change.
+   */
+  private drawControls(model: LobbyModel): void {
+    const enabled = model.hostControls && !model.classLocked;
+    this.drawToggle(this.modeBody, this.modeText, this.layout.modeToggle, `MODE · ${MODE_LABELS[model.mode]}`, enabled);
+    this.drawToggle(
+      this.abundanceBody,
+      this.abundanceText,
+      this.layout.abundance,
+      `ORE · ${ABUNDANCE_LABELS[model.abundance]}`,
+      enabled,
+    );
+  }
+
+  /** One pill toggle: a steel body, a plasma edge when live, and a centred label
+   *  (no stat, no yellow — the lobby's palette rules hold here too). */
+  private drawToggle(body: Graphics, label: Text, rect: Rect, text: string, enabled: boolean): void {
+    const visible = rect.width > 0 && rect.height > 0;
+    body.visible = visible;
+    label.visible = visible;
+    body.clear();
+    if (!visible) return;
+    body
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
+      .fill({ color: PALETTE.hullSteel, alpha: enabled ? 0.16 : 0.08 })
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
+      .stroke({ width: 1, color: enabled ? PALETTE.plasma : PALETTE.hullSteel, alpha: enabled ? 0.8 : 0.4 });
+    label.text = text;
+    label.style.fill = enabled ? TEXT_PRIMARY : TEXT_DIM;
+    label.alpha = enabled ? 1 : 0.7;
+    label.x = rect.x + rect.width / 2;
+    label.y = rect.y + rect.height / 2;
   }
 
   // --- Hull tiles ----------------------------------------------------------
@@ -415,11 +525,10 @@ export class LobbyView extends Container {
     this.rushText.y = rect.y + rect.height / 2;
 
     // A guest is told who they are waiting for rather than shown a dead button.
-    this.rushHint.text = counting
-      ? ''
-      : model.hostControls
-        ? `${model.humanCount} PLAYING · ${model.botCount} BOTS`
-        : 'WAITING FOR THE HOST';
+    // The host sees the shape of the match they are about to start — the head count
+    // in FFA, and the always-visible per-side tally in TEAMS (ratified: counts
+    // shown, never blocking a split).
+    this.rushHint.text = counting ? '' : model.hostControls ? this.hintText(model) : 'WAITING FOR THE HOST';
     this.rushHint.visible = this.rushHint.text !== '';
     this.rushHint.x = rect.x + rect.width / 2;
     this.rushHint.y = rect.y + rect.height + 2;
@@ -427,6 +536,17 @@ export class LobbyView extends Container {
     // button the bottom edge, so on a very short screen there is no room below.
     const bottom = this.layout.content.y + this.layout.content.height;
     if (this.rushHint.y + 12 > bottom) this.rushHint.visible = false;
+  }
+
+  /** The RUSH! hint the host reads: the FFA head count, or the TEAMS per-side
+   *  tally (`A 2 · B 2`), which is always shown so an uneven split is visible and
+   *  never blocked (ratified). */
+  private hintText(model: LobbyModel): string {
+    if (model.mode === 'teams') {
+      const sides = model.teamCounts.map((c) => `${c.label} ${c.count}`).join(' · ');
+      return sides || `${model.size} PLAYERS`;
+    }
+    return `${model.humanCount} PLAYING · ${model.botCount} BOTS`;
   }
 }
 

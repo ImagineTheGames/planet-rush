@@ -1,0 +1,192 @@
+{
+  "codex": "systems",
+  "title": "Systems — how Planet Rush works",
+  "gddVersion": "0.7",
+  "generated": { "against": "GDD.md v0.7", "critic_loops": 3, "tone_pinned": true },
+  "entries": [
+    {
+      "id": "sys-core-loop",
+      "title": "The Triangle: mine, defend, attack",
+      "category": "systems",
+      "summary": "One ship, three jobs, never enough time — the whole game is which corner you're standing in.",
+      "body": "Planet Rush is a Saturday-morning space brawl with one serious rule underneath it: you fly a single ship and you own a single mining station, and every second is spent on one of three jobs. Mine the shared asteroid field for ore. Spend that ore at home on defenses, repairs, or ship upgrades. Fight — besiege a rival station, or pick off enemy miners in the open. That is the triangle, and the trap is that you can only ever be in one corner of it. Every minute chipping rock is a minute you are not defending your reactor or cracking someone else's, and the match clock is finite: five ore surges, then the claim closes in. The decision — where should I be right now? — made every few seconds with one ship, is the game.",
+      "tags": ["loop", "triangle", "design"],
+      "see_also": ["sys-mining", "sys-waves-collapse", "strat-triangle"],
+      "facts": []
+    },
+    {
+      "id": "sys-mining",
+      "title": "Your gun is your mining tool",
+      "category": "systems",
+      "summary": "The same shot that bites a hull chips a rock — one weapon, one trigger.",
+      "body": "The idea the whole game inverts: your weapon and your mining tool are the same gun. Hold fire on an asteroid and your shots chip it into ore chunks that tractor toward you automatically; hold fire on a hull and those same shots bite. Whatever the shot reaches first decides which payload applies. Every shot is a travel-time projectile — a firework you can watch cross the gap — so a rock sits still and takes it, but a strafing ship can slip aside. Mining speed and weapon bite are one stat: upgrade DAMAGE and you both mine faster and hit harder. A stock Vanguard chips ore at a steady rate off the shared field, and the field is finite, so time spent mining is the tax you pay to have anything to spend.",
+      "tags": ["mining", "weapon", "projectile"],
+      "see_also": ["sys-ship-upgrades", "sys-reactor-core"],
+      "facts": [
+        { "label": "Mining rate (Vanguard, per second of fire)", "value": 0.5, "unit": "ore/s", "constant": "MINING_RATE" },
+        { "label": "Weapon vs ships & turrets (Vanguard DPS)", "value": 10, "unit": "dps", "constant": "WEAPON_DPS_SHIP" }
+      ]
+    },
+    {
+      "id": "sys-collection-field",
+      "title": "The collection field — banking without docking",
+      "category": "systems",
+      "summary": "Fly into your own station's field and your hold drains into the safe banked total.",
+      "body": "Held ore is not safe; banked ore is. You bank simply by flying into your own station's collection field — the ring of space around it — and while your ship sits inside that radius the hold drains steadily into your banked total, one chunk visibly couriering from ship to station per unit banked. Leave the ring and it stops. No docking, no parking, no button. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in a single tap for a pilot in a hurry. The choice the drain forces is how full to run: dart home early and safe, or risk hauling a fat hold through contested space where a death spills half of it.",
+      "tags": ["banking", "economy", "collection-field"],
+      "see_also": ["sys-ore-economy", "sys-death-debris"],
+      "facts": [
+        { "label": "Auto-deposit drain rate inside the field", "value": 2, "unit": "ore/s", "constant": "DEPOSIT.drainRate" }
+      ]
+    },
+    {
+      "id": "sys-ore-economy",
+      "title": "Ore is ore — and it's conserved exactly",
+      "category": "systems",
+      "summary": "Every unit is accounted for; five uses compete for each one you bank.",
+      "body": "There is one pool of ore and it is conserved to the unit — mined, dropped on death, looted off a wreck, deposited, or spent, the simulation asserts every tick that none was minted or lost. Mined ore, a dead rival's spilled fortune, and scavenged wreck-debris are the same stuff, read the same way by the collection field's drain. Once banked, every ore has five competing uses: a turret, a shield, a repair-reactor tap, a ship upgrade, or just sitting safe in the bank. That five-way spend, made all match under the clock, is the strategy layer — and because the field's total yield is finite, an ore spent on staying alive is an ore not spent on winning. Abundance (scarce, standard, or rich) is a per-match lobby setting that scales how much the field holds, not how it's counted.",
+      "tags": ["economy", "conservation", "ore"],
+      "see_also": ["sys-collection-field", "sys-repair-reactor", "sys-waves-collapse"],
+      "facts": [
+        { "label": "Starting ore (one opening choice)", "value": 3, "unit": "ore", "constant": "STARTING_ORE" },
+        { "label": "Total field yield per match (standard)", "value": 400, "unit": "ore", "constant": "FIELD_YIELD" }
+      ]
+    },
+    {
+      "id": "sys-repair-reactor",
+      "title": "The Repair Reactor — a rationed emergency patch",
+      "category": "systems",
+      "summary": "One ore, fifteen core HP, resolved instantly — then a fifteen-second lockout.",
+      "body": "Repair is a discrete purchase, not something you hold down. Press the REPAIR REACTOR segment and it spends 1 ore and restores 15 HP to your station's core, clamped at the core's max, resolved in full the instant you buy it — a hit that lands afterward cannot undo HP already banked into the core. There is no drain and nothing to interrupt. The catch is the clock on it: each repair puts that station on a 15-second cooldown, and the wedge counts it down live (\"REPAIR in 12s\") before re-arming to \"+15 HP / 1 ORE\". The cooldown is per station, not per player, so an ally patching a shared core waits on the same clock. This makes repair a rationed emergency patch, never a heal-tank tapped every frame — and it repairs the station core only, never a ship hull, because ships are cheap and respawn free. When the claim finally closes in, repair shuts off for good.",
+      "tags": ["repair", "core", "economy", "cooldown"],
+      "see_also": ["sys-ore-economy", "sys-shields", "sys-reactor-core"],
+      "facts": [
+        { "label": "Ore per repair tap", "value": 1, "unit": "ore", "constant": "REPAIR_ORE_COST" },
+        { "label": "Core HP restored per tap", "value": 15, "unit": "HP", "constant": "REPAIR_HP_PER_ORE" },
+        { "label": "Cooldown before the next repair (per station)", "value": 15, "unit": "s", "constant": "REPAIR_COOLDOWN_SECONDS" }
+      ]
+    },
+    {
+      "id": "sys-turrets",
+      "title": "Turrets — deterrents on a three-rung ladder",
+      "category": "systems",
+      "summary": "They deter; the ship defends. Mk I to Mk III buys tankier, harder, tighter aim.",
+      "body": "A turret auto-fires at enemies in range and assembles over about ten seconds, so you buy it before an attack, not during one. Four ring a station at most. The TURRET segment builds until the ring is full, then upgrades the weakest standing turret one mark — Mk I to Mk II to Mk III — each mark tankier, harder-hitting, faster-firing, slightly longer-ranged, and better-aimed than the last. Their shots travel and lead a mover, so a low ring aims loosely and a strafing attacker can make it miss, while a Mk III ring tracks an orbiter far better: upgrading buys accuracy as well as bite. The one invariant the ladder never breaks is that every mark's range stays under the ship's weapon reach, so a patient attacker can always pick turrets off from the edge of their range — slowly, and while ringing the owner's alarm. Turrets deter a lone raider; turrets fighting alongside the defender's own ship kill attackers fast.",
+      "tags": ["turret", "defense", "siege"],
+      "see_also": ["sys-shields", "strat-siege", "sys-reactor-core"],
+      "facts": [
+        { "label": "Turret cost (Mk I)", "value": 3, "unit": "ore", "constant": "TURRET.cost" },
+        { "label": "Turret HP (Mk I)", "value": 30, "unit": "HP", "constant": "TURRET.hp" },
+        { "label": "Turret DPS (Mk I)", "value": 4, "unit": "dps", "constant": "TURRET.dps" },
+        { "label": "Turret build time", "value": 10, "unit": "s", "constant": "TURRET.buildTime" },
+        { "label": "Turrets per station (cap)", "value": 4, "unit": "turrets", "constant": "TURRET.capPerStation" }
+      ]
+    },
+    {
+      "id": "sys-shields",
+      "title": "Shields — the bubble that pressure beats",
+      "category": "systems",
+      "summary": "A regenerating bubble over the core that only heals after eight quiet seconds.",
+      "body": "A shield generator is a regenerating bubble over your station core, medium-priced, assembling over about fifteen seconds, stacking two deep. It regenerates — but only after eight seconds without taking a hit, which is the whole \"pressure beats regeneration\" rule of a siege: a well-aimed attacker who keeps landing shots keeps the bubble from ever healing, and the defender who wants it back has to drive that attacker off first. A besieged station reads outermost-first, its shields reddening and dying before the core ring begins to fill, so the layers are a countdown you can watch. Two attackers crack what one cannot, because sustained pressure from two guns keeps the bubble suppressed while a single gun's gaps let it tick back.",
+      "tags": ["shield", "defense", "siege", "regen"],
+      "see_also": ["sys-turrets", "strat-siege", "sys-fog-radar"],
+      "facts": [
+        { "label": "Shield cost", "value": 5, "unit": "ore", "constant": "SHIELD.cost" },
+        { "label": "Shield HP", "value": 40, "unit": "HP", "constant": "SHIELD.hp" },
+        { "label": "Shield regen (after the delay)", "value": 2, "unit": "HP/s", "constant": "SHIELD.regenPerSecond" },
+        { "label": "Undamaged delay before regen", "value": 8, "unit": "s", "constant": "SHIELD.regenDelay" },
+        { "label": "Shield build time", "value": 15, "unit": "s", "constant": "SHIELD.buildTime" },
+        { "label": "Shields per station (cap)", "value": 2, "unit": "shields", "constant": "SHIELD.capPerStation" }
+      ]
+    },
+    {
+      "id": "sys-ship-upgrades",
+      "title": "Ship upgrades — the half of the economy you can miss",
+      "category": "systems",
+      "summary": "DAMAGE, SPEED, engine, cargo, hull — bought from the one screen that shows ship stats.",
+      "body": "Four wheel segments spend on your station; UPGRADE SHIP is the one that spends on your ship, and it carries an arrow because it opens a second screen — the upgrade panel, the only place ship stats are ever shown, each row giving current value, next tier, and ore cost. The weapon splits into two tracks: DAMAGE (per-shot bite, which is also mining speed — one stat) and SPEED (projectile muzzle velocity, so a faster shot is a harder-to-dodge shot). Alongside them: engine speed, cargo capacity, and hull HP. Upgrades multiply your hull class's base stats and persist through respawn, so a maxed Interceptor is still the fastest thing on the map and a maxed Hauler still the toughest. Cargo is the one additive track — your hold starts at two slots and each tier adds two, up to a hard cap of eight, so a wider hold is visibly more squares on the HUD.",
+      "tags": ["upgrade", "ship", "cargo", "weapon"],
+      "see_also": ["sys-mining", "ship-overview", "sys-ore-economy"],
+      "facts": [
+        { "label": "Base cargo hold", "value": 2, "unit": "slots", "constant": "CARGO_BASE" },
+        { "label": "Cargo added per upgrade tier", "value": 2, "unit": "slots", "constant": "CARGO_PER_TIER" },
+        { "label": "Cargo hard cap", "value": 8, "unit": "slots", "constant": "CARGO_CAP_MAX" }
+      ]
+    },
+    {
+      "id": "sys-reactor-core",
+      "title": "The station core — the one thing worth dying for",
+      "category": "systems",
+      "summary": "A naked core dies in about twenty seconds of fire; killing it ends a player's match.",
+      "body": "Every mining station has a core — its reactor, the health that actually matters. Ships are cheap and respawn free, but a core is not: when it hits zero its owner is eliminated, and this is where the game goes briefly quiet. A naked core takes roughly twenty seconds of sustained weapon fire to kill, because the weapon deals less to a core than to a hull — a station is meant to be worn down through its shields and turrets, not one-shot. That is why an occupied, defended station is nearly uncrackable one-on-one and an abandoned one falls to a determined siege. When a core dies the wreck stays on the map for the rest of the match, ringed by the dead player's own banked fortune as contestable loot. Nobody jokes for three seconds.",
+      "tags": ["core", "reactor", "win-loss", "siege"],
+      "see_also": ["sys-repair-reactor", "sys-death-debris", "strat-siege"],
+      "facts": [
+        { "label": "Core HP", "value": 100, "unit": "HP", "constant": "CORE_HP" },
+        { "label": "Weapon vs core (Vanguard DPS)", "value": 5, "unit": "dps", "constant": "WEAPON_DPS_CORE" }
+      ]
+    },
+    {
+      "id": "sys-waves-collapse",
+      "title": "Ore surges and the Crush",
+      "category": "systems",
+      "summary": "Five waves spawning ever closer to center, then the claim closes in.",
+      "body": "The claim sits in a decaying asteroid belt eating itself. Ore arrives in five timed surges — asteroid waves — each spawning closer to the map center than the last, pulling every surviving player into a smaller and smaller contested space. The HUD names the wave and counts down to the next so nobody has to guess what's being tracked. When the final surge is spent, the match enters its collapse phase — in fiction, the Crush: the claim's boundary contracts, shields stop regenerating, repair shuts off, no new ore arrives, and the closing vice finishes whoever the players didn't. The match cannot stalemate; the ruleset guarantees an ending in the ten-to-fifteen-minute window. Whoever managed the clock best owns the endgame.",
+      "tags": ["waves", "collapse", "clock", "the-crush"],
+      "see_also": ["sys-core-loop", "sys-ore-economy", "strat-clock"],
+      "facts": [
+        { "label": "Number of ore surges (waves)", "value": 5, "unit": "waves", "constant": "WAVE_COUNT" },
+        { "label": "Wave interval (the metronome)", "value": 150, "unit": "s", "constant": "WAVE_INTERVAL_S" }
+      ]
+    },
+    {
+      "id": "sys-fog-radar",
+      "title": "Fog of war and the radar satellite",
+      "category": "systems",
+      "summary": "Enemy health is scouted, not broadcast — and a satellite widens what you see.",
+      "body": "You never see a rival station's HP from across the map. A rival core's damage ring appears only when your ship flies within sensor range of it, so knowing who is winning, who is wounded, and who is under siege is information you earn by scouting — or by reading the smoke, since a burning station shows from further off than its numbers do. A global HP scoreboard would let everyone free-ride on every attack; the fog makes third-party awareness a skill. To see more, build a radar satellite: a buildable body that orbits your station and lights up a large slice of the arena on the minimap. It is attackable — one shot target on a slow, legible orbit — so blinding a rival by shooting down their satellite is a real play. Bots are fog-honest too: a Hard bot that knows you're wounded knows because it scouted you.",
+      "tags": ["fog-of-war", "radar", "satellite", "scouting", "minimap"],
+      "see_also": ["sys-shields", "strat-scouting", "bots-warden"],
+      "facts": [
+        { "label": "Sensor range (enemy damage ring becomes visible)", "value": 180, "unit": "units", "constant": "SENSOR_RANGE" },
+        { "label": "Radar satellite cost", "value": 6, "unit": "ore", "constant": "SATELLITE.cost" },
+        { "label": "Satellite minimap coverage radius", "value": 900, "unit": "units", "constant": "SATELLITE.sensorRange" }
+      ]
+    },
+    {
+      "id": "sys-death-debris",
+      "title": "Death, respawn, and the wreck",
+      "category": "systems",
+      "summary": "Ships die cheap; you drop half your hold and respawn in five seconds — stations do not.",
+      "body": "Dying in a ship is cheap: you respawn at your home station in five seconds with every upgrade intact, so the cost of death is time and position, not progress. But you drop half your held ore where you exploded — banked ore is never touched — so a full hold is a gamble and a fresh spill is a scramble. Stations are the opposite of cheap. When a core dies its wreck persists for the whole match, ringed by ore-laden debris funded by the dead player's own banked fortune, so the thing they were hoarding becomes the thing their killers fight over. Small holds mean nobody hauls a dead rival's fortune away in one trip, so wreck sites stay contested — a feature, not a bug. On the compass and diamond maps at small player counts, the empty home slots are seeded as derelicts: unowned abandoned rigs carrying a scavengeable ore field from the opening whistle. They are nobody's enemy and take no siege damage — just contested loot.",
+      "tags": ["death", "respawn", "wreck", "derelict", "loot"],
+      "see_also": ["sys-collection-field", "strat-wrecks", "sys-spawn-protection"],
+      "facts": [
+        { "label": "Respawn time", "value": 5, "unit": "s", "constant": "RESPAWN_S" },
+        { "label": "Fraction of held ore dropped on death", "value": 0.5, "unit": "fraction", "constant": "DEATH_ORE_DROP_FRACTION" }
+      ]
+    },
+    {
+      "id": "sys-spawn-protection",
+      "title": "Spawn protection — the ten-second grace",
+      "category": "systems",
+      "summary": "Ship and core are untouchable for ten seconds at match start, so no rush ends it early.",
+      "body": "At match start both your ship and your station core carry ten seconds of spawn protection, so no opening rush can end a match before anyone has even flown. It is the breath before the brawl: enough time to make your one opening ore choice — an early turret, a head start on upgrades, or banked safety — and point yourself at the field. A match countdown (\"RUSH!\") drops the flag when it ends.",
+      "tags": ["spawn-protection", "match-start"],
+      "see_also": ["sys-ore-economy", "sys-death-debris"],
+      "facts": [
+        { "label": "Spawn protection (ship and core)", "value": 10, "unit": "s", "constant": "SPAWN_PROTECTION_S" }
+      ]
+    },
+    {
+      "id": "sys-maps",
+      "title": "Four maps, fair at every size",
+      "category": "systems",
+      "summary": "Octagon, compass, oval, diamond — rotationally symmetric so per-player ore is exactly equal.",
+      "body": "Four hand-authored arenas ship in core scope — octagon, compass, oval, and diamond — chosen in the lobby. Each is a resource-fairness invariant: the asteroid field is rotationally symmetric about the arena center, so per-player ore is exactly equal no matter how many are playing. Small matches are handled two ways. Octagon and oval regenerate as true N-station arenas with equal gaps at any size. Compass and diamond always place eight homes and leave the unused ones as lootable derelicts, preserving their signature geometry. Because a finite field splits across fewer stations, a smaller match is a richer board even though its wall-clock length still lands in the ten-to-fifteen-minute target — an economy-feel difference, not a clock change.",
+      "tags": ["maps", "fairness", "arena"],
+      "see_also": ["sys-death-debris", "sys-waves-collapse"],
+      "facts": []
+    }
+  ]
+}

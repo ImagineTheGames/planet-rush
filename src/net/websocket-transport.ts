@@ -26,6 +26,8 @@
 
 import { encodeClientMessage, parseServerMessage } from './wire';
 import type { WireFrame } from './wire';
+import { decideReconnect } from './reconnect';
+import type { RoomLiveness, StopReason } from './reconnect';
 import type { PlayerId } from '@shared/types';
 import type {
   ClientMessage,
@@ -59,6 +61,23 @@ export interface WebSocketTransportConfig {
   readonly url: string;
   /** The room to join on connect, and to rejoin on every retry (GDD §4.2). */
   readonly room: RoomCode;
+  /**
+   * The allocator's signed routing decision (`./allocator-client` → `./ticket`),
+   * presented on `join` so a Machine in a fleet accepts a connection it was sent.
+   * Absent on the direct-connect path (no allocator, one Machine, nothing to
+   * prove — the seam the direct-connect path keeps). Carried on every dial,
+   * reclaims included, so a redial inside the grace window still proves membership.
+   */
+  readonly ticket?: string;
+  /**
+   * Ask the allocator whether the room still exists, used only after a drop to
+   * tell "my connection died" from "the room died" (`./reconnect`, M9 Task 9b).
+   * A `'gone'` answer stops the retry loop *early* instead of hammering a dead
+   * Machine for the whole grace window. Absent (the direct-connect path) leaves
+   * the room `'unknown'`, and the reconnect decision falls back to the window
+   * alone — exactly today's behaviour.
+   */
+  readonly checkRoomAlive?: () => Promise<RoomLiveness>;
   /** Opens a socket. Defaults to the browser's `WebSocket`. */
   readonly connect?: (url: string) => WebSocketLike;
   /** Wall clock, ms. Defaults to `Date.now`. */
@@ -74,6 +93,16 @@ export interface WebSocketTransportConfig {
   readonly retryBaseMs?: number;
   readonly retryMaxMs?: number;
 }
+
+/**
+ * Why the transport ended up `closed`, once it has. `'left'` is a deliberate
+ * hang-up; the other two are the two dead-socket truths Task 9b keeps apart —
+ * a room that ended (`'room-gone'`, nothing to reclaim, offer a new match) versus
+ * a grace window that ran out (`'grace-elapsed'`, the seat is a bot's now). The
+ * ratified `Transport` interface says only `state`; this richer reason is a
+ * concrete-class extra the online menu reads, exactly as `player` already is.
+ */
+export type CloseReason = 'left' | StopReason;
 
 /** Defaults, named so the reconnect behaviour is legible without reading code. */
 export const RECONNECT_WINDOW_MS = 60_000;
@@ -101,6 +130,14 @@ export class WebSocketTransport implements Transport {
   /** Wall clock of the drop we are currently trying to recover from, or -1. */
   private droppedAt = -1;
   private retry: TimerHandle | null = null;
+  /** The allocator's latest word on the room behind a dead socket (`./reconnect`).
+   *  `'unknown'` until a probe answers, and reset to it on every fresh open. */
+  private roomLiveness: RoomLiveness = 'unknown';
+  /** True while a liveness probe is in flight, so a drop fires at most one. */
+  private probing = false;
+  /** Why we last moved to `closed`, for a UI that must say the right thing:
+   *  a deliberate leave, a dead room, or a spent grace window. Null until closed. */
+  private closeReasonValue: CloseReason | null = null;
 
   private readonly connectSocket: (url: string) => WebSocketLike;
   private readonly now: () => number;
@@ -109,8 +146,10 @@ export class WebSocketTransport implements Transport {
   private readonly windowMs: number;
   private readonly retryBase: number;
   private readonly retryMax: number;
+  private readonly checkRoomAlive: (() => Promise<RoomLiveness>) | null;
 
   constructor(private readonly config: WebSocketTransportConfig) {
+    this.checkRoomAlive = config.checkRoomAlive ?? null;
     this.connectSocket =
       config.connect ?? ((url) => new WebSocket(url) as unknown as WebSocketLike);
     this.now = config.now ?? (() => Date.now());
@@ -162,12 +201,20 @@ export class WebSocketTransport implements Transport {
     }
     this.socket?.close();
     this.socket = null;
+    this.closeReasonValue = 'left';
     this.setState('closed');
   }
 
   /** The slot the server seated us in, or null before `welcome`. */
   get player(): PlayerId | null {
     return this.seat;
+  }
+
+  /** Why the transport closed, or null while it is still open/reconnecting. Lets a
+   *  reconnect banner distinguish "the room ended" from "your grace ran out" — the
+   *  two dead-socket truths (M9 Task 9b). Not part of the `Transport` interface. */
+  get closeReason(): CloseReason | null {
+    return this.closeReasonValue;
   }
 
   // --- Dialling -----------------------------------------------------------
@@ -183,6 +230,9 @@ export class WebSocketTransport implements Transport {
     socket.onopen = (): void => {
       this.attempt = 0;
       this.droppedAt = -1;
+      // A fresh open is a clean slate: whatever a prior drop learned about the
+      // room no longer bears on the connection we just made.
+      this.roomLiveness = 'unknown';
       // Every dial ends the same way: ask for the room. On a first connect that
       // is a join; on a redial inside the grace window it is a reclaim, and the
       // server hands the ship back rather than seating us somewhere new.
@@ -217,6 +267,9 @@ export class WebSocketTransport implements Transport {
   }
 
   private sendJoin(): void {
+    // The allocator's ticket rides every dial, reclaims included: in a fleet the
+    // Machine refuses a join it was never sent, and a redial is still a join.
+    const ticket = this.config.ticket;
     const message: ClientMessage =
       this.seat !== null && this.token !== null
         ? {
@@ -224,8 +277,13 @@ export class WebSocketTransport implements Transport {
             room: this.config.room,
             reclaim: this.seat,
             reclaimToken: this.token,
+            ...(ticket !== undefined ? { ticket } : {}),
           }
-        : { type: 'join', room: this.config.room };
+        : {
+            type: 'join',
+            room: this.config.room,
+            ...(ticket !== undefined ? { ticket } : {}),
+          };
     this.socket?.send(encodeClientMessage(message));
   }
 
@@ -233,32 +291,90 @@ export class WebSocketTransport implements Transport {
    * The socket went away without us asking. Start (or continue) the sixty
    * seconds we have to get the ship back, with an exponential backoff so a
    * server that is genuinely down is not hammered by eight phones at once.
+   *
+   * The verdict — keep trying, or stop and why — is `decideReconnect`'s
+   * (`./reconnect`), fed the elapsed grace and whatever a liveness probe has
+   * learned about the room. With no probe wired (the direct-connect path) the
+   * room stays `'unknown'` and the decision is the grace window alone, exactly as
+   * before. With one wired, a `'gone'` room stops the loop the instant the probe
+   * answers, rather than burning the rest of the window against a dead Machine.
    */
   private onDrop(): void {
     const now = this.now();
     if (this.droppedAt < 0) this.droppedAt = now;
 
-    if (now - this.droppedAt >= this.windowMs) {
-      // The window has closed: the bot owns that seat for the rest of the match
-      // (GDD §4.2), so there is nothing left to reconnect *to*.
-      this.setState('closed');
+    const decision = decideReconnect({
+      elapsedMs: now - this.droppedAt,
+      graceWindowMs: this.windowMs,
+      roomLiveness: this.roomLiveness,
+      room: this.config.room,
+    });
+    if (decision.action === 'stop') {
+      this.stop(decision.reason);
       return;
     }
 
     this.setState('reconnecting');
+    // Ask the allocator, in parallel with the backoff, whether the room even
+    // still exists; a `'gone'` answer aborts the pending retry early (M9 Task 9b).
+    this.probeRoom();
     const delay = Math.min(this.retryMax, this.retryBase * 2 ** this.attempt);
     this.attempt++;
     this.retry = this.schedule(() => {
       this.retry = null;
       if (this.left) return;
-      // Re-check the window on wake: the tab may have been asleep for the whole
-      // of it, and redialling then would just reconnect into someone else's match.
-      if (this.now() - this.droppedAt >= this.windowMs) {
-        this.setState('closed');
+      // Re-decide on wake: the tab may have slept through the whole window, and a
+      // probe may have landed a verdict while we backed off.
+      const again = decideReconnect({
+        elapsedMs: this.now() - this.droppedAt,
+        graceWindowMs: this.windowMs,
+        roomLiveness: this.roomLiveness,
+        room: this.config.room,
+      });
+      if (again.action === 'stop') {
+        this.stop(again.reason);
         return;
       }
       this.open();
     }, delay);
+  }
+
+  /**
+   * Probe the allocator for the room's liveness while we are reconnecting, at most
+   * one in flight at a time. A `'gone'` verdict is the whole point of Task 9b: it
+   * cancels the pending redial and closes now, so a phone does not retry-loop
+   * against a room that has ended. A `'live'`/`'unknown'` answer, or a probe that
+   * throws, changes nothing — the window-based retry carries on.
+   */
+  private probeRoom(): void {
+    if (this.checkRoomAlive === null || this.probing || this.left) return;
+    this.probing = true;
+    this.checkRoomAlive()
+      .then((liveness) => {
+        this.probing = false;
+        // Ignore a verdict that arrived after we already reconnected or left: it
+        // describes a socket we are no longer trying to recover.
+        if (this.left || this.connection !== 'reconnecting') return;
+        this.roomLiveness = liveness;
+        if (liveness === 'gone') {
+          if (this.retry !== null) {
+            this.cancel(this.retry);
+            this.retry = null;
+          }
+          this.stop('room-gone');
+        }
+      })
+      .catch(() => {
+        // A failed probe is not a dead room, only an unreachable allocator: leave
+        // the room `'unknown'` and let the grace window keep deciding.
+        this.probing = false;
+      });
+  }
+
+  /** Give up reconnecting: record why, then close. */
+  private stop(reason: StopReason): void {
+    this.closeReasonValue = reason;
+    this.setState('closed');
   }
 
   private setState(state: ConnectionState): void {
