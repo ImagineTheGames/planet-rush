@@ -35,6 +35,7 @@ import {
   isDocked,
   isOver,
   stationOf,
+  satelliteCount,
   shieldCount,
   shieldPool,
   turretCount,
@@ -2126,6 +2127,7 @@ async function boot(): Promise<void> {
       hudFrame.stationAlive = station.alive;
       hudFrame.turrets = turretCount(station);
       hudFrame.shields = shieldCount(station);
+      hudFrame.satellites = satelliteCount(station);
       hudFrame.homePos = station.pos;
     }
 

@@ -1,10 +1,13 @@
 /**
  * Build & Upgrade wheel model tests (GDD §2.5). The load-bearing contracts:
- *  - **four** segments, each naming its target, in the order the GDD names them
- *    (the manual BANK segment is gone — ore auto-deposits in the atmosphere);
+ *  - **five** segments, each naming its target, in the order the GDD names them
+ *    (the manual BANK segment is gone — ore auto-deposits in the atmosphere — but
+ *    RADAR is back, one wedge per player-buildable sim item; p13 regression);
  *  - **the only number on a segment is its cost** — and the costs are the sim's;
  *  - affordability, caps, and no-op presses are shown honestly, so the wheel
  *    never dangles a segment `placeOrder` would refuse;
+ *  - **every player-buildable sim item has a wedge** (the guard), so the next
+ *    silent `Exclude<>` cut fails the build instead of vanishing a feature;
  *  - the wheel opens **at your own station and nowhere else**.
  * These are the day-2 DoD tests: wheel affordability states.
  */
@@ -12,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWheelModel,
   canOpenWheel,
+  radarCapLabel,
   segmentAtDirection,
   segmentAngle,
   segmentCost,
@@ -22,10 +26,12 @@ import {
   repairCooldownSeconds,
   REPAIR_ENTRY_ORE,
   SEGMENT_ARC,
+  WHEEL_EXCLUDED_ITEMS,
   WHEEL_ORDER,
 } from './build-wheel';
 import type { BuildWheelSignals, WheelSegmentId } from './build-wheel';
-import { REPAIR_COOLDOWN_SECONDS, REPAIR_HP_PER_ORE, SHIELD, TURRET } from '../sim/constants';
+import type { BuildItem } from '@shared/types';
+import { REPAIR_COOLDOWN_SECONDS, REPAIR_HP_PER_ORE, SATELLITE, SHIELD, TURRET } from '../sim/constants';
 
 /** A docked player at a healthy station with `ore` banked, plus overrides. */
 function sig(over: Partial<BuildWheelSignals> = {}): BuildWheelSignals {
@@ -38,6 +44,7 @@ function sig(over: Partial<BuildWheelSignals> = {}): BuildWheelSignals {
     banked: 0,
     turrets: 0,
     shields: 0,
+    satellites: 0,
     coreHp: 100,
     maxCoreHp: 100,
     ...over,
@@ -49,10 +56,10 @@ function stateOf(id: WheelSegmentId, over: Partial<BuildWheelSignals> = {}) {
   return segmentState(id, sig(over));
 }
 
-describe('the wheel itself (GDD §2.5 — four segments, words + target)', () => {
-  it('has exactly four segments, in the order the GDD names them', () => {
-    expect(WHEEL_ORDER).toEqual(['turret', 'shield', 'repair', 'upgrade']);
-    expect(buildWheelModel(sig()).segments).toHaveLength(4);
+describe('the wheel itself (GDD §2.5 — five segments, words + target)', () => {
+  it('has exactly five segments, in the order the GDD names them', () => {
+    expect(WHEEL_ORDER).toEqual(['turret', 'shield', 'satellite', 'repair', 'upgrade']);
+    expect(buildWheelModel(sig()).segments).toHaveLength(5);
   });
 
   it('no longer carries a manual BANK segment (ore auto-deposits — p4-11)', () => {
@@ -60,18 +67,28 @@ describe('the wheel itself (GDD §2.5 — four segments, words + target)', () =>
     expect(ids).not.toContain('bank');
   });
 
+  it('carries the RADAR (satellite) segment again — bots build it, so the player can (p13)', () => {
+    // The regression this file guards against: `satellite` was swept out of the
+    // wheel alongside `bank` and no test noticed for four versions. It is a
+    // player-buildable sim item, so it MUST have a wedge.
+    const ids = buildWheelModel(sig()).segments.map((s) => s.id);
+    expect(ids).toContain('satellite');
+  });
+
   it('labels every segment in words, and names which target it spends on', () => {
     const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
     expect(byId.get('turret')?.label).toBe('TURRET');
     expect(byId.get('shield')?.label).toBe('SHIELD');
+    expect(byId.get('satellite')?.label).toBe('RADAR');
     // Named in full — it repairs the station's reactor, never the ship (GDD §2.5).
     expect(byId.get('repair')?.label).toBe('REPAIR REACTOR');
     expect(byId.get('upgrade')?.label).toBe('UPGRADE SHIP');
 
-    // "Three spend on your station, one on your ship" (GDD §2.5).
+    // "Everything but the ship upgrade spends on your station" (GDD §2.5): four
+    // station segments (turret, shield, radar, repair), one on the ship.
     const stationSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'station');
     const shipSegments = buildWheelModel(sig()).segments.filter((s) => s.target === 'ship');
-    expect(stationSegments).toHaveLength(3);
+    expect(stationSegments).toHaveLength(4);
     expect(shipSegments).toHaveLength(1);
     expect(shipSegments[0]?.id).toBe('upgrade');
   });
@@ -79,6 +96,95 @@ describe('the wheel itself (GDD §2.5 — four segments, words + target)', () =>
   it('marks UPGRADE SHIP — and only it — as the segment that opens a screen', () => {
     const opening = buildWheelModel(sig()).segments.filter((s) => s.opensPanel);
     expect(opening.map((s) => s.id)).toEqual(['upgrade']);
+  });
+});
+
+describe('THE GUARD — every player-buildable sim item has a wedge (or a named exclusion)', () => {
+  // Exhaustive by construction: every `BuildItem` MUST be a key here, or tsc fails
+  // on this literal — so a new sim build order forces its way into the guard, which
+  // then demands it either get a wheel segment or a ratified entry in
+  // WHEEL_EXCLUDED_ITEMS. This is the structural fix for the p13 regression: the
+  // wheel can no longer silently drop a buildable item.
+  const ALL_BUILD_ITEMS: Record<BuildItem, true> = {
+    turret: true,
+    shield: true,
+    satellite: true,
+    repair: true,
+    bank: true,
+  };
+
+  it('shows, or explicitly excludes, every BuildItem — never neither, never both', () => {
+    const shown = new Set<string>(WHEEL_ORDER);
+    const excluded = new Set<string>(WHEEL_EXCLUDED_ITEMS);
+    for (const item of Object.keys(ALL_BUILD_ITEMS) as BuildItem[]) {
+      const hasWedge = shown.has(item);
+      const isExcluded = excluded.has(item);
+      // Neither = the regression (a buildable item with no way to build it).
+      expect(hasWedge || isExcluded, `${item} is neither on the wheel nor in WHEEL_EXCLUDED_ITEMS`).toBe(
+        true,
+      );
+      // Both = a contradiction (excluded yet drawn).
+      expect(hasWedge && isExcluded, `${item} is both shown and excluded`).toBe(false);
+    }
+  });
+
+  it('excludes exactly the ratified set — nothing padded in to silence the guard', () => {
+    // The ONE sanctioned cut is BANK (ore auto-deposits, p4-11). If a future cut is
+    // made, it belongs here with a name against it — this assertion makes adding one
+    // a deliberate, reviewed act, not a silent `Exclude<>`.
+    expect([...WHEEL_EXCLUDED_ITEMS]).toEqual(['bank']);
+  });
+});
+
+describe('RADAR — cost, one-per-station cap, and the "0/1" count (p13)', () => {
+  it('prices RADAR at the sim\'s satellite cost', () => {
+    expect(segmentCost('satellite')).toBe(SATELLITE.cost);
+    expect(SATELLITE.cost).toBe(6); // feature f1 balance — above a shield's 5
+  });
+
+  it('is buildable when affordable and none is up yet', () => {
+    expect(stateOf('satellite', { banked: SATELLITE.cost, satellites: 0 })).toBe('ready');
+    expect(stateOf('satellite', { banked: SATELLITE.cost - 1, satellites: 0 })).toBe('unaffordable');
+  });
+
+  it('caps at one per station — a second is refused because coverage exists, not the wallet', () => {
+    expect(stateOf('satellite', { banked: 99, satellites: SATELLITE.capPerStation })).toBe('capped');
+    // Cap outranks cost, like turret/shield: broke AND at the cap still reads capped.
+    expect(stateOf('satellite', { banked: 0, satellites: SATELLITE.capPerStation })).toBe('capped');
+  });
+
+  it('shows the u2-02 "0/1" count, and "1/1" at the cap', () => {
+    expect(radarCapLabel(sig({ satellites: 0 }))).toBe(`0/${SATELLITE.capPerStation}`);
+    expect(radarCapLabel(sig({ satellites: 1 }))).toBe(`1/${SATELLITE.capPerStation}`);
+    const seg = buildWheelModel(sig({ satellites: 0 })).segments.find((s) => s.id === 'satellite');
+    expect(seg?.capLabel).toBe('0/1');
+  });
+
+  it('re-arms after the satellite is shot down — count drops, wedge goes ready again', () => {
+    // At the cap: greyed, "1/1". The satellite dies, the sim's count drops to 0, and
+    // the wedge is buildable again with "0/1" — the count IS the re-arm tell.
+    expect(stateOf('satellite', { banked: 99, satellites: 1 })).toBe('capped');
+    expect(stateOf('satellite', { banked: 99, satellites: 0 })).toBe('ready');
+    expect(buildWheelModel(sig({ satellites: 1 })).segments.find((s) => s.id === 'satellite')?.capLabel).toBe(
+      '1/1',
+    );
+  });
+
+  it('hangs the "0/1" count on RADAR only — null on every other wedge', () => {
+    const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
+    expect(byId.get('satellite')?.capLabel).not.toBeNull();
+    expect(byId.get('turret')?.capLabel).toBeNull();
+    expect(byId.get('shield')?.capLabel).toBeNull();
+    expect(byId.get('repair')?.capLabel).toBeNull();
+    expect(byId.get('upgrade')?.capLabel).toBeNull();
+  });
+
+  it('reads "0/1" when the caller predates the radar wedge (no satellites field)', () => {
+    // Backward-compatible default: an old caller/fixture reads as "none built".
+    const legacy: BuildWheelSignals = { ...sig() };
+    delete (legacy as { satellites?: number }).satellites;
+    expect(radarCapLabel(legacy)).toBe('0/1');
+    expect(segmentState('satellite', legacy)).toBe('unaffordable'); // 0 ore, none built
   });
 });
 
@@ -333,10 +439,10 @@ describe('the wheel opens at your own station and nowhere else (GDD §2.5, §2.4
     expect(canOpenWheel(sig({ stationAlive: false }))).toBe(false);
   });
 
-  it('still describes all four segments while closed, so the view pools once', () => {
+  it('still describes all five segments while closed, so the view pools once', () => {
     const closed = buildWheelModel(sig({ docked: false }));
     expect(closed.open).toBe(false);
-    expect(closed.segments).toHaveLength(4);
+    expect(closed.segments).toHaveLength(5);
   });
 });
 
@@ -352,7 +458,7 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
   it('puts segment 0 at twelve o\'clock and runs clockwise', () => {
     expect(segmentAngle(0)).toBeCloseTo(-Math.PI / 2);
     expect(segmentAngle(1)).toBeCloseTo(-Math.PI / 2 + SEGMENT_ARC);
-    expect(SEGMENT_ARC).toBeCloseTo((2 * Math.PI) / 4);
+    expect(SEGMENT_ARC).toBeCloseTo((2 * Math.PI) / 5);
   });
 
   it('selects the segment a stick or pointer direction is aimed at', () => {
@@ -361,7 +467,10 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
     // A fifth of a turn clockwise from up → the second.
     const a = segmentAngle(1);
     expect(segmentAtDirection(Math.cos(a), Math.sin(a))).toBe('shield');
-    const d = segmentAngle(3);
+    // RADAR is the third wedge now; UPGRADE SHIP is the fifth and last.
+    const r = segmentAngle(2);
+    expect(segmentAtDirection(Math.cos(r), Math.sin(r))).toBe('satellite');
+    const d = segmentAngle(WHEEL_ORDER.indexOf('upgrade'));
     expect(segmentAtDirection(Math.cos(d), Math.sin(d))).toBe('upgrade');
   });
 
@@ -378,6 +487,6 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
       expect(id).not.toBeNull();
       seen.add(id!);
     }
-    expect(seen.size).toBe(4);
+    expect(seen.size).toBe(5);
   });
 });
