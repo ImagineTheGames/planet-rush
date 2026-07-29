@@ -92,6 +92,7 @@ import { Minimap } from './minimap';
 import type { MinimapFrame, MinimapInsets } from './minimap';
 import { MinimapView } from './minimap-view';
 import type { DrawnMinimap } from './minimap-view';
+import { PANEL_FILL, PANEL_FILL_ALPHA, PANEL_RULE, PANEL_RULE_ALPHA, TEXT_MUTED, RADIUS } from './chrome';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -127,8 +128,10 @@ const FONT_NUMERAL = 'Oxanium, "DejaVu Sans Mono", monospace';
 
 /** Neutral light HUD text. Chalk-white — NOT signal yellow (RESERVED, §2). */
 const TEXT_PRIMARY = 0xdce3ec;
-/** Dimmer neutral (match time, secondary numerals). */
-const TEXT_DIM = PALETTE.hullSteel;
+// Muted secondary labels (TOTAL, HOME, MATCH, a strip action) draw in the void
+// material's muted tone {@link TEXT_MUTED} from ./chrome — the ui-mockup's HUD
+// grey, one step lighter than the disabled `hullSteel`, so a readable-but-inert
+// label never wears the "you can't press this" costume.
 
 // ---------------------------------------------------------------------------
 // Layout constants (CSS pixels; the Application handles devicePixelRatio)
@@ -551,7 +554,7 @@ export class Hud extends Container {
     // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
     // yellow. The heading names it as the safe bank total, distinct in both form
     // and place from the pips carried under the ship (field rule).
-    this.totalLabel = this.makeText('TOTAL', FONT_HEADING, 11, TEXT_DIM);
+    this.totalLabel = this.makeText('TOTAL', FONT_HEADING, 11, TEXT_MUTED);
     this.totalLabel.y = 0;
     this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
     this.bankedText.y = TOTAL_LABEL_H;
@@ -562,7 +565,7 @@ export class Hud extends Container {
     // Wave clock: three stacked, centre-anchored lines.
     this.waveName = this.makeText('', FONT_HEADING, 15, TEXT_PRIMARY);
     this.waveNext = this.makeText('', FONT_NUMERAL, 14, PALETTE.plasma);
-    this.waveMatch = this.makeText('', FONT_NUMERAL, 13, TEXT_DIM);
+    this.waveMatch = this.makeText('', FONT_NUMERAL, 13, TEXT_MUTED);
     for (const t of [this.waveName, this.waveNext, this.waveMatch]) t.anchor.set(0.5, 0);
     this.waveName.y = 0;
     this.waveNext.y = 20;
@@ -589,7 +592,7 @@ export class Hud extends Container {
     // opposite HOME and above the left end of the bar — a numeral, so Oxanium
     // (style-guide §5.6). It rides within the bar's own x-span, so it never widens
     // the top-right footprint the layout registry records (see hud-geometry.ts).
-    this.stationLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_DIM);
+    this.stationLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_MUTED);
     this.stationLabel.anchor.set(1, 0);
     this.coreLabel = this.makeText('', FONT_NUMERAL, 11, TEXT_PRIMARY);
     this.coreLabel.anchor.set(0, 0);
@@ -805,7 +808,7 @@ export class Hud extends Container {
         x += key.width + 6;
       }
 
-      const label = this.makeText(row.label, FONT_HEADING, 12, TEXT_DIM);
+      const label = this.makeText(row.label, FONT_HEADING, 12, TEXT_MUTED);
       label.x = x;
       label.y = 1;
       label.alpha = row.dimmed ? DIM_ALPHA : 1;
@@ -880,7 +883,7 @@ export class Hud extends Container {
     }
 
     this.stationLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
-    this.stationLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_DIM;
+    this.stationLabel.style.fill = model.destroyed ? model.criticalColor : TEXT_MUTED;
 
     // Numeric core HP ("75/100") beside the bar, off the SAME numbers the bar
     // fills from so the two can never drift. It flashes threat red in step with the
@@ -930,9 +933,11 @@ export class Hud extends Container {
     const w = this.respawnText.width + RESPAWN_PAD_X;
     const h = this.respawnText.height + RESPAWN_PAD_Y;
     this.respawnPanel.clear();
+    // The unified panel skin (./chrome), outlined in the player's own colour —
+    // the countdown's identity — rather than the neutral rule.
     this.respawnPanel
-      .roundRect(-w / 2, -h / 2, w, h, 8)
-      .fill({ color: PALETTE.vacuum, alpha: 0.72 })
+      .roundRect(-w / 2, -h / 2, w, h, RADIUS.panel)
+      .fill({ color: PANEL_FILL, alpha: PANEL_FILL_ALPHA })
       .stroke({ width: RESPAWN_STROKE, color: model.color, alpha: 0.6 });
 
     this.respawnGroup.visible = true;
@@ -1501,10 +1506,14 @@ export class Hud extends Container {
     const w = this.promptText.width + PROMPT_PAD_X;
     const h = this.promptText.height + PROMPT_PAD_Y;
     this.promptPanel.clear();
+    // The unified panel skin: the void-material fill + a neutral hairline rule
+    // (./chrome), the same chrome every menu and the wheel now wear. The prompt's
+    // identity is carried by its plasma accent bar below, not by a coloured panel
+    // outline — exactly how the ui-mockup draws it.
     this.promptPanel
-      .roundRect(-w / 2, -h / 2, w, h, 8)
-      .fill({ color: PALETTE.vacuum, alpha: 0.82 })
-      .stroke({ width: PROMPT_STROKE, color: PALETTE.plasma, alpha: 0.6 });
+      .roundRect(-w / 2, -h / 2, w, h, RADIUS.panel)
+      .fill({ color: PANEL_FILL, alpha: PANEL_FILL_ALPHA })
+      .stroke({ width: PROMPT_STROKE, color: PANEL_RULE, alpha: PANEL_RULE_ALPHA });
     // Plasma accent bar on the left — the weapon is plasma (style-guide §1).
     this.promptAccent.clear();
     this.promptAccent.rect(-w / 2, -h / 2, 4, h).fill({ color: PALETTE.plasma });

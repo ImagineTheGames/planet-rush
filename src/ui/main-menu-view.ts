@@ -20,6 +20,7 @@ import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_HEADING, TEXT_PRIMARY } from './typography';
 import { buttonStyle } from './button-theme';
+import { RADIUS } from './chrome';
 import { MAIN_MENU_ID, mainMenuHitTest, mainMenuLayout } from './main-menu';
 import type { MainMenuLayout, MainMenuModel, MainMenuOption } from './main-menu';
 import type { Insets } from './menu-geometry';
@@ -100,9 +101,9 @@ export class MainMenuView extends Container {
     const style = buttonStyle(primary ? 'primary' : 'standard');
     nodes.body.clear();
     nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
+      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
       .fill({ color: style.fill, alpha: style.fillAlpha })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
+      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
       .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
 
     nodes.label.text = label;
