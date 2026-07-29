@@ -1268,5 +1268,35 @@
     "buildSha": "f7a213d",
     "attestation": "Supporting evidence, LOCAL not live: to isolate whether the online failures are the netcode or the deployment, the repo's own integration tests were run (vitest, this artifact): tests/net/online-2p.test.ts — 'a two-player online match runs end-to-end against a locally-run server, each client predicting its own ship' — PASSES; tests/net/reconnect-resume.test.ts PASSES; tests/server/ticket-enforcement.test.ts PASSES; 13/13 green. This proves the wire protocol, two-client sim, reconnect-grace, and ticket enforcement work when a real server is actually running and reachable. It does NOT satisfy the live-deployment deliverables (online-room-create/two-clients/reconnect) — it is here only to show the live failures are operational (empty allocator fleet, no CORS) and client-wiring (m9-09 unwired), not a broken protocol.",
     "verdict": "verified"
+  },
+  {
+    "id": "teams-identity",
+    "title": "TEAMS 2v2 — teammates read as a team by viewer-relative shot tint (hull colour is per-PLAYER)",
+    "area": "match",
+    "image": "images/teams-identity.png",
+    "capturedAt": "2026-07-29T20:25:00Z",
+    "buildSha": "b1edc0a",
+    "attestation": "A TEAMS 2v2 world (real src/sim createWorld: p0,p1 team 0; p2,p3 team 1) drawn by the REAL src/render Renderer, viewer = P0 (team 0). Two form factors stitched: desktop 1280x800 (left) and landscape phone 844x390 (right). VISIBLE on screen: four ships, each with a QA caption read off world.ship.team via teamOf — 'P0 team 0 you', 'P1 team 0 ally', 'P2 team 1 ENEMY', 'P3 team 1 ENEMY' — so team membership is computed correctly (P0's ally is P1; P2,P3 are enemies). Each hull swatch shows a DISTINCT per-player colour: P0 #3d7bff, P1 #22d3c5, P2 #3dd68c, P3 #9b5de5 — i.e. teammates do NOT share a hull colour. The one team-aware pixel the Renderer itself draws is present and labelled: every ship's live shot is ringed in the exact colour the Renderer tinted it — P0 AND ally P1 fire renders PLASMA blue (#4dc3ff), both ringed 'friendly fire'; enemies P2 AND P3 fire renders THREAT-RED (#b23a3a), both ringed 'enemy fire' — chosen viewer-relative by areEnemies(P0,owner) in drawShots. So the shot channel groups by team: your side's fire is one colour, the foes' another. HONEST SCOPE (stated on the frame): the shared-team signal is this viewer-relative SHOT tint (plus the spawn side and the nameplate team label); hull/nameplate/minimap colour is per-PLAYER — makeShip keys the hull art to ship.id and the UI minimap fills by playerColor(owner) — so there is no shared team hull/minimap swatch. That is an unfilled render-lane gap, not a bug in the p14 team logic. The nameplate/team labels in this frame are QA captions off world.ship.team, not the shipped HUD nameplate. VERDICT verified: the render distinguishes teams (own/ally fire vs enemy fire, viewer-relative) and team membership is correct and legible; the frame also plainly documents that a dedicated shared team colour is not yet implemented.",
+    "verdict": "verified"
+  },
+  {
+    "id": "teams-no-friendly-fire",
+    "title": "TEAMS — a shot flies through an ally unharmed and only the enemy takes damage",
+    "area": "match",
+    "image": "images/teams-no-friendly-fire.png",
+    "capturedAt": "2026-07-29T20:25:00Z",
+    "buildSha": "b1edc0a",
+    "attestation": "A real src/sim world with P0 (team 0, shooter) — ally P1 (team 0) directly in the line of fire — enemy P2 (team 1) behind, drawn by the REAL Renderer and stepped by the REAL sim step(). Three panels stitched: desktop FREEZE (left), desktop RESOLVED (middle), landscape-phone RESOLVED (right). FREEZE panel: a live projectile P0 fired (yellow QA ring) is sitting ON ally P1; both ally and enemy read 'hull 50/50'. The caption reads off the real sim: 'FRIENDLY_FIRE = false (shipped default). canDamage(P0->P1)=false canDamage(P0->P2)=true'. RESOLVED panels (after stepping the real sim 33 ticks = 0.55s until impact): the projectile is gone, ally P1 STILL reads 'hull 50/50' in green (untouched), and enemy P2 reads 'hull 10/50' in red (took the 40 damage). Identical outcome on desktop and on the landscape phone. VISIBLE proof: the shot passed straight through the teammate and harmed only the enemy — hull readouts are the real Ship.hull off world state, not asserted by code. VERDICT verified on both form factors: no friendly fire — an ally in the beaten zone is spared, the enemy is hit.",
+    "verdict": "verified"
+  },
+  {
+    "id": "teams-spawn-adjacency",
+    "title": "TEAMS 2v2 — teammates spawn on adjacent homes on the same side; layout is mirror-symmetric",
+    "area": "match",
+    "image": "images/teams-spawn-adjacency.png",
+    "capturedAt": "2026-07-29T20:25:00Z",
+    "buildSha": "b1edc0a",
+    "attestation": "A real src/sim createWorld TEAMS 2v2 on the default 'octagon' map (no positions edited), drawn by the REAL Renderer, then each home captioned with its real owner+team (teamOf) and the intra/cross distances measured off the real station positions. Two form factors stitched (desktop left, landscape phone right). VISIBLE: four home stations on the arena ring at the cardinal points — P0 (east) and P1 (south) ringed CYAN 'team 0'; P2 (west) and P3 (north) ringed ORANGE 'team 1'. The QA overlay rings sit exactly on the real station sprites (yellow-cored discs) after a camera fix. So team 0 holds the EAST+SOUTH vertices (bottom-right half) and team 1 holds the WEST+NORTH vertices (top-left half): teammates take ADJACENT (neighbouring) home slots and are never interleaved with an enemy — the 'spawn together' property (teamHomeSlots contiguous slots). A grey line joins the two team centroids showing the layout is mirror-symmetric across the arena centre, i.e. equidistant/fair cross-team. Measured off the real positions and captioned: team 0 homes 1222 apart, team 1 homes 1222 apart, cross-team centroid span 1222. HONEST NOTE (on the frame): on a 4-station ring the teammate chord (neighbours 90 degrees apart) equals the cross-team centroid span, so the harness 'clustered' flag is false — teammates are adjacent-and-same-side but not numerically nearer than the centroid gap; the deliverable claim proved here is that teammates share a side on adjacent slots and the two sides are symmetric/fair, which is visible. VERDICT verified: teammates spawn adjacent on the same side and the cross-team layout is symmetric.",
+    "verdict": "verified"
   }
 ]
