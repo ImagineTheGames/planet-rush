@@ -37,6 +37,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { PANEL_FILL, PANEL_RULE, RADIUS } from './chrome';
 import { playerColor } from './station-hp';
 import {
   fitBounds,
@@ -70,7 +71,9 @@ export const MINIMAP_EXPANDED_ANCHOR: AnchorSpec = { region: 'full', margin: MIN
 const BACKDROP_ALPHA = 0.72;
 const BORDER_ALPHA = 0.55;
 const BORDER_WIDTH = 1.5;
-const CORNER_RADIUS = 6;
+/** The unified card radius (./chrome) — the ui-mockup rounds the minimap frame
+ *  like every other full card. */
+const CORNER_RADIUS = RADIUS.card;
 /** Collapse-ring stroke, CSS px. */
 const RING_WIDTH = 1.5;
 
@@ -210,13 +213,14 @@ export class MinimapView extends Container {
     this.frameG.clear();
     this.frameG
       .roundRect(rect.x, rect.y, rect.width, rect.height, CORNER_RADIUS)
-      .fill({ color: PALETTE.vacuum, alpha: BACKDROP_ALPHA });
+      .fill({ color: PANEL_FILL, alpha: BACKDROP_ALPHA });
     // Border inset by the stroke width so the drawn geometry never spills past the
     // fill's bounds — which keeps getBounds() exactly the rect the registry checks.
+    // The unified panel rule (./chrome), the same hairline every menu/HUD panel wears.
     const i = BORDER_WIDTH;
     this.frameG
       .roundRect(rect.x + i, rect.y + i, rect.width - 2 * i, rect.height - 2 * i, CORNER_RADIUS - 1)
-      .stroke({ width: BORDER_WIDTH, color: PALETTE.hullSteel, alpha: BORDER_ALPHA });
+      .stroke({ width: BORDER_WIDTH, color: PANEL_RULE, alpha: BORDER_ALPHA });
 
     // A small close hint in the expanded overlay's top-right — the whole overlay
     // collapses on a tap, so this is a legibility cue, not the only target.

@@ -64,6 +64,7 @@ import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
+import { PANEL_FILL, TEXT_MUTED } from './chrome';
 
 /** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
  *  shape. Repair (p5-08) is the one that needs this: a live-stage test reads back
@@ -104,6 +105,9 @@ const FONT_NUMERAL = 'Oxanium, "DejaVu Sans Mono", monospace';
 
 /** Neutral light UI text. Chalk-white — never signal yellow (style-guide §2). */
 const TEXT_PRIMARY = 0xdce3ec;
+/** The refused/disabled dim — a wedge that can't be pressed, a cost you can't pay.
+ *  A *state*, hull steel; distinct from the always-muted {@link TEXT_MUTED} the
+ *  secondary labels (a wedge's target line, the hub ORE caption) wear. */
 const TEXT_DIM = PALETTE.hullSteel;
 
 // ---------------------------------------------------------------------------
@@ -254,7 +258,7 @@ export class BuildWheelView extends Container {
     // level; here, the top level, that CLOSES the wheel).
     this.buildHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.buildHubOre.anchor.set(0.5, 0.5);
-    this.buildHubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_DIM);
+    this.buildHubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_MUTED);
     this.buildHubLabel.anchor.set(0.5, 0);
     this.buildHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
     this.buildHubBackLabel.anchor.set(0.5, 0);
@@ -272,7 +276,7 @@ export class BuildWheelView extends Container {
     // lobby, so it names whose ship you are spending on.
     this.upgradeHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.upgradeHubOre.anchor.set(0.5, 0.5);
-    this.upgradeHubLabel = makeText('', FONT_HEADING, 10, TEXT_DIM);
+    this.upgradeHubLabel = makeText('', FONT_HEADING, 10, TEXT_MUTED);
     this.upgradeHubLabel.anchor.set(0.5, 0);
     this.upgradeHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
     this.upgradeHubBackLabel.anchor.set(0.5, 0);
@@ -532,13 +536,15 @@ export class BuildWheelView extends Container {
   private drawRings(rings: Graphics, r: number, hub: number): void {
     // Backing disc + hub ring. Redrawn per frame: one Graphics, open for seconds.
     rings.clear();
+    // The unified panel material (./chrome) for both discs — the wheel is a floating
+    // panel like every other; its identity stays the plasma rings, not the fill.
     rings
       .circle(0, 0, r)
-      .fill({ color: PALETTE.vacuum, alpha: 0.88 })
+      .fill({ color: PANEL_FILL, alpha: 0.88 })
       .circle(0, 0, r)
       .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.35 })
       .circle(0, 0, hub)
-      .fill({ color: PALETTE.vacuum, alpha: 0.95 })
+      .fill({ color: PANEL_FILL, alpha: 0.95 })
       .circle(0, 0, hub)
       .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.6 });
   }
@@ -635,7 +641,7 @@ export class BuildWheelView extends Container {
     const body = new Graphics();
     const cluster = new Container();
     const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
-    const sub = makeText('', FONT_HEADING, 9, TEXT_DIM);
+    const sub = makeText('', FONT_HEADING, 9, TEXT_MUTED);
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
     const arrow = new Graphics();
     for (const t of [label, sub, cost]) t.anchor.set(0.5, 0);
