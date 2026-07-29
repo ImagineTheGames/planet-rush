@@ -1,7 +1,8 @@
-# LIVE M3 wire probe — self-witnessed 2026-07-29T12:29:00Z (tree HEAD b35f884)
+=== FRESH LIVE WIRE PROBE — self-witnessed re-verify 2026-07-29T12:33:06Z, tree HEAD 1d26567 ===
+(probe: evidence/probe-online-live.mjs, read-only, real internet)
 
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":14580}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":14826}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
