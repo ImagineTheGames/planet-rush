@@ -44,6 +44,11 @@ import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
 import { buyUpgrade, turretTier, satelliteOrbitPos } from './sim/buildings';
+// Match-config bounds + types for the lobby's variable-size / mode / abundance
+// controls (variable-slots Milestone E) — persisted and threaded into the world.
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from './sim/match-config';
+import type { MatchMode } from './sim/match-config';
+import type { Abundance } from './sim/constants';
 // SATELLITE tunables — used only by the ?debug=1 minimap-fog live-stage seam to
 // stage a radar satellite (build → coverage appears; kill → coverage collapses).
 import { SATELLITE } from './sim';
@@ -159,6 +164,11 @@ import {
   selectShipClass,
   selectMap,
   cycleBotDifficulty,
+  cycleSeatState,
+  cycleSeatTeam,
+  toggleMode,
+  cycleAbundance,
+  matchSizeOf,
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
   normalizePlayerName,
@@ -271,6 +281,14 @@ const SHIP_CLASS_KEY = 'planet-rush:shipClass';
  *  storage seam as the hull and fire mode, so a returning player finds their
  *  callsign over their ship and station. */
 const PLAYER_NAME_KEY = 'planet-rush:playerName';
+/** Where the lobby's match MODE, ore ABUNDANCE, and last SIZE are remembered
+ *  (variable-slots Milestone E) — the same `planet-rush:` storage seam as the hull
+ *  and the arena, so a returning host finds the whole match shape they last set.
+ *  Each is folded to a legal value on read ({@link readMatchMode} etc.), so a
+ *  stale or hand-edited key can never reach the sim. */
+const MATCH_MODE_KEY = 'planet-rush:matchMode';
+const ABUNDANCE_KEY = 'planet-rush:abundance';
+const MATCH_SIZE_KEY = 'planet-rush:matchSize';
 /** Match seed. Deterministic and never time-derived (GDD §4.8) — the lobby
  *  picks it once rooms exist (M4); until then every offline match is the same
  *  arena, which is also what makes a bug report reproducible. */
@@ -470,9 +488,17 @@ async function boot(): Promise<void> {
   // AND the arena (p2 field rule — the map picker moved into the lobby, so PLAY
   // goes menu → LOBBY → RUSH! with no separate picker step). Under ?debug=1 there
   // is no lobby, so both fall back to the persisted-or-default values.
-  const chosen = lobby
+  const debugSize = readMatchSize(platform);
+  const chosen: LobbyChoice = lobby
     ? await lobby.untilRush()
-    : { shipClass: readShipClass(platform), mapId: readMapId(platform), name: readPlayerName(platform) };
+    : {
+        shipClass: readShipClass(platform),
+        mapId: readMapId(platform),
+        name: readPlayerName(platform),
+        mode: readMatchMode(platform),
+        abundance: readAbundance(platform),
+        ...(debugSize !== undefined ? { size: debugSize } : {}),
+      };
   const chosenShipClass = chosen.shipClass;
   // The name shown over the local ship and station (field request v0.2.1) — the
   // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
@@ -483,6 +509,10 @@ async function boot(): Promise<void> {
     platform.storage.set(SHIP_CLASS_KEY, chosenShipClass);
     platform.storage.set(MAP_STORAGE_KEY, chosen.mapId);
     platform.storage.set(PLAYER_NAME_KEY, chosenName);
+    // The match shape too (variable-slots Milestone E): mode, abundance, size.
+    platform.storage.set(MATCH_MODE_KEY, chosen.mode);
+    platform.storage.set(ABUNDANCE_KEY, chosen.abundance);
+    if (chosen.size !== undefined) platform.storage.set(MATCH_SIZE_KEY, String(chosen.size));
   }
 
   // --- The match. Eight slots, eight stations (GDD §2.1): this client flies one
@@ -509,6 +539,12 @@ async function boot(): Promise<void> {
   // `?debug=1` there is no lobby, so this is the persisted-or-default map and every
   // existing harness keeps its `octagon` board unless a test opts out.
   const chosenMapId = chosen.mapId;
+  // The match SIZE the lobby resolved (variable-slots Milestone E). Threads into
+  // `bootOfflineMatch` as the seat count, so closing seats in the lobby actually
+  // builds a smaller world (local + N-1 bots). Undefined = the design's eight.
+  // (Mode/abundance/team also ride the resolved config, but their offline
+  // world-build wiring is Task C4 — Netcode — so only size takes effect here.)
+  const chosenSize = chosen.size;
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
@@ -518,6 +554,7 @@ async function boot(): Promise<void> {
       localPlayer: LOCAL_PLAYER,
       shipClass: chosenShipClass,
       mapId: chosenMapId,
+      ...(chosenSize !== undefined ? { slots: chosenSize } : {}),
     });
   }
   let match = bootMatch(matchSeed);
@@ -4364,6 +4401,31 @@ function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
   return normalizeMapId(platform.storage.get(MAP_STORAGE_KEY));
 }
 
+/** The match MODE the lobby opens on (variable-slots Milestone E): the last one
+ *  the host chose, or FFA the first time out. Anything but the known TEAMS value
+ *  folds to FFA, so a stale key is always a legal mode. */
+function readMatchMode(platform: ReturnType<typeof createBrowserPlatform>): MatchMode {
+  return platform.storage.get(MATCH_MODE_KEY) === 'teams' ? 'teams' : 'ffa';
+}
+
+/** The ore ABUNDANCE the lobby opens on (ratified p11): the last one the host
+ *  chose, or the ratified SCARCE default ("by default more scarce"). Anything but
+ *  the two richer levels folds to SCARCE. */
+function readAbundance(platform: ReturnType<typeof createBrowserPlatform>): Abundance {
+  const stored = platform.storage.get(ABUNDANCE_KEY);
+  return stored === 'standard' || stored === 'rich' ? stored : 'scarce';
+}
+
+/** The match SIZE the lobby opens on (variable-slots Milestone E): the last count
+ *  the host RUSHed with, folded into 2..8, or `undefined` (every seat open — the
+ *  eight-player game) when unset or stale. */
+function readMatchSize(platform: ReturnType<typeof createBrowserPlatform>): number | undefined {
+  const stored = Number(platform.storage.get(MATCH_SIZE_KEY));
+  if (!Number.isFinite(stored)) return undefined;
+  const n = Math.floor(stored);
+  return n >= MIN_MATCH_SIZE && n <= MAX_MATCH_SIZE ? n : undefined;
+}
+
 /** Combine one device's control state into the accumulator: strongest thrust
  *  wins, latest aim wins, held states OR together (GDD §2.4 auto device-switch). */
 function mergeControl(dst: ControlState, src: ControlState): void {
@@ -4869,12 +4931,19 @@ function installMainMenuSeam(seam: object): void {
   }
 }
 
-/** The choices the player locks in at RUSH! — the hull, the arena (p2), and the
- *  name shown over their ship and station (field request v0.2.1). */
+/** The choices the player locks in at RUSH! — the hull, the arena (p2), the
+ *  name shown over their ship and station (field request v0.2.1), and the match
+ *  shape (variable-slots Milestone E): the MODE, the ore ABUNDANCE, and the SIZE
+ *  (`N`). Size threads into `bootOfflineMatch` today; mode/abundance ride the
+ *  config seam the sim consumes and await the offline world-build wiring (Task C4). */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
   readonly name: string;
+  readonly mode: MatchMode;
+  readonly abundance: Abundance;
+  /** `N`, the active-seat count (2..8). Undefined means every seat open (eight). */
+  readonly size?: number;
 }
 
 /** What `boot()` holds the lobby by: a promise resolving with the hull and the
@@ -4907,6 +4976,12 @@ interface LobbySeam {
   isTouch: boolean;
   /** Joinable over the wire — false offline, so the room code is hidden. */
   online: boolean;
+  /** The match mode the lobby is on — FFA or TEAMS (variable-slots Milestone E). */
+  mode: MatchMode;
+  /** The ore abundance the lobby is on — scarce / standard / rich (ratified p11). */
+  abundance: Abundance;
+  /** `N` — the active (non-closed) seat count the world will build at (2..8). */
+  size: number;
   /** The hull currently selected — the tile drawn as chosen. */
   selectedClass: ShipClass;
   /** The onboarding default (Vanguard), so a test can pick anything *but* it. */
@@ -5000,6 +5075,7 @@ function openLobby(
   // Offline solo-vs-bots: seat 0 is you and the host; the room code is hidden
   // (`online: false`); the pre-selected hull and arena are your last picks
   // (GDD §2.11; p2 — same storage seam as the fire mode).
+  const savedSize = readMatchSize(platform);
   let state: LobbyState = createLobby({
     room: OFFLINE_ROOM,
     you: LOCAL_PLAYER,
@@ -5007,6 +5083,12 @@ function openLobby(
     shipClass: readShipClass(platform),
     name: readPlayerName(platform),
     mapId: readMapId(platform),
+    // The whole match shape the host last set (variable-slots Milestone E): the
+    // mode, the abundance, and the size (trailing seats pre-closed) — folded to
+    // legal values on read, so a stale key can never open an illegal lobby.
+    mode: readMatchMode(platform),
+    abundance: readAbundance(platform),
+    ...(savedSize !== undefined ? { size: savedSize } : {}),
     online: false,
   });
   let resolved = false;
@@ -5023,6 +5105,9 @@ function openLobby(
     slotCount: 0,
     isTouch,
     online: false,
+    mode: state.mode,
+    abundance: state.abundance,
+    size: matchSizeOf(state),
     selectedClass: state.shipClass,
     defaultClass: DEFAULT_SHIP_CLASS,
     classOrder: CLASS_ORDER,
@@ -5066,6 +5151,9 @@ function openLobby(
     seam.visible = view.visible;
     seam.slotCount = layout.seats.length;
     seam.online = model.online;
+    seam.mode = model.mode;
+    seam.abundance = model.abundance;
+    seam.size = model.size;
     seam.selectedClass = state.shipClass;
     seam.selectedMapId = state.mapId;
     seam.mapCards = layout.maps.map((r) => ({ ...r }));
@@ -5171,7 +5259,14 @@ function openLobby(
     render();
     if (state.phase === 'started' && !resolved) {
       resolved = true;
-      const chosen: LobbyChoice = { shipClass: state.shipClass, mapId: state.mapId, name: state.name };
+      const chosen: LobbyChoice = {
+        shipClass: state.shipClass,
+        mapId: state.mapId,
+        name: state.name,
+        mode: state.mode,
+        abundance: state.abundance,
+        size: matchSizeOf(state),
+      };
       teardown();
       seam.visible = false;
       resolveRush(chosen);
@@ -5191,9 +5286,30 @@ function openLobby(
         selectMapAt(hit.index);
         break;
       case 'seat':
-        // Host taps a bot row to cycle its difficulty (GDD §2.1). A no-op on your
-        // own row and — offline you are always host — never refused for that.
-        state = cycleBotDifficulty(state, hit.index);
+        // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
+        // Milestone E) — the host shrinks or shapes the match here. Persist the
+        // resulting size so a returning host reopens on the same count.
+        state = cycleSeatState(state, hit.index);
+        platform.storage.set(MATCH_SIZE_KEY, String(matchSizeOf(state)));
+        render();
+        break;
+      case 'seatChip':
+        // The trailing chip is mode-contextual: it assigns the seat's TEAM in
+        // TEAMS, and cycles the bot's difficulty in FFA.
+        state =
+          state.mode === 'teams' ? cycleSeatTeam(state, hit.index) : cycleBotDifficulty(state, hit.index);
+        render();
+        break;
+      case 'mode':
+        // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode.
+        state = toggleMode(state);
+        platform.storage.set(MATCH_MODE_KEY, state.mode);
+        render();
+        break;
+      case 'abundance':
+        // SCARCE → STANDARD → RICH (ratified p11). Persisted like the mode.
+        state = cycleAbundance(state);
+        platform.storage.set(ABUNDANCE_KEY, state.abundance);
         render();
         break;
       case 'rush':
