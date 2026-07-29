@@ -67,11 +67,16 @@ interface SeatNodes {
   readonly name: Text;
   /** Hull and colour name — the words that carry identity without the hue. */
   readonly detail: Text;
-  /** The trailing chip's background (variable-slots E) — the TEAM chip in TEAMS,
-   *  the difficulty chip in FFA; the tap target the host cycles. */
+  /** The trailing DIFFICULTY chip's background — the bot-tier cycle, in BOTH modes
+   *  (n2); the tap target the host cycles. */
   readonly rightChip: Graphics;
-  /** The team letter (TEAMS) or EASY/MEDIUM/HARD (FFA), centred on the chip. */
+  /** EASY/MEDIUM/HARD, centred on the difficulty chip. */
   readonly chipLabel: Text;
+  /** The TEAM chip's background (TEAMS only) — the side cycle, composed left of the
+   *  difficulty chip (n2), so a bot seat carries BOTH controls at once. */
+  readonly teamChip: Graphics;
+  /** The side letter (A…D), centred on the team chip. */
+  readonly teamChipLabel: Text;
   /** The team underline under the name — the TEAMS grouping motif over the eight
    *  identity colours (ratified: keep the colours, add a team indicator). */
   readonly underline: Graphics;
@@ -192,8 +197,9 @@ export class LobbyView extends Container {
       const seat = model.seats[i];
       const rect = this.layout.seats[i];
       const chip = this.layout.seatChips[i];
-      if (!seat || !rect || !chip) continue;
-      this.drawSeat(this.seatSlot(i), seat, rect, chip, model);
+      const teamChip = this.layout.seatTeamChips[i];
+      if (!seat || !rect || !chip || !teamChip) continue;
+      this.drawSeat(this.seatSlot(i), seat, rect, chip, teamChip, model);
     }
     for (let i = 0; i < this.layout.classOptions.length; i++) {
       const option = model.classOptions[i];
@@ -285,6 +291,7 @@ export class LobbyView extends Container {
     seat: LobbySeatView,
     rect: Rect,
     chipRect: Rect,
+    teamChipRect: Rect,
     model: LobbyModel,
   ): void {
     const pad = 8;
@@ -350,44 +357,77 @@ export class LobbyView extends Container {
         .fill({ color: PALETTE.patina, alpha: 0.85 });
     }
 
-    // The trailing chip: the TEAM (TEAMS) or difficulty (FFA) the host cycles.
-    this.drawSeatChip(nodes, seat, chipRect, teams, closed);
+    // The two trailing controls (n2): the DIFFICULTY chip (bot tier, both modes)
+    // and — composed to its left in TEAMS — the TEAM chip (side). A bot seat in
+    // TEAMS therefore carries both at once; neither replaces the other.
+    const tierShown = this.drawDifficultyChip(nodes, seat, chipRect);
+    const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed);
 
     // A bot seat before RUSH is a seat somebody can still take by room code —
-    // marked just left of the chip so it never fights the tier/team label.
+    // marked just left of the leftmost visible chip so it never fights a label.
     nodes.open.visible = seat.openToJoin && phase === 'gathering' && rect.height > 30 && !closed;
     if (nodes.open.visible) {
-      nodes.open.x = chipRect.x - 4;
+      const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
+      nodes.open.x = chipsLeft - 4;
       nodes.open.y = rect.y + rect.height / 2 + 2;
     }
   }
 
   /**
-   * A roster row's trailing chip — the ONE per-seat host control that is drawn:
-   * in TEAMS it shows the seat's side (A…D, {@link LobbySeatView.teamLabel}); in
-   * FFA it shows the bot's tier (EASY/MEDIUM/HARD). A human FFA seat and a closed
-   * seat have neither, so the chip is hidden — a tap on it is a no-op in the model
-   * either way, so the geometry can stay mode-blind.
+   * The trailing DIFFICULTY chip — the bot-tier cycle (EASY/MEDIUM/HARD), drawn on
+   * every BOT seat in BOTH modes (n2): the one slot-editor control every mode
+   * shares, so a bot's tier is editable in TEAMS exactly as in FFA. A human or
+   * closed seat has no tier, so the chip is hidden. Returns whether it was drawn.
    */
-  private drawSeatChip(nodes: SeatNodes, seat: LobbySeatView, chip: Rect, teams: boolean, closed: boolean): void {
-    const showTeam = teams && !closed;
-    const showTier = !teams && seat.isBot;
-    const visible = (showTeam || showTier) && chip.width > 0 && chip.height > 8;
+  private drawDifficultyChip(nodes: SeatNodes, seat: LobbySeatView, chip: Rect): boolean {
+    const visible = seat.isBot && chip.width > 0 && chip.height > 8;
     nodes.rightChip.visible = visible;
     nodes.chipLabel.visible = visible;
     nodes.rightChip.clear();
-    if (!visible) return;
+    if (!visible) return false;
 
-    const accent = showTeam ? PALETTE.plasma : PALETTE.patina;
+    const accent = PALETTE.patina;
     nodes.rightChip
       .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
       .fill({ color: PALETTE.hullSteel, alpha: 0.16 })
       .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
       .stroke({ width: 1, color: accent, alpha: 0.85 });
-    nodes.chipLabel.text = showTeam ? seat.teamLabel : DIFFICULTY_LABELS[seat.botDifficulty ?? 'medium'];
-    nodes.chipLabel.style.fill = showTeam ? TEXT_PRIMARY : accent;
+    nodes.chipLabel.text = DIFFICULTY_LABELS[seat.botDifficulty ?? 'medium'];
+    nodes.chipLabel.style.fill = accent;
     nodes.chipLabel.x = chip.x + chip.width / 2;
     nodes.chipLabel.y = chip.y + chip.height / 2;
+    return true;
+  }
+
+  /**
+   * The TEAM chip — the seat's side (A…D, {@link LobbySeatView.teamLabel}), drawn
+   * in TEAMS on every non-closed seat and composed to the LEFT of the difficulty
+   * chip (n2), so it adds to the slot editor rather than replacing it. FFA is
+   * teams-of-one, so it is hidden there. Returns whether it was drawn.
+   */
+  private drawTeamChip(
+    nodes: SeatNodes,
+    seat: LobbySeatView,
+    chip: Rect,
+    teams: boolean,
+    closed: boolean,
+  ): boolean {
+    const visible = teams && !closed && chip.width > 0 && chip.height > 8;
+    nodes.teamChip.visible = visible;
+    nodes.teamChipLabel.visible = visible;
+    nodes.teamChip.clear();
+    if (!visible) return false;
+
+    nodes.teamChip
+      .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
+      .fill({ color: PALETTE.hullSteel, alpha: 0.16 })
+      .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
+      .stroke({ width: 1, color: PALETTE.plasma, alpha: 0.85 });
+    nodes.teamChipLabel.text = seat.teamLabel;
+    nodes.teamChipLabel.style.fill = TEXT_PRIMARY;
+    nodes.teamChipLabel.x = chip.x + chip.width / 2;
+    nodes.teamChipLabel.y = chip.y + chip.height / 2;
+    return true;
   }
 
   private seatSlot(index: number): SeatNodes {
@@ -401,14 +441,29 @@ export class LobbyView extends Container {
     const name = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
     const detail = makeText('', FONT_BODY, 11, TEXT_DIM);
     const rightChip = new Graphics();
-    const chipLabel = makeText('', FONT_HEADING, 11, PALETTE.plasma);
+    const chipLabel = makeText('', FONT_HEADING, 11, PALETTE.patina);
     chipLabel.anchor.set(0.5, 0.5);
+    const teamChip = new Graphics();
+    const teamChipLabel = makeText('', FONT_HEADING, 11, TEXT_PRIMARY);
+    teamChipLabel.anchor.set(0.5, 0.5);
     const underline = new Graphics();
     const open = makeText('OPEN', FONT_BODY, 10, TEXT_DIM);
     open.anchor.set(1, 0.5);
 
-    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, open);
-    const nodes: SeatNodes = { body, chip, decal, name, detail, rightChip, chipLabel, underline, open };
+    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, teamChip, teamChipLabel, open);
+    const nodes: SeatNodes = {
+      body,
+      chip,
+      decal,
+      name,
+      detail,
+      rightChip,
+      chipLabel,
+      teamChip,
+      teamChipLabel,
+      underline,
+      open,
+    };
     this.seatNodes[index] = nodes;
     return nodes;
   }

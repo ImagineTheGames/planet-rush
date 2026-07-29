@@ -5786,10 +5786,17 @@ function openLobby(
         render();
         break;
       case 'seatChip':
-        // The trailing chip is mode-contextual: it assigns the seat's TEAM in
-        // TEAMS, and cycles the bot's difficulty in FFA.
-        state =
-          state.mode === 'teams' ? cycleSeatTeam(state, hit.index) : cycleBotDifficulty(state, hit.index);
+        // The trailing DIFFICULTY chip — the bot-tier cycle, in BOTH modes (n2):
+        // the shared slot-editor control, so a bot's tier is reachable in TEAMS
+        // exactly as in FFA (the TEAMS lobby had lost it when the side control took
+        // the only chip).
+        state = cycleBotDifficulty(state, hit.index);
+        render();
+        break;
+      case 'seatTeamChip':
+        // The TEAM chip — the side cycle, composed alongside the difficulty chip in
+        // TEAMS (n2). A model no-op in FFA (teams-of-one).
+        state = cycleSeatTeam(state, hit.index);
         render();
         break;
       case 'mode':
