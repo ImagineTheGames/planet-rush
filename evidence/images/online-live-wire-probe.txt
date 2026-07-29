@@ -1,8 +1,9 @@
-=== QA LIVE WIRE PROBE — captured 2026-07-29T10:30:59Z, repo HEAD 170d6b2 ===
-Probe: evidence/probe-online-live.mjs against https://planet-rush-allocator.fly.dev + wss://planet-rush-gameserver.fly.dev
+# Planet Rush — LIVE online wire probe (self-witnessed by QA)
+# capturedAt: 2026-07-29T10:37:55Z   repo HEAD: 8031680   probe: evidence/probe-online-live.mjs
+# talks to the real Fly apps over the real internet exactly as a client would.
 
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":7499}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":7915}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
