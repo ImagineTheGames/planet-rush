@@ -52,6 +52,57 @@ const TARGET_CORE_SLOWDOWN = 5;
 /** One 60 Hz tick's real budget: the whole fleet must fit inside it. */
 const TICK_BUDGET_MS = TICK_DT * 1000;
 
+/** A sink the reference workload feeds, read after the fact so no V8 version can
+ *  dead-code-eliminate the loop (which would read as an infinitely-fast core). */
+let referenceSink = 0;
+
+/**
+ * A fixed, allocation-free numeric workload — the same FLOPs every call, no I/O,
+ * no GC — whose wall-clock time is a clean proxy for the raw speed of the core
+ * underneath the test. Its instruction mix (sqrt/trig/mul/add) deliberately
+ * mirrors the sim's hot path (distances, angles, integration), so it scales with
+ * core speed the way the fleet tick does. Returns the *median* time over a short
+ * burst — the same central-tendency statistic the fleet is judged by (its mean),
+ * so both absorb a noisy shared host the same way: a truer like-for-like ratio
+ * than a min would give (a min filters out the contention the fleet's mean pays
+ * for, under-reporting a busy core's slowness and tightening Gate 2 unsafely),
+ * while staying robust to the odd GC/scheduler spike. Gate 2 uses it to make the
+ * deploy-target extrapolation independent of which machine runs the test — a fast
+ * i9 dev core, or a slow, noisy CI runner.
+ */
+function referenceCoreMs(): number {
+  const work = (): number => {
+    let acc = 0;
+    for (let i = 1; i <= 400_000; i++) acc += Math.sqrt(i) * 1.0000001 - Math.sin(i * 0.5);
+    return acc;
+  };
+  for (let i = 0; i < 10; i++) referenceSink += work(); // warm the JIT
+  const times: number[] = [];
+  for (let i = 0; i < 30; i++) {
+    const start = performance.now();
+    referenceSink += work();
+    times.push(performance.now() - start);
+  }
+  return percentile(times, 0.5); // median — see doc above
+}
+
+/**
+ * {@link referenceCoreMs} on the i9 dev core the day-0 spike and this file's
+ * headline numbers were measured on (~2.9 ms, stable to ±5% across runs).
+ * `TARGET_CORE_SLOWDOWN` is the i9→Fly-guest ratio, so it is only meaningful
+ * *relative to this baseline core*. A core K× slower than the i9 reads the same
+ * reference at ~K×2.9 ms; the honest slowdown from *that* core to the Fly guest
+ * is `TARGET_CORE_SLOWDOWN / K`, because a slower measuring core has already paid
+ * part of the penalty. Gate 2 applies exactly that, so `mean × effectiveSlowdown`
+ * is hardware-invariant — it always evaluates to the i9-mean × `TARGET_CORE_SLOWDOWN`,
+ * whether an i9 or a 3×-slower CI runner is holding the stopwatch. Without this
+ * normalisation the raw ×5 double-counts CI's own slowness and the gate can never
+ * pass on the runner (it read 19.69 ms against a 16.67 ms budget).
+ */
+const I9_REFERENCE_MS = 2.9;
+
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+
 /** A socket that reads nothing — a bot-only room needs a seat's creator only long
  *  enough to pick the bots' difficulties, then hands the whole room to AI. */
 const NULL_SOCKET = { send(): void {}, close(): void {} };
@@ -133,6 +184,15 @@ describe('fleet density — DEFAULT_MAX_ROOMS full of Hard bots', () => {
     let liveProjectiles = 0;
     for (const room of rooms) liveProjectiles += room.world?.projectiles.filter((p) => p.active).length ?? 0;
 
+    // Read this core's speed against the i9 baseline, in the same thermal/contention
+    // state the samples were just taken in, and normalise the deploy-target factor:
+    // a measuring core K× slower than the i9 has already paid part of the penalty, so
+    // the remaining i9→Fly slowdown from *here* is `TARGET_CORE_SLOWDOWN / K`. The
+    // product `mean × effectiveSlowdown` is then invariant to the measuring machine.
+    const coreRatio = clamp(referenceCoreMs() / I9_REFERENCE_MS, 0.25, 20);
+    const effectiveSlowdown = TARGET_CORE_SLOWDOWN / coreRatio;
+    const targetCoreMean = mean * effectiveSlowdown;
+
     // Printed unconditionally — the measurement is the deliverable; the asserts are
     // the backstop (docs/netcode-spike.md carries these numbers forward).
     console.log(
@@ -142,12 +202,21 @@ describe('fleet density — DEFAULT_MAX_ROOMS full of Hard bots', () => {
         `budget ${TICK_BUDGET_MS.toFixed(2)} ms → ${((mean / TICK_BUDGET_MS) * 100).toFixed(1)}% mean / ` +
         `${((p99 / TICK_BUDGET_MS) * 100).toFixed(1)}% p99 of one core\n` +
         `  per-room-tick: ${(mean / DEFAULT_MAX_ROOMS).toFixed(4)} ms\n` +
-        `  @${TARGET_CORE_SLOWDOWN}× shared-core estimate: mean ${(mean * TARGET_CORE_SLOWDOWN).toFixed(2)} ms ` +
-        `(${((mean * TARGET_CORE_SLOWDOWN) / TICK_BUDGET_MS * 100).toFixed(0)}% of budget)`,
+        `  core vs i9 baseline: ${coreRatio.toFixed(2)}× (ref ${(coreRatio * I9_REFERENCE_MS).toFixed(2)} ms) ` +
+        `→ effective slowdown ${effectiveSlowdown.toFixed(2)}×\n` +
+        `  @${TARGET_CORE_SLOWDOWN}× shared-core estimate (i9-normalised): mean ${targetCoreMean.toFixed(2)} ms ` +
+        `(${((targetCoreMean / TICK_BUDGET_MS) * 100).toFixed(0)}% of budget)`,
     );
 
     // The workload is real: nothing collapsed, and there is combat to pay for.
     expect(liveRooms).toBe(DEFAULT_MAX_ROOMS);
+
+    // Sanity on the calibration itself: the reference must have actually run (a
+    // dead-code-eliminated loop would read ~0 ms and clamp to a bogus 20× slowdown)
+    // and produced a finite sink. Observing the sink is also what keeps V8 from
+    // eliminating the loop in the first place.
+    expect(Number.isFinite(referenceSink)).toBe(true);
+    expect(effectiveSlowdown).toBeGreaterThan(0);
 
     // Gate 1 — the fleet keeps up with real time on the measuring core, by a wide
     // margin. This is a true capacity assertion (not a print), yet loose enough
@@ -160,7 +229,10 @@ describe('fleet density — DEFAULT_MAX_ROOMS full of Hard bots', () => {
     // /health `loopLagMs` gate watches. This is what justifies the constant: if a
     // regression made a room heavy enough that DEFAULT_MAX_ROOMS of them could not
     // fit the estimated target core, this fails and the constant must drop (or the
-    // room get cheaper), exactly as the hosting plan intends.
-    expect(mean * TARGET_CORE_SLOWDOWN).toBeLessThan(TICK_BUDGET_MS);
+    // room get cheaper), exactly as the hosting plan intends. The estimate is
+    // i9-normalised (see `effectiveSlowdown`) so the gate asserts the same
+    // extrapolated cost on any core — it does not silently loosen into a no-op on a
+    // slow CI runner, nor double-count that runner's own slowness into a false fail.
+    expect(targetCoreMean).toBeLessThan(TICK_BUDGET_MS);
   }, 60_000);
 });

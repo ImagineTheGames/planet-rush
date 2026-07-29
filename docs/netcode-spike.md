@@ -335,6 +335,21 @@ measurement of the real guest — item 4 is what turns it into a number, and the
 `fly.gameserver.toml` guest comment still reads "≤64", which the live gate will
 reconcile (raise the ceiling on a performance CPU, or ratify 32 on the shared one).
 
+*How the CI backstop applies the 5× without lying about the runner.* The
+extrapolation gate (`fleet-density.test.ts` Gate 2) has to hold on GitHub's
+runners too, not just the i9 — and a bare `mean × 5 < 16.67 ms` does not: the
+runner is itself ~3× slower than this i9, so the raw ×5 double-counts *its* own
+slowness and reads ~19.7 ms against the 16.67 ms budget (the red job this note
+descends from). The factor is defined i9→Fly-guest, so it is only valid relative
+to the i9. The test therefore times a fixed reference workload on whatever core is
+running it, ratios that against the i9 baseline (~2.9 ms), and scales the factor:
+a K×-slower measuring core has already paid part of the penalty, so the remaining
+slowdown from *there* is `5 / K`. The asserted `mean × (5/K)` is then invariant to
+the measuring machine — it always evaluates to the i9-mean × 5 — so the gate stays
+a real regression backstop (a room that got heavier still trips it, on any core)
+without becoming either a CI false-fail or a slow-core no-op. It is a *backstop*,
+not the answer: the honest deploy-target number is still item 4's live gate.
+
 ### 3. Sustained CPU gate (20 min on the real guest) — INSTRUMENTED, OPEN
 
 The load signal is now on the front door: `/health` reports `loopLagMs`, the p99
