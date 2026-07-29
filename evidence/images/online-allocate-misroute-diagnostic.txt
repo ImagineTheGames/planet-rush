@@ -1,0 +1,25 @@
+# allocate-misroute header diagnostic — 2026-07-29T12:12:16.317Z (buildSha fb291fc)
+# Shows the allocator OWNS /rooms (GET->405 application/json) but POST /rooms is
+# fly-replayed to a gameserver machine that has no room-minting handler and falls
+# through to its text/plain WS-root greeting (byte-identical to GET gameserver root).
+
+
+POST /rooms (json {}): HTTP 200
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 12:12:17 GMT","fly-request-id":"01KYPWMCJYGBWCCENEWQZ4WTV1-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  body: "Planet Rush match server — connect a WebSocket to play.\n"
+
+POST /rooms (no body): HTTP 200
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 12:12:17 GMT","fly-request-id":"01KYPWMCW4QAT44WKQ6QQY3X3H-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  body: "Planet Rush match server — connect a WebSocket to play.\n"
+
+POST /rooms (region iad): HTTP 200
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 12:12:17 GMT","fly-request-id":"01KYPWMD15RDQ2ZSH0GK7HEGQZ-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  body: "Planet Rush match server — connect a WebSocket to play.\n"
+
+GET /rooms: HTTP 405
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"application/json","date":"Wed, 29 Jul 2026 12:12:18 GMT","fly-request-id":"01KYPWMD66GTXJ5VN6Y4RZA0JK-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  body: "{\"error\":\"method-not-allowed\"}"
+
+GET gameserver root: HTTP 200
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 12:12:18 GMT","fly-request-id":"01KYPWMDCBV3YJAP431393PC3Q-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  body: "Planet Rush match server — connect a WebSocket to play.\n"
