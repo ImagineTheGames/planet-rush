@@ -1,9 +1,6 @@
-# QA live wire probe — self-witnessed re-verify 2026-07-29T11:10:21Z
-# code HEAD fcdfe11 (unchanged since; git log fcdfe11..HEAD -- src server dist is empty)
-# client rebuilt this session: dist/assets/index-C7-H2sz1.js, VITE_ALLOCATOR_URL=https://planet-rush-allocator.fly.dev (grep-confirmed in served bundle)
-
+=== LIVE WIRE PROBE re-captured 2026-07-29T11:16:12Z by evidence/probe-online-live.mjs (self-witnessed) ===
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":9861}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":10212}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
