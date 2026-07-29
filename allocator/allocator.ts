@@ -55,6 +55,27 @@ export const MIN_ROOM_SIZE = 2;
 export const MAX_ROOM_SIZE = 8;
 
 /**
+ * A room's load weight, in **full-room-equivalents** (variable-slots Task F1). A
+ * room is not one flat unit of load: an 8-seat room is a whole room's worth of
+ * players (and bandwidth); a 2-seat room a quarter of one. Weighting placement by
+ * this — the room's seat count over the max — is what lets the allocator pack four
+ * small matches where it would pack one big one, and spread by *players* rather
+ * than by *room count* (the trap this milestone closes: a host of 64 two-player
+ * rooms once looked identical to a host of 64 eight-player rooms).
+ *
+ * A room whose size is unknown — an older Machine that does not advertise it, or a
+ * reservation placed without one — weighs a **full** room. That is the
+ * conservative default: an un-advertised room is never *under*-counted into
+ * over-packing, and a fleet of all-unknown sizes weighs exactly as it did before
+ * F1 (one unit per room), so this change is byte-identical until real sizes flow.
+ */
+export function roomSeatWeight(size: number | undefined): number {
+  if (size === undefined) return 1;
+  const clamped = Math.max(MIN_ROOM_SIZE, Math.min(MAX_ROOM_SIZE, size));
+  return clamped / MAX_ROOM_SIZE;
+}
+
+/**
  * How long a signed ticket stays valid after issue. A ticket only has to survive
  * the walk from "allocator answered" to "socket open on the Machine" — seconds,
  * not minutes — so this is short: a leaked or stale ticket is useless almost at
@@ -338,17 +359,25 @@ export class Allocator {
   }
 
   /**
-   * How many slots a Machine has taken: its heartbeat rooms plus any reservation
-   * pointed at it whose room the heartbeat has not yet confirmed. Counting the
-   * lease is what makes capacity honest in the gap before a placed room reports.
+   * How much load a Machine has taken, in full-room-equivalents: its heartbeat
+   * rooms plus any reservation pointed at it whose room the heartbeat has not yet
+   * confirmed, each **weighted by its seats** ({@link roomSeatWeight}, Task F1)
+   * rather than counted as one flat unit. Counting the lease is what makes
+   * capacity honest in the gap before a placed room reports; weighting by seats is
+   * what makes a host of small rooms read as the light load it actually is, so
+   * {@link pickMachine} spreads by players and the fullness gate (`load < capacity`)
+   * lets small matches pack tighter than big ones onto the same host.
    */
   private loadOf(view: MachineView, leases: readonly Reservation[]): number {
     const hosted = new Set(view.rooms.map((r) => r.code));
-    let pending = 0;
+    let load = 0;
+    for (const room of view.rooms) load += roomSeatWeight(room.size);
     for (const lease of leases) {
-      if (lease.machine === view.machine && !hosted.has(lease.room)) pending += 1;
+      if (lease.machine === view.machine && !hosted.has(lease.room)) {
+        load += roomSeatWeight(lease.size);
+      }
     }
-    return hosted.size + pending;
+    return load;
   }
 
   /** Draw a code the whole fleet agrees is unused (no room, no live lease). */

@@ -273,3 +273,46 @@ describe('FleetController — capacity is a fact, not a crash', () => {
     expect(report.created).toBe(0);
   });
 });
+
+describe('FleetController — free capacity is seats, not flat rooms (Task F1)', () => {
+  /** Heartbeat a machine whose rooms carry per-room sizes, so free capacity can
+   *  be weighed by seats rather than counted one flat unit per room. */
+  function sizedBeat(
+    registry: InMemoryRoomRegistry,
+    machine: string,
+    capacity: number,
+    sizes: number[],
+    now: number,
+  ): void {
+    const list: Room[] = sizes.map((size, i) => ({
+      code: `${machine}-r${i}`,
+      players: size,
+      size,
+    }));
+    registry.observe({ machine, region: 'iad', capacity, rooms: list }, now);
+  }
+
+  it('weighs each room by its seats when counting free slots', async () => {
+    const provider = new InMemoryMachineProvider();
+    const registry = new InMemoryRoomRegistry();
+    const m1 = await spawn(provider, 'started', 0);
+    // Four 4-seat rooms weigh 4·(4/8) = 2 room-equivalents, not 4 flat rooms, so a
+    // capacity-8 host reports 6 free — real seat headroom a flat count would hide.
+    sizedBeat(registry, m1, 8, [4, 4, 4, 4], 1000);
+
+    const fc = new FleetController(config(provider, registry, { enabled: false }));
+    const report = await fc.reconcile({ loopLagMs: 0 }, 1000);
+    expect(report.freeSlots).toBe(6);
+  });
+
+  it('still counts an unknown-size room as a whole room — flat behaviour preserved', async () => {
+    const provider = new InMemoryMachineProvider();
+    const registry = new InMemoryRoomRegistry();
+    const m1 = await spawn(provider, 'started', 0);
+    beat(registry, m1, 8, 4, 1000); // four unsized rooms → 4 flat → free 4
+
+    const fc = new FleetController(config(provider, registry, { enabled: false }));
+    const report = await fc.reconcile({ loopLagMs: 0 }, 1000);
+    expect(report.freeSlots).toBe(4);
+  });
+})
