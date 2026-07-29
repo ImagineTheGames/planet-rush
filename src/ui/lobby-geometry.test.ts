@@ -79,11 +79,16 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
   return [
     { label: 'title', rect: layout.title },
     { label: 'roomCode', rect: layout.roomCode },
+    { label: 'modeToggle', rect: layout.modeToggle },
+    { label: 'abundance', rect: layout.abundance },
     ...layout.seats.map((rect, i) => ({ label: `seat[${i}]`, rect })),
     ...layout.classOptions.map((rect, i) => ({ label: `class[${i}]`, rect })),
     ...layout.maps.map((rect, i) => ({ label: `map[${i}]`, rect })),
     { label: 'rushButton', rect: layout.rushButton },
   ];
+  // NB: seatChips are DELIBERATELY absent — they nest inside their roster row
+  // (the row body cycles state, the chip cycles team/tier), so they overlap a
+  // seat by design and are contained-checked separately (see the chip test).
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -366,4 +371,46 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
     const layout = lobbyLayout({ width: 10, height: 10 });
     expect(lobbyHitTest(layout, 5, 5)).toBeNull();
   });
+});
+
+// ---------------------------------------------------------------------------
+// 5. The control strip and the row chips (variable-slots Milestone E)
+// ---------------------------------------------------------------------------
+
+describe('the MODE / ABUNDANCE strip and the per-row team/tier chip', () => {
+  for (const { name, vp, touch } of PROFILES) {
+    it(`taps the toggles and each row's chip, body vs chip kept apart — ${name}`, () => {
+      const layout = lobbyLayout(vp, { isTouch: touch });
+
+      // The two toggles map to their own targets when they have extent.
+      if (layout.modeToggle.width > 0 && layout.modeToggle.height > 0) {
+        const m = center(layout.modeToggle);
+        expect(lobbyHitTest(layout, m.x, m.y), `mode toggle on ${name}`).toEqual({ kind: 'mode' });
+      }
+      if (layout.abundance.width > 0 && layout.abundance.height > 0) {
+        const a = center(layout.abundance);
+        expect(lobbyHitTest(layout, a.x, a.y), `abundance on ${name}`).toEqual({ kind: 'abundance' });
+      }
+
+      expect(layout.seatChips).toHaveLength(layout.seats.length);
+      for (let i = 0; i < layout.seats.length; i++) {
+        const chip = layout.seatChips[i]!;
+        const seat = layout.seats[i]!;
+        // The chip never covers the row's centre — the row body stays tappable.
+        expect(rectContains(seat, chip), `chip ${i} escapes its row on ${name}`).toBe(true);
+        expect(
+          lobbyHitTest(layout, center(seat).x, center(seat).y),
+          `row body ${i} on ${name}`,
+        ).toEqual({ kind: 'seat', index: i });
+        // A tap on the chip itself cycles the team/tier, not the state.
+        if (chip.width > 0 && chip.height > 0) {
+          const c = center(chip);
+          expect(lobbyHitTest(layout, c.x, c.y), `chip ${i} on ${name}`).toEqual({
+            kind: 'seatChip',
+            index: i,
+          });
+        }
+      }
+    });
+  }
 });

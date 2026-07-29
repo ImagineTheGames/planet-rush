@@ -60,6 +60,10 @@ import { PLAYER_COLORS } from '@render/index';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
+import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from '../sim/match-config';
+import type { Abundance } from '../sim/constants';
+import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import { playerColor } from './station-hp';
 import { CLASS_NAMES } from './upgrade-wheel';
 import { normalizeMapId } from './map-picker';
@@ -92,6 +96,69 @@ export const DIFFICULTY_LABELS: Readonly<Record<BotDifficulty, string>> = {
 /** Cycle order for the host's per-seat difficulty tap. Easiest first, so the
  *  host walks *up* the ladder rather than down into Hard by accident. */
 export const DIFFICULTY_CYCLE: readonly BotDifficulty[] = ['easy', 'medium', 'hard'];
+
+// ---------------------------------------------------------------------------
+// Variable matches (docs/variable-slots-plan.md, Milestone E) — the lobby as a
+// control surface: a MODE toggle, per-seat OPEN/BOT/CLOSED, TEAM assignment, and
+// the ratified ABUNDANCE row. All four ride the one `MatchConfig` seam
+// ({@link lobbyMatchConfig}) that the sim already consumes (`../sim/match-config`).
+// ---------------------------------------------------------------------------
+
+/** The two match modes (GDD §2.1), as the toggle spells them. FFA is
+ *  teams-of-one; TEAMS groups slots by a shared team — the only thing that
+ *  differs is that table (spike §S5). */
+export const MODE_LABELS: Readonly<Record<MatchMode, string>> = {
+  ffa: 'FFA',
+  teams: 'TEAMS',
+};
+
+/**
+ * The host's per-seat occupancy tap walks this ring: a seat OPEN to a joiner (and
+ * previewing the bot who fills it) becomes an explicit BOT, then CLOSED (out of
+ * the match entirely — `N` drops by one), then open again. A human seat is never
+ * in the ring: you cannot cycle a seat somebody is sitting in.
+ */
+export const SEAT_STATE_CYCLE: readonly SeatOccupant[] = ['open', 'bot', 'closed'];
+
+/**
+ * How many sides TEAMS can split into. Two is the common game (1v1..4v4, and any
+ * uneven split — the developer ratified "any team split allowed, show counts,
+ * never block"); the ring runs to four so 2v2v2v2 and three-corner games are
+ * reachable, and no further because there are only eight identity colours and a
+ * team of one is just FFA with extra steps.
+ */
+export const MAX_TEAMS = 4;
+
+/** A team's label — a letter, not a colour: the eight identity colours stay
+ *  per-SLOT (style-guide §3.1, ratified), and the team is the *motif* over them
+ *  (nameplate underline), so it needs a hue-independent name of its own. */
+export const TEAM_LABELS: readonly string[] = ['A', 'B', 'C', 'D'];
+
+/** A team number's label, folded into range so a stray value still reads. */
+export function teamLabel(team: number): string {
+  if (!Number.isFinite(team) || team < 0) return TEAM_LABELS[0]!;
+  return TEAM_LABELS[Math.floor(team) % TEAM_LABELS.length]!;
+}
+
+/** The default side a slot starts on when TEAMS is picked: alternating by slot,
+ *  so any active count of two or more already has both sides manned (an even
+ *  split at 4v4, 2v1 at three, 1v1 at two) — the host re-assigns from there. A
+ *  first-half/second-half default would strand every small match on one side. */
+export function defaultTeamForSlot(index: number): number {
+  return Math.abs(Math.floor(index)) % 2;
+}
+
+/** The abundance ring the ABUNDANCE row walks (ratified developer, p11): the
+ *  shipped default is SCARCE ({@link DEFAULT_ABUNDANCE}, "by default more
+ *  scarce"), then STANDARD, then RICH, then back. */
+export const ABUNDANCE_CYCLE: readonly Abundance[] = ['scarce', 'standard', 'rich'];
+
+/** The words the abundance row shows for each level. */
+export const ABUNDANCE_LABELS: Readonly<Record<Abundance, string>> = {
+  scarce: 'SCARCE',
+  standard: 'STANDARD',
+  rich: 'RICH',
+};
 
 /**
  * The identity colours in words (style-guide §3.1), indexed by slot. Named on
@@ -278,12 +345,18 @@ export function isJoinableRoomCode(code: string): boolean {
 /**
  * Who holds a seat.
  *
- *  - `human` — a player is in it.
- *  - `bot`   — a bot is in it, seated by the server (that happens at RUSH!).
- *  - `open`  — nobody yet: it *previews* the bot that will fill it, and anyone
- *              with the room code can still take it (GDD §2.1, §4.2).
+ *  - `human`  — a player is in it.
+ *  - `bot`    — a bot is in it: seated by the server at RUSH!, or LOCKED to a bot
+ *               by the host (so a joiner can't take it — the explicit-bot state of
+ *               the OPEN/BOT/CLOSED cycle).
+ *  - `open`   — nobody yet: it *previews* the bot that will fill it, and anyone
+ *               with the room code can still take it (GDD §2.1, §4.2).
+ *  - `closed` — out of the match ENTIRELY (variable-slots Milestone E): no player,
+ *               no station, no colour on the field. `N = count(occupant !==
+ *               'closed')`, and it is the seat state that shrinks a match below
+ *               eight. Maps to `SlotState.'closed'` (`../sim/match-config`).
  */
-export type SeatOccupant = 'human' | 'bot' | 'open';
+export type SeatOccupant = 'human' | 'bot' | 'open' | 'closed';
 
 /** One of the eight seats. */
 export interface LobbySeat {
@@ -294,8 +367,12 @@ export interface LobbySeat {
   /** The tier this seat's bot flies at — meaningless on a human seat, and kept
    *  anyway, so a seat that empties again shows the difficulty it had. */
   readonly difficulty: BotDifficulty;
-  /** The character previewed (or seated) here, or `null` on a human seat. */
+  /** The character previewed (or seated) here, or `null` on a human/closed seat. */
   readonly personality: PersonalityId | null;
+  /** The side this slot fights for in TEAMS (variable-slots Milestone E). FFA
+   *  ignores it (teams-of-one, `team === slot`); TEAMS shares one value across
+   *  allies. Kept on every seat so switching modes never loses an assignment. */
+  readonly team: number;
 }
 
 /** Lobby phases. The view draws nothing once the match owns the screen. */
@@ -328,6 +405,19 @@ export interface LobbyState {
    * id ({@link normalizeMapId}), so a stale saved key can never reach the sim.
    */
   readonly mapId: string;
+  /**
+   * The match mode (variable-slots Milestone E, GDD §2.1): FFA or TEAMS. The one
+   * toggle at the top of the roster; locked at RUSH! like the hull and arena.
+   * Rides the {@link lobbyMatchConfig} seam the sim consumes.
+   */
+  readonly mode: MatchMode;
+  /**
+   * Ore scarcity for this match (ratified developer, p11): the ABUNDANCE row —
+   * `scarce | standard | rich`, defaulting to the ratified SCARCE
+   * ({@link DEFAULT_ABUNDANCE}, "by default more scarce"). Rides the same
+   * {@link lobbyMatchConfig} seam as the mode and the slots.
+   */
+  readonly abundance: Abundance;
   /** Seconds left on the RUSH countdown; 0 outside `counting`. */
   readonly countdown: number;
   /**
@@ -351,6 +441,19 @@ export interface LobbyOptions {
   readonly host?: PlayerId;
   /** Seats. Default {@link LOBBY_SLOTS}; a smaller room is a test fixture. */
   readonly slots?: number;
+  /**
+   * The match size to open on (variable-slots Milestone E): the first `size`
+   * seats start active, the rest CLOSED, so a returning player's last size is
+   * restored without a special path (the same shape {@link ffaConfig} builds).
+   * Clamped to {@link MIN_MATCH_SIZE}..{@link MAX_MATCH_SIZE}; default: every
+   * physical slot open (the eight-player game).
+   */
+  readonly size?: number;
+  /** The match mode to open on (variable-slots Milestone E). Default `'ffa'`. */
+  readonly mode?: MatchMode;
+  /** The ore abundance to open on (ratified p11). Default {@link DEFAULT_ABUNDANCE}
+   *  — SCARCE, "by default more scarce". */
+  readonly abundance?: Abundance;
   /** Your hull. Default {@link DEFAULT_SHIP_CLASS} — the Vanguard (GDD §2.11). */
   readonly shipClass?: ShipClass;
   /** Your name. Default {@link DEFAULT_PLAYER_NAME}; folded through
@@ -379,16 +482,24 @@ export function createLobby(options: LobbyOptions): LobbyState {
   const shipClass = options.shipClass ?? DEFAULT_SHIP_CLASS;
   const name = normalizePlayerName(options.name);
   const mapId = normalizeMapId(options.mapId);
+  // The size restored (or defaulted): the first `size` seats open, the rest
+  // CLOSED — the same shape `ffaConfig` builds, so a returning player's last size
+  // is one option, not a special path. A human seat is never closed (below), so a
+  // guest welcomed past `size` still holds their seat.
+  const size = clampSize(options.size, count);
   const seats: LobbySeat[] = [];
   let emptyIndex = 0;
   for (let player = 0; player < count; player++) {
     const human = player === you || player === host;
+    const closed = !human && player >= size;
+    const occupant: SeatOccupant = human ? 'human' : closed ? 'closed' : 'open';
     seats.push({
       player,
-      occupant: human ? 'human' : 'open',
+      occupant,
       shipClass: player === you ? shipClass : DEFAULT_SHIP_CLASS,
-      difficulty: human ? 'medium' : defaultDifficultyForEmptySeat(emptyIndex++),
+      difficulty: human || closed ? 'medium' : defaultDifficultyForEmptySeat(emptyIndex++),
       personality: null,
+      team: defaultTeamForSlot(player),
     });
   }
   return withCast({
@@ -400,9 +511,20 @@ export function createLobby(options: LobbyOptions): LobbyState {
     shipClass,
     name,
     mapId,
+    mode: options.mode ?? 'ffa',
+    abundance: options.abundance ?? DEFAULT_ABUNDANCE,
     countdown: 0,
     online: options.online ?? true,
   });
+}
+
+/** Fold a requested match size into range: absent means every physical slot open
+ *  (the eight-player game); present is clamped to 2..8 and never past the physical
+ *  seat count of a test fixture. */
+function clampSize(size: number | undefined, count: number): number {
+  if (size === undefined) return count;
+  const ceiling = Math.min(count, MAX_MATCH_SIZE);
+  return Math.min(Math.max(Math.floor(size), MIN_MATCH_SIZE), ceiling);
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +564,12 @@ export function castForEmptySeat(emptyIndex: number, difficulty: BotDifficulty):
 function withCast(state: LobbyState): LobbyState {
   let emptyIndex = 0;
   const seats = state.seats.map((seat) => {
-    if (seat.occupant === 'human') return seat.personality === null ? seat : { ...seat, personality: null };
+    // A human sits in their seat, a closed seat holds nobody: neither previews a
+    // bot, and a closed seat must not consume an empty-seat cast index (it is not
+    // a seat the room will ever cast into).
+    if (seat.occupant === 'human' || seat.occupant === 'closed') {
+      return seat.personality === null ? seat : { ...seat, personality: null };
+    }
     const personality = castForEmptySeat(emptyIndex++, seat.difficulty);
     // A bot the server has actually seated flies its character's hull
     // (style-guide §4: the livery is a palette swap over one of four
@@ -555,7 +682,9 @@ export function hostControls(state: LobbyState): boolean {
 export function cycleBotDifficulty(state: LobbyState, player: PlayerId): LobbyState {
   if (!hostControls(state)) return state;
   const seat = state.seats[player];
-  if (!seat || seat.occupant === 'human') return state;
+  // Only a bot-bearing seat has a difficulty: a human flies their own hull, a
+  // closed seat holds nobody.
+  if (!seat || !isBotSeat(seat.occupant)) return state;
   const at = DIFFICULTY_CYCLE.indexOf(seat.difficulty);
   const next = DIFFICULTY_CYCLE[(at + 1) % DIFFICULTY_CYCLE.length] ?? 'medium';
   return withCast({
@@ -571,7 +700,143 @@ export function cycleBotDifficulty(state: LobbyState, player: PlayerId): LobbySt
  * slot order. Getting this wrong would hand seat 5's difficulty to seat 2.
  */
 export function botDifficulties(state: LobbyState): readonly BotDifficulty[] {
-  return state.seats.filter((s) => s.occupant !== 'human').map((s) => s.difficulty);
+  return state.seats.filter((s) => isBotSeat(s.occupant)).map((s) => s.difficulty);
+}
+
+// ---------------------------------------------------------------------------
+// Variable matches — mode, seat state, teams, abundance (Milestone E)
+// ---------------------------------------------------------------------------
+
+/** Whether a seat will fly a bot: an OPEN preview or a host-LOCKED bot. Not a
+ *  human (their own hull), not CLOSED (nobody). The one predicate the cast, the
+ *  difficulty tap and the config builder share. */
+export function isBotSeat(occupant: SeatOccupant): boolean {
+  return occupant === 'open' || occupant === 'bot';
+}
+
+/** The seats that take the field — everything not CLOSED, in slot order. `N` is
+ *  its length (2..8 when the lobby can RUSH). */
+export function activeSeats(state: LobbyState): readonly LobbySeat[] {
+  return state.seats.filter((s) => s.occupant !== 'closed');
+}
+
+/** `N` — the match size, the count of non-closed seats. */
+export function matchSizeOf(state: LobbyState): number {
+  return activeSeats(state).length;
+}
+
+/** The distinct sides manned by the active seats — TEAMS needs at least two, or
+ *  it is FFA wearing a costume (secondary ratified default: ≥1 player per team). */
+export function activeTeams(state: LobbyState): number {
+  return new Set(activeSeats(state).map((s) => s.team)).size;
+}
+
+/**
+ * Cycle one seat's occupancy — the host's tap on a roster row: OPEN → BOT →
+ * CLOSED → OPEN ({@link SEAT_STATE_CYCLE}). A no-op from a guest, after RUSH!, or
+ * on a HUMAN seat — you cannot cycle a seat somebody is sitting in (the same three
+ * refusals {@link cycleBotDifficulty} keeps, plus the human guard). Closing a seat
+ * is never blocked on the count — the developer ratified "show, never block"; the
+ * floor of two is enforced at {@link canStart}, not here.
+ */
+export function cycleSeatState(state: LobbyState, player: PlayerId): LobbyState {
+  if (!hostControls(state)) return state;
+  const seat = state.seats[player];
+  if (!seat || seat.occupant === 'human') return state;
+  const at = SEAT_STATE_CYCLE.indexOf(seat.occupant);
+  const next = SEAT_STATE_CYCLE[(at + 1) % SEAT_STATE_CYCLE.length] ?? 'open';
+  if (next === seat.occupant) return state;
+  return withCast({
+    ...state,
+    seats: state.seats.map((s) => (s.player === player ? { ...s, occupant: next } : s)),
+  });
+}
+
+/**
+ * Flip the match mode FFA ⇄ TEAMS (the toggle at the top of the roster). A no-op
+ * from a guest or after RUSH! — the mode is match config the world is built from,
+ * so it locks with the hull. Team assignments are kept across the flip (they live
+ * on every seat), so a host who set sides, glanced at FFA, and flipped back finds
+ * them intact.
+ */
+export function toggleMode(state: LobbyState): LobbyState {
+  if (!hostControls(state)) return state;
+  const mode: MatchMode = state.mode === 'ffa' ? 'teams' : 'ffa';
+  return { ...state, mode };
+}
+
+/**
+ * Cycle one seat's TEAM (the host's tap on a row's team chip, TEAMS only). A
+ * no-op from a guest, after RUSH!, outside TEAMS, or on a CLOSED seat — a seat
+ * out of the match has no side. Humans and bots alike are assignable: the host
+ * seats the sides (secondary ratified default). Walks 0..{@link MAX_TEAMS}-1.
+ */
+export function cycleSeatTeam(state: LobbyState, player: PlayerId): LobbyState {
+  if (!hostControls(state) || state.mode !== 'teams') return state;
+  const seat = state.seats[player];
+  if (!seat || seat.occupant === 'closed') return state;
+  const next = (Math.floor(seat.team) + 1) % MAX_TEAMS;
+  if (next === seat.team) return state;
+  return { ...state, seats: state.seats.map((s) => (s.player === player ? { ...s, team: next } : s)) };
+}
+
+/**
+ * Cycle the ABUNDANCE row SCARCE → STANDARD → RICH → SCARCE
+ * ({@link ABUNDANCE_CYCLE}). A no-op from a guest or after RUSH! — abundance is
+ * economy config the world is built from, so it locks with the hull.
+ */
+export function cycleAbundance(state: LobbyState): LobbyState {
+  if (!hostControls(state)) return state;
+  const at = ABUNDANCE_CYCLE.indexOf(state.abundance);
+  const next = ABUNDANCE_CYCLE[(at + 1) % ABUNDANCE_CYCLE.length] ?? DEFAULT_ABUNDANCE;
+  if (next === state.abundance) return state;
+  return { ...state, abundance: next };
+}
+
+/**
+ * The whole authored match, as the one {@link MatchConfig} the sim consumes
+ * (`../sim/match-config`): the mode, the abundance, and eight slots each mapped
+ * from its seat —
+ *
+ *  - a CLOSED seat → `closed` (dropped at world-build, shrinks `N`);
+ *  - a host-locked BOT → `bot`;
+ *  - a HUMAN → `open` (a live competitive seat);
+ *  - an OPEN preview → `open` online (a joiner can still take it) or `bot`
+ *    offline (there is no wire for a joiner, so the empty seats are the cast).
+ *
+ * `team` rides FFA as the slot id (teams-of-one) and TEAMS as the authored side;
+ * the bot fields ride only bot-bearing slots. This is the single handoff to the
+ * wire and the world — the lobby is the only place a `MatchConfig` is authored.
+ */
+export function lobbyMatchConfig(state: LobbyState): MatchConfig {
+  const slots: SlotConfig[] = state.seats.map((seat) => {
+    const slotState = seatSlotState(seat.occupant, state.online);
+    const bot = slotState === 'bot';
+    return {
+      index: seat.player,
+      state: slotState,
+      shipClass: seat.shipClass,
+      team: state.mode === 'ffa' ? seat.player : seat.team,
+      ...(bot && seat.personality ? { botPersonality: seat.personality } : {}),
+      ...(bot ? { botDifficulty: seat.difficulty } : {}),
+    };
+  });
+  return { mode: state.mode, slots, abundance: state.abundance };
+}
+
+/** One seat's occupancy as the config's {@link SlotState}: an OPEN preview is a
+ *  joinable seat online but a bot offline (no wire for a joiner). */
+function seatSlotState(occupant: SeatOccupant, online: boolean): SlotState {
+  switch (occupant) {
+    case 'closed':
+      return 'closed';
+    case 'bot':
+      return 'bot';
+    case 'human':
+      return 'open';
+    case 'open':
+      return online ? 'open' : 'bot';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -596,13 +861,25 @@ export function applyLobbySlots(state: LobbyState, slots: readonly LobbySlot[]):
   const seats = state.seats.map((seat) => {
     const wire = slots[seat.player];
     if (!wire) return seat;
-    const occupant: SeatOccupant = wire.isBot ? 'bot' : wire.ready ? 'human' : 'open';
+    // The wire has no "closed" flag yet (the server seam is Milestone C), so a
+    // seat the host closed locally stays closed unless the wire actually seats a
+    // human or a bot in it — an `open`-reading wire slot never re-opens it.
+    const occupant: SeatOccupant = wire.isBot
+      ? 'bot'
+      : wire.ready
+        ? 'human'
+        : seat.occupant === 'closed'
+          ? 'closed'
+          : 'open';
     const mine = seat.player === state.you && state.phase === 'gathering';
     return {
       ...seat,
       occupant,
       shipClass: mine ? state.shipClass : wire.shipClass,
       difficulty: wire.botDifficulty ?? seat.difficulty,
+      // Allegiance is static config the server carries on the slot (Task C4);
+      // absent (a pre-teams host), the seat keeps the side it already had.
+      team: wire.team ?? seat.team,
     };
   });
   return withCast({ ...state, seats });
@@ -629,10 +906,22 @@ export function seatLocalPlayer(state: LobbyState, you: PlayerId, host = state.h
 // RUSH!
 // ---------------------------------------------------------------------------
 
-/** Whether RUSH! can be pressed right now: the host, still gathering. Empty
- *  seats are never a reason to wait — they become bots (GDD §2.1, §4.2). */
+/**
+ * Whether RUSH! can be pressed right now: the host, still gathering, with a legal
+ * match to start. Empty seats are never a reason to wait — they become bots (GDD
+ * §2.1, §4.2) — but two things gate the start (variable-slots Milestone E):
+ *
+ *  - **At least two players.** A match needs two live cores ({@link MIN_MATCH_SIZE},
+ *    the sim's `< 2` win guard); a host who closed all but one seat cannot RUSH.
+ *  - **In TEAMS, at least two sides.** One team is FFA in a costume (the secondary
+ *    ratified default: ≥1 player per team). Any *split* is allowed — 3v1 is fine,
+ *    counts are shown never blocked — but not a single team.
+ */
 export function canStart(state: LobbyState): boolean {
-  return hostControls(state);
+  if (!hostControls(state)) return false;
+  if (matchSizeOf(state) < MIN_MATCH_SIZE) return false;
+  if (state.mode === 'teams' && activeTeams(state) < 2) return false;
+  return true;
 }
 
 /** Press RUSH! — starts the countdown every player watches, and locks the hull
@@ -693,8 +982,26 @@ export interface LobbySeatView {
   readonly isHost: boolean;
   /** Still claimable by anyone with the room code. */
   readonly openToJoin: boolean;
+  /** The seat's occupancy (variable-slots Milestone E) — the view dims a `closed`
+   *  row and shows the OPEN/BOT/CLOSED cycle state. */
+  readonly state: SeatOccupant;
+  /** Out of the match: no station, no player. The view draws it as a shut seat. */
+  readonly isClosed: boolean;
+  /** The side this slot fights for (raw team number, TEAMS). */
+  readonly team: number;
+  /** …and its label (`A`…`D`), so the row reads the team with the hue removed —
+   *  colour is identity, the letter is the team (style-guide §3 rule 3). */
+  readonly teamLabel: string;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
+}
+
+/** A side's active headcount, for the always-visible TEAMS tally (ratified:
+ *  counts shown, never blocking). */
+export interface LobbyTeamCount {
+  readonly team: number;
+  readonly label: string;
+  readonly count: number;
 }
 
 /** The lobby for one frame. */
@@ -710,6 +1017,15 @@ export interface LobbyModel {
   readonly name: string;
   /** The arena — the map card drawn as selected (`../sim/maps` id). */
   readonly mapId: string;
+  /** The match mode — the toggle drawn as FFA or TEAMS (variable-slots E). */
+  readonly mode: MatchMode;
+  /** The ore abundance — the row drawn as SCARCE / STANDARD / RICH (ratified p11). */
+  readonly abundance: Abundance;
+  /** `N` — active (non-closed) seats, 2..8. The size the world will build at. */
+  readonly size: number;
+  /** Per-side active headcounts, always present so TEAMS shows them and never
+   *  blocks a split (ratified). Sorted by team; empty of nothing active. */
+  readonly teamCounts: readonly LobbyTeamCount[];
   readonly classLocked: boolean;
   readonly countdown: { readonly active: boolean; readonly label: string; readonly seconds: number };
   readonly canStart: boolean;
@@ -725,7 +1041,11 @@ export interface LobbyModel {
 /** Build the frame model. Pure: the view draws exactly this and decides nothing. */
 export function lobbyModel(state: LobbyState): LobbyModel {
   const seats = state.seats.map((seat) => seatView(state, seat));
-  const humanCount = seats.filter((s) => !s.isBot).length;
+  // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
+  // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
+  const active = seats.filter((s) => !s.isClosed);
+  const humanCount = active.filter((s) => !s.isBot).length;
+  const botCount = active.filter((s) => s.isBot).length;
   return {
     phase: state.phase,
     room: state.room,
@@ -734,6 +1054,10 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     shipClass: state.shipClass,
     name: state.name,
     mapId: state.mapId,
+    mode: state.mode,
+    abundance: state.abundance,
+    size: active.length,
+    teamCounts: teamCountsOf(active),
     classLocked: classLocked(state),
     countdown: {
       active: state.phase === 'counting',
@@ -743,19 +1067,32 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     canStart: canStart(state),
     hostControls: state.you === state.host,
     humanCount,
-    botCount: seats.length - humanCount,
+    botCount,
     online: state.online,
   };
 }
 
+/** The active seats grouped into per-side headcounts, sorted by team number —
+ *  the always-visible TEAMS tally (ratified: shown, never blocking). */
+function teamCountsOf(active: readonly LobbySeatView[]): LobbyTeamCount[] {
+  const counts = new Map<number, number>();
+  for (const seat of active) counts.set(seat.team, (counts.get(seat.team) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([team, count]) => ({ team, label: teamLabel(team), count }));
+}
+
 function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
-  const isBot = seat.occupant !== 'human';
+  const isBot = isBotSeat(seat.occupant);
+  const isClosed = seat.occupant === 'closed';
   const character = seat.personality ? PERSONALITIES[seat.personality] : null;
-  const name = isBot
-    ? (character?.name ?? 'BOT')
-    : seat.player === state.you
-      ? state.name
-      : `PLAYER ${seat.player + 1}`;
+  const name = isClosed
+    ? 'CLOSED'
+    : isBot
+      ? (character?.name ?? 'BOT')
+      : seat.player === state.you
+        ? state.name
+        : `PLAYER ${seat.player + 1}`;
   return {
     player: seat.player,
     decal: `P${seat.player + 1}`,
@@ -766,10 +1103,15 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isBot,
     isYou: seat.player === state.you,
     isHost: seat.player === state.host && seat.occupant === 'human',
+    state: seat.occupant,
+    isClosed,
+    team: seat.team,
+    teamLabel: teamLabel(seat.team),
     // An open seat stops being claimable the moment the match starts; a seat the
-    // server has already seated a bot in was never claimable to begin with; and
-    // offline there is no wire for a second player to arrive on, so nothing is
-    // ever "claimable by room code" (the empty seats are simply the bot cast).
+    // server has already seated a bot in was never claimable to begin with; a
+    // closed seat is a shut door; and offline there is no wire for a second player
+    // to arrive on, so nothing is ever "claimable by room code" (the empty seats
+    // are simply the bot cast).
     openToJoin: seat.occupant === 'open' && state.phase !== 'started' && state.online,
     ...(isBot ? { botDifficulty: seat.difficulty } : {}),
   };

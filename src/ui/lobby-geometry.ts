@@ -161,6 +161,33 @@ export const LOBBY_MAP_MIN_WIDTH = 60;
 /** Cards don't sprawl on a wide desktop. */
 export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 
+// ---------------------------------------------------------------------------
+// The control strip — MODE toggle + ABUNDANCE (variable-slots Milestone E). Two
+// toggles carved off the TOP of the roster box, never a band of their own: the
+// roster is a list to read and it is what compresses (the file header's rule), so
+// the hull tiles and the arena cards keep their thumb floors on the tightest
+// phone. The per-seat OPEN/BOT/CLOSED cycle is the row itself; the per-row TEAM /
+// difficulty control is a chip at the row's right edge (below).
+// ---------------------------------------------------------------------------
+
+/** Height of the MODE/ABUNDANCE strip at the top of the roster. A plain tap
+ *  (GDD §2.4), thumb-scaled like every other control. */
+export const CONTROLS_HEIGHT = 30;
+export const CONTROLS_HEIGHT_TOUCH = 38;
+/** Widest a single toggle grows — the two split the roster width, capped so they
+ *  read as controls, not banners, on a wide desktop roster column. */
+export const CONTROL_MAX_WIDTH = 200;
+
+/** Width of a roster row's trailing chip — the TEAM chip in TEAMS, the difficulty
+ *  chip in FFA. Carved off the RIGHT of the row, so a tap on the row's body still
+ *  cycles the seat state and only the chip cycles the team/tier. */
+export const SEAT_CHIP_WIDTH = 54;
+/** The chip never eats more than this share of a (narrow) row, so the state-cycle
+ *  body — and the row's centre, which the hit-test contract taps — stays clear. */
+export const SEAT_CHIP_MAX_FRACTION = 0.4;
+/** Inset of the chip from the row's edges. */
+export const SEAT_CHIP_PAD = 3;
+
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;
 export const RUSH_HEIGHT_TOUCH = 64;
@@ -243,6 +270,14 @@ export interface LobbyLayout {
   readonly roomCode: Rect;
   /** The eight roster rows, in slot order, top to bottom. */
   readonly seats: readonly Rect[];
+  /** Each roster row's trailing chip (variable-slots E) — the TEAM chip in TEAMS,
+   *  the difficulty chip in FFA. Nested inside its {@link seats} row on the right,
+   *  so the hit-test checks it *before* the row body. Aligned to `seats`. */
+  readonly seatChips: readonly Rect[];
+  /** The MODE toggle (FFA / TEAMS), top-left of the roster (variable-slots E). */
+  readonly modeToggle: Rect;
+  /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), top-right of the roster. */
+  readonly abundance: Rect;
   /** The four hull tiles, in `CLASS_ORDER`. */
   readonly classOptions: readonly Rect[];
   /** The four arena cards, in `MAP_ORDER` (`./map-picker`). A row along the
@@ -271,7 +306,15 @@ export interface LobbyLayout {
  *  seat or a hull *is* — the caller maps an index through the model's own order
  *  (`./lobby` CLASS_ORDER / seat slots), and the two can't drift. */
 export type LobbyTarget =
+  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E). */
   | { readonly kind: 'seat'; readonly index: number }
+  /** The row's trailing chip — the TEAM (TEAMS) or difficulty (FFA) cycle. The
+   *  geometry is mode-blind (it only knows there is a chip); the flow routes it. */
+  | { readonly kind: 'seatChip'; readonly index: number }
+  /** The MODE toggle (variable-slots E). */
+  | { readonly kind: 'mode' }
+  /** The ABUNDANCE toggle (variable-slots E). */
+  | { readonly kind: 'abundance' }
   | { readonly kind: 'class'; readonly index: number }
   | { readonly kind: 'map'; readonly index: number }
   | { readonly kind: 'rush' }
@@ -374,7 +417,18 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     );
   }
 
-  const seatColumns = placeSeats(seats, rosterBox, seatRowMax(isTouch));
+  // The MODE / ABUNDANCE strip is carved off the TOP of the roster box (never a
+  // band of its own — see the constants header): the roster gives back the space,
+  // the tiles and the arena cards keep their floors. The seats take what is left.
+  const controls = placeControls(rosterBox, isTouch);
+  const seatsBox: Rect = {
+    x: rosterBox.x,
+    y: rosterBox.y + controls.height + (controls.height > 0 ? ROW_GAP : 0),
+    width: rosterBox.width,
+    height: Math.max(0, rosterBox.height - controls.height - (controls.height > 0 ? ROW_GAP : 0)),
+  };
+  const seatColumns = placeSeats(seats, seatsBox, seatRowMax(isTouch));
+  const seatChips = seats.map((rect) => chipRect(rect));
   const mapColumns = placeMaps(maps, mapBand);
 
   return {
@@ -382,6 +436,9 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     title,
     roomCode,
     seats,
+    seatChips,
+    modeToggle: controls.modeToggle,
+    abundance: controls.abundance,
     classOptions,
     maps,
     mapBand,
@@ -392,6 +449,33 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     seatColumns,
     tileShape,
   };
+}
+
+/**
+ * The MODE toggle (top-left of the roster) and the ABUNDANCE toggle (top-right),
+ * splitting the roster width with a gap between. Capped in width so they read as
+ * controls on a wide desktop column, and clamped to the roster's own height so a
+ * comically short box yields zero-extent rather than a strip taller than its band.
+ */
+function placeControls(roster: Rect, isTouch: boolean): { modeToggle: Rect; abundance: Rect; height: number } {
+  const height = Math.max(0, Math.min(isTouch ? CONTROLS_HEIGHT_TOUCH : CONTROLS_HEIGHT, roster.height));
+  const width = Math.max(0, Math.min(CONTROL_MAX_WIDTH, (roster.width - BLOCK_GAP) / 2));
+  const modeToggle: Rect = { x: roster.x, y: roster.y, width, height };
+  const abundance: Rect = { x: roster.x + roster.width - width, y: roster.y, width, height };
+  return { modeToggle, abundance, height };
+}
+
+/**
+ * A roster row's trailing chip — the TEAM (TEAMS) / difficulty (FFA) cycle. Carved
+ * off the RIGHT of the row and inset, so it never covers the row's centre: the
+ * hit-test contract taps a seat at its centre and must still land on the row body
+ * ({@link lobbyHitTest} checks the chip first, so a tap *on* the chip wins).
+ */
+function chipRect(seat: Rect): Rect {
+  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
+  const width = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
+  const height = Math.max(0, seat.height - 2 * SEAT_CHIP_PAD);
+  return { x: seat.x + seat.width - width - SEAT_CHIP_PAD, y: seat.y + SEAT_CHIP_PAD, width, height };
 }
 
 /**
@@ -413,7 +497,14 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
     const rect = layout.maps[i];
     if (rect && hit(rect, x, y)) return { kind: 'map', index: i };
   }
+  // The MODE / ABUNDANCE toggles (variable-slots E) — above the roster rows.
+  if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
+  if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
   for (let i = 0; i < layout.seats.length; i++) {
+    // A row's trailing chip wins over its body: a tap on the chip cycles the
+    // team/tier, a tap anywhere else on the row cycles the seat state.
+    const chip = layout.seatChips[i];
+    if (chip && hit(chip, x, y)) return { kind: 'seatChip', index: i };
     const rect = layout.seats[i];
     if (rect && hit(rect, x, y)) return { kind: 'seat', index: i };
   }
