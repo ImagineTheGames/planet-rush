@@ -42,9 +42,11 @@ import {
   EventLoopLagMonitor,
   HeartbeatReporter,
   LagProbe,
+  buildRegistration,
   readMachineIdentity,
 } from './heartbeat';
-import type { HeartbeatBody } from './heartbeat';
+import type { DeregistrationBody, HeartbeatBody, RegistrationBody } from './heartbeat';
+import { FLEET_AUTH_HEADER, signFleetRequest } from '../src/net/fleet-auth';
 import { attachWebSocketServer } from './ws';
 
 /** The sim runs at 60 Hz (GDD §4.1); the loop wakes at that rate and the room
@@ -138,32 +140,89 @@ const lagProbe = new LagProbe(lag, DEFAULT_LAG_SAMPLE_INTERVAL_MS);
 const lagTimer = setInterval(() => lagProbe.sample(performance.now()), DEFAULT_LAG_SAMPLE_INTERVAL_MS);
 lagTimer.unref();
 
-/** POST one heartbeat to the allocator. A non-2xx or a network error throws, and
- *  the reporter swallows it — a dropped beat is recoverable (the registry rides
- *  out a few misses). */
-async function postHeartbeat(base: string, body: HeartbeatBody): Promise<void> {
-  const response = await fetch(new URL('/fleet/heartbeat', base), {
+/**
+ * POST a fleet control-plane message to the allocator, authenticated (M10). The
+ * body is serialised once and *that exact string* is both signed and sent, so the
+ * allocator's HMAC over the bytes it receives matches (`src/net/fleet-auth.ts`). A
+ * non-2xx or a network error throws; the caller decides whether that is fatal (a
+ * boot registration retries) or ignorable (a dropped beat, the registry rides it
+ * out). The secret is the shared `TICKET_SECRET`.
+ */
+async function postFleet(
+  base: string,
+  path: string,
+  body: RegistrationBody | HeartbeatBody | DeregistrationBody,
+  secret: string,
+): Promise<void> {
+  const raw = JSON.stringify(body);
+  const response = await fetch(new URL(path, base), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: {
+      'content-type': 'application/json',
+      [FLEET_AUTH_HEADER]: signFleetRequest(raw, secret),
+    },
+    body: raw,
   });
-  if (!response.ok) throw new Error(`heartbeat rejected: ${response.status}`);
+  if (!response.ok) throw new Error(`${path} rejected: ${response.status}`);
 }
 
-// Join the fleet only when there is an allocator to beat to. A solo/self-hosted
-// server has no ALLOCATOR_URL and simply never starts a reporter (M9).
+// Join the fleet only when there is an allocator to beat to AND a shared secret to
+// authenticate with. A solo/self-hosted server has no ALLOCATOR_URL and simply
+// never joins (M9). An ALLOCATOR_URL with no TICKET_SECRET cannot sign its
+// membership, so it fails closed rather than beating unsigned requests the
+// allocator would only 401 (M10) — the same fail-closed rule as a ticket mismatch.
 let heartbeatTimer: NodeJS.Timeout | undefined;
-if (allocatorUrl !== undefined) {
+if (allocatorUrl !== undefined && ticketSecret === undefined) {
+  console.warn(
+    '[planet-rush] ALLOCATOR_URL is set but TICKET_SECRET is not — cannot authenticate ' +
+      'to the allocator; this Machine will NOT join the fleet. Set the shared secret.',
+  );
+}
+if (allocatorUrl !== undefined && ticketSecret !== undefined) {
+  const secret = ticketSecret;
   const reporter = new HeartbeatReporter({
     identity,
     source: matches,
     cordon,
     lag,
-    poster: { post: (body) => postHeartbeat(allocatorUrl, body) },
+    poster: { post: (body) => postFleet(allocatorUrl, '/fleet/heartbeat', body, secret) },
   });
+
+  // Announce ourselves the instant we boot, so `/machines` lists this Machine and
+  // the allocator can place on it before the first 5 s heartbeat lands (M10). The
+  // registration retries a few times: on a fresh deploy the allocator may still be
+  // coming up, and the heartbeats that follow would eventually register us anyway,
+  // but retrying makes the door open promptly rather than a beat-interval later.
+  const register = (): RegistrationBody =>
+    buildRegistration({ identity, capacity: matches.capacity, draining: cordon.draining });
+  void (async (): Promise<void> => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await postFleet(allocatorUrl, '/register', register(), secret);
+        console.log(`[planet-rush] registered ${identity.machine || '(no id)'} with ${allocatorUrl}`);
+        return;
+      } catch (e) {
+        console.warn(`[planet-rush] registration attempt ${attempt + 1} failed`, e);
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+      }
+    }
+    console.warn('[planet-rush] registration never succeeded — relying on heartbeats to join');
+  })();
+
   heartbeatTimer = setInterval(() => void reporter.beat(), DEFAULT_HEARTBEAT_INTERVAL_MS);
   heartbeatTimer.unref();
   console.log(`[planet-rush] fleet member ${identity.machine || '(no id)'} — beating to ${allocatorUrl}`);
+
+  // Leave the fleet cleanly on the way out: deregister so the allocator forgets us
+  // at once instead of ~15 s later when our last beat lapses (M10). Best-effort —
+  // if it fails, liveness still expires us. Registered on the same signals as the
+  // listener shutdown below.
+  const deregister = (): Promise<void> =>
+    postFleet(allocatorUrl, '/deregister', { machine: identity.machine }, secret).catch(() => {
+      // Ignored: liveness expiry is the backstop.
+    });
+  process.on('SIGTERM', () => void deregister());
+  process.on('SIGINT', () => void deregister());
 }
 
 http.listen(port, host, () => {
