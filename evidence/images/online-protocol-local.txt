@@ -1,13 +1,28 @@
+=== Planet Rush — netcode protocol + reconnect, LOCAL not live ===
+buildSha: 4d35a3b   capturedAt(UTC approx): 2026-07-29T07:30Z
 
+WHAT THIS IS: the repo's own end-to-end net tests, run against a REAL in-process
+server over REAL TCP sockets + hand-rolled RFC 6455 (tests/net/node-websocket.ts
+stands up node:http + server/ws.ts + a real MatchServer). The two clients are
+the real client net library (createOnlineSession), driven headlessly in Node —
+NOT the browser UI. This proves the WIRE PROTOCOL, two-client shared world,
+reconnect-grace (same ship, cargo/ore/upgrades intact) and ticket enforcement.
+It does NOT satisfy the live-deployment browser deliverables (see the online-*
+entries): the browser client's match handoff (m9-09) is unwired, so no browser
+can enter these matches, and the public Fly allocator has no fleet + no CORS.
+
+COMMAND: npx vitest run tests/net/online-2p.test.ts tests/net/reconnect-resume.test.ts tests/server/ticket-enforcement.test.ts tests/net/match-start-config.test.ts
+
+=== OUTPUT ===
  RUN  v2.1.8 /lanes/lane-1
 
- ✓ tests/server/ticket-enforcement.test.ts (11 tests) 6ms
- ✓ tests/net/reconnect-resume.test.ts (1 test) 295ms
- ✓ tests/net/online-2p.test.ts (1 test) 1744ms
-   ✓ a two-player online match > runs end-to-end against a locally-run server, each client predicting its own ship 1744ms
+ ✓ tests/net/match-start-config.test.ts (3 tests) 4ms
+ ✓ tests/server/ticket-enforcement.test.ts (11 tests) 5ms
+ ✓ tests/net/reconnect-resume.test.ts (1 test) 297ms
+ ✓ tests/net/online-2p.test.ts (1 test) 1747ms
+   ✓ a two-player online match > runs end-to-end against a locally-run server, each client predicting its own ship 1747ms
 
- Test Files  3 passed (3)
-      Tests  13 passed (13)
-   Start at  07:09:25
-   Duration  5.73s (transform 1.79s, setup 0ms, collect 4.75s, tests 2.05s, environment 0ms, prepare 4.75s)
-
+ Test Files  4 passed (4)
+      Tests  16 passed (16)
+   Start at  07:30:49
+   Duration  6.86s (transform 3.39s, setup 0ms, collect 9.71s, tests 2.05s, environment 0ms, prepare 6.55s)

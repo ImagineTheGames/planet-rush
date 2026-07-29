@@ -26,6 +26,31 @@ async function j(label, url, init) {
 console.log('=== allocator health / regions ===');
 await j('GET /health ', `${ALLOCATOR}/health`);
 await j('GET /regions', `${ALLOCATOR}/regions`);
+
+console.log('=== browser CORS reachability (what a real client hits first) ===');
+// The browser sends a preflight before a cross-origin POST. If the allocator
+// answers no Access-Control-Allow-Origin, the fetch throws before the app ever
+// sees the 503 body. Print the preflight status + whether ANY ACAO comes back.
+try {
+  const pre = await fetch(`${ALLOCATOR}/rooms`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://planet-rush.example',
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type',
+    },
+  });
+  const acao = pre.headers.get('access-control-allow-origin');
+  console.log(`OPTIONS /rooms (preflight): HTTP ${pre.status} ACAO=${acao ?? '(absent)'}`);
+} catch (e) {
+  console.log(`OPTIONS /rooms (preflight): THREW ${e?.message ?? e}`);
+}
+try {
+  const got = await fetch(`${ALLOCATOR}/health`, { headers: { Origin: 'https://planet-rush.example' } });
+  console.log(`GET /health with Origin: HTTP ${got.status} ACAO=${got.headers.get('access-control-allow-origin') ?? '(absent)'}`);
+} catch (e) {
+  console.log(`GET /health with Origin: THREW ${e?.message ?? e}`);
+}
 console.log('=== allocate + join through the allocator ===');
 await j('POST /rooms', `${ALLOCATOR}/rooms`, {
   method: 'POST',
