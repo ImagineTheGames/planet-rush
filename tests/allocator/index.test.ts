@@ -193,13 +193,20 @@ describe('POST /rooms — allocate a new room', () => {
     expect((await res.json()).error).toBe('no-capacity');
   });
 
-  it('sets a fly-replay header instead of a URL under a FlyReplayRouter', async () => {
-    const { base, registry, now } = await fixture({ router: new FlyReplayRouter({ selfRegion: 'iad' }) });
+  it('hands back the shared gameserver connectUrl and NO fly-replay header under a FlyReplayRouter', async () => {
+    // The machine-pin must NOT ride the JSON response: on the Fly edge a
+    // `fly-replay` header there replays the POST at the gameserver and the client
+    // never receives its {room, ticket}. The client dials the shared connectUrl and
+    // the SOCKET hop pins it to the room's host (allocator/index.ts `decided`).
+    const { base, registry, now } = await fixture({
+      router: new FlyReplayRouter({ selfRegion: 'iad', connectUrl: 'wss://gs.test/play' }),
+    });
     registry.observe(heartbeat('m-1', 'iad', []), now.value);
 
     const res = await fetch(`${base}/rooms`, { method: 'POST' });
-    expect(res.headers.get('fly-replay')).toBe('instance=m-1');
-    expect((await res.json()).connectUrl).toBeNull();
+    expect(res.status).toBe(201);
+    expect(res.headers.get('fly-replay')).toBeNull();
+    expect((await res.json()).connectUrl).toBe('wss://gs.test/play');
   });
 });
 
