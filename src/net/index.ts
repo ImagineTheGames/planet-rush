@@ -36,5 +36,6 @@ export * from './reconnect';
 export * from './wire';
 export * from './loopback';
 export * from './allocator-client';
+export * from './server-url';
 export * from './websocket-transport';
 export * from './session';
