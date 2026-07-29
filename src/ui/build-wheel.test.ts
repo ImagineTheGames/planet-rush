@@ -18,12 +18,14 @@ import {
   segmentState,
   spendableOre,
   repairWedgeInfo,
+  repairCoolingDown,
+  repairCooldownSeconds,
   REPAIR_ENTRY_ORE,
   SEGMENT_ARC,
   WHEEL_ORDER,
 } from './build-wheel';
 import type { BuildWheelSignals, WheelSegmentId } from './build-wheel';
-import { REPAIR_HP_PER_ORE, SHIELD, TURRET } from '../sim/constants';
+import { REPAIR_COOLDOWN_SECONDS, REPAIR_HP_PER_ORE, SHIELD, TURRET } from '../sim/constants';
 
 /** A docked player at a healthy station with `ore` banked, plus overrides. */
 function sig(over: Partial<BuildWheelSignals> = {}): BuildWheelSignals {
@@ -151,6 +153,7 @@ describe('REPAIR REACTOR names its effect — the informed tap (p5-08)', () => {
       { coreHp: 100, maxCoreHp: 100, banked: 9 }, // full
       { coreHp: 50, maxCoreHp: 100, banked: 0, cargo: 0 }, // broke
       { coreHp: 50, maxCoreHp: 100, banked: 9, collapsed: true }, // collapsed
+      { coreHp: 50, maxCoreHp: 100, banked: 9, repairGate: 8 }, // cooling down
     ];
     for (const f of frames) {
       const s = sig(f);
@@ -241,6 +244,74 @@ describe('presses that would do nothing (GDD §2.5, the sim\'s refusal reasons)'
     // legal (and sometimes correct) way to spend a doomed stockpile.
     expect(stateOf('turret', { banked: 99, collapsed: true })).toBe('ready');
     expect(stateOf('shield', { banked: 99, collapsed: true })).toBe('ready');
+  });
+});
+
+describe('the repair COOLDOWN wedge — no ready-looking press that does nothing (the field bug)', () => {
+  // A damaged, well-funded core: everything about the press is right EXCEPT that the
+  // station is still cooling down from its last repair (the sim's `repairGate`), so
+  // `placeOrder` would refuse it `cooling-down` and spend nothing. The wedge must say
+  // so — disabled-gray with a live countdown — rather than draw "+15 HP" at full
+  // brightness over a press that silently does nothing (evidence: cooldown-countdown-ui).
+  const cooling = (repairGate: number, over: Partial<BuildWheelSignals> = {}) =>
+    sig({ banked: 99, coreHp: 50, maxCoreHp: 100, repairGate, ...over });
+
+  it('disables the wedge while `repairGate` is live, however much ore is held', () => {
+    expect(stateOf('repair', { banked: 99, coreHp: 50, maxCoreHp: 100, repairGate: 8 })).toBe('inactive');
+    // A funded, damaged core is refused because it is cooling — not because it is
+    // poor: the state is `inactive` (a no-op press), never `ready`.
+    expect(segmentState('repair', cooling(REPAIR_COOLDOWN_SECONDS))).toBe('inactive');
+  });
+
+  it('counts the cooldown down live in the wedge copy — "REPAIR in Ns", read off sim state', () => {
+    // The copy is the CEILING of the sim's remaining seconds (no UI timer, p4-17),
+    // so it never reads 0 while the press is still locked. QA's attested frame: 1.63 s
+    // into the cooldown reads "REPAIR in 2s", not a "+15 HP" deal.
+    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS)).line).toBe(`REPAIR in ${REPAIR_COOLDOWN_SECONDS}s`);
+    expect(repairWedgeInfo(cooling(13.37)).line).toBe('REPAIR in 14s');
+    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS - 1.63)).line).toBe('REPAIR in 14s');
+    expect(repairWedgeInfo(cooling(1.63)).line).toBe('REPAIR in 2s');
+    // A sub-second sliver still reads "1s" — never a bare "0s" that looks ready.
+    expect(repairWedgeInfo(cooling(0.0001)).line).toBe('REPAIR in 1s');
+    expect(repairCooldownSeconds(cooling(0.0001))).toBe(1);
+  });
+
+  it('heals nothing while cooling — the disabled wedge restores 0 HP, like every other reason', () => {
+    const info = repairWedgeInfo(cooling(5));
+    expect(info.restoreHp).toBe(0);
+    expect(info.line.startsWith('+')).toBe(false);
+  });
+
+  it('re-arms the moment `repairGate` reaches zero — back to the "+15 HP" deal on the expiry frame', () => {
+    // The sim ticks `repairGate` down to exactly 0 on the expiry tick; on that frame
+    // the wedge must return to full brightness, mirroring the sim re-allowing the order.
+    expect(repairCoolingDown(cooling(0))).toBe(false);
+    expect(stateOf('repair', { banked: 99, coreHp: 50, maxCoreHp: 100, repairGate: 0 })).toBe('ready');
+    expect(repairWedgeInfo(cooling(0)).line).toBe(`+${REPAIR_HP_PER_ORE} HP`);
+    // ...and a frame that predates the cooldown (no `repairGate` field at all) reads
+    // as not cooling, the backward-compatible default.
+    expect(repairCoolingDown(sig({ coreHp: 50 }))).toBe(false);
+    expect(stateOf('repair', { banked: 99, coreHp: 50, maxCoreHp: 100 })).toBe('ready');
+  });
+
+  it('matches the sim gate exactly — refused on precisely the frames `placeOrder` refuses (1e-9 boundary)', () => {
+    // `placeOrder` gates on `(repairGate ?? 0) > 1e-9`; the wedge must disable on the
+    // same frames, never one early or late, so the wheel and the sim never disagree.
+    expect(repairCoolingDown(cooling(1e-9))).toBe(false); // the sim would allow this
+    expect(stateOf('repair', { banked: 99, coreHp: 50, maxCoreHp: 100, repairGate: 1e-9 })).toBe('ready');
+    expect(repairCoolingDown(cooling(2e-9))).toBe(true); // and refuse this
+    expect(stateOf('repair', { banked: 99, coreHp: 50, maxCoreHp: 100, repairGate: 2e-9 })).toBe('inactive');
+  });
+
+  it('yields to a full core and to collapse — cooldown is the lowest-priority reason (sim order)', () => {
+    // Precedence mirrors `placeOrder`: collapsed → core-full → cooling-down. A full or
+    // collapsed core reads its own reason, not the countdown, even while cooling.
+    expect(repairWedgeInfo(cooling(9, { coreHp: 100 })).line).toBe('REACTOR FULL');
+    expect(repairWedgeInfo(cooling(9, { collapsed: true })).line).toBe('NO REPAIR');
+    // But cooldown DOES outrank affordability: a broke, cooling core reads the
+    // countdown (the sim refuses `cooling-down` before it ever checks the bank).
+    expect(repairWedgeInfo(cooling(9, { banked: 0, cargo: 0 })).line).toBe('REPAIR in 9s');
+    expect(stateOf('repair', { banked: 0, cargo: 0, coreHp: 50, maxCoreHp: 100, repairGate: 9 })).toBe('inactive');
   });
 });
 

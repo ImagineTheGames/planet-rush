@@ -266,6 +266,12 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+  /** Seconds left on the own station's repair COOLDOWN — the sim's
+   *  `station.repairGate`, read each frame. While `> 0` the sim refuses every
+   *  repair order `'cooling-down'`, so REPAIR REACTOR draws disabled-gray with a
+   *  live "REPAIR in Ns" countdown rather than a pressable "+15 HP" deal. Default
+   *  0 ⇒ not cooling (the pre-cooldown behaviour). */
+  readonly repairGate?: number;
 
   // --- Day 2: over-entity health bars (GDD §2.2 — a hull bar over every ship) --
 
@@ -1348,6 +1354,7 @@ export class Hud extends Container {
       coreHp: frame.coreHp ?? 0,
       maxCoreHp: frame.maxCoreHp ?? 0,
       collapsed: frame.collapsed ?? false,
+      repairGate: frame.repairGate ?? 0,
     };
     const wheel = buildWheelModel(signals);
     const upgrade = upgradeWheelModel({

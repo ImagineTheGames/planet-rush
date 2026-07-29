@@ -41,11 +41,23 @@ interface RepairStage {
   setCore(hp: number): { coreHp: number; maxCoreHp: number } | null;
   /** The LOGICAL screen point at the centre of the REPAIR wedge (the real-click door). */
   repairWedgePoint(): { x: number; y: number } | null;
+  /** The REPAIR wedge centre in CLIENT (physical CSS) space — the same point rotated
+   *  back through the landscape lock, so a real tap lands on it on BOTH form factors
+   *  (identity on desktop, un-rotated on a portrait phone). */
+  repairWedgeClientPoint(): { x: number; y: number } | null;
   /** The REPAIR wedge the real view drew this frame — its second line, whether it
    *  drew bright (pressable), and its cost. */
   wedge(): { sub: string; ready: boolean; cost: number | null } | null;
-  /** The live core HP / max / bank / repair tell this frame. */
-  readout(): { coreHp: number; maxCoreHp: number; banked: number; repairing: boolean } | null;
+  /** The live core HP / max / bank / repair tell / repair COOLDOWN remaining this
+   *  frame. `repairGate > 0` ⇒ the wedge draws its "REPAIR in Ns" countdown and a
+   *  press is refused `cooling-down`. */
+  readout(): {
+    coreHp: number;
+    maxCoreHp: number;
+    banked: number;
+    repairing: boolean;
+    repairGate: number;
+  } | null;
 }
 interface StageWindow {
   __repairStage?: RepairStage;
@@ -70,7 +82,10 @@ async function boot(page: import('@playwright/test').Page): Promise<string[]> {
  *  click hits. NOT a debug order method — this is the wiring the field report warns
  *  about ("the wedge fires the wrong verb, or the order never leaves the client"). */
 async function realTapRepair(page: import('@playwright/test').Page): Promise<void> {
-  const point = await page.evaluate(() => window.__repairStage!.repairWedgePoint());
+  // The CLIENT-space wedge centre: identical to the logical point on desktop, and
+  // correctly un-rotated on a portrait phone under the landscape lock — so the one
+  // tap door drives both form factors.
+  const point = await page.evaluate(() => window.__repairStage!.repairWedgeClientPoint());
   if (!point) throw new Error('no REPAIR wedge to tap');
   await page.evaluate((p) => {
     const canvas = document.querySelector('canvas');
@@ -143,32 +158,48 @@ test('the REPAIR wedge shows "+15 HP" and a real click heals the core and spends
   expect(pageErrors, 'no page errors placing a real repair order').toEqual([]);
 });
 
-test('five real clicks are five discrete purchases — exactly +75 HP for 5 ore', async ({ page }) => {
+test('one real click heals once and arms the cooldown; the four rapid re-taps behind it are refused', async ({
+  page,
+}) => {
+  // The cooldown truth on the shipped bundle (RATIFIED developer, 2026-07-28): repair
+  // is a rationed patch now, NOT a heal-tank. One tap heals 15 HP and arms the 15 s
+  // gate; every rapid re-tap behind it is refused `cooling-down`, spending nothing —
+  // the live-stage analog of the sim's `buildings.test.ts` cooldown check, proven
+  // through the REAL wedge on the REAL bundle (the wiring the finding was about).
   const pageErrors = await boot(page);
 
-  // Siege 80 HP down so five full 15-HP taps (75) never hit the clamp, and bank a
-  // comfortable 10 ore. Each press is drained in its own frame (we wait for the
-  // core to step up between clicks), so five clicks are five independent orders.
+  // Siege 80 HP down (so a full 15-HP tap never hits the clamp) and bank a comfortable
+  // 10 ore — plenty to (wrongly) over-spend if the gate were not honoured.
   const staged = await page.evaluate(() => window.__repairStage!.siege(80, 10));
   expect(staged, 'staged').not.toBeNull();
   const coreAtStart = staged!.coreHp;
 
-  const TAPS = 5;
-  for (let i = 1; i <= TAPS; i++) {
-    await realTapRepair(page);
-    await waitForCore(page, coreAtStart + i * REPAIR_HP);
-  }
+  // The first tap heals once and arms the gate.
+  await realTapRepair(page);
+  await waitForCore(page, coreAtStart + REPAIR_HP);
+  const armed = await page.evaluate(() => window.__repairStage!.readout());
+  expect(armed!.repairGate, 'the first repair armed the cooldown gate').toBeGreaterThan(0);
+  const bankAfterFirst = armed!.banked;
 
+  // Four more rapid taps while the gate is live — each refused, changing nothing.
+  for (let i = 0; i < 4; i++) await realTapRepair(page);
+  // Let several live ticks pass (the gate visibly drains) so a leaked order would have
+  // had every chance to spend or heal — then prove none did.
+  await page.waitForFunction(
+    (g0) => (window.__repairStage!.readout()?.repairGate ?? 0) < g0 - 0.3,
+    armed!.repairGate,
+    { timeout: 8_000 },
+  );
   const after = await page.evaluate(() => window.__repairStage!.readout());
-  expect(after!.coreHp, 'five discrete taps healed exactly 5 × 15 HP').toBeCloseTo(
-    coreAtStart + TAPS * REPAIR_HP,
+  expect(after!.coreHp, 'the four rapid re-taps healed nothing — one tap, not five').toBeCloseTo(
+    coreAtStart + REPAIR_HP,
     1,
   );
-  expect(after!.banked, 'five discrete taps spent exactly 5 ore — no channel over-spend').toBeCloseTo(
-    staged!.banked - TAPS * REPAIR_ORE,
+  expect(after!.banked, 'the four refused taps spent no extra ore — one ore, not five').toBeCloseTo(
+    bankAfterFirst,
     5,
   );
-  expect(pageErrors, 'no page errors placing five real repair orders').toEqual([]);
+  expect(pageErrors, 'no page errors placing one real repair order then four refused').toEqual([]);
 });
 
 test('near full, the wedge shows the REAL partial number, not a full tap', async ({ page }) => {
@@ -219,3 +250,127 @@ test('at full, the REPAIR wedge is disabled with a reason ("REACTOR FULL")', asy
   expect(wedge!.ready, 'a full core makes the wedge unpressable').toBe(false);
   expect(pageErrors).toEqual([]);
 });
+
+/**
+ * The finding this deliverable fixes (evidence: repair-cooldown-countdown-ui): after
+ * a repair the sim arms a 15 s cooldown and refuses every further order
+ * `cooling-down`, spending nothing — but the wedge was drawing "+15 HP" at full
+ * brightness the whole time, a ready-looking press that silently did nothing. The
+ * full cycle, driven through the REAL door on the REAL bundle:
+ *
+ *   ready "+15 HP"  →  tap heals + arms cooldown  →  disabled "REPAIR in Ns" that
+ *   ticks down and refuses a second tap (no ore, no HP)  →  re-arms to "+15 HP" the
+ *   moment the gate drains.
+ *
+ * The countdown is read straight off `station.repairGate` each frame (no UI timer,
+ * the p4-17 rule); the spec waits real seconds for the gate to drain so the re-arm is
+ * the sim's, not a fake. Run on BOTH form factors — desktop mouse and portrait phone
+ * touch — so the wiring is proven on the two devices the game ships to.
+ */
+async function driveFullCooldownCycle(page: import('@playwright/test').Page): Promise<void> {
+  const pageErrors = await boot(page);
+
+  // Siege 30 HP down and bank a comfortable 5 ore, then open the wheel.
+  const staged = await page.evaluate(() => window.__repairStage!.siege(30, 5));
+  expect(staged, 'the local ship and its station were available to stage').not.toBeNull();
+  const coreAtStart = staged!.coreHp;
+
+  // Before the tap the wedge is the pressable "+15 HP" deal — the cooldown is cold.
+  const ready = await page
+    .waitForFunction(() => {
+      const w = window.__repairStage!.wedge();
+      return w && w.ready ? w : null;
+    }, undefined, { timeout: 20_000 })
+    .then((h) => h.jsonValue());
+  expect(ready!.sub, 'the cold wedge shows the full tap it will buy').toBe(`+${REPAIR_HP} HP`);
+
+  // --- Tap: the core heals and the cooldown ARMS ---------------------------------
+  await realTapRepair(page);
+  await waitForCore(page, coreAtStart + REPAIR_HP);
+  const armed = await page.evaluate(() => window.__repairStage!.readout());
+  expect(armed!.repairGate, 'the successful repair armed the cooldown gate').toBeGreaterThan(0);
+
+  // --- Cooling down: the wedge is DISABLED with a live "REPAIR in Ns" countdown ---
+  // Read the DRAWN wedge and the LIVE sim gate in the SAME evaluate, so the two
+  // reflect one snapshot and the match below is not raced by a tick landing between
+  // two reads.
+  const cooling = await page
+    .waitForFunction(() => {
+      const w = window.__repairStage!.wedge();
+      const r = window.__repairStage!.readout();
+      return w && r && !w.ready && /^REPAIR in \d+s$/.test(w.sub)
+        ? { sub: w.sub, ready: w.ready, repairGate: r.repairGate }
+        : null;
+    }, undefined, { timeout: 20_000 })
+    .then((h) => h.jsonValue());
+  expect(cooling!.ready, 'a cooling core makes the wedge unpressable — never a ready-looking press').toBe(false);
+  // The shown seconds are the ceiling of the sim's remaining gate (no UI timer). The
+  // drawn wedge lags the live sim by at most one render frame, so the shown ceil sits
+  // within 1 s of `repairGate` — proving the copy TRACKS sim state (a UI timer would
+  // drift free), while the exact re-arm below proves it hits zero on the sim's tick.
+  const shown = Number(/^REPAIR in (\d+)s$/.exec(cooling!.sub)![1]);
+  expect(
+    Math.abs(shown - Math.max(1, Math.ceil(cooling!.repairGate))),
+    'the countdown tracks the sim remaining, ceiled (within one render frame)',
+  ).toBeLessThanOrEqual(1);
+
+  // --- A second REAL tap while cooling changes NOTHING: no ore, no HP -------------
+  const before = await page.evaluate(() => window.__repairStage!.readout());
+  await realTapRepair(page);
+  // Let several live ticks pass (the gate visibly drains) so a refused order would
+  // have had every chance to (wrongly) spend — then prove it did not.
+  await page.waitForFunction(
+    (g0) => (window.__repairStage!.readout()?.repairGate ?? 0) < g0 - 0.3,
+    before!.repairGate,
+    { timeout: 8_000 },
+  );
+  const afterRefused = await page.evaluate(() => window.__repairStage!.readout());
+  expect(afterRefused!.banked, 'the refused tap spent no ore from the bank').toBeCloseTo(before!.banked, 5);
+  expect(afterRefused!.coreHp, 'the refused tap healed no HP').toBeCloseTo(before!.coreHp, 5);
+
+  await page.screenshot({ path: 'tests/live-stage/repair-cooldown-evidence.png' });
+
+  // --- Re-arm: the moment the gate drains, the wedge is the "+15 HP" deal again ---
+  const rearmed = await page
+    .waitForFunction(() => {
+      const r = window.__repairStage!.readout();
+      const w = window.__repairStage!.wedge();
+      return r && w && r.repairGate <= 0 && w.ready ? w : null;
+    }, undefined, { timeout: 20_000 })
+    .then((h) => h.jsonValue());
+  expect(rearmed!.sub, 'the drained gate restores the "+15 HP" deal at full brightness').toBe(`+${REPAIR_HP} HP`);
+  expect(rearmed!.ready, 'the re-armed wedge is pressable again').toBe(true);
+
+  expect(pageErrors, 'no page errors across the whole cooldown cycle').toEqual([]);
+}
+
+test('PC: the REPAIR wedge counts the cooldown down and re-arms — no ready-looking press that does nothing', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await driveFullCooldownCycle(page);
+});
+
+// The same full cycle on the two device profiles the mobile matrix contracts, at
+// their real portrait pixels: under the landscape lock the wedge point is rotated
+// back to physical space, so a real touch lands on the wedge the client drew.
+const PHONE_PROFILES = [
+  { name: 'iPhone', width: 390, height: 844, dpr: 3 },
+  { name: 'Pixel', width: 412, height: 915, dpr: 2.6 },
+] as const;
+
+for (const profile of PHONE_PROFILES) {
+  test.describe(`phone profile — ${profile.name} (portrait, held)`, () => {
+    test.use({
+      hasTouch: true,
+      isMobile: true,
+      deviceScaleFactor: profile.dpr,
+      viewport: { width: profile.width, height: profile.height },
+    });
+
+    test(`${profile.name}: the REPAIR wedge counts the cooldown down and re-arms on touch`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await driveFullCooldownCycle(page);
+    });
+  });
+}

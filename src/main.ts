@@ -1997,6 +1997,9 @@ async function boot(): Promise<void> {
     if (station) {
       hudFrame.coreHp = station.coreHp;
       hudFrame.maxCoreHp = station.maxCoreHp;
+      // The repair COOLDOWN remaining (the sim's `repairGate`), straight off sim
+      // state so the wheel counts "REPAIR in Ns" down without a UI timer (p4-17).
+      hudFrame.repairGate = station.repairGate ?? 0;
       hudFrame.shieldHp = shieldPool(station);
       hudFrame.maxShieldHp = shieldPoolMax(station);
       hudFrame.turretHp = turretPool(station);
@@ -3171,11 +3174,30 @@ async function boot(): Promise<void> {
           y: h / 2 + Math.sin(angle) * radius * 0.6,
         };
       },
+      repairWedgeClientPoint(): { x: number; y: number } | null {
+        // The wedge centre in CLIENT (physical CSS) space, so a real tap lands on it
+        // on EITHER form factor: on a portrait phone under the landscape lock the
+        // logical point is rotated back through `logicalToPhysical` (identity on
+        // desktop), then offset by the canvas rect — the exact inverse of the
+        // `toLogical` every real pointer crosses. The live-stage cooldown spec taps
+        // here so the same cycle drives on desktop and phone alike.
+        const logical = stage.repairWedgePoint();
+        if (!logical) return null;
+        const p = logicalToPhysical(logical.x, logical.y, transform);
+        const rect = app.canvas.getBoundingClientRect();
+        return { x: p.x + rect.left, y: p.y + rect.top };
+      },
       wedge(): { sub: string; ready: boolean; cost: number | null } | null {
         const drawn = hud.debugBuildWedges().find((wedge) => wedge.id === 'repair');
         return drawn ? { sub: drawn.sub, ready: drawn.ready, cost: drawn.cost } : null;
       },
-      readout(): { coreHp: number; maxCoreHp: number; banked: number; repairing: boolean } | null {
+      readout(): {
+        coreHp: number;
+        maxCoreHp: number;
+        banked: number;
+        repairing: boolean;
+        repairGate: number;
+      } | null {
         const ship = world.ships.find(isLocalShip);
         const station = localStation();
         if (!ship || !station) return null;
@@ -3184,6 +3206,11 @@ async function boot(): Promise<void> {
           maxCoreHp: station.maxCoreHp,
           banked: ship.banked,
           repairing: station.repairing ?? false,
+          // The repair COOLDOWN remaining (RATIFIED developer, 2026-07-28): while
+          // `> 0` the wedge draws "REPAIR in Ns" and a press is refused
+          // `'cooling-down'`. The live-stage spec waits on this to prove the wedge
+          // disables through the whole cooldown and re-arms as it reaches zero.
+          repairGate: station.repairGate ?? 0,
         };
       },
     };
