@@ -1,75 +1,55 @@
-=== LIVE WIRE PROBE — Planet Rush M3 online — captured 2026-07-29T10:17:59Z ===
-repo HEAD: 6ac8035
-allocator: https://planet-rush-allocator.fly.dev ; gameserver: wss://planet-rush-gameserver.fly.dev/play
+=== LIVE WIRE PROBE — Planet Rush M3 online — captured 2026-07-29T10:23:35Z ===
+repo HEAD: f3474c1
+allocator: https://planet-rush-allocator.fly.dev ; gameserver: wss://planet-rush-gameserver.fly.dev/play ; client Origin used: https://planet-rush.fly.dev
+curl self-witnessed by QA; read-only stethoscope; each request shows status, key headers, body.
 
 ### GET /health
 HTTP/2 200 
 content-type: application/json
-date: Wed, 29 Jul 2026 10:18:00 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP34SCSBJYVZH6X5SZND8K-gru
-
-  body: {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":6719}
+fly-request-id: 01KYPPDD0KPQT5XSM92PQ1M05T-gru
+  body: {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":7056}
 
 ### GET /regions
 HTTP/2 200 
 content-type: application/json
-date: Wed, 29 Jul 2026 10:18:01 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP351MQPEQRYSVZMB0BZ88-gru
-
+fly-request-id: 01KYPPDD7DQ7HA48YPERMMJPBX-gru
   body: {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 
-### OPTIONS /rooms  (preflight, Origin https://planet-rush.fly.dev)
+### OPTIONS /rooms (browser preflight, Origin https://planet-rush.fly.dev)
 HTTP/2 204 
 access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-headers: content-type
-access-control-max-age: 86400
-date: Wed, 29 Jul 2026 10:18:02 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP369DXD7PSPW4BPFZ218G-gru
+fly-request-id: 01KYPPDDE755HGZA3DY422MWMG-gru
+  -> NOTE: access-control-allow-origin absence means a browser fetch() is CORS-blocked before the app can read any body.
 
+### POST /rooms (allocate; Origin https://planet-rush.fly.dev, body {}) — 3 attempts
+  attempt 1:
+    HTTP/2 200 
+    content-type: text/plain
+    fly-request-id: 01KYPPDDMSV3834RYBNCPEZFH6-gru
+    body: Planet Rush match server — connect a WebSocket to play.
+  attempt 2:
+    HTTP/2 200 
+    content-type: text/plain
+    fly-request-id: 01KYPPDDW2289Y3V5FZ8SCDZXH-gru
+    body: Planet Rush match server — connect a WebSocket to play.
+  attempt 3:
+    HTTP/2 200 
+    content-type: text/plain
+    fly-request-id: 01KYPPDE3FX1XZDNEKA4X119BD-gru
+    body: Planet Rush match server — connect a WebSocket to play.
 
-### POST /rooms  (allocate, Origin https://planet-rush.fly.dev, body {}) — 3 attempts
--- attempt 1 --
-HTTP/2 200 
-content-type: text/plain
-date: Wed, 29 Jul 2026 10:18:02 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP36JBMCDMAGA3SM1CJ0AD-gru
-
-  body: Planet Rush match server — connect a WebSocket to play.
--- attempt 2 --
-HTTP/2 200 
-content-type: text/plain
-date: Wed, 29 Jul 2026 10:18:03 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP36VP5Y9WMGYYK2YMVMM6-gru
-
-  body: Planet Rush match server — connect a WebSocket to play.
--- attempt 3 --
-HTTP/2 200 
-content-type: text/plain
-date: Wed, 29 Jul 2026 10:18:03 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP373JVMXQZ6TGHQMZJ5MH-gru
-
-  body: Planet Rush match server — connect a WebSocket to play.
-
-### POST /rooms/ABCD/join  (Origin https://planet-rush.fly.dev, body {})
+### POST /rooms/ABCD/join (routing control; Origin https://planet-rush.fly.dev)
 HTTP/2 404 
 content-type: application/json
-date: Wed, 29 Jul 2026 10:18:03 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPP37A3F28G3VBTPSDBRYYD-gru
-
+fly-request-id: 01KYPPDEAGN34DNBSV8HFRW14Z-gru
   body: {"error":"not-found"}
 
-=== probe done ===
+### INTERPRETATION
+The allocator control plane (/health, /regions, /rooms/:code/join) answers as clean JSON and is UP.
+But POST /rooms returns 200 text/plain '"Planet Rush match server..."' — the bare gameserver's
+WebSocket root banner — with NO access-control-allow-origin header. That is the Fly fly-replay
+misroute: the allocate POST is replayed to a gameserver Machine instead of being handled by the
+allocator, so no JSON room code is minted AND no CORS header is present. A browser fetch() therefore
+fails CORS before reading any body -> allocator-client returns 'network' -> the client shows
+'Can't reach the servers'. No room code can be minted on the live deploy. Deploy defect, not netcode.
