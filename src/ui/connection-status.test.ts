@@ -67,6 +67,41 @@ describe('what it says', () => {
   });
 });
 
+describe('a lost server is not a lost connection (M3/online)', () => {
+  it('says the match ended for a dead room, not a spent grace window', () => {
+    const gone = connectionStatusModel({ state: 'closed', online: true, closeReason: 'room-gone' });
+    const away = connectionStatusModel({ state: 'closed', online: true, closeReason: 'grace-elapsed' });
+    // Two different endings → two different messages a player would file different
+    // bugs about — never collapsed.
+    expect(gone.headline).not.toBe(away.headline);
+    expect(gone.detail).not.toBe(away.detail);
+    expect(gone.detail).toMatch(/lost the server/i);
+    expect(away.detail).toMatch(/away too long/i);
+    // Both are still the terminal, back-to-menu overlay.
+    for (const m of [gone, away]) {
+      expect(m.severity).toBe('error');
+      expect(m.spinner).toBe(false);
+      expect(m.action).toBe('BACK TO MENU');
+    }
+  });
+
+  it('keeps the generic line for a plain drop or a deliberate leave', () => {
+    const dropped = connectionStatusModel({ state: 'closed', online: true });
+    const left = connectionStatusModel({ state: 'closed', online: true, closeReason: 'left' });
+    for (const m of [dropped, left]) {
+      expect(m.headline).toBe('DISCONNECTED');
+      expect(m.detail).toMatch(/SOLO/i);
+    }
+  });
+
+  it('ignores a close reason until the connection is actually closed', () => {
+    // A reason arriving early (e.g. carried on the input while still reconnecting)
+    // must not rewrite the reconnecting copy.
+    const m = connectionStatusModel({ state: 'reconnecting', online: true, closeReason: 'room-gone' });
+    expect(m.headline).toBe('RECONNECTING');
+  });
+});
+
 describe('the one live control', () => {
   it('routes a tap on BACK TO MENU to dismiss, only when closed', () => {
     const layout = connectionStatusLayout(VIEWPORT);

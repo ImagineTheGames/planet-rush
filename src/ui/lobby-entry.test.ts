@@ -34,6 +34,7 @@ import {
   chooseDoor,
   createEntry,
   entryConnected,
+  entryErrorFor,
   entryFailed,
   entryLive,
   entryModel,
@@ -492,5 +493,27 @@ describe('a tap hits what it looks like it hits', () => {
     // The index the geometry returns indexes the model's own key list — this is
     // the seam where a drifted order would silently type the wrong letter.
     expect(typeEntryCode(typed(''), KEYPAD_KEYS[index] as string).code).toBe(KEYPAD_KEYS[9]);
+  });
+});
+
+describe('the allocator refuses (M3/online)', () => {
+  it('turns each allocator failure into a distinct sentence the screen can show', () => {
+    const messages = (['no-capacity', 'not-found', 'network', 'bad-response'] as const).map((r) =>
+      entryErrorFor(r),
+    );
+    // Three (here four) failures, three different messages — never one line.
+    expect(new Set(messages).size).toBe(messages.length);
+    for (const m of messages) expect(m.length).toBeGreaterThan(0);
+  });
+
+  it('feeds straight into entryFailed and keeps the typed code for a retry', () => {
+    // A join that came back 503 (fleet full) leaves the code intact — retrying is
+    // one tap, not four keys re-typed.
+    const state = submitJoin(typed(KEYPAD_KEYS.slice(0, ROOM_CODE_LENGTH).join(''))).state;
+    const failed = entryFailed(state, entryErrorFor('no-capacity'));
+    expect(failed.status).toBe('error');
+    expect(failed.error).toBe(entryErrorFor('no-capacity'));
+    expect(failed.error).toMatch(/full/i);
+    expect(failed.code).toBe(state.code); // the code survives the refusal
   });
 });
