@@ -355,3 +355,47 @@ needs none of this and is shot on the LIVE preview build.
 the offline boot bypasses `MatchConfig` entirely — there is also no in-app scarce/rich
 selector yet. So "by default more scarce" is not what the shipped offline game runs today.
 The p11 economy code itself resolves each level correctly (proven in `scarce-default`).
+
+## M3 online, step 4 — a real match over the real internet (build `4d35a3b`)
+
+**The deliverable cannot be met on the current build, and that is the finding.**
+Three online gates — `online-room-create`, `online-two-clients`,
+`online-reconnect` — are **failed**, each verified today against the live Fly
+deployment and the current tree. The netcode itself is sound; three *other*
+things are broken. The developer's two-phone test cannot even be attempted until
+all three are fixed.
+
+| Gate | Shot | Result |
+| --- | --- | --- |
+| ONLINE front door renders (CREATE/JOIN/keypad) | `online-front-door` | **verified** — the UI is correct |
+| Netcode protocol + reconnect (Node, localhost) | `online-protocol-local` | **verified** — 16/16 green; isolates the blockers |
+| Room created with a shareable code (live) | `online-room-create` | **failed** — no code minted |
+| Two clients in one live match, same world | `online-two-clients` | **failed** — unreachable |
+| Reconnect mid-match, ship+cargo+bank+upgrades intact (live) | `online-reconnect` | **failed** — untestable |
+
+**The three blockers (all confirmed on `4bb…`→`4d35a3b`, live probe
+`images/probe-online-live-reverify3.txt`):**
+
+1. **Live fleet not registered.** The allocator reports `{"machines":0,"regions":[]}`,
+   so `POST /rooms` → `503 no-capacity`. The gameserver is *healthy* (capacity 32,
+   region iad) but never registers with the allocator — the two Fly apps aren't
+   talking. Infra/deploy.
+2. **Allocator has no CORS, in source.** No `access-control`/`OPTIONS` handler
+   anywhere in `allocator/`; on the wire the preflight `OPTIONS /rooms` → `405`
+   with `Access-Control-Allow-Origin` **absent** (even `GET /health` sends none).
+   A browser allocate is refused before it sees any body — this blocks a browser
+   room-create even against a *local* allocator. Code gap, not an ops toggle.
+3. **Client match handoff (m9-09) unwired.** On a successful allocate the shipped
+   client dead-ends at `src/main.ts:4930-4931` — it records `result.connection.room`
+   and **discards** the socket `url` + signed `ticket`. `createOnlineSession`/
+   `WebSocketTransport` have zero production callers; the transport dispatch in
+   `src/ui/index.ts` is commented out. No browser can open a game socket, so
+   two-clients and reconnect are unreachable *from the client as built*,
+   independent of the server.
+
+**Netcode is NOT the problem** (`images/online-protocol-local.txt`): the repo's
+own end-to-end tests drive two real client-net-library sessions through a real
+in-process server over real sockets — two-client shared world, reconnect-grace
+(same ship, cargo/ore/upgrades intact), ticket enforcement — 16/16 green. Those
+are Node clients on localhost, so they prove the protocol, not the live
+deliverable. **This M3 gate must stay red until all three blockers are fixed.**
