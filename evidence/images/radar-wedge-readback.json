@@ -1,0 +1,114 @@
+{
+  "desktop": {
+    "key": "desktop",
+    "bankStart": 30,
+    "geometry": {
+      "hub": {
+        "x": 640,
+        "y": 400
+      },
+      "r06": 138.00000000000003,
+      "satLogical": {
+        "x": 721.1143648163613,
+        "y": 511.6443452237428
+      },
+      "satClient": {
+        "x": 721.1143648163613,
+        "y": 511.6443452237428
+      },
+      "selfCheckPx": 5.684341886080802e-14
+    },
+    "minimapBaseline": {
+      "coverageCount": 2,
+      "satelliteCount": 0,
+      "shipCount": 0
+    },
+    "armed": {
+      "banked": 30
+    },
+    "files": {
+      "armed": "/tmp/rw_desktop_1_armed.png",
+      "built": "/tmp/rw_desktop_2_built.png",
+      "fogLifted": "/tmp/rw_desktop_3_fog_lifted.png",
+      "fogReturned": "/tmp/rw_desktop_4_fog_returned.png",
+      "rearmed": "/tmp/rw_desktop_5_rearmed.png"
+    },
+    "built": {
+      "banked": 24
+    },
+    "spent": 6,
+    "fogLifted": {
+      "coverageCount": 3,
+      "satelliteCount": 1,
+      "shipCount": 4
+    },
+    "fogReturned": {
+      "coverageCount": 2,
+      "satelliteCount": 0,
+      "shipCount": 0
+    },
+    "minimapCollapsed": true,
+    "rearm": {
+      "banked": 24,
+      "affordable": true,
+      "satelliteCount": 0
+    },
+    "pageErrors": []
+  },
+  "mobile": {
+    "key": "mobile",
+    "bankStart": 30,
+    "geometry": {
+      "hub": {
+        "x": 422,
+        "y": 195
+      },
+      "r06": 84.24000000000002,
+      "satLogical": {
+        "x": 471.51502965311795,
+        "y": 263.1515916061456
+      },
+      "satClient": {
+        "x": 126.84840839385441,
+        "y": 471.51502965311795
+      },
+      "selfCheckPx": 0
+    },
+    "minimapBaseline": {
+      "coverageCount": 2,
+      "satelliteCount": 0,
+      "shipCount": 0
+    },
+    "armed": {
+      "banked": 30
+    },
+    "files": {
+      "armed": "/tmp/rw_mobile_1_armed.png",
+      "built": "/tmp/rw_mobile_2_built.png",
+      "fogLifted": "/tmp/rw_mobile_3_fog_lifted.png",
+      "fogReturned": "/tmp/rw_mobile_4_fog_returned.png",
+      "rearmed": "/tmp/rw_mobile_5_rearmed.png"
+    },
+    "built": {
+      "banked": 24
+    },
+    "spent": 6,
+    "fogLifted": {
+      "coverageCount": 3,
+      "satelliteCount": 1,
+      "shipCount": 3
+    },
+    "fogReturned": {
+      "coverageCount": 2,
+      "satelliteCount": 0,
+      "shipCount": 0
+    },
+    "minimapCollapsed": true,
+    "rearm": {
+      "banked": 24,
+      "affordable": true,
+      "satelliteCount": 0
+    },
+    "pageErrors": []
+  }
+}

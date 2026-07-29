@@ -1268,5 +1268,25 @@
     "buildSha": "f7a213d",
     "attestation": "Supporting evidence, LOCAL not live: to isolate whether the online failures are the netcode or the deployment, the repo's own integration tests were run (vitest, this artifact): tests/net/online-2p.test.ts — 'a two-player online match runs end-to-end against a locally-run server, each client predicting its own ship' — PASSES; tests/net/reconnect-resume.test.ts PASSES; tests/server/ticket-enforcement.test.ts PASSES; 13/13 green. This proves the wire protocol, two-client sim, reconnect-grace, and ticket enforcement work when a real server is actually running and reachable. It does NOT satisfy the live-deployment deliverables (online-room-create/two-clients/reconnect) — it is here only to show the live failures are operational (empty allocator fleet, no CORS) and client-wiring (m9-09 unwired), not a broken protocol.",
     "verdict": "verified"
+  },
+  {
+    "id": "radar-wedge-restored",
+    "title": "RADAR wedge restored — real-tap build → fog lifts → kill → fog returns → re-arms (desktop)",
+    "area": "build-wheel",
+    "image": "images/radar-wedge-desktop.png",
+    "capturedAt": "2026-07-29T19:35:00Z",
+    "buildSha": "dbf2541",
+    "attestation": "Desktop 1280x800, live ?debug=1 (no freeze), build dbf2541 (HEAD). Five-panel montage radar-wedge-desktop.png plus full-res frames radar-wedge-desktop-1..5-*.png; I looked at every frame. (1) ARMED: the Build wheel draws FIVE wedges — TURRET (3), SHIELD (5), RADAR \"0/1\" cost 6, REPAIR REACTOR (1), UPGRADE SHIP; hub reads 30 ORE, TOTAL 30. The RADAR wedge is visibly back — the p13 silent-cut regression is fixed. (2) REAL TAP -> BUILT: a genuine synthesized pointer press on the drawn RADAR wedge (its screen point reconstructed from the wheel hub + the REPAIR wedge and self-checked to under 1px, NOT a debug order method) spent exactly 6 ore — TOTAL 30->24, hub 24 ORE — and the RADAR wedge capped to \"1/1\" (dimmed). 6 is SATELLITE.cost and no other wheel build costs 6, so the spend names the wedge that was pressed. (3) FOG LIFTS: after the 12s construction the minimap (expanded with a real tap) shows the satellite LARGE coverage disc; coverage discs 2->3, satellites 0->1, and 4 enemy contacts the fog had hidden are now dots on the map (enemy dots 0->4). (4) KILL -> FOG RETURNS: the satellite HP is driven to 0 (the same no-sensor-source state an enemy shot leaves) — the large disc collapses, coverage 3->2, satellites ->0, enemy dots ->0; only the own-ship/own-station reach remains (two contacts are still fading in frame 4 under the ~1/s minimap redraw the sim throttles). (5) RE-ARMED: with the satellite gone the RADAR wedge is back to \"0/1\" and pressable (bright yellow 6), bank held at 24 (>= 6), so it can be rebuilt. Every transition was gated on live __repairStage / __minimapStage readback (a mis-tap fails the gate rather than faking a pass); no page errors. FINDING, reported not blocking: the shipped main.ts carries NO dedicated radar-wedge live-stage seam (de34bbb from PR #226 did not land in main), so this real tap is driven through reconstructed, self-checked wheel geometry rather than a purpose-built seam.",
+    "verdict": "verified"
+  },
+  {
+    "id": "radar-wedge-restored-mobile",
+    "title": "RADAR wedge restored — same real-tap build → fog → kill → re-arm cycle on iPhone touch",
+    "area": "build-wheel",
+    "image": "images/radar-wedge-mobile.png",
+    "capturedAt": "2026-07-29T19:35:00Z",
+    "buildSha": "dbf2541",
+    "attestation": "iPhone profile 390x844 @3x, portrait viewport, TOUCH input, live ?debug=1, build dbf2541 (HEAD). Montage radar-wedge-mobile.png (frames rotated 90deg CCW into the landscape orientation the player holds under the game landscape lock) plus full-res portrait frames radar-wedge-mobile-1..5-*.png; I looked at every frame. The same cycle as desktop holds on the phone, driven through the +90deg landscape-lock transform: (1) ARMED — the five-wedge wheel with RADAR \"0/1\" cost 6, hub 30 ORE, TOTAL 30, alongside the touch BUILD/FIRE buttons. (2) A REAL touchscreen tap on the RADAR wedge spent exactly 6 ore (TOTAL 30->24) and capped the wedge to \"1/1\". (3) FOG LIFTS — the expanded minimap shows the satellite LARGE coverage disc; coverage 2->3, satellites 0->1, 3 enemy contacts revealed (enemy dots 0->3; the phone match bot layout differs from desktop 4). (4) KILL -> FOG RETURNS — HP to 0 collapses the disc, coverage 3->2, satellites->0, enemy dots->0. (5) RE-ARMED — RADAR back to \"0/1\", pressable (bright 6), bank 24 >= 6. Gated on the same seam readback; no page errors. The touch pause corner (||) is visible top-right on the expanded-minimap frames.",
+    "verdict": "verified"
   }
 ]
