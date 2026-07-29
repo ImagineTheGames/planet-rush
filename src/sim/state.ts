@@ -117,6 +117,23 @@ export interface Ship {
    *  same backward-compatible discipline as `Turret.muzzle`. The sim's own ships
    *  always carry it (`makeShip` sets it). */
   weaponCooldown?: number;
+  /**
+   * Seconds this ship has been GRINDING a body — pressing into a station or
+   * asteroid while held to near-stillness by the contact (the bot-home-rim wedge,
+   * developer report p14). The collision response (`step` `reflectOffCircle`)
+   * counts it up while the grind persists and resets it the instant the ship
+   * breaks contact or gets moving; once it crosses `WEDGE_CONTACT_S` the response
+   * slides the pinned hull off the rim. A gate on *persistent* contact, not any
+   * contact, so a normal bounce or a momentary graze is left untouched — and, in
+   * particular, a ship that only brushes a body for a fraction of a second stays
+   * byte-for-byte on the pre-p14 path, which the netcode's prediction relies on
+   * (a discontinuous shove on every touch would amplify snapshot quantization).
+   *
+   * Local grind-state scratch: it is NOT on the wire snapshot (`src/net/snapshot`)
+   * and not needed there — a remote ship reads an absent value as 0 and re-earns
+   * it from its own contacts. Optional on the same backward-compatible terms as
+   * `weaponCooldown`; `makeShip` always sets it to 0 and respawn clears it. */
+  wedgeContactS?: number;
 }
 
 /** A minable asteroid — the economy (GDD §2.3, §5.5). */
@@ -715,6 +732,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     radius: SHIP_RADIUS,
     firing: false,
     weaponCooldown: 0,
+    wedgeContactS: 0,
   };
 }
 
