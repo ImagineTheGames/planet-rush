@@ -1,11 +1,11 @@
 Planet Rush — LIVE online wire probe (self-witnessed by QA)
-capturedAt: 2026-07-29T10:09:10Z
-repo HEAD: 9b0fe0a
+capturedAt: 2026-07-29T10:14:03Z
+repo HEAD: e3f179b
 allocator: https://planet-rush-allocator.fly.dev   client origin: https://planet-rush.fly.dev
 ============================================================
 
 ### GET /health
-{"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":6190}HTTP 200 application/json
+{"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":6483}HTTP 200 application/json
 
 ### GET /regions
 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}HTTP 200 application/json
@@ -15,29 +15,31 @@ HTTP/2 204
 access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-headers: content-type
 access-control-max-age: 86400
-fly-request-id: 01KYPNK0ESS9E8H7HWT3Z7YY9K-gru
+fly-request-id: 01KYPNVYMCKH1JX3K6V8GVZF3B-gru
 
-### POST /rooms  (allocate, Origin https://planet-rush.fly.dev, body {}) x3
+### POST /rooms  (allocate, Origin https://planet-rush.fly.dev, body {}) x3 — looking for JSON room code + ACAO
 --- attempt 1 ---
 HTTP/2 200 
 content-type: text/plain
-fly-request-id: 01KYPNK0NS3RZGH8ZB9S2NKC9S-gru
+fly-request-id: 01KYPNVYTH9Q872QXM2AH9NFHK-gru
 Planet Rush match server — connect a WebSocket to play.
+
 --- attempt 2 ---
 HTTP/2 200 
 content-type: text/plain
-fly-request-id: 01KYPNK0ZDVR70ZS8X0MGZF6T6-gru
+fly-request-id: 01KYPNVZ7QQCTE2VGXXWJYSEHN-gru
 Planet Rush match server — connect a WebSocket to play.
+
 --- attempt 3 ---
 HTTP/2 200 
 content-type: text/plain
-fly-request-id: 01KYPNK1C2S8G6XPNTE9RQQ8YZ-gru
+fly-request-id: 01KYPNVZNNFQQNBVPD4AMYSN59-gru
 Planet Rush match server — connect a WebSocket to play.
 
 ### POST /rooms/ABCD/join  (control: join path routing, Origin https://planet-rush.fly.dev)
 HTTP/2 404 
 content-type: application/json
-fly-request-id: 01KYPNK1QB3W6VQ4CAXAXCQMFE-gru
+fly-request-id: 01KYPNW02YK9FYDZ96CT0WW8AN-gru
 {"error":"not-found"}
 
 ============================================================
