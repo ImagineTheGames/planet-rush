@@ -407,16 +407,17 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       // a human seat are no-ops in `./lobby`, so a refused tap costs the wire zero.
       return withLobby(state, cycleSeatState(lobby, target.index));
     case 'seatChip':
-      // The row's trailing chip is mode-contextual: it assigns the seat's TEAM in
-      // TEAMS, and cycles the bot's difficulty in FFA — the two per-seat host
-      // controls that never both apply at once. The geometry is mode-blind (one
-      // chip); the routing lives here, where the mode is known.
-      return withLobby(
-        state,
-        lobby.mode === 'teams'
-          ? cycleSeatTeam(lobby, target.index)
-          : cycleBotDifficulty(lobby, target.index),
-      );
+      // The row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH modes
+      // (n2). It is the one slot-editor control every mode shares, so a bot's tier
+      // is reachable in TEAMS exactly as in FFA (the TEAMS lobby had lost it when
+      // the side control took the only chip). A human/closed seat is a no-op in
+      // `./lobby`, so a refused tap costs the wire zero.
+      return withLobby(state, cycleBotDifficulty(lobby, target.index));
+    case 'seatTeamChip':
+      // The row's TEAM chip — the side cycle, composed alongside the difficulty
+      // chip in TEAMS (n2). A no-op outside TEAMS (FFA is teams-of-one) and from a
+      // guest, both refused in `./lobby`, so a tap there costs the wire nothing.
+      return withLobby(state, cycleSeatTeam(lobby, target.index));
     case 'mode':
       // FFA ⇄ TEAMS. Locked with the hull once RUSH! is pressed (`./lobby`).
       return withLobby(state, toggleMode(lobby));

@@ -86,9 +86,10 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
     ...layout.maps.map((rect, i) => ({ label: `map[${i}]`, rect })),
     { label: 'rushButton', rect: layout.rushButton },
   ];
-  // NB: seatChips are DELIBERATELY absent — they nest inside their roster row
-  // (the row body cycles state, the chip cycles team/tier), so they overlap a
-  // seat by design and are contained-checked separately (see the chip test).
+  // NB: seatChips AND seatTeamChips are DELIBERATELY absent — they nest inside
+  // their roster row (the row body cycles state, the difficulty chip cycles the
+  // tier, the team chip cycles the side), so they overlap a seat by design and are
+  // contained-checked separately (see the chip test).
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -389,9 +390,9 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
 // 5. The control strip and the row chips (variable-slots Milestone E)
 // ---------------------------------------------------------------------------
 
-describe('the MODE / ABUNDANCE strip and the per-row team/tier chip', () => {
+describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', () => {
   for (const { name, vp, touch } of PROFILES) {
-    it(`taps the toggles and each row's chip, body vs chip kept apart — ${name}`, () => {
+    it(`taps the toggles and each row's chips, body vs chips kept apart — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: touch });
 
       // The two toggles map to their own targets when they have extent.
@@ -405,20 +406,45 @@ describe('the MODE / ABUNDANCE strip and the per-row team/tier chip', () => {
       }
 
       expect(layout.seatChips).toHaveLength(layout.seats.length);
+      expect(layout.seatTeamChips).toHaveLength(layout.seats.length);
       for (let i = 0; i < layout.seats.length; i++) {
         const chip = layout.seatChips[i]!;
+        const teamChip = layout.seatTeamChips[i]!;
         const seat = layout.seats[i]!;
-        // The chip never covers the row's centre — the row body stays tappable.
-        expect(rectContains(seat, chip), `chip ${i} escapes its row on ${name}`).toBe(true);
+        const mid = center(seat).x;
+
+        // Both chips nest inside the row and never cover its centre — the row body
+        // stays tappable and both chips sit strictly right of centre (n2).
+        expect(rectContains(seat, chip), `difficulty chip ${i} escapes its row on ${name}`).toBe(true);
+        expect(rectContains(seat, teamChip), `team chip ${i} escapes its row on ${name}`).toBe(true);
         expect(
-          lobbyHitTest(layout, center(seat).x, center(seat).y),
+          lobbyHitTest(layout, mid, center(seat).y),
           `row body ${i} on ${name}`,
         ).toEqual({ kind: 'seat', index: i });
-        // A tap on the chip itself cycles the team/tier, not the state.
+
+        // The difficulty chip — the shared control, present in BOTH modes — cycles
+        // the bot's tier. Right-anchored, so a tap on it wins over the body.
         if (chip.width > 0 && chip.height > 0) {
+          expect(chip.x, `difficulty chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
           const c = center(chip);
-          expect(lobbyHitTest(layout, c.x, c.y), `chip ${i} on ${name}`).toEqual({
+          expect(lobbyHitTest(layout, c.x, c.y), `difficulty chip ${i} on ${name}`).toEqual({
             kind: 'seatChip',
+            index: i,
+          });
+        }
+
+        // The team chip — composed to the LEFT of the difficulty chip (TEAMS) —
+        // cycles the side. It, too, stays right of centre and never overlaps the
+        // difficulty chip, so editing one control never costs the other.
+        if (teamChip.width > 0 && teamChip.height > 0) {
+          expect(teamChip.x, `team chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
+          expect(
+            overlaps(teamChip, chip),
+            `team chip ${i} overlaps difficulty chip on ${name}`,
+          ).toBe(false);
+          const t = center(teamChip);
+          expect(lobbyHitTest(layout, t.x, t.y), `team chip ${i} on ${name}`).toEqual({
+            kind: 'seatTeamChip',
             index: i,
           });
         }

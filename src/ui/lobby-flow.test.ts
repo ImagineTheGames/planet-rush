@@ -39,7 +39,11 @@ import {
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
 import { DOOR_ORDER, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
-import { CLASS_ORDER, DEFAULT_SHIP_CLASS, RUSH_COUNTDOWN_SECONDS, lobbyModel } from './lobby';
+import { CLASS_ORDER, DEFAULT_SHIP_CLASS, MODE_LABELS, RUSH_COUNTDOWN_SECONDS, lobbyModel } from './lobby';
+import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
+import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
+import type { MatchMode } from '../sim/match-config';
+import type { Rect } from '@platform/layout-registry';
 import { endOfMatchModel } from './end-of-match';
 import { createSettings, volumeLevel } from './settings';
 
@@ -251,9 +255,18 @@ describe('the room tells the server what it chose', () => {
     const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
     expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
 
-    // The chip in TEAMS assigns a side rather than a difficulty.
-    const assigned = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
+    // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
+    // the TEAMS lobby had lost when the side control took the only chip.
+    const tiered = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
+    expect(tiered.state.lobby?.seats[2]?.difficulty).not.toBe(teams.state.lobby?.seats[2]?.difficulty);
+    // …and it changed the tier WITHOUT touching the side.
+    expect(tiered.state.lobby?.seats[2]?.team).toBe(teams.state.lobby?.seats[2]?.team);
+
+    // The TEAM chip, composed alongside it, assigns the seat's side (TEAMS).
+    const assigned = flowTapLobby(teams.state, { kind: 'seatTeamChip', index: 2 });
     expect(assigned.state.lobby?.seats[2]?.team).not.toBe(teams.state.lobby?.seats[2]?.team);
+    // …and it changed the side WITHOUT touching the tier.
+    expect(assigned.state.lobby?.seats[2]?.difficulty).toBe(teams.state.lobby?.seats[2]?.difficulty);
   });
 
   it('refuses every variable-match control from a guest', () => {
@@ -263,6 +276,7 @@ describe('the room tells the server what it chose', () => {
       { kind: 'abundance' } as const,
       { kind: 'seat', index: 2 } as const,
       { kind: 'seatChip', index: 2 } as const,
+      { kind: 'seatTeamChip', index: 2 } as const,
     ]) {
       const tapped = flowTapLobby(guest, target);
       expect(tapped.state, `${target.kind} from a guest`).toBe(guest);
@@ -275,6 +289,89 @@ describe('the room tells the server what it chose', () => {
     const folded = flowLobbySlots(state, slots(8, [0, 5]));
     expect(folded.effects).toEqual([]);
     expect(lobbyModel(folded.state.lobby!).humanCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The slot-editor CLASS GUARD (n2 — the radar-wedge lesson).
+//
+// A bot slot's editor — open/close, bot-assign, bot-DIFFICULTY, and team-assign
+// where applicable — must be REACHABLE in every mode, driven through the same
+// hit-test the view uses (a control that isn't laid out isn't reachable). The
+// TEAMS lobby had silently dropped bot-difficulty when the side control took the
+// row's only chip; this asserts the whole set, exhaustively over the modes, so a
+// new mode has to satisfy it or name a ratified exclusion.
+// ---------------------------------------------------------------------------
+
+/** A roomy desktop viewport — every row chip has extent here, so "reachable"
+ *  means "laid out", not "laid out big enough on this phone". */
+const GUARD_VIEWPORT = { width: 1280, height: 800 };
+
+/** The target a tap at a rect's centre resolves to, through the SAME hit-test the
+ *  view drives — so an affordance the geometry never laid out reads as unreachable
+ *  (null / the wrong target) rather than as passing. */
+function tapCentre(layout: LobbyLayout, rect: Rect): LobbyTarget | null {
+  return lobbyHitTest(layout, rect.x + rect.width / 2, rect.y + rect.height / 2);
+}
+
+describe('the slot editor is reachable in EVERY mode (guard the class — the radar-wedge lesson)', () => {
+  // Exhaustive over the ratified modes: a new mode added to MODE_LABELS lands here
+  // automatically and must reach the shared affordances or be given an exclusion.
+  const MODES = Object.keys(MODE_LABELS) as MatchMode[];
+  const SEAT = 3; // an OPEN (bot-previewing) seat in an offline solo lobby
+
+  for (const mode of MODES) {
+    it(`reaches open/close, bot-assign AND bot-difficulty on a bot seat in ${mode}`, () => {
+      let state = inLobby(0, 0);
+      if (mode !== 'ffa') state = flowTapLobby(state, { kind: 'mode' }).state;
+      expect(state.lobby?.mode, `lobby is in ${mode}`).toBe(mode);
+      const layout = lobbyLayout(GUARD_VIEWPORT);
+
+      // open/close + bot-assign: the row body reaches the OPEN→BOT→CLOSED cycle.
+      const body = tapCentre(layout, layout.seats[SEAT]!);
+      expect(body, `row body reachable in ${mode}`).toEqual({ kind: 'seat', index: SEAT });
+      const cycled = flowTapLobby(state, body!);
+      expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
+        state.lobby?.seats[SEAT]?.occupant,
+      );
+
+      // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
+      // This is the exact control the TEAMS lobby had lost.
+      const diff = tapCentre(layout, layout.seatChips[SEAT]!);
+      expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
+      const tiered = flowTapLobby(state, diff!);
+      expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
+        state.lobby?.seats[SEAT]?.difficulty,
+      );
+    });
+  }
+
+  it('reaches team-assign in TEAMS, and treats FFA as the ratified exclusion (teams-of-one)', () => {
+    const layout = lobbyLayout(GUARD_VIEWPORT);
+
+    // TEAMS — the team chip is laid out, and a tap on it changes the side.
+    const teams = flowTapLobby(inLobby(0, 0), { kind: 'mode' }).state;
+    const teamTarget = tapCentre(layout, layout.seatTeamChips[SEAT]!);
+    expect(teamTarget, 'team chip reachable in teams').toEqual({ kind: 'seatTeamChip', index: SEAT });
+    const assigned = flowTapLobby(teams, teamTarget!);
+    expect(assigned.state.lobby?.seats[SEAT]?.team).not.toBe(teams.lobby?.seats[SEAT]?.team);
+
+    // FFA — the ratified exclusion: a slot's side IS its slot (teams-of-one), so the
+    // team chip's tap is a model no-op (and the flow stays perfectly still).
+    const ffa = inLobby(0, 0);
+    const ffaTapped = flowTapLobby(ffa, { kind: 'seatTeamChip', index: SEAT });
+    expect(ffaTapped.state, 'team-assign is excluded in FFA').toBe(ffa);
+  });
+
+  it('composes the two controls — the difficulty and team chips are distinct targets', () => {
+    // The n2 regression in one line: in TEAMS a bot row carries BOTH chips at
+    // distinct hit targets, so the side control never replaces the tier control.
+    const layout = lobbyLayout(GUARD_VIEWPORT);
+    const diff = tapCentre(layout, layout.seatChips[SEAT]!);
+    const team = tapCentre(layout, layout.seatTeamChips[SEAT]!);
+    expect(diff).toEqual({ kind: 'seatChip', index: SEAT });
+    expect(team).toEqual({ kind: 'seatTeamChip', index: SEAT });
+    expect(diff).not.toEqual(team);
   });
 });
 
