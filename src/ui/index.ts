@@ -450,6 +450,7 @@ export {
   chooseDoor,
   createEntry,
   entryConnected,
+  entryErrorFor,
   entryFailed,
   entryLive,
   entryModel,
@@ -677,6 +678,30 @@ export type {
 } from './connection-status';
 
 export { ConnectionStatusView, CONNECTION_STATUS_ANCHOR } from './connection-status-view';
+
+// --- Online words: allocator failures, reconnect-ended events, region ------
+//
+// The one place `src/net`'s reasons become a player's words (M3/online step 3).
+// The front door ({@link ./lobby-entry} `entryErrorFor`) and the connection
+// overlay ({@link ./connection-status}) both draw their copy from here, so a
+// failure reads the same wherever it appears. Region is modelled and suppressed
+// at one region (`regionPickerVisible === false`) — present in the code, hidden
+// on screen until a second region lands.
+
+export {
+  CROSS_REGION_PING_WARN_MS,
+  crossRegionWarning,
+  reconnectEndedCopy,
+  regionPickerVisible,
+  resolveFailureCopy,
+  resolveFailureMessage,
+} from './online-copy';
+export type {
+  OnlineErrorAction,
+  OnlineErrorCopy,
+  ReconnectEndedCopy,
+  RegionInfo,
+} from './online-copy';
 
 // --- The main menu — the front door a clean boot opens on (GDD §4.6 M7) -----
 //

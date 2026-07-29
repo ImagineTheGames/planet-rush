@@ -47,6 +47,8 @@
 
 import type { Rng } from '@shared/types';
 import type { RoomCode } from '../net/transport';
+import type { ResolveFailure } from '../net/allocator-client';
+import { resolveFailureMessage } from './online-copy';
 import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -158,6 +160,14 @@ export interface EntryState {
  */
 export interface EntryIntent {
   readonly door: EntryDoor;
+  /**
+   * The room to open a transport for. For `solo` this is the loopback room; for a
+   * `join` it is the code the player typed. For an **online `create`** it is a
+   * locally-drawn placeholder the caller MUST discard: the allocator mints the
+   * real, globally-unique code and the client uses `assignment.code` verbatim
+   * (M3 brief — "the client must never mint or guess a room code"). The seeded
+   * placeholder exists only so the offline loopback create has an id to key on.
+   */
   readonly room: RoomCode;
   /** `false` only for {@link EntryDoor} `solo` — the caller's cue to reach for
    *  `LocalLoopback` rather than a WebSocket (GDD §4.2). */
@@ -296,6 +306,21 @@ export function entryFailed(state: EntryState, reason: string = ENTRY_ERRORS.off
  *  to rest so that leaving a match lands on a clean home. */
 export function entryConnected(): EntryState {
   return createEntry();
+}
+
+/**
+ * Turn an allocator {@link ResolveFailure} (`src/net/allocator-client`) into the
+ * line this screen shows — the caller feeds it straight to {@link entryFailed}.
+ *
+ * The three failures the M3 brief keeps apart get three different sentences
+ * calling for three different actions (never one "connection failed"): the fleet
+ * is full (retry later), no room has that code (fix the code), or the servers
+ * cannot be reached (retry, and PLAY SOLO still works). The mapping itself lives
+ * in {@link ./online-copy} so this door and the in-match connection overlay say
+ * the same words for the same reason.
+ */
+export function entryErrorFor(reason: ResolveFailure): string {
+  return resolveFailureMessage(reason);
 }
 
 // ---------------------------------------------------------------------------

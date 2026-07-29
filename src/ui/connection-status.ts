@@ -27,6 +27,8 @@
 import type { Viewport } from '@platform/layout-registry';
 import type { Rect } from '@platform/layout-registry';
 import type { ConnectionState } from '../net/transport';
+import type { CloseReason } from '../net/websocket-transport';
+import { reconnectEndedCopy } from './online-copy';
 import { centeredPanel, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
@@ -42,6 +44,16 @@ export interface ConnectionStatusInput {
   /** Seconds left to rejoin before the stand-in bot keeps the slot, while
    *  reconnecting (GDD §4.2). `null` when not counting. */
   readonly graceSeconds?: number | null;
+  /**
+   * Why the transport closed, once it has (`src/net/websocket-transport`
+   * `CloseReason`). A **lost server is not a lost connection** (M3 brief), so a
+   * `closed` overlay says different things for different endings:
+   *   • `room-gone`     — the match ended; the server is gone.
+   *   • `grace-elapsed` — the room went on without us; we were away too long.
+   *   • `left` / absent — a plain drop or a deliberate leave: the generic line.
+   * Ignored until `state === 'closed'`.
+   */
+  readonly closeReason?: CloseReason | null;
 }
 
 /** How loud the overlay is — chrome for the view, and a testable summary. */
@@ -104,17 +116,33 @@ export function connectionStatusModel(input: ConnectionStatusInput): ConnectionS
         action: null,
       };
     }
-    case 'closed':
+    case 'closed': {
+      // A lost server is not a lost connection: when the transport names *why* it
+      // gave up (a dead room vs a spent grace window), say the right one — a
+      // player told the wrong thing files the wrong bug (M3 brief). A plain drop
+      // or a deliberate leave has no such reason and keeps the generic line.
+      const ended = endedCopy(input.closeReason);
       return {
         visible: true,
         severity: 'error',
-        headline: 'DISCONNECTED',
-        detail: 'Lost the match server. PLAY SOLO still works offline.',
+        headline: ended ? ended.headline : 'DISCONNECTED',
+        detail: ended ? ended.detail : 'Lost the match server. PLAY SOLO still works offline.',
         spinner: false,
         grace: null,
         action: 'BACK TO MENU',
       };
+    }
   }
+}
+
+/** The distinct headline/detail for a terminal reconnect verdict, or `null` for a
+ *  plain drop / deliberate leave (`'left'`) where the generic closed line stands. */
+function endedCopy(reason: CloseReason | null | undefined): { headline: string; detail: string } | null {
+  if (reason === 'room-gone' || reason === 'grace-elapsed') {
+    const copy = reconnectEndedCopy(reason);
+    return { headline: copy.headline, detail: copy.detail };
+  }
+  return null;
 }
 
 const HIDDEN: ConnectionStatusModel = {
