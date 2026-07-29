@@ -1,5 +1,5 @@
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":8716}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":9038}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
