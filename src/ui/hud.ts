@@ -223,6 +223,10 @@ export interface HudFrame {
   readonly turrets?: number;
   /** Shields standing or queued (the sim's `shieldCount`). Default 0. */
   readonly shields?: number;
+  /** Radar satellites standing or queued (the sim's `satelliteCount`). One per
+   *  station, so 0 or 1 — drives the RADAR wedge's "0/1" count and its cap.
+   *  Default 0. */
+  readonly satellites?: number;
   /** The player has UPGRADE SHIP selected — the panel is in front of the wheel
    *  (GDD §2.5). Default false. */
   readonly upgradePanelOpen?: boolean;
@@ -1356,6 +1360,7 @@ export class Hud extends Container {
       banked: frame.banked,
       turrets: frame.turrets ?? 0,
       shields: frame.shields ?? 0,
+      satellites: frame.satellites ?? 0,
       coreHp: frame.coreHp ?? 0,
       maxCoreHp: frame.maxCoreHp ?? 0,
       collapsed: frame.collapsed ?? false,

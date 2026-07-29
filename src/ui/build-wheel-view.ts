@@ -687,9 +687,17 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
     label: seg.label,
     // REPAIR CORE is the one wedge that names its effect: the HP a tap buys, or the
     // reason it's refused (p5-08 — a discrete purchase, so the deal must be legible
-    // before the tap). Every other wedge's second line names its target instead —
-    // "every label names which" (GDD §2.5), station or ship, words not a number.
-    sub: seg.repair ? seg.repair.line : seg.target === 'ship' ? 'YOUR SHIP' : 'YOUR STATION',
+    // before the tap). RADAR names its "0/1" count/cap instead (p13 — one per
+    // station, and the count is the "it re-arms after it's shot down" tell). Every
+    // other wedge's second line names its target — "every label names which"
+    // (GDD §2.5), station or ship, words not a number.
+    sub: seg.repair
+      ? seg.repair.line
+      : seg.capLabel
+        ? seg.capLabel
+        : seg.target === 'ship'
+          ? 'YOUR SHIP'
+          : 'YOUR STATION',
     cost: seg.cost,
     ready: wedgeReady(seg.state),
     costReady: seg.state === 'ready',

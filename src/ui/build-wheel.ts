@@ -1,9 +1,9 @@
 /**
  * src/ui/build-wheel.ts — the Build & Upgrade wheel model. OWNER: UI Engineer.
  *
- * "Everything is bought from one place" (GDD §2.5). **Four segments**, each
- * labeled in words and each naming its target — TURRET, SHIELD, REPAIR CORE,
- * UPGRADE SHIP — with the player's live ore total in the hub. Three spend
+ * "Everything is bought from one place" (GDD §2.5). **Five segments**, each
+ * labeled in words and each naming its target — TURRET, SHIELD, RADAR, REPAIR
+ * REACTOR, UPGRADE SHIP — with the player's live ore total in the hub. Four spend
  * on the **station**, one on the **ship**; the economy is the choice between
  * those two, so every label names which.
  *
@@ -41,7 +41,7 @@
  */
 
 import type { BuildItem } from '@shared/types';
-import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SHIELD, TURRET } from '../sim/constants';
+import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SATELLITE, SHIELD, TURRET } from '../sim/constants';
 import { affordable } from './affordability';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
@@ -51,23 +51,41 @@ import type { HubBack } from './wheel-nav';
 // ---------------------------------------------------------------------------
 
 /**
- * The four wheel segments (GDD §2.5). Three are {@link BuildItem}s the sim
- * spends on the spot; `upgrade` is the fourth and is deliberately *not* a
- * `BuildItem` — it opens the upgrade panel rather than placing an order, which
- * is exactly why the shared contract does not include it.
+ * The {@link BuildItem}s the wheel deliberately does **not** show — the ONE
+ * sanctioned reason a player-buildable sim item has no wedge, each entry named
+ * against the authority that ratified the cut. Every other `BuildItem` gets a
+ * segment ({@link buildWheelModel}), and the guard test (build-wheel.test.ts)
+ * fails the build if a `BuildItem` is neither shown nor listed here.
  *
- * `bank` is a {@link BuildItem} the sim still honours (bots deposit through it),
- * but the wheel does **not** expose it: ore auto-deposits in the atmosphere, so
- * a manual bank verb is obsolete. It is excluded here on purpose.
+ * This list exists because a bare `Exclude<>` is exactly how the RADAR wedge
+ * vanished (p13 regression): `satellite` was swept out alongside `bank` when the
+ * manual BANK segment was cut, and nothing noticed for four versions. A named
+ * list with a guard means the next cut has to be added here, in the open, with a
+ * name against it — it has to look the regression risk in the eye.
  *
- * `satellite` is the ratified radar-satellite build order (feature f1). The sim
- * honours it as a `BuildItem`, but adding its *visible* wheel segment reflows the
- * radial layout (four wedges → five) and its hit-test, which is a UI follow-up —
- * so, like `bank`, it is excluded from this derived union for now to keep the
- * current four-segment wheel and its geometry unchanged (mechanical: track the
- * widened shared contract without reshaping the wheel).
+ *  - `bank`  — ore auto-deposits the instant a ship enters its own station's
+ *              atmosphere (p4-11), so a manual BANK verb names an action the
+ *              player never has to take. Ratified: GDD §2.5 (the atmosphere does
+ *              the banking; the wheel is purely for spending the safe total).
  */
-export type WheelSegmentId = Exclude<BuildItem, 'bank' | 'satellite'> | 'upgrade';
+export const WHEEL_EXCLUDED_ITEMS = ['bank'] as const;
+
+/**
+ * The wheel segments. Every {@link BuildItem} the sim spends on the spot EXCEPT
+ * the ratified {@link WHEEL_EXCLUDED_ITEMS} (derived, so the type and the guard
+ * share one source of truth and the two can never drift). `upgrade` is added on
+ * top and is deliberately *not* a `BuildItem` — it opens the upgrade panel
+ * rather than placing an order, which is exactly why the shared contract does
+ * not include it.
+ *
+ * `satellite` is the ratified radar-satellite build order (feature f1): a
+ * buildable body that orbits the station and lifts the minimap fog. It IS shown
+ * — a fifth wedge — because the sim builds it and bots build it, so the player
+ * must be able to as well (restoring the p13 regression).
+ */
+export type WheelSegmentId =
+  | Exclude<BuildItem, (typeof WHEEL_EXCLUDED_ITEMS)[number]>
+  | 'upgrade';
 
 /** What a segment spends on: your station, or your ship (GDD §2.5 — "every label
  *  names which", because the economy *is* the choice between the two). */
@@ -78,9 +96,10 @@ export type SegmentTarget = 'station' | 'ship';
  *
  * - `ready`        — affordable, under cap, and it would do something.
  * - `unaffordable` — costs more ore than hold + bank hold (GDD §2.5).
- * - `capped`       — the per-station cap is reached: 4 turrets, 2 shields
- *                    (GDD §2.5 — "design rules, not renderer limits"). Queued
- *                    construction counts, so a player cannot buy past the cap.
+ * - `capped`       — the per-station cap is reached: 4 turrets, 2 shields, 1
+ *                    radar satellite (GDD §2.5 — "design rules, not renderer
+ *                    limits"). Queued construction counts, so a player cannot buy
+ *                    past the cap; the RADAR wedge also shows its "1/1" count.
  * - `inactive`     — the press would be a no-op: REPAIR CORE on a core that is
  *                    already full, after the collapse phase has shut repair off
  *                    for good (GDD §2.3), *or* while the station is still cooling
@@ -124,6 +143,8 @@ export function segmentCost(id: WheelSegmentId): number | null {
       return TURRET.cost;
     case 'shield':
       return SHIELD.cost;
+    case 'satellite':
+      return SATELLITE.cost;
     case 'repair':
       return REPAIR_ENTRY_ORE;
     case 'upgrade':
@@ -132,19 +153,22 @@ export function segmentCost(id: WheelSegmentId): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// Layout — four segments, clockwise from twelve o'clock
+// Layout — five segments, clockwise from twelve o'clock
 // ---------------------------------------------------------------------------
 
-/** Segment order around the wheel, clockwise from the top. Matches the order
- *  GDD §2.5 names them in, so the document and the screen read the same. */
+/** Segment order around the wheel, clockwise from the top. The four
+ *  build-at-the-station segments come first — TURRET, SHIELD, RADAR, REPAIR
+ *  REACTOR — then UPGRADE SHIP, the one that spends on the ship and opens a
+ *  screen. RADAR sits with its sibling station builds (feature f1 / p13). */
 export const WHEEL_ORDER: readonly WheelSegmentId[] = [
   'turret',
   'shield',
+  'satellite',
   'repair',
   'upgrade',
 ];
 
-/** Angular width of one segment (radians). Four segments fill the circle. */
+/** Angular width of one segment (radians). Five segments fill the circle. */
 export const SEGMENT_ARC = (2 * Math.PI) / WHEEL_ORDER.length;
 
 /** Screen-space angle of a segment's centre (radians, y-down: `-π/2` is up).
@@ -197,6 +221,16 @@ export interface BuildWheelSignals {
   readonly turrets: number;
   /** Shields standing **or under construction** (the sim's `shieldCount`). */
   readonly shields: number;
+  /**
+   * Radar satellites standing **or under construction** (the sim's
+   * `satelliteCount`). One per station (`SATELLITE.capPerStation`), so this is 0
+   * or 1 in practice — the RADAR wedge shows it as "0/1" / "1/1" and disables at
+   * the cap, re-arming when the satellite is shot down and the count drops.
+   *
+   * Optional and treated as `0` when absent, so a caller/fixture that predates the
+   * radar wedge reads as "none built", the pre-f1 behaviour it had.
+   */
+  readonly satellites?: number;
   /** Current core HP — REPAIR CORE is inactive on a full core. */
   readonly coreHp: number;
   /** Max core HP. */
@@ -271,6 +305,18 @@ export interface WheelSegment {
   /** Repair-only effect/reason copy (p5-08), or `null` on every other segment.
    *  Not a numeric field — the "only `cost` is a number" guarantee is kept. */
   readonly repair: RepairWedgeInfo | null;
+  /**
+   * The u2-02 count/cap grammar — a string like `"0/1"` — for a single-build,
+   * capped segment whose count the player must be able to *see* (the RADAR
+   * satellite: one per station, and it re-arms after it is shot down, so hiding
+   * the count would hide the rebuild). `null` on every other segment — turret and
+   * shield cap silently, and their wedges name their target instead.
+   *
+   * A string, never a number, so the "the only numeric field is `cost`" guarantee
+   * ({@link WheelSegment}, build-wheel.test.ts) still holds — no rate or count can
+   * leak into a numeric field.
+   */
+  readonly capLabel: string | null;
 }
 
 /** The wheel for one frame. */
@@ -280,7 +326,7 @@ export interface BuildWheelModel {
   /** Live ore total shown in the hub (GDD §2.5): everything a press can draw on,
    *  floored to whole ore because costs are whole ore. */
   readonly ore: number;
-  /** The four segments, clockwise from twelve o'clock. Always all four, even
+  /** The five segments, clockwise from twelve o'clock. Always all five, even
    *  when the wheel is closed, so the view can pool its children once. */
   readonly segments: readonly WheelSegment[];
   /**
@@ -296,12 +342,27 @@ export interface BuildWheelModel {
 const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: SegmentTarget }>> = {
   turret: { label: 'TURRET', target: 'station' },
   shield: { label: 'SHIELD', target: 'station' },
-  // Named in full: "REPAIR CORE", never "REPAIR" — it repairs the station's core
-  // and never the ship, and the label is the only place that is ever said.
+  // The radar satellite (feature f1): a station-built body that orbits and lifts
+  // the minimap fog. One word, its own thing — the wedge's second line carries the
+  // "0/1" count so the one-per-station cap and its re-arm are legible.
+  satellite: { label: 'RADAR', target: 'station' },
+  // Named in full: "REPAIR REACTOR", never "REPAIR" — it repairs the station's
+  // reactor and never the ship, and the label is the only place that is ever said.
   repair: { label: 'REPAIR REACTOR', target: 'station' },
   // The one segment that spends on the ship, and the one that opens a screen.
   upgrade: { label: 'UPGRADE SHIP', target: 'ship' },
 };
+
+/**
+ * The RADAR wedge's "0/1" count/cap line (u2-02 grammar): satellites built (or
+ * building) over the per-station cap. Reads `"0/1"` before the first is built,
+ * `"1/1"` at the cap (paired with the `capped` state that greys the wedge), and
+ * back to `"0/1"` the frame the sim's `satelliteCount` drops after the satellite
+ * is shot down — so the wedge's count *is* the "it will re-arm" tell.
+ */
+export function radarCapLabel(signals: BuildWheelSignals): string {
+  return `${Math.max(0, signals.satellites ?? 0)}/${SATELLITE.capPerStation}`;
+}
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's
  *  `spendableOre` so the wheel's affordability and the sim's agree exactly. */
@@ -332,6 +393,7 @@ export function buildWheelModel(signals: BuildWheelSignals): BuildWheelModel {
       opensPanel: id === 'upgrade',
       angle: segmentAngle(index),
       repair: id === 'repair' ? repairWedgeInfo(signals, ore) : null,
+      capLabel: id === 'satellite' ? radarCapLabel(signals) : null,
     };
   });
   const open = canOpenWheel(signals);
@@ -417,6 +479,16 @@ export function segmentState(
     case 'shield':
       if (signals.shields >= SHIELD.capPerStation) return 'capped';
       return affordable(ore, SHIELD.cost) ? 'ready' : 'unaffordable';
+    case 'satellite':
+      // One radar per station (`SATELLITE.capPerStation`). At the cap the wedge is
+      // disabled-gray with its "1/1" count; when the satellite is shot down the
+      // sim's `satelliteCount` drops and the wedge re-arms — so the wheel never
+      // dangles a second build `placeOrder` would refuse `cap-reached`, and never
+      // hides the rebuild it would allow. Cap before cost, like turret/shield: a
+      // second radar is refused because coverage already exists, not because the
+      // player is poor.
+      if ((signals.satellites ?? 0) >= SATELLITE.capPerStation) return 'capped';
+      return affordable(ore, SATELLITE.cost) ? 'ready' : 'unaffordable';
     case 'repair':
       // Collapse shuts repair off for the rest of the match (GDD §2.3) — the
       // sim answers `collapsed`, and the wheel must not keep offering it.
