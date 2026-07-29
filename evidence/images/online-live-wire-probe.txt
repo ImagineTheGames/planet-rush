@@ -1,9 +1,10 @@
 # evidence/images/online-live-wire-probe.txt
-# Self-witnessed LIVE wire probe of the Fly deployment (evidence/probe-online-live.mjs).
-# Captured: 2026-07-29T (fresh this session), code HEAD 56cbaa4, src/server/dist unchanged since fcdfe11.
+# Self-witnessed live wire probe of the M3 Fly deployment.
+# Captured: 2026-07-29T11:59:37Z by evidence/probe-online-live.mjs
+# Allocator: https://planet-rush-allocator.fly.dev  Gameserver: wss://planet-rush-gameserver.fly.dev/play
 
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":12465}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":12817}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
