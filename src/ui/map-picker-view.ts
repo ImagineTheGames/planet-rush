@@ -20,7 +20,8 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { FONT_BODY, FONT_HEADING, TEXT_DIM, TEXT_PRIMARY } from './typography';
+import { FONT_BODY, FONT_HEADING, TEXT_PRIMARY } from './typography';
+import { PANEL_FILL, PANEL_RULE, TEXT_MUTED, RADIUS } from './chrome';
 import { MAP_PICKER_ID, mapPickerHitTest } from './map-picker';
 import type { MapCardModel, MapPickerLayout, MapPickerModel, MapPreview } from './map-picker';
 
@@ -88,9 +89,9 @@ export class MapPickerView extends Container {
 
     nodes.body.clear();
     nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 8)
+      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
       .fill({ color: tint, alpha: card.selected ? 0.16 : 0.07 })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 8)
+      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
       .stroke({ width: card.selected ? 2 : 1, color: tint, alpha: card.selected ? 0.95 : 0.55 });
 
     // --- The preview box, off the top of the card -----------------------------
@@ -138,9 +139,9 @@ export class MapPickerView extends Container {
       nodes.veteranBg.clear();
       nodes.veteranBg
         .roundRect(tx, ty, tw, th, 3)
-        .fill({ color: PALETTE.vacuum, alpha: 0.7 })
+        .fill({ color: PANEL_FILL, alpha: 0.7 })
         .roundRect(tx, ty, tw, th, 3)
-        .stroke({ width: 1, color: PALETTE.hullSteel, alpha: 0.8 });
+        .stroke({ width: 1, color: PANEL_RULE, alpha: 0.8 });
       nodes.veteran.x = tx + padX;
       nodes.veteran.y = ty + padY;
     } else {
@@ -168,9 +169,9 @@ export class MapPickerView extends Container {
 
     // The arena frame — steel, the "space with a steel frame" read (maps.ts).
     g.roundRect(drawX, drawY, drawW, drawH, 3)
-      .fill({ color: PALETTE.vacuum, alpha: 0.6 })
+      .fill({ color: PANEL_FILL, alpha: 0.6 })
       .roundRect(drawX, drawY, drawW, drawH, 3)
-      .stroke({ width: 1, color: PALETTE.hullSteel, alpha: 0.5 });
+      .stroke({ width: 1, color: PANEL_RULE, alpha: 0.5 });
 
     // Each home station: a patina disc (its body colour), scaled to the box.
     const dotR = Math.max(1.5, Math.min(drawW, drawH) * 0.05);
@@ -205,7 +206,7 @@ export class MapPickerView extends Container {
       style: {
         fontFamily: FONT_BODY,
         fontSize: 11,
-        fill: TEXT_DIM,
+        fill: TEXT_MUTED,
         align: 'center',
         wordWrap: true,
         wordWrapWidth: 120,

@@ -39,6 +39,11 @@ primary_region = "iad"
   # is FLY_APP_NAME and would be *this* app — wrong for both — so set it explicitly.
   MATCH_APP = "planet-rush-gameserver"
   FLY_APP = "planet-rush-gameserver"
+  # The game is served from GitHub Pages — a DIFFERENT origin from this allocator —
+  # so a browser's POST /rooms is cross-origin and gated on a CORS preflight. Grant
+  # the Pages origin (localhost dev is always granted, needs no entry). Without this
+  # the browser never sees the room decision (M10). Comma-separate to add more.
+  ALLOW_ORIGINS = "https://imaginethegames.github.io"
   # FLY_REGION is injected by Fly at runtime → the router's cross-region replay
   # hint and the fleet controller's default region. One region here, so it never
   # emits a cross-region hint; harmless and correct.

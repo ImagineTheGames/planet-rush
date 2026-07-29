@@ -1,0 +1,167 @@
+{
+  "pc_label": "Desktop 1280×800",
+  "build": {
+    "sha": "97d13c5",
+    "time": "2026-07-29T03:52:53.222Z",
+    "dirty": true
+  },
+  "pc": {
+    "staged": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10
+    },
+    "read0": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10,
+      "repairing": false,
+      "repairGate": 0
+    },
+    "A": {
+      "tick": 563,
+      "read": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": true,
+        "repairGate": 14.116666666666623
+      },
+      "wedge": {
+        "sub": "REPAIR in 15s",
+        "ready": false,
+        "cost": 1
+      },
+      "coreDelta": 15,
+      "bankDelta": -1
+    },
+    "B": {
+      "tick": 749,
+      "taps": 4,
+      "read": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": true,
+        "repairGate": 9.483333333333059
+      },
+      "wedge": {
+        "sub": "REPAIR in 11s",
+        "ready": false,
+        "cost": 1
+      },
+      "elapsedSimS": 3.1,
+      "repairGate": 11.02,
+      "coreFrozen": true,
+      "bankFrozen": true,
+      "wedgeGrayedDuringLockout": true,
+      "wedgeShowsCountdown": true
+    },
+    "C": {
+      "readyTick": 1519,
+      "wedge": {
+        "sub": "+15 HP",
+        "ready": true,
+        "cost": 1
+      },
+      "elapsedSimS": 15.93,
+      "readAtRearm": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": false,
+        "repairGate": 0
+      },
+      "readAfterTap": {
+        "coreHp": 40,
+        "maxCoreHp": 100,
+        "banked": 8,
+        "repairing": true,
+        "repairGate": 14.283333333333298
+      },
+      "coreDelta": 15,
+      "bankDelta": -1
+    },
+    "errors": []
+  },
+  "phone_label": "iPhone 390×844 dpr3",
+  "phone": {
+    "staged": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10
+    },
+    "read0": {
+      "coreHp": 10,
+      "maxCoreHp": 100,
+      "banked": 10,
+      "repairing": false,
+      "repairGate": 0
+    },
+    "A": {
+      "tick": 566,
+      "read": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": true,
+        "repairGate": 14.216666666666628
+      },
+      "wedge": {
+        "sub": "REPAIR in 15s",
+        "ready": false,
+        "cost": 1
+      },
+      "coreDelta": 15,
+      "bankDelta": -1
+    },
+    "B": {
+      "tick": 745,
+      "taps": 4,
+      "read": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": true,
+        "repairGate": 9.816666666666409
+      },
+      "wedge": {
+        "sub": "REPAIR in 12s",
+        "ready": false,
+        "cost": 1
+      },
+      "elapsedSimS": 2.98,
+      "repairGate": 11.23,
+      "coreFrozen": true,
+      "bankFrozen": true,
+      "wedgeGrayedDuringLockout": true,
+      "wedgeShowsCountdown": true
+    },
+    "C": {
+      "readyTick": 1531,
+      "wedge": {
+        "sub": "+15 HP",
+        "ready": true,
+        "cost": 1
+      },
+      "elapsedSimS": 16.08,
+      "readAtRearm": {
+        "coreHp": 25,
+        "maxCoreHp": 100,
+        "banked": 9,
+        "repairing": false,
+        "repairGate": 0
+      },
+      "readAfterTap": {
+        "coreHp": 40,
+        "maxCoreHp": 100,
+        "banked": 8,
+        "repairing": true,
+        "repairGate": 14.19999999999996
+      },
+      "coreDelta": 15,
+      "bankDelta": -1
+    },
+    "errors": []
+  }
+}

@@ -31,10 +31,12 @@ import type { Insets } from './menu-geometry';
 // The buttons
 // ---------------------------------------------------------------------------
 
-/** What a tap on the main menu resolves to. `play` is the one door that builds a
- *  match; `codex` opens the optional reference (GDD §2.10) and comes back;
- *  `settings` opens the fire-mode / VFX / volume screen and comes back. */
-export type MainMenuOption = 'play' | 'codex' | 'settings';
+/** What a tap on the main menu resolves to. `play` builds an offline match (bots
+ *  fill every other seat); `online` opens the room-code front door — CREATE a room
+ *  and read the code out, or JOIN one somebody is holding up (M3/online); `codex`
+ *  opens the optional reference (GDD §2.10) and comes back; `settings` opens the
+ *  fire-mode / VFX / volume screen and comes back. */
+export type MainMenuOption = 'play' | 'online' | 'codex' | 'settings';
 
 /** One button's identity, in screen order. The layout, the view and the hit test
  *  all walk this same list, so a re-ordered screen can never mis-route a tap —
@@ -47,19 +49,22 @@ export interface MainMenuItem {
   readonly primary: boolean;
 }
 
-/** The buttons, top to bottom. PLAY is the one primary door; CODEX and SETTINGS
- *  are the two secondary screens that open and come back. CODEX is the optional
- *  reference a player consults voluntarily (GDD §2.10) — a door, never a gate:
- *  it builds no match and, like SETTINGS, is fully active steel (never gray). */
+/** The buttons, top to bottom. PLAY is the one primary door (plasma) — the
+ *  offline game is a complete product on its own and always works (GDD §4.8 risk
+ *  6), so it stays the single emphasised action. ONLINE sits right under it: the
+ *  room-code front door (CREATE / JOIN), fully active steel — a peer of PLAY, not
+ *  a louder one. CODEX and SETTINGS are the two secondary screens that open and
+ *  come back; like ONLINE they are active steel, never gray. */
 export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
   { kind: 'play', label: 'PLAY', primary: true },
+  { kind: 'online', label: 'ONLINE', primary: false },
   { kind: 'codex', label: 'CODEX', primary: false },
   { kind: 'settings', label: 'SETTINGS', primary: false },
 ];
 
 /** The wordmark, in Audiowide (style-guide §5.6) — the one place the game names
  *  itself before a match. */
-export const MAIN_MENU_TITLE = 'STATION RUSH';
+export const MAIN_MENU_TITLE = 'PLANET RUSH';
 
 // ---------------------------------------------------------------------------
 // The per-frame model
@@ -104,7 +109,7 @@ export interface MainMenuLayoutOptions {
 
 /** The main menu's rects: the title band and one rect per {@link MAIN_MENU_ITEMS}
  *  in order. The arena picker used to reserve a band here; it now lives in the
- *  lobby (p2 field rule), so the menu is just the wordmark and its two buttons. */
+ *  lobby (p2 field rule), so the menu is just the wordmark and its button stack. */
 export interface MainMenuLayout {
   readonly content: Rect;
   readonly title: Rect;

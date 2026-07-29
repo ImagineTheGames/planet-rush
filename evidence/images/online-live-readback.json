@@ -1,0 +1,51 @@
+{
+  "door": {
+    "visible": true,
+    "screen": "home",
+    "status": "idle",
+    "error": "",
+    "code": "",
+    "resolvedCode": null,
+    "regionPickerVisible": false
+  },
+  "doorShot": "/lanes/lane-1/evidence/images/online-door.png",
+  "createConnecting": {
+    "visible": true,
+    "screen": "home",
+    "status": "connecting",
+    "error": "",
+    "code": "",
+    "resolvedCode": null,
+    "regionPickerVisible": false
+  },
+  "createSettled": {
+    "visible": true,
+    "screen": "home",
+    "status": "error",
+    "error": "Can’t reach the servers. Check your connection — PLAY SOLO still works.",
+    "code": "",
+    "resolvedCode": null,
+    "regionPickerVisible": false
+  },
+  "createShot": "/lanes/lane-1/evidence/images/online-create-live.png",
+  "joinTyped": {
+    "visible": false,
+    "screen": "join",
+    "status": "idle",
+    "error": "",
+    "code": "ABCD",
+    "resolvedCode": null,
+    "regionPickerVisible": false
+  },
+  "joinSettled": {
+    "visible": false,
+    "screen": "join",
+    "status": "connecting",
+    "error": "",
+    "code": "ABCD",
+    "resolvedCode": null,
+    "regionPickerVisible": false
+  },
+  "joinShot": "/lanes/lane-1/evidence/images/online-join-live.png",
+  "pageErrors": []
+}

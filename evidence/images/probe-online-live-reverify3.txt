@@ -1,0 +1,15 @@
+=== allocator health / regions ===
+GET /health : HTTP 200 {"status":"ok","machines":0,"rooms":0,"reservations":0,"uptimeSeconds":7385}
+GET /regions: HTTP 200 {"regions":[]}
+=== browser CORS reachability (what a real client hits first) ===
+OPTIONS /rooms (preflight): HTTP 405 ACAO=(absent)
+GET /health with Origin: HTTP 200 ACAO=(absent)
+=== allocate + join through the allocator ===
+POST /rooms: HTTP 503 {"error":"no-capacity"}
+POST /rooms/ABCD/join: HTTP 404 {"error":"not-found"}
+=== direct-connect to the gameserver: ticketless join ===
+direct-join: socket OPEN, sending ticketless join {room:"PROBE"}
+direct-join: MESSAGE {"type":"joinError","reason":"bad-ticket"}
+direct-join: TIMEOUT (no reply in 12s)
+=== probe done ===
+direct-join: CLOSE code=1006 reason=""

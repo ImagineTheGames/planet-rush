@@ -1,0 +1,17 @@
+{
+  "keypad": {
+    "visible": true,
+    "screen": "join",
+    "status": "idle",
+    "error": "",
+    "code": "WXYZ"
+  },
+  "submitted": {
+    "visible": true,
+    "screen": "join",
+    "status": "error",
+    "error": "Can’t reach the servers. Check your connection — PLAY SOLO still works.",
+    "code": "WXYZ"
+  },
+  "pageErrors": []
+}
