@@ -1,0 +1,20 @@
+LIVE WIRE PROBE — Fly allocator — captured 2026-07-29T09:42:37Z — repo HEAD d599893
+Host: https://planet-rush-allocator.fly.dev
+
+=== GET /health ===
+HTTP/2 200 
+content-type: application/json
+{"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":4597}
+
+=== OPTIONS /rooms (browser preflight; Origin: https://planet-rush.fly.dev) ===
+HTTP/2 204 
+access-control-allow-methods: GET, POST, OPTIONS
+  (note: NO access-control-allow-origin line above == preflight grants no origin)
+
+=== POST /rooms x3 (the allocate; Origin: https://planet-rush.fly.dev) ===
+attempt 1: HTTP/2 200   ct=content-type: text/plain  acao=0
+  body: Planet Rush match server — connect a WebSocket to play.
+attempt 2: HTTP/2 200   ct=content-type: text/plain  acao=0
+  body: Planet Rush match server — connect a WebSocket to play.
+attempt 3: HTTP/2 200   ct=content-type: text/plain  acao=0
+  body: Planet Rush match server — connect a WebSocket to play.
