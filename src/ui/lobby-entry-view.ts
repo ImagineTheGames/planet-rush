@@ -175,14 +175,19 @@ export class LobbyEntryView extends Container {
       if (!home) this.drawKey(nodes, key, rect, !model.connecting);
     }
 
+    // BACK is on BOTH screens — the exit every screen must carry (u2 menu-back):
+    // on the keypad it steps back to the doors, on the home screen it leaves to
+    // the main menu. Steel chrome, never plasma. ERASE / JOIN are join-only.
+    setVisible(true, this.back.body, this.back.label);
+    this.drawButton(this.back, this.layout.back, !model.connecting, false);
+
     for (const [nodes, rect, enabled] of [
-      [this.back, this.layout.back, !model.connecting],
       [this.erase, this.layout.erase, model.canErase],
       [this.submit, this.layout.submit, model.canSubmit],
     ] as const) {
       setVisible(!home, nodes.body, nodes.label);
       // JOIN is the screen's one affirmative action, so it is the only button
-      // that reads as plasma; BACK and ERASE are steel chrome.
+      // that reads as plasma; ERASE is steel chrome.
       if (!home) this.drawButton(nodes, rect, enabled, nodes === this.submit);
     }
 

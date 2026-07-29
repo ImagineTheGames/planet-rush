@@ -27,6 +27,7 @@ import {
   DOOR_OPTIONS,
   DOOR_ORDER,
   ENTRY_ERRORS,
+  ENTRY_TAGLINE,
   KEYPAD_COLUMNS,
   KEYPAD_KEYS,
   backToDoors,
@@ -253,6 +254,14 @@ describe('the frame model', () => {
     expect(entryModel(createEntry()).error).toBe('');
   });
 
+  it('subtitles the home screen with the tagline, not the title repeated (u2)', () => {
+    // The field report: the line under the wordmark used to say "PLANET RUSH"
+    // again. The subtitle is the pitch (GDD §2.3 triangle), never the name twice.
+    const prompt = entryModel(createEntry()).prompt;
+    expect(prompt).toBe(ENTRY_TAGLINE);
+    expect(prompt).not.toBe('PLANET RUSH');
+  });
+
   it('enables JOIN only on a complete code', () => {
     expect(entryModel(typed('K7Q')).canSubmit).toBe(false);
     expect(entryModel(typed('K7QM')).canSubmit).toBe(true);
@@ -460,6 +469,25 @@ describe('a tap hits what it looks like it hits', () => {
     const settings = center(layout.settings);
     const onJoin = entryHitTest(layout, settings.x, settings.y, 'join');
     expect(onJoin === null || onJoin.kind !== 'settings').toBe(true);
+  });
+
+  it('gives the home screen a BACK exit that never collides with SETTINGS (u2)', () => {
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      const back = center(layout.back);
+      // BACK is live on the home screen — the online front door's exit to the
+      // main menu (the field-report bug: there was no way back).
+      expect(entryHitTest(layout, back.x, back.y, 'home'), `home BACK on ${name}`).toEqual({
+        kind: 'back',
+      });
+      // It is the SAME rect the keypad's BACK uses, so the button holds its place
+      // as the screen changes under it.
+      expect(entryHitTest(layout, back.x, back.y, 'join'), `join BACK on ${name}`).toEqual({
+        kind: 'back',
+      });
+      // BACK and SETTINGS split the home action band; they must never overlap.
+      expect(overlaps(layout.back, layout.settings), `back/settings overlap on ${name}`).toBe(false);
+    }
   });
 
   it('never lets a tap land on a control the screen is not showing', () => {

@@ -380,9 +380,19 @@ export function entryModel(state: EntryState): EntryModel {
   };
 }
 
+/**
+ * The tagline under the wordmark on the home screen — the triangle the whole loop
+ * turns on (GDD §2.3: "the loop is a triangle — mine / defend / attack"). It
+ * replaces an earlier line that simply repeated the title ("PLANET RUSH"), which
+ * said nothing the wordmark above it did not already say: the subtitle is the
+ * pitch, not the name a second time.
+ */
+export const ENTRY_TAGLINE = 'MINE · DEFEND · ATTACK';
+
 /** The line under the wordmark. Says what to do, and — while connecting — what
- *  is being waited on, so a slow server never reads as a dead screen. */
+ *  is being waited on, so a slow server never reads as a dead screen. On the home
+ *  screen it is the {@link ENTRY_TAGLINE}, not the title repeated. */
 function entryPrompt(state: EntryState): string {
   if (state.status === 'connecting') return 'CONNECTING…';
-  return state.screen === 'join' ? 'ENTER THE ROOM CODE' : 'PLANET RUSH';
+  return state.screen === 'join' ? 'ENTER THE ROOM CODE' : ENTRY_TAGLINE;
 }
