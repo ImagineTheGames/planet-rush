@@ -115,9 +115,10 @@ describe('joinRoom', () => {
     expect(result).toEqual({ ok: false, reason: 'bad-response' });
   });
 
-  it('falls back to a ws URL derived from the allocator host when connectUrl is null (Fly)', async () => {
-    // On Fly the edge routes by header and hands back no per-Machine URL; the
-    // client dials the shared app host and Fly replays the upgrade to the Machine.
+  it('falls back to a ws URL derived from the allocator host when connectUrl is null', async () => {
+    // A defensive fallback for a body that carries no connectUrl at all. (On Fly
+    // the allocator now populates connectUrl with the gameserver app's shared
+    // endpoint, so this path is not the Fly path — it is the last-resort default.)
     const { fetch } = stubFetch({
       status: 200,
       json: () => Promise.resolve({ ...OK_BODY, connectUrl: null }),

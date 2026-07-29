@@ -81,22 +81,44 @@ export interface FlyReplayConfig {
    * edge crosses the app boundary. Omit when allocator and match share an app.
    */
   readonly appName?: string;
+  /**
+   * The gameserver app's shared WebSocket endpoint — e.g.
+   * `wss://planet-rush-gameserver.fly.dev/play`. This is the URL the allocate/join
+   * JSON response hands the client so it can open its socket. **The machine-pin is
+   * NOT on this response** (a `fly-replay` on a JSON body makes the edge REPLAY the
+   * POST and the client never receives the room+ticket); it moves to the SOCKET
+   * hop, where a wrong-machine WS upgrade is replayed to the room's host. So the
+   * client dials this one shared hostname and the edge sorts the socket out.
+   */
+  readonly connectUrl?: string;
 }
 
 /**
- * Fly.io routing: answer with a `fly-replay` header and let the edge re-deliver
- * the request to the named Machine. The directive is assembled in Fly's order —
- * `app`, then `region`, then `instance` — with only the parts this target needs.
- * No URL is handed back: on Fly the client stays on the shared app hostname, so
- * the allocator can disappear the instant the request is replayed.
+ * Fly.io routing. Two distinct hops read this router, and each takes a different
+ * field of the {@link RouteInstruction} — never both at once:
+ *
+ *   • The allocate/join **JSON response** takes `connectUrl` — the gameserver
+ *     app's shared endpoint. It must NOT carry the `fly-replay` header: on the
+ *     Fly edge that header REPLAYS the POST at the gameserver, so the client never
+ *     receives its `{room, ticket}` and the menu reports "can't reach the servers"
+ *     (allocator/index.ts `decided()` no longer merges these headers).
+ *
+ *   • The **socket hop** (server/ws upgrade) takes `headers` — the `fly-replay`
+ *     directive that pins a WS upgrade landing on the wrong gameserver machine to
+ *     the one hosting the room's ticket, *before* completing the upgrade.
+ *
+ * The directive is assembled in Fly's order — `app`, then `region`, then
+ * `instance` — with only the parts a target needs.
  */
 export class FlyReplayRouter implements Router {
   private readonly selfRegion: string | undefined;
   private readonly appName: string | undefined;
+  private readonly connectUrl: string | undefined;
 
   constructor(config: FlyReplayConfig = {}) {
     this.selfRegion = config.selfRegion;
     this.appName = config.appName;
+    this.connectUrl = config.connectUrl;
   }
 
   routeTo(target: RouteTarget): RouteInstruction {
@@ -108,6 +130,6 @@ export class FlyReplayRouter implements Router {
       parts.push(`region=${target.region}`);
     }
     parts.push(`instance=${target.machine}`);
-    return { headers: { 'fly-replay': parts.join(';') }, connectUrl: null };
+    return { headers: { 'fly-replay': parts.join(';') }, connectUrl: this.connectUrl ?? null };
   }
 }
