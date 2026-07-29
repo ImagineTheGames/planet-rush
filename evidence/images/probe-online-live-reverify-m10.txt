@@ -1,43 +1,54 @@
-=== LIVE WIRE PROBE — QA re-verify M10 online gates ===
-capturedAt: 2026-07-29T09:28Z   buildSha: 81cbea0
+===================================================================
+LIVE ONLINE WIRE PROBE — M10 re-verify (self-witnessed by QA)
+captured: 2026-07-29T09:33:15Z
+repo HEAD: fe9d9c6
+allocator: https://planet-rush-allocator.fly.dev
+===================================================================
 
---- probe-online-live.mjs (fresh run) ---
-=== allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":3741}
-GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
-=== browser CORS reachability (what a real client hits first) ===
-OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
-GET /health with Origin: HTTP 200 ACAO=(absent)
-=== allocate + join through the allocator ===
-POST /rooms: HTTP 200 Planet Rush match server — connect a WebSocket to play.
-
-POST /rooms/ABCD/join: HTTP 404 {"error":"not-found"}
-=== direct-connect to the gameserver: ticketless join ===
-direct-join: socket OPEN, sending ticketless join {room:"PROBE"}
-direct-join: MESSAGE {"type":"joinError","reason":"bad-ticket"}
-direct-join: TIMEOUT (no reply in 12s)
-=== probe done ===
-direct-join: CLOSE code=1006 reason=""
-
---- curl -i POST /rooms (Origin http://localhost:4173) ---
-HTTP/2 200 
-content-type: text/plain
-date: Wed, 29 Jul 2026 09:28:45 GMT
-server: Fly/3d7232b6e (2026-07-27)
-via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPK8YT32CFNRZ79PWP7KBX6-gru
-
-Planet Rush match server — connect a WebSocket to play.
-
---- curl -i OPTIONS /rooms preflight (Origin http://localhost:4173) ---
+### 1. OPTIONS /rooms preflight (Origin http://localhost:4173) — EXPECT 204 + ACAO ###
 HTTP/2 204 
 access-control-allow-origin: http://localhost:4173
 vary: Origin
 access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-headers: content-type
 access-control-max-age: 86400
-date: Wed, 29 Jul 2026 09:28:45 GMT
+date: Wed, 29 Jul 2026 09:33:16 GMT
 server: Fly/3d7232b6e (2026-07-27)
 via: 2 fly.io, 2 fly.io
-fly-request-id: 01KYPK8Z11RCQ93YG91EQF1CYE-gru
+fly-request-id: 01KYPKH7G6NH7THXY9YJV0KA3R-gru
 
+
+### 2. POST /rooms allocate (Origin http://localhost:4173) — THE DEFECT ###
+HTTP/2 200 
+content-type: text/plain
+date: Wed, 29 Jul 2026 09:33:16 GMT
+server: Fly/3d7232b6e (2026-07-27)
+via: 2 fly.io, 2 fly.io
+fly-request-id: 01KYPKH7Q3CKDKGSZFYTSWPXZ0-gru
+
+Planet Rush match server — connect a WebSocket to play.
+
+### 3. rooms count before/after a POST — EXPECT 0 -> 0 (no mint) ###
+rooms before: 0
+rooms after:  0
+
+### 4. control: POST /rooms/WXYZ/join (non-replayed path) — EXPECT 404 json WITH ACAO ###
+HTTP/2 404 
+content-type: application/json
+access-control-allow-origin: http://localhost:4173
+vary: Origin
+date: Wed, 29 Jul 2026 09:33:17 GMT
+server: Fly/3d7232b6e (2026-07-27)
+via: 2 fly.io, 2 fly.io
+fly-request-id: 01KYPKH8HBC199RY1D4Y48C1QW-gru
+
+{"error":"not-found"}
+### 5. GET /health ###
+{"status":"ok","machines":2,"rooms":0,"reservations":2,"uptimeSeconds":4037}
+
+INTERPRETATION: preflight (1) is CORS-correct, but the allocate POST (2) returns
+200 text/plain 'Planet Rush match server...' with via:'2 fly.io, 2 fly.io' (double
+edge hop = fly-replay) and NO access-control-allow-origin. Room count stays 0 (3):
+nothing is minted. A browser CORS-blocks the ACAO-less reply, fetch() throws, no code
+reaches the client. The join control (4) proves the allocator is directly reachable +
+CORS-correct on non-replayed paths. => LIVE deploy defect UNFIXED. 3 gates stay FAILED.
