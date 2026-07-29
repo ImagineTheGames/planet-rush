@@ -1,7 +1,5 @@
-=== FRESH LIVE WIRE PROBE (self-witnessed) 2026-07-29T12:42:44Z ===
-# evidence/probe-online-live.mjs against planet-rush-allocator.fly.dev
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":15404}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":15583}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)
