@@ -1,0 +1,39 @@
+RAW WIRE RE-CHECK #2 — live M10 online gates (fresh pass)
+captured: 2026-07-29T09:22:26Z   client buildSha: 67c395d (bundle rebuilt with VITE_ALLOCATOR_URL=https://planet-rush-allocator.fly.dev, dist/version.json sha=67c395d)
+purpose: re-verify whether the one remaining LIVE defect (fly-replay breaks POST /rooms) has been fixed. It has NOT.
+===================================================================
+
+### CONTROL PLANE STILL HEALTHY (blockers 1-2 remain fixed)
+$ curl https://planet-rush-allocator.fly.dev/health
+{"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":3387}
+$ curl https://planet-rush-allocator.fly.dev/machines
+{"machines":[{"machine":"6836293b5161d8","region":"iad","capacity":32,"rooms":0,"lastSeen":1785316946763},{"machine":"0800d5b6d62328","region":"iad","capacity":32,"rooms":0,"lastSeen":1785316947686}]}
+$ curl -X OPTIONS .../rooms  (preflight)
+HTTP/2 204 
+access-control-allow-origin: http://localhost:4173
+access-control-allow-methods: GET, POST, OPTIONS
+  => allocator direct replies remain CORS-correct. Preflight passes.
+
+### THE REMAINING BLOCKER — STILL BROKEN: POST /rooms (allocate success path)
+$ curl -X POST .../rooms -H 'Origin: http://localhost:4173' -d '{}'
+HTTP/2 200 
+content-type: text/plain
+  body:
+    Planet Rush match server — connect a WebSocket to play.
+
+  => STILL 200 text/plain, NO access-control-allow-origin — the GAMESERVER root reply.
+     fly-replay on the allocate is unchanged: allocator/index.ts sets fly-replay
+     (fly.allocator.toml MATCH_APP=planet-rush-gameserver), Fly re-delivers POST /rooms
+     to a gameserver machine, and server/index.ts has ONLY /health + /drain (no POST /rooms,
+     no CORS). The minted room+ticket JSON is discarded; the browser CORS-blocks the reply.
+
+### NO FIX IN FLIGHT (checked 2026-07-29T09:22:26Z)
+  gh pr list --state open  => only PR #223 (this QA branch). No netcode/deploy PR repairs POST /rooms.
+  last allocator/server commit: 9524c93 net(m10): fleet registration + authenticated control plane + CORS
+  This is a deploy/routing defect owned by the Netcode/Deploy lane, outside evidence/ (QA lane).
+
+### FRONT-DOOR RESULT (shipped bundle, real input, both form factors) — see readback + screenshots
+  desktop CREATE: status=error, resolvedCode=null  (online-create-desktop.png: red 'Can't reach the servers')
+  phone   CREATE: status=error, resolvedCode=null  (online-create-phone.png)
+  desktop JOIN 'WXYZ': status=error 'No room with that code' (online-join-desktop.png) — allocator 404 round-trips, guest path works
+  zero page errors on any capture (createErrors:[], joinErrors:[] in online-live-reverify-readback.json)
