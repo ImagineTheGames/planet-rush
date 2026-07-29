@@ -33,6 +33,35 @@ function match(): World {
   });
 }
 
+/** A 2v2 TEAMS world — team 0 is {0,2}, team 1 is {1,3}. The alarm must open to a
+ *  teammate's home (owner 2 for slot 0) yet stay shut for either enemy (1, 3). */
+function teamsMatch(): World {
+  return createWorld({
+    seed: 4242,
+    players: [
+      { id: 0, shipClass: ShipClass.Vanguard, team: 0 },
+      { id: 1, shipClass: ShipClass.Vanguard, team: 1 },
+      { id: 2, shipClass: ShipClass.Vanguard, team: 0 },
+      { id: 3, shipClass: ShipClass.Vanguard, team: 1 },
+    ],
+    bounds: { width: 1400, height: 1400 },
+    asteroidCount: 16,
+  });
+}
+
+/** Sustained fire on the home owned by `victim`, seen from slot `localSlot`; the
+ *  returned flag is whether that listener's under-attack alarm ended up ringing. */
+function siegeRings(world: World, localSlot: number, victim: number): boolean {
+  const art = new ArtPresenter({ local: localSlot });
+  art.observe(world, 1 / 60); // prime in silence
+  const home = world.stations.find((p) => p.owner === victim)!;
+  for (let tick = 0; tick < 120; tick++) {
+    home.coreHp -= 0.1; // sustained, not a taunt-tap
+    art.observe(world, 1 / 60);
+  }
+  return art.underAttack;
+}
+
 describe('ArtPresenter — one object, two calls a frame', () => {
   it('runs a real match with no renderer and no audio hardware', () => {
     const art = new ArtPresenter({ local: 0, seed: 4242 });
@@ -112,6 +141,30 @@ describe('ArtPresenter — one object, two calls a frame', () => {
       other.observe(world2, 1 / 60);
     }
     expect(other.underAttack).toBe(false);
+  });
+
+  it('TEAMS: a teammate under siege rings your alarm; neither enemy under siege does (s5)', () => {
+    // The alarm belongs to your SIDE, not your slot (developer report s5). Each
+    // call is its own world so the sieges do not bleed together.
+    expect(siegeRings(teamsMatch(), 0, 0)).toBe(true); // your own home
+    expect(siegeRings(teamsMatch(), 0, 2)).toBe(true); // your TEAMMATE's home — the fix
+    expect(siegeRings(teamsMatch(), 0, 1)).toBe(false); // an enemy's home
+    expect(siegeRings(teamsMatch(), 0, 3)).toBe(false); // the other enemy's home
+  });
+
+  it('does not ring for the collapse core-entropy — the "alarm out of nowhere" phantom (s5)', () => {
+    const art = new ArtPresenter({ local: 0 });
+    const world = match();
+    art.observe(world, 1 / 60); // prime
+
+    // Enter collapse and let the reactor decay on its own — no attacker present.
+    world.match.phase = 'collapse';
+    const home = world.stations.find((p) => p.owner === 0)!;
+    for (let tick = 0; tick < 240; tick++) {
+      home.coreHp -= 0.1; // exactly the entropy the sim applies during collapse
+      art.observe(world, 1 / 60);
+    }
+    expect(art.underAttack).toBe(false); // entropy is not a siege (GDD §2.3 vs §2.2)
   });
 
   it('thins effects on the reduce-VFX setting without losing one (GDD §4.3)', () => {

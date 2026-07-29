@@ -52,6 +52,27 @@ export function areEnemies(world: World, a: PlayerId, b: PlayerId): boolean {
 }
 
 /**
+ * True when `a` and `b` are on the SAME side — allies, or the same player. The
+ * exact complement of {@link areEnemies}, named for the callers that ask the
+ * question the other way round.
+ *
+ * This is the **under-attack alarm's ownership predicate** (developer report
+ * s5, "the alarm fires for ENEMY bases"). The alarm belongs to *ownership, not
+ * proximity*: a station taking damage rings player P's alarm only when the
+ * station's owner is on P's side — `sameSide(world, P, owner)`. In FFA that is
+ * `P === owner` (your own home, and no one else's — enemies and neutral
+ * derelicts read as foes and stay silent). In TEAMS it opens to a teammate's
+ * home too, at zero extra code: same-team owners are on your side by the same
+ * `team` table every other allegiance check reads. The three alarm surfaces —
+ * the audio klaxon (`src/art/audio`), the HUD arrow (`src/ui`), and the haptic
+ * pulse (`src/main`) — should each gate on THIS, so they can never disagree
+ * about whose siege you hear.
+ */
+export function sameSide(world: World, a: PlayerId, b: PlayerId): boolean {
+  return !areEnemies(world, a, b);
+}
+
+/**
  * Whether a shot fired by `attacker` may deal damage to `victim` — the single
  * gate every projectile-damage site reads (`./projectiles`), so friendly fire is
  * one switch, not a rule scattered across the damage branches.
