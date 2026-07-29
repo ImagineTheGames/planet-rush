@@ -18,6 +18,7 @@
  */
 
 import type { PlayerId } from '@shared/types';
+import { FRIENDLY_FIRE } from './constants';
 import type { World } from './state';
 
 /**
@@ -48,4 +49,25 @@ export function teamOf(world: World, id: PlayerId): number {
 export function areEnemies(world: World, a: PlayerId, b: PlayerId): boolean {
   if (a === b) return false;
   return teamOf(world, a) !== teamOf(world, b);
+}
+
+/**
+ * Whether a shot fired by `attacker` may deal damage to `victim` — the single
+ * gate every projectile-damage site reads (`./projectiles`), so friendly fire is
+ * one switch, not a rule scattered across the damage branches.
+ *
+ * A shot always flies over its own owner (`attacker === victim` → false), no
+ * matter what — self-immunity never depends on the flag, so flipping friendly
+ * fire on can never make a ship shoot itself. An **enemy** is always damageable.
+ * An **ally** is damageable only when {@link FRIENDLY_FIRE} is ratified ON
+ * (`./constants`); with it OFF (the default), a teammate in the line of fire eats
+ * nothing and the projectile passes through (GDD §2.1). This is a strictly looser
+ * question than {@link areEnemies}, which the *targeting* ladder keeps using —
+ * auto-aim, turrets, and bots never *lock* an ally regardless of the flag; this
+ * only decides what a shot already in flight is allowed to hit.
+ */
+export function canDamage(world: World, attacker: PlayerId, victim: PlayerId): boolean {
+  if (attacker === victim) return false;
+  if (areEnemies(world, attacker, victim)) return true;
+  return FRIENDLY_FIRE;
 }

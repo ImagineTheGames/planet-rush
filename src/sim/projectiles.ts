@@ -30,7 +30,7 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
-import { areEnemies } from './allegiance';
+import { canDamage } from './allegiance';
 import {
   ASTEROID,
   CHUNK,
@@ -252,7 +252,7 @@ export function updateProjectiles(world: World, hash: SpatialHash, dt: number): 
 function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
-    if (!ship.alive || !areEnemies(world, p.owner, ship.id) || ship.spawnProtect > 0) continue;
+    if (!ship.alive || !canDamage(world, p.owner, ship.id) || ship.spawnProtect > 0) continue;
     const rr = ship.radius + p.radius;
     if (dist2(p.pos, ship.pos) > rr * rr) continue;
     damageShip(world, ship, p.damage);
@@ -275,7 +275,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
 
   for (let pi = 0; pi < world.stations.length; pi++) {
     const station = world.stations[pi]!;
-    if (!areEnemies(world, p.owner, station.owner)) continue; // never your own/allied home
+    if (!canDamage(world, p.owner, station.owner)) continue; // never your own home; an ally's only under FRIENDLY_FIRE
     for (let ti = 0; ti < station.turrets.length; ti++) {
       const turret = station.turrets[ti]!;
       if (turret.hp <= 0) continue;
