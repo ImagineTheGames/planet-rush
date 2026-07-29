@@ -1263,6 +1263,55 @@ export const SHIP_RADIUS: Tunable<number> = 16;
  *  1 = perfectly elastic. TUNABLE */
 export const SHIP_ASTEROID_RESTITUTION: Tunable<number> = 0.8;
 
+/**
+ * The in-sim wedge escape hatch (developer report p14 — "bot wedged on its OWN
+ * station's rim"). A ship thrusting *radially* into a solid body (its own
+ * station, or a rock) has no tangential velocity for the collision response to
+ * preserve: it is pushed back to the surface and its inward velocity is killed
+ * every tick, so a ship whose steering keeps aiming *through* the body — a bot
+ * given an arrival point at or inside a station's collision radius, the exact
+ * screenshot — sits pinned against the geometry, motionless, forever. The
+ * bot-side net-progress detector cannot see it, because a home-bound bot decel-
+ * erating onto its own station reports a *low* throttle (it thinks it has
+ * arrived) and the detector exempts low throttle as deliberate station-keeping.
+ *
+ * So the guarantee is made where it cannot be evaded — in the collision response
+ * itself, off the sim's own ground truth, for EVERY ship (bot or human) and
+ * EVERY solid body. When a ship is in contact with a body, pressing inward, and
+ * has been reduced to near-stillness by that contact, the sim gives it a
+ * tangential slide along the surface — it can never *stay* pinned, whatever
+ * heading its pilot keeps asking for. It slides around/off the rim and its
+ * steering re-approaches from open space (the report's "nudge tangentially,
+ * re-approach"). This is the physics floor; a bot keeping its arrival points
+ * outside a body (`safeAnchorRadius`, `./anchors`) is the behavioural fix that
+ * stops the ship ever reaching this state — belt and braces.
+ */
+
+/**
+ * Speed (units/s) at or below which a ship *pressing into* a body counts as
+ * pinned and earns the tangential slide. Sized well under cruise so it fires
+ * only on a genuine wedge, never on a ship bouncing off a rock at speed (which
+ * keeps most of its momentum as tangential velocity) or flying past one: a
+ * radial grind against a station at partial throttle nets only a few units/s
+ * (one tick's thrust, minus the restitution bounce), an order of magnitude
+ * below this, while a live bounce or a strafing pass stays well above it. ≈20%
+ * of `BASE_SPEED`. TUNABLE
+ */
+export const WEDGE_SLIDE_SPEED: Tunable<number> = 52;
+
+/**
+ * The tangential slide speed (units/s) the escape hatch imparts along a body's
+ * surface to a pinned ship — enough to walk a grinding hull off the rim within
+ * a fraction of a second (clearing the `unstuck` invariant's few-unit wedge
+ * window quickly) yet gentle enough to read as a slide, not a launch. Added as
+ * velocity along the contact tangent, so drag bleeds it the instant the pilot
+ * stops pressing in; it self-limits, because a ship already sliding at this
+ * speed is above `WEDGE_SLIDE_SPEED` and no longer counts as pinned. Handedness
+ * is fixed (counter-clockwise about the contact normal) so the response is fully
+ * deterministic — no RNG, no clock (GDD §4.1, §4.8). TUNABLE
+ */
+export const WEDGE_SLIDE_KICK: Tunable<number> = 60;
+
 // ---------------------------------------------------------------------------
 // Weapon acquisition range (GDD §2.4 — auto-aim engagement radius)
 // ---------------------------------------------------------------------------

@@ -51,6 +51,8 @@ import {
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
+  WEDGE_SLIDE_SPEED,
+  WEDGE_SLIDE_KICK,
 } from './constants';
 import {
   buyUpgrade,
@@ -454,7 +456,10 @@ function reflectOffStations(ship: Ship, world: World): void {
 }
 
 /** Push a ship out of an intersecting circle and reflect the normal component of
- *  its velocity. No sqrt until a contact is confirmed. */
+ *  its velocity. No sqrt until a contact is confirmed. Also the in-sim wedge
+ *  escape hatch: a ship ground to a standstill *pressing into* the body gets a
+ *  tangential slide so it can never stay pinned against it (see
+ *  `WEDGE_SLIDE_*`, developer report p14). */
 function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
   const rr = ship.radius + radius;
   const d2 = dist2(ship.pos, center);
@@ -473,6 +478,27 @@ function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
     const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
     ship.vel.x -= j * nx;
     ship.vel.y -= j * ny;
+  }
+
+  // Escape hatch (developer report p14). A ship whose steering keeps aiming
+  // *through* this body — an arrival point at or inside its collision radius —
+  // presses in every tick (`vn < 0`) and the response above kills that push, so
+  // it is ground to near-stillness against the surface and stays there. Pure
+  // reflection cannot free it: a radial push has no tangential velocity to
+  // preserve. So when a ship is both pressing in and reduced to near-stillness,
+  // give it a deterministic tangential slide along the surface (counter-clockwise
+  // about the outward normal, fixed handedness — no RNG, no clock). It walks the
+  // pinned hull around and off the rim; drag bleeds the slide the instant the
+  // pilot stops pressing in, and a ship already sliding faster than this is not
+  // pinned, so the kick self-limits. A live bounce (large post-reflection speed)
+  // or a strafing graze never trips it.
+  if (vn < 0) {
+    const sp2 = ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y;
+    if (sp2 <= WEDGE_SLIDE_SPEED * WEDGE_SLIDE_SPEED) {
+      // Tangent = normal rotated +90° (CCW): (-ny, nx).
+      ship.vel.x += -ny * WEDGE_SLIDE_KICK;
+      ship.vel.y += nx * WEDGE_SLIDE_KICK;
+    }
   }
 }
 

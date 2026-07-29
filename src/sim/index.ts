@@ -20,6 +20,9 @@
  */
 
 export * from './constants';
+// Safe arrival geometry — one clamp keeps every pilot's fly-to point off a body's
+// collision radius (developer report p14, the bot-home-rim wedge class).
+export * from './anchors';
 // The ratified map registry: arena bounds + home placements per layout.
 export * from './maps';
 // Class bases × upgrade tiers — every derived ship stat (GDD §2.5, §2.11).
