@@ -145,6 +145,20 @@ export class AudioEngine {
   private ambientLoop: LoopHandle | null = null;
   private alarmLoop: LoopHandle | null = null;
   private local: PlayerId;
+  /**
+   * The player slots whose home damage rings THIS listener's alarm — the local
+   * player and, in TEAMS, their allies (the sim's `sameSide` set, owner-keyed).
+   * `null` means "no roster wired": the alarm falls back to the local player
+   * alone, i.e. FFA / teams-of-one, which is exactly the pre-Teams behaviour.
+   */
+  private alarmAllies: ReadonlySet<PlayerId> | null = null;
+  /**
+   * True while the field is collapsing. During collapse every core decays on its
+   * own (entropy, GDD §2.3) — that is not an attacker (GDD §2.2), so the core-hit
+   * tells the decay emits must not ring the alarm out of nowhere. A real siege
+   * still rings it: shields and turrets do not decay, so their tells are honest.
+   */
+  private collapsing = false;
   private listenerX = 0;
   private listenerY = 0;
   private hasListener = false;
@@ -237,6 +251,31 @@ export class AudioEngine {
   }
 
   /**
+   * Scope the under-attack alarm to a *side*, not just a slot (developer report
+   * s5, "the alarm fires for ENEMY bases"). The alarm belongs to ownership, not
+   * proximity: it rings only when a station on the local player's side takes
+   * damage. Pass the owner slots on that side — in FFA a set of one (the local
+   * player), in TEAMS the local player and their allies (the sim's `sameSide`
+   * roster). Pass `collapsing` so the endgame's core entropy is not mistaken for
+   * a siege. Called each frame by the presenter from live world truth; with it
+   * never called the alarm falls back to the local player alone (FFA-identical).
+   */
+  setAlarmScope(allies: ReadonlySet<PlayerId>, collapsing: boolean): void {
+    this.alarmAllies = allies;
+    this.collapsing = collapsing;
+  }
+
+  /**
+   * Does damage to a station owned by `player` ring THIS listener's alarm? Your
+   * own home always does; a teammate's does in TEAMS; an enemy or neutral home
+   * never does. With no roster wired, "your side" is just you (FFA).
+   */
+  private alarmRingsFor(player: PlayerId): boolean {
+    if (this.alarmAllies) return this.alarmAllies.has(player);
+    return player === this.local && this.local >= 0;
+  }
+
+  /**
    * Where the camera is, in world units. Sounds fall off from here.
    *
    * Optional — with no listener every sound plays at full level, which is the
@@ -293,8 +332,14 @@ export class AudioEngine {
       const magnitude = tells.magnitude[i]!;
       const player = tells.player[i]!;
 
-      // The alarm hears only your own home taking sustained damage (GDD §2.2).
-      if (player === this.local && this.local >= 0) this.alarm.damage(kind);
+      // The alarm hears only YOUR SIDE's home taking sustained damage (GDD §2.2):
+      // your own, and a teammate's in TEAMS — never an enemy's or a neutral's
+      // (developer report s5). During collapse the core decays on its own, so a
+      // core-hit is entropy, not an attacker (GDD §2.3 vs §2.2) and is not heard;
+      // shields and turrets do not decay, so a real siege still rings it.
+      if (this.alarmRingsFor(player) && !(this.collapsing && kind === TELL.coreHit)) {
+        this.alarm.damage(kind);
+      }
 
       // The soundtrack reads the same queue: combat heats the theme, the waves
       // raise the tension, the collapse and the end turn the arc (`./music`).
@@ -388,6 +433,10 @@ export class AudioEngine {
     this.musicScore.reset();
     this.music?.stop();
     this.lastSpatial = HERE;
+    // Forget last match's side and phase; the presenter re-pushes them on the
+    // first frame of the new one, and until then the alarm is the local player's.
+    this.alarmAllies = null;
+    this.collapsing = false;
   }
 
   // -------------------------------------------------------------------------

@@ -76,6 +76,14 @@ export class ArtPresenter {
 
   private layer: VfxLayer | null = null;
   private unlocker: AudioUnlock | null = null;
+  /** The local player slot — the alarm's "you". Kept so the presenter can derive
+   *  the alarm's side (below) from world truth without another wiring seam. */
+  private local: PlayerId;
+  /** Cached owner slots on the local player's side — the under-attack alarm's
+   *  roster (GDD §2.2, developer report s5). Teams are static for a match, so
+   *  this is built once from the first world seen and reused; cleared on a new
+   *  match or a `setLocal`. `null` = not yet derived. */
+  private alarmAllies: Set<PlayerId> | null = null;
 
   constructor(options: ArtPresenterOptions = {}) {
     const vfx: VfxFieldOptions = {
@@ -84,6 +92,7 @@ export class ArtPresenter {
       ...(options.capacity !== undefined ? { capacity: options.capacity } : {}),
     };
     this.field = new VfxField(vfx);
+    this.local = options.local ?? -1;
     this.observer = new WorldObserver(options.local !== undefined ? { local: options.local } : {});
     this.tells = new TellQueue(TELL_CAPACITY);
 
@@ -137,6 +146,12 @@ export class ArtPresenter {
     this.tells.clear();
     this.observer.observe(world, dt, this.tells);
     this.field.consume(this.tells);
+    // Scope the alarm to the local player's SIDE before the audio hears the tells:
+    // your home and (in TEAMS) a teammate's ring it; an enemy's or a neutral's
+    // never does, and the collapse's core entropy is not an attacker (GDD §2.2,
+    // developer report s5). Teams are static, so the roster is derived once.
+    this.alarmAllies ??= deriveAlarmAllies(world, this.local);
+    this.audio.setAlarmScope(this.alarmAllies, world.match.phase === 'collapse');
     this.audio.consume(this.tells);
     this.field.update(dt);
     this.audio.update(dt);
@@ -185,6 +200,8 @@ export class ArtPresenter {
 
   /** Which slot's home rings the alarm. Set on join, and on a rejoin. */
   setLocal(id: PlayerId): void {
+    this.local = id;
+    this.alarmAllies = null; // the side changed — rebuild it from the next world
     this.audio.setLocal(id);
   }
 
@@ -209,10 +226,38 @@ export class ArtPresenter {
     this.field.reset();
     this.audio.reset();
     this.tells.clear();
+    this.alarmAllies = null; // a new match may re-team the board
   }
 
   /** Drop the mix. The draw layer is the caller's to remove from the scene. */
   dispose(): void {
     this.audio.dispose();
   }
+}
+
+/**
+ * The owner slots on the local player's SIDE — the under-attack alarm's roster
+ * (GDD §2.2, developer report s5). A structural mirror of the sim's `teamOf` /
+ * `sameSide`: art is a leaf and cannot import `src/sim`, but the rule is the same
+ * plain-int `team` table (`ship.team ?? id`, `station.team ?? owner`). In FFA
+ * every player is a team of one, so this is just `{local}` — your home and no
+ * other rings. In TEAMS it also holds each ally's owning slot, so a teammate's
+ * siege rings your klaxon while both enemies' sieges stay silent. A spectator
+ * (`local < 0`) has no side, so the set is empty and nothing rings.
+ */
+function deriveAlarmAllies(world: WorldView, local: PlayerId): Set<PlayerId> {
+  const allies = new Set<PlayerId>();
+  if (local < 0) return allies;
+  allies.add(local); // a player is always on their own side, even with no station left
+
+  const teamOf = (id: number): number => {
+    for (const s of world.ships) if (s.id === id) return s.team ?? s.id;
+    for (const st of world.stations) if (st.owner === id) return st.team ?? st.owner;
+    return id;
+  };
+  const localTeam = teamOf(local);
+  for (const st of world.stations) {
+    if ((st.team ?? st.owner) === localTeam) allies.add(st.owner);
+  }
+  return allies;
 }
