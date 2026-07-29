@@ -364,7 +364,13 @@ export class AudioEngine {
           // wherever on the map a home dies (ratified a3-03).
           this.flat(SOUND.stationDeath, 1);
           if (this.ownsDeath) this.death.trigger();
-          if (player === this.local) this.alarm.silence();
+          // Silence on the same SIDE the alarm rings for (developer report s5):
+          // an alarm still ringing over a dead home tells the player to defend
+          // what no longer exists (`alarm.silence`). Your own home and — in
+          // TEAMS — a teammate's are what could have raised it, so either one
+          // falling stops it; an enemy's or a neutral's never rang it, so its
+          // death changes nothing. Mirrors the ring gate above, `alarmRingsFor`.
+          if (this.alarmRingsFor(player)) this.alarm.silence();
           break;
 
         // --- Everything else -----------------------------------------------

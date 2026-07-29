@@ -966,6 +966,26 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(rings(3)).toBe(false); // …and neither is the other enemy's
   });
 
+  it("silences on a teammate's home death the same as your own — the klaxon never rings over a dead home (TEAMS, s5)", () => {
+    // The alarm rings for your SIDE {0,2}; whichever of those homes raised it,
+    // that home falling must stop it (`alarm.silence`) — else it keeps ringing
+    // over a station that no longer exists. The silence gate mirrors the ring gate.
+    const dies = (owner: number) => {
+      const { ctx, engine } = engineOn({ local: 0 });
+      engine.setAlarmScope(new Set([0, 2]), false);
+      const siege = new TellQueue(4);
+      siege.push(TELL.coreHit, 0, 0, 0, 0.5, owner);
+      run(engine, ctx, 1.5, () => engine.consume(siege)); // it is ringing…
+      expect(engine.alarm.active).toBe(true);
+      const death = new TellQueue(1);
+      death.push(TELL.stationDeath, 0, 0, 0, 1, owner);
+      engine.consume(death); // …the home falls
+      return engine.alarm.active;
+    };
+    expect(dies(0)).toBe(false); // your own home's death silences it (as ever)
+    expect(dies(2)).toBe(false); // a TEAMMATE's home death silences it too — the fix
+  });
+
   it('does not let collapse core-entropy ring the alarm, but a real siege still does (GDD §2.3 vs §2.2)', () => {
     // During collapse every core decays on its own — that is entropy, not an
     // attacker (developer report s5, "alarm out of nowhere"). Core-hit tells the
