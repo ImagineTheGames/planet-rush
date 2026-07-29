@@ -64,7 +64,7 @@ export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
 
 /** The wordmark, in Audiowide (style-guide §5.6) — the one place the game names
  *  itself before a match. */
-export const MAIN_MENU_TITLE = 'STATION RUSH';
+export const MAIN_MENU_TITLE = 'PLANET RUSH';
 
 // ---------------------------------------------------------------------------
 // The per-frame model
