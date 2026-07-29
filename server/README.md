@@ -47,7 +47,23 @@ Two apps, both in this repo's root:
 
 **The one shared secret.** The allocator signs each ticket with `ALLOCATOR_SECRET`;
 this server verifies it with `TICKET_SECRET`. They must be the *same value*. Both
-apps fail closed, so a mismatch refuses every join with no other symptom.
+apps fail closed, so a mismatch refuses every join with no other symptom. The same
+secret also authenticates this server's **fleet-membership** calls (`/register`,
+`/fleet/heartbeat`, `/deregister`): each carries an `X-Fleet-Auth` HMAC over its
+body (`src/net/fleet-auth.ts`), so a stranger cannot register a phantom Machine or
+forge a heartbeat that hijacks a room code's routing. A gameserver with an
+`ALLOCATOR_URL` but no `TICKET_SECRET` cannot sign, so it refuses to join the fleet
+rather than beat requests the allocator would only 401.
+
+**Fleet membership (M10).** A gameserver with `ALLOCATOR_URL` set joins the fleet
+on boot: it `POST`s `/register` to the allocator (authenticated, retried while the
+allocator is still coming up), then heartbeats its rooms and load every 5 s, then
+`POST`s `/deregister` as it exits so the allocator forgets it at once instead of
+waiting out its ~15 s liveness window. `GET /machines` on the allocator lists the
+registered fleet — the operator's (and the deploy pipeline's) answer to "did the
+Machines actually register?", the check the M10 live probe was missing. The drain
+contract above still holds: a Machine cordons and empties its rooms *before* it
+exits, so deregistering strands no live match.
 
 ```bash
 # First deploy (from the repo root; FLY_API_TOKEN is in Actions secrets)

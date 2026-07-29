@@ -220,6 +220,42 @@ export interface HeartbeatBody {
   readonly load: HeartbeatLoad;
 }
 
+/**
+ * What a Machine announces on boot (M10 fleet registration): its identity and the
+ * ceiling it will place under. No room list — a freshly-booted Machine hosts none
+ * yet; its rooms arrive on the heartbeats that follow. Authenticated on the wire
+ * with the shared secret (`src/net/fleet-auth.ts`), like every fleet write.
+ */
+export interface RegistrationBody {
+  readonly machine: string;
+  readonly region: string;
+  readonly capacity: number;
+}
+
+/**
+ * What a Machine sends to `POST /deregister` as it leaves the fleet (M10): just
+ * who it is. The graceful counterpart to being expired by liveness — a Machine on
+ * its way out says so, so the allocator forgets it at once.
+ */
+export interface DeregistrationBody {
+  readonly machine: string;
+}
+
+/** Assemble a boot registration. Pure — no clock, no I/O. Mirrors
+ *  {@link buildHeartbeat}'s cordon rule: a Machine already draining at
+ *  registration announces zero capacity so nothing is ever placed on it. */
+export function buildRegistration(inputs: {
+  readonly identity: MachineIdentity;
+  readonly capacity: number;
+  readonly draining: boolean;
+}): RegistrationBody {
+  return {
+    machine: inputs.identity.machine,
+    region: inputs.identity.region,
+    capacity: inputs.draining ? 0 : inputs.capacity,
+  };
+}
+
 /** Everything {@link buildHeartbeat} needs, gathered by the reporter each beat. */
 export interface HeartbeatInputs {
   readonly identity: MachineIdentity;

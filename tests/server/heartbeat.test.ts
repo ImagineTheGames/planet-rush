@@ -24,6 +24,7 @@ import {
   HeartbeatReporter,
   LagProbe,
   buildHeartbeat,
+  buildRegistration,
   readMachineIdentity,
 } from '../../server/heartbeat';
 import type {
@@ -193,6 +194,20 @@ describe('buildHeartbeat', () => {
     expect(body.draining).toBe(true);
     // ...but the rooms already running stay reachable for joins and reconnects.
     expect(body.rooms).toEqual(rooms);
+  });
+});
+
+describe('buildRegistration (M10)', () => {
+  it('announces identity and capacity, with no room list yet', () => {
+    expect(buildRegistration({ identity: IDENTITY, capacity: 32, draining: false })).toEqual({
+      machine: 'iad-7',
+      region: 'iad',
+      capacity: 32,
+    });
+  });
+
+  it('announces zero capacity when it boots already draining', () => {
+    expect(buildRegistration({ identity: IDENTITY, capacity: 32, draining: true }).capacity).toBe(0);
   });
 });
 

@@ -99,6 +99,26 @@ describe('InMemoryRoomRegistry — liveness (the cache expires)', () => {
   });
 });
 
+describe('InMemoryRoomRegistry — deregistration (the graceful leave, M10)', () => {
+  it('forgets a machine at once, before its liveness window would expire it', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('m-1', ['WXYZ']), 1000);
+    expect(reg.machines(1000)).toHaveLength(1);
+
+    reg.remove('m-1');
+    // Gone immediately at the same instant — no waiting out DEFAULT_LIVENESS_MS.
+    expect(reg.machines(1000)).toEqual([]);
+    expect(reg.locate('WXYZ', 1000)).toBeNull();
+  });
+
+  it('is a no-op for a machine it never knew', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('m-1', ['WXYZ']), 1000);
+    reg.remove('m-2'); // unknown id
+    expect(reg.machines(1000).map((m) => m.machine)).toEqual(['m-1']);
+  });
+});
+
 describe('InMemoryRoomRegistry — reservations (the one owned thing)', () => {
   it('a reservation locates a room before any heartbeat mentions it', () => {
     const reg = new InMemoryRoomRegistry();

@@ -135,6 +135,16 @@ export interface RegistryConfig {
 export interface RoomRegistry {
   /** Ingest a Machine's heartbeat: learn/refresh it and retire any lease it fulfils. */
   observe(hb: Heartbeat, now: number): void;
+  /**
+   * Forget a Machine at once, rather than waiting out its liveness window — the
+   * graceful counterpart to expiry (M10 fleet registration). A Machine that is
+   * shutting down `POST /deregister`s so the allocator stops routing to it the
+   * instant it leaves, not ~15 s later when its last beat lapses; a Machine that
+   * simply dies is still swept by liveness. Unknown ids are a no-op. Leases the
+   * Machine held are left to lapse on their own TTL — a room the Machine was
+   * placed but never confirmed is not something a deregister can speak to.
+   */
+  remove(machine: MachineId): void;
   /** The live fleet at `now` — Machines heard from within the liveness window. */
   machines(now: number): MachineView[];
   /** Which live Machine hosts `room`, by heartbeat first then lease, or `null`. */
@@ -181,6 +191,10 @@ export class InMemoryRoomRegistry implements RoomRegistry {
         this.leases.delete(room.code);
       }
     }
+  }
+
+  remove(machine: MachineId): void {
+    this.views.delete(machine);
   }
 
   machines(now: number): MachineView[] {
