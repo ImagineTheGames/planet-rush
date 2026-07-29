@@ -803,12 +803,55 @@ function initialMatch(): MatchState {
 }
 
 /**
+ * Which fair home slot each player takes, so **teammates spawn adjacent** (TEAMS,
+ * developer report p14 "we should also spawn close together if we are teams").
+ *
+ * A map's live home slots are handed back in spatial-walk order — consecutive
+ * slots are neighbouring positions on the arena (octagon's `2π/N` ring, oval's
+ * angle-sorted rim, the compass/diamond eight-point walks all share this). So
+ * grouping same-team players into **contiguous slot blocks** clusters each team
+ * onto neighbouring homes, while the layout's own rotational symmetry keeps the
+ * clusters equidistant across teams — team A's arc and team B's arc sit opposite
+ * on the ring, exactly the "equal spacing ACROSS teams" fairness rule. Every home
+ * is resource-identical by construction (`spawnHomeFields`), so which owner takes
+ * which slot never changes per-player ore.
+ *
+ * Returns, for each player index, the home slot it occupies. Teams are laid down
+ * in **first-seen order** and players within a team in id order — a pure,
+ * sort-free grouping so replay is deterministic without leaning on `Array.sort`
+ * stability. **FFA is teams-of-one:** every player is its own team, so the grouping
+ * is the identity permutation and an FFA world is byte-for-byte unchanged.
+ */
+function teamHomeSlots(players: readonly PlayerSpec[]): number[] {
+  const order: number[] = []; // team values, in first-seen order
+  const buckets = new Map<number, number[]>(); // team → member player indices
+  players.forEach((p, i) => {
+    const team = p.team ?? p.id;
+    let bucket = buckets.get(team);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(team, bucket);
+      order.push(team);
+    }
+    bucket.push(i);
+  });
+
+  // slot k (spatially the k-th live home) is taken by the k-th player in the
+  // team-grouped walk; invert that to "player i → its home slot".
+  const slotOf = new Array<number>(players.length);
+  let slot = 0;
+  for (const team of order) for (const playerIndex of buckets.get(team)!) slotOf[playerIndex] = slot++;
+  return slotOf;
+}
+
+/**
  * Construct a fresh, deterministic match world. Stations sit evenly around a
  * ring with each player's ship spawning in orbit of its own — inboard of the
  * station, facing the field (GDD §2.1); the opening field is **asteroid wave 1**,
  * scattered in the central disc from the seeded RNG (GDD §2.3 — the remaining
- * four waves arrive on the metronome, each closer to centre). Same config ⇒
- * byte-identical world.
+ * four waves arrive on the metronome, each closer to centre). In TEAMS, teammates
+ * take contiguous home slots so a side spawns clustered ({@link teamHomeSlots}).
+ * Same config ⇒ byte-identical world.
  */
 export function createWorld(config: WorldConfig): World {
   // The layout owns the arena and where the homes sit (`./maps`); everything
@@ -835,10 +878,15 @@ export function createWorld(config: WorldConfig): World {
   const placements = map.stations(config.seed, config.players.length, bounds);
   const homes = placements.filter((p) => !p.derelict);
 
-  // Ships spawn orbiting their live home, one per lobby slot — deterministic, no
-  // RNG. Derelict positions carry no ship.
+  // Which live home each player takes. In FFA this is the identity (teams-of-one),
+  // so the board is unchanged; in TEAMS teammates get contiguous — hence spatially
+  // adjacent — home slots, so a side spawns clustered ({@link teamHomeSlots}).
+  const homeSlotOf = teamHomeSlots(config.players);
+
+  // Ships spawn orbiting their (team-clustered) live home, one per lobby slot —
+  // deterministic, no RNG. Derelict positions carry no ship.
   const ships: Ship[] = config.players.map((spec, i) => {
-    const pos = homes[i]!.ship;
+    const pos = homes[homeSlotOf[i]!]!.ship;
     const ship = makeShip(spec, pos);
     // Face inward toward the field so the opening read is legible.
     ship.angle = Math.atan2(cy - pos.y, cx - pos.x);
@@ -847,18 +895,17 @@ export function createWorld(config: WorldConfig): World {
 
   // A station per board position: a live home for each player (on the same spoke
   // as its ship, outboard of it), and an unowned wreck for each derelict position
-  // — so the layout keeps its shape at any N. The station's array index is its
-  // board id; live homes take ids `0..N-1` (actives are first), matching each
-  // owner id, and derelicts take the remaining ids `>= N`.
+  // — so the layout keeps its shape at any N. The station's array index stays its
+  // board id: live homes keep ids `0..N-1` matching each owner id (so every
+  // `stations[owner]` lookup is unmoved), while the team-clustered slot only moves
+  // where each live station SITS; derelicts take the remaining board ids `>= N`.
   const stations: MiningStation[] = [];
-  let liveIndex = 0;
+  config.players.forEach((spec, i) => {
+    const home = homes[homeSlotOf[i]!]!;
+    stations.push(makeStation(spec, i, home.station, home.angle));
+  });
   placements.forEach((place, index) => {
-    if (place.derelict) {
-      stations.push(makeDerelictStation(index, place.station, place.angle));
-    } else {
-      stations.push(makeStation(config.players[liveIndex]!, index, place.station, place.angle));
-      liveIndex++;
-    }
+    if (place.derelict) stations.push(makeDerelictStation(index, place.station, place.angle));
   });
 
   // Resolve the abundance economy once (ore scarcity, p11). An omitted level reads
