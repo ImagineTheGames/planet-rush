@@ -356,46 +356,67 @@ the offline boot bypasses `MatchConfig` entirely — there is also no in-app sca
 selector yet. So "by default more scarce" is not what the shipped offline game runs today.
 The p11 economy code itself resolves each level correctly (proven in `scarce-default`).
 
-## M3 online, step 4 — a real match over the real internet (build `4d35a3b`)
+## M3 online, step 4 — a real match over the real internet
 
-**The deliverable cannot be met on the current build, and that is the finding.**
-Three online gates — `online-room-create`, `online-two-clients`,
-`online-reconnect` — are **failed**, each verified today against the live Fly
-deployment and the current tree. The netcode itself is sound; three *other*
-things are broken. The developer's two-phone test cannot even be attempted until
-all three are fixed.
+### Re-verify (client build `fcdfe11`, live probe `2026-07-29T09:12Z`)
+
+**The three prior blockers are FIXED — but room-create still fails on live, for a
+fourth reason that the earlier three were masking.** Re-driven from the shipped
+front door (bundle built with `VITE_ALLOCATOR_URL=https://planet-rush-allocator.fly.dev`),
+both form factors, against the live Fly fleet. The three gates stay **failed**.
 
 | Gate | Shot | Result |
 | --- | --- | --- |
-| ONLINE front door renders (CREATE/JOIN/keypad) | `online-front-door` | **verified** — the UI is correct |
-| Netcode protocol + reconnect (Node, localhost) | `online-protocol-local` | **verified** — 16/16 green; isolates the blockers |
-| Room created with a shareable code (live) | `online-room-create` | **failed** — no code minted |
-| Two clients in one live match, same world | `online-two-clients` | **failed** — unreachable |
-| Reconnect mid-match, ship+cargo+bank+upgrades intact (live) | `online-reconnect` | **failed** — untestable |
+| Room created with a shareable code (live) | `online-room-create` | **failed** — CREATE → `network` error, no code minted |
+| Two clients in one live match, same world | `online-two-clients` | **failed** — no host code to join (guest path itself works) |
+| Reconnect mid-match, ship+cargo+bank+upgrades intact (live) | `online-reconnect` | **failed** — no live match to drop from |
 
-**The three blockers (all confirmed on `4bb…`→`4d35a3b`, live probe
-`images/probe-online-live-reverify3.txt`):**
+**What changed since `4d35a3b` — all three prior blockers cleared:**
 
-1. **Live fleet not registered.** The allocator reports `{"machines":0,"regions":[]}`,
-   so `POST /rooms` → `503 no-capacity`. The gameserver is *healthy* (capacity 32,
-   region iad) but never registers with the allocator — the two Fly apps aren't
-   talking. Infra/deploy.
-2. **Allocator has no CORS, in source.** No `access-control`/`OPTIONS` handler
-   anywhere in `allocator/`; on the wire the preflight `OPTIONS /rooms` → `405`
-   with `Access-Control-Allow-Origin` **absent** (even `GET /health` sends none).
-   A browser allocate is refused before it sees any body — this blocks a browser
-   room-create even against a *local* allocator. Code gap, not an ops toggle.
-3. **Client match handoff (m9-09) unwired.** On a successful allocate the shipped
-   client dead-ends at `src/main.ts:4930-4931` — it records `result.connection.room`
-   and **discards** the socket `url` + signed `ticket`. `createOnlineSession`/
-   `WebSocketTransport` have zero production callers; the transport dispatch in
-   `src/ui/index.ts` is commented out. No browser can open a game socket, so
-   two-clients and reconnect are unreachable *from the client as built*,
-   independent of the server.
+1. ~~Fleet not registered~~ → **FIXED.** `GET /machines` lists **two** machines
+   (`6836293b5161d8` + `0800d5b6d62328`, region iad, cap 32); `/health` →
+   `machines:2`. The heartbeat wiring connected.
+2. ~~No CORS in source~~ → **FIXED.** `OPTIONS /rooms` → `204` with
+   `access-control-allow-origin` echoed for the caller origin. The allocator's own
+   replies carry CORS — proven by `POST /rooms/WXYZ/join` → `404 not-found`
+   **with** `access-control-allow-origin`, which the client renders as a clean
+   "No room with that code" (`online-join-desktop.png` / `online-join-phone.png`).
+3. ~~Client match handoff unwired~~ → **FIXED (PR #222).** `startResolve()` now
+   calls `allocateRoom`/`joinRoom` and, on success, `connectMatch()` opens a real
+   `createOnlineSession`/`WebSocketTransport` with the signed ticket — no longer a
+   dead-end that discards `.url`/`.ticket`.
 
-**Netcode is NOT the problem** (`images/online-protocol-local.txt`): the repo's
-own end-to-end tests drive two real client-net-library sessions through a real
-in-process server over real sockets — two-client shared world, reconnect-grace
-(same ship, cargo/ore/upgrades intact), ticket enforcement — 16/16 green. Those
-are Node clients on localhost, so they prove the protocol, not the live
-deliverable. **This M3 gate must stay red until all three blockers are fixed.**
+**The remaining defect — fly-replay breaks the successful allocate.** On Fly the
+allocator answers `POST /rooms` by minting room+ticket JSON **and** attaching a
+`fly-replay` header (`allocator/index.ts` `decided()` merges the `FlyReplayRouter`
+instruction). Fly's edge acts on that header and **re-delivers the POST to a bare
+gameserver machine**, discarding the allocator's JSON. That gameserver has no
+`POST /rooms` handler and no CORS layer (`server/index.ts` serves only `/health` +
+`/drain`, else `200 text/plain "Planet Rush match server — connect a WebSocket to
+play."`). On the wire: `POST /rooms` → `200 text/plain`, **no**
+`access-control-allow-origin`. A browser CORS-blocks that cross-origin reply,
+`fetch()` throws, and `allocator-client` maps a thrown fetch to the `network`
+failure → the red "Can't reach the servers" refusal on `online-create-desktop.png`
+/ `online-create-phone.png` (seam `status:error`, `resolvedCode:null`, zero page
+errors, both form factors).
+
+**Isolation:** the non-replayed JOIN path reaches the allocator and returns a
+clean CORS-correct 404; only the fly-replayed CREATE (success) path fails. This is
+a deploy/routing defect (the allocate HTTP response should not be fly-replayed to
+a server that can't answer it, or that server must mint+CORS the room), **not** the
+client, the CORS source, or the fleet — all now correct. Raw wire probe:
+`images/probe-online-live-reverify-m10.txt`. **This M3 gate must stay red until the
+allocate reaches the browser intact.**
+
+---
+
+### Original finding (build `4d35a3b`) — three blockers, now historical
+
+The gates first failed on three blockers, each since fixed (see re-verify above):
+(1) the live fleet was unregistered (`{"machines":0}` → `503 no-capacity`);
+(2) the allocator had no CORS in source (`OPTIONS /rooms` → `405`, ACAO absent);
+(3) the client match handoff was unwired (`src/main.ts` discarded the socket
+`url` + `ticket`). Netcode was never the problem — `images/online-protocol-local.txt`
+shows the repo's own end-to-end tests (two real client sessions, shared world,
+reconnect-grace, ticket enforcement) 16/16 green on Node/localhost, isolating every
+failure to deploy + client wiring. Artifact: `images/probe-online-live-reverify3.txt`.
