@@ -1304,13 +1304,30 @@ export const WEDGE_SLIDE_SPEED: Tunable<number> = 52;
  * surface to a pinned ship — enough to walk a grinding hull off the rim within
  * a fraction of a second (clearing the `unstuck` invariant's few-unit wedge
  * window quickly) yet gentle enough to read as a slide, not a launch. Added as
- * velocity along the contact tangent, so drag bleeds it the instant the pilot
- * stops pressing in; it self-limits, because a ship already sliding at this
- * speed is above `WEDGE_SLIDE_SPEED` and no longer counts as pinned. Handedness
+ * velocity along the contact tangent and RAMPED to zero as the hull's speed
+ * approaches `WEDGE_SLIDE_SPEED`, so it self-limits and stays continuous at the
+ * threshold; drag bleeds it the instant the pilot stops pressing in. Handedness
  * is fixed (counter-clockwise about the contact normal) so the response is fully
  * deterministic — no RNG, no clock (GDD §4.1, §4.8). TUNABLE
  */
 export const WEDGE_SLIDE_KICK: Tunable<number> = 60;
+
+/**
+ * Seconds a ship must be CONTINUOUSLY grinding a body — pressing into it while
+ * held to near-stillness — before the escape hatch engages and slides it off
+ * (`Ship.wedgeContactS`). The gate is on *persistent* contact, not any contact,
+ * for two reasons. First, the report's wedge is a permanent pin (a whole match),
+ * so a half-second grace loses nothing while cleanly excluding the everyday
+ * touch: a ship bounces off a rock, brushes a station rounding it, or overshoots
+ * an anchor and settles — all sub-threshold, all left exactly as they were.
+ * Second and decisively, the netcode predicts collisions off snapshots whose
+ * positions are quantized to whole units; a slide that fired on *every* momentary
+ * contact would turn that sub-unit quantization into a standing prediction error
+ * (`src/net/prediction`). Kept well above the longest transient grind a bounce
+ * produces (~0.2 s at cruise) and an order of magnitude below the multi-second
+ * pin it kills. TUNABLE
+ */
+export const WEDGE_CONTACT_S: Tunable<number> = 0.5;
 
 // ---------------------------------------------------------------------------
 // Weapon acquisition range (GDD §2.4 — auto-aim engagement radius)
