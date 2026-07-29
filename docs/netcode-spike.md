@@ -235,3 +235,167 @@ the server.
 ---
 
 ## DECISION: sim 60 Hz / snapshot broadcast 30 Hz · snapshot budget 512 B (measured 510 B worst case) · host = Oracle Cloud Always Free (ARM Ampere A1), fallback = ~€4/mo Hetzner VPS — both run the identical Dockerized Node process, so switching is an afternoon (risk 1).
+
+> **The host line above is superseded — Oracle → Fly.io.** See
+> *Status since (hosting, 2026-07-25)* below for the change and, more to the
+> point, *why it is a scope change and not a correction*. Everything else in the
+> DECISION stands and has since been measured against the real workload.
+
+---
+
+## Status since (hosting, 2026-07-25)
+
+This is the spike closing the items it left **explicitly open** — the ones the
+day-3 notes above promised as "a test to run, not a thing to build". The document
+keeps its habit: what has been measured is stated as a number, and what still
+needs the live link is stated as *open*, not quietly closed. Full context lives in
+`docs/hosting-plan.md`; the reproducible pieces live in the repo:
+
+```
+npx vitest run tests/harness/fleet-density.test.ts   # room density + real-workload tick cost
+npx vitest run tests/net                              # online play + reconnect-resume, real socket
+```
+
+### The host supersession — Oracle → Fly, and why it is a scope change
+
+The day-0 analysis chose Oracle Always Free for a **single** always-on server:
+one bare VM, zero cost, no vendor lock, portable by construction. That analysis
+was not wrong for the question it answered. The question then changed. M9 turned
+"one server" into a **fleet**: an allocator control plane, several match Machines,
+per-room routing with signed tickets, heartbeats, cordon-and-drain lifecycle, and
+a reconnect room-liveness probe (`allocator/`, `src/net/allocator-client.ts`,
+`server/heartbeat.ts`). A single bare VM does not *have* the primitives that fleet
+needs, so on Oracle we would have had to *build* them by hand:
+
+| Fleet needs | Fly gives it | On a bare Oracle VM |
+|---|---|---|
+| Per-Machine identity a ticket routes to | `FLY_MACHINE_ID` / `FLY_REGION`, injected (`server/heartbeat.ts` falls back to them) | hand-assign and distribute `MACHINE_ID` / `REGION` per host |
+| Private allocator↔Machine link | 6PN private DNS (`*.internal`) — `ALLOCATOR_URL=http://planet-rush-allocator.internal:8080` | stand up and secure our own overlay network |
+| `wss://` for clients | anycast edge terminates TLS at the app hostname, free | run caddy/traefik + distribute a certificate |
+| Machine lifecycle for the controller | a Machines API the fleet controller drives (`allocator/provider-fly.ts`) | script VM create/destroy against a VM API by hand |
+
+**The portability contract is intact, which is the whole point of risk 1.** The
+game server is *still* a plain Dockerized Node process with zero vendor-specific
+APIs — nothing in `server/` imports a Fly SDK; the Fly-ness is entirely in
+environment variables (`fly.gameserver.toml`) that a plain VPS supplies explicitly
+instead. `server/heartbeat.ts` reads `MACHINE_ID ?? FLY_MACHINE_ID`, so the same
+image runs on Fly and on the **€4 Hetzner fallback, which remains the standing
+paid baseline** — the afternoon-to-redeploy escape hatch the day-0 doc insisted on
+is exactly as open as it was. Fly is not a lock-in; it is the host that already
+*implements* the fleet shape the single-server host would have made us implement.
+Cloudflare DO stays rejected for the same reason as day 0 (not a plain Node
+process). So: **scope grew from server to fleet; the host followed the scope.**
+
+### 1. Tick headroom against the REAL workload — CLOSED
+
+Day 0 flagged the headroom as measured against the *stand-in* sim, not "the real
+sim plus server-side bot AI plus 8-socket fan-out". `tests/harness/fleet-density.test.ts`
+now measures the real thing: real `MatchRoom`s (the exact object `server/index.ts`
+hosts), each running eight **Hard** bots — the worst case, because a bot runs its
+behaviour tree server-side every tick and costs *more* than a human's one dequeued
+input. The real snapshot **encode** runs every broadcast tick regardless of socket
+count, so it is billed; the per-socket **send** fan-out is the cheap half a human
+seat trades *into* (bot → human swaps a behaviour tree for one buffer copy), so a
+bot-only room is the true CPU ceiling.
+
+Measured on the same i9-14900HX dev core the day-0 table used:
+
+```
+per room, 8 Hard bots, steady-state (past spawn protection, live combat):
+  ~0.043 ms per room per 60 Hz tick
+32-room fleet (the new DEFAULT_MAX_ROOMS):
+  mean 1.4 ms/tick  (8.3% of the 16.67 ms budget) · p99 2.9 ms (17.6%)
+64-room fleet (the previous ceiling), for comparison:
+  mean 2.95 ms/tick (18%)  · p99 6.8 ms (41%)
+```
+
+The day-0 "50× heavier real workload" fear was pessimistic: the real room is
+~0.043 ms/tick, so eight Hard bots + encode are **~3× the stand-in step**, not
+50×. Headroom holds with room to spare — closed.
+
+### 2. Room density, MEASURED → DEFAULT_MAX_ROOMS 64 → 32
+
+The old `DEFAULT_MAX_ROOMS = 64` comment cited the spike's *stand-in* estimate.
+The measurement replaces it. Extrapolating the fleet cost to the deploy target —
+a shared-cpu-1x Fly guest, taken at the day-0 §2 estimate of **~5× slower** than
+this dev core:
+
+```
+32 rooms @5×:  mean ~7.0 ms/tick (~42% of budget)  ← chosen ceiling, real headroom
+64 rooms @5×:  mean ~14.7 ms/tick (~88% of budget) ← too close to saturation
+```
+
+At 64 the estimated target core sits at ~88% of the tick budget on the *sustained*
+(mean) cost — the number the `/health` `loopLagMs` gate watches — with no margin
+for memory, socket fan-out, GC, or a noisy shared neighbour. That is not a *hard*
+ceiling; it is a coin toss. **32** lands near ~42%, a ~2.3× margin, so
+`server/match-server.ts` now sets `DEFAULT_MAX_ROOMS = 32` with the measurement in
+its comment. **Still open, and stated:** the 5× is a documented *estimate*, not a
+measurement of the real guest — item 4 is what turns it into a number, and the
+`fly.gameserver.toml` guest comment still reads "≤64", which the live gate will
+reconcile (raise the ceiling on a performance CPU, or ratify 32 on the shared one).
+
+### 3. Sustained CPU gate (20 min on the real guest) — INSTRUMENTED, OPEN
+
+The load signal is now on the front door: `/health` reports `loopLagMs`, the p99
+event-loop lag over the recent window (`server/index.ts`, `server/heartbeat.ts`).
+That is the reading a short burst hides — a shared vCPU passes for a minute on
+burst credit, then falls to its low baseline once the credit is spent, and only a
+*sustained* watch catches it. The gate: run **one 8-player match for a full 20
+minutes** against the deployed Fly Machine and poll `/health`; healthy is a few ms,
+and a breach of **~8 ms** is the sign the shared core has run out of credit, at
+which point the app moves to a **performance CPU size** — affordable at one region
+and exactly the trade `fly.gameserver.toml` anticipates. **Open, and honestly so:**
+the 20-minute duration *is* the test (a short run passes on burst credit and proves
+nothing), and it must run on the real guest, which this repo's CI cannot stand up.
+The instrument is shipped and the procedure is fixed; the number is owed.
+
+### 4. TCP head-of-line on a REAL lossy network — STILL OPEN, still stated
+
+Unchanged in status from day 0, and this document will keep saying so until it is
+run over a genuinely lossy link. What *is* now true: the full online stack runs
+end to end over a real socket — `tests/net/online-2p.test.ts` (two clients, real
+`node:http` + RFC 6455 + `MatchServer`) and `tests/net/reconnect-resume.test.ts`
+(item 5) — so there is nothing left to *build* to run the HoL test; there is only a
+lossy link to run it *over*. **Loopback and a LAN socket do not drop packets**, so
+risk 3 itself remains unmeasured. The way to close it is fixed: put a lossy shaper
+in the path (a `tc netem` egress rule, or a delay/drop proxy) between eight real
+clients and the deployed Machine, and watch whether a dropped TCP segment's ~1-RTT
+retransmit stall is, as argued, only a *stale rival* rather than a freeze —
+prediction keeps the local ship at 60 Hz, and the next full-state snapshot recovers
+without a delta chain. If it bites at 8 players, geckos.io (UDP/WebRTC) drops in
+behind the same `Transport` seam. Owed, not assumed.
+
+### 5. Reconnect-resume, end to end — DONE in-process, live run OPEN
+
+The ship-comes-back-with-cargo guarantee (GDD §4.2) now has an end-to-end proof
+over a real socket: `tests/net/reconnect-resume.test.ts` kills the underlying TCP
+socket mid-match (a blip, not a deliberate leave), lets `WebSocketTransport`'s own
+backoff redial and reclaim, and asserts the reclaimed authoritative `Ship` is the
+**same object** the player flew — so its hull, cargo, banked ore and upgrade tiers
+are exactly as left, because the world was never rebuilt, only its pilot swapped
+and swapped back. Against a deployed Fly Machine this is the identical handshake
+over `wss://`; that **live-deploy pass is the open half** — the guarantee is proven
+against the real stack in-process, not yet against the real network.
+
+### 6. Client server-URL config — DONE
+
+`src/net/server-url.ts` resolves the direct-connect match-server URL from, in
+order: a `?server=` query override (repoint a shipped build at a staging Machine
+or a colleague's laptop **without rebuilding** — testing's one knob), the
+build-time `VITE_SERVER_URL` default a production build bakes in, then a
+same-origin fallback for dev and the simplest self-host. Pure and injected like
+the rest of `src/net/`, tested in `src/net/server-url.test.ts`. The allocator path
+is unaffected — a fleet's URL still comes from the signed `ResolvedConnection`
+(`src/net/allocator-client.ts`); this is the seam the single/self-hosted server and
+local dev dial through.
+
+### Still open, gathered in one place (the day-0 habit)
+
+- **Risk 3 (TCP HoL)** — unmeasured until run over a real lossy link (item 4).
+- **Sustained CPU** — `loopLagMs` shipped; the 20-minute live gate is owed (item 3).
+- **The 5× target-core factor** — an estimate feeding DEFAULT_MAX_ROOMS = 32; the
+  live gate measures the real guest and reconciles the ceiling (and the
+  `fly.gameserver.toml` "≤64" comment) up or down.
+- **Reconnect-resume live** — proven in-process; the deployed `wss://` pass owed
+  (item 5).

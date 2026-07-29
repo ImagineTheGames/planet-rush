@@ -78,6 +78,16 @@ const startedAt = Date.now();
  *  capacity so the allocator places nothing new on it while its rooms empty. */
 const cordon = new Cordon();
 
+// The load signal (M9): sample how far past its deadline the event loop runs, at
+// a steady cadence. The gap between the interval we asked for and the time that
+// actually elapsed *is* the lag — the one reading that catches a throttled shared
+// vCPU, which a CPU percentage hides. `performance.now()` is monotonic, so it is
+// immune to a wall-clock step. Built before the HTTP server so `/health` can read
+// it: the sustained-CPU gate (docs/netcode-spike.md, hosting Task 12) watches this
+// number over a full match to tell a healthy shared core from a credit-exhausted
+// one that has fallen back to its low baseline.
+const lag = new EventLoopLagMonitor();
+
 const http = createServer((request: IncomingMessage, response: ServerResponse) => {
   // Plain HTTP routes, so a health check or a cordon never has to speak WebSocket.
   if (request.url === '/health') {
@@ -90,6 +100,11 @@ const http = createServer((request: IncomingMessage, response: ServerResponse) =
         rooms: matches.roomCount,
         capacity: matches.capacity,
         draining: cordon.draining,
+        // p99 event-loop lag over the recent window, ms. The number the sustained
+        // 20-minute CPU gate watches: healthy is a few ms; a breach of ~8 ms is the
+        // sign a shared core has run out of burst credit and the fleet needs a
+        // performance CPU size (docs/netcode-spike.md, "Status since (hosting)").
+        loopLagMs: Math.round(lag.p99() * 100) / 100,
         uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       }),
     );
@@ -117,12 +132,8 @@ attachWebSocketServer(http, (connection) => {
 
 const loop = setInterval(() => matches.update(Date.now()), LOOP_INTERVAL_MS);
 
-// The load signal (M9): sample how far past its deadline the event loop runs, at
-// a steady cadence. The gap between the interval we asked for and the time that
-// actually elapsed *is* the lag — the one reading that catches a throttled shared
-// vCPU, which a CPU percentage hides. `performance.now()` is monotonic, so it is
-// immune to a wall-clock step.
-const lag = new EventLoopLagMonitor();
+// The lag monitor was built above (so `/health` can read it); the probe that feeds
+// it a monotonic reading on a cadence lives here with the other timers.
 const lagProbe = new LagProbe(lag, DEFAULT_LAG_SAMPLE_INTERVAL_MS);
 const lagTimer = setInterval(() => lagProbe.sample(performance.now()), DEFAULT_LAG_SAMPLE_INTERVAL_MS);
 lagTimer.unref();

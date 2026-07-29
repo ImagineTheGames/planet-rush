@@ -129,9 +129,22 @@ export interface MatchServerConfig {
   readonly machineId?: MachineId;
 }
 
-/** Default room ceiling. Eight players × this is comfortably inside a free-tier
- *  ARM core's budget at the measured per-room cost (docs/netcode-spike.md). */
-export const DEFAULT_MAX_ROOMS = 64;
+/**
+ * Default room ceiling — a **measured** number, not the day-0 stand-in estimate
+ * it replaced. `tests/harness/fleet-density.test.ts` stands up this many real
+ * rooms, each running eight Hard bots (the worst case: bot AI runs server-side
+ * and costs more than a human's input), and times one 60 Hz tick of the whole
+ * fleet. At 32 the fleet costs ~1.5 ms/tick on the i9 dev core (~9% of the
+ * 16.67 ms budget); the ~5×-slower shared-cpu-1x Fly guest the fleet deploys to
+ * lands near ~45% of budget on the sustained (mean) cost the /health `loopLagMs`
+ * gate watches — real headroom for a *hard* ceiling that must also absorb memory,
+ * socket fan-out, and a noisy shared host. 64 (the previous value) measured out to
+ * ~88% of the estimated target core at p99-adjacent load: too close to saturation
+ * to be a ceiling. A performance CPU size lifts this (docs/netcode-spike.md,
+ * "Status since (hosting)" — the live 20-minute sustained-CPU gate can re-raise it
+ * once the real guest is measured).
+ */
+export const DEFAULT_MAX_ROOMS = 32;
 
 /**
  * The per-room shape a *new*-room join asks for (variable-slots Task C1): the
