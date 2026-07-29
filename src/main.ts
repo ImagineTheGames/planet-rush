@@ -767,6 +767,7 @@ async function boot(): Promise<void> {
     installUpgradeWheelStage();
     installPressStage();
     installRepairStage();
+    installRadarWedgeStage();
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
@@ -3338,6 +3339,132 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__repairStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__radarWedgeStage` — the ?debug=1 live-stage seam for the
+   * RESTORED RADAR (satellite) build wedge (p13 regression), the same discipline as
+   * {@link installRepairStage} and driven by REAL clicks (the p1a rule). A unit test
+   * proves the wheel MODEL carries the fifth wedge again (src/ui/build-wheel.test.ts);
+   * what only a boot can prove is the whole live wiring the wedge silently vanished
+   * inside of — that the shipped bundle DRAWS the RADAR wedge, routes a genuine
+   * pointer press on it into one satellite build order, the sim's fog then LIFTS (a
+   * new coverage disc on the real minimap pipeline), and when the satellite is shot
+   * down the wedge RE-ARMS ("1/1" → "0/1", pressable again) as the fog RETURNS. That
+   * is exactly the "green model, dead on the real client" class the wedge was lost to
+   * for four versions, and it lives nowhere a unit test can reach.
+   *
+   * It parks the ship docked, funds the bank, and opens the Build wheel so the RADAR
+   * wedge draws and can be hit — then hands back the wedge the view DREW this frame
+   * ({@link Hud.debugBuildWedges}, its "0/1" count line + pressable flag), the LIVE
+   * fog counts off the real minimap ({@link Hud.debugMinimap}, coverage discs +
+   * sensed satellites), the sim's own satellite count, and the client point to click.
+   * Runs WITHOUT ?freeze so the sim steps and the build order actually resolves and
+   * the satellite constructs; it reads fog off the real pipeline, so the seam cannot
+   * fake the wiring it proves. Methods:
+   *
+   *  - `stage(banked)` — park docked at rest, bank `banked` ore, lift station spawn
+   *    protection (so a later kill lands), open the Build wheel. Returns the
+   *    satellite cost + the staged bank, or null when there is no ship/station.
+   *  - `radarWedgePoint()` / `radarWedgeClientPoint()` — the RADAR wedge centre in
+   *    LOGICAL and CLIENT (physical CSS) space, the real-click door on both form
+   *    factors (identity on desktop, un-rotated under the portrait landscape lock).
+   *  - `wedge()` — the RADAR wedge the real view drew this frame (label, its "0/1"
+   *    count line, pressable flag, cost).
+   *  - `fog()` — the live minimap fog counts this frame: coverage discs drawn (grows
+   *    when the satellite goes live) and sensed radar-satellite dots.
+   *  - `satelliteCount()` — satellites standing OR building on the local station (the
+   *    sim's count, which the wedge's "0/1" mirrors — 1 the instant the order lands).
+   *  - `killSatellite()` — shoot the built satellite down (zero its HP), so it stops
+   *    being a sensor source: the coverage disc collapses and the wedge re-arms.
+   *
+   * Behind ?debug=1, never in a normal build; it mutates only the plain sim data the
+   * boot path already reads and never reaches into src/sim beyond `satelliteCount`.
+   */
+  function installRadarWedgeStage(): void {
+    const RADAR_INDEX = WHEEL_ORDER.indexOf('satellite');
+    const localStation = () => stationOf(world, LOCAL_PLAYER);
+    const parkDockedOpen = () => {
+      const ship = world.ships.find(isLocalShip);
+      const station = localStation();
+      if (!ship || !station) return null;
+      ship.alive = true;
+      ship.pos.x = station.pos.x + (station.radius + ship.radius + 30);
+      ship.pos.y = station.pos.y;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      docked = true; // the wheel opens at your own station and nowhere else
+      if (!buildWheel.open) buildWheel.toggle();
+      buildWheel.closePanel(); // land on the main wheel, where RADAR lives
+      return { ship, station };
+    };
+    const stage = {
+      stage(banked: number): { cost: number; banked: number } | null {
+        const parked = parkDockedOpen();
+        if (!parked) return null;
+        const { ship, station } = parked;
+        ship.cargo = 0;
+        ship.banked = banked;
+        // Lift match-start spawn protection (GDD §2.1) so a later satellite kill
+        // lands the REAL way rather than being no-op'd in the opening seconds.
+        station.spawnProtect = 0;
+        return { cost: SATELLITE.cost, banked: ship.banked };
+      },
+      radarWedgePoint(): { x: number; y: number } | null {
+        if (RADAR_INDEX < 0) return null;
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const radius = wheelRadius(w, h);
+        const angle = segmentAngle(RADAR_INDEX);
+        // 0.6 of the outer radius sits inside the segment ring where the wedge's
+        // words are drawn — the honest middle of the pressable wedge.
+        return {
+          x: w / 2 + Math.cos(angle) * radius * 0.6,
+          y: h / 2 + Math.sin(angle) * radius * 0.6,
+        };
+      },
+      radarWedgeClientPoint(): { x: number; y: number } | null {
+        // The wedge centre in CLIENT (physical CSS) space, so a real tap lands on it
+        // on EITHER form factor: the logical point rotated back through
+        // `logicalToPhysical` (identity on desktop, un-rotated on a portrait phone
+        // under the landscape lock), then offset by the canvas rect — the exact
+        // inverse of the `toLogical` every real pointer crosses.
+        const logical = stage.radarWedgePoint();
+        if (!logical) return null;
+        const p = logicalToPhysical(logical.x, logical.y, transform);
+        const rect = app.canvas.getBoundingClientRect();
+        return { x: p.x + rect.left, y: p.y + rect.top };
+      },
+      wedge(): { label: string; sub: string; ready: boolean; cost: number | null } | null {
+        const drawn = hud.debugBuildWedges().find((w) => w.id === 'satellite');
+        return drawn ? { label: drawn.label, sub: drawn.sub, ready: drawn.ready, cost: drawn.cost } : null;
+      },
+      fog(): { coverageCount: number; satelliteCount: number } | null {
+        const m = hud.debugMinimap();
+        return { coverageCount: m.coverageCount, satelliteCount: m.satelliteCount };
+      },
+      satelliteCount(): number {
+        const station = localStation();
+        return station ? satelliteCount(station) : 0;
+      },
+      killSatellite(): boolean {
+        const station = localStation();
+        const sat = station?.satellites?.[0];
+        if (!sat) return false;
+        sat.hp = 0;
+        return true;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__radarWedgeStage', {
         value: stage,
         writable: false,
         configurable: false,
