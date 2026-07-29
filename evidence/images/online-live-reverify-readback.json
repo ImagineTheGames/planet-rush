@@ -1,0 +1,103 @@
+{
+  "base": "http://localhost:4173",
+  "forms": {
+    "desktop": {
+      "door": {
+        "visible": true,
+        "screen": "home",
+        "status": "idle",
+        "error": "",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createConnecting": {
+        "visible": true,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createSettled": {
+        "visible": true,
+        "screen": "home",
+        "status": "error",
+        "error": "Can’t reach the servers. Check your connection — PLAY SOLO still works.",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createErrors": [],
+      "joinKeypad": {
+        "visible": true,
+        "screen": "join",
+        "status": "idle",
+        "error": "",
+        "code": "WXYZ",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "joinSettled": {
+        "visible": true,
+        "screen": "join",
+        "status": "error",
+        "error": "No room with that code. Check it and try again.",
+        "code": "WXYZ",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "joinErrors": []
+    },
+    "phone": {
+      "door": {
+        "visible": true,
+        "screen": "home",
+        "status": "idle",
+        "error": "",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createConnecting": {
+        "visible": true,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createSettled": {
+        "visible": true,
+        "screen": "home",
+        "status": "error",
+        "error": "Can’t reach the servers. Check your connection — PLAY SOLO still works.",
+        "code": "",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "createErrors": [],
+      "joinKeypad": {
+        "visible": true,
+        "screen": "join",
+        "status": "idle",
+        "error": "",
+        "code": "WXYZ",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "joinSettled": {
+        "visible": true,
+        "screen": "join",
+        "status": "error",
+        "error": "No room with that code. Check it and try again.",
+        "code": "WXYZ",
+        "resolvedCode": null,
+        "regionPickerVisible": false
+      },
+      "joinErrors": []
+    }
+  }
+}

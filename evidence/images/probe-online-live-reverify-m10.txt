@@ -1,0 +1,40 @@
+RAW WIRE PROBE — live M10 online re-verify
+captured: 2026-07-29T09:12:22Z   client buildSha: fcdfe11 (bundle built with VITE_ALLOCATOR_URL=https://planet-rush-allocator.fly.dev)
+===================================================================
+
+### BLOCKER 1 (was: fleet not registered) — NOW FIXED
+$ curl https://planet-rush-allocator.fly.dev/health
+{"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":2782}
+$ curl https://planet-rush-allocator.fly.dev/machines
+{"machines":[{"machine":"6836293b5161d8","region":"iad","capacity":32,"rooms":0,"lastSeen":1785316341752},{"machine":"0800d5b6d62328","region":"iad","capacity":32,"rooms":0,"lastSeen":1785316342670}]}
+$ curl https://planet-rush-gameserver.fly.dev/health
+{"status":"ok","machine":"0800d5b6d62328","region":"iad","rooms":0,"capacity":32,"draining":false,"loopLagMs":1.08,"uptimeSeconds":2742}
+  => allocator reports machines:2, both region iad cap 32. The fleet IS registered.
+
+### BLOCKER 2 (was: no CORS in source) — NOW FIXED for the allocator's own responses
+$ curl -X OPTIONS https://planet-rush-allocator.fly.dev/rooms  -H 'Origin: http://localhost:4173' -H 'Access-Control-Request-Method: POST'
+HTTP/2 204 
+access-control-allow-origin: http://localhost:4173
+vary: Origin
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-headers: content-type
+access-control-max-age: 86400
+  => 204 + access-control-allow-origin echoed. Preflight now PASSES (was 405).
+
+$ curl -X POST https://planet-rush-allocator.fly.dev/rooms/WXYZ/join  -H 'Origin: http://localhost:4173'   (non-existent room, NOT fly-replayed)
+HTTP/2 404 
+content-type: application/json
+access-control-allow-origin: http://localhost:4173
+  body: {"error":"not-found"}
+  => 404 application/json WITH access-control-allow-origin. The allocator answers the browser DIRECTLY and CORS-correctly.
+
+### THE REMAINING BLOCKER — fly-replay breaks the successful allocate (POST /rooms)
+$ curl -X POST https://planet-rush-allocator.fly.dev/rooms  -H 'Origin: http://localhost:4173' -d '{}'   (success path => fly-replay)
+HTTP/2 200 
+content-type: text/plain
+  body: Planet Rush match server — connect a WebSocket to play.
+  => 200 text/plain, NO access-control-allow-origin. This is the GAMESERVER root reply:
+     the allocator set a fly-replay header, Fly re-delivered the POST to a bare gameserver
+     machine (which has no /rooms handler and no CORS layer), and the minted room+ticket JSON
+     the allocator computed is discarded. A browser rejects this ACAO-less cross-origin reply,
+     fetch() throws, and the client shows the 'network' refusal ("Can't reach the servers").
