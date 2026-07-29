@@ -1,8 +1,8 @@
-=== FRESH LIVE WIRE PROBE — self-witnessed re-verify 2026-07-29T13:15Z (buildSha fcdfe11) ===
-host: planet-rush-allocator.fly.dev / planet-rush-gameserver.fly.dev
+=== FRESH LIVE WIRE PROBE — 2026-07-29T13:21:44Z — code HEAD fcdfe11 (byte-unchanged) ===
+(evidence/probe-online-live.mjs, self-witnessed against real Fly apps)
 
 === allocator health / regions ===
-GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":17424}
+GET /health : HTTP 200 {"status":"ok","machines":2,"rooms":0,"reservations":0,"uptimeSeconds":17744}
 GET /regions: HTTP 200 {"regions":[{"region":"iad","machines":2,"capacity":64,"rooms":0,"free":64}]}
 === browser CORS reachability (what a real client hits first) ===
 OPTIONS /rooms (preflight): HTTP 204 ACAO=(absent)

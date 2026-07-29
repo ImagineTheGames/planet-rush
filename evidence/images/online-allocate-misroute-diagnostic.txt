@@ -1,22 +1,23 @@
-=== FRESH ALLOCATE-MISROUTE DIAGNOSTIC — self-witnessed re-verify 2026-07-29T13:15Z (buildSha fcdfe11) ===
+=== FRESH ALLOCATE-MISROUTE DIAGNOSTIC — 2026-07-29T13:22:07Z ===
+(evidence/probe-allocate-misroute.mjs, self-witnessed)
 
 
 POST /rooms (json {}): HTTP 200
-  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:16:44 GMT","fly-request-id":"01KYQ0ACTM8ECA14MH6T0CVZ7Y-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:22:08 GMT","fly-request-id":"01KYQ0M9MQ3FQER3JR0KT0CD4W-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
   body: "Planet Rush match server — connect a WebSocket to play.\n"
 
 POST /rooms (no body): HTTP 200
-  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:16:44 GMT","fly-request-id":"01KYQ0AD0EPRB3XYA72W31PBGJ-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:22:08 GMT","fly-request-id":"01KYQ0M9SXQFWBYBTY8C59N9ZY-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
   body: "Planet Rush match server — connect a WebSocket to play.\n"
 
 POST /rooms (region iad): HTTP 200
-  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:16:44 GMT","fly-request-id":"01KYQ0AD5Z5FETXA6M33V6SSP1-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:22:09 GMT","fly-request-id":"01KYQ0M9YY6D3MV4DDHXV1HEGK-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
   body: "Planet Rush match server — connect a WebSocket to play.\n"
 
 GET /rooms: HTTP 405
-  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"application/json","date":"Wed, 29 Jul 2026 13:16:44 GMT","fly-request-id":"01KYQ0ADAXKM96AHZSR2JX4BSJ-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"application/json","date":"Wed, 29 Jul 2026 13:22:09 GMT","fly-request-id":"01KYQ0MA4K3DRMXFVS0BRTKGX8-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
   body: "{\"error\":\"method-not-allowed\"}"
 
 GET gameserver root: HTTP 200
-  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:16:45 GMT","fly-request-id":"01KYQ0ADJNHX2W3E4N14X2RE61-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
+  headers: {"connection":"keep-alive","content-encoding":"br","content-type":"text/plain","date":"Wed, 29 Jul 2026 13:22:09 GMT","fly-request-id":"01KYQ0MABWH5B7PP70H47FM9B9-gru","keep-alive":"timeout=5","server":"Fly/3d7232b6e (2026-07-27)","transfer-encoding":"chunked","via":"1.1 fly.io, 1.1 fly.io"}
   body: "Planet Rush match server — connect a WebSocket to play.\n"
