@@ -1,0 +1,13 @@
+
+ RUN  v2.1.8 /lanes/lane-1
+
+ ✓ tests/server/ticket-enforcement.test.ts (11 tests) 6ms
+ ✓ tests/net/reconnect-resume.test.ts (1 test) 295ms
+ ✓ tests/net/online-2p.test.ts (1 test) 1744ms
+   ✓ a two-player online match > runs end-to-end against a locally-run server, each client predicting its own ship 1744ms
+
+ Test Files  3 passed (3)
+      Tests  13 passed (13)
+   Start at  07:09:25
+   Duration  5.73s (transform 1.79s, setup 0ms, collect 4.75s, tests 2.05s, environment 0ms, prepare 4.75s)
+
