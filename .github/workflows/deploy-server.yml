@@ -64,6 +64,9 @@ jobs:
       - name: Deploy allocator (control plane first)
         run: flyctl deploy --config fly.allocator.toml --remote-only
 
+      - name: Allocator is a SINGLE machine (in-memory registry; 2 machines = split brain)
+        run: flyctl scale count 1 --app planet-rush-allocator --yes || true
+
       - name: Deploy gameserver fleet
         run: flyctl deploy --config fly.gameserver.toml --remote-only
 
