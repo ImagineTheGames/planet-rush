@@ -96,10 +96,14 @@ export const BLOCK_GAP = 12;
 /** Gap between two roster rows, and between two hull tiles. */
 export const ROW_GAP = 6;
 
-/** Title band: wordmark on the left, room code on the right. */
+/** Title band: BACK on the far left, wordmark beside it, room code on the right. */
 export const TITLE_HEIGHT = 52;
 /** Room-code block width — `ROOM` over a 26px code, right-aligned. */
 export const ROOM_CODE_WIDTH = 132;
+/** BACK button width — the lobby's exit to the main menu (u2 menu-back), carved
+ *  off the far left of the title band. Compact, so the wordmark and the room code
+ *  keep their room; the same left-anchored corner every screen puts its exit in. */
+export const LOBBY_BACK_WIDTH = 64;
 
 /** Roster row height ceiling — rows are capped here and compress below it on a
  *  short screen; there is deliberately no floor (see the file header). */
@@ -266,6 +270,9 @@ export interface LobbyLayout {
   readonly content: Rect;
   /** Wordmark band (left of the room code). */
   readonly title: Rect;
+  /** BACK — the lobby's exit to the main menu (u2 menu-back), carved off the far
+   *  left of the title band; the wordmark sits to its right. */
+  readonly leave: Rect;
   /** `ROOM` + the code, right-aligned inside the title band. */
   readonly roomCode: Rect;
   /** The eight roster rows, in slot order, top to bottom. */
@@ -306,6 +313,9 @@ export interface LobbyLayout {
  *  seat or a hull *is* — the caller maps an index through the model's own order
  *  (`./lobby` CLASS_ORDER / seat slots), and the two can't drift. */
 export type LobbyTarget =
+  /** BACK — leaves the lobby for the main menu (u2 menu-back), the exit every
+   *  screen carries. Top-left of the title band. */
+  | { readonly kind: 'leave' }
   /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E). */
   | { readonly kind: 'seat'; readonly index: number }
   /** The row's trailing chip — the TEAM (TEAMS) or difficulty (FFA) cycle. The
@@ -337,6 +347,10 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // --- Title band -----------------------------------------------------------
   const titleHeight = Math.min(TITLE_HEIGHT, content.height);
   const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
+  // BACK — the lobby's exit, top-left of the title band (u2 menu-back). Capped to
+  // the content width so a comically narrow box yields a shrunk-not-escaped rect.
+  const leaveWidth = Math.max(0, Math.min(LOBBY_BACK_WIDTH, content.width));
+  const leave: Rect = { x: content.x, y: content.y, width: leaveWidth, height: titleHeight };
   const codeWidth = Math.min(ROOM_CODE_WIDTH, content.width);
   const roomCode: Rect = {
     x: content.x + content.width - codeWidth,
@@ -434,6 +448,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   return {
     content,
     title,
+    leave,
     roomCode,
     seats,
     seatChips,
@@ -488,6 +503,9 @@ function chipRect(seat: Rect): Rect {
  * tiles, then the roster.
  */
 export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTarget | null {
+  // BACK first — the exit sits in the title band's corner, clear of every other
+  // control, and a mis-hit toward the edge should favour leaving over nothing.
+  if (hit(layout.leave, x, y)) return { kind: 'leave' };
   if (hit(layout.rushButton, x, y)) return { kind: 'rush' };
   for (let i = 0; i < layout.classOptions.length; i++) {
     const rect = layout.classOptions[i];
@@ -531,7 +549,10 @@ export interface EntryLayout {
   readonly cells: readonly Rect[];
   /** The keypad, in `KEYPAD_KEYS` order: across a row, then down. */
   readonly keys: readonly Rect[];
-  /** BACK — out of the keypad, back to the doors. */
+  /** BACK — the one exit both entry screens carry (u2 menu-back). On the keypad
+   *  it steps back to the doors; on the home screen it leaves to the main menu
+   *  (the standing "every screen you can leave" rule). Same left-anchored rect on
+   *  both, so the button never moves as the screen changes under it. */
   readonly back: Rect;
   /** The erase key. Sized like a button, not like a key: it is pressed far more
    *  often than any single letter, and a mis-hit on it costs a whole character. */
@@ -539,7 +560,9 @@ export interface EntryLayout {
   /** JOIN. */
   readonly submit: Rect;
   /** SETTINGS — home screen only. Shares the action band with the join controls
-   *  (only one screen is ever drawn), so it costs a rect, not a branch. */
+   *  (only one screen is ever drawn), so it costs a rect, not a branch. It gives
+   *  the left slice of the band to {@link back} — the home screen's exit — and
+   *  takes the rest. */
   readonly settings: Rect;
   readonly isTouch: boolean;
 }
@@ -611,12 +634,19 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: Math.max(0, actionsY - BLOCK_GAP - middleY),
   };
 
-  // The home screen's own bottom control, in the same band the join screen hangs
-  // its action row from — the two screens never draw together, so one rect can
-  // sit under another and the hit test (which is told the live screen) keeps them
-  // apart. SETTINGS is centred and full-width: it is the home screen's one
-  // control down here, so it need not share the row into thirds.
-  const settings: Rect = { x: actionX, y: actionsY, width: actionWidth, height: actionHeight };
+  // The home screen's own bottom controls, in the same band the join screen hangs
+  // its action row from — the two screens never draw together, so these rects can
+  // sit under the keypad's row and the hit test (which is told the live screen)
+  // keeps them apart. BACK reuses the join screen's left-anchored `back` rect —
+  // the exit every screen must carry (u2 menu-back) — so the button holds its
+  // place as the screen changes; SETTINGS takes the remainder of the band.
+  const settingsX = actionX + third + ROW_GAP;
+  const settings: Rect = {
+    x: settingsX,
+    y: actionsY,
+    width: Math.max(0, actionX + actionWidth - settingsX),
+    height: actionHeight,
+  };
 
   return {
     content,
@@ -650,6 +680,9 @@ export function entryHitTest(
       const rect = layout.doors[i];
       if (rect && hit(rect, x, y)) return { kind: 'door', index: i };
     }
+    // BACK leaves the online front door for the main menu; it shares the action
+    // band with SETTINGS, so it is tested first (the two never overlap).
+    if (hit(layout.back, x, y)) return { kind: 'back' };
     if (hit(layout.settings, x, y)) return { kind: 'settings' };
     return null;
   }
