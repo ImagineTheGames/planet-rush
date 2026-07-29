@@ -25,6 +25,7 @@ primary_region = "iad"
   dockerfile = "server/Dockerfile"
 
 [env]
+  HOST = "::"
   PORT = "8080"
   # Where each Machine beats its rooms + load. Fly 6PN private DNS: `.internal`
   # resolves to the allocator's Machine(s) on the port it listens on. Presence of

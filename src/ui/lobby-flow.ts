@@ -443,6 +443,13 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       // offer copy-to-clipboard (a DOM affordance UI does not own); ignoring it
       // here means a tap on it never disturbs the roster.
       return rest(state);
+    case 'leave':
+      // BACK — leave the lobby (u2 menu-back). In this online flow, backing out of
+      // a room returns to the entry front door with the lobby dropped — the same
+      // shape {@link flowFailed} uses, so the caller closes the transport exactly
+      // as it does on an aborted join. (Offline, the same BACK reloads onto the
+      // main menu — wired in `main.ts` `openLobby.leaveToMenu`.)
+      return rest({ ...state, screen: 'entry', entry: entryConnected(), lobby: null });
   }
 }
 

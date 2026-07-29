@@ -34,7 +34,7 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { buttonStyle } from './button-theme';
 import { ABUNDANCE_LABELS, DIFFICULTY_LABELS, MODE_LABELS, RUSH_LABEL } from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
-import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
+import { BLOCK_GAP, lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
 import { MapPickerView } from './map-picker-view';
 import { mapPickerModel } from './map-picker';
@@ -98,6 +98,9 @@ interface ClassNodes {
  */
 export class LobbyView extends Container {
   private readonly backdrop = new Graphics();
+  /** BACK — the lobby's exit to the main menu (u2 menu-back), top-left. */
+  private readonly backBody = new Graphics();
+  private readonly backText: Text;
   private readonly wordmark: Text;
   private readonly roomLabel: Text;
   private readonly roomCode: Text;
@@ -124,6 +127,9 @@ export class LobbyView extends Container {
     super();
     this.layout = lobbyLayout({ width: screenWidth, height: screenHeight }, touchOpts(isTouch, insets));
 
+    this.backText = makeText('BACK', FONT_HEADING, 12, TEXT_PRIMARY);
+    this.backText.anchor.set(0.5, 0.5);
+
     this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 22, TEXT_PRIMARY);
     // The room code is the thing that gets read across a classroom, so it is the
     // largest text on the screen after the wordmark — and it is set in the body
@@ -143,7 +149,7 @@ export class LobbyView extends Container {
     this.abundanceText = makeText('', FONT_HEADING, 12, TEXT_PRIMARY);
     this.abundanceText.anchor.set(0.5, 0.5);
 
-    this.addChild(this.backdrop, this.wordmark, this.roomLabel, this.roomCode);
+    this.addChild(this.backdrop, this.backBody, this.backText, this.wordmark, this.roomLabel, this.roomCode);
     this.addChild(this.mapPicker);
     this.addChild(this.modeBody, this.modeText, this.abundanceBody, this.abundanceText);
     this.addChild(this.rushBody, this.rushText, this.rushHint);
@@ -221,8 +227,30 @@ export class LobbyView extends Container {
   // --- Title ---------------------------------------------------------------
 
   private drawTitle(model: LobbyModel): void {
-    const { title, roomCode } = this.layout;
-    this.wordmark.x = title.x;
+    const { title, leave, roomCode } = this.layout;
+
+    // BACK — the exit every screen carries (u2 menu-back). Steel chrome, drawn in
+    // the same visual language as the codex/keypad BACK; the wordmark steps to its
+    // right so the two never collide.
+    const backVisible = leave.width > 0 && leave.height > 0;
+    this.backBody.visible = backVisible;
+    this.backText.visible = backVisible;
+    this.backBody.clear();
+    if (backVisible) {
+      const style = buttonStyle('standard', false);
+      this.backBody
+        .roundRect(leave.x, leave.y + 6, leave.width, leave.height - 12, 5)
+        .fill({ color: style.fill, alpha: style.fillAlpha })
+        .roundRect(leave.x, leave.y + 6, leave.width, leave.height - 12, 5)
+        .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
+      this.backText.text = 'BACK';
+      this.backText.style.fill = style.label;
+      this.backText.alpha = style.labelAlpha;
+      this.backText.x = leave.x + leave.width / 2;
+      this.backText.y = leave.y + leave.height / 2;
+    }
+
+    this.wordmark.x = title.x + (backVisible ? leave.width + BLOCK_GAP : 0);
     this.wordmark.y = title.y + (title.height - this.wordmark.height) / 2;
 
     // The room code is the number a classroom reads off one screen and types into

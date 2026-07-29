@@ -224,3 +224,30 @@ test('BACK walks the front door back to the menu', async ({ page }) => {
   await page.waitForFunction(() => window.__mainMenu?.screen === 'menu', undefined, { timeout: 5_000 });
   expect(await page.evaluate(() => window.__onlineMenu!.visible), 'the front door is dismissed').toBe(false);
 });
+
+test('the home screen itself has a BACK to the main menu (u2 — the field-report fix)', async ({
+  page,
+}) => {
+  // The developer report: the ONLINE screen (PLAY SOLO / CREATE ROOM / JOIN ROOM /
+  // SETTINGS) had no way back to the main menu. From the *home* screen — not the
+  // keypad — BACK must now return straight to the menu, the exit every screen
+  // carries. The screenshot is the visual evidence that the BACK button is drawn
+  // and that the subtitle is the tagline, not the title repeated.
+  await bootMenu(page);
+  await page.evaluate(() => window.__mainMenu!.online());
+  await page.waitForFunction(() => window.__onlineMenu?.visible === true, undefined, { timeout: 5_000 });
+  await page.waitForFunction(() => window.__onlineMenu?.screen === 'home', undefined, { timeout: 5_000 });
+
+  await page.screenshot({ path: 'tests/live-stage/online-flow-back-evidence.png' });
+
+  // One BACK from the home screen returns the whole screen to the main menu — no
+  // keypad detour, no reload.
+  await page.evaluate(() => window.__onlineMenu!.back());
+  await page.waitForFunction(() => window.__mainMenu?.screen === 'menu', undefined, { timeout: 5_000 });
+  const after = await page.evaluate(() => ({
+    menuScreen: window.__mainMenu!.screen,
+    onlineVisible: window.__onlineMenu!.visible,
+  }));
+  expect(after.menuScreen, 'home BACK lands on the main menu').toBe('menu');
+  expect(after.onlineVisible, 'the front door is dismissed').toBe(false);
+});

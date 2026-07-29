@@ -338,6 +338,23 @@ export const SHOT_SPEED_COSTS: readonly Tunable<number>[] = [8, 14];
 export const PROJECTILE_CORE_FACTOR: Tunable<number> = WEAPON_DPS_CORE / WEAPON_DPS_SHIP;
 
 /**
+ * Friendly fire — **OFF** (ratified default, developer report p14 "TEAMS doesn't
+ * feel like teams"). In TEAMS a teammate's shot does **zero** damage to an ally's
+ * ship, structures, or station: an ally caught in your line of fire passes the
+ * projectile through rather than eating it (GDD §2.1 — "allies' shots pass through
+ * each other"). FFA is teams-of-one, so no two players ever share a team and this
+ * never changes an FFA match.
+ *
+ * This is the ONE switch that ratifies friendly fire on later: flip it to `true`
+ * and every damage site follows, because they all read the single {@link
+ * canDamage} gate (`./allegiance`) rather than scattering the rule. It does NOT
+ * make auto-aim, turrets, or bots *target* allies — that is the stricter,
+ * separate `areEnemies` question — it only governs whether a shot already in
+ * flight is allowed to bite a teammate it happens to reach. TUNABLE
+ */
+export const FRIENDLY_FIRE: Tunable<boolean> = false;
+
+/**
  * Ore chipped from an asteroid by ONE weapon projectile that strikes it —
  * **mining is shooting now** (ratified amendment v0.3, `docs/design-amendments.md`:
  * "the mining laser should go away, it should be a projectile as well"). The

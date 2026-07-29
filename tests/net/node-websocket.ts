@@ -22,7 +22,7 @@ import { randomBytes } from 'node:crypto';
 import { MatchServer } from '../../server/match-server';
 import type { MatchServerConfig } from '../../server/match-server';
 import { attachWebSocketServer } from '../../server/ws';
-import type { WsConnection } from '../../server/ws';
+import type { UpgradeGuard, WsConnection } from '../../server/ws';
 import type { WebSocketLike } from '../../src/net/websocket-transport';
 
 // ---------------------------------------------------------------------------
@@ -106,8 +106,10 @@ export function nodeWebSocket(url: string): WebSocketLike {
   let buffer = Buffer.alloc(0);
 
   socket.on('connect', () => {
+    // Send the real request-target — path *and* query — so a `?ticket=` routing
+    // hint reaches the server's upgrade hop exactly as a browser would deliver it.
     socket.write(
-      `GET /play HTTP/1.1\r\nHost: ${parsed.host}\r\nUpgrade: websocket\r\n` +
+      `GET ${parsed.pathname}${parsed.search} HTTP/1.1\r\nHost: ${parsed.host}\r\nUpgrade: websocket\r\n` +
         `Connection: Upgrade\r\nSec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\n` +
         `Sec-WebSocket-Version: 13\r\n\r\n`,
     );
@@ -161,19 +163,26 @@ export interface MatchServerHarness {
  * config is the caller's (seats, seed, grace window) so a reconnect test can hand
  * the room a short grace and watch it pass in real seconds.
  */
-export async function startMatchServer(config: MatchServerConfig): Promise<MatchServerHarness> {
+export async function startMatchServer(
+  config: MatchServerConfig,
+  beforeUpgrade?: UpgradeGuard,
+): Promise<MatchServerHarness> {
   const matches = new MatchServer(config);
   const connections: WsConnection[] = [];
   const http: Server = createServer((_request, response) => {
     response.writeHead(200);
     response.end('ok');
   });
-  attachWebSocketServer(http, (connection) => {
-    connections.push(connection);
-    const client = matches.connect(connection);
-    connection.onMessage((frame) => client.receive(frame));
-    connection.onClose(() => client.close(Date.now()));
-  });
+  attachWebSocketServer(
+    http,
+    (connection) => {
+      connections.push(connection);
+      const client = matches.connect(connection);
+      connection.onMessage((frame) => client.receive(frame));
+      connection.onClose(() => client.close(Date.now()));
+    },
+    beforeUpgrade,
+  );
 
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const address = http.address();

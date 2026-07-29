@@ -30,14 +30,28 @@ describe('DirectRouter — the client dials the Machine itself', () => {
 });
 
 describe('FlyReplayRouter — the edge routes to the Machine', () => {
-  it('names the target instance and leaves the client on the shared entry', () => {
+  it('names the target instance for the socket hop to pin', () => {
     // Same region as the allocator: instance is enough for the edge to pin it.
+    // This directive is what the SOCKET hop emits; the allocate/join JSON response
+    // never carries it (that would replay the POST at the gameserver).
     const router = new FlyReplayRouter({ selfRegion: 'iad' });
     const instr = router.routeTo({ machine: 'm-1', region: 'iad' });
     expect(instr.headers['fly-replay']).toBe('instance=m-1');
-    // On Fly the client keeps talking to the same app hostname — no per-Machine
-    // URL is handed out, which is what keeps the allocator out of the data path.
+    // No connectUrl configured → null. The allocate response supplies its own.
     expect(instr.connectUrl).toBeNull();
+  });
+
+  it('hands back the configured shared gameserver connectUrl for the JSON response', () => {
+    // The client dials this one shared hostname; the socket hop replays a
+    // wrong-machine upgrade to the room's host. The instance pin still rides
+    // `headers`, but the allocate/join response takes only the connectUrl.
+    const router = new FlyReplayRouter({
+      selfRegion: 'iad',
+      connectUrl: 'wss://planet-rush-gameserver.fly.dev/play',
+    });
+    const instr = router.routeTo({ machine: 'm-1', region: 'iad' });
+    expect(instr.connectUrl).toBe('wss://planet-rush-gameserver.fly.dev/play');
+    expect(instr.headers['fly-replay']).toBe('instance=m-1');
   });
 
   it('adds the region when the target is in another datacentre', () => {

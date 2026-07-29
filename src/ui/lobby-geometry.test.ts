@@ -358,8 +358,20 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
       expect(lobbyHitTest(layout, rush.x, rush.y)).toEqual({ kind: 'rush' });
       const code = center(layout.roomCode);
       expect(lobbyHitTest(layout, code.x, code.y)).toEqual({ kind: 'roomCode' });
+      // BACK — the lobby's exit to the main menu (u2 menu-back).
+      const leave = center(layout.leave);
+      expect(lobbyHitTest(layout, leave.x, leave.y), `leave on ${name}`).toEqual({ kind: 'leave' });
     });
   }
+
+  it('keeps the lobby BACK exit inside the title band, clear of the room code (u2)', () => {
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = lobbyLayout(vp, { isTouch: touch });
+      expect(rectContains(layout.content, layout.leave), `leave escapes content on ${name}`).toBe(true);
+      expect(rectContains(layout.title, layout.leave), `leave escapes title band on ${name}`).toBe(true);
+      expect(overlaps(layout.leave, layout.roomCode), `leave overlaps room code on ${name}`).toBe(false);
+    }
+  });
 
   it('returns null for a tap on nothing', () => {
     const layout = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });

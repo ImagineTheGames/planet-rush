@@ -221,7 +221,7 @@ export class WebSocketTransport implements Transport {
 
   private open(): void {
     if (this.left) return;
-    const socket = this.connectSocket(this.config.url);
+    const socket = this.connectSocket(dialUrl(this.config.url, this.config.ticket));
     // Snapshots are binary; without this a browser hands them over as `Blob`
     // and every read becomes asynchronous (docs/netcode-spike.md wire layout).
     socket.binaryType = 'arraybuffer';
@@ -381,5 +381,27 @@ export class WebSocketTransport implements Transport {
     if (this.connection === state) return;
     this.connection = state;
     this.stateHandler?.(state);
+  }
+}
+
+/**
+ * The URL to actually dial: the base with the ticket added as a `?ticket=` query
+ * when there is one. On Fly the client reaches the gameserver app on one shared
+ * hostname, and the edge cannot know which machine hosts this room until the
+ * upgrade names it — so the ticket (the signed room→machine binding) rides the
+ * upgrade URL and the socket hop replays a wrong-machine upgrade to the room's
+ * host (`server/upgrade-router.ts`). The join message still carries the ticket
+ * for auth; this is purely the routing hint. Off Fly (direct/solo) the machine
+ * that receives the upgrade already hosts the room, so the hint is simply unread.
+ * A base that will not parse as a URL (an odd test stub) is dialled as given.
+ */
+function dialUrl(base: string, ticket: string | undefined): string {
+  if (ticket === undefined) return base;
+  try {
+    const url = new URL(base);
+    url.searchParams.set('ticket', ticket);
+    return url.toString();
+  } catch {
+    return base;
   }
 }

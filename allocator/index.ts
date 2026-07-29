@@ -57,6 +57,9 @@
  *   ALLOCATOR_ROUTER 'fly' | 'direct'                            (default 'direct')
  *   FLY_REGION       this allocator's region (Fly sets it)       (fly router only)
  *   MATCH_APP        the match servers' Fly app, if separate     (fly router only)
+ *   MATCH_CONNECT_URL  the gameserver app's shared socket URL the client dials on
+ *                    Fly; the SOCKET hop pins it to the room's host
+ *                    (default wss://planet-rush-gameserver.fly.dev/play)  (fly router only)
  *   MATCH_URL_TEMPLATE  direct connect URL, '{machine}' expanded (default ws://{machine}:8080/)
  *   ALLOW_ORIGINS    comma-separated browser origins the CORS layer permits, on top
  *                    of any localhost dev origin (default the GitHub Pages origin)
@@ -442,7 +445,16 @@ function roomInfoRoute(deps: AllocatorServerDeps, code: string, now: number): Ro
   return { status: 200, body: info };
 }
 
-/** Turn an {@link Allocation} into a response, folding in the Router's instruction. */
+/**
+ * Turn an {@link Allocation} into a response, taking the Router's `connectUrl` —
+ * and *only* that. The Router's `fly-replay` header is deliberately NOT merged
+ * here: on the Fly edge a `fly-replay` on a JSON response makes the edge REPLAY
+ * the POST at the gameserver, so the client never receives its `{room, ticket}`
+ * and the menu reports "can't reach the servers" (the live CREATE ROOM failure).
+ * The machine-pin lives on the SOCKET hop instead (server/ws upgrade): the client
+ * dials `connectUrl` — the gameserver app's shared endpoint on Fly — and a WS
+ * upgrade landing on the wrong machine is replayed to the room's host there.
+ */
 function decided(
   deps: AllocatorServerDeps,
   allocation: ReturnType<Allocator['allocate']>,
@@ -451,7 +463,6 @@ function decided(
   const instr = deps.router.routeTo({ machine: allocation.machine, region: allocation.region });
   return {
     status,
-    headers: instr.headers,
     body: {
       room: allocation.room,
       machine: allocation.machine,
@@ -572,7 +583,12 @@ function fleetControllerFromEnv(provider: MachineProvider, registry: RoomRegistr
 function routerFromEnv(): Router {
   const env = process.env;
   if ((env['ALLOCATOR_ROUTER'] ?? 'direct') === 'fly') {
-    const config: { selfRegion?: string; appName?: string } = {};
+    const config: { selfRegion?: string; appName?: string; connectUrl?: string } = {
+      // The gameserver app's shared socket endpoint the client dials; the SOCKET
+      // hop replays a wrong-machine upgrade to the room's host from there. The
+      // JSON response carries this URL, never a fly-replay header (see `decided`).
+      connectUrl: env['MATCH_CONNECT_URL'] ?? 'wss://planet-rush-gameserver.fly.dev/play',
+    };
     if (env['FLY_REGION']) config.selfRegion = env['FLY_REGION'];
     if (env['MATCH_APP']) config.appName = env['MATCH_APP'];
     return new FlyReplayRouter(config);

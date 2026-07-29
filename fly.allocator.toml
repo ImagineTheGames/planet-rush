@@ -29,6 +29,7 @@ primary_region = "iad"
   dockerfile = "allocator/Dockerfile"
 
 [env]
+  HOST = "::"
   PORT = "8080"
   # Route clients to their Machine via Fly's edge (`fly-replay`), not a per-Machine
   # URL — the allocator names a destination and steps out (allocator/router.ts).

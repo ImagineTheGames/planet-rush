@@ -35,6 +35,7 @@ import {
   isDocked,
   isOver,
   stationOf,
+  satelliteCount,
   shieldCount,
   shieldPool,
   turretCount,
@@ -2126,6 +2127,7 @@ async function boot(): Promise<void> {
       hudFrame.stationAlive = station.alive;
       hudFrame.turrets = turretCount(station);
       hudFrame.shields = shieldCount(station);
+      hudFrame.satellites = satelliteCount(station);
       hudFrame.homePos = station.pos;
     }
 
@@ -5495,6 +5497,9 @@ interface LobbySeam {
   selectClass(index: number): void;
   /** Press RUSH! — starts the countdown that boots the match. */
   rush(): void;
+  /** BACK — leave the lobby for the main menu (u2 menu-back), the exit every
+   *  screen carries. A clean reload lands on a fresh main menu. */
+  leave(): void;
 
   // --- The arena picker, now in the lobby (p2 field rule) ------------------
   /** The arena currently selected — the map card drawn as chosen. */
@@ -5597,6 +5602,7 @@ function openLobby(
     classControls: [],
     selectClass: (index: number): void => selectClassAt(index),
     rush: (): void => rush(),
+    leave: (): void => leaveToMenu(),
     // The arena picker (p2), computed once from the bundled registry — the same
     // board the sim builds from, so `expectedStations` is the truth a booted match
     // must match. Layout facts are refreshed each render; `worldMapId`/
@@ -5715,6 +5721,17 @@ function openLobby(
     render();
   }
 
+  /** BACK — leave the lobby for the main menu (u2 menu-back). A clean reload to
+   *  the bare menu URL is the exit's maximal teardown: it drops any online socket,
+   *  clears the pre-match world state, and boots straight onto a fresh main menu
+   *  (the same "go to the menu" reload the pause overlay and end screen use). A
+   *  no-op once the countdown has resolved and the match owns the screen. */
+  function leaveToMenu(): void {
+    if (resolved) return;
+    const menuUrl = window.location.origin + window.location.pathname;
+    window.location.assign(menuUrl);
+  }
+
   /** Press RUSH! — starts the countdown (offline you are the host, so it always
    *  takes). A no-op once counting or once the match has been handed the screen. */
   function rush(): void {
@@ -5787,6 +5804,10 @@ function openLobby(
         platform.storage.set(ABUNDANCE_KEY, state.abundance);
         render();
         break;
+      case 'leave':
+        // BACK — leave the lobby for the main menu (u2 menu-back).
+        leaveToMenu();
+        break;
       case 'rush':
         rush();
         break;
@@ -5854,6 +5875,12 @@ function openLobby(
   }
 
   function onKeyDown(e: KeyboardEvent): void {
+    // Escape leaves the lobby for the main menu (u2 menu-back) — the pointer twin
+    // of the BACK button, the exit every screen answers Escape with.
+    if (e.code === 'Escape') {
+      leaveToMenu();
+      return;
+    }
     // Enter or Space is RUSH! — a keyboard player never reaches for the mouse to
     // start, the same courtesy the main menu gives PLAY.
     if (e.code === 'Enter' || e.code === 'Space') rush();

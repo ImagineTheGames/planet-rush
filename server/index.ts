@@ -48,6 +48,8 @@ import {
 import type { DeregistrationBody, HeartbeatBody, RegistrationBody } from './heartbeat';
 import { FLEET_AUTH_HEADER, signFleetRequest } from '../src/net/fleet-auth';
 import { attachWebSocketServer } from './ws';
+import type { UpgradeGuard } from './ws';
+import { replayForUpgrade } from './upgrade-router';
 
 /** The sim runs at 60 Hz (GDD §4.1); the loop wakes at that rate and the room
  *  converts however much real time actually passed into whole ticks. */
@@ -124,13 +126,30 @@ const http = createServer((request: IncomingMessage, response: ServerResponse) =
   response.end('Planet Rush match server — connect a WebSocket to play.\n');
 });
 
-attachWebSocketServer(http, (connection) => {
-  const client = matches.connect(connection);
-  connection.onMessage((frame) => client.receive(frame));
-  // A dropped socket is where the reconnect-grace rule begins: the room seats a
-  // bot at once and holds the seat ~60 s (GDD §4.2).
-  connection.onClose(() => client.close(Date.now()));
-});
+// The Fly socket-hop machine-pin (M10). It arms only behind a Fly edge
+// (MATCH_ROUTER=fly) and only when this Machine both knows its own id and holds
+// the ticket key — the same fail-closed rule as ticket enforcement. Off Fly
+// (direct/solo, and every test that dials a Machine directly) there is no guard
+// and every upgrade completes locally, exactly as before.
+const machineRouter = process.env['MATCH_ROUTER'] ?? 'direct';
+const machineId = identity.machine;
+const beforeUpgrade: UpgradeGuard | undefined =
+  machineRouter === 'fly' && ticketSecret !== undefined && machineId
+    ? (request): Readonly<Record<string, string>> | null =>
+        replayForUpgrade(request.url, { machineId, secret: ticketSecret, now: Date.now })
+    : undefined;
+
+attachWebSocketServer(
+  http,
+  (connection) => {
+    const client = matches.connect(connection);
+    connection.onMessage((frame) => client.receive(frame));
+    // A dropped socket is where the reconnect-grace rule begins: the room seats a
+    // bot at once and holds the seat ~60 s (GDD §4.2).
+    connection.onClose(() => client.close(Date.now()));
+  },
+  beforeUpgrade,
+);
 
 const loop = setInterval(() => matches.update(Date.now()), LOOP_INTERVAL_MS);
 

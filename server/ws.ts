@@ -317,19 +317,52 @@ class WsSocket implements WsConnection {
 // ---------------------------------------------------------------------------
 
 /**
+ * A pre-upgrade routing hook (M10 fly-replay-on-socket). Given the upgrade
+ * request, it returns either `null` — complete the handshake here — or a set of
+ * response headers (a `fly-replay` directive) that answer the upgrade *instead*
+ * of the 101, so the Fly edge re-delivers it to the machine that hosts the room.
+ * See {@link replayForUpgrade} in `./upgrade-router`. Off Fly there is no guard
+ * and every upgrade completes locally, exactly as before.
+ */
+export type UpgradeGuard = (
+  request: IncomingMessage,
+) => Readonly<Record<string, string>> | null;
+
+/**
  * Attach a WebSocket endpoint to a plain `node:http` server. `onConnection` is
  * called once per client with a {@link WsConnection}; everything above this line
  * is bytes, everything below it is the game.
+ *
+ * `beforeUpgrade`, when supplied, may divert an upgrade before the handshake —
+ * the Fly socket-hop machine-pin. A machine that hosts the room (or a deployment
+ * with no edge to replay to) passes no guard, or the guard returns `null`, and
+ * the upgrade completes here.
  */
 export function attachWebSocketServer(
   http: HttpServer,
   onConnection: (connection: WsConnection) => void,
+  beforeUpgrade?: UpgradeGuard,
 ): void {
   http.on('upgrade', (request: IncomingMessage, socket: UpgradeSocket, head: Buffer) => {
     const key = request.headers['sec-websocket-key'];
     const upgrade = String(request.headers['upgrade'] ?? '').toLowerCase();
     if (upgrade !== 'websocket' || typeof key !== 'string') {
       socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    // The machine-pin: a wrong-machine upgrade is answered with `fly-replay` and
+    // closed *before* the 101, so the edge re-delivers it to the room's host and
+    // the game never sees a connection it cannot serve.
+    const replay = beforeUpgrade?.(request) ?? null;
+    if (replay !== null) {
+      const lines = Object.entries(replay).map(([name, value]) => `${name}: ${value}`);
+      socket.write(
+        ['HTTP/1.1 409 Conflict', ...lines, 'Connection: close', 'Content-Length: 0', '', ''].join(
+          '\r\n',
+        ),
+      );
       socket.destroy();
       return;
     }
