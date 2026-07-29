@@ -1218,5 +1218,55 @@
     "buildSha": "97d13c5",
     "attestation": "RE-VERIFY of the round-9 FAILED finding (that entry was captured on 35c2595, where the 15s repair lockout was enforced sim-side but INVISIBLE in the wheel — the wedge kept drawing '+15 HP' ready=true while every tap was silently refused). PR #212 (p12 cooldown-wedge) wired station.repairGate through to the wedge. Re-checked on the fixed tip 97d13c5, live ?debug=1 (NO freeze so the gate actually decrements), on BOTH form factors with REAL taps at the drawn REPAIR REACTOR wedge via the shipped __repairStage seam (Desktop 1280x800, pointerType mouse; iPhone 390x844 dpr3, pointerType touch — the phone taps land through repairWedgeClientPoint, the same portrait/landscape remap a thumb crosses; the FIRE/BUILD touch controls in the phone frames confirm the mobile profile). The seam only sieged the local core to 10/100 and funded 10 ore; the repairs and the gate are the real sim. On EACH form factor: one real tap first LANDS a repair (core 10->25, +15 HP; bank 10->9, -1 ore) and arms the 15s gate. VISIBLE mid-cooldown (p12-cd-ui-*-B-gated): the REPAIR REACTOR wedge is DIMMED/GRAYED and its sub-line is now a live countdown — 'REPAIR in 9s' on the desktop frame, 'REPAIR in 10s' on the phone frame (the readback snapshot a moment earlier read 11s/12s; the number ticks DOWN between snapshot and shot, proving it is read off sim state each frame, not a static string), and its cost '1' is drawn gray rather than the signal-yellow of the ready TURRET(3)/SHIELD(5) wedges beside it. REFUSED-TAP / NO-ORE-MOVED proof, in the same frame: four rapid REAL taps into that grayed wedge moved ZERO ore and ZERO HP — the HOME core bar holds 25/100 and the hub holds 9 ORE (coreFrozen=true, bankFrozen=true in the readback) on both form factors. VISIBLE at expiry (p12-cd-ui-*-C-rearm): once the gate drains to 0 (~16s of sim time) the SAME wedge re-arms to a bright '+15 HP' ready=true with a signal-yellow '1' matching its neighbours, and a real tap from that state lands a SECOND repair (core 25->40, +15 HP; bank 9->8, -1 ore) on both form factors. Zero page errors on either run. This is the exact countdown affordance the round-9 finding said was missing, now drawn on the shipped client on desktop and phone alike. Verdict verified.",
     "verdict": "verified"
+  },
+  {
+    "id": "online-front-door",
+    "title": "ONLINE front door — CREATE / JOIN doors + keypad (shipped client)",
+    "area": "online",
+    "image": "images/online-door.png",
+    "capturedAt": "2026-07-29T07:09:00Z",
+    "buildSha": "f7a213d",
+    "attestation": "The shipped client (built with VITE_ALLOCATOR_URL=https://planet-rush-allocator.fly.dev), main menu → ONLINE. Title 'STATION RUSH' (note: the title/subtitle both read 'STATION RUSH'; the ratified brand is 'Planet Rush' — flagged in passing, not this milestone's concern). Three stacked doors: a cyan-outlined 'PLAY SOLO' ('Seven bots, no connection needed.'), 'CREATE ROOM' ('Get a code, read it out, they join you.'), 'JOIN ROOM' ('Type the code somebody is holding up.'), and 'SETTINGS' below. The companion capture online-join-keypad.png shows the JOIN keypad — 'ENTER THE ROOM CODE', four code slots, and the ambiguity-free alphabet (A–H, J–N, P–R, S–Z and digits 2–9; no I/O/0/1), with BACK / ERASE / JOIN. This proves the front-door UI itself renders correctly. It does NOT prove any room is reachable — see online-room-create.",
+    "verdict": "verified"
+  },
+  {
+    "id": "online-room-create",
+    "title": "Online room create over the real internet — FAILS on live deploy",
+    "area": "online",
+    "image": "images/online-create-live.png",
+    "capturedAt": "2026-07-29T07:09:00Z",
+    "buildSha": "f7a213d",
+    "attestation": "GOAL: a room created with a shareable code on the LIVE Fly deployment. RESULT: no code is produced. Pressing CREATE ROOM (a genuine allocate against https://planet-rush-allocator.fly.dev, baked into this bundle) turns the subtitle red: 'Can’t reach the servers. Check your connection — PLAY SOLO still works.' The seam readback confirms status='error', resolvedCode=null — no code was minted. Root cause, from the raw wire (images/probe-online-live.txt): (1) the live allocator reports {\"machines\":0,\"regions\":[]} after ~90 min uptime, so POST /rooms returns HTTP 503 {\"error\":\"no-capacity\"} on every attempt — the gameserver (planet-rush-gameserver.fly.dev /health ok, capacity 32) is healthy but NOT registered with the allocator. (2) From a browser the cross-origin allocate is refused before it even sees the 503: the allocator 405s the CORS preflight (OPTIONS /rooms → method-not-allowed) and sends no Access-Control-Allow-Origin, so the fetch throws and the client shows the network-failure copy. Either way, no shareable room code is created. Deliverable UNMET.",
+    "verdict": "failed"
+  },
+  {
+    "id": "online-two-clients",
+    "title": "Two clients in one live match — UNREACHABLE on live deploy",
+    "area": "online",
+    "image": "images/online-join-live.png",
+    "capturedAt": "2026-07-29T07:09:00Z",
+    "buildSha": "f7a213d",
+    "attestation": "GOAL: two clients in one match on the live deployment, both viewports, same world state. RESULT: not reachable — no two-viewport capture is possible, and that impossibility is the finding. The host side mints no code (see online-room-create), so there is nothing to share. The guest side is shown here: on the JOIN keypad with a code entered (WXYZ), pressing JOIN turns the subtitle red — 'Can’t reach the servers. Check your connection — PLAY SOLO still works.' Beyond the UI, direct-connecting a WebSocket to wss://planet-rush-gameserver.fly.dev/play and sending a join replies {\"type\":\"joinError\",\"reason\":\"bad-ticket\"} then closes (the gameserver enforces tickets; only the allocator can sign one, and it has no machines to allocate on) — see images/probe-online-live.txt. Separately, even against a working server the SHIPPED client cannot enter a match: src/main.ts opens no WebSocket at all — startResolve() records the allocator's minted code and stops, with the socket+lobby handoff (m9-09) still unmerged. The protocol itself is sound in isolation (images/online-protocol-local.txt: the repo's tests/net/online-2p.test.ts drives two predicting clients through a locally-run server end-to-end, green), which isolates the blockers to deployment (empty fleet + no CORS) and client wiring (m9-09), not the netcode. Deliverable UNMET on live.",
+    "verdict": "failed"
+  },
+  {
+    "id": "online-reconnect",
+    "title": "Reconnect mid-match, ship+cargo+bank+upgrades intact — UNTESTABLE on live",
+    "area": "online",
+    "image": "images/probe-online-live.txt",
+    "capturedAt": "2026-07-29T07:09:00Z",
+    "buildSha": "f7a213d",
+    "attestation": "GOAL: a client reconnecting mid-match and getting its ship back with cargo/bank/upgrades intact, on the live deployment. RESULT: cannot be exercised — there is no live match to drop out of and rejoin. Creating a room fails (online-room-create) and joining fails (online-two-clients), so the reconnect-grace window is never entered on the live servers. The raw wire probe (this artifact) records the two live blockers: allocator machines:0 → 503 no-capacity, and gameserver ticketless direct-join → joinError bad-ticket. The reconnect-grace state machine DOES pass the repo's CI integration test locally (images/online-protocol-local.txt: tests/net/reconnect-resume.test.ts, green), so the logic is implemented — but that is not the live deployment this deliverable is about. Deliverable UNMET on live.",
+    "verdict": "failed"
+  },
+  {
+    "id": "online-protocol-local",
+    "title": "Netcode protocol + reconnect — GREEN locally (isolates the live blocker)",
+    "area": "online",
+    "image": "images/online-protocol-local.txt",
+    "capturedAt": "2026-07-29T07:09:00Z",
+    "buildSha": "f7a213d",
+    "attestation": "Supporting evidence, LOCAL not live: to isolate whether the online failures are the netcode or the deployment, the repo's own integration tests were run (vitest, this artifact): tests/net/online-2p.test.ts — 'a two-player online match runs end-to-end against a locally-run server, each client predicting its own ship' — PASSES; tests/net/reconnect-resume.test.ts PASSES; tests/server/ticket-enforcement.test.ts PASSES; 13/13 green. This proves the wire protocol, two-client sim, reconnect-grace, and ticket enforcement work when a real server is actually running and reachable. It does NOT satisfy the live-deployment deliverables (online-room-create/two-clients/reconnect) — it is here only to show the live failures are operational (empty allocator fleet, no CORS) and client-wiring (m9-09 unwired), not a broken protocol.",
+    "verdict": "verified"
   }
 ]
