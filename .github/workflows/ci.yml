@@ -39,6 +39,15 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      # The join path, dialled the way a player dials it: a two-Machine fleet
+      # behind a Fly-shaped edge, the allocator's own shared connectUrl, and half
+      # the rounds aimed at the WRONG Machine on purpose. It is the Director's 6/6
+      # wire probe with the coin flip removed — the check that was manual, and
+      # therefore not run, while the fleet served a pre-pin image for days (M10).
+      # No network and no secrets: the fleet is local.
+      - name: Join-pin wire probe (local 2-machine fleet)
+        run: node tests/net/live-pin.probe.mjs --local 6
+
       - name: Build
         run: npx vite build
         env:
