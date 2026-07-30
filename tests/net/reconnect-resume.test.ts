@@ -57,8 +57,10 @@ describe('reconnect-resume', () => {
     };
 
     // A ~250 ms first retry leaves a clear window where a bot flies the seat before
-    // the reclaim lands — long enough to observe the substitution, short enough
-    // that the bot cannot dock and spend the banked ore we are about to stamp.
+    // the reclaim lands — long enough to observe the substitution. It is NOT short
+    // enough to stop the stand-in docking and spending the ore stamped below: that
+    // is wall-clock, the window stretches under a loaded box, and the assertions
+    // after the reclaim are written to survive it rather than to race it.
     const alice = createOnlineSession({
       url: harness.url,
       room: 'RUSH',
@@ -132,24 +134,47 @@ describe('reconnect-resume', () => {
     expect(alice.you).toBe(seat);
 
     // The ship is the *same object* she left — never removed, never rebuilt — so
-    // its hull, cargo, banked ore and upgrade tier are exactly as she left them.
+    // its hull, cargo, banked ore and upgrade tier came back with it.
     const reclaimed = room.world?.ships.find((s) => s.id === seat);
     expect(reclaimed).toBe(stampedShip);
     expect(reclaimed?.shipClass).toBe(ShipClass.Interceptor);
-    expect(reclaimed?.banked).toBe(42);
-    expect((reclaimed?.tiers as Record<string, number>)[track]).toBe(3);
+
+    // The forged *tier* is the wallet assertion that holds unconditionally, and it
+    // is the one that catches a naked reclaim: a rebuilt ship carries tier 0, and
+    // tiers only ever climb, so nothing that happens while the seat is flown can
+    // push this below the 3 she left on it.
+    //
+    // Her forged *bank* is deliberately not asserted against 42 here, in either
+    // direction. The stand-in is a real Medium bot flying a real ship with a real
+    // wallet (`server/room` `substituteFor`), and it moves that bank both ways
+    // while it has the controls — legitimately, since the seat is hers:
+    //
+    //   down, buying an upgrade with ore it finds itself docked with — measured
+    //        under full-suite load, 42 → 28, one DAMAGE tier at cost 14;
+    //   up,   mining and depositing — measured over a 25 s window, 42 → 49.27.
+    //
+    // Both are the bots lane's question, not this one's, and both are wall-clock
+    // races: how much the stand-in gets done depends on how long the redial takes
+    // on the box of the day. A netcode test that fails when a bot does its job is
+    // testing the wrong thing, so this asserts what the reclaim itself owns.
+    //
+    // That the reclaim did not *wipe* the bank is proved below by conservation:
+    // spending moves `banked` and the ledger's `spent` sink by the same amount and
+    // mining is a pure transfer, so both leave the residual flat — while a wiped
+    // bank is ore vanishing off the books and moves it (`src/sim/ore-ledger`).
+    expect((reclaimed?.tiers as Record<string, number>)[track]).toBeGreaterThanOrEqual(3);
 
     // --- The wallet rode the wire (QA m10 "economy-not-on-wire") -------------
     // Server-authority identity is not enough: the *client* rebuilds a fresh,
     // naked world on reclaim, and the streaming snapshot never carries cargo,
     // bank or tiers (`src/net/snapshot`). The reclaim `welcome` must, so the
-    // reconnecting client is handed back the economy it earned (GDD §4.2). Bank
-    // and tier are the forged values; the hold rides its own field and is proved
-    // by the client↔wire equality below.
+    // reconnecting client is handed back the economy it earned (GDD §4.2). The
+    // tier is the forged value; the bank and the hold ride their own fields and
+    // are proved by the client↔wire equality below.
     const reclaimWelcome = aliceWelcomes.at(-1);
     expect(reclaimWelcome?.economy, 'reclaim welcome carries the wallet').toBeDefined();
-    expect(reclaimWelcome?.economy?.banked).toBe(42);
-    expect(reclaimWelcome?.economy?.tiers[track]).toBe(3);
+    expect(reclaimWelcome?.economy?.tiers[track]).toBeGreaterThanOrEqual(3);
+    expect(typeof reclaimWelcome?.economy?.banked).toBe('number');
     expect(typeof reclaimWelcome?.economy?.held).toBe('number');
 
     // ...and the client stamped every wallet field exactly as the wire delivered
@@ -158,8 +183,8 @@ describe('reconnect-resume', () => {
     const clientShip = alice.world?.ships.find((s) => s.id === seat);
     expect(clientShip, 'client has a predicted ship for the reclaimed seat').toBeDefined();
     expect(clientShip?.cargo).toBe(reclaimWelcome?.economy?.held);
-    expect(clientShip?.banked).toBe(42);
-    expect((clientShip?.tiers as Record<string, number>)[track]).toBe(3);
+    expect(clientShip?.banked).toBe(reclaimWelcome?.economy?.banked);
+    expect((clientShip?.tiers as Record<string, number>)[track]).toBe(reclaimWelcome?.economy?.tiers[track]);
 
     // --- ...and stays true for the rest of the match -------------------------
     // The welcome is one statement, made once. Everything after it rides the
@@ -169,11 +194,14 @@ describe('reconnect-resume', () => {
     // with RTT — reconciliation replays unacked input over authority, and a rewind
     // cannot put the hold back the way it puts the position back — until the buy
     // button offers an upgrade the server refuses.
-    const banked = 42 + 13;
-    stampedShip.banked = banked;
+    // Minted *relatively* (`+= 13`, not `= 55`): the stand-in may have spent some
+    // of the forged 42 through the ledger's `spent` sink, and an absolute stamp
+    // would mint that spend back off the books and move the residual asserted
+    // below by however much the bot happened to buy.
+    stampedShip.banked += 13;
     await until(
       'the client wallet to follow authority',
-      () => (alice.world?.ships.find((s) => s.id === seat)?.banked ?? 0) >= banked,
+      () => alice.world?.ships.find((s) => s.id === seat)?.banked === stampedShip.banked,
       5_000,
     );
 
