@@ -273,10 +273,6 @@ export class PredictedMatch {
   /** Every ship's hull as authority last stated it — the only source there is
    *  ({@link holdHull}). Empty until the first snapshot. */
   private readonly hull = new Map<PlayerId, number>();
-  /** The tick each of the firer's own in-flight shots was created on — the fact
-   *  that tells a shot the replay will re-fire from one only this screen has
-   *  ({@link harvestOwnShots}). */
-  private readonly shotBirth = new Map<number, Tick>();
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
@@ -385,9 +381,6 @@ export class PredictedMatch {
     step(this.world, [{ id: this.local, actions }], this.dt);
 
     if (before) this.ledgeOrders(orders, before, tick);
-    // A shot spawned this tick gets its birth tick now, while "now" is unambiguous
-    // ({@link noteShotBirths}).
-    this.noteShotBirths();
     this.holdHull();
     this.checkpoint();
     this.decayOffset();
@@ -510,7 +503,7 @@ export class PredictedMatch {
     // The firer's own shots are the client's to draw, so they are lifted out
     // before authority flattens the pool and put back after the replay
     // (`settleShots`, audit item 2b).
-    const carried = this.harvestOwnShots(snapshot.tick);
+    const carried = this.harvestOwnShots();
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -753,25 +746,12 @@ export class PredictedMatch {
    * ({@link applySnapshot} `suppressShipShotsFrom`). Damage stays entirely the
    * server's word — a predicted shot is a picture of a shot.
    */
-  private harvestOwnShots(snapshotTick: Tick): CarriedShot[] {
+  private harvestOwnShots(): CarriedShot[] {
     const out: CarriedShot[] = [];
     const seen = new Set<number>();
     for (const p of this.world.projectiles) {
       if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
-      // **Carry only what the replay cannot re-create.**
-      //
-      // A shot born at or before the snapshot's tick was fired by an input the
-      // replay does not re-run (the replay starts at `snapshotTick + 1`), so it
-      // exists only here and must be carried. A shot born *after* it will be fired
-      // again by the replay in a moment — carrying it too is how one shot became
-      // two on the firer's own screen, and the two copies do not even share an id:
-      // a rewind restores `nextEntityId` to the snapshot's tick, so the re-fired
-      // shot can come back numbered differently and slip past an id-keyed dedupe.
-      // (Measured before this rule: five own shots alive on a screen whose sim can
-      // hold two, and the same id standing in two pool slots at once.)
-      const born = this.shotBirth.get(p.id);
-      if (born !== undefined && born > snapshotTick) continue;
-      // A duplicate that already exists in the pool must not be re-seeded, or the
+      // A duplicate already standing in the pool must not be re-seeded, or the
       // list carries it forward for the rest of the match.
       if (seen.has(p.id)) continue;
       seen.add(p.id);
@@ -806,33 +786,24 @@ export class PredictedMatch {
    *  - the exception is the local player's own ship shots, which are re-placed
    *    above {@link LOCAL_SHOT_BASE} where no snapshot can reach them.
    *
-   * The replay re-fires those own shots too, and they come back with the *same*
-   * entity id, because `rewind` restores `nextEntityId` and the sim is
-   * deterministic — so the duplicate is identified exactly, by id, and not by a
-   * distance heuristic. A shot the replay produced that the carry list has never
-   * seen (a correction changed what the trigger did) joins the carry list instead.
+   * **A shot the replay fires is always a duplicate, so it is always dropped.**
+   *
+   * The carry list is *complete* by construction: every tick the replay re-runs was
+   * predicted once already ({@link predict} steps before any snapshot for that tick
+   * can arrive), so every own shot the replay could possibly produce was produced
+   * then and is already carried. Keeping the replay's copy as well was the old rule,
+   * guarded by an id match — and the guard leaked, because a rewind restores
+   * `nextEntityId` and a re-fired shot can come back numbered differently. Measured
+   * before this: five own shots alive on a screen whose sim can hold two, and one id
+   * standing in two pool slots at once. The rule is now the simple one, and it needs
+   * no id matching at all: **carried in, replayed out.**
    */
   private settleShots(wireSlots: ReadonlySet<number>, carried: readonly CarriedShot[]): void {
-    const keep: CarriedShot[] = [...carried];
-    const known = new Set(carried.map((c) => c.id));
+    const keep = carried;
 
     for (let slot = 0; slot < this.world.projectiles.length; slot++) {
       const p = this.world.projectiles[slot]!;
       if (!p.active || wireSlots.has(slot)) continue;
-      if (p.owner === this.local && p.kind === 'ship' && !known.has(p.id) && keep.length < MAX_PREDICTED_SHOTS) {
-        known.add(p.id);
-        keep.push({
-          id: p.id,
-          x: p.pos.x,
-          y: p.pos.y,
-          vx: p.vel.x,
-          vy: p.vel.y,
-          damage: p.damage,
-          radius: p.radius,
-          life: p.life,
-          mineYield: p.mineYield,
-        });
-      }
       p.active = false;
     }
 
@@ -858,31 +829,6 @@ export class PredictedMatch {
     for (let i = Math.min(keep.length, MAX_PREDICTED_SHOTS); i < MAX_PREDICTED_SHOTS; i++) {
       const p = this.world.projectiles[LOCAL_SHOT_BASE + i];
       if (p) p.active = false;
-    }
-    this.noteShotBirths();
-  }
-
-  /**
-   * Give every own shot on screen a birth tick, and forget the ones that are gone.
-   *
-   * The birth tick is what makes {@link harvestOwnShots} exact rather than a
-   * heuristic: it is the one fact that separates "the replay will fire this again"
-   * from "this exists only on my screen". Recorded here and after every predicted
-   * tick, so a shot has one from the frame it appears.
-   *
-   * The map is pruned to the shots actually alive, so it is bounded by
-   * {@link MAX_PREDICTED_SHOTS} plus whatever the sim is holding this instant —
-   * tens of entries, never a match-long accumulation.
-   */
-  private noteShotBirths(): void {
-    const live = new Set<number>();
-    for (const p of this.world.projectiles) {
-      if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
-      live.add(p.id);
-      if (!this.shotBirth.has(p.id)) this.shotBirth.set(p.id, this.world.tick);
-    }
-    for (const id of this.shotBirth.keys()) {
-      if (!live.has(id)) this.shotBirth.delete(id);
     }
   }
 
@@ -1061,11 +1007,22 @@ interface FrozenClocks {
   readonly builds: number[];
   /** `[repairGate, repairCooldown]` per station, in station order. */
   readonly repair: number[];
+  /** Seconds until each ship's weapon may fire again, in ship order. */
+  readonly weapon: number[];
 }
 
 function freezeClocks(world: World): FrozenClocks {
   const builds: number[] = [];
   const repair: number[] = [];
+  // The weapon cooldown is the same class of clock as the construction countdown,
+  // and it is the one the developer *shot* at: `weaponCooldown -= dt` every tick,
+  // re-spent by every replayed tick, so a client at 150 ms drains it about ten
+  // times too fast and its predicted ship fires a far denser stream than the ship
+  // authority is flying. Two sets of shots, and the extra set is the client's own
+  // invention rather than a copy of anything (GDD §2.8: the fire interval is a
+  // balance constant, not a suggestion).
+  const weapon: number[] = [];
+  for (const ship of world.ships) weapon.push(ship.weaponCooldown ?? 0);
   for (let s = 0; s < world.stations.length; s++) {
     const station = world.stations[s]!;
     for (let j = 0; j < station.builds.length; j++) {
@@ -1073,7 +1030,7 @@ function freezeClocks(world: World): FrozenClocks {
     }
     repair.push(station.repairGate ?? 0, station.repairCooldown ?? 0);
   }
-  return { builds, repair };
+  return { builds, repair, weapon };
 }
 
 /**
@@ -1096,6 +1053,10 @@ function thawClocks(world: World, clocks: FrozenClocks, elapsed: number): void {
     if (gate === undefined || tell === undefined) continue;
     station.repairGate = Math.max(0, gate - elapsed);
     station.repairCooldown = Math.max(0, tell - elapsed);
+  }
+  for (let i = 0; i < world.ships.length; i++) {
+    const held = clocks.weapon[i];
+    if (held !== undefined) world.ships[i]!.weaponCooldown = Math.max(0, held - elapsed);
   }
 }
 

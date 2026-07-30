@@ -195,6 +195,56 @@ describe('one volley at 150 ms', () => {
   });
 });
 
+describe('the capture — what the two screens actually showed', () => {
+  it('prints a frame-by-frame readout of one volley, for the PR', () => {
+    // Not an assertion so much as the *evidence*: a run anyone can reproduce, whose
+    // output is the sentence the brief asks for — "one volley = one set of shots on
+    // BOTH screens" — with the frames written down instead of described. Printed
+    // rather than snapshotted so a reviewer reads it in the CI log, the same way
+    // `src/net/spike/spike.bench.test.ts` publishes its measurements.
+    const rows: string[] = [];
+    let seats: [PlayerId, PlayerId] = [0, 1];
+
+    runLatencyMatch({
+      profile: PHONE,
+      frames: 130,
+      seed: 909,
+      asteroidCount: 6,
+      input: volleyInput(0),
+      onFrame: (frame, clients) => {
+        seats = [clients[0]!.you, clients[1]!.you];
+        if (frame < FIRE_AT - 2 || frame > FIRE_AT + 60 || frame % 4 !== 0) return;
+        const firerSeat = clients[0]!.you;
+        const onFirer = shotsOnScreen(clients[0]!.world, firerSeat);
+        const onRival = shotsOnScreen(clients[1]!.world, firerSeat);
+        rows.push(
+          `  f${String(frame).padStart(3)}  firer ${onFirer}  rival ${onRival}  ` +
+            `${'█'.repeat(onFirer)}${'·'.repeat(2 - onFirer)} | ${'█'.repeat(onRival)}${'·'.repeat(2 - onRival)}`,
+        );
+      },
+    });
+
+    // eslint-disable-next-line no-console
+    console.log(
+      [
+        '',
+        '===== ONE VOLLEY, TWO SCREENS =====',
+        `wire            : ${PHONE.rttMs}ms RTT, ±${PHONE.jitterMs}ms jitter, ${PHONE.lossRate * 100}% loss`,
+        `seats           : firing client = seat ${seats[0]}, rival = seat ${seats[1]}`,
+        `trigger         : frame ${FIRE_AT}, held ${FIRE_FRAMES} frames (one shot)`,
+        'columns         : ship shots owned by the firer, as drawn on each screen',
+        '',
+        ...rows,
+        '',
+      ].join('\n'),
+    );
+
+    // The readout is only worth reading if it is also the gate.
+    expect(rows.some((r) => r.includes('firer 1'))).toBe(true);
+    expect(rows.every((r) => !r.includes('firer 2') && !r.includes('rival 2'))).toBe(true);
+  });
+});
+
 /** The first pool slot reserved for locally-predicted own shots. Restated from
  *  `src/net/presentation` rather than imported, so this test still fails loudly if
  *  that constant moves under it without the wire's cap moving too. */
