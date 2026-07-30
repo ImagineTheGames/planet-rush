@@ -161,9 +161,29 @@ describe('reconnect-resume', () => {
     expect(clientShip?.banked).toBe(42);
     expect((clientShip?.tiers as Record<string, number>)[track]).toBe(3);
 
+    // --- ...and stays true for the rest of the match -------------------------
+    // The welcome is one statement, made once. Everything after it rides the
+    // wallet's own channel (`src/net/transport` EconomyMessage): authority states
+    // the wallet on the ticks it moves, to this slot alone, and the client writes
+    // it inside that tick's reconcile. Without it the predicted wallet drifts up
+    // with RTT — reconciliation replays unacked input over authority, and a rewind
+    // cannot put the hold back the way it puts the position back — until the buy
+    // button offers an upgrade the server refuses.
+    const banked = 42 + 13;
+    stampedShip.banked = banked;
+    await until(
+      'the client wallet to follow authority',
+      () => (alice.world?.ships.find((s) => s.id === seat)?.banked ?? 0) >= banked,
+      5_000,
+    );
+
     // --- Conservation holds across the reconnect ----------------------------
     // The authoritative ledger's residual is exactly where it was before the
-    // drop: the substitution and reclaim moved no ore off the books.
-    expect(oreResidual(room.world!)).toBeCloseTo(residualBaseline, 6);
+    // drop: the substitution and reclaim moved no ore off the books. (Both direct
+    // stamps mint ore off the ledger by design — this test forges a wallet rather
+    // than earning one — so the baseline is re-sampled with them included. A wallet
+    // *earned* by a real substitute bot, with the residual sampled every tick of
+    // the cycle, is `./economy-conservation.test.ts`.)
+    expect(oreResidual(room.world!)).toBeCloseTo(residualBaseline + 13, 6);
   }, 30_000);
 });

@@ -22,15 +22,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
-import { TICK_DT, createWorld, step } from '../sim';
-import type { World, WorldConfig } from '../sim';
+import { TICK_DT, createWorld, shipCargoCap, stockTiers, step } from '../sim';
+import type { UpgradeTiers, World, WorldConfig } from '../sim';
 import { InputQueue } from './input-queue';
 import { PredictedMatch, SNAP_THRESHOLD, applySnapshot } from './prediction';
 import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
-import type { InputMessage } from './transport';
+import type { InputMessage, PlayerEconomy } from './transport';
 
 const LOCAL: PlayerId = 0;
 
@@ -425,5 +425,101 @@ describe('applySnapshot', () => {
     // The pool is sparse and reused: a shot the server no longer lists has
     // landed or expired, and leaving it lit would draw a ghost (`src/sim/state`).
     expect(world.projectiles[0]?.active).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The wallet
+// ---------------------------------------------------------------------------
+
+/** A wallet as the server would state it (`./transport` EconomyMessage). */
+function wallet(held: number, banked: number, tiers: Partial<UpgradeTiers> = {}): PlayerEconomy {
+  return { held, banked, tiers: { ...stockTiers(), ...tiers } };
+}
+
+describe('the wallet on the wire', () => {
+  /** A client and a server in agreement, four ticks in, with two presses the
+   *  server has not run yet — the steady state a wallet correction lands in. */
+  function flying(): { server: Authority; client: PredictedMatch } {
+    const server = new Authority();
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    for (let tick = 1; tick <= 6; tick++) {
+      server.receive({ type: 'input', tick, seq: tick, actions: THRUST });
+      client.predict(tick, THRUST);
+      if (tick <= 4) server.tick();
+    }
+    return { server, client };
+  }
+
+  it('re-bases the hold and the bank on authority at the snapshot’s tick', () => {
+    const { server, client } = flying();
+    // The compounding error this channel exists for: reconciliation rewinds the
+    // clock but the snapshot carries no wallet, so ore the client tractored in
+    // during its unacked ticks is re-earned once per reconcile it survives. Stand
+    // in for however many reconciles it took — the client's hold is simply wrong.
+    shipOf(client.world).cargo = 5.5;
+    shipOf(client.world).banked = 30;
+
+    client.stageEconomy(wallet(1.25, 12), server.world.tick);
+    const { snapshot, ackSeq } = server.broadcast();
+    client.reconcile(snapshot, ackSeq);
+
+    // The inflated wallet is gone and authority's 13.25 ore is what the client
+    // holds. Not field for field: the ship is parked on its home station, so the
+    // two replayed ticks drain a sliver of the hold into the bank
+    // (`__oreDepositStage`) — that is the *sim* moving the player's own ore on top
+    // of authority's figure, which is exactly what a replay is for.
+    const ship = shipOf(client.world);
+    expect(ship.cargo + ship.banked).toBeCloseTo(13.25, 6);
+    expect(ship.cargo).toBeLessThanOrEqual(1.25);
+    expect(ship.banked).toBeGreaterThanOrEqual(12);
+    // And it is consumed, not re-applied on every later snapshot.
+    expect(client.stagedEconomyTick).toBe(-1);
+  });
+
+  it('restores the tiers *and* the ceilings they scale', () => {
+    const { server, client } = flying();
+    const stock = shipOf(client.world).maxHull;
+
+    client.stageEconomy(wallet(0, 40, { [UpgradeTrack.Hull]: 2, [UpgradeTrack.Cargo]: 1 }), server.world.tick);
+    client.reconcile(server.broadcast().snapshot, server.broadcast().ackSeq);
+
+    const ship = shipOf(client.world);
+    expect(ship.tiers[UpgradeTrack.Hull]).toBe(2);
+    // `maxHull` and `cargoCap` are stored, not derived per read (`src/sim/upgrades`
+    // `refreshDerivedStats`): a ship handed only its `tiers` would fly the fight
+    // with tier-0 ceilings and mis-predict every hit it takes.
+    expect(ship.maxHull).toBeGreaterThan(stock);
+    expect(ship.cargoCap).toBe(shipCargoCap(ship));
+  });
+
+  it('holds a wallet from a tick the client has not reconciled yet', () => {
+    const { server, client } = flying();
+    const future = server.world.tick + 20;
+    const before = { ...shipOf(client.world) };
+    client.stageEconomy(wallet(before.banked + 25, before.banked + 25), future);
+
+    client.reconcile(server.broadcast().snapshot, server.broadcast().ackSeq);
+
+    // Applying it now would stamp a wallet from the future onto the present and
+    // then let the replay add to it — the wallet is written in *its own* tick's
+    // reconcile or not at all, so the client's own predicted figures stand.
+    expect(shipOf(client.world).banked).toBeCloseTo(before.banked, 6);
+    expect(client.stagedEconomyTick).toBe(future);
+  });
+
+  it('keeps the newest statement when two arrive between snapshots', () => {
+    const { server, client } = flying();
+    client.stageEconomy(wallet(1, 9), server.world.tick);
+    // An older reading, arriving late. It has nothing to say: the wallet is full
+    // state, so the newest word is the only one worth keeping.
+    client.stageEconomy(wallet(0.5, 0.5), server.world.tick - 2);
+
+    client.reconcile(server.broadcast().snapshot, server.broadcast().ackSeq);
+
+    // 10 ore, from the newest statement — not the 1 the stale one claimed. (Hold
+    // and bank are summed for the same home-station drain reason as above.)
+    const ship = shipOf(client.world);
+    expect(ship.cargo + ship.banked).toBeCloseTo(10, 6);
   });
 });
