@@ -1,0 +1,1937 @@
+{
+  "schema": "planet-rush.playtest-log",
+  "version": 1,
+  "summary": "Planet Rush playtest log — build 927943a (2026-07-30T14:34:58.423Z) · session 2026-07-30T15:01:44.848Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+  "env": {
+    "sha": "927943a",
+    "buildTime": "2026-07-30T14:34:58.423Z",
+    "dirty": false,
+    "startedAt": "2026-07-30T15:01:44.848Z",
+    "formFactor": "desktop",
+    "viewport": "1280x800",
+    "touch": false,
+    "connection": "4g"
+  },
+  "durationMs": 114258,
+  "capacity": 600,
+  "dropped": 0,
+  "events": [
+    {
+      "at": 0,
+      "kind": "session",
+      "msg": "session start",
+      "data": {
+        "sha": "927943a",
+        "buildTime": "2026-07-30T14:34:58.423Z",
+        "dirty": false,
+        "startedAt": "2026-07-30T15:01:44.848Z",
+        "form": "desktop",
+        "viewport": "1280x800",
+        "touch": false,
+        "connection": "4g",
+        "schema": "planet-rush.playtest-log/1"
+      }
+    },
+    {
+      "at": 0,
+      "kind": "note",
+      "msg": "Planet Rush build 927943a built 2026-07-30T14:34:58.423Z"
+    },
+    {
+      "at": 89,
+      "kind": "note",
+      "msg": "webgl",
+      "data": {
+        "api": "webgl2"
+      }
+    },
+    {
+      "at": 1112,
+      "kind": "connect",
+      "msg": "front door idle",
+      "data": {
+        "screen": "home"
+      }
+    },
+    {
+      "at": 1790,
+      "kind": "connect",
+      "msg": "front door idle",
+      "data": {
+        "screen": "join"
+      }
+    },
+    {
+      "at": 3081,
+      "kind": "connect",
+      "msg": "front door connecting",
+      "data": {
+        "screen": "join"
+      }
+    },
+    {
+      "at": 3081,
+      "kind": "connect",
+      "msg": "allocate",
+      "data": {
+        "door": "join",
+        "allocator": "planet-rush-allocator.fly.dev",
+        "region": "iad"
+      }
+    },
+    {
+      "at": 3355,
+      "kind": "connect",
+      "msg": "ticket",
+      "data": {
+        "room": "J5LG",
+        "machine": "0800d5b6d62328",
+        "region": "iad",
+        "ticket": true,
+        "expiresInMs": 31516
+      }
+    },
+    {
+      "at": 3355,
+      "kind": "connect",
+      "msg": "dial",
+      "data": {
+        "host": "planet-rush-gameserver.fly.dev",
+        "room": "J5LG",
+        "creator": false
+      }
+    },
+    {
+      "at": 3707,
+      "kind": "connect",
+      "msg": "state open"
+    },
+    {
+      "at": 3763,
+      "kind": "connect",
+      "msg": "welcome",
+      "data": {
+        "seat": 1,
+        "room": "J5LG",
+        "tick": 0,
+        "reclaimable": true
+      }
+    },
+    {
+      "at": 3946,
+      "kind": "connect",
+      "msg": "lobbyState",
+      "data": {
+        "slots": 8,
+        "bots": 0
+      },
+      "repeat": 3,
+      "lastAt": 4011
+    },
+    {
+      "at": 9726,
+      "kind": "match",
+      "msg": "matchStart",
+      "data": {
+        "tick": 0,
+        "seed": 2874683721,
+        "slots": 8,
+        "reclaim": false
+      }
+    },
+    {
+      "at": 10059,
+      "kind": "connect",
+      "msg": "lobbyState",
+      "data": {
+        "slots": 8,
+        "bots": 6
+      }
+    },
+    {
+      "at": 10479,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": null,
+        "rttMax": null,
+        "jitter": null,
+        "corr": 0.027,
+        "corrMax": 0.082,
+        "mispred": 0,
+        "recon": 3,
+        "resync": 0,
+        "snap": 0,
+        "lead": 7
+      }
+    },
+    {
+      "at": 11193,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 354,
+        "rttMax": 473,
+        "jitter": 110,
+        "corr": 0.25,
+        "corrMax": 1.473,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 12235,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 419,
+        "rttMax": 632,
+        "jitter": 56,
+        "corr": 0.372,
+        "corrMax": 0.921,
+        "mispred": 0,
+        "recon": 35,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 13452,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 400,
+        "rttMax": 549,
+        "jitter": 34,
+        "corr": 0.421,
+        "corrMax": 1.176,
+        "mispred": 0.031,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 14436,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 381,
+        "rttMax": 455,
+        "jitter": 26,
+        "corr": 0.445,
+        "corrMax": 0.896,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 15466,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 360,
+        "rttMax": 446,
+        "jitter": 39,
+        "corr": 0.435,
+        "corrMax": 0.877,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 19
+      }
+    },
+    {
+      "at": 16430,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 371,
+        "rttMax": 456,
+        "jitter": 43,
+        "corr": 0.487,
+        "corrMax": 1.011,
+        "mispred": 0.033,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 17415,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 422,
+        "rttMax": 630,
+        "jitter": 41,
+        "corr": 0.319,
+        "corrMax": 1.12,
+        "mispred": 0.036,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 18184,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 358,
+        "rttMax": 428,
+        "jitter": 35,
+        "corr": 0.452,
+        "corrMax": 0.892,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 19
+      }
+    },
+    {
+      "at": 19448,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 371,
+        "rttMax": 454,
+        "jitter": 42,
+        "corr": 0.396,
+        "corrMax": 1.074,
+        "mispred": 0.03,
+        "recon": 33,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 20429,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 353,
+        "rttMax": 458,
+        "jitter": 33,
+        "corr": 0.515,
+        "corrMax": 1.065,
+        "mispred": 0.034,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 19
+      }
+    },
+    {
+      "at": 21427,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 368,
+        "rttMax": 497,
+        "jitter": 38,
+        "corr": 0.491,
+        "corrMax": 0.978,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 22530,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 360,
+        "rttMax": 409,
+        "jitter": 23,
+        "corr": 0.436,
+        "corrMax": 0.935,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 23452,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 387,
+        "rttMax": 473,
+        "jitter": 27,
+        "corr": 0.464,
+        "corrMax": 1.256,
+        "mispred": 0.033,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 24472,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 401,
+        "rttMax": 621,
+        "jitter": 45,
+        "corr": 0.501,
+        "corrMax": 1.165,
+        "mispred": 0.069,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 25435,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 365,
+        "rttMax": 441,
+        "jitter": 29,
+        "corr": 0.395,
+        "corrMax": 1.16,
+        "mispred": 0.033,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 26419,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 384,
+        "rttMax": 433,
+        "jitter": 30,
+        "corr": 0.402,
+        "corrMax": 1.014,
+        "mispred": 0.033,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 27441,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 385,
+        "rttMax": 478,
+        "jitter": 34,
+        "corr": 0.5,
+        "corrMax": 1.09,
+        "mispred": 0.063,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 28441,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 395,
+        "rttMax": 519,
+        "jitter": 48,
+        "corr": 0.468,
+        "corrMax": 1.082,
+        "mispred": 0.037,
+        "recon": 27,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 29517,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 387,
+        "rttMax": 481,
+        "jitter": 29,
+        "corr": 0.432,
+        "corrMax": 1.164,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 30453,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 397,
+        "rttMax": 471,
+        "jitter": 37,
+        "corr": 0.545,
+        "corrMax": 1.128,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 31440,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 383,
+        "rttMax": 498,
+        "jitter": 45,
+        "corr": 0.491,
+        "corrMax": 1.003,
+        "mispred": 0.036,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 32191,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 377,
+        "rttMax": 445,
+        "jitter": 22,
+        "corr": 0.435,
+        "corrMax": 0.964,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 33213,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 395,
+        "rttMax": 486,
+        "jitter": 44,
+        "corr": 0.462,
+        "corrMax": 1.085,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 34477,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 388,
+        "rttMax": 529,
+        "jitter": 45,
+        "corr": 0.569,
+        "corrMax": 0.94,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 35154,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 391,
+        "rttMax": 505,
+        "jitter": 41,
+        "corr": 0.43,
+        "corrMax": 1.072,
+        "mispred": 0.034,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 36210,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 380,
+        "rttMax": 454,
+        "jitter": 40,
+        "corr": 0.486,
+        "corrMax": 1.287,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 37430,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 378,
+        "rttMax": 490,
+        "jitter": 27,
+        "corr": 0.471,
+        "corrMax": 1.141,
+        "mispred": 0.067,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 38431,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 390,
+        "rttMax": 495,
+        "jitter": 38,
+        "corr": 0.498,
+        "corrMax": 1.146,
+        "mispred": 0.063,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 39518,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 374,
+        "rttMax": 466,
+        "jitter": 36,
+        "corr": 0.435,
+        "corrMax": 0.73,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 40434,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 399,
+        "rttMax": 476,
+        "jitter": 18,
+        "corr": 0.332,
+        "corrMax": 0.997,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 41453,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 391,
+        "rttMax": 474,
+        "jitter": 38,
+        "corr": 0.484,
+        "corrMax": 1.185,
+        "mispred": 0.065,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 42408,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 388,
+        "rttMax": 480,
+        "jitter": 22,
+        "corr": 0.52,
+        "corrMax": 0.912,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 43209,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 381,
+        "rttMax": 465,
+        "jitter": 29,
+        "corr": 0.384,
+        "corrMax": 0.988,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 44460,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 382,
+        "rttMax": 494,
+        "jitter": 39,
+        "corr": 0.405,
+        "corrMax": 1.06,
+        "mispred": 0.032,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 45464,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 381,
+        "rttMax": 480,
+        "jitter": 33,
+        "corr": 0.496,
+        "corrMax": 0.89,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 46199,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 385,
+        "rttMax": 455,
+        "jitter": 15,
+        "corr": 0.44,
+        "corrMax": 1.003,
+        "mispred": 0.033,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 47412,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 390,
+        "rttMax": 478,
+        "jitter": 37,
+        "corr": 0.352,
+        "corrMax": 1.002,
+        "mispred": 0.031,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 48373,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 384,
+        "rttMax": 514,
+        "jitter": 44,
+        "corr": 0.443,
+        "corrMax": 0.883,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 49231,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 355,
+        "rttMax": 392,
+        "jitter": 33,
+        "corr": 0.391,
+        "corrMax": 1.003,
+        "mispred": 0.034,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 19
+      }
+    },
+    {
+      "at": 50232,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 383,
+        "rttMax": 436,
+        "jitter": 52,
+        "corr": 0.112,
+        "corrMax": 0.938,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 51476,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 375,
+        "rttMax": 439,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 52467,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 379,
+        "rttMax": 438,
+        "jitter": 53,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 53235,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 369,
+        "rttMax": 440,
+        "jitter": 47,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 54494,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 369,
+        "rttMax": 427,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 55430,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 374,
+        "rttMax": 430,
+        "jitter": 45,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 56497,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 373,
+        "rttMax": 438,
+        "jitter": 44,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 57499,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 381,
+        "rttMax": 433,
+        "jitter": 55,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 58477,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 389,
+        "rttMax": 459,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 59438,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 384,
+        "rttMax": 454,
+        "jitter": 37,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 60245,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 388,
+        "rttMax": 450,
+        "jitter": 47,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 61240,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 383,
+        "rttMax": 464,
+        "jitter": 29,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 62235,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 386,
+        "rttMax": 483,
+        "jitter": 36,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 63433,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 372,
+        "rttMax": 442,
+        "jitter": 34,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 64427,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 391,
+        "rttMax": 460,
+        "jitter": 25,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 65504,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 392,
+        "rttMax": 474,
+        "jitter": 40,
+        "corr": 58.444,
+        "corrMax": 362.353,
+        "mispred": 0.161,
+        "recon": 31,
+        "resync": 0,
+        "snap": 1,
+        "lead": 21
+      }
+    },
+    {
+      "at": 66480,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 398,
+        "rttMax": 439,
+        "jitter": 30,
+        "corr": 362.353,
+        "corrMax": 362.353,
+        "mispred": 1,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 67504,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 398,
+        "rttMax": 461,
+        "jitter": 26,
+        "corr": 362.353,
+        "corrMax": 362.353,
+        "mispred": 1,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 68503,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 397,
+        "rttMax": 467,
+        "jitter": 35,
+        "corr": 362.353,
+        "corrMax": 362.353,
+        "mispred": 1,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 69452,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 390,
+        "rttMax": 473,
+        "jitter": 16,
+        "corr": 362.353,
+        "corrMax": 362.353,
+        "mispred": 1,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 70453,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 390,
+        "rttMax": 472,
+        "jitter": 32,
+        "corr": 362.353,
+        "corrMax": 362.353,
+        "mispred": 1,
+        "recon": 25,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 71229,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 537,
+        "rttMax": 770,
+        "jitter": 51,
+        "corr": 0.002,
+        "corrMax": 0.082,
+        "mispred": 0,
+        "recon": 33,
+        "resync": 0,
+        "snap": 0,
+        "lead": 24
+      }
+    },
+    {
+      "at": 72237,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 438,
+        "rttMax": 490,
+        "jitter": 35,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 73236,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 441,
+        "rttMax": 463,
+        "jitter": 25,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 74430,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 431,
+        "rttMax": 461,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 75488,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 412,
+        "rttMax": 458,
+        "jitter": 49,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 76491,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 411,
+        "rttMax": 471,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 77498,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 427,
+        "rttMax": 475,
+        "jitter": 53,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 78502,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 422,
+        "rttMax": 467,
+        "jitter": 56,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 79483,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 424,
+        "rttMax": 481,
+        "jitter": 59,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 80243,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 422,
+        "rttMax": 463,
+        "jitter": 61,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 81449,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 415,
+        "rttMax": 459,
+        "jitter": 47,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 82429,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 434,
+        "rttMax": 523,
+        "jitter": 55,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 83276,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 482,
+        "rttMax": 682,
+        "jitter": 36,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 84516,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 460,
+        "rttMax": 569,
+        "jitter": 44,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 85270,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 459,
+        "rttMax": 567,
+        "jitter": 54,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 86488,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 468,
+        "rttMax": 554,
+        "jitter": 45,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 24
+      }
+    },
+    {
+      "at": 87499,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 463,
+        "rttMax": 550,
+        "jitter": 35,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 88502,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 470,
+        "rttMax": 565,
+        "jitter": 35,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 24
+      }
+    },
+    {
+      "at": 89492,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 459,
+        "rttMax": 543,
+        "jitter": 39,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 90484,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 442,
+        "rttMax": 541,
+        "jitter": 30,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 91504,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 447,
+        "rttMax": 468,
+        "jitter": 21,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 92494,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 424,
+        "rttMax": 468,
+        "jitter": 32,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 93496,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 441,
+        "rttMax": 454,
+        "jitter": 15,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 94507,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 420,
+        "rttMax": 467,
+        "jitter": 33,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 95510,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 433,
+        "rttMax": 555,
+        "jitter": 39,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 96257,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 447,
+        "rttMax": 470,
+        "jitter": 32,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 97272,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 446,
+        "rttMax": 473,
+        "jitter": 34,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 98244,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 433,
+        "rttMax": 459,
+        "jitter": 33,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 99261,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 445,
+        "rttMax": 466,
+        "jitter": 31,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 100253,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 412,
+        "rttMax": 466,
+        "jitter": 55,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 101460,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 429,
+        "rttMax": 469,
+        "jitter": 56,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 102500,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 426,
+        "rttMax": 494,
+        "jitter": 61,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 103496,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 422,
+        "rttMax": 470,
+        "jitter": 48,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 104492,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 419,
+        "rttMax": 461,
+        "jitter": 56,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 105484,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 439,
+        "rttMax": 548,
+        "jitter": 51,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 28,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 106508,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 432,
+        "rttMax": 527,
+        "jitter": 58,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 23
+      }
+    },
+    {
+      "at": 107516,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 420,
+        "rttMax": 472,
+        "jitter": 63,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 31,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 108252,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 418,
+        "rttMax": 471,
+        "jitter": 67,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 27,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 109505,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 412,
+        "rttMax": 468,
+        "jitter": 54,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 32,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 110493,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 417,
+        "rttMax": 457,
+        "jitter": 28,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    },
+    {
+      "at": 111496,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 450,
+        "rttMax": 644,
+        "jitter": 32,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 33,
+        "resync": 0,
+        "snap": 0,
+        "lead": 22
+      }
+    },
+    {
+      "at": 112488,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 361,
+        "rttMax": 452,
+        "jitter": 41,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 27,
+        "resync": 0,
+        "snap": 0,
+        "lead": 19
+      }
+    },
+    {
+      "at": 113452,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 388,
+        "rttMax": 453,
+        "jitter": 33,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 29,
+        "resync": 0,
+        "snap": 0,
+        "lead": 20
+      }
+    },
+    {
+      "at": 114258,
+      "kind": "net",
+      "msg": "sample",
+      "data": {
+        "rtt": 405,
+        "rttMax": 451,
+        "jitter": 42,
+        "corr": 0,
+        "corrMax": 0,
+        "mispred": 0,
+        "recon": 30,
+        "resync": 0,
+        "snap": 0,
+        "lead": 21
+      }
+    }
+  ]
+}

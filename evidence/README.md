@@ -420,3 +420,68 @@ The gates first failed on three blockers, each since fixed (see re-verify above)
 shows the repo's own end-to-end tests (two real client sessions, shared world,
 reconnect-grace, ticket enforcement) 16/16 green on Node/localhost, isolating every
 failure to deploy + client wiring. Artifact: `images/probe-online-live-reverify3.txt`.
+
+---
+
+## M10 online-final — reconnect re-verified, and the feel measured with COPY LOG (client `927943a`)
+
+Two gates this round. **Both FAILED**, and the failures are worth more than the
+green would have been: three separate, precisely-located defects, none of them in
+the netcode this round was meant to bless.
+
+| Gate | Shot | Verdict |
+| --- | --- | --- |
+| Reconnect restores ship + cargo/bank/upgrades, live | `online-reconnect` | **failed** — the reclaim resumes the match on both fleets, but no wallet reaches the live client |
+| Feel at real latency, quoted from the session log export | `online-feel` | **failed** — flight is far inside every threshold; the exported session breaches three, and COPY LOG cannot be pressed on a phone |
+
+**The one line that explains most of it: the gameserver deploy has been RED since
+2026-07-29T08:25Z.** Every `Deploy server (Fly.io)` run since then has failed, on
+`server/upgrade-router.ts(29,33): error TS2307: Cannot find module
+'../allocator/router'` — `server/Dockerfile` never copies `allocator/`, and the
+image's own `RUN npx tsc --noEmit` therefore fails. The live gameserver's
+`uptimeSeconds` (109 398 ≈ 30.4 h) lands exactly on that last green deploy. So the
+Machines in iad are running a build from before #235, #238, #241, #243, #244 and
+#245. That single missing `COPY` line is why the reconnect wallet (#241) never
+reaches a live client and why the socket-hop machine-pin (#235) is still a coin
+flip — measured twice this session at 5/10 and 5/12 welcome
+(`images/online-final-wire-pin.txt`).
+
+**The second defect, found while testing the first: `upgradeOrder` cannot cross
+the online wire.** `parseActions` (`src/net/wire.ts`) has no case for it and
+`default: return null` rejects the whole input tick, so online you can never buy a
+ship upgrade — your own HUD shows the tier and the ore leaving your bank, and
+authority never saw the order. `'satellite'` is missing from the same validator's
+`BUILD_ITEMS` and dies the same way. Measured, not read
+(`probe-wire-orders.mjs` → `images/online-final-wire-orders.json`): one fresh room
+per order, verdict taken from authority's own `economy` frames —
+`turret` charges, `turret + thrust` charges, `turret + shield` charges,
+`turret + repair` charges, but `turret + upgradeOrder` and `turret + satellite`
+charge nothing at all.
+
+**The third: COPY LOG is unreachable on a phone.** The mobile landscape lock
+enters ELEMENT fullscreen on the game root, and the Fullscreen API paints only
+that subtree — while the affordance is appended to `document.body`. It is in the
+DOM at an on-screen rect and `document.elementFromPoint` at its own centre returns
+`CANVAS`. `images/copylog-reach.json`: desktop PRESSABLE=true, both phone profiles
+PRESSABLE=false. The one button built so a phone can hand a session back is the
+one place it cannot be pressed.
+
+**What is genuinely good, and should not be lost in the red.** On the code at HEAD
+(`fleet-head.mjs`, the two shipped server bundles run here) a reclaim brings back
+the banked ore and the held cargo exactly as authority holds them, witnessed on the
+wire. And the #244 feel wiring plainly reaches the screen: across 164 of 176
+measured seconds on two live clients at ~400 ms RTT, the worst correction anywhere
+is **1.473 u** against a 4 u ceiling, the mean is 0.29 u / 0.18 u against 1.5 u,
+misprediction is 2 % and 1 % against 50 %, the lead is bounded at **21 t mean / 24 t
+peak** against 32 / 120 — the ratchet the audit measured at 33 t and 59 t is gone —
+and there is not one visual snap. The breaching seconds are all one window per
+client, and that window is a death-and-respawn teleport home (correctly snapped
+once) followed by ~5 s in which the telemetry keeps re-charging the same correction
+while the ship provably sits still — `images/online-feel-diagnose.json`.
+
+**The instruments, all runnable, all in `evidence/`:**
+`capture-online-feel.mjs` (two browser clients through the shipped front door on
+both form factors, then the real COPY LOG button — the exports are committed
+verbatim), `online-final.live.test.ts` (the shipped `src/net` modules over the real
+internet; `QA_ALLOCATOR` re-points it at a HEAD fleet), `fleet-head.mjs`,
+`probe-wire-orders.mjs`, `probe-copylog-reach.mjs`, `feel-diagnose.live.test.ts`.

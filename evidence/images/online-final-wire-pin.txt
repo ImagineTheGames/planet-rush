@@ -1,0 +1,21 @@
+# evidence/images/online-final-wire-pin.txt — the LIVE machine-pin, measured by the repo's own probe
+# captured 2026-07-30T14:50:12Z by QA against https://planet-rush-allocator.fly.dev
+# node tests/net/wire-probe.mjs https://planet-rush-allocator.fly.dev 12
+
+{"status":"ok","machines":2,"rooms":1,"reservations":0,"uptimeSeconds":1085}
+{"status":"ok","machine":"6836293b5161d8","region":"iad","rooms":0,"capacity":32,"draining":false,"loopLagMs":0.87,"uptimeSeconds":109398}
+
+#1  FAIL      [join] joinError: bad-ticket  room=PGE6 machine=6836293b5161d8
+#2  FAIL      [join] joinError: bad-ticket  room=PEDB machine=0800d5b6d62328
+#3  FAIL      [join] joinError: bad-ticket  room=ERGD machine=6836293b5161d8
+#4  WELCOME   room=VQMV machine=0800d5b6d62328 seat=0
+#5  WELCOME   room=BY3C machine=6836293b5161d8 seat=0
+#6  FAIL      [join] joinError: bad-ticket  room=3Y7X machine=0800d5b6d62328
+#7  WELCOME   room=QWRQ machine=6836293b5161d8 seat=0
+#8  FAIL      [join] joinError: bad-ticket  room=57FE machine=0800d5b6d62328
+#9  FAIL      [join] joinError: bad-ticket  room=ENP4 machine=6836293b5161d8
+#10  WELCOME   room=XZZA machine=0800d5b6d62328 seat=0
+#11  FAIL      [join] joinError: bad-ticket  room=94HX machine=6836293b5161d8
+#12  WELCOME   room=5MTW machine=0800d5b6d62328 seat=0
+
+5/12 welcome
