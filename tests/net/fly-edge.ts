@@ -31,6 +31,35 @@ import { createConnection } from 'node:net';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 
+/** How the edge itself behaves, beyond which Machines are behind it. */
+export interface EdgeOptions {
+  /** Fixed listen port, for a fixture that has to be reachable at a known URL
+   *  (the live-stage evidence run). 0 — the default — takes an ephemeral one. */
+  readonly port?: number;
+  /**
+   * Hold each upgrade this long before forwarding it. Zero in every test that
+   * asserts behaviour; a second or so in the evidence run, where the point is to
+   * photograph the connecting screen *while it is still dialling* rather than to
+   * catch a 20-millisecond frame.
+   */
+  readonly hopDelayMs?: number;
+  /**
+   * Extra knobs the *owner* of the fleet wants reachable on the same control
+   * route — `./local-fleet` hangs `?pin=on|off` here so an out-of-process caller
+   * (the live-stage evidence run) can put the fleet into the shipped-dead state
+   * and back without restarting it. The edge itself has no opinion about them.
+   */
+  readonly onControl?: (params: URLSearchParams) => void;
+  /**
+   * Resolve the Machine an upgrade URL's ticket names, for {@link FlyEdge.landWrong}
+   * — the "anycast always picks the wrong one" mode. Fly's edge cannot do this and
+   * must not: it is the fixture cheating on purpose, so a wrong hop is a certainty
+   * rather than a coin flip a test has to wait for. `null` means "cannot tell", and
+   * the edge falls back to its normal first hop.
+   */
+  readonly hostOf?: (upgradeUrl: string) => string | null;
+}
+
 /** One Machine behind the edge: the id a ticket names, and where it really is. */
 export interface EdgeMachine {
   /** The Machine id (`MACHINE_ID` / `FLY_MACHINE_ID`) a `fly-replay` names. */
@@ -51,6 +80,9 @@ export interface FlyEdge {
    * round-robin. This is the knob that turns a coin flip into a test.
    */
   landOn(machine: string | null): void;
+  /** Land every upgrade on a Machine that is NOT the one its ticket names (or stop
+   *  doing so). Needs {@link EdgeOptions.hostOf}; without it this is a no-op. */
+  landWrong(on: boolean): void;
   /** How many upgrades have been re-delivered because of a `fly-replay`. */
   readonly replays: number;
   /** Reset the counter between rounds. */
@@ -87,14 +119,24 @@ function replayTarget(head: string): string | null {
  * Start an edge in front of `machines`. Clients dial {@link FlyEdge.url} and never
  * learn which Machine served them — which is the whole shape of the live system.
  */
-export async function startFlyEdge(machines: readonly EdgeMachine[]): Promise<FlyEdge> {
+export async function startFlyEdge(
+  machines: readonly EdgeMachine[],
+  options: EdgeOptions = {},
+): Promise<FlyEdge> {
   if (machines.length === 0) throw new Error('an edge needs at least one machine');
+  const hopDelayMs = options.hopDelayMs ?? 0;
   const byId = new Map(machines.map((m) => [m.machine, m]));
   let forced: string | null = null;
+  let wrongOnly = false;
   let cursor = 0;
   let replays = 0;
 
-  const firstHop = (): EdgeMachine => {
+  const firstHop = (upgradeUrl: string): EdgeMachine => {
+    if (wrongOnly && options.hostOf) {
+      const host = options.hostOf(upgradeUrl);
+      const wrong = host === null ? undefined : machines.find((m) => m.machine !== host);
+      if (wrong) return wrong;
+    }
     if (forced !== null) {
       const pinned = byId.get(forced);
       if (!pinned) throw new Error(`no machine ${forced} behind this edge`);
@@ -118,8 +160,11 @@ export async function startFlyEdge(machines: readonly EdgeMachine[]): Promise<Fl
       const machine = url.searchParams.get('machine');
       if (machine !== null) forced = machine === 'any' ? null : machine;
       if (url.searchParams.get('reset') === '1') replays = 0;
+      const wrong = url.searchParams.get('wrong');
+      if (wrong !== null) wrongOnly = wrong !== '0';
+      options.onControl?.(url.searchParams);
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ forced, replays, machines: [...byId.keys()] }));
+      response.end(JSON.stringify({ forced, wrongOnly, replays, machines: [...byId.keys()] }));
       return;
     }
     response.writeHead(200, { 'content-type': 'text/plain' });
@@ -140,6 +185,10 @@ export async function startFlyEdge(machines: readonly EdgeMachine[]): Promise<Fl
         return;
       }
       const parsed = new URL(target.url);
+      if (hopDelayMs > 0 && depth === 1) {
+        setTimeout(() => hop(target, depth + 0.001), hopDelayMs);
+        return;
+      }
       const upstream: Socket = createConnection(Number(parsed.port), parsed.hostname);
       live.add(upstream);
       upstream.on('close', () => live.delete(upstream));
@@ -191,10 +240,10 @@ export async function startFlyEdge(machines: readonly EdgeMachine[]): Promise<Fl
       client.on('close', () => upstream.destroy());
     };
 
-    hop(firstHop(), 1);
+    hop(firstHop(request.url ?? '/'), 1);
   });
 
-  await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => http.listen(options.port ?? 0, '127.0.0.1', resolve));
   const address = http.address();
   if (address === null || typeof address === 'string') throw new Error('no port');
 
@@ -203,6 +252,9 @@ export async function startFlyEdge(machines: readonly EdgeMachine[]): Promise<Fl
     controlUrl: `http://127.0.0.1:${address.port}${CONTROL_PATH}`,
     landOn: (machine): void => {
       forced = machine;
+    },
+    landWrong: (on): void => {
+      wrongOnly = on;
     },
     get replays(): number {
       return replays;

@@ -39,8 +39,9 @@ import { MatchServer } from '../../server/match-server';
 import { attachWebSocketServer } from '../../server/ws';
 import type { WsConnection } from '../../server/ws';
 import { armReplayGuard } from '../../server/upgrade-router';
-import { buildRegistration } from '../../server/heartbeat';
+import { buildHeartbeat, buildRegistration } from '../../server/heartbeat';
 import { FLEET_AUTH_HEADER, signFleetRequest } from '../../src/net/fleet-auth';
+import { verifyTicket } from '../../src/net/ticket';
 import { startFlyEdge } from './fly-edge';
 import type { FlyEdge } from './fly-edge';
 
@@ -68,11 +69,23 @@ export interface LocalFleet {
   readonly machines: readonly FleetMachine[];
   /** Look up a Machine by the id a ticket names. */
   machineOf(id: string): FleetMachine | undefined;
+  /** Arm or disarm the socket-hop pin across the whole fleet at runtime — the
+   *  fixture's stand-in for redeploying with `MATCH_ROUTER` set or unset. */
+  setPin(on: boolean): void;
   stop(): Promise<void>;
 }
 
 /** How a fleet is stood up. */
 export interface FleetOptions {
+  /** Fixed allocator port, so a fixture that must be reachable at a known URL (the
+   *  live-stage evidence run, whose bundle bakes `VITE_ALLOCATOR_URL` at build
+   *  time) can be. 0 — the default — takes an ephemeral one. */
+  readonly allocatorPort?: number;
+  /** Fixed edge port, for the same reason: the allocator advertises this URL as
+   *  `connectUrl`, and a built bundle cannot be told about an ephemeral one. */
+  readonly edgePort?: number;
+  /** Hold every upgrade this long at the edge — see {@link EdgeOptions.hopDelayMs}. */
+  readonly hopDelayMs?: number;
   /**
    * Arm the socket-hop machine-pin on every Machine (default `true` — production's
    * intent, `MATCH_ROUTER = "fly"`). Pass `false` to reproduce the **shipped-dead**
@@ -89,7 +102,12 @@ async function startMachine(
   machineId: string,
   seed: number,
   pin: boolean,
-): Promise<FleetMachine & { close(): Promise<void> }> {
+): Promise<FleetMachine & { close(): Promise<void>; setPin(on: boolean): void }> {
+  // The pin is a *runtime* flag in the fixture so a caller can put the fleet into
+  // the shipped-dead state and back without restarting it. On a real Machine this
+  // is `MATCH_ROUTER`, read once at boot and only changeable by a deploy — which
+  // is precisely why production stayed broken for days.
+  let pinned = pin;
   const matches = new MatchServer({ seed, slots: 8, ticketSecret: FLEET_SECRET, machineId });
   const connections: WsConnection[] = [];
   const http: Server = createServer((_request, response) => {
@@ -115,7 +133,9 @@ async function startMachine(
       connection.onMessage((frame) => client.receive(frame));
       connection.onClose(() => client.close(Date.now()));
     },
-    beforeUpgrade,
+    // `null` is "complete the upgrade here", which is exactly what an unarmed
+    // Machine does — so a disarmed fixture behaves like the production one did.
+    (request) => (pinned && beforeUpgrade ? beforeUpgrade(request) : null),
   );
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const { port } = http.address() as AddressInfo;
@@ -124,6 +144,9 @@ async function startMachine(
     machine: machineId,
     url: `ws://127.0.0.1:${port}/play`,
     matches,
+    setPin: (on: boolean): void => {
+      pinned = on && beforeUpgrade !== undefined;
+    },
     close: async (): Promise<void> => {
       clearInterval(loop);
       for (const connection of connections) connection.close();
@@ -132,24 +155,51 @@ async function startMachine(
   };
 }
 
+/** POST an authenticated fleet message, exactly as `server/index.ts` does. */
+async function postFleet(allocatorBase: string, path: string, body: unknown): Promise<Response> {
+  const raw = JSON.stringify(body);
+  return fetch(`${allocatorBase}${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      [FLEET_AUTH_HEADER]: signFleetRequest(raw, FLEET_SECRET),
+    },
+    body: raw,
+  });
+}
+
 /** Announce a Machine to the allocator the way `server/index.ts` does on boot. */
 async function register(allocatorBase: string, machine: FleetMachine): Promise<void> {
-  const body = JSON.stringify(
+  const response = await postFleet(
+    allocatorBase,
+    '/register',
     buildRegistration({
       identity: { machine: machine.machine, region: 'iad' },
       capacity: machine.matches.capacity,
       draining: false,
     }),
   );
-  const response = await fetch(`${allocatorBase}/register`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      [FLEET_AUTH_HEADER]: signFleetRequest(body, FLEET_SECRET),
-    },
-    body,
-  });
   if (!response.ok) throw new Error(`registration refused: ${response.status}`);
+}
+
+/** How often each Machine beats. A registration alone goes stale in the registry's
+ *  liveness window, and a fleet that stops beating stops being placeable — which
+ *  showed up here as `503 no-capacity` fifteen seconds into a run. */
+const HEARTBEAT_MS = 2_000;
+
+/** Beat one Machine's rooms and load, the way `HeartbeatReporter` does in prod. */
+function beat(allocatorBase: string, machine: FleetMachine): Promise<Response> {
+  return postFleet(
+    allocatorBase,
+    '/fleet/heartbeat',
+    buildHeartbeat({
+      identity: { machine: machine.machine, region: 'iad' },
+      capacity: machine.matches.capacity,
+      draining: false,
+      rooms: machine.matches.roomLoads(),
+      lagP99Ms: 0,
+    }),
+  );
 }
 
 /**
@@ -160,7 +210,26 @@ async function register(allocatorBase: string, machine: FleetMachine): Promise<v
 export async function startLocalFleet(seed = 7, options: FleetOptions = {}): Promise<LocalFleet> {
   const pin = options.pin ?? true;
   const machines = await Promise.all(MACHINE_IDS.map((id, i) => startMachine(id, seed + i, pin)));
-  const edge = await startFlyEdge(machines.map((m) => ({ machine: m.machine, url: m.url })));
+  const edge = await startFlyEdge(
+    machines.map((m) => ({ machine: m.machine, url: m.url })),
+    {
+      ...(options.edgePort !== undefined ? { port: options.edgePort } : {}),
+      ...(options.hopDelayMs !== undefined ? { hopDelayMs: options.hopDelayMs } : {}),
+      // `?pin=on|off` on the edge's control route, for an out-of-process caller.
+      // The fixture may read the ticket the real edge cannot: it holds the fleet
+      // secret, so `?wrong=1` can land every upgrade on a Machine that provably
+      // does NOT host the room — the worst case, on demand.
+      hostOf: (upgradeUrl): string | null => {
+        const ticket = new URL(upgradeUrl, 'http://edge.internal').searchParams.get('ticket');
+        if (ticket === null) return null;
+        return verifyTicket(ticket, FLEET_SECRET, Date.now())?.machine ?? null;
+      },
+      onControl: (params): void => {
+        const value = params.get('pin');
+        if (value !== null) for (const machine of machines) machine.setPin(value !== 'off');
+      },
+    },
+  );
 
   const registry = new InMemoryRoomRegistry();
   const allocator = new Allocator({ registry, rng: mulberry32(seed), secret: FLEET_SECRET });
@@ -173,22 +242,38 @@ export async function startLocalFleet(seed = 7, options: FleetOptions = {}): Pro
     now: Date.now,
     secret: FLEET_SECRET,
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => server.listen(options.allocatorPort ?? 0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   const allocatorBase = `http://127.0.0.1:${port}`;
   for (const machine of machines) await register(allocatorBase, machine);
+  // Keep beating, or the registry expires the fleet mid-run and every allocate
+  // answers 503.
+  const heartbeats = setInterval(() => {
+    for (const machine of machines) void beat(allocatorBase, machine).catch(() => {});
+  }, HEARTBEAT_MS);
+  heartbeats.unref?.();
 
   return {
     allocatorBase,
     edge,
     machines,
     machineOf: (id) => machines.find((m) => m.machine === id),
+    setPin: (on: boolean): void => {
+      for (const machine of machines) machine.setPin(on);
+    },
     stop: async (): Promise<void> => {
+      clearInterval(heartbeats);
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await edge.stop();
       for (const machine of machines) await machine.close();
     },
   };
+}
+
+/** `{key: value}` when the value is defined, `{}` when it is not — the shape
+ *  `exactOptionalPropertyTypes` wants for an optional field built from an env var. */
+function maybe<K extends string>(key: K, value: number | undefined): Record<K, number> | object {
+  return value === undefined || Number.isNaN(value) ? {} : ({ [key]: value } as Record<K, number>);
 }
 
 // --- standalone -------------------------------------------------------------
@@ -205,7 +290,20 @@ if (process.env['LOCAL_FLEET'] === 'serve') {
     // `LOCAL_FLEET_PIN=off` reproduces the shipped-dead fleet on purpose, so the
     // probe can be shown failing the way production failed before it is trusted
     // to report a pass. It is the standalone twin of `FleetOptions.pin`.
-    const fleet = await startLocalFleet(7, { pin: process.env['LOCAL_FLEET_PIN'] !== 'off' });
+    const num = (name: string): number | undefined => {
+      const raw = process.env[name];
+      return raw === undefined ? undefined : Number(raw);
+    };
+    const fleet = await startLocalFleet(7, {
+      pin: process.env['LOCAL_FLEET_PIN'] !== 'off',
+      ...maybe('allocatorPort', num('LOCAL_FLEET_PORT')),
+      ...maybe('edgePort', num('LOCAL_FLEET_EDGE_PORT')),
+      ...maybe('hopDelayMs', num('LOCAL_FLEET_HOP_DELAY_MS')),
+    });
+    // A fixed first hop, for the evidence run that has to produce a wrong-machine
+    // refusal on demand rather than wait for the round-robin to oblige.
+    const land = process.env['LOCAL_FLEET_LAND'];
+    if (land !== undefined) fleet.edge.landOn(MACHINE_IDS[Number(land)] ?? land);
     console.log(`ALLOCATOR ${fleet.allocatorBase}`);
     console.log(`EDGE      ${fleet.edge.url}`);
     console.log(`CONTROL   ${fleet.edge.controlUrl}`);
