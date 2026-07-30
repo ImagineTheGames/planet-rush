@@ -1,0 +1,3562 @@
+{
+  "probe": "reclaim-upgrades",
+  "attempts": 3,
+  "foundUpgrade": false,
+  "runs": [
+    {
+      "attempt": 1,
+      "at": "2026-07-30T16:53:47.799Z",
+      "room": "JZ6X",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 2,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 2,
+      "turretBuildsAtDrop": 0,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 2,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "spendableInheritedByStandIn": 2,
+      "setupReady": true,
+      "parkRockDistanceFromHome": 486,
+      "parkedWithinUnitsOfRock": 118,
+      "tickAtDrop": 1996,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 55000,
+      "standInShift": {
+        "samples": 110,
+        "netDisplacementUnits": 548,
+        "pathLengthUnits": 7983,
+        "everDied": true,
+        "maxCargoSeen": 0,
+        "minHullSeen": 0,
+        "first": {
+          "tick": 2008,
+          "x": 1670,
+          "y": 1285,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        "last": {
+          "tick": 5280,
+          "x": 1892,
+          "y": 1786,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      },
+      "standInShiftSamples": [
+        {
+          "tick": 2008,
+          "x": 1670,
+          "y": 1285,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2038,
+          "x": 1667,
+          "y": 1235,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2068,
+          "x": 1685,
+          "y": 1155,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2098,
+          "x": 1704,
+          "y": 1071,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2128,
+          "x": 1722,
+          "y": 990,
+          "hull": 32,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2158,
+          "x": 1715,
+          "y": 942,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2188,
+          "x": 1660,
+          "y": 933,
+          "hull": 21,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2218,
+          "x": 1641,
+          "y": 885,
+          "hull": 18,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2248,
+          "x": 1650,
+          "y": 829,
+          "hull": 14,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2278,
+          "x": 1693,
+          "y": 822,
+          "hull": 7,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2308,
+          "x": 1752,
+          "y": 879,
+          "hull": 4,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2338,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2368,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2398,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2428,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2458,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2488,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2518,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2548,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2578,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2608,
+          "x": 1781,
+          "y": 909,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 2638,
+          "x": 1973,
+          "y": 1182,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2670,
+          "x": 2021,
+          "y": 1088,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2700,
+          "x": 2083,
+          "y": 1024,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2728,
+          "x": 2107,
+          "y": 980,
+          "hull": 32,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2760,
+          "x": 2112,
+          "y": 931,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2790,
+          "x": 2130,
+          "y": 872,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2818,
+          "x": 2136,
+          "y": 802,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2848,
+          "x": 2184,
+          "y": 767,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2878,
+          "x": 2126,
+          "y": 735,
+          "hull": 28,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2908,
+          "x": 2048,
+          "y": 699,
+          "hull": 26,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2940,
+          "x": 1969,
+          "y": 672,
+          "hull": 24,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2970,
+          "x": 1900,
+          "y": 714,
+          "hull": 22,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3000,
+          "x": 1831,
+          "y": 729,
+          "hull": 20,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3030,
+          "x": 1754,
+          "y": 687,
+          "hull": 18,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3058,
+          "x": 1680,
+          "y": 642,
+          "hull": 16,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3088,
+          "x": 1606,
+          "y": 595,
+          "hull": 14,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3118,
+          "x": 1536,
+          "y": 552,
+          "hull": 12,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3148,
+          "x": 1521,
+          "y": 605,
+          "hull": 12,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3178,
+          "x": 1527,
+          "y": 688,
+          "hull": 5,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3194,
+          "x": 1546,
+          "y": 713,
+          "hull": 5,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3236,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3268,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3298,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3330,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3358,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3388,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3420,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3448,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3480,
+          "x": 1582,
+          "y": 750,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 3510,
+          "x": 1923,
+          "y": 1147,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3540,
+          "x": 1945,
+          "y": 1255,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3568,
+          "x": 1915,
+          "y": 1328,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3600,
+          "x": 1880,
+          "y": 1412,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3630,
+          "x": 1848,
+          "y": 1490,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3660,
+          "x": 1815,
+          "y": 1569,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3690,
+          "x": 1766,
+          "y": 1629,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3718,
+          "x": 1703,
+          "y": 1678,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3750,
+          "x": 1632,
+          "y": 1733,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3780,
+          "x": 1564,
+          "y": 1784,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3810,
+          "x": 1496,
+          "y": 1837,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3840,
+          "x": 1430,
+          "y": 1888,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3870,
+          "x": 1368,
+          "y": 1944,
+          "hull": 33,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3900,
+          "x": 1303,
+          "y": 1965,
+          "hull": 31,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3930,
+          "x": 1216,
+          "y": 1946,
+          "hull": 29,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3960,
+          "x": 1133,
+          "y": 1927,
+          "hull": 27,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3990,
+          "x": 1048,
+          "y": 1909,
+          "hull": 25,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4020,
+          "x": 965,
+          "y": 1891,
+          "hull": 25,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4050,
+          "x": 880,
+          "y": 1873,
+          "hull": 23,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4080,
+          "x": 807,
+          "y": 1865,
+          "hull": 18,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4110,
+          "x": 754,
+          "y": 1906,
+          "hull": 14,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4140,
+          "x": 746,
+          "y": 1879,
+          "hull": 5,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4170,
+          "x": 815,
+          "y": 1841,
+          "hull": 0,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4200,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4230,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4260,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4290,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4320,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4350,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4380,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4410,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4440,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4470,
+          "x": 851,
+          "y": 1823,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 4500,
+          "x": 1961,
+          "y": 1219,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4530,
+          "x": 1929,
+          "y": 1294,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4560,
+          "x": 1896,
+          "y": 1373,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4590,
+          "x": 1864,
+          "y": 1452,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4620,
+          "x": 1831,
+          "y": 1531,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4650,
+          "x": 1801,
+          "y": 1602,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4680,
+          "x": 1839,
+          "y": 1638,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4710,
+          "x": 1888,
+          "y": 1683,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4740,
+          "x": 1890,
+          "y": 1732,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4770,
+          "x": 1891,
+          "y": 1780,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4800,
+          "x": 1897,
+          "y": 1775,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4830,
+          "x": 1900,
+          "y": 1797,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4860,
+          "x": 1979,
+          "y": 1766,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4890,
+          "x": 2110,
+          "y": 1685,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4920,
+          "x": 2248,
+          "y": 1597,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4950,
+          "x": 2384,
+          "y": 1506,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4980,
+          "x": 2344,
+          "y": 1479,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5010,
+          "x": 2266,
+          "y": 1511,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5040,
+          "x": 2190,
+          "y": 1545,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5070,
+          "x": 2113,
+          "y": 1580,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5100,
+          "x": 2035,
+          "y": 1614,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5130,
+          "x": 1957,
+          "y": 1648,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5160,
+          "x": 1883,
+          "y": 1681,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5190,
+          "x": 1890,
+          "y": 1736,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5218,
+          "x": 1887,
+          "y": 1769,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5250,
+          "x": 1902,
+          "y": 1800,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 5280,
+          "x": 1892,
+          "y": 1786,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      ],
+      "reclaimTimedOut": true,
+      "reclaimError": "Error: timed out waiting for alice back on the live wire past the drop tick",
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "JZ6X",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        }
+      ],
+      "economies": [
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 0,
+          "economy": {
+            "held": 0,
+            "banked": 3,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 12,
+          "economy": {
+            "held": 0,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 358,
+          "economy": {
+            "held": 1,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 532,
+          "economy": {
+            "held": 2,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1724,
+          "economy": {
+            "held": 1.9666666666666666,
+            "banked": 0.03333333333333333,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1726,
+          "economy": {
+            "held": 1.8999999999999997,
+            "banked": 0.1,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1728,
+          "economy": {
+            "held": 1.8333333333333328,
+            "banked": 0.16666666666666666,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1730,
+          "economy": {
+            "held": 1.766666666666666,
+            "banked": 0.2333333333333333,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1732,
+          "economy": {
+            "held": 1.699999999999999,
+            "banked": 0.3,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1734,
+          "economy": {
+            "held": 1.6333333333333322,
+            "banked": 0.36666666666666664,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1736,
+          "economy": {
+            "held": 1.5666666666666653,
+            "banked": 0.4333333333333333,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1738,
+          "economy": {
+            "held": 1.4999999999999984,
+            "banked": 0.49999999999999994,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1740,
+          "economy": {
+            "held": 1.4333333333333316,
+            "banked": 0.5666666666666667,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1742,
+          "economy": {
+            "held": 1.3666666666666647,
+            "banked": 0.6333333333333333,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1744,
+          "economy": {
+            "held": 1.2999999999999978,
+            "banked": 0.7,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1746,
+          "economy": {
+            "held": 1.233333333333331,
+            "banked": 0.7666666666666666,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1748,
+          "economy": {
+            "held": 1.166666666666664,
+            "banked": 0.8333333333333333,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1750,
+          "economy": {
+            "held": 1.0999999999999972,
+            "banked": 0.8999999999999999,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1752,
+          "economy": {
+            "held": 1.0333333333333303,
+            "banked": 0.9666666666666666,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1754,
+          "economy": {
+            "held": 0.9666666666666637,
+            "banked": 1.0333333333333332,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1756,
+          "economy": {
+            "held": 0.899999999999997,
+            "banked": 1.1,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1758,
+          "economy": {
+            "held": 0.8333333333333304,
+            "banked": 1.166666666666667,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1760,
+          "economy": {
+            "held": 0.7666666666666637,
+            "banked": 1.2333333333333338,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1762,
+          "economy": {
+            "held": 0.6999999999999971,
+            "banked": 1.3000000000000007,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1764,
+          "economy": {
+            "held": 0.6333333333333304,
+            "banked": 1.3666666666666676,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1766,
+          "economy": {
+            "held": 0.5666666666666638,
+            "banked": 1.4333333333333345,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1768,
+          "economy": {
+            "held": 0.4999999999999971,
+            "banked": 1.5000000000000013,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1770,
+          "economy": {
+            "held": 0.43333333333333046,
+            "banked": 1.5666666666666682,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1772,
+          "economy": {
+            "held": 0.3666666666666638,
+            "banked": 1.633333333333335,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1774,
+          "economy": {
+            "held": 0.29999999999999716,
+            "banked": 1.700000000000002,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1776,
+          "economy": {
+            "held": 0.2333333333333305,
+            "banked": 1.7666666666666688,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1778,
+          "economy": {
+            "held": 0.16666666666666385,
+            "banked": 1.8333333333333357,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1780,
+          "economy": {
+            "held": 0.0999999999999972,
+            "banked": 1.9000000000000026,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1782,
+          "economy": {
+            "held": 0.03333333333333054,
+            "banked": 1.9666666666666694,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        },
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1784,
+          "economy": {
+            "held": 0,
+            "banked": 2,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": false
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "at": "2026-07-30T16:56:18.388Z",
+      "room": "8546",
+      "machine": "6836293b5161d8",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 2,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 1,
+      "turretBuildsAtDrop": 1,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 2,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "spendableInheritedByStandIn": 2,
+      "setupReady": true,
+      "parkRockDistanceFromHome": 489,
+      "parkedWithinUnitsOfRock": 117,
+      "tickAtDrop": 908,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 55000,
+      "standInShift": {
+        "samples": 110,
+        "netDisplacementUnits": 306,
+        "pathLengthUnits": 1682,
+        "everDied": true,
+        "maxCargoSeen": 0,
+        "minHullSeen": 0,
+        "first": {
+          "tick": 916,
+          "x": 1671,
+          "y": 1128,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        "last": {
+          "tick": 4188,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      },
+      "standInShiftSamples": [
+        {
+          "tick": 916,
+          "x": 1671,
+          "y": 1128,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 946,
+          "x": 1669,
+          "y": 1075,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 978,
+          "x": 1694,
+          "y": 990,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1008,
+          "x": 1718,
+          "y": 906,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1038,
+          "x": 1742,
+          "y": 826,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1068,
+          "x": 1744,
+          "y": 750,
+          "hull": 33,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1098,
+          "x": 1682,
+          "y": 698,
+          "hull": 31,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1128,
+          "x": 1614,
+          "y": 647,
+          "hull": 29,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1158,
+          "x": 1547,
+          "y": 596,
+          "hull": 24,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1188,
+          "x": 1479,
+          "y": 545,
+          "hull": 17,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1218,
+          "x": 1421,
+          "y": 503,
+          "hull": 13,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1246,
+          "x": 1458,
+          "y": 546,
+          "hull": 10,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1278,
+          "x": 1513,
+          "y": 606,
+          "hull": 6,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1308,
+          "x": 1531,
+          "y": 625,
+          "hull": 6,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1338,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1368,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1398,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1428,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1458,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1488,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1518,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1548,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1578,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1608,
+          "x": 1534,
+          "y": 628,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1638,
+          "x": 1906,
+          "y": 1118,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1668,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1698,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1728,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1758,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1788,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1818,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1848,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1878,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1908,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1938,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1968,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1998,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2028,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2058,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2088,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2118,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2148,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2178,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2208,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2238,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2268,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2298,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2328,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2358,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2388,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2418,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2448,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2478,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2508,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2538,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2568,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2598,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2628,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2658,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2688,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2718,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2748,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2778,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2808,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2838,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2868,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2898,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2928,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2958,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2988,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3018,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3048,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3078,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3108,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3132,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3168,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3198,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3228,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3258,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3284,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3320,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3348,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3378,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3408,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3434,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3468,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3494,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3528,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3558,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3584,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3618,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3648,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3680,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3708,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3738,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3768,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3800,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3830,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3860,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3890,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3918,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3950,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3978,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4008,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4038,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4068,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4098,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4128,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4158,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4188,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      ],
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 2,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 2,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "8546",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "8546",
+          "tick": 1261,
+          "economy": {
+            "held": 0,
+            "banked": 2,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    },
+    {
+      "attempt": 3,
+      "at": "2026-07-30T16:57:31.798Z",
+      "room": "F4K6",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 2.0000000000000027,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 2,
+      "turretBuildsAtDrop": 0,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 2.0000000000000027,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "spendableInheritedByStandIn": 2.0000000000000027,
+      "setupReady": true,
+      "parkRockDistanceFromHome": 489,
+      "parkedWithinUnitsOfRock": 116,
+      "tickAtDrop": 1216,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 55000,
+      "standInShift": {
+        "samples": 110,
+        "netDisplacementUnits": 309,
+        "pathLengthUnits": 1396,
+        "everDied": true,
+        "maxCargoSeen": 0,
+        "minHullSeen": 0,
+        "first": {
+          "tick": 1228,
+          "x": 1668,
+          "y": 1276,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        "last": {
+          "tick": 4498,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      },
+      "standInShiftSamples": [
+        {
+          "tick": 1228,
+          "x": 1668,
+          "y": 1276,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1258,
+          "x": 1669,
+          "y": 1221,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1286,
+          "x": 1685,
+          "y": 1145,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1318,
+          "x": 1706,
+          "y": 1056,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1348,
+          "x": 1724,
+          "y": 973,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1376,
+          "x": 1742,
+          "y": 893,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1406,
+          "x": 1762,
+          "y": 809,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1438,
+          "x": 1745,
+          "y": 736,
+          "hull": 26,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1466,
+          "x": 1685,
+          "y": 690,
+          "hull": 21,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1498,
+          "x": 1612,
+          "y": 636,
+          "hull": 12,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1528,
+          "x": 1604,
+          "y": 643,
+          "hull": 8,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1558,
+          "x": 1656,
+          "y": 706,
+          "hull": 2,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1588,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1618,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1646,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1678,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1708,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1738,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1768,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1798,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1828,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1858,
+          "x": 1702,
+          "y": 762,
+          "hull": 0,
+          "alive": false,
+          "cargo": 0
+        },
+        {
+          "tick": 1888,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1918,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1948,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 1976,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2008,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2038,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2068,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2098,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2128,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2156,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2186,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2218,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2246,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2278,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2308,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2336,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2366,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2398,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2426,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2458,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2486,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2518,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2548,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2578,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2608,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2636,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2666,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2698,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2728,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2758,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2788,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2818,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2848,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2878,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2908,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2938,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2968,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 2998,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3028,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3058,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3088,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3118,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3148,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3178,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3208,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3238,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3268,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3298,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3328,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3358,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3388,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3418,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3448,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3478,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3508,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3538,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3568,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3598,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3628,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3658,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3688,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3716,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3748,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3778,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3808,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3838,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3856,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3898,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3928,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3958,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 3988,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4018,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4048,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4078,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4108,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4138,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4168,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4198,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4228,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4258,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4288,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4318,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4348,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4378,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4408,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4438,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4468,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        },
+        {
+          "tick": 4498,
+          "x": 1968,
+          "y": 1200,
+          "hull": 35,
+          "alive": true,
+          "cargo": 0
+        }
+      ],
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 2.0000000000000027,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 2.0000000000000027,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "F4K6",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "F4K6",
+          "tick": 1573,
+          "economy": {
+            "held": 0,
+            "banked": 2.0000000000000027,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    }
+  ]
+}
