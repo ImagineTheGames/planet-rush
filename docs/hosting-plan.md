@@ -195,6 +195,68 @@ one per tap) / BACK affordance on that state is a UI-lane follow-up.
 
 ---
 
+## Task 14 — the pin was never live: a build-context bug wearing a netcode costume
+
+Task 13 shipped the socket-hop pin and the `MATCH_ROUTER = "fly"` flag that arms
+it, and both are still exactly right in the repository. The join lottery came back
+anyway — the Director's live probe answered `{"type":"joinError","reason":"bad-ticket"}`
+on 1 join in 3. The cause was not in the netcode at all:
+
+**`server/upgrade-router.ts` imports `../allocator/router`, and `server/Dockerfile`
+never copied `allocator/`.** From the commit that introduced the pin, the gameserver
+image failed at its own `RUN npx tsc --noEmit`:
+
+```
+server/upgrade-router.ts(29,33): error TS2307:
+  Cannot find module '../allocator/router' or its corresponding type declarations.
+```
+
+So **every `flyctl deploy --config fly.gameserver.toml` since has failed.** The
+allocator app kept deploying — its Dockerfile does copy what it needs — which left
+the fleet in a half-updated state that looks exactly like the Task 13 bug and is a
+different bug entirely:
+
+| Half | State on the live fleet | Consequence |
+|---|---|---|
+| Allocator | current, `ALLOCATOR_ROUTER = "fly"` | hands out the shared `connectUrl` |
+| Gameserver | **pre-pin image**, `MATCH_ROUTER` never applied | no upgrade guard → the coin flip stands |
+
+`MATCH_ROUTER` is set in `fly.gameserver.toml`, and an env change only reaches a
+Machine through a deploy — so the flag that Task 13 added has never run on a
+Machine either. The pin has been correct in the repo and absent from production
+the whole time, which is why every unit test stayed green: they all ran against
+sources that were present on disk.
+
+**Fixed:** `server/Dockerfile` now `COPY allocator ./allocator` (build-time only —
+the runtime stage still ships one bundled file). **Guarded:**
+`tests/server/docker-context.test.ts` reads the Dockerfiles and the sources
+together and fails if any directory a build stage imports from is not a directory
+that stage copies. It is the same class of guard as `tests/server/fleet-config.test.ts`:
+two files that must agree, with nothing but a live deploy to notice when they stop.
+
+**The lesson for this document.** Twice now the pin has been right and production
+has been wrong, and both times the only instrument that could see it was a probe
+someone ran by hand. So the probe has a CI home now: `tests/net/live-pin.probe.mjs
+--local` stands up a two-Machine fleet behind a Fly-shaped edge
+(`tests/net/local-fleet.ts`, `tests/net/fly-edge.ts`), aims half the rounds at the
+**wrong** Machine on purpose, and fails the build unless every round welcomed *and*
+at least one round actually exercised the pin — because a green run that never took
+the wrong hop proves nothing, which is how this went unnoticed. The deterministic
+form of the same check is `tests/net/live-pin.test.ts`, on every `npm test`, and it
+includes a test that *reproduces* `bad-ticket` with the pin disarmed, so the harness
+is shown catching the bug before it is trusted to report a pass.
+
+Against the live fleet the manual form is unchanged and still the last word:
+
+```
+node tests/net/live-pin.probe.mjs https://planet-rush-allocator.fly.dev 6
+```
+
+Run it after the next gameserver deploy actually goes green — that deploy is the
+thing that has been missing, and until it rolls, the fleet is still pre-pin.
+
+---
+
 ## Still open (kept, not closed)
 
 The spike's discipline: state what remains open rather than quietly closing it.

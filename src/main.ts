@@ -248,6 +248,20 @@ import {
   createOnlineSession,
   allocatorTransport,
   attachSessionLog,
+  // The verbose connecting screen (M10): every step of the join named as it
+  // happens, or the exact refusal with RETRY and COPY LOG on the panel itself.
+  beginConnect,
+  connectDialing,
+  connectFailed,
+  connectJoined,
+  connectRefused,
+  connectTicketed,
+  connectTraceLogEntry,
+  connectTraceModel,
+  connectTransportState,
+  hideConnectTrace,
+  installConnectTraceView,
+  showConnectTrace,
   copyLogButton,
   describeEnvironment,
   disconnectOfferHint,
@@ -265,6 +279,7 @@ import type {
   OnlineSession,
   ResolvedConnection,
   AllocatorClientConfig,
+  ConnectTrace,
   SessionLogHandle,
   // The room code the doors resolved and the lobby opens on — one code, end to end
   // (the unified play flow; `./ui/lobby-flow` rule 1).
@@ -5067,6 +5082,108 @@ function openMainMenu(
   // per change rather than one per render.
   let loggedEntryState = '';
 
+  // --- The verbose connecting screen (M10) ----------------------------------
+  // `CONNECTING…` covered five separate things that can each fail on their own, so
+  // when one of them broke the screen had one word to say about it. `connectTrace`
+  // is the live story — allocate → ticket → dial → hand-off → seat, or the exact
+  // refusal — drawn by the panel below and written into the session log step for
+  // step (`src/net/connect-trace`). Null when no attempt is in flight.
+  let connectTrace: ConnectTrace | null = null;
+  // What RETRY re-runs: a *fresh* allocate through the same door, never a redial of
+  // a ticket that already lost its coin flip.
+  let retryDoor: { door: 'create' | 'join'; room: string } | null = null;
+  // Drives the panel while nothing is happening, which is exactly when it matters:
+  // a stall is only visible if something keeps looking at the clock (STALL_MS).
+  let connectTraceTimer: ReturnType<typeof setInterval> | null = null;
+  // The transport state last folded into the trace, so a poll records one step per
+  // change rather than one per tick.
+  let tracedTransportState = '';
+  installConnectTraceView({
+    dom: document,
+    onRetry: () => {
+      if (retryDoor) void startResolve(retryDoor.door, retryDoor.room);
+    },
+    onCopyLog: () => void copyLogButton()?.copy(),
+  });
+
+  /**
+   * Take one step of the connection's story: keep it, draw it, and write it to the
+   * session log — in that order, and in one place, so the screen and the pasted log
+   * can never disagree about what happened or when (m10-09b `connect` channel).
+   */
+  function traceStep(next: ConnectTrace): void {
+    const step = next.steps[next.steps.length - 1];
+    connectTrace = next;
+    if (step) {
+      const entry = connectTraceLogEntry(step);
+      playtest.recordConnect(entry.step, entry.data);
+    }
+    showConnectTrace(next, Date.now());
+    startTraceTicker();
+  }
+
+  /** Keep the panel's clock running while an attempt is live, so a stall crosses
+   *  STALL_MS on its own and auto-offers COPY LOG with nothing else happening. */
+  function startTraceTicker(): void {
+    if (connectTraceTimer !== null) return;
+    connectTraceTimer = setInterval(() => {
+      const trace = connectTrace;
+      if (!trace) {
+        stopTraceTicker();
+        return;
+      }
+      pollTransportForTrace();
+      showConnectTrace(connectTrace ?? trace, Date.now());
+      // A stall crosses STALL_MS with nothing else happening, so the corner
+      // affordance has to be re-decided here too rather than only on a render.
+      syncCopyLog();
+    }, SESSION_LOG_POLL_MS);
+  }
+
+  function stopTraceTicker(): void {
+    if (connectTraceTimer !== null) clearInterval(connectTraceTimer);
+    connectTraceTimer = null;
+  }
+
+  /**
+   * Fold the transport's own state into the trace. Polled rather than subscribed
+   * because `Transport.onStateChange` already belongs to the session, and a second
+   * subscriber would be a second thing to keep in sync; a state is a scalar and a
+   * quarter-second is well inside human time.
+   */
+  function pollTransportForTrace(): void {
+    const session = onlineSession;
+    const trace = connectTrace;
+    if (!session || !trace) return;
+    if (session.state === tracedTransportState) return;
+    tracedTransportState = session.state;
+    const next = connectTransportState(trace, session.state, Date.now(), session.closeReason);
+    if (next !== trace) traceStep(next);
+  }
+
+  /**
+   * The attempt is over: stop the clock and take the panel down. The steps stay in
+   * the session log either way.
+   *
+   * `lingerMs` is for the happy ending only — "JOINED · SEAT 2" gets a beat to be
+   * read over the lobby it just opened, because a confirmation that vanishes on the
+   * same frame it appears is a confirmation nobody has ever seen.
+   */
+  function endConnectTrace(lingerMs = 0): void {
+    connectTrace = null;
+    retryDoor = null;
+    tracedTransportState = '';
+    stopTraceTicker();
+    if (lingerMs <= 0) {
+      hideConnectTrace();
+      return;
+    }
+    setTimeout(() => hideConnectTrace(), lingerMs);
+  }
+
+  /** How long "JOINED · SEAT n" stays up over the freshly-opened lobby. */
+  const JOINED_LINGER_MS = 1_400;
+
   /** Refresh the seam's logical viewport, rotation flag, and per-button reports
    *  (logical rect + physical tap point) from the live transform — the executable
    *  form of "the menu lays out in landscape and a tap lands where it's drawn." */
@@ -5182,6 +5299,9 @@ function openMainMenu(
     screen = 'online';
     entry = createEntry();
     onlineResolved = null;
+    // A fresh visit starts a fresh story; a panel left over from a previous
+    // refusal must not sit under a door the player has not tapped yet.
+    endConnectTrace();
     render();
   }
 
@@ -5189,6 +5309,7 @@ function openMainMenu(
   function closeDoors(): void {
     screen = 'menu';
     entry = createEntry();
+    endConnectTrace();
     render();
   }
 
@@ -5197,6 +5318,7 @@ function openMainMenu(
    *  allocator and open the same lobby online once the room welcomes us. */
   function chooseEntryDoor(door: EntryDoor): void {
     if (door === 'solo') {
+      endConnectTrace();
       beginSolo();
       return;
     }
@@ -5230,6 +5352,7 @@ function openMainMenu(
         // From the keypad, back to the doors; from the doors, back to the menu.
         if (entry.screen === 'join') {
           entry = backToDoors(entry).state;
+          endConnectTrace();
           render();
         } else {
           closeDoors();
@@ -5258,17 +5381,28 @@ function openMainMenu(
    */
   async function startResolve(door: 'create' | 'join', room: string): Promise<void> {
     const base = allocatorUrlFromEnv();
+    // RETRY means *this* door again, from the allocate — recorded before the first
+    // thing that can fail, so a refusal always has something to offer.
+    retryDoor = { door, room };
+    // The screen goes back to CONNECTING for a retry, or the panel would sit on the
+    // old refusal while a fresh attempt ran behind it.
+    entry = { ...entry, status: 'connecting', error: '' };
     if (base === null) {
       // No allocator wired (local dev, the offline build): never reached, so this
       // is a network failure, and it names the door that still works (PLAY SOLO).
       playtest.recordConnect('no allocator configured', { door });
+      traceStep(connectFailed(beginConnect(door, Date.now()), 'no allocator configured', Date.now()));
       failOnline('network');
       return;
     }
     const config = { baseUrl: base };
     const region = onlineRegions[0]?.id;
     // Step 1 of the lifecycle the log carries end to end (brief §1): the allocate.
+    // It is now also the first line the *player* reads — "ALLOCATING ROOM…" — and
+    // every step below likewise reaches the screen through `traceStep`, so the
+    // screen and the log are one story told once (M10 verbose connecting).
     playtest.recordConnect('allocate', { door, allocator: logHost(base), region: region ?? null });
+    traceStep(beginConnect(door, Date.now(), logHost(base)));
     const result =
       door === 'create'
         ? await allocateRoom(config, region !== undefined ? { region } : {})
@@ -5278,6 +5412,7 @@ function openMainMenu(
     if (screen !== 'online' || entry.status !== 'connecting') return;
     if (!result.ok) {
       playtest.recordConnect('allocate failed', { door, reason: result.reason });
+      if (connectTrace) traceStep(connectFailed(connectTrace, result.reason, Date.now()));
       failOnline(result.reason);
       return;
     }
@@ -5294,6 +5429,21 @@ function openMainMenu(
       ticket: result.connection.ticket.length > 0,
       expiresInMs: result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
     });
+    if (connectTrace) {
+      traceStep(
+        connectTicketed(
+          connectTrace,
+          {
+            room: result.connection.room,
+            machine: result.connection.machine,
+            region: result.connection.region,
+            expiresInMs:
+              result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
+          },
+          Date.now(),
+        ),
+      );
+    }
     connectMatch(config, result.connection, door === 'create');
     render();
   }
@@ -5331,6 +5481,19 @@ function openMainMenu(
     // Step 3 of the logged lifecycle: the dial itself — which host, for which room.
     // The URL's `?ticket=` query is a signed credential, so only the host is logged.
     playtest.recordConnect('dial', { host: logHost(connection.url), room: connection.room, creator: host });
+    // …and on screen, the Machine by name: "DIALING MACHINE 0800d5b6…". Which
+    // Machine is the first question every join failure in this game has turned out
+    // to hinge on, and it used to be a thing only the log knew.
+    tracedTransportState = '';
+    if (connectTrace) {
+      traceStep(
+        connectDialing(
+          connectTrace,
+          { machine: connection.machine, host: logHost(connection.url), room: connection.room },
+          Date.now(),
+        ),
+      );
+    }
     const session = createOnlineSession({
       url: connection.url,
       room: connection.room,
@@ -5346,7 +5509,20 @@ function openMainMenu(
     // are the session's own to report (`src/net/playtest-log-attach`).
     startSessionLog(session);
     session.observe((message) => {
-      if (message.type === 'welcome') beginRoom(session, connection.room, message.you);
+      // The two ends of the story, straight from the wire. A refusal is terminal
+      // (`src/net/websocket-transport` `rejectJoin`), so the panel keeps the exact
+      // reason on screen — "REFUSED: bad-ticket — machine mismatch" — with RETRY
+      // and COPY LOG on it, instead of a spinner that never resolves.
+      if (message.type === 'joinError' && connectTrace) {
+        traceStep(connectRefused(connectTrace, message.reason, Date.now()));
+        entry = entryFailed(entry, `REFUSED: ${message.reason}`);
+        render();
+        return;
+      }
+      if (message.type === 'welcome') {
+        if (connectTrace) traceStep(connectJoined(connectTrace, message.you, Date.now()));
+        beginRoom(session, connection.room, message.you);
+      }
     });
   }
 
@@ -5392,6 +5568,9 @@ function openMainMenu(
     teardown();
     seam.visible = false;
     onlineSeam.visible = false; // the doors are gone; see `beginSolo`
+    // The story ends where the lobby begins: "JOINED · SEAT n" stays up for a beat
+    // over the room it just opened, then the panel goes.
+    endConnectTrace(JOINED_LINGER_MS);
     resolvePlay({ kind: 'online', session, room, you, host: onlineHost });
   }
 
@@ -5410,6 +5589,14 @@ function openMainMenu(
    * state rather than needing a call at each failure site.
    */
   function syncCopyLog(): void {
+    // The connect panel carries its own COPY LOG now, right under the failure it
+    // is reporting (M10). Two buttons offering the same export, one of them in a
+    // far corner, is worse than one in the right place — so the corner affordance
+    // stands down for exactly as long as the panel is making the offer.
+    if (connectTrace !== null && connectTraceModel(connectTrace, Date.now()).offerCopyLog) {
+      hideCopyLog();
+      return;
+    }
     if (screen === 'online' && entry.status === 'error') showCopyLog({ reason: 'error' });
     else hideCopyLog();
   }

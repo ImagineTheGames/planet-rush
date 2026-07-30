@@ -55,6 +55,13 @@
  * the clipboard (with a download fallback), and `./playtest-log-button` is the one
  * COPY LOG affordance that offers it — on the pause menu and on every error screen.
  * Nothing in that group uploads anything; the developer chooses what to paste.
+ *
+ * Alongside it, `./connect-trace` and `./connect-trace-view` are the connecting
+ * screen said out loud (M10): the five things `CONNECTING…` used to cover —
+ * allocate, ticket, dial, hand-off, seat — each named as it happens, or stopped on
+ * the exact refusal with RETRY and COPY LOG on the panel itself. Same division as
+ * the button: a pure model here, one DOM panel over the canvas, and `src/ui/`'s own
+ * screens untouched.
  */
 
 export * from './transport';
@@ -74,6 +81,8 @@ export * from './playtest-log-capture';
 export * from './playtest-log-export';
 export * from './playtest-log-button';
 export * from './playtest-log-attach';
+export * from './connect-trace';
+export * from './connect-trace-view';
 export * from './allocator-client';
 export * from './server-url';
 export * from './websocket-transport';

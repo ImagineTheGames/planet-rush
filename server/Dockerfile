@@ -33,6 +33,19 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY content ./content
 COPY server ./server
+# allocator/ is a BUILD-TIME dependency of the match server, not a runtime one:
+# `server/upgrade-router.ts` builds its `fly-replay` directive with the same
+# `FlyReplayRouter` the allocator uses (allocator/router.ts) rather than
+# hand-rolling a second copy of the header format. Nothing from the allocator
+# *process* ships — the runtime stage below copies one bundled file — but without
+# these sources the bundler cannot resolve that import and the image does not
+# build at all. Which is exactly what happened (M10): the socket-hop machine-pin
+# landed with this import and no COPY, so every gameserver deploy failed from
+# then on, the fleet kept serving a PRE-PIN image, and `MATCH_ROUTER = "fly"`
+# never reached a Machine either — the pin was correct in the repo and absent
+# from production, and the join lottery came back. `tests/server/docker-context.test.ts`
+# now asserts every cross-directory import the server makes is copied here.
+COPY allocator ./allocator
 
 # Typecheck before bundling: a server that does not compile must not build.
 RUN npx tsc --noEmit
