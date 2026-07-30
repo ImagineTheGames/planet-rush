@@ -1,0 +1,47 @@
+{
+  "steps": [
+    {
+      "step": "host created",
+      "code": "YDUJ",
+      "status": "connecting"
+    },
+    {
+      "step": "joiner typed"
+    },
+    {
+      "step": "joiner submitted",
+      "joiner": {
+        "gone": false,
+        "visible": true,
+        "screen": "join",
+        "status": "connecting",
+        "resolvedCode": "YDUJ",
+        "error": ""
+      }
+    },
+    {
+      "step": "after rush",
+      "hostSeam": {
+        "gone": false,
+        "visible": true,
+        "screen": "home",
+        "status": "connecting",
+        "resolvedCode": "YDUJ",
+        "error": ""
+      },
+      "joinerSeam": {
+        "gone": false,
+        "visible": true,
+        "screen": "join",
+        "status": "connecting",
+        "resolvedCode": "YDUJ",
+        "error": ""
+      }
+    }
+  ],
+  "hostCode": "YDUJ",
+  "hostShot": "/lanes/lane-2/evidence/images/online-two-clients-host.png",
+  "joinerShot": "/lanes/lane-2/evidence/images/online-two-clients-joiner.png",
+  "hostErrors": [],
+  "joinerErrors": []
+}

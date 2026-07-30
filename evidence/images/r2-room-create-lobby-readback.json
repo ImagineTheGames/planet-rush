@@ -1,0 +1,23 @@
+{
+  "desktop": {
+    "profile": "desktop",
+    "viewport": {
+      "w": 1000,
+      "h": 640,
+      "touch": false
+    },
+    "attempts": 6,
+    "reachedLobby": false,
+    "resolvedCode": "PSRN",
+    "finalSeam": {
+      "gone": false,
+      "visible": true,
+      "screen": "home",
+      "status": "connecting",
+      "resolvedCode": "PSRN",
+      "error": ""
+    },
+    "shot": "/lanes/lane-2/evidence/images/online-create-lobby-desktop.png",
+    "pageErrors": []
+  }
+}
