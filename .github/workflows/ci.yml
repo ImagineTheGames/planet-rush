@@ -41,6 +41,10 @@ jobs:
 
       - name: Build
         run: npx vite build
+        env:
+          # The shipped client must know the live allocator — without this the
+          # online menu fails closed with "can't reach the servers" (bit us 2026-07-29).
+          VITE_ALLOCATOR_URL: https://planet-rush-allocator.fly.dev
 
       # Only main and v* tags ship; feature branches stop at the gate above.
       - name: Package Pages artifact
