@@ -1,0 +1,202 @@
+{
+  "probe": "diag-upgrade",
+  "room": "HJRC",
+  "dockRange": 160,
+  "orbitOffset": 96,
+  "finalCargoTier": 1,
+  "finalBanked": 1,
+  "timeline": [
+    {
+      "i": 0,
+      "tick": 3,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 5,
+      "tick": 33,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 10,
+      "tick": 63,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 15,
+      "tick": 93,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 20,
+      "tick": 123,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 25,
+      "tick": 151,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 30,
+      "tick": 190,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 35,
+      "tick": 225,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 40,
+      "tick": 260,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 45,
+      "tick": 295,
+      "dist": 96,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 50,
+      "tick": 330,
+      "dist": 94,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 55,
+      "tick": 365,
+      "dist": 92,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 60,
+      "tick": 400,
+      "dist": 90,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 65,
+      "tick": 435,
+      "dist": 87,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 70,
+      "tick": 470,
+      "dist": 84,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 75,
+      "tick": 505,
+      "dist": 80,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 80,
+      "tick": 538,
+      "dist": 82,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 85,
+      "tick": 545,
+      "dist": 82,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 90,
+      "tick": 550,
+      "dist": 82,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 95,
+      "tick": 565,
+      "dist": 81,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 100,
+      "tick": 570,
+      "dist": 81,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 105,
+      "tick": 575,
+      "dist": 81,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 110,
+      "tick": 580,
+      "dist": 80,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    },
+    {
+      "i": 115,
+      "tick": 585,
+      "dist": 80,
+      "banked": 1,
+      "cargoTier": 1,
+      "alive": true
+    }
+  ]
+}
