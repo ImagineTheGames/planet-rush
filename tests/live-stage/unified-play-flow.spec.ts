@@ -27,18 +27,21 @@
  * The rest of the online half — the room code up while the host configures, a second
  * client's name appearing in an open seat as they join, the guest's read-only map and
  * mode, RUSH! at the end of the countdown, and the match arriving from authority — is
- * proven against a REAL server, with nothing mocked, in
- * `tests/net/online-lobby-flow.test.ts`, which runs in the ordinary unit suite. The
- * two together are the flow; neither is the whole of it alone.
+ * walked by TWO real browsers against a REAL allocator and a REAL match server in
+ * `tests/live-stage-online/online-play-flow.spec.ts` (which stands the fleet up
+ * itself), and proven at the model level, with nothing mocked, in
+ * `tests/net/online-lobby-flow.test.ts`. The three together are the flow; none is the
+ * whole of it alone.
  *
  * HOW TO RUN IT
  * ---------------------------------------------------------------------------
  * `npm run test:live-stage`. Note that `.github/workflows/ci.yml` does NOT run this
  * suite (it runs typecheck, vitest, the build, `tests/mobile` and `tests/live`), so
  * this file is only ever exercised deliberately, on a machine with browsers
- * installed. It was authored unexecuted — the agent lane it was written in has no
- * Playwright browsers (`playwright install` needs `sudo install-deps` there) — so the
- * first real run should be read as a first run, not a re-run.
+ * installed — and on a Linux box that also needs Chromium's shared libraries
+ * (`playwright install-deps`), which is why it was first authored unexecuted. It has
+ * since been RUN: all four tests green, PC and both phone profiles, and the evidence
+ * PNGs beside this file are from that run.
  */
 import { test, expect, type Page } from '@playwright/test';
 
