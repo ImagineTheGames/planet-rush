@@ -18,6 +18,7 @@ import {
   connectHandoff,
   connectJoined,
   connectOfferHint,
+  connectProgress,
   connectRefused,
   connectTicketed,
   connectTitleFailed,
@@ -28,6 +29,7 @@ import {
   refusalGloss,
   shortMachine,
 } from './connect-trace';
+import type { ConnectTrace } from './connect-trace';
 
 const T0 = 1_700_000_000_000;
 const MACHINE = '0800d5b6f1e208';
@@ -154,6 +156,103 @@ describe('the verbose connecting screen', () => {
     expect(model.offerCopyLog).toBe(false);
   });
 
+  // --- The clock the stall is measured on (m10-15) --------------------------
+  //
+  // "I joined a room but it said to copy logs as if an error occurred — it showed
+  // up too early." Three rules, one per test: the clock is time in the CURRENT
+  // state and every advance resets it; a state that really does sit still is still
+  // caught; and a seat cancels the offer on the spot.
+
+  it('never offers the log on a slow connect that keeps advancing', () => {
+    // The reported bug, simulated: a join on a cold Machine. Four seconds per
+    // state, twenty overall — four times STALL_MS — and every one of them spent
+    // making progress. The screen must not ask this player to report anything.
+    const STEP = 4_000;
+    const machine = { machine: MACHINE, room: 'Q5RN' };
+    const advances: ConnectTrace[] = [];
+    let trace = beginConnect('create', T0, 'planet-rush-allocator.fly.dev');
+    advances.push(trace);
+    trace = connectTicketed(trace, { room: 'Q5RN', machine: MACHINE }, T0 + STEP);
+    advances.push(trace);
+    trace = connectDialing(trace, machine, T0 + 2 * STEP);
+    advances.push(trace);
+    // The socket comes up — progress with no line of its own, and the advance the
+    // bug was hiding in: without it the `dialing` clock would run from T0+2·STEP
+    // straight through the server's join handling and trip at five seconds.
+    trace = connectTransportState(trace, 'open', T0 + 3 * STEP);
+    advances.push(trace);
+    trace = connectJoined(trace, 1, T0 + 4 * STEP);
+    advances.push(trace);
+
+    // Sampled every quarter-second across the whole twenty, the way the live
+    // ticker samples it — never a stall, never an offer, at any instant.
+    for (let now = T0; now <= T0 + 4 * STEP; now += 250) {
+      const at = advances.filter((t) => t.since <= now).pop()!;
+      const model = connectTraceModel(at, now);
+      expect({ now: now - T0, stalled: model.stalled, offer: model.offerCopyLog }).toEqual({
+        now: now - T0,
+        stalled: false,
+        offer: false,
+      });
+    }
+    // …and the story it told is still the four lines of the happy path: a silent
+    // advance moves the clock and says nothing.
+    expect(connectTraceModel(trace, T0 + 4 * STEP).lines).toEqual([
+      'ALLOCATING ROOM…',
+      'ROOM Q5RN · TICKET SIGNED',
+      'DIALING MACHINE 0800d5b6…',
+      'JOINED · SEAT 2',
+    ]);
+  });
+
+  it('still catches a single state that really does sit still', () => {
+    // The other half of the contract: the fix must not buy its silence by going
+    // deaf. One state, no advance of any kind, five seconds — the offer stands.
+    let trace = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 400);
+    trace = connectTransportState(trace, 'open', T0 + 900);
+    // Nine seconds after the socket opened, with no welcome and no state change:
+    // the server took the join and never answered it.
+    const stalled = connectTraceModel(trace, T0 + 900 + 9_000);
+    expect(stalled.stalled).toBe(true);
+    expect(stalled.offerCopyLog).toBe(true);
+    // Measured from the open, not from the dial — 9s, not 9.5s.
+    expect(connectTitleLine(stalled)).toBe('DIALING MACHINE 0800d5b6… 9s');
+    // And a stall is not a failure: nothing is red and RETRY is not on offer.
+    expect(connectTitleFailed(stalled)).toBe(false);
+    expect(stalled.canRetry).toBe(false);
+  });
+
+  it('cancels a due offer the moment the seat arrives', () => {
+    // The screen has been asking for the log for a full minute — and then the
+    // welcome lands. The offer goes in the same frame, unconditionally.
+    const dialing = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 100);
+    const due = connectTraceModel(dialing, T0 + 100 + 12 * STALL_MS);
+    expect(due.offerCopyLog).toBe(true);
+
+    const seated = connectJoined(dialing, 1, T0 + 100 + 12 * STALL_MS);
+    const model = connectTraceModel(seated, T0 + 100 + 12 * STALL_MS);
+    expect(model.stalled).toBe(false);
+    expect(model.offerCopyLog).toBe(false);
+    expect(model.canRetry).toBe(false);
+    // Nothing to say about it either — the title is the seat, with no clock on it.
+    expect(connectOfferHint(model)).toBe('');
+    expect(connectTitleLine(model)).toBe('JOINED · SEAT 2');
+  });
+
+  it('takes no advance from a finished attempt, and no clock backwards', () => {
+    // `connectProgress` is a clock, and a clock that can be wound back is a way to
+    // hide a stall: a late poll carrying an older `now` leaves it alone.
+    const dialing = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 100);
+    expect(connectProgress(dialing, T0 + 50)).toBe(dialing);
+    expect(connectProgress(dialing, T0 + 100)).toBe(dialing);
+    expect(connectProgress(dialing, T0 + 101).since).toBe(T0 + 101);
+    // A seat has no "still going" to report, and a refusal must not be un-stuck by
+    // a socket state arriving behind it.
+    const seated = connectJoined(dialing, 1, T0 + 200);
+    expect(connectProgress(seated, T0 + 9_000)).toBe(seated);
+    expect(connectTransportState(seated, 'open', T0 + 9_000)).toBe(seated);
+  });
+
   // --- The title -----------------------------------------------------------
 
   it('advances the TITLE through every state of a real connect', () => {
@@ -214,9 +313,21 @@ describe('the verbose connecting screen', () => {
     expect(connectTraceModel(after, T0 + 2).current).toBe('REFUSED: bad-ticket — machine mismatch');
   });
 
-  it('an open socket is not itself a step — the join is what matters', () => {
+  it('an open socket is not a step, but it IS an advance', () => {
+    // The join is what matters, so the socket coming up adds no line: the story is
+    // the same three lines it was. What it does add is progress — the dial is over
+    // and the wait that follows is a different wait — so the stall clock starts
+    // again from the open (m10-15; without this a healthy join tripped the offer).
     const dialing = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 1);
-    expect(connectTransportState(dialing, 'open', T0 + 2)).toBe(dialing);
+    const open = connectTransportState(dialing, 'open', T0 + 2_000);
+    expect(open.steps).toEqual(dialing.steps);
+    expect(open.stage).toBe('dialing');
+    expect(connectTraceModel(open, T0 + 2_000).waitedMs).toBe(0);
+    // Two seconds dialling plus four seconds waiting on the server is six seconds
+    // and two states, so it is not a stall in either of them.
+    expect(connectTraceModel(open, T0 + 6_000).stalled).toBe(false);
+    // `connecting` is where every attempt starts, so it is not progress at all.
+    expect(connectTransportState(dialing, 'connecting', T0 + 2_000)).toBe(dialing);
   });
 
   // --- The session log -----------------------------------------------------
