@@ -54,6 +54,7 @@ import type {
   EntityEventMessage,
   InputMessage,
   LobbySlot,
+  PlayerEconomy,
   RoomCode,
   ServerMessage,
 } from '../src/net/transport';
@@ -157,6 +158,15 @@ interface Slot {
   ackSeq: number;
   /** Per-client fog of war over station health (GDD §2.2). */
   fog: FogTracker | null;
+  /**
+   * The wallet this slot's client was last *told* (`src/net/transport`
+   * EconomyMessage), or null when it has never been told one — the whole of the
+   * economy channel's change detection. Held ore, banked ore and upgrade tiers do
+   * not ride the per-tick snapshot, so authority volunteers them on the ticks they
+   * move and stays quiet otherwise; comparing against what went out last is what
+   * makes "otherwise" the common case.
+   */
+  wallet: PlayerEconomy | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +259,7 @@ export class MatchRoom {
       token: null,
       ackSeq: 0,
       fog: null,
+      wallet: null,
     }));
   }
 
@@ -406,6 +417,9 @@ export class MatchRoom {
     if (!slot || slot.socket === null) return;
     slot.socket = null;
     slot.fog = null;
+    // Nobody is listening to this seat's economy channel any more, and whoever
+    // reclaims it will be told the wallet afresh in their welcome (`welcome`).
+    slot.wallet = null;
 
     if (this.phase !== 'live') {
       slot.ready = false;
@@ -669,13 +683,49 @@ export class MatchRoom {
 
   // --- Sending ------------------------------------------------------------
 
+  /**
+   * Volunteer this slot's wallet when authority has moved it since the client was
+   * last told (`src/net/transport` EconomyMessage): held ore, banked ore, upgrade
+   * tiers — the match-lifetime state the per-tick snapshot deliberately does not
+   * carry (`src/net/snapshot`).
+   *
+   * Sent immediately *ahead of* the snapshot for the same tick, and to that slot
+   * only. The client stages it and writes it inside that tick's reconcile, so its
+   * own unacknowledged mining replays on top of authority's figure instead of on
+   * top of its own compounding one (`src/net/prediction` `stageEconomy`) — the
+   * drift the reclaim welcome alone cannot fix, because it happens in normal
+   * flight. Quiet by default: a wallet that has not moved sends nothing.
+   */
+  private syncEconomy(slot: Slot, world: World): void {
+    // No socket, nobody told: recording a wallet against a seat a bot is flying
+    // would make the next reclaimer's client miss the statement it is owed.
+    if (!slot.socket) return;
+    const ship = world.ships.find((s) => s.id === slot.player);
+    if (!ship) return;
+    const wallet = walletOf(ship);
+    if (slot.wallet && sameWallet(slot.wallet, wallet)) return;
+    slot.wallet = wallet;
+    this.sendTo(slot, { type: 'economy', player: slot.player, tick: world.tick, economy: wallet });
+  }
+
   private welcome(slot: Slot): void {
+    // A reclaim hands the wallet back over the wire: the streaming snapshot never
+    // carries a ship's cargo/bank/upgrades (`src/net/snapshot`), so a returning
+    // client that rebuilds a fresh world would otherwise fly a naked ship (GDD
+    // §4.2, QA m10 "economy-not-on-wire"). Present only when authority already
+    // holds a live ship for this slot — a lobby join has none yet.
+    const ship = this.authoritative?.ships.find((s) => s.id === slot.player);
+    // What the welcome states is also what this client has now been told, so the
+    // economy channel stays quiet until authority actually moves it (`syncEconomy`).
+    const wallet = ship ? walletOf(ship) : null;
+    slot.wallet = wallet;
     this.sendTo(slot, {
       type: 'welcome',
       you: slot.player,
       room: this.code,
       tick: this.authoritative?.tick ?? 0,
       ...(slot.token ? { reclaimToken: slot.token } : {}),
+      ...(wallet ? { economy: wallet } : {}),
     });
   }
 
@@ -696,6 +746,7 @@ export class MatchRoom {
   }
 
   private sendSnapshot(slot: Slot, world: World): void {
+    this.syncEconomy(slot, world);
     this.sendTo(slot, {
       type: 'snapshot',
       tick: world.tick,
@@ -710,6 +761,9 @@ export class MatchRoom {
     const payload = encodeWorldSnapshot(world);
     for (const slot of this.slots) {
       if (!slot.socket) continue;
+      // The wallet first, when it moved: the client applies it in the reconcile the
+      // snapshot on its heels triggers (`syncEconomy`).
+      this.syncEconomy(slot, world);
       this.sendTo(slot, { type: 'snapshot', tick: world.tick, ackSeq: slot.ackSeq, payload });
     }
   }
@@ -726,4 +780,33 @@ export class MatchRoom {
   private sendTo(slot: Slot, message: ServerMessage): void {
     slot.socket?.send(encodeServerMessage(message));
   }
+}
+
+// ---------------------------------------------------------------------------
+// The wallet
+// ---------------------------------------------------------------------------
+
+/** The wallet fields this file reads off an authoritative ship. Structural rather
+ *  than `Ship` itself: the room states a wallet, it does not own one. */
+interface Walleted {
+  readonly cargo: number;
+  readonly banked: number;
+  readonly tiers: Readonly<Record<string, number>>;
+}
+
+/** One immutable reading of a ship's wallet, copied out of the live ship so the
+ *  record of what a client was told cannot be mutated by the next tick. */
+function walletOf(ship: Walleted): PlayerEconomy {
+  return { held: ship.cargo, banked: ship.banked, tiers: { ...ship.tiers } };
+}
+
+/** True when two wallet readings say the same thing — the test for "nothing to
+ *  tell this client". Exact comparison on purpose: held ore is fractional while a
+ *  tractor beam is running, and rounding the comparison would let a sub-ore
+ *  divergence live in the client's hold forever. */
+function sameWallet(a: PlayerEconomy, b: PlayerEconomy): boolean {
+  if (a.held !== b.held || a.banked !== b.banked) return false;
+  const tracks = Object.keys(b.tiers);
+  if (Object.keys(a.tiers).length !== tracks.length) return false;
+  return tracks.every((track) => a.tiers[track] === b.tiers[track]);
 }

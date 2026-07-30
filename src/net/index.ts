@@ -24,7 +24,11 @@
  * in flight, and reconciles the result against each snapshot — rewind, overwrite
  * with authority, replay everything the server has not yet run (GDD §4.2). The
  * static half of the world that does not stream arrives as events and is applied
- * by `./entity-events`.
+ * by `./entity-events`. The one piece of *ship* state that does not stream either
+ * — the wallet: held ore, banked ore, upgrade tiers — rides its own low-frequency
+ * channel to its own slot (`./transport` `EconomyMessage`), because a rewind cannot
+ * put a hold back the way it puts a position back (GDD §4.2, docs/netcode-spike.md
+ * "The wallet on the wire").
  *
  * And three modules make that reconciliation *feel* right at real latency (M10):
  * `./telemetry` instruments it — misprediction rate, correction magnitude, and
@@ -33,6 +37,15 @@
  * while the local ship stays predicted; and `./latency-transport` wraps any
  * transport in a configurable one-way delay + jitter, so the developer's ~150 ms
  * condition is a test that runs instantly rather than a feel only reproduced live.
+ *
+ * And one module group exists so a *playtest* can be reported rather than described:
+ * `./playtest-log` is a bounded, local-only ring of the session's real events (build
+ * sha, the whole connection lifecycle, the per-second net telemetry, match events,
+ * our own console errors), `./playtest-log-capture` feeds it the console,
+ * `./playtest-log-attach` feeds it a live session, `./playtest-log-export` puts it on
+ * the clipboard (with a download fallback), and `./playtest-log-button` is the one
+ * COPY LOG affordance that offers it — on the pause menu and on every error screen.
+ * Nothing in that group uploads anything; the developer chooses what to paste.
  */
 
 export * from './transport';
@@ -46,6 +59,11 @@ export * from './reconnect';
 export * from './wire';
 export * from './loopback';
 export * from './latency-transport';
+export * from './playtest-log';
+export * from './playtest-log-capture';
+export * from './playtest-log-export';
+export * from './playtest-log-button';
+export * from './playtest-log-attach';
 export * from './allocator-client';
 export * from './server-url';
 export * from './websocket-transport';
