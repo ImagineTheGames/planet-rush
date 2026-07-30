@@ -1,9 +1,9 @@
 {
   "probe": "reconnect",
   "allocator": "https://planet-rush-allocator.fly.dev",
-  "capturedAt": "2026-07-30T02:15:36.785Z",
-  "room": "KMK9",
-  "machine": "0800d5b6d62328",
+  "capturedAt": "2026-07-30T02:57:32.414Z",
+  "room": "G63N",
+  "machine": "6836293b5161d8",
   "hostWelcomeDials": 1,
   "bankedAtSpawn": 3,
   "upgradeLanded": true,
@@ -22,10 +22,10 @@
   "substitutionSeenByPeer": true,
   "trace": [
     {
-      "ms": 1501,
+      "ms": 1500,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -36,10 +36,10 @@
       ]
     },
     {
-      "ms": 3001,
+      "ms": 3000,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -50,10 +50,10 @@
       ]
     },
     {
-      "ms": 4501,
+      "ms": 4500,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -67,7 +67,7 @@
       "ms": 6001,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -78,10 +78,10 @@
       ]
     },
     {
-      "ms": 7501,
+      "ms": 7503,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -92,10 +92,10 @@
       ]
     },
     {
-      "ms": 9001,
+      "ms": 9003,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -106,10 +106,10 @@
       ]
     },
     {
-      "ms": 10501,
+      "ms": 10503,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -120,10 +120,10 @@
       ]
     },
     {
-      "ms": 12001,
-      "state": "open",
+      "ms": 12004,
+      "state": "reconnecting",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -134,10 +134,10 @@
       ]
     },
     {
-      "ms": 13502,
+      "ms": 13505,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -148,10 +148,10 @@
       ]
     },
     {
-      "ms": 15002,
+      "ms": 15005,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -162,10 +162,10 @@
       ]
     },
     {
-      "ms": 16501,
+      "ms": 16505,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -176,52 +176,10 @@
       ]
     },
     {
-      "ms": 18001,
+      "ms": 18005,
       "state": "open",
       "seat": 0,
-      "worldTick": 38,
-      "cargoTier": 1,
-      "saw": [
-        "welcome",
-        "lobbyState",
-        "matchStart",
-        "entityEvent",
-        "snapshot"
-      ]
-    },
-    {
-      "ms": 19501,
-      "state": "open",
-      "seat": 0,
-      "worldTick": 38,
-      "cargoTier": 1,
-      "saw": [
-        "welcome",
-        "lobbyState",
-        "matchStart",
-        "entityEvent",
-        "snapshot"
-      ]
-    },
-    {
-      "ms": 21001,
-      "state": "open",
-      "seat": 0,
-      "worldTick": 38,
-      "cargoTier": 1,
-      "saw": [
-        "welcome",
-        "lobbyState",
-        "matchStart",
-        "entityEvent",
-        "snapshot"
-      ]
-    },
-    {
-      "ms": 22501,
-      "state": "open",
-      "seat": 0,
-      "worldTick": 38,
+      "worldTick": 40,
       "cargoTier": 1,
       "saw": [
         "welcome",
@@ -235,8 +193,8 @@
   "aliceOpensAfterDrop": 3,
   "aliceClosesAfterDrop": 3,
   "joinErrorsPastDrop": 2,
-  "tickAtDrop": 38,
-  "tickAfterReclaim": 1476,
+  "tickAtDrop": 40,
+  "tickAfterReclaim": 1266,
   "afterReclaimAlice": {
     "shipClass": "interceptor",
     "banked": 3,

@@ -1,13 +1,13 @@
 {
   "probe": "reclaim-wire",
   "allocator": "https://planet-rush-allocator.fly.dev",
-  "capturedAt": "2026-07-30T02:42:09.000Z",
-  "room": "BTPQ",
+  "capturedAt": "2026-07-30T03:02:55.211Z",
+  "room": "KL4L",
   "machine": "0800d5b6d62328",
-  "firstWelcomeDials": 4,
+  "firstWelcomeDials": 2,
   "seat": 0,
-  "reclaimToken": "aae74ea8…",
-  "firstSnapshots": 115,
+  "reclaimToken": "5013fefe…",
+  "firstSnapshots": 114,
   "matchWentLive": true,
   "reclaimWelcomeDials": 1,
   "reclaimWelcomeSeat": 0,
@@ -73,9 +73,9 @@
     "playerReclaimed",
     "lobbyState"
   ],
-  "reclaimSnapshots": 121,
+  "reclaimSnapshots": 122,
   "reclaimSawMatchStart": true,
-  "reclaimMatchStartTick": 344,
+  "reclaimMatchStartTick": 386,
   "reclaimBroadcastSeen": true,
   "VERDICT": "RECLAIM-RESUMED-MATCH"
 }

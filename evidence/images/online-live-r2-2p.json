@@ -1,18 +1,18 @@
 {
   "probe": "two-clients",
   "allocator": "https://planet-rush-allocator.fly.dev",
-  "capturedAt": "2026-07-30T01:30:03.397Z",
+  "capturedAt": "2026-07-30T02:57:09.949Z",
   "hostConnection": {
-    "room": "YV9R",
+    "room": "5Z63",
     "machine": "0800d5b6d62328",
     "url": "wss://planet-rush-gameserver.fly.dev/play"
   },
-  "hostWelcomeDials": 3,
+  "hostWelcomeDials": 2,
   "joinerConnection": {
-    "room": "YV9R",
+    "room": "5Z63",
     "machine": "0800d5b6d62328"
   },
-  "joinerWelcomeDials": 1,
+  "joinerWelcomeDials": 4,
   "aliceSeat": 0,
   "bobSeat": 1,
   "roster": [
@@ -53,9 +53,9 @@
   "asteroidsBob": 48,
   "shipsAlice": 8,
   "shipsBob": 8,
-  "tickAlice": 186,
-  "tickBob": 186,
-  "bobMovedOnAlicesScreen": -219.05800795126834,
+  "tickAlice": 184,
+  "tickBob": 184,
+  "bobMovedOnAlicesScreen": -237.05800795126834,
   "crossClientShipDistance": 0,
   "aliceLastError": 0,
   "aliceSaw": [

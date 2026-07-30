@@ -1,6 +1,6 @@
 {
   "probe": "diag-upgrade",
-  "room": "HJRC",
+  "room": "YAQB",
   "dockRange": 160,
   "orbitOffset": 96,
   "finalCargoTier": 1,
@@ -8,7 +8,7 @@
   "timeline": [
     {
       "i": 0,
-      "tick": 3,
+      "tick": 1,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -16,7 +16,7 @@
     },
     {
       "i": 5,
-      "tick": 33,
+      "tick": 29,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -24,7 +24,7 @@
     },
     {
       "i": 10,
-      "tick": 63,
+      "tick": 57,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -32,7 +32,7 @@
     },
     {
       "i": 15,
-      "tick": 93,
+      "tick": 85,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -40,7 +40,7 @@
     },
     {
       "i": 20,
-      "tick": 123,
+      "tick": 117,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -48,7 +48,7 @@
     },
     {
       "i": 25,
-      "tick": 151,
+      "tick": 147,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -56,7 +56,7 @@
     },
     {
       "i": 30,
-      "tick": 190,
+      "tick": 179,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -64,7 +64,7 @@
     },
     {
       "i": 35,
-      "tick": 225,
+      "tick": 205,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -72,7 +72,7 @@
     },
     {
       "i": 40,
-      "tick": 260,
+      "tick": 239,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -80,7 +80,7 @@
     },
     {
       "i": 45,
-      "tick": 295,
+      "tick": 267,
       "dist": 96,
       "banked": 1,
       "cargoTier": 1,
@@ -88,72 +88,72 @@
     },
     {
       "i": 50,
-      "tick": 330,
-      "dist": 94,
+      "tick": 301,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 55,
-      "tick": 365,
-      "dist": 92,
+      "tick": 329,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 60,
-      "tick": 400,
-      "dist": 90,
+      "tick": 357,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 65,
-      "tick": 435,
-      "dist": 87,
+      "tick": 393,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 70,
-      "tick": 470,
-      "dist": 84,
+      "tick": 423,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 75,
-      "tick": 505,
-      "dist": 80,
+      "tick": 453,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 80,
-      "tick": 538,
-      "dist": 82,
+      "tick": 477,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 85,
-      "tick": 545,
-      "dist": 82,
+      "tick": 503,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 90,
-      "tick": 550,
-      "dist": 82,
+      "tick": 529,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
@@ -161,39 +161,39 @@
     {
       "i": 95,
       "tick": 565,
-      "dist": 81,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 100,
-      "tick": 570,
-      "dist": 81,
+      "tick": 589,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 105,
-      "tick": 575,
-      "dist": 81,
+      "tick": 615,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 110,
-      "tick": 580,
-      "dist": 80,
+      "tick": 622,
+      "dist": 96,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
     },
     {
       "i": 115,
-      "tick": 585,
-      "dist": 80,
+      "tick": 627,
+      "dist": 95,
       "banked": 1,
       "cargoTier": 1,
       "alive": true
