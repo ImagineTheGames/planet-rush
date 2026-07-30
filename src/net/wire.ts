@@ -234,6 +234,11 @@ const SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   'playerSubstituted',
   'playerReclaimed',
   'matchEnd',
+  // A refused join (server/match-server.ts). Without it here parseServerMessage
+  // drops the frame, the transport never learns *why* the socket then closed, and
+  // a wrong-machine `bad-ticket` reads as a plain drop → a 60 s reconnect loop and
+  // an eternal "connecting" screen (M10). Parsed so the transport can end honestly.
+  'joinError',
 ]);
 
 function isServerMessageType(value: unknown): boolean {

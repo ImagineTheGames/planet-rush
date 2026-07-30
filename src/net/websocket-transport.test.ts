@@ -297,4 +297,56 @@ describe('WebSocketTransport', () => {
     h.tick(500);
     expect(h.sockets).toHaveLength(2);
   });
+
+  // --- A refused join is terminal, not a drop (M10 machine-pin lottery) --------
+
+  it('closes on joinError with the reason, and never redials (M10)', () => {
+    const h = harness({ ticket: 'sig.tok' });
+    h.latest().open();
+    expect(h.transport.state).toBe('open');
+
+    // The wrong-machine outcome the pin exists to prevent: the server refuses the
+    // join. A dropped socket would recover; this must not — the same ticket would
+    // lose the same edge lottery again.
+    h.latest().deliver({ type: 'joinError', reason: 'bad-ticket' });
+
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('join-rejected');
+    expect(h.transport.rejectReason).toBe('bad-ticket');
+    // The reason reaches an observer too, so a menu can show specifics.
+    expect(h.received.map((m) => m.type)).toContain('joinError');
+  });
+
+  it('does not restart the reconnect loop when the server closes the socket after a joinError', () => {
+    const h = harness({ ticket: 'sig.tok' });
+    h.latest().open();
+    h.latest().deliver({ type: 'joinError', reason: 'room-full' });
+    // The server closes the socket right after refusing — the exact sequence that,
+    // read as a plain drop, spun the 60 s reconnect loop and the eternal spinner.
+    h.latest().drop();
+
+    expect(h.transport.state).toBe('closed');
+    expect(h.states.filter((s) => s === 'reconnecting')).toHaveLength(0);
+    // No redial now, and none when the whole grace window elapses.
+    h.tick(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('a mid-reconnect joinError ends the loop instead of burning the window', () => {
+    const h = harness({ ticket: 'sig.tok' });
+    h.latest().open();
+    h.latest().drop();
+    expect(h.transport.state).toBe('reconnecting');
+
+    h.tick(500); // the backoff fires a redial
+    expect(h.sockets).toHaveLength(2);
+    h.latest().open();
+    // The redial reaches a wrong machine and is refused: stop, do not keep looping.
+    h.latest().deliver({ type: 'joinError', reason: 'bad-ticket' });
+
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('join-rejected');
+    h.tick(60_000);
+    expect(h.sockets).toHaveLength(2); // no further dials
+  });
 });
