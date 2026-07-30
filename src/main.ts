@@ -4991,6 +4991,9 @@ function openMainMenu(
   // The session log (`src/net/playtest-log`), installed by `boot()`. The front door
   // writes the connection lifecycle into it: allocate → ticket → dial.
   const playtest = playtestLog();
+  // The last front-door state written to the log, so `logEntryStatus` records one line
+  // per change rather than one per render.
+  let loggedEntryState = '';
 
   /** Refresh the seam's logical viewport, rotation flag, and per-button reports
    *  (logical rect + physical tap point) from the live transform — the executable
@@ -5054,6 +5057,7 @@ function openMainMenu(
     if (entryView.visible) entryView.update(entryModel(entry));
     seam.screen = screen;
     updateOnlineSeam();
+    logEntryStatus();
     syncCopyLog();
     updateSeamLayout();
   }
@@ -5302,6 +5306,27 @@ function openMainMenu(
   function syncCopyLog(): void {
     if (screen === 'online' && entry.status === 'error') showCopyLog({ reason: 'error' });
     else hideCopyLog();
+  }
+
+  /**
+   * Log the front door's own status as it changes — `connecting`, `error` and the
+   * refusal line **in the words the player read** (brief §1, "the verbose
+   * connecting-status states").
+   *
+   * This is the join between the two halves of a report: the developer says *"it told
+   * me it couldn't reach the servers"*, and the log's next line is the allocator
+   * failure that produced exactly that sentence. Keyed on the whole visible state, so
+   * one line per change and none per frame.
+   */
+  function logEntryStatus(): void {
+    if (screen !== 'online') return;
+    const key = `${entry.screen}/${entry.status}/${entry.error}`;
+    if (key === loggedEntryState) return;
+    loggedEntryState = key;
+    playtest.recordConnect(`front door ${entry.status}`, {
+      screen: entry.screen,
+      ...(entry.error.length > 0 ? { shown: entry.error } : {}),
+    });
   }
 
   /** The codex's layout at the current logical size — for the pane a scroll or a
