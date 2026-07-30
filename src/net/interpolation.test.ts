@@ -11,9 +11,17 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { INTERP_DELAY_MS, MAX_EXTRAPOLATION_MS, RemoteInterpolator } from './interpolation';
+import {
+  DELAY_SLEW_MS,
+  INTERP_DELAY_MS,
+  MAX_DELAY_MS,
+  MAX_EXTRAPOLATION_MS,
+  MIN_DELAY_MS,
+  RemoteInterpolator,
+  jitterDelayMs,
+} from './interpolation';
 import { dequantizeAngle } from './snapshot';
-import type { DecodedSnapshot, ShipSnap } from './snapshot';
+import type { DecodedSnapshot, ProjSnap, ShipSnap } from './snapshot';
 
 const LOCAL = 0;
 const REMOTE = 1;
@@ -118,5 +126,116 @@ describe('RemoteInterpolator', () => {
     const out = interp.sample(1350 + INTERP_DELAY_MS);
     expect(typeof out[0]!.angle).toBe('number');
     expect(dequantizeAngle(0)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shots (M10 netcode audit item 2b)
+// ---------------------------------------------------------------------------
+
+describe('streamed shots', () => {
+  const shot = (id: number, x: number, y: number, meta = 0b1001): ProjSnap => ({
+    id,
+    posX: x,
+    posY: y,
+    meta,
+  });
+  const frame = (tick: number, projectiles: ProjSnap[]): DecodedSnapshot => ({
+    tick,
+    ships: [],
+    projectiles,
+  });
+
+  it('fly between snapshots instead of standing still and teleporting', () => {
+    // The field report's "jumpy projectiles": the 6-byte record carries no
+    // velocity, so before this a decoded shot sat at one position for 33 ms and
+    // jumped to the next. Two snapshots ARE the velocity.
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
+    // 20 units in one 33 ms broadcast interval — ~600 u/s, a real muzzle speed.
+    buffer.record(frame(4, [shot(1, 20, 0)]), 1_033);
+
+    const half = buffer.sampleShots(1_116.5);
+    expect(half).toHaveLength(1);
+    expect(half[0]!.x).toBeCloseTo(10, 0);
+    expect(half[0]!.slot).toBe(1);
+    expect(half[0]!.meta).toBe(0b1001);
+  });
+
+  it('does not drag a recycled pool slot across the map', () => {
+    // The slot a landed shot freed is reused by the next one fired. Interpolating
+    // across that reuse would draw one bright dot travelling the whole arena.
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
+    buffer.record(frame(4, [shot(1, 900, 900)]), 1_033);
+
+    const sampled = buffer.sampleShots(1_116.5);
+    // Too far for any muzzle in the game: drawn where the newer record puts it,
+    // never halfway between two different shots.
+    expect(sampled[0]!.x).toBe(900);
+    expect(sampled[0]!.y).toBe(900);
+  });
+
+  it('does not interpolate a slot whose owner or kind changed', () => {
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0, 0b1001)]), 1_000);
+    buffer.record(frame(4, [shot(1, 10, 0, 0b1010)]), 1_033);
+
+    const sampled = buffer.sampleShots(1_116.5);
+    expect(sampled[0]!.x).toBe(0);
+    expect(sampled[0]!.meta).toBe(0b1001);
+  });
+
+  it('shows a shot that appears only in the later frame, at its first position', () => {
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
+    buffer.record(frame(4, [shot(1, 20, 0), shot(2, 500, 500)]), 1_033);
+
+    const sampled = buffer.sampleShots(1_116.5);
+    expect(sampled.map((s) => s.slot).sort()).toEqual([1, 2]);
+    expect(sampled.find((s) => s.slot === 2)!.x).toBe(500);
+  });
+
+  it('never extrapolates a shot — with no velocity on the wire there is nothing to extrapolate along', () => {
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
+    buffer.record(frame(4, [shot(1, 20, 0)]), 1_033);
+
+    // Render clock far past the newest frame: the stream stalled.
+    const stalled = buffer.sampleShots(2_000);
+    expect(stalled[0]!.x).toBe(20);
+  });
+});
+
+describe('the jitter buffer sizes itself (audit item 2d)', () => {
+  it('asks for the standard delay before anything has been measured', () => {
+    expect(jitterDelayMs(null)).toBe(INTERP_DELAY_MS);
+  });
+
+  it('asks for less on a clean wire and more on a jittery one, inside its range', () => {
+    expect(jitterDelayMs(0)).toBe(MIN_DELAY_MS);
+    expect(jitterDelayMs(20)).toBe(MIN_DELAY_MS + 2 * 20);
+    // Clamped at both ends: a pathological measurement cannot make remote ships
+    // unleadable (GDD §2.6 is a game of leading moving targets).
+    expect(jitterDelayMs(10_000)).toBe(MAX_DELAY_MS);
+  });
+
+  it('slides to its new size rather than jumping there', () => {
+    const buffer = new RemoteInterpolator({ local: 0 });
+    const opened = buffer.delayMs;
+    const after = buffer.resize(0);
+    expect(after).toBeLessThan(opened);
+    expect(opened - after).toBeLessThanOrEqual(DELAY_SLEW_MS);
+
+    // ...and it gets there eventually.
+    for (let i = 0; i < 200; i++) buffer.resize(0);
+    expect(buffer.delayMs).toBe(MIN_DELAY_MS);
+  });
+
+  it('is pinned when a caller passed an explicit delay — a reproducible test wants one', () => {
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 80 });
+    buffer.resize(0);
+    buffer.resize(500);
+    expect(buffer.delayMs).toBe(80);
   });
 });

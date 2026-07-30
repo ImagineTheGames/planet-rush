@@ -27,7 +27,16 @@ import type { Action, PlayerId } from '@shared/types';
 import { TICK_DT, createWorld, shipCargoCap, stockTiers, step } from '../sim';
 import type { UpgradeTiers, World, WorldConfig } from '../sim';
 import { InputQueue } from './input-queue';
-import { PredictedMatch, SNAP_THRESHOLD, applySnapshot } from './prediction';
+import {
+  MAX_LEAD_TICKS,
+  MAX_PREDICTED_SHOTS,
+  MAX_TRIM_PER_RECONCILE,
+  MIN_LEAD_TICKS,
+  PredictedMatch,
+  SNAP_THRESHOLD,
+  applySnapshot,
+} from './prediction';
+import { LOCAL_SHOT_BASE } from './presentation';
 import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
 import type { InputMessage, PlayerEconomy } from './transport';
@@ -521,5 +530,211 @@ describe('the wallet on the wire', () => {
     // and bank are summed for the same home-station drain reason as above.)
     const ship = shipOf(client.world);
     expect(ship.cargo + ship.banked).toBeCloseTo(10, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Projectiles (M10 netcode audit item 2b)
+// ---------------------------------------------------------------------------
+
+const FIRE: readonly Action[] = [
+  { type: 'thrust', dir: { x: 1, y: 0 } },
+  { type: 'aim', dir: { x: 1, y: 0 } },
+  { type: 'fire', active: true, auto: false },
+];
+
+/** Every live shot in a world, as `[slot, owner, kind]`. */
+function shotsOf(world: World): [number, PlayerId, string | undefined][] {
+  const out: [number, PlayerId, string | undefined][] = [];
+  for (let slot = 0; slot < world.projectiles.length; slot++) {
+    const p = world.projectiles[slot]!;
+    if (p.active) out.push([slot, p.owner, p.kind]);
+  }
+  return out;
+}
+
+describe('the firer\'s own shots', () => {
+  it('survive the reconcile that acknowledges the input which fired them', () => {
+    // The bug this guards: a predicted shot used to be re-created only from the
+    // still-unacknowledged inputs, so one round trip after firing it vanished and
+    // the server's copy — a whole RTT behind, and standing still between
+    // snapshots — appeared in its place. Two wrong shots instead of one right one.
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const server = createWorld(MATCH);
+
+    // Fire, and keep flying, until a shot exists.
+    let seq = 0;
+    for (let i = 0; i < 6; i++) client.predict(++seq, FIRE);
+    const fired = shotsOf(client.world).filter(([, owner, kind]) => owner === LOCAL && kind === 'ship');
+    expect(fired.length).toBeGreaterThan(0);
+
+    // The server runs the same ticks and acknowledges every one of them, then
+    // sends a snapshot that does NOT contain the client's own shot (suppressed).
+    for (let i = 0; i < 6; i++) step(server, [{ id: LOCAL, actions: FIRE }], TICK_DT);
+    const report = client.reconcile(decodeSnapshot(encodeWorldSnapshot(server)), seq);
+    expect(report.applied).toBe(true);
+    expect(report.replayed).toBe(0); // everything acknowledged: nothing to replay
+
+    const after = shotsOf(client.world).filter(([, owner, kind]) => owner === LOCAL && kind === 'ship');
+    expect(after.length).toBeGreaterThan(0);
+    // ...and they live where the wire cannot reach them.
+    for (const [slot] of after) expect(slot).toBeGreaterThanOrEqual(LOCAL_SHOT_BASE);
+  });
+
+  it('are not doubled by the authoritative copy of the same shot', () => {
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const server = createWorld(MATCH);
+    let seq = 0;
+    for (let i = 0; i < 8; i++) {
+      client.predict(++seq, FIRE);
+      step(server, [{ id: LOCAL, actions: FIRE }], TICK_DT);
+    }
+    // The server's world genuinely holds this player's shots...
+    const authoritative = decodeSnapshot(encodeWorldSnapshot(server));
+    const ownOnWire = authoritative.projectiles.filter((p) => (p.meta & 0b1000) !== 0 && (p.meta & 0b111) === LOCAL);
+    expect(ownOnWire.length).toBeGreaterThan(0);
+
+    client.reconcile(authoritative, seq);
+
+    // ...and the client draws exactly its own predicted ones, none of the wire's.
+    const mine = shotsOf(client.world).filter(([, owner, kind]) => owner === LOCAL && kind === 'ship');
+    expect(mine.length).toBe(ownOnWire.length);
+    for (const [slot] of mine) expect(slot).toBeGreaterThanOrEqual(LOCAL_SHOT_BASE);
+  });
+
+  it('are capped, so a long match cannot grow the pool without bound', () => {
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const server = createWorld(MATCH);
+    let seq = 0;
+    for (let round = 0; round < 20; round++) {
+      for (let i = 0; i < 6; i++) {
+        client.predict(++seq, FIRE);
+        step(server, [{ id: LOCAL, actions: FIRE }], TICK_DT);
+      }
+      client.reconcile(decodeSnapshot(encodeWorldSnapshot(server)), seq);
+    }
+    const mine = shotsOf(client.world).filter(([, owner, kind]) => owner === LOCAL && kind === 'ship');
+    expect(mine.length).toBeLessThanOrEqual(MAX_PREDICTED_SHOTS);
+    expect(client.world.projectiles.length).toBeLessThanOrEqual(LOCAL_SHOT_BASE + MAX_PREDICTED_SHOTS);
+  });
+});
+
+describe('shots the client did not fire', () => {
+  it('are taken from the wire, never from the local replay', () => {
+    // `step()` runs the whole world, so a replaying client fires *everyone's*
+    // turrets locally. Those predicted copies are duplicates of shots already on
+    // the wire, drawn a round trip ahead of them — culled outright.
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const world = client.world;
+
+    // Plant a locally-spawned turret shot in a slot the snapshot will not name.
+    // (Grow the pool first: a fresh world's pool is empty, so an unqualified push
+    // would land in slot 0 — which is exactly the slot the wire names below.)
+    for (let i = 0; i < 4; i++) {
+      world.projectiles.push({
+        id: 0,
+        active: false,
+        owner: -1,
+        pos: { x: 0, y: 0 },
+        vel: { x: 0, y: 0 },
+        damage: 0,
+        radius: 3,
+        life: 0,
+      });
+    }
+    world.projectiles.push({
+      id: 9_001,
+      active: true,
+      owner: 1,
+      kind: 'turret',
+      pos: { x: 10, y: 10 },
+      vel: { x: 1, y: 0 },
+      damage: 1,
+      radius: 3,
+      life: 5,
+    });
+    const planted = world.projectiles.length - 1;
+
+    client.predict(1, THRUST);
+    client.reconcile({ tick: 1, ships: [], projectiles: [{ id: 0, posX: 5, posY: 5, meta: 0b0010 }] }, 1);
+
+    expect(world.projectiles[planted]!.active).toBe(false);
+    expect(world.projectiles[0]!.active).toBe(true);
+    expect(world.projectiles[0]!.kind).toBe('turret');
+  });
+
+  it('carry their shot kind off the wire, so the renderer can still tell them apart', () => {
+    const world = createWorld(MATCH);
+    applySnapshot(world, {
+      tick: 3,
+      ships: [],
+      projectiles: [
+        { id: 0, posX: 1, posY: 2, meta: 0b0001 },
+        { id: 1, posX: 3, posY: 4, meta: 0b1001 },
+      ],
+    });
+    expect(world.projectiles[0]!.kind).toBe('turret');
+    expect(world.projectiles[1]!.kind).toBe('ship');
+  });
+
+  it('are all written when nobody asked for suppression — the spectator case', () => {
+    const world = createWorld(MATCH);
+    const slots = applySnapshot(world, {
+      tick: 3,
+      ships: [],
+      projectiles: [{ id: 0, posX: 1, posY: 2, meta: 0b1000 }],
+    });
+    expect([...slots]).toEqual([0]);
+    expect(world.projectiles[0]!.active).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The lead budget (M10 netcode audit)
+// ---------------------------------------------------------------------------
+
+describe('the lead budget', () => {
+  it('is sized from the measured round trip, and clamped at both ends', () => {
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    expect(client.leadBudget).toBe(MAX_LEAD_TICKS);
+
+    // A LAN: a couple of ticks of round trip, floored so a clean client never
+    // starts trimming its own presses.
+    expect(client.setLeadBudget(5, 0)).toBe(MIN_LEAD_TICKS);
+    // The developer's condition: ~150 ms + jitter ≈ 15 ticks.
+    expect(client.setLeadBudget(150, 20)).toBe(Math.ceil((150 + 40) / (TICK_DT * 1000)) + 2);
+    // A satellite link: capped, not honoured.
+    expect(client.setLeadBudget(5_000, 500)).toBe(MAX_LEAD_TICKS);
+    // No measurement changes nothing.
+    const held = client.leadBudget;
+    expect(client.setLeadBudget(null, null)).toBe(held);
+  });
+
+  it('bleeds an over-lead down rather than yanking the ship backwards', () => {
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const server = createWorld(MATCH);
+    client.setLeadBudget(20, 0); // a very short budget: MIN_LEAD_TICKS
+
+    // A stall: the client predicts thirty ticks with no snapshot at all.
+    let seq = 0;
+    for (let i = 0; i < 30; i++) client.predict(++seq, THRUST);
+    step(server, [{ id: LOCAL, actions: THRUST }], TICK_DT);
+    expect(client.pendingCount).toBe(30);
+
+    // The stall clears. Each reconcile trims at most MAX_TRIM_PER_RECONCILE, so
+    // the clock comes back over several of them and never in one jump.
+    const first = client.reconcile(decodeSnapshot(encodeWorldSnapshot(server)), 0);
+    expect(first.trimmed).toBeLessThanOrEqual(MAX_TRIM_PER_RECONCILE);
+    expect(first.snapped).toBe(false);
+    expect(client.pendingCount).toBe(30 - first.trimmed);
+
+    for (let i = 0; i < 20; i++) {
+      step(server, [{ id: LOCAL, actions: THRUST }], TICK_DT);
+      const report = client.reconcile(decodeSnapshot(encodeWorldSnapshot(server)), 0);
+      expect(report.trimmed).toBeLessThanOrEqual(MAX_TRIM_PER_RECONCILE);
+      // Never a teleport, at any point in the recovery.
+      expect(report.snapped).toBe(false);
+    }
+    expect(client.pendingCount).toBeLessThanOrEqual(MIN_LEAD_TICKS);
   });
 });
