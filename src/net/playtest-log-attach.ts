@@ -239,5 +239,8 @@ export function describeSample(sample: TelemetrySample): Record<string, number |
     // Visible teleports, counted apart from magnitude: a blended correction is not
     // felt, and this is the one a player calls "server rollback" (M10 audit).
     snap: sample.visualSnaps,
+    // How far ahead of authority the client ran, in ticks — the input latency the
+    // player pays on their own trigger, over and above the wire (M10 audit).
+    lead: Math.round(sample.leadMeanTicks),
   };
 }

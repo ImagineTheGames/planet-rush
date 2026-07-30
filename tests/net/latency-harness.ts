@@ -45,6 +45,14 @@ import type { NetTelemetry } from '../../src/net/telemetry';
  *  what a fast-retransmit costs, which is the end a gate should be written at. */
 export const RETRANSMIT_FACTOR = 3;
 
+/**
+ * How closely two messages may be delivered once a stalled pipe is draining, ms —
+ * link rate, effectively. A backlog of thirty messages clears in thirty
+ * milliseconds, which is what a real retransmit recovery looks like from the
+ * application's side: a gap, then everything at once.
+ */
+export const DRAIN_SPACING_MS = 1;
+
 /** One 60 Hz frame in ms — the harness's clock granularity (GDD §4.1). */
 export const FRAME_MS = TICK_DT * 1000;
 
@@ -74,7 +82,7 @@ export function lcg(seed: number): () => number {
 /** One direction of the wire: a FIFO whose items come due on the harness clock. */
 class Pipe<T> {
   private readonly queue: { at: number; payload: T }[] = [];
-  private lastAt = -1;
+  private lastAt = Number.NEGATIVE_INFINITY;
   /** Messages this pipe delayed for a retransmit — reported, so a run can never
    *  claim to have tested loss it did not actually inject. */
   stalls = 0;
@@ -94,7 +102,15 @@ class Pipe<T> {
     }
     // TCP does not reorder, and neither may this: a message is never delivered
     // before one sent ahead of it — the head-of-line clamp.
-    const at = Math.max(nowMs + delay, this.lastAt);
+    //
+    // But it *drains*. Once the retransmit lands, everything queued behind it goes
+    // out back-to-back at link rate, which is far faster than a 60 Hz client
+    // produces input — so a stall is a pause followed by a burst, not a permanent
+    // shift of every later message. {@link DRAIN_SPACING_MS} is that line rate.
+    // (Modelling it as a permanent shift makes the wire's effective latency grow
+    // without bound, which is a bug in the harness rather than a finding about the
+    // game — and it is one this file made before it made this comment.)
+    const at = Math.max(nowMs + delay, this.lastAt + DRAIN_SPACING_MS);
     this.lastAt = at;
     this.queue.push({ at, payload });
   }
@@ -269,21 +285,31 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
       pump();
     }
   };
-  /** Frames one round trip takes, plus a frame of slack. */
-  const rttFrames = Math.ceil(options.profile.rttMs / FRAME_MS) + 1;
+  /** Frames one round trip takes, plus a frame of slack — and generous multiples
+   *  of it below, because a retransmit stall can land on a lobby message just as
+   *  easily as on an input, and a lobby that did not finish is a vacuous run. */
+  const rttFrames = Math.ceil(options.profile.rttMs / FRAME_MS) + 1 + Math.ceil(options.profile.jitterMs / FRAME_MS);
 
   // The lobby, in the order a real one happens and with the wire's delay between
   // each step: both clients join, *then* both pick a hull, *then* the creator
   // starts. Collapsing these (the offline `open()` gesture) would race the second
   // join against the match going live, and the server would rightly refuse it.
   for (const transport of transports) transport.joinRoom('RUSH');
-  settle(rttFrames * 4, () => (server.room('RUSH')?.humanCount ?? 0) === 2);
+  settle(rttFrames * 16 + 60, () => (server.room('RUSH')?.humanCount ?? 0) === 2);
   for (let i = 0; i < sessions.length; i++) {
     sessions[i]!.chooseInLobby({ shipClass: i === 0 ? ShipClass.Vanguard : ShipClass.Interceptor });
   }
-  settle(rttFrames * 2);
-  sessions[0]!.startMatch();
-  settle(rttFrames * 6, () => sessions.every((s) => s.world !== null));
+  settle(rttFrames * 8 + 30);
+  // RUSH! from *both*: the two joins race on independent pipes, so with jitter
+  // either client may have arrived first and be the room's creator — and a
+  // `startMatch` from anyone else is a no-op by design (`server/room.ts`).
+  for (const session of sessions) session.startMatch();
+  settle(rttFrames * 16 + 60, () => sessions.every((s) => s.world !== null));
+  // A run whose lobby never completed would sail through every feel threshold by
+  // measuring nothing at all. Fail loudly instead.
+  if (!sessions.every((s) => s.world !== null)) {
+    throw new Error('latency harness: the match never started — the lobby did not settle');
+  }
 
   for (let frame = 1; frame <= options.frames; frame++) {
     nowMs += FRAME_MS;

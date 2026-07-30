@@ -128,7 +128,8 @@ export class PresentationLayer {
     // its death yet, and one that is only in the newest snapshot is not on screen
     // until the render clock arrives at it.
     if (frame.shots.length > 0 || this.anyStreamedShotActive(world)) {
-      for (let slot = 0; slot < Math.min(world.projectiles.length, LOCAL_SHOT_BASE); slot++) {
+      const stashedUpTo = Math.min(world.projectiles.length, LOCAL_SHOT_BASE);
+      for (let slot = 0; slot < stashedUpTo; slot++) {
         const p = world.projectiles[slot]!;
         this.shots.push({ index: slot, active: p.active, x: p.pos.x, y: p.pos.y, owner: p.owner, kind: p.kind });
         p.active = false;
@@ -137,6 +138,12 @@ export class PresentationLayer {
         if (shot.slot >= LOCAL_SHOT_BASE) continue;
         const p = this.growTo(world, shot.slot);
         if (!p) continue;
+        // A slot this world had never allocated — the client's own pool only grows
+        // when it fires. It still needs a stash entry, or `restore` would leave the
+        // presented shot behind as if the simulation had produced it.
+        if (shot.slot >= stashedUpTo && !this.shots.some((s) => s.index === shot.slot)) {
+          this.shots.push({ index: shot.slot, active: false, x: p.pos.x, y: p.pos.y, owner: p.owner, kind: p.kind });
+        }
         p.active = true;
         p.pos.x = shot.x;
         p.pos.y = shot.y;

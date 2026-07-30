@@ -144,6 +144,21 @@ export const MAX_PREDICTED_SHOTS = 8;
  */
 export const MAX_LEAD_TICKS = 24;
 
+/**
+ * The most pending inputs one reconcile will drop while pulling an over-budget
+ * clock back.
+ *
+ * Trimming the lead moves the client's clock *backwards* by however many inputs it
+ * drops, and the ship goes with it — so a stall that left the clock 45 ticks out
+ * would, trimmed in one go, rewind the ship three quarters of a second of travel
+ * on screen. That is the exact thing this audit exists to remove. So the clock
+ * bleeds down instead: one tick per reconcile, 30 times a second, each step worth
+ * a few world units and absorbed whole by the correction blend
+ * ({@link RECONCILE_BLEND_FRAMES}). A second's worth of over-lead is gone inside
+ * ~1.5 s and never once seen.
+ */
+export const MAX_TRIM_PER_RECONCILE = 4;
+
 /** The floor the lead budget will not narrow below, whatever the wire measures:
  *  a client must be able to hold at least this many ticks of input in flight or a
  *  clean LAN would start trimming its own presses. Four ticks ≈ 67 ms. */
@@ -503,10 +518,13 @@ export class PredictedMatch {
    * client has now decided not to keep waiting on: they are older than one lead
    * budget, which means the server has either already refused them as late or is
    * about to. Keeping them would only hold the clock out where a stall left it.
+   *
+   * At most {@link MAX_TRIM_PER_RECONCILE} per reconcile — see that constant for
+   * why the clock bleeds rather than snaps back.
    */
   private trimLead(): number {
     let dropped = 0;
-    while (this.queue.length > this.lead_budget) {
+    while (this.queue.length > this.lead_budget && dropped < MAX_TRIM_PER_RECONCILE) {
       this.queue.shift();
       dropped++;
     }

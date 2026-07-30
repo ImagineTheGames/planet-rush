@@ -399,7 +399,11 @@ export class TransportSession implements MatchSession {
           // Feed the netgraph only for a reconcile that actually applied — a stale
           // snapshot the client ignored is not a data point (`./telemetry`).
           if (report.applied) {
-            this.netTelemetry.recordReconcile(report, message.ackSeq, now);
+            this.netTelemetry.recordReconcile(
+              { ...report, lead: report.replayed },
+              message.ackSeq,
+              now,
+            );
             const live = this.netTelemetry.live;
             // Re-size the jitter buffer from the variance just measured, not from a
             // constant (audit item 2d). Slew-limited inside, so this is a slide.

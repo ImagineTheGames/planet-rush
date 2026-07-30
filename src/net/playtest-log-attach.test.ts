@@ -39,6 +39,8 @@ function sample(atMs: number, over: Partial<TelemetrySample> = {}): TelemetrySam
     rttMaxMs: 210.2,
     rttMinMs: 120.4,
     rttJitterMs: 12.3,
+    leadMeanTicks: 11,
+    leadMaxTicks: 14,
     resyncs: 0,
     visualSnaps: 0,
     ...over,
@@ -180,6 +182,7 @@ describe('the per-second telemetry', () => {
       recon: 30,
       resync: 2,
       snap: 4,
+      lead: 11,
     });
   });
 

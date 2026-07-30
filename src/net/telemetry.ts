@@ -139,6 +139,11 @@ export interface TelemetrySample {
    * the number `./interpolation` sizes the interpolation delay from.
    */
   readonly rttJitterMs: number | null;
+  /** Mean lead over the window, ticks — how far ahead of authority the client ran.
+   *  0 when the window saw no reconciles. */
+  readonly leadMeanTicks: number;
+  /** Worst lead in the window, ticks. The ratchet's fever chart. */
+  readonly leadMaxTicks: number;
   /** Wholesale authority takeovers in the window (a reclaim, a slept tab). */
   readonly resyncs: number;
   /**
@@ -179,6 +184,10 @@ export interface ReconcileFacts {
   /** Whether the correction was hard-snapped rather than blended — `ReconcileReport.snapped`.
    *  Absent reads as false, so a caller built before the counter existed still compiles. */
   readonly snapped?: boolean;
+  /** Ticks the client is running ahead of authority *after* this reconcile —
+   *  `ReconcileReport.replayed`, which is exactly the pending queue's depth. The
+   *  input latency the player pays on their own trigger, over and above the wire. */
+  readonly lead?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +208,8 @@ interface OpenBucket {
   rttCount: number;
   rttMax: number;
   rttMin: number;
+  leadSum: number;
+  leadMax: number;
   resyncs: number;
   visualSnaps: number;
 }
@@ -261,6 +272,10 @@ export class NetTelemetry {
     if (facts.error > this.mispredictionUnits) bucket.mispredictions++;
     if (facts.resynced) bucket.resyncs++;
     if (facts.snapped === true) bucket.visualSnaps++;
+    if (facts.lead !== undefined) {
+      bucket.leadSum += facts.lead;
+      if (facts.lead > bucket.leadMax) bucket.leadMax = facts.lead;
+    }
     this.lastCorrection = facts.error;
 
     const rtt = this.matchRtt(ackSeq, nowMs);
@@ -320,6 +335,7 @@ export class NetTelemetry {
         `rtt ${rtt}/${rttMax}ms  jit ${jit}ms  ` +
         `corr ${s.correctionMeanUnits.toFixed(1)}/${s.correctionMaxUnits.toFixed(1)}u  ` +
         `mispred ${(s.mispredictionRate * 100).toFixed(0).padStart(3)}%  ` +
+        `lead ${Math.round(s.leadMeanTicks)}/${s.leadMaxTicks}t  ` +
         `snap ${s.visualSnaps}  ` +
         `(${s.reconciles} recon${s.resyncs > 0 ? `, ${s.resyncs} resync` : ''})`
       );
@@ -387,6 +403,8 @@ export class NetTelemetry {
         rttCount: 0,
         rttMax: 0,
         rttMin: Number.POSITIVE_INFINITY,
+        leadSum: 0,
+        leadMax: 0,
         resyncs: 0,
         visualSnaps: 0,
       };
@@ -416,6 +434,8 @@ export class NetTelemetry {
       rttMaxMs: b.rttCount > 0 ? b.rttMax : null,
       rttMinMs: b.rttCount > 0 ? b.rttMin : null,
       rttJitterMs: this.jitterMs,
+      leadMeanTicks: b.reconciles > 0 ? b.leadSum / b.reconciles : 0,
+      leadMaxTicks: b.leadMax,
       resyncs: b.resyncs,
       visualSnaps: b.visualSnaps,
     });
