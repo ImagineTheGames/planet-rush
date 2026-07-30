@@ -49,11 +49,13 @@ import {
   pressRush,
   selectMap,
   selectShipClass,
+  setPlayerName,
   startLobbyMatch,
   tickLobby,
   toggleMode,
 } from '../../src/ui/lobby';
 import type { LobbyState } from '../../src/ui/lobby';
+import type { LobbySlot } from '../../src/net/transport';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 
 // ---------------------------------------------------------------------------
@@ -347,5 +349,86 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(guest.started(), 'a client that left never enters the match it left').toBe(false);
     expect(guestSession.world, 'and never builds its world').toBeNull();
+  }, 30_000);
+
+  it('fills the seat live — but the joiner’s NAME never crosses the wire (pinned for Netcode)', async () => {
+    // Requirement 2 of the ratification asks that "joiners fill HUMAN-open slots live
+    // (names appear as they join)". One half of that is real, and the test above
+    // asserts it: the seat fills on the host's own model, live, with no re-open and no
+    // reload. The other half is NOT this client's to deliver, and this test says so out
+    // loud rather than letting a filled roster imply it.
+    //
+    // `LobbySlot` (src/net/transport.ts) carries `player`, `isBot`, `botDifficulty`,
+    // `shipClass`, `ready` and `team` — and no name. So `nameFor` (src/ui/lobby) labels
+    // every remote human seat by its slot tag, `PLAYER 2`, and the name a joiner typed
+    // never leaves the joiner's own machine. What a host actually watches arrive is a
+    // seat, correctly and live, under a slot number rather than a person's name.
+    //
+    // Closing it means adding a field to `LobbySlot` and populating it in
+    // `server/room.ts` — both Netcode's, both ratified contracts, so this lane does not
+    // touch either. The assertion below is a FORCING FUNCTION rather than a wish: it
+    // FAILS the day a name lands on the wire, which makes deleting this pin (and
+    // showing the name) part of that change instead of a comment nobody re-reads.
+    const harness = await startMatchServer({ seed: 77, slots: 4, asteroidCount: 8 });
+    const sessions: OnlineSession[] = [];
+    cleanup = async (): Promise<void> => {
+      for (const session of sessions) session.close();
+      await harness.stop();
+    };
+
+    const hostSession = createOnlineSession({
+      url: harness.url,
+      room: 'NAME',
+      shipClass: ShipClass.Vanguard,
+      transport: { connect: nodeWebSocket },
+    });
+    sessions.push(hostSession);
+    // Every `lobbyState` the host is sent, kept RAW — the wire's own words, before any
+    // model has folded them into seats. Registered before the lobby's own observer, so
+    // nothing is missed.
+    const wire: LobbySlot[][] = [];
+    hostSession.observe((message) => {
+      if (message.type === 'lobbyState') wire.push(message.slots.map((slot) => ({ ...slot })));
+    });
+    await until('the room to exist', () => harness.matches.room('NAME') !== undefined);
+    const room = harness.matches.room('NAME');
+    if (!room) throw new Error('no room');
+    const host = openClient(hostSession, 'NAME', hostSession.you, hostSession.you);
+
+    const guestSession = createOnlineSession({
+      url: harness.url,
+      room: 'NAME',
+      shipClass: ShipClass.Hauler,
+      transport: { connect: nodeWebSocket },
+    });
+    sessions.push(guestSession);
+    await until('both seats to be filled', () => room.humanCount === 2);
+    await until('the joiner to reach the host roster', () => lobbyModel(host.lobby()).humanCount === 2);
+
+    // The SEAT arrives — requirement 2's live-fill half, on the host's screen.
+    const guestSeat = lobbyModel(host.lobby()).seats.find((s) => !s.isBot && !s.isYou && !s.isClosed);
+    expect(guestSeat, 'the joiner has a seat on the host screen').toBeDefined();
+    expect(guestSeat?.state, 'and it fills live, without a reload').toBe('human');
+
+    // The NAME does not — asserted on the wire's own words, not on the UI's reading of
+    // them: no slot the host was ever sent carries one.
+    expect(wire.length, 'the host was sent at least one lobbyState').toBeGreaterThan(0);
+    expect(
+      wire.flat().filter((slot) => 'name' in slot),
+      'LobbySlot carries no name yet — when it does, delete this pin and DRAW the name',
+    ).toEqual([]);
+
+    // …so the row the host reads is labelled by slot tag, which is what
+    // `seatView`/`nameFor` fall back to for any human who is not you.
+    expect(guestSeat?.name, 'a joiner reads as their slot number on the host screen').toBe(
+      `PLAYER ${(guestSeat?.player ?? 0) + 1}`,
+    );
+
+    // Requirement 3's half IS met, and needs no wire at all: a joiner sees THEIR OWN
+    // name in their own slot, because it never had to cross anything to get there.
+    const guest = openClient(guestSession, 'NAME', guestSession.you, hostSession.you);
+    const named = setPlayerName(guest.lobby(), 'ZEPHYR');
+    const ownSeat = lobbyModel(named).seats.find((s) => s.isYou);
+    expect(ownSeat?.name, 'your own seat is you, by name').toBe('ZEPHYR');
   }, 30_000);
 });
