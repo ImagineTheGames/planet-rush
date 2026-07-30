@@ -50,7 +50,7 @@ One occurrence each — their own definitions:
 ```
 
 **There is no call site.** The client renders straight off the predicted `World`
-(`renderer.draw(world, …)`, `src/main.ts:1525`), and #238 shipped its smoothing
+(`renderer.draw(world, …)`, `src/main.ts:1556`), and #238 shipped its smoothing
 and its interpolation buffer as *seams for the render layer to adopt* — which
 never happened, because the render layer is Platform's lane and the seam was
 offered rather than wired. The correction offset was computed every reconcile and
@@ -76,7 +76,7 @@ column that explains the report. "Now" is this PR.
 | **Projectiles — everyone else's** | **Server-snapped with zero velocity.** The 6-byte record carries position and owner, no velocity; a decoded shot therefore *stood still* for 33 ms and teleported. This is the report's "jumpy projectiles", exactly. | Interpolated on the same buffer as remote ships. Two snapshots are the velocity; no wire change. | `snapshot.ts:147`, `interpolation.ts:305` |
 | **Projectiles — locally re-fired turrets** | **Duplicated.** `step()` runs the whole world, so a replaying client fires *everyone's* turrets locally, on top of the same shots arriving on the wire. | Culled: a locally-spawned shot that is not the firer's own is dropped every reconcile. | `prediction.ts:642` |
 | **Ore chunks** | **Client-side fiction.** Not in the snapshot, not in the event stream. Each client spawns chunks from its own predicted hits; a remote player's shot chips nothing locally (a decoded shot has no `mineYield`). | Unchanged — see §6, gap 1. | `sim/projectiles.ts:393`, `sim/state.ts:593` |
-| **Ore flights (deposit couriers)** | Client-side, derived from the same local `chunks` with `deposit` set. Cosmetic. | Unchanged. | `main.ts:2897` |
+| **Ore flights (deposit couriers)** | Client-side, derived from the same local `chunks` with `deposit` set. Cosmetic. | Unchanged. | `main.ts:2928` |
 | **Turrets** | Server-authoritative via the entity-event stream at 10 Hz — spawn / update / destroy. Correct, and unaffected by any of the above. | Unchanged. | `entity-events.ts:152`, `room.ts` `DEFAULT_EVENT_INTERVAL_TICKS` |
 | **Shields** | Server-authoritative, entity events. | Unchanged. | `entity-events.ts:156` |
 | **Stations / reactors / wrecks** | Server-authoritative, entity events (including the scouted-HP fog the client has earned). | Unchanged. | `entity-events.ts:164`, `:165` |
