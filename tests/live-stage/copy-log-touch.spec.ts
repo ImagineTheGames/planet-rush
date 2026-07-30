@@ -30,24 +30,32 @@
  *                                        that tells the developer where it went
  *
  * ── HAS THIS RUN? ──────────────────────────────────────────────────────────
- * **Not in the lane it was written in.** This box has Chromium's binary but not
- * its shared libraries — `ldd headless_shell` reports `libnss3.so`, `libnspr4.so`,
- * `libdbus-1.so.3`, `libatk-1.0.so.0` and more as `not found`, and
- * `playwright install-deps` needs root the lane does not have — so every browser
- * launch dies before a single assertion runs. It is the same condition
- * `./connect-trace.spec.ts` documents against the same binary. The bundle builds
- * and `vite preview` serves; only the browser does not start.
- *
- * It needs one run on a box with those libraries:
+ * **Yes — green, both tests, on the phone profile, against the shipped bundle.**
+ * Evidence: the two PNGs above.
  *
  *   npx playwright test --config tests/live-stage/playwright.copy-log.config.ts
  *
- * Until then, what IS proven and green in the DoD suite: every export route and its
- * fallback ordering (`src/net/playtest-log-export.test.ts`), the button's words,
- * its 44-px touch minimum and its markup (`src/net/playtest-log-button.test.ts`),
- * and the log's contents and bounds (`src/net/playtest-log.test.ts`). What is
- * unproven without this file is only the wiring, and the wiring is exactly the class
- * of bug this whole milestone keeps finding.
+ * It did not run when it was written: the lane has Chromium's binary but not its
+ * shared libraries (`ldd headless_shell` → `libnss3.so`, `libnspr4.so`,
+ * `libdbus-1.so.3`, `libatk-1.0.so.0` and 13 more `not found`), and
+ * `playwright install-deps` needs a root this box does not have. The way through
+ * needs no root: `apt-get download` the library packages, `dpkg-deb -x` them into a
+ * prefix, and put that prefix on `LD_LIBRARY_PATH` for the run —
+ * `docs/netcode-action-echo.md` records the exact recipe. The same unblocks
+ * `./connect-trace.spec.ts`, which documents the same condition.
+ *
+ * And it earned its run on the first one. Two assertions here had been written
+ * against a payload shape that does not exist — `entries` for `events`, a
+ * `viewportWidth` number for the `"390x844"` string `PlaytestLogEnvironment`
+ * actually carries. Both were plausible, neither was real, and nothing else in the
+ * suite could have said so: the unit tests import the type and so cannot disagree
+ * with it. A test that has never executed is a claim, not evidence — which is the
+ * same lesson as the wiring bugs this milestone kept finding, aimed at the tests.
+ *
+ * Alongside it, with no browser at all: every export route and its fallback ordering
+ * (`src/net/playtest-log-export.test.ts`), the button's words, its 44-px touch
+ * minimum and its markup (`src/net/playtest-log-button.test.ts`), and the log's
+ * contents and bounds (`src/net/playtest-log.test.ts`).
  */
 import { test, expect, type Page } from '@playwright/test';
 
@@ -118,6 +126,29 @@ async function armShareSheet(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Hold the button's answer on screen for the photograph.
+ *
+ * The affordance reverts itself to COPY LOG {@link REVERT_MS} after it reports —
+ * correct behaviour, and covered twice in the unit suite (`playtest-log-button.test.ts`
+ * proves both the revert and that a stale one cannot wipe a newer press's answer). But
+ * it races the evidence screenshot: at DPR 3 a 1170×2532 capture of a rotated,
+ * composited page is not always inside four seconds, and the first green run of this
+ * file photographed a button that had already reverted — a shot whose filename claimed
+ * something it no longer showed.
+ *
+ * So the revert timer alone is suppressed for the capture. Only timers at or past the
+ * revert delay: everything shorter — the game loop, the export itself — runs untouched,
+ * and the assertions below still read the real DOM the real export wrote.
+ */
+async function holdConfirmation(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const native = window.setTimeout.bind(window);
+    window.setTimeout = ((fn: TimerHandler, ms?: number, ...rest: unknown[]) =>
+      (ms ?? 0) >= 4000 ? 0 : native(fn, ms, ...rest)) as typeof window.setTimeout;
+  });
+}
+
 /** Open the pause menu the way a thumb does: a real tap on the corner affordance
  *  the client itself drew, at the point the client says it drew it. */
 async function tapPause(page: Page): Promise<void> {
@@ -134,6 +165,7 @@ test('COPY LOG is on the touch pause menu, and a tap sends the log to the share 
   test.setTimeout(90_000);
   const pageErrors = await bootMatch(page);
   await armShareSheet(page);
+  await holdConfirmation(page);
 
   // --- It is not there during play ------------------------------------------
   // The match owns the screen; a floating diagnostic over the HUD is exactly the
@@ -157,6 +189,27 @@ test('COPY LOG is on the touch pause menu, and a tap sends the log to the share 
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
   expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
 
+  // --- It turned with the game -----------------------------------------------
+  // Planet Rush is landscape on mobile always: on a touch viewport held portrait the
+  // game root is rotated +90° (`@platform/orientation`). This affordance is DOM over
+  // the canvas and does not get that for free, so it carries the rotation itself
+  // (`src/net/playtest-log-button.ts`). Without it, it is the one element on the
+  // screen reading sideways — and a log the developer has to tilt their head to find
+  // is most of the way back to having no way to send one. `rotate(90deg)` computes to
+  // `matrix(0, 1, -1, 0, …)`; asserted on the real bundle because a media query that
+  // does not match ships as silently as one that does.
+  const matrix = await page.evaluate(
+    (id) => getComputedStyle(document.getElementById(id)!).transform,
+    ROOT_ID,
+  );
+  expect(matrix, 'the affordance turns with the landscape lock').toMatch(
+    /^matrix\(0,\s*1,\s*-1,\s*0,/,
+  );
+  // Logical bottom-right — where it sits unrotated — is the PHYSICAL bottom-left
+  // under that transform. Left half of the screen, bottom half.
+  expect(box!.x, 'anchored to the physical left edge').toBeLessThan(viewport.width / 2);
+  expect(box!.y + box!.height, 'and the physical bottom').toBeGreaterThan(viewport.height / 2);
+
   await page.screenshot({ path: 'tests/live-stage/copy-log-touch-pause-evidence.png' });
 
   // --- The tap: a named JSON file reaches the share sheet -------------------
@@ -169,14 +222,22 @@ test('COPY LOG is on the touch pause menu, and a tap sends the log to the share 
   expect(shared.files[0]!.type).toBe('application/json');
 
   // It is a real, parseable log — the developer pastes/attaches this and it is
-  // readable at the other end (`src/net/playtest-log.ts`).
+  // readable at the other end. The field names are `PlaytestLogExport`'s
+  // (`src/net/playtest-log.ts`): `events`, and an `env` whose viewport is the
+  // `"390x844"` string the header carries, not a pair of numbers.
   const parsed = JSON.parse(shared.files[0]!.body) as {
-    env: { sha: string; touch: boolean; viewportWidth: number };
-    entries: unknown[];
+    schema: string;
+    summary: string;
+    env: { sha: string; touch: boolean; viewport: string; formFactor: string };
+    events: unknown[];
   };
-  expect(parsed.entries.length, 'the log is not empty').toBeGreaterThan(0);
+  expect(parsed.events.length, 'the log is not empty').toBeGreaterThan(0);
+  expect(parsed.summary, 'the top of the paste reads as a sentence').toMatch(/Planet Rush playtest log/);
   expect(parsed.env.touch, 'the log knows it came off a touch device').toBe(true);
-  expect(parsed.env.viewportWidth).toBe(viewport.width);
+  // The header describes the device the report came from — a phone. This is the
+  // one assertion no desk profile can make, and the reason this config exists.
+  expect(parsed.env.formFactor, 'and that the device was a phone').toBe('phone');
+  expect(parsed.env.viewport).toBe(`${viewport.width}x${viewport.height}`);
 
   // --- And the button says where it went ------------------------------------
   await expect(button).toHaveText(/LOG SENT/);
