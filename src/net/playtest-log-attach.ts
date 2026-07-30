@@ -227,10 +227,17 @@ export function describeSample(sample: TelemetrySample): Record<string, number |
   return {
     rtt: sample.rttMeanMs === null ? null : Math.round(sample.rttMeanMs),
     rttMax: sample.rttMaxMs === null ? null : Math.round(sample.rttMaxMs),
+    // The wire's *variance*, not just its length — the number the jitter buffer is
+    // sized from, so a pasted log says why the buffer was the size it was
+    // (`./interpolation` `jitterDelayMs`, M10 audit item 2d).
+    jitter: sample.rttJitterMs === null ? null : Math.round(sample.rttJitterMs),
     corr: sample.correctionMeanUnits,
     corrMax: sample.correctionMaxUnits,
     mispred: sample.mispredictionRate,
     recon: sample.reconciles,
     resync: sample.resyncs,
+    // Visible teleports, counted apart from magnitude: a blended correction is not
+    // felt, and this is the one a player calls "server rollback" (M10 audit).
+    snap: sample.visualSnaps,
   };
 }

@@ -37,7 +37,10 @@ function sample(atMs: number, over: Partial<TelemetrySample> = {}): TelemetrySam
     correctionMaxUnits: 2.5,
     rttMeanMs: 148.6,
     rttMaxMs: 210.2,
+    rttMinMs: 120.4,
+    rttJitterMs: 12.3,
     resyncs: 0,
+    visualSnaps: 0,
     ...over,
   };
 }
@@ -165,16 +168,18 @@ describe('the per-second telemetry', () => {
     expect(log.events.filter((e) => e.kind === 'net').map((e) => e.data!['recon'])).toEqual([1, 2, 3]);
   });
 
-  it('carries the whole #238 readout: rtt, correction, misprediction rate, snaps', () => {
-    const data = describeSample(sample(1_000, { resyncs: 2 }));
+  it('carries the whole #238 readout plus the audit\'s two: jitter and visual snaps', () => {
+    const data = describeSample(sample(1_000, { resyncs: 2, visualSnaps: 4 }));
     expect(data).toEqual({
       rtt: 149,
       rttMax: 210,
+      jitter: 12,
       corr: 0.4,
       corrMax: 2.5,
       mispred: 0.1,
       recon: 30,
       resync: 2,
+      snap: 4,
     });
   });
 
