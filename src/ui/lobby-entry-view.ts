@@ -41,6 +41,15 @@ const FONT_BODY = 'Oxanium, "DejaVu Sans Mono", monospace';
 const TEXT_PRIMARY = 0xdce3ec;
 const TEXT_DIM = PALETTE.hullSteel;
 
+/** The standing line under the wordmark: a tagline, a prompt, an error. */
+const MESSAGE_SIZE = 12;
+/** The same slot carrying a live connect narration — the connecting screen's real
+ *  title now, so it is read at a glance from across a classroom rather than
+ *  squinted at. Kept in the body face: it spells out machine ids and room codes,
+ *  which is exactly what a body face is for, and it fits a phone's width where
+ *  Audiowide at this size would not. */
+const NARRATION_SIZE = 17;
+
 /** The entry screen's layout-registry id and anchor: it owns the screen. */
 export const ENTRY_ID = 'lobby-entry';
 export const ENTRY_ANCHOR: AnchorSpec = { region: 'full' };
@@ -102,8 +111,13 @@ export class LobbyEntryView extends Container {
 
     this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 26, TEXT_PRIMARY);
     this.wordmark.anchor.set(0.5, 0.5);
-    this.message = makeText('', FONT_BODY, 12, TEXT_DIM);
+    this.message = makeText('', FONT_BODY, MESSAGE_SIZE, TEXT_DIM);
     this.message.anchor.set(0.5, 0);
+    // A safety net, not a layout: every line this slot carries fits one row on the
+    // narrowest supported phone. It exists so a refusal token nobody anticipated
+    // wraps inside the content box instead of running off both edges.
+    this.message.style.wordWrap = true;
+    this.message.style.align = 'center';
 
     this.addChild(this.backdrop, this.wordmark, this.message);
 
@@ -199,20 +213,41 @@ export class LobbyEntryView extends Container {
 
   // --- Title and the one line under it --------------------------------------
 
+  /**
+   * The wordmark, and **the title slot under it** — the line that used to read
+   * `CONNECTING…` from the first tap to the last, and now reads whatever the
+   * connection is actually doing: ALLOCATING ROOM… → ROOM Q5RN · TICKET SIGNED →
+   * DIALING MACHINE 0800d5b6… → JOINED · SEAT 2, or the exact refusal
+   * (`EntryModel.narrating`, fed from `src/net/connect-trace`).
+   *
+   * A narration is drawn as a *title*, not as the standing sub-line: bigger, in
+   * plasma while there is still hope and threat red once there is not, with the
+   * wordmark stepping back behind it — the same deference it already shows the
+   * keypad prompt. One text element at the top of the screen, which was the ask.
+   */
   private drawTitle(model: EntryModel): void {
     const { title, message } = this.layout;
     this.wordmark.x = title.x + title.width / 2;
     this.wordmark.y = title.y + title.height / 2;
-    // The wordmark is the title on the home screen; on the keypad the *prompt*
-    // is what the player needs, so the wordmark steps back rather than shouting
-    // the game's name at somebody mid-way through typing a code.
-    this.wordmark.alpha = model.screen === 'home' ? 1 : 0.45;
+    // The wordmark is the title on the home screen; on the keypad the *prompt* is
+    // what the player needs, and while a connect narrates, the narration is — so
+    // the wordmark steps back rather than shouting the game's name at somebody who
+    // is mid-way through typing a code or watching a socket refuse them.
+    this.wordmark.alpha = model.screen === 'home' && !model.narrating ? 1 : 0.45;
 
     // Threat red is reserved for danger (style-guide §2) — and a join that came
     // back refused is the only genuinely wrong thing this screen can show.
     const failed = model.error !== '';
     this.message.text = failed ? model.error : model.prompt;
-    this.message.style.fill = failed ? PALETTE.threatRed : TEXT_DIM;
+    this.message.style.fill = failed
+      ? PALETTE.threatRed
+      : model.narrating
+        ? PALETTE.plasma
+        : TEXT_DIM;
+    this.message.style.fontSize = model.narrating ? NARRATION_SIZE : MESSAGE_SIZE;
+    // A refusal names a token the server chose the length of, so the title wraps
+    // inside the content box rather than running off both edges of a phone.
+    this.message.style.wordWrapWidth = Math.max(1, message.width);
     this.message.x = message.x + message.width / 2;
     this.message.y = message.y;
     this.message.visible = this.message.text !== '' && message.height > 0;

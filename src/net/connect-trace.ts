@@ -12,7 +12,11 @@
  *
  * This module is the fix, and it is deliberately *pure*: a state machine plus the
  * lines it produces, with no DOM, no clock of its own and no transport. It reads
- * as a story the player can follow while it happens —
+ * as a story the player can follow while it happens, **in the connecting screen's
+ * title** — the one big line at the top that used to read `CONNECTING…` and now
+ * reads whatever is actually happening ({@link connectTitleLine}; the developer's
+ * third pass: "show it at the top where it says CONNECTING… we don't need a
+ * separate pop-up for it") —
  *
  *     ALLOCATING ROOM…
  *     ROOM Q5RN · TICKET SIGNED
@@ -37,8 +41,13 @@
  * (the m10-09b `connect` channel, `./playtest-log` `recordConnect`), so the screen
  * and the pasted log tell the same story in the same order.
  *
- * The view that draws this is `./connect-trace-view`; `src/main.ts` drives it from
- * the real allocator round trip and the real transport.
+ * **Where it is drawn.** The title itself: `src/main.ts` feeds
+ * {@link connectTitleLine} to the entry screen's title slot (`src/ui/lobby-entry`
+ * `entryModel(state, narration)`), so there is exactly ONE text element and it is
+ * the big one at the top. `./connect-trace-view` is no longer a panel of its own —
+ * it is reduced to the two affordances a failure needs, RETRY and COPY LOG, sitting
+ * under that title. `src/main.ts` drives both from the real allocator round trip
+ * and the real transport.
  */
 
 import type { ConnectionState } from './transport';
@@ -244,9 +253,12 @@ export function connectTransportState(
 
 /** What the view draws for one frame. Everything it needs, nothing it decides. */
 export interface ConnectTraceModel {
-  /** Every step so far, in order, oldest first — the story as it happened. */
+  /** Every step so far, in order, oldest first — the story as it happened. Kept
+   *  for the session log and the tests; the *screen* shows only the current one,
+   *  because the screen has one title and the log has the history. */
   readonly lines: readonly string[];
-  /** The line the player is waiting on (the last one), or `''` before the first. */
+  /** The line the player is waiting on (the last one), or `''` before the first.
+   *  This is what the title says — see {@link connectTitleLine}. */
   readonly current: string;
   readonly stage: ConnectStage;
   /** True while the attempt is still moving — the view shows a live indicator. */
@@ -285,18 +297,42 @@ export function connectTraceModel(trace: ConnectTrace, now: number): ConnectTrac
 }
 
 /**
+ * The **title**: the one line the connecting screen shows at the top, in place of
+ * the static `CONNECTING…` it used to show from the first tap to the last
+ * (`src/ui/lobby-entry` `entryModel(state, narration)`).
+ *
+ * It is the current step, plus one thing the removed panel used to carry on a line
+ * of its own: once a step has sat past {@link STALL_MS}, the seconds are appended —
+ *
+ *     DIALING MACHINE 0800d5b6… 12s
+ *
+ * — because a title that never changes is exactly the screen this whole module
+ * exists to replace, and a stalled dial with no clock on it reads as a frozen game
+ * rather than a slow one. A healthy connect never shows the tail: a number ticking
+ * up from zero on a connect that is working is noise.
+ */
+export function connectTitleLine(model: ConnectTraceModel): string {
+  if (!model.stalled || model.current === '') return model.current;
+  return `${model.current} ${Math.round(model.waitedMs / 1000)}s`;
+}
+
+/** Whether {@link connectTitleLine} is naming a *failure* — the title's one cue to
+ *  draw in threat red rather than plasma (style-guide §2: red is damage, and a
+ *  refused join is the one thing on this screen that has actually gone wrong). */
+export function connectTitleFailed(model: ConnectTraceModel): boolean {
+  return model.error !== '';
+}
+
+/**
  * The line the COPY LOG affordance shows above itself, so the offer names what it
  * is offering to report rather than appearing out of nowhere
  * (`./playtest-log-button` `CopyLogOffer.hint`).
  */
 export function connectOfferHint(model: ConnectTraceModel): string {
-  // On a failure the reason is already the panel's last step, three lines above —
-  // repeating it here just made the panel say the same sentence twice.
-  if (model.error) return 'COPY LOG to report this.';
-  if (model.stalled) {
-    return `Stuck on "${model.current}" for ${Math.round(model.waitedMs / 1000)}s — COPY LOG to report this.`;
-  }
-  return '';
+  // The reason — and, on a stall, the seconds — are already the TITLE, one line
+  // above (`connectTitleLine`). The hint names the offer and nothing else, or the
+  // screen says the same sentence twice in two sizes.
+  return model.error || model.stalled ? 'COPY LOG to report this.' : '';
 }
 
 // ---------------------------------------------------------------------------

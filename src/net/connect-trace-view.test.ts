@@ -1,11 +1,16 @@
 /**
- * src/net/connect-trace-view.test.ts — the panel, asserted without a browser.
- * OWNER: Netcode Engineer (M10, the developer's twice-repeated ask).
+ * src/net/connect-trace-view.test.ts — RETRY and COPY LOG, asserted without a
+ * browser. OWNER: Netcode Engineer (M10, the developer's ask, third pass).
  *
  * Same discipline as `./playtest-log-button.test.ts`: the markup is pure, so the
  * wording, the ids, the touch minimum and — the one that matters — *which
  * affordances appear at which moment* are all testable in node. A fake DOM covers
  * the mounting half.
+ *
+ * The load-bearing assertion in here is now a negative one: on a healthy connect
+ * this module renders **nothing**. The story is the screen's title
+ * (`./connect-trace` `connectTitleLine`), and the second surface that used to
+ * repeat it at the foot of the screen is gone.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -13,7 +18,7 @@ import {
   CONNECT_TRACE_COPY_ID,
   CONNECT_TRACE_RETRY_ID,
   CONNECT_TRACE_ROOT_ID,
-  CONNECT_TRACE_STEPS_ID,
+  CONNECT_TRACE_TOP_PX,
   ConnectTraceView,
   renderConnectTraceHtml,
 } from './connect-trace-view';
@@ -90,40 +95,52 @@ function fakeDom(): TraceDom & {
 }
 
 describe('renderConnectTraceHtml', () => {
-  it('draws every step, marking the live one and dimming the done ones', () => {
+  it('draws NOTHING while a connect is simply working', () => {
+    // The developer's whole complaint, as an assertion: no second surface. The
+    // steps are the title's now, and a connect that is going fine has no
+    // affordance to offer, so it has no markup either.
     const html = renderConnectTraceHtml(connectTraceModel(dialingTrace(), T0 + 250));
-    expect(html).toContain(`id="${CONNECT_TRACE_STEPS_ID}"`);
-    expect(html).toContain('ALLOCATING ROOM');
-    expect(html).toContain('ROOM Q5RN · TICKET SIGNED');
-    expect(html).toContain('DIALING MACHINE 0800d5b6');
-    expect(html).toContain('pr-ct-done'); // the two behind it
-    expect(html).toContain('pr-ct-live'); // the one being waited on
-    // Nothing has failed, so neither affordance is on the panel yet.
-    expect(html).not.toContain(CONNECT_TRACE_RETRY_ID);
-    expect(html).not.toContain(CONNECT_TRACE_COPY_ID);
+    expect(html).toBe('');
   });
 
-  it('puts RETRY and COPY LOG on the panel the moment a join is refused', () => {
+  it('never repeats the story the title is telling', () => {
     const refused = connectRefused(dialingTrace(), 'bad-ticket', T0 + 300);
     const html = renderConnectTraceHtml(connectTraceModel(refused, T0 + 300));
-    expect(html).toContain('REFUSED: bad-ticket — machine mismatch');
-    expect(html).toContain('pr-ct-bad'); // threat red, the one failure on the panel
+    // Not one step line — not the refusal, not the two successes behind it.
+    expect(html).not.toContain('ALLOCATING ROOM');
+    expect(html).not.toContain('TICKET SIGNED');
+    expect(html).not.toContain('DIALING MACHINE');
+    expect(html).not.toContain('machine mismatch');
+  });
+
+  it('puts RETRY and COPY LOG under the title the moment a join is refused', () => {
+    const refused = connectRefused(dialingTrace(), 'bad-ticket', T0 + 300);
+    const html = renderConnectTraceHtml(connectTraceModel(refused, T0 + 300));
     expect(html).toContain(`id="${CONNECT_TRACE_RETRY_ID}"`);
     expect(html).toContain('RETRY');
     expect(html).toContain(`id="${CONNECT_TRACE_COPY_ID}"`);
     expect(html).toContain('COPY LOG');
     expect(html).toContain('COPY LOG to report this.');
-    // …and says the reason once, not twice: it is already the last step above.
-    expect(html.match(/machine mismatch/g)).toHaveLength(1);
   });
 
-  it('offers COPY LOG (and only COPY LOG) on a stall, with the seconds', () => {
+  it('sits at the top of the screen, below the title — never at the foot of it', () => {
+    const refused = connectRefused(dialingTrace(), 'bad-ticket', T0 + 300);
+    const html = renderConnectTraceHtml(connectTraceModel(refused, T0 + 300));
+    expect(html).toContain(`top:calc(${CONNECT_TRACE_TOP_PX}px`);
+    expect(html).not.toContain('bottom:');
+    // Only the buttons take taps: on the shortest phone these two float over the
+    // top of the door stack, and PLAY SOLO has to stay pressable (GDD §4.8 risk 6).
+    expect(html).toContain('pointer-events:none');
+    expect(html).toContain('pointer-events:auto');
+  });
+
+  it('offers COPY LOG (and only COPY LOG) on a stall', () => {
     const html = renderConnectTraceHtml(connectTraceModel(dialingTrace(), T0 + 250 + STALL_MS));
     expect(html).toContain(`id="${CONNECT_TRACE_COPY_ID}"`);
     // The attempt is still live, so RETRY would race a socket that may yet open.
     expect(html).not.toContain(`id="${CONNECT_TRACE_RETRY_ID}"`);
-    expect(html).toContain('5s');
-    expect(html).toContain('Stuck on');
+    // The seconds are the title's tail (`connectTitleLine`), not a line down here.
+    expect(html).not.toContain('5s');
   });
 
   it('keeps a 44-px touch target on every button', () => {
@@ -134,33 +151,49 @@ describe('renderConnectTraceHtml', () => {
     expect(html).toContain('min-width:44px');
   });
 
-  it('escapes a reason the server chose the words for', () => {
+  it('escapes the one line it still writes', () => {
+    // The hint is fixed copy today, but it goes through `escapeHtml` because the
+    // day it names a server-chosen token is the day nobody re-reads this file.
     const nasty = connectRefused(dialingTrace(), '<script>x</script>', T0 + 300);
     const html = renderConnectTraceHtml(connectTraceModel(nasty, T0 + 300));
     expect(html).not.toContain('<script>');
-    expect(html).toContain('&lt;script&gt;');
   });
 });
 
 describe('ConnectTraceView', () => {
-  it('mounts once, re-renders on change, and does nothing when nothing changed', () => {
+  it('stays off the screen entirely while the connect is working', () => {
     const dom = fakeDom();
     const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
+
+    // Four hundred milliseconds into a perfectly ordinary dial: nothing mounts, so
+    // there is no second surface to disagree with the title — not even an empty one.
     view.update(dialingTrace(), T0 + 250);
+    expect(view.visible).toBe(false);
+    expect(dom.mounted.children).toHaveLength(0);
+
+    // …until the stall crosses five seconds, which is the first thing worth saying.
+    view.update(dialingTrace(), T0 + 250 + STALL_MS);
+    expect(view.visible).toBe(true);
     expect(dom.mounted.children).toHaveLength(1);
     expect(dom.root.id).toBe(CONNECT_TRACE_ROOT_ID);
-    expect(view.visible).toBe(true);
     const first = view.html;
+    expect(first).toContain('COPY LOG');
 
-    // A frame later with nothing new: same markup, no DOM write.
-    view.update(dialingTrace(), T0 + 260);
+    // A frame later with nothing new: same markup, no second mount.
+    view.update(dialingTrace(), T0 + 260 + STALL_MS);
     expect(view.html).toBe(first);
     expect(dom.mounted.children).toHaveLength(1);
+  });
 
-    // …until the stall crosses five seconds, which is a real change.
+  it('withdraws again if the attempt gets moving after a stall', () => {
+    const dom = fakeDom();
+    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
     view.update(dialingTrace(), T0 + 250 + STALL_MS);
-    expect(view.html).not.toBe(first);
-    expect(view.html).toContain('COPY LOG');
+    expect(view.visible).toBe(true);
+    // The socket finally opened and the story moved on — the offer goes with it.
+    view.update(dialingTrace(), T0 + 250);
+    expect(view.visible).toBe(false);
+    expect(dom.root.hidden).toBe(true);
   });
 
   it('wires RETRY and COPY LOG to their handlers', () => {
@@ -183,7 +216,7 @@ describe('ConnectTraceView', () => {
   it('takes itself off screen when the attempt ends', () => {
     const dom = fakeDom();
     const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
-    view.update(dialingTrace(), T0 + 250);
+    view.update(connectRefused(dialingTrace(), 'bad-ticket', T0 + 300), T0 + 300);
     view.hide();
     expect(view.visible).toBe(false);
     expect(dom.root.hidden).toBe(true);
@@ -195,7 +228,8 @@ describe('ConnectTraceView', () => {
       onRetry: () => {},
       onCopyLog: () => {},
     });
-    expect(() => view.update(dialingTrace(), T0 + 250)).not.toThrow();
+    const refused = connectRefused(dialingTrace(), 'bad-ticket', T0 + 300);
+    expect(() => view.update(refused, T0 + 300)).not.toThrow();
     expect(view.visible).toBe(false);
   });
 });

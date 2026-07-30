@@ -238,6 +238,7 @@ import type {
   EntryState,
   EntryTarget,
   EntryDoor,
+  EntryNarration,
   RegionInfo,
 } from './ui';
 import {
@@ -249,13 +250,16 @@ import {
   allocatorTransport,
   attachSessionLog,
   // The verbose connecting screen (M10): every step of the join named as it
-  // happens, or the exact refusal with RETRY and COPY LOG on the panel itself.
+  // happens **in the screen's own title**, or the exact refusal there with RETRY
+  // and COPY LOG under it.
   beginConnect,
   connectDialing,
   connectFailed,
   connectJoined,
   connectRefused,
   connectTicketed,
+  connectTitleFailed,
+  connectTitleLine,
   connectTraceLogEntry,
   connectTraceModel,
   connectTransportState,
@@ -4893,6 +4897,16 @@ interface OnlineSeam {
   status: EntryState['status'];
   /** The refusal line, in the player's words, or `''`. */
   error: string;
+  /**
+   * The screen's TITLE, exactly as drawn: the standing line (`MINE · DEFEND ·
+   * ATTACK`, `ENTER THE ROOM CODE`) when nothing is connecting, and the live
+   * connect narration when something is — `ALLOCATING ROOM…`, `ROOM Q5RN · TICKET
+   * SIGNED`, `DIALING MACHINE 0800d5b6…`, `JOINED · SEAT 2`, or the exact refusal.
+   *
+   * The title is Pixi text, so this is how a live-stage run reads it (M10 status-in-
+   * title, brief §3: the title must be seen to ADVANCE on a real connect).
+   */
+  title: string;
   /** The code typed so far on the join screen. */
   code: string;
   /** Whether the region picker draws — `false` at one region (launch). */
@@ -5037,6 +5051,7 @@ function openMainMenu(
     screen: 'home',
     status: 'idle',
     error: '',
+    title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
     resolvedCode: null,
@@ -5119,7 +5134,25 @@ function openMainMenu(
       playtest.recordConnect(entry.step, entry.data);
     }
     showConnectTrace(next, Date.now());
+    // The step is the screen's TITLE now, not a panel of its own, so a step is not
+    // taken until the entry screen has been re-drawn with it.
+    render();
     startTraceTicker();
+  }
+
+  /**
+   * The connection's story, in the shape the entry screen's title takes
+   * (`./ui/lobby-entry` `entryModel(state, narration)`).
+   *
+   * `null` when nothing is connecting — which is when the title goes back to being
+   * the screen's own line — and `null` for PLAY SOLO, which opens no socket and so
+   * has no story: the offline door keeps the plain `CONNECTING…` it always had, for
+   * the fraction of a second it is up.
+   */
+  function connectNarration(): EntryNarration | null {
+    if (!connectTrace) return null;
+    const model = connectTraceModel(connectTrace, Date.now());
+    return { line: connectTitleLine(model), failed: connectTitleFailed(model) };
   }
 
   /** Keep the panel's clock running while an attempt is live, so a stall crosses
@@ -5134,6 +5167,9 @@ function openMainMenu(
       }
       pollTransportForTrace();
       showConnectTrace(connectTrace ?? trace, Date.now());
+      // The title carries the stall's seconds (`connectTitleLine`), so the screen
+      // is re-drawn on the tick as well — a clock nobody re-draws is a frozen one.
+      render();
       // A stall crosses STALL_MS with nothing else happening, so the corner
       // affordance has to be re-decided here too rather than only on a render.
       syncCopyLog();
@@ -5162,27 +5198,22 @@ function openMainMenu(
   }
 
   /**
-   * The attempt is over: stop the clock and take the panel down. The steps stay in
-   * the session log either way.
+   * The attempt is over: stop the clock, drop the story and take the affordances
+   * down. The steps stay in the session log either way.
    *
-   * `lingerMs` is for the happy ending only — "JOINED · SEAT 2" gets a beat to be
-   * read over the lobby it just opened, because a confirmation that vanishes on the
-   * same frame it appears is a confirmation nobody has ever seen.
+   * This used to keep the panel up for a beat past a seat so "JOINED · SEAT 2"
+   * could be read over the lobby it had just opened. There is no panel to keep up
+   * any more — the seat is announced in the title of the screen that is *being*
+   * replaced, and the lobby appearing is itself the confirmation — so the linger
+   * went with it rather than becoming a timer that outlives an empty surface.
    */
-  function endConnectTrace(lingerMs = 0): void {
+  function endConnectTrace(): void {
     connectTrace = null;
     retryDoor = null;
     tracedTransportState = '';
     stopTraceTicker();
-    if (lingerMs <= 0) {
-      hideConnectTrace();
-      return;
-    }
-    setTimeout(() => hideConnectTrace(), lingerMs);
+    hideConnectTrace();
   }
-
-  /** How long "JOINED · SEAT n" stays up over the freshly-opened lobby. */
-  const JOINED_LINGER_MS = 1_400;
 
   /** Refresh the seam's logical viewport, rotation flag, and per-button reports
    *  (logical rect + physical tap point) from the live transform — the executable
@@ -5243,7 +5274,7 @@ function openMainMenu(
     if (menuView.visible) menuView.update(mainMenuModel());
     if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode, controlScheme));
     if (codexView.visible) codexView.update(codexModel(codexState));
-    if (entryView.visible) entryView.update(entryModel(entry));
+    if (entryView.visible) entryView.update(entryModel(entry, connectNarration()));
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -5267,6 +5298,9 @@ function openMainMenu(
     onlineSeam.screen = entry.screen;
     onlineSeam.status = entry.status;
     onlineSeam.error = entry.error;
+    // Read off the same model the view draws, never re-derived — a seam that
+    // computes its own answer can agree with a screen that says something else.
+    onlineSeam.title = entryModel(entry, connectNarration()).prompt;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
     const { w, h } = ctx.logicalSize();
@@ -5510,9 +5544,9 @@ function openMainMenu(
     startSessionLog(session);
     session.observe((message) => {
       // The two ends of the story, straight from the wire. A refusal is terminal
-      // (`src/net/websocket-transport` `rejectJoin`), so the panel keeps the exact
+      // (`src/net/websocket-transport` `rejectJoin`), so the TITLE keeps the exact
       // reason on screen — "REFUSED: bad-ticket — machine mismatch" — with RETRY
-      // and COPY LOG on it, instead of a spinner that never resolves.
+      // and COPY LOG under it, instead of a word that never resolves.
       if (message.type === 'joinError' && connectTrace) {
         traceStep(connectRefused(connectTrace, message.reason, Date.now()));
         entry = entryFailed(entry, `REFUSED: ${message.reason}`);
@@ -5568,9 +5602,9 @@ function openMainMenu(
     teardown();
     seam.visible = false;
     onlineSeam.visible = false; // the doors are gone; see `beginSolo`
-    // The story ends where the lobby begins: "JOINED · SEAT n" stays up for a beat
-    // over the room it just opened, then the panel goes.
-    endConnectTrace(JOINED_LINGER_MS);
+    // The story ends where the lobby begins: the title's last line was "JOINED ·
+    // SEAT n", and the room opening under it is the same news said better.
+    endConnectTrace();
     resolvePlay({ kind: 'online', session, room, you, host: onlineHost });
   }
 
