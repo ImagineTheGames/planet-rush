@@ -191,7 +191,7 @@ interface Checkpoint {
   y: number;
 }
 
-/** What one reconcile did, for the HUD, the tests, and the netgraph. */
+/** What one reconcile did, for the tests and for the instrument (`./telemetry`). */
 export interface ReconcileReport {
   /** false when the snapshot was stale (an older tick than one already applied)
    *  and was therefore ignored — snapshots are full state, so the newest wins. */

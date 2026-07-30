@@ -18,7 +18,9 @@
  *  2. **The telemetry ring** (`./telemetry`, the #238 instrument): each finalized
  *     one-second sample is copied across once, so the log carries the same RTT,
  *     correction magnitude, misprediction rate and resync ("snap") counts the
- *     `?debug=1` netgraph shows — but off the phone and into a paste.
+ *     instrument holds — off the phone and into a paste. (This is the *only*
+ *     route those numbers take to a human: there is no on-screen netgraph, whatever
+ *     #238's comments said — docs/netcode-audit.md §6.)
  *  3. **The predicted world**, for the two match events no message announces to the
  *     player who lived them: the local ship dying, and the local ship respawning.
  *
@@ -188,7 +190,7 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
       const newest = samples[samples.length - 1];
       if (newest && newest.atMs !== lastSampleAt) {
         // Catch up in order if several seconds rolled between polls (a slept tab, a
-        // stalled frame) — the log should not have a hole the netgraph did not.
+        // stalled frame) — the log should not have a hole the instrument does not.
         for (const sample of samples) {
           if (sample.atMs <= lastSampleAt) continue;
           log.record('net', 'sample', describeSample(sample));

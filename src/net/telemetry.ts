@@ -1,5 +1,5 @@
 /**
- * src/net/telemetry.ts — the reconciliation netgraph's data source.
+ * src/net/telemetry.ts — what reconciliation feel is measured with.
  * OWNER: Netcode Engineer (GDD §3.5, §4.2; M10 reconcile-feel brief).
  *
  * *"TELEMETRY FIRST: instrument the client — misprediction rate, correction
@@ -43,10 +43,12 @@
  * **Sampled per second, kept for two minutes.** Every event folds into an open
  * one-second bucket keyed by wall-clock; when the second rolls over the bucket is
  * finalized into a ring of {@link SAMPLE_HISTORY} {@link TelemetrySample}s. The
- * live sub-second numbers are always readable off {@link NetTelemetry.live} for a
- * per-frame netgraph, and {@link NetTelemetry.format} dumps the recent history as
- * text for the `?debug=1` console — the "paste a real capture in the PR" the
- * brief asks for.
+ * live sub-second numbers are always readable off {@link NetTelemetry.live}, and
+ * {@link NetTelemetry.format} dumps the recent history as text — the "paste a real
+ * capture in the PR" the brief asks for. In the shipped client the route to a
+ * player is **COPY LOG**: every finalized second is copied into the playtest log
+ * (`./playtest-log-attach`, docs/playtest-log.md). There is no on-screen netgraph;
+ * #238's comments said there was, and the audit found otherwise.
  *
  * **No ambient clock.** Like the rest of `src/net`, the wall clock is passed in
  * (the session's injected `now`, `./session.ts`), never read from a global — so a
@@ -155,7 +157,7 @@ export interface TelemetrySample {
   readonly visualSnaps: number;
 }
 
-/** The always-current sub-second view, for a per-frame netgraph. */
+/** The always-current sub-second view, for anything sampling per frame. */
 export interface TelemetryReadout {
   /** The most recent measured round-trip, ms, or null before one is measured. */
   readonly rttMs: number | null;
@@ -303,7 +305,7 @@ export class NetTelemetry {
     return this.history;
   }
 
-  /** The current sub-second numbers, for a per-frame netgraph. */
+  /** The current sub-second numbers, sampled live rather than per second. */
   get live(): TelemetryReadout {
     const b = this.open;
     const rate = b && b.reconciles > 0 ? b.mispredictions / b.reconciles : 0;

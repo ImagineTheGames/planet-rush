@@ -270,7 +270,22 @@ Stated plainly rather than left for the next report.
    bounds the symptom from the measured RTT floor. The bound is worth its keep
    (§3), but a client that spent a stall far ahead still pays a short recovery.
 
-4. **`main.ts` still renders straight off the world.** That is deliberate — the
+4. **There is no netgraph.** #238's module comments say a `?debug=1` netgraph
+   reads `NetTelemetry.live` per frame; grepping the client for it returns
+   nothing, in `main.ts`, `debug-hook.ts` or `src/ui/`. It was never built. This
+   audit corrected the comments rather than build it, because the *instrument*
+   does reach a human by a route that works — COPY LOG copies every finalized
+   second into the playtest log (`playtest-log-attach.ts`), which is what QA and
+   the developer actually hand back. A netgraph would be a nicer live read and is
+   worth having; it is a `?debug=1` HUD overlay, so it belongs to Platform or UI,
+   not to this lane.
+
+   (Noting the pattern, since it is the same one §1 is about: three of the four
+   things #238's comments claimed about how its numbers reached a screen were not
+   true. A comment describing another lane's adoption of your seam is a *plan*,
+   not a fact, and should be written as one.)
+
+5. **`main.ts` still renders straight off the world.** That is deliberate — the
    render layer is Platform's lane, and this audit fixed the feel from inside
    `src/net/` by writing the presented frame over the world for the render window
    (`presentation.ts`). If Platform later adopts `sampleRemotes()` /
@@ -283,10 +298,10 @@ Stated plainly rather than left for the next report.
 
 For the follow-up gate riding the next evidence round, on the live fleet:
 
-- Open with `?debug=1`; the netgraph reads `session.telemetry.live` per frame and
-  `NetTelemetry.format()` dumps the capture. Or press **COPY LOG** — every
-  finalized second is in the playtest log already, now carrying `jitter`, `snap`
-  and `lead` alongside the #238 numbers (`docs/playtest-log.md`).
+- **Press COPY LOG and paste it.** That is the whole instrument path in the
+  shipped client: every finalized second is already in the playtest log, now
+  carrying `jitter`, `snap` and `lead` alongside the #238 numbers
+  (`docs/playtest-log.md`). There is **no on-screen netgraph** — see §6, gap 4.
 - The verdict belongs in numbers, not vibes: **worst correction (u), visual snaps,
   mean lead (ticks), RTT and its variance**, at the capture's real distance
   profile. The thresholds in §5 are what to compare against.

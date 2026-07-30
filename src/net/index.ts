@@ -32,7 +32,7 @@
  *
  * And three modules make that reconciliation *feel* right at real latency (M10):
  * `./telemetry` instruments it — misprediction rate, correction magnitude, and
- * measured RTT, sampled per second for the `?debug=1` netgraph; `./interpolation`
+ * measured RTT, sampled per second and handed back through COPY LOG; `./interpolation`
  * renders other ships ~100 ms in the past so their motion is smooth at any RTT
  * while the local ship stays predicted; and `./latency-transport` wraps any
  * transport in a configurable one-way delay + jitter, so the developer's ~150 ms

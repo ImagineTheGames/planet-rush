@@ -77,15 +77,18 @@ export interface MatchSession {
   /**
    * The predictor, online; null offline, where authority is already in this
    * process. The renderer reads {@link PredictedMatch.renderOffset} off it to
-   * absorb corrections smoothly, and a netgraph reads the error and the lead.
+   * absorb corrections smoothly, and the instrument reads the error and the lead.
    */
   readonly prediction: PredictedMatch | null;
   /**
    * Client-side reconciliation telemetry — misprediction rate, correction
    * magnitude, and measured RTT, sampled per second (`./telemetry`, M10 reconcile
    * brief). Populated only online, where there is prediction to measure; a
-   * `?debug=1` netgraph reads {@link NetTelemetry.live} per frame and
-   * {@link NetTelemetry.format} dumps a capture.
+   * Every finalized second reaches the player through COPY LOG
+   * (`./playtest-log-attach`); {@link NetTelemetry.format} dumps a capture for a
+   * console or a test. (#238's comments promised a `?debug=1` netgraph reading
+   * {@link NetTelemetry.live} per frame — it was never built. See
+   * docs/netcode-audit.md §6.)
    */
   readonly telemetry: NetTelemetry;
   /**
@@ -185,7 +188,7 @@ export class TransportSession implements MatchSession {
   private readonly dt: number;
   private readonly clock: () => number;
   /** The reconciliation instrument — fed on every send and every applied
-   *  reconcile, read by the `?debug=1` netgraph (`./telemetry`). Inert offline. */
+   *  reconcile, and handed back through COPY LOG (`./telemetry`). Inert offline. */
   private readonly netTelemetry = new NetTelemetry();
   /** True when the transport runs the sim in this process. Then the session
    *  predicts nothing: there is no latency to hide, and inventing a second copy
@@ -396,7 +399,7 @@ export class TransportSession implements MatchSession {
           // values right now. Reconcile against the simulation, never the picture.
           this.unpresent();
           const report = this.predictor.reconcile(decoded, message.ackSeq);
-          // Feed the netgraph only for a reconcile that actually applied — a stale
+          // Feed the instrument only for a reconcile that actually applied — a stale
           // snapshot the client ignored is not a data point (`./telemetry`).
           if (report.applied) {
             this.netTelemetry.recordReconcile(
