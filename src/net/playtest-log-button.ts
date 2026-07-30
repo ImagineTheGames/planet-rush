@@ -32,7 +32,7 @@
  */
 
 import { exportPlaytestLog } from './playtest-log-export';
-import type { ExportConfig, ExportResult } from './playtest-log-export';
+import type { ExportConfig, ExportResult, ExportRoute } from './playtest-log-export';
 import { playtestLog } from './playtest-log';
 import type { PlaytestLog } from './playtest-log';
 
@@ -57,7 +57,7 @@ export interface CopyLogOffer {
 
 /** Where a press has got to. `working` exists because a clipboard write is async and
  *  a button that looks inert for 200 ms gets pressed four times. */
-export type CopyLogPhase = 'idle' | 'working' | 'copied' | 'saved' | 'failed';
+export type CopyLogPhase = 'idle' | 'working' | 'shared' | 'copied' | 'saved' | 'failed';
 
 export interface CopyLogModel {
   readonly label: string;
@@ -73,6 +73,10 @@ export function copyLogLabel(phase: CopyLogPhase): string {
   switch (phase) {
     case 'working':
       return 'COPYING…';
+    case 'shared':
+      // The share sheet took it somewhere the developer chose; the button says so
+      // rather than claiming a clipboard it never touched.
+      return 'LOG SENT';
     case 'copied':
       return 'LOG COPIED';
     case 'saved':
@@ -95,6 +99,8 @@ export const ERROR_OFFER_HINT = 'COPY LOG to report this.';
  */
 export function copyLogHint(offer: CopyLogOffer, phase: CopyLogPhase): string {
   switch (phase) {
+    case 'shared':
+      return 'Log sent — pick where it went from the share sheet.';
     case 'copied':
       return 'Log copied — paste it into chat.';
     case 'saved':
@@ -133,6 +139,14 @@ export function copyLogModel(offer: CopyLogOffer, phase: CopyLogPhase): CopyLogM
 // ---------------------------------------------------------------------------
 // Markup
 // ---------------------------------------------------------------------------
+
+/** The phase each export route lands the button in — one place, so the words and
+ *  the route can never drift apart (`./playtest-log-export` `ExportRoute`). */
+const ROUTE_PHASE: Record<ExportRoute, CopyLogPhase> = {
+  share: 'shared',
+  clipboard: 'copied',
+  download: 'saved',
+};
 
 /** Element ids — the handles the affordance and any live test address. */
 export const COPY_LOG_ROOT_ID = 'playtest-copy-log';
@@ -325,7 +339,7 @@ export class CopyLogAffordance {
       result = { ok: false, reason: String(err) };
     }
     this.inFlight = false;
-    this.phase = result.ok ? (result.route === 'clipboard' ? 'copied' : 'saved') : 'failed';
+    this.phase = result.ok ? ROUTE_PHASE[result.route] : 'failed';
     this.render();
     this.scheduleRevert(ticket);
     return result;

@@ -104,6 +104,10 @@ describe('the words on the button', () => {
 
   it('answers a press, so it never looks dead', () => {
     expect(copyLogLabel('working')).toBe('COPYING…');
+    // The share sheet is the phone's route out (M10 action-echo §5), and the
+    // button says where the log actually went rather than claiming a clipboard it
+    // never touched.
+    expect(copyLogLabel('shared')).toBe('LOG SENT');
     expect(copyLogLabel('copied')).toBe('LOG COPIED');
     expect(copyLogLabel('saved')).toBe('LOG SAVED');
     expect(copyLogLabel('failed')).toBe('COPY FAILED');
@@ -125,6 +129,7 @@ describe('the words on the button', () => {
   it('tells the developer where the log went, including the download case', () => {
     expect(copyLogModel({ reason: 'pause' }, 'copied').hint).toContain('paste it into chat');
     expect(copyLogModel({ reason: 'pause' }, 'saved').hint).toContain('downloaded as a file');
+    expect(copyLogModel({ reason: 'pause' }, 'shared').hint).toContain('share sheet');
     expect(copyLogModel({ reason: 'error' }, 'failed').hint).toContain('Could not copy');
   });
 
