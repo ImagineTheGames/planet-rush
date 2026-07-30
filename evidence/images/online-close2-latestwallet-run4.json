@@ -1,0 +1,792 @@
+{
+  "probe": "reconnect-all-three-thirds",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T21:55:26.033Z",
+  "cargoTier1Cost": 2,
+  "startingOre": 3,
+  "room": "PCVJ",
+  "machine": "0800d5b6d62328",
+  "hostWelcomeDials": 1,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "tiersAtSpawn": {
+    "power": 0,
+    "speed": 0,
+    "engine": 0,
+    "cargo": 0,
+    "hull": 0
+  },
+  "cargoCapAtSpawn": 2,
+  "authorityTierAfterOrder": 1,
+  "authorityWalletAfterUpgrade": {
+    "held": 0,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "upgradeLanded": true,
+  "authorityHeldAfterMining": 1,
+  "authorityWalletBeforeDrop": {
+    "held": 1,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "clientWalletBeforeDrop": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 1,
+    "cargoCap": 4,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    },
+    "alive": true,
+    "hull": 35
+  },
+  "bankMovedOffSpawnDefault": true,
+  "tickAtDrop": 339,
+  "substitutionSeenByPeer": true,
+  "awayMs": 1500,
+  "afterReclaimAlice": {
+    "shipClass": "interceptor",
+    "banked": 3.1666666666666656,
+    "cargo": 0.8333333333333338,
+    "cargoCap": 4,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    },
+    "alive": true,
+    "hull": 35
+  },
+  "tickAfterReclaim": 1096,
+  "reclaimedSameSeat": true,
+  "aliceOpensAfterDrop": 1,
+  "joinErrorsPastDrop": 0,
+  "aliceSawReclaimBroadcast": true,
+  "bobSawReclaimBroadcast": true,
+  "aliceSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerReclaimed"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerSubstituted",
+    "playerReclaimed"
+  ],
+  "aliceState": "open",
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "PCVJ",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    },
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "PCVJ",
+      "tick": 1006,
+      "economy": {
+        "held": 3,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "hasReclaimToken": true,
+      "afterDrop": true
+    }
+  ],
+  "economyFrames": [
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 0,
+      "economy": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 12,
+      "economy": {
+        "held": 0,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 336,
+      "economy": {
+        "held": 1,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1032,
+      "economy": {
+        "held": 2.966666666666667,
+        "banked": 1.0333333333333334,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1034,
+      "economy": {
+        "held": 2.9000000000000004,
+        "banked": 1.1000000000000003,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1036,
+      "economy": {
+        "held": 2.833333333333334,
+        "banked": 1.1666666666666672,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1038,
+      "economy": {
+        "held": 2.7666666666666675,
+        "banked": 1.233333333333334,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1040,
+      "economy": {
+        "held": 2.700000000000001,
+        "banked": 1.300000000000001,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1042,
+      "economy": {
+        "held": 2.6333333333333346,
+        "banked": 1.3666666666666678,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1044,
+      "economy": {
+        "held": 2.566666666666668,
+        "banked": 1.4333333333333347,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1046,
+      "economy": {
+        "held": 2.5000000000000018,
+        "banked": 1.5000000000000016,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1048,
+      "economy": {
+        "held": 2.4333333333333353,
+        "banked": 1.5666666666666684,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1050,
+      "economy": {
+        "held": 2.366666666666669,
+        "banked": 1.6333333333333353,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1052,
+      "economy": {
+        "held": 2.3000000000000025,
+        "banked": 1.7000000000000022,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1054,
+      "economy": {
+        "held": 2.233333333333336,
+        "banked": 1.766666666666669,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1056,
+      "economy": {
+        "held": 2.1666666666666696,
+        "banked": 1.833333333333336,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1058,
+      "economy": {
+        "held": 2.100000000000003,
+        "banked": 1.9000000000000028,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1060,
+      "economy": {
+        "held": 2.0333333333333368,
+        "banked": 1.9666666666666697,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1062,
+      "economy": {
+        "held": 1.9666666666666701,
+        "banked": 2.0333333333333363,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1064,
+      "economy": {
+        "held": 1.9000000000000032,
+        "banked": 2.1000000000000028,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1066,
+      "economy": {
+        "held": 1.8333333333333364,
+        "banked": 2.166666666666669,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1068,
+      "economy": {
+        "held": 1.7666666666666695,
+        "banked": 2.2333333333333356,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1070,
+      "economy": {
+        "held": 1.7000000000000026,
+        "banked": 2.300000000000002,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1072,
+      "economy": {
+        "held": 1.6333333333333357,
+        "banked": 2.3666666666666685,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1074,
+      "economy": {
+        "held": 1.5666666666666689,
+        "banked": 2.433333333333335,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1076,
+      "economy": {
+        "held": 1.500000000000002,
+        "banked": 2.5000000000000013,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1078,
+      "economy": {
+        "held": 1.4333333333333351,
+        "banked": 2.5666666666666678,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1080,
+      "economy": {
+        "held": 1.3666666666666683,
+        "banked": 2.633333333333334,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1082,
+      "economy": {
+        "held": 1.3000000000000014,
+        "banked": 2.7000000000000006,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1084,
+      "economy": {
+        "held": 1.2333333333333345,
+        "banked": 2.766666666666667,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1086,
+      "economy": {
+        "held": 1.1666666666666676,
+        "banked": 2.8333333333333335,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1088,
+      "economy": {
+        "held": 1.1000000000000008,
+        "banked": 2.9,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1090,
+      "economy": {
+        "held": 1.0333333333333339,
+        "banked": 2.9666666666666663,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1092,
+      "economy": {
+        "held": 0.9666666666666671,
+        "banked": 3.0333333333333328,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1094,
+      "economy": {
+        "held": 0.9000000000000005,
+        "banked": 3.099999999999999,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1096,
+      "economy": {
+        "held": 0.8333333333333338,
+        "banked": 3.1666666666666656,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 1098,
+      "economy": {
+        "held": 0.7666666666666672,
+        "banked": 3.233333333333332,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": true
+    }
+  ],
+  "joinWelcomeCarriedEconomy": false,
+  "reclaimWelcomeEconomy": {
+    "held": 3,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "economyMovedAfterReclaimWelcome": true,
+  "authoritysLatestWallet": {
+    "held": 0.7666666666666672,
+    "banked": 3.233333333333332,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "heldThirdProven": true
+}

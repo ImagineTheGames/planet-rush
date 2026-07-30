@@ -99,6 +99,11 @@ function wallet(world: World | null, id: PlayerId): Record<string, unknown> {
     cargo: s.cargo,
     cargoCap: s.cargoCap,
     tiers: { ...s.tiers },
+    // A held-ore figure is only readable next to whether the ship was still
+    // flying: death drops the hold (GDD §2.7), so `cargo: 0` on a dead ship is
+    // the rules working, not the reclaim failing.
+    alive: s.alive,
+    hull: s.hull,
   };
 }
 
@@ -305,7 +310,25 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
       bob.close();
       throw e;
     }
-    await sleep(1_500);
+    // WAIT FOR THE WALLET TO STOP MOVING BEFORE COMPARING IT TO ANYTHING.
+    // Banking is continuous (ore deposits over several ticks), so mid-deposit the
+    // client's ship and authority's newest frame are both correct and merely a
+    // fraction of a second apart — comparing them exactly then measures the read
+    // instant, not the reclaim. Settle for a quiet window instead: no new economy
+    // frame for QUIESCE_MS, up to a bounded wait.
+    const QUIESCE_MS = 1_500;
+    const quiesceDeadline = Date.now() + 12_000;
+    let lastCount = -1;
+    let quietSince = Date.now();
+    while (Date.now() < quiesceDeadline) {
+      if (economies.length !== lastCount) {
+        lastCount = economies.length;
+        quietSince = Date.now();
+      } else if (Date.now() - quietSince >= QUIESCE_MS) break;
+      await sleep(100);
+    }
+    t.walletQuiescedMs = Date.now() - quietSince;
+    t.walletQuiesced = Date.now() - quietSince >= QUIESCE_MS;
 
     const after = wallet(alice.world, seat);
     t.afterReclaimAlice = after;
@@ -325,6 +348,30 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
     const reclaimWelcome = welcomes.filter((w) => w.afterDrop === true).at(-1) ?? null;
     t.joinWelcomeCarriedEconomy = joinWelcome ? 'economy' in joinWelcome : null;
     t.reclaimWelcomeEconomy = reclaimWelcome ? (reclaimWelcome.economy ?? null) : null;
+
+    // THE WALLET THE SHIP SHOULD MATCH IS AUTHORITY'S LATEST, NOT THE WELCOME'S.
+    // The reclaim welcome is a snapshot at the reclaim tick; the match does not
+    // pause for it. If authority sends another `economy` frame in the settle
+    // window — she is shot and drops the hold, or a chunk banks — the ship
+    // correctly follows that one, and asserting it against the welcome's stale
+    // figure fails a client that did exactly the right thing. (Observed live,
+    // 2026-07-30 room 638B: a tick-1018 frame moved held 1 → 0 with banked
+    // unchanged, and the earlier form of this assertion charged it to the client.)
+    const laterEconomy =
+      (economies.filter((e) => e.player === seat && e.afterDrop === true).at(-1) as
+        | { economy: { held: number; banked: number; tiers: Record<string, number> } }
+        | undefined) ?? null;
+    t.economyMovedAfterReclaimWelcome =
+      laterEconomy !== null &&
+      JSON.stringify(laterEconomy.economy) !== JSON.stringify(t.reclaimWelcomeEconomy);
+    t.authoritysLatestWallet = laterEconomy ? laterEconomy.economy : t.reclaimWelcomeEconomy;
+
+    // WAS THE HELD THIRD ACTUALLY PROVEN, OR ONLY NOT DISPROVEN? `cargo === held`
+    // is satisfied by 0 === 0, which is what a run says when the stand-in banked
+    // the hold before the reclaim. That run proves the BANK third twice and the
+    // HOLD third not at all, so it is recorded as such rather than counted green.
+    const latest = t.authoritysLatestWallet as { held: number } | null;
+    t.heldThirdProven = latest !== null && latest.held > 0;
 
     writeFileSync(join(OUT, TRANSCRIPT), JSON.stringify(t, null, 2));
     console.log('RECONNECT-THREE-THIRDS:', JSON.stringify({ ...t, economyFrames: undefined }, null, 2));
@@ -352,9 +399,10 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
     // …and the shipped client stamped that wallet onto the ship it predicts from,
     // derived stats included: a restored CARGO tier that did not move `cargoCap`
     // would be a number in a field, not an upgrade.
-    expect(after.tiers, 'the reclaimed ship carries the wire wallet’s tiers').toMatchObject(econ!.tiers);
-    expect(after.banked, 'and its banked ore').toBe(econ!.banked);
-    expect(after.cargo, 'and its held ore').toBe(econ!.held);
+    const live = t.authoritysLatestWallet as { held: number; banked: number; tiers: Record<string, number> };
+    expect(after.tiers, 'the reclaimed ship carries the wire wallet’s tiers').toMatchObject(live.tiers);
+    expect(after.banked, 'and its banked ore').toBe(live.banked);
+    expect(after.cargo, 'and its held ore — against authority’s LATEST frame').toBe(live.held);
     expect(after.shipClass, 'the hull class survives too').toBe(ShipClass.Interceptor);
     expect(after.cargoCap as number, 'and the hold really is bigger than a stock one').toBeGreaterThan(
       t.cargoCapAtSpawn as number,
