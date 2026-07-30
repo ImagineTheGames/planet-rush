@@ -129,6 +129,37 @@ export type ClientMessage =
 // Server → client
 // ---------------------------------------------------------------------------
 
+/**
+ * The per-player economy the streaming wire never carries. Ships and projectiles
+ * stream every tick (`./snapshot`), but a ship's **wallet** — the ore in its hold,
+ * the ore it has banked, and the upgrade tiers it bought (DAMAGE/SPEED weapon
+ * tiers among them) — is match-lifetime state maintained by *deterministic replay
+ * of the player's own input*: the client runs the same `step()` the server does,
+ * so its predicted wallet tracks authority without a byte on the wire, and
+ * reconciliation deliberately leaves it untouched (`./prediction` `applySnapshot`).
+ *
+ * That replay only holds while the player is flying. Across a reconnect the
+ * substituting bot mines, banks and upgrades on the authoritative ship, and the
+ * reclaiming client rebuilds a **fresh** world with a naked ship (`./session`
+ * `beginPredicting`) — there is no input history that would reproduce the wallet.
+ * Without this, a reclaimed seat comes back with an empty hold and tier-0 stats
+ * (QA m10 "economy-not-on-wire", GDD §4.2 "same cargo, same banked ore, same
+ * upgrades"). So the welcome carries the wallet, and the returning client stamps
+ * it onto its ship before predicting a single tick.
+ */
+export interface PlayerEconomy {
+  /** Ore currently in the hold (`Ship.cargo`). */
+  held: number;
+  /** Ore safely banked, never lost to ship death (`Ship.banked`). */
+  banked: number;
+  /**
+   * Tiers bought per upgrade track, keyed by `UpgradeTrack` value (`Ship.tiers`).
+   * The client restores every track it recognizes and recomputes the derived
+   * stats those tiers scale (max hull, cargo capacity).
+   */
+  tiers: Readonly<Record<string, number>>;
+}
+
 /** Assigned slot + authoritative room identity on (re)join. */
 export interface WelcomeMessage {
   type: 'welcome';
@@ -142,6 +173,14 @@ export interface WelcomeMessage {
    * which has no connection to lose and nothing to prove.
    */
   reclaimToken?: string;
+  /**
+   * This slot's wallet as authority holds it right now (`PlayerEconomy`). Present
+   * only when the room already has a live ship for the slot — i.e. on a *reclaim*
+   * welcome (GDD §4.2), where the returning client must be handed the cargo, bank
+   * and upgrades it earned before the drop. Absent on a lobby join (no ship yet)
+   * and from `LocalLoopback` (authority is in-process — nothing to restore).
+   */
+  economy?: PlayerEconomy;
 }
 
 /** One slot's public lobby state (GDD §2.1 lobby; §5.2 player colors). */

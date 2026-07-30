@@ -670,12 +670,21 @@ export class MatchRoom {
   // --- Sending ------------------------------------------------------------
 
   private welcome(slot: Slot): void {
+    // A reclaim hands the wallet back over the wire: the streaming snapshot never
+    // carries a ship's cargo/bank/upgrades (`src/net/snapshot`), so a returning
+    // client that rebuilds a fresh world would otherwise fly a naked ship (GDD
+    // §4.2, QA m10 "economy-not-on-wire"). Present only when authority already
+    // holds a live ship for this slot — a lobby join has none yet.
+    const ship = this.authoritative?.ships.find((s) => s.id === slot.player);
     this.sendTo(slot, {
       type: 'welcome',
       you: slot.player,
       room: this.code,
       tick: this.authoritative?.tick ?? 0,
       ...(slot.token ? { reclaimToken: slot.token } : {}),
+      ...(ship
+        ? { economy: { held: ship.cargo, banked: ship.banked, tiers: { ...ship.tiers } } }
+        : {}),
     });
   }
 
