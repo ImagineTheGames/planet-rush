@@ -34,7 +34,7 @@
  */
 
 import type { PlayerId } from '@shared/types';
-import { dequantizeAngle } from './snapshot';
+import { dequantizeAngle, projIsShipShot, projOwner } from './snapshot';
 import type { DecodedSnapshot, ProjSnap, ShipSnap } from './snapshot';
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,10 @@ export class RemoteInterpolator {
       tick: snapshot.tick,
       receivedMs,
       ships: snapshot.ships,
-      projectiles: snapshot.projectiles,
+      // The firer's own shots are dropped **here**, on the way in, so every
+      // playback path below is covered by construction rather than by four
+      // remembering to do it (`withoutOwnShots`).
+      projectiles: withoutOwnShots(snapshot.projectiles, this.local),
     });
     this.prune(receivedMs);
   }
@@ -457,6 +460,40 @@ export class RemoteInterpolator {
  *  Shots are not extrapolated at all: with no velocity on the wire there is
  *  nothing to extrapolate *along*, and a stalled stream is exactly when guessing a
  *  shot's position would put a bright dot through a hull that never was hit. */
+/**
+ * One snapshot's projectiles with the **local player's own ship shots removed** —
+ * the fix for *"shooting produces 2 sets of shots"* (M10 action-echo).
+ *
+ * The firer draws their own shots from prediction, spawned the instant the trigger
+ * went down and flown on this client's own physics; the reconcile path suppresses
+ * authority's copy of them for exactly that reason (`./prediction` `applySnapshot`
+ * `suppressShipShotsFrom`). But suppression there only ever touched the *world* —
+ * the snapshot handed to this buffer was the raw decode, own shots and all, and the
+ * presentation layer then drew everything the buffer sampled straight into the pool
+ * slots the wire owns (`./presentation`). So the predicted volley and the
+ * authoritative volley were both on screen, one round trip apart, in different pool
+ * slots, neither aware of the other. Two sets of shots from one trigger pull — and
+ * the module header above has claimed since it was written that they were "absent
+ * from this stream by the time it gets here", which they were not.
+ *
+ * Dropped on ingest rather than on sample, so `hold`, `extrapolate` and
+ * `interpolate` cannot disagree about it, and so the buffered *history* a later
+ * frame lerps through is already clean. Allocates only when there is something to
+ * drop — a client that is not shooting keeps the decoder's own array.
+ */
+function withoutOwnShots(projectiles: readonly ProjSnap[], local: PlayerId): readonly ProjSnap[] {
+  let kept: ProjSnap[] | null = null;
+  for (let i = 0; i < projectiles.length; i++) {
+    const shot = projectiles[i]!;
+    if (projIsShipShot(shot.meta) && projOwner(shot.meta) === local) {
+      kept ??= projectiles.slice(0, i);
+      continue;
+    }
+    kept?.push(shot);
+  }
+  return kept ?? projectiles;
+}
+
 function shotsOf(entry: BufferedSnapshot): InterpolatedShot[] {
   return entry.projectiles.map((p) => ({ slot: p.id, x: p.posX, y: p.posY, meta: p.meta }));
 }

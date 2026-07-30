@@ -52,6 +52,7 @@ import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, stationOf, step } from '../sim';
 import type { BuildJob, MiningStation, World } from '../sim';
 import { applyEntityEvent } from './entity-events';
+import { StructureEcho } from './entity-echo';
 import { OrderLedger } from './order-ledger';
 import type { OrderEcho, OrderOutcome, OrderVerb } from './order-ledger';
 import { LOCAL_SHOT_BASE } from './presentation';
@@ -266,6 +267,12 @@ export class PredictedMatch {
   /** Predicted orders awaiting authority's word, and their TTL clock — the whole
    *  of "one entity, never two" for anything the wheel buys (`./order-ledger`). */
   private readonly ledger = new OrderLedger();
+  /** The other half of "one entity, never two": a predicted turret and the
+   *  authoritative turret it becomes are one turret (`./entity-echo`). */
+  private readonly structures = new StructureEcho();
+  /** Every ship's hull as authority last stated it — the only source there is
+   *  ({@link holdHull}). Empty until the first snapshot. */
+  private readonly hull = new Map<PlayerId, number>();
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
@@ -374,6 +381,7 @@ export class PredictedMatch {
     step(this.world, [{ id: this.local, actions }], this.dt);
 
     if (before) this.ledgeOrders(orders, before, tick);
+    this.holdHull();
     this.checkpoint();
     this.decayOffset();
     return tick;
@@ -551,6 +559,10 @@ export class PredictedMatch {
     // evidence its trigger is down. Painted after the replay, because `step()`
     // clears it every tick (`src/sim/step.ts`).
     paintRemoteFiring(this.world, snapshot, this.local);
+    // Hull is authority's, and the replay just ran a whole world's worth of
+    // collisions over it. Put authority's numbers back ({@link holdHull}).
+    this.readHull(snapshot);
+    this.holdHull();
     this.settleShots(wireSlots, carried);
 
     const snapped = this.absorb(before);
@@ -565,9 +577,21 @@ export class PredictedMatch {
     };
   }
 
-  /** Apply one static-entity event to the predicted world (`./entity-events`). */
+  /**
+   * Apply one static-entity event to the predicted world (`./entity-events`).
+   *
+   * With one step in front of it: a structure this client predicted into existence
+   * steps aside for the authoritative one the moment authority names it, so a tap
+   * that bought one turret leaves one turret standing and not two (`./entity-echo`).
+   */
   applyEvent(message: EntityEventMessage): boolean {
+    this.structures.reconcileSpawn(this.world, message);
     return applyEntityEvent(this.world, message);
+  }
+
+  /** The structure-echo bookkeeping — which ids authority has named so far. */
+  get structureEcho(): StructureEcho {
+    return this.structures;
   }
 
   // --- The wallet ---------------------------------------------------------
@@ -809,6 +833,56 @@ export class PredictedMatch {
     for (let i = Math.min(keep.length, MAX_PREDICTED_SHOTS); i < MAX_PREDICTED_SHOTS; i++) {
       const p = this.world.projectiles[LOCAL_SHOT_BASE + i];
       if (p) p.active = false;
+    }
+  }
+
+  // --- Hull is authority's --------------------------------------------------
+
+  /**
+   * Take every hull number off the snapshot and remember it.
+   *
+   * The wire carries one byte of hull per ship every snapshot (`./snapshot`), for
+   * *all* eight seats, so this is a complete statement of who is hurt and by how
+   * much — there is nothing for a client to add to it.
+   */
+  private readHull(snapshot: DecodedSnapshot): void {
+    for (const snap of snapshot.ships) this.hull.set(snap.id, snap.hull);
+  }
+
+  /**
+   * **No client ever applies damage to a hull it draws.**
+   *
+   * *"My health went down then back up after taking damage."* That is prediction
+   * doing exactly what it was built to do, on the one quantity it must not touch.
+   * `step()` runs the whole world including collisions, so a shot the client can
+   * see arriving takes HP off locally the frame it lands. The server then reports
+   * the hull it actually has — one round trip *earlier* in the fight, before that
+   * shot resolved — and `applySnapshot` writes it back. The bar drops and pops back
+   * up, thirty times a second, on every exchange.
+   *
+   * And it is not a cosmetic disagreement, because the reconcile is *right*: the
+   * snapshot is authority and the local guess was a guess. Damage is decided by
+   * geometry the client does not have — a remote ship's position is a jitter buffer
+   * in the past (`./interpolation`), its shots are drawn from the same buffer, and
+   * spawn protection, shields and allegiance are all resolved server-side against
+   * state this client only half knows. A hull the client predicts is wrong more
+   * often than it is right, and being wrong about HP reads as a lie about the fight.
+   *
+   * So hull is *held* at authority's last word: written by the snapshot, re-asserted
+   * after every predicted tick and after every replay, and never moved by anything
+   * local. There is nothing here to blend, which is the point — the bar only ever
+   * moves in the direction and by the amount the server says, so it never rewinds
+   * and there is no correction for the smoothing rules to hide (the position
+   * correction they *do* hide is `renderOffset`, above).
+   *
+   * A ship the client has never had a snapshot for is left alone: it is holding its
+   * spawn hull, which is the right answer until authority speaks.
+   */
+  private holdHull(): void {
+    if (this.hull.size === 0) return;
+    for (const ship of this.world.ships) {
+      const authoritative = this.hull.get(ship.id);
+      if (authoritative !== undefined) ship.hull = authoritative;
     }
   }
 
