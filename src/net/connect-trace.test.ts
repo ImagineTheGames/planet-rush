@@ -95,9 +95,8 @@ describe('the verbose connecting screen', () => {
     // Both affordances, on the panel, at the moment of failure.
     expect(model.canRetry).toBe(true);
     expect(model.offerCopyLog).toBe(true);
-    expect(connectOfferHint(model)).toBe(
-      'REFUSED: bad-ticket — machine mismatch — COPY LOG to report this.',
-    );
+    // The reason is already the last step, so the offer line does not repeat it.
+    expect(connectOfferHint(model)).toBe('COPY LOG to report this.');
   });
 
   it('glosses the reasons the server actually sends, and invents nothing for the rest', () => {

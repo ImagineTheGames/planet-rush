@@ -12,6 +12,8 @@
     "test:mobile": "playwright test",
     "test:live": "playwright test --config tests/live/playwright.live.config.ts",
     "test:live-stage": "playwright test --config tests/live-stage/playwright.config.ts",
+    "test:pin": "node tests/net/live-pin.probe.mjs --local 6",
+    "test:connect-evidence": "playwright test --config tests/live-stage/playwright.connect-trace.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

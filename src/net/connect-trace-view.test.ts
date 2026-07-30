@@ -113,6 +113,8 @@ describe('renderConnectTraceHtml', () => {
     expect(html).toContain(`id="${CONNECT_TRACE_COPY_ID}"`);
     expect(html).toContain('COPY LOG');
     expect(html).toContain('COPY LOG to report this.');
+    // …and says the reason once, not twice: it is already the last step above.
+    expect(html.match(/machine mismatch/g)).toHaveLength(1);
   });
 
   it('offers COPY LOG (and only COPY LOG) on a stall, with the seconds', () => {

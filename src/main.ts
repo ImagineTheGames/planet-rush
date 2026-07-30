@@ -257,6 +257,7 @@ import {
   connectRefused,
   connectTicketed,
   connectTraceLogEntry,
+  connectTraceModel,
   connectTransportState,
   hideConnectTrace,
   installConnectTraceView,
@@ -5132,7 +5133,10 @@ function openMainMenu(
         return;
       }
       pollTransportForTrace();
-      showConnectTrace(trace, Date.now());
+      showConnectTrace(connectTrace ?? trace, Date.now());
+      // A stall crosses STALL_MS with nothing else happening, so the corner
+      // affordance has to be re-decided here too rather than only on a render.
+      syncCopyLog();
     }, SESSION_LOG_POLL_MS);
   }
 
@@ -5585,6 +5589,14 @@ function openMainMenu(
    * state rather than needing a call at each failure site.
    */
   function syncCopyLog(): void {
+    // The connect panel carries its own COPY LOG now, right under the failure it
+    // is reporting (M10). Two buttons offering the same export, one of them in a
+    // far corner, is worse than one in the right place — so the corner affordance
+    // stands down for exactly as long as the panel is making the offer.
+    if (connectTrace !== null && connectTraceModel(connectTrace, Date.now()).offerCopyLog) {
+      hideCopyLog();
+      return;
+    }
     if (screen === 'online' && entry.status === 'error') showCopyLog({ reason: 'error' });
     else hideCopyLog();
   }

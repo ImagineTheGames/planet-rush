@@ -290,7 +290,9 @@ export function connectTraceModel(trace: ConnectTrace, now: number): ConnectTrac
  * (`./playtest-log-button` `CopyLogOffer.hint`).
  */
 export function connectOfferHint(model: ConnectTraceModel): string {
-  if (model.error) return `${model.error} — COPY LOG to report this.`;
+  // On a failure the reason is already the panel's last step, three lines above —
+  // repeating it here just made the panel say the same sentence twice.
+  if (model.error) return 'COPY LOG to report this.';
   if (model.stalled) {
     return `Stuck on "${model.current}" for ${Math.round(model.waitedMs / 1000)}s — COPY LOG to report this.`;
   }

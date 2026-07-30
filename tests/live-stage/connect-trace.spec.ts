@@ -100,7 +100,8 @@ test.describe('the verbose connecting screen, in the real client', () => {
     });
 
     const lines = await steps(page);
-    expect(lines[lines.length - 1]).toBe('× REFUSED: bad-ticket — machine mismatch');
+    // `×` is the step's own mark element, so the concatenated text has no space.
+    expect(lines[lines.length - 1]).toBe('×REFUSED: bad-ticket — machine mismatch');
     // Both affordances, on the panel, at the moment of failure — the ask, verbatim.
     await expect(page.locator('#pr-connect-trace-retry')).toBeVisible();
     await expect(page.locator('#pr-connect-trace-copy')).toBeVisible();
