@@ -128,6 +128,19 @@ export type FormFactor = 'phone' | 'tablet' | 'desktop';
  * screen) — no device ids, no user agent string, no location (brief §5).
  */
 export interface PlaytestLogEnvironment {
+  /**
+   * **The badge string, verbatim** — `'3d7cc6a'` offline, `'3d7cc6a · d891dd0a
+   * (gru)'` once a session is on a server (`@platform/build-identity`
+   * `formatBuildTag`).
+   *
+   * This is the same characters the corner badge is drawing at the moment of the
+   * export, and that is the whole point (ratified, M10): a screenshot and a pasted
+   * log must never disagree about which build was on which Machine in which
+   * region. Kept current for the *whole* session by {@link PlaytestLog.setBuild},
+   * so an export taken after a connect carries the server the earlier events were
+   * heading for, not the bare sha the session started on.
+   */
+  readonly build: string;
   /** Short git sha of the build, or `'dev'`/`'unknown'` (`@platform/build-info`). */
   readonly sha: string;
   /** Build timestamp, ISO-8601 — the disambiguator between two builds of one sha. */
@@ -187,6 +200,9 @@ export function normalizeConnectionType(raw: unknown, online = true): string {
 /** What a caller measures off the page to describe the session. Every field is
  *  optional so a headless / node caller can describe what it has and no more. */
 export interface EnvironmentProbe {
+  /** The badge string (`@platform/build-identity`). Defaults to the sha with its
+   *  dirty marker — which is exactly what the badge shows before a connect. */
+  readonly build?: string;
   readonly sha?: string;
   readonly buildTime?: string;
   readonly dirty?: boolean;
@@ -209,10 +225,15 @@ export function describeEnvironment(probe: EnvironmentProbe = {}): PlaytestLogEn
   const width = Math.round(probe.viewportWidth ?? 0);
   const height = Math.round(probe.viewportHeight ?? 0);
   const touch = probe.touch ?? false;
+  const sha = nonEmpty(probe.sha) ?? UNKNOWN;
+  const dirty = probe.dirty ?? false;
   return {
-    sha: nonEmpty(probe.sha) ?? UNKNOWN,
+    // No probe build tag: reconstruct what the badge would be showing offline,
+    // rather than leaving the field `unknown` next to a sha we plainly know.
+    build: nonEmpty(probe.build) ?? (dirty ? `${sha}*` : sha),
+    sha,
     buildTime: nonEmpty(probe.buildTime) ?? UNKNOWN,
-    dirty: probe.dirty ?? false,
+    dirty,
     startedAt: nonEmpty(probe.startedAt) ?? UNKNOWN,
     formFactor: classifyFormFactor(width, height, touch),
     viewport: `${width}x${height}`,
@@ -277,16 +298,40 @@ export class PlaytestLog {
   private evicted = 0;
   /** Coalescing key of the newest entry (`kind|msg|data`), for repeat detection. */
   private lastKey = '';
-
-  readonly env: PlaytestLogEnvironment;
+  private environment: PlaytestLogEnvironment;
 
   constructor(config: PlaytestLogConfig = {}) {
     this.clock = config.now ?? ((): number => Date.now());
     // A capacity of 0 would make the log a silent sink, which is worse than a small
     // one: it looks like "nothing happened". One event is the floor.
     this.cap = Math.max(1, Math.floor(config.capacity ?? PLAYTEST_LOG_CAPACITY));
-    this.env = config.env ?? describeEnvironment();
+    this.environment = config.env ?? describeEnvironment();
     this.startMs = this.clock();
+  }
+
+  /** The session's identity — the export header, and the one place a reader looks
+   *  to answer "which build, on what, over what?". */
+  get env(): PlaytestLogEnvironment {
+    return this.environment;
+  }
+
+  /**
+   * Adopt the badge string the screen is currently showing
+   * (`@platform/build-identity`), so the export's `env.build` and the corner of
+   * every screenshot are the same characters (ratified, M10).
+   *
+   * The env is rewritten rather than versioned per event: a session is on one
+   * server, and a reader asking "which Machine was this?" wants one answer at the
+   * top of the paste, not a field that changes value halfway down. The *moment* it
+   * changed is not lost — the change is recorded as its own `session` event, on
+   * the timeline, where a reconnect onto a different Machine shows up as the event
+   * it is. A no-op when the tag has not moved.
+   */
+  setBuild(tag: string): void {
+    const build = truncate(String(tag ?? ''), MAX_MESSAGE_CHARS);
+    if (build === '' || build === this.environment.build) return;
+    this.environment = { ...this.environment, build };
+    this.record('session', 'build tag', { build });
   }
 
   // --- Recording ----------------------------------------------------------
@@ -336,6 +381,7 @@ export class PlaytestLog {
    *  starts with the answer to "which build was this?". */
   recordSessionStart(): void {
     this.record('session', 'session start', {
+      build: this.env.build,
       sha: this.env.sha,
       buildTime: this.env.buildTime,
       dirty: this.env.dirty,
@@ -411,9 +457,11 @@ export class PlaytestLog {
    * connection type — so a pasted log needs no follow-up question about the build.
    */
   summaryLine(): string {
-    const sha = this.env.dirty ? `${this.env.sha}*` : this.env.sha;
+    // The badge string, so the first line of a paste names the build AND the
+    // server exactly as the screenshot beside it does (M10). It already carries
+    // the dirty marker (`displaySha`), which is why the sha is not re-formatted.
     return (
-      `Planet Rush playtest log — build ${sha} (${this.env.buildTime})` +
+      `Planet Rush playtest log — build ${this.env.build} (${this.env.buildTime})` +
       ` · session ${this.env.startedAt}` +
       ` · ${this.env.formFactor} ${this.env.viewport}${this.env.touch ? ' touch' : ''}` +
       ` · net ${this.env.connection}` +
