@@ -3,6 +3,10 @@ node_modules/
 
 # Build output
 dist/
+# The online live-stage suite's client bundle — the same build with an allocator
+# URL baked in, kept out of dist/ so it never overwrites the offline artifact
+# (tests/live-stage-online/).
+dist-online-stage/
 
 # Vite / test caches
 .vite/
