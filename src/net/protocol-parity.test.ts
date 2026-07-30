@@ -101,6 +101,7 @@ const ALL_SERVER_MESSAGE_TYPES: Record<ServerMessage['type'], true> = {
   playerSubstituted: true,
   playerReclaimed: true,
   economy: true,
+  orderEcho: true,
   matchEnd: true,
   joinError: true,
 };

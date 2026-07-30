@@ -49,9 +49,12 @@
  */
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
-import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, step } from '../sim';
-import type { World } from '../sim';
+import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, stationOf, step } from '../sim';
+import type { BuildJob, MiningStation, World } from '../sim';
 import { applyEntityEvent } from './entity-events';
+import { StructureEcho } from './entity-echo';
+import { OrderLedger } from './order-ledger';
+import type { OrderEcho, OrderOutcome, OrderVerb } from './order-ledger';
 import { LOCAL_SHOT_BASE } from './presentation';
 import { MAX_PROJECTILES, SHIP_FLAG, SHOT_META, dequantizeAngle } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
@@ -261,6 +264,15 @@ export class PredictedMatch {
    *  session ({@link setLeadBudget}). */
   private lead_budget = MAX_LEAD_TICKS;
   private readonly offset: Vec2 = { x: 0, y: 0 };
+  /** Predicted orders awaiting authority's word, and their TTL clock — the whole
+   *  of "one entity, never two" for anything the wheel buys (`./order-ledger`). */
+  private readonly ledger = new OrderLedger();
+  /** The other half of "one entity, never two": a predicted turret and the
+   *  authoritative turret it becomes are one turret (`./entity-echo`). */
+  private readonly structures = new StructureEcho();
+  /** Every ship's hull as authority last stated it — the only source there is
+   *  ({@link holdHull}). Empty until the first snapshot. */
+  private readonly hull = new Map<PlayerId, number>();
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
@@ -360,10 +372,102 @@ export class PredictedMatch {
     // than replay a minute of history when it comes back.
     while (this.queue.length > this.maxPending) this.queue.shift();
 
+    // A one-shot order is predicted exactly once, here, on the tick it was
+    // pressed — and its local side effect is entered in the ledger so authority's
+    // echo has something to be *about* (`./order-ledger`).
+    const orders = identifiedOrders(actions);
+    const before = orders.length > 0 ? buildIdsOf(stationOf(this.world, this.local)) : null;
+
     step(this.world, [{ id: this.local, actions }], this.dt);
+
+    if (before) this.ledgeOrders(orders, before, tick);
+    this.holdHull();
     this.checkpoint();
     this.decayOffset();
     return tick;
+  }
+
+  // --- Orders -------------------------------------------------------------
+
+  /** The outstanding predicted orders and their TTL clock (`./order-ledger`). */
+  get orders(): OrderLedger {
+    return this.ledger;
+  }
+
+  /**
+   * Take authority's word on one order and put the predicted world in line with it
+   * (`./transport` OrderEchoMessage). Returns what was done, or null when the id is
+   * not one this client is waiting on.
+   */
+  settleOrder(echo: OrderEcho): OrderOutcome | null {
+    const outcome = this.ledger.settle(echo);
+    if (outcome) this.applyOrderOutcome(outcome);
+    return outcome;
+  }
+
+  /**
+   * Enter this tick's identified orders in the ledger, each with the build job the
+   * local sim just gave it — the handle a rollback removes and an adoption rewrites.
+   *
+   * Two orders on one tick are attributed in creation order, which is the sim's own
+   * order (`placeOrder` pushes as it validates), so the pairing is exact rather than
+   * heuristic.
+   */
+  private ledgeOrders(orders: readonly IdentifiedOrder[], before: readonly number[], tick: Tick): void {
+    const station = stationOf(this.world, this.local);
+    const after = station?.builds ?? [];
+    let next = 0;
+    for (const order of orders) {
+      this.ledger.record(order.orderId, order.verb, order.what, tick);
+      while (next < after.length && before.includes(after[next]!.id)) next++;
+      if (next < after.length) this.ledger.attachBuild(order.orderId, after[next++]!.id);
+    }
+  }
+
+  /**
+   * Make the predicted world agree with one settled order.
+   *
+   *  - **adopt** — the predicted build job *becomes* authority's: it takes the
+   *    authoritative id and, more importantly, the authoritative construction
+   *    clock, wound forward by however far this client is running ahead of the tick
+   *    the echo was read at. That is what makes an online turret take the sim's real
+   *    ten seconds (GDD §2.5) instead of finishing one round trip early — and it is
+   *    the same job, so it is never two turrets. An accepted order this client did
+   *    *not* predict (it refused the press locally, on a wallet a snapshot has since
+   *    corrected) gains authority's job outright: the ore was spent, so the player
+   *    gets the thing.
+   *  - **rollback** — the prediction is taken back, visibly. The half-built ghost
+   *    the player was watching disappears, which is the truth arriving late.
+   */
+  private applyOrderOutcome(outcome: OrderOutcome): void {
+    const station = stationOf(this.world, this.local);
+    if (!station) return;
+    const predicted = outcome.order.buildId;
+
+    if (outcome.kind === 'rollback') {
+      if (predicted !== null) removeBuild(station, predicted);
+      return;
+    }
+
+    const build = outcome.echo.build;
+    if (!build) return; // an accepted order that spawns nothing — nothing to align
+    const kind = buildKindOf(outcome.order.what);
+    if (!kind) return; // an echo naming a job for an item that queues none
+    // Authority read `remaining` at `echo.tick`; this client is `lead` ticks past
+    // that and has already run those ticks of construction, so the clock is wound
+    // forward by exactly that much. Never past completion: the entity event for the
+    // finished thing is what completes it, and finishing early is the bug.
+    const lead = Math.max(0, this.world.tick - outcome.echo.tick);
+    const remaining = Math.max(0, build.remaining - lead * this.dt);
+    const ghost = predicted === null ? undefined : station.builds.find((j) => j.id === predicted);
+    // The mount the local sim reserved, kept: it is where the client has been
+    // drawing the half-built turret, and moving it now would be a visible jump for
+    // no gain (the ring is the same ring on both sides — the sim picks the lowest
+    // free slot from the same rules).
+    const slot = ghost?.slot ?? 0;
+    if (predicted !== null) removeBuild(station, predicted);
+    if (station.builds.some((j) => j.id === build.id)) return;
+    station.builds.push({ id: build.id, kind, slot, remaining, total: build.total });
   }
 
   // --- Reconcile ----------------------------------------------------------
@@ -395,6 +499,7 @@ export class PredictedMatch {
     // A copy, not the live vector: `absorb` measures how far this reconcile
     // moved the ship, and the ship is about to move.
     const before = { ...this.localShipPos() };
+    const tickBefore = this.world.tick;
     // The firer's own shots are the client's to draw, so they are lifted out
     // before authority flattens the pool and put back after the replay
     // (`settleShots`, audit item 2b).
@@ -417,16 +522,47 @@ export class PredictedMatch {
     // replay, so the world lands at `snapshotTick + leadBudget` at worst and the
     // next input is stamped for a tick the server will reach promptly.
     const trimmed = this.trimLead();
+    // The construction and repair clocks as they stood before any of this — put
+    // back after the replay, because a replay must not spend them twice
+    // ({@link freezeClocks}).
+    const clocks = freezeClocks(this.world);
+    const clocksAt = tickBefore;
     for (const input of this.queue) {
-      step(this.world, [{ id: this.local, actions: input.actions }], this.dt);
+      // **A one-shot order is never replayed.** The rewind puts the world's
+      // *clock* back — tick, time, RNG, entity counter — but it cannot put a
+      // structure back: `station.builds` is not in the checkpoint, and could not
+      // be without copying the whole world every tick. So the build job an order
+      // created before this reconcile is still standing when the replay reaches
+      // that same order, and running it again queues a second one. At 30 Hz
+      // snapshots and 150 ms RTT an unacknowledged tap is replayed four or five
+      // times before its ack lands — which is the client-side half of *"I built 2
+      // but 3 got built"*, and it is charged for every time.
+      //
+      // Replay exists to put the ship back where the player's hands have taken it.
+      // Thrust, aim and fire are the only verbs that answer that question; an order
+      // is a *fact already established*, owned from here on by the ledger and
+      // authority's echo of it (`./order-ledger`).
+      step(this.world, [{ id: this.local, actions: withoutOrders(input.actions) }], this.dt);
       this.checkpoint();
     }
+    // Put the construction and repair clocks back where the replay found them,
+    // moved on by the *net* time this reconcile actually advanced the world — which
+    // in a steady state is nothing at all.
+    thawClocks(this.world, clocks, (this.world.tick - clocksAt) * this.dt);
+    // Anything predicted long enough ago that authority should have answered by now
+    // and did not — the order never arrived, or its echo never came back. Rolled
+    // back, so a dropped press cannot leave a phantom assembling forever.
+    for (const outcome of this.ledger.sweep(this.world.tick)) this.applyOrderOutcome(outcome);
 
     // Remote firing is the one thing the replay cannot produce: a ship the
     // client has no input for never fires, so the flag on the wire is the only
     // evidence its trigger is down. Painted after the replay, because `step()`
     // clears it every tick (`src/sim/step.ts`).
     paintRemoteFiring(this.world, snapshot, this.local);
+    // Hull is authority's, and the replay just ran a whole world's worth of
+    // collisions over it. Put authority's numbers back ({@link holdHull}).
+    this.readHull(snapshot);
+    this.holdHull();
     this.settleShots(wireSlots, carried);
 
     const snapped = this.absorb(before);
@@ -441,9 +577,21 @@ export class PredictedMatch {
     };
   }
 
-  /** Apply one static-entity event to the predicted world (`./entity-events`). */
+  /**
+   * Apply one static-entity event to the predicted world (`./entity-events`).
+   *
+   * With one step in front of it: a structure this client predicted into existence
+   * steps aside for the authoritative one the moment authority names it, so a tap
+   * that bought one turret leaves one turret standing and not two (`./entity-echo`).
+   */
   applyEvent(message: EntityEventMessage): boolean {
+    this.structures.reconcileSpawn(this.world, message);
     return applyEntityEvent(this.world, message);
+  }
+
+  /** The structure-echo bookkeeping — which ids authority has named so far. */
+  get structureEcho(): StructureEcho {
+    return this.structures;
   }
 
   // --- The wallet ---------------------------------------------------------
@@ -600,8 +748,13 @@ export class PredictedMatch {
    */
   private harvestOwnShots(): CarriedShot[] {
     const out: CarriedShot[] = [];
+    const seen = new Set<number>();
     for (const p of this.world.projectiles) {
       if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
+      // A duplicate already standing in the pool must not be re-seeded, or the
+      // list carries it forward for the rest of the match.
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
       out.push({
         id: p.id,
         x: p.pos.x,
@@ -633,33 +786,24 @@ export class PredictedMatch {
    *  - the exception is the local player's own ship shots, which are re-placed
    *    above {@link LOCAL_SHOT_BASE} where no snapshot can reach them.
    *
-   * The replay re-fires those own shots too, and they come back with the *same*
-   * entity id, because `rewind` restores `nextEntityId` and the sim is
-   * deterministic — so the duplicate is identified exactly, by id, and not by a
-   * distance heuristic. A shot the replay produced that the carry list has never
-   * seen (a correction changed what the trigger did) joins the carry list instead.
+   * **A shot the replay fires is always a duplicate, so it is always dropped.**
+   *
+   * The carry list is *complete* by construction: every tick the replay re-runs was
+   * predicted once already ({@link predict} steps before any snapshot for that tick
+   * can arrive), so every own shot the replay could possibly produce was produced
+   * then and is already carried. Keeping the replay's copy as well was the old rule,
+   * guarded by an id match — and the guard leaked, because a rewind restores
+   * `nextEntityId` and a re-fired shot can come back numbered differently. Measured
+   * before this: five own shots alive on a screen whose sim can hold two, and one id
+   * standing in two pool slots at once. The rule is now the simple one, and it needs
+   * no id matching at all: **carried in, replayed out.**
    */
   private settleShots(wireSlots: ReadonlySet<number>, carried: readonly CarriedShot[]): void {
-    const keep: CarriedShot[] = [...carried];
-    const known = new Set(carried.map((c) => c.id));
+    const keep = carried;
 
     for (let slot = 0; slot < this.world.projectiles.length; slot++) {
       const p = this.world.projectiles[slot]!;
       if (!p.active || wireSlots.has(slot)) continue;
-      if (p.owner === this.local && p.kind === 'ship' && !known.has(p.id) && keep.length < MAX_PREDICTED_SHOTS) {
-        known.add(p.id);
-        keep.push({
-          id: p.id,
-          x: p.pos.x,
-          y: p.pos.y,
-          vx: p.vel.x,
-          vy: p.vel.y,
-          damage: p.damage,
-          radius: p.radius,
-          life: p.life,
-          mineYield: p.mineYield,
-        });
-      }
       p.active = false;
     }
 
@@ -688,6 +832,56 @@ export class PredictedMatch {
     }
   }
 
+  // --- Hull is authority's --------------------------------------------------
+
+  /**
+   * Take every hull number off the snapshot and remember it.
+   *
+   * The wire carries one byte of hull per ship every snapshot (`./snapshot`), for
+   * *all* eight seats, so this is a complete statement of who is hurt and by how
+   * much — there is nothing for a client to add to it.
+   */
+  private readHull(snapshot: DecodedSnapshot): void {
+    for (const snap of snapshot.ships) this.hull.set(snap.id, snap.hull);
+  }
+
+  /**
+   * **No client ever applies damage to a hull it draws.**
+   *
+   * *"My health went down then back up after taking damage."* That is prediction
+   * doing exactly what it was built to do, on the one quantity it must not touch.
+   * `step()` runs the whole world including collisions, so a shot the client can
+   * see arriving takes HP off locally the frame it lands. The server then reports
+   * the hull it actually has — one round trip *earlier* in the fight, before that
+   * shot resolved — and `applySnapshot` writes it back. The bar drops and pops back
+   * up, thirty times a second, on every exchange.
+   *
+   * And it is not a cosmetic disagreement, because the reconcile is *right*: the
+   * snapshot is authority and the local guess was a guess. Damage is decided by
+   * geometry the client does not have — a remote ship's position is a jitter buffer
+   * in the past (`./interpolation`), its shots are drawn from the same buffer, and
+   * spawn protection, shields and allegiance are all resolved server-side against
+   * state this client only half knows. A hull the client predicts is wrong more
+   * often than it is right, and being wrong about HP reads as a lie about the fight.
+   *
+   * So hull is *held* at authority's last word: written by the snapshot, re-asserted
+   * after every predicted tick and after every replay, and never moved by anything
+   * local. There is nothing here to blend, which is the point — the bar only ever
+   * moves in the direction and by the amount the server says, so it never rewinds
+   * and there is no correction for the smoothing rules to hide (the position
+   * correction they *do* hide is `renderOffset`, above).
+   *
+   * A ship the client has never had a snapshot for is left alone: it is holding its
+   * spawn hull, which is the right answer until authority speaks.
+   */
+  private holdHull(): void {
+    if (this.hull.size === 0) return;
+    for (const ship of this.world.ships) {
+      const authoritative = this.hull.get(ship.id);
+      if (authoritative !== undefined) ship.hull = authoritative;
+    }
+  }
+
   private decayOffset(): void {
     this.offset.x *= BLEND_DECAY;
     this.offset.y *= BLEND_DECAY;
@@ -702,6 +896,169 @@ export class PredictedMatch {
 }
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+
+// ---------------------------------------------------------------------------
+// Orders — the predicted half of "one entity, never two"
+// ---------------------------------------------------------------------------
+
+/** One identified order lifted out of a tick's actions. */
+interface IdentifiedOrder {
+  readonly orderId: number;
+  readonly verb: OrderVerb;
+  /** The `BuildItem` or `UpgradeTrack` asked for. */
+  readonly what: string;
+}
+
+/** No order in this tick — the overwhelmingly common case, allocating nothing. */
+const NO_ORDERS: readonly IdentifiedOrder[] = Object.freeze([]);
+
+/** The identified one-shot orders in one tick's actions. An order with no id is
+ *  ignored here on purpose: nothing can be matched to an echo that will never name
+ *  it, and offline play mints none (`@shared/types` `OrderId`). */
+function identifiedOrders(actions: readonly Action[]): readonly IdentifiedOrder[] {
+  let out: IdentifiedOrder[] | null = null;
+  for (const action of actions) {
+    if (action.type === 'buildOrder' && typeof action.orderId === 'number') {
+      (out ??= []).push({ orderId: action.orderId, verb: 'buildOrder', what: action.item });
+    } else if (action.type === 'upgradeOrder' && typeof action.orderId === 'number') {
+      (out ??= []).push({ orderId: action.orderId, verb: 'upgradeOrder', what: action.track });
+    }
+  }
+  return out ?? NO_ORDERS;
+}
+
+/**
+ * The same tick's actions with every one-shot order removed — what the replay
+ * runs. Returns the caller's own array untouched on a tick that carried none,
+ * which is almost every tick (GDD §4.3: no per-frame allocation).
+ */
+function withoutOrders(actions: readonly Action[]): readonly Action[] {
+  let kept: Action[] | null = null;
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i]!;
+    if (action.type === 'buildOrder' || action.type === 'upgradeOrder') {
+      kept ??= actions.slice(0, i);
+      continue;
+    }
+    kept?.push(action);
+  }
+  return kept ?? actions;
+}
+
+/** The build jobs standing at a station right now, by id — the "before" of the
+ *  one-tick diff that pairs an order with the job it created. */
+function buildIdsOf(station: MiningStation | null): number[] {
+  const out: number[] = [];
+  for (const job of station?.builds ?? []) out.push(job.id);
+  return out;
+}
+
+/** Drop one build job from a station by id. */
+function removeBuild(station: MiningStation, id: number): void {
+  const index = station.builds.findIndex((j) => j.id === id);
+  if (index >= 0) station.builds.splice(index, 1);
+}
+
+/** The `BuildJob` kind a wheel item queues, or null for the items that queue
+ *  nothing (BANK, REPAIR) and for an upgrade track. */
+function buildKindOf(what: string): BuildJob['kind'] | null {
+  return what === 'turret' || what === 'shield' || what === 'satellite' ? what : null;
+}
+
+// ---------------------------------------------------------------------------
+// Structural clocks — the reason a turret appeared "instantly" online
+// ---------------------------------------------------------------------------
+
+/**
+ * *"Turrets built instantly."*
+ *
+ * A turret assembles over ten seconds, and it is a **countdown integrated one tick
+ * at a time** (`sim/buildings.ts` `advanceConstruction`: `job.remaining -= dt`).
+ * Reconciliation rewinds the world's *clock* and replays every unacknowledged
+ * input on top of authority — and `step()` steps the whole world, so every one of
+ * those replayed ticks takes another `dt` off that countdown. The ticks were
+ * already spent once when they were first predicted; the replay spends them again.
+ *
+ * The arithmetic is brutal. Snapshots arrive 30 times a second and each one replays
+ * the whole pending queue — one round trip's worth of input. At 150 ms that is
+ * about 10 ticks, so construction runs at roughly **ten times** its real rate; at
+ * 250 ms with a stall behind it, faster still. A ten-second turret lands in under a
+ * second, which is precisely what the developer saw, and it is not a display bug:
+ * the *simulation* finished it early, so the entity was real and the entity events
+ * for the server's copy then arrived on top of a turret the client already had.
+ *
+ * The fix is to make a reconcile mean what it says. Rewinding is supposed to undo
+ * time, not just re-label it, so anything the sim integrates against `dt` and the
+ * checkpoint cannot restore is **frozen across the whole rewind/replay** and then
+ * moved on by the *net* time the reconcile actually advanced — which in a steady
+ * state is zero, and after a lead trim is slightly negative. Construction then runs
+ * at exactly one second per second online, the same as offline (GDD §2.5, and the
+ * §2.4 parity principle: the offline and online sim run the identical code).
+ *
+ * Deliberately narrow. It covers the two clocks the developer's report names — the
+ * construction countdown, and the repair gate and tell (`REPAIR in 12s` would
+ * otherwise re-arm ten times too fast, which is *"my repair showed twice"* from the
+ * other side). Position, velocity and everything else the *player's own input*
+ * determines is left to the replay, because re-running it is exactly what the
+ * replay is for.
+ */
+interface FrozenClocks {
+  /** `[stationIndex, jobIndex, remaining]` per build job in flight. */
+  readonly builds: number[];
+  /** `[repairGate, repairCooldown]` per station, in station order. */
+  readonly repair: number[];
+  /** Seconds until each ship's weapon may fire again, in ship order. */
+  readonly weapon: number[];
+}
+
+function freezeClocks(world: World): FrozenClocks {
+  const builds: number[] = [];
+  const repair: number[] = [];
+  // The weapon cooldown is the same class of clock as the construction countdown,
+  // and it is the one the developer *shot* at: `weaponCooldown -= dt` every tick,
+  // re-spent by every replayed tick, so a client at 150 ms drains it about ten
+  // times too fast and its predicted ship fires a far denser stream than the ship
+  // authority is flying. Two sets of shots, and the extra set is the client's own
+  // invention rather than a copy of anything (GDD §2.8: the fire interval is a
+  // balance constant, not a suggestion).
+  const weapon: number[] = [];
+  for (const ship of world.ships) weapon.push(ship.weaponCooldown ?? 0);
+  for (let s = 0; s < world.stations.length; s++) {
+    const station = world.stations[s]!;
+    for (let j = 0; j < station.builds.length; j++) {
+      builds.push(s, j, station.builds[j]!.remaining);
+    }
+    repair.push(station.repairGate ?? 0, station.repairCooldown ?? 0);
+  }
+  return { builds, repair, weapon };
+}
+
+/**
+ * Put the frozen clocks back, advanced by `elapsed` seconds of *net* progress.
+ *
+ * A job the replay finished (and therefore removed) is simply not restored: its
+ * index is gone, and re-inserting a completed job would be a worse lie than letting
+ * the entity-event stream correct the turret it became.
+ */
+function thawClocks(world: World, clocks: FrozenClocks, elapsed: number): void {
+  for (let i = 0; i < clocks.builds.length; i += 3) {
+    const station = world.stations[clocks.builds[i]!];
+    const job = station?.builds[clocks.builds[i + 1]!];
+    if (job) job.remaining = Math.max(0, clocks.builds[i + 2]! - elapsed);
+  }
+  for (let s = 0; s < world.stations.length; s++) {
+    const station = world.stations[s]!;
+    const gate = clocks.repair[s * 2];
+    const tell = clocks.repair[s * 2 + 1];
+    if (gate === undefined || tell === undefined) continue;
+    station.repairGate = Math.max(0, gate - elapsed);
+    station.repairCooldown = Math.max(0, tell - elapsed);
+  }
+  for (let i = 0; i < world.ships.length; i++) {
+    const held = clocks.weapon[i];
+    if (held !== undefined) world.ships[i]!.weaponCooldown = Math.max(0, held - elapsed);
+  }
+}
 
 /** One of the firer's own predicted shots, held across a reconcile. */
 interface CarriedShot {

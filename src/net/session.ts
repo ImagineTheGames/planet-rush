@@ -170,6 +170,9 @@ export class TransportSession implements MatchSession {
   private player: PlayerId = 0;
   private nextTick: Tick = 1;
   private seq = 0;
+  /** The highest tick this client has stamped an input with. Input ticks only ever
+   *  go up, whatever the predicted clock does under them (`sendInput`). */
+  private sentTick: Tick = 0;
   private snapshotTick: Tick = -1;
   private predictor: PredictedMatch | null = null;
   private interpolator: RemoteInterpolator | null = null;
@@ -330,18 +333,68 @@ export class TransportSession implements MatchSession {
     // buffer in the past. Put the simulation back before a single tick of it runs
     // (`./presentation`), or the picture compounds into drift.
     this.unpresent();
-    const tick = this.tick;
+    // ── ONE TICK NUMBER, ONCE ────────────────────────────────────────────────
+    //
+    // `InputQueue` files by `(player, tick)` and keeps the FIRST message for a
+    // pair, dropping every later one as a duplicate — correctly, since two
+    // messages claiming one tick cannot both be that tick's input.
+    //
+    // But the client's clock is not monotonic. Reconciliation rewinds to the
+    // snapshot and replays what is still pending, and a lead trim drops some of
+    // that pending input (`./prediction` `trimLead`), so the world lands on a
+    // *lower* tick than it was on before. The next input is then stamped for a tick
+    // this client has already sent one for, and the server drops it — silently,
+    // whole. Measured on a real socket: ~4 % of all input, in bursts, every one of
+    // them invisible. For a stick that is a lost frame; for a **one-shot order** it
+    // is a purchase the player made, was charged for locally, and that authority
+    // never heard — the wheel press that "does nothing sometimes".
+    //
+    // So the tick a message is stamped with only ever goes up. At most a few ticks
+    // of skew (a trim is bounded per reconcile) and it closes itself as the clock
+    // catches back up, against never losing a press.
+    const tick = Math.max(this.tick, this.sentTick + 1);
+    this.sentTick = tick;
     const seq = ++this.seq;
-    this.transport.send({ type: 'input', tick, seq, actions });
+    // Name every one-shot order before it goes anywhere, so the copy on the wire
+    // and the copy this client is about to predict are the *same* order (M10
+    // action-echo; `@shared/types` OrderId). Stamped here rather than at the button
+    // because this is the last moment before the two copies part company — and
+    // because the input layer that built these actions has no business knowing
+    // there is a wire. Offline mints nothing: there is nothing to match.
+    const stamped = this.predictor ? this.stampOrders(actions) : actions;
+    this.transport.send({ type: 'input', tick, seq, actions: stamped });
     // Send first, then predict: the wire gets the press with no local work in
     // front of it, and the ship moves this frame either way (GDD §4.2).
     if (this.predictor) {
       // Timestamp the send so the snapshot that later acks this seq measures a
       // real round trip (`./telemetry`). Only online — offline there is no wire.
       this.netTelemetry.recordInput(seq, this.clock());
-      this.predictor.predict(seq, actions);
+      this.predictor.predict(seq, stamped);
     } else this.nextTick = tick + 1;
     this.present();
+  }
+
+  /**
+   * Give every one-shot order in this tick a client sequence id.
+   *
+   * Allocates only on the ticks a wheel is actually pressed — a few dozen times in
+   * a fifteen-minute match against 54 000 ticks of flying, so the common path
+   * returns the caller's own array (GDD §4.3). An order that already carries an id
+   * keeps it: re-stamping would break the very identity the id exists to hold.
+   */
+  private stampOrders(actions: readonly Action[]): readonly Action[] {
+    let out: Action[] | null = null;
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i]!;
+      const orderly = action.type === 'buildOrder' || action.type === 'upgradeOrder';
+      if (!orderly || action.orderId !== undefined) {
+        out?.push(action);
+        continue;
+      }
+      out ??= actions.slice(0, i);
+      out.push({ ...action, orderId: this.predictor!.orders.mint(this.player) });
+    }
+    return out ?? actions;
   }
 
   /**
@@ -388,6 +441,10 @@ export class TransportSession implements MatchSession {
         break;
       case 'matchStart':
         this.nextTick = message.tick + 1;
+        // RUSH! (or a reclaim's replay) re-bases the clock: the server names the
+        // tick to predict from, and nothing this client sent before it is on that
+        // timeline (`beginPredicting`).
+        this.sentTick = message.tick;
         if (!this.authoritative) this.beginPredicting(message);
         break;
       case 'snapshot': {
@@ -416,6 +473,10 @@ export class TransportSession implements MatchSession {
             // hundreds of ms out and every later press waits in the server's queue
             // for it (`./prediction` MAX_LEAD_TICKS).
             this.predictor.setLeadBudget(live.rttFloorMs, live.rttJitterMs);
+            // And how long a predicted order waits for its echo before it is
+            // rolled back — measured from the same wire, for the same reason a
+            // constant would be wrong on both a LAN and a phone (`./order-ledger`).
+            this.predictor.orders.setTtlFromRtt(live.rttFloorMs, live.rttJitterMs, this.dt * 1000);
           }
           // And buffer the authoritative frame for remote-ship interpolation,
           // timed by the same clock the render layer samples with (`./interpolation`).
@@ -436,6 +497,22 @@ export class TransportSession implements MatchSession {
         if (message.player !== this.player) break;
         if (this.predictor) this.predictor.stageEconomy(message.economy, message.tick);
         else if (!this.authoritative) this.pendingEconomy = message.economy;
+        break;
+      case 'orderEcho':
+        // What authority did with one identified order (`./transport`
+        // OrderEchoMessage): the prediction is adopted into it, or taken back. The
+        // world is the simulation for the length of this call — a settled order
+        // adds or removes a build job, and doing that to a *presented* world would
+        // stash the edit as if the picture had made it (`./presentation`).
+        if (message.player !== this.player || !this.predictor) break;
+        this.unpresent();
+        this.predictor.settleOrder({
+          orderId: message.orderId,
+          accepted: message.accepted,
+          tick: message.tick,
+          ...(message.build ? { build: message.build } : {}),
+        });
+        this.present();
         break;
       case 'entityEvent':
         // The half of the world that does not stream: rocks, turrets, shields,

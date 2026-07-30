@@ -32,7 +32,7 @@
  */
 
 import { exportPlaytestLog } from './playtest-log-export';
-import type { ExportConfig, ExportResult } from './playtest-log-export';
+import type { ExportConfig, ExportResult, ExportRoute } from './playtest-log-export';
 import { playtestLog } from './playtest-log';
 import type { PlaytestLog } from './playtest-log';
 
@@ -57,7 +57,7 @@ export interface CopyLogOffer {
 
 /** Where a press has got to. `working` exists because a clipboard write is async and
  *  a button that looks inert for 200 ms gets pressed four times. */
-export type CopyLogPhase = 'idle' | 'working' | 'copied' | 'saved' | 'failed';
+export type CopyLogPhase = 'idle' | 'working' | 'shared' | 'copied' | 'saved' | 'failed';
 
 export interface CopyLogModel {
   readonly label: string;
@@ -73,6 +73,10 @@ export function copyLogLabel(phase: CopyLogPhase): string {
   switch (phase) {
     case 'working':
       return 'COPYING…';
+    case 'shared':
+      // The share sheet took it somewhere the developer chose; the button says so
+      // rather than claiming a clipboard it never touched.
+      return 'LOG SENT';
     case 'copied':
       return 'LOG COPIED';
     case 'saved':
@@ -95,6 +99,8 @@ export const ERROR_OFFER_HINT = 'COPY LOG to report this.';
  */
 export function copyLogHint(offer: CopyLogOffer, phase: CopyLogPhase): string {
   switch (phase) {
+    case 'shared':
+      return 'Log sent — pick where it went from the share sheet.';
     case 'copied':
       return 'Log copied — paste it into chat.';
     case 'saved':
@@ -133,6 +139,14 @@ export function copyLogModel(offer: CopyLogOffer, phase: CopyLogPhase): CopyLogM
 // ---------------------------------------------------------------------------
 // Markup
 // ---------------------------------------------------------------------------
+
+/** The phase each export route lands the button in — one place, so the words and
+ *  the route can never drift apart (`./playtest-log-export` `ExportRoute`). */
+const ROUTE_PHASE: Record<ExportRoute, CopyLogPhase> = {
+  share: 'shared',
+  clipboard: 'copied',
+  download: 'saved',
+};
 
 /** Element ids — the handles the affordance and any live test address. */
 export const COPY_LOG_ROOT_ID = 'playtest-copy-log';
@@ -191,7 +205,36 @@ const COPY_LOG_CSS =
   `#${COPY_LOG_ROOT_ID} .pr-log-button[disabled]{color:${CSS_HULL_STEEL};` +
   `border-color:${CSS_HULL_STEEL};cursor:default;}` +
   `#${COPY_LOG_ROOT_ID} .pr-log-button:hover,#${COPY_LOG_ROOT_ID} .pr-log-button:focus-visible` +
-  `{background:rgba(77,195,255,.14);outline:none;}`;
+  `{background:rgba(77,195,255,.14);outline:none;}` +
+  // --- The landscape lock (@platform/orientation) -------------------------------
+  // Planet Rush IS landscape on mobile, always: on a touch viewport held portrait the
+  // game's root container is rotated +90° so the player sees a landscape game however
+  // the phone is held. Everything drawn into that root rotates for free. This
+  // affordance does not — it is DOM over the canvas, laid out in PHYSICAL space — so
+  // without this block it is the one element on the screen reading sideways, in a
+  // corner that is not the corner it means. The phone live-stage evidence is what
+  // showed it (`tests/live-stage/copy-log-touch.spec.ts`): a log the developer has to
+  // tilt their head to find is most of the way back to having no way to send one.
+  //
+  // The media query is `computeRootTransform`'s condition in CSS: `pointer:coarse` is
+  // the `isTouch` main.ts passes it, `orientation:portrait` is its `physH > physW`.
+  // Stated here rather than wired in from `main.ts` because that is another lane's
+  // file, and because a pure media query cannot fall out of step with a JS resize
+  // handler this module does not own.
+  //
+  // The geometry: the root rotates +π/2 about the origin and translates x by physW,
+  // so logical (landscape) bottom-right — where this sits unrotated — lands on the
+  // PHYSICAL bottom-left. `rotate(90deg)` matches the root's direction (baseline runs
+  // down the physical screen, glyph-up points right, exactly as the game's own text
+  // does); `translateX(-100%)` applies first, putting the element's right edge on the
+  // origin so it grows back up-screen into the logical viewport instead of off its
+  // right edge. `vh` for the width cap because under rotation the element's width is
+  // measured along the physical HEIGHT.
+  `@media (pointer:coarse) and (orientation:portrait){` +
+  `#${COPY_LOG_ROOT_ID}{right:auto;` +
+  `left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));` +
+  `max-width:min(22rem,80vh);` +
+  `transform-origin:left bottom;transform:rotate(90deg) translateX(-100%);}}`;
 
 /** HTML-escape every interpolated string. A hint can carry a server's own words. */
 export function escapeHtml(s: string): string {
@@ -325,7 +368,7 @@ export class CopyLogAffordance {
       result = { ok: false, reason: String(err) };
     }
     this.inFlight = false;
-    this.phase = result.ok ? (result.route === 'clipboard' ? 'copied' : 'saved') : 'failed';
+    this.phase = result.ok ? ROUTE_PHASE[result.route] : 'failed';
     this.render();
     this.scheduleRevert(ticket);
     return result;

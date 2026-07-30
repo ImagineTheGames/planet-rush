@@ -339,6 +339,51 @@ export interface EconomyMessage {
   economy: PlayerEconomy;
 }
 
+/**
+ * **What authority did with one order** — the echo that closes the loop a client
+ * sequence id opens (`@shared/types` `OrderId`, `./order-ledger`).
+ *
+ * Sent to the ordering slot alone, on the tick the order was actually simulated,
+ * and only for an order that carried an id. It is the smallest message in the
+ * protocol that is *not* optional: without it a client can only ever guess whether
+ * the turret it is watching assemble is real, and the developer's playtest is what
+ * guessing looks like — *"turrets built instantly and I built 2 but 3 got built."*
+ *
+ * Three facts, and each one is load-bearing:
+ *
+ *  - **`accepted`** — the sim acted, or the sim refused (unaffordable, undocked,
+ *    capped). A refusal is stated rather than inferred from silence, so the
+ *    prediction is taken back at once instead of at the TTL.
+ *  - **`tick`** — the **authoritative birth tick**. A predicted build re-bases its
+ *    construction clock onto this, which is why an online turret takes the sim's
+ *    real ten seconds (GDD §2.5) instead of finishing one round trip early.
+ *  - **`build`** — the job the order queued, when it queued one, so the client's
+ *    predicted job can *become* authority's job (same id, same clock) rather than
+ *    stand beside it. Absent for BANK, REPAIR, a ship upgrade and a turret-tier
+ *    step, which spawn nothing.
+ *
+ * Low-frequency by construction: a player taps a wheel a few dozen times a match,
+ * against a snapshot stream of thirty frames a second (docs/netcode-spike.md).
+ */
+export interface OrderEchoMessage {
+  type: 'orderEcho';
+  /** The slot the order came from — always the recipient's own seat. */
+  player: PlayerId;
+  /** The client sequence id the order carried (`@shared/types` `OrderId`). */
+  orderId: number;
+  /** True when the simulation acted on it. */
+  accepted: boolean;
+  /** The authoritative tick it was simulated on — the birth tick of anything it
+   *  spawned. */
+  tick: Tick;
+  /** The build job it queued, when it queued one. */
+  build?: {
+    id: number;
+    remaining: number;
+    total: number;
+  };
+}
+
 /** The match ended; `winner` is null on the (degenerate) no-survivor case. */
 export interface MatchEndMessage {
   type: 'matchEnd';
@@ -378,6 +423,7 @@ export type ServerMessage =
   | PlayerSubstitutedMessage
   | PlayerReclaimedMessage
   | EconomyMessage
+  | OrderEchoMessage
   | MatchEndMessage
   | JoinErrorMessage;
 
