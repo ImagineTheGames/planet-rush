@@ -1,0 +1,956 @@
+{
+  "probe": "reconnect",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T02:42:46.149Z",
+  "room": "BK39",
+  "machine": "6836293b5161d8",
+  "hostWelcomeDials": 2,
+  "bankedAtSpawn": 3,
+  "upgradeLanded": true,
+  "stampedBefore": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "substitutionSeenByPeer": true,
+  "trace": [
+    {
+      "ms": 1500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 3000,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 4500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 6001,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 7500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 9000,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 10501,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 12001,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 13501,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 15001,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 16501,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 18001,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 19502,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 21002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 22502,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 24002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 25500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 27000,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 28500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 30001,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 31501,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 33002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 34502,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 36002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 37502,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 39002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 40502,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 42002,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 43502,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 45003,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 46503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 48004,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 49504,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 51004,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 52504,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 54004,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 55503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 57002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 58503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 60002,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 61503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 63004,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 64504,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 66003,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 67503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 69004,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 70504,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 72004,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 73505,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 75005,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 76505,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 78007,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 79507,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 81007,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 82507,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 84007,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 85506,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 87007,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 88507,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 90007,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 91507,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 93007,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 94507,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 34,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    }
+  ],
+  "joinErrorsPastDrop": 12,
+  "reclaimTimedOut": true,
+  "reclaimError": "Error: timed out waiting for alice back on the live wire past the drop tick",
+  "aliceOpensAfterDrop": 12,
+  "aliceClosesAfterDrop": 12,
+  "aliceSawBeforeDrop": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot"
+  ],
+  "aliceSawAfterDropOrdered": [
+    "entityEvent",
+    "entityEvent",
+    "entityEvent",
+    "entityEvent",
+    "entityEvent",
+    "lobbyState",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "entityEvent",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot"
+  ],
+  "aliceState": "open",
+  "aliceSeat": 0,
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot",
+    "playerSubstituted"
+  ]
+}
