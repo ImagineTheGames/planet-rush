@@ -461,6 +461,63 @@ iad; a gru client eats the whole ~150 ms. The telemetry above is the input to
 "does a gru Machine earn its keep?" — multi-region seams already exist (allocator
 region hints, router). Out of scope for M10 by the brief.
 
+## The wallet on the wire (M10, QA "economy-not-on-wire")
+
+QA's live online gates passed create and two-clients and failed **reconnect**: a
+reclaimed seat got its ship back *naked*. The cause was a layout decision from this
+spike, working as designed. The 30 Hz snapshot carries ships and projectiles only —
+510 measured bytes — because a ship's **wallet** (held ore, banked ore, upgrade
+tiers, the DAMAGE/SPEED weapon tiers among them) is match-lifetime state a client
+maintains by *deterministic replay of its own input*: same `step()`, same result, no
+bytes. That reasoning holds exactly as long as the player is flying.
+
+Two places it does not, one loud and one quiet:
+
+1. **A reclaim** (the QA failure). The substitute bot mines and banks on the
+   authoritative ship while the reclaiming client rebuilds a **fresh** world from
+   the seed (`src/net/session` `beginPredicting`). No input history reproduces a
+   wallet the *bot* earned, so the returning ship is tier-0 with an empty hold.
+2. **Normal flight** (found while fixing 1, and never reported because it is
+   invisible until it bites). Reconciliation rewinds the clock and replays every
+   unacknowledged input on top of authority, but the snapshot carries no wallet, so
+   a rewind cannot put the hold back the way it puts the position back: ore
+   tractored in during those ticks is re-earned once per reconcile it survives. The
+   error grows with RTT instead of decaying, and it is not cosmetic — the buy button
+   reads the *predicted* bank, so a client one ore richer than authority sends an
+   upgrade the server refuses, and from then on the two disagree about the ship's
+   stats too.
+
+**Decision: the wallet gets its own low-frequency channel, not a snapshot field.**
+Widening the measured binary layout would tax every tick of every client for state
+that moves on a handful of them, and it would put a *rival's* cargo on a client that
+has no business knowing it. Instead:
+
+- the reclaim `welcome` carries the wallet, because that statement must land before
+  the client has a world to predict in (`WelcomeMessage.economy`);
+- thereafter an `EconomyMessage` states the whole wallet to the owning slot alone,
+  on the ticks it moves, immediately **ahead of** that tick's snapshot. The client
+  stages it and writes it inside that snapshot's reconcile, so its own unacked
+  mining replays *on top of* authority's figure (`src/net/prediction`
+  `stageEconomy`) rather than on top of its own compounding one.
+
+**Measured cost.** 136 B typical / 168 B worst case as a JSON text frame (five
+upgrade tracks, fractional held ore) against the snapshot stream's 16.2 KB/s at
+30 Hz. Worst case — a client mining continuously, so the hold changes every tick —
+adds ~5.0 KB/s, taking one client's downstream to ~21 KB/s (**53%** of the 40 KB/s
+budget, from 41%). Typical is far below that: a wallet that has not moved sends
+nothing, and nothing about flying, shooting or being shot at moves a wallet. It is
+state, not a diff, so a dropped frame is corrected by the next one rather than
+desyncing the client.
+
+Proofs: `tests/server/economy-wire.test.ts` (what is sent, when, to whom),
+`src/net/prediction.test.ts` "the wallet on the wire" (the re-base lands under the
+replay, and the ceilings the tiers scale are recomputed),
+`tests/net/reconnect-resume.test.ts` (welcome → client, over a real socket, then the
+channel keeps it true), and `tests/net/economy-conservation.test.ts` — the ore
+ledger's conservation law (`src/sim/ore-ledger`) sampled **every tick** of a
+drop → substitute-earns → reclaim cycle, so handing a wallet across a wire is proven
+to neither mint nor destroy ore.
+
 ### Still open, gathered in one place (the day-0 habit)
 
 - **Risk 3 (TCP HoL)** — unmeasured until run over a real lossy link (item 4).

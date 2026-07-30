@@ -31,7 +31,7 @@ import type { World } from '../sim';
 import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
-import { PredictedMatch } from './prediction';
+import { PredictedMatch, applyPlayerEconomy } from './prediction';
 import { NetTelemetry } from './telemetry';
 import { RemoteInterpolator } from './interpolation';
 import type { InterpolatedShip } from './interpolation';
@@ -41,6 +41,7 @@ import type {
   ConnectionState,
   FireMode,
   MatchStartMessage,
+  PlayerEconomy,
   RoomCode,
   ServerMessage,
   Tick,
@@ -162,6 +163,13 @@ export class TransportSession implements MatchSession {
   private snapshotTick: Tick = -1;
   private predictor: PredictedMatch | null = null;
   private interpolator: RemoteInterpolator | null = null;
+  /**
+   * The wallet the server sent in a reclaim `welcome`, held until the predicted
+   * world exists to stamp it onto. Welcome arrives before the `matchStart` that
+   * builds that world, so the two are stitched together here (GDD §4.2 reclaim).
+   * Null on a lobby join and offline, where there is nothing to restore.
+   */
+  private pendingEconomy: PlayerEconomy | null = null;
   private readonly observers: ((message: ServerMessage) => void)[] = [];
   private readonly dt: number;
   private readonly clock: () => number;
@@ -300,6 +308,10 @@ export class TransportSession implements MatchSession {
         this.player = message.you;
         // Predict from the tick the server says it is on (GDD §4.2).
         this.nextTick = message.tick + 1;
+        // A reclaim welcome carries the wallet the streaming snapshot never does
+        // (`./transport` PlayerEconomy). Hold it for the `matchStart` that builds
+        // the world it belongs on — it is stamped there, in `beginPredicting`.
+        this.pendingEconomy = message.economy ?? null;
         break;
       case 'matchStart':
         this.nextTick = message.tick + 1;
@@ -322,6 +334,17 @@ export class TransportSession implements MatchSession {
         }
         break;
       }
+      case 'economy':
+        // The wallet's own channel, for this client's own seat: held/banked ore and
+        // upgrade tiers, on the ticks authority moves them (`./transport`
+        // EconomyMessage). Staged on the predictor so it is written inside the
+        // reconcile for its tick and the player's unacked mining replays on top; if
+        // the world is not built yet (an `economy` that beat `matchStart` home), it
+        // waits with the welcome's wallet and is stamped at world-build instead.
+        if (message.player !== this.player) break;
+        if (this.predictor) this.predictor.stageEconomy(message.economy, message.tick);
+        else if (!this.authoritative) this.pendingEconomy = message.economy;
+        break;
       case 'entityEvent':
         // The half of the world that does not stream: rocks, turrets, shields,
         // wrecks, and the scouted health a client has earned (GDD §2.2, §4.2).
@@ -380,9 +403,29 @@ export class TransportSession implements MatchSession {
       localPlayer: this.player,
       dt: this.dt,
     });
+    // A reclaim rebuilds a fresh, naked ship; the wallet the welcome carried is
+    // stamped on now, before the first prediction, so cargo/bank/upgrades are the
+    // ones the player left (GDD §4.2). Reconciliation then leaves them alone — the
+    // snapshot never overwrites the wallet (`./prediction` applySnapshot).
+    if (this.pendingEconomy) {
+      this.restoreEconomy(world, this.pendingEconomy);
+      this.pendingEconomy = null;
+    }
     // Remote ships render out of this buffer, ~100 ms in the past, so their
     // motion is smooth at any RTT while the local slot stays predicted (M10).
     this.interpolator = new RemoteInterpolator({ local: this.player });
+  }
+
+  /**
+   * Stamp a reclaimed wallet onto the local ship in a freshly built predicted
+   * world (`./prediction` `applyPlayerEconomy`) — held ore, banked ore and every
+   * upgrade track the client recognizes, with the stats those tiers scale
+   * recomputed, so the returning ship matches the one authority is flying rather
+   * than merely wearing its labels. Remote ships keep their fresh defaults: this
+   * client never learns their wallets, and never needs to.
+   */
+  private restoreEconomy(world: World, economy: PlayerEconomy): void {
+    applyPlayerEconomy(world, this.player, economy);
   }
 }
 

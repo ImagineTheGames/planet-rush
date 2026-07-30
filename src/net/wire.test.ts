@@ -170,6 +170,23 @@ describe('server → client', () => {
       { type: 'entityEvent', tick: 12, kind: 'turret', op: 'spawn', data: { id: 4 } },
       { type: 'playerSubstituted', player: 5, graceSeconds: 60 },
       { type: 'playerReclaimed', player: 5 },
+      // The reclaim welcome hands back the wallet the snapshot never carries, and
+      // the economy channel keeps it true for the rest of the match — fractional
+      // held ore and all (QA m10 "economy-not-on-wire", GDD §4.2).
+      {
+        type: 'welcome',
+        you: 5,
+        room: 'QK7P',
+        tick: 9_000,
+        reclaimToken: 'cafef00d',
+        economy: { held: 2.5, banked: 41, tiers: { power: 3, engine: 0, cargo: 1, hull: 2, speed: 0 } },
+      },
+      {
+        type: 'economy',
+        player: 5,
+        tick: 9_042,
+        economy: { held: 0.25, banked: 44, tiers: { power: 3, engine: 0, cargo: 1, hull: 2, speed: 0 } },
+      },
       { type: 'matchEnd', winner: 3, tick: 44_100 },
       // A refused join must survive the round trip, or the transport cannot tell a
       // rejection from a plain drop and spins the reconnect loop forever (M10).

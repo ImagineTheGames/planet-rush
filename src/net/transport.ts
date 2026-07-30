@@ -129,6 +129,40 @@ export type ClientMessage =
 // Server → client
 // ---------------------------------------------------------------------------
 
+/**
+ * The per-player economy the streaming wire never carries. Ships and projectiles
+ * stream every tick (`./snapshot`), but a ship's **wallet** — the ore in its hold,
+ * the ore it has banked, and the upgrade tiers it bought (DAMAGE/SPEED weapon
+ * tiers among them) — is match-lifetime state maintained by *deterministic replay
+ * of the player's own input*: the client runs the same `step()` the server does,
+ * so its predicted wallet tracks authority without a byte on the wire, and
+ * `applySnapshot` deliberately leaves it untouched (`./prediction`).
+ *
+ * That replay only holds while the player is flying. Across a reconnect the
+ * substituting bot mines, banks and upgrades on the authoritative ship, and the
+ * reclaiming client rebuilds a **fresh** world with a naked ship (`./session`
+ * `beginPredicting`) — there is no input history that would reproduce the wallet.
+ * Without this, a reclaimed seat comes back with an empty hold and tier-0 stats
+ * (QA m10 "economy-not-on-wire", GDD §4.2 "same cargo, same banked ore, same
+ * upgrades"). So the welcome carries the wallet, and the returning client stamps
+ * it onto its ship before predicting a single tick.
+ *
+ * The welcome is one statement, made once; {@link EconomyMessage} is how it stays
+ * true for the rest of the match, on the ticks authority moves it.
+ */
+export interface PlayerEconomy {
+  /** Ore currently in the hold (`Ship.cargo`). */
+  held: number;
+  /** Ore safely banked, never lost to ship death (`Ship.banked`). */
+  banked: number;
+  /**
+   * Tiers bought per upgrade track, keyed by `UpgradeTrack` value (`Ship.tiers`).
+   * The client restores every track it recognizes and recomputes the derived
+   * stats those tiers scale (max hull, cargo capacity).
+   */
+  tiers: Readonly<Record<string, number>>;
+}
+
 /** Assigned slot + authoritative room identity on (re)join. */
 export interface WelcomeMessage {
   type: 'welcome';
@@ -142,6 +176,14 @@ export interface WelcomeMessage {
    * which has no connection to lose and nothing to prove.
    */
   reclaimToken?: string;
+  /**
+   * This slot's wallet as authority holds it right now (`PlayerEconomy`). Present
+   * only when the room already has a live ship for the slot — i.e. on a *reclaim*
+   * welcome (GDD §4.2), where the returning client must be handed the cargo, bank
+   * and upgrades it earned before the drop. Absent on a lobby join (no ship yet)
+   * and from `LocalLoopback` (authority is in-process — nothing to restore).
+   */
+  economy?: PlayerEconomy;
 }
 
 /** One slot's public lobby state (GDD §2.1 lobby; §5.2 player colors). */
@@ -246,6 +288,51 @@ export interface PlayerReclaimedMessage {
   player: PlayerId;
 }
 
+/**
+ * **The wallet's own low-frequency channel** — one slot's {@link PlayerEconomy}
+ * as authority holds it at `tick`, sent to that slot alone, immediately ahead of
+ * the snapshot for the same tick and only when a value actually changed.
+ *
+ * The reclaim `welcome` hands the wallet back once, at world-build; this keeps it
+ * true for the rest of the match. Two things move a predicted wallet off
+ * authority's and neither is a reconnect:
+ *
+ *  - **Replay re-earns.** Reconciliation rewinds the clock and replays every
+ *    unacknowledged input on top of authority (`./prediction`), but the snapshot
+ *    carries no wallet, so a rewind cannot put the hold back the way it puts the
+ *    position back. Ore tractored in during those ticks is therefore banked once
+ *    per reconcile it survives — an error that compounds with RTT rather than
+ *    decaying.
+ *  - **Divergent deaths.** Hull comes from the wire, so a ship can die on
+ *    authority (half its hold lost, GDD §2.3) on a tick prediction had it alive.
+ *    Nothing local ever charges the client for that ore.
+ *
+ * Either way the drift is *permanent* and it is not cosmetic: the buy button
+ * reads the predicted bank, so a client that thinks it is one ore richer than it
+ * is sends an upgrade the server refuses, and from then on the two disagree about
+ * the ship's stats as well as its wallet. So the wallet re-bases from this message
+ * inside the same rewind/replay that corrects position — the client's own unacked
+ * mining is still replayed on top, so nothing it just earned reads as lost.
+ *
+ * Cheap by construction: one slot's frame, ~140 bytes of JSON, and only on the
+ * ticks a wallet moves (mining, banking, a purchase) — nothing while a ship is
+ * merely flying and fighting, against the snapshot stream's own ~15 KB/s
+ * (docs/netcode-spike.md). It is state, not a diff: the whole wallet every time,
+ * so a client that missed one is corrected by the next rather than desynced.
+ */
+export interface EconomyMessage {
+  type: 'economy';
+  /** The slot this wallet belongs to. Always the recipient's own seat — a client
+   *  is never told a rival's cargo or bank (the same discipline as scouted station
+   *  health, GDD §2.2). */
+  player: PlayerId;
+  /** The authoritative tick this wallet was read at. The client applies it during
+   *  the reconcile for that tick, so replay lands on top of it rather than under
+   *  it (`./prediction` `stageEconomy`). */
+  tick: Tick;
+  economy: PlayerEconomy;
+}
+
 /** The match ended; `winner` is null on the (degenerate) no-survivor case. */
 export interface MatchEndMessage {
   type: 'matchEnd';
@@ -284,6 +371,7 @@ export type ServerMessage =
   | EntityEventMessage
   | PlayerSubstitutedMessage
   | PlayerReclaimedMessage
+  | EconomyMessage
   | MatchEndMessage
   | JoinErrorMessage;
 
