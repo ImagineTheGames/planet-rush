@@ -2,7 +2,7 @@
   "steps": [
     {
       "step": "host created",
-      "code": "YDUJ",
+      "code": "KHVW",
       "status": "connecting"
     },
     {
@@ -15,7 +15,7 @@
         "visible": true,
         "screen": "join",
         "status": "connecting",
-        "resolvedCode": "YDUJ",
+        "resolvedCode": "KHVW",
         "error": ""
       }
     },
@@ -26,7 +26,7 @@
         "visible": true,
         "screen": "home",
         "status": "connecting",
-        "resolvedCode": "YDUJ",
+        "resolvedCode": "KHVW",
         "error": ""
       },
       "joinerSeam": {
@@ -34,12 +34,12 @@
         "visible": true,
         "screen": "join",
         "status": "connecting",
-        "resolvedCode": "YDUJ",
+        "resolvedCode": "KHVW",
         "error": ""
       }
     }
   ],
-  "hostCode": "YDUJ",
+  "hostCode": "KHVW",
   "hostShot": "/lanes/lane-2/evidence/images/online-two-clients-host.png",
   "joinerShot": "/lanes/lane-2/evidence/images/online-two-clients-joiner.png",
   "hostErrors": [],
