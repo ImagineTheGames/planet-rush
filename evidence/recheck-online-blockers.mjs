@@ -127,7 +127,7 @@ checks.push({
   owner: 'netcode',
   clear: null,
   want: 'mean correction and visual snaps inside docs/netcode-audit.md §5 across a session that contains a death',
-  saw: 'not statically checkable — re-measure with feel-diagnose.live.test.ts; last read: 25.4 u / 18.0 u mean against a 1.5 u ceiling, all of it in one post-respawn window',
+  saw: 'not statically checkable — re-measure with feel-diagnose.live.test.ts; last read: 25.4 u / 18.0 u mean against a 1.5 u ceiling, all of it in one post-respawn window. NARROWED 2026-07-30T15:44Z by reading, not measuring: the obvious suspect is ELIMINATED — a correction that repeats to three decimals looks like the stale-snapshot early return handing back its previous `this.error` (prediction.ts:382-392), but session.ts:404 already feeds the instrument only `if (report.applied)`, so those are not the samples. The tail is therefore built from reconciles that genuinely applied and genuinely computed that error. Noted as a lead, NOT a diagnosis: `localShipPos()` answers ORIGIN when the local ship is absent from world.ships (prediction.ts:698-701) and `checkpoint()` records that answer verbatim (prediction.ts:545-553), which would poison every history entry written while the ship is gone — but an origin-based checkpoint implies a correction of hypot(home) and the measured magnitude is death-site→home instead, so that alone does not explain it either. Netcode owns the answer; both seams above are eliminated or unconfirmed, not causes.',
 });
 
 const fleet = await fleetAge();
