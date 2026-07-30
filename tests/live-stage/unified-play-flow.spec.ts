@@ -30,6 +30,15 @@
  * proven against a REAL server, with nothing mocked, in
  * `tests/net/online-lobby-flow.test.ts`, which runs in the ordinary unit suite. The
  * two together are the flow; neither is the whole of it alone.
+ *
+ * HOW TO RUN IT
+ * ---------------------------------------------------------------------------
+ * `npm run test:live-stage`. Note that `.github/workflows/ci.yml` does NOT run this
+ * suite (it runs typecheck, vitest, the build, `tests/mobile` and `tests/live`), so
+ * this file is only ever exercised deliberately, on a machine with browsers
+ * installed. It was authored unexecuted — the agent lane it was written in has no
+ * Playwright browsers (`playwright install` needs `sudo install-deps` there) — so the
+ * first real run should be read as a first run, not a re-run.
  */
 import { test, expect, type Page } from '@playwright/test';
 
