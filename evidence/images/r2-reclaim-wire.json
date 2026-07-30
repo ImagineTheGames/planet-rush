@@ -1,20 +1,17 @@
 {
   "probe": "reclaim-wire",
   "allocator": "https://planet-rush-allocator.fly.dev",
-  "capturedAt": "2026-07-30T02:05:24.557Z",
-  "room": "JJAS",
+  "capturedAt": "2026-07-30T02:42:09.000Z",
+  "room": "BTPQ",
   "machine": "0800d5b6d62328",
-  "firstWelcomeDials": 2,
+  "firstWelcomeDials": 4,
   "seat": 0,
-  "reclaimToken": "2a56f5ce…",
-  "firstSnapshots": 116,
+  "reclaimToken": "aae74ea8…",
+  "firstSnapshots": 115,
   "matchWentLive": true,
-  "reclaimWelcomeDials": 4,
+  "reclaimWelcomeDials": 1,
   "reclaimWelcomeSeat": 0,
   "reclaimFrames": [
-    "joinError",
-    "joinError",
-    "joinError",
     "welcome",
     "matchStart",
     "entityEvent",
@@ -71,11 +68,14 @@
     "entityEvent",
     "entityEvent",
     "entityEvent",
-    "entityEvent"
+    "entityEvent",
+    "entityEvent",
+    "playerReclaimed",
+    "lobbyState"
   ],
   "reclaimSnapshots": 121,
   "reclaimSawMatchStart": true,
-  "reclaimMatchStartTick": 455,
+  "reclaimMatchStartTick": 344,
   "reclaimBroadcastSeen": true,
   "VERDICT": "RECLAIM-RESUMED-MATCH"
 }
