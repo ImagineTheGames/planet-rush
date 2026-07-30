@@ -49,7 +49,7 @@ import type { DeregistrationBody, HeartbeatBody, RegistrationBody } from './hear
 import { FLEET_AUTH_HEADER, signFleetRequest } from '../src/net/fleet-auth';
 import { attachWebSocketServer } from './ws';
 import type { UpgradeGuard } from './ws';
-import { replayForUpgrade } from './upgrade-router';
+import { armReplayGuard } from './upgrade-router';
 
 /** The sim runs at 60 Hz (GDD §4.1); the loop wakes at that rate and the room
  *  converts however much real time actually passed into whole ticks. */
@@ -131,13 +131,12 @@ const http = createServer((request: IncomingMessage, response: ServerResponse) =
 // the ticket key — the same fail-closed rule as ticket enforcement. Off Fly
 // (direct/solo, and every test that dials a Machine directly) there is no guard
 // and every upgrade completes locally, exactly as before.
-const machineRouter = process.env['MATCH_ROUTER'] ?? 'direct';
-const machineId = identity.machine;
-const beforeUpgrade: UpgradeGuard | undefined =
-  machineRouter === 'fly' && ticketSecret !== undefined && machineId
-    ? (request): Readonly<Record<string, string>> | null =>
-        replayForUpgrade(request.url, { machineId, secret: ticketSecret, now: Date.now })
-    : undefined;
+const beforeUpgrade: UpgradeGuard | undefined = armReplayGuard({
+  router: process.env['MATCH_ROUTER'],
+  machineId: identity.machine,
+  secret: ticketSecret,
+  now: Date.now,
+});
 
 attachWebSocketServer(
   http,

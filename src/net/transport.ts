@@ -253,6 +253,28 @@ export interface MatchEndMessage {
   tick: Tick;
 }
 
+/**
+ * The server refused this connection's join and will seat no ship for it: a bad
+ * or expired ticket, a full room, an unknown room code (`server/match-server.ts`
+ * `JoinErrorMessage`, whose `reason` is a stricter union — typed `string` here so
+ * this module stays below the server layer that owns those constants).
+ *
+ * The reason it earns a place in the union is a reconnect distinction, not a new
+ * feature. A dropped socket is *recoverable* — a bot holds the seat and the
+ * transport redials for the grace window (GDD §4.2). A refused join is *terminal*:
+ * the same ticket redialled would lose the same edge lottery again, so
+ * `WebSocketTransport` must stop and surface the reason rather than burn sixty
+ * seconds hammering — which is exactly what left a lost coin-flip stuck on
+ * "connecting" (M10). It was a server→client courtesy outside the original
+ * ratified union; adding it lets the client tell "refused" from "dropped" and
+ * offer RETRY (a fresh allocate) / BACK instead of a spinner that never resolves.
+ */
+export interface JoinErrorMessage {
+  type: 'joinError';
+  /** Why the join was refused, verbatim from the server for the player to read. */
+  reason: string;
+}
+
 /** Everything a client can receive. */
 export type ServerMessage =
   | WelcomeMessage
@@ -262,7 +284,8 @@ export type ServerMessage =
   | EntityEventMessage
   | PlayerSubstitutedMessage
   | PlayerReclaimedMessage
-  | MatchEndMessage;
+  | MatchEndMessage
+  | JoinErrorMessage;
 
 // ---------------------------------------------------------------------------
 // The seam

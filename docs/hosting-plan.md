@@ -146,6 +146,55 @@ The two measured results in one line each:
 
 ---
 
+## Task 13 — the socket-hop machine-pin, and the two flags that arm it
+
+A fleet of ≥2 match Machines behind one anycast hostname needs a client's
+WebSocket to reach the *specific* Machine hosting its room. The allocator can't
+put that routing on the allocate response — a `fly-replay` header on the `POST
+/rooms` JSON makes the edge replay the *POST*, so the client never receives its
+`{room, ticket}`. So the pin moved to the **socket hop**: the client dials the
+shared `connectUrl` (`wss://planet-rush-gameserver.fly.dev/play`) with its signed
+ticket on the URL (`?ticket=`), the edge lands the upgrade on *some* Machine, and
+a Machine that is not the ticket's host answers the upgrade with `fly-replay
+instance=<host>` **before** the 101, so the edge re-delivers it to the host
+(`server/upgrade-router.ts`, `server/ws.ts`; proven over a real socket in
+`tests/server/upgrade-replay.test.ts`).
+
+**The pin has two halves, one per app, and they are useless apart:**
+
+| Half | App | Flag | Effect if unset |
+|---|---|---|---|
+| Allocator emits the shared `connectUrl` | `planet-rush-allocator` | `ALLOCATOR_ROUTER = "fly"` | client gets a direct per-Machine URL (wrong on Fly) |
+| Gameserver arms the upgrade guard | `planet-rush-gameserver` | `MATCH_ROUTER = "fly"` | **the guard is never built — every wrong-Machine upgrade completes locally → `joinError: bad-ticket`** |
+
+**The lottery bug (M10).** The allocator half was armed; the gameserver half was
+not — `fly.gameserver.toml` never set `MATCH_ROUTER`, so `armReplayGuard`
+(`server/upgrade-router.ts`) returned `undefined` and the pin code shipped **dead**.
+Behind a 2-Machine fleet that is a coin flip: the upgrade lands on the room's host
+→ welcome; it lands on the other Machine → `bad-ticket`, surfacing to the player as
+a stuck "connecting" screen. The repo's own probe against the **live** fleet caught
+it exactly — `node tests/net/wire-probe.mjs https://planet-rush-allocator.fly.dev 6`
+returned **4/6 welcome, 2/6 `bad-ticket`**, each failure a room allocated to one
+Machine whose upgrade the edge dropped on the other.
+
+**The fix** is the missing flag: `fly.gameserver.toml` now sets `MATCH_ROUTER =
+"fly"`, and `tests/server/fleet-config.test.ts` asserts **both** halves stay armed
+so this asymmetry cannot silently return. Off Fly (the €4 Hetzner fallback, solo,
+every direct-dial test) neither flag is set and every upgrade completes locally,
+exactly as before — the portability contract is untouched (no Fly SDK; the flags
+are plain env vars a VPS omits). It takes effect on the next gameserver **redeploy**
+(`deploy-server.yml` rolls on `fly.gameserver.toml` changes); re-run the probe
+against the live fleet after the roll to confirm **6/6**.
+
+**Client honesty (M10).** A refused join is now *terminal*, not a drop:
+`WebSocketTransport` surfaces `joinError` as `closeReason = 'join-rejected'` with
+the server's `rejectReason` and stops — rather than redialling the same ticket into
+the same lottery for the whole grace window and leaving a spinner that never
+resolves (`src/net/websocket-transport.ts`). The menu's RETRY (a *fresh* allocate,
+one per tap) / BACK affordance on that state is a UI-lane follow-up.
+
+---
+
 ## Still open (kept, not closed)
 
 The spike's discipline: state what remains open rather than quietly closing it.

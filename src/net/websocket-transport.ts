@@ -96,13 +96,17 @@ export interface WebSocketTransportConfig {
 
 /**
  * Why the transport ended up `closed`, once it has. `'left'` is a deliberate
- * hang-up; the other two are the two dead-socket truths Task 9b keeps apart —
- * a room that ended (`'room-gone'`, nothing to reclaim, offer a new match) versus
- * a grace window that ran out (`'grace-elapsed'`, the seat is a bot's now). The
- * ratified `Transport` interface says only `state`; this richer reason is a
- * concrete-class extra the online menu reads, exactly as `player` already is.
+ * hang-up; two are the dead-socket truths Task 9b keeps apart — a room that ended
+ * (`'room-gone'`, nothing to reclaim, offer a new match) versus a grace window
+ * that ran out (`'grace-elapsed'`, the seat is a bot's now); and `'join-rejected'`
+ * is the server refusing the join outright (M10) — a *terminal* end no redial can
+ * mend, unlike the recoverable drops above, so the transport stops and the menu
+ * offers RETRY (a fresh allocate) / BACK. The specific server reason rides
+ * {@link WebSocketTransport.rejectReason}. The ratified `Transport` interface says
+ * only `state`; this richer reason is a concrete-class extra the online menu
+ * reads, exactly as `player` already is.
  */
-export type CloseReason = 'left' | StopReason;
+export type CloseReason = 'left' | 'join-rejected' | StopReason;
 
 /** Defaults, named so the reconnect behaviour is legible without reading code. */
 export const RECONNECT_WINDOW_MS = 60_000;
@@ -126,6 +130,13 @@ export class WebSocketTransport implements Transport {
 
   /** True once `close()` was called: a deliberate exit never redials. */
   private left = false;
+  /** True once the server refused the join: like `left`, a state from which the
+   *  transport never redials — but the end came *from* the server, not the player,
+   *  so it is surfaced with its reason rather than silent (M10). */
+  private rejected = false;
+  /** The server's stated reason for a refused join, for a menu to show verbatim.
+   *  Null until a `joinError` arrives. */
+  private rejectReasonValue: string | null = null;
   private attempt = 0;
   /** Wall clock of the drop we are currently trying to recover from, or -1. */
   private droppedAt = -1;
@@ -217,10 +228,18 @@ export class WebSocketTransport implements Transport {
     return this.closeReasonValue;
   }
 
+  /** The server's reason for refusing the join, or null when it was not refused.
+   *  Meaningful only alongside `closeReason === 'join-rejected'`; a menu shows it
+   *  next to a RETRY (fresh allocate) / BACK choice (M10). Not part of the ratified
+   *  `Transport` interface — a concrete-class extra, like {@link closeReason}. */
+  get rejectReason(): string | null {
+    return this.rejectReasonValue;
+  }
+
   // --- Dialling -----------------------------------------------------------
 
   private open(): void {
-    if (this.left) return;
+    if (this.left || this.rejected) return;
     const socket = this.connectSocket(dialUrl(this.config.url, this.config.ticket));
     // Snapshots are binary; without this a browser hands them over as `Blob`
     // and every read becomes asynchronous (docs/netcode-spike.md wire layout).
@@ -252,6 +271,15 @@ export class WebSocketTransport implements Transport {
         this.seat = message.you;
         if (message.reclaimToken) this.token = message.reclaimToken;
       }
+      // A refused join is terminal, not a drop: the same ticket redialled would
+      // lose the same edge lottery again (M10). Surface the reason and stop —
+      // never fall through to the reconnect loop this message's own socket-close
+      // would otherwise start. Forwarded first so an observer sees the reason too.
+      if (message.type === 'joinError') {
+        this.messageHandler?.(message);
+        this.rejectJoin(message.reason);
+        return;
+      }
       this.messageHandler?.(message);
     };
 
@@ -260,10 +288,33 @@ export class WebSocketTransport implements Transport {
     socket.onerror = (): void => {};
 
     socket.onclose = (): void => {
-      if (this.left || this.socket !== socket) return;
+      // `rejected` as well as `left`: the server closes the socket right after a
+      // `joinError`, and that close must not restart the reconnect loop the
+      // rejection just ended (M10).
+      if (this.left || this.rejected || this.socket !== socket) return;
       this.socket = null;
       this.onDrop();
     };
+  }
+
+  /**
+   * The server refused the join. Unlike a drop this is terminal (M10): retrying
+   * the same ticket would only lose the same edge lottery, so cancel any pending
+   * redial, hang up, record the reason, and close — the menu offers RETRY (which
+   * means a *fresh* allocate, one per tap, never this transport redialling) / BACK.
+   */
+  private rejectJoin(reason: string): void {
+    if (this.left || this.rejected) return;
+    this.rejected = true;
+    this.rejectReasonValue = reason;
+    if (this.retry !== null) {
+      this.cancel(this.retry);
+      this.retry = null;
+    }
+    this.socket?.close();
+    this.socket = null;
+    this.closeReasonValue = 'join-rejected';
+    this.setState('closed');
   }
 
   private sendJoin(): void {

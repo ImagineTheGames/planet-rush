@@ -16,8 +16,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createConnection } from 'node:net';
 import { randomBytes } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import { signTicket } from '../../src/net/ticket';
-import { replayForUpgrade } from '../../server/upgrade-router';
+import { armReplayGuard, replayForUpgrade } from '../../server/upgrade-router';
 import type { UpgradeGuard } from '../../server/ws';
 import { startMatchServer } from '../net/node-websocket';
 import type { MatchServerHarness } from '../net/node-websocket';
@@ -58,6 +59,34 @@ describe('replayForUpgrade — the pure decision', () => {
   it('serves here for an expired ticket', () => {
     const stale = signTicket({ room: 'RUSH', machine: OTHER, expiresAt: Date.now() - 1 }, SECRET);
     expect(replayForUpgrade(`/play?ticket=${encodeURIComponent(stale)}`, config)).toBeNull();
+  });
+});
+
+describe('armReplayGuard — the gate the deploy config drives', () => {
+  const now = (): number => Date.now();
+  const req = (url: string): IncomingMessage => ({ url }) as unknown as IncomingMessage;
+
+  it('arms behind a Fly edge with an id and a secret, and it makes the pin decision', () => {
+    const guard = armReplayGuard({ router: 'fly', machineId: MACHINE, secret: SECRET, now });
+    expect(guard).toBeTypeOf('function');
+    // The armed guard is the real decision: a wrong-machine ticket is replayed.
+    const wrong = req(`/play?ticket=${encodeURIComponent(ticketFor('RUSH', OTHER))}`);
+    expect(guard?.(wrong)).toEqual({ 'fly-replay': `instance=${OTHER}` });
+    const mine = req(`/play?ticket=${encodeURIComponent(ticketFor('RUSH', MACHINE))}`);
+    expect(guard?.(mine)).toBeNull();
+  });
+
+  it('does NOT arm when MATCH_ROUTER is unset or not "fly" — the shipped-dead lottery bug (M10)', () => {
+    // This is the exact production defect: the pin code shipped, but the gameserver
+    // never set MATCH_ROUTER, so the router defaulted to direct and the guard was
+    // never built — every wrong-machine upgrade completed locally → bad-ticket.
+    expect(armReplayGuard({ router: undefined, machineId: MACHINE, secret: SECRET, now })).toBeUndefined();
+    expect(armReplayGuard({ router: 'direct', machineId: MACHINE, secret: SECRET, now })).toBeUndefined();
+  });
+
+  it('fails closed without a ticket key or a machine id, even on Fly', () => {
+    expect(armReplayGuard({ router: 'fly', machineId: MACHINE, secret: undefined, now })).toBeUndefined();
+    expect(armReplayGuard({ router: 'fly', machineId: '', secret: SECRET, now })).toBeUndefined();
   });
 });
 
