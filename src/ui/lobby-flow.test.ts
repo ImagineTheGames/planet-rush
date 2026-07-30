@@ -81,6 +81,24 @@ function inLobby(you = 0, host = you): FlowState {
   return flowConnected(opened.state, you, { host }).state;
 }
 
+/**
+ * A flow already in a lobby, entered through a NAMED door — the whole point of the
+ * ratified play flow is that all three doors land in the same room, so a guard that
+ * only ever walks in through SOLO is only testing a third of it.
+ */
+function inLobbyVia(door: 'solo' | 'create' | 'join', you = 0, host = you): FlowState {
+  const rng = mulberry32(7);
+  let state = createFlow();
+  if (door === 'join') {
+    state = flowTapEntry(state, { kind: 'door', index: doorIndex('join') }, rng).state;
+    for (const ch of 'K7QM') state = flowTapEntry(state, { kind: 'key', index: keyIndex(ch) }, rng).state;
+    state = flowTapEntry(state, { kind: 'submit' }, rng).state;
+  } else {
+    state = flowTapEntry(state, { kind: 'door', index: doorIndex(door) }, rng).state;
+  }
+  return flowConnected(state, you, { host }).state;
+}
+
 /** A `lobbyState` broadcast: `count` seats, with `humans` of them seated. */
 function slots(count: number, humans: number[]): LobbySlot[] {
   return Array.from({ length: count }, (_, player) => ({
@@ -293,14 +311,109 @@ describe('the room tells the server what it chose', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The slot-editor CLASS GUARD (n2 — the radar-wedge lesson).
+// ONE DOOR, ONE LOBBY (ratified — the unified play flow)
+//
+// PLAY opens the doors; the doors open the lobby. All three doors land in the SAME
+// component, and the only thing that differs is the `online` flag the door already
+// resolved. These tests hold that shape: the flavours are a flag, not a screen.
+// ---------------------------------------------------------------------------
+
+describe('one door, one lobby (ratified: PLAY opens the doors, the doors open the room)', () => {
+  it('opens the SOLO lobby offline — no room code, the empty seats are the cast', () => {
+    const state = inLobbyVia('solo');
+    expect(state.screen).toBe('lobby');
+    expect(state.online).toBe(false);
+    // The lobby the SOLO door opened knows it is offline, so the view draws no room
+    // code and no OPEN markers: there is no transport for a joiner to arrive on.
+    expect(lobbyModel(state.lobby!).online).toBe(false);
+    expect(lobbyModel(state.lobby!).seats.some((s) => s.openToJoin)).toBe(false);
+  });
+
+  it('opens the SAME lobby online for CREATE and JOIN — code up, seats claimable', () => {
+    for (const door of ['create', 'join'] as const) {
+      const state = inLobbyVia(door);
+      expect(state.screen, door).toBe('lobby');
+      expect(state.online, door).toBe(true);
+      const model = lobbyModel(state.lobby!);
+      expect(model.online, door).toBe(true);
+      expect(model.room, door).toBe(state.lobby!.room);
+      expect(model.seats.some((s) => s.openToJoin), door).toBe(true);
+    }
+  });
+
+  it('fills the room’s HUMAN-open seats live, as joiners arrive', () => {
+    // The host is watching the roster while people type the code in: a `lobbyState`
+    // broadcast is the only thing that seats them, and it must land on the same
+    // lobby the host is configuring rather than a second screen.
+    let state = inLobbyVia('create', 0, 0);
+    expect(lobbyModel(state.lobby!).humanCount).toBe(1);
+    state = flowLobbySlots(state, slots(8, [0, 1])).state;
+    expect(lobbyModel(state.lobby!).humanCount).toBe(2);
+    expect(state.lobby?.seats[1]?.occupant).toBe('human');
+    state = flowLobbySlots(state, slots(8, [0, 1, 4])).state;
+    expect(lobbyModel(state.lobby!).humanCount).toBe(3);
+  });
+
+  it('shows a JOINER their own name in their own seat', () => {
+    // Requirement 3: a joiner sees the slots fill AND their own name in their slot.
+    const guest = inLobbyVia('join', 3, 0);
+    const model = lobbyModel(guest.lobby!);
+    expect(model.seats[3]?.isYou).toBe(true);
+    expect(model.seats[3]?.name).toBe(guest.lobby?.name);
+    expect(model.seats[3]?.state).toBe('human');
+    // …and the host's seat is marked as the host, so "waiting for the host" names
+    // somebody the roster actually shows.
+    expect(model.seats[0]?.isHost).toBe(true);
+  });
+
+  it('gives a JOINER the map and the mode READ-ONLY', () => {
+    // The host owns the board and the mode for the whole room; a guest reads them.
+    const guest = inLobbyVia('join', 3, 0);
+    const before = lobbyModel(guest.lobby!);
+    for (const target of [{ kind: 'map', index: 2 } as const, { kind: 'mode' } as const]) {
+      const tapped = flowTapLobby(guest, target);
+      expect(tapped.state, `${target.kind} from a joiner`).toBe(guest);
+      expect(tapped.effects).toEqual([]);
+    }
+    expect(lobbyModel(guest.lobby!).mapId).toBe(before.mapId);
+    // …and the host of that same online room CAN change both — read-only is the
+    // guest's condition, not the online lobby's.
+    const host = inLobbyVia('create', 0, 0);
+    expect(flowTapLobby(host, { kind: 'map', index: 2 }).state.lobby?.mapId).not.toBe(
+      host.lobby?.mapId,
+    );
+    expect(flowTapLobby(host, { kind: 'mode' }).state.lobby?.mode).toBe('teams');
+  });
+
+  it('closes the transport when BACK leaves an ONLINE room, and nothing offline', () => {
+    // u2 item 4 — no ghost rooms. BACK out of a room frees the seat; BACK out of a
+    // solo lobby has no socket to close, so it asks for nothing.
+    const online = flowTapLobby(inLobbyVia('create', 0, 0), { kind: 'leave' });
+    expect(online.state.screen).toBe('entry');
+    expect(online.state.lobby).toBeNull();
+    expect(kinds(online)).toEqual(['close-transport']);
+
+    const offline = flowTapLobby(inLobbyVia('solo'), { kind: 'leave' });
+    expect(offline.state.screen).toBe('entry');
+    expect(offline.state.lobby).toBeNull();
+    expect(offline.effects).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The slot-editor CLASS GUARD (n2 — the radar-wedge lesson), now extended over
+// the ONLINE lobby as well (ratified: "no feature may exist in one mode's lobby
+// and not the other unless ratified by name — the n2-01 affordance-set test
+// extends to cover the online lobby").
 //
 // A bot slot's editor — open/close, bot-assign, bot-DIFFICULTY, and team-assign
-// where applicable — must be REACHABLE in every mode, driven through the same
-// hit-test the view uses (a control that isn't laid out isn't reachable). The
-// TEAMS lobby had silently dropped bot-difficulty when the side control took the
-// row's only chip; this asserts the whole set, exhaustively over the modes, so a
-// new mode has to satisfy it or name a ratified exclusion.
+// where applicable — must be REACHABLE in every mode AND in both lobby flavours,
+// driven through the same hit-test the view uses (a control that isn't laid out
+// isn't reachable). The TEAMS lobby had silently dropped bot-difficulty when the
+// side control took the row's only chip; the online room had no slot editor at all,
+// because it had no lobby. This asserts the whole set, exhaustively over the modes
+// and the flavours, so a new mode or a new flavour has to satisfy it or name a
+// ratified exclusion.
 // ---------------------------------------------------------------------------
 
 /** A roomy desktop viewport — every row chip has extent here, so "reachable"
@@ -314,35 +427,75 @@ function tapCentre(layout: LobbyLayout, rect: Rect): LobbyTarget | null {
   return lobbyHitTest(layout, rect.x + rect.width / 2, rect.y + rect.height / 2);
 }
 
-describe('the slot editor is reachable in EVERY mode (guard the class — the radar-wedge lesson)', () => {
+describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the class)', () => {
   // Exhaustive over the ratified modes: a new mode added to MODE_LABELS lands here
   // automatically and must reach the shared affordances or be given an exclusion.
   const MODES = Object.keys(MODE_LABELS) as MatchMode[];
-  const SEAT = 3; // an OPEN (bot-previewing) seat in an offline solo lobby
+  // …and over the two ways a lobby is opened. `solo` is the offline room, `create`
+  // the online one; the ratified rule is that the affordance SET is identical, so
+  // the same loop body has to pass for both.
+  const FLAVOURS: readonly { readonly name: string; readonly door: 'solo' | 'create' }[] = [
+    { name: 'the SOLO lobby (offline)', door: 'solo' },
+    { name: 'the ROOM lobby (online)', door: 'create' },
+  ];
+  const SEAT = 3; // an OPEN (bot-previewing) seat in either flavour
 
-  for (const mode of MODES) {
-    it(`reaches open/close, bot-assign AND bot-difficulty on a bot seat in ${mode}`, () => {
-      let state = inLobby(0, 0);
-      if (mode !== 'ffa') state = flowTapLobby(state, { kind: 'mode' }).state;
-      expect(state.lobby?.mode, `lobby is in ${mode}`).toBe(mode);
+  for (const flavour of FLAVOURS) {
+    for (const mode of MODES) {
+      it(`reaches open/close, bot-assign AND bot-difficulty on a bot seat in ${mode}, in ${flavour.name}`, () => {
+        let state = inLobbyVia(flavour.door, 0, 0);
+        if (mode !== 'ffa') state = flowTapLobby(state, { kind: 'mode' }).state;
+        expect(state.lobby?.mode, `lobby is in ${mode}`).toBe(mode);
+        const layout = lobbyLayout(GUARD_VIEWPORT);
+
+        // open/close + bot-assign: the row body reaches the OPEN→BOT→CLOSED cycle.
+        const body = tapCentre(layout, layout.seats[SEAT]!);
+        expect(body, `row body reachable in ${mode}`).toEqual({ kind: 'seat', index: SEAT });
+        const cycled = flowTapLobby(state, body!);
+        expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
+          state.lobby?.seats[SEAT]?.occupant,
+        );
+
+        // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
+        // This is the exact control the TEAMS lobby had lost.
+        const diff = tapCentre(layout, layout.seatChips[SEAT]!);
+        expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
+        const tiered = flowTapLobby(state, diff!);
+        expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
+          state.lobby?.seats[SEAT]?.difficulty,
+        );
+      });
+    }
+
+    it(`reaches the whole host affordance SET in ${flavour.name} — nothing exists in one lobby and not the other`, () => {
+      // The ratified guard, stated positively: every control the lobby offers its
+      // host is laid out and takes effect, in BOTH flavours. The online room used to
+      // have none of these, because CREATE ROOM skipped the lobby entirely.
       const layout = lobbyLayout(GUARD_VIEWPORT);
+      const state = inLobbyVia(flavour.door, 0, 0);
 
-      // open/close + bot-assign: the row body reaches the OPEN→BOT→CLOSED cycle.
-      const body = tapCentre(layout, layout.seats[SEAT]!);
-      expect(body, `row body reachable in ${mode}`).toEqual({ kind: 'seat', index: SEAT });
-      const cycled = flowTapLobby(state, body!);
-      expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
-        state.lobby?.seats[SEAT]?.occupant,
-      );
+      // Every affordance, by the rect the view draws → the target a tap resolves to.
+      expect(tapCentre(layout, layout.classOptions[0]!)).toEqual({ kind: 'class', index: 0 });
+      expect(tapCentre(layout, layout.maps[1]!)).toEqual({ kind: 'map', index: 1 });
+      expect(tapCentre(layout, layout.modeToggle)).toEqual({ kind: 'mode' });
+      expect(tapCentre(layout, layout.abundance)).toEqual({ kind: 'abundance' });
+      expect(tapCentre(layout, layout.rushButton)).toEqual({ kind: 'rush' });
+      expect(tapCentre(layout, layout.leave)).toEqual({ kind: 'leave' });
 
-      // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
-      // This is the exact control the TEAMS lobby had lost.
-      const diff = tapCentre(layout, layout.seatChips[SEAT]!);
-      expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
-      const tiered = flowTapLobby(state, diff!);
-      expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
-        state.lobby?.seats[SEAT]?.difficulty,
+      // …and each one takes effect through the flow, in this flavour.
+      expect(flowTapLobby(state, { kind: 'class', index: 0 }).state.lobby?.shipClass).not.toBe(
+        state.lobby?.shipClass,
       );
+      expect(flowTapLobby(state, { kind: 'map', index: 1 }).state.lobby?.mapId).not.toBe(state.lobby?.mapId);
+      expect(flowTapLobby(state, { kind: 'mode' }).state.lobby?.mode).toBe('teams');
+      expect(flowTapLobby(state, { kind: 'abundance' }).state.lobby?.abundance).not.toBe(
+        state.lobby?.abundance,
+      );
+      expect(flowTapLobby(state, { kind: 'seat', index: SEAT }).state.lobby?.seats[SEAT]?.occupant).toBe(
+        'bot',
+      );
+      expect(flowTapLobby(state, { kind: 'rush' }).state.lobby?.phase).toBe('counting');
+      expect(flowTapLobby(state, { kind: 'leave' }).state.screen).toBe('entry');
     });
   }
 

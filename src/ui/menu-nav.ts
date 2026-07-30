@@ -34,8 +34,10 @@
 export type NavScreen =
   /** The front door and the one true destination — a clean boot opens here. */
   | 'main-menu'
-  /** The ONLINE front door: PLAY SOLO / CREATE ROOM / JOIN ROOM / SETTINGS, and
-   *  now BACK (u2 menu-back). `src/ui/lobby-entry`, `screen: 'home'`. */
+  /** **The doors** — the one screen PLAY opens (ratified: one play flow): PLAY SOLO
+   *  / CREATE ROOM / JOIN ROOM, and BACK (u2 menu-back). `src/ui/lobby-entry`,
+   *  `screen: 'home'`. Kept named `online` because that is the screen id `main.ts`
+   *  and the `__mainMenu` seam already use. */
   | 'online'
   /** The room-code keypad reached by JOIN ROOM. `lobby-entry`, `screen: 'join'`. */
   | 'online-keypad'
@@ -43,9 +45,16 @@ export type NavScreen =
   | 'settings'
   /** The CODEX reference (GDD §2.10). */
   | 'codex'
-  /** The lobby: roster, ship-class select, MAP SELECT, mode/abundance, RUSH — and
-   *  now BACK (u2 menu-back). `src/ui/lobby`, drawn by `openLobby`. */
+  /** The lobby in its OFFLINE flavour (PLAY SOLO): roster, ship-class select, MAP
+   *  SELECT, mode/abundance, RUSH — and BACK (u2 menu-back). `src/ui/lobby`, drawn
+   *  by `openLobby` with no session. */
   | 'lobby'
+  /** The SAME lobby component, online (CREATE ROOM / JOIN ROOM): one screen, one
+   *  model, one view — plus the room code up top and live seats. It is a distinct
+   *  *node* here for one reason only: its BACK has a room to give back, so the exit
+   *  it owes is stronger than the offline one (close the socket, free the seat, let
+   *  the room deallocate — no ghost rooms). `openLobby` with a session. */
+  | 'lobby-online'
   /** A live match (including spectating after elimination). */
   | 'match'
   /** The pause overlay over a match: RESUME / SETTINGS / EXIT TO MENU. */
@@ -67,6 +76,7 @@ export const NAV_SCREENS: readonly NavScreen[] = [
   'settings',
   'codex',
   'lobby',
+  'lobby-online',
   'match',
   'pause',
   'pause-settings',
@@ -109,23 +119,30 @@ export interface NavEdge {
  * cares about the *return* edges, but a full graph reads as the map it is.
  */
 export const NAV_EDGES: readonly NavEdge[] = [
-  // --- Main menu → the four screens it opens (openMainMenu.onPointerDown) ------
-  { from: 'main-menu', to: 'online', via: 'ONLINE' },
+  // --- Main menu → the three screens it opens (openMainMenu.onPointerDown) -----
+  // PLAY is now the ONE door into a match, and what it opens is the doors screen
+  // (ratified: one play flow). It builds no world and no lobby of its own — the
+  // second front door that used to live here (ONLINE) is gone, and with it the
+  // offline-lobby shortcut that made PLAY redundant with PLAY SOLO.
+  { from: 'main-menu', to: 'online', via: 'PLAY' },
   { from: 'main-menu', to: 'settings', via: 'SETTINGS' },
   { from: 'main-menu', to: 'codex', via: 'CODEX' },
-  // PLAY builds the offline match's *lobby* first (openLobby) — the match itself
-  // does not begin until RUSH, so PLAY is a normal edge, not a match-start.
-  { from: 'main-menu', to: 'lobby', via: 'PLAY' },
 
-  // --- ONLINE front door (openMainMenu.applyEntryTarget / chooseEntryDoor) -----
+  // --- The doors (openMainMenu.applyEntryTarget / chooseEntryDoor) -------------
   // BACK leaves for the menu (closeOnline); Escape does the same on a pointer.
   { from: 'online', to: 'main-menu', via: 'BACK', escape: true },
   { from: 'online', to: 'online-keypad', via: 'JOIN ROOM' },
-  // PLAY SOLO drops into the offline lobby (chooseEntryDoor('solo') → play()).
+  // PLAY SOLO opens the lobby offline (chooseEntryDoor('solo') → play()).
   { from: 'online', to: 'lobby', via: 'PLAY SOLO' },
+  // CREATE ROOM opens the SAME lobby online, host flavour: the allocator mints the
+  // code, the socket opens, and the room's `welcome` hands the lobby the seat.
+  { from: 'online', to: 'lobby-online', via: 'CREATE ROOM' },
 
   // --- Room-code keypad (backToDoors / Escape) --------------------------------
   { from: 'online-keypad', to: 'online', via: 'BACK', escape: true },
+  // A submitted code joins the host's room and lands in the same lobby, guest
+  // flavour — the seats fill live, the map and mode read-only.
+  { from: 'online-keypad', to: 'lobby-online', via: 'JOIN ROOM (code)' },
 
   // --- Settings (closeSettings / Escape) --------------------------------------
   { from: 'settings', to: 'main-menu', via: 'DONE', escape: true },
@@ -133,9 +150,19 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // --- Codex (closeCodex / Escape / Backspace) --------------------------------
   { from: 'codex', to: 'main-menu', via: 'BACK', escape: true },
 
-  // --- Lobby (openLobby.act('leave') / Escape — u2 menu-back) -----------------
+  // --- Lobby, offline (openLobby.act('leave') / Escape — u2 menu-back) --------
   { from: 'lobby', to: 'main-menu', via: 'BACK', escape: true },
   { from: 'lobby', to: 'match', via: 'RUSH', startsMatch: true },
+
+  // --- Lobby, online (the same component; openLobby with a session) ------------
+  // BACK closes the socket BEFORE reloading onto the menu, so the seat is freed
+  // and an empty room deallocates — a lobby that leaked its room would leave a
+  // code the classroom can still type and nobody is behind (u2 item 4).
+  { from: 'lobby-online', to: 'main-menu', via: 'BACK', escape: true },
+  // The host's RUSH sends `startMatch`; a guest's match arrives when the host
+  // presses it. Both are match-starts, so neither counts as an exit.
+  { from: 'lobby-online', to: 'match', via: 'RUSH', startsMatch: true },
+  { from: 'lobby-online', to: 'match', via: '(host started)', startsMatch: true },
 
   // --- A live match → the pause overlay (ESC / the corner pause button) --------
   { from: 'match', to: 'pause', via: 'PAUSE', escape: true },
