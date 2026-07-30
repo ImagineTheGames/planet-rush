@@ -1,0 +1,352 @@
+{
+  "probe": "desktop-online-lobby",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-07-30T21:06:03.012Z",
+  "steps": [
+    {
+      "step": "01-main-menu",
+      "shot": "images/desktop-lobby-01-main-menu.png",
+      "mainMenu": {
+        "visible": true,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "idle",
+        "error": "",
+        "code": null
+      },
+      "lobby": null,
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "02-entry-screen",
+      "shot": "images/desktop-lobby-02-entry-screen.png",
+      "mainMenu": {
+        "visible": true,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": true,
+        "screen": "home",
+        "status": "idle",
+        "error": "",
+        "code": null
+      },
+      "lobby": null,
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "03-connecting",
+      "shot": "images/desktop-lobby-03-connecting.png",
+      "mainMenu": {
+        "visible": false,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "YQFF"
+      },
+      "lobby": {
+        "visible": true,
+        "room": "YQFF",
+        "online": true,
+        "isHost": true,
+        "humanCount": 1,
+        "counting": false,
+        "rush": {
+          "x": 640,
+          "y": 740
+        }
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "04-lobby-just-arrived",
+      "shot": "images/desktop-lobby-04-lobby-just-arrived.png",
+      "mainMenu": {
+        "visible": false,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "YQFF"
+      },
+      "lobby": {
+        "visible": true,
+        "room": "YQFF",
+        "online": true,
+        "isHost": true,
+        "humanCount": 1,
+        "counting": false,
+        "rush": {
+          "x": 640,
+          "y": 740
+        }
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "05-lobby-settled",
+      "shot": "images/desktop-lobby-05-lobby-settled.png",
+      "mainMenu": {
+        "visible": false,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "YQFF"
+      },
+      "lobby": {
+        "visible": true,
+        "room": "YQFF",
+        "online": true,
+        "isHost": true,
+        "humanCount": 1,
+        "counting": false,
+        "rush": {
+          "x": 640,
+          "y": 740
+        }
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "06-one-press-later",
+      "shot": "images/desktop-lobby-06-one-press-later.png",
+      "mainMenu": {
+        "visible": false,
+        "matchStarted": false
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "YQFF"
+      },
+      "lobby": {
+        "visible": true,
+        "room": "YQFF",
+        "online": true,
+        "isHost": true,
+        "humanCount": 1,
+        "counting": true,
+        "rush": {
+          "x": 640,
+          "y": 740
+        }
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    },
+    {
+      "step": "07-six-seconds-later",
+      "shot": "images/desktop-lobby-07-six-seconds-later.png",
+      "mainMenu": {
+        "visible": false,
+        "matchStarted": true
+      },
+      "onlineMenu": {
+        "visible": false,
+        "screen": "home",
+        "status": "connecting",
+        "error": "",
+        "code": "YQFF"
+      },
+      "lobby": {
+        "visible": false,
+        "room": "YQFF",
+        "online": true,
+        "isHost": true,
+        "humanCount": 1,
+        "counting": false,
+        "rush": {
+          "x": 640,
+          "y": 740
+        }
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800,
+        "display": "inline",
+        "visibility": "visible",
+        "opacity": "1"
+      },
+      "overlays": [
+        {
+          "tag": "DIV",
+          "id": "app",
+          "hidden": false,
+          "display": "block",
+          "z": "auto",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "console": [
+    "info: Planet Rush build 3d7cc6a built 2026-07-30T20:57:24.870Z",
+    "info: WebGL available: webgl2",
+    "warning: The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://goo.gl/7K7WLu",
+    "warning: [.WebGL-0x22ec017c4000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "warning: [.WebGL-0x22ec017c4000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "warning: [.WebGL-0x22ec017c4000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "warning: [.WebGL-0x22ec017c4000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+  ]
+}

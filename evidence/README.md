@@ -541,3 +541,106 @@ statically checkable, so it is now an ordinary check like the rest. Asked of Git
 directly at **15:44Z**: every `Deploy server (Fly.io)` run is still red through run
 30552080733, `origin/main` is still `927943a`, and PR #246 is the only open PR — no
 lane has a fix in flight for any of the five.
+
+---
+
+## M10 online close — the reconnect gate goes GREEN; the feel gate fails on one 5-second window (client and server both `3d7cc6a`)
+
+The two blockers this round was called on were both cleared upstream between
+20:18Z and 20:54Z, so for the first time this milestone the gates could be asked
+their real questions instead of a question about a defect.
+
+| Gate | Shot | Verdict |
+| --- | --- | --- |
+| Reconnect restores ship + cargo/bank/upgrades, live | `online-reconnect` | **verified** — all three thirds, twice, on two machines, read off authority's own frames |
+| Feel at real latency, quoted from the COPY LOG export | `online-feel` | **failed** — the front door works now and ordinary flight passes 6/6; the session still breaches three thresholds, all inside one post-death window |
+
+**Everything was one build.** `Deploy server (Fly.io)` for `3d7cc6a` went green at
+20:54Z (live `/health` uptime 88 s when the round started), the deployed client's
+`version.json` reads sha `3d7cc6a` built 20:57Z, and the repo is `3d7cc6a`. Server,
+client and source agree — the state this milestone spent two rounds without.
+
+### `online-reconnect` — the player buys her own tier now
+
+The third third was unprovable while `parseActions` had no `case 'upgradeOrder'`:
+every input tick carrying one was rejected whole, so no tier a player bought could
+exist on authority, and last round's nine live substitution windows trying to make
+a stand-in bot buy one instead came back empty. PR #250 landed the case. The new
+instrument (`online-close.live.test.ts`) therefore does the plain thing: docked at
+her own station, the player orders **CARGO tier 1** — cost 2, the cheapest rung in
+the ladder and the only one affordable out of `STARTING_ORE` — and authority's own
+`economy` frame acknowledges `tiers.cargo = 1, banked 1` at tick 12. She mines to
+`held 1`, and the socket is severed with no goodbye.
+
+Two runs, two different Fly machines. With **18 s** away (room `APWS`) the reclaim
+welcome carried `{held 0, banked 2.999999999999997, tiers.cargo 1}` — the stand-in
+had banked her hold and mined more, which is the stronger reading of GDD §4.2:
+what comes back is what authority holds *now*. With **1.5 s** away (room `3NXV`)
+it carried `{held 1, banked 1, tiers.cargo 1}` — byte for byte the wallet she left,
+which is the legible form of the cargo third. Both times: first dial, zero
+`joinError` frames past the drop, `playerSubstituted` and `playerReclaimed` seen by
+the peer, same seat, match resumed. The shipped client stamped the wire's wallet
+onto the ship it predicts from, `cargoCap` moving **2 → 4** — the derived stat
+follows the tier, so this is an upgrade and not a number in a field.
+
+Transcripts: `images/online-close-reconnect.json`, `-shortaway.json`. This is a
+**wire** attestation — raw frames off a live socket — not a photograph; no
+reclaimed HUD was put on screen.
+
+*Side-finding, flagged not attested:* authority's `banked` accumulates float error
+from mining (2.999999999999997 above). `spendOre` compares with a 1e-9 epsilon so
+purchases are fine, but `oreHudModel` **floors** for display — a player holding
+2.999999999999997 reads `TOTAL 2` while affording a 3-ore turret. Gameplay/UI's call.
+
+### `online-feel` — the front door is fixed, and the numbers still fail
+
+**RUSH! is pressable.** #251 moved the connect-trace narration into the connecting
+screen's title, and the panel that sat over the desktop lobby's RUSH! button is not
+in the document at all by the time the lobby is up. Measured three ways:
+`probe-desktop-lobby.mjs` clicked the button's own centre with a real mouse and
+watched it become a bare `3` and then a live arena
+(`images/desktop-lobby-0[5-7]-*.png`); the capture recorded `rushPressLanded: true`
+and **`rushViaSeam: false`** — last round's measurement needed the seam, this one
+never touched it; and both doors reached the lobby on the first attempt. The
+roster shot (`images/online-feel-pc-roster.png`) shows ROOM `GRJP` with P1 `YOU ★`
+and P2 `PLAYER 2` — two humans, six bots.
+
+Recorded rather than averaged away: **one desktop-online press in four did not
+start.** Four were made (21:03Z, 21:05Z, 21:07Z, 21:19Z); three began a match, and
+the 21:03Z one left `counting` and `matchStarted` both false with a flat black
+frame on screen (`images/rush-reach-attempt1-desktop-online.png`). Nothing was over
+the button in that run either, so it is not last round's defect returning; it is
+undiagnosed, on a headless swiftshader browser, and reported as observed.
+
+The scores, from the game's own COPY LOG exports: **host 3/6** (96 s, 2 883
+reconciles, RTT 617/1 203 ms — worst correction 253.453 u, mean 13.215 u, snaps 1)
+and **guest 3/6** (133 s, 3 987 reconciles, RTT 602/1 389 ms — worst 140.604 u,
+mean 5.476 u, snaps 1). Lead and misprediction pass on both (24 t mean, 34–36 t
+peak against 32 / 120), so the #244 ratchet is provably still gone.
+
+Every breaching second of both clients sits in **one ~5 s window**, and the two
+windows are in different places (host 47.8–52.7 s, guest 108.1–112.8 s). Outside
+them the host's other 90 s and the guest's other 127 s each score **6/6**. The
+guest's window holds a single correction value — 140.604 u, to three decimals,
+five seconds running. Re-measured live on this build (`respawn-tail.live.test.ts`,
+room `SEGX` → `images/online-close-respawn-tail.json`): 150 breaching reconciles
+across 4 963 ms, one error value 1 276.989 u, checkpoint frozen at home, authority
+frozen at the death site, `histHit` true and `resynced` false throughout. The cause
+is unchanged and is one absence — `ShipSnap` carries no `respawnTimer` and
+`applySnapshot` never restores one. The guest's log records **no death at all**
+across its own breach window, which is exactly what the defect predicts.
+
+Two defects handed back, neither QA's: the post-respawn divergence (**Netcode** —
+the single reason this gate is not green) and the COPY LOG button still mounting
+into `document.body` outside the `#app` subtree the landscape lock fullscreens, so
+a phone cannot press it (**Platform/UI**, re-checked at 21:14Z →
+`images/copylog-reach.json`).
+
+`images/online-feel-pc-rush-swallowed.png` is last round's artifact and was **not**
+reproduced this round; the run that would write it never happened.
+
+`recheck-online-blockers.mjs` now reports **4 of 6 clear** and names the two that
+stand. Its build-item detector was also fixed this round: #250 replaced the
+`BUILD_ITEMS` array literal with a `BUILD_ITEM_TABLE` record, and a check keyed on
+the old literal reported `satellite: ABSENT` for a verb that was right there — a
+false BLOCKED costs a round just as surely as a false CLEAR.
