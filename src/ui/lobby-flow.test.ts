@@ -640,7 +640,9 @@ describe('the whole front of a match, in one pass', () => {
     const drain = (result: FlowResult): void => {
       state = result.state;
       for (const effect of result.effects) {
-        log.push(effect.kind === 'open-transport' ? `open:${effect.intent.room}` : `send:${effect.message.type}`);
+        if (effect.kind === 'open-transport') log.push(`open:${effect.intent.room}`);
+        else if (effect.kind === 'send') log.push(`send:${effect.message.type}`);
+        else log.push('close');
       }
     };
 
