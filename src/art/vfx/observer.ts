@@ -71,6 +71,10 @@ export interface TiersView {
 /** What the observer reads off a ship. */
 export interface ShipView {
   readonly id: number;
+  /** The player's team (sim `Ship.team`). Optional and back-compatible: absent on
+   *  a pre-Teams snapshot, where every player is a team of one (`team ?? id`).
+   *  Read by the presenter to scope the under-attack alarm to a side, not a slot. */
+  readonly team?: number;
   readonly pos: PointView;
   readonly vel: PointView;
   readonly angle: number;
@@ -128,6 +132,10 @@ export interface BuildJobView {
 export interface StationView {
   readonly id: number;
   readonly owner: number;
+  /** The owning player's team (sim `MiningStation.team`). Optional and
+   *  back-compatible (`team ?? owner` = teams-of-one). The presenter reads it to
+   *  decide whose home damage rings the local alarm — your side's, never a foe's. */
+  readonly team?: number;
   readonly pos: PointView;
   readonly radius: number;
   readonly coreHp: number;

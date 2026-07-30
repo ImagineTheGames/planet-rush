@@ -1,0 +1,70 @@
+{
+  "desktop": {
+    "profile": "desktop",
+    "viewport": {
+      "w": 1000,
+      "h": 640,
+      "touch": false
+    },
+    "rotated": false,
+    "logicalViewport": {
+      "width": 1000,
+      "height": 640
+    },
+    "onlineButtonPhysical": {
+      "x": 500,
+      "y": 328
+    },
+    "afterOnlineScreen": "home",
+    "createDoorLogical": {
+      "x": 500,
+      "y": 322,
+      "width": 420,
+      "height": 56
+    },
+    "createDoorPhysical": {
+      "x": 500,
+      "y": 322
+    },
+    "connectingStatus": "connecting",
+    "settledStatus": "connecting",
+    "resolvedCode": "978P",
+    "error": "",
+    "shot": "/lanes/lane-2/evidence/images/online-create-desktop.png",
+    "pageErrors": []
+  },
+  "phone": {
+    "profile": "phone",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "touch": true
+    },
+    "rotated": true,
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "onlineButtonPhysical": {
+      "x": 188.75,
+      "y": 422
+    },
+    "afterOnlineScreen": "home",
+    "createDoorLogical": {
+      "x": 422,
+      "y": 193,
+      "width": 420,
+      "height": 43.333333333333336
+    },
+    "createDoorPhysical": {
+      "x": 197,
+      "y": 422
+    },
+    "connectingStatus": "connecting",
+    "settledStatus": "connecting",
+    "resolvedCode": "AGLS",
+    "error": "",
+    "shot": "/lanes/lane-2/evidence/images/online-create-phone.png",
+    "pageErrors": []
+  }
+}

@@ -948,6 +948,67 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(theirs.engine.alarm.active).toBe(false);
   });
 
+  it('scopes the alarm to a SIDE, not a slot — a teammate rings it, both enemies stay silent (TEAMS, s5)', () => {
+    // Local player is slot 0; its side is {0,2} (the sim's `sameSide` roster);
+    // the enemies own {1,3}. A home taking sustained fire rings the alarm iff its
+    // owner is on the local player's side.
+    const rings = (owner: number) => {
+      const { ctx, engine } = engineOn({ local: 0 });
+      engine.setAlarmScope(new Set([0, 2]), false);
+      const q = new TellQueue(4);
+      q.push(TELL.coreHit, 0, 0, 0, 0.5, owner);
+      run(engine, ctx, 1.5, () => engine.consume(q));
+      return engine.alarm.active;
+    };
+    expect(rings(0)).toBe(true); // your own home
+    expect(rings(2)).toBe(true); // a TEAMMATE's home — the developer-report fix
+    expect(rings(1)).toBe(false); // an enemy's home is never your klaxon
+    expect(rings(3)).toBe(false); // …and neither is the other enemy's
+  });
+
+  it("silences on a teammate's home death the same as your own — the klaxon never rings over a dead home (TEAMS, s5)", () => {
+    // The alarm rings for your SIDE {0,2}; whichever of those homes raised it,
+    // that home falling must stop it (`alarm.silence`) — else it keeps ringing
+    // over a station that no longer exists. The silence gate mirrors the ring gate.
+    const dies = (owner: number) => {
+      const { ctx, engine } = engineOn({ local: 0 });
+      engine.setAlarmScope(new Set([0, 2]), false);
+      const siege = new TellQueue(4);
+      siege.push(TELL.coreHit, 0, 0, 0, 0.5, owner);
+      run(engine, ctx, 1.5, () => engine.consume(siege)); // it is ringing…
+      expect(engine.alarm.active).toBe(true);
+      const death = new TellQueue(1);
+      death.push(TELL.stationDeath, 0, 0, 0, 1, owner);
+      engine.consume(death); // …the home falls
+      return engine.alarm.active;
+    };
+    expect(dies(0)).toBe(false); // your own home's death silences it (as ever)
+    expect(dies(2)).toBe(false); // a TEAMMATE's home death silences it too — the fix
+  });
+
+  it('does not let collapse core-entropy ring the alarm, but a real siege still does (GDD §2.3 vs §2.2)', () => {
+    // During collapse every core decays on its own — that is entropy, not an
+    // attacker (developer report s5, "alarm out of nowhere"). Core-hit tells the
+    // decay emits must stay silent…
+    const decay = engineOn({ local: 0 });
+    decay.engine.setAlarmScope(new Set([0]), true);
+    const core = new TellQueue(4);
+    core.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+    run(decay.engine, decay.ctx, 3, () => decay.engine.consume(core));
+    expect(decay.engine.alarm.active).toBe(false);
+
+    // …but shields and turrets do NOT decay, so a real attacker felling them
+    // during collapse is honest fire and rings the alarm exactly as ever.
+    const siege = engineOn({ local: 0 });
+    siege.engine.setAlarmScope(new Set([0]), true);
+    const falling = new TellQueue(4);
+    falling.push(TELL.shieldDown, 0, 0, 0, 1, 0);
+    falling.push(TELL.turretDown, 0, 0, 0, 1, 0);
+    siege.engine.consume(falling);
+    siege.engine.update(1 / 60);
+    expect(siege.engine.alarm.active).toBe(true);
+  });
+
   it('starts one alarm loop and ducks the ambience under it', () => {
     // Music off here so the loop count is just the two this test is about — the
     // soundtrack's own ducking has its own test below.

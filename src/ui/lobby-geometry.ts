@@ -182,15 +182,26 @@ export const CONTROLS_HEIGHT_TOUCH = 38;
  *  read as controls, not banners, on a wide desktop roster column. */
 export const CONTROL_MAX_WIDTH = 200;
 
-/** Width of a roster row's trailing chip — the TEAM chip in TEAMS, the difficulty
- *  chip in FFA. Carved off the RIGHT of the row, so a tap on the row's body still
- *  cycles the seat state and only the chip cycles the team/tier. */
+/** Width of a roster row's trailing DIFFICULTY chip — the bot-tier cycle
+ *  (EASY/MEDIUM/HARD). Carved off the RIGHT of the row in BOTH modes: it is the
+ *  one slot-editor control every mode shares, so a bot's tier is reachable in FFA
+ *  and TEAMS alike (n2 — the TEAMS lobby had lost it). A tap on the row's body
+ *  still cycles the seat state; only the chip cycles the tier. */
 export const SEAT_CHIP_WIDTH = 54;
 /** The chip never eats more than this share of a (narrow) row, so the state-cycle
  *  body — and the row's centre, which the hit-test contract taps — stays clear. */
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /** Inset of the chip from the row's edges. */
 export const SEAT_CHIP_PAD = 3;
+
+/** Width of a roster row's TEAM chip (TEAMS only) — a single side letter (A…D),
+ *  so it is narrow. It COMPOSES with the difficulty chip rather than replacing it
+ *  (n2): laid out immediately left of the difficulty chip and always kept strictly
+ *  right of the row's centre, so the row body stays tappable and the shared
+ *  difficulty control keeps its place. In FFA a seat's side is its slot
+ *  (teams-of-one), so the team chip is laid out but drawn away and a tap on it is a
+ *  no-op in the model — the geometry stays mode-blind, the flow routes by mode. */
+export const SEAT_TEAM_CHIP_WIDTH = 30;
 
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;
@@ -277,10 +288,14 @@ export interface LobbyLayout {
   readonly roomCode: Rect;
   /** The eight roster rows, in slot order, top to bottom. */
   readonly seats: readonly Rect[];
-  /** Each roster row's trailing chip (variable-slots E) — the TEAM chip in TEAMS,
-   *  the difficulty chip in FFA. Nested inside its {@link seats} row on the right,
-   *  so the hit-test checks it *before* the row body. Aligned to `seats`. */
+  /** Each roster row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH
+   *  modes (n2). Nested inside its {@link seats} row on the right, so the hit-test
+   *  checks it *before* the row body. Aligned to `seats`. */
   readonly seatChips: readonly Rect[];
+  /** Each roster row's TEAM chip (TEAMS) — the side cycle, composed immediately
+   *  left of the difficulty chip and kept right of the row centre (n2). Aligned to
+   *  `seats`; zero-extent where a very narrow row cannot spare the width. */
+  readonly seatTeamChips: readonly Rect[];
   /** The MODE toggle (FFA / TEAMS), top-left of the roster (variable-slots E). */
   readonly modeToggle: Rect;
   /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), top-right of the roster. */
@@ -318,9 +333,12 @@ export type LobbyTarget =
   | { readonly kind: 'leave' }
   /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E). */
   | { readonly kind: 'seat'; readonly index: number }
-  /** The row's trailing chip — the TEAM (TEAMS) or difficulty (FFA) cycle. The
-   *  geometry is mode-blind (it only knows there is a chip); the flow routes it. */
+  /** The row's trailing DIFFICULTY chip — the bot-tier cycle, present in BOTH
+   *  modes (n2). The flow routes it to the difficulty cycle in either mode. */
   | { readonly kind: 'seatChip'; readonly index: number }
+  /** The row's TEAM chip — the side cycle, TEAMS only (n2). Laid out in FFA too
+   *  (geometry stays mode-blind), where a tap on it is a model no-op. */
+  | { readonly kind: 'seatTeamChip'; readonly index: number }
   /** The MODE toggle (variable-slots E). */
   | { readonly kind: 'mode' }
   /** The ABUNDANCE toggle (variable-slots E). */
@@ -443,6 +461,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   };
   const seatColumns = placeSeats(seats, seatsBox, seatRowMax(isTouch));
   const seatChips = seats.map((rect) => chipRect(rect));
+  const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!));
   const mapColumns = placeMaps(maps, mapBand);
 
   return {
@@ -452,6 +471,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     roomCode,
     seats,
     seatChips,
+    seatTeamChips,
     modeToggle: controls.modeToggle,
     abundance: controls.abundance,
     classOptions,
@@ -494,6 +514,26 @@ function chipRect(seat: Rect): Rect {
 }
 
 /**
+ * A roster row's TEAM chip (TEAMS) — the side cycle that COMPOSES with the
+ * difficulty chip rather than replacing it (n2). It sits immediately left of the
+ * difficulty chip and its left edge is clamped strictly right of the row's centre,
+ * so a tap on the row body's centre still lands on the body ({@link lobbyHitTest}
+ * checks the chips first, so a tap *on* a chip wins). A very narrow row that cannot
+ * spare the width right of its centre yields a zero-extent chip — the difficulty
+ * control, the shared one, always keeps its place.
+ */
+function teamChipRect(seat: Rect, diffChip: Rect): Rect {
+  if (seat.width <= 0 || seat.height <= 0 || diffChip.width <= 0) {
+    return { x: seat.x, y: seat.y, width: 0, height: 0 };
+  }
+  const right = diffChip.x - SEAT_CHIP_PAD;
+  const centre = seat.x + seat.width / 2;
+  const left = Math.max(centre + SEAT_CHIP_PAD, right - SEAT_TEAM_CHIP_WIDTH);
+  const width = Math.max(0, right - left);
+  return { x: left, y: diffChip.y, width, height: diffChip.height };
+}
+
+/**
  * The target a tap at `(x, y)` hits, or `null` for a tap on nothing.
  *
  * Tested against the rects the frame was **drawn** at, never a second copy of
@@ -519,8 +559,13 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
   for (let i = 0; i < layout.seats.length; i++) {
-    // A row's trailing chip wins over its body: a tap on the chip cycles the
-    // team/tier, a tap anywhere else on the row cycles the seat state.
+    // A row's trailing chips win over its body: the difficulty chip cycles the
+    // bot's tier (both modes), the team chip to its left cycles the side (TEAMS);
+    // a tap anywhere else on the row cycles the seat state. Both chips sit strictly
+    // right of the row centre, so the centre — what the hit-test contract taps —
+    // is always the body.
+    const teamChip = layout.seatTeamChips[i];
+    if (teamChip && hit(teamChip, x, y)) return { kind: 'seatTeamChip', index: i };
     const chip = layout.seatChips[i];
     if (chip && hit(chip, x, y)) return { kind: 'seatChip', index: i };
     const rect = layout.seats[i];

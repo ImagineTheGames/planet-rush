@@ -1,0 +1,232 @@
+{
+  "probe": "reconnect",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T02:57:32.414Z",
+  "room": "G63N",
+  "machine": "6836293b5161d8",
+  "hostWelcomeDials": 1,
+  "bankedAtSpawn": 3,
+  "upgradeLanded": true,
+  "stampedBefore": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "substitutionSeenByPeer": true,
+  "trace": [
+    {
+      "ms": 1500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 3000,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 4500,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 6001,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 7503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 9003,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 10503,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 12004,
+      "state": "reconnecting",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 13505,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 15005,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 16505,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    },
+    {
+      "ms": 18005,
+      "state": "open",
+      "seat": 0,
+      "worldTick": 40,
+      "cargoTier": 1,
+      "saw": [
+        "welcome",
+        "lobbyState",
+        "matchStart",
+        "entityEvent",
+        "snapshot"
+      ]
+    }
+  ],
+  "aliceOpensAfterDrop": 3,
+  "aliceClosesAfterDrop": 3,
+  "joinErrorsPastDrop": 2,
+  "tickAtDrop": 40,
+  "tickAfterReclaim": 1266,
+  "afterReclaimAlice": {
+    "shipClass": "interceptor",
+    "banked": 3,
+    "cargo": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "reclaimedSameSeat": true,
+  "aliceSawReclaimBroadcast": true,
+  "bobSawReclaimBroadcast": true,
+  "aliceSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot",
+    "playerReclaimed"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot",
+    "playerSubstituted",
+    "playerReclaimed"
+  ],
+  "aliceState": "open",
+  "economyResetToSeedOnReclaim": true
+}

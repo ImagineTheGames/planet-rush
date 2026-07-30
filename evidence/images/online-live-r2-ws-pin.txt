@@ -1,0 +1,21 @@
+=== LIVE match-socket fly-replay machine-pin probe (QA r2, refreshed) ===
+when: 2026-07-30T02:28:57Z
+allocator: https://planet-rush-allocator.fly.dev  gameserver: wss://planet-rush-gameserver.fly.dev/play
+fleet: health machines=2, redeployed this session (uptimeSeconds ~700 at 02:26Z)
+method: allocate POST /rooms (201 JSON) -> dial wss /play?ticket=<ticket> -> JSON join -> first server frame
+
+#0 room=UJW2 ticketMachine=0800d5b6d62328 -> joinError:bad-ticket
+#1 room=3JYS ticketMachine=6836293b5161d8 -> joinError:bad-ticket
+#2 room=Y9KJ ticketMachine=0800d5b6d62328 -> joinError:bad-ticket
+#3 room=B753 ticketMachine=6836293b5161d8 -> joinError:bad-ticket
+#4 room=44VT ticketMachine=0800d5b6d62328 -> joinError:bad-ticket
+#5 room=ZQEZ ticketMachine=6836293b5161d8 -> joinError:bad-ticket
+#6 room=LSR3 ticketMachine=0800d5b6d62328 -> welcome
+#7 room=YJMK ticketMachine=6836293b5161d8 -> welcome
+#8 room=KSWL ticketMachine=0800d5b6d62328 -> joinError:bad-ticket
+#9 room=4775 ticketMachine=6836293b5161d8 -> joinError:bad-ticket
+#10 room=PKEW ticketMachine=0800d5b6d62328 -> welcome
+#11 room=JC97 ticketMachine=6836293b5161d8 -> joinError:bad-ticket
+
+SUMMARY: 3/12 welcome; 9/12 failed
+ticket machines seen: 0800d5b6d62328, 6836293b5161d8

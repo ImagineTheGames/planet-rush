@@ -935,10 +935,19 @@ describe('the ring layout (GDD §2.1)', () => {
     for (let t = 0; t < Math.round(3 / TICK_DT); t++) {
       step(world, thrust);
       const gap = Math.hypot(ship.pos.x - station.pos.x, ship.pos.y - station.pos.y);
+      // The whole point: it is stopped AT the surface and never tunnels inside,
+      // every tick, however long it presses — a solid body, not a curtain.
       expect(gap).toBeGreaterThanOrEqual(station.radius + ship.radius - 1e-6);
     }
-    // Still docked at the surface it bounced off, which is the point.
-    expect(isDocked(ship, station)).toBe(true);
+    // It never got INSIDE the body. It does NOT, however, sit pinned to the rim:
+    // a ship that keeps thrusting *into* a body is slid tangentially off it by the
+    // p14 anti-wedge floor (`WEDGE_SLIDE_*`, developer report p14 — no bot may
+    // grind motionless against its own station), so by now it has peeled away
+    // rather than grinding in place. The solid-body guarantee is the no-tunnel
+    // loop above; staying wedged is exactly what we no longer allow.
+    expect(
+      Math.hypot(ship.pos.x - station.pos.x, ship.pos.y - station.pos.y),
+    ).toBeGreaterThanOrEqual(station.radius + ship.radius - 1e-6);
   });
 
   it('two runs with orders, turret fire and repair deep-equal (GDD §4.8)', () => {

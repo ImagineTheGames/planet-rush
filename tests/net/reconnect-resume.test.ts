@@ -25,8 +25,10 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
+import { oreResidual } from '../../src/sim';
 import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
+import type { WelcomeMessage } from '../../src/net/transport';
 import type { WebSocketLike } from '../../src/net/websocket-transport';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 
@@ -64,7 +66,11 @@ describe('reconnect-resume', () => {
       transport: { connect: capturingConnect, retryBaseMs: 250, retryMaxMs: 250, reconnectWindowMs: 10_000 },
     });
     const aliceSaw: string[] = [];
-    alice.observe((m) => aliceSaw.push(m.type));
+    const aliceWelcomes: WelcomeMessage[] = [];
+    alice.observe((m) => {
+      aliceSaw.push(m.type);
+      if (m.type === 'welcome') aliceWelcomes.push(m);
+    });
     sessions.push(alice);
     await until('alice to be seated', () => harness.matches.room('RUSH') !== undefined);
 
@@ -90,11 +96,22 @@ describe('reconnect-resume', () => {
     const ship = room.world?.ships.find((s) => s.id === seat);
     if (!ship) throw new Error('no authoritative ship for alice');
     // Cargo and an upgrade, planted directly on authority: banked ore that a fresh
-    // spawn would not have, and a tier a fresh spawn would not carry.
+    // spawn would not have, and a tier a fresh spawn would not carry. Held cargo is
+    // left at zero on purpose — a ship parked at its home station auto-drains its
+    // hold into the bank (`__oreDepositStage`), which would creep `banked` off its
+    // forged value; the held-ore *channel* is proved by wire↔client equality below.
     ship.banked = 42;
     const track = Object.keys(ship.tiers)[0]!;
     (ship.tiers as Record<string, number>)[track] = 3;
     const stampedShip = ship;
+
+    // The conservation baseline, sampled AFTER the direct stamp (which mints ore
+    // off the ledger — this test forges a wallet rather than earning it). The
+    // reconnect must not move it a further inch: bot flight, substitution and
+    // reclaim are all conservation-neutral, so the residual is invariant across
+    // the whole cycle (`src/sim/ore-ledger`). A nonzero *delta* would mean the
+    // reclaim path minted or destroyed ore — the exact leak this guards.
+    const residualBaseline = oreResidual(room.world!);
 
     // --- The drop: sever the live socket, no goodbye ------------------------
     if (!aliceSocket) throw new Error('never captured alice’s socket');
@@ -121,5 +138,32 @@ describe('reconnect-resume', () => {
     expect(reclaimed?.shipClass).toBe(ShipClass.Interceptor);
     expect(reclaimed?.banked).toBe(42);
     expect((reclaimed?.tiers as Record<string, number>)[track]).toBe(3);
+
+    // --- The wallet rode the wire (QA m10 "economy-not-on-wire") -------------
+    // Server-authority identity is not enough: the *client* rebuilds a fresh,
+    // naked world on reclaim, and the streaming snapshot never carries cargo,
+    // bank or tiers (`src/net/snapshot`). The reclaim `welcome` must, so the
+    // reconnecting client is handed back the economy it earned (GDD §4.2). Bank
+    // and tier are the forged values; the hold rides its own field and is proved
+    // by the client↔wire equality below.
+    const reclaimWelcome = aliceWelcomes.at(-1);
+    expect(reclaimWelcome?.economy, 'reclaim welcome carries the wallet').toBeDefined();
+    expect(reclaimWelcome?.economy?.banked).toBe(42);
+    expect(reclaimWelcome?.economy?.tiers[track]).toBe(3);
+    expect(typeof reclaimWelcome?.economy?.held).toBe('number');
+
+    // ...and the client stamped every wallet field exactly as the wire delivered
+    // it — not a naked reclaim. Deterministic: this client sends no input after
+    // reclaim, and reconciliation never overwrites the wallet (`./prediction`).
+    const clientShip = alice.world?.ships.find((s) => s.id === seat);
+    expect(clientShip, 'client has a predicted ship for the reclaimed seat').toBeDefined();
+    expect(clientShip?.cargo).toBe(reclaimWelcome?.economy?.held);
+    expect(clientShip?.banked).toBe(42);
+    expect((clientShip?.tiers as Record<string, number>)[track]).toBe(3);
+
+    // --- Conservation holds across the reconnect ----------------------------
+    // The authoritative ledger's residual is exactly where it was before the
+    // drop: the substitution and reclaim moved no ore off the books.
+    expect(oreResidual(room.world!)).toBeCloseTo(residualBaseline, 6);
   }, 30_000);
 });

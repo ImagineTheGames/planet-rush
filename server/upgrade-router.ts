@@ -27,6 +27,7 @@
 
 import { verifyTicket } from '../src/net/ticket';
 import { FlyReplayRouter } from '../allocator/router';
+import type { UpgradeGuard } from './ws';
 
 /** What the upgrade router needs to decide: who am I, what's the key, what time is it. */
 export interface UpgradeRouterConfig {
@@ -56,6 +57,37 @@ export function replayForUpgrade(
   if (claims.machine === config.machineId) return null; // we host it — proceed
   // A bare router: same app, so no `app=`; no region in a ticket, so `instance=` alone.
   return new FlyReplayRouter().routeTo({ machine: claims.machine, region: '' }).headers;
+}
+
+/** The environment a Machine arms its upgrade guard from. Everything ambient is
+ *  passed in so the decision is a pure function of its inputs, not of the process. */
+export interface GuardEnv {
+  /** `MATCH_ROUTER` — `'fly'` behind the anycast edge, else direct/solo. */
+  readonly router: string | undefined;
+  /** This Machine's resolved id (`MACHINE_ID ?? FLY_MACHINE_ID`), '' if unknown. */
+  readonly machineId: string;
+  /** `TICKET_SECRET` — the shared allocator↔Machine key, absent on a solo server. */
+  readonly secret: string | undefined;
+  /** Epoch-ms clock the guard reads per decision. */
+  readonly now: () => number;
+}
+
+/**
+ * Build the pre-upgrade guard `server/index.ts` hands {@link attachWebSocketServer},
+ * or `undefined` to complete every upgrade locally. This is the gate the deploy
+ * config drives, and the one whose silent default cost 3/6 joins: the pin arms
+ * **only** behind a Fly edge (`router === 'fly'`) and only when this Machine both
+ * knows its own id and holds the ticket key — the same fail-closed rule as ticket
+ * enforcement. `MATCH_ROUTER` unset means `router` is not `'fly'`, so the guard is
+ * `undefined` and every wrong-machine upgrade completes locally → `bad-ticket`.
+ * `fly.gameserver.toml` MUST set `MATCH_ROUTER = "fly"` or the pin ships dead and
+ * the edge lottery stands (M10). Off Fly (the €4 VPS, solo, every direct-dial
+ * test) this is `undefined` by design, and the upgrade completes here as before.
+ */
+export function armReplayGuard(env: GuardEnv): UpgradeGuard | undefined {
+  if (env.router !== 'fly' || env.secret === undefined || env.machineId === '') return undefined;
+  const { secret, machineId, now } = env;
+  return (request) => replayForUpgrade(request.url, { machineId, secret, now });
 }
 
 /** Pull the `ticket` query param off an upgrade URL, or `null` if there is none

@@ -171,6 +171,9 @@ describe('server → client', () => {
       { type: 'playerSubstituted', player: 5, graceSeconds: 60 },
       { type: 'playerReclaimed', player: 5 },
       { type: 'matchEnd', winner: 3, tick: 44_100 },
+      // A refused join must survive the round trip, or the transport cannot tell a
+      // rejection from a plain drop and spins the reconnect loop forever (M10).
+      { type: 'joinError', reason: 'bad-ticket' },
     ];
 
     for (const message of messages) {

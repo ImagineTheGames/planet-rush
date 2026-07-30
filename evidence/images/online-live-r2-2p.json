@@ -1,0 +1,75 @@
+{
+  "probe": "two-clients",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T02:57:09.949Z",
+  "hostConnection": {
+    "room": "5Z63",
+    "machine": "0800d5b6d62328",
+    "url": "wss://planet-rush-gameserver.fly.dev/play"
+  },
+  "hostWelcomeDials": 2,
+  "joinerConnection": {
+    "room": "5Z63",
+    "machine": "0800d5b6d62328"
+  },
+  "joinerWelcomeDials": 4,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "roster": [
+    {
+      "id": 0,
+      "shipClass": "interceptor"
+    },
+    {
+      "id": 1,
+      "shipClass": "hauler"
+    },
+    {
+      "id": 2,
+      "shipClass": "hauler"
+    },
+    {
+      "id": 3,
+      "shipClass": "interceptor"
+    },
+    {
+      "id": 4,
+      "shipClass": "excavator"
+    },
+    {
+      "id": 5,
+      "shipClass": "hauler"
+    },
+    {
+      "id": 6,
+      "shipClass": "interceptor"
+    },
+    {
+      "id": 7,
+      "shipClass": "vanguard"
+    }
+  ],
+  "asteroidsAlice": 48,
+  "asteroidsBob": 48,
+  "shipsAlice": 8,
+  "shipsBob": 8,
+  "tickAlice": 184,
+  "tickBob": 184,
+  "bobMovedOnAlicesScreen": -237.05800795126834,
+  "crossClientShipDistance": 0,
+  "aliceLastError": 0,
+  "aliceSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot"
+  ]
+}

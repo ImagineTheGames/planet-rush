@@ -51,6 +51,9 @@ import {
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
+  WEDGE_SLIDE_SPEED,
+  WEDGE_SLIDE_KICK,
+  WEDGE_CONTACT_S,
 } from './constants';
 import {
   buyUpgrade,
@@ -236,11 +239,18 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 4. Broad phase over the (static) asteroid field, reused by collision + shots.
   const hash = SpatialHash.from(world.asteroids.map((a) => a.pos), HASH_CELL_SIZE);
 
-  // 5. Ship-vs-asteroid and ship-vs-station reflection (GDD §4.1).
+  // 5. Ship-vs-asteroid and ship-vs-station reflection (GDD §4.1), then the
+  //    persistent-grind escape hatch (developer report p14): a hull pressed into
+  //    a body and held near-still by it accrues grind-time; once it crosses
+  //    `WEDGE_CONTACT_S` it is slid off the rim so it can never stay pinned. The
+  //    contact accumulator is reused across ships to keep the loop allocation-free.
+  const contact: WedgeContact = { pressedIn: false, nx: 0, ny: 0 };
   for (const ship of world.ships) {
     if (!ship.alive) continue;
-    reflectOffAsteroids(ship, world.asteroids, hash);
-    reflectOffStations(ship, world);
+    contact.pressedIn = false;
+    reflectOffAsteroids(ship, world.asteroids, hash, contact);
+    reflectOffStations(ship, world, contact);
+    updateWedgeEscape(ship, contact, dt);
   }
 
   // 6. Facing — one priority ladder per ship, always turn-rate-limited. The
@@ -435,27 +445,41 @@ function turnToward(angle: number, target: number, maxDelta: number): number {
 // Ship-vs-asteroid reflection (narrow phase: dx²+dy² < (r1+r2)², no sqrt until hit)
 // ---------------------------------------------------------------------------
 
-function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHash): void {
+/** The grind a ship suffered against a body this tick, filled by the reflection
+ *  pass for the escape hatch (`updateWedgeEscape`): whether it pressed *into* a
+ *  body (`vn < 0` on some contact) and the outward normal of that contact. One
+ *  instance is reused per tick, so the collision path allocates nothing. */
+interface WedgeContact {
+  pressedIn: boolean;
+  /** Outward contact normal of the pressed-into body (unit). */
+  nx: number;
+  ny: number;
+}
+
+function reflectOffAsteroids(ship: Ship, asteroids: Asteroid[], hash: SpatialHash, contact: WedgeContact): void {
   const candidates = hash.query(ship.pos, ship.radius + ASTEROID.maxRadius);
   for (const idx of candidates) {
     const a = asteroids[idx];
     if (!a) continue;
-    reflectOffCircle(ship, a.pos, a.radius);
+    reflectOffCircle(ship, a.pos, a.radius, contact);
   }
 }
 
 /** Stations are solid bodies too — you dock *at* your world, you do not fly
  *  through it. Same contact response as a rock (GDD §4.1: every colliding body
  *  is a circle); the shield bubble is energy and is not a collider. */
-function reflectOffStations(ship: Ship, world: World): void {
+function reflectOffStations(ship: Ship, world: World, contact: WedgeContact): void {
   for (const station of world.stations) {
-    reflectOffCircle(ship, station.pos, station.radius);
+    reflectOffCircle(ship, station.pos, station.radius, contact);
   }
 }
 
 /** Push a ship out of an intersecting circle and reflect the normal component of
- *  its velocity. No sqrt until a contact is confirmed. */
-function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
+ *  its velocity. No sqrt until a contact is confirmed. Records an inward press
+ *  into `contact` for the persistent-grind escape hatch (`updateWedgeEscape`,
+ *  developer report p14) — this function no longer touches velocity beyond the
+ *  reflection, so a momentary touch is byte-for-byte the pre-p14 response. */
+function reflectOffCircle(ship: Ship, center: Vec2, radius: number, contact: WedgeContact): void {
   const rr = ship.radius + radius;
   const d2 = dist2(ship.pos, center);
   if (d2 >= rr * rr) return;
@@ -473,7 +497,52 @@ function reflectOffCircle(ship: Ship, center: Vec2, radius: number): void {
     const j = (1 + SHIP_ASTEROID_RESTITUTION) * vn;
     ship.vel.x -= j * nx;
     ship.vel.y -= j * ny;
+    // Pressed *into* this body — the grind that, if it persists, wedges the hull.
+    // Record it (and its normal) for the escape hatch; the last pressed-into body
+    // this tick wins, which for the single-body pin the report photographed is
+    // exactly that body.
+    contact.pressedIn = true;
+    contact.nx = nx;
+    contact.ny = ny;
   }
+}
+
+/**
+ * The in-sim wedge escape hatch (developer report p14). A ship whose steering
+ * keeps aiming *through* a body — an arrival point at or inside its collision
+ * radius — presses in every tick and the reflection kills that push, so it is
+ * ground to near-stillness against the surface and, with no tangential velocity
+ * for a pure radial press to preserve, stays there. The bot-side net-progress
+ * detector cannot see it (a home-bound bot decelerating onto its station reports
+ * a low throttle it reads as arrival), so the guarantee is made here, off the
+ * sim's own ground truth, for EVERY ship against EVERY solid body.
+ *
+ * It gates on *persistent* grind, not any contact: while a ship is both pressing
+ * into a body and held below `WEDGE_SLIDE_SPEED` by it, `wedgeContactS` counts up;
+ * any tick it breaks contact or gets moving, it resets. Only past `WEDGE_CONTACT_S`
+ * — a genuine pin, not a bounce — does it earn a deterministic tangential slide
+ * along the surface (counter-clockwise about the outward normal, fixed handedness:
+ * no RNG, no clock). The slide walks the pinned hull off the rim; the pilot's
+ * steering then re-approaches from open space. The kick RAMPS to zero as speed
+ * nears the threshold, so it self-limits and reads as a slide, not a launch, and
+ * drag bleeds it the instant the press stops. Leaving a momentary touch on the
+ * pre-p14 path (no shove) is what keeps the netcode's snapshot-quantized
+ * prediction convergent (`src/net/prediction`; `WEDGE_CONTACT_S`).
+ */
+function updateWedgeEscape(ship: Ship, contact: WedgeContact, dt: number): void {
+  const sp = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);
+  if (!contact.pressedIn || sp >= WEDGE_SLIDE_SPEED) {
+    ship.wedgeContactS = 0;
+    return;
+  }
+  const held = (ship.wedgeContactS ?? 0) + dt;
+  ship.wedgeContactS = held;
+  if (held < WEDGE_CONTACT_S) return;
+
+  const kick = WEDGE_SLIDE_KICK * (1 - sp / WEDGE_SLIDE_SPEED);
+  // Tangent = outward normal rotated +90° (CCW): (-ny, nx).
+  ship.vel.x += -contact.ny * kick;
+  ship.vel.y += contact.nx * kick;
 }
 
 // ---------------------------------------------------------------------------
@@ -960,4 +1029,5 @@ function respawn(ship: Ship): void {
   ship.respawnTimer = 0;
   ship.spawnProtect = SPAWN_PROTECTION_S;
   ship.weaponCooldown = 0;
+  ship.wedgeContactS = 0; // a fresh hull at home is not mid-grind (p14).
 }

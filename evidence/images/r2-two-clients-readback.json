@@ -1,0 +1,47 @@
+{
+  "steps": [
+    {
+      "step": "host created",
+      "code": "KHVW",
+      "status": "connecting"
+    },
+    {
+      "step": "joiner typed"
+    },
+    {
+      "step": "joiner submitted",
+      "joiner": {
+        "gone": false,
+        "visible": true,
+        "screen": "join",
+        "status": "connecting",
+        "resolvedCode": "KHVW",
+        "error": ""
+      }
+    },
+    {
+      "step": "after rush",
+      "hostSeam": {
+        "gone": false,
+        "visible": true,
+        "screen": "home",
+        "status": "connecting",
+        "resolvedCode": "KHVW",
+        "error": ""
+      },
+      "joinerSeam": {
+        "gone": false,
+        "visible": true,
+        "screen": "join",
+        "status": "connecting",
+        "resolvedCode": "KHVW",
+        "error": ""
+      }
+    }
+  ],
+  "hostCode": "KHVW",
+  "hostShot": "/lanes/lane-2/evidence/images/online-two-clients-host.png",
+  "joinerShot": "/lanes/lane-2/evidence/images/online-two-clients-joiner.png",
+  "hostErrors": [],
+  "joinerErrors": []
+}

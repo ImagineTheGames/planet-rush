@@ -35,6 +35,19 @@ primary_region = "iad"
   # Identity (MACHINE_ID / REGION) is left unset on purpose: server/heartbeat.ts
   # falls back to Fly's own FLY_MACHINE_ID / FLY_REGION, which Fly injects into
   # every Machine at runtime. One less thing to keep in sync per Machine.
+  #
+  # Arm the socket-hop machine-pin (M10). Behind Fly's anycast edge a client dials
+  # one shared hostname and the edge lands the WS upgrade on *some* Machine — a coin
+  # flip that landed on the wrong one 3/6 of the time in the Director's wire probe,
+  # each miss a `joinError: bad-ticket`. With this set, server/index.ts arms the
+  # `beforeUpgrade` guard (server/upgrade-router.ts): a wrong-Machine upgrade is
+  # answered with `fly-replay instance=<host>` *before* the handshake, so the edge
+  # re-delivers it to the Machine the room's ticket names. The allocator side of the
+  # same seam is already armed (fly.allocator.toml ALLOCATOR_ROUTER = "fly"); this is
+  # the missing half — without it the pin code ships but never fires, and the lottery
+  # stands. Off Fly (the €4 VPS, solo, every direct-dial test) this is simply unset
+  # and every upgrade completes locally, exactly as before.
+  MATCH_ROUTER = "fly"
 
 [http_service]
   internal_port = 8080
