@@ -280,6 +280,28 @@ export class TransportSession implements MatchSession {
     return this.interpolator;
   }
 
+  /**
+   * Why the transport closed, when the concrete transport says so
+   * (`./websocket-transport` `CloseReason`: a deliberate leave, a dead room, a spent
+   * grace window, a refused join). Null offline, and null while still connected.
+   *
+   * Read structurally rather than by importing the concrete class, because that is
+   * exactly the seam `Transport` exists to keep: a session works over any transport,
+   * and the two that carry a reason are welcome to say so without the interface
+   * growing a field a `LocalLoopback` would have to fake. Surfaced for the reconnect
+   * banner and for the playtest log, which must record *why* a socket ended
+   * (`./playtest-log-attach`).
+   */
+  get closeReason(): string | null {
+    return readOptionalString(this.transport, 'closeReason');
+  }
+
+  /** The server's stated reason for refusing a join, or null. Same structural read
+   *  as {@link closeReason}; meaningful alongside `closeReason === 'join-rejected'`. */
+  get rejectReason(): string | null {
+    return readOptionalString(this.transport, 'rejectReason');
+  }
+
   sampleRemotes(): readonly InterpolatedShip[] {
     return this.interpolator?.sample(this.clock()) ?? [];
   }
@@ -451,6 +473,13 @@ export interface OnlineSessionConfig {
   readonly transport?: Omit<WebSocketTransportConfig, 'url' | 'room'>;
 }
 
+/** Read a named optional string property off a transport, or null when it does not
+ *  carry one (the `LocalLoopback` case). Never throws on a transport that lacks it. */
+function readOptionalString(transport: unknown, key: string): string | null {
+  const value = (transport as Record<string, unknown> | null)?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 /** An online session, with the two lobby gestures a room needs. */
 export interface OnlineSession extends MatchSession {
   /** Re-send the lobby choice (hull, fire mode, bot difficulties). */
@@ -463,6 +492,12 @@ export interface OnlineSession extends MatchSession {
   startMatch(): void;
   /** Watch the protocol: lobby state, the reconnect-grace pair, match end. */
   observe(handler: (message: ServerMessage) => void): void;
+  /** Why the socket closed, once it has — a deliberate leave, a dead room, a spent
+   *  grace window, or a refused join. Null while connected (`./websocket-transport`
+   *  `CloseReason`). */
+  readonly closeReason: string | null;
+  /** The server's own reason for refusing the join, or null. */
+  readonly rejectReason: string | null;
 }
 
 /**
