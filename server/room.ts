@@ -33,7 +33,7 @@
  * amendment).
  */
 
-import type { PlayerId } from '@shared/types';
+import type { Action, PlayerId } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import type { Bot } from '../src/bots';
 import {
@@ -167,7 +167,28 @@ interface Slot {
    * makes "otherwise" the common case.
    */
   wallet: PlayerEconomy | null;
+  /**
+   * The client order ids from this slot the world has already simulated — the
+   * per-slot idempotence table (`@shared/types` `OrderId`, {@link MatchRoom.consumeOrders}).
+   *
+   * An array rather than a `Set` because it is a *ring*: bounded at
+   * {@link ORDER_MEMORY} so a match cannot grow it, and read with `includes`, which
+   * on a few dozen entries is faster than the hashing a `Set` would do. Cleared when
+   * the seat changes hands, because a returning client's ids are its own.
+   */
+  orders: number[];
 }
+
+/**
+ * How many of a slot's recent order ids are remembered for the idempotence check.
+ *
+ * The window has to outlive every path that can re-say an order: a TCP retransmit
+ * (one RTT), a late message re-filed onto the next tick, and a client replaying an
+ * unacknowledged press. All of those are round-trip-scale, and a player cannot tap a
+ * wheel more than a few times a second, so 64 ids is many seconds of the fastest
+ * plausible tapping — while staying a hard bound a hostile client cannot grow.
+ */
+export const ORDER_MEMORY = 64;
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -260,6 +281,7 @@ export class MatchRoom {
       ackSeq: 0,
       fog: null,
       wallet: null,
+      orders: [],
     }));
   }
 
@@ -393,6 +415,14 @@ export class MatchRoom {
     slot.difficulty = null;
     slot.ready = true;
     slot.fog = new FogTracker(slot.player);
+    // New hands, and possibly a new input counter: a client that rebuilt its
+    // session numbers its input from 1 again, and an `ackSeq` left high from before
+    // the drop would then read every one of its presses as "already simulated" and
+    // drop them forever (`acceptInput`). The seat's ack restarts with the seat.
+    slot.ackSeq = 0;
+    // Orders from the connection that left are answered for; a returning client
+    // mints fresh ids and must not collide with a table it never saw.
+    slot.orders.length = 0;
 
     this.welcome(slot);
     // Sixty seconds is long enough for the field to have changed underneath
@@ -482,8 +512,35 @@ export class MatchRoom {
    * far better lie than the ship forgetting the player pressed anything. The
    * re-filed message keeps its `seq`, so it is acknowledged when it is *run*,
    * one tick later than the client asked for — which is the truth.
+   *
+   * ── WHERE THE THIRD TURRET CAME FROM (M10 action-echo, developer playtest) ──
+   *
+   * That softening is also a **redelivery amplifier**, and it is the wire-side half
+   * of *"I built 2 but 3 got built."* `InputQueue` dedupes on `(player, tick)`, so a
+   * second copy of a message is caught only while it still names the tick the first
+   * copy named. Re-filing a late message onto `simTick + 1` gives it a *different*
+   * tick — which is exactly what makes the queue's duplicate check miss it. A
+   * message whose actions the sim has already run therefore runs a second time, and
+   * a `buildOrder` is a one-shot verb: the second run is a second turret, bought
+   * and paid for, from one tap.
+   *
+   * So the seq is the gate, before the re-file and before the queue. `ackSeq` is
+   * already the newest input from this slot the world has **actually simulated**
+   * (`inputsFor`), which makes `seq <= ackSeq` the precise statement "these actions
+   * have already happened". Such a message is dropped whole rather than re-filed:
+   * there is nothing in it left to run, and holding its thrust would only steer the
+   * ship with a stale stick.
+   *
+   * This is a *transport-level* guard and it is deliberately not the only one. It
+   * cannot help an order redelivered under a fresh seq, and it cannot help the
+   * client's own reconcile replaying a press — so the identified order carries its
+   * own idempotence as well ({@link consumeOrders}). Two locks, because the failure
+   * they prevent costs the player ore.
    */
   private acceptInput(slot: Slot, message: InputMessage): void {
+    // Already simulated — every action in it has had its effect. Dropped, never
+    // re-filed: re-filing is what turned a retransmit into a second turret.
+    if (message.seq <= slot.ackSeq) return;
     const simTick = this.authoritative?.tick ?? 0;
     const verdict = this.queue.accept(slot.player, message, simTick);
     if (verdict === 'late') this.queue.accept(slot.player, { ...message, tick: simTick + 1 }, simTick);
@@ -574,10 +631,22 @@ export class MatchRoom {
     for (let i = 0; i < ticks && this.phase === 'live'; i++) this.tick(world);
   }
 
-  /** One fixed sim tick: gather the ordered input, step, broadcast. */
+  /** One fixed sim tick: gather the ordered input, step, broadcast.
+   *
+   *  The one wrinkle is the order echo (`src/net/transport` OrderEchoMessage): an
+   *  identified order's *outcome* is only knowable by looking at the world either
+   *  side of the `step()` that ran it, so the reading is taken here, where both
+   *  sides exist, and nowhere else. It costs one small object per ordering player
+   *  on the ticks somebody actually presses a wheel, and nothing at all otherwise —
+   *  which is almost every tick. */
   private tick(world: World): void {
-    step(world, this.inputsFor(world), this.dt);
+    const rows = this.inputsFor(world);
+    const orders = collectOrders(rows);
+    const before = orders.length > 0 ? readOutcomeStates(world, orders) : null;
 
+    step(world, rows, this.dt);
+
+    if (before) this.echoOrders(world, orders, before);
     if (world.tick % this.snapshotInterval === 0) this.broadcastSnapshot(world);
     if (world.tick % this.eventInterval === 0) {
       for (const event of this.statics.diff(world)) this.broadcast(event);
@@ -615,10 +684,12 @@ export class MatchRoom {
     }
     for (const row of this.queue.take(nextTick)) {
       if (botSeats.has(row.id)) continue; // a substitute's seat ignores its human
-      rows.push(row);
+      const slot = this.slots[row.id];
+      // Strip any identified order this slot has already had simulated — the
+      // idempotence rule (below). Everything else in the tick still flies.
+      rows.push(slot ? { ...row, actions: this.consumeOrders(slot, row.actions) } : row);
       // This input is about to be simulated, so this is the moment it becomes
       // true to tell its client "I have run this" (GDD §4.2 reconciliation).
-      const slot = this.slots[row.id];
       if (slot && row.seq > slot.ackSeq) slot.ackSeq = row.seq;
     }
 
@@ -626,6 +697,105 @@ export class MatchRoom {
     // order — the property the determinism replay rests on (GDD §4.8).
     rows.sort((a, b) => a.id - b.id);
     return rows;
+  }
+
+  // --- Idempotent orders (M10 action-echo) --------------------------------
+
+  /**
+   * **N taps buy exactly N things, however many times the wire says them.**
+   *
+   * One tick's actions, with every identified order this slot has already had
+   * simulated removed. The developer's playtest reported two taps buying three
+   * turrets; this is the lock that makes that arithmetic impossible, and it is a
+   * lock on *identity* rather than on timing, which is why it holds where the input
+   * queue's `(player, tick)` duplicate check cannot:
+   *
+   *  - a TCP retransmit of a message whose tick has since been simulated (the
+   *    re-file in {@link acceptInput} gives it a fresh tick, so the queue sees a
+   *    first arrival);
+   *  - the same press arriving under two sequence numbers;
+   *  - anything a future transport does that today's does not.
+   *
+   * An order with **no** id is passed through untouched. That is the compatibility
+   * contract of the optional field (`@shared/types` `OrderId`): a bot orders through
+   * the same action interface a human does (GDD §2.9) and mints no ids, an offline
+   * `LocalLoopback` has no wire to duplicate anything on, and neither may be made to
+   * stop working by a rule aimed at the socket.
+   *
+   * Allocates only on the ticks an identified order actually arrives, and only when
+   * one is actually dropped — the returned array is the caller's own on every other
+   * tick.
+   */
+  private consumeOrders(slot: Slot, actions: readonly Action[]): readonly Action[] {
+    let kept: Action[] | null = null;
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i]!;
+      const orderId = orderIdOf(action);
+      if (orderId === null) {
+        kept?.push(action);
+        continue;
+      }
+      if (slot.orders.includes(orderId)) {
+        // The first copy of this order stands; this one is a redelivery. Split the
+        // array here, once, keeping everything decided so far.
+        kept ??= actions.slice(0, i);
+        continue;
+      }
+      slot.orders.push(orderId);
+      if (slot.orders.length > ORDER_MEMORY) slot.orders.shift();
+      kept?.push(action);
+    }
+    return kept ?? actions;
+  }
+
+  /**
+   * Tell each ordering client what authority did with its order — accepted or
+   * refused, on which tick, and what it queued (`src/net/transport`
+   * OrderEchoMessage).
+   *
+   * The outcome is *observed*, not reported by the sim: `step()` resolves orders
+   * internally and returns nothing, and reaching into `src/sim/` to change that
+   * would be this lane writing in another lane's file. So the world is read either
+   * side of the step and the difference is the answer — which is also the honest
+   * definition of "did it happen", and it stays true if the sim's refusal reasons
+   * ever change.
+   *
+   * A player who fires two orders inside one 16 ms tick is the one ambiguous case:
+   * queued build jobs are attributed in id order (the order the sim created them),
+   * and non-spawning orders share the one wallet/core reading. The tie is broken
+   * toward `accepted`, because the cost of a wrong refusal is taking away something
+   * the player paid for, and the cost of a wrong acceptance is one TTL of a stale
+   * prediction that the next entity event corrects anyway.
+   */
+  private echoOrders(world: World, orders: readonly IssuedOrder[], before: OutcomeStates): void {
+    const after = readOutcomeStates(world, orders);
+    for (const order of orders) {
+      const slot = this.slots[order.player];
+      if (!slot?.socket) continue;
+      const was = before.get(order.player);
+      const now = after.get(order.player);
+      if (!was || !now) continue;
+
+      // A build job the step created and this player has not been told about yet:
+      // the lowest such id, so two orders on one tick take them in creation order.
+      let build: { id: number; remaining: number; total: number } | undefined;
+      for (const job of now.builds) {
+        if (was.buildIds.includes(job.id) || before.claimed.includes(job.id)) continue;
+        before.claimed.push(job.id);
+        build = { id: job.id, remaining: job.remaining, total: job.total };
+        break;
+      }
+
+      this.sendTo(slot, {
+        type: 'orderEcho',
+        player: order.player,
+        orderId: order.orderId,
+        // Something was queued, or something the order could have moved did move.
+        accepted: build !== undefined || !sameOutcomeState(was, now),
+        tick: world.tick,
+        ...(build ? { build } : {}),
+      });
+    }
   }
 
   // --- Bots ---------------------------------------------------------------
@@ -780,6 +950,115 @@ export class MatchRoom {
   private sendTo(slot: Slot, message: ServerMessage): void {
     slot.socket?.send(encodeServerMessage(message));
   }
+}
+
+// ---------------------------------------------------------------------------
+// Order outcomes — what a step actually did with an identified order
+// ---------------------------------------------------------------------------
+
+/** One identified order simulated on this tick, and who sent it. */
+interface IssuedOrder {
+  readonly player: PlayerId;
+  readonly orderId: number;
+}
+
+/**
+ * The client sequence id an action carries, or null when it carries none (every
+ * verb but the two one-shot orders, and an order from a sender that mints no ids).
+ */
+function orderIdOf(action: Action): number | null {
+  if (action.type !== 'buildOrder' && action.type !== 'upgradeOrder') return null;
+  return typeof action.orderId === 'number' ? action.orderId : null;
+}
+
+/** Every identified order in one tick's rows, in the sim's own resolution order. */
+function collectOrders(rows: readonly PlayerInput[]): readonly IssuedOrder[] {
+  let out: IssuedOrder[] | null = null;
+  for (const row of rows) {
+    for (const action of row.actions) {
+      const orderId = orderIdOf(action);
+      if (orderId !== null) (out ??= []).push({ player: row.id, orderId });
+    }
+  }
+  return out ?? NO_ORDERS;
+}
+
+const NO_ORDERS: readonly IssuedOrder[] = Object.freeze([]);
+
+/**
+ * Everything one order could have moved, read off the world in one pass — the
+ * before/after pair whose difference *is* the order's outcome.
+ *
+ * Deliberately a wide net rather than a per-item check. TURRET queues a job *or*
+ * steps a standing turret's mark; REPAIR moves core HP; BANK and UPGRADE SHIP move
+ * the wallet; every one of them spends. Watching all of it means this reading does
+ * not have to know which order it is watching, and stays right if the wheel grows a
+ * sixth segment.
+ */
+interface OutcomeState {
+  readonly buildIds: number[];
+  readonly builds: readonly { readonly id: number; readonly remaining: number; readonly total: number }[];
+  readonly cargo: number;
+  readonly banked: number;
+  readonly coreHp: number;
+  /** Sum of standing turret marks — the TURRET wedge's upgrade branch, which
+   *  queues nothing and so would otherwise read as a refusal. */
+  readonly turretTiers: number;
+  /** Sum of ship upgrade tiers — the UPGRADE SHIP panel's row press. */
+  readonly shipTiers: number;
+}
+
+/** The per-player readings for one tick, plus the build ids already handed to an
+ *  echo (so two orders on one tick cannot both claim the same job). */
+interface OutcomeStates {
+  get(player: PlayerId): OutcomeState | undefined;
+  readonly claimed: number[];
+}
+
+function readOutcomeStates(world: World, orders: readonly IssuedOrder[]): OutcomeStates {
+  const map = new Map<PlayerId, OutcomeState>();
+  for (const order of orders) {
+    if (map.has(order.player)) continue;
+    map.set(order.player, readOutcomeState(world, order.player));
+  }
+  return { get: (player) => map.get(player), claimed: [] };
+}
+
+function readOutcomeState(world: World, player: PlayerId): OutcomeState {
+  const station = world.stations.find((s) => s.owner === player);
+  const ship = world.ships.find((s) => s.id === player);
+  let turretTiers = 0;
+  for (const turret of station?.turrets ?? []) turretTiers += turret.tier ?? 0;
+  let shipTiers = 0;
+  for (const tier of Object.values(ship?.tiers ?? {})) shipTiers += tier;
+  const builds = (station?.builds ?? []).map((b) => ({
+    id: b.id,
+    remaining: b.remaining,
+    total: b.total,
+  }));
+  return {
+    buildIds: builds.map((b) => b.id),
+    builds,
+    cargo: ship?.cargo ?? 0,
+    banked: ship?.banked ?? 0,
+    coreHp: station?.coreHp ?? 0,
+    turretTiers,
+    shipTiers,
+  };
+}
+
+/** True when nothing an order could have moved moved. Exact comparison: held ore
+ *  is fractional while a tractor beam runs, and a rounded compare would read a
+ *  1-ore repair as "nothing happened" on a ship that is mining at the same time. */
+function sameOutcomeState(a: OutcomeState, b: OutcomeState): boolean {
+  return (
+    a.cargo === b.cargo &&
+    a.banked === b.banked &&
+    a.coreHp === b.coreHp &&
+    a.turretTiers === b.turretTiers &&
+    a.shipTiers === b.shipTiers &&
+    a.buildIds.length === b.buildIds.length
+  );
 }
 
 // ---------------------------------------------------------------------------

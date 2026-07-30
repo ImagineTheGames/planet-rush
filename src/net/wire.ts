@@ -262,6 +262,11 @@ const SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   // and upgrade tiers for the recipient's own seat, on the ticks they change. Text,
   // like everything that is not a snapshot — it is low-frequency by construction.
   'economy',
+  // What authority did with one identified order (`./transport` OrderEchoMessage).
+  // Without it here `parseServerMessage` drops the frame, no prediction is ever
+  // settled, and every order the player places is rolled back at its TTL — the
+  // exact opposite of the bug this channel exists to close.
+  'orderEcho',
   'matchEnd',
   // A refused join (server/match-server.ts). Without it here parseServerMessage
   // drops the frame, the transport never learns *why* the socket then closed, and
@@ -318,6 +323,29 @@ function parseBotDifficulties(value: unknown): BotDifficulty[] | null {
     out.push(entry);
   }
   return out;
+}
+
+/**
+ * The sentinel {@link parseOrderId} returns for an id that is present but
+ * malformed — told apart from `null` ("absent, and that is fine") because the two
+ * demand opposite answers. An absent id is an *older client*, which must keep
+ * working (the field is optional, `@shared/types` `OrderId`). A malformed one is a
+ * hostile or broken sender naming an id the dedupe table would then key on, and it
+ * takes the whole message down like every other known-verb-bad-payload does.
+ */
+const INVALID_ORDER_ID = -1;
+
+/**
+ * The client sequence id on a one-shot order (`@shared/types` `OrderId`) — absent
+ * (`null`), well-formed (the number), or malformed ({@link INVALID_ORDER_ID}).
+ *
+ * Bounded like every other field on this surface: it is a key in a per-slot dedupe
+ * table on the authoritative server, so a client must not be able to make that
+ * table's keys arbitrary. Non-negative safe integers only.
+ */
+function parseOrderId(value: unknown): number | null {
+  if (value === undefined) return null;
+  return isCount(value) ? value : INVALID_ORDER_ID;
 }
 
 /** A finite, bounded vector. Non-finite components are the classic way to
@@ -431,7 +459,13 @@ export function parseActions(value: unknown): Action[] | null {
       case 'buildOrder': {
         const item = entry['item'];
         if (typeof item !== 'string' || !BUILD_ITEMS.has(item)) return null;
-        actions.push({ type: 'buildOrder', item: item as BuildItem });
+        const orderId = parseOrderId(entry['orderId']);
+        if (orderId === INVALID_ORDER_ID) return null;
+        actions.push({
+          type: 'buildOrder',
+          item: item as BuildItem,
+          ...(orderId !== null ? { orderId } : {}),
+        });
         break;
       }
       case 'upgradeOrder': {
@@ -443,7 +477,13 @@ export function parseActions(value: unknown): Action[] | null {
         // refuse a track that does not exist.
         const track = entry['track'];
         if (typeof track !== 'string' || !UPGRADE_TRACKS.has(track)) return null;
-        actions.push({ type: 'upgradeOrder', track: track as UpgradeTrack });
+        const orderId = parseOrderId(entry['orderId']);
+        if (orderId === INVALID_ORDER_ID) return null;
+        actions.push({
+          type: 'upgradeOrder',
+          track: track as UpgradeTrack,
+          ...(orderId !== null ? { orderId } : {}),
+        });
         break;
       }
       default: {
