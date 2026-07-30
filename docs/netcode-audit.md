@@ -50,7 +50,7 @@ One occurrence each — their own definitions:
 ```
 
 **There is no call site.** The client renders straight off the predicted `World`
-(`renderer.draw(world, …)`, `src/main.ts:1525`), and #238 shipped its smoothing
+(`renderer.draw(world, …)`, `src/main.ts:1556`), and #238 shipped its smoothing
 and its interpolation buffer as *seams for the render layer to adopt* — which
 never happened, because the render layer is Platform's lane and the seam was
 offered rather than wired. The correction offset was computed every reconcile and
@@ -69,20 +69,20 @@ column that explains the report. "Now" is this PR.
 
 | Entity class | As shipped (`d43a00f`) | Now | Where |
 |---|---|---|---|
-| **Local ship** | Predicted + reconciled, correction **written straight into the world** — every reconcile moved the hull instantly, at whatever magnitude. The decaying offset existed and was never applied. | Predicted + reconciled, correction **blended over `RECONCILE_BLEND_FRAMES`** because the offset now reaches the world the renderer reads. | `prediction.ts:340` (offset), `presentation.ts:110` (applied), `session.ts:354` |
-| **Remote ships** | Dead-reckoned by the client's own `step()` between snapshots, then **hard-snapped** by each snapshot 33 ms apart. The interpolation buffer was fed and never read. | Rendered from the interpolation buffer at `now − delay`, with bounded extrapolation on a gap. | `prediction.ts:802` (snap), `interpolation.ts:181`, `presentation.ts:122` |
+| **Local ship** | Predicted + reconciled, correction **written straight into the world** — every reconcile moved the hull instantly, at whatever magnitude. The decaying offset existed and was never applied. | Predicted + reconciled, correction **blended over `RECONCILE_BLEND_FRAMES`** because the offset now reaches the world the renderer reads. | `prediction.ts:340` (offset), `presentation.ts:110` (applied), `session.ts:360` |
+| **Remote ships** | Dead-reckoned by the client's own `step()` between snapshots, then **hard-snapped** by each snapshot 33 ms apart. The interpolation buffer was fed and never read. | Rendered from the interpolation buffer at `now − delay`, with bounded extrapolation on a gap. | `prediction.ts:802` (snap), `interpolation.ts:181`, `presentation.ts:119` |
 | **Bots** | Identical to remote ships — a bot is a server-side seat in the same snapshot, with no client-side distinction anywhere. | Identical to remote ships. | `snapshot.ts:193` |
 | **Projectiles — the firer's own** | **Doubled.** Predicted at the trigger (good), but re-created only from *unacknowledged* inputs, so the predicted shot died one RTT after firing and the server's copy of the same shot appeared behind it. | Predicted at the trigger and **carried** for its whole flight, in pool slots the wire cannot name; the authoritative twin is suppressed on arrival. | `prediction.ts:601`, `:642`, `:784` |
 | **Projectiles — everyone else's** | **Server-snapped with zero velocity.** The 6-byte record carries position and owner, no velocity; a decoded shot therefore *stood still* for 33 ms and teleported. This is the report's "jumpy projectiles", exactly. | Interpolated on the same buffer as remote ships. Two snapshots are the velocity; no wire change. | `snapshot.ts:147`, `interpolation.ts:305` |
 | **Projectiles — locally re-fired turrets** | **Duplicated.** `step()` runs the whole world, so a replaying client fires *everyone's* turrets locally, on top of the same shots arriving on the wire. | Culled: a locally-spawned shot that is not the firer's own is dropped every reconcile. | `prediction.ts:642` |
-| **Ore chunks** | **Client-side fiction.** Not in the snapshot, not in the event stream. Each client spawns chunks from its own predicted hits; a remote player's shot chips nothing locally (a decoded shot has no `mineYield`). | Unchanged — see §6, gap 1. | `sim/projectiles.ts:393`, `sim/state.ts:592` |
-| **Ore flights (deposit couriers)** | Client-side, derived from the same local `chunks` with `deposit` set. Cosmetic. | Unchanged. | `main.ts:2897` |
-| **Turrets** | Server-authoritative via the entity-event stream at 10 Hz — spawn / update / destroy. Correct, and unaffected by any of the above. | Unchanged. | `entity-events.ts:123`, `room.ts` `DEFAULT_EVENT_INTERVAL_TICKS` |
-| **Shields** | Server-authoritative, entity events. | Unchanged. | `entity-events.ts:127` |
-| **Stations / reactors / wrecks** | Server-authoritative, entity events (including the scouted-HP fog the client has earned). | Unchanged. | `entity-events.ts:131`, `:132` |
-| **Asteroids** | Server-authoritative, entity events. | Unchanged. | `entity-events.ts:119` |
-| **Radar satellites** | **Not on the wire at all** — no snapshot field, no event kind, despite `state.ts` claiming they ride the event stream. Online, a satellite is invisible on every client. | Unchanged — see §6, gap 2. | `transport.ts:272` (`kind` union), `sim/state.ts:322`, `:446` |
-| **HUD numbers (held / banked ore, upgrade tiers)** | Server-authoritative on their own low-frequency channel, staged into the reconcile for their tick so unacked mining replays on top. Correct. | Unchanged. | `transport.ts:323`, `prediction.ts` `stageEconomy` |
+| **Ore chunks** | **Client-side fiction.** Not in the snapshot, not in the event stream. Each client spawns chunks from its own predicted hits; a remote player's shot chips nothing locally (a decoded shot has no `mineYield`). | Unchanged — see §6, gap 1. | `sim/projectiles.ts:393`, `sim/state.ts:593` |
+| **Ore flights (deposit couriers)** | Client-side, derived from the same local `chunks` with `deposit` set. Cosmetic. | Unchanged. | `main.ts:2928` |
+| **Turrets** | Server-authoritative via the entity-event stream at 10 Hz — spawn / update / destroy. Correct, and unaffected by any of the above. | Unchanged. | `entity-events.ts:152`, `room.ts` `DEFAULT_EVENT_INTERVAL_TICKS` |
+| **Shields** | Server-authoritative, entity events. | Unchanged. | `entity-events.ts:156` |
+| **Stations / reactors / wrecks** | Server-authoritative, entity events (including the scouted-HP fog the client has earned). | Unchanged. | `entity-events.ts:164`, `:165` |
+| **Asteroids** | Server-authoritative, entity events. | Unchanged. | `entity-events.ts:148` |
+| **Radar satellites** | **Not on the wire at all** — no snapshot field, no event kind, despite `state.ts` claiming they ride the event stream. A satellite standing on the server reached *neither* client, its owner's included: six ore bought a structure nobody could see, shoot, or take coverage from. | Server-authoritative on the entity-event stream — spawn / orbit-correction / destroy, HP scouted like a turret's. | `transport.ts:278` (`kind` union), `entity-events.ts` `applySatellite`, `server/static-events.ts` `satelliteEvent` |
+| **HUD numbers (held / banked ore, upgrade tiers)** | Server-authoritative on their own low-frequency channel, staged into the reconcile for their tick so unacked mining replays on top. Correct. | Unchanged. | `transport.ts:329`, `prediction.ts` `stageEconomy` |
 | **Wave clock / match phase / collapse** | Predicted locally off `world.time`, corrected only by the client rewinding to each snapshot's tick. | Unchanged. | `prediction.ts` `rewind` |
 
 **The one-line answer to "is EVERYTHING server sided?"** Authority is server-side
@@ -256,14 +256,7 @@ Stated plainly rather than left for the next report.
    player does not. Closing it means either an ore-chunk event kind or a mine-hit
    event; both are wire changes and neither is in this brief's priority list.
 
-2. **Radar satellites never reach a client online.** `sim/state.ts` says a
-   satellite "is a static-ish structure the client rebuilds from entity events" —
-   but `EntityEventMessage['kind']` has no `'satellite'` member and
-   `server/static-events.ts` never emits one. The satellite exists and works
-   server-side (it is a real siege target and a real sensor source); it is simply
-   invisible in an online match. Fixing it is an additive event kind plus a
-   tracker case — small, contained, and a wire change, so it is proposed rather
-   than taken unilaterally.
+2. ~~**Radar satellites never reach a client online.**~~ **Closed** — see §6a.
 
 3. **The lead is bounded, not clock-synchronised.** A proper fix estimates the
    server's current tick and targets a lead of one one-way delay; what ships here
@@ -294,6 +287,45 @@ Stated plainly rather than left for the next report.
 
 ---
 
+## 6a. The gap that got closed after all: radar satellites
+
+Gap 2 was written down as "proposed rather than taken unilaterally, because it is
+a wire change." That reasoning was wrong on its own terms — `EntityEventMessage`
+lives in `src/net/transport.ts`, which is this lane's file, not a `src/shared/`
+contract. The producer (`server/static-events.ts`) and the consumer
+(`src/net/entity-events.ts`) are both this lane's too. So it was closed.
+
+**First it was measured, not grepped.** `tests/net/satellite-visibility.test.ts`
+stands a satellite up on the server through the sim's own construction path and
+asks both clients whether they ever hear about it. Before the fix, both answered
+zero — including the satellite's *owner*. Feature f1 sells a satellite for six
+ore, above a shield, as a sensor source and a legitimate siege target; online it
+was six ore for a structure nobody could see, shoot, or take coverage from.
+
+**What ships now** is the same shape the other static entities already had:
+`'satellite'` on the `kind` union, spawn events in the join and reclaim burst
+(`fullEntityState`), spawn/destroy from `StaticEntityTracker`, and HP on the
+scouted `FogTracker` channel rather than the public diff — a satellite's damage
+is a besieger's earned read, exactly as a turret's is (GDD §2.2).
+
+**One thing is not like the others, and it is the interesting part.** A satellite
+is the only static entity that *moves*, and `sim/buildings.ts` **integrates**
+`orbitAngle` per tick rather than deriving it from `world.time`. A reconcile
+rewinds the clock and replays, and a rewind restores scalars, not structures — so
+every replayed tick advances the client's orbit a *second* time and its satellite
+outruns the server's. Phase-locking at spawn is therefore not enough. The
+producer corrects it with an `update`, throttled by `ORBIT_ANNOUNCE_RADIANS`
+(0.125 rad): the server's own orbit crosses that threshold at a fixed rate, so one
+satellite costs ~2 updates a second rather than the 10 a per-diff announcement
+would, and 0.125 rad is ~14 u of arc at orbit radius — under what the eye catches.
+`tests/server/satellite-events.test.ts` pins both halves: that the correction
+happens, and that it does not degrade into a stream.
+
+That leaves **ore chunks** (gap 1) as the one entity class still drawn from client
+fiction online, and it stays open for the reason stated there.
+
+---
+
 ## 7. What a QA run should look at (`online-feel`)
 
 For the follow-up gate riding the next evidence round, on the live fleet:
@@ -309,6 +341,10 @@ For the follow-up gate riding the next evidence round, on the live fleet:
   another ship's motion between snapshots (should be a glide, not a stutter), a
   shot in flight (should travel, not blink), and your own hull after a correction
   (should slide, not jump).
+- **One thing to buy:** a RADAR satellite, on one client. The *other* player must
+  see it orbiting (§6a — until this PR nobody could, not even its owner), and it
+  should glide around the rim rather than tick. Shoot it down and it must vanish
+  on both screens.
 
 ---
 
