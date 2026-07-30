@@ -5010,8 +5010,14 @@ function openMainMenu(
   // --- The ONLINE front door (M3/online step 3) ----------------------------
 
   /** Mirror the entry model onto the `__onlineMenu` seam after every change, plus
-   *  the doors' physical press points (the landscape-lock remap the menu buttons
-   *  get), so a live-stage run can press a door for real. */
+   *  the physical press points of whatever the entry screen is actually DRAWING
+   *  (through the landscape-lock remap the menu buttons get), so a live-stage run
+   *  can press its way in for real.
+   *
+   *  The reported set follows the screen, because a control reported at a point
+   *  nobody drew is exactly the class of bug this suite exists to catch: the doors
+   *  on `home`, the keypad + ERASE + JOIN on `join`, and BACK on both (it is the
+   *  one control that never moves between them). */
   function updateOnlineSeam(): void {
     onlineSeam.visible = screen === 'online';
     onlineSeam.screen = entry.screen;
@@ -5023,13 +5029,23 @@ function openMainMenu(
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
       ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
-    onlineSeam.doorControls = [
-      ...DOOR_OPTIONS.map((option, i) => ({
-        kind: option.door,
-        physicalCenter: point(layout.doors[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-      })),
-      { kind: 'back', physicalCenter: point(layout.back) },
-    ];
+    const front =
+      entry.screen === 'join'
+        ? [
+            // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
+            // room code by pressing the very keys a player's thumb finds.
+            ...KEYPAD_KEYS.map((ch, i) => ({
+              kind: `key:${ch}`,
+              physicalCenter: point(layout.keys[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
+            })),
+            { kind: 'erase', physicalCenter: point(layout.erase) },
+            { kind: 'submit', physicalCenter: point(layout.submit) },
+          ]
+        : DOOR_OPTIONS.map((option, i) => ({
+            kind: option.door,
+            physicalCenter: point(layout.doors[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
+          }));
+    onlineSeam.doorControls = [...front, { kind: 'back', physicalCenter: point(layout.back) }];
   }
 
   /** Open THE DOORS — what PLAY does now (ratified: one play flow), and the only
