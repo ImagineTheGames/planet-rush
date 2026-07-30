@@ -308,6 +308,19 @@ describe('arena select and the lock at start (p2 — the map picker moved into t
     const started = startLobbyMatch(selectMap(lobby(), 'oval'));
     expect(selectMap(started, 'diamond').mapId).toBe('oval');
   });
+
+  it('is the HOST’s pick — a joiner reads the arena read-only (the unified play flow)', () => {
+    // One arena for the whole room, and the creator owns it exactly as they own the
+    // mode and the slot states. A guest tapping a card gets the identical state back,
+    // so the tap costs the wire nothing and the board they are told about is the
+    // board they will fly.
+    const guest = lobby({ you: 3, host: 0, mapId: 'octagon' });
+    expect(selectMap(guest, 'diamond')).toBe(guest);
+    expect(lobbyModel(guest).mapId).toBe('octagon');
+    // …while the host of the same room can still change it.
+    const host = lobby({ you: 0, host: 0, mapId: 'octagon' });
+    expect(selectMap(host, 'diamond').mapId).toBe('diamond');
+  });
 });
 
 // ---------------------------------------------------------------------------

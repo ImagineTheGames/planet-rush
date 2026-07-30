@@ -12,9 +12,11 @@
  * So this spec boots the production build two ways and asserts the boot CONTRACT:
  *
  *  - A CLEAN boot (no `?debug=1`) lands on the main menu and builds NO match
- *    world yet; pressing PLAY builds it. Proven through the read-only
- *    `window.__mainMenu` seam `main.ts` installs on the menu path, whose
- *    `matchStarted` flips true only once the real world is constructed.
+ *    world yet. **PLAY opens THE DOORS** (ratified: one play flow — PLAY SOLO /
+ *    CREATE ROOM / JOIN ROOM), PLAY SOLO opens the lobby, and RUSH! builds the
+ *    world. Proven through the read-only `window.__mainMenu` / `__onlineMenu` /
+ *    `__lobby` seams `main.ts` installs on the menu path, whose `matchStarted`
+ *    flips true only once the real world is constructed.
  *  - A `?debug=1` boot skips the menu entirely and boots straight into a match —
  *    the harness every existing live / live-stage / mobile test depends on
  *    (field report §3). Proven by the menu seam being absent and the `?debug=1`
@@ -33,10 +35,11 @@ interface ControlReport {
   readonly physicalCenter: PhysicalPoint;
 }
 interface MainMenuSeam {
-  /** The menu layer is up (true until PLAY). */
+  /** The menu layer is up (true until a door resolves). */
   visible: boolean;
-  /** Which screen owns the menu — 'menu' or 'settings'. */
-  screen: 'menu' | 'settings';
+  /** Which screen owns the menu — 'menu', 'settings', 'codex', or 'online' (THE
+   *  DOORS: PLAY SOLO / CREATE ROOM / JOIN ROOM, the screen PLAY opens). */
+  screen: 'menu' | 'settings' | 'codex' | 'online';
   /** Flipped true only once `boot()` has actually built the match world — which,
    *  since M4, is after the LOBBY's RUSH!, not directly on PLAY (see below). */
   matchStarted: boolean;
@@ -53,25 +56,35 @@ interface MainMenuSeam {
   matchControlScheme: 'sticks' | 'tap' | null;
   /** The local ship's live WORLD position in the running match (null before). */
   localShipPos: PhysicalPoint | null;
-  /** Activate PLAY as a real tap would — resolves boot's `untilPlay()`. */
+  /** Activate PLAY as a real tap would — opens THE DOORS. */
   play(): void;
 }
-/** The lobby seam PLAY now hands off to (src/main.ts `openLobby`) — the M4 gate
- *  between the menu and the match. This spec only needs to see it appear and to
- *  RUSH! through it. */
+/** The doors seam (src/main.ts `installOnlineSeam`) — the screen PLAY opens, and
+ *  the three ways a match is entered. This spec drives PLAY SOLO through it. */
+interface OnlineSeam {
+  visible: boolean;
+  screen: 'home' | 'join';
+  doorControls: readonly ControlReport[];
+  solo(): void;
+}
+/** The lobby seam the doors hand off to (src/main.ts `openLobby`) — the M4 gate
+ *  between the menu and the match, and now the ONE lobby both modes use. This spec
+ *  only needs to see it appear and to RUSH! through it. */
 interface LobbySeam {
   visible: boolean;
+  online: boolean;
   rush(): void;
   rushControl: { physicalCenter: PhysicalPoint };
 }
 interface StageWindow {
   __mainMenu?: MainMenuSeam;
+  __onlineMenu?: OnlineSeam;
   __lobby?: LobbySeam;
   __planetRush?: unknown;
 }
 declare const window: Window & StageWindow;
 
-test('a clean boot lands on the main menu; PLAY opens the lobby, RUSH builds the world', async ({
+test('a clean boot lands on the main menu; PLAY opens the doors, PLAY SOLO the lobby, RUSH the world', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -100,10 +113,25 @@ test('a clean boot lands on the main menu; PLAY opens the lobby, RUSH builds the
   const debugPresent = await page.evaluate(() => '__planetRush' in window);
   expect(debugPresent, 'the ?debug=1 instrument must be absent on a clean boot').toBe(false);
 
-  // Press PLAY. Since M4 this no longer builds the world — it dismisses the menu
-  // and hands off to the LOBBY (GDD §2.1: MAIN MENU → PLAY → LOBBY). The world is
-  // still NOT built: the lobby's RUSH! gates it.
+  // Press PLAY. It opens THE DOORS (ratified: one play flow) — PLAY SOLO / CREATE
+  // ROOM / JOIN ROOM. Still no world, and still no lobby: PLAY is one screen, not
+  // a shortcut past it.
   await page.evaluate(() => window.__mainMenu!.play());
+  await page.waitForFunction(() => window.__onlineMenu?.visible === true, undefined, { timeout: 20_000 });
+  const atDoors = await page.evaluate(() => ({
+    menuScreen: window.__mainMenu!.screen,
+    doorsScreen: window.__onlineMenu!.screen,
+    matchStarted: window.__mainMenu!.matchStarted,
+    lobbyPresent: '__lobby' in window,
+  }));
+  expect(atDoors.menuScreen, 'PLAY hands the screen to the doors').toBe('online');
+  expect(atDoors.doorsScreen, 'the doors open on PLAY SOLO / CREATE / JOIN').toBe('home');
+  expect(atDoors.matchStarted, 'PLAY builds no world').toBe(false);
+  expect(atDoors.lobbyPresent, 'PLAY does not open a lobby of its own — one way in').toBe(false);
+
+  // PLAY SOLO opens the LOBBY, offline flavour. The world is still NOT built: the
+  // lobby's RUSH! gates it, online and offline alike.
+  await page.evaluate(() => window.__onlineMenu!.solo());
   await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, {
     timeout: 20_000,
   });
@@ -111,10 +139,12 @@ test('a clean boot lands on the main menu; PLAY opens the lobby, RUSH builds the
     menuVisible: window.__mainMenu!.visible,
     matchStarted: window.__mainMenu!.matchStarted,
     lobbyVisible: window.__lobby!.visible,
+    lobbyOnline: window.__lobby!.online,
   }));
-  expect(afterPlay.menuVisible, 'the menu is dismissed once PLAY opens the lobby').toBe(false);
-  expect(afterPlay.lobbyVisible, 'the lobby is on screen after PLAY').toBe(true);
-  expect(afterPlay.matchStarted, 'PLAY opens the lobby — the world is not built until RUSH').toBe(
+  expect(afterPlay.menuVisible, 'the menu is dismissed once a door opens the lobby').toBe(false);
+  expect(afterPlay.lobbyVisible, 'the lobby is on screen after PLAY SOLO').toBe(true);
+  expect(afterPlay.lobbyOnline, 'the SOLO lobby is the offline flavour — no room code').toBe(false);
+  expect(afterPlay.matchStarted, 'PLAY SOLO opens the lobby — the world is not built until RUSH').toBe(
     false,
   );
 
@@ -243,8 +273,17 @@ async function switchToTapCommanderThroughSettings(page: Page, press: Press): Pr
   await pressPoint(await controlPoint(page, 'settingsControls', 'back'));
   await page.waitForFunction(() => window.__mainMenu?.screen === 'menu', undefined, { timeout: 10_000 });
 
-  // --- PLAY → the lobby, then RUSH! → the match world builds. ------------------
+  // --- PLAY → the doors → PLAY SOLO → the lobby, then RUSH! → the world builds. --
+  // Both presses are real, at the points the client itself reported drawing the
+  // controls at: the ratified flow is walked the way a player walks it.
   await pressPoint(await controlPoint(page, 'controls', 'play'));
+  await page.waitForFunction(() => window.__onlineMenu?.visible === true, undefined, { timeout: 20_000 });
+  const soloDoor = await page.evaluate(() => {
+    const door = window.__onlineMenu!.doorControls.find((d) => d.kind === 'solo');
+    return door ? { x: door.physicalCenter.x, y: door.physicalCenter.y } : null;
+  });
+  if (!soloDoor) throw new Error('no PLAY SOLO door reported');
+  await pressPoint(soloDoor);
   await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, { timeout: 20_000 });
   const rush = await page.evaluate(() => {
     const c = window.__lobby!.rushControl.physicalCenter;

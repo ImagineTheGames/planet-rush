@@ -611,14 +611,23 @@ export function selectShipClass(state: LobbyState, shipClass: ShipClass): LobbyS
 }
 
 /**
- * Pick the arena (a tap on a map card). Refused once the lobby is counting down,
- * exactly like the hull ({@link classLocked}): the countdown is the start of the
- * match, and an arena that changed after RUSH! would be an arena the world was
- * not built from. Folds the id to a real one, so a stray index can never select a
- * map that does not exist.
+ * Pick the arena (a tap on a map card).
+ *
+ * **The host's, and refused from a guest** — one arena for the whole room, and the
+ * room's creator owns it exactly as they own the mode, the abundance and the slot
+ * states ({@link hostControls}). A joiner sees the pick read-only: the board they
+ * are about to fly is information, not a control, and a guest who could re-pick it
+ * would be changing a world the host's own client is about to build. Offline you
+ * *are* the host, so the solo lobby is unaffected.
+ *
+ * {@link hostControls} also refuses once the countdown has started, exactly like
+ * the hull ({@link classLocked}): the countdown is the start of the match, and an
+ * arena that changed after RUSH! would be an arena the world was not built from.
+ * Folds the id to a real one, so a stray index can never select a map that does
+ * not exist.
  */
 export function selectMap(state: LobbyState, mapId: string): LobbyState {
-  if (classLocked(state)) return state;
+  if (!hostControls(state)) return state;
   const next = normalizeMapId(mapId);
   if (state.mapId === next) return state;
   return { ...state, mapId: next };

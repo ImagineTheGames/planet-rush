@@ -30,6 +30,18 @@
  * the world, exactly as before.
  *
  * ---------------------------------------------------------------------------
+ * ONE DOOR, ONE LOBBY (ratified — the unified play flow)
+ * ---------------------------------------------------------------------------
+ * There is exactly one entry point and exactly one lobby. The main menu's PLAY
+ * opens {@link ./lobby-entry} — PLAY SOLO / CREATE ROOM / JOIN ROOM — and all
+ * three of those doors resolve into the same {@link ./lobby} through the same
+ * {@link flowConnected}. The single difference between "the solo lobby" and "the
+ * online lobby" is the `online` flag the door already decided, which the lobby
+ * uses to show the room code and mark seats claimable. There is no second lobby
+ * component and no feature that exists in one mode and not the other — a mode is a
+ * flag on a screen, not a screen.
+ *
+ * ---------------------------------------------------------------------------
  * THE THREE RULES THE SEQUENCE KEEPS
  * ---------------------------------------------------------------------------
  *
@@ -161,7 +173,16 @@ export type FlowEffect =
    *  `intent.online` is false) and send it a `join` for that room. */
   | { readonly kind: 'open-transport'; readonly intent: EntryIntent }
   /** Send this on the open transport, unchanged. */
-  | { readonly kind: 'send'; readonly message: ClientMessage };
+  | { readonly kind: 'send'; readonly message: ClientMessage }
+  /**
+   * Close the transport and forget the room — BACK out of a lobby that had one
+   * (u2 item 4: "BACK from the online lobby leaves the room cleanly … no ghost
+   * rooms"). Emitted only when the lobby being left was online: leaving the socket
+   * open would hold a seat nobody is in, and an unemptied room keeps a code the
+   * classroom can still type and nobody is behind. Offline there is nothing to
+   * close, so nothing is asked for.
+   */
+  | { readonly kind: 'close-transport' };
 
 /** A transition, plus whatever it owes the outside world. */
 export interface FlowResult {
@@ -354,7 +375,14 @@ export function flowConnected(
   // typed a code into JOIN walked into somebody else's room, so its host is
   // whoever the caller says it is — and, absent a wire field for it, seat 0.
   const host = options.host ?? (state.entry.screen === 'join' ? 0 : you);
-  const lobby = seatLocalPlayer(createLobby({ room, you, host }), you, host);
+  // ONE lobby component, both modes (ratified): the same `createLobby` opens the
+  // solo room and the online one, and the ONLY thing that differs is the flag the
+  // door already resolved — `online: false` for PLAY SOLO (no room code, the empty
+  // seats are the bot cast), `true` for CREATE / JOIN (code up, seats claimable).
+  // Every other affordance — hulls, map, mode, abundance, slot states, difficulty,
+  // teams, RUSH — is the same model function in both, which is the property the
+  // affordance-set guard in `./lobby-flow.test.ts` holds us to.
+  const lobby = seatLocalPlayer(createLobby({ room, you, host, online: state.online }), you, host);
   const next: FlowState = {
     ...state,
     screen: 'lobby',
@@ -444,13 +472,16 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       // offer copy-to-clipboard (a DOM affordance UI does not own); ignoring it
       // here means a tap on it never disturbs the roster.
       return rest(state);
-    case 'leave':
-      // BACK — leave the lobby (u2 menu-back). In this online flow, backing out of
-      // a room returns to the entry front door with the lobby dropped — the same
-      // shape {@link flowFailed} uses, so the caller closes the transport exactly
-      // as it does on an aborted join. (Offline, the same BACK reloads onto the
-      // main menu — wired in `main.ts` `openLobby.leaveToMenu`.)
-      return rest({ ...state, screen: 'entry', entry: entryConnected(), lobby: null });
+    case 'leave': {
+      // BACK — leave the lobby (u2 menu-back). Backing out of a room returns to the
+      // doors with the lobby dropped — the same shape {@link flowFailed} uses. When
+      // the room was ONLINE the caller is also owed a `close-transport`: the seat
+      // has to be freed and the room allowed to deallocate, or the code stays live
+      // with nobody behind it (u2 item 4). Offline there is no socket to close, so
+      // the effect list stays empty and BACK costs the wire nothing.
+      const next: FlowState = { ...state, screen: 'entry', entry: entryConnected(), lobby: null };
+      return lobby.online ? { state: next, effects: [{ kind: 'close-transport' }] } : rest(next);
+    }
   }
 }
 

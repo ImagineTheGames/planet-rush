@@ -49,6 +49,20 @@ interface MenuSeam {
   }>;
 }
 
+/**
+ * The `window.__onlineMenu` doors seam (src/main.ts `OnlineSeam`) — the screen PLAY
+ * opens since the ratified ONE play flow: PLAY SOLO / CREATE ROOM / JOIN ROOM, plus
+ * BACK. Each door reports the physical point a tap must hit to reach it, exactly as
+ * the main menu's controls do, so the rotation remap is provable on this screen too.
+ */
+interface DoorsSeam {
+  readonly visible: boolean;
+  readonly doorControls: ReadonlyArray<{
+    readonly kind: string;
+    readonly physicalCenter: { readonly x: number; readonly y: number };
+  }>;
+}
+
 /** The `window.__planetRush` centring instrument (src/platform/debug-hook.ts). */
 interface DebugState {
   readonly shipScreen: { readonly x: number; readonly y: number };
@@ -256,18 +270,27 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
 });
 
 // ===========================================================================
-// 3. Two physical portrait taps, remapped through the rotation: PLAY opens the
-//    LOBBY, then RUSH! boots the match with the hull picked there (GDD §2.1).
+// 3. Three physical portrait taps, remapped through the rotation: PLAY opens the
+//    DOORS, PLAY SOLO opens the LOBBY, RUSH! boots the match with the hull
+//    picked there (GDD §2.1; the ratified ONE play flow).
 // ===========================================================================
 //
-// Since M4, PLAY no longer builds the match directly — it opens the LOBBY, and
-// RUSH! is the door that boots the world. So the landscape-lock remap must hold
-// for BOTH doors, not just PLAY: a physical portrait tap has to land on the
-// logical PLAY control (→ lobby renders) AND, a screen later, on the logical
-// RUSH! control (→ match boots with the chosen hull). Two remapped touches, each
-// proven against the owning screen's own layout-registry seam — no pixel-hunting.
+// Since M4, PLAY no longer builds the match directly, and since the ratified ONE
+// play flow it no longer opens the lobby directly either: PLAY opens the DOORS
+// (PLAY SOLO / CREATE ROOM / JOIN ROOM), PLAY SOLO opens the lobby, and RUSH! is
+// the door that boots the world. The old separate offline-lobby entry point is
+// gone — one way in — so the journey this test walks gained a screen.
+//
+// That makes the landscape-lock remap provable on THREE screens rather than two,
+// which is the point: a physical portrait tap has to land on the logical PLAY
+// control (→ the doors render), then on the logical PLAY SOLO door (→ the lobby
+// renders), then on the logical RUSH! control (→ the match boots with the chosen
+// hull). Each touch is proven against the owning screen's own layout-registry seam
+// — `__mainMenu.controls`, `__onlineMenu.doorControls`, `__lobby.rushControl` — so
+// none of it is pixel-hunting, and a screen that drew its control in the wrong
+// place fails on its own report rather than on a screenshot.
 
-test('two physical taps remap through the rotation: PLAY → lobby, RUSH! → match with the chosen hull', async ({
+test('three physical taps remap through the rotation: PLAY → doors → PLAY SOLO → lobby, RUSH! → match with the chosen hull', async ({
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the touch remap only rotates on mobile');
@@ -300,14 +323,37 @@ test('two physical taps remap through the rotation: PLAY → lobby, RUSH! → ma
   assertInsidePhysical(play!.physicalCenter, 'PLAY');
   await physicalTap(page, play!.physicalCenter.x, play!.physicalCenter.y);
 
+  // --- Tap 2: PLAY SOLO, on the doors PLAY opens (the ONE play flow). ---------
+  // The doors seam appearing is proof the PLAY tap un-rotated onto the logical
+  // control. PLAY builds no match and no lobby — it opens exactly this screen.
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as { __onlineMenu?: DoorsSeam }).__onlineMenu;
+      return !!d && d.visible && d.doorControls.length > 0;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
+  const solo = await page.evaluate(() => {
+    const d = (window as unknown as { __onlineMenu?: DoorsSeam }).__onlineMenu;
+    const c = (d?.doorControls ?? []).find((x) => x.kind === 'solo');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(solo, 'PLAY SOLO door present in the doors layout registry').toBeTruthy();
+  assertInsidePhysical(solo!, 'PLAY SOLO');
+  await physicalTap(page, solo!.x, solo!.y);
+
   // The lobby seam appearing — laid out via its own layout registry (eight seats,
-  // a content box inside the logical viewport) — is proof the PLAY tap un-rotated
-  // onto the logical control. PLAY builds NO match; it opens this screen.
+  // a content box inside the logical viewport) — is proof the PLAY SOLO tap
+  // un-rotated onto the logical door. It opens the screen; it builds no match.
   const lobby = await readLobby(page);
-  expect(lobby.visible, 'lobby is up after the PLAY tap').toBe(true);
+  expect(lobby.visible, 'lobby is up after the PLAY SOLO tap').toBe(true);
   expect(lobby.slotCount, 'lobby laid out its eight seats (GDD §2.1)').toBe(8);
   expect(lobby.online, 'offline solo-vs-bots lobby').toBe(false);
-  expect(lobby.localShipClass, 'no match world built yet — PLAY only opens the lobby').toBeNull();
+  expect(
+    lobby.localShipClass,
+    'no match world built yet — PLAY SOLO only opens the lobby',
+  ).toBeNull();
   assertInside(lobby.content, lobby.logicalViewport, 'lobby content box');
 
   // --- Pick a NON-default hull, so "boots with the chosen hull" is meaningful. -
