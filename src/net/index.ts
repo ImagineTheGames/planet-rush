@@ -24,7 +24,11 @@
  * in flight, and reconciles the result against each snapshot — rewind, overwrite
  * with authority, replay everything the server has not yet run (GDD §4.2). The
  * static half of the world that does not stream arrives as events and is applied
- * by `./entity-events`.
+ * by `./entity-events`. The one piece of *ship* state that does not stream either
+ * — the wallet: held ore, banked ore, upgrade tiers — rides its own low-frequency
+ * channel to its own slot (`./transport` `EconomyMessage`), because a rewind cannot
+ * put a hold back the way it puts a position back (GDD §4.2, docs/netcode-spike.md
+ * "The wallet on the wire").
  *
  * And three modules make that reconciliation *feel* right at real latency (M10):
  * `./telemetry` instruments it — misprediction rate, correction magnitude, and

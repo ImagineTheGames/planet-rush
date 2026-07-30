@@ -233,6 +233,10 @@ const SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   'entityEvent',
   'playerSubstituted',
   'playerReclaimed',
+  // The wallet's own channel (`./transport` EconomyMessage): held ore, banked ore
+  // and upgrade tiers for the recipient's own seat, on the ticks they change. Text,
+  // like everything that is not a snapshot — it is low-frequency by construction.
+  'economy',
   'matchEnd',
   // A refused join (server/match-server.ts). Without it here parseServerMessage
   // drops the frame, the transport never learns *why* the socket then closed, and

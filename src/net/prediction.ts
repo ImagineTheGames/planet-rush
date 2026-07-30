@@ -49,12 +49,12 @@
  */
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
-import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, step } from '../sim';
+import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, step } from '../sim';
 import type { World } from '../sim';
 import { applyEntityEvent } from './entity-events';
 import { MAX_PROJECTILES, SHIP_FLAG, dequantizeAngle } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
-import type { EntityEventMessage, Tick } from './transport';
+import type { EntityEventMessage, PlayerEconomy, Tick } from './transport';
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -183,6 +183,9 @@ export class PredictedMatch {
   private snapshotTick: Tick = -1;
   private error = 0;
   private readonly offset: Vec2 = { x: 0, y: 0 };
+  /** The newest authoritative wallet the server has volunteered, waiting for the
+   *  reconcile of its own tick (`./transport` EconomyMessage). */
+  private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
 
   constructor(config: PredictedMatchConfig) {
     this.world = config.world;
@@ -291,6 +294,10 @@ export class PredictedMatch {
         : 0;
 
     applySnapshot(this.world, snapshot);
+    // The wallet is corrected here, in the same breath as position and hull, and
+    // *before* the replay: unacked mining is then re-earned on top of authority's
+    // figure instead of on top of the client's own compounding one (`stageEconomy`).
+    this.applyStagedEconomy(snapshot.tick);
 
     const acknowledged = this.retire(ackSeq);
     for (const input of this.queue) {
@@ -319,7 +326,46 @@ export class PredictedMatch {
     return applyEntityEvent(this.world, message);
   }
 
+  // --- The wallet ---------------------------------------------------------
+
+  /**
+   * Take authority's word on the local wallet as of `tick`, to be written into the
+   * world at the reconcile for that tick (`./transport` EconomyMessage).
+   *
+   * Staged rather than applied on arrival, because *when* it lands decides whether
+   * the player's own unacked mining survives. The server sends it immediately
+   * ahead of the snapshot for the same tick, so by the time that snapshot is
+   * reconciled the correct wallet is already here: rewind, write authority (ships,
+   * hull, and now the wallet), then replay — and the ore the client tractored in
+   * during the ticks the server has not simulated yet is added back on top, once.
+   * Applying it on arrival instead would stamp a wallet from tick `T` onto a world
+   * predicted to `T + RTT` and drop that window's earnings on every snapshot.
+   *
+   * A wallet for a tick the client has already reconciled past is applied at the
+   * next reconcile (the newest word always wins; the ticks between are replayed
+   * over it). Only the newest staged wallet is kept — this is full state, not a
+   * diff, so an older one has nothing left to say.
+   */
+  stageEconomy(economy: PlayerEconomy, tick: Tick): void {
+    if (this.staged && this.staged.tick > tick) return;
+    this.staged = { tick, economy };
+  }
+
+  /** Tick of the wallet waiting to be applied, or -1 when none is — the read that
+   *  makes "staged, not stamped" observable to a test. */
+  get stagedEconomyTick(): Tick {
+    return this.staged?.tick ?? -1;
+  }
+
   // --- Internals ----------------------------------------------------------
+
+  /** Write the staged wallet if it describes this snapshot's tick or an earlier
+   *  one; a wallet from the future stays staged until its tick arrives. */
+  private applyStagedEconomy(tick: Tick): void {
+    if (!this.staged || this.staged.tick > tick) return;
+    applyPlayerEconomy(this.world, this.local, this.staged.economy);
+    this.staged = null;
+  }
 
   /**
    * Put the world's clock back to `tick` and return the checkpoint it was
@@ -402,6 +448,36 @@ const ORIGIN: Vec2 = { x: 0, y: 0 };
 // ---------------------------------------------------------------------------
 // Authority → world
 // ---------------------------------------------------------------------------
+
+/**
+ * Write one authoritative wallet onto a client world's ship: held ore, banked ore,
+ * and every upgrade track the client recognizes (`./transport` PlayerEconomy).
+ *
+ * The tiers are followed by a recompute of the stats they scale — max hull and
+ * cargo capacity are *stored* on a ship rather than derived per read (`src/sim`
+ * `refreshDerivedStats`), so a reclaimed DAMAGE-3 hull that only had its `tiers`
+ * relabelled would fly with tier-0 ceilings and mis-predict the next fight. A
+ * track the client's build does not know is ignored rather than invented.
+ *
+ * Returns false when the world has no ship for that slot — a wallet for a seat
+ * this client has not built yet, which the caller re-stages or drops.
+ */
+export function applyPlayerEconomy(
+  world: World,
+  player: PlayerId,
+  economy: PlayerEconomy,
+): boolean {
+  const ship = world.ships.find((s) => s.id === player);
+  if (!ship) return false;
+  ship.cargo = economy.held;
+  ship.banked = economy.banked;
+  for (const track of Object.keys(ship.tiers)) {
+    const tier = economy.tiers[track];
+    if (typeof tier === 'number') (ship.tiers as Record<string, number>)[track] = tier;
+  }
+  refreshDerivedStats(ship);
+  return true;
+}
 
 /**
  * Write one decoded snapshot over a client world's ships and projectiles.

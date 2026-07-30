@@ -26,12 +26,12 @@
  */
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
-import { TICK_DT, createWorld, refreshDerivedStats } from '../sim';
+import { TICK_DT, createWorld } from '../sim';
 import type { World } from '../sim';
 import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
-import { PredictedMatch } from './prediction';
+import { PredictedMatch, applyPlayerEconomy } from './prediction';
 import { NetTelemetry } from './telemetry';
 import { RemoteInterpolator } from './interpolation';
 import type { InterpolatedShip } from './interpolation';
@@ -334,6 +334,17 @@ export class TransportSession implements MatchSession {
         }
         break;
       }
+      case 'economy':
+        // The wallet's own channel, for this client's own seat: held/banked ore and
+        // upgrade tiers, on the ticks authority moves them (`./transport`
+        // EconomyMessage). Staged on the predictor so it is written inside the
+        // reconcile for its tick and the player's unacked mining replays on top; if
+        // the world is not built yet (an `economy` that beat `matchStart` home), it
+        // waits with the welcome's wallet and is stamped at world-build instead.
+        if (message.player !== this.player) break;
+        if (this.predictor) this.predictor.stageEconomy(message.economy, message.tick);
+        else if (!this.authoritative) this.pendingEconomy = message.economy;
+        break;
       case 'entityEvent':
         // The half of the world that does not stream: rocks, turrets, shields,
         // wrecks, and the scouted health a client has earned (GDD §2.2, §4.2).
@@ -407,24 +418,14 @@ export class TransportSession implements MatchSession {
 
   /**
    * Stamp a reclaimed wallet onto the local ship in a freshly built predicted
-   * world. Restores held ore, banked ore and every upgrade track the client
-   * recognizes, then recomputes the stats those tiers scale (`refreshDerivedStats`
-   * — max hull, cargo cap) so the returning ship is byte-identical to the one
-   * authority is flying, not just re-labelled. Remote ships keep their fresh
-   * defaults: this client never learns their wallets, and never needs to.
+   * world (`./prediction` `applyPlayerEconomy`) — held ore, banked ore and every
+   * upgrade track the client recognizes, with the stats those tiers scale
+   * recomputed, so the returning ship matches the one authority is flying rather
+   * than merely wearing its labels. Remote ships keep their fresh defaults: this
+   * client never learns their wallets, and never needs to.
    */
   private restoreEconomy(world: World, economy: PlayerEconomy): void {
-    const ship = world.ships.find((s) => s.id === this.player);
-    if (!ship) return;
-    ship.cargo = economy.held;
-    ship.banked = economy.banked;
-    for (const track of Object.keys(ship.tiers)) {
-      const restored = economy.tiers[track];
-      if (typeof restored === 'number') {
-        (ship.tiers as Record<string, number>)[track] = restored;
-      }
-    }
-    refreshDerivedStats(ship);
+    applyPlayerEconomy(world, this.player, economy);
   }
 }
 
