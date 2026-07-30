@@ -179,6 +179,56 @@ describe('the markup', () => {
   it('marks the button disabled while working', () => {
     expect(renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'working'))).toContain('disabled');
   });
+
+  // The landscape lock (`@platform/orientation`). The game root is rotated +90° on a
+  // touch viewport held portrait, so this affordance — DOM over the canvas, laid out
+  // in physical space — has to rotate with it or be the one thing on the screen
+  // reading sideways, in the wrong corner. Asserted as CSS text because that is the
+  // whole mechanism: there is no JS to exercise, which is the point of doing it with
+  // a media query rather than a resize handler this module would have to own.
+  describe('under the landscape lock', () => {
+    const css = renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'idle'));
+
+    it('rotates only on a touch viewport held portrait — the lock’s own condition', () => {
+      // `pointer:coarse` is the `isTouch` main.ts hands `computeRootTransform`;
+      // `orientation:portrait` is its `physH > physW`. Anything else (desktop, or a
+      // phone already in landscape) leaves the affordance untransformed.
+      expect(css).toContain('@media (pointer:coarse) and (orientation:portrait)');
+    });
+
+    it('turns the same way the root does, so its text reads with the game’s', () => {
+      // +π/2, matching `computeRootTransform`'s rotation — not -90, which would read
+      // upside down relative to every other word on the screen.
+      expect(css).toContain('rotate(90deg)');
+      expect(css).not.toContain('rotate(-90deg)');
+    });
+
+    it('lands on the logical bottom-right, which is the PHYSICAL bottom-left', () => {
+      // The root's +π/2-about-origin-then-translate-x-by-physW puts logical
+      // bottom-right — where this sits unrotated — at physical (0, physH). So the
+      // rotated rule anchors left/bottom and releases the `right` the base rule set.
+      expect(css).toContain('right:auto');
+      expect(css).toContain('left:max(12px,env(safe-area-inset-left))');
+      expect(css).toContain('bottom:max(12px,env(safe-area-inset-bottom))');
+      // Origin and pre-rotation shift together are what make it grow back INTO the
+      // logical viewport instead of off its right edge.
+      expect(css).toContain('transform-origin:left bottom');
+      expect(css).toContain('translateX(-100%)');
+    });
+
+    it('caps its width against the physical height it is now measured along', () => {
+      // Unrotated the cap is 80vw; rotated, the element's width runs down the
+      // physical screen, so the viewport unit that bounds it is vh.
+      expect(css).toContain('max-width:min(22rem,80vh)');
+    });
+
+    it('still states the 44px touch minimum, which a rotation cannot rescue', () => {
+      // A rotated box swaps which edge is which; both minima are set, so the target
+      // clears 44px in either orientation.
+      expect(css).toContain('min-height:44px');
+      expect(css).toContain('min-width:44px');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

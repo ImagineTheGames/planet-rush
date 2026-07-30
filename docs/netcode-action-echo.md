@@ -203,6 +203,55 @@ a `files:` share rejects rather than degrades and that must cost the clipboard r
 nothing. A dismissed sheet falls through silently. Still no `fetch` and no endpoint
 anywhere in the feature.
 
+### …and the button was sideways
+
+`tests/live-stage/copy-log-touch.spec.ts` **has now run**, green, both tests, on the
+phone profile against the shipped bundle. Getting it to run needed no root after all,
+which is worth writing down because the same recipe unblocks `connect-trace.spec.ts`
+and every other live-stage config in this lane:
+
+```sh
+# Chromium's binary is installed; 17 of its shared libraries are not, and
+# `playwright install-deps` wants a root this box does not have. It does not need to.
+apt-get -o Dir::State::Lists=/tmp/plibs/lists -o Dir::Cache=/tmp/plibs/cache update
+cd /tmp/plibs/debs && apt-get -o Dir::State::Lists=/tmp/plibs/lists download \
+  libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+  libcups2 libdrm2 libgbm1 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+  libxrandr2 libasound2 libwayland-server0 libxi6 libxtst6 libpango-1.0-0 libcairo2 \
+  libgtk-3-0 libgdk-pixbuf-2.0-0 libepoxy0 libxshmfence1 libxcb-dri3-0 libxcb-present0
+for d in *.deb; do dpkg-deb -x "$d" /tmp/plibs/root/; done
+export LD_LIBRARY_PATH=/tmp/plibs/root/usr/lib/x86_64-linux-gnu
+npx playwright test --config tests/live-stage/playwright.copy-log.config.ts
+```
+
+It earned the run twice over.
+
+**The spec was asserting a payload that does not exist.** `parsed.entries` for
+`events`, a `viewportWidth` number for the `"390x844"` string
+`PlaytestLogEnvironment` actually carries. Both plausible, neither real, and nothing
+else in the suite could have said so — the unit tests import the type, so they cannot
+disagree with it. A test that has never executed is a claim, not evidence.
+
+**And the affordance did not turn with the game.** Planet Rush is landscape on mobile
+*always*: on a touch viewport held portrait the game root is rotated +90°
+(`@platform/orientation`) so the player sees a landscape game however the phone is
+held. Everything drawn *into* that root rotates for free. COPY LOG is DOM over the
+canvas, laid out in physical space, and so was the one element on the screen reading
+sideways — in the physical bottom-right, which under that transform is not the corner
+it means. The screenshot is what showed it; no unit test was ever going to.
+
+It now carries the rotation itself, as a media query stating the lock's own condition
+(`pointer:coarse` is the `isTouch` `main.ts` hands `computeRootTransform`;
+`orientation:portrait` is its `physH > physW`) — rather than wiring in from `main.ts`,
+which is another lane's file, and which a pure media query cannot fall out of step
+with. Logical bottom-right lands on the physical bottom-left, so the rule releases
+`right`, anchors `left`/`bottom`, and turns about `left bottom` with a `translateX(-100%)`
+that applies first, putting the element's right edge on the origin so it grows back
+*into* the logical viewport instead of off its right edge.
+
+A log the developer has to tilt their head to find is most of the way back to having
+no way to send one.
+
 ## The gate
 
 `tests/net/single-volley.test.ts` runs the full two-client stack at 150 ms / ±30 ms
@@ -233,7 +282,7 @@ rollback and a build clock that takes two seconds to build two seconds of turret
 player reads is one the server stated (`src/net/hull-authority.test.ts`).
 
 `tests/live-stage/copy-log-touch.spec.ts` proves the export path on a phone profile
-in the real bundle. **It has not run in this lane** — Chromium's `headless_shell` is
-missing `libnss3`/`libnspr4`/`libdbus`/`libatk` here and `playwright install-deps`
-needs root, the same condition `connect-trace.spec.ts` documents. Everything it
-covers except the *wiring* is green with no browser in the DoD suite.
+in the real bundle, and **it is green** — see the section above for the run and for
+the two defects the run found. Evidence: `copy-log-touch-pause-evidence.png` and
+`copy-log-touch-shared-evidence.png`, both portrait, both showing COPY LOG turned
+with the game.
