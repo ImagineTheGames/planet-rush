@@ -1,0 +1,39 @@
+{
+  "probe": "reconnect-economy",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T15:11:53.996Z",
+  "room": "FUYS",
+  "machine": "0800d5b6d62328",
+  "hostWelcomeDials": 2,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "authorityHeldAfterMining": null,
+  "nearestRockUnits": 117,
+  "authorityWalletBeforeDrop": null,
+  "clientWalletBeforeDrop": {
+    "shipClass": "interceptor",
+    "banked": 0,
+    "cargo": 2,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "spendLanded": false,
+  "economies": [],
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "FUYS",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    }
+  ]
+}

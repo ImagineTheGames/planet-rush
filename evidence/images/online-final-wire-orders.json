@@ -1,0 +1,205 @@
+{
+  "probe": "wire-orders",
+  "allocator": "http://127.0.0.1:8892",
+  "capturedAt": "2026-07-30T15:05:34.783Z",
+  "results": [
+    {
+      "order": "A. buildOrder:turret (control)",
+      "room": "X8V7",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 2,
+      "finalWallet": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": true
+    },
+    {
+      "order": "B. buildOrder:shield alone",
+      "room": "4BFM",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 1,
+      "finalWallet": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": false
+    },
+    {
+      "order": "C. buildOrder:satellite alone",
+      "room": "PAC2",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 1,
+      "finalWallet": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": false
+    },
+    {
+      "order": "D. upgradeOrder:cargo alone",
+      "room": "MPQ8",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 1,
+      "finalWallet": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": false
+    },
+    {
+      "order": "E. turret + thrust (control pair)",
+      "room": "YYLM",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 2,
+      "finalWallet": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": true
+    },
+    {
+      "order": "F. turret + upgradeOrder:cargo",
+      "room": "EE7L",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 1,
+      "finalWallet": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": false
+    },
+    {
+      "order": "G. turret + buildOrder:satellite",
+      "room": "GWLB",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 1,
+      "finalWallet": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": false
+    },
+    {
+      "order": "H. turret + buildOrder:shield",
+      "room": "X7T4",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 2,
+      "finalWallet": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": true
+    },
+    {
+      "order": "I. turret + buildOrder:repair",
+      "room": "W7DS",
+      "machine": "m-qa-head",
+      "dial": 1,
+      "seat": 0,
+      "matchStartTick": 0,
+      "result": "ran",
+      "walletFrames": 2,
+      "finalWallet": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "authorityCharged": true
+    }
+  ]
+}
