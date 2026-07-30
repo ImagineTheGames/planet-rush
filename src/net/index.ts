@@ -25,6 +25,14 @@
  * with authority, replay everything the server has not yet run (GDD §4.2). The
  * static half of the world that does not stream arrives as events and is applied
  * by `./entity-events`.
+ *
+ * And three modules make that reconciliation *feel* right at real latency (M10):
+ * `./telemetry` instruments it — misprediction rate, correction magnitude, and
+ * measured RTT, sampled per second for the `?debug=1` netgraph; `./interpolation`
+ * renders other ships ~100 ms in the past so their motion is smooth at any RTT
+ * while the local ship stays predicted; and `./latency-transport` wraps any
+ * transport in a configurable one-way delay + jitter, so the developer's ~150 ms
+ * condition is a test that runs instantly rather than a feel only reproduced live.
  */
 
 export * from './transport';
@@ -32,9 +40,12 @@ export * from './input-queue';
 export * from './snapshot';
 export * from './entity-events';
 export * from './prediction';
+export * from './telemetry';
+export * from './interpolation';
 export * from './reconnect';
 export * from './wire';
 export * from './loopback';
+export * from './latency-transport';
 export * from './allocator-client';
 export * from './server-url';
 export * from './websocket-transport';

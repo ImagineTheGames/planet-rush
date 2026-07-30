@@ -405,6 +405,62 @@ is unaffected — a fleet's URL still comes from the signed `ResolvedConnection`
 (`src/net/allocator-client.ts`); this is the seam the single/self-hosted server and
 local dev dial through.
 
+## Reconciliation feel at real latency (M10)
+
+A developer playing live from Brazil (gru edge) against the single-region iad
+fleet — ~150–180 ms RTT — reported *"constant server rollback."* At that latency
+the reconciliation *policy* is the game feel, so this milestone made the feel
+measurable, smooth, and permanently guarded. The one-line finding: **the rollback
+was never physics divergence.** Instrumented at the developer's exact condition,
+corrections sit at the wire's ~1-unit quantization floor with a ~1 %
+misprediction rate — the felt rollback was the *presentation* of tiny corrections
+(a local snap, and un-interpolated remote ships stuttering), not the sim
+disagreeing.
+
+**Capture** (reproduce: `npx vitest run src/net/spike/reconcile-capture.test.ts`;
+`NetTelemetry` fed through a real client↔authority round trip over an
+artificially delayed wire at one-way 3 frames + 0–2 jitter, 30 Hz broadcast):
+
+```
+net telemetry — last 9s
+  +  0s  rtt  151/ 167ms  corr 0.4/1.1u  mispred   4%  (27 recon)
+  +  1s  rtt  147/ 167ms  corr 0.6/0.9u  mispred   0%  (30 recon)
+  +  2s  rtt  158/ 167ms  corr 0.5/1.0u  mispred   0%  (30 recon)
+  +  3s  rtt  154/ 167ms  corr 0.4/1.0u  mispred   3%  (30 recon)
+  +  4s  rtt  150/ 167ms  corr 0.0/0.0u  mispred   0%  (31 recon)
+  +  5s  rtt  151/ 167ms  corr 0.0/0.0u  mispred   0%  (30 recon)
+  +  6s  rtt  153/ 167ms  corr 0.0/0.0u  mispred   0%  (30 recon)
+  +  7s  rtt  151/ 167ms  corr 0.0/0.0u  mispred   0%  (29 recon)
+  summary: rtt ~152ms  worst corr 1.1u  mispred 1%  over 238 reconciles
+```
+
+**What shipped** (all behind the one `Transport` seam, no protocol change):
+
+1. **Telemetry** (`src/net/telemetry.ts`, `NetTelemetry`) — misprediction rate,
+   correction magnitude, and RTT sampled per wall-clock second. RTT is *measured*
+   off the ack the reconcile loop already carries (send→first-ack round trip), so
+   no new wire field and no server clock. Wired into `TransportSession`; a
+   `?debug=1` netgraph reads `session.telemetry.live` per frame and
+   `.format()` dumps the capture above.
+2. **Smooth corrections** (`src/net/prediction.ts`) — the visual correction offset
+   now blends out over a named `RECONCILE_BLEND_FRAMES` (exponential error decay,
+   time-constant 6 frames ≈ 100 ms), and only a divergence past `SNAP_THRESHOLD`
+   (120 u, teleport-grade: respawn / reclaim / resync) is hard-snapped. Below it,
+   nothing the developer sees is a jump.
+3. **Remote interpolation** (`src/net/interpolation.ts`, `RemoteInterpolator`) —
+   other ships render `INTERP_DELAY_MS` (100 ms) in the past, played back *between*
+   received snapshots rather than dead-reckoned forward, so their motion is smooth
+   at any local RTT. The local ship stays predicted. Fed by `TransportSession`; the
+   render layer samples it (that wiring is Platform's lane — see the PR).
+4. **Latency harness** (`src/net/latency-transport.ts` + the permanent test in
+   `src/net/prediction.test.ts`) — the developer's ~150 ms + jitter is now a
+   standing assertion: normal flight never produces a correction ≥ `SNAP_THRESHOLD`.
+
+**Region note (Director decision, not acted on here).** The fleet is single-region
+iad; a gru client eats the whole ~150 ms. The telemetry above is the input to
+"does a gru Machine earn its keep?" — multi-region seams already exist (allocator
+region hints, router). Out of scope for M10 by the brief.
+
 ### Still open, gathered in one place (the day-0 habit)
 
 - **Risk 3 (TCP HoL)** — unmeasured until run over a real lossy link (item 4).
