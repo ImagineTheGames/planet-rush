@@ -284,6 +284,7 @@ import type {
   ResolvedConnection,
   AllocatorClientConfig,
   ConnectTrace,
+  ConnectStep,
   SessionLogHandle,
   // The room code the doors resolved and the lobby opens on — one code, end to end
   // (the unified play flow; `./ui/lobby-flow` rule 1).
@@ -5113,6 +5114,10 @@ function openMainMenu(
   // The transport state last folded into the trace, so a poll records one step per
   // change rather than one per tick.
   let tracedTransportState = '';
+  // The last step written to the session log, by identity — see `traceStep`. An
+  // advance that adds no line (the socket opening) must not re-log the line it
+  // left standing.
+  let lastTracedStep: ConnectStep | null = null;
   installConnectTraceView({
     dom: document,
     onRetry: () => {
@@ -5125,11 +5130,17 @@ function openMainMenu(
    * Take one step of the connection's story: keep it, draw it, and write it to the
    * session log — in that order, and in one place, so the screen and the pasted log
    * can never disagree about what happened or when (m10-09b `connect` channel).
+   *
+   * Not every advance is a step. A socket that opens moves the stall clock without
+   * adding a line (`connectProgress`), and the trace is immutable, so "is this a new
+   * line?" is an identity check against the last one logged — no line, no log entry,
+   * and the export does not gain a `dialing` it already has.
    */
   function traceStep(next: ConnectTrace): void {
     const step = next.steps[next.steps.length - 1];
     connectTrace = next;
-    if (step) {
+    if (step && step !== lastTracedStep) {
+      lastTracedStep = step;
       const entry = connectTraceLogEntry(step);
       playtest.recordConnect(entry.step, entry.data);
     }
@@ -5211,6 +5222,7 @@ function openMainMenu(
     connectTrace = null;
     retryDoor = null;
     tracedTransportState = '';
+    lastTracedStep = null;
     stopTraceTicker();
     hideConnectTrace();
   }
