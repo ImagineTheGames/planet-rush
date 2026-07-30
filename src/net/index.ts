@@ -33,6 +33,15 @@
  * while the local ship stays predicted; and `./latency-transport` wraps any
  * transport in a configurable one-way delay + jitter, so the developer's ~150 ms
  * condition is a test that runs instantly rather than a feel only reproduced live.
+ *
+ * And one module group exists so a *playtest* can be reported rather than described:
+ * `./playtest-log` is a bounded, local-only ring of the session's real events (build
+ * sha, the whole connection lifecycle, the per-second net telemetry, match events,
+ * our own console errors), `./playtest-log-capture` feeds it the console,
+ * `./playtest-log-attach` feeds it a live session, `./playtest-log-export` puts it on
+ * the clipboard (with a download fallback), and `./playtest-log-button` is the one
+ * COPY LOG affordance that offers it — on the pause menu and on every error screen.
+ * Nothing in that group uploads anything; the developer chooses what to paste.
  */
 
 export * from './transport';
@@ -46,6 +55,11 @@ export * from './reconnect';
 export * from './wire';
 export * from './loopback';
 export * from './latency-transport';
+export * from './playtest-log';
+export * from './playtest-log-capture';
+export * from './playtest-log-export';
+export * from './playtest-log-button';
+export * from './playtest-log-attach';
 export * from './allocator-client';
 export * from './server-url';
 export * from './websocket-transport';
