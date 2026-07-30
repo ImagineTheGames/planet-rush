@@ -1,0 +1,174 @@
+{
+  "probe": "reconnect-economy",
+  "allocator": "http://127.0.0.1:8892",
+  "capturedAt": "2026-07-30T15:11:09.034Z",
+  "room": "ZT29",
+  "machine": "m-qa-head",
+  "hostWelcomeDials": 1,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "authorityHeldAfterMining": 1,
+  "nearestRockUnits": 124,
+  "authorityWalletBeforeDrop": {
+    "held": 1,
+    "banked": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "clientWalletBeforeDrop": {
+    "shipClass": "interceptor",
+    "banked": 0,
+    "cargo": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "spendLanded": true,
+  "tickAtDrop": 334,
+  "substitutionSeenByPeer": true,
+  "afterReclaimAlice": {
+    "shipClass": "interceptor",
+    "banked": 0,
+    "cargo": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "tickAfterReclaim": 1510,
+  "reclaimedSameSeat": true,
+  "aliceOpensAfterDrop": 1,
+  "joinErrorsPastDrop": 0,
+  "aliceSawReclaimBroadcast": true,
+  "bobSawReclaimBroadcast": true,
+  "aliceSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerReclaimed"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerSubstituted",
+    "playerReclaimed"
+  ],
+  "aliceState": "open",
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "ZT29",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    },
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "ZT29",
+      "tick": 349,
+      "economy": {
+        "held": 1,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "hasReclaimToken": true,
+      "afterDrop": true
+    }
+  ],
+  "economyFrames": [
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 0,
+      "economy": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 6,
+      "economy": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 334,
+      "economy": {
+        "held": 1,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    }
+  ],
+  "joinWelcomeCarriedEconomy": false,
+  "reclaimWelcomeEconomy": {
+    "held": 1,
+    "banked": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "reclaimWalletIsSpawnDefault": false,
+  "economyResetToSeedOnReclaim": false
+}

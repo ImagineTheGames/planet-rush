@@ -1,0 +1,310 @@
+{
+  "probe": "reclaim-upgrades",
+  "attempts": 3,
+  "foundUpgrade": false,
+  "runs": [
+    {
+      "attempt": 1,
+      "at": "2026-07-30T16:25:13.861Z",
+      "room": "MCND",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wentBroke": true,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "tickAtDrop": 12,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 0,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "MCND",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "MCND",
+          "tick": 364,
+          "economy": {
+            "held": 0,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    },
+    {
+      "attempt": 2,
+      "at": "2026-07-30T16:25:59.405Z",
+      "room": "UJAE",
+      "machine": "6836293b5161d8",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wentBroke": true,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "tickAtDrop": 14,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 1,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 0,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "UJAE",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "UJAE",
+          "tick": 372,
+          "economy": {
+            "held": 1,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": [
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 1720,
+          "economy": {
+            "held": 0,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": true
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "at": "2026-07-30T16:26:45.170Z",
+      "room": "4F46",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 0,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wentBroke": true,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "tickAtDrop": 14,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 1,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 0,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "4F46",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "4F46",
+          "tick": 382,
+          "economy": {
+            "held": 1,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": [
+        {
+          "type": "economy",
+          "player": 0,
+          "tick": 2408,
+          "economy": {
+            "held": 0,
+            "banked": 0,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "afterDrop": true
+        }
+      ]
+    }
+  ]
+}

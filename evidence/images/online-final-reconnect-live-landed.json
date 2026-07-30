@@ -1,0 +1,85 @@
+{
+  "probe": "reconnect-economy",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-30T14:58:13.342Z",
+  "room": "84LX",
+  "machine": "6836293b5161d8",
+  "hostWelcomeDials": 2,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "stampedBefore": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "upgradeLanded": true,
+  "tickAtDrop": 56,
+  "substitutionSeenByPeer": true,
+  "afterReclaimAlice": {
+    "shipClass": "interceptor",
+    "banked": 3,
+    "cargo": 0,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 0,
+      "hull": 0
+    }
+  },
+  "tickAfterReclaim": 518,
+  "reclaimedSameSeat": true,
+  "aliceOpensAfterDrop": 1,
+  "joinErrorsPastDrop": 0,
+  "aliceSawReclaimBroadcast": true,
+  "bobSawReclaimBroadcast": true,
+  "aliceSaw": [
+    "joinError",
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot",
+    "playerReclaimed"
+  ],
+  "bobSaw": [
+    "joinError",
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "snapshot",
+    "playerSubstituted",
+    "playerReclaimed"
+  ],
+  "aliceState": "open",
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "84LX",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    },
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "84LX",
+      "tick": 430,
+      "hasReclaimToken": true,
+      "afterDrop": true
+    }
+  ],
+  "joinWelcomeCarriedEconomy": false,
+  "reclaimWelcomeEconomy": null
+}

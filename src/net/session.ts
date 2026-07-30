@@ -34,7 +34,8 @@ import type { LoopbackConfig } from './loopback';
 import { PredictedMatch, applyPlayerEconomy } from './prediction';
 import { NetTelemetry } from './telemetry';
 import { RemoteInterpolator } from './interpolation';
-import type { InterpolatedShip } from './interpolation';
+import type { InterpolatedShip, InterpolatedShot } from './interpolation';
+import { PresentationLayer } from './presentation';
 import { decodeSnapshot } from './snapshot';
 import type {
   BotDifficulty,
@@ -76,15 +77,18 @@ export interface MatchSession {
   /**
    * The predictor, online; null offline, where authority is already in this
    * process. The renderer reads {@link PredictedMatch.renderOffset} off it to
-   * absorb corrections smoothly, and a netgraph reads the error and the lead.
+   * absorb corrections smoothly, and the instrument reads the error and the lead.
    */
   readonly prediction: PredictedMatch | null;
   /**
    * Client-side reconciliation telemetry — misprediction rate, correction
    * magnitude, and measured RTT, sampled per second (`./telemetry`, M10 reconcile
    * brief). Populated only online, where there is prediction to measure; a
-   * `?debug=1` netgraph reads {@link NetTelemetry.live} per frame and
-   * {@link NetTelemetry.format} dumps a capture.
+   * Every finalized second reaches the player through COPY LOG
+   * (`./playtest-log-attach`); {@link NetTelemetry.format} dumps a capture for a
+   * console or a test. (#238's comments promised a `?debug=1` netgraph reading
+   * {@link NetTelemetry.live} per frame — it was never built. See
+   * docs/netcode-audit.md §6.)
    */
   readonly telemetry: NetTelemetry;
   /**
@@ -101,6 +105,12 @@ export interface MatchSession {
    * domains. Empty offline (authoritative world) and until the first snapshot.
    */
   sampleRemotes(): readonly InterpolatedShip[];
+  /**
+   * Streamed shots at the current render instant, played back on the same jitter
+   * buffer as {@link sampleRemotes} — the firer's own predicted shots are not in
+   * here, by design (`./prediction`). Empty offline and until the first snapshot.
+   */
+  sampleShots(): readonly InterpolatedShot[];
   /** Leave the match. */
   close(): void;
 }
@@ -163,6 +173,10 @@ export class TransportSession implements MatchSession {
   private snapshotTick: Tick = -1;
   private predictor: PredictedMatch | null = null;
   private interpolator: RemoteInterpolator | null = null;
+  /** Writes the smoothed/interpolated picture over the predicted world for the
+   *  render window, and takes it straight back off (`./presentation`). Null
+   *  offline, where the world *is* authority and there is nothing to smooth. */
+  private presentation: PresentationLayer | null = null;
   /**
    * The wallet the server sent in a reclaim `welcome`, held until the predicted
    * world exists to stamp it onto. Welcome arrives before the `matchStart` that
@@ -174,7 +188,7 @@ export class TransportSession implements MatchSession {
   private readonly dt: number;
   private readonly clock: () => number;
   /** The reconciliation instrument — fed on every send and every applied
-   *  reconcile, read by the `?debug=1` netgraph (`./telemetry`). Inert offline. */
+   *  reconcile, and handed back through COPY LOG (`./telemetry`). Inert offline. */
   private readonly netTelemetry = new NetTelemetry();
   /** True when the transport runs the sim in this process. Then the session
    *  predicts nothing: there is no latency to hide, and inventing a second copy
@@ -280,11 +294,42 @@ export class TransportSession implements MatchSession {
     return this.interpolator;
   }
 
+  /**
+   * Why the transport closed, when the concrete transport says so
+   * (`./websocket-transport` `CloseReason`: a deliberate leave, a dead room, a spent
+   * grace window, a refused join). Null offline, and null while still connected.
+   *
+   * Read structurally rather than by importing the concrete class, because that is
+   * exactly the seam `Transport` exists to keep: a session works over any transport,
+   * and the two that carry a reason are welcome to say so without the interface
+   * growing a field a `LocalLoopback` would have to fake. Surfaced for the reconnect
+   * banner and for the playtest log, which must record *why* a socket ended
+   * (`./playtest-log-attach`).
+   */
+  get closeReason(): string | null {
+    return readOptionalString(this.transport, 'closeReason');
+  }
+
+  /** The server's stated reason for refusing a join, or null. Same structural read
+   *  as {@link closeReason}; meaningful alongside `closeReason === 'join-rejected'`. */
+  get rejectReason(): string | null {
+    return readOptionalString(this.transport, 'rejectReason');
+  }
+
   sampleRemotes(): readonly InterpolatedShip[] {
     return this.interpolator?.sample(this.clock()) ?? [];
   }
 
+  sampleShots(): readonly InterpolatedShot[] {
+    return this.interpolator?.sampleShots(this.clock()) ?? [];
+  }
+
   sendInput(actions: readonly Action[]): void {
+    // The world the game loop has been rendering holds *presented* values — the
+    // local hull nudged by its decaying correction offset, remote hulls a jitter
+    // buffer in the past. Put the simulation back before a single tick of it runs
+    // (`./presentation`), or the picture compounds into drift.
+    this.unpresent();
     const tick = this.tick;
     const seq = ++this.seq;
     this.transport.send({ type: 'input', tick, seq, actions });
@@ -296,6 +341,34 @@ export class TransportSession implements MatchSession {
       this.netTelemetry.recordInput(seq, this.clock());
       this.predictor.predict(seq, actions);
     } else this.nextTick = tick + 1;
+    this.present();
+  }
+
+  /**
+   * Draw the presented frame over the predicted world, so the renderer — which
+   * reads the world and nothing else — sees smoothing and interpolation at all.
+   *
+   * This is where PR #238's two dead seams (`prediction.renderOffset`,
+   * `sampleRemotes()`) finally reach a screen. It is deliberately *here* rather
+   * than in the render layer: the game loop is Platform's, the world is the
+   * contract between us, and the net lane can honour that contract without
+   * reaching across it (docs/netcode-audit.md).
+   */
+  private present(): void {
+    const world = this.predictor?.world;
+    if (!world || !this.presentation) return;
+    this.presentation.apply(world, {
+      localOffset: this.predictor!.renderOffset,
+      remotes: this.sampleRemotes(),
+      shots: this.sampleShots(),
+    });
+  }
+
+  /** Put the simulation back. Idempotent; called before anything that steps or
+   *  reconciles, so a message arriving between frames is applied to sim state. */
+  private unpresent(): void {
+    const world = this.predictor?.world;
+    if (world && this.presentation) this.presentation.restore(world);
   }
 
   close(): void {
@@ -322,15 +395,34 @@ export class TransportSession implements MatchSession {
         if (this.predictor) {
           const now = this.clock();
           const decoded = decodeSnapshot(message.payload);
+          // A snapshot lands between frames, so the world may be holding presented
+          // values right now. Reconcile against the simulation, never the picture.
+          this.unpresent();
           const report = this.predictor.reconcile(decoded, message.ackSeq);
-          // Feed the netgraph only for a reconcile that actually applied — a stale
+          // Feed the instrument only for a reconcile that actually applied — a stale
           // snapshot the client ignored is not a data point (`./telemetry`).
           if (report.applied) {
-            this.netTelemetry.recordReconcile(report, message.ackSeq, now);
+            this.netTelemetry.recordReconcile(
+              { ...report, lead: report.replayed },
+              message.ackSeq,
+              now,
+            );
+            const live = this.netTelemetry.live;
+            // Re-size the jitter buffer from the variance just measured, not from a
+            // constant (audit item 2d). Slew-limited inside, so this is a slide.
+            this.interpolator?.resize(live.rttJitterMs);
+            // And bound how far ahead of authority this client may run, from the
+            // same measurement — otherwise a retransmit stall leaves the clock
+            // hundreds of ms out and every later press waits in the server's queue
+            // for it (`./prediction` MAX_LEAD_TICKS).
+            this.predictor.setLeadBudget(live.rttFloorMs, live.rttJitterMs);
           }
           // And buffer the authoritative frame for remote-ship interpolation,
           // timed by the same clock the render layer samples with (`./interpolation`).
           this.interpolator?.record(decoded, now);
+          // Put the picture back up: a frame drawn between this snapshot and the
+          // next tick must not show the raw correction we just applied.
+          this.present();
         }
         break;
       }
@@ -411,9 +503,12 @@ export class TransportSession implements MatchSession {
       this.restoreEconomy(world, this.pendingEconomy);
       this.pendingEconomy = null;
     }
-    // Remote ships render out of this buffer, ~100 ms in the past, so their
-    // motion is smooth at any RTT while the local slot stays predicted (M10).
+    // Remote ships and streamed shots render out of this buffer, one jitter-buffer
+    // delay in the past, so their motion is smooth at any RTT while the local slot
+    // stays predicted (M10). The delay opens at the standard 100 ms and re-sizes
+    // itself from measured RTT variance thereafter (audit item 2d).
     this.interpolator = new RemoteInterpolator({ local: this.player });
+    this.presentation = new PresentationLayer(this.player);
   }
 
   /**
@@ -451,6 +546,13 @@ export interface OnlineSessionConfig {
   readonly transport?: Omit<WebSocketTransportConfig, 'url' | 'room'>;
 }
 
+/** Read a named optional string property off a transport, or null when it does not
+ *  carry one (the `LocalLoopback` case). Never throws on a transport that lacks it. */
+function readOptionalString(transport: unknown, key: string): string | null {
+  const value = (transport as Record<string, unknown> | null)?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 /** An online session, with the two lobby gestures a room needs. */
 export interface OnlineSession extends MatchSession {
   /** Re-send the lobby choice (hull, fire mode, bot difficulties). */
@@ -463,6 +565,12 @@ export interface OnlineSession extends MatchSession {
   startMatch(): void;
   /** Watch the protocol: lobby state, the reconnect-grace pair, match end. */
   observe(handler: (message: ServerMessage) => void): void;
+  /** Why the socket closed, once it has — a deliberate leave, a dead room, a spent
+   *  grace window, or a refused join. Null while connected (`./websocket-transport`
+   *  `CloseReason`). */
+  readonly closeReason: string | null;
+  /** The server's own reason for refusing the join, or null. */
+  readonly rejectReason: string | null;
 }
 
 /**

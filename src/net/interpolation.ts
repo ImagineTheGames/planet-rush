@@ -35,7 +35,7 @@
 
 import type { PlayerId } from '@shared/types';
 import { dequantizeAngle } from './snapshot';
-import type { DecodedSnapshot, ShipSnap } from './snapshot';
+import type { DecodedSnapshot, ProjSnap, ShipSnap } from './snapshot';
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -69,6 +69,74 @@ export const RETAIN_MS = 1000;
  *  times ever misbehave (a clock that jumps). At 30 Hz, 64 covers ~2 s. */
 export const MAX_ENTRIES = 64;
 
+// --- The adaptive jitter buffer (M10 audit item 2d) -------------------------
+//
+// *"jitter buffer sized from measured RTT variance, not a constant."* The delay
+// above is the standard opening value; these three turn it into a range the
+// buffer moves inside, driven by the RTT variance `NetTelemetry` measures.
+
+/**
+ * The floor the adaptive delay will not go below: one 30 Hz broadcast interval
+ * (~33 ms) plus a little, so even on a perfect wire the render clock still lands
+ * *between* two snapshots and playback is interpolation rather than a guess.
+ * A client on a clean LAN pays this and nothing more.
+ */
+export const MIN_DELAY_MS = 45;
+
+/**
+ * The ceiling. Past this, delay stops buying smoothness and starts costing
+ * fairness — a remote ship a quarter-second in the past is a ship you cannot lead
+ * a shot at (GDD §2.6 is a game of leading moving targets). A wire jittery enough
+ * to want more than this is one the acceptance gate should fail, not one the
+ * buffer should quietly absorb.
+ */
+export const MAX_DELAY_MS = 250;
+
+/**
+ * How many standard-ish deviations of measured RTT variance the delay covers,
+ * on top of {@link MIN_DELAY_MS}. Two: an arrival later than twice the smoothed
+ * jitter estimate is rare enough that catching it costs more delay for everyone
+ * than it saves in the tail. `delay = clamp(MIN + JITTER_COVERAGE × jitter)`.
+ */
+export const JITTER_COVERAGE = 2;
+
+/**
+ * How fast the delay is allowed to move, ms per adjustment. A jitter buffer that
+ * re-sizes instantly is itself a source of stutter: every remote ship's render
+ * clock jumps with it. Bounding the step means the buffer *slides* to its new
+ * size over a few snapshots instead of snapping to it.
+ */
+export const DELAY_SLEW_MS = 2;
+
+/**
+ * The delay a measured RTT variance asks for — the sizing rule, exported on its
+ * own so the audit doc and its tests can quote one function rather than a
+ * paragraph. `null` (no measurement yet) opens at {@link INTERP_DELAY_MS}, the
+ * standard value, because a client with no measurement is not a client on a clean
+ * wire — it is a client that does not know yet.
+ */
+export function jitterDelayMs(rttJitterMs: number | null): number {
+  if (rttJitterMs === null) return INTERP_DELAY_MS;
+  const wanted = MIN_DELAY_MS + JITTER_COVERAGE * rttJitterMs;
+  return Math.max(MIN_DELAY_MS, Math.min(MAX_DELAY_MS, wanted));
+}
+
+/**
+ * The longest a shot may plausibly travel between two snapshots before the two
+ * records cannot be the same shot — the fastest muzzle in the game (a turret's
+ * 700 u/s, `src/sim/constants`) with headroom for a late snapshot, plus the wire's
+ * ~1-unit position quantization.
+ *
+ * Projectile records are keyed by **pool slot**, and slots are recycled: a shot
+ * that lands frees its slot for the next one fired. Interpolating across that
+ * reuse would drag a bright dot across the whole arena in 33 ms. So a pair whose
+ * positions are further apart than this is read as *two different shots in one
+ * slot* and is not interpolated — the newer one is drawn where it is.
+ */
+export function maxShotStep(spanMs: number): number {
+  return 700 * (spanMs / 1000) * 1.5 + 4;
+}
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
@@ -86,10 +154,24 @@ export interface InterpolatedShip {
   readonly flags: number;
 }
 
+/**
+ * One shot's render state at the sampled instant. `slot` is the pool slot the
+ * wire named, so the presentation layer can write it straight back into the
+ * client's projectile pool; `meta` is carried verbatim (owner in the low bits,
+ * ship-vs-turret kind in bit 3) so the renderer keeps tinting the two apart.
+ */
+export interface InterpolatedShot {
+  readonly slot: number;
+  readonly x: number;
+  readonly y: number;
+  readonly meta: number;
+}
+
 interface BufferedSnapshot {
   readonly tick: number;
   readonly receivedMs: number;
   readonly ships: readonly ShipSnap[];
+  readonly projectiles: readonly ProjSnap[];
 }
 
 // ---------------------------------------------------------------------------
@@ -99,28 +181,60 @@ interface BufferedSnapshot {
 export class RemoteInterpolator {
   private readonly buffer: BufferedSnapshot[] = [];
   private readonly local: PlayerId;
-  private readonly delayMsValue: number;
+  private delayMsValue: number;
   private readonly maxExtrapolationMs: number;
   private readonly retainMs: number;
   private readonly maxEntries: number;
 
+  /** True when {@link delayMs} is driven by measured RTT variance rather than
+   *  pinned to the value the caller passed in. */
+  private readonly adaptive: boolean;
+  private readonly slewMs: number;
+
   constructor(config: {
     /** The slot rendered by prediction, excluded from every {@link sample}. */
     readonly local: PlayerId;
+    /** Fixed interpolation delay. Passing one turns {@link resize} into a no-op —
+     *  the buffer is pinned, which is what a reproducible test wants. Omitted, the
+     *  buffer opens at {@link INTERP_DELAY_MS} and sizes itself from measured
+     *  jitter (audit item 2d). */
     readonly delayMs?: number;
     readonly maxExtrapolationMs?: number;
     readonly retainMs?: number;
     readonly maxEntries?: number;
+    /** Per-adjustment slew limit, ms. Default {@link DELAY_SLEW_MS}. */
+    readonly slewMs?: number;
   }) {
     this.local = config.local;
+    this.adaptive = config.delayMs === undefined;
     this.delayMsValue = config.delayMs ?? INTERP_DELAY_MS;
     this.maxExtrapolationMs = config.maxExtrapolationMs ?? MAX_EXTRAPOLATION_MS;
     this.retainMs = config.retainMs ?? RETAIN_MS;
     this.maxEntries = config.maxEntries ?? MAX_ENTRIES;
+    this.slewMs = config.slewMs ?? DELAY_SLEW_MS;
   }
 
   /** The interpolation delay in ms — remote ships render this far in the past. */
   get delayMs(): number {
+    return this.delayMsValue;
+  }
+
+  /**
+   * Re-size the jitter buffer from the RTT variance the instrument has measured
+   * (`./telemetry` {@link TelemetryReadout.rttJitterMs}), slew-limited so the
+   * render clock slides rather than jumps. A no-op on a buffer constructed with an
+   * explicit `delayMs`.
+   *
+   * Called once per applied reconcile (`./session`), which is 30 times a second:
+   * at {@link DELAY_SLEW_MS} per step the buffer can travel its whole legal range
+   * in ~3.5 s, fast enough to follow a route change and slow enough that no single
+   * frame moves visibly.
+   */
+  resize(rttJitterMs: number | null): number {
+    if (!this.adaptive) return this.delayMsValue;
+    const target = jitterDelayMs(rttJitterMs);
+    const step = Math.max(-this.slewMs, Math.min(this.slewMs, target - this.delayMsValue));
+    this.delayMsValue += step;
     return this.delayMsValue;
   }
 
@@ -138,7 +252,12 @@ export class RemoteInterpolator {
   record(snapshot: DecodedSnapshot, receivedMs: number): void {
     const newest = this.buffer[this.buffer.length - 1];
     if (newest && snapshot.tick <= newest.tick) return;
-    this.buffer.push({ tick: snapshot.tick, receivedMs, ships: snapshot.ships });
+    this.buffer.push({
+      tick: snapshot.tick,
+      receivedMs,
+      ships: snapshot.ships,
+      projectiles: snapshot.projectiles,
+    });
     this.prune(receivedMs);
   }
 
@@ -158,14 +277,60 @@ export class RemoteInterpolator {
    * The local slot is never returned — it stays predicted.
    */
   sample(nowMs: number): InterpolatedShip[] {
-    if (this.buffer.length === 0) return [];
+    const at = this.bracket(nowMs);
+    if (at === null) return [];
+    if (at.mode === 'hold') return this.snap(at.a);
+    if (at.mode === 'extrapolate') return this.extrapolate(at.a, at.renderMs);
+    return this.lerp(at.a, at.b, at.frac);
+  }
+
+  /**
+   * Where every shot in the streamed projectile pool was {@link delayMs} ago — the
+   * same three regimes as {@link sample}, on the same buffer and the same clock.
+   *
+   * Shots are the one entity class the client *cannot* dead-reckon from the wire:
+   * the 6-byte projectile record carries position and owner but **no velocity**
+   * (`./snapshot`), deliberately, because a client that sees the whole board can
+   * watch a shot fly. The catch is that "watch it fly" was never implemented — a
+   * decoded shot sat still at its snapshot position and teleported on the next one,
+   * 33 ms later, which is exactly the *"jumpy projectiles"* in the field report.
+   * Interpolating between two known positions is the missing half, and it needs no
+   * wire change: two snapshots *are* the velocity.
+   *
+   * The local player's own ship shots are absent from this stream by the time it
+   * gets here — the reconcile path suppresses them so the firer sees their own
+   * predicted shot instead of a copy trailing one round trip behind
+   * (`./prediction`, audit item 2b).
+   */
+  sampleShots(nowMs: number): InterpolatedShot[] {
+    const at = this.bracket(nowMs);
+    if (at === null) return [];
+    if (at.mode !== 'interpolate') return shotsOf(at.a);
+    return this.lerpShots(at.a, at.b, at.frac);
+  }
+
+  // --- Internals ----------------------------------------------------------
+
+  /**
+   * Locate the render instant in the buffer: which pair of snapshots surrounds it,
+   * and how far between them it sits. Null before the first snapshot.
+   */
+  private bracket(
+    nowMs: number,
+  ):
+    | { mode: 'hold' | 'extrapolate'; a: BufferedSnapshot; b: BufferedSnapshot; frac: number; renderMs: number }
+    | { mode: 'interpolate'; a: BufferedSnapshot; b: BufferedSnapshot; frac: number; renderMs: number }
+    | null {
+    if (this.buffer.length === 0) return null;
     const renderMs = nowMs - this.delayMsValue;
 
     const oldest = this.buffer[0]!;
-    if (renderMs <= oldest.receivedMs) return this.snap(oldest);
+    if (renderMs <= oldest.receivedMs)
+      return { mode: 'hold', a: oldest, b: oldest, frac: 0, renderMs };
 
     const newest = this.buffer[this.buffer.length - 1]!;
-    if (renderMs >= newest.receivedMs) return this.extrapolate(newest, renderMs);
+    if (renderMs >= newest.receivedMs)
+      return { mode: 'extrapolate', a: newest, b: newest, frac: 0, renderMs };
 
     // Find the bracketing pair [a, b] with a.receivedMs <= renderMs < b.receivedMs.
     let a = oldest;
@@ -180,10 +345,45 @@ export class RemoteInterpolator {
     }
     const span = b.receivedMs - a.receivedMs;
     const frac = span > 0 ? (renderMs - a.receivedMs) / span : 0;
-    return this.lerp(a, b, frac);
+    return { mode: 'interpolate', a, b, frac, renderMs };
   }
 
-  // --- Internals ----------------------------------------------------------
+  /**
+   * Interpolate every shot present in both snapshots, in the same pool slot and
+   * with the same owner and kind. A slot present in only one of the two is drawn
+   * where it is: a shot that has just spawned, or one that landed between the two
+   * frames and must still be seen for the rest of its playback.
+   */
+  private lerpShots(a: BufferedSnapshot, b: BufferedSnapshot, frac: number): InterpolatedShot[] {
+    const out: InterpolatedShot[] = [];
+    const span = b.receivedMs - a.receivedMs;
+    const maxStep = maxShotStep(span);
+    for (const s of a.projectiles) {
+      const next = b.projectiles.find((o) => o.id === s.id);
+      // A slot whose meta changed is a *recycled* slot, not the same shot moving:
+      // different owner or a turret shot where a ship shot was. Never lerp those.
+      if (!next || next.meta !== s.meta) {
+        out.push({ slot: s.id, x: s.posX, y: s.posY, meta: s.meta });
+        continue;
+      }
+      const dx = next.posX - s.posX;
+      const dy = next.posY - s.posY;
+      if (dx * dx + dy * dy > maxStep * maxStep) {
+        // Same slot, same owner, but further apart than any shot can fly in this
+        // span — the slot was recycled by the same shooter. Draw the newer one.
+        out.push({ slot: next.id, x: next.posX, y: next.posY, meta: next.meta });
+        continue;
+      }
+      out.push({ slot: s.id, x: s.posX + dx * frac, y: s.posY + dy * frac, meta: s.meta });
+    }
+    // Shots that appear only in the later frame: freshly fired. Draw them at their
+    // first known position rather than making the player wait a frame for them.
+    for (const s of b.projectiles) {
+      if (a.projectiles.some((o) => o.id === s.id)) continue;
+      out.push({ slot: s.id, x: s.posX, y: s.posY, meta: s.meta });
+    }
+    return out;
+  }
 
   /** Draw one buffered snapshot with no interpolation (the hold regime). */
   private snap(entry: BufferedSnapshot): InterpolatedShip[] {
@@ -251,6 +451,14 @@ export class RemoteInterpolator {
     }
     while (this.buffer.length > this.maxEntries) this.buffer.shift();
   }
+}
+
+/** One buffered frame's shots, uninterpolated — the hold and extrapolate regimes.
+ *  Shots are not extrapolated at all: with no velocity on the wire there is
+ *  nothing to extrapolate *along*, and a stalled stream is exactly when guessing a
+ *  shot's position would put a bright dot through a hull that never was hit. */
+function shotsOf(entry: BufferedSnapshot): InterpolatedShot[] {
+  return entry.projectiles.map((p) => ({ slot: p.id, x: p.posX, y: p.posY, meta: p.meta }));
 }
 
 /** Shortest-arc angle interpolation, radians. */

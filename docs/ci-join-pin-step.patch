@@ -1,0 +1,103 @@
+# docs/ci-join-pin-step.patch — the CI wiring for the join-pin probe and the
+# connecting-screen evidence. OWNER: Netcode Engineer (M10 join-pin regression).
+#
+# WHY THIS IS A PATCH AND NOT A COMMIT
+# ------------------------------------------------------------------------------
+# The agent token that pushed this branch has no `workflow` scope, so GitHub
+# refuses any push that touches `.github/workflows/**`:
+#
+#   ! [remote rejected] ... refusing to allow an OAuth App to create or update
+#     workflow `.github/workflows/ci.yml` without `workflow` scope
+#
+# Same reason `docs/ci-determinism-step.patch` exists. Everything the two jobs
+# RUN is committed and works today — `npm run test:pin` and
+# `npm run test:connect-evidence` — so this patch only wires them to CI.
+#
+#   git apply docs/ci-join-pin-step.patch
+#
+# WHAT IT ADDS
+#   1. `workflow_dispatch:` — so a branch can be asked for the evidence PNGs
+#      without opening a PR first.
+#   2. A "Join-pin wire probe" step on the merge gate: a two-Machine fleet behind
+#      a Fly-shaped edge, half the rounds aimed at the WRONG Machine on purpose.
+#      No network, no secrets, a few seconds. This is the check that was manual —
+#      and therefore not run — while the fleet served a pre-pin image for days.
+#   3. A `connect-evidence` job: the live-stage run that photographs the verbose
+#      connecting screen against that same fleet, uploading the PNGs.
+#
+# ------------------------------------------------------------------------------
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index ea3c109..72e4e38 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -13,6 +13,9 @@ on:
+     branches: ['**']
+     tags: ['v*']
+   pull_request:
++  # So a branch can be asked for the connecting-screen evidence PNGs without
++  # opening a PR first (M10, brief §3).
++  workflow_dispatch:
+ 
+ # Least privilege by default; the deploy job widens this for itself.
+ permissions:
+@@ -39,6 +42,15 @@ jobs:
+       - name: Unit tests
+         run: npx vitest run
+ 
++      # The join path, dialled the way a player dials it: a two-Machine fleet
++      # behind a Fly-shaped edge, the allocator's own shared connectUrl, and half
++      # the rounds aimed at the WRONG Machine on purpose. It is the Director's 6/6
++      # wire probe with the coin flip removed — the check that was manual, and
++      # therefore not run, while the fleet served a pre-pin image for days (M10).
++      # No network and no secrets: the fleet is local.
++      - name: Join-pin wire probe (local 2-machine fleet)
++        run: npm run test:pin
++
+       - name: Build
+         run: npx vite build
+         env:
+@@ -108,6 +120,43 @@ jobs:
+             -d "${body}" \
+             "https://ntfy.sh/${NTFY_TOPIC}"
+ 
++  # --- The verbose connecting screen, photographed in the real client. ------
++  # The only live-stage run with a FLEET behind it: two match Machines, a
++  # Fly-shaped edge, a real allocator, and a bundle built against them — so the
++  # screenshots show ALLOCATING / TICKET SIGNED / DIALING / JOINED, and the
++  # refusal panel, over a real socket rather than a mock (M10, brief §3).
++  connect-evidence:
++    name: Connecting-screen evidence (Playwright + local fleet)
++    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: 22
++          cache: npm
++      - run: npm ci
++      - id: pw
++        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
++      - id: pw-cache
++        uses: actions/cache@v4
++        with:
++          path: ~/.cache/ms-playwright
++          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
++      - if: steps.pw-cache.outputs.cache-hit != 'true'
++        run: npx playwright install --with-deps chromium
++      - if: steps.pw-cache.outputs.cache-hit == 'true'
++        run: npx playwright install-deps chromium
++
++      - run: npm run test:connect-evidence
++
++      - if: ${{ !cancelled() }}
++        uses: actions/upload-artifact@v4
++        with:
++          name: connect-trace-evidence
++          path: tests/live-stage/connect-trace-*.png
++          retention-days: 14
++
+   mobile:
+     name: Mobile emulation (Playwright)
+     # Run where gating matters (PRs + main) — not on every agent branch push.

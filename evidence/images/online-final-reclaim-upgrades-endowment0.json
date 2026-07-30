@@ -1,0 +1,286 @@
+{
+  "probe": "reclaim-upgrades",
+  "attempts": 3,
+  "foundUpgrade": false,
+  "runs": [
+    {
+      "attempt": 1,
+      "at": "2026-07-30T16:30:10.627Z",
+      "room": "2MGX",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 2,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 1,
+      "turretBuildsAtDrop": 1,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 0,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "setupReady": true,
+      "tickAtDrop": 618,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 2,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 2,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "2MGX",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "2MGX",
+          "tick": 1275,
+          "economy": {
+            "held": 0,
+            "banked": 2,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    },
+    {
+      "attempt": 2,
+      "at": "2026-07-30T16:31:06.243Z",
+      "room": "GH76",
+      "machine": "6836293b5161d8",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 2,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 1,
+      "turretBuildsAtDrop": 1,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 0,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "setupReady": true,
+      "tickAtDrop": 614,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 2,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 2,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "GH76",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "GH76",
+          "tick": 1264,
+          "economy": {
+            "held": 0,
+            "banked": 2,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    },
+    {
+      "attempt": 3,
+      "at": "2026-07-30T16:32:01.604Z",
+      "room": "EZ4S",
+      "machine": "0800d5b6d62328",
+      "aliceSeat": 0,
+      "authorityWalletBeforeDrop": {
+        "held": 2,
+        "banked": 0,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "turretsStandingAtDrop": 1,
+      "turretBuildsAtDrop": 1,
+      "turretsOrdered": 1,
+      "bankedAtDrop": 0,
+      "tiersBeforeDrop": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "setupReady": true,
+      "tickAtDrop": 614,
+      "substitutionSeenByPeer": true,
+      "substituteWindowMs": 42000,
+      "reclaimedSameSeat": true,
+      "reclaimWelcomeEconomy": {
+        "held": 0,
+        "banked": 1.9000000000000026,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "wireTiers": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientTiersAfterReclaim": {
+        "power": 0,
+        "speed": 0,
+        "engine": 0,
+        "cargo": 0,
+        "hull": 0
+      },
+      "clientBankedAfterReclaim": 1.9000000000000026,
+      "clientCargoAfterReclaim": 0,
+      "clientShipClassAfterReclaim": "interceptor",
+      "standInBoughtAnUpgrade": false,
+      "welcomes": [
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "EZ4S",
+          "tick": 0,
+          "hasReclaimToken": true,
+          "afterDrop": false
+        },
+        {
+          "type": "welcome",
+          "you": 0,
+          "room": "EZ4S",
+          "tick": 975,
+          "economy": {
+            "held": 0,
+            "banked": 1.9000000000000026,
+            "tiers": {
+              "power": 0,
+              "speed": 0,
+              "engine": 0,
+              "cargo": 0,
+              "hull": 0
+            }
+          },
+          "hasReclaimToken": true,
+          "afterDrop": true
+        }
+      ],
+      "economyFramesAfterReclaim": []
+    }
+  ]
+}

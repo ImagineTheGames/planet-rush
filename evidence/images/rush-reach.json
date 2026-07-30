@@ -1,0 +1,71 @@
+{
+  "probe": "rush-reach",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-07-30T17:21:15.105Z",
+  "results": [
+    {
+      "profile": "desktop-online",
+      "door": "create",
+      "rushCentre": {
+        "x": 640,
+        "y": 740
+      },
+      "elementAtRushCentre": "LI",
+      "connectTracePresent": true,
+      "connectTraceHidden": true,
+      "connectTraceRect": {
+        "x": 400,
+        "y": 673,
+        "w": 480,
+        "h": 111
+      },
+      "connectTracePointerEvents": "auto",
+      "connectTraceDisplay": "flex",
+      "connectTraceZIndex": "2147483646",
+      "countingAfterPress": false,
+      "startedAfterPress": false,
+      "PRESSABLE": false
+    },
+    {
+      "profile": "desktop-offline",
+      "door": "solo",
+      "rushCentre": {
+        "x": 640,
+        "y": 740
+      },
+      "elementAtRushCentre": "CANVAS",
+      "connectTracePresent": false,
+      "connectTraceHidden": null,
+      "connectTraceRect": null,
+      "connectTracePointerEvents": null,
+      "connectTraceDisplay": null,
+      "connectTraceZIndex": null,
+      "countingAfterPress": true,
+      "startedAfterPress": false,
+      "PRESSABLE": true
+    },
+    {
+      "profile": "phone-online",
+      "door": "create",
+      "rushCentre": {
+        "x": 64,
+        "y": 422
+      },
+      "elementAtRushCentre": "CANVAS",
+      "connectTracePresent": true,
+      "connectTraceHidden": true,
+      "connectTraceRect": {
+        "x": 16,
+        "y": 727,
+        "w": 359,
+        "h": 101
+      },
+      "connectTracePointerEvents": "auto",
+      "connectTraceDisplay": "flex",
+      "connectTraceZIndex": "2147483646",
+      "countingAfterPress": true,
+      "startedAfterPress": false,
+      "PRESSABLE": true
+    }
+  ]
+}

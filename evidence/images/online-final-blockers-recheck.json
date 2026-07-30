@@ -1,0 +1,63 @@
+{
+  "checkedAt": "2026-07-30T17:30:44.351Z",
+  "verdict": "BLOCKED",
+  "fleet": {
+    "reachable": true,
+    "uptimeSeconds": 4277,
+    "uptimeHours": 1.2,
+    "bootedAt": "2026-07-30T16:19:27.341Z",
+    "machine": "0800d5b6d62328",
+    "predatesWalletFix": false,
+    "matchesLastGreenDeploy": false
+  },
+  "checks": [
+    {
+      "id": "deploy-image-builds",
+      "gate": "online-reconnect",
+      "owner": "deploy/CI",
+      "clear": true,
+      "want": "server/Dockerfile copies allocator/ into the build stage",
+      "saw": "Dockerfile copies allocator/"
+    },
+    {
+      "id": "wire-accepts-upgrade-order",
+      "gate": "online-reconnect",
+      "owner": "netcode",
+      "clear": false,
+      "want": "parseActions has a case for 'upgradeOrder', and BUILD_ITEMS contains 'satellite'",
+      "saw": "case 'upgradeOrder': ABSENT; BUILD_ITEMS satellite: ABSENT"
+    },
+    {
+      "id": "copylog-pressable-on-phone",
+      "gate": "online-feel",
+      "owner": "platform/UI",
+      "clear": false,
+      "want": "the COPY LOG affordance mounts inside the element the landscape lock fullscreens",
+      "saw": "installCopyLogButton still mounts into document.body (outside the fullscreen subtree)"
+    },
+    {
+      "id": "respawn-countdown-crosses-the-wire",
+      "gate": "online-feel",
+      "owner": "netcode",
+      "clear": false,
+      "want": "the client can know how much of authority's respawn countdown is left — `respawnTimer` streamed in ShipSnap, or restored by applySnapshot, or the local ship held dead until authority revives it",
+      "saw": "snapshot.ts carries NO respawnTimer and applySnapshot never restores it — so the client respawns the instant authority reports the ship dead, and every reconcile for the next RESPAWN_S (5 s) charges the whole death-site→home distance. MEASURED 2026-07-30T15:50Z, live, room SWQD (images/online-feel-respawn-tail.json): 150 consecutive reconciles, ONE distinct error value 1228.217 u, checkpoint frozen at home (1968.841, 1200), authority frozen at the death site (744, 1291), histHit true and resynced false throughout — the instrument is right and the two states genuinely disagree. Visual snaps stay at 1 because absorb() sees home before and home after, so this never looked like a teleport; what it looks like instead is a ship pinned within ±4 u of home for ~5 s while thrust is held down."
+    },
+    {
+      "id": "fleet-runs-the-wallet-fix",
+      "gate": "online-reconnect",
+      "owner": "deploy/CI",
+      "clear": true,
+      "want": "the live gameserver runs an image built after #241 landed (2026-07-30T11:09:00Z)",
+      "saw": "up 1.2 h, booted 2026-07-30T16:19:27.341Z"
+    },
+    {
+      "id": "rush-pressable-on-desktop",
+      "gate": "online-feel",
+      "owner": "netcode/UI",
+      "clear": false,
+      "want": "the connect-trace panel stops covering the online lobby when hidden — a `#pr-connect-trace[hidden]{display:none}` rule, or `pointer-events:none` on the root",
+      "saw": "the panel still sets only `hidden`, while its id rule keeps `display:flex` and `pointer-events:auto` — so RUSH! stays covered and an online match cannot be started with a mouse"
+    }
+  ]
+}

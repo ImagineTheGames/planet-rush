@@ -52,7 +52,8 @@ import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, step } from '../sim';
 import type { World } from '../sim';
 import { applyEntityEvent } from './entity-events';
-import { MAX_PROJECTILES, SHIP_FLAG, dequantizeAngle } from './snapshot';
+import { LOCAL_SHOT_BASE } from './presentation';
+import { MAX_PROJECTILES, SHIP_FLAG, SHOT_META, dequantizeAngle } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
 import type { EntityEventMessage, PlayerEconomy, Tick } from './transport';
 
@@ -105,6 +106,64 @@ export const SMOOTHING_EPSILON = 0.05;
  */
 export const SNAP_THRESHOLD = 120;
 
+/**
+ * Most locally-predicted own shots kept alive across a reconcile.
+ *
+ * *"PROJECTILES — spawn predicted for the firer"* (M10 audit item 2b). A ship
+ * fires every `SHIP_WEAPON.fireInterval` (0.35 s) and its shot lives
+ * `range / speed` (~0.58 s), so **two** are in flight at once in the steady state;
+ * this is that with room for the SPEED upgrade track and a burst, and it is a hard
+ * cap so a pathological stream cannot grow the pool.
+ */
+export const MAX_PREDICTED_SHOTS = 8;
+
+/**
+ * The most ticks the client will run ahead of the newest snapshot it has applied
+ * — the **lead budget**, and the audit's third fix (docs/netcode-audit.md).
+ *
+ * The client's clock is `snapshotTick + pending`: rewind to authority, replay
+ * everything unacknowledged, land wherever that puts you. In a steady state that
+ * is exactly right — the lead *is* the round trip, measured rather than guessed.
+ * On a lossy wire it is a ratchet. A TCP retransmit stalls the ack stream for
+ * hundreds of ms; the client keeps predicting and sending, so `pending` grows by
+ * however long the stall lasted; the clock jumps forward by that much; and every
+ * input after it is stamped for a tick that far in the future, so the *server*
+ * holds it in its input queue until that tick comes round — which delays the next
+ * ack, which keeps the queue long. The measured cost, at the developer's condition
+ * with 2 % loss: a lead of 33 ticks (550 ms) at 150 ms RTT and 59 ticks (~1 s) at
+ * 250 ms, held for the rest of the match. That is not rollback; it is the player's
+ * own trigger arriving a second late, which is the other half of *"everything
+ * moves so erratically"*.
+ *
+ * So the lead is bounded. This is the ceiling on that bound — 24 ticks, 400 ms,
+ * enough for any playable wire; {@link PredictedMatch.leadBudget} narrows it to
+ * the measured round trip plus a jitter allowance, and the excess is dropped
+ * oldest-first. Dropping an unacknowledged input costs at most one small
+ * correction (the server has almost always refused it as late anyway) and buys the
+ * clock back.
+ */
+export const MAX_LEAD_TICKS = 24;
+
+/**
+ * The most pending inputs one reconcile will drop while pulling an over-budget
+ * clock back.
+ *
+ * Trimming the lead moves the client's clock *backwards* by however many inputs it
+ * drops, and the ship goes with it — so a stall that left the clock 45 ticks out
+ * would, trimmed in one go, rewind the ship three quarters of a second of travel
+ * on screen. That is the exact thing this audit exists to remove. So the clock
+ * bleeds down instead: one tick per reconcile, 30 times a second, each step worth
+ * a few world units and absorbed whole by the correction blend
+ * ({@link RECONCILE_BLEND_FRAMES}). A second's worth of over-lead is gone inside
+ * ~1.5 s and never once seen.
+ */
+export const MAX_TRIM_PER_RECONCILE = 4;
+
+/** The floor the lead budget will not narrow below, whatever the wire measures:
+ *  a client must be able to hold at least this many ticks of input in flight or a
+ *  clean LAN would start trimming its own presses. Four ticks ≈ 67 ms. */
+export const MIN_LEAD_TICKS = 4;
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
@@ -132,7 +191,7 @@ interface Checkpoint {
   y: number;
 }
 
-/** What one reconcile did, for the HUD, the tests, and the netgraph. */
+/** What one reconcile did, for the tests and for the instrument (`./telemetry`). */
 export interface ReconcileReport {
   /** false when the snapshot was stale (an older tick than one already applied)
    *  and was therefore ignored — snapshots are full state, so the newest wins. */
@@ -145,11 +204,26 @@ export interface ReconcileReport {
   /** Pending inputs retired because the server has now simulated them. */
   acknowledged: number;
   /**
+   * Pending inputs **dropped** because the client had run further ahead of
+   * authority than {@link PredictedMatch.leadBudget} allows — the clock being
+   * pulled back after a stall. Zero on a healthy wire; a burst of them is the
+   * signature of a retransmit having just cleared.
+   */
+  trimmed: number;
+  /**
    * True when the client could not rewind — a snapshot from before its history,
    * or from a tick it has not predicted yet (a join mid-match, a long stall) —
    * and took authority wholesale instead of correcting toward it.
    */
   resynced: boolean;
+  /**
+   * True when the correction was **hard-snapped** rather than blended: it cleared
+   * {@link SNAP_THRESHOLD}, so the ship teleported on screen instead of sliding
+   * back over {@link RECONCILE_BLEND_FRAMES}. This is the event a player calls
+   * "server rollback", and the M10 acceptance gate counts it directly rather than
+   * inferring it from a magnitude (`./telemetry` `visualSnaps`).
+   */
+  snapped: boolean;
 }
 
 /** How to stand up a predicted match. */
@@ -182,6 +256,10 @@ export class PredictedMatch {
 
   private snapshotTick: Tick = -1;
   private error = 0;
+  /** Ticks the client may run ahead of authority before the oldest pending inputs
+   *  are dropped. Opens at the ceiling and is narrowed from measured RTT by the
+   *  session ({@link setLeadBudget}). */
+  private lead_budget = MAX_LEAD_TICKS;
   private readonly offset: Vec2 = { x: 0, y: 0 };
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
@@ -229,6 +307,29 @@ export class PredictedMatch {
   /** Tick of the newest snapshot applied, or -1 before the first one. */
   get lastSnapshotTick(): Tick {
     return this.snapshotTick;
+  }
+
+  /** The current lead budget, in ticks (`MAX_LEAD_TICKS` until measured). */
+  get leadBudget(): number {
+    return this.lead_budget;
+  }
+
+  /**
+   * Size the lead budget from a measured round trip.
+   *
+   * The client must hold enough input in flight to cover one round trip plus the
+   * wire's wobble — that is what makes an input arrive *just* before the tick it
+   * is stamped for. Anything past that is not headroom, it is latency the player
+   * pays on their own trigger. So the budget is `RTT + 2 × jitter` in ticks with a
+   * couple of ticks of margin, clamped into
+   * `[MIN_LEAD_TICKS, MAX_LEAD_TICKS]`, and everything older is dropped at the next
+   * reconcile.
+   */
+  setLeadBudget(rttMs: number | null, jitterMs: number | null): number {
+    if (rttMs === null) return this.lead_budget;
+    const ticks = Math.ceil((rttMs + 2 * (jitterMs ?? 0)) / (this.dt * 1000)) + 2;
+    this.lead_budget = Math.max(MIN_LEAD_TICKS, Math.min(MAX_LEAD_TICKS, ticks));
+    return this.lead_budget;
   }
 
   /**
@@ -279,13 +380,25 @@ export class PredictedMatch {
     // Snapshots are full state, not deltas, so an older one has nothing to add —
     // and applying it would drag the world backwards (docs/netcode-spike.md).
     if (snapshot.tick <= this.snapshotTick) {
-      return { applied: false, error: this.error, replayed: 0, acknowledged: 0, resynced: false };
+      return {
+        applied: false,
+        error: this.error,
+        replayed: 0,
+        acknowledged: 0,
+        trimmed: 0,
+        resynced: false,
+        snapped: false,
+      };
     }
     this.snapshotTick = snapshot.tick;
 
     // A copy, not the live vector: `absorb` measures how far this reconcile
     // moved the ship, and the ship is about to move.
     const before = { ...this.localShipPos() };
+    // The firer's own shots are the client's to draw, so they are lifted out
+    // before authority flattens the pool and put back after the replay
+    // (`settleShots`, audit item 2b).
+    const carried = this.harvestOwnShots();
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -293,13 +406,17 @@ export class PredictedMatch {
         ? Math.hypot(checkpoint.x - authoritative.posX, checkpoint.y - authoritative.posY)
         : 0;
 
-    applySnapshot(this.world, snapshot);
+    const wireSlots = applySnapshot(this.world, snapshot, { suppressShipShotsFrom: this.local });
     // The wallet is corrected here, in the same breath as position and hull, and
     // *before* the replay: unacked mining is then re-earned on top of authority's
     // figure instead of on top of the client's own compounding one (`stageEconomy`).
     this.applyStagedEconomy(snapshot.tick);
 
     const acknowledged = this.retire(ackSeq);
+    // Pull the clock back if a stall pushed it too far ahead. Done *before* the
+    // replay, so the world lands at `snapshotTick + leadBudget` at worst and the
+    // next input is stamped for a tick the server will reach promptly.
+    const trimmed = this.trimLead();
     for (const input of this.queue) {
       step(this.world, [{ id: this.local, actions: input.actions }], this.dt);
       this.checkpoint();
@@ -310,14 +427,17 @@ export class PredictedMatch {
     // evidence its trigger is down. Painted after the replay, because `step()`
     // clears it every tick (`src/sim/step.ts`).
     paintRemoteFiring(this.world, snapshot, this.local);
+    this.settleShots(wireSlots, carried);
 
-    this.absorb(before);
+    const snapped = this.absorb(before);
     return {
       applied: true,
       error: this.error,
       replayed: this.queue.length,
       acknowledged,
+      trimmed,
       resynced: checkpoint === null,
+      snapped,
     };
   }
 
@@ -391,6 +511,26 @@ export class PredictedMatch {
     return found;
   }
 
+  /**
+   * Drop the oldest pending inputs beyond the lead budget, and report how many.
+   *
+   * These are inputs the client sent, the server has not acknowledged, and the
+   * client has now decided not to keep waiting on: they are older than one lead
+   * budget, which means the server has either already refused them as late or is
+   * about to. Keeping them would only hold the clock out where a stall left it.
+   *
+   * At most {@link MAX_TRIM_PER_RECONCILE} per reconcile — see that constant for
+   * why the clock bleeds rather than snaps back.
+   */
+  private trimLead(): number {
+    let dropped = 0;
+    while (this.queue.length > this.lead_budget && dropped < MAX_TRIM_PER_RECONCILE) {
+      this.queue.shift();
+      dropped++;
+    }
+    return dropped;
+  }
+
   /** Drop every pending input the server has told us it simulated. */
   private retire(ackSeq: number): number {
     let dropped = 0;
@@ -415,19 +555,137 @@ export class PredictedMatch {
     while (this.history.length > this.maxPending + 1) this.history.shift();
   }
 
-  /** Turn the displacement a correction just caused into a decaying visual
-   *  offset — unless it is big enough that it should be seen. */
-  private absorb(before: Vec2): void {
+  /**
+   * Turn the displacement a correction just caused into a decaying visual
+   * offset — unless it is big enough that it should be seen. Returns whether it
+   * was seen: true means the ship teleported on screen this reconcile, which is
+   * the counter the acceptance gate is written against (`./telemetry`).
+   */
+  private absorb(before: Vec2): boolean {
     const after = this.localShipPos();
     const dx = before.x - after.x;
     const dy = before.y - after.y;
     if (Math.hypot(dx, dy) > SNAP_THRESHOLD) {
       this.offset.x = 0;
       this.offset.y = 0;
-      return;
+      return true;
     }
     this.offset.x += dx;
     this.offset.y += dy;
+    return false;
+  }
+
+  // --- The firer's own shots ------------------------------------------------
+
+  /**
+   * Lift the local player's own in-flight ship shots out of the pool before
+   * authority flattens it.
+   *
+   * A shot is spawned the instant the trigger goes down — that is what makes the
+   * weapon feel connected — and until this audit it then *died with its own input*:
+   * reconciliation clears the pool and only the still-unacknowledged ticks are
+   * replayed, so a shot stopped being re-created the moment the server confirmed
+   * the tick that fired it. One round trip after firing, the predicted shot
+   * vanished and the server's copy of the same shot — a whole RTT behind it, and
+   * standing still between snapshots because the wire carries no velocity —
+   * appeared in its place. That is the *"jumpy projectiles"* in the field report,
+   * seen from the shooting end: not one shot, but two, neither of them right.
+   *
+   * So the firer's shots become the firer's business. Carried across the
+   * reconcile, re-placed afterwards in pool slots the wire cannot name
+   * ({@link LOCAL_SHOT_BASE}), they fly their whole life on this client's own
+   * physics, and the authoritative copies are suppressed on arrival
+   * ({@link applySnapshot} `suppressShipShotsFrom`). Damage stays entirely the
+   * server's word — a predicted shot is a picture of a shot.
+   */
+  private harvestOwnShots(): CarriedShot[] {
+    const out: CarriedShot[] = [];
+    for (const p of this.world.projectiles) {
+      if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
+      out.push({
+        id: p.id,
+        x: p.pos.x,
+        y: p.pos.y,
+        vx: p.vel.x,
+        vy: p.vel.y,
+        damage: p.damage,
+        radius: p.radius,
+        life: p.life,
+        mineYield: p.mineYield,
+      });
+      if (out.length >= MAX_PREDICTED_SHOTS) break;
+    }
+    return out;
+  }
+
+  /**
+   * Decide, once per reconcile, which shots the client is drawing.
+   *
+   * After the replay the pool holds three kinds of thing: slots authority named,
+   * shots the replay itself re-fired (this client's own, and every turret in range
+   * of anything — `step()` runs the whole world, so the client fires *everyone's*
+   * turrets locally), and nothing else. Only the first is authoritative. The second
+   * is a duplicate of a shot already on the wire, drawn a round trip ahead of it,
+   * and it is the other half of the field report's jumpiness. So:
+   *
+   *  - a slot the wire named stays exactly as authority wrote it;
+   *  - a locally-spawned shot is dropped — with one exception;
+   *  - the exception is the local player's own ship shots, which are re-placed
+   *    above {@link LOCAL_SHOT_BASE} where no snapshot can reach them.
+   *
+   * The replay re-fires those own shots too, and they come back with the *same*
+   * entity id, because `rewind` restores `nextEntityId` and the sim is
+   * deterministic — so the duplicate is identified exactly, by id, and not by a
+   * distance heuristic. A shot the replay produced that the carry list has never
+   * seen (a correction changed what the trigger did) joins the carry list instead.
+   */
+  private settleShots(wireSlots: ReadonlySet<number>, carried: readonly CarriedShot[]): void {
+    const keep: CarriedShot[] = [...carried];
+    const known = new Set(carried.map((c) => c.id));
+
+    for (let slot = 0; slot < this.world.projectiles.length; slot++) {
+      const p = this.world.projectiles[slot]!;
+      if (!p.active || wireSlots.has(slot)) continue;
+      if (p.owner === this.local && p.kind === 'ship' && !known.has(p.id) && keep.length < MAX_PREDICTED_SHOTS) {
+        known.add(p.id);
+        keep.push({
+          id: p.id,
+          x: p.pos.x,
+          y: p.pos.y,
+          vx: p.vel.x,
+          vy: p.vel.y,
+          damage: p.damage,
+          radius: p.radius,
+          life: p.life,
+          mineYield: p.mineYield,
+        });
+      }
+      p.active = false;
+    }
+
+    for (let i = 0; i < keep.length && i < MAX_PREDICTED_SHOTS; i++) {
+      const shot = keep[i]!;
+      if (shot.life <= 0) continue;
+      const p = localShotSlot(this.world, LOCAL_SHOT_BASE + i);
+      p.id = shot.id;
+      p.active = true;
+      p.owner = this.local;
+      p.kind = 'ship';
+      p.pos.x = shot.x;
+      p.pos.y = shot.y;
+      p.vel.x = shot.vx;
+      p.vel.y = shot.vy;
+      p.damage = shot.damage;
+      p.radius = shot.radius;
+      p.life = shot.life;
+      if (shot.mineYield !== undefined) p.mineYield = shot.mineYield;
+    }
+    // Slots past the ones refilled hold last reconcile's shots; a shot that has
+    // landed or expired must not linger.
+    for (let i = Math.min(keep.length, MAX_PREDICTED_SHOTS); i < MAX_PREDICTED_SHOTS; i++) {
+      const p = this.world.projectiles[LOCAL_SHOT_BASE + i];
+      if (p) p.active = false;
+    }
   }
 
   private decayOffset(): void {
@@ -444,6 +702,37 @@ export class PredictedMatch {
 }
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+
+/** One of the firer's own predicted shots, held across a reconcile. */
+interface CarriedShot {
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
+  readonly vx: number;
+  readonly vy: number;
+  readonly damage: number;
+  readonly radius: number;
+  readonly life: number;
+  readonly mineYield: number | undefined;
+}
+
+/** The reserved pool slot at `index`, allocating up to it. Unlike {@link poolSlot}
+ *  this one is deliberately *above* the wire's reach, so it never returns null. */
+function localShotSlot(world: World, index: number): World['projectiles'][number] {
+  while (world.projectiles.length <= index) {
+    world.projectiles.push({
+      id: 0,
+      active: false,
+      owner: -1,
+      pos: { x: 0, y: 0 },
+      vel: { x: 0, y: 0 },
+      damage: 0,
+      radius: PROJECTILE.radius,
+      life: 0,
+    });
+  }
+  return world.projectiles[index]!;
+}
 
 // ---------------------------------------------------------------------------
 // Authority → world
@@ -492,7 +781,21 @@ export function applyPlayerEconomy(
  * so it is left exactly where prediction put it rather than being zeroed by
  * something that never knew about it.
  */
-export function applySnapshot(world: World, snapshot: DecodedSnapshot): void {
+export function applySnapshot(
+  world: World,
+  snapshot: DecodedSnapshot,
+  options: {
+    /**
+     * Drop the wire's copy of this player's own **ship** shots. The firer draws
+     * those from prediction (`PredictedMatch.harvestOwnShots`), and writing
+     * authority's copy as well would put two of every shot on their screen, one
+     * round trip apart. Omitted — a spectator, or a client that has stopped
+     * predicting — every shot on the wire is written, which is correct for a
+     * viewer who fired none of them.
+     */
+    readonly suppressShipShotsFrom?: PlayerId;
+  } = {},
+): ReadonlySet<number> {
   for (const snap of snapshot.ships) {
     const ship = world.ships.find((s) => s.id === snap.id);
     if (!ship) continue;
@@ -517,11 +820,21 @@ export function applySnapshot(world: World, snapshot: DecodedSnapshot): void {
   // the live slots, so every slot it does not name holds a shot that has landed
   // or expired. Clearing first is what makes that true.
   for (const projectile of world.projectiles) projectile.active = false;
+  const wireSlots = new Set<number>();
   for (const snap of snapshot.projectiles) {
+    if (
+      options.suppressShipShotsFrom !== undefined &&
+      (snap.meta & SHOT_META.ownerMask) === options.suppressShipShotsFrom &&
+      (snap.meta & SHOT_META.shipKind) !== 0
+    ) {
+      continue;
+    }
     const projectile = poolSlot(world, snap.id);
     if (!projectile) continue;
+    wireSlots.add(snap.id);
     projectile.active = true;
     projectile.owner = snap.meta & 0x7;
+    projectile.kind = (snap.meta & SHOT_META.shipKind) !== 0 ? 'ship' : 'turret';
     projectile.pos.x = snap.posX;
     projectile.pos.y = snap.posY;
     // Velocity is not streamed for shots — six bytes each, and a client that
@@ -531,6 +844,7 @@ export function applySnapshot(world: World, snapshot: DecodedSnapshot): void {
     // expire between snapshots, so the clock is wound back on every one.
     projectile.life = PROJECTILE.life;
   }
+  return wireSlots;
 }
 
 /**

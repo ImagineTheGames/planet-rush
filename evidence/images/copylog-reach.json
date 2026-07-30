@@ -1,0 +1,76 @@
+{
+  "probe": "copylog-reach",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-07-30T15:26:22.118Z",
+  "results": [
+    {
+      "profile": "desktop",
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "pauseOverlayUp": false,
+      "buttonInDom": true,
+      "buttonLabel": "COPY LOG",
+      "buttonRect": {
+        "x": 1149,
+        "y": 744,
+        "w": 120,
+        "h": 44
+      },
+      "rectInsideViewport": true,
+      "elementAtButtonCentre": "playtest-copy-log-button",
+      "pressable": true,
+      "fullscreenElement": null,
+      "copyLogRootParent": "BODY",
+      "copyLogInsideFullscreenSubtree": false,
+      "pageErrors": []
+    },
+    {
+      "profile": "phone-portrait-held",
+      "viewport": {
+        "w": 390,
+        "h": 844
+      },
+      "pauseOverlayUp": false,
+      "buttonInDom": true,
+      "buttonLabel": "COPY LOG",
+      "buttonRect": {
+        "x": 270,
+        "y": 788,
+        "w": 108,
+        "h": 44
+      },
+      "rectInsideViewport": true,
+      "elementAtButtonCentre": "CANVAS",
+      "pressable": false,
+      "fullscreenElement": "DIV#app",
+      "copyLogRootParent": "BODY",
+      "copyLogInsideFullscreenSubtree": false,
+      "pageErrors": []
+    },
+    {
+      "profile": "phone-landscape",
+      "viewport": {
+        "w": 844,
+        "h": 390
+      },
+      "pauseOverlayUp": false,
+      "buttonInDom": true,
+      "buttonLabel": "COPY LOG",
+      "buttonRect": {
+        "x": 713,
+        "y": 334,
+        "w": 120,
+        "h": 44
+      },
+      "rectInsideViewport": true,
+      "elementAtButtonCentre": "CANVAS",
+      "pressable": false,
+      "fullscreenElement": "DIV#app",
+      "copyLogRootParent": "BODY",
+      "copyLogInsideFullscreenSubtree": false,
+      "pageErrors": []
+    }
+  ]
+}

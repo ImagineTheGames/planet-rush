@@ -57,13 +57,60 @@ describe('every screen you can enter, you can leave', () => {
 describe('Escape works on pointer for the menu screens (u2 item 2)', () => {
   // The pre-match menu screens each answer Escape with the same exit their BACK /
   // DONE button takes — the desktop twin of the tap affordance.
-  const escapable: readonly NavScreen[] = ['online', 'online-keypad', 'settings', 'codex', 'lobby'];
+  const escapable: readonly NavScreen[] = [
+    'online',
+    'online-keypad',
+    'settings',
+    'codex',
+    'lobby',
+    'lobby-online',
+  ];
   for (const screen of escapable) {
     it(`${screen} has an Escape-answerable exit`, () => {
       const hasEscapeExit = NAV_EDGES.some((e) => e.from === screen && e.escape && !e.startsMatch);
       expect(hasEscapeExit, `${screen} needs an Escape exit`).toBe(true);
     });
   }
+});
+
+describe('ONE play flow: PLAY opens the doors, and every door lands in the lobby', () => {
+  // The ratified shape (developer): "PLAY → goes to the same online menu (which
+  // already has offline play)… right now PLAY going to a separate offline lobby is
+  // just redundant." So the graph must have exactly one edge off the main menu that
+  // leads toward a match, it must land on the doors, and there must be no second
+  // front door beside it.
+  it('gives the main menu exactly one match-ward door, and it is PLAY → the doors', () => {
+    const fromMenu = NAV_EDGES.filter((e) => e.from === 'main-menu');
+    const matchward = fromMenu.filter((e) => e.to === 'online' || e.to === 'lobby' || e.to === 'lobby-online');
+    expect(matchward.map((e) => e.via)).toEqual(['PLAY']);
+    expect(matchward[0]?.to).toBe('online');
+  });
+
+  it('no longer routes PLAY straight into a lobby, skipping the doors', () => {
+    // The removed redundancy, asserted as an absence: nothing on the main menu may
+    // reach a lobby without passing through the one screen that offers all three
+    // ways in.
+    expect(NAV_EDGES.some((e) => e.from === 'main-menu' && e.to === 'lobby')).toBe(false);
+    expect(NAV_EDGES.some((e) => e.from === 'main-menu' && e.to === 'lobby-online')).toBe(false);
+  });
+
+  it('reaches the offline lobby from PLAY SOLO and the online one from CREATE / JOIN', () => {
+    const doors = NAV_EDGES.filter((e) => e.from === 'online' || e.from === 'online-keypad');
+    expect(doors.some((e) => e.via === 'PLAY SOLO' && e.to === 'lobby')).toBe(true);
+    expect(doors.some((e) => e.via === 'CREATE ROOM' && e.to === 'lobby-online')).toBe(true);
+    expect(doors.some((e) => e.from === 'online-keypad' && e.to === 'lobby-online')).toBe(true);
+  });
+
+  it('gives the ONLINE lobby a BACK that leaves without starting a match (no ghost rooms)', () => {
+    // u2 item 4: BACK out of a room must free it. The graph's half of that promise
+    // is that the exit exists, is not a match-start, and lands on the menu; the
+    // socket close itself is asserted in `lobby-flow.test.ts` (the `close-transport`
+    // effect) and in the live-stage run.
+    const exits = screenExits('lobby-online');
+    expect(exits.some((e) => e.via === 'BACK' && e.to === 'main-menu')).toBe(true);
+    expect(exits.every((e) => e.to !== 'match')).toBe(true);
+    expect(reachesMainMenuWithoutMatch('lobby-online')).toBe(true);
+  });
 });
 
 describe('a match is never the only way out', () => {

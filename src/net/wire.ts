@@ -29,10 +29,33 @@
  * layer promises, and a message that is not one of the four client verbs is
  * dropped rather than coerced. A malformed frame costs the sender its own
  * packet and nothing else.
+ *
+ * **The wire speaks every verb the game speaks, and drops forward-compatibly.**
+ * Two rules keep the protocol from quietly amputating gameplay (M10 QA
+ * "the wire refuses verbs the game speaks", where `upgradeOrder` was absent from
+ * the switch and `satellite` absent from the build-item set, so online players
+ * could buy neither an upgrade nor a satellite — silently, because the whole
+ * message was rejected):
+ *
+ *  1. The verb tables here are **pinned to the shared union at compile time**
+ *     ({@link BUILD_ITEM_TABLE}, and {@link ACTION_TYPE_TABLE} beside the switch
+ *     that must handle them). A new `BuildItem` or a new `Action` in
+ *     `@shared/types` fails `tsc` right here until the wire learns it, and
+ *     `./protocol-parity.test.ts` enumerates the same unions and asserts each one
+ *     actually parses.
+ *  2. An **unknown** verb drops *that action*, not the message. A client one
+ *     version ahead of the server degrades — it loses the verb this server has
+ *     never heard of, and keeps the five it shares — instead of going silent
+ *     because every one of its inputs was refused whole. The drop is counted into
+ *     the session log (`./playtest-log`) so the asymmetry is visible rather than
+ *     inferred. A **known** verb with a malformed payload is still refused whole:
+ *     that is a validation failure, not a version skew, and a partially-applied
+ *     tick is a worse lie than a missing one.
  */
 
-import type { Action, BuildItem, Vec2 } from '@shared/types';
-import { ShipClass } from '@shared/types';
+import type { Action, ActionType, BuildItem, Vec2 } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
+import { playtestLog } from './playtest-log';
 import type {
   BotDifficulty,
   ClientMessage,
@@ -75,9 +98,11 @@ export const MAX_ROOM_CODE_LENGTH = 8;
  */
 export const MAX_TICKET_LENGTH = 512;
 
-/** Most actions one input message may carry. The action union has seven verbs
- *  and a tick sensibly carries at most one of each; anything past that is a
- *  client trying to make the server do arithmetic on its behalf. */
+/** Most actions one input message may carry. The action union has six verbs and
+ *  a tick sensibly carries at most one of each; the two spare slots are the
+ *  headroom a client one version ahead sends its new verbs in (dropped, not
+ *  fatal — see {@link parseActions}). Anything past that is a client trying to
+ *  make the server do arithmetic on its behalf. */
 export const MAX_ACTIONS_PER_MESSAGE = 8;
 
 /** Slots in a match (GDD §2.1) — the id space a client may name. */
@@ -314,16 +339,68 @@ function clamp(v: number, limit: number): number {
  *  bounded so a malformed message can never carry an absurd number into the sim. */
 const MAX_WORLD_COORD = 1e6;
 
-const BUILD_ITEMS: ReadonlySet<string> = new Set<BuildItem>(['turret', 'shield', 'repair', 'bank']);
+/**
+ * Every `BuildItem` the wheel can order, as a table rather than a list — the
+ * `Record<BuildItem, true>` is the point: a new item in the shared union fails to
+ * compile here until the wire names it. `satellite` was missing from the old
+ * hand-written list, which is exactly how a ratified feature (f1, the radar
+ * satellite) shipped unbuildable online.
+ */
+const BUILD_ITEM_TABLE: Record<BuildItem, true> = {
+  turret: true,
+  shield: true,
+  satellite: true,
+  repair: true,
+  bank: true,
+};
+const BUILD_ITEMS: ReadonlySet<string> = new Set(Object.keys(BUILD_ITEM_TABLE));
+
+/** Every upgrade track, straight off the shared enum — no restatement to drift
+ *  from. A new track is on the wire the moment `@shared/types` has it. */
+const UPGRADE_TRACKS: ReadonlySet<string> = new Set<string>(Object.values(UpgradeTrack));
 
 /**
- * Validate one tick's action list. Every action is checked against its own
- * shape; one bad action rejects the whole message rather than being silently
- * dropped, because a partially-applied tick is a worse lie than a missing one.
+ * Every action verb {@link parseActions} handles, pinned to the shared `Action`
+ * union. Adding a verb to `@shared/types` fails to compile here, and the switch
+ * below is the thing that must then grow a `case` — the compiler points at the
+ * table, `./protocol-parity.test.ts` proves the case exists and works.
+ */
+const ACTION_TYPE_TABLE: Record<ActionType, true> = {
+  thrust: true,
+  aim: true,
+  fire: true,
+  build: true,
+  buildOrder: true,
+  upgradeOrder: true,
+};
+
+/** The verbs this build of the wire understands — read by the parity test, and
+ *  the honest answer to "what can a client send me?". */
+export const WIRE_ACTION_TYPES: ReadonlySet<string> = new Set(Object.keys(ACTION_TYPE_TABLE));
+
+/** How many distinct unknown verb names one dropped message reports into the
+ *  session log. The names come off a hostile socket, so they are bounded in both
+ *  count and length before anything keeps them. */
+const MAX_LOGGED_UNKNOWN_VERBS = 4;
+const MAX_LOGGED_VERB_CHARS = 24;
+
+/**
+ * Validate one tick's action list.
+ *
+ * A **known** verb is checked against its own shape, and a failure there rejects
+ * the whole message: a partially-applied tick is a worse lie than a missing one.
+ *
+ * An **unknown** verb drops only itself, and is counted into the session log. The
+ * asymmetry is deliberate and is the forward-compatibility rule: a client one
+ * version ahead of this server must degrade to the verbs the two share, not go
+ * silent because a verb this server has never heard of poisoned every message
+ * carrying it (M10 QA — a build where `upgradeOrder` was unknown cost players
+ * thrust, aim and fire on every tick they tried to buy an upgrade).
  */
 export function parseActions(value: unknown): Action[] | null {
   if (!Array.isArray(value) || value.length > MAX_ACTIONS_PER_MESSAGE) return null;
   const actions: Action[] = [];
+  let unknown: string[] | null = null;
   for (const entry of value) {
     if (!isRecord(entry)) return null;
     switch (entry['type']) {
@@ -357,9 +434,44 @@ export function parseActions(value: unknown): Action[] | null {
         actions.push({ type: 'buildOrder', item: item as BuildItem });
         break;
       }
-      default:
-        return null;
+      case 'upgradeOrder': {
+        // The sibling of `buildOrder` (GDD §2.5): the press on a row of the panel
+        // behind the wheel's UPGRADE SHIP arrow. It names a track and nothing
+        // else — no tier argument, because a tier is bought one step at a time
+        // and the sim decides what the next step costs. Ownership, dock, cost and
+        // max-tier are the simulation's to validate; the wire's job is only to
+        // refuse a track that does not exist.
+        const track = entry['track'];
+        if (typeof track !== 'string' || !UPGRADE_TRACKS.has(track)) return null;
+        actions.push({ type: 'upgradeOrder', track: track as UpgradeTrack });
+        break;
+      }
+      default: {
+        // Forward compatibility: drop the verb, keep the tick. See the module
+        // header — this is the one case that does not reject the whole message.
+        const verb = typeof entry['type'] === 'string' ? entry['type'] : typeof entry['type'];
+        (unknown ??= []).push(verb.slice(0, MAX_LOGGED_VERB_CHARS));
+        break;
+      }
     }
   }
+  if (unknown) reportUnknownVerbs(unknown);
   return actions;
+}
+
+/**
+ * Record dropped verbs in the session log (`./playtest-log`), so a version skew
+ * reads as "this server dropped 1 verb it does not know" in an exported log
+ * rather than as an input that mysteriously did nothing.
+ *
+ * The log coalesces identical consecutive lines into a repeat count, so a client
+ * spraying an unknown verb every tick costs one entry and a counter — which is
+ * also why the *distinct names* are what is logged and not the raw list.
+ */
+function reportUnknownVerbs(verbs: readonly string[]): void {
+  const distinct = [...new Set(verbs)].slice(0, MAX_LOGGED_UNKNOWN_VERBS);
+  playtestLog().record('net', 'wire dropped unknown action verbs', {
+    count: verbs.length,
+    verbs: distinct.join(','),
+  });
 }

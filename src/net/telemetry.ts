@@ -1,5 +1,5 @@
 /**
- * src/net/telemetry.ts — the reconciliation netgraph's data source.
+ * src/net/telemetry.ts — what reconciliation feel is measured with.
  * OWNER: Netcode Engineer (GDD §3.5, §4.2; M10 reconcile-feel brief).
  *
  * *"TELEMETRY FIRST: instrument the client — misprediction rate, correction
@@ -26,13 +26,29 @@
  *    waited in the server queue; at a healthy lead that wait is ~0, so this
  *    tracks true RTT closely enough to tune against.
  *
+ * The M10 **audit** (docs/netcode-audit.md) added the two numbers the acceptance
+ * gate is actually written against, because neither could be read off the three
+ * above:
+ *
+ *  - **RTT variance** ({@link TelemetrySample.rttJitterMs}) — RFC 3550's smoothed
+ *    interarrival jitter over consecutive round trips. A mean RTT says how far
+ *    away the server is; only the variance says how big a jitter buffer has to be,
+ *    and the buffer is now *sized from this* instead of from a constant
+ *    (`./interpolation`, audit item 2d).
+ *  - **visual snaps** ({@link TelemetrySample.visualSnaps}) — corrections large
+ *    enough that the client teleported the ship instead of blending it. A blended
+ *    correction is not felt; a snap is exactly the "server rollback" a player
+ *    reports, so it is counted on its own rather than inferred from a magnitude.
+ *
  * **Sampled per second, kept for two minutes.** Every event folds into an open
  * one-second bucket keyed by wall-clock; when the second rolls over the bucket is
  * finalized into a ring of {@link SAMPLE_HISTORY} {@link TelemetrySample}s. The
- * live sub-second numbers are always readable off {@link NetTelemetry.live} for a
- * per-frame netgraph, and {@link NetTelemetry.format} dumps the recent history as
- * text for the `?debug=1` console — the "paste a real capture in the PR" the
- * brief asks for.
+ * live sub-second numbers are always readable off {@link NetTelemetry.live}, and
+ * {@link NetTelemetry.format} dumps the recent history as text — the "paste a real
+ * capture in the PR" the brief asks for. In the shipped client the route to a
+ * player is **COPY LOG**: every finalized second is copied into the playtest log
+ * (`./playtest-log-attach`, docs/playtest-log.md). There is no on-screen netgraph;
+ * #238's comments said there was, and the audit found otherwise.
  *
  * **No ambient clock.** Like the rest of `src/net`, the wall clock is passed in
  * (the session's injected `now`, `./session.ts`), never read from a global — so a
@@ -65,6 +81,34 @@ export const MISPREDICTION_UNITS = 1;
  *  past the pending-input horizon (`./prediction` `MAX_PENDING_INPUTS`). */
 export const SEND_RING = 256;
 
+/**
+ * Gain of the running RTT-variance estimate — RFC 3550's interarrival-jitter
+ * smoothing, `J += (|D| − J) / JITTER_GAIN`, where `D` is the change between two
+ * consecutive RTT measurements. Sixteen is the RTP constant and the reason to keep
+ * it: it is slow enough that one late packet does not move the estimate much, and
+ * fast enough that a route change is absorbed within a second or two.
+ *
+ * This number exists because the jitter buffer is *sized from it* rather than from
+ * a constant (`./interpolation` `jitterDelayMs`, M10 audit item 2d): a client on a
+ * clean wire should not pay 100 ms of interpolation delay, and a client on a
+ * jittery one needs more than 100 ms.
+ */
+export const JITTER_GAIN = 16;
+
+/**
+ * How many finalized seconds the **RTT floor** is taken over — the minimum round
+ * trip recently seen, which is the closest this instrument gets to the *wire's*
+ * latency with none of the client's own queueing in it.
+ *
+ * The measured RTT is send→ack, and the ack cannot come until the server has run
+ * the tick the input was stamped for; a client running far ahead of authority is
+ * therefore measuring its own lead as if it were the network. The minimum over a
+ * window is not: a sample that low is one where the input arrived just in time and
+ * waited for nothing. That is the number the lead budget must be sized from
+ * (`./prediction` `setLeadBudget`), or the budget chases its own tail.
+ */
+export const RTT_FLOOR_WINDOW = 10;
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
@@ -87,11 +131,33 @@ export interface TelemetrySample {
   readonly rttMeanMs: number | null;
   /** Worst measured round-trip in the window, ms, or null if none was measured. */
   readonly rttMaxMs: number | null;
+  /** Best measured round-trip in the window, ms, or null if none was measured —
+   *  the sample with the least queueing in it (see {@link RTT_FLOOR_WINDOW}). */
+  readonly rttMinMs: number | null;
+  /**
+   * The smoothed RTT variance at the end of the window, ms — how much the wire's
+   * delivery instants *wander*, which is what a jitter buffer must cover and what
+   * a mean RTT cannot say. Null until two round trips have been measured. This is
+   * the number `./interpolation` sizes the interpolation delay from.
+   */
+  readonly rttJitterMs: number | null;
+  /** Mean lead over the window, ticks — how far ahead of authority the client ran.
+   *  0 when the window saw no reconciles. */
+  readonly leadMeanTicks: number;
+  /** Worst lead in the window, ticks. The ratchet's fever chart. */
+  readonly leadMaxTicks: number;
   /** Wholesale authority takeovers in the window (a reclaim, a slept tab). */
   readonly resyncs: number;
+  /**
+   * Corrections in the window big enough that the client **teleported** the ship
+   * instead of blending (`./prediction` `SNAP_THRESHOLD`) — the visible-snap
+   * counter the M10 acceptance gate is written against. A blended correction is
+   * invisible; one of these is the "server rollback" a player reports.
+   */
+  readonly visualSnaps: number;
 }
 
-/** The always-current sub-second view, for a per-frame netgraph. */
+/** The always-current sub-second view, for anything sampling per frame. */
 export interface TelemetryReadout {
   /** The most recent measured round-trip, ms, or null before one is measured. */
   readonly rttMs: number | null;
@@ -99,6 +165,13 @@ export interface TelemetryReadout {
   readonly correctionUnits: number;
   /** Misprediction rate over the second in progress so far, [0, 1]. */
   readonly mispredictionRate: number;
+  /** The live smoothed RTT variance, ms, or null before two round trips. Read by
+   *  the adaptive jitter buffer every time a snapshot lands (`./session`). */
+  readonly rttJitterMs: number | null;
+  /** The least round trip seen over the last {@link RTT_FLOOR_WINDOW} seconds, ms,
+   *  or null before one was measured — the wire without this client's own queue in
+   *  it. The lead budget is sized from this. */
+  readonly rttFloorMs: number | null;
   /** The last finalized one-second sample, or null before a second has rolled. */
   readonly lastSample: TelemetrySample | null;
 }
@@ -110,6 +183,13 @@ export interface ReconcileFacts {
   readonly error: number;
   /** Whether the reconcile took authority wholesale — `ReconcileReport.resynced`. */
   readonly resynced: boolean;
+  /** Whether the correction was hard-snapped rather than blended — `ReconcileReport.snapped`.
+   *  Absent reads as false, so a caller built before the counter existed still compiles. */
+  readonly snapped?: boolean;
+  /** Ticks the client is running ahead of authority *after* this reconcile —
+   *  `ReconcileReport.replayed`, which is exactly the pending queue's depth. The
+   *  input latency the player pays on their own trigger, over and above the wire. */
+  readonly lead?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +209,11 @@ interface OpenBucket {
   rttSum: number;
   rttCount: number;
   rttMax: number;
+  rttMin: number;
+  leadSum: number;
+  leadMax: number;
   resyncs: number;
+  visualSnaps: number;
 }
 
 export class NetTelemetry {
@@ -144,17 +228,23 @@ export class NetTelemetry {
   private open: OpenBucket | null = null;
   private lastRttMs: number | null = null;
   private lastCorrection = 0;
+  /** The smoothed RTT variance, ms — RFC 3550's estimator over consecutive round
+   *  trips. Null until a second measurement gives it a difference to smooth. */
+  private jitterMs: number | null = null;
+  private readonly jitterGain: number;
 
   constructor(
     config: {
       readonly historySize?: number;
       readonly mispredictionUnits?: number;
       readonly sendRingSize?: number;
+      readonly jitterGain?: number;
     } = {},
   ) {
     this.historySize = config.historySize ?? SAMPLE_HISTORY;
     this.mispredictionUnits = config.mispredictionUnits ?? MISPREDICTION_UNITS;
     this.sendRingSize = config.sendRingSize ?? SEND_RING;
+    this.jitterGain = config.jitterGain ?? JITTER_GAIN;
   }
 
   // --- Recording ----------------------------------------------------------
@@ -183,6 +273,11 @@ export class NetTelemetry {
     if (facts.error > bucket.correctionMax) bucket.correctionMax = facts.error;
     if (facts.error > this.mispredictionUnits) bucket.mispredictions++;
     if (facts.resynced) bucket.resyncs++;
+    if (facts.snapped === true) bucket.visualSnaps++;
+    if (facts.lead !== undefined) {
+      bucket.leadSum += facts.lead;
+      if (facts.lead > bucket.leadMax) bucket.leadMax = facts.lead;
+    }
     this.lastCorrection = facts.error;
 
     const rtt = this.matchRtt(ackSeq, nowMs);
@@ -190,6 +285,15 @@ export class NetTelemetry {
       bucket.rttSum += rtt;
       bucket.rttCount++;
       if (rtt > bucket.rttMax) bucket.rttMax = rtt;
+      if (rtt < bucket.rttMin) bucket.rttMin = rtt;
+      // RFC 3550's jitter: smooth the absolute change between consecutive round
+      // trips. The first measurement has nothing to differ from, so the estimate
+      // opens on the second one.
+      if (this.lastRttMs !== null) {
+        const delta = Math.abs(rtt - this.lastRttMs);
+        this.jitterMs =
+          this.jitterMs === null ? delta : this.jitterMs + (delta - this.jitterMs) / this.jitterGain;
+      }
       this.lastRttMs = rtt;
     }
   }
@@ -201,7 +305,7 @@ export class NetTelemetry {
     return this.history;
   }
 
-  /** The current sub-second numbers, for a per-frame netgraph. */
+  /** The current sub-second numbers, sampled live rather than per second. */
   get live(): TelemetryReadout {
     const b = this.open;
     const rate = b && b.reconciles > 0 ? b.mispredictions / b.reconciles : 0;
@@ -209,6 +313,8 @@ export class NetTelemetry {
       rttMs: this.lastRttMs,
       correctionUnits: this.lastCorrection,
       mispredictionRate: rate,
+      rttJitterMs: this.jitterMs,
+      rttFloorMs: this.rttFloor(),
       lastSample: this.history.length > 0 ? this.history[this.history.length - 1]! : null,
     };
   }
@@ -225,11 +331,14 @@ export class NetTelemetry {
     const lines = recent.map((s) => {
       const rtt = s.rttMeanMs === null ? '   —' : `${Math.round(s.rttMeanMs)}`.padStart(4);
       const rttMax = s.rttMaxMs === null ? '  —' : `${Math.round(s.rttMaxMs)}`.padStart(4);
+      const jit = s.rttJitterMs === null ? '  —' : `${Math.round(s.rttJitterMs)}`.padStart(3);
       return (
         `  +${`${Math.round((s.atMs - recent[0]!.atMs) / 1000)}`.padStart(3)}s  ` +
-        `rtt ${rtt}/${rttMax}ms  ` +
+        `rtt ${rtt}/${rttMax}ms  jit ${jit}ms  ` +
         `corr ${s.correctionMeanUnits.toFixed(1)}/${s.correctionMaxUnits.toFixed(1)}u  ` +
         `mispred ${(s.mispredictionRate * 100).toFixed(0).padStart(3)}%  ` +
+        `lead ${Math.round(s.leadMeanTicks)}/${s.leadMaxTicks}t  ` +
+        `snap ${s.visualSnaps}  ` +
         `(${s.reconciles} recon${s.resyncs > 0 ? `, ${s.resyncs} resync` : ''})`
       );
     });
@@ -240,18 +349,34 @@ export class NetTelemetry {
     const totalRecon = recent.reduce((n, s) => n + s.reconciles, 0);
     const totalMispred = recent.reduce((n, s) => n + s.mispredictions, 0);
     const overallRate = totalRecon > 0 ? (totalMispred / totalRecon) * 100 : 0;
+    const totalSnaps = recent.reduce((n, s) => n + s.visualSnaps, 0);
+    const jitterNow = recent[recent.length - 1]!.rttJitterMs;
 
     return (
       `net telemetry — last ${recent.length}s\n` +
       lines.join('\n') +
       `\n  summary: rtt ~${rttAvg === null ? '—' : `${rttAvg}ms`}  ` +
+      `jitter ${jitterNow === null ? '—' : `${Math.round(jitterNow)}ms`}  ` +
       `worst corr ${worstCorr.toFixed(1)}u  ` +
       `mispred ${overallRate.toFixed(0)}%  ` +
+      `snaps ${totalSnaps}  ` +
       `over ${totalRecon} reconciles`
     );
   }
 
   // --- Internals ----------------------------------------------------------
+
+  /** The least round trip over the recent window, open bucket included. Null when
+   *  nothing has been measured yet. */
+  private rttFloor(): number | null {
+    let floor = this.open && this.open.rttCount > 0 ? this.open.rttMin : Number.POSITIVE_INFINITY;
+    const from = Math.max(0, this.history.length - RTT_FLOOR_WINDOW);
+    for (let i = from; i < this.history.length; i++) {
+      const min = this.history[i]!.rttMinMs;
+      if (min !== null && min < floor) floor = min;
+    }
+    return Number.isFinite(floor) ? floor : null;
+  }
 
   /** Match `ackSeq` against the recorded sends, returning the round-trip of the
    *  input it just confirmed (and retiring everything at or before it), or null
@@ -279,7 +404,11 @@ export class NetTelemetry {
         rttSum: 0,
         rttCount: 0,
         rttMax: 0,
+        rttMin: Number.POSITIVE_INFINITY,
+        leadSum: 0,
+        leadMax: 0,
         resyncs: 0,
+        visualSnaps: 0,
       };
     }
     return this.open;
@@ -305,7 +434,12 @@ export class NetTelemetry {
       correctionMaxUnits: b.correctionMax,
       rttMeanMs: b.rttCount > 0 ? b.rttSum / b.rttCount : null,
       rttMaxMs: b.rttCount > 0 ? b.rttMax : null,
+      rttMinMs: b.rttCount > 0 ? b.rttMin : null,
+      rttJitterMs: this.jitterMs,
+      leadMeanTicks: b.reconciles > 0 ? b.leadSum / b.reconciles : 0,
+      leadMaxTicks: b.leadMax,
       resyncs: b.resyncs,
+      visualSnaps: b.visualSnaps,
     });
     while (this.history.length > this.historySize) this.history.shift();
   }

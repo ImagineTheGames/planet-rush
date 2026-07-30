@@ -12,8 +12,9 @@
  *     unbounded action list, a message type nobody implements: all null.
  */
 
-import { describe, expect, it } from 'vitest';
-import { ShipClass } from '@shared/types';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { ShipClass, UpgradeTrack } from '@shared/types';
+import { playtestLog, resetPlaytestLog } from './playtest-log';
 import { decodeSnapshot, encodeSnapshot } from './snapshot';
 import type { ProjSnap, ShipSnap } from './snapshot';
 import type { ClientMessage, ServerMessage } from './transport';
@@ -65,6 +66,10 @@ describe('client → server', () => {
           { type: 'thrust', dir: { x: 0.5, y: -1 } },
           { type: 'fire', active: true, auto: false },
           { type: 'buildOrder', item: 'turret' },
+          // The two verbs the M10 wire ate: a satellite order and a panel
+          // purchase. Both are gameplay the online game simply did not have.
+          { type: 'buildOrder', item: 'satellite' },
+          { type: 'upgradeOrder', track: UpgradeTrack.Power },
         ],
       },
     ];
@@ -127,6 +132,12 @@ describe('client → server', () => {
       }),
       // A build order for something that is not on the wheel (GDD §2.5).
       JSON.stringify({ type: 'input', tick: 1, seq: 1, actions: [{ type: 'buildOrder', item: 'battleship' }] }),
+      // A known verb with a payload that names nothing: `upgradeOrder` is parsed
+      // now, but a track the enum does not define is still refused. Forward
+      // compatibility is for verbs the server has never heard of — not for a
+      // verb it knows, carrying a value it knows to be wrong.
+      JSON.stringify({ type: 'input', tick: 1, seq: 1, actions: [{ type: 'upgradeOrder', track: 'luck' }] }),
+      JSON.stringify({ type: 'input', tick: 1, seq: 1, actions: [{ type: 'upgradeOrder' }] }),
       // A hull that does not exist — four classes ship, and no others (§2.11).
       JSON.stringify({ type: 'lobbyChoice', shipClass: 'dreadnought', fireMode: 'manual' }),
       JSON.stringify({ type: 'join', room: 'ok', reclaim: 99 }),
@@ -148,6 +159,106 @@ describe('client → server', () => {
       room: 'QK7P',
       reclaim: 7,
     });
+  });
+});
+
+/**
+ * The blast radius rule (M10). Before this, ONE action the wire did not recognize
+ * returned `null` for the entire message — so a client one version ahead of the
+ * server did not lose its new verb, it lost *every* verb: thrust, aim and fire
+ * all went with it, every tick, and the ship simply stopped responding. A player
+ * cannot tell that apart from a dead connection.
+ */
+describe('a client one version ahead degrades — it does not go silent', () => {
+  beforeEach(() => {
+    // The session log is a process-wide singleton; one spec's drops must not be
+    // read as the next one's.
+    resetPlaytestLog();
+  });
+
+  const frameWithFutureVerb = (): string =>
+    JSON.stringify({
+      type: 'input',
+      tick: 900,
+      seq: 12,
+      actions: [
+        { type: 'thrust', dir: { x: 0, y: -1 } },
+        { type: 'tractorBeam', target: 4 }, // a verb from a build this server has never seen
+        { type: 'upgradeOrder', track: UpgradeTrack.Speed },
+      ],
+    });
+
+  it('drops the unknown action and keeps the rest of the tick', () => {
+    expect(parseClientMessage(frameWithFutureVerb())).toEqual({
+      type: 'input',
+      tick: 900,
+      seq: 12,
+      actions: [
+        { type: 'thrust', dir: { x: 0, y: -1 } },
+        { type: 'upgradeOrder', track: UpgradeTrack.Speed },
+      ],
+    });
+  });
+
+  it('counts the dropped verbs into the session log', () => {
+    parseClientMessage(frameWithFutureVerb());
+    const dropped = playtestLog().events.filter((e) => e.msg.includes('unknown action verb'));
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]?.kind).toBe('net');
+    expect(dropped[0]?.data).toMatchObject({ count: 1, verbs: 'tractorBeam' });
+  });
+
+  it('says nothing when every verb was understood', () => {
+    parseClientMessage(
+      JSON.stringify({ type: 'input', tick: 1, seq: 1, actions: [{ type: 'build', active: true }] }),
+    );
+    expect(playtestLog().events.filter((e) => e.msg.includes('unknown action verb'))).toEqual([]);
+  });
+
+  it('bounds what a hostile client can write into the log', () => {
+    // The verb names come off a socket: distinct names only, capped in count and
+    // length, so a spray of junk verbs cannot become a log full of attacker text.
+    parseClientMessage(
+      JSON.stringify({
+        type: 'input',
+        tick: 1,
+        seq: 1,
+        actions: [
+          { type: 'a'.repeat(200) },
+          { type: 'v2' },
+          { type: 'v3' },
+          { type: 'v4' },
+          { type: 'v5' },
+          { type: 'v5' },
+        ],
+      }),
+    );
+    const dropped = playtestLog().events.filter((e) => e.msg.includes('unknown action verb'));
+    expect(dropped[0]?.data?.['count']).toBe(6);
+    const verbs = String(dropped[0]?.data?.['verbs']);
+    expect(verbs.split(',')).toHaveLength(4); // capped at four distinct names
+    expect(verbs.length).toBeLessThan(120);
+  });
+
+  it('still refuses an action list longer than the bound', () => {
+    // Forward compatibility is not an exemption from the size bound: a client
+    // cannot buy unbounded parsing by making its actions unrecognizable.
+    expect(
+      parseClientMessage(
+        JSON.stringify({
+          type: 'input',
+          tick: 1,
+          seq: 1,
+          actions: Array.from({ length: MAX_ACTIONS_PER_MESSAGE + 1 }, () => ({ type: 'whoKnows' })),
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('still refuses an action that is not even an object', () => {
+    expect(
+      parseClientMessage(JSON.stringify({ type: 'input', tick: 1, seq: 1, actions: ['thrust', 7] })),
+    ).toBeNull();
   });
 });
 

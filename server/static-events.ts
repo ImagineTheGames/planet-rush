@@ -30,6 +30,7 @@
 import type { PlayerId } from '@shared/types';
 import type {
   AsteroidEventData,
+  SatelliteEventData,
   StationEventData,
   StationHealthData,
   ShieldEventData,
@@ -114,6 +115,24 @@ function shieldEvent(
   return { type: 'entityEvent', tick, kind: 'shield', op, data };
 }
 
+function satelliteEvent(
+  satellite: NonNullable<MiningStation['satellites']>[number],
+  owner: PlayerId,
+  tick: Tick,
+  op: 'spawn' | 'update',
+): EntityEventMessage {
+  const data: SatelliteEventData = {
+    id: satellite.id,
+    owner,
+    x: satellite.pos.x,
+    y: satellite.pos.y,
+    radius: satellite.radius,
+    maxHp: satellite.maxHp,
+    orbitAngle: satellite.orbitAngle,
+  };
+  return { type: 'entityEvent', tick, kind: 'satellite', op, data };
+}
+
 function destroyEvent(
   kind: EntityEventMessage['kind'],
   id: number,
@@ -137,6 +156,9 @@ export function fullEntityState(world: World): EntityEventMessage[] {
     for (const shield of station.shields) {
       events.push(shieldEvent(shield, station.owner, tick, 'spawn'));
     }
+    for (const satellite of station.satellites ?? []) {
+      events.push(satelliteEvent(satellite, station.owner, tick, 'spawn'));
+    }
   }
   for (const asteroid of world.asteroids) events.push(asteroidEvent(asteroid, tick, 'spawn'));
   return events;
@@ -145,6 +167,22 @@ export function fullEntityState(world: World): EntityEventMessage[] {
 // ---------------------------------------------------------------------------
 // Structure — public, broadcast on change
 // ---------------------------------------------------------------------------
+
+/**
+ * How far a satellite's orbit may drift from the angle last announced before the
+ * tracker re-announces it (radians).
+ *
+ * A satellite is the one static entity that *moves*, and its angle is integrated
+ * per tick rather than derived from the clock, so a client's replayed ticks
+ * advance its copy twice and it runs ahead (`src/net/entity-events`
+ * `SatelliteEventData`). This is the correction, and the threshold is what keeps
+ * it an event: the server's own orbit crosses it at a fixed rate, so at
+ * `SATELLITE.orbitSpeed` (0.35 rad/s) one satellite costs about **two updates a
+ * second**, not the ten a naive per-diff announcement would. An eighth of a
+ * radian is also under what reads as a jump at orbit radius (~114 u → ~14 u of
+ * arc), so the correction lands before the eye has anything to catch. TUNABLE
+ */
+const ORBIT_ANNOUNCE_RADIANS = 0.125;
 
 /**
  * Diffs the world's static entities against what it last announced and emits
@@ -156,10 +194,14 @@ export class StaticEntityTracker {
   private readonly asteroids = new Set<number>();
   private readonly turrets = new Set<number>();
   private readonly shields = new Set<number>();
+  private readonly satellites = new Set<number>();
   private readonly wrecked = new Set<number>();
   /** Crack stage last announced per asteroid — the one *update* worth sending,
    *  because it is a sprite swap the player reads a payout off (GDD §5.5). */
   private readonly crack = new Map<number, number>();
+  /** Orbit angle last announced per satellite, for the same reason: the one
+   *  *update* worth sending, throttled by {@link ORBIT_ANNOUNCE_RADIANS}. */
+  private readonly orbit = new Map<number, number>();
 
   /** Prime the tracker with a world it has already fully described (the state a
    *  fresh client got from {@link fullEntityState}), so the first diff after a
@@ -194,6 +236,7 @@ export class StaticEntityTracker {
 
     const liveTurrets = new Set<number>();
     const liveShields = new Set<number>();
+    const liveSatellites = new Set<number>();
     for (const station of world.stations) {
       for (const turret of station.turrets) {
         liveTurrets.add(turret.id);
@@ -206,6 +249,18 @@ export class StaticEntityTracker {
         if (this.shields.has(shield.id)) continue;
         this.shields.add(shield.id);
         events.push(shieldEvent(shield, station.owner, tick, 'spawn'));
+      }
+      for (const satellite of station.satellites ?? []) {
+        liveSatellites.add(satellite.id);
+        const announced = this.orbit.get(satellite.id);
+        if (announced === undefined) {
+          this.satellites.add(satellite.id);
+          this.orbit.set(satellite.id, satellite.orbitAngle);
+          events.push(satelliteEvent(satellite, station.owner, tick, 'spawn'));
+        } else if (Math.abs(satellite.orbitAngle - announced) >= ORBIT_ANNOUNCE_RADIANS) {
+          this.orbit.set(satellite.id, satellite.orbitAngle);
+          events.push(satelliteEvent(satellite, station.owner, tick, 'update'));
+        }
       }
       // A dead core is announced once, as the wreck it becomes: the wreck stays
       // on the map for the rest of the match (GDD §2.7), so this is the event
@@ -224,6 +279,12 @@ export class StaticEntityTracker {
       if (liveShields.has(id)) continue;
       this.shields.delete(id);
       events.push(destroyEvent('shield', id, tick));
+    }
+    for (const id of this.satellites) {
+      if (liveSatellites.has(id)) continue;
+      this.satellites.delete(id);
+      this.orbit.delete(id);
+      events.push(destroyEvent('satellite', id, tick));
     }
 
     return events;
@@ -276,6 +337,12 @@ export class FogTracker {
         coreHp: station.coreHp,
         shields: station.shields.map((s) => ({ id: s.id, hp: s.hp })),
         turrets: station.turrets.map((t) => ({ id: t.id, hp: t.hp })),
+        // A satellite is a siege target on the same terms as a turret (feature
+        // f1), so its damage is scouted on the same terms too. Omitted entirely
+        // when there is none, so a station without one signs the same as before.
+        ...(station.satellites?.length
+          ? { satellites: station.satellites.map((s) => ({ id: s.id, hp: s.hp })) }
+          : {}),
       };
       // Health is continuous and mostly unchanging; a signature keeps a besieged
       // station reporting every sample and a quiet one reporting nothing.

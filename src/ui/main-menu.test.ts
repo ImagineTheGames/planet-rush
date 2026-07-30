@@ -26,26 +26,36 @@ const VIEWPORT = { width: 1280, height: 720 };
 const center = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 describe('the model', () => {
-  it('shows the wordmark and exactly PLAY, ONLINE, CODEX then SETTINGS', () => {
+  it('shows the wordmark and exactly PLAY, CODEX then SETTINGS', () => {
     const model = mainMenuModel();
     expect(model.title).toBe(MAIN_MENU_TITLE);
-    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'ONLINE', 'CODEX', 'SETTINGS']);
+    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'CODEX', 'SETTINGS']);
   });
 
-  it('marks PLAY as the primary action and ONLINE/CODEX/SETTINGS as secondary', () => {
-    const [play, online, codex, settings] = mainMenuModel().buttons;
+  it('offers ONE way into a match — no second front door beside PLAY', () => {
+    // The ratified single play flow: PLAY opens the doors screen (PLAY SOLO /
+    // CREATE ROOM / JOIN ROOM), which already carries offline play, so the separate
+    // ONLINE button — and the offline-lobby shortcut PLAY used to be — are gone.
+    // Asserted as an absence, because a redundant door is exactly the kind of thing
+    // that gets quietly re-added.
+    const kinds = MAIN_MENU_ITEMS.map((i) => i.kind);
+    expect(kinds.filter((k) => k === 'play')).toHaveLength(1);
+    expect(kinds).not.toContain('online');
+  });
+
+  it('marks PLAY as the primary action and CODEX/SETTINGS as secondary', () => {
+    const [play, codex, settings] = mainMenuModel().buttons;
     expect(play?.primary).toBe(true);
-    // ONLINE, CODEX and SETTINGS are doors that come back — secondary, but fully
-    // active (never gray): the gray-means-disabled theme rule (GDD §2.10 point 4).
-    // PLAY stays the single plasma primary because the offline game always works.
-    expect(online?.primary).toBe(false);
+    // CODEX and SETTINGS are doors that come back — secondary, but fully active
+    // (never gray): the gray-means-disabled theme rule (GDD §2.10 point 4). PLAY is
+    // the single plasma primary because it is the only way into a match.
     expect(codex?.primary).toBe(false);
     expect(settings?.primary).toBe(false);
   });
 
   it('keeps the item list, the model and the hit test in the same order', () => {
-    // The four walk one list — a re-order can never mis-route a tap.
-    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'online', 'codex', 'settings']);
+    // The three walk one list — a re-order can never mis-route a tap.
+    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'codex', 'settings']);
   });
 });
 
@@ -107,12 +117,9 @@ describe('hit test', () => {
     const layout = mainMenuLayout(VIEWPORT);
     expect(mainMenuHitTest(layout, center(layout.buttons[0]!).x, center(layout.buttons[0]!).y)).toBe('play');
     expect(mainMenuHitTest(layout, center(layout.buttons[1]!).x, center(layout.buttons[1]!).y)).toBe(
-      'online',
-    );
-    expect(mainMenuHitTest(layout, center(layout.buttons[2]!).x, center(layout.buttons[2]!).y)).toBe(
       'codex',
     );
-    expect(mainMenuHitTest(layout, center(layout.buttons[3]!).x, center(layout.buttons[3]!).y)).toBe(
+    expect(mainMenuHitTest(layout, center(layout.buttons[2]!).x, center(layout.buttons[2]!).y)).toBe(
       'settings',
     );
   });

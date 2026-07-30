@@ -157,3 +157,79 @@ describe('NetTelemetry — dump', () => {
     expect(dump.split('\n').length).toBeGreaterThanOrEqual(4);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The audit's additions (M10, docs/netcode-audit.md)
+// ---------------------------------------------------------------------------
+
+describe('RTT variance', () => {
+  it('opens on the second measurement and tracks how much the wire wanders', () => {
+    const telemetry = new NetTelemetry();
+    // A steady wire: every round trip the same, so the variance is zero.
+    for (let i = 1; i <= 6; i++) {
+      telemetry.recordInput(i, i * 100);
+      telemetry.recordReconcile({ error: 0, resynced: false }, i, i * 100 + 150);
+    }
+    expect(telemetry.live.rttJitterMs).toBe(0);
+
+    // A wobbling one: alternating round trips, so the estimate climbs.
+    for (let i = 7; i <= 40; i++) {
+      telemetry.recordInput(i, i * 100);
+      telemetry.recordReconcile({ error: 0, resynced: false }, i, i * 100 + (i % 2 === 0 ? 100 : 200));
+    }
+    expect(telemetry.live.rttJitterMs).toBeGreaterThan(20);
+  });
+
+  it('reports null before there are two round trips to compare', () => {
+    const telemetry = new NetTelemetry();
+    expect(telemetry.live.rttJitterMs).toBeNull();
+    telemetry.recordInput(1, 0);
+    telemetry.recordReconcile({ error: 0, resynced: false }, 1, 150);
+    expect(telemetry.live.rttJitterMs).toBeNull();
+  });
+});
+
+describe('the RTT floor', () => {
+  it('is the least round trip recently seen, not the mean — the wire without our own queue', () => {
+    const telemetry = new NetTelemetry();
+    const trips = [400, 380, 160, 420, 390];
+    trips.forEach((rtt, i) => {
+      const seq = i + 1;
+      telemetry.recordInput(seq, seq * 100);
+      telemetry.recordReconcile({ error: 0, resynced: false }, seq, seq * 100 + rtt);
+    });
+    expect(telemetry.live.rttFloorMs).toBe(160);
+  });
+
+  it('is null before anything has been measured', () => {
+    expect(new NetTelemetry().live.rttFloorMs).toBeNull();
+  });
+});
+
+describe('the visual-snap counter', () => {
+  it('counts teleports apart from magnitude — a blended correction is not one', () => {
+    const telemetry = new NetTelemetry();
+    telemetry.recordReconcile({ error: 2, resynced: false, snapped: false }, 1, 1_000);
+    telemetry.recordReconcile({ error: 300, resynced: false, snapped: true }, 2, 1_100);
+    telemetry.recordReconcile({ error: 1, resynced: false }, 3, 1_200);
+    // Roll the second so the bucket finalizes.
+    telemetry.recordReconcile({ error: 0, resynced: false }, 4, 2_100);
+
+    const sample = telemetry.samples[0]!;
+    expect(sample.reconciles).toBe(3);
+    expect(sample.visualSnaps).toBe(1);
+  });
+});
+
+describe('the lead', () => {
+  it('records how far ahead of authority each reconcile left the client', () => {
+    const telemetry = new NetTelemetry();
+    telemetry.recordReconcile({ error: 0, resynced: false, lead: 10 }, 1, 1_000);
+    telemetry.recordReconcile({ error: 0, resynced: false, lead: 30 }, 2, 1_100);
+    telemetry.recordReconcile({ error: 0, resynced: false, lead: 0 }, 3, 2_100);
+
+    const sample = telemetry.samples[0]!;
+    expect(sample.leadMeanTicks).toBe(20);
+    expect(sample.leadMaxTicks).toBe(30);
+  });
+});

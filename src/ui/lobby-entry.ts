@@ -8,6 +8,13 @@
  *   CREATE ROOM   a fresh code, generated here and shown for the room to read.
  *   JOIN ROOM     type the code somebody else is holding up.
  *
+ * **This is the one and only front door** (ratified: one play flow). The main
+ * menu's PLAY opens *this* screen — there is no second entry point that skips it —
+ * and all three doors land in the SAME lobby ({@link ./lobby}): SOLO opens it
+ * offline, CREATE opens it online with the room code up while the host configures,
+ * JOIN opens it online as a guest watching the seats fill. One screen decides how
+ * you get in; one screen decides what the match is.
+ *
  * Pure and DOM-free like every model in this directory. It decides; the geometry
  * ({@link ./lobby-geometry} `entryLayout`) holds the rects and the view
  * ({@link ./lobby-entry-view}) only draws what the two of them return.
@@ -89,13 +96,13 @@ export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
   {
     door: 'solo',
     label: 'PLAY SOLO',
-    hint: 'Seven bots, no connection needed.',
+    hint: 'Set up the match. Bots fill the seats, no connection needed.',
     needsNetwork: false,
   },
   {
     door: 'create',
     label: 'CREATE ROOM',
-    hint: 'Get a code, read it out, they join you.',
+    hint: 'Set up the match and read the code out. They join you.',
     needsNetwork: true,
   },
   {

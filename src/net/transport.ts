@@ -261,15 +261,21 @@ export interface SnapshotMessage {
 }
 
 /**
- * Static-entity events — asteroids, turrets, shields, wrecks — sent on join and
- * on change rather than streamed every tick (GDD §4.2). `kind` names the entity
- * class; `data` is the entity-specific payload the sim applies. Kept structural
- * in the sketch; the implementation picks a compact encoding.
+ * Static-entity events — asteroids, turrets, shields, satellites, wrecks — sent
+ * on join and on change rather than streamed every tick (GDD §4.2). `kind` names
+ * the entity class; `data` is the entity-specific payload the sim applies. Kept
+ * structural in the sketch; the implementation picks a compact encoding.
+ *
+ * `'satellite'` was added by the M10 netcode audit, which found the kind missing
+ * and the structure it names therefore invisible in every online match
+ * (docs/netcode-audit.md §6, gap 2). Additive: an unrecognized kind was already
+ * dropped rather than guessed at, so the only code that had to change is the
+ * code that wanted to see one.
  */
 export interface EntityEventMessage {
   type: 'entityEvent';
   tick: Tick;
-  kind: 'asteroid' | 'turret' | 'shield' | 'wreck' | 'station';
+  kind: 'asteroid' | 'turret' | 'shield' | 'satellite' | 'wreck' | 'station';
   op: 'spawn' | 'update' | 'destroy';
   data: unknown;
 }
