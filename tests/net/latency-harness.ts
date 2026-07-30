@@ -135,6 +135,12 @@ class PipedTransport implements Transport {
   readonly up: Pipe<WireFrame>;
   readonly down: Pipe<WireFrame>;
   state: ConnectionState = 'connecting';
+  /** Input ticks this client has stamped a message with, and how often. An input
+   *  tick used twice is a message the server's queue will drop as a duplicate —
+   *  silently, whole — so this is counted rather than assumed (M10 action-echo). */
+  readonly inputTicks = new Map<number, number>();
+  /** Input messages stamped for a tick this client had already used. */
+  repeatedInputTicks = 0;
 
   constructor(
     private readonly server: MatchServer,
@@ -164,6 +170,11 @@ class PipedTransport implements Transport {
   }
 
   send(message: ClientMessage): void {
+    if (message.type === 'input') {
+      const seen = this.inputTicks.get(message.tick) ?? 0;
+      if (seen > 0) this.repeatedInputTicks++;
+      this.inputTicks.set(message.tick, seen + 1);
+    }
     this.up.push(this.clock(), encodeClientMessage(message));
   }
 
@@ -217,6 +228,16 @@ export interface LatencyMatchOptions {
   readonly input?: (client: number, frame: number) => readonly Action[];
   /** Rocks in the arena. Small keeps the run quick; non-zero keeps mining real. */
   readonly asteroidCount?: number;
+  /**
+   * Called once per frame, after both clients have sent that frame's input and the
+   * presentation layer has drawn over their worlds — so what it sees is **what each
+   * screen shows**, not what the simulation holds (`src/net/presentation`).
+   *
+   * The hook exists because some properties are only true *continuously*. A final
+   * reading cannot tell "one shot on screen throughout" from "two for 300 ms and
+   * then one", and the second is the developer's bug report (M10 action-echo).
+   */
+  readonly onFrame?: (frame: number, clients: readonly HarnessClient[]) => void;
 }
 
 /** What a run reports back — enough for a gate, and for a capture in the doc. */
@@ -228,6 +249,14 @@ export interface LatencyMatchResult {
   readonly frames: number;
   /** The authoritative world, for comparing a screen against the truth. */
   readonly authoritative: World;
+  /**
+   * Input messages, across both clients, stamped for a tick that client had
+   * already used — every one of which the server's ordered queue drops as a
+   * duplicate (`src/net/input-queue`). Zero is the only acceptable number: a
+   * dropped input is a lost frame for a stick and a lost *purchase* for a one-shot
+   * order, and neither is visible from anywhere else.
+   */
+  readonly repeatedInputTicks: number;
 }
 
 const DEFAULT_INPUT = (client: number, frame: number): readonly Action[] => {
@@ -311,29 +340,36 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
     throw new Error('latency harness: the match never started — the lobby did not settle');
   }
 
-  for (let frame = 1; frame <= options.frames; frame++) {
-    nowMs += FRAME_MS;
-    pump();
-    for (let i = 0; i < sessions.length; i++) sessions[i]!.sendInput(input(i, frame));
-  }
-
-  const room = server.room('RUSH');
+  // Built before the run, with `world` as a getter, so the per-frame hook reads the
+  // live screen rather than a snapshot taken at the end.
   const clients: HarnessClient[] = sessions.map((session) => ({
     session,
     telemetry: session.telemetry,
     you: session.you,
-    world: session.world,
+    get world(): World | null {
+      return session.world;
+    },
     screenPos: (id: PlayerId): { x: number; y: number } | null => {
       const ship = session.world?.ships.find((s) => s.id === id);
       return ship ? { x: ship.pos.x, y: ship.pos.y } : null;
     },
   }));
 
+  for (let frame = 1; frame <= options.frames; frame++) {
+    nowMs += FRAME_MS;
+    pump();
+    for (let i = 0; i < sessions.length; i++) sessions[i]!.sendInput(input(i, frame));
+    options.onFrame?.(frame, clients);
+  }
+
+  const room = server.room('RUSH');
+
   const stalls = transports.reduce((n, t) => n + t.up.stalls + t.down.stalls, 0);
   return {
     clients,
     stalls,
     frames: options.frames,
+    repeatedInputTicks: transports.reduce((n, t) => n + t.repeatedInputTicks, 0),
     authoritative: room!.world!,
   };
 }

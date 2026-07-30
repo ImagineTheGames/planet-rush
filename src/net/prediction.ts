@@ -273,6 +273,10 @@ export class PredictedMatch {
   /** Every ship's hull as authority last stated it — the only source there is
    *  ({@link holdHull}). Empty until the first snapshot. */
   private readonly hull = new Map<PlayerId, number>();
+  /** The tick each of the firer's own in-flight shots was created on — the fact
+   *  that tells a shot the replay will re-fire from one only this screen has
+   *  ({@link harvestOwnShots}). */
+  private readonly shotBirth = new Map<number, Tick>();
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
@@ -381,6 +385,9 @@ export class PredictedMatch {
     step(this.world, [{ id: this.local, actions }], this.dt);
 
     if (before) this.ledgeOrders(orders, before, tick);
+    // A shot spawned this tick gets its birth tick now, while "now" is unambiguous
+    // ({@link noteShotBirths}).
+    this.noteShotBirths();
     this.holdHull();
     this.checkpoint();
     this.decayOffset();
@@ -503,7 +510,7 @@ export class PredictedMatch {
     // The firer's own shots are the client's to draw, so they are lifted out
     // before authority flattens the pool and put back after the replay
     // (`settleShots`, audit item 2b).
-    const carried = this.harvestOwnShots();
+    const carried = this.harvestOwnShots(snapshot.tick);
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -746,10 +753,28 @@ export class PredictedMatch {
    * ({@link applySnapshot} `suppressShipShotsFrom`). Damage stays entirely the
    * server's word — a predicted shot is a picture of a shot.
    */
-  private harvestOwnShots(): CarriedShot[] {
+  private harvestOwnShots(snapshotTick: Tick): CarriedShot[] {
     const out: CarriedShot[] = [];
+    const seen = new Set<number>();
     for (const p of this.world.projectiles) {
       if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
+      // **Carry only what the replay cannot re-create.**
+      //
+      // A shot born at or before the snapshot's tick was fired by an input the
+      // replay does not re-run (the replay starts at `snapshotTick + 1`), so it
+      // exists only here and must be carried. A shot born *after* it will be fired
+      // again by the replay in a moment — carrying it too is how one shot became
+      // two on the firer's own screen, and the two copies do not even share an id:
+      // a rewind restores `nextEntityId` to the snapshot's tick, so the re-fired
+      // shot can come back numbered differently and slip past an id-keyed dedupe.
+      // (Measured before this rule: five own shots alive on a screen whose sim can
+      // hold two, and the same id standing in two pool slots at once.)
+      const born = this.shotBirth.get(p.id);
+      if (born !== undefined && born > snapshotTick) continue;
+      // A duplicate that already exists in the pool must not be re-seeded, or the
+      // list carries it forward for the rest of the match.
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
       out.push({
         id: p.id,
         x: p.pos.x,
@@ -833,6 +858,31 @@ export class PredictedMatch {
     for (let i = Math.min(keep.length, MAX_PREDICTED_SHOTS); i < MAX_PREDICTED_SHOTS; i++) {
       const p = this.world.projectiles[LOCAL_SHOT_BASE + i];
       if (p) p.active = false;
+    }
+    this.noteShotBirths();
+  }
+
+  /**
+   * Give every own shot on screen a birth tick, and forget the ones that are gone.
+   *
+   * The birth tick is what makes {@link harvestOwnShots} exact rather than a
+   * heuristic: it is the one fact that separates "the replay will fire this again"
+   * from "this exists only on my screen". Recorded here and after every predicted
+   * tick, so a shot has one from the frame it appears.
+   *
+   * The map is pruned to the shots actually alive, so it is bounded by
+   * {@link MAX_PREDICTED_SHOTS} plus whatever the sim is holding this instant —
+   * tens of entries, never a match-long accumulation.
+   */
+  private noteShotBirths(): void {
+    const live = new Set<number>();
+    for (const p of this.world.projectiles) {
+      if (!p.active || p.owner !== this.local || p.kind !== 'ship') continue;
+      live.add(p.id);
+      if (!this.shotBirth.has(p.id)) this.shotBirth.set(p.id, this.world.tick);
+    }
+    for (const id of this.shotBirth.keys()) {
+      if (!live.has(id)) this.shotBirth.delete(id);
     }
   }
 
