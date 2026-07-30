@@ -215,7 +215,46 @@ export type BuildItem = 'turret' | 'shield' | 'satellite' | 'repair' | 'bank';
 export interface BuildOrderAction {
   type: 'buildOrder';
   item: BuildItem;
+  /** @see OrderId — the client sequence id that makes this order idempotent. */
+  orderId?: OrderId;
 }
+
+/**
+ * ── PROPOSED ADDITION (Netcode, M10 action-echo) ────────────────────────────
+ *
+ * A **client sequence id** for one one-shot order, minted by the client that
+ * issued it and carried unchanged to the authority that runs it.
+ *
+ * The developer's mobile playtest: *"turrets built instantly and I built 2 but 3
+ * got built."* An order is a one-shot verb, but the wire is allowed to deliver a
+ * message twice — a retransmit, or a late message the server re-files onto the
+ * next unsimulated tick — and neither the input queue's `(player, tick)`
+ * duplicate check nor the sim's own validation can tell a *redelivered* order from
+ * a second tap: both are "a buildOrder from slot 3, and yes, you can afford it".
+ * So two taps bought three turrets.
+ *
+ * An id fixes that in the only place it can be fixed — at identity. The server
+ * remembers the ids it has run per slot and refuses a repeat, so **N taps buy
+ * exactly N things** however many times the wire says them. The same id is what
+ * lets the client match its own *prediction* to authority's echo of it, replacing
+ * one with the other instead of drawing both (`src/net/order-ledger.ts`).
+ *
+ * Deliberately **optional**, and deliberately not minted by the sim:
+ *
+ *  - Absent, everything behaves exactly as it did — offline play, the bots
+ *    (GDD §2.9: a bot issues orders through the same action interface and needs no
+ *    id, because a `LocalLoopback` has no wire to duplicate them), and every
+ *    existing test all keep compiling and passing unchanged.
+ *  - It is stamped by the *network* layer on the way out (`src/net/session.ts`),
+ *    so the input layer that produces actions (`src/platform/`) is untouched and
+ *    the simulation never reads it. The sim's contract is still "validate the
+ *    order, never trust the sender"; this is only about *how many times* it is
+ *    asked.
+ *
+ * Non-negative integer. Uniqueness is required only per player and only for the
+ * length of a match.
+ */
+export type OrderId = number;
 
 /**
  * Buy one tier on one ship-upgrade track (GDD §2.5) — the press on a row of the
@@ -234,6 +273,9 @@ export interface BuildOrderAction {
 export interface UpgradeOrderAction {
   type: 'upgradeOrder';
   track: UpgradeTrack;
+  /** @see OrderId — a row press is one-shot for the same reason a wheel press is,
+   *  and is made idempotent on the wire by the same id. */
+  orderId?: OrderId;
 }
 
 /**
