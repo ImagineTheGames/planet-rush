@@ -1,7 +1,7 @@
 {
   "probe": "rush-reach",
   "base": "https://imaginethegames.github.io/planet-rush/",
-  "capturedAt": "2026-07-30T21:21:18.242Z",
+  "capturedAt": "2026-07-30T21:04:30.091Z",
   "results": [
     {
       "profile": "desktop-online",
@@ -17,9 +17,9 @@
       "connectTracePointerEvents": null,
       "connectTraceDisplay": null,
       "connectTraceZIndex": null,
-      "countingAfterPress": true,
+      "countingAfterPress": false,
       "startedAfterPress": false,
-      "PRESSABLE": true
+      "PRESSABLE": false
     },
     {
       "profile": "desktop-offline",
@@ -35,8 +35,8 @@
       "connectTracePointerEvents": null,
       "connectTraceDisplay": null,
       "connectTraceZIndex": null,
-      "countingAfterPress": true,
-      "startedAfterPress": false,
+      "countingAfterPress": false,
+      "startedAfterPress": true,
       "PRESSABLE": true
     },
     {
