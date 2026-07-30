@@ -106,6 +106,20 @@ export function copyLogHint(offer: CopyLogOffer, phase: CopyLogPhase): string {
   }
 }
 
+/**
+ * The auto-offer line for a *dropped* connection (brief §3), naming what happened
+ * before it asks for the log. The transport's own reason rides along when it has one,
+ * because "the room ended" and "your grace ran out" are different bugs and a report
+ * that conflates them costs a round trip (`./websocket-transport` `CloseReason`).
+ *
+ * Pure, so the wording is asserted without a socket.
+ */
+export function disconnectOfferHint(state: string, closeReason?: string | null): string {
+  if (state === 'reconnecting') return `Reconnecting — ${ERROR_OFFER_HINT}`;
+  const reason = closeReason ? ` (${closeReason})` : '';
+  return `Disconnected${reason} — ${ERROR_OFFER_HINT}`;
+}
+
 /** The whole frame model. Pure, so both the wording and the disabled state are
  *  asserted without a DOM. */
 export function copyLogModel(offer: CopyLogOffer, phase: CopyLogPhase): CopyLogModel {
@@ -156,7 +170,12 @@ export function renderCopyLogHtml(model: CopyLogModel): string {
 }
 
 const COPY_LOG_CSS =
-  `#${COPY_LOG_ROOT_ID}{position:fixed;z-index:2147483000;` +
+  // The same maximum z-index the boot-error screen uses (`@platform/boot-error`), and
+  // that is deliberate: this affordance is appended to `body` *after* the app root, so
+  // at an equal z-index it paints above a full-viewport error overlay — which is the
+  // one screen it most needs to be reachable on ("the 'can't reach servers' page
+  // especially"). Anything lower would leave it buried under the message it reports.
+  `#${COPY_LOG_ROOT_ID}{position:fixed;z-index:2147483647;` +
   `right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));` +
   `display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;` +
   `max-width:min(22rem,80vw);font-family:${FONT_BODY};text-align:right;` +
@@ -188,13 +207,19 @@ export function escapeHtml(s: string): string {
 // The DOM edge
 // ---------------------------------------------------------------------------
 
-/** The slice of an element this module writes. `HTMLElement` satisfies it. */
+/**
+ * The slice of an element this module writes. `HTMLElement` satisfies it — which is
+ * why `appendChild` takes `unknown`: the DOM's own signature is generic over `Node`
+ * (`<T extends Node>(node: T) => T`), and a parameter typed as our own element would
+ * make `Document` unassignable to {@link CopyLogDom}. `unknown` keeps the seam narrow
+ * *and* structurally satisfiable by the real thing.
+ */
 export interface CopyLogElement {
   id: string;
   innerHTML: string;
   hidden: boolean;
   addEventListener(type: string, handler: () => void): void;
-  appendChild(child: CopyLogElement): void;
+  appendChild(child: unknown): void;
   remove(): void;
 }
 

@@ -19,6 +19,7 @@ import {
   ERROR_OFFER_HINT,
   copyLogLabel,
   copyLogModel,
+  disconnectOfferHint,
   hideCopyLog,
   installCopyLogButton,
   renderCopyLogHtml,
@@ -125,6 +126,15 @@ describe('the words on the button', () => {
     expect(copyLogModel({ reason: 'pause' }, 'copied').hint).toContain('paste it into chat');
     expect(copyLogModel({ reason: 'pause' }, 'saved').hint).toContain('downloaded as a file');
     expect(copyLogModel({ reason: 'error' }, 'failed').hint).toContain('Could not copy');
+  });
+
+  it('names what happened before it asks for the log, on a drop', () => {
+    expect(disconnectOfferHint('reconnecting')).toBe(`Reconnecting — ${ERROR_OFFER_HINT}`);
+    expect(disconnectOfferHint('closed', 'grace-elapsed')).toBe(
+      `Disconnected (grace-elapsed) — ${ERROR_OFFER_HINT}`,
+    );
+    // No reason to give (a plain drop) still reads as a sentence.
+    expect(disconnectOfferHint('closed', null)).toBe(`Disconnected — ${ERROR_OFFER_HINT}`);
   });
 
   it('disables the button only while a press is in flight', () => {
