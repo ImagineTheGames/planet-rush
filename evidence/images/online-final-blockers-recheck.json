@@ -1,23 +1,23 @@
 {
-  "checkedAt": "2026-07-30T15:55:20.764Z",
+  "checkedAt": "2026-07-30T17:30:44.351Z",
   "verdict": "BLOCKED",
   "fleet": {
     "reachable": true,
-    "uptimeSeconds": 113320,
-    "uptimeHours": 31.5,
-    "bootedAt": "2026-07-29T08:26:40.764Z",
+    "uptimeSeconds": 4277,
+    "uptimeHours": 1.2,
+    "bootedAt": "2026-07-30T16:19:27.341Z",
     "machine": "0800d5b6d62328",
-    "predatesWalletFix": true,
-    "matchesLastGreenDeploy": true
+    "predatesWalletFix": false,
+    "matchesLastGreenDeploy": false
   },
   "checks": [
     {
       "id": "deploy-image-builds",
       "gate": "online-reconnect",
       "owner": "deploy/CI",
-      "clear": false,
+      "clear": true,
       "want": "server/Dockerfile copies allocator/ into the build stage",
-      "saw": "Dockerfile has no COPY for allocator/, and server/upgrade-router.ts imports ../allocator/router"
+      "saw": "Dockerfile copies allocator/"
     },
     {
       "id": "wire-accepts-upgrade-order",
@@ -47,9 +47,17 @@
       "id": "fleet-runs-the-wallet-fix",
       "gate": "online-reconnect",
       "owner": "deploy/CI",
-      "clear": false,
+      "clear": true,
       "want": "the live gameserver runs an image built after #241 landed (2026-07-30T11:09:00Z)",
-      "saw": "up 31.5 h, booted 2026-07-29T08:26:40.764Z — that is the last GREEN deploy, 2026-07-29T08:25:09Z"
+      "saw": "up 1.2 h, booted 2026-07-30T16:19:27.341Z"
+    },
+    {
+      "id": "rush-pressable-on-desktop",
+      "gate": "online-feel",
+      "owner": "netcode/UI",
+      "clear": false,
+      "want": "the connect-trace panel stops covering the online lobby when hidden — a `#pr-connect-trace[hidden]{display:none}` rule, or `pointer-events:none` on the root",
+      "saw": "the panel still sets only `hidden`, while its id rule keeps `display:flex` and `pointer-events:auto` — so RUSH! stays covered and an online match cannot be started with a mouse"
     }
   ]
 }

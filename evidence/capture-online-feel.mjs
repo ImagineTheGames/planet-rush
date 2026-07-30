@@ -307,8 +307,43 @@ async function walk(browser, hostProfile, guestProfile, tag) {
     await host.page.screenshot({ path: join(OUT, `online-feel-${tag}-roster.png`) });
 
     // --- RUSH! — authority starts the match on both clients. ----------------
+    //
+    // THE PRESS IS TRIED FOR REAL FIRST, AND WHETHER IT WORKED IS RECORDED.
+    // On build 6888456 the desktop online lobby's RUSH! is DEAD to a pointer:
+    // the connect-trace panel (`pr-connect-trace`, added by fafff19) sets
+    // `hidden = true` but its own CSS says `display:flex`, which beats the user
+    // agent's `[hidden]{display:none}` — so the panel stays laid out and
+    // hit-testable at bottom-centre, 480x111 at (400,673) in a 1280x800 view,
+    // squarely over the RUSH! rect at (500,712,280,56). `elementFromPoint` at
+    // the button's own centre answers LI, not CANVAS
+    // (evidence/probe-rush-reach.mjs → images/rush-reach.json). The offline
+    // lobby, which never builds the panel, presses fine at the same point; a
+    // phone's lobby draws RUSH! higher than the panel and presses fine too.
+    //
+    // The gate still needs numbers, so when the real press is swallowed this
+    // falls back to the lobby's own `rush()` seam and RECORDS THAT IT HAD TO.
+    // A run with `rushViaSeam: true` is NOT evidence that the menu flow works —
+    // it is evidence that it does not, plus a measurement taken anyway.
     const rush = await host.page.evaluate(() => window.__lobby.rushControl.physicalCenter);
     await host.press({ x: rush.x, y: rush.y });
+    let counting = false;
+    for (let i = 0; i < 12 && !counting; i++) {
+      await sleep(500);
+      counting = await host.page.evaluate(
+        () => window.__lobby?.counting === true || window.__mainMenu?.matchStarted === true,
+      );
+    }
+    run.rushPressLanded = counting;
+    run.rushViaSeam = false;
+    if (!counting) {
+      run.rushBlockedBy = await host.page.evaluate((pt) => {
+        const el = document.elementFromPoint(pt.x, pt.y);
+        return el ? (el.id ? `${el.tagName}#${el.id}` : el.tagName) : null;
+      }, rush);
+      await host.page.screenshot({ path: join(OUT, `online-feel-${tag}-rush-swallowed.png`) });
+      await host.page.evaluate(() => window.__lobby.rush());
+      run.rushViaSeam = true;
+    }
     for (const c of [host, guest]) {
       await c.page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, { timeout: 60_000 });
     }

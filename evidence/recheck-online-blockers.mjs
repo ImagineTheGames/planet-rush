@@ -160,6 +160,41 @@ checks.push({
     : `gameserver /health unreachable: ${fleet.detail}`,
 });
 
+/** 6. The front door itself, found 2026-07-30T17:05Z while trying to capture the
+ *     feel gate: the desktop online lobby has no pressable RUSH! button. The
+ *     connect-trace panel (`pr-connect-trace`, fafff19) is hidden with the HTML
+ *     `hidden` attribute, but its own id rule sets `display:flex`, which beats
+ *     the user agent's `[hidden]{display:none}` — so it stays laid out, painted
+ *     and hit-testable at (400,673) 480x111, right over the RUSH! rect at
+ *     (500,712) 280x56. `elementFromPoint` at the button's centre answers LI.
+ *     Measured in evidence/probe-rush-reach.mjs → images/rush-reach.json.
+ *
+ *     Statically: the fix is either a `[hidden]` rule that restores display:none
+ *     or `pointer-events:none` on the root, so look for either. */
+{
+  const view = read('src/net/connect-trace-view.ts') ?? '';
+  const css = view.match(/const CONNECT_TRACE_CSS[\s\S]*?;\n/)?.[0] ?? '';
+  // Only two things in the STYLESHEET can stop the panel eating the press: a
+  // rule that makes `hidden` mean display:none again, or pointer-events:none.
+  // Deliberately NOT keyed on `remove()` appearing somewhere in the module —
+  // teardown helpers use it and the first draft of this check read them as a
+  // fix, reporting CLEAR for a defect I had just measured as BLOCKED.
+  const hiddenRule = /\[hidden\]\s*\{[^}]*display\s*:\s*none/.test(css);
+  const pointerNone = /pointer-events\s*:\s*none/.test(css);
+  checks.push({
+    id: 'rush-pressable-on-desktop',
+    gate: 'online-feel',
+    owner: 'netcode/UI',
+    clear: hiddenRule || pointerNone,
+    want:
+      'the connect-trace panel stops covering the online lobby when hidden — a `#pr-connect-trace[hidden]{display:none}` rule, or `pointer-events:none` on the root',
+    saw:
+      hiddenRule || pointerNone
+        ? 'the panel can no longer swallow the press — re-run probe-rush-reach.mjs to confirm PRESSABLE on desktop-online'
+        : 'the panel still sets only `hidden`, while its id rule keeps `display:flex` and `pointer-events:auto` — so RUSH! stays covered and an online match cannot be started with a mouse',
+  });
+}
+
 const blocked = checks.filter((c) => c.clear === false);
 const unknown = checks.filter((c) => c.clear === null);
 const verdict = blocked.length > 0 ? 'BLOCKED' : unknown.length > 0 ? 'RECAPTURE-TO-CONFIRM' : 'RECAPTURE';
