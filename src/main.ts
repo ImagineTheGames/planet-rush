@@ -1701,7 +1701,10 @@ async function boot(): Promise<void> {
       // changes, and keep the server half of it honest: a socket that has closed
       // is no longer a server this client is on, so the tag collapses back to
       // build-only exactly when the connection does (ratified, M10 §2).
-      if (onlineSession?.state === 'closed') identity.disconnected();
+      // (Guarded on `server`, not just on the state: a closed socket stays closed
+      // for every remaining frame, and `formatBuildTag` builds a string. One call
+      // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
+      if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
       // any frame) and show the re-enter affordance only once we've been fullscreen
