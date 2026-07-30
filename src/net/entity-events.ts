@@ -3,11 +3,11 @@
  * how a client applies it. OWNER: Netcode Engineer (GDD §3.5, §4.2).
  *
  * Only ships and projectiles ride the 30 Hz binary snapshot (`./snapshot`).
- * Asteroids, stations, turrets, shields and wrecks are **events, sent on join and
- * on change** (GDD §4.2) — they change a few times a minute, not sixty times a
- * second. This module owns both ends of that contract: the payload shapes (the
- * server's producer, `server/static-events.ts`, fills them in) and the client's
- * consumer, which writes them into the predicted world.
+ * Asteroids, stations, turrets, shields, radar satellites and wrecks are
+ * **events, sent on join and on change** (GDD §4.2) — they change a few times a
+ * minute, not sixty times a second. This module owns both ends of that contract:
+ * the payload shapes (the server's producer, `server/static-events.ts`, fills
+ * them in) and the client's consumer, which writes them into the predicted world.
  *
  * **Why the client needs a consumer at all.** The predicted world is built from
  * the same seed and the same roster the server built its world from, so at
@@ -81,6 +81,30 @@ export interface ShieldEventData {
 }
 
 /**
+ * A radar satellite orbiting its owner's station (RATIFIED feature f1).
+ *
+ * The one static entity whose *position* has to keep arriving, and the reason is
+ * in the sim rather than the wire: `orbitAngle` is **integrated** every tick
+ * (`sim/buildings.ts` `updateSatellites`), not derived from `world.time`. A
+ * reconcile rewinds the clock and replays, and a rewind restores scalars, not
+ * structures — so every replayed tick advances the client's orbit a second time
+ * and the satellite outruns the server's. `orbitAngle` on an `update` is the
+ * correction for that; the producer sends one only once the orbit has moved a
+ * legible amount (`server/static-events.ts`), so this stays an event and does not
+ * become a stream.
+ */
+export interface SatelliteEventData {
+  id: number;
+  owner: PlayerId;
+  x: number;
+  y: number;
+  radius: number;
+  maxHp: number;
+  /** Angular position around the station rim (radians). */
+  orbitAngle: number;
+}
+
+/**
  * The scouted half: one station's live health, sent only to a client entitled to
  * see it. Turret and shield HP ride along, because a defender's alarm and a
  * scout's read of a siege are the same information (GDD §2.2, §2.6).
@@ -90,6 +114,11 @@ export interface StationHealthData {
   coreHp: number;
   shields: { id: number; hp: number }[];
   turrets: { id: number; hp: number }[];
+  /** Satellite HP, on the same scouted terms (feature f1 — a satellite is a
+   *  legitimate siege target, so its damage is a besieger's earned read too).
+   *  Optional: a health payload from before the satellite kind existed simply
+   *  carries no satellites, which is also what a station without one sends. */
+  satellites?: { id: number; hp: number }[];
 }
 
 /** A `destroy` payload: an id, and nothing else worth the bytes. */
@@ -128,6 +157,10 @@ export function applyEntityEvent(world: World, message: EntityEventMessage): boo
       return message.op === 'destroy'
         ? removeShield(world, data['id'])
         : applyShield(world, data as unknown as ShieldEventData);
+    case 'satellite':
+      return message.op === 'destroy'
+        ? removeSatellite(world, data['id'])
+        : applySatellite(world, data as unknown as SatelliteEventData);
     case 'station':
     case 'wreck':
       // One `kind`, two payloads: structure (where the station is, whether it is
@@ -158,6 +191,9 @@ export function resetStaticEntities(world: World): void {
     station.turrets.length = 0;
     station.shields.length = 0;
     station.builds.length = 0;
+    // A satellite is refilled from the same burst, and a stale one left standing
+    // would go on granting sensor coverage authority stopped granting (GDD §2.2).
+    if (station.satellites) station.satellites.length = 0;
   }
 }
 
@@ -266,6 +302,49 @@ function removeShield(world: World, id: number): boolean {
   return false;
 }
 
+// --- Radar satellites (feature f1) ------------------------------------------
+
+function applySatellite(world: World, data: SatelliteEventData): boolean {
+  const station = world.stations.find((p) => p.owner === data.owner);
+  if (!station) return false;
+  if (!station.satellites) station.satellites = [];
+  const existing = station.satellites.find((s) => s.id === data.id);
+  if (existing) {
+    existing.pos.x = data.x;
+    existing.pos.y = data.y;
+    existing.radius = data.radius;
+    existing.maxHp = data.maxHp;
+    // The correction this event kind exists for — see {@link SatelliteEventData}.
+    existing.orbitAngle = data.orbitAngle;
+    return true;
+  }
+  station.satellites.push({
+    id: data.id,
+    owner: data.owner,
+    pos: { x: data.x, y: data.y },
+    radius: data.radius,
+    // Health is scouted, not broadcast (GDD §2.2), exactly as for a turret: a
+    // satellite arrives at full and is corrected only for a client that has
+    // earned the number.
+    hp: data.maxHp,
+    maxHp: data.maxHp,
+    orbitAngle: data.orbitAngle,
+  });
+  return true;
+}
+
+function removeSatellite(world: World, id: number): boolean {
+  for (const station of world.stations) {
+    if (!station.satellites) continue;
+    const index = station.satellites.findIndex((s) => s.id === id);
+    if (index >= 0) {
+      station.satellites.splice(index, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
 // --- Stations ---------------------------------------------------------------
 
 function applyStation(world: World, data: StationEventData): boolean {
@@ -292,6 +371,10 @@ function applyStationHealth(world: World, data: StationHealthData): boolean {
   for (const row of data.turrets) {
     const turret = station.turrets.find((t) => t.id === row.id);
     if (turret) turret.hp = row.hp;
+  }
+  for (const row of data.satellites ?? []) {
+    const satellite = station.satellites?.find((s) => s.id === row.id);
+    if (satellite) satellite.hp = row.hp;
   }
   return true;
 }
