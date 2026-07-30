@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-07-30T15:36:48.894Z",
+  "verdict": "BLOCKED",
+  "fleet": {
+    "reachable": true,
+    "uptimeSeconds": 112194,
+    "uptimeHours": 31.2,
+    "bootedAt": "2026-07-29T08:26:54.893Z",
+    "machine": "6836293b5161d8",
+    "predatesWalletFix": true,
+    "matchesLastGreenDeploy": true
+  },
+  "checks": [
+    {
+      "id": "deploy-image-builds",
+      "gate": "online-reconnect",
+      "owner": "deploy/CI",
+      "clear": false,
+      "want": "server/Dockerfile copies allocator/ into the build stage",
+      "saw": "Dockerfile has no COPY for allocator/, and server/upgrade-router.ts imports ../allocator/router"
+    },
+    {
+      "id": "wire-accepts-upgrade-order",
+      "gate": "online-reconnect",
+      "owner": "netcode",
+      "clear": false,
+      "want": "parseActions has a case for 'upgradeOrder', and BUILD_ITEMS contains 'satellite'",
+      "saw": "case 'upgradeOrder': ABSENT; BUILD_ITEMS satellite: ABSENT"
+    },
+    {
+      "id": "copylog-pressable-on-phone",
+      "gate": "online-feel",
+      "owner": "platform/UI",
+      "clear": false,
+      "want": "the COPY LOG affordance mounts inside the element the landscape lock fullscreens",
+      "saw": "installCopyLogButton still mounts into document.body (outside the fullscreen subtree)"
+    },
+    {
+      "id": "respawn-correction-tail",
+      "gate": "online-feel",
+      "owner": "netcode",
+      "clear": null,
+      "want": "mean correction and visual snaps inside docs/netcode-audit.md §5 across a session that contains a death",
+      "saw": "not statically checkable — re-measure with feel-diagnose.live.test.ts; last read: 25.4 u / 18.0 u mean against a 1.5 u ceiling, all of it in one post-respawn window"
+    },
+    {
+      "id": "fleet-runs-the-wallet-fix",
+      "gate": "online-reconnect",
+      "owner": "deploy/CI",
+      "clear": false,
+      "want": "the live gameserver runs an image built after #241 landed (2026-07-30T11:09:00Z)",
+      "saw": "up 31.2 h, booted 2026-07-29T08:26:54.893Z — that is the last GREEN deploy, 2026-07-29T08:25:09Z"
+    }
+  ]
+}

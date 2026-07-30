@@ -485,3 +485,27 @@ both form factors, then the real COPY LOG button — the exports are committed
 verbatim), `online-final.live.test.ts` (the shipped `src/net` modules over the real
 internet; `QA_ALLOCATOR` re-points it at a HEAD fleet), `fleet-head.mjs`,
 `probe-wire-orders.mjs`, `probe-copylog-reach.mjs`, `feel-diagnose.live.test.ts`.
+
+**Before re-capturing either gate, run `node evidence/recheck-online-blockers.mjs`.**
+Neither verdict can move until the defects above land, and the full round is two
+live browser clients on two form factors plus a HEAD fleet — roughly forty
+minutes to be told the same thing again. The re-check asks the four questions
+that decide it in about a second, names the lane that owns each, and exits 0 only
+when nothing static is in the way. Three of the checks read the shipped source at
+HEAD; the fourth asks the live gameserver how old it is and works back to the
+image it is running.
+
+At **2026-07-30T15:36Z** it reports **BLOCKED**, and its fleet arithmetic is the
+round's central finding arrived at independently: the live gameserver is up 31.2 h,
+which puts its boot at `2026-07-29T08:26:41Z` — **92 seconds after the last green
+deploy**, and a day before #241 put the reconnect wallet on the wire. The other
+three: `server/Dockerfile` still has no `COPY` for `allocator/` while
+`server/upgrade-router.ts` still imports `../allocator/router`; `parseActions`
+still has no `case 'upgradeOrder'` and `BUILD_ITEMS` still has no `'satellite'`;
+and `installCopyLogButton` still mounts into `document.body`, outside the subtree
+the landscape lock fullscreens. Output committed as
+`images/online-final-blockers-recheck.json`.
+
+The fifth question — the post-respawn correction tail — cannot be answered by
+reading source, and is carried as UNKNOWN rather than dropped, so that a green
+board on the other four does not read as permission to skip re-measuring it.
