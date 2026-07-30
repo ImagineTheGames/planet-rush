@@ -254,6 +254,55 @@ describe('the frame model', () => {
     expect(entryModel(createEntry()).error).toBe('');
   });
 
+  // --- The title carries the connect narration (M10 status-in-title) --------
+
+  it('gives the TITLE to the live connect narration, not to the word CONNECTING', () => {
+    // "show it at the top where it says CONNECTING… we don't need a separate
+    // pop-up for it" — so the one text element at the top of the screen advances,
+    // and the static word is never what a player watching an online join reads.
+    const connecting = chooseDoor(createEntry(), 'create', rng()).state;
+    const titles = [
+      'ALLOCATING ROOM…',
+      'ROOM Q5RN · TICKET SIGNED',
+      'DIALING MACHINE 0800d5b6…',
+      'JOINED · SEAT 2',
+    ].map((line) => entryModel(connecting, { line, failed: false }));
+
+    expect(titles.map((m) => m.prompt)).toEqual([
+      'ALLOCATING ROOM…',
+      'ROOM Q5RN · TICKET SIGNED',
+      'DIALING MACHINE 0800d5b6…',
+      'JOINED · SEAT 2',
+    ]);
+    expect(titles.every((m) => m.narrating)).toBe(true);
+    // Nothing is *wrong* on the way to a seat, so nothing is red.
+    expect(titles.every((m) => m.error === '')).toBe(true);
+  });
+
+  it('puts the exact refusal in the title, and says it once', () => {
+    const failed = entryFailed(chooseDoor(createEntry(), 'create', rng()).state, ENTRY_ERRORS.offline);
+    const line = 'REFUSED: bad-ticket — machine mismatch';
+    const model = entryModel(failed, { line, failed: true });
+    // The narration's own last step IS the failure, said exactly — so it takes the
+    // title AND the red, and the screen's generic sentence stands down rather than
+    // becoming a second explanation of one refusal.
+    expect(model.prompt).toBe(line);
+    expect(model.error).toBe(line);
+    expect(model.error).not.toBe(ENTRY_ERRORS.offline);
+  });
+
+  it('leaves the screen exactly as it was when nobody is narrating', () => {
+    // PLAY SOLO opens no socket, so it has no story and keeps the plain word; a
+    // mistyped code is still the screen's own error, not the netcode's.
+    const solo = entryModel(chooseDoor(createEntry(), 'create', rng()).state, null);
+    expect(solo.prompt).toContain('CONNECTING');
+    expect(solo.narrating).toBe(false);
+    // An empty line is no narration at all — a trace that has not taken its first
+    // step must never blank the title.
+    expect(entryModel(createEntry(), { line: '', failed: false }).prompt).toBe(ENTRY_TAGLINE);
+    expect(entryModel(entryFailed(createEntry(), ENTRY_ERRORS.full), null).error).toBe(ENTRY_ERRORS.full);
+  });
+
   it('subtitles the home screen with the tagline, not the title repeated (u2)', () => {
     // The field report: the line under the wordmark used to say "PLANET RUSH"
     // again. The subtitle is the pitch (GDD §2.3 triangle), never the name twice.

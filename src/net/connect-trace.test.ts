@@ -20,6 +20,8 @@ import {
   connectOfferHint,
   connectRefused,
   connectTicketed,
+  connectTitleFailed,
+  connectTitleLine,
   connectTraceLogEntry,
   connectTraceModel,
   connectTransportState,
@@ -131,9 +133,10 @@ describe('the verbose connecting screen', () => {
     // RETRY is NOT offered on a stall: the attempt is still live, and a second
     // allocate over the top of a socket that may yet open is how you get two rooms.
     expect(stalled.canRetry).toBe(false);
-    expect(connectOfferHint(stalled)).toBe(
-      'Stuck on "DIALING MACHINE 0800d5b6…" for 5s — COPY LOG to report this.',
-    );
+    // The step and the seconds are the TITLE's to say, so the offer names only the
+    // offer — the screen never says the same sentence twice in two sizes.
+    expect(connectOfferHint(stalled)).toBe('COPY LOG to report this.');
+    expect(connectTitleLine(stalled)).toBe('DIALING MACHINE 0800d5b6… 5s');
   });
 
   it('measures the stall from the LAST step, not from the start of the attempt', () => {
@@ -149,6 +152,47 @@ describe('the verbose connecting screen', () => {
     const model = connectTraceModel(happyPath(), T0 + 900 + 10 * STALL_MS);
     expect(model.stalled).toBe(false);
     expect(model.offerCopyLog).toBe(false);
+  });
+
+  // --- The title -----------------------------------------------------------
+
+  it('advances the TITLE through every state of a real connect', () => {
+    // The developer's third pass, asserted as one list: the big line at the top of
+    // the screen is never the same word twice in a row, and it is never
+    // `CONNECTING…`. This is the whole ask, in one expectation.
+    let trace = beginConnect('create', T0, 'planet-rush-allocator.fly.dev');
+    const titles = [connectTitleLine(connectTraceModel(trace, T0))];
+    trace = connectTicketed(trace, { room: 'Q5RN', machine: MACHINE, region: 'iad' }, T0 + 300);
+    titles.push(connectTitleLine(connectTraceModel(trace, T0 + 300)));
+    trace = connectDialing(trace, { machine: MACHINE, room: 'Q5RN' }, T0 + 400);
+    titles.push(connectTitleLine(connectTraceModel(trace, T0 + 400)));
+    trace = connectJoined(trace, 1, T0 + 900);
+    titles.push(connectTitleLine(connectTraceModel(trace, T0 + 900)));
+
+    expect(titles).toEqual([
+      'ALLOCATING ROOM…',
+      'ROOM Q5RN · TICKET SIGNED',
+      'DIALING MACHINE 0800d5b6…',
+      'JOINED · SEAT 2',
+    ]);
+    expect(titles).not.toContain('CONNECTING…');
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  it('stops the title on the exact refusal, and says so in red', () => {
+    const dialing = connectDialing(beginConnect('join', T0), { machine: MACHINE }, T0 + 1);
+    const model = connectTraceModel(connectRefused(dialing, 'bad-ticket', T0 + 2), T0 + 2);
+    expect(connectTitleLine(model)).toBe('REFUSED: bad-ticket — machine mismatch');
+    expect(connectTitleFailed(model)).toBe(true);
+  });
+
+  it('never hangs a clock on a title that is doing fine', () => {
+    // The seconds are the removed panel's one line worth keeping — but only once a
+    // step has sat long enough for the number to mean something.
+    const trace = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0);
+    expect(connectTitleLine(connectTraceModel(trace, T0 + 900))).toBe('DIALING MACHINE 0800d5b6…');
+    expect(connectTitleLine(connectTraceModel(trace, T0 + 12_000))).toBe('DIALING MACHINE 0800d5b6… 12s');
+    expect(connectTitleFailed(connectTraceModel(trace, T0 + 12_000))).toBe(false);
   });
 
   // --- The transport's own states ------------------------------------------

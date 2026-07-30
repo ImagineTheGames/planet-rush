@@ -1,28 +1,38 @@
 /**
- * src/net/connect-trace-view.ts — the verbose connecting screen, on screen.
- * OWNER: Netcode Engineer (GDD §4.2; M10, the developer's twice-repeated ask).
+ * src/net/connect-trace-view.ts — RETRY and COPY LOG, under the connecting
+ * screen's title. OWNER: Netcode Engineer (GDD §4.2; M10, the developer's ask, now
+ * on its third pass).
  *
- * The drawing half of `./connect-trace`. **DOM, not PixiJS**, for exactly the
- * reason the COPY LOG button is (`./playtest-log-button`, `@platform/boot-error`):
- * the moments this panel exists for are the moments the game may not be drawing —
- * a socket that never opened, a join the server refused, a screen someone is
- * staring at because nothing else is happening. A DOM panel over the canvas cannot
- * be taken down by the renderer's troubles, and it is one `innerHTML` write.
+ * **What this used to be, and why it is not that any more.** It was a panel at the
+ * foot of the connecting screen listing every step of `./connect-trace` while the
+ * title above it still said the one static word `CONNECTING…`. The developer read
+ * it and said the quiet part: *"I see the verbosity (it's on the bottom) but I
+ * meant show it at the top where it says CONNECTING… we don't need a separate
+ * pop-up for it."* Two surfaces saying two different true things about the same
+ * moment is one surface too many, and the useless one was the loud one.
  *
- * It is also deliberately *only* this: `src/ui/` owns the doors, the keypad and the
- * lobby, and none of that moves. This adds one panel over the existing connecting
- * screen, showing the steps the netcode layer is the only thing that knows about,
- * and takes itself off the instant a seat arrives or the player backs out.
+ * So the narration moved into the title itself — `./connect-trace`
+ * `connectTitleLine` feeding `src/ui/lobby-entry` `entryModel(state, narration)`,
+ * one text element at the top of the screen — and what is left here is the part a
+ * title cannot be: the two things a *failure* has to offer.
  *
- * RETRY and COPY LOG sit inside the panel rather than somewhere else on the page,
- * because "with RETRY and COPY LOG right there" was the actual ask: a failure the
+ * **DOM, not PixiJS**, for exactly the reason the COPY LOG button is
+ * (`./playtest-log-button`, `@platform/boot-error`): the moments these buttons
+ * exist for are the moments the game may not be drawing — a socket that never
+ * opened, a join the server refused. A DOM button over the canvas cannot be taken
+ * down by the renderer's troubles, and it is one `innerHTML` write. RETRY and COPY
+ * LOG sit together, right under the line that just told the player what went wrong,
+ * because "with RETRY and COPY LOG right there" was the original ask: a failure the
  * player has to go looking for an affordance to report is a failure that does not
  * get reported.
  *
- * Cold Vacuum palette (style-guide §1): chalk for the words, plasma for the live
- * step and the one action, hull steel for what is already done, threat red for a
- * refusal — the one thing on this panel that *is* a failure, which is the only
- * thing style-guide §2 spends red on.
+ * It shows **nothing at all** while a connect is merely in progress — the title is
+ * saying everything there is to say, and an affordance offered before there is
+ * anything to report is just the pop-up again.
+ *
+ * Cold Vacuum palette (style-guide §1): chalk for the words, plasma for the one
+ * affirmative action, hull steel for the chrome. No red here — the refusal is the
+ * title's to say, and style-guide §2 spends red once.
  */
 
 import { connectOfferHint, connectTraceModel } from './connect-trace';
@@ -35,48 +45,26 @@ import { escapeHtml } from './playtest-log-button';
 
 /** Element ids — the handles the affordance, a test, and the live-stage seam use. */
 export const CONNECT_TRACE_ROOT_ID = 'pr-connect-trace';
-export const CONNECT_TRACE_STEPS_ID = 'pr-connect-trace-steps';
 export const CONNECT_TRACE_RETRY_ID = 'pr-connect-trace-retry';
 export const CONNECT_TRACE_COPY_ID = 'pr-connect-trace-copy';
 
 const CSS_CHALK = '#DCE3EC';
 const CSS_PLASMA = '#4DC3FF';
 const CSS_HULL_STEEL = '#7E8894';
-const CSS_THREAT = '#FF4D4D';
-const CSS_PANEL = '#141922';
 
 const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
 const FONT_BODY = 'Oxanium, "Segoe UI", system-ui, sans-serif';
 
 /**
- * The panel's inner markup. Pure, so every word, every id and the 44-px touch
+ * The affordances, as markup. Pure, so every word, every id and the 44-px touch
  * minimum are asserted in node with no browser.
  *
- * Steps already taken are dimmed and the live one is lit, so the eye lands on
- * *what is happening now* without losing what already succeeded — which is the
- * whole diagnostic value: "ROOM Q5RN · TICKET SIGNED" above a stuck
- * "DIALING MACHINE 0800d5b6…" says, on its own, that the allocator is fine and
- * the socket is not.
+ * Returns `''` while the attempt is simply running — the title is already telling
+ * the whole story and there is nothing yet to retry or report, so there is no
+ * second surface on the screen at all. That empty string is the *normal* case: on
+ * a healthy connect this module never draws.
  */
 export function renderConnectTraceHtml(model: ConnectTraceModel): string {
-  const last = model.lines.length - 1;
-  const steps = model.lines
-    .map((line, i) => {
-      const live = i === last && model.busy;
-      const bad = i === last && model.error !== '';
-      const cls = bad ? 'pr-ct-step pr-ct-bad' : live ? 'pr-ct-step pr-ct-live' : 'pr-ct-step pr-ct-done';
-      const mark = bad ? '×' : live ? '›' : '·';
-      return `<li class="${cls}"><span class="pr-ct-mark">${mark}</span>${escapeHtml(line)}</li>`;
-    })
-    .join('');
-
-  // The waited tail only appears once a step has been sitting long enough to be
-  // worth counting — a number that ticks from zero on a healthy connect is noise.
-  const waited =
-    model.busy && model.stalled ? `<p class="pr-ct-waited">${Math.round(model.waitedMs / 1000)}s</p>` : '';
-  const hint = connectOfferHint(model);
-  const hintHtml = hint ? `<p class="pr-ct-hint" role="status" aria-live="polite">${escapeHtml(hint)}</p>` : '';
-
   const buttons: string[] = [];
   if (model.canRetry) {
     buttons.push(
@@ -86,45 +74,49 @@ export function renderConnectTraceHtml(model: ConnectTraceModel): string {
   if (model.offerCopyLog) {
     buttons.push(`<button id="${CONNECT_TRACE_COPY_ID}" type="button" class="pr-ct-button">COPY LOG</button>`);
   }
-  const actions = buttons.length > 0 ? `<div class="pr-ct-actions">${buttons.join('')}</div>` : '';
+  if (buttons.length === 0) return '';
+
+  // What the offer is offering — never the failure itself, which is the title.
+  const hint = connectOfferHint(model);
+  const hintHtml = hint ? `<p class="pr-ct-hint" role="status" aria-live="polite">${escapeHtml(hint)}</p>` : '';
 
   return (
     `<style>${CONNECT_TRACE_CSS}</style>` +
-    `<ol id="${CONNECT_TRACE_STEPS_ID}" class="pr-ct-steps">${steps}</ol>` +
-    waited +
     hintHtml +
-    actions
+    `<div class="pr-ct-actions">${buttons.join('')}</div>`
   );
 }
 
+/**
+ * How far below the top of the screen the affordances sit. Enough to clear the
+ * wordmark and the title line under it — that is the whole point of the number: the
+ * buttons belong *below* the title, not over it.
+ */
+export const CONNECT_TRACE_TOP_PX = 92;
+
 const CONNECT_TRACE_CSS =
-  // Centred low on the screen, under the doors' own wordmark and prompt, so it adds
-  // to that screen rather than covering it. One z-index below the COPY LOG button's
-  // maximum, so the two never fight over the same corner.
-  `#${CONNECT_TRACE_ROOT_ID}{position:fixed;z-index:2147483646;` +
-  `left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom));` +
-  `display:flex;flex-direction:column;align-items:center;gap:.5rem;` +
-  `width:min(30rem,92vw);padding:.75rem 1rem;box-sizing:border-box;` +
-  `background:${CSS_PANEL};border:1px solid rgba(126,136,148,.35);border-radius:6px;` +
+  // Centred at the TOP now, under the title that is doing the talking, rather than
+  // at the foot of the screen where the developer found it and did not want it. One
+  // z-index below the COPY LOG button's maximum, so the two never fight.
+  //
+  // `pointer-events:none` on the container with `auto` on the buttons: on the
+  // shortest landscape phone the doors begin barely under the title band, and a
+  // transparent container that swallowed taps there would take PLAY SOLO — the door
+  // that always works (GDD §4.8 risk 6) — down with a failed online join. Only the
+  // two button rects are ever live.
+  `#${CONNECT_TRACE_ROOT_ID}{position:fixed;z-index:2147483646;pointer-events:none;` +
+  `left:50%;transform:translateX(-50%);top:calc(${CONNECT_TRACE_TOP_PX}px + env(safe-area-inset-top));` +
+  `display:flex;flex-direction:column;align-items:center;gap:.45rem;` +
+  `width:min(30rem,92vw);box-sizing:border-box;` +
   `font-family:${FONT_BODY};-webkit-text-size-adjust:100%;}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-steps{list-style:none;margin:0;padding:0;width:100%;` +
-  `display:flex;flex-direction:column;gap:.2rem;}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-step{font-size:clamp(11px,2.9vw,13px);letter-spacing:.06em;` +
-  `line-height:1.45;display:flex;gap:.5rem;align-items:baseline;}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-mark{flex:0 0 auto;width:.75rem;text-align:center;}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-done{color:${CSS_HULL_STEEL};}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-live{color:${CSS_PLASMA};}` +
-  // Red is damage and only damage (style-guide §2): a refused join is the one
-  // thing on this panel that has actually gone wrong.
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-bad{color:${CSS_THREAT};}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-waited{margin:0;color:${CSS_HULL_STEEL};` +
-  `font-size:clamp(10px,2.6vw,12px);letter-spacing:.1em;}` +
   `#${CONNECT_TRACE_ROOT_ID} .pr-ct-hint{margin:0;color:${CSS_CHALK};text-align:center;` +
-  `font-size:clamp(11px,2.8vw,13px);line-height:1.4;}` +
+  `font-size:clamp(11px,2.8vw,13px);line-height:1.4;text-shadow:0 1px 3px #05070Bcc;}` +
   `#${CONNECT_TRACE_ROOT_ID} .pr-ct-actions{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;}` +
-  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-button{font-family:${FONT_HEADING};` +
+  `#${CONNECT_TRACE_ROOT_ID} .pr-ct-button{pointer-events:auto;font-family:${FONT_HEADING};` +
   `font-size:clamp(12px,3vw,14px);letter-spacing:.1em;color:${CSS_CHALK};` +
-  `background:transparent;border:1px solid ${CSS_HULL_STEEL};border-radius:4px;` +
+  // A chip of hull behind each button, since there is no panel behind them any
+  // more and a bare word over the starfield is not a button.
+  `background:#141922;border:1px solid ${CSS_HULL_STEEL};border-radius:4px;` +
   // 44px minimum: a real touch target on the phone (mobile amendment §1).
   `padding:.55rem 1.1rem;min-height:44px;min-width:44px;cursor:pointer;}` +
   `#${CONNECT_TRACE_ROOT_ID} .pr-ct-primary{color:${CSS_PLASMA};border-color:${CSS_PLASMA};}` +
@@ -162,9 +154,10 @@ export interface ConnectTraceViewConfig {
 }
 
 /**
- * The mounted panel. `update` is safe to call every frame: it re-renders only when
- * the model's *rendered shape* actually changed, so a connect that sits for five
- * seconds costs one string comparison per frame and no DOM work.
+ * The mounted affordances. `update` is safe to call every frame: it re-renders only
+ * when the model's *rendered shape* actually changed, so a connect that sits for
+ * five seconds costs one string comparison per frame and no DOM work — and while
+ * nothing has failed it is not on screen at all.
  */
 export class ConnectTraceView {
   private root: TraceElement | null = null;
@@ -173,7 +166,7 @@ export class ConnectTraceView {
 
   constructor(private readonly config: ConnectTraceViewConfig) {}
 
-  /** Whether the panel is currently on screen. */
+  /** Whether the affordances are currently on screen. */
   get visible(): boolean {
     return this.shown;
   }
@@ -183,12 +176,12 @@ export class ConnectTraceView {
     return this.lastHtml;
   }
 
-  /** Show (or refresh) the panel for `trace` as of `now`. */
+  /** Show (or refresh) the affordances for `trace` as of `now`. */
   update(trace: ConnectTrace, now: number): void {
     this.render(connectTraceModel(trace, now));
   }
 
-  /** Take the panel off screen — a seat arrived, or the player backed out. */
+  /** Take them off screen — a seat arrived, or the player backed out. */
   hide(): void {
     this.shown = false;
     this.lastHtml = '';
@@ -207,6 +200,12 @@ export class ConnectTraceView {
 
   private render(model: ConnectTraceModel): void {
     const html = renderConnectTraceHtml(model);
+    // Nothing to offer yet: the title has the floor and this surface is not on the
+    // screen at all. The common case, and it costs one string comparison.
+    if (html === '') {
+      this.hide();
+      return;
+    }
     const root = this.mount();
     if (!root) return;
     root.hidden = false;
@@ -238,12 +237,12 @@ export class ConnectTraceView {
 }
 
 // ---------------------------------------------------------------------------
-// The shared panel — what the game's screens actually call
+// The shared surface — what the game's screens actually call
 // ---------------------------------------------------------------------------
 
 let shared: ConnectTraceView | null = null;
 
-/** Install the session's connect panel. Called once by `boot()` with the real
+/** Install the session's connect affordances. Called once by `boot()` with the real
  *  `document`; a page with no DOM (node, the server) never calls it, and the
  *  helpers below then do nothing. */
 export function installConnectTraceView(config: ConnectTraceViewConfig): ConnectTraceView {
@@ -252,23 +251,23 @@ export function installConnectTraceView(config: ConnectTraceViewConfig): Connect
   return shared;
 }
 
-/** The installed panel, or null. */
+/** The installed surface, or null. */
 export function connectTraceView(): ConnectTraceView | null {
   return shared;
 }
 
-/** Show the trace. Safe where no panel was installed (it does nothing), so a
+/** Show the trace. Safe where nothing was installed (it does nothing), so a
  *  caller needs no null check. */
 export function showConnectTrace(trace: ConnectTrace, now: number): void {
   shared?.update(trace, now);
 }
 
-/** Withdraw the panel. */
+/** Withdraw the affordances. */
 export function hideConnectTrace(): void {
   shared?.hide();
 }
 
-/** Drop the shared panel (tests, teardown). */
+/** Drop the shared surface (tests, teardown). */
 export function resetConnectTraceView(): void {
   shared?.destroy();
   shared = null;
