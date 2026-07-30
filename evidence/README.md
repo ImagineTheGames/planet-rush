@@ -479,33 +479,65 @@ client, and that window is a death-and-respawn teleport home (correctly snapped
 once) followed by ~5 s in which the telemetry keeps re-charging the same correction
 while the ship provably sits still — `images/online-feel-diagnose.json`.
 
+That tail was carried as UNKNOWN when the round first closed. It is now
+**measured, and it is not a fault in the instrument**
+(`respawn-tail.live.test.ts` → `images/online-feel-respawn-tail.json`, live, room
+SWQD). `prediction.ts` computes the correction as
+`hypot(checkpoint − authoritative)`; the probe wraps the shipped `reconcile` and
+records both terms, and across the 150 breaching reconciles each side takes
+**exactly one value**: the checkpoint frozen at **home** (1968.841, 1200),
+authority frozen at the **death site** (744, 1291), 1228.217 u apart, with
+`histHit` true and `resynced` false throughout. The window spans 298 snapshot
+ticks — at `TICK_DT = 1/60` that is 4.97 s, i.e. `RESPAWN_S = 5`.
+
+The cause is one absence: **the respawn countdown never crosses the wire.**
+`killShip` sets `respawnTimer = RESPAWN_S` and only authority runs it (damage is
+the server's word); `ShipSnap` carries an `alive` bit and no timer;
+`applySnapshot` writes `alive` and never writes `respawnTimer`. So the client's
+ship goes dead with its timer already at 0, and `step()`'s
+`if (ship.respawnTimer <= 0) respawn(ship)` puts it back at full hull at home on
+the very next replay — the whole 5 s early. Every reconcile until authority
+catches up then re-applies dead-at-death-site and re-respawns to home, charging
+the full distance again. `absorb()` sees home before and home after, so no visual
+snap is counted and it never looked like a teleport; what it looks like instead
+is the ship pinned within ±4 u of home for ~5 s **while thrust is held down**.
+The correction metric is right — the two states really are that far apart.
+Owner: Netcode.
+
 **The instruments, all runnable, all in `evidence/`:**
 `capture-online-feel.mjs` (two browser clients through the shipped front door on
 both form factors, then the real COPY LOG button — the exports are committed
 verbatim), `online-final.live.test.ts` (the shipped `src/net` modules over the real
 internet; `QA_ALLOCATOR` re-points it at a HEAD fleet), `fleet-head.mjs`,
-`probe-wire-orders.mjs`, `probe-copylog-reach.mjs`, `feel-diagnose.live.test.ts`.
+`probe-wire-orders.mjs`, `probe-copylog-reach.mjs`, `feel-diagnose.live.test.ts`,
+`respawn-tail.live.test.ts` (wraps the shipped `reconcile` to record both terms of
+the correction across a real death).
 
 **Before re-capturing either gate, run `node evidence/recheck-online-blockers.mjs`.**
 Neither verdict can move until the defects above land, and the full round is two
 live browser clients on two form factors plus a HEAD fleet — roughly forty
-minutes to be told the same thing again. The re-check asks the four questions
+minutes to be told the same thing again. The re-check asks the five questions
 that decide it in about a second, names the lane that owns each, and exits 0 only
-when nothing static is in the way. Three of the checks read the shipped source at
-HEAD; the fourth asks the live gameserver how old it is and works back to the
+when nothing static is in the way. Four of the checks read the shipped source at
+HEAD; the fifth asks the live gameserver how old it is and works back to the
 image it is running.
 
-At **2026-07-30T15:36Z** it reports **BLOCKED**, and its fleet arithmetic is the
-round's central finding arrived at independently: the live gameserver is up 31.2 h,
-which puts its boot at `2026-07-29T08:26:41Z` — **92 seconds after the last green
-deploy**, and a day before #241 put the reconnect wallet on the wire. The other
-three: `server/Dockerfile` still has no `COPY` for `allocator/` while
+At **2026-07-30T15:54Z** it reports **BLOCKED** on all five. Its fleet arithmetic
+is the round's central finding arrived at independently: the live gameserver is up
+31.5 h, which puts its boot at `2026-07-29T08:26:54Z` — **92 seconds after the last
+green deploy**, and a day before #241 put the reconnect wallet on the wire. The
+others: `server/Dockerfile` still has no `COPY` for `allocator/` while
 `server/upgrade-router.ts` still imports `../allocator/router`; `parseActions`
 still has no `case 'upgradeOrder'` and `BUILD_ITEMS` still has no `'satellite'`;
-and `installCopyLogButton` still mounts into `document.body`, outside the subtree
-the landscape lock fullscreens. Output committed as
+`installCopyLogButton` still mounts into `document.body`, outside the subtree
+the landscape lock fullscreens; and `snapshot.ts` still carries no `respawnTimer`
+while `applySnapshot` still never restores it. Output committed as
 `images/online-final-blockers-recheck.json`.
 
-The fifth question — the post-respawn correction tail — cannot be answered by
-reading source, and is carried as UNKNOWN rather than dropped, so that a green
-board on the other four does not read as permission to skip re-measuring it.
+The fifth question used to be the post-respawn correction tail, carried as UNKNOWN
+because it could not be answered by reading source. It has since been **measured**
+(above), and the cause it turned out to have — an absence in the wire format — *is*
+statically checkable, so it is now an ordinary check like the rest. Asked of GitHub
+directly at **15:44Z**: every `Deploy server (Fly.io)` run is still red through run
+30552080733, `origin/main` is still `927943a`, and PR #246 is the only open PR — no
+lane has a fix in flight for any of the five.
