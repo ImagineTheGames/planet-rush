@@ -118,6 +118,35 @@ export interface ResolvedConnection {
  */
 export type ResolveFailure = 'not-found' | 'no-capacity' | 'bad-response' | 'network';
 
+/**
+ * Classify a socket-level join refusal (`JoinErrorMessage.reason`, the match
+ * server's own vocabulary) into the {@link ResolveFailure} the front door already
+ * speaks, so a refused join lands in the SAME graceful, retry-able error screen an
+ * allocator refusal does — never the eternal "connecting" a dropped `joinError`
+ * left the player staring at (M10 machine-pin lottery).
+ *
+ * The wire type of the reason is `string` (`./transport` keeps it loose so the
+ * server can add refusals a client predates), so this is TOTAL by construction:
+ * anything unrecognised is treated as a retry-able server refusal. The one reason
+ * that must NOT map to a plain retry is a genuinely wrong room code — retrying a
+ * code that is not the problem only asks the same refusal again, so it routes to
+ * `'not-found'` (fix the code), exactly as a 404 allocate does. A refused *ticket*
+ * (`'bad-ticket'` — the lottery this milestone closes, or an expired one) and a
+ * room that cannot seat us now (`'room-full'`, `'match-live'`) are all mended by a
+ * FRESH allocate, which is what the front door's retry does — one per tap.
+ */
+export function resolveFailureForJoinError(reason: string): ResolveFailure {
+  switch (reason) {
+    case 'bad-room-code':
+      return 'not-found';
+    case 'room-full':
+    case 'match-live':
+      return 'no-capacity';
+    default:
+      return 'bad-response';
+  }
+}
+
 /** A resolve either lands a connection or names why it could not. */
 export type ResolveResult =
   | { readonly ok: true; readonly connection: ResolvedConnection }

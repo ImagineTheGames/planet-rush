@@ -14,6 +14,7 @@ import {
   allocatorUrlFromEnv,
   joinRoom,
   probeRoomLiveness,
+  resolveFailureForJoinError,
 } from './allocator-client';
 import type { FetchLike, FetchResponse } from './allocator-client';
 
@@ -196,5 +197,37 @@ describe('probeRoomLiveness', () => {
     expect(
       await probeRoomLiveness({ baseUrl: 'https://alloc.example.com', fetch }, 'QK7P'),
     ).toBe('unknown');
+  });
+});
+
+describe('resolveFailureForJoinError', () => {
+  // The M10 lottery: the ticket lost the socket coin flip. A fresh allocate (the
+  // front door's retry) mints a fresh ticket to a correctly-pinned Machine, so the
+  // action must be retry, never edit-code — the room code was never the problem.
+  it('routes a refused ticket to a retry-able failure, not edit-code', () => {
+    expect(resolveFailureForJoinError('bad-ticket')).toBe('bad-response');
+  });
+
+  // A room that exists but cannot seat us right now: full, or already in-match.
+  // "Try again in a moment" (no-capacity) is the honest action, and a fresh
+  // allocate gets a room that can.
+  it('routes a room that will not seat us now to no-capacity', () => {
+    expect(resolveFailureForJoinError('room-full')).toBe('no-capacity');
+    expect(resolveFailureForJoinError('match-live')).toBe('no-capacity');
+  });
+
+  // The one reason where retrying the SAME code is pointless: the code is wrong.
+  // Route it to not-found so the front door says "check it", exactly as a 404 does.
+  it('routes a bad room code to not-found (edit the code, do not retry it)', () => {
+    expect(resolveFailureForJoinError('bad-room-code')).toBe('not-found');
+  });
+
+  // Total by construction: the wire reason is `string`, so a refusal this client
+  // predates must still land as a retry-able error — never an unhandled join that
+  // strands the player on "connecting" (the whole point of the M10 client honesty).
+  it('defaults an unrecognised reason to a retry-able failure', () => {
+    expect(resolveFailureForJoinError('reclaim-expired')).toBe('bad-response');
+    expect(resolveFailureForJoinError('some-reason-shipped-after-this-client')).toBe('bad-response');
+    expect(resolveFailureForJoinError('')).toBe('bad-response');
   });
 });
