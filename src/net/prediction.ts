@@ -41,8 +41,10 @@
  * — by a hair every snapshot (the wire quantizes positions to whole units) or by
  * a lot after real divergence. {@link PredictedMatch.renderOffset} carries that
  * displacement as a decaying visual offset the renderer adds, so the world is
- * authoritative *now* while the picture catches up over a few frames. Past
- * {@link SNAP_DISTANCE} it is not smoothed at all: a respawn or a genuine
+ * authoritative *now* while the picture catches up over {@link RECONCILE_BLEND_FRAMES}
+ * frames — the smooth correction the developer at ~150 ms asked for, where a
+ * per-snapshot error too small to see must never read as a rollback. Past
+ * {@link SNAP_THRESHOLD} it is not smoothed at all: a respawn or a genuine
  * teleport should look like one.
  */
 
@@ -67,19 +69,41 @@ import type { EntityEventMessage, Tick } from './transport';
  */
 export const MAX_PENDING_INPUTS = 120;
 
-/** Per-tick decay of the visual correction offset. Roughly a 60 ms tail: fast
- *  enough that the picture is never meaningfully behind the world, slow enough
- *  that a half-unit quantization correction is invisible instead of a twitch. */
-export const SMOOTHING_DECAY = 0.8;
+/**
+ * The frame count a correction is blended out over — the developer's *"blend the
+ * predicted state toward the authoritative one over N frames"* (M10 reconcile
+ * brief), expressed as an exponential error decay with this as its time constant.
+ * The offset falls to 1/e (~37 %) after this many frames and is effectively gone
+ * (~5 %) after ~3× it — so at 60 fps a `RECONCILE_BLEND_FRAMES` of 6 lands the
+ * picture on authority in ~100 ms without a single visible snap. It is the one
+ * knob that decides whether a small per-snapshot divergence reads as *smooth* or
+ * as the *"constant server rollback"* the developer reported at 150 ms RTT.
+ */
+export const RECONCILE_BLEND_FRAMES = 6;
+
+/**
+ * Per-frame fraction of the visual correction offset that survives to the next
+ * frame — the exponential-decay multiplier derived from
+ * {@link RECONCILE_BLEND_FRAMES} (`e^(-1/N)` ≈ 0.846 at N = 6). Named separately
+ * because {@link PredictedMatch.decayOffset} multiplies by it every tick and a
+ * bare `0.846` there would be unreadable; tune {@link RECONCILE_BLEND_FRAMES},
+ * not this.
+ */
+export const BLEND_DECAY = Math.exp(-1 / RECONCILE_BLEND_FRAMES);
 
 /** Below this the offset is simply zeroed — chasing sub-pixel error costs more
  *  than it hides. */
 export const SMOOTHING_EPSILON = 0.05;
 
-/** A correction larger than this is not smoothed. A respawn, a reclaim, or a
- *  resync moves the ship *because something happened*; sliding it across the map
- *  would be a lie, and a slow one. */
-export const SNAP_DISTANCE = 120;
+/**
+ * A correction larger than this is not smoothed — it is snapped, teleport-grade.
+ * A respawn, a reclaim, or a resync moves the ship *because something happened*;
+ * sliding it across the map would be a lie, and a slow one. Everything under it
+ * is the smooth-correction regime {@link RECONCILE_BLEND_FRAMES} governs, so this
+ * is also the ceiling the 150 ms latency harness (`prediction.test.ts`) asserts a
+ * normal-flight correction never reaches.
+ */
+export const SNAP_THRESHOLD = 120;
 
 // ---------------------------------------------------------------------------
 // Records
@@ -351,7 +375,7 @@ export class PredictedMatch {
     const after = this.localShipPos();
     const dx = before.x - after.x;
     const dy = before.y - after.y;
-    if (Math.hypot(dx, dy) > SNAP_DISTANCE) {
+    if (Math.hypot(dx, dy) > SNAP_THRESHOLD) {
       this.offset.x = 0;
       this.offset.y = 0;
       return;
@@ -361,8 +385,8 @@ export class PredictedMatch {
   }
 
   private decayOffset(): void {
-    this.offset.x *= SMOOTHING_DECAY;
-    this.offset.y *= SMOOTHING_DECAY;
+    this.offset.x *= BLEND_DECAY;
+    this.offset.y *= BLEND_DECAY;
     if (Math.abs(this.offset.x) < SMOOTHING_EPSILON) this.offset.x = 0;
     if (Math.abs(this.offset.y) < SMOOTHING_EPSILON) this.offset.y = 0;
   }

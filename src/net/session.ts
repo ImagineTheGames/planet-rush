@@ -32,6 +32,9 @@ import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
 import { PredictedMatch } from './prediction';
+import { NetTelemetry } from './telemetry';
+import { RemoteInterpolator } from './interpolation';
+import type { InterpolatedShip } from './interpolation';
 import { decodeSnapshot } from './snapshot';
 import type {
   BotDifficulty,
@@ -75,6 +78,28 @@ export interface MatchSession {
    * absorb corrections smoothly, and a netgraph reads the error and the lead.
    */
   readonly prediction: PredictedMatch | null;
+  /**
+   * Client-side reconciliation telemetry — misprediction rate, correction
+   * magnitude, and measured RTT, sampled per second (`./telemetry`, M10 reconcile
+   * brief). Populated only online, where there is prediction to measure; a
+   * `?debug=1` netgraph reads {@link NetTelemetry.live} per frame and
+   * {@link NetTelemetry.format} dumps a capture.
+   */
+  readonly telemetry: NetTelemetry;
+  /**
+   * The remote-entity interpolation buffer (`./interpolation`), or null offline
+   * where the world is authoritative in-process. The render layer samples it to
+   * draw *other* ships ~100 ms in the past while the local ship stays predicted,
+   * so remote motion is smooth regardless of this client's RTT (M10 brief).
+   */
+  readonly interpolation: RemoteInterpolator | null;
+  /**
+   * Remote ships at the current render instant, ~100 ms in the past — a
+   * clock-safe convenience over {@link interpolation}: it samples with the
+   * session's own wall clock, so the render layer never has to match clock
+   * domains. Empty offline (authoritative world) and until the first snapshot.
+   */
+  sampleRemotes(): readonly InterpolatedShip[];
   /** Leave the match. */
   close(): void;
 }
@@ -136,15 +161,27 @@ export class TransportSession implements MatchSession {
   private seq = 0;
   private snapshotTick: Tick = -1;
   private predictor: PredictedMatch | null = null;
+  private interpolator: RemoteInterpolator | null = null;
   private readonly observers: ((message: ServerMessage) => void)[] = [];
   private readonly dt: number;
+  private readonly clock: () => number;
+  /** The reconciliation instrument — fed on every send and every applied
+   *  reconcile, read by the `?debug=1` netgraph (`./telemetry`). Inert offline. */
+  private readonly netTelemetry = new NetTelemetry();
   /** True when the transport runs the sim in this process. Then the session
    *  predicts nothing: there is no latency to hide, and inventing a second copy
    *  of a world we already own would be the one way to make offline drift. */
   private readonly authoritative: boolean;
 
-  constructor(private readonly transport: Transport, options: { dt?: number } = {}) {
+  constructor(
+    private readonly transport: Transport,
+    options: { dt?: number; now?: () => number } = {},
+  ) {
     this.dt = options.dt ?? TICK_DT;
+    // Wall clock for telemetry and interpolation timing. Injected like every
+    // other clock in `src/net`, defaulting to the browser's, so a capture is
+    // reproducible and a test runs instantly.
+    this.clock = options.now ?? ((): number => Date.now());
     this.authoritative = isLocalAuthority(transport);
     transport.onMessage((message) => this.receive(message));
   }
@@ -227,14 +264,30 @@ export class TransportSession implements MatchSession {
     return this.predictor;
   }
 
+  get telemetry(): NetTelemetry {
+    return this.netTelemetry;
+  }
+
+  get interpolation(): RemoteInterpolator | null {
+    return this.interpolator;
+  }
+
+  sampleRemotes(): readonly InterpolatedShip[] {
+    return this.interpolator?.sample(this.clock()) ?? [];
+  }
+
   sendInput(actions: readonly Action[]): void {
     const tick = this.tick;
     const seq = ++this.seq;
     this.transport.send({ type: 'input', tick, seq, actions });
     // Send first, then predict: the wire gets the press with no local work in
     // front of it, and the ship moves this frame either way (GDD §4.2).
-    if (this.predictor) this.predictor.predict(seq, actions);
-    else this.nextTick = tick + 1;
+    if (this.predictor) {
+      // Timestamp the send so the snapshot that later acks this seq measures a
+      // real round trip (`./telemetry`). Only online — offline there is no wire.
+      this.netTelemetry.recordInput(seq, this.clock());
+      this.predictor.predict(seq, actions);
+    } else this.nextTick = tick + 1;
   }
 
   close(): void {
@@ -252,10 +305,23 @@ export class TransportSession implements MatchSession {
         this.nextTick = message.tick + 1;
         if (!this.authoritative) this.beginPredicting(message);
         break;
-      case 'snapshot':
+      case 'snapshot': {
         this.snapshotTick = message.tick;
-        this.predictor?.reconcile(decodeSnapshot(message.payload), message.ackSeq);
+        if (this.predictor) {
+          const now = this.clock();
+          const decoded = decodeSnapshot(message.payload);
+          const report = this.predictor.reconcile(decoded, message.ackSeq);
+          // Feed the netgraph only for a reconcile that actually applied — a stale
+          // snapshot the client ignored is not a data point (`./telemetry`).
+          if (report.applied) {
+            this.netTelemetry.recordReconcile(report, message.ackSeq, now);
+          }
+          // And buffer the authoritative frame for remote-ship interpolation,
+          // timed by the same clock the render layer samples with (`./interpolation`).
+          this.interpolator?.record(decoded, now);
+        }
         break;
+      }
       case 'entityEvent':
         // The half of the world that does not stream: rocks, turrets, shields,
         // wrecks, and the scouted health a client has earned (GDD §2.2, §4.2).
@@ -314,6 +380,9 @@ export class TransportSession implements MatchSession {
       localPlayer: this.player,
       dt: this.dt,
     });
+    // Remote ships render out of this buffer, ~100 ms in the past, so their
+    // motion is smooth at any RTT while the local slot stays predicted (M10).
+    this.interpolator = new RemoteInterpolator({ local: this.player });
   }
 }
 

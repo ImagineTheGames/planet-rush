@@ -27,7 +27,7 @@ import type { Action, PlayerId } from '@shared/types';
 import { TICK_DT, createWorld, step } from '../sim';
 import type { World, WorldConfig } from '../sim';
 import { InputQueue } from './input-queue';
-import { PredictedMatch, applySnapshot } from './prediction';
+import { PredictedMatch, SNAP_THRESHOLD, applySnapshot } from './prediction';
 import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
 import type { InputMessage } from './transport';
@@ -100,17 +100,37 @@ class Authority {
   }
 }
 
-/** A wire with a fixed one-way delay, measured in frames. */
+/** A seeded LCG, so a "150 ms + jitter" run is reproducible frame for frame
+ *  rather than depending on `Math.random`. */
+function lcg(seed: number): () => number {
+  let s = seed >>> 0;
+  return (): number => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/**
+ * A wire with a one-way delay in frames, plus optional additive jitter (never
+ * negative — a packet cannot beat the base latency, so jitter only ever delays,
+ * the same shape a real jitter buffer sees). Arrivals are drained in `at` order
+ * so a jittered packet cannot overtake an earlier one on the same link.
+ */
 class Link<T> {
   private readonly inflight: { at: number; payload: T }[] = [];
-  constructor(private readonly delayFrames: number) {}
+  constructor(
+    private readonly delayFrames: number,
+    private readonly jitterFrames = 0,
+    private readonly rng: () => number = () => 0,
+  ) {}
 
   send(frame: number, payload: T): void {
-    this.inflight.push({ at: frame + this.delayFrames, payload });
+    const jitter = this.jitterFrames > 0 ? Math.floor(this.rng() * (this.jitterFrames + 1)) : 0;
+    this.inflight.push({ at: frame + this.delayFrames + jitter, payload });
   }
 
   arrivals(frame: number): T[] {
-    const due = this.inflight.filter((p) => p.at <= frame);
+    const due = this.inflight.filter((p) => p.at <= frame).sort((a, b) => a.at - b.at);
     for (const packet of due) this.inflight.splice(this.inflight.indexOf(packet), 1);
     return due.map((p) => p.payload);
   }
@@ -127,9 +147,10 @@ class Match {
   private seq = 0;
   private frame = 0;
 
-  constructor(delayFrames = 0) {
-    this.up = new Link(delayFrames);
-    this.down = new Link(delayFrames);
+  constructor(delayFrames = 0, jitterFrames = 0) {
+    const rng = lcg(0x5eed);
+    this.up = new Link(delayFrames, jitterFrames, rng);
+    this.down = new Link(delayFrames, jitterFrames, rng);
   }
 
   /** One 60 Hz frame: the client presses and predicts, the server runs the tick
@@ -309,26 +330,57 @@ describe('reconciliation', () => {
     expect(distance(client.world, server.world)).toBeLessThan(1);
   });
 
-  it('shows a small correction as a decaying offset and a big one as a jump', () => {
+  it('blends a small correction out over the blend window and snaps a big one', () => {
+    // Small: a shove worth smoothing leaves the renderer an offset to walk off,
+    // so the world is authoritative *now* while the picture catches up over
+    // RECONCILE_BLEND_FRAMES (M10 reconcile brief).
     const smooth = new Match();
     smooth.run(10);
     shipOf(smooth.server.world).pos.x += 8;
     smooth.run(2);
-
-    // A shove worth smoothing leaves the renderer an offset to walk off, so the
-    // world is authoritative now while the picture catches up.
     expect(Math.hypot(smooth.client.renderOffset.x, smooth.client.renderOffset.y)).toBeGreaterThan(
       0,
     );
-    smooth.run(30);
-    expect(Math.hypot(smooth.client.renderOffset.x, smooth.client.renderOffset.y)).toBe(0);
+    // It decays to sub-pixel — invisible — over the blend window. It need not
+    // reach a hard zero: the wire quantizes position to whole units every
+    // snapshot, so a well-predicted ship carries a perpetual fraction-of-a-unit
+    // offset, which is exactly the twitch the blend exists to hide rather than a
+    // divergence to correct. (A slower blend than the old fixed 0.8 decay leaves
+    // that residue slightly larger, still far under a pixel.)
+    smooth.run(40);
+    expect(Math.hypot(smooth.client.renderOffset.x, smooth.client.renderOffset.y)).toBeLessThan(1);
 
+    // Big: a respawn-sized move is not slid across the map. It is snapped —
+    // teleport-grade, past SNAP_THRESHOLD — so it leaves no blend offset behind
+    // (only the same sub-pixel quantization residue any tick carries).
     const snap = new Match();
     snap.run(10);
     shipOf(snap.server.world).pos.x += 900;
     snap.run(2);
-    // A respawn-sized move is not slid across the map: it happened, and it shows.
-    expect(Math.hypot(snap.client.renderOffset.x, snap.client.renderOffset.y)).toBe(0);
+    expect(Math.hypot(snap.client.renderOffset.x, snap.client.renderOffset.y)).toBeLessThan(1);
+  });
+
+  it('keeps corrections smooth, never teleport-grade, during normal flight at ~150 ms + jitter', () => {
+    // The developer's actual condition, made a permanent test (M10 brief): a gru
+    // client on an iad fleet at ~150 ms RTT with jitter. One-way 4 frames (≈67 ms)
+    // plus 0–3 frames of additive jitter puts the round trip around 150–220 ms.
+    const match = new Match(4, 3);
+    match.run(60); // warm up — let the client's lead settle against the latency
+    const before = match.errors.length;
+    match.run(300, THRUST); // five seconds of steady, ordinary flight
+
+    const flight = match.errors.slice(before);
+    expect(flight.length).toBeGreaterThan(60); // the run actually reconciled
+
+    // The guarantee the developer asked for: normal flight never produces a
+    // teleport-grade correction. Every reconcile lands inside the smooth-blend
+    // regime the renderer hides (< SNAP_THRESHOLD), so a small per-snapshot
+    // divergence decays as an offset and is never the "constant server rollback".
+    expect(Math.max(...flight)).toBeLessThan(SNAP_THRESHOLD);
+    // And the typical correction is tiny — the wire's ~1-unit quantization floor
+    // plus the occasional one-tick jitter miss, not a standing divergence.
+    const mean = flight.reduce((a, b) => a + b, 0) / flight.length;
+    expect(mean).toBeLessThan(5);
   });
 });
 
