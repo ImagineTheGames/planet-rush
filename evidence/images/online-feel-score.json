@@ -8,86 +8,62 @@
     "MAX_PEAK_LEAD_TICKS": 120,
     "MAX_MISPREDICTION_RATE": 0.5
   },
-  "capturedAt": "2026-07-30T21:17:58.125Z",
+  "capturedAt": "2026-07-30T22:04:11.308Z",
   "logs": [
     {
       "file": "images/online-feel-pc-host-log.json",
-      "summary": "Planet Rush playtest log — build 3d7cc6a (2026-07-30T20:57:24.870Z) · session 2026-07-30T21:07:38.527Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+      "summary": "Planet Rush playtest log — build 5a545f0 (2026-07-30T21:26:51.810Z) · session 2026-07-30T21:31:27.656Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
       "dropped": 0,
       "matchEvents": [
         {
-          "at": 28114,
+          "at": 41757,
           "msg": "matchStart",
           "tick": 0,
-          "seed": 1143374235,
+          "seed": 1323978413,
           "slots": 8,
           "reclaim": false
-        },
-        {
-          "at": 61891,
-          "msg": "death",
-          "tick": 2022
-        },
-        {
-          "at": 61891,
-          "msg": "eliminated",
-          "tick": 2022
         }
       ],
       "session": {
-        "seconds": 96,
-        "reconciles": 2883,
-        "rttMean": 617,
-        "rttMax": 1203,
-        "jitterMean": 68,
-        "meanCorrection": 13.215,
-        "worstCorrection": 253.453,
-        "mispredictionRate": 0.073,
-        "meanLead": 24.8,
-        "peakLead": 34,
-        "visualSnaps": 1,
+        "seconds": 72,
+        "reconciles": 2258,
+        "rttMean": 1141,
+        "rttMax": 4346,
+        "jitterMean": 136,
+        "meanCorrection": 0.283,
+        "worstCorrection": 1.755,
+        "mispredictionRate": 0.044,
+        "meanLead": 27.6,
+        "peakLead": 60,
+        "visualSnaps": 0,
         "resyncs": 0,
         "verdicts": {
-          "MAX_CORRECTION_UNITS": false,
-          "MAX_MEAN_CORRECTION_UNITS": false,
-          "MAX_VISUAL_SNAPS": false,
+          "MAX_CORRECTION_UNITS": true,
+          "MAX_MEAN_CORRECTION_UNITS": true,
+          "MAX_VISUAL_SNAPS": true,
           "MAX_MEAN_LEAD_TICKS": true,
           "MAX_PEAK_LEAD_TICKS": true,
           "MAX_MISPREDICTION_RATE": true
         },
-        "passes": 3
+        "passes": 6
       },
       "breachWindow": {
-        "seconds": 6,
-        "atMs": [
-          47817,
-          48636,
-          50077,
-          50695,
-          51608,
-          52699
-        ],
-        "distinctWorstCorrections": [
-          253.148,
-          253.453
-        ],
-        "mispredictionRates": [
-          0.4,
-          1,
-          0.714
-        ]
+        "seconds": 0,
+        "atMs": [],
+        "distinctWorstCorrections": [],
+        "mispredictionRates": []
       },
       "outsideBreachWindow": {
-        "seconds": 90,
-        "reconciles": 2712,
-        "rttMean": 619,
-        "rttMax": 1203,
-        "jitterMean": 68,
-        "meanCorrection": 0.14,
-        "worstCorrection": 2.199,
-        "mispredictionRate": 0.021,
-        "meanLead": 24.8,
-        "peakLead": 34,
+        "seconds": 72,
+        "reconciles": 2258,
+        "rttMean": 1141,
+        "rttMax": 4346,
+        "jitterMean": 136,
+        "meanCorrection": 0.283,
+        "worstCorrection": 1.755,
+        "mispredictionRate": 0.044,
+        "meanLead": 27.6,
+        "peakLead": 60,
         "visualSnaps": 0,
         "resyncs": 0,
         "verdicts": {
@@ -103,71 +79,58 @@
     },
     {
       "file": "images/online-feel-pc-guest-log.json",
-      "summary": "Planet Rush playtest log — build 3d7cc6a (2026-07-30T20:57:24.870Z) · session 2026-07-30T21:07:40.208Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+      "summary": "Planet Rush playtest log — build 5a545f0 (2026-07-30T21:26:51.810Z) · session 2026-07-30T21:31:30.313Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
       "dropped": 0,
       "matchEvents": [
         {
-          "at": 26432,
+          "at": 39084,
           "msg": "matchStart",
           "tick": 0,
-          "seed": 1143374235,
+          "seed": 1323978413,
           "slots": 8,
           "reclaim": false
         }
       ],
       "session": {
-        "seconds": 133,
-        "reconciles": 3987,
-        "rttMean": 602,
-        "rttMax": 1389,
-        "jitterMean": 71,
-        "meanCorrection": 5.476,
-        "worstCorrection": 140.604,
-        "mispredictionRate": 0.075,
-        "meanLead": 24.3,
-        "peakLead": 36,
-        "visualSnaps": 1,
+        "seconds": 116,
+        "reconciles": 3506,
+        "rttMean": 992,
+        "rttMax": 3168,
+        "jitterMean": 99,
+        "meanCorrection": 0.19,
+        "worstCorrection": 1.809,
+        "mispredictionRate": 0.031,
+        "meanLead": 25.8,
+        "peakLead": 65,
+        "visualSnaps": 0,
         "resyncs": 0,
         "verdicts": {
-          "MAX_CORRECTION_UNITS": false,
-          "MAX_MEAN_CORRECTION_UNITS": false,
-          "MAX_VISUAL_SNAPS": false,
+          "MAX_CORRECTION_UNITS": true,
+          "MAX_MEAN_CORRECTION_UNITS": true,
+          "MAX_VISUAL_SNAPS": true,
           "MAX_MEAN_LEAD_TICKS": true,
           "MAX_PEAK_LEAD_TICKS": true,
           "MAX_MISPREDICTION_RATE": true
         },
-        "passes": 3
+        "passes": 6
       },
       "breachWindow": {
-        "seconds": 6,
-        "atMs": [
-          108074,
-          108859,
-          110484,
-          111375,
-          112357,
-          112849
-        ],
-        "distinctWorstCorrections": [
-          140.604
-        ],
-        "mispredictionRates": [
-          0.241,
-          1,
-          0.667
-        ]
+        "seconds": 0,
+        "atMs": [],
+        "distinctWorstCorrections": [],
+        "mispredictionRates": []
       },
       "outsideBreachWindow": {
-        "seconds": 127,
-        "reconciles": 3806,
-        "rttMean": 602,
-        "rttMax": 1389,
-        "jitterMean": 72,
-        "meanCorrection": 0.232,
-        "worstCorrection": 1.848,
-        "mispredictionRate": 0.04,
-        "meanLead": 24.4,
-        "peakLead": 36,
+        "seconds": 116,
+        "reconciles": 3506,
+        "rttMean": 992,
+        "rttMax": 3168,
+        "jitterMean": 99,
+        "meanCorrection": 0.19,
+        "worstCorrection": 1.809,
+        "mispredictionRate": 0.031,
+        "meanLead": 25.8,
+        "peakLead": 65,
         "visualSnaps": 0,
         "resyncs": 0,
         "verdicts": {
