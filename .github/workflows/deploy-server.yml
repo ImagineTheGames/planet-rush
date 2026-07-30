@@ -65,13 +65,15 @@ jobs:
         run: flyctl deploy --config fly.allocator.toml --remote-only
 
       - name: Allocator is a SINGLE machine (in-memory registry; 2 machines = split brain)
-        run: flyctl scale count 1 --app planet-rush-allocator --yes || true
+        run: flyctl scale count 1 --region iad --app planet-rush-allocator --yes
 
       - name: Deploy gameserver fleet
         run: flyctl deploy --config fly.gameserver.toml --remote-only
 
       - name: Always-on floor (iad x2 + gru x1 — the developer plays from Brazil)
-        run: flyctl scale count iad=2 gru=1 --app planet-rush-gameserver --yes || true
+        run: |
+          flyctl scale count 2 --region iad --app planet-rush-gameserver --yes
+          flyctl scale count 1 --region gru --app planet-rush-gameserver --yes
 
       - name: Health checks
         run: |
