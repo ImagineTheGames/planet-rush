@@ -5,7 +5,7 @@
  * The `online-reconnect` and `online-feel` gates are both FAILED, and not one of
  * the reasons is QA's to fix. Re-running the full capture round is expensive
  * (two live browser clients on two form factors, a HEAD fleet, ~40 minutes) and
- * pointless while the blockers stand. This asks the four questions that decide
+ * pointless while the blockers stand. This asks the five questions that decide
  * it, cheaply, and says BLOCKED or RECAPTURE.
  *
  *   node evidence/recheck-online-blockers.mjs
@@ -118,16 +118,34 @@ const checks = [];
   });
 }
 
-/** 4. The telemetry tail. Not statically checkable — the accounting keeps
- *     re-charging one respawn teleport for ~5 s while the ship sits still. Left
- *     as a live re-measure, flagged so it is not forgotten when the rest clears. */
+/** 4. The post-respawn correction tail. This was carried as UNKNOWN until
+ *     2026-07-30T15:50Z, when `respawn-tail.live.test.ts` watched both terms of
+ *     the correction across a real death and found neither of them moving: the
+ *     checkpoint frozen at HOME, authority frozen at the DEATH SITE, 1228.217 u
+ *     apart for 298 ticks — which at TICK_DT 1/60 is 4.97 s, i.e. RESPAWN_S.
+ *
+ *     The cause is one absence, and an absence IS statically checkable: the
+ *     respawn countdown never crosses the wire. `killShip` sets
+ *     `respawnTimer = RESPAWN_S` and only authority runs it; `ShipSnap` carries
+ *     an `alive` bit and no timer; `applySnapshot` writes `alive` and never
+ *     writes `respawnTimer`. So the client's ship goes dead with its timer at 0
+ *     and `step()`'s `if (ship.respawnTimer <= 0) respawn(ship)` resurrects it
+ *     at home on the very next replay — the full 5 s before authority does. */
+const snapshotSrc = read('src/net/snapshot.ts') ?? '';
+const predictionSrc = read('src/net/prediction.ts') ?? '';
+const applyBody = predictionSrc.slice(predictionSrc.indexOf('export function applySnapshot'));
+const wireCarriesTimer = /respawnTimer/.test(snapshotSrc);
+const applyRestoresTimer = /respawnTimer/.test(applyBody.slice(0, 4000));
 checks.push({
-  id: 'respawn-correction-tail',
+  id: 'respawn-countdown-crosses-the-wire',
   gate: 'online-feel',
   owner: 'netcode',
-  clear: null,
-  want: 'mean correction and visual snaps inside docs/netcode-audit.md §5 across a session that contains a death',
-  saw: 'not statically checkable — re-measure with feel-diagnose.live.test.ts; last read: 25.4 u / 18.0 u mean against a 1.5 u ceiling, all of it in one post-respawn window. NARROWED 2026-07-30T15:44Z by reading, not measuring: the obvious suspect is ELIMINATED — a correction that repeats to three decimals looks like the stale-snapshot early return handing back its previous `this.error` (prediction.ts:382-392), but session.ts:404 already feeds the instrument only `if (report.applied)`, so those are not the samples. The tail is therefore built from reconciles that genuinely applied and genuinely computed that error. Noted as a lead, NOT a diagnosis: `localShipPos()` answers ORIGIN when the local ship is absent from world.ships (prediction.ts:698-701) and `checkpoint()` records that answer verbatim (prediction.ts:545-553), which would poison every history entry written while the ship is gone — but an origin-based checkpoint implies a correction of hypot(home) and the measured magnitude is death-site→home instead, so that alone does not explain it either. Netcode owns the answer; both seams above are eliminated or unconfirmed, not causes.',
+  clear: wireCarriesTimer || applyRestoresTimer,
+  want: "the client can know how much of authority's respawn countdown is left — `respawnTimer` streamed in ShipSnap, or restored by applySnapshot, or the local ship held dead until authority revives it",
+  saw:
+    wireCarriesTimer || applyRestoresTimer
+      ? `snapshot.ts mentions respawnTimer: ${wireCarriesTimer}; applySnapshot mentions it: ${applyRestoresTimer} — re-measure with respawn-tail.live.test.ts to confirm the tail is gone`
+      : 'snapshot.ts carries NO respawnTimer and applySnapshot never restores it — so the client respawns the instant authority reports the ship dead, and every reconcile for the next RESPAWN_S (5 s) charges the whole death-site→home distance. MEASURED 2026-07-30T15:50Z, live, room SWQD (images/online-feel-respawn-tail.json): 150 consecutive reconciles, ONE distinct error value 1228.217 u, checkpoint frozen at home (1968.841, 1200), authority frozen at the death site (744, 1291), histHit true and resynced false throughout — the instrument is right and the two states genuinely disagree. Visual snaps stay at 1 because absorb() sees home before and home after, so this never looked like a teleport; what it looks like instead is a ship pinned within ±4 u of home for ~5 s while thrust is held down.',
 });
 
 const fleet = await fleetAge();
