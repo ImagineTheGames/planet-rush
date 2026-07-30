@@ -217,6 +217,12 @@ export class LobbyView extends Container {
    * built from those rects and the model for the currently-selected arena — so
    * the card previews, names, VETERAN tag and plasma selection are pixel-for-pixel
    * what the standalone picker drew, with none of it duplicated here.
+   *
+   * The whole row dims for a client that cannot change it — a JOINER in an online
+   * room, or any lobby past RUSH! — the same honest tell the MODE and ABUNDANCE
+   * pills carry ({@link drawControls}), and the same rule the model enforces
+   * (`./lobby` `selectMap` is the host's). A guest still *reads* which arena the
+   * room is flying; it just doesn't read as theirs to press.
    */
   private drawMaps(model: LobbyModel): void {
     const mapLayout: MapPickerLayout = {
@@ -227,6 +233,7 @@ export class LobbyView extends Container {
     };
     this.mapPicker.setLayout(mapLayout);
     this.mapPicker.visible = true;
+    this.mapPicker.alpha = model.hostControls && !model.classLocked ? 1 : 0.55;
     this.mapPicker.update(mapPickerModel(model.mapId));
   }
 

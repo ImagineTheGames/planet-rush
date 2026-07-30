@@ -1,13 +1,16 @@
 /**
  * src/ui/main-menu.ts — the main menu. OWNER: UI Engineer (GDD §3.7, §4.6 M7).
  *
- * The screen a clean boot opens on: the wordmark, PLAY, and SETTINGS. It is the
- * front door the field report found missing — the Day-7 menus merged, but boot
- * dropped the player "right in the match", so the menu was never reached. PLAY is
- * the *only* thing that builds a match world; SETTINGS opens the Day-7 settings
- * screen ({@link ./settings}). The wiring that gates the world on PLAY lives in
- * `src/main.ts`; this module only decides what the screen says and where a tap
- * lands.
+ * The screen a clean boot opens on: the wordmark, PLAY, CODEX and SETTINGS. It is
+ * the front door the field report found missing — the Day-7 menus merged, but boot
+ * dropped the player "right in the match", so the menu was never reached.
+ *
+ * **PLAY opens the doors, and it is the only way in** (ratified: one play flow).
+ * PLAY leads to {@link ./lobby-entry} — PLAY SOLO / CREATE ROOM / JOIN ROOM — and
+ * all three of those lead to the *same* lobby ({@link ./lobby}), offline or
+ * online. Nothing on this screen builds a match world; SETTINGS opens the Day-7
+ * settings screen ({@link ./settings}). The wiring lives in `src/main.ts`; this
+ * module only decides what the screen says and where a tap lands.
  *
  * Same three-piece discipline as the rest of the directory: a pure, DOM-free
  * model with its layout co-located — a short stack of centred buttons needs no
@@ -31,12 +34,21 @@ import type { Insets } from './menu-geometry';
 // The buttons
 // ---------------------------------------------------------------------------
 
-/** What a tap on the main menu resolves to. `play` builds an offline match (bots
- *  fill every other seat); `online` opens the room-code front door — CREATE a room
- *  and read the code out, or JOIN one somebody is holding up (M3/online); `codex`
- *  opens the optional reference (GDD §2.10) and comes back; `settings` opens the
- *  fire-mode / VFX / volume screen and comes back. */
-export type MainMenuOption = 'play' | 'online' | 'codex' | 'settings';
+/**
+ * What a tap on the main menu resolves to.
+ *
+ * `play` opens **the doors** — PLAY SOLO / CREATE ROOM / JOIN ROOM
+ * ({@link ./lobby-entry}) — and nothing else. It does not build a match and it no
+ * longer has an offline lobby of its own: the developer ratified ONE way in
+ * ("PLAY → goes to the same online menu, which already has offline play … right
+ * now PLAY going to a separate offline lobby is just redundant"), so the second
+ * front door that used to sit under it (ONLINE) is gone and this one option leads
+ * to all three ways a match starts.
+ *
+ * `codex` opens the optional reference (GDD §2.10) and comes back; `settings`
+ * opens the fire-mode / VFX / volume screen and comes back.
+ */
+export type MainMenuOption = 'play' | 'codex' | 'settings';
 
 /** One button's identity, in screen order. The layout, the view and the hit test
  *  all walk this same list, so a re-ordered screen can never mis-route a tap —
@@ -49,15 +61,20 @@ export interface MainMenuItem {
   readonly primary: boolean;
 }
 
-/** The buttons, top to bottom. PLAY is the one primary door (plasma) — the
- *  offline game is a complete product on its own and always works (GDD §4.8 risk
- *  6), so it stays the single emphasised action. ONLINE sits right under it: the
- *  room-code front door (CREATE / JOIN), fully active steel — a peer of PLAY, not
- *  a louder one. CODEX and SETTINGS are the two secondary screens that open and
- *  come back; like ONLINE they are active steel, never gray. */
+/**
+ * The buttons, top to bottom. **PLAY is the only door into a match** (plasma, the
+ * one primary action) and it opens the three ways in rather than one of them: the
+ * ratified single play flow. There used to be a second button here — ONLINE —
+ * whose screen already carried PLAY SOLO, which made PLAY a redundant shortcut to
+ * an offline lobby the doors screen could reach anyway; two front doors is one
+ * more than a player can be told about, so the redundant one was removed rather
+ * than relabelled.
+ *
+ * CODEX and SETTINGS are the two secondary screens that open and come back —
+ * active steel, never gray (the gray-means-disabled theme rule).
+ */
 export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
   { kind: 'play', label: 'PLAY', primary: true },
-  { kind: 'online', label: 'ONLINE', primary: false },
   { kind: 'codex', label: 'CODEX', primary: false },
   { kind: 'settings', label: 'SETTINGS', primary: false },
 ];
