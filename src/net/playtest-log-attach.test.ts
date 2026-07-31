@@ -16,7 +16,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
-import { attachSessionLog, describeSample } from './playtest-log-attach';
+import { ActionJournal } from './action-journal';
+import { attachSessionLog, describeAction, describeSample } from './playtest-log-attach';
 import type { LoggedSession, LoggedWorld } from './playtest-log-attach';
 import { ShipClass } from '@shared/types';
 import type { ConnectionState, ServerMessage } from './transport';
@@ -38,7 +39,16 @@ function sample(atMs: number, over: Partial<TelemetrySample> = {}): TelemetrySam
     rttMeanMs: 148.6,
     rttMaxMs: 210.2,
     rttMinMs: 120.4,
+    appliedDeltaMean: 0,
+    appliedDeltaMax: 0,
+    appliedDeltaSamples: 30,
     rttJitterMs: 12.3,
+    networkMeanMs: 26.4,
+    networkMinMs: 24.1,
+    serverQueueMeanMs: 118.2,
+    serverLoopLagMaxMs: 2.4,
+    clientLagMeanMs: 1.2,
+    clientLagMaxMs: 9.5,
     leadMeanTicks: 11,
     leadMaxTicks: 14,
     resyncs: 0,
@@ -73,6 +83,59 @@ function fakeSession(over: Partial<LoggedSession> = {}): LoggedSession & {
   };
   return session;
 }
+
+describe('the action events', () => {
+  it('drains the predictor\'s journal into the log, one line per event, once', () => {
+    const log = newLog();
+    const journal = new ActionJournal();
+    const session = fakeSession({ prediction: { actions: journal } });
+    const handle = attachSessionLog({ log, session });
+
+    journal.record({ kind: 'volley', tick: 120, inFlight: 2 });
+    journal.record({ kind: 'order', tick: 121, orderId: 0x40001, verb: 'buildOrder', what: 'turret' });
+    journal.record({ kind: 'echo', tick: 140, orderId: 0x40001, outcome: 'adopt', waited: 19 });
+    handle.poll();
+
+    const net = log.events.filter((e) => e.kind === 'net');
+    expect(net.map((e) => e.msg)).toEqual(['volley', 'order', 'echo']);
+    expect(net[1]!.data).toEqual({ tick: 121, id: 0x40001, verb: 'buildOrder', what: 'turret' });
+    expect(net[2]!.data).toEqual({ tick: 140, id: 0x40001, outcome: 'adopt', waited: 19 });
+
+    // Drained: a second poll with nothing new adds nothing, so a paste is not a
+    // wall of the same three lines.
+    handle.poll();
+    expect(log.events.filter((e) => e.kind === 'net')).toHaveLength(3);
+  });
+
+  it('says which way an echo went — the two mismatches are the point', () => {
+    expect(describeAction({ kind: 'echo', tick: 9, orderId: 7, outcome: 'refused', waited: 30 })).toEqual({
+      tick: 9,
+      id: 7,
+      outcome: 'refused',
+      waited: 30,
+    });
+    // An echo about an order this client never predicted: not an error, and not
+    // something a log may pass over in silence either.
+    expect(describeAction({ kind: 'echo', tick: 9, orderId: 7, outcome: 'unknown', waited: null })).toMatchObject({
+      outcome: 'unknown',
+      waited: null,
+    });
+    // And a prediction nobody ever answered.
+    expect(describeAction({ kind: 'expiry', tick: 200, orderId: 7, what: 'shield', waited: 90 })).toEqual({
+      tick: 200,
+      id: 7,
+      what: 'shield',
+      waited: 90,
+    });
+  });
+
+  it('is silent offline, where there is no prediction and no echo', () => {
+    const log = newLog();
+    const handle = attachSessionLog({ log, session: fakeSession() });
+    handle.poll();
+    expect(log.events.filter((e) => e.kind === 'net')).toHaveLength(0);
+  });
+});
 
 describe('the joinError path', () => {
   it('populates the log with the server’s own reason', () => {
@@ -183,6 +246,20 @@ describe('the per-second telemetry', () => {
       resync: 2,
       snap: 4,
       lead: 11,
+      // The M10 tick-alignment instrument: how much later the server ran this
+      // client's input than the tick it predicted it at.
+      align: 0,
+      alignMax: 0,
+      alignN: 30,
+      // The M10 RTT decomposition (item 6): the composite `rtt` above, and the three
+      // stages it is actually made of. `rtt 149` beside `net 26` is the whole finding
+      // of the developer's gru capture in one line — the wire was never the problem.
+      net: 26,
+      netMin: 24,
+      srvq: 118,
+      srvlag: 2,
+      cli: 1,
+      cliMax: 10,
     });
   });
 
@@ -281,7 +358,7 @@ describe('what is deliberately NOT logged', () => {
     attachSessionLog({ log, session });
 
     for (let tick = 0; tick < 200; tick++) {
-      session.emit({ type: 'snapshot', tick, ackSeq: tick, payload: new ArrayBuffer(8) });
+      session.emit({ type: 'snapshot', tick, ackSeq: tick, ackTick: tick, payload: new ArrayBuffer(8) });
       session.emit({ type: 'entityEvent', tick, kind: 'asteroid', op: 'update', data: {} });
     }
 

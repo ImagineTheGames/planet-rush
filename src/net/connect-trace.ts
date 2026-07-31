@@ -12,7 +12,11 @@
  *
  * This module is the fix, and it is deliberately *pure*: a state machine plus the
  * lines it produces, with no DOM, no clock of its own and no transport. It reads
- * as a story the player can follow while it happens —
+ * as a story the player can follow while it happens, **in the connecting screen's
+ * title** — the one big line at the top that used to read `CONNECTING…` and now
+ * reads whatever is actually happening ({@link connectTitleLine}; the developer's
+ * third pass: "show it at the top where it says CONNECTING… we don't need a
+ * separate pop-up for it") —
  *
  *     ALLOCATING ROOM…
  *     ROOM Q5RN · TICKET SIGNED
@@ -29,16 +33,36 @@
  *   • **Nothing is claimed before it happens.** Each step is appended when the
  *     event actually occurs, so a screen showing "TICKET SIGNED" means a ticket
  *     was signed. A screen stuck on "ALLOCATING ROOM…" is itself the diagnosis.
- *   • **A stall is a state, not a silence.** {@link STALL_MS} without progress
- *     flips {@link ConnectTraceModel.stalled}, which is what auto-offers COPY LOG
- *     — the report gets made while the developer is still looking at the failure.
+ *   • **A stall is a state, not a silence.** {@link STALL_MS} in *one* state flips
+ *     {@link ConnectTraceModel.stalled}, which is what auto-offers COPY LOG — the
+ *     report gets made while the developer is still looking at the failure.
+ *
+ * **What a stall is measured against** (m10-15, the developer: *"I joined a room but
+ * it said to copy logs as if an error occurred — it showed up too early"*). The clock
+ * is **time in the CURRENT state**, never time since the tap:
+ *
+ *   1. Every advance resets it — including the ones that add no line. The socket
+ *      opening is the case that produced the bug report: it is real progress the
+ *      story has nothing new to say about ({@link connectProgress}), and it used to
+ *      be thrown away, so a healthy join whose Machine was cold spent one long
+ *      `dialing` clock covering both the dial *and* the server's join handling, and
+ *      crossed five seconds while it was still working. A slow-but-advancing connect
+ *      is a slow connect, not a stall, however long it takes overall.
+ *   2. A success cancels outright. `joined` withdraws a due offer — and one already
+ *      on screen — in the same frame the seat arrives, because the one thing the
+ *      offer must never do is ask a player who just got in to report a bug.
  *
  * Every step also lands in the session log through {@link connectTraceLogEntry}
  * (the m10-09b `connect` channel, `./playtest-log` `recordConnect`), so the screen
  * and the pasted log tell the same story in the same order.
  *
- * The view that draws this is `./connect-trace-view`; `src/main.ts` drives it from
- * the real allocator round trip and the real transport.
+ * **Where it is drawn.** The title itself: `src/main.ts` feeds
+ * {@link connectTitleLine} to the entry screen's title slot (`src/ui/lobby-entry`
+ * `entryModel(state, narration)`), so there is exactly ONE text element and it is
+ * the big one at the top. `./connect-trace-view` is no longer a panel of its own —
+ * it is reduced to the two affordances a failure needs, RETRY and COPY LOG, sitting
+ * under that title. `src/main.ts` drives both from the real allocator round trip
+ * and the real transport.
  */
 
 import type { ConnectionState } from './transport';
@@ -70,10 +94,11 @@ export type ConnectStage =
 /** Terminal stages — nothing further will happen without another tap. */
 const TERMINAL: ReadonlySet<ConnectStage> = new Set(['joined', 'refused', 'failed']);
 
-/** How long a stage may sit without progress before the screen offers COPY LOG.
- *  Five seconds is the brief's number, and it is about right: a healthy allocate
- *  plus dial is well under a second, so five is "something is wrong" and not
- *  "the network is being slow". */
+/** How long **one state** may sit without progress before the screen offers COPY
+ *  LOG. Five seconds is the brief's number, and it is about right *for a single
+ *  state*: a healthy allocate is well under a second, so five in one of them is
+ *  "something is wrong" and not "the network is being slow". It is emphatically not
+ *  a budget for the whole join — see the module note on the m10-15 report. */
 export const STALL_MS = 5_000;
 
 /** How many characters of a Machine id the screen shows. A Fly id is long, and the
@@ -100,7 +125,12 @@ export interface ConnectStep {
 export interface ConnectTrace {
   readonly steps: readonly ConnectStep[];
   readonly stage: ConnectStage;
-  /** When the current stage began — the clock a stall is measured from. */
+  /**
+   * When the current state began — the clock, and the *only* clock, a stall is
+   * measured from. Reset by every advance: the narrated ones that append a step,
+   * and the silent ones that do not ({@link connectProgress}). Never the time of
+   * the tap, so a connect that keeps moving never accumulates a stall.
+   */
   readonly since: number;
   /** How many times the dial has gone round (0 on the first). */
   readonly dials: number;
@@ -119,10 +149,25 @@ export function beginConnect(door: 'create' | 'join', at: number, allocator?: st
   );
 }
 
-/** The allocator answered: a room, a Machine, and a signed ticket. */
+/**
+ * The allocator answered: a room, a Machine, and a signed ticket.
+ *
+ * `placement` is the allocator's reason for choosing *that* Machine
+ * (`./allocator-client` `ConnectionPlacement.detail` — `gru — your region`,
+ * `iad — gru full`). It rides in the step's structured data, so a pasted session
+ * log answers "why am I on a US server?" on its own; the *line* stays as it was,
+ * because the screen has one title and a routing rationale is not what a player
+ * waiting to connect needs it to say.
+ */
 export function connectTicketed(
   trace: ConnectTrace,
-  info: { room: string; machine: string; region?: string; expiresInMs?: number | null },
+  info: {
+    room: string;
+    machine: string;
+    region?: string;
+    expiresInMs?: number | null;
+    placement?: string;
+  },
   at: number,
 ): ConnectTrace {
   return advance(trace, {
@@ -133,6 +178,7 @@ export function connectTicketed(
       room: info.room,
       machine: info.machine,
       ...(info.region !== undefined ? { region: info.region } : {}),
+      ...(info.placement !== undefined ? { placement: info.placement } : {}),
       ...(info.expiresInMs != null ? { expiresInMs: info.expiresInMs } : {}),
     },
   });
@@ -221,10 +267,32 @@ export function connectFailed(trace: ConnectTrace, reason: string, at: number): 
 }
 
 /**
- * A transport state change, mapped onto the trace. `reconnecting` before a seat is
- * a hand-off; `closed` before a seat is a failure that names its close reason.
- * After a seat this is the lobby's problem, not the connecting screen's, so the
- * trace is returned untouched.
+ * The attempt moved forward with **nothing new to say**: the state clock starts
+ * over, no line is appended, the story reads exactly as it did.
+ *
+ * This exists because the stall clock and the narration are not the same thing.
+ * Some advances are worth a line ("TICKET SIGNED") and some are not — the socket
+ * opening is progress the player can neither read nor act on, and giving it a step
+ * of its own would put a line on screen that says less than the one above it. But
+ * throwing it away entirely is what produced the m10-15 report: the `dialing` clock
+ * then covered the dial *and* everything the server did afterwards, so a cold
+ * Machine that took three seconds to answer and three more to seat the player
+ * crossed {@link STALL_MS} on a join that was working the whole time, and the
+ * screen asked a player who was about to get in to file a bug.
+ *
+ * No-op on a finished attempt — nothing advances past a seat or a refusal.
+ */
+export function connectProgress(trace: ConnectTrace, at: number): ConnectTrace {
+  if (TERMINAL.has(trace.stage)) return trace;
+  if (at <= trace.since) return trace; // a clock that only ever moves forward
+  return { ...trace, since: at };
+}
+
+/**
+ * A transport state change, mapped onto the trace. `open` before a seat is silent
+ * progress (above); `reconnecting` before a seat is a hand-off; `closed` before a
+ * seat is a failure that names its close reason. After a seat this is the lobby's
+ * problem, not the connecting screen's, so the trace is returned untouched.
  */
 export function connectTransportState(
   trace: ConnectTrace,
@@ -235,6 +303,11 @@ export function connectTransportState(
   if (TERMINAL.has(trace.stage)) return trace;
   if (state === 'reconnecting') return connectHandoff(trace, at, closeReason ?? 'socket dropped');
   if (state === 'closed') return connectFailed(trace, closeReason ?? 'connection closed', at);
+  // The socket is up and the join has gone out with it (`./websocket-transport`
+  // sends `join` *before* announcing `open`). Still no seat, so still no line —
+  // but the dial is over, and the clock that decides "stuck" belongs to what is
+  // happening NOW, which is waiting on the server rather than reaching it.
+  if (state === 'open') return connectProgress(trace, at);
   return trace;
 }
 
@@ -244,18 +317,24 @@ export function connectTransportState(
 
 /** What the view draws for one frame. Everything it needs, nothing it decides. */
 export interface ConnectTraceModel {
-  /** Every step so far, in order, oldest first — the story as it happened. */
+  /** Every step so far, in order, oldest first — the story as it happened. Kept
+   *  for the session log and the tests; the *screen* shows only the current one,
+   *  because the screen has one title and the log has the history. */
   readonly lines: readonly string[];
-  /** The line the player is waiting on (the last one), or `''` before the first. */
+  /** The line the player is waiting on (the last one), or `''` before the first.
+   *  This is what the title says — see {@link connectTitleLine}. */
   readonly current: string;
   readonly stage: ConnectStage;
   /** True while the attempt is still moving — the view shows a live indicator. */
   readonly busy: boolean;
   /** The failure line, or `''` — refusals and failures only, drawn in threat red. */
   readonly error: string;
-  /** No progress for {@link STALL_MS}. Auto-offers COPY LOG (brief §2). */
+  /** {@link STALL_MS} in the CURRENT state with no advance of any kind. Auto-offers
+   *  COPY LOG (brief §2). Always false once the attempt has finished — a seat, a
+   *  refusal and a failure are all endings, and an ending is not a stall. */
   readonly stalled: boolean;
-  /** Milliseconds the current stage has been sitting, for a "…12s" tail. */
+  /** Milliseconds the current *state* has been sitting, for a "…12s" tail. Zero
+   *  again after every advance, narrated or silent. */
   readonly waitedMs: number;
   /** Offer RETRY: a terminal failure that another attempt could plausibly fix. */
   readonly canRetry: boolean;
@@ -268,20 +347,53 @@ export interface ConnectTraceModel {
 export function connectTraceModel(trace: ConnectTrace, now: number): ConnectTraceModel {
   const last = trace.steps[trace.steps.length - 1];
   const terminal = TERMINAL.has(trace.stage);
+  // Time in the CURRENT state — `trace.since`, which every advance resets — and
+  // never time since the attempt began. See the module note (m10-15).
   const waitedMs = Math.max(0, now - trace.since);
   const stalled = !terminal && waitedMs >= STALL_MS;
   const failed = trace.stage === 'refused' || trace.stage === 'failed';
+  // A seat cancels the offer outright, and is written as its own rule rather than
+  // left to fall out of `terminal`: whatever else this model ever learns to offer,
+  // a player who just got in is never asked to report a bug.
+  const seated = trace.stage === 'joined';
   return {
     lines: trace.steps.map((s) => s.line),
     current: last?.line ?? '',
     stage: trace.stage,
     busy: !terminal,
     error: failed ? (last?.line ?? '') : '',
-    stalled,
+    stalled: stalled && !seated,
     waitedMs,
     canRetry: failed,
-    offerCopyLog: failed || stalled,
+    offerCopyLog: !seated && (failed || stalled),
   };
+}
+
+/**
+ * The **title**: the one line the connecting screen shows at the top, in place of
+ * the static `CONNECTING…` it used to show from the first tap to the last
+ * (`src/ui/lobby-entry` `entryModel(state, narration)`).
+ *
+ * It is the current step, plus one thing the removed panel used to carry on a line
+ * of its own: once a step has sat past {@link STALL_MS}, the seconds are appended —
+ *
+ *     DIALING MACHINE 0800d5b6… 12s
+ *
+ * — because a title that never changes is exactly the screen this whole module
+ * exists to replace, and a stalled dial with no clock on it reads as a frozen game
+ * rather than a slow one. A healthy connect never shows the tail: a number ticking
+ * up from zero on a connect that is working is noise.
+ */
+export function connectTitleLine(model: ConnectTraceModel): string {
+  if (!model.stalled || model.current === '') return model.current;
+  return `${model.current} ${Math.round(model.waitedMs / 1000)}s`;
+}
+
+/** Whether {@link connectTitleLine} is naming a *failure* — the title's one cue to
+ *  draw in threat red rather than plasma (style-guide §2: red is damage, and a
+ *  refused join is the one thing on this screen that has actually gone wrong). */
+export function connectTitleFailed(model: ConnectTraceModel): boolean {
+  return model.error !== '';
 }
 
 /**
@@ -290,13 +402,10 @@ export function connectTraceModel(trace: ConnectTrace, now: number): ConnectTrac
  * (`./playtest-log-button` `CopyLogOffer.hint`).
  */
 export function connectOfferHint(model: ConnectTraceModel): string {
-  // On a failure the reason is already the panel's last step, three lines above —
-  // repeating it here just made the panel say the same sentence twice.
-  if (model.error) return 'COPY LOG to report this.';
-  if (model.stalled) {
-    return `Stuck on "${model.current}" for ${Math.round(model.waitedMs / 1000)}s — COPY LOG to report this.`;
-  }
-  return '';
+  // The reason — and, on a stall, the seconds — are already the TITLE, one line
+  // above (`connectTitleLine`). The hint names the offer and nothing else, or the
+  // screen says the same sentence twice in two sizes.
+  return model.error || model.stalled ? 'COPY LOG to report this.' : '';
 }
 
 // ---------------------------------------------------------------------------

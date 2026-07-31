@@ -23,9 +23,10 @@ import { dirname, join } from 'node:path';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GAMESERVER_HEALTH = 'https://planet-rush-gameserver.fly.dev/health';
 
-/** The last green `Deploy server (Fly.io)` run, as of this file being written.
- *  A live uptime that reaches back to here means the fleet is still that image. */
-const LAST_GREEN_DEPLOY = '2026-07-29T08:25:09Z';
+/** The last green `Deploy server (Fly.io)` run, as of this file being written:
+ *  3d7cc6a, 2026-07-30T20:54Z. A live uptime that reaches back to here means the
+ *  fleet is still that image. */
+const LAST_GREEN_DEPLOY = '2026-07-30T20:54:05Z';
 /** When #241 (`WelcomeMessage.economy` — the reconnect wallet) landed in server/. */
 const WALLET_LANDED = '2026-07-30T11:09:00Z';
 
@@ -83,13 +84,23 @@ const checks = [];
 }
 
 /** 2. The wire validator. `upgradeOrder` is the sixth verb of the Action union
- *     and parseActions has no case for it — `default: return null` throws the
- *     whole input tick away, so "upgrades restored" cannot even be tested. */
+ *     and parseActions had no case for it — `default: return null` threw the
+ *     whole input tick away, so "upgrades restored" could not even be tested.
+ *     CLEARED by PR #250 (2026-07-30T20:26Z) and spent immediately:
+ *     evidence/online-close.live.test.ts bought CARGO tier 1 over a real socket
+ *     on the live fleet and authority acknowledged it (images/online-close-*.json).
+ *
+ *     The build-item half of this check is read from whatever shape the module
+ *     keeps the set in: #250 replaced the `BUILD_ITEMS` array literal with a
+ *     `BUILD_ITEM_TABLE` record whose keys the Set is built from, and a detector
+ *     keyed on the old literal reported ABSENT for a `satellite` that was right
+ *     there — a false BLOCKED is as expensive as a false CLEAR. */
 {
   const wire = read('src/net/wire.ts') ?? '';
   const hasUpgradeCase = /case\s+'upgradeOrder'/.test(wire);
-  const buildItems = wire.match(/const BUILD_ITEMS[^;]*;/s)?.[0] ?? '';
-  const hasSatellite = /'satellite'/.test(buildItems);
+  const buildItems =
+    (wire.match(/const BUILD_ITEM_TABLE[\s\S]*?\n\};/)?.[0] ?? '') + (wire.match(/const BUILD_ITEMS[^;]*;/s)?.[0] ?? '');
+  const hasSatellite = /satellite/.test(buildItems);
   checks.push({
     id: 'wire-accepts-upgrade-order',
     gate: 'online-reconnect',
@@ -145,7 +156,7 @@ checks.push({
   saw:
     wireCarriesTimer || applyRestoresTimer
       ? `snapshot.ts mentions respawnTimer: ${wireCarriesTimer}; applySnapshot mentions it: ${applyRestoresTimer} — re-measure with respawn-tail.live.test.ts to confirm the tail is gone`
-      : 'snapshot.ts carries NO respawnTimer and applySnapshot never restores it — so the client respawns the instant authority reports the ship dead, and every reconcile for the next RESPAWN_S (5 s) charges the whole death-site→home distance. MEASURED 2026-07-30T15:50Z, live, room SWQD (images/online-feel-respawn-tail.json): 150 consecutive reconciles, ONE distinct error value 1228.217 u, checkpoint frozen at home (1968.841, 1200), authority frozen at the death site (744, 1291), histHit true and resynced false throughout — the instrument is right and the two states genuinely disagree. Visual snaps stay at 1 because absorb() sees home before and home after, so this never looked like a teleport; what it looks like instead is a ship pinned within ±4 u of home for ~5 s while thrust is held down.',
+      : 'snapshot.ts carries NO respawnTimer and applySnapshot never restores it — so the client respawns the instant authority reports the ship dead, and every reconcile for the next RESPAWN_S (5 s) charges the whole death-site→home distance. RE-MEASURED 2026-07-30T21:12Z on build 3d7cc6a, live, room SEGX (images/online-close-respawn-tail.json): 1 486 reconciles recorded, 150 of them breaching across 4 963 ms, ONE distinct error value 1276.989 u, checkpoint frozen at home (1968, 1199.159), authority frozen at the death site (774, 1652), histHit true and resynced false throughout — identical to the 2026-07-30T15:50Z measurement on the previous build (room SWQD, 1228.217 u, images/online-feel-respawn-tail.json) — the instrument is right and the two states genuinely disagree. Visual snaps stay at 1 because absorb() sees home before and home after, so this never looked like a teleport; what it looks like instead is a ship pinned within ±4 u of home for ~5 s while thrust is held down.',
 });
 
 const fleet = await fleetAge();
@@ -190,7 +201,7 @@ checks.push({
       'the connect-trace panel stops covering the online lobby when hidden — a `#pr-connect-trace[hidden]{display:none}` rule, or `pointer-events:none` on the root',
     saw:
       hiddenRule || pointerNone
-        ? 'the panel can no longer swallow the press — re-run probe-rush-reach.mjs to confirm PRESSABLE on desktop-online'
+        ? 'the panel can no longer swallow the press. CONFIRMED LIVE 2026-07-30T21:05Z on build 3d7cc6a (#251 moved the narration into the connecting screen\'s TITLE and the panel is not in the document at all on the lobby): probe-desktop-lobby.mjs walked PLAY → CREATE ROOM → lobby, clicked RUSH! at (640,740) with a real mouse, and the button became the 3-2-1 countdown and then a live arena (images/desktop-lobby-0[5-7]-*.png). capture-online-feel.mjs recorded rushPressLanded=true, rushViaSeam=false'
         : 'the panel still sets only `hidden`, while its id rule keeps `display:flex` and `pointer-events:auto` — so RUSH! stays covered and an online match cannot be started with a mouse',
   });
 }

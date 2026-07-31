@@ -8,126 +8,35 @@
     "MAX_PEAK_LEAD_TICKS": 120,
     "MAX_MISPREDICTION_RATE": 0.5
   },
-  "capturedAt": "2026-07-30T17:27:28.619Z",
+  "capturedAt": "2026-07-30T22:04:11.308Z",
   "logs": [
     {
       "file": "images/online-feel-pc-host-log.json",
-      "summary": "Planet Rush playtest log — build 6888456 (2026-07-30T16:21:20.031Z) · session 2026-07-30T17:22:25.719Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+      "summary": "Planet Rush playtest log — build 5a545f0 (2026-07-30T21:26:51.810Z) · session 2026-07-30T21:31:27.656Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
       "dropped": 0,
       "matchEvents": [
         {
-          "at": 29584,
+          "at": 41757,
           "msg": "matchStart",
           "tick": 0,
-          "seed": 197240465,
-          "slots": 8,
-          "reclaim": false
-        },
-        {
-          "at": 68780,
-          "msg": "death",
-          "tick": 2361
-        },
-        {
-          "at": 68781,
-          "msg": "eliminated",
-          "tick": 2361
-        }
-      ],
-      "session": {
-        "seconds": 71,
-        "reconciles": 2169,
-        "rttMean": 542,
-        "rttMax": 2335,
-        "jitterMean": 64,
-        "meanCorrection": 21.98,
-        "worstCorrection": 315.221,
-        "mispredictionRate": 0.102,
-        "meanLead": 23.8,
-        "peakLead": 44,
-        "visualSnaps": 1,
-        "resyncs": 0,
-        "verdicts": {
-          "MAX_CORRECTION_UNITS": false,
-          "MAX_MEAN_CORRECTION_UNITS": false,
-          "MAX_VISUAL_SNAPS": false,
-          "MAX_MEAN_LEAD_TICKS": true,
-          "MAX_PEAK_LEAD_TICKS": true,
-          "MAX_MISPREDICTION_RATE": true
-        },
-        "passes": 3
-      },
-      "breachWindow": {
-        "seconds": 6,
-        "atMs": [
-          55435,
-          56753,
-          57651,
-          58808,
-          59654,
-          60341
-        ],
-        "distinctWorstCorrections": [
-          315.221,
-          314.606
-        ],
-        "mispredictionRates": [
-          0.792,
-          1,
-          0.344
-        ]
-      },
-      "outsideBreachWindow": {
-        "seconds": 65,
-        "reconciles": 1992,
-        "rttMean": 540,
-        "rttMax": 2335,
-        "jitterMean": 64,
-        "meanCorrection": 0.243,
-        "worstCorrection": 1.725,
-        "mispredictionRate": 0.032,
-        "meanLead": 23.7,
-        "peakLead": 44,
-        "visualSnaps": 0,
-        "resyncs": 0,
-        "verdicts": {
-          "MAX_CORRECTION_UNITS": true,
-          "MAX_MEAN_CORRECTION_UNITS": true,
-          "MAX_VISUAL_SNAPS": true,
-          "MAX_MEAN_LEAD_TICKS": true,
-          "MAX_PEAK_LEAD_TICKS": true,
-          "MAX_MISPREDICTION_RATE": true
-        },
-        "passes": 6
-      }
-    },
-    {
-      "file": "images/online-feel-pc-guest-log.json",
-      "summary": "Planet Rush playtest log — build 6888456 (2026-07-30T16:21:20.031Z) · session 2026-07-30T17:22:27.498Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
-      "dropped": 0,
-      "matchEvents": [
-        {
-          "at": 28067,
-          "msg": "matchStart",
-          "tick": 0,
-          "seed": 197240465,
+          "seed": 1323978413,
           "slots": 8,
           "reclaim": false
         }
       ],
       "session": {
-        "seconds": 105,
-        "reconciles": 3224,
-        "rttMean": 535,
-        "rttMax": 3401,
-        "jitterMean": 55,
-        "meanCorrection": 0.176,
-        "worstCorrection": 1.702,
-        "mispredictionRate": 0.024,
-        "meanLead": 22.8,
-        "peakLead": 27,
+        "seconds": 72,
+        "reconciles": 2258,
+        "rttMean": 1141,
+        "rttMax": 4346,
+        "jitterMean": 136,
+        "meanCorrection": 0.283,
+        "worstCorrection": 1.755,
+        "mispredictionRate": 0.044,
+        "meanLead": 27.6,
+        "peakLead": 60,
         "visualSnaps": 0,
-        "resyncs": 3,
+        "resyncs": 0,
         "verdicts": {
           "MAX_CORRECTION_UNITS": true,
           "MAX_MEAN_CORRECTION_UNITS": true,
@@ -145,18 +54,85 @@
         "mispredictionRates": []
       },
       "outsideBreachWindow": {
-        "seconds": 105,
-        "reconciles": 3224,
-        "rttMean": 535,
-        "rttMax": 3401,
-        "jitterMean": 55,
-        "meanCorrection": 0.176,
-        "worstCorrection": 1.702,
-        "mispredictionRate": 0.024,
-        "meanLead": 22.8,
-        "peakLead": 27,
+        "seconds": 72,
+        "reconciles": 2258,
+        "rttMean": 1141,
+        "rttMax": 4346,
+        "jitterMean": 136,
+        "meanCorrection": 0.283,
+        "worstCorrection": 1.755,
+        "mispredictionRate": 0.044,
+        "meanLead": 27.6,
+        "peakLead": 60,
         "visualSnaps": 0,
-        "resyncs": 3,
+        "resyncs": 0,
+        "verdicts": {
+          "MAX_CORRECTION_UNITS": true,
+          "MAX_MEAN_CORRECTION_UNITS": true,
+          "MAX_VISUAL_SNAPS": true,
+          "MAX_MEAN_LEAD_TICKS": true,
+          "MAX_PEAK_LEAD_TICKS": true,
+          "MAX_MISPREDICTION_RATE": true
+        },
+        "passes": 6
+      }
+    },
+    {
+      "file": "images/online-feel-pc-guest-log.json",
+      "summary": "Planet Rush playtest log — build 5a545f0 (2026-07-30T21:26:51.810Z) · session 2026-07-30T21:31:30.313Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+      "dropped": 0,
+      "matchEvents": [
+        {
+          "at": 39084,
+          "msg": "matchStart",
+          "tick": 0,
+          "seed": 1323978413,
+          "slots": 8,
+          "reclaim": false
+        }
+      ],
+      "session": {
+        "seconds": 116,
+        "reconciles": 3506,
+        "rttMean": 992,
+        "rttMax": 3168,
+        "jitterMean": 99,
+        "meanCorrection": 0.19,
+        "worstCorrection": 1.809,
+        "mispredictionRate": 0.031,
+        "meanLead": 25.8,
+        "peakLead": 65,
+        "visualSnaps": 0,
+        "resyncs": 0,
+        "verdicts": {
+          "MAX_CORRECTION_UNITS": true,
+          "MAX_MEAN_CORRECTION_UNITS": true,
+          "MAX_VISUAL_SNAPS": true,
+          "MAX_MEAN_LEAD_TICKS": true,
+          "MAX_PEAK_LEAD_TICKS": true,
+          "MAX_MISPREDICTION_RATE": true
+        },
+        "passes": 6
+      },
+      "breachWindow": {
+        "seconds": 0,
+        "atMs": [],
+        "distinctWorstCorrections": [],
+        "mispredictionRates": []
+      },
+      "outsideBreachWindow": {
+        "seconds": 116,
+        "reconciles": 3506,
+        "rttMean": 992,
+        "rttMax": 3168,
+        "jitterMean": 99,
+        "meanCorrection": 0.19,
+        "worstCorrection": 1.809,
+        "mispredictionRate": 0.031,
+        "meanLead": 25.8,
+        "peakLead": 65,
+        "visualSnaps": 0,
+        "resyncs": 0,
         "verdicts": {
           "MAX_CORRECTION_UNITS": true,
           "MAX_MEAN_CORRECTION_UNITS": true,

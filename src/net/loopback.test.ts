@@ -207,8 +207,9 @@ describe('LocalLoopback — the protocol a client sees', () => {
     const decoded = decodeSnapshot(latest.payload);
     expect(decoded.tick).toBe(transport.world!.tick);
     expect(decoded.ships).toHaveLength(MATCH.players.length);
-    // Quantized to the wire, so compare against the world at wire precision.
-    expect(decoded.ships[0]!.posX).toBe(Math.round(transport.world!.ships[0]!.pos.x));
+    // Quantized to the wire, so compare against the world at wire precision —
+    // eighths of a unit since `POS_SCALE`, so within half a step of the truth.
+    expect(decoded.ships[0]!.posX).toBeCloseTo(transport.world!.ships[0]!.pos.x, 1);
     // Every ship is alive and inside its 10 s of spawn protection this early.
     for (const s of decoded.ships) {
       expect(s.flags & SHIP_FLAG.alive).toBeTruthy();

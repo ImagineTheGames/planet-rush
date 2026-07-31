@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { INTERP_DELAY_MS, MAX_DELAY_MS, MIN_DELAY_MS } from '../../src/net/interpolation';
 import { MAX_LEAD_TICKS, SNAP_THRESHOLD } from '../../src/net/prediction';
 import { runLatencyMatch } from './latency-harness';
-import type { LatencyMatchResult, WireProfile } from './latency-harness';
+import type { HarnessClient, LatencyMatchResult, WireProfile } from './latency-harness';
 
 // ---------------------------------------------------------------------------
 // The named thresholds (docs/netcode-audit.md §5)
@@ -102,10 +102,63 @@ const AT_150: WireProfile = { rttMs: 150, jitterMs: 30, lossRate: 0.02 };
 const AT_250: WireProfile = { rttMs: 250, jitterMs: 30, lossRate: 0.02 };
 /** The control: a clean local wire, where nothing may be wrong at all. */
 const AT_0: WireProfile = { rttMs: 0, jitterMs: 0, lossRate: 0 };
+/**
+ * The developer's own reported condition for the constant-correction gate below: a
+ * slow, jittery, but **loss-free** wire. Their capture had no resyncs, no snaps, and
+ * a lead that simply tracked RTT — the signature of a link that is far away rather
+ * than broken — and it still corrected on every single sampled second. That is the
+ * run this gate holds at zero.
+ */
+const STEADY_250: WireProfile = { rttMs: 250, jitterMs: 30, lossRate: 0 };
 
 /** Twenty seconds of two-client flight — long enough for stalls to happen, the
  *  jitter buffer to re-size, and the lead to settle wherever it settles. */
 const FRAMES = 20 * 60;
+
+/** Ten seconds of straight-line flight — long enough for the lead to settle and
+ *  for ~300 reconciles, short enough that a ship crossing the arena at top speed
+ *  never reaches the far wall (which would stop it, and a stopped ship proves
+ *  nothing about prediction). */
+const STRAIGHT_FRAMES = 10 * 60;
+
+/**
+ * **Mean correction in steady straight-line flight, world units.** The gate the M10
+ * tick-alignment brief asks for: *"steady-state corr in straight-line flight is ~0
+ * at 250 ms"*.
+ *
+ * "~0" is the wire's own precision and nothing else. Positions stream as eighths of
+ * a unit (`src/net/snapshot` `POS_SCALE`), so a *perfect* prediction still
+ * reconciles by up to 1/16 u per axis — a mean of ~0.05 u in two. This is that with
+ * room for the odd tick of jitter, and it is 10× under what the developer measured
+ * (0.3–0.6 u) and 20× under the wire's *old* floor. A regression to whole-unit
+ * streaming, or to input the server files somewhere other than where the client
+ * predicted it, lands well over this line.
+ */
+export const STEADY_CORRECTION_UNITS = 0.15;
+
+/** **Worst correction in steady straight-line flight, world units.** The developer's
+ *  `corrMax ~1.0-1.2` line: not one reconcile in the run may reach a quarter of a
+ *  unit, let alone a whole one. */
+export const STEADY_PEAK_CORRECTION_UNITS = 0.25;
+
+/** **Mean input-tick misalignment in steady flight, ticks.** Zero is the honest
+ *  answer and what the run actually reports; the allowance is for a jitter draw
+ *  landing one input a tick late, which costs a correction far under the line
+ *  above (`src/net/telemetry` `appliedDeltaMean`). */
+export const STEADY_ALIGNMENT_TICKS = 0.5;
+
+/** **Worst input-tick misalignment in steady flight, ticks.** A tick or two of
+ *  jitter is a wire; anything more is authority filing input somewhere the client
+ *  never predicted it, which is the whole subject of this gate. */
+export const STEADY_PEAK_ALIGNMENT_TICKS = 2;
+
+/** How far off the arena centre each ship's straight line passes, world units —
+ *  wide enough that the two never touch at the crossing (ship radius is ~16). */
+const LANE_OFFSET = 250;
+
+/** The speed a gate ship must still be carrying at the end of the run, u/s: proof
+ *  it flew the whole way instead of stopping against something. */
+const FLYING_SPEED = 50;
 
 interface Feel {
   worstCorrection: number;
@@ -118,14 +171,30 @@ interface Feel {
   jitterMs: number | null;
   rttMs: number | null;
   bufferMs: number;
+  /** Mean input-tick misalignment over the run, in ticks, or null when nothing
+   *  could be measured (`src/net/telemetry` `appliedDeltaMean`). */
+  meanAlignment: number | null;
+  /** Worst input-tick misalignment over the run, in ticks. */
+  peakAlignment: number;
 }
 
-function feelOf(result: LatencyMatchResult, index: number): Feel {
+/**
+ * @param skipSeconds finalized seconds to drop from the front of the window — the
+ *   *steady state* rather than the join. The opening second of a match is the
+ *   client establishing its clock against a server already running (a resync or
+ *   two, a lead climbing from nothing), which is real but is not what "constant
+ *   correction in flight" means.
+ */
+function feelOf(result: LatencyMatchResult, index: number, skipSeconds = 0): Feel {
   const client = result.clients[index]!;
-  const samples = client.telemetry.samples;
+  const samples = client.telemetry.samples.slice(skipSeconds);
   const reconciles = samples.reduce((n, s) => n + s.reconciles, 0);
   const weighted = samples.reduce((n, s) => n + s.correctionMeanUnits * s.reconciles, 0);
   const mispredictions = samples.reduce((n, s) => n + s.mispredictions, 0);
+  // Alignment is weighted by the reconciles that could state one, so a second
+  // that measured twice does not count as much as a second that measured thirty.
+  const alignN = samples.reduce((n, s) => n + s.appliedDeltaSamples, 0);
+  const alignSum = samples.reduce((n, s) => n + (s.appliedDeltaMean ?? 0) * s.appliedDeltaSamples, 0);
   return {
     worstCorrection: Math.max(0, ...samples.map((s) => s.correctionMaxUnits)),
     meanCorrection: reconciles > 0 ? weighted / reconciles : 0,
@@ -137,18 +206,22 @@ function feelOf(result: LatencyMatchResult, index: number): Feel {
     jitterMs: client.telemetry.live.rttJitterMs,
     rttMs: client.telemetry.live.rttMs,
     bufferMs: client.session.interpolation?.delayMs ?? 0,
+    meanAlignment: alignN > 0 ? alignSum / alignN : null,
+    peakAlignment: Math.max(0, ...samples.map((s) => s.appliedDeltaMax)),
   };
 }
 
 /** The capture the audit doc quotes. Printed on every run, so a regression is
  *  readable in CI output and not only in an assertion message. */
-function report(label: string, result: LatencyMatchResult): Feel[] {
-  const feels = result.clients.map((_, i) => feelOf(result, i));
+function report(label: string, result: LatencyMatchResult, skipSeconds = 0): Feel[] {
+  const feels = result.clients.map((_, i) => feelOf(result, i, skipSeconds));
   const lines = feels.map(
     (f, i) =>
       `    client ${i}: corr ${f.meanCorrection.toFixed(2)}/${f.worstCorrection.toFixed(2)}u  ` +
       `mispred ${(f.mispredictionRate * 100).toFixed(0)}%  snaps ${f.snaps}  ` +
-      `lead ${f.meanLead.toFixed(0)}/${f.peakLead}t  rtt ${f.rttMs === null ? '—' : Math.round(f.rttMs)}ms  ` +
+      `lead ${f.meanLead.toFixed(0)}/${f.peakLead}t  ` +
+      `align ${f.meanAlignment === null ? '—' : f.meanAlignment.toFixed(2)}/${f.peakAlignment}t  ` +
+      `rtt ${f.rttMs === null ? '—' : Math.round(f.rttMs)}ms  ` +
       `jitter ${f.jitterMs === null ? '—' : Math.round(f.jitterMs)}ms  ` +
       `buffer ${Math.round(f.bufferMs)}ms  (${f.reconciles} recon)`,
   );
@@ -201,6 +274,97 @@ describe('the full two-client match, at real-world latency', () => {
       // floor, and the client must not be running meaningfully ahead of anything.
       expect(feel.meanCorrection).toBeLessThan(1);
       expect(feel.meanLead).toBeLessThanOrEqual(6);
+    }
+  });
+});
+
+describe('the constant correction', () => {
+  it('is gone: straight-line flight at 250 ms reconciles to nothing', () => {
+    // ── THE M10 TICK-ALIGNMENT GATE ──
+    //
+    // The developer's report: *"corr 0.3-0.6u with corrMax ~1.0-1.2 nearly EVERY
+    // sampled second in flight"* at ~250 ms, on a connection with no resyncs and no
+    // snaps — a *constant* correction, which is a systematic cause rather than a
+    // stochastic one. This is that condition reproduced, and then held: a slow,
+    // jittery, loss-free wire, and the plainest flight there is.
+    //
+    // Straight-line flight is the case where prediction should be *exactly* right —
+    // one stick, no direction changes, a client and a server running the same
+    // integrator on the same inputs at the same ticks — so every unit of correction
+    // in it is a defect. There were two, in order of size: the wire rounding
+    // positions to whole units (`src/net/snapshot` `POS_SCALE`), and authority
+    // filing input somewhere other than where the client predicted it
+    // (`src/net/input-queue` `coalesce`, `server/room.ts` `heldIntent`, and the
+    // client stamping its true tick again — `src/net/session` `sendInput`).
+    //
+    // Before them: **corr 0.50/1.26 u, every second, forever.** This gate is what
+    // makes a return to that red.
+    const clients: HarnessClient[] = [];
+    const heading: { x: number; y: number }[] = [];
+    const result = runLatencyMatch({
+      profile: STEADY_250,
+      frames: STRAIGHT_FRAMES,
+      // An empty board. A rock is a discontinuity — a graze resolves differently on
+      // either side of an eighth of a unit — and this gate is about the smooth case,
+      // which is the one the developer flew and the one a defect cannot hide in.
+      asteroidCount: 0,
+      input: (client) => {
+        const dir = heading[client] ?? { x: 1, y: 0 };
+        return [
+          { type: 'thrust', dir },
+          { type: 'aim', dir },
+        ];
+      },
+      onFrame: (frame, cs) => {
+        if (frame !== 1) return;
+        clients.push(...cs);
+        for (const c of cs) {
+          const ship = c.world?.ships.find((s) => s.id === c.you);
+          if (!ship) continue;
+          // Each ship flies from its spawn across the middle of the board — the
+          // longest straight run available — down its own lane, so the two pass
+          // each other rather than meeting head-on (a collision is a discontinuity
+          // for the same reason a rock is).
+          const lane = c.you === 0 ? LANE_OFFSET : -LANE_OFFSET;
+          const dx = c.world!.bounds.width / 2 - ship.pos.x;
+          const dy = c.world!.bounds.height / 2 + lane - ship.pos.y;
+          const len = Math.hypot(dx, dy) || 1;
+          heading[c.you] = { x: dx / len, y: dy / len };
+        }
+      },
+    });
+
+    expect(result.stalls).toBe(0); // the wire under test really is loss-free
+    // The first second is the join — the client's clock arriving at a server
+    // already running — and steady state is what the report is about.
+    const feels = report('250 ms ±30 ms, no loss — straight-line flight', result, 1);
+
+    for (const feel of feels) {
+      expect(feel.reconciles).toBeGreaterThan(100);
+      // **The gate.** A steady-state correction at the wire's own precision floor,
+      // and nothing above it.
+      expect(feel.meanCorrection).toBeLessThan(STEADY_CORRECTION_UNITS);
+      // Not one reconcile in five seconds of flight reaches a quarter of a unit —
+      // the "corrMax ~1.0-1.2" half of the report, answered.
+      expect(feel.worstCorrection).toBeLessThan(STEADY_PEAK_CORRECTION_UNITS);
+      expect(feel.mispredictionRate).toBe(0);
+      expect(feel.snaps).toBe(0);
+      // And the *reason* it is this low is stated rather than hoped for: authority
+      // ran this client's input at the tick the client predicted it at, all but
+      // exactly (the M10 instrument — `src/net/telemetry` `appliedDeltaMean`).
+      expect(feel.meanAlignment).toBeLessThan(STEADY_ALIGNMENT_TICKS);
+      expect(feel.peakAlignment).toBeLessThanOrEqual(STEADY_PEAK_ALIGNMENT_TICKS);
+    }
+
+    // Nothing the player pressed was thrown away, on a wire or in a queue.
+    expect(result.droppedInputs).toBe(0);
+
+    // The flight guards: a ship that stopped — into a wall, into the other ship —
+    // would reconcile perfectly and prove nothing, so the run must have been a real
+    // flight from end to end.
+    for (const client of clients) {
+      const ship = client.world!.ships.find((s) => s.id === client.you)!;
+      expect(Math.hypot(ship.vel.x, ship.vel.y)).toBeGreaterThan(FLYING_SPEED);
     }
   });
 });

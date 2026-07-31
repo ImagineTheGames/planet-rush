@@ -137,6 +137,100 @@ describe('Allocator.allocate — region selection', () => {
     ]);
     expect(alloc.allocate({}, 1000).machine).toBe('m-2');
   });
+
+  it('honours the creator region even when a foreign Machine is emptier', () => {
+    // The guarantee, stated as the case that would break it: least-loaded is the
+    // rule *within* the preferred region, never a reason to leave it. Before the
+    // region was requested at all, this fleet sent every creator to the idle
+    // Virginia box — which is precisely the Brazil complaint.
+    const { alloc } = withFleet([
+      beat('m-iad', 'iad', [], 8), // load 0
+      beat('m-gru', 'gru', ['AAAA', 'BBBB'], 8), // load 2, but it is *their* region
+    ]);
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+    expect(a.machine).toBe('m-gru');
+    expect(a.region).toBe('gru');
+  });
+});
+
+describe('Allocator.allocate — the placement is explainable', () => {
+  it('says "your region" when the creator region took the room', () => {
+    const { alloc } = withFleet([beat('m-iad', 'iad', []), beat('m-gru', 'gru', [])]);
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+
+    expect(a.machine).toBe('m-gru');
+    expect(a.placement).toEqual({
+      requested: 'gru',
+      region: 'gru',
+      reason: 'preferred',
+      detail: 'gru — your region',
+    });
+  });
+
+  it('names the full region it fell back FROM', () => {
+    const { alloc } = withFleet([
+      beat('m-gru', 'gru', ['AAAA'], 1), // gru live, and full
+      beat('m-iad', 'iad', [], 8),
+    ]);
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+
+    expect(a.machine).toBe('m-iad');
+    expect(a.placement).toEqual({
+      requested: 'gru',
+      region: 'iad',
+      reason: 'region-full',
+      detail: 'iad — gru full',
+    });
+  });
+
+  it('tells "that region is full" apart from "that region does not exist"', () => {
+    // Different operator action: scale gru, versus create gru. A single
+    // "fell back" reason would have hidden which one this fleet needs.
+    const { alloc } = withFleet([beat('m-iad', 'iad', [], 8)]);
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+
+    expect(a.machine).toBe('m-iad');
+    expect(a.placement).toEqual({
+      requested: 'gru',
+      region: 'iad',
+      reason: 'region-absent',
+      detail: 'iad — no gru machines',
+    });
+  });
+
+  it('does not claim a preference was honoured when none was expressed', () => {
+    const { alloc } = withFleet([beat('m-iad', 'iad', [], 8)]);
+    const a = alloc.allocate({}, 1000);
+
+    expect(a.placement).toEqual({
+      region: 'iad',
+      reason: 'no-preference',
+      detail: 'iad — no region preference',
+    });
+    expect(a.placement?.requested).toBeUndefined();
+  });
+
+  it('carries no placement on a join — a join places nothing', () => {
+    const { alloc, reg } = withFleet([beat('m-gru', 'gru', ['AAAA'])]);
+    expect(alloc.join('AAAA', 1000).placement).toBeUndefined();
+    expect(reg.machines(1000)).toHaveLength(1);
+  });
+
+  it('reads a cordoned-out region as full, not absent — it IS live', () => {
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('m-gru', 'gru', [], 8), 1000);
+    reg.observe(beat('m-iad', 'iad', [], 8), 1000);
+    const alloc = new Allocator({
+      registry: reg,
+      rng: mulberry32(1),
+      secret: SECRET,
+      excludeMachine: (m) => m === 'm-gru',
+    });
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+
+    expect(a.machine).toBe('m-iad');
+    expect(a.placement?.reason).toBe('region-full');
+  });
 });
 
 describe('Allocator.allocate — size-aware fleet density (Task F1)', () => {

@@ -166,6 +166,18 @@ export interface OpenOptions {
  * would otherwise have to: the input sequence number, and the tick each input
  * is stamped with.
  */
+/**
+ * How often the client probes the wire's own round trip, ms (`./transport`
+ * PingMessage, M10 item 6).
+ *
+ * Twice a second. The number it feeds is the displayed ping and the lead budget's
+ * input, and both want a *floor* over a window of seconds rather than an instant
+ * reading — so this only has to be often enough to catch a route change inside a
+ * second or two. Thirty-odd bytes each way at 2 Hz is a rounding error against a
+ * 15 KB/s snapshot stream (docs/netcode-spike.md).
+ */
+export const PING_INTERVAL_MS = 500;
+
 export class TransportSession implements MatchSession {
   private player: PlayerId = 0;
   private nextTick: Tick = 1;
@@ -190,6 +202,12 @@ export class TransportSession implements MatchSession {
   /** The reconciliation instrument — fed on every send and every applied
    *  reconcile, and handed back through COPY LOG (`./telemetry`). Inert offline. */
   private readonly netTelemetry = new NetTelemetry();
+  /** Probe ids, and the clock reading of the last probe sent ({@link PING_INTERVAL_MS}). */
+  private pingId = 0;
+  private lastPingMs = Number.NEGATIVE_INFINITY;
+  /** When the previous tick's input was produced — the frame-scheduling delay's
+   *  other end (`./telemetry` `recordFrameLag`). */
+  private lastSendMs: number | null = null;
   /** True when the transport runs the sim in this process. Then the session
    *  predicts nothing: there is no latency to hide, and inventing a second copy
    *  of a world we already own would be the one way to make offline drift. */
@@ -316,6 +334,29 @@ export class TransportSession implements MatchSession {
     return readOptionalString(this.transport, 'rejectReason');
   }
 
+  /**
+   * **The ping to show a player**, ms — the wire's own round trip, or null before a
+   * probe has been answered (offline, or in the first half second of a match).
+   *
+   * This is what the lobby and HUD readouts must read (m10-17). Deliberately *not* the
+   * composite `telemetry.live.rttMs`, which is send→ack and therefore contains this
+   * client's own input lead and the server's 30 Hz broadcast cadence: on the
+   * developer's gru session that figure read 95 ms and then a sustained 215 ms on a
+   * wire a speedtest called 24 ms. Showing that number tells a player their connection
+   * is bad when it is not, which is a lie the client has no business telling
+   * (M10 item 6).
+   *
+   * The *floor* over the recent window rather than the newest reading, for the same
+   * reason a speedtest reports its best pass: one retransmit stalls the probe with
+   * everything else on the socket, and a single 750 ms sample says nothing about the
+   * connection a player is asking about. The wobble is not lost — it is measured, on
+   * its own line, as jitter (`./telemetry` `rttJitterMs`). One number, one source: this
+   * is the same figure the lead budget is sized from.
+   */
+  get networkPingMs(): number | null {
+    return this.netTelemetry.live.networkFloorMs;
+  }
+
   sampleRemotes(): readonly InterpolatedShip[] {
     return this.interpolator?.sample(this.clock()) ?? [];
   }
@@ -330,18 +371,88 @@ export class TransportSession implements MatchSession {
     // buffer in the past. Put the simulation back before a single tick of it runs
     // (`./presentation`), or the picture compounds into drift.
     this.unpresent();
+    // ── ONE TICK NUMBER, AND IT IS THE TRUE ONE ──────────────────────────────
+    //
+    // The tick a message is stamped with is **the tick this client is about to
+    // predict it at**, always — never a number invented to keep the stream tidy.
+    // That equality is what makes client-side prediction mean anything: the client
+    // replays this input at that tick on every reconcile, so if authority runs it
+    // at a different one, every prediction built on it stands at the wrong instant
+    // and reconciliation pays the gap back on every snapshot for as long as it
+    // lasts (`./telemetry` `appliedDeltaMean`).
+    //
+    // It has not always been so, for a reason worth keeping written down. The
+    // client's clock is not monotonic — a lead trim rewinds it a few ticks
+    // (`./prediction` `trimLead`) — so the next input can be predicted at a tick
+    // this client has already sent one for, and `InputQueue`'s first-wins duplicate
+    // rule dropped such a message whole (~4 % of all input on a real socket, in
+    // bursts). The fix then was to stamp strictly increasing ticks; the cost, only
+    // visible once `ackTick` existed to measure it, was up to 15 ticks of
+    // client-server misalignment on a loss-free wire. The collision is now *merged*
+    // by authority instead — newest stick, every order kept, nothing dropped
+    // (`server/room.ts` `acceptInput`, `./input-queue` `coalesce`) — so the client
+    // can afford to be honest about its own clock, which is the whole point.
     const tick = this.tick;
     const seq = ++this.seq;
-    this.transport.send({ type: 'input', tick, seq, actions });
+    // Name every one-shot order before it goes anywhere, so the copy on the wire
+    // and the copy this client is about to predict are the *same* order (M10
+    // action-echo; `@shared/types` OrderId). Stamped here rather than at the button
+    // because this is the last moment before the two copies part company — and
+    // because the input layer that built these actions has no business knowing
+    // there is a wire. Offline mints nothing: there is nothing to match.
+    const stamped = this.predictor ? this.stampOrders(actions) : actions;
+    this.transport.send({ type: 'input', tick, seq, actions: stamped });
     // Send first, then predict: the wire gets the press with no local work in
     // front of it, and the ship moves this frame either way (GDD §4.2).
     if (this.predictor) {
+      const now = this.clock();
       // Timestamp the send so the snapshot that later acks this seq measures a
       // real round trip (`./telemetry`). Only online — offline there is no wire.
-      this.netTelemetry.recordInput(seq, this.clock());
-      this.predictor.predict(seq, actions);
+      this.netTelemetry.recordInput(seq, now);
+      // **CLIENT**, the third stage of the round trip (M10 item 6): how much later
+      // than the fixed tick interval this device actually produced this tick's input.
+      // Zero on a device holding its frame budget; a GC pause or a backgrounded tab
+      // shows up here rather than being blamed on the wire — and it is real latency,
+      // because a late press is stamped for a tick authority has nearly reached, so it
+      // arrives late, is re-filed, and its ack comes back later still.
+      if (this.lastSendMs !== null) {
+        this.netTelemetry.recordFrameLag(now - this.lastSendMs - this.dt * 1000, now);
+      }
+      this.lastSendMs = now;
+      // **NETWORK**: the probe, on its own cadence, riding the same frame the input
+      // does so it needs no timer of its own ({@link PING_INTERVAL_MS}).
+      if (now - this.lastPingMs >= PING_INTERVAL_MS) {
+        this.lastPingMs = now;
+        const id = ++this.pingId;
+        this.transport.send({ type: 'ping', id });
+        this.netTelemetry.recordPingSent(id, now);
+      }
+      this.predictor.predict(seq, stamped);
     } else this.nextTick = tick + 1;
     this.present();
+  }
+
+  /**
+   * Give every one-shot order in this tick a client sequence id.
+   *
+   * Allocates only on the ticks a wheel is actually pressed — a few dozen times in
+   * a fifteen-minute match against 54 000 ticks of flying, so the common path
+   * returns the caller's own array (GDD §4.3). An order that already carries an id
+   * keeps it: re-stamping would break the very identity the id exists to hold.
+   */
+  private stampOrders(actions: readonly Action[]): readonly Action[] {
+    let out: Action[] | null = null;
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i]!;
+      const orderly = action.type === 'buildOrder' || action.type === 'upgradeOrder';
+      if (!orderly || action.orderId !== undefined) {
+        out?.push(action);
+        continue;
+      }
+      out ??= actions.slice(0, i);
+      out.push({ ...action, orderId: this.predictor!.orders.mint(this.player) });
+    }
+    return out ?? actions;
   }
 
   /**
@@ -387,6 +498,9 @@ export class TransportSession implements MatchSession {
         this.pendingEconomy = message.economy ?? null;
         break;
       case 'matchStart':
+        // RUSH! (or a reclaim's replay) re-bases the clock: the server names the
+        // tick to predict from, and nothing this client sent before it is on that
+        // timeline (`beginPredicting`).
         this.nextTick = message.tick + 1;
         if (!this.authoritative) this.beginPredicting(message);
         break;
@@ -398,10 +512,13 @@ export class TransportSession implements MatchSession {
           // A snapshot lands between frames, so the world may be holding presented
           // values right now. Reconcile against the simulation, never the picture.
           this.unpresent();
-          const report = this.predictor.reconcile(decoded, message.ackSeq);
+          const report = this.predictor.reconcile(decoded, message.ackSeq, message.ackTick);
           // Feed the instrument only for a reconcile that actually applied — a stale
           // snapshot the client ignored is not a data point (`./telemetry`).
           if (report.applied) {
+            // `lead` and `appliedDelta` ride along: the first is how far ahead of
+            // authority this client is standing, the second whether the input that
+            // put it there was run where it thought (`./telemetry`).
             this.netTelemetry.recordReconcile(
               { ...report, lead: report.replayed },
               message.ackSeq,
@@ -415,7 +532,27 @@ export class TransportSession implements MatchSession {
             // same measurement — otherwise a retransmit stall leaves the clock
             // hundreds of ms out and every later press waits in the server's queue
             // for it (`./prediction` MAX_LEAD_TICKS).
-            this.predictor.setLeadBudget(live.rttFloorMs, live.rttJitterMs);
+            // ── SIZED FROM THE WIRE, NOT FROM ITSELF (M10 item 7) ──────────────
+            //
+            // The measurement handed over here is the **network** floor when there is
+            // one: the ping probe's round trip, which has no tick queue in it
+            // (`./telemetry` `networkFloorMs`). The composite send→ack floor is the
+            // fallback and it is a feedback loop — an input is stamped for a future
+            // tick, so the server holds it until that tick and the ack comes back one
+            // *lead* later. Every sample in the window is inflated by the same amount,
+            // so the minimum is inflated too, so the budget is sized from the very
+            // number it determines. That is the plateau in the developer's second
+            // capture: one 500 ms hiccup stepped the lead 5 → 9 and the rtt 108 → 174,
+            // and neither ever came back down on a wire whose jitter never moved.
+            this.predictor.setLeadBudget(live.networkFloorMs ?? live.rttFloorMs, live.rttJitterMs);
+            // And how long a predicted order waits for its echo before it is
+            // rolled back — measured from the same wire, for the same reason a
+            // constant would be wrong on both a LAN and a phone (`./order-ledger`).
+            this.predictor.orders.setTtlFromRtt(
+              live.networkFloorMs ?? live.rttFloorMs,
+              live.rttJitterMs,
+              this.dt * 1000,
+            );
           }
           // And buffer the authoritative frame for remote-ship interpolation,
           // timed by the same clock the render layer samples with (`./interpolation`).
@@ -426,6 +563,16 @@ export class TransportSession implements MatchSession {
         }
         break;
       }
+      case 'pong':
+        // The latency probe's answer (`./transport` PongMessage): the wire's own round
+        // trip, measured against the send this client is holding, plus the two
+        // components only the server can state. Handled outside the reconcile path on
+        // purpose — it touches no world, so it needs no unpresent.
+        this.netTelemetry.recordPong(message.id, this.clock(), {
+          queueMs: message.queueMs,
+          loopLagMs: message.loopLagMs,
+        });
+        break;
       case 'economy':
         // The wallet's own channel, for this client's own seat: held/banked ore and
         // upgrade tiers, on the ticks authority moves them (`./transport`
@@ -436,6 +583,22 @@ export class TransportSession implements MatchSession {
         if (message.player !== this.player) break;
         if (this.predictor) this.predictor.stageEconomy(message.economy, message.tick);
         else if (!this.authoritative) this.pendingEconomy = message.economy;
+        break;
+      case 'orderEcho':
+        // What authority did with one identified order (`./transport`
+        // OrderEchoMessage): the prediction is adopted into it, or taken back. The
+        // world is the simulation for the length of this call — a settled order
+        // adds or removes a build job, and doing that to a *presented* world would
+        // stash the edit as if the picture had made it (`./presentation`).
+        if (message.player !== this.player || !this.predictor) break;
+        this.unpresent();
+        this.predictor.settleOrder({
+          orderId: message.orderId,
+          accepted: message.accepted,
+          tick: message.tick,
+          ...(message.build ? { build: message.build } : {}),
+        });
+        this.present();
         break;
       case 'entityEvent':
         // The half of the world that does not stream: rocks, turrets, shields,

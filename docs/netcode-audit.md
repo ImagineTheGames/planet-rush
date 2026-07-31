@@ -13,8 +13,10 @@ several of the claims in the code's own comments were the thing that turned out
 to be wrong, and §1 is how that was established.
 
 Companion documents: `docs/netcode-spike.md` (the day-0 measurements — snapshot
-size, tick rate, host) and `docs/playtest-log.md` (how a session gets handed
-back). The permanent acceptance runs are `tests/net/latency-feel.test.ts`.
+size, tick rate, host), `docs/playtest-log.md` (how a session gets handed back),
+and `docs/netcode-tick-alignment.md` (the follow-up that found what was left: the
+wire's own precision, and the input ticks authority was throwing away). The
+permanent acceptance runs are `tests/net/latency-feel.test.ts`.
 
 ---
 
@@ -205,7 +207,7 @@ assertion.
 
 | Threshold | Value | What it means |
 |---|---|---|
-| `MAX_CORRECTION_UNITS` | 4 u | Worst single correction anywhere in the run. Perfect prediction still reconciles by ~1.4 u (the wire quantizes position to whole units, both axes). |
+| `MAX_CORRECTION_UNITS` | 4 u | Worst single correction anywhere in the run. (Written when the wire quantized position to whole units, where perfect prediction still reconciled by ~1.4 u. It carries eighths since M10 tick-alignment, so the real numbers are far under this — see `docs/netcode-tick-alignment.md`, which adds the tight straight-line gate this one is now the loose outer bound for.) |
 | `MAX_MEAN_CORRECTION_UNITS` | 1.5 u | The typical reconcile — feel is an average, not a worst case. |
 | `MAX_VISUAL_SNAPS` | **0** | Corrections big enough to teleport the hull. In normal flight there is nothing a snap could be except a bug. |
 | `MAX_MEAN_LEAD_TICKS` | 32 t (~530 ms) | How far ahead of its newest snapshot the client runs on average. The steady-state budget is 24 t; the allowance covers the stall windows where the client is correctly ahead of a frame that is simply old. Guards the ratchet: 33 t / 59 t before the fix. |

@@ -68,16 +68,28 @@ import type {
 // Framing
 // ---------------------------------------------------------------------------
 
-/** Wire format version. Bumped whenever a frame layout changes; a client and a
- *  server that disagree here disagree about everything, so it is checked. */
-export const WIRE_VERSION = 1;
+/**
+ * Wire format version. Bumped whenever a frame layout changes; a client and a
+ * server that disagree here disagree about everything, so it is checked.
+ *
+ * **v2 (M10 tick-alignment)** — two changes to the snapshot frame, both of which a
+ * v1 reader would misread rather than reject, which is exactly what a version byte
+ * is for: the header gained `ackTick` (`./transport` `SnapshotMessage`), and the
+ * payload's positions and velocities became eighths of a world unit rather than
+ * whole ones (`./snapshot` `POS_SCALE`) — a v1 client decoding a v2 payload would
+ * draw the entire match at an eighth scale.
+ */
+export const WIRE_VERSION = 2;
 
 /** First byte of a binary frame: this is a snapshot. Room for more binary
  *  frame kinds later (a binary input frame is the obvious next one). */
 export const FRAME_SNAPSHOT = 0x01;
 
-/** kind u8 · version u8 · tick u32 · ackSeq u32, little-endian. */
-export const SNAPSHOT_FRAME_HEADER_BYTES = 10;
+/** kind u8 · version u8 · tick u32 · ackSeq u32 · ackTick u32, little-endian.
+ *  The last field is the M10 alignment instrument: the tick `ackSeq` was run at
+ *  (`./transport` `SnapshotMessage.ackTick`). Four bytes, thirty times a second —
+ *  120 B/s per client against the ~15 KB/s the snapshots themselves cost. */
+export const SNAPSHOT_FRAME_HEADER_BYTES = 14;
 
 /** The raw payload a socket carries either way. */
 export type WireFrame = string | ArrayBuffer;
@@ -189,6 +201,14 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       if (actions === null) return null;
       return { type: 'input', tick, seq, actions };
     }
+    // The latency probe (`./transport` PingMessage, M10 item 6). One bounded number,
+    // echoed back untouched — the id is the client's own bookkeeping and the server
+    // reads no meaning into it, so there is nothing here to validate but its shape.
+    case 'ping': {
+      const id = raw['id'];
+      if (!isCount(id)) return null;
+      return { type: 'ping', id };
+    }
     default:
       return null;
   }
@@ -213,6 +233,7 @@ export function encodeServerMessage(message: ServerMessage): WireFrame {
   dv.setUint8(1, WIRE_VERSION);
   dv.setUint32(2, message.tick >>> 0, true);
   dv.setUint32(6, message.ackSeq >>> 0, true);
+  dv.setUint32(10, message.ackTick >>> 0, true);
   new Uint8Array(frame, SNAPSHOT_FRAME_HEADER_BYTES).set(payload);
   return frame;
 }
@@ -242,6 +263,7 @@ export function parseServerMessage(frame: WireFrame): ServerMessage | null {
     type: 'snapshot',
     tick: dv.getUint32(2, true),
     ackSeq: dv.getUint32(6, true),
+    ackTick: dv.getUint32(10, true),
     payload: frame.slice(SNAPSHOT_FRAME_HEADER_BYTES),
   };
 }
@@ -262,7 +284,16 @@ const SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   // and upgrade tiers for the recipient's own seat, on the ticks they change. Text,
   // like everything that is not a snapshot — it is low-frequency by construction.
   'economy',
+  // What authority did with one identified order (`./transport` OrderEchoMessage).
+  // Without it here `parseServerMessage` drops the frame, no prediction is ever
+  // settled, and every order the player places is rolled back at its TTL — the
+  // exact opposite of the bug this channel exists to close.
+  'orderEcho',
   'matchEnd',
+  // The latency probe's answer (`./transport` PongMessage, M10 item 6). Without it
+  // here the frame is dropped, the client measures no network RTT, and every number
+  // it shows a player is the ack-based composite with its own lead baked in.
+  'pong',
   // A refused join (server/match-server.ts). Without it here parseServerMessage
   // drops the frame, the transport never learns *why* the socket then closed, and
   // a wrong-machine `bad-ticket` reads as a plain drop → a 60 s reconnect loop and
@@ -318,6 +349,29 @@ function parseBotDifficulties(value: unknown): BotDifficulty[] | null {
     out.push(entry);
   }
   return out;
+}
+
+/**
+ * The sentinel {@link parseOrderId} returns for an id that is present but
+ * malformed — told apart from `null` ("absent, and that is fine") because the two
+ * demand opposite answers. An absent id is an *older client*, which must keep
+ * working (the field is optional, `@shared/types` `OrderId`). A malformed one is a
+ * hostile or broken sender naming an id the dedupe table would then key on, and it
+ * takes the whole message down like every other known-verb-bad-payload does.
+ */
+const INVALID_ORDER_ID = -1;
+
+/**
+ * The client sequence id on a one-shot order (`@shared/types` `OrderId`) — absent
+ * (`null`), well-formed (the number), or malformed ({@link INVALID_ORDER_ID}).
+ *
+ * Bounded like every other field on this surface: it is a key in a per-slot dedupe
+ * table on the authoritative server, so a client must not be able to make that
+ * table's keys arbitrary. Non-negative safe integers only.
+ */
+function parseOrderId(value: unknown): number | null {
+  if (value === undefined) return null;
+  return isCount(value) ? value : INVALID_ORDER_ID;
 }
 
 /** A finite, bounded vector. Non-finite components are the classic way to
@@ -431,7 +485,13 @@ export function parseActions(value: unknown): Action[] | null {
       case 'buildOrder': {
         const item = entry['item'];
         if (typeof item !== 'string' || !BUILD_ITEMS.has(item)) return null;
-        actions.push({ type: 'buildOrder', item: item as BuildItem });
+        const orderId = parseOrderId(entry['orderId']);
+        if (orderId === INVALID_ORDER_ID) return null;
+        actions.push({
+          type: 'buildOrder',
+          item: item as BuildItem,
+          ...(orderId !== null ? { orderId } : {}),
+        });
         break;
       }
       case 'upgradeOrder': {
@@ -443,7 +503,13 @@ export function parseActions(value: unknown): Action[] | null {
         // refuse a track that does not exist.
         const track = entry['track'];
         if (typeof track !== 'string' || !UPGRADE_TRACKS.has(track)) return null;
-        actions.push({ type: 'upgradeOrder', track: track as UpgradeTrack });
+        const orderId = parseOrderId(entry['orderId']);
+        if (orderId === INVALID_ORDER_ID) return null;
+        actions.push({
+          type: 'upgradeOrder',
+          track: track as UpgradeTrack,
+          ...(orderId !== null ? { orderId } : {}),
+        });
         break;
       }
       default: {

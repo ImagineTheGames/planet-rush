@@ -340,6 +340,22 @@ export interface EntryDoorView extends EntryDoorOption {
   readonly enabled: boolean;
 }
 
+/**
+ * The live connect narration, handed in by whoever owns the transport
+ * (`src/main.ts`, from `src/net/connect-trace` `connectTitleLine`).
+ *
+ * This screen has never known what a socket is doing and still does not: it is
+ * given a line and a flag, and it puts the line in its title. That keeps the
+ * developer's ask — *"show it at the top where it says CONNECTING"* — a change of
+ * one string, and keeps `src/ui/` free of the netcode it must never import.
+ */
+export interface EntryNarration {
+  /** The line the title shows, e.g. `ROOM Q5RN · TICKET SIGNED`. */
+  readonly line: string;
+  /** True when that line is a refusal or a failure — the title's cue for red. */
+  readonly failed: boolean;
+}
+
 /** One code cell — a typed character, or the empty box waiting for one. */
 export interface EntryCodeCell {
   readonly char: string;
@@ -362,18 +378,36 @@ export interface EntryModel {
   /** The failure line, or `''`. Drawn in threat red — the one place on this
    *  screen that colour is allowed to mean something (style-guide §2). */
   readonly error: string;
-  /** The line under the title: what the player is being asked to do. */
+  /** The title line: what the player is being asked to do, or — while a connect is
+   *  running — what the connection is actually doing right now. */
   readonly prompt: string;
+  /** True when {@link prompt} is a live connect narration rather than the screen's
+   *  own standing line, so the view can draw it as the *title* it now is: bigger,
+   *  lit, and with the wordmark stepping back behind it. */
+  readonly narrating: boolean;
 }
 
-/** Build the frame model. Pure: the view draws exactly this and decides nothing. */
-export function entryModel(state: EntryState): EntryModel {
+/**
+ * Build the frame model. Pure: the view draws exactly this and decides nothing.
+ *
+ * `narration`, when present, **takes the title**. It replaces the static
+ * `CONNECTING…` that used to sit there from the first tap to the last, and on a
+ * failure it replaces the screen's own error line too — because the narration's
+ * last step *is* the failure, said exactly (`REFUSED: bad-ticket — machine
+ * mismatch`), and two sentences about one refusal is the duplicate surface this
+ * whole change exists to delete. With no narration the screen behaves exactly as it
+ * always has, which is what PLAY SOLO and a mistyped room code still want.
+ */
+export function entryModel(state: EntryState, narration: EntryNarration | null = null): EntryModel {
   const live = entryLive(state);
   const cells: EntryCodeCell[] = [];
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
     const char = state.code[i] ?? '';
     cells.push({ char, filled: char !== '', active: i === state.code.length });
   }
+  // An empty narration line is no narration at all — a trace that has not taken
+  // its first step yet must not blank the title.
+  const told = narration !== null && narration.line !== '' ? narration : null;
   return {
     screen: state.screen,
     doors: DOOR_OPTIONS.map((option) => ({ ...option, enabled: live })),
@@ -382,8 +416,9 @@ export function entryModel(state: EntryState): EntryModel {
     canErase: live && state.code.length > 0,
     canSubmit: canSubmitJoin(state),
     connecting: state.status === 'connecting',
-    error: state.error,
-    prompt: entryPrompt(state),
+    error: told ? (told.failed ? told.line : '') : state.error,
+    prompt: told ? told.line : entryPrompt(state),
+    narrating: told !== null,
   };
 }
 
@@ -396,9 +431,15 @@ export function entryModel(state: EntryState): EntryModel {
  */
 export const ENTRY_TAGLINE = 'MINE · DEFEND · ATTACK';
 
-/** The line under the wordmark. Says what to do, and — while connecting — what
- *  is being waited on, so a slow server never reads as a dead screen. On the home
- *  screen it is the {@link ENTRY_TAGLINE}, not the title repeated. */
+/**
+ * The line under the wordmark when nobody is narrating: what to do. On the home
+ * screen it is the {@link ENTRY_TAGLINE}, not the title repeated.
+ *
+ * `CONNECTING…` survives here as the *fallback only* — the offline SOLO door, which
+ * opens no socket and so has no story to tell. Every online attempt hands
+ * {@link entryModel} an {@link EntryNarration} and this word is never seen: that
+ * was the whole complaint.
+ */
 function entryPrompt(state: EntryState): string {
   if (state.status === 'connecting') return 'CONNECTING…';
   return state.screen === 'join' ? 'ENTER THE ROOM CODE' : ENTRY_TAGLINE;

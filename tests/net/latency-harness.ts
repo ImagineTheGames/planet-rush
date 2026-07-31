@@ -32,7 +32,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
 import { MatchServer } from '../../server/match-server';
 import type { ServerSocket } from '../../server/room';
-import { TICK_DT } from '../../src/sim';
+import { TICK_DT, killShip } from '../../src/sim';
 import type { World } from '../../src/sim';
 import { TransportSession } from '../../src/net/session';
 import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
@@ -115,6 +115,27 @@ class Pipe<T> {
     this.queue.push({ at, payload });
   }
 
+  /**
+   * Hold everything in flight — and everything pushed for the next `ms` — until the
+   * stall clears: one scripted head-of-line block, which is what a single lost
+   * segment does to a TCP socket (`RETRANSMIT_FACTOR` models the incidental case; this
+   * is the *scripted* one, so a test can name the instant a hiccup happened).
+   *
+   * The queue is ordered by delivery instant, so pushing each waiting message to the
+   * far side of the stall and spacing them at line rate reproduces the shape a real
+   * recovery has: a gap, then everything at once.
+   */
+  stall(nowMs: number, ms: number): void {
+    let at = nowMs + ms;
+    for (const item of this.queue) {
+      if (item.at >= at) break;
+      item.at = at;
+      at += DRAIN_SPACING_MS;
+    }
+    this.lastAt = Math.max(this.lastAt, at);
+    this.stalls++;
+  }
+
   /** Everything due at `nowMs`, in send order. */
   drain(nowMs: number): T[] {
     const out: T[] = [];
@@ -135,6 +156,12 @@ class PipedTransport implements Transport {
   readonly up: Pipe<WireFrame>;
   readonly down: Pipe<WireFrame>;
   state: ConnectionState = 'connecting';
+  /** Input ticks this client has stamped a message with, and how often. An input
+   *  tick used twice is a message the server's queue will drop as a duplicate —
+   *  silently, whole — so this is counted rather than assumed (M10 action-echo). */
+  readonly inputTicks = new Map<number, number>();
+  /** Input messages stamped for a tick this client had already used. */
+  repeatedInputTicks = 0;
 
   constructor(
     private readonly server: MatchServer,
@@ -164,6 +191,11 @@ class PipedTransport implements Transport {
   }
 
   send(message: ClientMessage): void {
+    if (message.type === 'input') {
+      const seen = this.inputTicks.get(message.tick) ?? 0;
+      if (seen > 0) this.repeatedInputTicks++;
+      this.inputTicks.set(message.tick, seen + 1);
+    }
     this.up.push(this.clock(), encodeClientMessage(message));
   }
 
@@ -217,6 +249,40 @@ export interface LatencyMatchOptions {
   readonly input?: (client: number, frame: number) => readonly Action[];
   /** Rocks in the arena. Small keeps the run quick; non-zero keeps mining real. */
   readonly asteroidCount?: number;
+  /**
+   * Called once per frame, after both clients have sent that frame's input and the
+   * presentation layer has drawn over their worlds — so what it sees is **what each
+   * screen shows**, not what the simulation holds (`src/net/presentation`).
+   *
+   * The hook exists because some properties are only true *continuously*. A final
+   * reading cannot tell "one shot on screen throughout" from "two for 300 ms and
+   * then one", and the second is the developer's bug report (M10 action-echo).
+   */
+  readonly onFrame?: (frame: number, clients: readonly HarnessClient[]) => void;
+  /**
+   * One scripted hiccup: at `atFrame`, every message in flight in both directions is
+   * held for `ms` (`Pipe.stall`).
+   *
+   * The M10 lead-ratchet brief (item 7) is written against exactly this shape — *"inject
+   * one 500 ms stall at t=20 s, assert lead returns to baseline within 10 s"* — because
+   * the fault it names is not what a bad wire does, it is what the client does *after*
+   * one. A loss-rate profile cannot express it: relentless stalls test the steady state,
+   * while a ratchet is a step that never comes back, and you need a clean wire either
+   * side of a single step to see one.
+   */
+  readonly stall?: { readonly atFrame: number; readonly ms: number };
+  /**
+   * Kill one player's ship on the authoritative world at `atFrame`, the way a shot
+   * does (`src/sim/damage.ts` `killShip`) — so the death this run reproduces is the
+   * sim's own death, with the respawn clock authority really runs behind it.
+   *
+   * The M10 lifecycle brief (item 1) asks for exactly this: *"the log's t=63
+   * signature (corr>100 sustained with mispred=1) becomes a latency-harness
+   * regression assertion."* A death is the one event a flight plan cannot produce on
+   * demand — two clients circling at 250 ms rarely land the killing blow inside a
+   * twenty-second run, and a gate that only sometimes tests a death is not a gate.
+   */
+  readonly kill?: { readonly atFrame: number; readonly player: PlayerId };
 }
 
 /** What a run reports back — enough for a gate, and for a capture in the doc. */
@@ -228,6 +294,45 @@ export interface LatencyMatchResult {
   readonly frames: number;
   /** The authoritative world, for comparing a screen against the truth. */
   readonly authoritative: World;
+  /**
+   * Input messages, across both clients, stamped for a tick that client had
+   * already used.
+   *
+   * No longer a fault, and worth saying why it stopped being one: the client's
+   * clock is not monotonic (a lead trim rewinds it), so it *does* re-use a tick
+   * number now and then — and it now stamps the tick it truly predicted at rather
+   * than an invented increasing one, because authority **merges** a collision
+   * instead of dropping it (`src/net/input-queue` `coalesce`). What must still be
+   * zero is {@link droppedInputs}; this is just how often the merge path was
+   * exercised.
+   */
+  readonly repeatedInputTicks: number;
+  /**
+   * Input messages the server's queue **threw away** — duplicates it refused and
+   * absurd futures it would not buffer (`src/net/input-queue` `InputStats`). Zero
+   * is the only acceptable number: a dropped input is a lost frame for a stick and
+   * a lost *purchase* for a one-shot order, and neither is visible from anywhere
+   * else. (Late arrivals are not dropped — they are re-filed onto the next
+   * unsimulated tick — so they are counted separately, in {@link lateInputs}.)
+   */
+  readonly droppedInputs: number;
+  /** Input messages that arrived after the tick they named had already been
+   *  simulated, and were re-filed onto the next free one. The wire's lateness,
+   *  which the client sees as `appliedDelta` (`src/net/telemetry`). */
+  readonly lateInputs: number;
+  /** Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.kill} was
+   *  injected, or null when the run scripted none. */
+  readonly killedAtMs: number | null;
+  /**
+   * Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.stall} was
+   * injected, or null when the run scripted none.
+   *
+   * Reported because the lobby settles on the same clock before frame 1, so "the
+   * twentieth second of the run" and "the twentieth entry in the telemetry history"
+   * are different instants — and a recovery assertion that confuses them measures the
+   * wrong second and passes for the wrong reason.
+   */
+  readonly stalledAtMs: number | null;
 }
 
 const DEFAULT_INPUT = (client: number, frame: number): readonly Action[] => {
@@ -311,29 +416,58 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
     throw new Error('latency harness: the match never started — the lobby did not settle');
   }
 
-  for (let frame = 1; frame <= options.frames; frame++) {
-    nowMs += FRAME_MS;
-    pump();
-    for (let i = 0; i < sessions.length; i++) sessions[i]!.sendInput(input(i, frame));
-  }
-
-  const room = server.room('RUSH');
+  // Built before the run, with `world` as a getter, so the per-frame hook reads the
+  // live screen rather than a snapshot taken at the end.
   const clients: HarnessClient[] = sessions.map((session) => ({
     session,
     telemetry: session.telemetry,
     you: session.you,
-    world: session.world,
+    get world(): World | null {
+      return session.world;
+    },
     screenPos: (id: PlayerId): { x: number; y: number } | null => {
       const ship = session.world?.ships.find((s) => s.id === id);
       return ship ? { x: ship.pos.x, y: ship.pos.y } : null;
     },
   }));
 
+  let stalledAtMs: number | null = null;
+  let killedAtMs: number | null = null;
+  for (let frame = 1; frame <= options.frames; frame++) {
+    nowMs += FRAME_MS;
+    if (options.kill && frame === options.kill.atFrame) {
+      const authoritative = server.room('RUSH')?.world;
+      const target = authoritative?.ships.find((s) => s.id === options.kill!.player);
+      if (authoritative && target) {
+        killShip(authoritative, target);
+        killedAtMs = nowMs;
+      }
+    }
+    if (options.stall && frame === options.stall.atFrame) {
+      stalledAtMs = nowMs;
+      for (const transport of transports) {
+        transport.up.stall(nowMs, options.stall.ms);
+        transport.down.stall(nowMs, options.stall.ms);
+      }
+    }
+    pump();
+    for (let i = 0; i < sessions.length; i++) sessions[i]!.sendInput(input(i, frame));
+    options.onFrame?.(frame, clients);
+  }
+
+  const room = server.room('RUSH');
+
   const stalls = transports.reduce((n, t) => n + t.up.stalls + t.down.stalls, 0);
+  const inputs = room!.inputStats;
   return {
+    droppedInputs: inputs.duplicate + inputs.farFuture,
+    lateInputs: inputs.late,
     clients,
     stalls,
     frames: options.frames,
+    repeatedInputTicks: transports.reduce((n, t) => n + t.repeatedInputTicks, 0),
     authoritative: room!.world!,
+    stalledAtMs,
+    killedAtMs,
   };
 }

@@ -465,6 +465,7 @@ export type {
   EntryDoorView,
   EntryIntent,
   EntryModel,
+  EntryNarration,
   EntryResult,
   EntryScreen,
   EntryState,

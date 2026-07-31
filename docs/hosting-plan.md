@@ -257,6 +257,80 @@ thing that has been missing, and until it rolls, the fleet is still pre-pin.
 
 ---
 
+## Task 15 — region placement is a guarantee, not luck
+
+**Ratified by the developer:** *"we shouldn't have that."* The fleet has run
+`iad ×2 + gru ×1` since 2026-07-30, and `Allocator.pickMachine` has preferred a
+requested region since Task 5 — but a creator in Minas Gerais still landed in
+Virginia every single time. Two causes, both of them the same shape (*nobody
+stated where the creator was*):
+
+1. **The client stated the wrong thing.** `src/main.ts` held
+   `onlineRegions = [{ id: 'iad', label: 'US East' }]` — one entry, picker
+   suppressed by `regionPickerVisible` — and sent `onlineRegions[0].id` on every
+   `POST /rooms`. A hard-coded `iad` is not a preference; it is a pin, and it
+   outranked everything below.
+2. **Nothing else stated anything.** Remove the pin and the allocator has no
+   region at all, so it spreads across the whole fleet and the tie-break
+   (least-loaded, then machine id) sends the same creator to the same Virginia
+   box — the coin flip the developer described.
+
+### The policy, as shipped
+
+| Input | Wins when | Reason returned |
+|---|---|---|
+| Request body `region` | The client named one (a real picker) | `preferred` / `region-full` / `region-absent` |
+| `Fly-Region` header | The body named none | as above |
+| `Fly-Request-Id` suffix | Neither of the above is readable | as above |
+| nothing | Off Fly, or a bare caller | `no-preference` |
+
+**Capacity semantics are unchanged and deliberately so:** the creator's region
+wins *whenever it has a free slot*, and a full one falls back across the whole
+fleet rather than refusing. A placed match beats a refused one.
+
+### The header, verified live (not assumed)
+
+The brief required the header name be confirmed against Fly rather than guessed.
+Read from Fly's own header echo on 2026-07-31, from the developer's network:
+
+```
+$ curl -s https://debug.fly.dev/
+Fly-Request-Id: 01KYTQS8FBEA8JW7GYH7KQYPGE-gru
+Fly-Region: gru
+Fly-Client-Ip: 201.77.129.150
+```
+
+So `fly-region` is the header, and the request id's trailing `-gru` is the same
+fact by a second route — kept as a fallback so a future rename degrades to an odd
+parse instead of silently re-pinning every creator to Virginia.
+`allocator/edge-region.ts` accepts only three lowercase letters, so a hostile
+header cannot reach a log line or a `/machines` reply.
+
+**A forged header buys nothing.** The region is a preference: it can only ask for
+a region the fleet already has, and a full one falls back anyway. It has exactly
+the power the body's `region` field has had since Task 5, and that is
+client-supplied too.
+
+### Explainable, on both sides of the wire
+
+Every allocate now answers with *why*:
+
+```json
+"placement": { "requested": "gru", "region": "gru",
+               "reason": "preferred", "detail": "gru — your region" }
+```
+
+- the allocator writes the same line to its own log
+  (`room H3HX → d891dd0a1443e8 (gru — your region)`), which is where `fly logs`
+  answers "why did that creator get Virginia?";
+- the client copies `detail` into the **session log** (`connect`/`ticket` step),
+  so a pasted COPY LOG carries the machine id *and* the reason.
+
+A `join` carries no placement and logs none: it goes where the room already is,
+and there is nothing to explain.
+
+---
+
 ## Still open (kept, not closed)
 
 The spike's discipline: state what remains open rather than quietly closing it.

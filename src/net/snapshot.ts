@@ -21,10 +21,19 @@
  * *kind* bit in the previously-reserved `meta` bits, at zero byte cost, so the
  * renderer can tint/size a ship shot apart from a turret shot (see {@link SHOT_META}).
  *
- * Everything is quantized to integers: the client renders at 60 fps and
- * interpolates between snapshots broadcast at 30 Hz (GDD §4.2), so sub-unit
- * precision is never worth its bytes. Velocity *is* sent, so a client can
- * dead-reckon a remote ship between snapshots instead of stuttering.
+ * Everything is quantized to fixed-point integers. Positions and velocities carry
+ * **eighths of a world unit** ({@link POS_SCALE}) in the same two bytes they always
+ * did: the original layout rounded them to whole units, which put a permanent
+ * half-unit lie under client-side prediction and produced a correction on every
+ * snapshot of every match (the M10 constant-correction hunt — the long note on
+ * {@link POS_SCALE} is the diagnosis and the arithmetic). Velocity *is* sent, so a
+ * client can dead-reckon a remote ship between snapshots instead of stuttering.
+ *
+ * The wire's precision is the codec's own business: {@link ShipSnap} and
+ * {@link ProjSnap} carry **world units** on both sides of the wire, and the
+ * fixed-point step exists only between {@link encodeSnapshot} and
+ * {@link decodeSnapshot}. Nothing upstream or downstream has to know the scale —
+ * which is what let it change without touching a single consumer.
  *
  * The ship record lost its `aim` field in the v0.3 laser funeral
  * (`docs/design-amendments.md`): `aim` was the old firing-ray direction, and once
@@ -124,11 +133,69 @@ export function projIsShipShot(meta: number): boolean {
 /** Angle quantization: a full turn over the u16 range (~0.005° per step). */
 const ANGLE_SCALE = 65536 / (2 * Math.PI);
 
+/**
+ * Fixed-point steps per world unit for every streamed position and velocity —
+ * **the wire's precision, and the floor under every prediction error there is.**
+ *
+ * ── WHY THIS NUMBER EXISTS (M10 tick-alignment, the constant-correction hunt) ──
+ *
+ * The developer's telemetry showed a *correction on every single snapshot*: mean
+ * 0.3–0.6 u, worst 1.0–1.2 u, all match, at 250 ms. A constant small correction is
+ * systematic rather than stochastic, so the instrument went in first
+ * (`./telemetry` `appliedDeltaMean`, `server/room.ts` `ackTick`) to test the prime
+ * suspect — the client predicting an input at one tick and the server running it at
+ * another. It said no: on the developer's wire **93 % of inputs are applied at
+ * exactly the tick they were predicted for**, and the remaining 7 % are one tick
+ * out. Alignment was not the fault.
+ *
+ * The fault was here. Positions streamed as **whole world units**, so a client whose
+ * physics were *perfect* still landed up to half a unit from the number authority
+ * sent — every ship, every snapshot, forever. In two axes that is a mean error of
+ * 0.38 u and a worst case of 0.71 u, which is the developer's capture almost
+ * exactly; velocity rounding (a whole unit per second, then replayed across a
+ * round trip's worth of ticks) supplies the rest. It is not a misprediction — the
+ * client and the server agreed — it is the wire *telling* the client something
+ * slightly untrue and reconciliation dutifully steering to it, 30 times a second.
+ *
+ * So the same two bytes now carry eighths of a unit. The error floor drops by 8×,
+ * to ~0.05 u mean — under the renderer's pixel and far under the blend
+ * ({@link ../prediction} `SMOOTHING_EPSILON`) — and steady-state flight reconciles
+ * to *nothing*, which is what "prediction is right" is supposed to look like.
+ *
+ * **Why 8 and not 16.** The field is an `i16`, so the representable range is
+ * `±32767 / POS_SCALE`. The widest arena the game ships is 3200 × 2000 (`src/sim`
+ * `maps.ts`, the oval and diamond), with coordinates measured from the corner, so
+ * the range must clear 3200 with room for a ship that has been kicked past a wall.
+ * At 8 the ceiling is 4095.9 u — 28 % of headroom. At 16 it is 2047.9 u, *inside*
+ * the arena, and a ship at the far end of an oval map would clamp to the wall on
+ * the wire. Eight is therefore the finest power of two the map catalogue permits,
+ * and `snapshot.test.ts` pins that relationship so a future wider map fails the
+ * build instead of teleporting a ship.
+ *
+ * Velocity shares the scale and has range to spare: a maxed Interceptor tops out
+ * near 300 u/s against a 4095 u/s ceiling.
+ *
+ * Byte cost of all of this: **zero**. The layout is unchanged (`WORST_CASE_BYTES`);
+ * only the meaning of the integer moved, which is why `WIRE_VERSION` moved with it
+ * (`./wire`) — a v1 client reading v2 numbers would draw the whole match at an
+ * eighth scale, so the two must never meet.
+ */
+export const POS_SCALE = 8;
+
+/** Largest world coordinate the wire can carry at {@link POS_SCALE}, in world
+ *  units. Any arena wider than this cannot be streamed without clamping — the
+ *  bound `snapshot.test.ts` holds the map catalogue against. */
+export const MAX_WIRE_COORD = 32767 / POS_SCALE;
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------
 
-/** A ship's streamed state for one snapshot. Integers, already quantized. */
+/** A ship's streamed state for one snapshot, in **world units** — the wire's
+ *  fixed-point step ({@link POS_SCALE}) is applied inside {@link encodeSnapshot}
+ *  and undone inside {@link decodeSnapshot}, so a record is the same units either
+ *  side of the socket. `heading` and `hull` are the exception: they are already
+ *  their own wire encodings (see {@link dequantizeAngle}). */
 export interface ShipSnap {
   id: number;
   posX: number;
@@ -165,12 +232,21 @@ export interface DecodedSnapshot {
 // Quantization
 // ---------------------------------------------------------------------------
 
-/** Clamp into the i16 the wire carries. World bounds are ~2000 units, so this
- *  only ever bites on a pathological value — but a wrapped coordinate would
- *  teleport a ship, so it is clamped rather than truncated. */
+/**
+ * World units → the fixed-point `i16` the wire carries ({@link POS_SCALE} steps
+ * per unit), clamped into range. The widest shipping arena leaves 28 % headroom,
+ * so this only ever bites on a pathological value — but a wrapped coordinate would
+ * teleport a ship, so it is clamped rather than truncated.
+ */
 function quantize(v: number): number {
-  const q = Math.round(v);
+  const q = Math.round(v * POS_SCALE);
   return q > 32767 ? 32767 : q < -32768 ? -32768 : q;
+}
+
+/** The wire's fixed-point `i16` → world units — the exact inverse of
+ *  {@link quantize} up to the eighth-unit step it rounds to. */
+function dequantize(wire: number): number {
+  return wire / POS_SCALE;
 }
 
 /** Angle → u16, normalized into one turn first so negatives encode correctly. */
@@ -196,10 +272,10 @@ export function snapshotWorld(world: World): { ships: ShipSnap[]; projectiles: P
     if (ships.length >= MAX_SHIPS) break;
     ships.push({
       id: ship.id & 0xff,
-      posX: quantize(ship.pos.x),
-      posY: quantize(ship.pos.y),
-      velX: quantize(ship.vel.x),
-      velY: quantize(ship.vel.y),
+      posX: ship.pos.x,
+      posY: ship.pos.y,
+      velX: ship.vel.x,
+      velY: ship.vel.y,
       heading: quantizeAngle(ship.angle),
       hull: Math.max(0, Math.min(255, Math.round(ship.hull))),
       flags:
@@ -221,8 +297,8 @@ export function snapshotWorld(world: World): { ships: ShipSnap[]; projectiles: P
     if (projectiles.length >= MAX_PROJECTILES) break;
     projectiles.push({
       id: slot & 0xff,
-      posX: quantize(p.pos.x),
-      posY: quantize(p.pos.y),
+      posX: p.pos.x,
+      posY: p.pos.y,
       // Owner in bits 0..2; the shot-kind bit marks a ship weapon shot so the
       // renderer can draw it apart from a turret shot (design amendment v0.2).
       meta: (p.owner & SHOT_META.ownerMask) | (p.kind === 'ship' ? SHOT_META.shipKind : 0),
@@ -268,13 +344,13 @@ export function encodeSnapshot(
   for (const s of ships) {
     dv.setUint8(o, s.id & 0xff);
     o += 1;
-    dv.setInt16(o, s.posX | 0, true);
+    dv.setInt16(o, quantize(s.posX), true);
     o += 2;
-    dv.setInt16(o, s.posY | 0, true);
+    dv.setInt16(o, quantize(s.posY), true);
     o += 2;
-    dv.setInt16(o, s.velX | 0, true);
+    dv.setInt16(o, quantize(s.velX), true);
     o += 2;
-    dv.setInt16(o, s.velY | 0, true);
+    dv.setInt16(o, quantize(s.velY), true);
     o += 2;
     dv.setUint16(o, s.heading & 0xffff, true);
     o += 2;
@@ -287,9 +363,9 @@ export function encodeSnapshot(
   for (const p of projectiles) {
     dv.setUint8(o, p.id & 0xff);
     o += 1;
-    dv.setInt16(o, p.posX | 0, true);
+    dv.setInt16(o, quantize(p.posX), true);
     o += 2;
-    dv.setInt16(o, p.posY | 0, true);
+    dv.setInt16(o, quantize(p.posY), true);
     o += 2;
     dv.setUint8(o, p.meta & 0xff);
     o += 1;
@@ -314,13 +390,13 @@ export function decodeSnapshot(buf: ArrayBuffer): DecodedSnapshot {
   for (let i = 0; i < shipCount; i++) {
     const id = dv.getUint8(o);
     o += 1;
-    const posX = dv.getInt16(o, true);
+    const posX = dequantize(dv.getInt16(o, true));
     o += 2;
-    const posY = dv.getInt16(o, true);
+    const posY = dequantize(dv.getInt16(o, true));
     o += 2;
-    const velX = dv.getInt16(o, true);
+    const velX = dequantize(dv.getInt16(o, true));
     o += 2;
-    const velY = dv.getInt16(o, true);
+    const velY = dequantize(dv.getInt16(o, true));
     o += 2;
     const heading = dv.getUint16(o, true);
     o += 2;
@@ -335,9 +411,9 @@ export function decodeSnapshot(buf: ArrayBuffer): DecodedSnapshot {
   for (let i = 0; i < projCount; i++) {
     const id = dv.getUint8(o);
     o += 1;
-    const posX = dv.getInt16(o, true);
+    const posX = dequantize(dv.getInt16(o, true));
     o += 2;
-    const posY = dv.getInt16(o, true);
+    const posY = dequantize(dv.getInt16(o, true));
     o += 2;
     const meta = dv.getUint8(o);
     o += 1;

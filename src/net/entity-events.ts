@@ -27,8 +27,9 @@
  */
 
 import type { PlayerId } from '@shared/types';
-import type { Asteroid, MiningStation, Shield, Turret, World } from '../sim';
-import type { EntityEventMessage } from './transport';
+import { SPAWN_PROTECTION_S, TICK_DT } from '../sim';
+import type { Asteroid, MiningStation, Shield, Ship, Turret, World } from '../sim';
+import type { EntityEventMessage, Tick } from './transport';
 
 // ---------------------------------------------------------------------------
 // Payload shapes — plain data, one per entity kind
@@ -126,6 +127,58 @@ export interface DestroyEventData {
   id: number;
 }
 
+/**
+ * **A ship died, or a ship came back** — the M10 lifecycle wire.
+ *
+ * The one non-static payload in this file, and it earns its place by carrying the
+ * two things a streaming snapshot cannot say. The snapshot spends a single bit on
+ * `alive` (`./snapshot` `SHIP_FLAG`) and stops there; the five-second respawn clock
+ * behind that bit (GDD §2.7) is `Ship.respawnTimer`, which is not on the wire at
+ * all. A predicting client therefore held a dead ship with a **zero** timer, and
+ * `step()`'s first act on a dead ship is `respawnTimer -= dt; if (<= 0) respawn()`
+ * — so the client revived it on the very next tick, at its home station, and flew
+ * it for the whole five seconds authority had it lying at the death site.
+ *
+ * That is the developer's t=63 s signature exactly: a correction that does not
+ * converge because it is not a misprediction at all — the two sims are simulating
+ * *different ships*. It reads as `corr` climbing 0.5 → 288 → 509 u with
+ * `mispred 1.0` held for five seconds and one snap that does not take, and the same
+ * shape shows up a second time at t=38 s in the RXS3 capture. On someone else's
+ * hull the same bug is the other half of the report: a dead rival the client has
+ * quietly respawned goes on being drawn, so *"dead enemies linger"*.
+ *
+ * So the lifecycle is **stated**, and the client stops guessing:
+ *
+ *  - `op: 'destroy'` — the ship died at `tick`, at `x`/`y`, and comes back at
+ *    `respawnTick` (or never, when `eliminated`: the home reactor is gone, GDD §2.7).
+ *  - `op: 'spawn'` — the ship is flying again as of `tick`, from `x`/`y`.
+ *
+ * The countdown a client runs is derived from `respawnTick` against **its own**
+ * clock, not from a duration handed over a wire whose delay would be baked into it:
+ * the two sims number their ticks identically (that is what makes prediction
+ * possible at all), so `(respawnTick − world.tick) × dt` is the same countdown on
+ * both sides no matter how late the message is. A client that is already past
+ * `respawnTick` when the message lands simply respawns on its next tick, which is
+ * the right answer and needs no special case.
+ */
+export interface ShipLifecycleData {
+  /** The slot this is about — a ship's id is its player id. */
+  id: PlayerId;
+  /** True on a respawn, false on a death. */
+  alive: boolean;
+  /** The authoritative tick it happened at. */
+  tick: Tick;
+  /** Where the hull was at that tick: the death site, or the respawn point. */
+  x: number;
+  y: number;
+  /** The tick authority will revive this ship at, or **-1** when it will not —
+   *  a respawn event, or a death with `eliminated` set. */
+  respawnTick: Tick;
+  /** This player's home reactor is gone: out of the match, never respawning
+   *  (GDD §2.7). The one death that has no countdown behind it. */
+  eliminated: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // The client's consumer
 // ---------------------------------------------------------------------------
@@ -161,6 +214,8 @@ export function applyEntityEvent(world: World, message: EntityEventMessage): boo
       return message.op === 'destroy'
         ? removeSatellite(world, data['id'])
         : applySatellite(world, data as unknown as SatelliteEventData);
+    case 'ship':
+      return applyShipLifecycle(world, data as unknown as ShipLifecycleData);
     case 'station':
     case 'wreck':
       // One `kind`, two payloads: structure (where the station is, whether it is
@@ -343,6 +398,147 @@ function removeSatellite(world: World, id: number): boolean {
     }
   }
   return false;
+}
+
+// --- Ships: death and respawn (M10 lifecycle wire) --------------------------
+
+/**
+ * Put one ship's **lifecycle** where authority says it is: dead at the site it
+ * died, on the countdown authority is running, or flying again from the point it
+ * respawned at ({@link ShipLifecycleData}).
+ *
+ * Written as the offline flow is written, because it *is* the offline flow: a dead
+ * ship is stopped, emptied of its trigger, and given the `respawnTimer` the sim's
+ * own death path gives it (`src/sim/damage.ts` `killShip`) — just measured against
+ * authority's respawn tick rather than started from a local guess. `step()` then
+ * counts it down and revives the ship exactly as it does in a solo match (GDD §2.4,
+ * the parity principle: the offline and online sim run the identical code).
+ *
+ * Hull is deliberately **not** invented on a respawn: it is authority's, and the
+ * snapshot on this event's heels carries it (`./prediction` `holdHull`). What is
+ * set is what the wire cannot otherwise say — where the hull is, whether it is
+ * flying, and how long until it is.
+ *
+ * And a respawn does **not** move a ship this client has already revived. That is the
+ * designed case, not the exception: both sims run the same `respawn()` at the same tick
+ * from the same state, so by the time this message lands — a round trip after the tick
+ * it describes — the fresh hull has been flying under the player's hands for a round
+ * trip. Placing it at the spawn point again would rewind that flight for the frames
+ * before the next snapshot re-derives it, which is a visible jerk on the one event a
+ * player is already watching closely. Position is taken only from a respawn this client
+ * had not reached, which is a client that fell behind and genuinely needs telling.
+ */
+function applyShipLifecycle(world: World, data: ShipLifecycleData): boolean {
+  const ship = world.ships.find((s) => s.id === data.id);
+  if (!ship) return false;
+  if (data.alive) {
+    const wasDead = !ship.alive;
+    ship.alive = true;
+    ship.respawnTimer = 0;
+    // A fresh hull at home is under spawn protection (GDD §2.1). The snapshot's
+    // flag bit is what ends it; this only makes sure the glow starts.
+    if (ship.spawnProtect <= 0) ship.spawnProtect = SPAWN_PROTECTION_S;
+    if (wasDead) {
+      ship.pos.x = data.x;
+      ship.pos.y = data.y;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+    }
+    return true;
+  }
+  ship.pos.x = data.x;
+  ship.pos.y = data.y;
+  ship.vel.x = 0;
+  ship.vel.y = 0;
+  ship.alive = false;
+  ship.hull = 0;
+  ship.firing = false;
+  ship.eliminated = data.eliminated;
+  ship.respawnTimer = respawnHold(data, world.tick);
+  return true;
+}
+
+/**
+ * Seconds this client should still show on the respawn countdown, from a death
+ * event read against the client's own tick. Zero for an elimination (no countdown
+ * — the match is over for that player, GDD §2.7) and zero once the deadline has
+ * passed, which lets `step()` revive the ship on its next tick rather than holding
+ * a corpse a late message left behind.
+ */
+export function respawnCountdown(data: ShipLifecycleData, tick: Tick, dt: number = TICK_DT): number {
+  if (data.alive || data.eliminated || data.respawnTick < 0) return 0;
+  return Math.max(0, (data.respawnTick - tick) * dt);
+}
+
+/** Read one ship's lifecycle off the world — what the server's differ compares
+ *  against, and what a full-state burst states for a ship that is currently dead. */
+export function shipLifecycleOf(ship: Ship, tick: Tick, dt: number = TICK_DT): ShipLifecycleData {
+  const respawning = !ship.alive && !ship.eliminated;
+  return {
+    id: ship.id,
+    alive: ship.alive,
+    tick,
+    x: ship.pos.x,
+    y: ship.pos.y,
+    respawnTick: respawning ? tick + respawnTicks(ship.respawnTimer, dt) : -1,
+    eliminated: ship.eliminated,
+  };
+}
+
+/** A death that cannot outlast a match: the iteration cap in {@link respawnTicks}. */
+const MAX_RESPAWN_TICKS = 60 * 60 * 60;
+
+/**
+ * Ticks from now until `step()` revives a ship holding `timer` seconds — the tick the
+ * *server's* own countdown lands on, stated so a client can land on the same one.
+ *
+ * Computed by **running that countdown**, one subtraction at a time, rather than
+ * dividing. Division is off by a tick and the arithmetic says why: `step()` revives
+ * on the first tick where repeated `timer -= dt` has reached zero or below, and at the
+ * only cadence that ships — `dt = 1/60`, which has no exact binary form — three
+ * hundred of those subtractions do *not* reach zero from five seconds, while
+ * `5 / (1/60)` rounds to exactly 300. So the closed form says the ship comes back on
+ * tick 300 and the sim brings it back on 301, the client revives a tick before
+ * authority does, and the reconcile that straddles the two reports the whole
+ * death-site-to-home distance as a fresh correction: one 15-unit jolt out of a fault
+ * that is otherwise entirely fixed.
+ *
+ * Three hundred subtractions, a handful of times per match, is nothing — and being
+ * the same operations in the same order on the same doubles as `src/sim/step.ts`, it
+ * is exact by construction rather than by a rounding argument.
+ *
+ * Never less than one: a corpse whose clock has already run out still spends a tick
+ * dead, because the revival happens *in* a tick and there is always a next one.
+ */
+export function respawnTicks(timer: number, dt: number = TICK_DT): number {
+  if (!(dt > 0)) return 1;
+  let left = timer;
+  let ticks = 0;
+  while (left > 0 && ticks < MAX_RESPAWN_TICKS) {
+    left -= dt;
+    ticks++;
+  }
+  return Math.max(1, ticks);
+}
+
+/**
+ * The countdown to *write onto* a dead ship at `tick`, so that `step()`'s own
+ * `timer -= dt` expires on the stated respawn tick and on neither of the ticks either
+ * side of it.
+ *
+ * Half a tick short of the honest figure {@link respawnCountdown} reports, and the
+ * half tick is the whole point: what the sim asks of this number is only that `k`
+ * subtractions take it to zero or below and `k − 1` do not, which makes any value in
+ * `((k−1)·dt, k·dt]` correct. The honest figure sits exactly on that interval's edge,
+ * where one rounding in the multiplication decides whether the ship comes back on the
+ * right tick — so the value written is the middle of the interval instead, and no
+ * accumulation of `dt`-sized error can reach either end. Eight milliseconds under
+ * five seconds is not a number any player reads; a respawn on the wrong tick is a
+ * correction they see.
+ */
+export function respawnHold(data: ShipLifecycleData, tick: Tick, dt: number = TICK_DT): number {
+  if (data.alive || data.eliminated || data.respawnTick < 0) return 0;
+  return Math.max(0, (data.respawnTick - tick - 0.5) * dt);
 }
 
 // --- Stations ---------------------------------------------------------------

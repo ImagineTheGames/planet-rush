@@ -173,14 +173,20 @@ describe('the post-respawn correction tail', () => {
       ] as never);
     }, 33);
 
-    // Stop once a breach has been seen AND enough tail recorded to characterise it.
+    // Stop once the interesting thing has been seen AND enough tail recorded to
+    // characterise it. The trigger is a breach OR a death: if the defect is fixed
+    // there will be no breach, and a probe that only watched for breaches would
+    // fly the whole budget and then report a death-free run as evidence.
     const flyUntil = Date.now() + FLY_MS;
-    let firstBreachAt: number | null = null;
+    let triggeredAt: number | null = null;
     while (Date.now() < flyUntil) {
-      if (firstBreachAt === null) {
-        const hit = recs.find((r) => r.applied && r.error > MAX_CORRECTION_UNITS);
-        if (hit) firstBreachAt = hit.n;
-      } else if (recs.length > firstBreachAt + 260) break;
+      if (triggeredAt === null) {
+        const hit = recs.find(
+          (r) =>
+            (r.applied && r.error > MAX_CORRECTION_UNITS) || (r.world !== null && !r.world.alive),
+        );
+        if (hit) triggeredAt = hit.n;
+      } else if (recs.length > triggeredAt + 260) break;
       await sleep(100);
     }
     clearInterval(flying);
@@ -202,6 +208,19 @@ describe('the post-respawn correction tail', () => {
     const worldValues = [...new Set(breaches.map((r) => key(r.world)))];
     const errValues = [...new Set(breaches.map((r) => r.error))];
 
+    // DID THE SHIP ACTUALLY DIE? Without this the probe is unfalsifiable: a run
+    // with zero breaches reads identically whether the defect is fixed or whether
+    // the bots simply never killed anyone, and those are opposite conclusions.
+    // `world.alive` is read off the predicted world before every reconcile, so a
+    // death is a true→false edge in that column.
+    const withShip = recs.filter((r) => r.world !== null);
+    let deathEdges = 0;
+    for (let i = 1; i < withShip.length; i++) {
+      if (withShip[i - 1]!.world!.alive && !withShip[i]!.world!.alive) deathEdges++;
+    }
+    const deadRecs = withShip.filter((r) => !r.world!.alive);
+    const hulls = withShip.map((r) => r.world!.hull);
+
     const out = {
       probe: 'respawn-tail',
       allocator: ALLOCATOR,
@@ -210,6 +229,14 @@ describe('the post-respawn correction tail', () => {
       seat,
       reconcilesRecorded: recs.length,
       reconcilesApplied: applied.length,
+      /** The falsifier: a breach-free run only means something if a death happened. */
+      deathsObserved: deathEdges,
+      deadReconciles: deadRecs.length,
+      deadSpanMs: deadRecs.length
+        ? deadRecs[deadRecs.length - 1]!.ms - deadRecs[0]!.ms
+        : null,
+      minHullSeen: hulls.length ? Math.min(...hulls) : null,
+      maxHullSeen: hulls.length ? Math.max(...hulls) : null,
       breachingReconciles: breaches.length,
       breachSpanMs: first && breaches.length ? breaches[breaches.length - 1]!.ms - first.ms : null,
       distinctErrorValuesInBreach: errValues,

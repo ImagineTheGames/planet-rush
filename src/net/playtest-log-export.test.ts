@@ -101,6 +101,115 @@ describe('exportPlaytestLog', () => {
   });
 });
 
+describe('the share sheet — the phone’s own route out (M10 action-echo §5)', () => {
+  /** A `navigator.share` stand-in that records what it was handed. */
+  function shareSpy(options: { canShare?: boolean; reject?: boolean } = {}): {
+    share: ReturnType<typeof vi.fn>;
+    canShare: ReturnType<typeof vi.fn>;
+  } {
+    return {
+      share: vi.fn(async () => {
+        if (options.reject) throw new Error('dismissed');
+      }),
+      canShare: vi.fn(() => options.canShare !== false),
+    };
+  }
+
+  /** A `File` stand-in: the payload's identity is its name and its contents. */
+  const makeShareFile = (filename: string, text: string): unknown => ({ filename, text });
+
+  it('shares a NAMED FILE first, ahead of the clipboard', async () => {
+    const log = newLog();
+    const sheet = shareSpy();
+    const writeText = vi.fn(async (_t: string) => {});
+
+    const result = await exportPlaytestLog({
+      log,
+      share: sheet,
+      makeShareFile,
+      clipboard: { writeText },
+      save: null,
+    });
+
+    expect(result).toEqual({ ok: true, route: 'share', bytes: log.toJson().length });
+    // The clipboard was never touched: on a phone, a share sheet is the gesture
+    // that exists, and pasting 40 KB of JSON into a chat app is not.
+    expect(writeText).not.toHaveBeenCalled();
+    const payload = sheet.share.mock.calls[0]![0] as { title: string; files: { filename: string; text: string }[] };
+    expect(payload.title).toBe(playtestLogFilename(log.env));
+    // A file, named for the build it came from — not a wall of text.
+    expect(payload.files[0]!.filename).toBe(playtestLogFilename(log.env));
+    expect(JSON.parse(payload.files[0]!.text)).toMatchObject({ env: { sha: '1a2b3c4' } });
+  });
+
+  it('falls through to the clipboard when the share is dismissed', async () => {
+    const log = newLog();
+    const writeText = vi.fn(async (_t: string) => {});
+    const result = await exportPlaytestLog({
+      log,
+      share: shareSpy({ reject: true }),
+      makeShareFile,
+      clipboard: { writeText },
+      save: null,
+    });
+    // A cancelled sheet reports as a rejection and says nothing about *why*, so it
+    // costs the developer the next route rather than the whole export.
+    expect(result.ok && result.route).toBe('clipboard');
+    expect(writeText).toHaveBeenCalledOnce();
+  });
+
+  it('does not even try when the platform says it cannot share files', async () => {
+    const log = newLog();
+    const sheet = shareSpy({ canShare: false });
+    const writeText = vi.fn(async (_t: string) => {});
+    const result = await exportPlaytestLog({
+      log,
+      share: sheet,
+      makeShareFile,
+      clipboard: { writeText },
+      save: null,
+    });
+    expect(sheet.share).not.toHaveBeenCalled();
+    expect(result.ok && result.route).toBe('clipboard');
+  });
+
+  it('skips the sheet on a device with no File constructor', async () => {
+    const log = newLog();
+    const sheet = shareSpy();
+    const writeText = vi.fn(async (_t: string) => {});
+    const result = await exportPlaytestLog({
+      log,
+      share: sheet,
+      makeShareFile: () => null,
+      clipboard: { writeText },
+      save: null,
+    });
+    expect(sheet.share).not.toHaveBeenCalled();
+    expect(result.ok && result.route).toBe('clipboard');
+  });
+
+  it('still reaches the download when the sheet AND the clipboard refuse', async () => {
+    const log = newLog();
+    const saved: string[] = [];
+    const result = await exportPlaytestLog({
+      log,
+      share: shareSpy({ reject: true }),
+      makeShareFile,
+      clipboard: { writeText: async () => Promise.reject(new Error('insecure origin')) },
+      save: (filename) => saved.push(filename),
+    });
+    expect(result.ok && result.route).toBe('download');
+    expect(saved).toEqual([playtestLogFilename(log.env)]);
+  });
+
+  it('is absent on a desktop browser with no share API, and that is not a failure', async () => {
+    const log = newLog();
+    const writeText = vi.fn(async (_t: string) => {});
+    const result = await exportPlaytestLog({ log, share: null, clipboard: { writeText }, save: null });
+    expect(result.ok && result.route).toBe('clipboard');
+  });
+});
+
 describe('playtestLogFilename', () => {
   it('leads with the build sha and then the UTC instant', () => {
     const log = newLog();
