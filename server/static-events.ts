@@ -36,9 +36,10 @@ import type {
   ShieldEventData,
   TurretEventData,
 } from '../src/net/entity-events';
+import { shipLifecycleOf } from '../src/net/entity-events';
 import type { EntityEventMessage, Tick } from '../src/net/transport';
-import { SENSOR_RANGE } from '../src/sim';
-import type { MiningStation, World } from '../src/sim';
+import { SENSOR_RANGE, TICK_DT } from '../src/sim';
+import type { MiningStation, Ship, World } from '../src/sim';
 
 // ---------------------------------------------------------------------------
 // Event payloads
@@ -142,6 +143,66 @@ function destroyEvent(
 }
 
 /**
+ * One ship's death or respawn, as the event channel carries it (`src/net/entity-events`
+ * {@link ShipLifecycleData}, M10 lifecycle wire).
+ *
+ * A ship is the one thing here that also *streams*, and this event does not
+ * duplicate a byte of that: position, velocity, hull and the `alive` bit are the
+ * snapshot's. What this carries is the pair of **ticks** the snapshot has no room
+ * for — when the death happened, and when authority will end it — because those are
+ * what a client needs to run the death presentation and respawn countdown the
+ * offline game runs (GDD §2.7), instead of reviving the ship on its next tick.
+ */
+export function shipLifecycleEvent(
+  ship: Ship,
+  tick: Tick,
+  op: 'spawn' | 'destroy',
+  dt: number = TICK_DT,
+): EntityEventMessage {
+  return {
+    type: 'entityEvent',
+    tick,
+    kind: 'ship',
+    op,
+    data: shipLifecycleOf(ship, tick, dt),
+  };
+}
+
+/**
+ * Watches every ship's `alive` flag and emits the change — nothing else. Death and
+ * respawn are rare (a handful per player per match, GDD §2.7 puts respawn at five
+ * seconds), so the whole channel costs a few hundred bytes a match against a
+ * snapshot stream of ~15 KB/s, and it is sampled **every tick** rather than on the
+ * 10 Hz static-entity cadence: a client that learns about a death 100 ms late has
+ * spent 100 ms flying a ghost, which is the thing being fixed.
+ */
+export class ShipLifecycleTracker {
+  private readonly alive = new Map<PlayerId, boolean>();
+
+  /** Take the world as it stands as the baseline, emitting nothing. Called at
+   *  RUSH!, where every ship is alive and there is no news in saying so. */
+  prime(world: World): void {
+    this.alive.clear();
+    for (const ship of world.ships) this.alive.set(ship.id, ship.alive);
+  }
+
+  /** Every ship whose `alive` flag moved since the last call. */
+  diff(world: World, dt: number = TICK_DT): EntityEventMessage[] {
+    const events: EntityEventMessage[] = [];
+    for (const ship of world.ships) {
+      const was = this.alive.get(ship.id);
+      if (was === ship.alive) continue;
+      this.alive.set(ship.id, ship.alive);
+      // `was === undefined` is a ship the tracker has never seen; it is announced
+      // only if it is *dead*, because a living ship is what a client already built.
+      if (was === undefined && ship.alive) continue;
+      events.push(shipLifecycleEvent(ship, world.tick, ship.alive ? 'spawn' : 'destroy', dt));
+    }
+    return events;
+  }
+}
+
+/**
  * Every static entity in the world, as spawn events. This is what a client
  * receives when it joins a running match — and what a reconnecting player
  * receives on reclaim, because sixty seconds of grace is long enough for the
@@ -150,6 +211,15 @@ function destroyEvent(
 export function fullEntityState(world: World): EntityEventMessage[] {
   const tick = world.tick;
   const events: EntityEventMessage[] = [];
+  // Anyone who is currently dead, stated up front. A joining or reclaiming client
+  // rebuilds its world from the seed and the roster, which gives it eight *living*
+  // ships — so without this it would fly a corpse's seat as though nothing had
+  // happened, and predict a rival that is lying at a death site (M10 lifecycle
+  // wire, `src/net/entity-events` `ShipLifecycleData`).
+  for (const ship of world.ships) {
+    if (ship.alive) continue;
+    events.push(shipLifecycleEvent(ship, tick, 'destroy'));
+  }
   for (const station of world.stations) {
     events.push(stationEvent(station, tick, 'spawn'));
     for (const turret of station.turrets) events.push(turretEvent(turret, tick, 'spawn'));

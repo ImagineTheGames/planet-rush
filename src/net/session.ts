@@ -166,6 +166,18 @@ export interface OpenOptions {
  * would otherwise have to: the input sequence number, and the tick each input
  * is stamped with.
  */
+/**
+ * How often the client probes the wire's own round trip, ms (`./transport`
+ * PingMessage, M10 item 6).
+ *
+ * Twice a second. The number it feeds is the displayed ping and the lead budget's
+ * input, and both want a *floor* over a window of seconds rather than an instant
+ * reading — so this only has to be often enough to catch a route change inside a
+ * second or two. Thirty-odd bytes each way at 2 Hz is a rounding error against a
+ * 15 KB/s snapshot stream (docs/netcode-spike.md).
+ */
+export const PING_INTERVAL_MS = 500;
+
 export class TransportSession implements MatchSession {
   private player: PlayerId = 0;
   private nextTick: Tick = 1;
@@ -190,6 +202,12 @@ export class TransportSession implements MatchSession {
   /** The reconciliation instrument — fed on every send and every applied
    *  reconcile, and handed back through COPY LOG (`./telemetry`). Inert offline. */
   private readonly netTelemetry = new NetTelemetry();
+  /** Probe ids, and the clock reading of the last probe sent ({@link PING_INTERVAL_MS}). */
+  private pingId = 0;
+  private lastPingMs = Number.NEGATIVE_INFINITY;
+  /** When the previous tick's input was produced — the frame-scheduling delay's
+   *  other end (`./telemetry` `recordFrameLag`). */
+  private lastSendMs: number | null = null;
   /** True when the transport runs the sim in this process. Then the session
    *  predicts nothing: there is no latency to hide, and inventing a second copy
    *  of a world we already own would be the one way to make offline drift. */
@@ -316,6 +334,29 @@ export class TransportSession implements MatchSession {
     return readOptionalString(this.transport, 'rejectReason');
   }
 
+  /**
+   * **The ping to show a player**, ms — the wire's own round trip, or null before a
+   * probe has been answered (offline, or in the first half second of a match).
+   *
+   * This is what the lobby and HUD readouts must read (m10-17). Deliberately *not* the
+   * composite `telemetry.live.rttMs`, which is send→ack and therefore contains this
+   * client's own input lead and the server's 30 Hz broadcast cadence: on the
+   * developer's gru session that figure read 95 ms and then a sustained 215 ms on a
+   * wire a speedtest called 24 ms. Showing that number tells a player their connection
+   * is bad when it is not, which is a lie the client has no business telling
+   * (M10 item 6).
+   *
+   * The *floor* over the recent window rather than the newest reading, for the same
+   * reason a speedtest reports its best pass: one retransmit stalls the probe with
+   * everything else on the socket, and a single 750 ms sample says nothing about the
+   * connection a player is asking about. The wobble is not lost — it is measured, on
+   * its own line, as jitter (`./telemetry` `rttJitterMs`). One number, one source: this
+   * is the same figure the lead budget is sized from.
+   */
+  get networkPingMs(): number | null {
+    return this.netTelemetry.live.networkFloorMs;
+  }
+
   sampleRemotes(): readonly InterpolatedShip[] {
     return this.interpolator?.sample(this.clock()) ?? [];
   }
@@ -364,9 +405,28 @@ export class TransportSession implements MatchSession {
     // Send first, then predict: the wire gets the press with no local work in
     // front of it, and the ship moves this frame either way (GDD §4.2).
     if (this.predictor) {
+      const now = this.clock();
       // Timestamp the send so the snapshot that later acks this seq measures a
       // real round trip (`./telemetry`). Only online — offline there is no wire.
-      this.netTelemetry.recordInput(seq, this.clock());
+      this.netTelemetry.recordInput(seq, now);
+      // **CLIENT**, the third stage of the round trip (M10 item 6): how much later
+      // than the fixed tick interval this device actually produced this tick's input.
+      // Zero on a device holding its frame budget; a GC pause or a backgrounded tab
+      // shows up here rather than being blamed on the wire — and it is real latency,
+      // because a late press is stamped for a tick authority has nearly reached, so it
+      // arrives late, is re-filed, and its ack comes back later still.
+      if (this.lastSendMs !== null) {
+        this.netTelemetry.recordFrameLag(now - this.lastSendMs - this.dt * 1000, now);
+      }
+      this.lastSendMs = now;
+      // **NETWORK**: the probe, on its own cadence, riding the same frame the input
+      // does so it needs no timer of its own ({@link PING_INTERVAL_MS}).
+      if (now - this.lastPingMs >= PING_INTERVAL_MS) {
+        this.lastPingMs = now;
+        const id = ++this.pingId;
+        this.transport.send({ type: 'ping', id });
+        this.netTelemetry.recordPingSent(id, now);
+      }
       this.predictor.predict(seq, stamped);
     } else this.nextTick = tick + 1;
     this.present();
@@ -472,11 +532,27 @@ export class TransportSession implements MatchSession {
             // same measurement — otherwise a retransmit stall leaves the clock
             // hundreds of ms out and every later press waits in the server's queue
             // for it (`./prediction` MAX_LEAD_TICKS).
-            this.predictor.setLeadBudget(live.rttFloorMs, live.rttJitterMs);
+            // ── SIZED FROM THE WIRE, NOT FROM ITSELF (M10 item 7) ──────────────
+            //
+            // The measurement handed over here is the **network** floor when there is
+            // one: the ping probe's round trip, which has no tick queue in it
+            // (`./telemetry` `networkFloorMs`). The composite send→ack floor is the
+            // fallback and it is a feedback loop — an input is stamped for a future
+            // tick, so the server holds it until that tick and the ack comes back one
+            // *lead* later. Every sample in the window is inflated by the same amount,
+            // so the minimum is inflated too, so the budget is sized from the very
+            // number it determines. That is the plateau in the developer's second
+            // capture: one 500 ms hiccup stepped the lead 5 → 9 and the rtt 108 → 174,
+            // and neither ever came back down on a wire whose jitter never moved.
+            this.predictor.setLeadBudget(live.networkFloorMs ?? live.rttFloorMs, live.rttJitterMs);
             // And how long a predicted order waits for its echo before it is
             // rolled back — measured from the same wire, for the same reason a
             // constant would be wrong on both a LAN and a phone (`./order-ledger`).
-            this.predictor.orders.setTtlFromRtt(live.rttFloorMs, live.rttJitterMs, this.dt * 1000);
+            this.predictor.orders.setTtlFromRtt(
+              live.networkFloorMs ?? live.rttFloorMs,
+              live.rttJitterMs,
+              this.dt * 1000,
+            );
           }
           // And buffer the authoritative frame for remote-ship interpolation,
           // timed by the same clock the render layer samples with (`./interpolation`).
@@ -487,6 +563,16 @@ export class TransportSession implements MatchSession {
         }
         break;
       }
+      case 'pong':
+        // The latency probe's answer (`./transport` PongMessage): the wire's own round
+        // trip, measured against the send this client is holding, plus the two
+        // components only the server can state. Handled outside the reconcile path on
+        // purpose — it touches no world, so it needs no unpresent.
+        this.netTelemetry.recordPong(message.id, this.clock(), {
+          queueMs: message.queueMs,
+          loopLagMs: message.loopLagMs,
+        });
+        break;
       case 'economy':
         // The wallet's own channel, for this client's own seat: held/banked ore and
         // upgrade tiers, on the ticks authority moves them (`./transport`

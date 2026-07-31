@@ -269,3 +269,115 @@ describe('the lead', () => {
     expect(sample.leadMaxTicks).toBe(30);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The round trip, taken apart (M10 item 6)
+// ---------------------------------------------------------------------------
+
+/**
+ * *"Speedtest 24 ms, game showed 95 then 215 sustained once the match heated up."*
+ *
+ * The instrument's job here is to make that sentence decidable. Every clock reading
+ * below is passed in, so the scenario is the developer's capture exactly: a 24 ms
+ * wire, an input that waits 150 ms in the server's tick queue for the tick it was
+ * stamped for, and a composite round trip of 174 ms that is the sum of the two.
+ */
+describe('the round trip, taken apart', () => {
+  /** The capture's numbers (room RXS3). */
+  const WIRE_MS = 24;
+  const QUEUE_MS = 150;
+
+  /** One second of a client at that condition: an input, its ack a queue-wait later,
+   *  and a probe answered at wire speed. */
+  function second(t: NetTelemetry, atMs: number): void {
+    t.recordInput(1, atMs);
+    t.recordPingSent(atMs, atMs);
+    t.recordPong(atMs, atMs + WIRE_MS, { queueMs: QUEUE_MS, loopLagMs: 2.4 });
+    t.recordReconcile(OK, 1, atMs + WIRE_MS + QUEUE_MS);
+  }
+
+  it('measures the network from the probe and the composite from the ack', () => {
+    const t = new NetTelemetry();
+    second(t, 1000);
+
+    // The wire, with no game in it — the number to show a player.
+    expect(t.live.networkRttMs).toBe(WIRE_MS);
+    // The composite, which is that plus the queue wait. Both readings are honest;
+    // only one of them is about the connection.
+    expect(t.live.rttMs).toBe(WIRE_MS + QUEUE_MS);
+    // And the server said where the difference went, rather than leaving it to be
+    // inferred: 150 ms of tick queue on a loop that is barely late at all.
+    expect(t.live.serverQueueMs).toBe(QUEUE_MS);
+    expect(t.live.serverLoopLagMs).toBe(2.4);
+  });
+
+  it('keeps two floors, and only one of them is the wire', () => {
+    const t = new NetTelemetry();
+    for (let i = 0; i < 5; i++) second(t, 1000 + i * 1000);
+    t.recordReconcile(OK, 1, 7000); // roll the last bucket
+
+    // This is the precondition item 7's fix rests on: *the instrument separates raw
+    // network from lead*. A floor taken over the composite cannot — every sample in
+    // the window carries the same queue wait, so its minimum carries it too, and a
+    // lead buffer sized from that number is sized from its own consequence.
+    expect(t.live.networkFloorMs).toBe(WIRE_MS);
+    expect(t.live.rttFloorMs).toBe(WIRE_MS + QUEUE_MS);
+  });
+
+  it('folds each stage into its own per-second field', () => {
+    const t = new NetTelemetry();
+    second(t, 1000);
+    t.recordFrameLag(4, 1500); // one late frame on this device
+    second(t, 2000);
+
+    const s = t.samples[0]!;
+    expect(s.networkMeanMs).toBe(WIRE_MS);
+    expect(s.networkMinMs).toBe(WIRE_MS);
+    expect(s.serverQueueMeanMs).toBe(QUEUE_MS);
+    expect(s.serverLoopLagMaxMs).toBe(2.4);
+    expect(s.clientLagMeanMs).toBe(4);
+    expect(s.clientLagMaxMs).toBe(4);
+    // The composite is still reported, unchanged — it is the one number that says how
+    // late a press actually lands, which is what the feel gates are written against.
+    expect(s.rttMeanMs).toBe(WIRE_MS + QUEUE_MS);
+  });
+
+  it('reports an unmeasured stage as null rather than as zero', () => {
+    const t = new NetTelemetry();
+    t.recordInput(1, 1000);
+    t.recordReconcile(OK, 1, 1100);
+    t.recordReconcile(OK, 1, 2000);
+
+    // No probe was answered: "the network is 0 ms" is a lie a display would repeat,
+    // where null is a display that shows nothing yet.
+    expect(t.live.networkRttMs).toBeNull();
+    expect(t.live.networkFloorMs).toBeNull();
+    expect(t.samples[0]!.networkMeanMs).toBeNull();
+    expect(t.samples[0]!.serverQueueMeanMs).toBeNull();
+    expect(t.samples[0]!.serverLoopLagMaxMs).toBeNull();
+    // The client's own scheduling is the one stage this device always knows, so it is
+    // a number and not a null: nothing recorded means nothing was late.
+    expect(t.samples[0]!.clientLagMeanMs).toBe(0);
+  });
+
+  it('drops a pong it has no send for, rather than timing it against the wrong one', () => {
+    const t = new NetTelemetry();
+    t.recordPingSent(1, 1000);
+    t.recordPong(1, 1024, { queueMs: 10, loopLagMs: 1 });
+    // A duplicate, or an id this client never sent: the server's own two numbers are
+    // still fresh news, but there is no round trip to measure from it.
+    t.recordPong(1, 1500, { queueMs: 20, loopLagMs: 3 });
+    expect(t.live.networkRttMs).toBe(24);
+    expect(t.live.serverQueueMs).toBe(20);
+  });
+
+  it('names all three stages in the dump', () => {
+    const t = new NetTelemetry();
+    second(t, 1000);
+    second(t, 2000);
+    const dump = t.format();
+    expect(dump).toContain('net ');
+    expect(dump).toContain('srv ');
+    expect(dump).toContain('cli ');
+  });
+});

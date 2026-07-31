@@ -265,6 +265,12 @@ export function describeAction(event: ActionEvent): Record<string, string | numb
  * a hundred times in a pasted log: `rtt`/`rttMax` in ms, `corr`/`corrMax` in world
  * units, `mispred` as a rate in [0, 1], `recon` the reconciles the second covered,
  * and `resync` the wholesale authority takeovers — the "snap events" the brief names.
+ *
+ * `rtt` is the **composite** send→ack figure and always has been; `net`, `srvq`,
+ * `srvlag` and `cli` are the three stages it is made of, logged separately since the
+ * M10 RTT audit (item 6). A pasted log where `rtt 215` sits beside `net 26` says the
+ * wire was never the problem — the tick queue was — and that is a sentence no single
+ * number could say (`./telemetry`).
  */
 export function describeSample(sample: TelemetrySample): Record<string, number | null> {
   return {
@@ -294,5 +300,18 @@ export function describeSample(sample: TelemetrySample): Record<string, number |
     align: sample.appliedDeltaMean,
     alignMax: sample.appliedDeltaMax,
     alignN: sample.appliedDeltaSamples,
+    // ── THE ROUND TRIP, TAKEN APART (M10 item 6) ────────────────────────────────
+    // NETWORK: the ping frame's own round trip, answered off the server's tick loop
+    // — the number a speedtest agrees with, and the only one shown to a player.
+    net: sample.networkMeanMs === null ? null : Math.round(sample.networkMeanMs),
+    netMin: sample.networkMinMs === null ? null : Math.round(sample.networkMinMs),
+    // SERVER: how long this client's input waited in the authoritative tick queue,
+    // and how far past its deadline the room's loop ran. The first tracks this
+    // client's lead; the second is the host's CPU.
+    srvq: sample.serverQueueMeanMs === null ? null : Math.round(sample.serverQueueMeanMs),
+    srvlag: sample.serverLoopLagMaxMs === null ? null : Math.round(sample.serverLoopLagMaxMs),
+    // CLIENT: this device's own frame scheduling delay, which the wire gets blamed for.
+    cli: Math.round(sample.clientLagMeanMs),
+    cliMax: Math.round(sample.clientLagMaxMs),
   };
 }

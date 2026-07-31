@@ -43,6 +43,12 @@ function sample(atMs: number, over: Partial<TelemetrySample> = {}): TelemetrySam
     appliedDeltaMax: 0,
     appliedDeltaSamples: 30,
     rttJitterMs: 12.3,
+    networkMeanMs: 26.4,
+    networkMinMs: 24.1,
+    serverQueueMeanMs: 118.2,
+    serverLoopLagMaxMs: 2.4,
+    clientLagMeanMs: 1.2,
+    clientLagMaxMs: 9.5,
     leadMeanTicks: 11,
     leadMaxTicks: 14,
     resyncs: 0,
@@ -245,6 +251,15 @@ describe('the per-second telemetry', () => {
       align: 0,
       alignMax: 0,
       alignN: 30,
+      // The M10 RTT decomposition (item 6): the composite `rtt` above, and the three
+      // stages it is actually made of. `rtt 149` beside `net 26` is the whole finding
+      // of the developer's gru capture in one line — the wire was never the problem.
+      net: 26,
+      netMin: 24,
+      srvq: 118,
+      srvlag: 2,
+      cli: 1,
+      cliMax: 10,
     });
   });
 

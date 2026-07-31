@@ -37,7 +37,7 @@
 import type { PlayerId, Vec2 } from '@shared/types';
 import { PROJECTILE } from '../sim';
 import type { World } from '../sim';
-import { MAX_PROJECTILES, SHOT_META } from './snapshot';
+import { MAX_PROJECTILES, SHIP_FLAG, SHOT_META } from './snapshot';
 import type { InterpolatedShip, InterpolatedShot } from './interpolation';
 
 /**
@@ -66,6 +66,12 @@ interface ShipStash {
   x: number;
   y: number;
   angle: number;
+  /** The remote entity view ({@link PresentationLayer.presentRemote}). Undefined on
+   *  the local slot, whose only presented field is its offset position. */
+  hull?: number;
+  alive?: boolean;
+  eliminated?: boolean;
+  firing?: boolean;
 }
 
 /** One stashed projectile slot. */
@@ -115,10 +121,20 @@ export class PresentationLayer {
       }
       const remote = frame.remotes.find((r) => r.id === ship.id);
       if (!remote) continue;
-      this.ships.push({ index: i, x: ship.pos.x, y: ship.pos.y, angle: ship.angle });
+      this.ships.push({
+        index: i,
+        x: ship.pos.x,
+        y: ship.pos.y,
+        angle: ship.angle,
+        hull: ship.hull,
+        alive: ship.alive,
+        eliminated: ship.eliminated,
+        firing: ship.firing,
+      });
       ship.pos.x = remote.x;
       ship.pos.y = remote.y;
       ship.angle = remote.angle;
+      this.presentRemote(ship, remote);
     }
 
     // Shots. The presentation layer owns the streamed half of the pool outright —
@@ -169,6 +185,10 @@ export class PresentationLayer {
       ship.pos.x = stash.x;
       ship.pos.y = stash.y;
       ship.angle = stash.angle;
+      if (stash.hull !== undefined) ship.hull = stash.hull;
+      if (stash.alive !== undefined) ship.alive = stash.alive;
+      if (stash.eliminated !== undefined) ship.eliminated = stash.eliminated;
+      if (stash.firing !== undefined) ship.firing = stash.firing;
     }
     for (const stash of this.shots) {
       const p = world.projectiles[stash.index];
@@ -186,6 +206,51 @@ export class PresentationLayer {
   }
 
   // --- Internals ------------------------------------------------------------
+
+  /**
+   * **One entity, one instant.** A remote ship's hull, its life, and its trigger are
+   * presented from the *same* interpolation sample its position came from — the M10
+   * lifecycle pass, items 3 and 4 of the developer's gru report.
+   *
+   * Position was already sampled {@link RemoteInterpolator.delayMs} in the past; every
+   * other field a viewer reads was taken straight off the world, where it is the
+   * *newest snapshot* as the reconcile left it. One entity drawn from two clocks, and
+   * the two symptoms the developer named come out of the gap:
+   *
+   *  - **"HP bars and numbers flicker."** The bar shows while an entity is damaged or
+   *    *in combat*, and in-combat is `Ship.firing` — a flag `step()` clears on every
+   *    tick and only the wire can set (a client has no input for a rival, so its
+   *    replay never fires that gun: `./prediction` `paintRemoteFiring`). Snapshots
+   *    land 30 times a second and frames are drawn 60, so the flag was true on the
+   *    frames a reconcile touched and false on the frames between: a bar strobing at
+   *    30 Hz over an enemy that is holding its trigger down. The hull number beside it
+   *    moved on a third clock again — authority's newest, one round trip ahead of the
+   *    hull the player is watching get shot at.
+   *  - **"Dead enemies linger."** The `alive` bit from the newest snapshot kills the
+   *    corpse the moment authority does, while the *body* is still being drawn a
+   *    hundred milliseconds in the past — and worse, before the lifecycle wire the
+   *    client would quietly revive that ship locally on its next tick and go on
+   *    drawing it for the whole respawn window (`./prediction` `holdLifecycle`).
+   *    Sampled here, the corpse clears exactly when the render clock reaches the death
+   *    — one interpolation delay behind, the same delay everything else about that
+   *    ship is drawn at, and not a second more.
+   *
+   * The flag bits are carried, not blended: {@link RemoteInterpolator} takes them from
+   * the nearer of the two bracketing snapshots, so each moves at most once per
+   * snapshot interval and only ever forward. That is what "no flap" means here — not
+   * that the state is smoothed, but that it has one source and one clock.
+   *
+   * Spawn protection is deliberately left where it is: it is a three-second glow whose
+   * *edges* the snapshot path already resolves against the client's own countdown
+   * (`./prediction` `applySnapshot`), and re-deriving it from a flag bit here would
+   * re-arm the glow rather than sharpen it.
+   */
+  private presentRemote(ship: World['ships'][number], remote: InterpolatedShip): void {
+    ship.hull = remote.hull;
+    ship.alive = (remote.flags & SHIP_FLAG.alive) !== 0;
+    ship.eliminated = (remote.flags & SHIP_FLAG.eliminated) !== 0;
+    ship.firing = (remote.flags & SHIP_FLAG.firing) !== 0;
+  }
 
   /** Whether any wire-owned slot is currently drawn — so a frame with no sampled
    *  shots still clears the last one off the screen instead of freezing it there. */

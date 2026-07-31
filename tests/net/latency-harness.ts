@@ -32,7 +32,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
 import { MatchServer } from '../../server/match-server';
 import type { ServerSocket } from '../../server/room';
-import { TICK_DT } from '../../src/sim';
+import { TICK_DT, killShip } from '../../src/sim';
 import type { World } from '../../src/sim';
 import { TransportSession } from '../../src/net/session';
 import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
@@ -113,6 +113,27 @@ class Pipe<T> {
     const at = Math.max(nowMs + delay, this.lastAt + DRAIN_SPACING_MS);
     this.lastAt = at;
     this.queue.push({ at, payload });
+  }
+
+  /**
+   * Hold everything in flight — and everything pushed for the next `ms` — until the
+   * stall clears: one scripted head-of-line block, which is what a single lost
+   * segment does to a TCP socket (`RETRANSMIT_FACTOR` models the incidental case; this
+   * is the *scripted* one, so a test can name the instant a hiccup happened).
+   *
+   * The queue is ordered by delivery instant, so pushing each waiting message to the
+   * far side of the stall and spacing them at line rate reproduces the shape a real
+   * recovery has: a gap, then everything at once.
+   */
+  stall(nowMs: number, ms: number): void {
+    let at = nowMs + ms;
+    for (const item of this.queue) {
+      if (item.at >= at) break;
+      item.at = at;
+      at += DRAIN_SPACING_MS;
+    }
+    this.lastAt = Math.max(this.lastAt, at);
+    this.stalls++;
   }
 
   /** Everything due at `nowMs`, in send order. */
@@ -238,6 +259,30 @@ export interface LatencyMatchOptions {
    * then one", and the second is the developer's bug report (M10 action-echo).
    */
   readonly onFrame?: (frame: number, clients: readonly HarnessClient[]) => void;
+  /**
+   * One scripted hiccup: at `atFrame`, every message in flight in both directions is
+   * held for `ms` (`Pipe.stall`).
+   *
+   * The M10 lead-ratchet brief (item 7) is written against exactly this shape — *"inject
+   * one 500 ms stall at t=20 s, assert lead returns to baseline within 10 s"* — because
+   * the fault it names is not what a bad wire does, it is what the client does *after*
+   * one. A loss-rate profile cannot express it: relentless stalls test the steady state,
+   * while a ratchet is a step that never comes back, and you need a clean wire either
+   * side of a single step to see one.
+   */
+  readonly stall?: { readonly atFrame: number; readonly ms: number };
+  /**
+   * Kill one player's ship on the authoritative world at `atFrame`, the way a shot
+   * does (`src/sim/damage.ts` `killShip`) — so the death this run reproduces is the
+   * sim's own death, with the respawn clock authority really runs behind it.
+   *
+   * The M10 lifecycle brief (item 1) asks for exactly this: *"the log's t=63
+   * signature (corr>100 sustained with mispred=1) becomes a latency-harness
+   * regression assertion."* A death is the one event a flight plan cannot produce on
+   * demand — two clients circling at 250 ms rarely land the killing blow inside a
+   * twenty-second run, and a gate that only sometimes tests a death is not a gate.
+   */
+  readonly kill?: { readonly atFrame: number; readonly player: PlayerId };
 }
 
 /** What a run reports back — enough for a gate, and for a capture in the doc. */
@@ -275,6 +320,19 @@ export interface LatencyMatchResult {
    *  simulated, and were re-filed onto the next free one. The wire's lateness,
    *  which the client sees as `appliedDelta` (`src/net/telemetry`). */
   readonly lateInputs: number;
+  /** Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.kill} was
+   *  injected, or null when the run scripted none. */
+  readonly killedAtMs: number | null;
+  /**
+   * Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.stall} was
+   * injected, or null when the run scripted none.
+   *
+   * Reported because the lobby settles on the same clock before frame 1, so "the
+   * twentieth second of the run" and "the twentieth entry in the telemetry history"
+   * are different instants — and a recovery assertion that confuses them measures the
+   * wrong second and passes for the wrong reason.
+   */
+  readonly stalledAtMs: number | null;
 }
 
 const DEFAULT_INPUT = (client: number, frame: number): readonly Action[] => {
@@ -373,8 +431,25 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
     },
   }));
 
+  let stalledAtMs: number | null = null;
+  let killedAtMs: number | null = null;
   for (let frame = 1; frame <= options.frames; frame++) {
     nowMs += FRAME_MS;
+    if (options.kill && frame === options.kill.atFrame) {
+      const authoritative = server.room('RUSH')?.world;
+      const target = authoritative?.ships.find((s) => s.id === options.kill!.player);
+      if (authoritative && target) {
+        killShip(authoritative, target);
+        killedAtMs = nowMs;
+      }
+    }
+    if (options.stall && frame === options.stall.atFrame) {
+      stalledAtMs = nowMs;
+      for (const transport of transports) {
+        transport.up.stall(nowMs, options.stall.ms);
+        transport.down.stall(nowMs, options.stall.ms);
+      }
+    }
     pump();
     for (let i = 0; i < sessions.length; i++) sessions[i]!.sendInput(input(i, frame));
     options.onFrame?.(frame, clients);
@@ -392,5 +467,7 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
     frames: options.frames,
     repeatedInputTicks: transports.reduce((n, t) => n + t.repeatedInputTicks, 0),
     authoritative: room!.world!,
+    stalledAtMs,
+    killedAtMs,
   };
 }
