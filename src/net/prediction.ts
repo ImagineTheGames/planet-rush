@@ -51,6 +51,7 @@
 import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, stationOf, step } from '../sim';
 import type { BuildJob, MiningStation, World } from '../sim';
+import { ActionJournal } from './action-journal';
 import { applyEntityEvent } from './entity-events';
 import { StructureEcho } from './entity-echo';
 import { OrderLedger } from './order-ledger';
@@ -290,6 +291,9 @@ export class PredictedMatch {
   /** Predicted orders awaiting authority's word, and their TTL clock — the whole
    *  of "one entity, never two" for anything the wheel buys (`./order-ledger`). */
   private readonly ledger = new OrderLedger();
+  /** What the player did and what authority said about it, for the pasted log
+   *  (`./action-journal`, M10 tick-alignment brief item 3). */
+  private readonly journal = new ActionJournal();
   /** The other half of "one entity, never two": a predicted turret and the
    *  authoritative turret it becomes are one turret (`./entity-echo`). */
   private readonly structures = new StructureEcho();
@@ -400,9 +404,28 @@ export class PredictedMatch {
     // echo has something to be *about* (`./order-ledger`).
     const orders = identifiedOrders(actions);
     const before = orders.length > 0 ? buildIdsOf(stationOf(this.world, this.local)) : null;
+    // The weapon's own clock, read either side of the step. It only ever counts
+    // *down* (`src/sim/step.ts`) except on the tick a shot leaves the barrel, when
+    // it is re-armed to the fire interval — so a cooldown that went *up* is a shot,
+    // exactly, and it is the only evidence of one this client will ever have (the
+    // firer's own shots are drawn from prediction, never from the wire —
+    // {@link harvestOwnShots}).
+    const cooldownBefore = this.localShip()?.weaponCooldown ?? 0;
 
     step(this.world, [{ id: this.local, actions }], this.dt);
 
+    if ((this.localShip()?.weaponCooldown ?? 0) > cooldownBefore) {
+      this.journal.record({ kind: 'volley', tick, inFlight: this.ownShotCount() });
+    }
+    for (const order of orders) {
+      this.journal.record({
+        kind: 'order',
+        tick,
+        orderId: order.orderId,
+        verb: order.verb,
+        what: order.what,
+      });
+    }
     if (before) this.ledgeOrders(orders, before, tick);
     this.holdHull();
     this.checkpoint();
@@ -424,8 +447,21 @@ export class PredictedMatch {
    */
   settleOrder(echo: OrderEcho): OrderOutcome | null {
     const outcome = this.ledger.settle(echo);
+    this.journal.record({
+      kind: 'echo',
+      tick: this.world.tick,
+      orderId: echo.orderId,
+      outcome: outcome === null ? 'unknown' : outcome.kind === 'adopt' ? 'adopt' : 'refused',
+      waited: outcome === null ? null : this.world.tick - outcome.order.tick,
+    });
     if (outcome) this.applyOrderOutcome(outcome);
     return outcome;
+  }
+
+  /** What the player did and what authority said about it, since the last drain
+   *  (`./action-journal`). Read by the playtest log; empty offline. */
+  get actions(): ActionJournal {
+    return this.journal;
   }
 
   /**
@@ -584,7 +620,19 @@ export class PredictedMatch {
     // Anything predicted long enough ago that authority should have answered by now
     // and did not — the order never arrived, or its echo never came back. Rolled
     // back, so a dropped press cannot leave a phantom assembling forever.
-    for (const outcome of this.ledger.sweep(this.world.tick)) this.applyOrderOutcome(outcome);
+    for (const outcome of this.ledger.sweep(this.world.tick)) {
+      // A prediction authority never answered at all. One is a lost message; a run
+      // of them is a wire that is not carrying orders, and either way the player
+      // watched a half-built ghost disappear.
+      this.journal.record({
+        kind: 'expiry',
+        tick: this.world.tick,
+        orderId: outcome.order.orderId,
+        what: outcome.order.what,
+        waited: this.world.tick - outcome.order.tick,
+      });
+      this.applyOrderOutcome(outcome);
+    }
 
     // Remote firing is the one thing the replay cannot produce: a ship the
     // client has no input for never fires, so the flag on the wire is the only
@@ -939,6 +987,21 @@ export class PredictedMatch {
     this.offset.y *= BLEND_DECAY;
     if (Math.abs(this.offset.x) < SMOOTHING_EPSILON) this.offset.x = 0;
     if (Math.abs(this.offset.y) < SMOOTHING_EPSILON) this.offset.y = 0;
+  }
+
+  /** The local ship, or null before the world has one. */
+  private localShip(): World['ships'][number] | null {
+    return this.world.ships.find((s) => s.id === this.local) ?? null;
+  }
+
+  /** The firer's own live ship shots — what a volley line reports, and the number
+   *  a "my shot came out twice" report is about. */
+  private ownShotCount(): number {
+    let n = 0;
+    for (const p of this.world.projectiles) {
+      if (p.active && p.owner === this.local && p.kind === 'ship') n++;
+    }
+    return n;
   }
 
   private localShipPos(): Vec2 {

@@ -16,7 +16,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
-import { attachSessionLog, describeSample } from './playtest-log-attach';
+import { ActionJournal } from './action-journal';
+import { attachSessionLog, describeAction, describeSample } from './playtest-log-attach';
 import type { LoggedSession, LoggedWorld } from './playtest-log-attach';
 import { ShipClass } from '@shared/types';
 import type { ConnectionState, ServerMessage } from './transport';
@@ -76,6 +77,59 @@ function fakeSession(over: Partial<LoggedSession> = {}): LoggedSession & {
   };
   return session;
 }
+
+describe('the action events', () => {
+  it('drains the predictor\'s journal into the log, one line per event, once', () => {
+    const log = newLog();
+    const journal = new ActionJournal();
+    const session = fakeSession({ prediction: { actions: journal } });
+    const handle = attachSessionLog({ log, session });
+
+    journal.record({ kind: 'volley', tick: 120, inFlight: 2 });
+    journal.record({ kind: 'order', tick: 121, orderId: 0x40001, verb: 'buildOrder', what: 'turret' });
+    journal.record({ kind: 'echo', tick: 140, orderId: 0x40001, outcome: 'adopt', waited: 19 });
+    handle.poll();
+
+    const net = log.events.filter((e) => e.kind === 'net');
+    expect(net.map((e) => e.msg)).toEqual(['volley', 'order', 'echo']);
+    expect(net[1]!.data).toEqual({ tick: 121, id: 0x40001, verb: 'buildOrder', what: 'turret' });
+    expect(net[2]!.data).toEqual({ tick: 140, id: 0x40001, outcome: 'adopt', waited: 19 });
+
+    // Drained: a second poll with nothing new adds nothing, so a paste is not a
+    // wall of the same three lines.
+    handle.poll();
+    expect(log.events.filter((e) => e.kind === 'net')).toHaveLength(3);
+  });
+
+  it('says which way an echo went — the two mismatches are the point', () => {
+    expect(describeAction({ kind: 'echo', tick: 9, orderId: 7, outcome: 'refused', waited: 30 })).toEqual({
+      tick: 9,
+      id: 7,
+      outcome: 'refused',
+      waited: 30,
+    });
+    // An echo about an order this client never predicted: not an error, and not
+    // something a log may pass over in silence either.
+    expect(describeAction({ kind: 'echo', tick: 9, orderId: 7, outcome: 'unknown', waited: null })).toMatchObject({
+      outcome: 'unknown',
+      waited: null,
+    });
+    // And a prediction nobody ever answered.
+    expect(describeAction({ kind: 'expiry', tick: 200, orderId: 7, what: 'shield', waited: 90 })).toEqual({
+      tick: 200,
+      id: 7,
+      what: 'shield',
+      waited: 90,
+    });
+  });
+
+  it('is silent offline, where there is no prediction and no echo', () => {
+    const log = newLog();
+    const handle = attachSessionLog({ log, session: fakeSession() });
+    handle.poll();
+    expect(log.events.filter((e) => e.kind === 'net')).toHaveLength(0);
+  });
+});
 
 describe('the joinError path', () => {
   it('populates the log with the server’s own reason', () => {
