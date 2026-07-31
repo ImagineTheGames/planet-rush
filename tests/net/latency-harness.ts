@@ -32,7 +32,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
 import { MatchServer } from '../../server/match-server';
 import type { ServerSocket } from '../../server/room';
-import { TICK_DT } from '../../src/sim';
+import { TICK_DT, killShip } from '../../src/sim';
 import type { World } from '../../src/sim';
 import { TransportSession } from '../../src/net/session';
 import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
@@ -271,6 +271,18 @@ export interface LatencyMatchOptions {
    * side of a single step to see one.
    */
   readonly stall?: { readonly atFrame: number; readonly ms: number };
+  /**
+   * Kill one player's ship on the authoritative world at `atFrame`, the way a shot
+   * does (`src/sim/damage.ts` `killShip`) — so the death this run reproduces is the
+   * sim's own death, with the respawn clock authority really runs behind it.
+   *
+   * The M10 lifecycle brief (item 1) asks for exactly this: *"the log's t=63
+   * signature (corr>100 sustained with mispred=1) becomes a latency-harness
+   * regression assertion."* A death is the one event a flight plan cannot produce on
+   * demand — two clients circling at 250 ms rarely land the killing blow inside a
+   * twenty-second run, and a gate that only sometimes tests a death is not a gate.
+   */
+  readonly kill?: { readonly atFrame: number; readonly player: PlayerId };
 }
 
 /** What a run reports back — enough for a gate, and for a capture in the doc. */
@@ -308,6 +320,9 @@ export interface LatencyMatchResult {
    *  simulated, and were re-filed onto the next free one. The wire's lateness,
    *  which the client sees as `appliedDelta` (`src/net/telemetry`). */
   readonly lateInputs: number;
+  /** Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.kill} was
+   *  injected, or null when the run scripted none. */
+  readonly killedAtMs: number | null;
   /**
    * Wall-clock ms (harness clock) at which {@link LatencyMatchOptions.stall} was
    * injected, or null when the run scripted none.
@@ -417,8 +432,17 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
   }));
 
   let stalledAtMs: number | null = null;
+  let killedAtMs: number | null = null;
   for (let frame = 1; frame <= options.frames; frame++) {
     nowMs += FRAME_MS;
+    if (options.kill && frame === options.kill.atFrame) {
+      const authoritative = server.room('RUSH')?.world;
+      const target = authoritative?.ships.find((s) => s.id === options.kill!.player);
+      if (authoritative && target) {
+        killShip(authoritative, target);
+        killedAtMs = nowMs;
+      }
+    }
     if (options.stall && frame === options.stall.atFrame) {
       stalledAtMs = nowMs;
       for (const transport of transports) {
@@ -444,5 +468,6 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
     repeatedInputTicks: transports.reduce((n, t) => n + t.repeatedInputTicks, 0),
     authoritative: room!.world!,
     stalledAtMs,
+    killedAtMs,
   };
 }

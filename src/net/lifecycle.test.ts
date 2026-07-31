@@ -227,136 +227,144 @@ class Match {
 // 1. Death and respawn — the t=63 s signature
 // ---------------------------------------------------------------------------
 
-describe('death and respawn are authority\'s (GDD §2.7; M10 lifecycle wire)', () => {
-  // 150 ms RTT: the developer's condition, one way in frames.
-  const DELAY_FRAMES = 5;
+/** The two wires the M10 acceptance gate names, one way in frames — the brief asks
+ *  for the kill/respawn cycle at both, because the ghost's cost is the distance the
+ *  two ships drift apart while the news is in flight, and that scales with the trip. */
+const WIRES = [
+  { name: '100 ms', delayFrames: 3 },
+  { name: '250 ms', delayFrames: 8 },
+];
 
-  it('stops predicting the dead ship instead of reviving it on the next tick', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    match.server.kill(LOCAL);
+describe.each(WIRES)(
+  'death and respawn are authority\'s at $name (GDD §2.7; M10 lifecycle wire)',
+  ({ delayFrames: DELAY_FRAMES }) => {
+    it('stops predicting the dead ship instead of reviving it on the next tick', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(LOCAL);
 
-    // The whole respawn window, plus the round trip it takes to hear about it.
-    let clientDead = 0;
-    let serverDead = 0;
-    match.run(Math.round(RESPAWN_S / TICK_DT) + 20, THRUST, () => {
-      if (!shipOf(match.client.world).alive) clientDead++;
-      if (!shipOf(match.server.world).alive) serverDead++;
+      // The whole respawn window, plus the round trip it takes to hear about it.
+      let clientDead = 0;
+      let serverDead = 0;
+      match.run(Math.round(RESPAWN_S / TICK_DT) + 20, THRUST, () => {
+        if (!shipOf(match.client.world).alive) clientDead++;
+        if (!shipOf(match.server.world).alive) serverDead++;
+      });
+
+      // The ship comes back — and not one tick before the countdown says so. The old
+      // client revived it on its very next predicted tick, so `clientDead` was 0 or 1
+      // against a server that held it dead for the whole five seconds.
+      expect(shipOf(match.server.world).alive).toBe(true);
+      expect(shipOf(match.client.world).alive).toBe(true);
+      expect(serverDead).toBeGreaterThan(Math.round(RESPAWN_S / TICK_DT) - 2);
+      // The client's window is the server's, shifted by the one round trip the news
+      // spends on the wire — never a fraction of it.
+      expect(clientDead).toBeGreaterThan(serverDead - DELAY_FRAMES * 2 - 2);
     });
 
-    // The ship comes back — and not one tick before the countdown says so. The old
-    // client revived it on its very next predicted tick, so `clientDead` was 0 or 1
-    // against a server that held it dead for the whole five seconds.
-    expect(shipOf(match.server.world).alive).toBe(true);
-    expect(shipOf(match.client.world).alive).toBe(true);
-    expect(serverDead).toBeGreaterThan(Math.round(RESPAWN_S / TICK_DT) - 2);
-    // The client's window is the server's, shifted by the one round trip the news
-    // spends on the wire — never a fraction of it.
-    expect(clientDead).toBeGreaterThan(serverDead - DELAY_FRAMES * 2 - 2);
-  });
+    it('keeps the correction bounded through the death — the t=63 s regression', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      const deathFrame = match.frame;
+      match.server.kill(LOCAL);
+      match.run(Math.round(RESPAWN_S / TICK_DT) + 30);
 
-  it('keeps the correction bounded through the death — the t=63 s regression', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    const deathFrame = match.frame;
-    match.server.kill(LOCAL);
-    match.run(Math.round(RESPAWN_S / TICK_DT) + 30);
-
-    // Everything reconciled after the death lands. The capture's signature is
-    // `corr > 100` held with `mispred 1.0`; the gate is the snap threshold, which
-    // is the line between "a correction" and "the ship teleported" (`./prediction`).
-    const after = match.errors.filter((e) => e.tick > deathFrame);
-    expect(after.length).toBeGreaterThan(20);
-    const worst = Math.max(...after.map((e) => e.error));
-    expect(worst).toBeLessThan(SNAP_THRESHOLD);
-    // And it is not merely under the ceiling — it converges. A death the client
-    // honours costs a correction while the news crosses the wire, and nothing after.
-    const settled = after.slice(6);
-    expect(Math.max(...settled.map((e) => e.error))).toBeLessThan(2);
-    // Nothing teleported: `snapped` is the counter the M10 acceptance gate reads.
-    expect(after.filter((e) => e.snapped).length).toBe(0);
-  });
-
-  it('runs the offline countdown, from authority\'s tick', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    match.server.kill(LOCAL);
-
-    const countdown: number[] = [];
-    match.run(Math.round(RESPAWN_S / TICK_DT) + 10, THRUST, () => {
-      const left = match.client.respawnIn(LOCAL);
-      if (left !== null) countdown.push(left);
+      // Everything reconciled after the death lands. The capture's signature is
+      // `corr > 100` held with `mispred 1.0`; the gate is the snap threshold, which
+      // is the line between "a correction" and "the ship teleported" (`./prediction`).
+      const after = match.errors.filter((e) => e.tick > deathFrame);
+      expect(after.length).toBeGreaterThan(20);
+      const worst = Math.max(...after.map((e) => e.error));
+      expect(worst).toBeLessThan(SNAP_THRESHOLD);
+      // And it is not merely under the ceiling — it converges. A death the client
+      // honours costs a correction while the news crosses the wire, and nothing after.
+      const settled = after.slice(6);
+      expect(Math.max(...settled.map((e) => e.error))).toBeLessThan(2);
+      // Nothing teleported: `snapped` is the counter the M10 acceptance gate reads.
+      expect(after.filter((e) => e.snapped).length).toBe(0);
     });
 
-    // A countdown at all — the death presentation has something to count.
-    expect(countdown.length).toBeGreaterThan(60);
-    // It opens near the design's five seconds (GDD §2.7) …
-    expect(countdown[0]!).toBeGreaterThan(RESPAWN_S - 0.5);
-    expect(countdown[0]!).toBeLessThanOrEqual(RESPAWN_S);
-    // … never runs backwards …
-    for (let i = 1; i < countdown.length; i++) {
-      expect(countdown[i]!).toBeLessThanOrEqual(countdown[i - 1]! + 1e-9);
-    }
-    // … and reaches zero.
-    expect(countdown[countdown.length - 1]!).toBeLessThan(0.2);
-    // The world's own timer is the same number, so the offline death presentation
-    // reads it exactly where it always did (`Ship.respawnTimer`).
-    expect(match.client.isDead(LOCAL)).toBe(false);
-  });
+    it('runs the offline countdown, from authority\'s tick', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(LOCAL);
 
-  it('clears a dead rival instead of leaving a corpse flying', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    match.server.kill(RIVAL);
+      const countdown: number[] = [];
+      match.run(Math.round(RESPAWN_S / TICK_DT) + 10, THRUST, () => {
+        const left = match.client.respawnIn(LOCAL);
+        if (left !== null) countdown.push(left);
+      });
 
-    let aliveWhileDead = 0;
-    match.run(60, THRUST, () => {
-      if (shipOf(match.server.world, RIVAL).alive) return;
-      if (shipOf(match.client.world, RIVAL).alive) aliveWhileDead++;
+      // A countdown at all — the death presentation has something to count.
+      expect(countdown.length).toBeGreaterThan(60);
+      // It opens near the design's five seconds (GDD §2.7) …
+      expect(countdown[0]!).toBeGreaterThan(RESPAWN_S - 0.5);
+      expect(countdown[0]!).toBeLessThanOrEqual(RESPAWN_S);
+      // … never runs backwards …
+      for (let i = 1; i < countdown.length; i++) {
+        expect(countdown[i]!).toBeLessThanOrEqual(countdown[i - 1]! + 1e-9);
+      }
+      // … and reaches zero.
+      expect(countdown[countdown.length - 1]!).toBeLessThan(0.2);
+      // The world's own timer is the same number, so the offline death presentation
+      // reads it exactly where it always did (`Ship.respawnTimer`).
+      expect(match.client.isDead(LOCAL)).toBe(false);
     });
 
-    // Every frame authority had the rival dead, this client had it dead too — bar
-    // the round trip the news spends on the wire.
-    expect(aliveWhileDead).toBeLessThanOrEqual(DELAY_FRAMES * 2 + 2);
-    expect(shipOf(match.client.world, RIVAL).alive).toBe(false);
-    expect(match.client.isDead(RIVAL)).toBe(true);
-  });
+    it('clears a dead rival instead of leaving a corpse flying', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(RIVAL);
 
-  it('holds the corpse where it fell, not where prediction had flown it', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    const deathSite = { ...shipOf(match.server.world).pos };
-    match.server.kill(LOCAL);
-    match.run(30);
+      let aliveWhileDead = 0;
+      match.run(60, THRUST, () => {
+        if (shipOf(match.server.world, RIVAL).alive) return;
+        if (shipOf(match.client.world, RIVAL).alive) aliveWhileDead++;
+      });
 
-    const drawn = shipOf(match.client.world).pos;
-    expect(Math.hypot(drawn.x - deathSite.x, drawn.y - deathSite.y)).toBeLessThan(1);
-    // The hull reads as dead, so the health bar and the death presentation agree
-    // with the wire rather than with a locally revived ship.
-    expect(shipOf(match.client.world).hull).toBe(0);
-  });
-
-  it('survives a lost death event: the snapshot\'s own flag is the backstop', () => {
-    const match = new Match(DELAY_FRAMES);
-    match.run(40);
-    match.server.kill(LOCAL);
-    // Drop every lifecycle event on the floor — the client sees only the alive bit.
-    const swallow = match.client.applyEvent.bind(match.client);
-    (match.client as unknown as { applyEvent: (m: EntityEventMessage) => boolean }).applyEvent = (
-      message: EntityEventMessage,
-    ): boolean => (message.kind === 'ship' ? false : swallow(message));
-
-    let aliveWhileDead = 0;
-    match.run(Math.round(RESPAWN_S / TICK_DT), THRUST, () => {
-      if (shipOf(match.server.world).alive) return;
-      if (shipOf(match.client.world).alive) aliveWhileDead++;
+      // Every frame authority had the rival dead, this client had it dead too — bar
+      // the round trip the news spends on the wire.
+      expect(aliveWhileDead).toBeLessThanOrEqual(DELAY_FRAMES * 2 + 2);
+      expect(shipOf(match.client.world, RIVAL).alive).toBe(false);
+      expect(match.client.isDead(RIVAL)).toBe(true);
     });
 
-    // The countdown a flag-only client runs is an estimate, but the thing that must
-    // never happen — a ghost flying against a corpse — still cannot.
-    expect(aliveWhileDead).toBeLessThanOrEqual(DELAY_FRAMES * 2 + 2);
-  });
-});
+    it('holds the corpse where it fell, not where prediction had flown it', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      const deathSite = { ...shipOf(match.server.world).pos };
+      match.server.kill(LOCAL);
+      match.run(30);
+
+      const drawn = shipOf(match.client.world).pos;
+      expect(Math.hypot(drawn.x - deathSite.x, drawn.y - deathSite.y)).toBeLessThan(1);
+      // The hull reads as dead, so the health bar and the death presentation agree
+      // with the wire rather than with a locally revived ship.
+      expect(shipOf(match.client.world).hull).toBe(0);
+    });
+
+    it('survives a lost death event: the snapshot\'s own flag is the backstop', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(LOCAL);
+      // Drop every lifecycle event on the floor — the client sees only the alive bit.
+      const swallow = match.client.applyEvent.bind(match.client);
+      (match.client as unknown as { applyEvent: (m: EntityEventMessage) => boolean }).applyEvent = (
+        message: EntityEventMessage,
+      ): boolean => (message.kind === 'ship' ? false : swallow(message));
+
+      let aliveWhileDead = 0;
+      match.run(Math.round(RESPAWN_S / TICK_DT), THRUST, () => {
+        if (shipOf(match.server.world).alive) return;
+        if (shipOf(match.client.world).alive) aliveWhileDead++;
+      });
+
+      // The countdown a flag-only client runs is an estimate, but the thing that must
+      // never happen — a ghost flying against a corpse — still cannot.
+      expect(aliveWhileDead).toBeLessThanOrEqual(DELAY_FRAMES * 2 + 2);
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // 2. Ore flights — "ore goes super fast to base online"
