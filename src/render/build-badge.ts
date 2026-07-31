@@ -48,9 +48,11 @@
  *     is what every real viewport draws; the shortening is the narrow-window floor,
  *     not the normal case.
  *
- * Render discipline (GDD §4.3): the text is rebuilt **only** when the identity
- * changes (a connect, a disconnect — twice a session, not twice a frame), and the
- * per-frame path writes `x`/`y` and nothing else. No geometry rebuild, no
+ * Render discipline (GDD §4.3): the text is rebuilt **only** when the tag changes
+ * — a connect, a disconnect, and while connected a round trip that moved, which
+ * `BuildIdentity.sampleRtt` throttles to once per ~2 s (about one frame in 120).
+ * The refit measures, so it is gated on the tag or the viewport WIDTH changing;
+ * the per-frame path writes `x`/`y` and nothing else. No geometry rebuild, no
  * allocation, nothing measured per frame.
  */
 
