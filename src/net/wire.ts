@@ -201,6 +201,14 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       if (actions === null) return null;
       return { type: 'input', tick, seq, actions };
     }
+    // The latency probe (`./transport` PingMessage, M10 item 6). One bounded number,
+    // echoed back untouched — the id is the client's own bookkeeping and the server
+    // reads no meaning into it, so there is nothing here to validate but its shape.
+    case 'ping': {
+      const id = raw['id'];
+      if (!isCount(id)) return null;
+      return { type: 'ping', id };
+    }
     default:
       return null;
   }
@@ -282,6 +290,10 @@ const SERVER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   // exact opposite of the bug this channel exists to close.
   'orderEcho',
   'matchEnd',
+  // The latency probe's answer (`./transport` PongMessage, M10 item 6). Without it
+  // here the frame is dropped, the client measures no network RTT, and every number
+  // it shows a player is the ack-based composite with its own lead baked in.
+  'pong',
   // A refused join (server/match-server.ts). Without it here parseServerMessage
   // drops the frame, the transport never learns *why* the socket then closed, and
   // a wrong-machine `bad-ticket` reads as a plain drop → a 60 s reconnect loop and

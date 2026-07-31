@@ -43,6 +43,22 @@
  *    `SnapshotMessage.ackTick`); this is the difference. It is the one measurement
  *    that can tell "the two sims disagree about physics" from "the two sims agree
  *    but are standing at different instants", and nothing else in this file could.
+ *  - **the round trip, taken apart** ({@link TelemetrySample.networkMeanMs},
+ *    {@link TelemetrySample.serverQueueMeanMs}, {@link TelemetrySample.clientLagMeanMs})
+ *    — the M10 RTT audit, item 6 of the developer's gru report: *"speedtest 24 ms,
+ *    game showed 95 then 215 sustained once the match heated up."*
+ *
+ *    Both numbers were true. The ack-based RTT above is send→ack, and that path is
+ *    *made of the game*: the input is stamped for a future tick, the server holds it
+ *    in its queue until that tick comes round, and the ack rides the next broadcast.
+ *    A client nine ticks ahead is measuring its own lead and calling it the network —
+ *    and, until this pass, sizing the lead buffer from that reading, which is a
+ *    ratchet with a feedback loop in it (item 7). So the three stages are measured
+ *    *separately*: NETWORK from a ping frame the server answers in its socket handler
+ *    with no tick in the path, SERVER from what only the server can state (its tick
+ *    queue's receive→apply wait and its loop lag, `./transport` `PongMessage`), and
+ *    CLIENT from this device's own frame scheduling. Each has a different fix — a
+ *    region, a lead budget, a machine size — so each is its own number.
  *  - **visual snaps** ({@link TelemetrySample.visualSnaps}) — corrections large
  *    enough that the client teleported the ship instead of blending it. A blended
  *    correction is not felt; a snap is exactly the "server rollback" a player
@@ -186,6 +202,53 @@ export interface TelemetrySample {
    * invisible; one of these is the "server rollback" a player reports.
    */
   readonly visualSnaps: number;
+  /**
+   * **NETWORK**: mean ping-frame round trip over the window, ms, or null when none
+   * was measured (offline, or before the first pong).
+   *
+   * The wire and nothing else. The server answers a ping from its socket handler
+   * rather than on a tick boundary (`server/room.ts` `receive`), so no queue wait, no
+   * broadcast wait and no lead is in this figure — which is what makes it the number
+   * to show a player and the number to size the lead budget from
+   * (`./prediction` `setLeadBudget`).
+   */
+  readonly networkMeanMs: number | null;
+  /** Best ping round trip in the window, ms — the wire at its least congested. */
+  readonly networkMinMs: number | null;
+  /**
+   * **SERVER**, first half: mean receive→apply wait in the authoritative tick queue
+   * over the window, ms, as the server states it (`./transport` `PongMessage.queueMs`).
+   * Null when no pong arrived.
+   *
+   * A tick or two at a healthy lead. This is the part of the composite RTT that is
+   * *the client's own lead coming back to it*, and seeing it on its own line is how
+   * the ratchet in item 7 became visible at all.
+   */
+  readonly serverQueueMeanMs: number | null;
+  /**
+   * **SERVER**, second half: the worst loop lag the server stated in the window, ms
+   * (`./transport` `PongMessage.loopLagMs`) — how far past its deadline the room's
+   * tick loop is running. Null when no pong arrived.
+   *
+   * Worst rather than mean, because the question this answers is whether the host
+   * ever starves: a few ms is healthy, and a figure that climbs with bot count is a
+   * shared core out of burst credit (a machine-size decision, docs/netcode-spike.md).
+   */
+  readonly serverLoopLagMaxMs: number | null;
+  /**
+   * **CLIENT**: mean frame-scheduling delay over the window, ms — how much later than
+   * the fixed tick interval this device actually produced its input.
+   *
+   * Zero on a device keeping its frame budget. It matters because a late frame is
+   * latency the player pays and the wire is blamed for: the input is stamped for a
+   * tick further behind authority's clock, so it arrives late, is re-filed, and its
+   * ack comes back later — which lands in the composite RTT looking exactly like a
+   * slow network.
+   */
+  readonly clientLagMeanMs: number;
+  /** Worst frame-scheduling delay in the window, ms — where a GC pause or a
+   *  backgrounded tab shows up. */
+  readonly clientLagMaxMs: number;
 }
 
 /** The always-current sub-second view, for anything sampling per frame. */
@@ -203,6 +266,27 @@ export interface TelemetryReadout {
    *  or null before one was measured — the wire without this client's own queue in
    *  it. The lead budget is sized from this. */
   readonly rttFloorMs: number | null;
+  /**
+   * **The number to show a player**: the most recent ping-frame round trip, ms, or
+   * null before one is measured (M10 item 6, and m10-17's lobby/HUD ping).
+   *
+   * Never the composite {@link rttMs} for a display. That figure contains this
+   * client's own lead and the server's broadcast cadence, so it reads 95 or 215 ms on
+   * a wire a speedtest calls 24 — and telling a player their connection is bad when
+   * it is not is a lie the client has no business telling.
+   */
+  readonly networkRttMs: number | null;
+  /** The least ping round trip over the recent window, ms, or null — the wire with
+   *  the least congestion in it. What the lead budget is sized from
+   *  (`./prediction` `setLeadBudget`), because it is the one latency figure with none
+   *  of this client's own lead inside it. */
+  readonly networkFloorMs: number | null;
+  /** The server's last stated tick-queue wait, ms (`./transport` PongMessage). */
+  readonly serverQueueMs: number | null;
+  /** The server's last stated loop lag, ms. */
+  readonly serverLoopLagMs: number | null;
+  /** This client's last frame-scheduling delay, ms. */
+  readonly clientLagMs: number;
   /** The last finalized one-second sample, or null before a second has rolled. */
   readonly lastSample: TelemetrySample | null;
 }
@@ -255,6 +339,15 @@ interface OpenBucket {
   alignCount: number;
   resyncs: number;
   visualSnaps: number;
+  networkSum: number;
+  networkCount: number;
+  networkMin: number;
+  queueSum: number;
+  queueCount: number;
+  loopLagMax: number;
+  clientLagSum: number;
+  clientLagCount: number;
+  clientLagMax: number;
 }
 
 export class NetTelemetry {
@@ -265,6 +358,9 @@ export class NetTelemetry {
 
   /** Outstanding input sends, oldest first: `{ seq, sentMs }`. The RTT probe. */
   private readonly sends: { seq: number; sentMs: number }[] = [];
+  /** Outstanding latency probes, oldest first — the *network* RTT's send ring, kept
+   *  apart from the input ring because the two measure different things (M10 item 6). */
+  private readonly pings: { seq: number; sentMs: number }[] = [];
 
   private open: OpenBucket | null = null;
   private lastRttMs: number | null = null;
@@ -273,6 +369,11 @@ export class NetTelemetry {
    *  trips. Null until a second measurement gives it a difference to smooth. */
   private jitterMs: number | null = null;
   private readonly jitterGain: number;
+  /** The decomposition's live values — the last of each stage that was measured. */
+  private lastNetworkMs: number | null = null;
+  private lastQueueMs: number | null = null;
+  private lastLoopLagMs: number | null = null;
+  private lastClientLagMs = 0;
 
   constructor(
     config: {
@@ -295,6 +396,69 @@ export class NetTelemetry {
   recordInput(seq: number, nowMs: number): void {
     this.sends.push({ seq, sentMs: nowMs });
     while (this.sends.length > this.sendRingSize) this.sends.shift();
+  }
+
+  /**
+   * Note that latency probe `id` left the client at `nowMs` (`./transport`
+   * PingMessage). Held against the pong that answers it, so the round trip is
+   * measured entirely on this client's clock and no wall clock crosses the wire.
+   *
+   * The ring is bounded like the input ring and for the same reason; an unanswered
+   * probe simply ages out, which is what a client whose pongs have stopped should do.
+   */
+  recordPingSent(id: number, nowMs: number): void {
+    this.pings.push({ seq: id, sentMs: nowMs });
+    while (this.pings.length > this.sendRingSize) this.pings.shift();
+  }
+
+  /**
+   * Fold one answered probe into the current second: the NETWORK round trip this
+   * client measured, and the two SERVER components the pong carries
+   * (`./transport` PongMessage). Unmatched ids — a duplicate, or one already aged out
+   * of the ring — are dropped rather than timed against the wrong send.
+   */
+  recordPong(
+    id: number,
+    nowMs: number,
+    server: { readonly queueMs: number; readonly loopLagMs: number },
+  ): void {
+    this.roll(nowMs);
+    const bucket = this.bucketFor(nowMs);
+    const index = this.pings.findIndex((p) => p.seq === id);
+    if (index >= 0) {
+      const networkMs = Math.max(0, nowMs - this.pings[index]!.sentMs);
+      this.pings.splice(index, 1);
+      bucket.networkSum += networkMs;
+      bucket.networkCount++;
+      if (networkMs < bucket.networkMin) bucket.networkMin = networkMs;
+      this.lastNetworkMs = networkMs;
+    }
+    if (Number.isFinite(server.queueMs)) {
+      bucket.queueSum += Math.max(0, server.queueMs);
+      bucket.queueCount++;
+      this.lastQueueMs = Math.max(0, server.queueMs);
+    }
+    if (Number.isFinite(server.loopLagMs)) {
+      const lag = Math.max(0, server.loopLagMs);
+      if (lag > bucket.loopLagMax) bucket.loopLagMax = lag;
+      this.lastLoopLagMs = lag;
+    }
+  }
+
+  /**
+   * Fold this client's own **frame scheduling delay** into the current second: how
+   * much later than the fixed tick interval it actually produced a tick's input, in
+   * ms. Negative or non-finite readings are dropped — a frame that arrived early is
+   * not a delay, and a clock that jumped is not a measurement.
+   */
+  recordFrameLag(lagMs: number, nowMs: number): void {
+    if (!Number.isFinite(lagMs) || lagMs < 0) return;
+    this.roll(nowMs);
+    const bucket = this.bucketFor(nowMs);
+    bucket.clientLagSum += lagMs;
+    bucket.clientLagCount++;
+    if (lagMs > bucket.clientLagMax) bucket.clientLagMax = lagMs;
+    this.lastClientLagMs = lagMs;
   }
 
   /**
@@ -363,6 +527,11 @@ export class NetTelemetry {
       mispredictionRate: rate,
       rttJitterMs: this.jitterMs,
       rttFloorMs: this.rttFloor(),
+      networkRttMs: this.lastNetworkMs,
+      networkFloorMs: this.networkFloor(),
+      serverQueueMs: this.lastQueueMs,
+      serverLoopLagMs: this.lastLoopLagMs,
+      clientLagMs: this.lastClientLagMs,
       lastSample: this.history.length > 0 ? this.history[this.history.length - 1]! : null,
     };
   }
@@ -380,9 +549,17 @@ export class NetTelemetry {
       const rtt = s.rttMeanMs === null ? '   —' : `${Math.round(s.rttMeanMs)}`.padStart(4);
       const rttMax = s.rttMaxMs === null ? '  —' : `${Math.round(s.rttMaxMs)}`.padStart(4);
       const jit = s.rttJitterMs === null ? '  —' : `${Math.round(s.rttJitterMs)}`.padStart(3);
+      // The composite, then the three stages it is made of (M10 item 6): a line
+      // reading `rtt 215/230ms  net 26ms  srv 180+2ms  cli 1ms` says, in one glance,
+      // that the wire is fine and the tick queue is where the 215 went.
+      const net = s.networkMeanMs === null ? '  —' : `${Math.round(s.networkMeanMs)}`.padStart(3);
+      const srvq = s.serverQueueMeanMs === null ? '  —' : `${Math.round(s.serverQueueMeanMs)}`.padStart(3);
+      const srvl =
+        s.serverLoopLagMaxMs === null ? ' —' : `${Math.round(s.serverLoopLagMaxMs)}`.padStart(2);
       return (
         `  +${`${Math.round((s.atMs - recent[0]!.atMs) / 1000)}`.padStart(3)}s  ` +
         `rtt ${rtt}/${rttMax}ms  jit ${jit}ms  ` +
+        `net ${net}ms  srv ${srvq}+${srvl}ms  cli ${Math.round(s.clientLagMeanMs)}ms  ` +
         `corr ${s.correctionMeanUnits.toFixed(1)}/${s.correctionMaxUnits.toFixed(1)}u  ` +
         `mispred ${(s.mispredictionRate * 100).toFixed(0).padStart(3)}%  ` +
         `lead ${Math.round(s.leadMeanTicks)}/${s.leadMaxTicks}t  ` +
@@ -406,11 +583,22 @@ export class NetTelemetry {
     );
     const worstAlign = Math.max(0, ...recent.map((s) => s.appliedDeltaMax));
     const jitterNow = recent[recent.length - 1]!.rttJitterMs;
+    const netVals = recent.filter((s) => s.networkMeanMs !== null).map((s) => s.networkMeanMs!);
+    const netAvg = netVals.length > 0 ? Math.round(mean(netVals)) : null;
+    const queueVals = recent
+      .filter((s) => s.serverQueueMeanMs !== null)
+      .map((s) => s.serverQueueMeanMs!);
+    const queueAvg = queueVals.length > 0 ? Math.round(mean(queueVals)) : null;
+    const worstLoopLag = Math.max(0, ...recent.map((s) => s.serverLoopLagMaxMs ?? 0));
+    const worstClientLag = Math.max(0, ...recent.map((s) => s.clientLagMaxMs));
 
     return (
       `net telemetry — last ${recent.length}s\n` +
       lines.join('\n') +
       `\n  summary: rtt ~${rttAvg === null ? '—' : `${rttAvg}ms`}  ` +
+      `= net ${netAvg === null ? '—' : `${netAvg}ms`} + ` +
+      `srv queue ${queueAvg === null ? '—' : `${queueAvg}ms`} (loop ${worstLoopLag.toFixed(1)}ms) + ` +
+      `client ${worstClientLag.toFixed(0)}ms peak  ` +
       `jitter ${jitterNow === null ? '—' : `${Math.round(jitterNow)}ms`}  ` +
       `worst corr ${worstCorr.toFixed(1)}u  ` +
       `mispred ${overallRate.toFixed(0)}%  ` +
@@ -429,6 +617,29 @@ export class NetTelemetry {
     const from = Math.max(0, this.history.length - RTT_FLOOR_WINDOW);
     for (let i = from; i < this.history.length; i++) {
       const min = this.history[i]!.rttMinMs;
+      if (min !== null && min < floor) floor = min;
+    }
+    return Number.isFinite(floor) ? floor : null;
+  }
+
+  /**
+   * The least **network** round trip over the recent window, open bucket included —
+   * the same {@link RTT_FLOOR_WINDOW} rule as {@link rttFloor}, over the ping probe
+   * instead of the ack.
+   *
+   * Two floors rather than one, because they answer different questions and only one
+   * of them can size a lead budget: the composite floor is the least *send→ack*, which
+   * still contains one queue wait, so on a client whose lead is stuck high every
+   * sample in the window is inflated by the same amount and the minimum is inflated
+   * too. That is the ratchet in item 7 — a buffer sized from a number its own size
+   * determines. This floor has no tick in it at all.
+   */
+  private networkFloor(): number | null {
+    let floor =
+      this.open && this.open.networkCount > 0 ? this.open.networkMin : Number.POSITIVE_INFINITY;
+    const from = Math.max(0, this.history.length - RTT_FLOOR_WINDOW);
+    for (let i = from; i < this.history.length; i++) {
+      const min = this.history[i]!.networkMinMs;
       if (min !== null && min < floor) floor = min;
     }
     return Number.isFinite(floor) ? floor : null;
@@ -468,6 +679,15 @@ export class NetTelemetry {
         alignCount: 0,
         resyncs: 0,
         visualSnaps: 0,
+        networkSum: 0,
+        networkCount: 0,
+        networkMin: Number.POSITIVE_INFINITY,
+        queueSum: 0,
+        queueCount: 0,
+        loopLagMax: 0,
+        clientLagSum: 0,
+        clientLagCount: 0,
+        clientLagMax: 0,
       };
     }
     return this.open;
@@ -502,6 +722,12 @@ export class NetTelemetry {
       appliedDeltaSamples: b.alignCount,
       resyncs: b.resyncs,
       visualSnaps: b.visualSnaps,
+      networkMeanMs: b.networkCount > 0 ? b.networkSum / b.networkCount : null,
+      networkMinMs: b.networkCount > 0 ? b.networkMin : null,
+      serverQueueMeanMs: b.queueCount > 0 ? b.queueSum / b.queueCount : null,
+      serverLoopLagMaxMs: b.queueCount > 0 ? b.loopLagMax : null,
+      clientLagMeanMs: b.clientLagCount > 0 ? b.clientLagSum / b.clientLagCount : 0,
+      clientLagMaxMs: b.clientLagMax,
     });
     while (this.history.length > this.historySize) this.history.shift();
   }

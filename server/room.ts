@@ -123,6 +123,21 @@ export const MAX_CATCHUP_TICKS = 30;
  */
 export const INTENT_HOLD_TICKS = 15;
 
+/** Most unacknowledged arrival ids one slot's tick-queue measurement will hold
+ *  ({@link Slot.arrivals}). One lead budget's worth with room to spare; a client
+ *  whose input the queue keeps refusing drops its oldest rather than growing this. */
+export const MAX_TRACKED_ARRIVALS = 64;
+
+/**
+ * Smoothing on the room's own loop-lag reading (`src/net/transport` `PongMessage`):
+ * `lag += (sample − lag) / LOOP_LAG_GAIN`, one sample per {@link MatchRoom.update}.
+ *
+ * Sixteen, the same constant the client's jitter estimate uses (`src/net/telemetry`
+ * `JITTER_GAIN`), for the same reason: one descheduled frame must not read as a
+ * starving host, and a host that really is starving must show up within a second.
+ */
+export const LOOP_LAG_GAIN = 16;
+
 // ---------------------------------------------------------------------------
 // Slots
 // ---------------------------------------------------------------------------
@@ -185,6 +200,27 @@ interface Slot {
    * only place in the system that knows it. 0 until a first input runs.
    */
   ackTick: Tick;
+  /**
+   * The sim tick each unacknowledged input **arrived** at, keyed by its `seq` — the
+   * arrival half of the tick-queue measurement (`src/net/transport` `PongMessage`).
+   *
+   * A ms figure is not needed and would need a clock this path does not have: both
+   * ends of the wait are sim ticks, so the wait is `appliedTick − arrivalTick`, exact
+   * and reproducible. Entries are dropped as their seq is acknowledged, so this holds
+   * at most one lead's worth of ids (`src/net/prediction` MAX_LEAD_TICKS).
+   */
+  arrivals: Map<number, Tick>;
+  /**
+   * How long this slot's most recently simulated input waited in the tick queue,
+   * in **ticks** — receive → apply, the SERVER component of the round trip the M10
+   * audit decomposes (item 6 of the developer's gru report).
+   *
+   * At a healthy lead this is one or two: the input arrives just before the tick it
+   * was stamped for. It tracks the client's lead and nothing else, which is exactly
+   * why it is stated on its own — the ack-based RTT the client can measure for itself
+   * is this *plus* the wire, and cannot tell the two apart.
+   */
+  queueTicks: number;
   /**
    * The continuous half of the last input this slot actually had simulated —
    * thrust, aim, fire, with every one-shot order stripped — or null before it has
@@ -281,6 +317,20 @@ export class MatchRoom {
   /** Watches every ship's `alive` flag so a death and a respawn reach the clients
    *  that must stop predicting through them (M10 lifecycle wire, `./static-events`). */
   private readonly lifecycle = new ShipLifecycleTracker();
+  /**
+   * How far past its deadline this room's tick loop is running, ms, smoothed
+   * ({@link LOOP_LAG_GAIN}) — the same overshoot `/health` reports as `loopLagMs`
+   * (`server/heartbeat.ts` `LagProbe`), read from the loop that actually steps this
+   * match and stated to each client on its pong.
+   *
+   * Measured from the pacing `update` already computes rather than from a clock of
+   * its own: when the process is healthy the room is called every `dt` and the
+   * overshoot is ~0; when the host has run out of burst credit the calls arrive late
+   * and this is the delay. That is the number the developer's report needs — *"if the
+   * server component grows with bot count, the gru shared-cpu-1x is CPU-starving the
+   * sim"* — and it is a machine-size decision, not a code fix.
+   */
+  private loopLag = 0;
   private readonly graceMs: number;
   private readonly dt: number;
   private readonly snapshotInterval: number;
@@ -322,6 +372,8 @@ export class MatchRoom {
       token: null,
       ackSeq: 0,
       ackTick: 0,
+      arrivals: new Map(),
+      queueTicks: 0,
       held: null,
       heldUntil: -1,
       fog: null,
@@ -466,6 +518,10 @@ export class MatchRoom {
     // drop them forever (`acceptInput`). The seat's ack restarts with the seat.
     slot.ackSeq = 0;
     slot.ackTick = 0;
+    // …and so does the tick-queue measurement: the ids it is keyed by belong to the
+    // connection that left ({@link Slot.arrivals}).
+    slot.arrivals.clear();
+    slot.queueTicks = 0;
     // A returning player's hands are their own: nothing the seat was holding when
     // it dropped may fly the reclaimed ship (GDD §4.2).
     slot.held = null;
@@ -547,6 +603,26 @@ export class MatchRoom {
       case 'input':
         this.acceptInput(slot, message);
         break;
+      // ── ANSWERED HERE, AND THAT IS THE WHOLE POINT ────────────────────────────
+      //
+      // A pong is written from the socket handler, not queued for a tick and not
+      // ridden home on the next 30 Hz broadcast, because a probe that waits for the
+      // game measures the game (`src/net/transport` PingMessage, M10 item 6). What
+      // the client gets back is the wire's own round trip — the number a speedtest
+      // agrees with, the only one honest enough to show a player, and the one the
+      // lead budget is sized from so the buffer cannot ratchet on its own reading.
+      //
+      // The server's own two components ride along, because only the server can
+      // state them: how long this client's last simulated input waited in the tick
+      // queue, and how far past its deadline the room's loop is running.
+      case 'ping':
+        this.sendTo(slot, {
+          type: 'pong',
+          id: message.id,
+          queueMs: slot.queueTicks * this.dt * 1000,
+          loopLagMs: this.loopLagMs,
+        });
+        break;
     }
   }
 
@@ -618,6 +694,21 @@ export class MatchRoom {
     if (verdict === 'late') {
       this.queue.coalesce(slot.player, { ...message, tick: simTick + 1 }, simTick);
     }
+    // When it got here, against the tick it will be run at ({@link Slot.arrivals}).
+    // Bounded by the ack sweep in `inputsFor`, plus a hard cap for a client whose
+    // input the queue keeps refusing.
+    slot.arrivals.set(message.seq, simTick);
+    if (slot.arrivals.size > MAX_TRACKED_ARRIVALS) {
+      const oldest = slot.arrivals.keys().next();
+      if (!oldest.done) slot.arrivals.delete(oldest.value);
+    }
+  }
+
+  /** How far past its deadline this room's loop is running, ms ({@link loopLag}).
+   *  Read by the pong the latency probe answers, and by the tests that assert the
+   *  reading is honest on a starved loop. */
+  get loopLagMs(): number {
+    return this.loopLag;
   }
 
   /** What the room's input queue has done with everything offered to it — queued,
@@ -697,8 +788,13 @@ export class MatchRoom {
     }
 
     const dtMs = this.dt * 1000;
-    const elapsed = Math.max(0, nowMs - this.lastUpdateMs) + this.carryMs;
+    const sinceLast = Math.max(0, nowMs - this.lastUpdateMs);
+    const elapsed = sinceLast + this.carryMs;
     this.lastUpdateMs = nowMs;
+    // The loop's own overshoot: how much more than one tick's worth of time had
+    // accumulated by the time this room was called ({@link loopLag}). Floored at
+    // zero — lag is lateness, never earliness.
+    this.loopLag += (Math.max(0, sinceLast - dtMs) - this.loopLag) / LOOP_LAG_GAIN;
 
     let ticks = Math.floor(elapsed / dtMs);
     this.carryMs = elapsed - ticks * dtMs;
@@ -786,6 +882,13 @@ export class MatchRoom {
       // true to tell its client "I have run this" (GDD §4.2 reconciliation).
       if (slot && row.seq > slot.ackSeq) {
         slot.ackSeq = row.seq;
+        // The tick queue's wait, measured where both ends are known: this input
+        // arrived at a tick, and it is being run at this one ({@link Slot.queueTicks}).
+        const arrived = slot.arrivals.get(row.seq);
+        if (arrived !== undefined) slot.queueTicks = Math.max(0, nextTick - arrived);
+        for (const seq of slot.arrivals.keys()) {
+          if (seq <= row.seq) slot.arrivals.delete(seq);
+        }
         // …and the tick it is being run at, which is `nextTick` and not whatever
         // tick the message named: a re-filed late arrival runs *here*, and the
         // client's copy of it is standing somewhere else (`acceptInput`, and

@@ -87,6 +87,10 @@ const ALL_CLIENT_MESSAGES: Record<ClientMessage['type'], ClientMessage> = {
   lobbyChoice: { type: 'lobbyChoice', shipClass: ShipClass.Vanguard, fireMode: 'manual' },
   startMatch: { type: 'startMatch' },
   input: { type: 'input', tick: 1, seq: 1, actions: [] },
+  // The latency probe (M10 item 6). It is on this list for the same reason as the
+  // rest: a verb the wire's front door does not admit is a feature that silently
+  // does not exist, and this one's absence would read as "the network is fine".
+  ping: { type: 'ping', id: 7 },
 };
 
 /** Every server message type. `joinError` is here because its *absence* from the
@@ -104,6 +108,7 @@ const ALL_SERVER_MESSAGE_TYPES: Record<ServerMessage['type'], true> = {
   orderEcho: true,
   matchEnd: true,
   joinError: true,
+  pong: true,
 };
 
 // ---------------------------------------------------------------------------

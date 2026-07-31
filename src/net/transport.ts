@@ -118,12 +118,48 @@ export interface InputMessage {
   actions: readonly Action[];
 }
 
+
+/**
+ * **A latency probe, and nothing else** — the M10 RTT-decomposition audit (item 6
+ * of the developer's gru report).
+ *
+ * *"speedtest 24 ms, game showed 95 then 215 sustained once the match heated up."*
+ * Both numbers were true, and neither was the network. The only round trip this
+ * client could measure was **input → the snapshot that acknowledges it**
+ * (`./telemetry`), and that path deliberately contains the game: the input is
+ * stamped for a *future* tick, so the server holds it in its queue until that tick
+ * comes round, and the ack then rides the next 30 Hz broadcast. A client running
+ * nine ticks ahead is therefore measuring its own lead — 150 ms of it — and calling
+ * it latency. Worse, the composite feeds the adaptive lead buffer, so the inflated
+ * reading holds the lead out, which keeps the reading inflated: the plateau in the
+ * developer's second capture (rtt stepped 108 → 174 at one hiccup and never came
+ * back down, while server loop lag stayed flat at 1.8-2.9 ms).
+ *
+ * So the wire gets a probe with no game in it. The server answers a ping **in the
+ * socket handler**, not on a tick boundary (`server/room.ts` `receive`), which is
+ * the entire point: what comes back is the wire's own round trip, the number a
+ * speedtest would agree with and the only number honest enough to show a player
+ * (GDD §4.2). The lead budget is sized from it too, which is what breaks the
+ * ratchet (`./prediction` `setLeadBudget`).
+ *
+ * Two a second, thirty-odd bytes each — a rounding error against a 15 KB/s snapshot
+ * stream (docs/netcode-spike.md).
+ */
+export interface PingMessage {
+  type: 'ping';
+  /** Client-chosen probe id, echoed verbatim in {@link PongMessage}. The client
+   *  holds the send time against it; no clock crosses the wire, so the two ends
+   *  never have to agree on one. */
+  id: number;
+}
+
 /** Everything a client can send. */
 export type ClientMessage =
   | JoinMessage
   | LobbyChoiceMessage
   | StartMatchMessage
-  | InputMessage;
+  | InputMessage
+  | PingMessage;
 
 // ---------------------------------------------------------------------------
 // Server → client
@@ -446,6 +482,47 @@ export interface JoinErrorMessage {
 }
 
 /** Everything a client can receive. */
+
+/**
+ * The answer to a {@link PingMessage}, sent from the socket handler the instant the
+ * ping lands — plus **the server's own two components of a round trip**, so the
+ * client can decompose what it measures instead of guessing (M10 item 6).
+ *
+ * The client measures NETWORK (this message's round trip) and CLIENT (its own frame
+ * scheduling, `./telemetry`); the two numbers here are the ones only the server can
+ * state. Together they answer the question the developer's report actually asks —
+ * *which* of the three is 215 ms made of — and they answer it separately, because
+ * the fix for each is different: a slow wire is a region choice, a deep tick queue
+ * is the lead buffer, and a lagging loop is a machine size (Director/developer call,
+ * docs/netcode-spike.md "Status since (hosting)").
+ */
+export interface PongMessage {
+  type: 'pong';
+  /** The {@link PingMessage.id} this answers. */
+  id: number;
+  /**
+   * How long this client's most recently *simulated* input waited between arriving
+   * at the server and being run, in ms — the **tick queue**, measured on the sim's
+   * own clock (`server/room.ts`).
+   *
+   * At a healthy lead this is a tick or two: the input arrives just before the tick
+   * it was stamped for. It grows with exactly one thing, the client's lead, which is
+   * why it is stated separately from the wire's own delay — the composite ack-based
+   * RTT is the sum of the two and cannot tell them apart.
+   */
+  queueMs: number;
+  /**
+   * How far past its deadline the room's tick loop is running, in ms — the same
+   * overshoot `/health` reports as `loopLagMs` (`server/heartbeat.ts`), read from the
+   * loop that actually steps this match.
+   *
+   * A few ms is healthy. A figure that climbs with bot count is a host whose CPU has
+   * run out of burst credit, starving the sim — the shared-cpu-1x question in the
+   * developer's report, and a machine-size decision rather than a code fix.
+   */
+  loopLagMs: number;
+}
+
 export type ServerMessage =
   | WelcomeMessage
   | LobbyStateMessage
@@ -457,7 +534,8 @@ export type ServerMessage =
   | EconomyMessage
   | OrderEchoMessage
   | MatchEndMessage
-  | JoinErrorMessage;
+  | JoinErrorMessage
+  | PongMessage;
 
 // ---------------------------------------------------------------------------
 // The seam
