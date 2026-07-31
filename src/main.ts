@@ -99,11 +99,12 @@ import { advanceToFreezeTick, hashWorld, stampDefenseShowcase, FREEZE_TICK } fro
 import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
 import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-info';
+import { buildIdentity } from '@platform/build-identity';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
 import { describeBootFailure, showBootError } from '@platform/boot-error';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { BuildBadge, BADGE_ID, BADGE_ANCHOR } from '@render/build-badge';
+import { BuildBadge, BADGE_ID, BADGE_ANCHOR, BADGE_STRIP_LIFT } from '@render/build-badge';
 import {
   FullscreenAffordance,
   FS_AFFORDANCE_ID,
@@ -211,6 +212,9 @@ import {
   nextPauseScreen,
   isPauseOpen,
   shouldFreezeSim,
+  // Whether the bottom edge carries the controls strip — the one piece of screen
+  // furniture the build badge has to make room for (see `buildBadge.lift`).
+  showControlsStrip,
 } from './ui';
 import type {
   HudFrame,
@@ -392,6 +396,10 @@ const MATCH_SIZE_KEY = 'planet-rush:matchSize';
 function describePage(): Parameters<typeof describeEnvironment>[0] {
   const nav = navigator as Navigator & { connection?: { effectiveType?: string } };
   return {
+    // The badge string the corner is about to draw (`@platform/build-identity`) —
+    // build-only here, since nothing has connected yet; `boot()` keeps it current
+    // for the rest of the session, so a log and a screenshot always agree (M10).
+    build: buildIdentity().tag,
     sha: BUILD_INFO.sha,
     buildTime: BUILD_INFO.time,
     dirty: BUILD_INFO.dirty,
@@ -448,6 +456,15 @@ async function boot(): Promise<void> {
   // And the one affordance that gets the log out: hidden until a screen offers it
   // (the pause menu, or an error screen — see `syncCopyLog` and `failOnline`).
   installCopyLogButton({ dom: document, log: playtest });
+
+  // --- Build identity → the log's env (ratified, M10 §3). The badge string and
+  //     the log header are ONE string: whenever the identity changes — a welcome
+  //     onto a Machine, a socket that closed — the log's `env.build` is rewritten
+  //     to whatever the corner is now drawing, and the change lands on the
+  //     timeline as its own event. So "logs and screen always agree" is a wire,
+  //     not a discipline. Fires once immediately, seating the offline tag.
+  const identity = buildIdentity();
+  identity.subscribe((tag) => playtest.setBuild(tag));
 
   // Which build is this? One line, first thing in the console, every build —
   // so a bug report can carry the sha instead of "the version I had open"
@@ -554,6 +571,61 @@ async function boot(): Promise<void> {
   let transform: RootTransform = computeRootTransform(app.screen.width, app.screen.height, isTouch);
   applyRootTransform(gameRoot, transform);
 
+  // --- The badge layer (render/build-badge.ts): the persistent build stamp, on
+  //     EVERY screen (ratified, M10 §1 — "shown on every single page"). Its own
+  //     root, a SIBLING of `gameRoot` and added after it, for one reason: every
+  //     screen in this game — menu, doors, keypad, lobby, codex, settings, match,
+  //     match-end — is a child of `gameRoot`, so a badge inside it would be buried
+  //     by whichever screen was added last. Out here it is unconditionally on top,
+  //     for the whole life of the page, and no screen has to remember it exists.
+  //     It carries the same landscape-lock transform, so it stays in the logical
+  //     bottom-left corner however the phone is held.
+  const badgeRoot = new Container();
+  badgeRoot.label = 'badge-root';
+  app.stage.addChild(badgeRoot);
+  applyRootTransform(badgeRoot, transform);
+
+  // ?freeze=1 exists so the frame is byte-deterministic across boots (golden
+  // screenshots). The stamp is the one thing on screen that changes every commit
+  // — and now also every server — so it is the one thing freeze must hide, and
+  // the only case where the badge is not shown. Every real build carries it.
+  const buildBadge = new BuildBadge(identity);
+  buildBadge.visible = !flags.freeze;
+  badgeRoot.addChild(buildBadge);
+  buildBadge.update(transform.logicalWidth, transform.logicalHeight);
+
+  // --- Read-only `window.__buildBadge` live-stage seam. The badge is Pixi text on
+  //     a canvas, so a Playwright run cannot read it any other way — and "it is on
+  //     every screen" is precisely the claim no unit test can make, because it is a
+  //     claim about the boot path, not about a component. Installed HERE, before
+  //     the menu exists, and on BOTH boots (no `?debug=1` gate: the front screens
+  //     only exist on the clean boot). Reports what is actually drawn, straight off
+  //     the layer — never a re-derived string, so a green run cannot mean a seam
+  //     agreeing with itself while the corner says something else.
+  installBuildBadgeSeam({
+    get text(): string {
+      return buildBadge.text;
+    },
+    get visible(): boolean {
+      return buildBadge.visible;
+    },
+    get server(): { machine: string; region: string } | null {
+      const s = identity.server;
+      return s ? { machine: s.machine, region: s.region } : null;
+    },
+    get bounds(): Rect | null {
+      if (!buildBadge.visible) return null;
+      const b = buildBadge.layoutBounds(transform.logicalWidth, transform.logicalHeight);
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    },
+    /** Does the drawn stamp sit inside its declared bottom-left zone? */
+    get withinAnchor(): boolean {
+      if (!buildBadge.visible) return false;
+      const vp = { width: transform.logicalWidth, height: transform.logicalHeight };
+      return rectContains(resolveAnchor(BADGE_ANCHOR, vp), buildBadge.layoutBounds(vp.width, vp.height));
+    },
+  });
+
   /** Recompute the root transform from the live canvas size and re-apply it
    *  (resize / orientationchange). Called first in every relayout.
    *
@@ -567,6 +639,12 @@ async function boot(): Promise<void> {
     app.resize();
     transform = computeRootTransform(app.screen.width, app.screen.height, isTouch);
     applyRootTransform(gameRoot, transform);
+    // The badge rides the same rotation, and re-corners for the new logical size.
+    // Done here rather than only in the match loop, because the front screens
+    // (menu, doors, lobby) have no loop of their own — and a badge stranded
+    // off-screen after an orientation flip is the field bug this file keeps re-learning.
+    applyRootTransform(badgeRoot, transform);
+    buildBadge.update(transform.logicalWidth, transform.logicalHeight);
   }
 
   /** Map a raw physical pointer coordinate (`clientX/Y`) to the logical landscape
@@ -915,17 +993,13 @@ async function boot(): Promise<void> {
   const touchVisuals = new TouchVisuals();
   gameRoot.addChild(touchVisuals);
 
-  // --- Build badge (render/build-badge.ts): the always-on corner stamp naming
-  //     the build on screen. Above the HUD/controls so a screenshot always
-  //     carries it. Under the landscape lock it rides `gameRoot`, so it stays in
-  //     the logical bottom-right corner however the phone is held.
-  const buildBadge = new BuildBadge();
-  // ?freeze=1 exists so the frame is byte-deterministic across boots (golden
-  // screenshots). The stamp is the one thing on screen that changes every
-  // commit, so it is the one thing freeze must hide — and the only case where
-  // the badge is not shown. Every real build carries it.
-  buildBadge.visible = !flags.freeze;
-  gameRoot.addChild(buildBadge);
+  // --- Build badge: already on screen (it was created with `badgeRoot`, before
+  //     the menu, and has been drawing on every screen since). The match is the
+  //     one place with furniture in the bottom-left corner — the desktop controls
+  //     strip along the bottom edge — so this is where the badge is lifted clear
+  //     of it. Nothing may cover a control (m10-14), and the strip's labels are
+  //     no exception to that in the other direction either.
+  buildBadge.lift = showControlsStrip(isTouch) ? BADGE_STRIP_LIFT : 0;
 
   // --- Re-enter-fullscreen affordance (fullscreen-affordance.ts): the small
   //     top-right button that appears only when the player has backed out of
@@ -1623,7 +1697,14 @@ async function boot(): Promise<void> {
         transform.logicalHeight,
         buildVisible,
       );
-      // Keep the build stamp cornered (logical bottom-right) as the viewport changes.
+      // Keep the build stamp cornered (logical bottom-left) as the viewport
+      // changes, and keep the server half of it honest: a socket that has closed
+      // is no longer a server this client is on, so the tag collapses back to
+      // build-only exactly when the connection does (ratified, M10 §2).
+      // (Guarded on `server`, not just on the state: a closed socket stays closed
+      // for every remaining frame, and `formatBuildTag` builds a string. One call
+      // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
+      if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
       // any frame) and show the re-enter affordance only once we've been fullscreen
@@ -4133,11 +4214,11 @@ async function boot(): Promise<void> {
     const buildBtn = buildButtonRect(isTouch, buildVisible, w, h);
     if (buildBtn) reg.register(BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildBtn);
 
-    // Build badge: declared bottom-right, actual rect measured from the real
-    // text metrics — so a font swap that pushes the stamp off-corner is caught
-    // by the placement check rather than by squinting at a screenshot. Skipped
-    // when frozen, where the badge is hidden (the registry records what is
-    // actually drawn, never what would have been).
+    // Build badge: declared bottom-left, actual rect measured from the real text
+    // metrics — so a font swap, or a server suffix appearing mid-session, that
+    // pushes the stamp off-corner is caught by the placement check rather than by
+    // squinting at a screenshot. Skipped when frozen, where the badge is hidden
+    // (the registry records what is actually drawn, never what would have been).
     if (buildBadge.visible) reg.register(BADGE_ID, BADGE_ANCHOR, buildBadge.layoutBounds(w, h));
 
     // Re-enter-fullscreen affordance: declared top-right, actual rect measured
@@ -5522,6 +5603,10 @@ function openMainMenu(
   ): void {
     onlineSession?.close();
     stopSessionLog();
+    // A fresh dial (or a RETRY) is not yet on any server — drop the previous
+    // one's suffix now rather than leaving a stale Machine on screen while a new
+    // socket opens. The next `welcome` puts the real one back.
+    buildIdentity().disconnected();
     roomEntered = false;
     onlineHost = host;
     // Step 3 of the logged lifecycle: the dial itself — which host, for which room.
@@ -5559,13 +5644,26 @@ function openMainMenu(
       // (`src/net/websocket-transport` `rejectJoin`), so the TITLE keeps the exact
       // reason on screen — "REFUSED: bad-ticket — machine mismatch" — with RETRY
       // and COPY LOG under it, instead of a word that never resolves.
-      if (message.type === 'joinError' && connectTrace) {
-        traceStep(connectRefused(connectTrace, message.reason, Date.now()));
-        entry = entryFailed(entry, `REFUSED: ${message.reason}`);
-        render();
+      if (message.type === 'joinError') {
+        // Refused is not connected: whatever the dial hoped for, the badge must
+        // not claim a Machine this client was never seated on.
+        buildIdentity().disconnected();
+        if (connectTrace) {
+          traceStep(connectRefused(connectTrace, message.reason, Date.now()));
+          entry = entryFailed(entry, `REFUSED: ${message.reason}`);
+          render();
+        }
         return;
       }
       if (message.type === 'welcome') {
+        // CONNECTED — and this is the moment the developer asked to see from a
+        // screenshot (ratified, M10 §2): the badge grows its server suffix,
+        // "3d7cc6a · d891dd0a (gru)", from the allocator's own answer. On
+        // `welcome` rather than on the allocate, because a signed ticket is a
+        // plan and a welcome is a fact; and the log's env follows the same string
+        // through the identity's subscribers, so a pasted log agrees with the
+        // corner of the screenshot beside it.
+        buildIdentity().connected(connection.machine, connection.region);
         if (connectTrace) traceStep(connectJoined(connectTrace, message.you, Date.now()));
         beginRoom(session, connection.room, message.you);
       }
@@ -6704,6 +6802,39 @@ interface FullscreenSeam {
   readonly bounds: Rect | null;
   /** Does the affordance sit inside its declared anchor zone ("no dead corners"). */
   readonly withinAnchor: boolean;
+}
+
+/**
+ * What `window.__buildBadge` reports: the persistent build badge exactly as it is
+ * drawn, on whatever screen is up (ratified, M10 — "shown on every single page").
+ * Read-only and structured-cloneable, like every other live-stage seam.
+ */
+interface BuildBadgeSeam {
+  /** The string on screen: `'3d7cc6a'`, or `'3d7cc6a · d891dd0a (gru)'` connected. */
+  readonly text: string;
+  /** False only under `?freeze=1`, where a changing stamp would break the goldens. */
+  readonly visible: boolean;
+  /** The server the tag's suffix came from, or null when there is no session. */
+  readonly server: { machine: string; region: string } | null;
+  /** The stamp's actual rect in logical (landscape) space, or null when hidden. */
+  readonly bounds: Rect | null;
+  /** Does that rect sit inside the declared `bottom-left` zone? */
+  readonly withinAnchor: boolean;
+}
+
+/** Install the read-only `window.__buildBadge` seam. Best-effort, like the
+ *  fullscreen seam — a double install (HMR) leaves the first in place. */
+function installBuildBadgeSeam(seam: BuildBadgeSeam): void {
+  try {
+    Object.defineProperty(window, '__buildBadge', {
+      value: seam,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    // Already defined (double install / HMR) — leave the existing one in place.
+  }
 }
 
 /** Install the read-only `window.__fullscreen` seam. Best-effort, like the menu

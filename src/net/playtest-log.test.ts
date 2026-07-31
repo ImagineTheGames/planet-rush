@@ -31,6 +31,7 @@ import type { PlaytestLogEnvironment } from './playtest-log';
 
 /** A fixed session identity, so a summary line is an exact string. */
 const ENV: PlaytestLogEnvironment = {
+  build: '1a2b3c4',
   sha: '1a2b3c4',
   buildTime: '2026-07-30T09:00:00.000Z',
   dirty: false,
@@ -179,8 +180,49 @@ describe('PlaytestLog — the export shape', () => {
   });
 
   it('marks a dirty build with the same asterisk the in-game badge uses', () => {
-    const log = new PlaytestLog({ env: { ...ENV, dirty: true } });
-    expect(log.summaryLine()).toContain('1a2b3c4*');
+    const env = describeEnvironment({ sha: '1a2b3c4', dirty: true });
+    expect(env.build).toBe('1a2b3c4*');
+    expect(new PlaytestLog({ env }).summaryLine()).toContain('1a2b3c4*');
+  });
+
+  it('leads with the BADGE string, so a paste and a screenshot agree (M10 §3)', () => {
+    const log = new PlaytestLog({ env: { ...ENV, build: '1a2b3c4 · d891dd0a (gru)' } });
+    // Not just the sha: the Machine and the region the session was on, in the very
+    // first line — the question every "it wouldn't connect" report has hinged on.
+    expect(log.summaryLine()).toContain('build 1a2b3c4 · d891dd0a (gru)');
+  });
+
+  describe('setBuild — the tag follows the badge for the whole session', () => {
+    it('rewrites env.build and lands the change on the timeline', () => {
+      const log = new PlaytestLog({ env: ENV });
+      log.record('note', 'before');
+      log.setBuild('1a2b3c4 · d891dd0a (gru)');
+
+      // ONE answer at the top of the paste, covering every event in it…
+      expect(log.env.build).toBe('1a2b3c4 · d891dd0a (gru)');
+      expect(log.snapshot().env.build).toBe('1a2b3c4 · d891dd0a (gru)');
+      // …and the moment it changed, on the timeline, where a reconnect onto a
+      // different Machine reads as the event it is.
+      const change = log.events.find((e) => e.msg === 'build tag');
+      expect(change?.kind).toBe('session');
+      expect(change?.data!['build']).toBe('1a2b3c4 · d891dd0a (gru)');
+    });
+
+    it('is a no-op for the same tag or an empty one', () => {
+      const log = new PlaytestLog({ env: ENV });
+      log.setBuild('1a2b3c4'); // unchanged
+      log.setBuild(''); // nothing to say
+      expect(log.env.build).toBe('1a2b3c4');
+      expect(log.events).toHaveLength(0);
+    });
+
+    it('collapses back to build-only when the tag does (a disconnect)', () => {
+      const log = new PlaytestLog({ env: ENV });
+      log.setBuild('1a2b3c4 · d891dd0a (gru)');
+      log.setBuild('1a2b3c4');
+      expect(log.env.build).toBe('1a2b3c4');
+      expect(log.events.filter((e) => e.msg === 'build tag')).toHaveLength(2);
+    });
   });
 
   it('reports the session duration it covers', () => {
@@ -209,8 +251,10 @@ describe('PlaytestLog — no PII beyond what the game already knows', () => {
     // The header's whole surface, enumerated: any field added to the environment has
     // to be added here too, which is the point — it forces the PII question to be
     // asked again rather than answered once in 2026 and forgotten.
+    // (`build` joined the header at M10: the badge string, which is our own build
+    // sha plus the SERVER's machine id and region — nothing about the player.)
     expect(Object.keys(env).sort()).toEqual(
-      ['buildTime', 'connection', 'dirty', 'formFactor', 'sha', 'startedAt', 'touch', 'viewport'].sort(),
+      ['build', 'buildTime', 'connection', 'dirty', 'formFactor', 'sha', 'startedAt', 'touch', 'viewport'].sort(),
     );
 
     const json = JSON.stringify(env).toLowerCase();
@@ -261,6 +305,7 @@ describe('classifyFormFactor / normalizeConnectionType', () => {
   it('falls back to unknown for every missing probe field, never to a guess', () => {
     const env = describeEnvironment();
     expect(env.sha).toBe('unknown');
+    expect(env.build).toBe('unknown'); // reconstructed from the sha, which is also unknown
     expect(env.buildTime).toBe('unknown');
     expect(env.startedAt).toBe('unknown');
     expect(env.viewport).toBe('0x0');
@@ -297,6 +342,7 @@ describe('the shared log', () => {
     const start = log.events.find((e) => e.msg === 'session start')!;
     expect(start.kind).toBe('session');
     expect(start.data!['sha']).toBe('1a2b3c4');
+    expect(start.data!['build']).toBe('1a2b3c4');
     expect(start.data!['schema']).toBe(`${PLAYTEST_LOG_SCHEMA}/${PLAYTEST_LOG_VERSION}`);
   });
 });

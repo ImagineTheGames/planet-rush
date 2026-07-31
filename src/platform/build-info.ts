@@ -11,7 +11,9 @@
  *
  *   1. **Build-time stamp** — `vite.config.ts` `define`s the `__BUILD_INFO__`
  *      global from git (see `build-stamp.ts`, the node-side half).
- *   2. **In-game badge** — the muted corner tag (`@render/build-badge`).
+ *   2. **The persistent badge** — the muted corner tag on every screen
+ *      (`@render/build-badge`), which joins this sha to the server a session is
+ *      on through `./build-identity`.
  *   3. **Boot console line** — `main.ts` logs {@link formatBootLine} once.
  *   4. **`version.json`** — emitted into the build output for the studio
  *      dashboard (the `version-json` vite plugin in `build-stamp.ts`).
@@ -103,9 +105,15 @@ export function formatUtcHhMm(iso: string): string {
 }
 
 /**
- * The in-game badge string: `"<sha> · <HH:MM>Z"` (dirty builds show `<sha>*`).
- * Deliberately tiny — the time is the disambiguator between two builds of the
- * same commit, and UTC so a phone and a laptop in different zones agree.
+ * The build stamp with its time: `"<sha> · <HH:MM>Z"` (dirty builds show
+ * `<sha>*`). Deliberately tiny — the time is the disambiguator between two builds
+ * of the same commit, and UTC so a phone and a laptop in different zones agree.
+ *
+ * Read by the boot-error screen and the boot console line. **Not** by the corner
+ * badge any more: since M10 that spends the same room on the server a session is
+ * on (`./build-identity` `formatBuildTag`), because a mis-routed region is the
+ * thing a screenshot now has to answer. The two strings share the sha, not the
+ * shape; the build time is one line away in every log export.
  */
 export function formatBuildBadge(info: BuildInfo = BUILD_INFO): string {
   return `${displaySha(info)} · ${formatUtcHhMm(info.time)}Z`;

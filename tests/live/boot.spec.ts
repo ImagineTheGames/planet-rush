@@ -111,7 +111,9 @@ test.describe('no WebGL — the friendly screen, never a black page', () => {
       await expect(screen).toContainText('chrome://gpu');
 
       // 3. It names the build, so a screenshot of this screen is a filable report
-      //    (the same `<sha> · <HH:MM>Z` stamp as the in-game corner badge).
+      //    (`formatBuildBadge`'s `<sha> · <HH:MM>Z`. Since M10 the in-game corner
+      //    badge spends that room on the server instead — `<sha> · <machine>
+      //    (<region>)` — so the two strings share a sha, not a format.)
       await expect(screen.locator('.pr-boot-build')).toContainText(/[0-9a-f]{7}\*?|dev\*?/);
 
       // 4. Retry is there and usable — a 44px touch target on a phone, too.
