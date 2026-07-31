@@ -62,6 +62,68 @@ describe('shouldFreezeSim — the transport owns pause (developer §2)', () => {
   });
 });
 
+/**
+ * The rule again, but in the units the ratification states it in: **ticks**.
+ *
+ * `shouldFreezeSim` is a predicate; what the developer asked to be tested is what a
+ * frame loop *does* with it over time — "online pause tick continuity, offline
+ * pause tick freeze". So this walks the gate the loop actually writes
+ * (`src/main.ts`: `if (shouldFreezeSim(pauseScreen, pausable)) return;` before
+ * `match.tick(...)`, `simTicks++`) across a pause and out the other side, and counts.
+ *
+ * It cannot catch a mis-wiring in main.ts — only the live-stage pair can, and does
+ * (`tests/live-stage/pause-tick-audit.spec.ts`,
+ * `tests/live-stage-online/online-pause.spec.ts`). What it does is state the
+ * contract in the ratification's own vocabulary, next to the predicate, so a future
+ * change to the predicate is read against "how many ticks passed" rather than
+ * against a truth table.
+ */
+describe('tick continuity across a pause (ratified M10 §2)', () => {
+  /** One frame of the loop's sim gate, `frames` times: a tick, unless frozen. */
+  function ticksOver(frames: number, screen: PauseScreen, pausable: boolean): number {
+    let ticks = 0;
+    for (let f = 0; f < frames; f++) if (!shouldFreezeSim(screen, pausable)) ticks++;
+    return ticks;
+  }
+
+  it('OFFLINE: not one tick passes while any pause screen is up', () => {
+    for (const screen of SCREENS.filter(isPauseOpen)) {
+      expect(ticksOver(60, screen, true), `${screen} let the offline sim run`).toBe(0);
+    }
+  });
+
+  it('ONLINE: every frame still ticks, on every pause screen — one player cannot stop eight', () => {
+    for (const screen of SCREENS) {
+      expect(ticksOver(60, screen, false), `${screen} froze a networked sim`).toBe(60);
+    }
+  });
+
+  it('OFFLINE: RESUME picks up exactly where it left off — no tick is skipped, none is caught up', () => {
+    // 30 frames running, 120 frames paused, 30 frames running. The paused frames
+    // are *time that did not happen* to the sim: the count is 60, not 180, and not
+    // 61 (a catch-up tick would be a jump the player did not fly).
+    let ticks = 0;
+    let screen: PauseScreen = 'closed';
+    for (let f = 0; f < 180; f++) {
+      if (f === 30) screen = 'menu';
+      if (f === 150) screen = 'closed';
+      if (!shouldFreezeSim(screen, true)) ticks++;
+    }
+    expect(ticks).toBe(60);
+  });
+
+  it('ONLINE: the same 180 frames are 180 ticks — the pause was a screen, not a stop', () => {
+    let ticks = 0;
+    let screen: PauseScreen = 'closed';
+    for (let f = 0; f < 180; f++) {
+      if (f === 30) screen = 'menu';
+      if (f === 150) screen = 'closed';
+      if (!shouldFreezeSim(screen, false)) ticks++;
+    }
+    expect(ticks).toBe(180);
+  });
+});
+
 describe('nextPauseScreen — the state machine', () => {
   it('toggle opens from closed and steps back one level from each open screen', () => {
     expect(nextPauseScreen('closed', 'toggle')).toBe('menu');

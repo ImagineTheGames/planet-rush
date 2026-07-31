@@ -44,7 +44,11 @@ export const PHONE = {
 
 export default defineConfig({
   testDir: '.',
-  testMatch: /copy-log-touch\.spec\.ts/,
+  // Both phone-profile log specs: COPY LOG's export path (`copy-log-touch`) and
+  // its DOWNLOAD sibling's (`log-download-touch`, ratified M10 §3 — "too large for
+  // mobile clipboard"). One config, because they need the identical device: an
+  // offline bundle at a portrait touch viewport, which is where the defect was.
+  testMatch: /(copy-log-touch|log-download-touch)\.spec\.ts/,
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

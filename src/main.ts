@@ -1012,8 +1012,21 @@ async function boot(): Promise<void> {
     installTapMarkerStage();
     installMinimapStage();
     installAudioStage();
-    installPauseStage();
   }
+
+  // The pause seam is installed on BOTH boots, unlike the debug stages above, and
+  // for the same reason `installBuildBadgeSeam` is: the thing it has to prove only
+  // exists on the CLEAN boot. `?debug=1` drops straight into an offline match with
+  // no menu (`mainMenu` is null above), so an online match is reachable only
+  // through the front door — and "an online pause must NOT pause the sim" (GDD
+  // §4.2, ratified M10) is exactly a claim about an online match. Gated, the
+  // ratified rule would be unprovable in a real browser, which is where the M2
+  // dark-matter class of bug lives.
+  //
+  // It is safe to ship for the same reason `__lobby` and `__mainMenu` are: pure
+  // read-back plus the physical points the client itself drew, no mutators, and it
+  // computes nothing until something calls `read()`.
+  installPauseStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -4145,14 +4158,18 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Install `window.__pauseStage` — the ?debug=1 live-stage seam that proves, on a
-   * REAL boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
+   * Install `window.__pauseStage` — the live-stage seam that proves, on a REAL
+   * boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
    * offline sim freezes while it is up and resumes on RESUME, SETTINGS round-trips,
    * and EXIT+confirm tears the world down to the menu. Pure READBACK plus the
    * physical press points the client itself drew each control at (through the
    * landscape-lock remap, the same shape `__mainMenu` uses), so a Playwright test
    * drives the WHOLE path with real ESC and real clicks — never a hit-test seam —
-   * and reads back only plain state. Behind ?debug=1; absent in a normal build.
+   * and reads back only plain state.
+   *
+   * Installed on BOTH boots (see the call site): the online half of the ratified
+   * pause rule — the sim keeps running under the overlay — is only reachable
+   * through the front door, which `?debug=1` skips.
    */
   function installPauseStage(): void {
     const physOf = (lx: number, ly: number): { x: number; y: number } => {
@@ -4194,10 +4211,13 @@ async function boot(): Promise<void> {
         pausable: boolean;
         frozen: boolean;
         simTicks: number;
+        online: boolean;
+        ship: { x: number; y: number; vx: number; vy: number } | null;
         controls: { kind: string; physicalCenter: { x: number; y: number } }[];
         buttonPoint: { x: number; y: number };
       } {
         const r = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+        const ship = world.ships.find(isLocalShip) ?? null;
         return {
           screen: pauseScreen,
           open: isPauseOpen(pauseScreen),
@@ -4208,6 +4228,14 @@ async function boot(): Promise<void> {
           // The sim's own step counter — unchanging while frozen, advancing after
           // RESUME. The executable form of "ticks stop, resume continues."
           simTicks,
+          // Which world this is, so the audit can say WHY it expected what it saw
+          // rather than inferring the transport from the freeze it is testing.
+          online: !pausable,
+          // The local ship's live position and velocity. The ratified online rule is
+          // "the world keeps running, the ship keeps flying (or drifts)" — a tick
+          // counter proves the first half; only a ship that has MOVED across the
+          // pause proves the second, and a frozen offline one must not have.
+          ship: ship ? { x: ship.pos.x, y: ship.pos.y, vx: ship.vel.x, vy: ship.vel.y } : null,
           controls: controls(),
           // The touch corner button's physical centre (for the phone-profile path).
           buttonPoint: physOf(r.x + r.width / 2, r.y + r.height / 2),
