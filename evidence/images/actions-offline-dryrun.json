@@ -1,0 +1,23 @@
+{
+  "probe": "actions-offline-dry-run",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-07-31T12:41:26.212Z",
+  "settingsControls": [
+    "fireMode",
+    "controls",
+    "reduceVfx",
+    "volume",
+    "volume",
+    "volume",
+    "back"
+  ],
+  "matchStarted": true,
+  "wheelRadius": 230,
+  "turretWedgePoint": {
+    "x": 640,
+    "y": 262
+  },
+  "copyLogButtonPresent": true,
+  "copyLogButtonPressable": "BUTTON#playtest-copy-log-button",
+  "pageErrors": []
+}

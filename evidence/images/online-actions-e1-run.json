@@ -1,0 +1,327 @@
+{
+  "tag": "e1",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-07-31T13:10:04.225Z",
+  "phases": {
+    "autoAim-host": "set through the SETTINGS screen",
+    "autoAim-guest": "set through the SETTINGS screen",
+    "mine": {
+      "host": {
+        "trips": [
+          {
+            "trip": 0,
+            "arrived": true,
+            "offset": 77,
+            "last": {
+              "found": true,
+              "x": 717,
+              "y": 396,
+              "n": 1998,
+              "kept": 1859
+            }
+          },
+          {
+            "trip": 1,
+            "arrived": true,
+            "offset": 80,
+            "last": {
+              "found": true,
+              "x": 720,
+              "y": 397,
+              "n": 1897,
+              "kept": 1675
+            }
+          }
+        ],
+        "settle": {
+          "arrived": true,
+          "offset": 80,
+          "last": {
+            "found": true,
+            "x": 720,
+            "y": 397,
+            "n": 1897,
+            "kept": 1678
+          }
+        },
+        "ms": 48531
+      },
+      "guest": {
+        "trips": [
+          {
+            "trip": 0,
+            "arrived": false,
+            "why": "budget",
+            "last": {
+              "found": true,
+              "x": 728,
+              "y": 437,
+              "n": 1596,
+              "kept": 1479
+            }
+          },
+          {
+            "trip": 1,
+            "arrived": true,
+            "offset": 51,
+            "last": {
+              "found": true,
+              "x": 663,
+              "y": 445,
+              "n": 2293,
+              "kept": 416
+            }
+          },
+          {
+            "trip": 2,
+            "arrived": true,
+            "offset": 35,
+            "last": {
+              "found": true,
+              "x": 618,
+              "y": 373,
+              "n": 1867,
+              "kept": 232
+            }
+          }
+        ],
+        "settle": {
+          "arrived": true,
+          "offset": 35,
+          "last": {
+            "found": true,
+            "x": 618,
+            "y": 373,
+            "n": 1866,
+            "kept": 232
+          }
+        },
+        "ms": 41648
+      }
+    },
+    "hullBurst": {
+      "frames": 60,
+      "everyMs": 120,
+      "clip": {
+        "x": 470,
+        "y": 280,
+        "width": 340,
+        "height": 240
+      }
+    },
+    "cruise": {
+      "startedAt": "2026-07-31T13:13:24.649Z",
+      "endedAt": "2026-07-31T13:14:09.442Z",
+      "legs": 4,
+      "legMs": 11000,
+      "note": "weapons cold; one direction change per leg"
+    }
+  },
+  "hostDoor": {
+    "attempts": 1,
+    "stalls": []
+  },
+  "room": {
+    "room": "8AN4",
+    "online": true,
+    "isHost": true,
+    "humanCount": 1
+  },
+  "guestDoor": {
+    "attempts": 1,
+    "stalls": []
+  },
+  "rushPoint": {
+    "x": 640,
+    "y": 740
+  },
+  "rushElementAtPoint": "CANVAS",
+  "rushPressLanded": true,
+  "rushViaSeam": false,
+  "matchStartedAt": "2026-07-31T13:10:17.562Z",
+  "wire": {
+    "atSpawn": {
+      "host": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      },
+      "guest": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      }
+    },
+    "afterMine": {
+      "host": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      },
+      "guest": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      }
+    },
+    "afterBuild": {
+      "host": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      },
+      "guest": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": true
+      }
+    },
+    "atLog": {
+      "host": {
+        "badge": "ef4babe · d891dd0a (gru)",
+        "server": {
+          "machine": "d891dd0a1443e8",
+          "region": "gru"
+        },
+        "copyLogOffered": false
+      },
+      "guest": {
+        "badge": "ef4babe",
+        "server": null,
+        "copyLogOffered": true
+      }
+    }
+  },
+  "build": {
+    "host": {
+      "who": "host",
+      "wedgePoint": {
+        "x": 640,
+        "y": 262
+      },
+      "wheelCheck": {
+        "luma": 41.49,
+        "open": true
+      },
+      "tapTwoAtMs": 2050,
+      "stationShots": [
+        2,
+        6,
+        13,
+        20
+      ],
+      "taps": 2,
+      "expectedOre": 6,
+      "expectedBuildSeconds": 10
+    },
+    "guest": {
+      "who": "guest",
+      "wedgePoint": {
+        "x": 640,
+        "y": 262
+      },
+      "wheelCheck": {
+        "luma": 41.52,
+        "open": true
+      },
+      "tapTwoAtMs": 2144,
+      "stationShots": [
+        2,
+        6,
+        13,
+        20
+      ],
+      "taps": 2,
+      "expectedOre": 6,
+      "expectedBuildSeconds": 10,
+      "rehomed": {
+        "arrived": true,
+        "offset": 87,
+        "last": {
+          "found": true,
+          "x": 674,
+          "y": 480,
+          "n": 1544,
+          "kept": 1473
+        }
+      },
+      "firstTryWheel": {
+        "luma": 18.23,
+        "open": false
+      }
+    }
+  },
+  "volleys": [
+    {
+      "index": 1,
+      "wave1MsAfterFire": 653,
+      "wave2MsAfterFire": 1135
+    },
+    {
+      "index": 2,
+      "wave1MsAfterFire": 654,
+      "wave2MsAfterFire": 1079
+    }
+  ],
+  "log_host": {
+    "via": "clipboard",
+    "buttonLabel": "COPY LOG",
+    "buttonAfterPress": "LOG COPIED",
+    "elementAtButton": "BUTTON#playtest-copy-log-button",
+    "summary": "Planet Rush playtest log — build ef4babe · d891dd0a (gru) (2026-07-31T02:11:11.993Z) · session 2026-07-31T13:10:01.960Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+    "env": {
+      "build": "ef4babe · d891dd0a (gru)",
+      "sha": "ef4babe",
+      "buildTime": "2026-07-31T02:11:11.993Z",
+      "dirty": false,
+      "startedAt": "2026-07-31T13:10:01.960Z",
+      "formFactor": "desktop",
+      "viewport": "1280x800",
+      "touch": false,
+      "connection": "4g"
+    },
+    "durationMs": 250166,
+    "dropped": 0,
+    "pageErrors": []
+  },
+  "log_guest": {
+    "via": "clipboard",
+    "buttonLabel": "COPY LOG",
+    "buttonAfterPress": "LOG COPIED",
+    "elementAtButton": "BUTTON#playtest-copy-log-button",
+    "summary": "Planet Rush playtest log — build ef4babe (2026-07-31T02:11:11.993Z) · session 2026-07-31T13:10:02.837Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+    "env": {
+      "build": "ef4babe",
+      "sha": "ef4babe",
+      "buildTime": "2026-07-31T02:11:11.993Z",
+      "dirty": false,
+      "startedAt": "2026-07-31T13:10:02.837Z",
+      "formFactor": "desktop",
+      "viewport": "1280x800",
+      "touch": false,
+      "connection": "4g"
+    },
+    "durationMs": 213290,
+    "dropped": 0,
+    "pageErrors": []
+  },
+  "ok": true
+}

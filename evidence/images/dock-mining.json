@@ -1,0 +1,14 @@
+{
+  "probe": "dock-mining",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "seconds": 120,
+  "marks": [
+    20,
+    40,
+    60,
+    80,
+    100,
+    120
+  ],
+  "capturedAt": "2026-07-31T13:02:34.016Z"
+}

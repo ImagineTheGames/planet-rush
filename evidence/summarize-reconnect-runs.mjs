@@ -25,13 +25,22 @@
  * dead at reclaim (`alive: false`). Those runs prove the BANK and TIER thirds and
  * the HOLD third not at all, and are counted as such rather than as green.
  *
- *   node evidence/summarize-reconnect-runs.mjs [--json > images/online-close2-repeatability.json]
+ * ROUNDS. Each capture round writes its transcripts under its own prefix, so the
+ * round being tabulated is named rather than assumed — a summary that silently
+ * swept in a previous build's runs would be the worst possible kind of green.
+ *
+ *   node evidence/summarize-reconnect-runs.mjs [round] [--json]
+ *     round defaults to `online-close2` (the 5a545f0 round); pass `online-close3`
+ *     for the ef4babe round. Output goes to images/<round>-repeatability.json.
  */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'images');
+
+/** The round to tabulate — the transcript filename prefix, and the output name. */
+const ROUND = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'online-close2';
 
 const GROUPS = [
   ['prefix-short', 'compared to the reclaim WELCOME (stale target) — 1.5 s away'],
@@ -43,7 +52,7 @@ const GROUPS = [
 const rows = [];
 for (const [group, note] of GROUPS) {
   const files = readdirSync(OUT)
-    .filter((f) => f.startsWith(`online-close2-${group}-run`) && f.endsWith('.json'))
+    .filter((f) => f.startsWith(`${ROUND}-${group}-run`) && f.endsWith('.json'))
     .sort();
   for (const f of files) {
     const j = JSON.parse(readFileSync(join(OUT, f), 'utf8'));
@@ -74,6 +83,14 @@ for (const [group, note] of GROUPS) {
       shipCargoCap: ship ? ship.cargoCap : null,
       shipAlive: ship && 'alive' in ship ? ship.alive : null,
       economyMovedAfterReclaimWelcome: j.economyMovedAfterReclaimWelcome ?? null,
+      // A run that never got back on the wire at all. Recorded with the REASON
+      // authority gave, because `grace-expired` or `room-full` would be the client
+      // returning wrongly while `bad-ticket` is Fly's edge landing the redial on
+      // the wrong Machine — the fleet's known socket-hop pin, not a game defect.
+      reclaimFailed: j.reclaimTimedOut === true || typeof j.reclaimError === 'string',
+      reclaimError: j.reclaimError ?? null,
+      joinErrorsPastDrop: j.joinErrorsPastDrop ?? null,
+      joinErrorReasonsPastDrop: j.joinErrorReasonsPastDrop ?? null,
       // The transcripts from before the fix predate the `heldThirdProven` field,
       // so derive it from what they DID record rather than reporting a missing
       // field as "not proven" — that would understate the earlier runs.
@@ -90,22 +107,39 @@ for (const [group, note] of GROUPS) {
 }
 
 const shipped = rows.filter((r) => r.group === 'short' || r.group === 'long');
+const reclaimed = shipped.filter((r) => !r.reclaimFailed);
+const failed = shipped.filter((r) => r.reclaimFailed);
 const summary = {
   probe: 'online-reconnect repeatability',
+  round: ROUND,
   runs: rows.length,
   shippedInstrumentRuns: shipped.length,
-  shippedInstrumentGreen: shipped.filter((r) => r.matchesAuthority).length,
-  shippedInstrumentProvingHeldThird: shipped.filter((r) => r.heldThirdProven && r.matchesAuthority)
+  // Denominators kept apart on purpose. A run that never got back on the wire
+  // cannot say anything about what the reclaimed ship carried, so it is neither
+  // green nor a wallet failure — it is a REACH failure, counted separately and
+  // named. Rolling the two together would let a flaky edge read as a game defect,
+  // or a real wallet defect hide behind "well, that one didn't connect".
+  reclaimReached: reclaimed.length,
+  reclaimFailed: failed.length,
+  reclaimFailures: failed.map((r) => ({
+    room: r.room,
+    error: r.reclaimError,
+    joinErrorsPastDrop: r.joinErrorsPastDrop,
+    reasons: r.joinErrorReasonsPastDrop,
+  })),
+  shippedInstrumentGreen: reclaimed.filter((r) => r.matchesAuthority).length,
+  shippedInstrumentProvingHeldThird: reclaimed.filter((r) => r.heldThirdProven && r.matchesAuthority)
     .length,
   tierBoughtOverTheWireInEveryRun: rows.every((r) => r.authorityTierAfterOrder >= 1),
-  sameSeatInEveryRun: rows.every((r) => r.reclaimedSameSeat === true),
+  sameSeatInEveryReachedRun: reclaimed.every((r) => r.reclaimedSameSeat === true),
+  peerSawSubstitutionInEveryRun: rows.every((r) => r.substitutionSeenByPeer === true),
   machines: [...new Set(rows.map((r) => r.machine).filter(Boolean))],
   rooms: rows.map((r) => r.room),
   rows,
 };
 
 if (process.argv.includes('--json')) {
-  writeFileSync(join(OUT, 'online-close2-repeatability.json'), JSON.stringify(summary, null, 2));
+  writeFileSync(join(OUT, `${ROUND}-repeatability.json`), JSON.stringify(summary, null, 2));
 }
 
 const pad = (s, n) => String(s).padEnd(n);
@@ -115,6 +149,15 @@ for (const r of rows) {
   if (r.group !== lastGroup) {
     console.log(`\n  ${r.group.toUpperCase()} — ${r.note}`);
     lastGroup = r.group;
+  }
+  if (r.reclaimFailed) {
+    // Say NEVER GOT BACK, not DIVERGES. The wallet comparison was never made in
+    // this run, and printing it as a mismatch would invent a defect.
+    console.log(
+      `   ${pad(r.room, 6)} ${pad(r.awayMs + 'ms', 8)} tier ${r.authorityTierAfterOrder} bought | NEVER GOT BACK ON THE WIRE — ` +
+        `${r.joinErrorsPastDrop} joinError(s) past the drop, reason(s) ${JSON.stringify(r.joinErrorReasonsPastDrop ?? 'not recorded by this run')}`,
+    );
+    continue;
   }
   console.log(
     `   ${pad(r.room, 6)} ${pad(r.awayMs + 'ms', 8)} tier ${r.wireTierCargo} | wire held ${pad(
@@ -132,10 +175,13 @@ for (const r of rows) {
   );
 }
 console.log(
-  `\n  SHIPPED INSTRUMENT: ${summary.shippedInstrumentGreen}/${summary.shippedInstrumentRuns} runs match authority exactly; ` +
-    `${summary.shippedInstrumentProvingHeldThird} of them carried held ore and so proved the HOLD third.`,
+  `\n  SHIPPED INSTRUMENT: ${summary.shippedInstrumentRuns} runs — ${summary.reclaimReached} got back on the wire, ${summary.reclaimFailed} did not.` +
+    `\n  Of the ${summary.reclaimReached} that got back: ${summary.shippedInstrumentGreen} match authority exactly; ` +
+    `${summary.shippedInstrumentProvingHeldThird} of those carried held ore and so proved the HOLD third.`,
 );
 console.log(
   `  Tier bought over the wire in every run: ${summary.tierBoughtOverTheWireInEveryRun}. ` +
-    `Same seat every run: ${summary.sameSeatInEveryRun}. Machines: ${summary.machines.join(', ')}\n`,
+    `Same seat in every reached run: ${summary.sameSeatInEveryReachedRun}. ` +
+    `Peer saw the substitution in every run: ${summary.peerSawSubstitutionInEveryRun}. ` +
+    `Machines: ${summary.machines.join(', ')}\n`,
 );

@@ -1,0 +1,402 @@
+{
+  "probe": "respawn-tail",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "room": "69Z8",
+  "capturedAt": "2026-07-31T13:25:59.026Z",
+  "seat": 0,
+  "reconcilesRecorded": 1391,
+  "reconcilesApplied": 1391,
+  "deathsObserved": 1,
+  "deadReconciles": 280,
+  "deadSpanMs": 4751,
+  "minHullSeen": 0,
+  "maxHullSeen": 35,
+  "hullRisesWhileAlive": 0,
+  "hullRises": [],
+  "hullFallsWhileAlive": 0,
+  "breachingReconciles": 0,
+  "breachSpanMs": null,
+  "distinctErrorValuesInBreach": [],
+  "distinctCheckpointValuesInBreach": [],
+  "distinctAuthorityValuesInBreach": [],
+  "distinctWorldShipValuesInBreach": [],
+  "histHitDuringBreach": [],
+  "resyncedDuringBreach": [],
+  "authPresentDuringBreach": [],
+  "window": [
+    {
+      "n": 0,
+      "ms": 26,
+      "snapTick": 6,
+      "histHit": false,
+      "histLen": 0,
+      "histFirstTick": null,
+      "histLastTick": null,
+      "cp": null,
+      "auth": {
+        "x": 1968,
+        "y": 1200
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1200,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 0,
+      "error": 0,
+      "applied": true,
+      "resynced": true,
+      "snapped": false
+    },
+    {
+      "n": 1,
+      "ms": 74,
+      "snapTick": 8,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 7,
+      "histLastTick": 8,
+      "cp": {
+        "x": 1968,
+        "y": 1199.159
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1199.75
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1199,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.591,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 2,
+      "ms": 112,
+      "snapTick": 10,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 9,
+      "histLastTick": 10,
+      "cp": {
+        "x": 1968,
+        "y": 1198.381
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1198.375
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1198,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.006,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 3,
+      "ms": 146,
+      "snapTick": 12,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 11,
+      "histLastTick": 12,
+      "cp": {
+        "x": 1968,
+        "y": 1196.029
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1196
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1196,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.029,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 4,
+      "ms": 199,
+      "snapTick": 14,
+      "histHit": true,
+      "histLen": 3,
+      "histFirstTick": 13,
+      "histLastTick": 15,
+      "cp": {
+        "x": 1968,
+        "y": 1192.77
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1192.75
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1191,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 3,
+      "error": 0.02,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 5,
+      "ms": 210,
+      "snapTick": 16,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 15,
+      "histLastTick": 16,
+      "cp": {
+        "x": 1968,
+        "y": 1188.725
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1188.75
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1189,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.025,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 6,
+      "ms": 243,
+      "snapTick": 18,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 17,
+      "histLastTick": 18,
+      "cp": {
+        "x": 1968,
+        "y": 1184.004
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1184
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1184,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.004,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 7,
+      "ms": 271,
+      "snapTick": 20,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 19,
+      "histLastTick": 20,
+      "cp": {
+        "x": 1968,
+        "y": 1178.605
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1178.625
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1179,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.02,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 8,
+      "ms": 313,
+      "snapTick": 22,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 21,
+      "histLastTick": 22,
+      "cp": {
+        "x": 1968,
+        "y": 1172.647
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1172.625
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1173,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.022,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 9,
+      "ms": 337,
+      "snapTick": 24,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 23,
+      "histLastTick": 24,
+      "cp": {
+        "x": 1968,
+        "y": 1166.119
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1166.125
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1166,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.006,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 10,
+      "ms": 370,
+      "snapTick": 26,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 25,
+      "histLastTick": 26,
+      "cp": {
+        "x": 1968,
+        "y": 1159.14
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1159.125
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1159,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.015,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 11,
+      "ms": 421,
+      "snapTick": 28,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 27,
+      "histLastTick": 28,
+      "cp": {
+        "x": 1968,
+        "y": 1151.708
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1151.75
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1152,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.042,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    },
+    {
+      "n": 12,
+      "ms": 436,
+      "snapTick": 30,
+      "histHit": true,
+      "histLen": 2,
+      "histFirstTick": 29,
+      "histLastTick": 30,
+      "cp": {
+        "x": 1968,
+        "y": 1143.947
+      },
+      "auth": {
+        "x": 1968,
+        "y": 1143.875
+      },
+      "authPresent": true,
+      "world": {
+        "x": 1968,
+        "y": 1144,
+        "alive": true,
+        "hull": 35
+      },
+      "queueLen": 2,
+      "error": 0.072,
+      "applied": true,
+      "resynced": false,
+      "snapped": false
+    }
+  ]
+}
