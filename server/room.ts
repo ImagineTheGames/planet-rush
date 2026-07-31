@@ -47,6 +47,7 @@ import {
 } from '../src/bots';
 import type { PersonalityId } from '../src/bots';
 import { InputQueue } from '../src/net/input-queue';
+import type { InputStats } from '../src/net/input-queue';
 import { encodeWorldSnapshot } from '../src/net/snapshot';
 import type {
   BotDifficulty,
@@ -104,6 +105,18 @@ export const DEFAULT_EVENT_INTERVAL_TICKS = 6;
  * that would stall every other room in the process. Half a second of sim.
  */
 export const MAX_CATCHUP_TICKS = 30;
+
+/**
+ * How many ticks a human seat's last stick reading stands in for when the wire
+ * delivers nothing (`MatchRoom.heldIntent`) — a quarter of a second at 60 Hz.
+ *
+ * Long enough to cover the gap a retransmit or a jitter spike leaves (the harness's
+ * worst stall at 250 ms RTT is ~45 ticks, but the burst that follows re-fills the
+ * queue immediately, so what actually has to be covered is the *ragged edge* of a
+ * stall, a handful of ticks), and far short of the reconnect-grace window, so a
+ * seat that has genuinely gone quiet coasts to a stop rather than flying on.
+ */
+export const INTENT_HOLD_TICKS = 15;
 
 // ---------------------------------------------------------------------------
 // Slots
@@ -167,6 +180,16 @@ interface Slot {
    * only place in the system that knows it. 0 until a first input runs.
    */
   ackTick: Tick;
+  /**
+   * The continuous half of the last input this slot actually had simulated —
+   * thrust, aim, fire, with every one-shot order stripped — or null before it has
+   * sent any. Stands in for the ticks the wire loses ({@link MatchRoom.heldIntent}).
+   */
+  held: readonly Action[] | null;
+  /** The last tick {@link held} may stand in for. Past it the seat falls silent
+   *  and the ship coasts, which is the honest picture of a connection that stopped
+   *  talking (GDD §4.2 hands the seat to a bot shortly after). */
+  heldUntil: Tick;
   /** Per-client fog of war over station health (GDD §2.2). */
   fog: FogTracker | null;
   /**
@@ -291,6 +314,8 @@ export class MatchRoom {
       token: null,
       ackSeq: 0,
       ackTick: 0,
+      held: null,
+      heldUntil: -1,
       fog: null,
       wallet: null,
       orders: [],
@@ -433,6 +458,10 @@ export class MatchRoom {
     // drop them forever (`acceptInput`). The seat's ack restarts with the seat.
     slot.ackSeq = 0;
     slot.ackTick = 0;
+    // A returning player's hands are their own: nothing the seat was holding when
+    // it dropped may fly the reclaimed ship (GDD §4.2).
+    slot.held = null;
+    slot.heldUntil = -1;
     // Orders from the connection that left are answered for; a returning client
     // mints fresh ids and must not collide with a table it never saw.
     slot.orders.length = 0;
@@ -555,8 +584,39 @@ export class MatchRoom {
     // re-filed: re-filing is what turned a retransmit into a second turret.
     if (message.seq <= slot.ackSeq) return;
     const simTick = this.authoritative?.tick ?? 0;
-    const verdict = this.queue.accept(slot.player, message, simTick);
-    if (verdict === 'late') this.queue.accept(slot.player, { ...message, tick: simTick + 1 }, simTick);
+    // `coalesce`, not `accept`: a second message for a tick this slot has already
+    // filed is *merged* rather than dropped (`src/net/input-queue`). Two ways that
+    // happens, and neither is the client misbehaving — see below.
+    const verdict = this.queue.coalesce(slot.player, message, simTick);
+    // ── WHY TWO MESSAGES LAND ON ONE TICK (M10 tick-alignment) ──
+    //
+    //  1. **A retransmit burst.** A TCP stall delivers thirty or forty messages at
+    //     once, all naming ticks already simulated, and all re-filed below onto the
+    //     same `simTick + 1`. First-wins kept the *oldest* stick reading of the
+    //     backlog and dropped the rest: 48 % of the player's input at 250 ms with
+    //     2 % loss, measured on the latency harness.
+    //  2. **The client's own clock.** It is not monotonic — a lead trim rewinds it
+    //     a few ticks (`src/net/prediction` `trimLead`) — so the next input can be
+    //     predicted at a tick this client has already sent one for. That used to be
+    //     dropped too (~4 % of all input on a real socket), which is why `sendInput`
+    //     once stamped strictly *increasing* ticks instead of honest ones. The cure
+    //     had its own disease: the tick on the wire then differed from the tick the
+    //     client predicted at, so authority ran the press where the client's replay
+    //     never put it — invisible until `ackTick` existed to name it, and worth up
+    //     to 15 ticks of misalignment on a *loss-free* wire.
+    //
+    // Merged, both cases keep the newest stick reading and every one-shot order in
+    // the collision, and the client is free to stamp the tick it truly predicted at.
+    if (verdict === 'late') {
+      this.queue.coalesce(slot.player, { ...message, tick: simTick + 1 }, simTick);
+    }
+  }
+
+  /** What the room's input queue has done with everything offered to it — queued,
+   *  late (and therefore re-filed), dropped. Read by the latency harness, which
+   *  asserts that *nothing* is dropped (`tests/net/single-volley.test.ts`). */
+  get inputStats(): InputStats {
+    return this.queue.stats;
   }
 
   // --- The match ----------------------------------------------------------
@@ -689,6 +749,7 @@ export class MatchRoom {
     const nextTick = world.tick + 1;
     const rows: PlayerInput[] = [];
     const botSeats = new Set<PlayerId>();
+    const spoken = new Set<PlayerId>();
 
     for (const slot of this.slots) {
       if (!slot.bot) continue;
@@ -698,6 +759,10 @@ export class MatchRoom {
     for (const row of this.queue.take(nextTick)) {
       if (botSeats.has(row.id)) continue; // a substitute's seat ignores its human
       const slot = this.slots[row.id];
+      spoken.add(row.id);
+      // The stick as it stood, for the ticks the wire loses ({@link heldIntent}).
+      if (slot) slot.held = continuousOnly(row.actions);
+      if (slot) slot.heldUntil = nextTick + INTENT_HOLD_TICKS;
       // Strip any identified order this slot has already had simulated — the
       // idempotence rule (below). Everything else in the tick still flies.
       rows.push(slot ? { ...row, actions: this.consumeOrders(slot, row.actions) } : row);
@@ -713,10 +778,48 @@ export class MatchRoom {
       }
     }
 
+    // A human seat the wire had nothing for this tick keeps holding the stick it
+    // was last holding ({@link heldIntent}).
+    for (const slot of this.slots) {
+      if (!slot.socket || slot.bot || spoken.has(slot.player)) continue;
+      const held = this.heldIntent(slot, nextTick);
+      if (held) rows.push({ id: slot.player, actions: held });
+    }
+
     // Sorted, so packet arrival order can never change the sim's resolution
     // order — the property the determinism replay rests on (GDD §4.8).
     rows.sort((a, b) => a.id - b.id);
     return rows;
+  }
+
+  /**
+   * **A tick the wire lost is not a tick the player let go of the stick.**
+   *
+   * `step()` gives a ship with no input row a *neutral* intent — no thrust, no aim,
+   * no trigger (`src/sim/step.ts` `intentFor`). That is the right answer for a seat
+   * nobody is flying, and the wrong one for a human whose 16 ms of input is merely
+   * in the air: the authoritative ship stops accelerating for that tick while the
+   * predicting client, which knows perfectly well what was pressed, keeps flying.
+   * Every such gap is a divergence the client did not cause and cannot fix, paid
+   * back as a correction on the next snapshot — and on a wire with any loss at all
+   * there are a lot of them, which is most of what was left of the constant
+   * correction after the wire's precision was fixed (`src/net/snapshot` `POS_SCALE`).
+   *
+   * So the last stick reading stands in, which is what the client predicted anyway
+   * (a thrust direction changes slowly; a 16 ms hole in it is invisible), for at
+   * most {@link INTENT_HOLD_TICKS}. The bound is the point: past it the connection
+   * is not jittery, it is *gone*, and a ship flying on a dead player's last press
+   * would be a lie the reconnect-grace rule already has a better answer for — a bot
+   * takes the seat (GDD §4.2).
+   *
+   * **Orders are never held.** A repeat of a one-shot verb is a second turret
+   * bought from one tap, which is the exact bug the order-echo work closed
+   * ({@link consumeOrders}); {@link continuousOnly} strips them before anything is
+   * remembered.
+   */
+  private heldIntent(slot: Slot, tick: Tick): readonly Action[] | null {
+    if (!slot.held || tick > slot.heldUntil) return null;
+    return slot.held;
   }
 
   // --- Idempotent orders (M10 action-echo) --------------------------------
@@ -982,6 +1085,24 @@ export class MatchRoom {
 // ---------------------------------------------------------------------------
 // Order outcomes — what a step actually did with an identified order
 // ---------------------------------------------------------------------------
+
+/**
+ * One tick's actions with every one-shot order removed — what a seat is allowed to
+ * *hold* between messages (`MatchRoom.heldIntent`). Returns the caller's own array
+ * on the overwhelmingly common tick that carried no order at all.
+ */
+function continuousOnly(actions: readonly Action[]): readonly Action[] {
+  let kept: Action[] | null = null;
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i]!;
+    if (orderIdOf(action) !== null || action.type === 'buildOrder' || action.type === 'upgradeOrder') {
+      kept ??= actions.slice(0, i);
+      continue;
+    }
+    kept?.push(action);
+  }
+  return kept ?? actions;
+}
 
 /** One identified order simulated on this tick, and who sent it. */
 interface IssuedOrder {

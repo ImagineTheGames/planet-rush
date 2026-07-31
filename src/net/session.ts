@@ -170,9 +170,6 @@ export class TransportSession implements MatchSession {
   private player: PlayerId = 0;
   private nextTick: Tick = 1;
   private seq = 0;
-  /** The highest tick this client has stamped an input with. Input ticks only ever
-   *  go up, whatever the predicted clock does under them (`sendInput`). */
-  private sentTick: Tick = 0;
   private snapshotTick: Tick = -1;
   private predictor: PredictedMatch | null = null;
   private interpolator: RemoteInterpolator | null = null;
@@ -333,27 +330,28 @@ export class TransportSession implements MatchSession {
     // buffer in the past. Put the simulation back before a single tick of it runs
     // (`./presentation`), or the picture compounds into drift.
     this.unpresent();
-    // ── ONE TICK NUMBER, ONCE ────────────────────────────────────────────────
+    // ── ONE TICK NUMBER, AND IT IS THE TRUE ONE ──────────────────────────────
     //
-    // `InputQueue` files by `(player, tick)` and keeps the FIRST message for a
-    // pair, dropping every later one as a duplicate — correctly, since two
-    // messages claiming one tick cannot both be that tick's input.
+    // The tick a message is stamped with is **the tick this client is about to
+    // predict it at**, always — never a number invented to keep the stream tidy.
+    // That equality is what makes client-side prediction mean anything: the client
+    // replays this input at that tick on every reconcile, so if authority runs it
+    // at a different one, every prediction built on it stands at the wrong instant
+    // and reconciliation pays the gap back on every snapshot for as long as it
+    // lasts (`./telemetry` `appliedDeltaMean`).
     //
-    // But the client's clock is not monotonic. Reconciliation rewinds to the
-    // snapshot and replays what is still pending, and a lead trim drops some of
-    // that pending input (`./prediction` `trimLead`), so the world lands on a
-    // *lower* tick than it was on before. The next input is then stamped for a tick
-    // this client has already sent one for, and the server drops it — silently,
-    // whole. Measured on a real socket: ~4 % of all input, in bursts, every one of
-    // them invisible. For a stick that is a lost frame; for a **one-shot order** it
-    // is a purchase the player made, was charged for locally, and that authority
-    // never heard — the wheel press that "does nothing sometimes".
-    //
-    // So the tick a message is stamped with only ever goes up. At most a few ticks
-    // of skew (a trim is bounded per reconcile) and it closes itself as the clock
-    // catches back up, against never losing a press.
-    const tick = Math.max(this.tick, this.sentTick + 1);
-    this.sentTick = tick;
+    // It has not always been so, for a reason worth keeping written down. The
+    // client's clock is not monotonic — a lead trim rewinds it a few ticks
+    // (`./prediction` `trimLead`) — so the next input can be predicted at a tick
+    // this client has already sent one for, and `InputQueue`'s first-wins duplicate
+    // rule dropped such a message whole (~4 % of all input on a real socket, in
+    // bursts). The fix then was to stamp strictly increasing ticks; the cost, only
+    // visible once `ackTick` existed to measure it, was up to 15 ticks of
+    // client-server misalignment on a loss-free wire. The collision is now *merged*
+    // by authority instead — newest stick, every order kept, nothing dropped
+    // (`server/room.ts` `acceptInput`, `./input-queue` `coalesce`) — so the client
+    // can afford to be honest about its own clock, which is the whole point.
+    const tick = this.tick;
     const seq = ++this.seq;
     // Name every one-shot order before it goes anywhere, so the copy on the wire
     // and the copy this client is about to predict are the *same* order (M10
@@ -440,11 +438,10 @@ export class TransportSession implements MatchSession {
         this.pendingEconomy = message.economy ?? null;
         break;
       case 'matchStart':
-        this.nextTick = message.tick + 1;
         // RUSH! (or a reclaim's replay) re-bases the clock: the server names the
         // tick to predict from, and nothing this client sent before it is on that
         // timeline (`beginPredicting`).
-        this.sentTick = message.tick;
+        this.nextTick = message.tick + 1;
         if (!this.authoritative) this.beginPredicting(message);
         break;
       case 'snapshot': {

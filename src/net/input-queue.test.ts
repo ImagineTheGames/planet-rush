@@ -11,6 +11,10 @@ import type { InputMessage } from './transport';
 
 const FIRE: readonly Action[] = [{ type: 'fire', active: true, auto: false }];
 const BUILD: readonly Action[] = [{ type: 'build', active: true }];
+const LEFT: readonly Action[] = [{ type: 'thrust', dir: { x: -1, y: 0 } }];
+const RIGHT: readonly Action[] = [{ type: 'thrust', dir: { x: 1, y: 0 } }];
+const TURRET: readonly Action[] = [{ type: 'buildOrder', item: 'turret', orderId: 77 }];
+const SHIELD: readonly Action[] = [{ type: 'buildOrder', item: 'shield', orderId: 78 }];
 
 function input(tick: number, actions: readonly Action[] = FIRE, seq = tick): InputMessage {
   return { type: 'input', tick, seq, actions };
@@ -96,5 +100,70 @@ describe('InputQueue', () => {
     q.pruneThrough(3);
     expect(q.bufferedTicks).toBe(1);
     expect(q.take(9).map((p) => p.id)).toEqual([0]);
+  });
+
+  // ── Coalescing: two messages, one tick, nothing lost (M10 tick-alignment) ──
+
+  it('merges a collision instead of dropping it, newest stick wins', () => {
+    const q = new InputQueue();
+    q.coalesce(0, { ...input(5, LEFT, 10) }, 0);
+    expect(q.coalesce(0, { ...input(5, RIGHT, 11) }, 0)).toBe('queued');
+
+    // The player is holding the stick to the right *now*; the older reading
+    // described a position that has been superseded. And the ack names the newest
+    // input whose effect is accounted for, so the client can retire both.
+    expect(q.take(5)).toEqual([{ id: 0, actions: RIGHT, seq: 11 }]);
+  });
+
+  it('keeps every one-shot order in a collision, older first', () => {
+    const q = new InputQueue();
+    q.coalesce(0, { ...input(5, [...TURRET, ...LEFT], 10) }, 0);
+    q.coalesce(0, { ...input(5, [...SHIELD, ...RIGHT], 11) }, 0);
+
+    // Both purchases survive — a dropped `buildOrder` is a press the player made,
+    // was charged for locally, and that authority never heard — while the stick
+    // reading is still only the newest one.
+    expect(q.take(5)).toEqual([{ id: 0, actions: [...TURRET, ...SHIELD, ...RIGHT], seq: 11 }]);
+  });
+
+  it('files a first arrival exactly as accept would', () => {
+    const q = new InputQueue();
+    expect(q.coalesce(0, input(5, LEFT, 10), 0)).toBe('queued');
+    expect(q.take(5)).toEqual([{ id: 0, actions: LEFT, seq: 10 }]);
+    expect(q.stats.duplicate).toBe(0);
+  });
+
+  it('merges a whole retransmit burst onto one tick without losing a press', () => {
+    const q = new InputQueue();
+    // Forty messages arriving at once after a stall, all re-filed onto tick 5 —
+    // the case that used to discard 48 % of a player's input at 250 ms with 2 %
+    // loss, keeping the *oldest* stick reading of the backlog.
+    for (let i = 0; i < 40; i++) {
+      const orders: readonly Action[] = i % 10 === 0 ? [{ type: 'buildOrder', item: 'turret', orderId: i }] : [];
+      q.coalesce(0, input(5, [...orders, ...(i === 39 ? RIGHT : LEFT)], 100 + i), 0);
+    }
+
+    const [row] = q.take(5);
+    expect(row!.seq).toBe(139);
+    expect(row!.actions.filter((a) => a.type === 'buildOrder')).toHaveLength(4);
+    expect(row!.actions.at(-1)).toEqual(RIGHT[0]);
+    expect(q.stats.duplicate).toBe(0);
+  });
+
+  it('is still bounded: late is late and the far future is refused', () => {
+    const q = new InputQueue();
+    expect(q.coalesce(0, input(7), 7)).toBe('late');
+    expect(q.coalesce(0, input(2 ** 31), 0)).toBe('far-future');
+    expect(q.bufferedTicks).toBe(0);
+  });
+
+  it('keeps one player out of another player\'s row', () => {
+    const q = new InputQueue();
+    q.coalesce(0, input(5, LEFT, 10), 0);
+    q.coalesce(1, input(5, RIGHT, 11), 0);
+    expect(q.take(5)).toEqual([
+      { id: 0, actions: LEFT, seq: 10 },
+      { id: 1, actions: RIGHT, seq: 11 },
+    ]);
   });
 });
