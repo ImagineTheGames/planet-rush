@@ -110,6 +110,11 @@ export const MAX_ROOM_CODE_LENGTH = 8;
  */
 export const MAX_TICKET_LENGTH = 512;
 
+/** Longest ABANDON-MATCH reason the server will keep (`./transport` LeaveMessage).
+ *  It is a log string and nothing branches on it, so it is truncated rather than
+ *  refused — but it is still attacker-supplied text on its way to a server log. */
+export const MAX_LEAVE_REASON_CHARS = 64;
+
 /** Most actions one input message may carry. The action union has six verbs and
  *  a tick sensibly carries at most one of each; the two spare slots are the
  *  headroom a client one version ahead sends its new verbs in (dropped, not
@@ -208,6 +213,16 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       const id = raw['id'];
       if (!isCount(id)) return null;
       return { type: 'ping', id };
+    }
+    // ABANDON MATCH (`./transport` LeaveMessage): the one client message whose
+    // whole content is its own arrival. The reason is a log string — bounded like
+    // every other field on this hostile surface, and dropped rather than refused
+    // when it is the wrong shape, because a malformed *reason* must not cost a
+    // player the clean exit they asked for.
+    case 'leave': {
+      const reason = raw['reason'];
+      const clean = typeof reason === 'string' ? reason.slice(0, MAX_LEAVE_REASON_CHARS) : null;
+      return { type: 'leave', ...(clean !== null && clean.length > 0 ? { reason: clean } : {}) };
     }
     default:
       return null;

@@ -31,6 +31,8 @@ import type { World } from '../sim';
 import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
+import { LinkWatch } from './link-loss';
+import type { LinkStatus, LinkWatchConfig } from './link-loss';
 import { PredictedMatch, applyPlayerEconomy } from './prediction';
 import { NetTelemetry } from './telemetry';
 import { RemoteInterpolator } from './interpolation';
@@ -113,6 +115,18 @@ export interface MatchSession {
   sampleShots(): readonly InterpolatedShot[];
   /** Leave the match. */
   close(): void;
+  /**
+   * Whether the link is dead and the world is therefore frozen (`./link-loss`).
+   *
+   * Always false offline, where authority is in this process and cannot go away.
+   * Online it is the honest answer to *"is what I am looking at still real?"* —
+   * and while it is true, {@link sendInput} predicts nothing (m10 disconnect
+   * honesty; the developer's *"bots frozen but I could still move"*).
+   */
+  readonly frozen: boolean;
+  /** Where the connection stands, as of the last poll (`./link-loss`). Permanently
+   *  `live` offline — a `LocalLoopback` cannot drop. */
+  readonly link: LinkStatus;
 }
 
 /** Everything an offline match needs: the loopback's config plus the lobby
@@ -178,6 +192,18 @@ export interface OpenOptions {
  */
 export const PING_INTERVAL_MS = 500;
 
+/** What {@link MatchSession.link} reads offline: a connection that cannot drop,
+ *  because there is no connection (`./loopback`). One frozen object, so an offline
+ *  frame allocates nothing to say nothing has happened. */
+const OFFLINE_LINK: LinkStatus = {
+  phase: 'live',
+  cause: null,
+  silentMs: 0,
+  graceRemainingMs: 0,
+  attempts: 0,
+  ending: null,
+};
+
 export class TransportSession implements MatchSession {
   private player: PlayerId = 0;
   private nextTick: Tick = 1;
@@ -212,10 +238,20 @@ export class TransportSession implements MatchSession {
    *  predicts nothing: there is no latency to hide, and inventing a second copy
    *  of a world we already own would be the one way to make offline drift. */
   private readonly authoritative: boolean;
+  /**
+   * The dead-connection watchdog (`./link-loss`), online only — offline there is
+   * no wire to lose and authority is in this process.
+   *
+   * It is *here*, on the session, rather than on the transport, because the signal
+   * it watches is the one the transport cannot see: server frames arriving. A
+   * backgrounded socket reads `open` long after it has stopped delivering, so the
+   * only honest measure of a live connection is that data is coming out of it.
+   */
+  private readonly watch: LinkWatch | null;
 
   constructor(
     private readonly transport: Transport,
-    options: { dt?: number; now?: () => number } = {},
+    options: { dt?: number; now?: () => number; link?: LinkWatchConfig } = {},
   ) {
     this.dt = options.dt ?? TICK_DT;
     // Wall clock for telemetry and interpolation timing. Injected like every
@@ -223,6 +259,7 @@ export class TransportSession implements MatchSession {
     // reproducible and a test runs instantly.
     this.clock = options.now ?? ((): number => Date.now());
     this.authoritative = isLocalAuthority(transport);
+    this.watch = this.authoritative ? null : new LinkWatch(this.clock(), options.link ?? {});
     transport.onMessage((message) => this.receive(message));
   }
 
@@ -357,6 +394,91 @@ export class TransportSession implements MatchSession {
     return this.netTelemetry.live.networkFloorMs;
   }
 
+  // --- The link, and whether it is still there (m10 disconnect honesty) -------
+
+  /**
+   * Where the connection stands as of the last {@link pollLink} (`./link-loss`).
+   * Offline this is permanently `live`: a `LocalLoopback` cannot drop.
+   */
+  get link(): LinkStatus {
+    return this.watch?.status ?? OFFLINE_LINK;
+  }
+
+  /**
+   * **The freeze.** True from the instant a dead connection is detected until a
+   * server frame proves it is back — and while it is true, {@link sendInput}
+   * predicts nothing.
+   */
+  get frozen(): boolean {
+    return this.watch?.frozen ?? false;
+  }
+
+  /**
+   * Sample the link. Call once per rendered frame *and* on the overlay's own
+   * clock: a dead connection is detected by nothing happening, so something has to
+   * keep looking at the clock or the silence is never noticed.
+   *
+   * It also spends the one automatic redial a fresh loss is owed (brief §2 —
+   * *"auto-attempt one reconnect on tab-return inside grace before even asking"*),
+   * so a player who backgrounds the tab for ten seconds and comes back is usually
+   * flying again before the overlay has finished asking them anything.
+   */
+  pollLink(now: number = this.clock()): LinkStatus {
+    const watch = this.watch;
+    if (!watch) return OFFLINE_LINK;
+    watch.transportState(this.transport.state, now, this.closeReason);
+    // Size the silence limit from the wire's own round trip, not from a constant:
+    // a satellite link deserves more patience than a LAN (`./link-loss`).
+    watch.setRtt(this.networkPingMs);
+    watch.poll(now);
+    // Spend the automatic attempt *inside* the poll, so the status handed back
+    // already says `redialing` — an overlay drawn from a pre-redial reading would
+    // ask the player to press a button the client is pressing in the same frame.
+    if (watch.takeAutoRedial(now)) this.reconnect(now);
+    return watch.status;
+  }
+
+  /** The page went away — detection suspends (`./link-loss` rule 2). */
+  linkHidden(): void {
+    this.watch?.hide();
+  }
+
+  /** The page came back. A stale last frame at this instant IS the diagnosis, and
+   *  this is where the developer's backgrounded-tab case is caught. */
+  linkShown(now: number = this.clock()): LinkStatus {
+    this.watch?.shown(now);
+    return this.pollLink(now);
+  }
+
+  /**
+   * **RECONNECT**: dial again now and reclaim the seat (GDD §4.2). True when a dial
+   * actually started; false when there was nothing to dial for — a dead room or a
+   * spent window, which the transport then closes with, so the overlay stops asking
+   * and says what happened instead.
+   */
+  reconnect(now: number = this.clock()): boolean {
+    const watch = this.watch;
+    if (!watch) return false;
+    const redial = (this.transport as { redial?: () => boolean }).redial;
+    const started = typeof redial === 'function' ? redial.call(this.transport) : false;
+    if (started) watch.beginRedial(now);
+    else watch.redialFailed(now);
+    return started;
+  }
+
+  /**
+   * **ABANDON MATCH**: a clean leave — the seat is freed rather than held empty for
+   * a minute (`./transport` LeaveMessage, `server/room.ts` `abandon`). Falls back to
+   * a plain hang-up on a transport with no leave gesture, which the grace rule
+   * handles exactly as it always has.
+   */
+  leave(reason = 'abandoned'): void {
+    const leave = (this.transport as { leave?: (reason?: string) => void }).leave;
+    if (typeof leave === 'function') leave.call(this.transport, reason);
+    else this.transport.close();
+    this.watch?.abandon(this.clock());
+  }
+
   sampleRemotes(): readonly InterpolatedShip[] {
     return this.interpolator?.sample(this.clock()) ?? [];
   }
@@ -366,6 +488,17 @@ export class TransportSession implements MatchSession {
   }
 
   sendInput(actions: readonly Action[]): void {
+    // ── THE FREEZE (m10 disconnect honesty) ───────────────────────────────────
+    //
+    // No authority, no world. The developer's report is what this line prevents:
+    // *"bots frozen but I could still move"* — a client predicting on a link that
+    // stopped delivering keeps flying a ship nobody else can see, mining rocks
+    // nobody else agrees exist, and every second of it is a lie that reconciliation
+    // will have to pay back if the link ever returns. So the moment the loss is
+    // detected the sim stops advancing: nothing sent, nothing predicted, no tick.
+    // The renderer keeps drawing (the overlay has to be live over *something*), and
+    // a frame arriving un-freezes it in the same instant it lands (`./link-loss`).
+    if (this.watch?.frozen) return;
     // The world the game loop has been rendering holds *presented* values — the
     // local hull nudged by its decaying correction offset, remote hulls a jitter
     // buffer in the past. Put the simulation back before a single tick of it runs
@@ -487,6 +620,11 @@ export class TransportSession implements MatchSession {
   }
 
   private receive(message: ServerMessage): void {
+    // **Proof of life**, and the only one there is (`./link-loss`). Any frame —
+    // snapshot, pong, lobby state — means the socket is still carrying data, and a
+    // frame arriving after a detected loss is the recovery: the freeze lifts and the
+    // overlay comes down here, in the same call the data lands in.
+    this.watch?.frame(this.clock());
     switch (message.type) {
       case 'welcome':
         this.player = message.you;
@@ -606,10 +744,16 @@ export class TransportSession implements MatchSession {
         // Written into the predicted world, where the renderer will find it.
         this.predictor?.applyEvent(message);
         break;
+      case 'matchEnd':
+        // The room stops stepping when it ends, so it stops broadcasting: from the
+        // watchdog's side the wire simply falls silent (`./link-loss` `retire`).
+        // Stop watching, or every finished match throws CONNECTION LOST over its own
+        // summary screen two and a half seconds later.
+        this.watch?.retire(this.clock());
+        break;
       case 'lobbyState':
       case 'playerSubstituted':
       case 'playerReclaimed':
-      case 'matchEnd':
         // Lobby, static entities, the reconnect-grace pair, and the end-of-match
         // summary are the UI's business; the loop's contract is input in, world
         // out. They reach those screens through `observe` (GDD §4.6 M4, M7).
@@ -707,6 +851,13 @@ export interface OnlineSessionConfig {
   /** Ambient overrides for the transport — injected in tests (see
    *  `./websocket-transport`); production passes none and gets the browser's. */
   readonly transport?: Omit<WebSocketTransportConfig, 'url' | 'room'>;
+  /** Dead-connection detection overrides (`./link-loss`) — the grace window to
+   *  count down and the broadcast interval to size the silence limit from. Tests
+   *  pass a short window; production takes the ratified ~60 s (GDD §4.2). */
+  readonly link?: LinkWatchConfig;
+  /** Wall clock, ms. Injected in tests so a sixty-second window elapses instantly;
+   *  production gets `Date.now`. */
+  readonly now?: () => number;
 }
 
 /** Read a named optional string property off a transport, or null when it does not
@@ -734,6 +885,20 @@ export interface OnlineSession extends MatchSession {
   readonly closeReason: string | null;
   /** The server's own reason for refusing the join, or null. */
   readonly rejectReason: string | null;
+
+  // --- The link, said out loud (m10 disconnect honesty) ---------------------
+
+  /** Sample the link; call once per frame and on the overlay's clock. */
+  pollLink(now?: number): LinkStatus;
+  /** The page went hidden — detection suspends until it returns. */
+  linkHidden(): void;
+  /** The page came back; a stale last frame at this instant is a lost connection. */
+  linkShown(now?: number): LinkStatus;
+  /** RECONNECT: dial now and reclaim the seat. False when there is nothing to
+   *  reclaim (dead room, spent window). */
+  reconnect(now?: number): boolean;
+  /** ABANDON MATCH: a stated leave, so the seat is freed rather than held. */
+  leave(reason?: string): void;
 }
 
 /**
@@ -759,7 +924,10 @@ export function createOnlineSession(config: OnlineSessionConfig): OnlineSession 
     room: config.room,
     ...(config.transport ?? {}),
   });
-  const session = new TransportSession(transport);
+  const session = new TransportSession(transport, {
+    ...(config.link !== undefined ? { link: config.link } : {}),
+    ...(config.now !== undefined ? { now: config.now } : {}),
+  });
 
   const sendLobbyChoice = (): void => {
     if (config.shipClass === undefined) return;

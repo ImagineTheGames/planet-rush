@@ -63,6 +63,17 @@
  * the button: a pure model here, one DOM panel over the canvas, and `src/ui/`'s own
  * screens untouched.
  *
+ * And `./link-loss` with `./link-loss-view` are the other end of that story: the
+ * connection **dying** out loud. The reconnect wire always worked when the client
+ * knew it had dropped; a backgrounded tab is the case where it does not — the socket
+ * dies silently, `state` still reads `open`, and the client keeps predicting a world
+ * no server is behind (the developer: *"bots frozen but I could still move"*). So
+ * silence itself is watched, a returning tab is judged rather than trusted,
+ * prediction FREEZES the instant either says the link is gone, and one DOM overlay
+ * says what was detected and offers RECONNECT (with the grace seconds ticking on the
+ * button) or ABANDON MATCH — which is a *stated* leave, so the seat is freed instead
+ * of held empty for a minute (`./transport` LeaveMessage, `server/room.ts` `abandon`).
+ *
  * And `./ping` with `./ping-badge` are the round trip finally shown to the person
  * whose connection it is (ratified developer): a pure grading model both surfaces
  * share — the lobby row beside each human's name, and one mono line in the corner
@@ -91,6 +102,8 @@ export * from './playtest-log-button';
 export * from './playtest-log-attach';
 export * from './connect-trace';
 export * from './connect-trace-view';
+export * from './link-loss';
+export * from './link-loss-view';
 export * from './allocator-client';
 export * from './server-url';
 export * from './websocket-transport';

@@ -602,6 +602,32 @@ export class MatchRoom {
    * the grace clock starts (GDD §4.2).
    */
   disconnect(player: PlayerId, nowMs: number): void {
+    this.vacate(player, nowMs + this.graceMs);
+  }
+
+  /**
+   * **ABANDON MATCH** — the player said they were done (`src/net/transport`
+   * LeaveMessage, m10 disconnect-honesty).
+   *
+   * Same substitution as a drop, and then the opposite treatment of the window: a
+   * seat nobody is coming back to is not held. The grace closes here rather than
+   * sixty seconds from now, so the token stops working immediately, the roster
+   * stops showing a ghost, and in the lobby the seat is free for the next player
+   * in the same broadcast.
+   *
+   * Peers see the substitution exactly as they would for a drop — `graceSeconds: 0`
+   * is the one difference, and it is the honest one: there is no window.
+   */
+  abandon(player: PlayerId): void {
+    this.vacate(player, -1);
+  }
+
+  /**
+   * The seat loses its connection, for whichever of the two reasons. `graceUntil`
+   * is the whole difference: a wall-clock deadline for a drop (the player may be
+   * back), `-1` for a stated leave (they will not be).
+   */
+  private vacate(player: PlayerId, graceUntil: number): void {
     const slot = this.slots[player];
     if (!slot || slot.socket === null) return;
     slot.socket = null;
@@ -619,11 +645,14 @@ export class MatchRoom {
     }
 
     this.seatBot(slot, this.substituteFor(slot.player));
-    slot.graceUntil = nowMs + this.graceMs;
+    slot.graceUntil = graceUntil;
+    // An abandoned seat's token dies with the window: a reclaim would be answered
+    // `reclaim-expired`, which is exactly what it is.
+    if (graceUntil < 0) slot.token = null;
     this.broadcast({
       type: 'playerSubstituted',
       player: slot.player,
-      graceSeconds: this.graceMs / 1000,
+      graceSeconds: graceUntil < 0 ? 0 : this.graceMs / 1000,
     });
     this.broadcastLobby();
   }
@@ -675,6 +704,12 @@ export class MatchRoom {
           queueMs: slot.queueTicks * this.dt * 1000,
           loopLagMs: this.loopLagMs,
         });
+        break;
+      // ABANDON MATCH. Handled before the socket closes so the *reason* for the
+      // close is known when it arrives: the connection's own `close()` then finds a
+      // seat already vacated and does nothing (`server/match-server.ts`).
+      case 'leave':
+        this.abandon(player);
         break;
     }
   }

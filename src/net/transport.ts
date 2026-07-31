@@ -153,13 +153,35 @@ export interface PingMessage {
   id: number;
 }
 
+/**
+ * **A deliberate exit**, said out loud (m10 disconnect-honesty, ABANDON MATCH).
+ *
+ * A socket that simply closes is ambiguous, and the reconnect-grace rule resolves
+ * that ambiguity generously: a bot takes the seat and the window is held ~60 s for
+ * a player who might be coming back (GDD §4.2). That is exactly right for a screen
+ * lock and exactly wrong for a player who pressed ABANDON MATCH — their seat sits
+ * un-joinable for a minute for nobody, and every peer's lobby keeps a ghost.
+ *
+ * So the client says which it is. On `leave` the server substitutes the bot as
+ * usual and then **closes the window immediately**: the seat is a bot's for the rest
+ * of the match (or free again in the lobby), and the reclaim token stops working
+ * (`server/room.ts` `abandon`). It is a courtesy message, not a requirement —
+ * a socket that dies without one is still handled by the grace rule.
+ */
+export interface LeaveMessage {
+  type: 'leave';
+  /** Why, for the server's own log. Bounded and never interpreted. */
+  reason?: string;
+}
+
 /** Everything a client can send. */
 export type ClientMessage =
   | JoinMessage
   | LobbyChoiceMessage
   | StartMatchMessage
   | InputMessage
-  | PingMessage;
+  | PingMessage
+  | LeaveMessage;
 
 // ---------------------------------------------------------------------------
 // Server → client

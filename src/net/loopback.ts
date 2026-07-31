@@ -179,6 +179,12 @@ export class LocalLoopback implements Transport, LocalAuthority {
       case 'input':
         this.input(this.you, message);
         break;
+      // ABANDON MATCH offline is simply leaving: there is no seat to free and no
+      // grace window to close (`./transport` LeaveMessage), so it is the same
+      // gesture as {@link close} and is spelled that way rather than ignored.
+      case 'leave':
+        this.close();
+        break;
     }
   }
 
