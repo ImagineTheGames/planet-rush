@@ -140,6 +140,7 @@ describe('WebSocketTransport', () => {
       type: 'snapshot',
       tick: 240,
       ackSeq: 12,
+      ackTick: 238,
       payload: encodeSnapshot(240, [], []),
     });
 

@@ -57,6 +57,7 @@ import type {
   PlayerEconomy,
   RoomCode,
   ServerMessage,
+  Tick,
 } from '../src/net/transport';
 import { encodeServerMessage } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
@@ -156,6 +157,16 @@ interface Slot {
    * the ship would visibly stutter backwards (GDD §4.2).
    */
   ackSeq: number;
+  /**
+   * The sim tick {@link ackSeq} was simulated at — the alignment half of the ack
+   * (`src/net/transport` `SnapshotMessage.ackTick`).
+   *
+   * Written in the same breath as `ackSeq` and from the tick actually being run,
+   * never from the tick the client asked for: when the two differ the client's
+   * prediction of that input is standing at the wrong instant, and this is the
+   * only place in the system that knows it. 0 until a first input runs.
+   */
+  ackTick: Tick;
   /** Per-client fog of war over station health (GDD §2.2). */
   fog: FogTracker | null;
   /**
@@ -279,6 +290,7 @@ export class MatchRoom {
       graceUntil: -1,
       token: null,
       ackSeq: 0,
+      ackTick: 0,
       fog: null,
       wallet: null,
       orders: [],
@@ -420,6 +432,7 @@ export class MatchRoom {
     // the drop would then read every one of its presses as "already simulated" and
     // drop them forever (`acceptInput`). The seat's ack restarts with the seat.
     slot.ackSeq = 0;
+    slot.ackTick = 0;
     // Orders from the connection that left are answered for; a returning client
     // mints fresh ids and must not collide with a table it never saw.
     slot.orders.length = 0;
@@ -690,7 +703,14 @@ export class MatchRoom {
       rows.push(slot ? { ...row, actions: this.consumeOrders(slot, row.actions) } : row);
       // This input is about to be simulated, so this is the moment it becomes
       // true to tell its client "I have run this" (GDD §4.2 reconciliation).
-      if (slot && row.seq > slot.ackSeq) slot.ackSeq = row.seq;
+      if (slot && row.seq > slot.ackSeq) {
+        slot.ackSeq = row.seq;
+        // …and the tick it is being run at, which is `nextTick` and not whatever
+        // tick the message named: a re-filed late arrival runs *here*, and the
+        // client's copy of it is standing somewhere else (`acceptInput`, and
+        // `src/net/telemetry` `appliedDeltaMean`).
+        slot.ackTick = nextTick;
+      }
     }
 
     // Sorted, so packet arrival order can never change the sim's resolution
@@ -921,6 +941,7 @@ export class MatchRoom {
       type: 'snapshot',
       tick: world.tick,
       ackSeq: slot.ackSeq,
+      ackTick: slot.ackTick,
       payload: encodeWorldSnapshot(world),
     });
   }
@@ -934,7 +955,13 @@ export class MatchRoom {
       // The wallet first, when it moved: the client applies it in the reconcile the
       // snapshot on its heels triggers (`syncEconomy`).
       this.syncEconomy(slot, world);
-      this.sendTo(slot, { type: 'snapshot', tick: world.tick, ackSeq: slot.ackSeq, payload });
+      this.sendTo(slot, {
+        type: 'snapshot',
+        tick: world.tick,
+        ackSeq: slot.ackSeq,
+        ackTick: slot.ackTick,
+        payload,
+      });
     }
   }
 

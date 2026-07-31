@@ -68,16 +68,28 @@ import type {
 // Framing
 // ---------------------------------------------------------------------------
 
-/** Wire format version. Bumped whenever a frame layout changes; a client and a
- *  server that disagree here disagree about everything, so it is checked. */
-export const WIRE_VERSION = 1;
+/**
+ * Wire format version. Bumped whenever a frame layout changes; a client and a
+ * server that disagree here disagree about everything, so it is checked.
+ *
+ * **v2 (M10 tick-alignment)** — two changes to the snapshot frame, both of which a
+ * v1 reader would misread rather than reject, which is exactly what a version byte
+ * is for: the header gained `ackTick` (`./transport` `SnapshotMessage`), and the
+ * payload's positions and velocities became eighths of a world unit rather than
+ * whole ones (`./snapshot` `POS_SCALE`) — a v1 client decoding a v2 payload would
+ * draw the entire match at an eighth scale.
+ */
+export const WIRE_VERSION = 2;
 
 /** First byte of a binary frame: this is a snapshot. Room for more binary
  *  frame kinds later (a binary input frame is the obvious next one). */
 export const FRAME_SNAPSHOT = 0x01;
 
-/** kind u8 · version u8 · tick u32 · ackSeq u32, little-endian. */
-export const SNAPSHOT_FRAME_HEADER_BYTES = 10;
+/** kind u8 · version u8 · tick u32 · ackSeq u32 · ackTick u32, little-endian.
+ *  The last field is the M10 alignment instrument: the tick `ackSeq` was run at
+ *  (`./transport` `SnapshotMessage.ackTick`). Four bytes, thirty times a second —
+ *  120 B/s per client against the ~15 KB/s the snapshots themselves cost. */
+export const SNAPSHOT_FRAME_HEADER_BYTES = 14;
 
 /** The raw payload a socket carries either way. */
 export type WireFrame = string | ArrayBuffer;
@@ -213,6 +225,7 @@ export function encodeServerMessage(message: ServerMessage): WireFrame {
   dv.setUint8(1, WIRE_VERSION);
   dv.setUint32(2, message.tick >>> 0, true);
   dv.setUint32(6, message.ackSeq >>> 0, true);
+  dv.setUint32(10, message.ackTick >>> 0, true);
   new Uint8Array(frame, SNAPSHOT_FRAME_HEADER_BYTES).set(payload);
   return frame;
 }
@@ -242,6 +255,7 @@ export function parseServerMessage(frame: WireFrame): ServerMessage | null {
     type: 'snapshot',
     tick: dv.getUint32(2, true),
     ackSeq: dv.getUint32(6, true),
+    ackTick: dv.getUint32(10, true),
     payload: frame.slice(SNAPSHOT_FRAME_HEADER_BYTES),
   };
 }

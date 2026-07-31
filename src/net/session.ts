@@ -455,10 +455,13 @@ export class TransportSession implements MatchSession {
           // A snapshot lands between frames, so the world may be holding presented
           // values right now. Reconcile against the simulation, never the picture.
           this.unpresent();
-          const report = this.predictor.reconcile(decoded, message.ackSeq);
+          const report = this.predictor.reconcile(decoded, message.ackSeq, message.ackTick);
           // Feed the instrument only for a reconcile that actually applied — a stale
           // snapshot the client ignored is not a data point (`./telemetry`).
           if (report.applied) {
+            // `lead` and `appliedDelta` ride along: the first is how far ahead of
+            // authority this client is standing, the second whether the input that
+            // put it there was run where it thought (`./telemetry`).
             this.netTelemetry.recordReconcile(
               { ...report, lead: report.replayed },
               message.ackSeq,

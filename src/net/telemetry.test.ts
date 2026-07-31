@@ -189,6 +189,42 @@ describe('RTT variance', () => {
   });
 });
 
+describe('input-tick alignment', () => {
+  it('averages only the reconciles that could state a delta, and keeps the worst', () => {
+    const t = new NetTelemetry();
+    // Two measured misalignments and one reconcile that had nothing to compare —
+    // an ack for input already retired. The unmeasurable one must not be averaged
+    // in as a zero, or a stalled second reads as a well-aligned one.
+    t.recordReconcile({ ...OK, appliedDelta: 2 }, 1, 1000);
+    t.recordReconcile({ ...OK, appliedDelta: null }, 2, 1010);
+    t.recordReconcile({ ...OK, appliedDelta: 6 }, 3, 1020);
+    t.recordReconcile(OK, 4, 2000); // rolls the second
+
+    const sample = t.samples[0]!;
+    expect(sample.reconciles).toBe(3);
+    expect(sample.appliedDeltaSamples).toBe(2);
+    expect(sample.appliedDeltaMean).toBe(4);
+    expect(sample.appliedDeltaMax).toBe(6);
+  });
+
+  it('reports null for a second in which nothing could be measured', () => {
+    const t = new NetTelemetry();
+    t.recordReconcile(OK, 1, 1000);
+    t.recordReconcile(OK, 2, 2000);
+
+    expect(t.samples[0]!.appliedDeltaMean).toBeNull();
+    expect(t.samples[0]!.appliedDeltaSamples).toBe(0);
+    expect(t.samples[0]!.appliedDeltaMax).toBe(0);
+  });
+
+  it('puts the alignment in the dump, because that is where it gets read', () => {
+    const t = new NetTelemetry();
+    t.recordReconcile({ ...OK, appliedDelta: 3 }, 1, 1000);
+    t.recordReconcile(OK, 2, 2000);
+    expect(t.format()).toContain('align');
+  });
+});
+
 describe('the RTT floor', () => {
   it('is the least round trip recently seen, not the mean — the wire without our own queue', () => {
     const telemetry = new NetTelemetry();

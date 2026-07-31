@@ -126,6 +126,11 @@ export class LocalLoopback implements Transport, LocalAuthority {
    *  snapshot so the client can retire the predictions the server has seen
    *  (GDD §4.2 prediction/reconciliation). */
   private ackSeq = 0;
+  /** The tick {@link ackSeq} ran at. Offline it is always the tick the client
+   *  asked for — there is no wire to arrive late on — so the alignment
+   *  instrument reads a flat zero here, which is the correct answer
+   *  (`./transport` `SnapshotMessage.ackTick`). */
+  private ackTick: Tick = 0;
   private matchEnded = false;
 
   /** Outbound delivery is queued rather than immediate so a handler that sends
@@ -289,7 +294,10 @@ export class LocalLoopback implements Transport, LocalAuthority {
       // it has been handed — the same rule the match server follows, because the
       // predicting client reconciles against both (GDD §4.2, `./prediction`).
       for (const row of rows) {
-        if (row.id === this.you && row.seq > this.ackSeq) this.ackSeq = row.seq;
+        if (row.id === this.you && row.seq > this.ackSeq) {
+          this.ackSeq = row.seq;
+          this.ackTick = world.tick + 1;
+        }
       }
       step(world, rows, this.dt);
       this.broadcastSnapshot();
@@ -315,6 +323,7 @@ export class LocalLoopback implements Transport, LocalAuthority {
       type: 'snapshot',
       tick: world.tick,
       ackSeq: this.ackSeq,
+      ackTick: this.ackTick,
       payload: encodeWorldSnapshot(world),
     });
   }

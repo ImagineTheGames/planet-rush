@@ -244,5 +244,14 @@ export function describeSample(sample: TelemetrySample): Record<string, number |
     // How far ahead of authority the client ran, in ticks — the input latency the
     // player pays on their own trigger, over and above the wire (M10 audit).
     lead: Math.round(sample.leadMeanTicks),
+    // **Input-tick alignment**, in ticks: how much later the server ran this
+    // client's input than the tick it was predicted at (M10 tick-alignment;
+    // `./telemetry` `appliedDeltaMean`). A pasted log showing `align 0` says the
+    // two clocks agree and a correction beside it is not a misalignment; a log
+    // showing `align 6/31` says the presses are landing late and everything
+    // predicted on them is standing at the wrong instant.
+    align: sample.appliedDeltaMean,
+    alignMax: sample.appliedDeltaMax,
+    alignN: sample.appliedDeltaSamples,
   };
 }

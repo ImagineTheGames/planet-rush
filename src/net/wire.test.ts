@@ -314,7 +314,7 @@ describe('server → client', () => {
     const projectiles = Array.from({ length: 64 }, (_, i) => projectile(i));
     const payload = encodeSnapshot(4096, ships, projectiles);
 
-    const frame = encodeServerMessage({ type: 'snapshot', tick: 4096, ackSeq: 77, payload });
+    const frame = encodeServerMessage({ type: 'snapshot', tick: 4096, ackSeq: 77, ackTick: 4090, payload });
     expect(frame).toBeInstanceOf(ArrayBuffer);
     expect((frame as ArrayBuffer).byteLength).toBe(SNAPSHOT_FRAME_HEADER_BYTES + payload.byteLength);
 

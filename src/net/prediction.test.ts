@@ -70,6 +70,9 @@ function distance(a: World, b: World): number {
 interface Broadcast {
   snapshot: DecodedSnapshot;
   ackSeq: number;
+  /** The tick `ackSeq` was actually simulated at — the alignment half of the ack
+   *  (`./transport` `SnapshotMessage.ackTick`). */
+  ackTick: number;
 }
 
 /**
@@ -82,6 +85,7 @@ class Authority {
   readonly world = createWorld(MATCH);
   private readonly queue = new InputQueue();
   private acknowledged = 0;
+  private acknowledgedAt = 0;
   /** How often a client's input missed its tick — the lateness a lead exists
    *  to prevent. */
   lateArrivals = 0;
@@ -94,9 +98,15 @@ class Authority {
   }
 
   tick(): void {
-    const rows = this.queue.take(this.world.tick + 1);
+    const nextTick = this.world.tick + 1;
+    const rows = this.queue.take(nextTick);
     for (const row of rows) {
-      if (row.id === LOCAL && row.seq > this.acknowledged) this.acknowledged = row.seq;
+      if (row.id === LOCAL && row.seq > this.acknowledged) {
+        this.acknowledged = row.seq;
+        // The tick it is being run at, which a re-filed late arrival makes
+        // different from the tick the client asked for (`server/room.ts`).
+        this.acknowledgedAt = nextTick;
+      }
     }
     step(this.world, rows, TICK_DT);
   }
@@ -105,6 +115,7 @@ class Authority {
     return {
       snapshot: decodeSnapshot(encodeWorldSnapshot(this.world)),
       ackSeq: this.acknowledged,
+      ackTick: this.acknowledgedAt,
     };
   }
 }
@@ -150,6 +161,9 @@ class Match {
   readonly server = new Authority();
   readonly client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
   readonly errors: number[] = [];
+  /** Every measured input-tick misalignment, in ticks (`ReconcileReport.appliedDelta`);
+   *  reconciles that could not be measured are absent rather than zero. */
+  readonly alignment: number[] = [];
 
   private readonly up: Link<InputMessage>;
   private readonly down: Link<Broadcast>;
@@ -183,8 +197,11 @@ class Match {
       if (this.server.world.tick % 2 === 0) this.down.send(this.frame, this.server.broadcast());
 
       for (const inbound of this.down.arrivals(this.frame)) {
-        const report = this.client.reconcile(inbound.snapshot, inbound.ackSeq);
+        const report = this.client.reconcile(inbound.snapshot, inbound.ackSeq, inbound.ackTick);
         if (report.applied) this.errors.push(report.error);
+        if (report.applied && report.appliedDelta !== null) {
+          this.alignment.push(report.appliedDelta);
+        }
       }
     }
   }
@@ -390,6 +407,77 @@ describe('reconciliation', () => {
     // plus the occasional one-tick jitter miss, not a standing divergence.
     const mean = flight.reduce((a, b) => a + b, 0) / flight.length;
     expect(mean).toBeLessThan(5);
+  });
+});
+
+describe('the alignment instrument', () => {
+  it('reads zero while the server is running each input at the tick it was predicted for', () => {
+    // The whole point of the number (M10 tick-alignment): a client stamps an input
+    // with the tick it predicted it at, the server files it under that tick and runs
+    // it there, and the difference is nothing at all. Four frames of one-way delay is
+    // the developer's own condition, and the client's lead covers it comfortably.
+    const match = new Match(4);
+    match.run(60); // warm-up: the opening frames are sent before any lead exists,
+    const opening = match.server.lateArrivals; // so a few genuinely do arrive late
+    const settled = match.alignment.length;
+    match.run(240);
+
+    const flight = match.alignment.slice(settled);
+    expect(flight.length).toBeGreaterThan(50);
+    // Nothing arrived late once the lead covered the wire…
+    expect(match.server.lateArrivals).toBe(opening);
+    // …so every input ran at exactly the tick it was predicted for. This is the
+    // measurement that took input-tick misalignment off the suspect list for the
+    // developer's condition and sent the hunt to the wire's own precision
+    // (`./snapshot` `POS_SCALE`).
+    expect(Math.max(...flight)).toBe(0);
+    expect(Math.min(...flight)).toBe(0);
+  });
+
+  it('states the gap in ticks when a late arrival is re-filed onto a later tick', () => {
+    // A wire whose delay the client's lead cannot cover: the input lands after its
+    // tick has already been simulated, so authority re-files it onto the next free
+    // one (`server/room.ts` `acceptInput`) and runs it *there*. The client predicted
+    // it somewhere else, and until this instrument existed nothing in the system
+    // could say so — the only visible symptom was a correction that never went away.
+    const match = new Match(4);
+    match.run(60);
+    // Freeze the client's clock relative to the server's by stamping input for
+    // ticks the server has already passed: the same shape a retransmit stall leaves
+    // behind, without needing one.
+    const server = match.server;
+    const client = match.client;
+    const stale: InputMessage = { type: 'input', tick: server.world.tick - 3, seq: 9_000, actions: THRUST };
+    const lateBefore = server.lateArrivals;
+    server.receive(stale);
+    expect(server.lateArrivals).toBe(lateBefore + 1);
+    server.tick();
+
+    const broadcast = server.broadcast();
+    // Authority ran seq 9000 at its own next tick, not at the tick the message named.
+    expect(broadcast.ackSeq).toBe(9_000);
+    expect(broadcast.ackTick).toBeGreaterThan(stale.tick);
+
+    // And a client that predicted that seq four ticks earlier is told exactly how
+    // far off it is standing.
+    client.predict(9_000, THRUST);
+    const predictedTick = client.pending.at(-1)!.tick;
+    const report = client.reconcile(broadcast.snapshot, broadcast.ackSeq, broadcast.ackTick);
+    expect(report.appliedDelta).toBe(broadcast.ackTick - predictedTick);
+  });
+
+  it('says null rather than zero when there is nothing to compare', () => {
+    const client = new PredictedMatch({ world: createWorld(MATCH), localPlayer: LOCAL });
+    const authority = new Authority();
+    authority.tick();
+    const broadcast = authority.broadcast();
+
+    // No `ackTick` at all — an offline transport, or a wire older than the field.
+    expect(client.reconcile(broadcast.snapshot, 0).appliedDelta).toBeNull();
+    // An ack naming input this client never held: unmeasurable, and *not* aligned.
+    authority.tick();
+    const next = authority.broadcast();
+    expect(client.reconcile(next.snapshot, 42, 7).appliedDelta).toBeNull();
   });
 });
 
