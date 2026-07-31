@@ -40,8 +40,10 @@ import { MapPickerView } from './map-picker-view';
 import { mapPickerModel } from './map-picker';
 import type { MapPickerLayout } from './map-picker';
 // One grade→colour table for both surfaces that show a ping, so the roster row
-// and the in-match stamp can never disagree about what "amber" means.
+// and the in-match stamp can never disagree about what "amber" means — and the
+// model's own rule for whether a row has the width to carry a number at all.
 import { PING_GRADE_COLORS } from '../net/ping-badge';
+import { pingFits } from '../net/ping';
 
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §7 — shared with the HUD and the wheel)
@@ -56,10 +58,6 @@ const TEXT_DIM = PALETTE.hullSteel;
 
 /** Air between a player's name and their ping — `reivi · 245ms`. */
 const PING_GAP = 8;
-
-/** How much of a row's right edge the ping keeps clear of the trailing chips.
- *  A name long enough to push the number into them loses the number. */
-const PING_RIGHT_GUARD = 120;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
@@ -359,26 +357,6 @@ export class LobbyView extends Container {
     nodes.name.x = textX;
     nodes.name.y = rect.y + rect.height / 2 - (rect.height > 46 ? 15 : 8);
 
-    // The ping, beside the name (ratified developer): `reivi · 245ms`, graded
-    // green/amber/red by `src/net/ping`. Drawn on the name's own line because it
-    // is a fact about the *person* in the seat, not about the hull under them —
-    // and never at all on a bot row, where a number would be a lie the model
-    // refuses to produce (`seat.ping === null`).
-    //
-    // The name is left-anchored, so the ping simply follows its measured width; a
-    // long name that would push the number under the trailing chips drops it
-    // instead, because a roster that overlaps itself is worse than one without a
-    // ping on one row.
-    const pingRight = rect.x + rect.width - PING_RIGHT_GUARD;
-    const pingX = nodes.name.x + nodes.name.width + PING_GAP;
-    nodes.ping.visible = seat.ping !== null && pingX < pingRight;
-    if (seat.ping && nodes.ping.visible) {
-      nodes.ping.text = `· ${seat.ping.label}`;
-      nodes.ping.style.fill = PING_GRADE_COLORS[seat.ping.grade];
-      nodes.ping.x = pingX;
-      nodes.ping.y = nodes.name.y + 2;
-    }
-
     // Colour named in words, beside the hull. This is the line that makes the
     // roster readable with the hue removed (style-guide §3 rule 3, §9).
     nodes.detail.text = closed ? 'out of the match' : `${seat.className} · ${seat.colorName}`;
@@ -403,13 +381,42 @@ export class LobbyView extends Container {
     const tierShown = this.drawDifficultyChip(nodes, seat, chipRect);
     const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed);
 
+    // Where the row's trailing furniture actually begins — the leftmost chip that
+    // was really drawn, or the right edge when the row carries none. Both the OPEN
+    // marker and the ping measure from it, so neither reserves space for a control
+    // that isn't there.
+    const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
+
     // A bot seat before RUSH is a seat somebody can still take by room code —
     // marked just left of the leftmost visible chip so it never fights a label.
     nodes.open.visible = seat.openToJoin && phase === 'gathering' && rect.height > 30 && !closed;
     if (nodes.open.visible) {
-      const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
       nodes.open.x = chipsLeft - 4;
       nodes.open.y = rect.y + rect.height / 2 + 2;
+    }
+
+    // The ping, beside the name (ratified developer): `reivi · 245ms`, graded
+    // green/amber/red by `src/net/ping`. Drawn on the name's own line because it
+    // is a fact about the *person* in the seat, not about the hull under them —
+    // and never at all on a bot row, where a number would be a lie the model
+    // refuses to produce (`seat.ping === null`).
+    //
+    // The name is left-anchored, so the ping follows its measured width, and the
+    // number is kept only if it fits WHOLE in the space before `chipsLeft`
+    // (`pingFits`). Measured against the row's real content edge rather than a
+    // fixed reservation: a human seat in FFA has no trailing chip at all, and on a
+    // phone in landscape — a 221px row — the difference between "the chips that
+    // are there" and "the chips that could be there" is the whole number.
+    nodes.ping.visible = false;
+    if (seat.ping) {
+      nodes.ping.text = `· ${seat.ping.label}`;
+      const pingX = nodes.name.x + nodes.name.width + PING_GAP;
+      if (pingFits(pingX, nodes.ping.width, chipsLeft)) {
+        nodes.ping.visible = true;
+        nodes.ping.style.fill = PING_GRADE_COLORS[seat.ping.grade];
+        nodes.ping.x = pingX;
+        nodes.ping.y = nodes.name.y + 2;
+      }
     }
   }
 

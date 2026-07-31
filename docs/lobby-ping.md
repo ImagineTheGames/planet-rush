@@ -102,6 +102,35 @@ socket closes.
 A long player name that would push the number under the roster's trailing chips drops
 the number instead: a roster that overlaps itself is worse than one row without a ping.
 
+### The row's width, and the one place it runs out
+
+"Both form factors" is a claim about the **221px roster row on a phone in landscape**
+(the lobby lays the eight seats out as two columns of four there), not about the 693px
+one on the desktop. The number is kept only if it fits *whole* in the space before the
+row's trailing furniture — `pingFits` in `src/net/ping.ts`, measured against the chips
+the row **actually draws**:
+
+| Row | Content edge | Full-length (12-char) callsign keeps its ping? |
+|---|---|---|
+| Human, FFA | the row's right edge — a human seat has no trailing chip at all (the tier chip is a bot control) | yes, every form factor |
+| Human, TEAMS | the side chip, 90px in | yes, except the landscape phone |
+| Landscape phone, TEAMS | 90px in on a 221px row | only up to ~8 characters |
+
+This was measured, not assumed. An earlier revision reserved a flat **120px** at the
+row's right edge; the chips reserve at most 90, and a human FFA seat reserves none — so
+on the phone that over-reservation was wider than the space a full-length callsign left,
+and an ordinary name silently cost the player their ping on the form factor most likely
+to need one. Reserving space for furniture that never appears on a ping-bearing row is
+the bug; `pingFits` against the real content edge is the fix.
+
+The remaining gap is genuine width, not arithmetic: a landscape phone in TEAMS has
+~108px for a name and a number, and a near-maximum callsign spends it. That boundary is
+asserted in `tests/net/lobby-ping-fit.test.ts` rather than left to be discovered, so
+widening the row would fail the test loudly instead of drifting. **Director:** if the
+phone's TEAMS row should keep the number at any name length, the call is a design one —
+right-aligning the ping into the dead space beside the side chip, or shortening the name
+on that row — and neither is a change this lane makes unilaterally.
+
 ## 6. What is tested
 
 | Claim | Test |
@@ -112,4 +141,5 @@ the number instead: a roster that overlaps itself is worse than one row without 
 | `lobbyState` carries rtt per human seat, rounded; cadence; silence when still; live-match silence; a socket that cannot measure | `tests/server/lobby-ping.test.ts` |
 | The wire → row path, including a seat that changes hands to a bot | `tests/net/lobby-ping-model.test.ts` |
 | The corner stacks clear of the build stamp and the controls strip | `src/net/ping-badge.test.ts` |
+| The number fits its row on both form factors, in both modes — and is dropped, never overlapped, where it cannot | `tests/net/lobby-ping-fit.test.ts` |
 | The HUD number is the log's number | `src/net/telemetry.test.ts` |
