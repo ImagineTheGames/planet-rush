@@ -116,15 +116,19 @@ describe('one volley at 150 ms', () => {
 
     // ── AND NOT ONE INPUT WAS SILENTLY THROWN AWAY ───────────────────────────
     //
-    // `InputQueue` files by `(player, tick)` and drops a second message for the
-    // same pair. The client's clock is *not* monotonic — a lead trim rewinds it a
-    // few ticks (`src/net/prediction` `trimLead`) — so before `sendInput` was made
-    // to stamp strictly increasing ticks, a client re-used tick numbers after every
-    // trim and the server dropped those messages whole. Measured on a real socket:
-    // ~4 % of all input, in bursts. A lost stick frame is invisible; a lost
-    // `buildOrder` is a purchase the player made, was charged for locally, and that
-    // authority never heard — the wheel press that "does nothing sometimes".
-    expect(result.repeatedInputTicks, 'no input message was dropped as a duplicate tick').toBe(0);
+    // `InputQueue` files by `(player, tick)`, and two messages do land on one tick:
+    // the client's clock is not monotonic (a lead trim rewinds it a few ticks —
+    // `src/net/prediction` `trimLead`), and a retransmit burst re-files a whole
+    // stalled backlog onto one tick. Both used to be *dropped* — ~4 % of all input
+    // from the first, 48 % at 250 ms with 2 % loss from the second. A lost stick
+    // frame is invisible; a lost `buildOrder` is a purchase the player made, was
+    // charged for locally, and that authority never heard — the wheel press that
+    // "does nothing sometimes".
+    //
+    // They are merged now (`src/net/input-queue` `coalesce`), so the count that
+    // matters is what authority *discarded*, and it is zero. A re-used tick number
+    // is no longer a lost message, which is why it is only reported.
+    expect(result.droppedInputs, 'no input message was thrown away by authority').toBe(0);
   });
 
   it('holds the line while the trigger is HELD — one shot in flight per interval', () => {

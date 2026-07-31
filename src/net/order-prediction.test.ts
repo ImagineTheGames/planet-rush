@@ -26,7 +26,7 @@ import { ShipClass } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
 import { TICK_DT, TURRET, createWorld } from '../sim';
 import type { MiningStation, World, WorldConfig } from '../sim';
-import { PredictedMatch } from './prediction';
+import { MAX_PREDICTED_SHOTS, PredictedMatch } from './prediction';
 import { DEFAULT_ORDER_TTL_TICKS } from './order-ledger';
 import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
 
@@ -242,5 +242,82 @@ describe('the TTL — an order that was never answered', () => {
     // Still standing, and still authority's job. A TTL that swept settled orders
     // would take turrets away from players who own them.
     expect(station.builds.map((j) => j.id)).toEqual([9]);
+  });
+});
+
+describe('the action journal — the echo machinery in a pasted log', () => {
+  it('records the order, then authority\'s answer, with the wait between them', () => {
+    const { match } = standUp();
+    match.predict(1, TAP);
+
+    match.settleOrder({
+      orderId: ORDER_ID,
+      accepted: true,
+      tick: match.tick,
+      build: { id: 9, remaining: TURRET.buildTime, total: TURRET.buildTime },
+    });
+
+    expect(match.actions.pending).toEqual([
+      { kind: 'order', tick: 1, orderId: ORDER_ID, verb: 'buildOrder', what: 'turret' },
+      { kind: 'echo', tick: 1, orderId: ORDER_ID, outcome: 'adopt', waited: 0 },
+    ]);
+    // Drained once, so the log never repeats a line (`./playtest-log-attach`).
+    expect(match.actions.drain()).toHaveLength(2);
+    expect(match.actions.pending).toHaveLength(0);
+  });
+
+  it('records a refusal as a refusal, and an id it never predicted as unknown', () => {
+    const { match } = standUp();
+    match.predict(1, TAP);
+    match.actions.drain();
+
+    match.settleOrder({ orderId: ORDER_ID, accepted: false, tick: match.tick });
+    match.settleOrder({ orderId: 0xdead, accepted: true, tick: match.tick });
+
+    expect(match.actions.pending.map((e) => e.kind === 'echo' && e.outcome)).toEqual([
+      'refused',
+      'unknown',
+    ]);
+  });
+
+  it('records the expiry of a prediction nobody ever answered', () => {
+    const { match } = standUp();
+    match.predict(1, TAP);
+    match.actions.drain();
+
+    for (let i = 0; i < DEFAULT_ORDER_TTL_TICKS + 4; i++) {
+      const seq = 2 + i;
+      match.predict(seq, THRUST);
+      match.reconcile(selfSnapshot(match, match.tick), seq);
+    }
+
+    const expiries = match.actions.pending.filter((e) => e.kind === 'expiry');
+    expect(expiries).toHaveLength(1);
+    expect(expiries[0]).toMatchObject({ orderId: ORDER_ID, what: 'turret' });
+    // It waited its whole TTL before giving up — a number a reader can compare
+    // against the RTT beside it in the log (`./order-ledger` `setTtlFromRtt`).
+    expect((expiries[0] as { waited: number }).waited).toBeGreaterThanOrEqual(DEFAULT_ORDER_TTL_TICKS);
+  });
+
+  it('records a volley when the trigger actually produces a shot, and how many are up', () => {
+    const { match } = standUp();
+    // Manual fire down a fixed heading: auto-aim needs something in range to
+    // engage, and this test is about the trigger, not about targeting.
+    const FIRE: readonly Action[] = [
+      { type: 'aim', dir: { x: 1, y: 0 } },
+      { type: 'fire', active: true, auto: false },
+    ];
+    for (let seq = 1; seq <= 60; seq++) match.predict(seq, FIRE);
+
+    const volleys = match.actions.pending.filter((e) => e.kind === 'volley');
+    // A second of held trigger at the sim's fire interval (0.35 s) is two or three
+    // shots — not sixty, which is what a volley line would say if it were counting
+    // *frames the trigger was down* instead of shots that left the barrel.
+    expect(volleys.length).toBeGreaterThanOrEqual(2);
+    expect(volleys.length).toBeLessThanOrEqual(4);
+    // And no more of the firer's own shots are alive at once than the sim allows.
+    for (const volley of volleys) {
+      expect((volley as { inFlight: number }).inFlight).toBeLessThanOrEqual(MAX_PREDICTED_SHOTS);
+    }
   });
 });

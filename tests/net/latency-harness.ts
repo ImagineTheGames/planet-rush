@@ -251,12 +251,30 @@ export interface LatencyMatchResult {
   readonly authoritative: World;
   /**
    * Input messages, across both clients, stamped for a tick that client had
-   * already used — every one of which the server's ordered queue drops as a
-   * duplicate (`src/net/input-queue`). Zero is the only acceptable number: a
-   * dropped input is a lost frame for a stick and a lost *purchase* for a one-shot
-   * order, and neither is visible from anywhere else.
+   * already used.
+   *
+   * No longer a fault, and worth saying why it stopped being one: the client's
+   * clock is not monotonic (a lead trim rewinds it), so it *does* re-use a tick
+   * number now and then — and it now stamps the tick it truly predicted at rather
+   * than an invented increasing one, because authority **merges** a collision
+   * instead of dropping it (`src/net/input-queue` `coalesce`). What must still be
+   * zero is {@link droppedInputs}; this is just how often the merge path was
+   * exercised.
    */
   readonly repeatedInputTicks: number;
+  /**
+   * Input messages the server's queue **threw away** — duplicates it refused and
+   * absurd futures it would not buffer (`src/net/input-queue` `InputStats`). Zero
+   * is the only acceptable number: a dropped input is a lost frame for a stick and
+   * a lost *purchase* for a one-shot order, and neither is visible from anywhere
+   * else. (Late arrivals are not dropped — they are re-filed onto the next
+   * unsimulated tick — so they are counted separately, in {@link lateInputs}.)
+   */
+  readonly droppedInputs: number;
+  /** Input messages that arrived after the tick they named had already been
+   *  simulated, and were re-filed onto the next free one. The wire's lateness,
+   *  which the client sees as `appliedDelta` (`src/net/telemetry`). */
+  readonly lateInputs: number;
 }
 
 const DEFAULT_INPUT = (client: number, frame: number): readonly Action[] => {
@@ -365,7 +383,10 @@ export function runLatencyMatch(options: LatencyMatchOptions): LatencyMatchResul
   const room = server.room('RUSH');
 
   const stalls = transports.reduce((n, t) => n + t.up.stalls + t.down.stalls, 0);
+  const inputs = room!.inputStats;
   return {
+    droppedInputs: inputs.duplicate + inputs.farFuture,
+    lateInputs: inputs.late,
     clients,
     stalls,
     frames: options.frames,

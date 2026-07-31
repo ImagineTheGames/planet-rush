@@ -35,6 +35,14 @@
  *    away the server is; only the variance says how big a jitter buffer has to be,
  *    and the buffer is now *sized from this* instead of from a constant
  *    (`./interpolation`, audit item 2d).
+ *  - **input-tick alignment** ({@link TelemetrySample.appliedDeltaMean}) — the M10
+ *    tick-alignment instrument, added when the developer's capture showed a
+ *    correction on *every* snapshot and a constant correction means a systematic
+ *    cause. The client predicts an input at a tick and stamps the message with it;
+ *    the server states the tick it actually ran it at (`./transport`
+ *    `SnapshotMessage.ackTick`); this is the difference. It is the one measurement
+ *    that can tell "the two sims disagree about physics" from "the two sims agree
+ *    but are standing at different instants", and nothing else in this file could.
  *  - **visual snaps** ({@link TelemetrySample.visualSnaps}) — corrections large
  *    enough that the client teleported the ship instead of blending it. A blended
  *    correction is not felt; a snap is exactly the "server rollback" a player
@@ -146,6 +154,29 @@ export interface TelemetrySample {
   readonly leadMeanTicks: number;
   /** Worst lead in the window, ticks. The ratchet's fever chart. */
   readonly leadMaxTicks: number;
+  /**
+   * Mean **input-tick misalignment** over the window, in ticks: how much later the
+   * server ran an input than the tick the client predicted it at
+   * (`./prediction` `ReconcileReport.appliedDelta`). Null when nothing in the window
+   * could be measured.
+   *
+   * This is the number the M10 tick-alignment brief exists for. A client predicts an
+   * input at its lead tick and the server is *supposed* to run it at that same tick;
+   * if it runs it somewhere else, every prediction built on it is standing at the
+   * wrong instant and reconciliation pays the gap back on every snapshot — a
+   * *constant* correction, which is what a systematic fault looks like from the
+   * outside and what the developer's capture showed. A flat 0 here means the two
+   * clocks agree and any residual correction is elsewhere (it was: the wire's own
+   * precision, `./snapshot` `POS_SCALE`).
+   */
+  readonly appliedDeltaMean: number | null;
+  /** Worst misalignment in the window, in ticks — a stalled wire's re-files land
+   *  here first. 0 when nothing was measured. */
+  readonly appliedDeltaMax: number;
+  /** Reconciles in the window that could be measured for alignment at all — the
+   *  denominator behind {@link appliedDeltaMean}, so a mean over two samples is not
+   *  read as a mean over thirty. */
+  readonly appliedDeltaSamples: number;
   /** Wholesale authority takeovers in the window (a reclaim, a slept tab). */
   readonly resyncs: number;
   /**
@@ -190,6 +221,13 @@ export interface ReconcileFacts {
    *  `ReconcileReport.replayed`, which is exactly the pending queue's depth. The
    *  input latency the player pays on their own trigger, over and above the wire. */
   readonly lead?: number;
+  /**
+   * Ticks between where this client predicted the acknowledged input and where the
+   * server ran it — `ReconcileReport.appliedDelta`. Null or absent when the ack
+   * named nothing this client could compare, and those reconciles are left out of
+   * the average rather than counted as aligned.
+   */
+  readonly appliedDelta?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +250,9 @@ interface OpenBucket {
   rttMin: number;
   leadSum: number;
   leadMax: number;
+  alignSum: number;
+  alignMax: number;
+  alignCount: number;
   resyncs: number;
   visualSnaps: number;
 }
@@ -278,6 +319,13 @@ export class NetTelemetry {
       bucket.leadSum += facts.lead;
       if (facts.lead > bucket.leadMax) bucket.leadMax = facts.lead;
     }
+    // Alignment is averaged over the reconciles that could state it, not over all
+    // of them: an unmeasurable ack is missing data, not a zero.
+    if (facts.appliedDelta !== undefined && facts.appliedDelta !== null) {
+      bucket.alignSum += facts.appliedDelta;
+      bucket.alignCount++;
+      if (facts.appliedDelta > bucket.alignMax) bucket.alignMax = facts.appliedDelta;
+    }
     this.lastCorrection = facts.error;
 
     const rtt = this.matchRtt(ackSeq, nowMs);
@@ -338,6 +386,7 @@ export class NetTelemetry {
         `corr ${s.correctionMeanUnits.toFixed(1)}/${s.correctionMaxUnits.toFixed(1)}u  ` +
         `mispred ${(s.mispredictionRate * 100).toFixed(0).padStart(3)}%  ` +
         `lead ${Math.round(s.leadMeanTicks)}/${s.leadMaxTicks}t  ` +
+        `align ${s.appliedDeltaMean === null ? '—' : s.appliedDeltaMean.toFixed(1)}/${s.appliedDeltaMax}t  ` +
         `snap ${s.visualSnaps}  ` +
         `(${s.reconciles} recon${s.resyncs > 0 ? `, ${s.resyncs} resync` : ''})`
       );
@@ -350,6 +399,12 @@ export class NetTelemetry {
     const totalMispred = recent.reduce((n, s) => n + s.mispredictions, 0);
     const overallRate = totalRecon > 0 ? (totalMispred / totalRecon) * 100 : 0;
     const totalSnaps = recent.reduce((n, s) => n + s.visualSnaps, 0);
+    const alignN = recent.reduce((n, s) => n + s.appliedDeltaSamples, 0);
+    const alignSum = recent.reduce(
+      (n, s) => n + (s.appliedDeltaMean ?? 0) * s.appliedDeltaSamples,
+      0,
+    );
+    const worstAlign = Math.max(0, ...recent.map((s) => s.appliedDeltaMax));
     const jitterNow = recent[recent.length - 1]!.rttJitterMs;
 
     return (
@@ -360,6 +415,7 @@ export class NetTelemetry {
       `worst corr ${worstCorr.toFixed(1)}u  ` +
       `mispred ${overallRate.toFixed(0)}%  ` +
       `snaps ${totalSnaps}  ` +
+      `align ${alignN > 0 ? `${(alignSum / alignN).toFixed(2)}/${worstAlign}t` : '—'}  ` +
       `over ${totalRecon} reconciles`
     );
   }
@@ -407,6 +463,9 @@ export class NetTelemetry {
         rttMin: Number.POSITIVE_INFINITY,
         leadSum: 0,
         leadMax: 0,
+        alignSum: 0,
+        alignMax: 0,
+        alignCount: 0,
         resyncs: 0,
         visualSnaps: 0,
       };
@@ -438,6 +497,9 @@ export class NetTelemetry {
       rttJitterMs: this.jitterMs,
       leadMeanTicks: b.reconciles > 0 ? b.leadSum / b.reconciles : 0,
       leadMaxTicks: b.leadMax,
+      appliedDeltaMean: b.alignCount > 0 ? b.alignSum / b.alignCount : null,
+      appliedDeltaMax: b.alignMax,
+      appliedDeltaSamples: b.alignCount,
       resyncs: b.resyncs,
       visualSnaps: b.visualSnaps,
     });

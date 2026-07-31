@@ -127,10 +127,14 @@ Wire layout (`src/net/spike/snapshot.ts`, little-endian, hand-packed):
 
 Only ships and projectiles stream as binary; static entities (asteroids,
 turrets, shields, wrecks) are events on join/change (GDD §4.2), so they cost
-nothing per tick. Values are quantized to integers on the wire — the client
-interpolates between snapshots at 60 fps render, so sub-unit precision is never
-sent. Velocity is included so the client can dead-reckon a remote entity between
-snapshots. Typical mid-match live snapshots measured **294–396 B** (fewer than
+nothing per tick. Values are quantized to fixed-point integers on the wire.
+Positions and velocities carry **eighths of a world unit** (`POS_SCALE`, M10
+tick-alignment) in the same two bytes the day-0 layout measured: the original
+whole-unit rounding put a permanent half-unit lie under client-side prediction and
+produced a correction on every snapshot of every match — see
+`docs/netcode-tick-alignment.md`. The byte cost is unchanged, so every bandwidth
+number below still stands. Velocity is included so the client can dead-reckon a
+remote entity between snapshots. Typical mid-match live snapshots measured **294–396 B** (fewer than
 64 projectiles usually in flight).
 
 ### 2. Sustainable tick rate
@@ -412,10 +416,17 @@ fleet — ~150–180 ms RTT — reported *"constant server rollback."* At that l
 the reconciliation *policy* is the game feel, so this milestone made the feel
 measurable, smooth, and permanently guarded. The one-line finding: **the rollback
 was never physics divergence.** Instrumented at the developer's exact condition,
-corrections sit at the wire's ~1-unit quantization floor with a ~1 %
+corrections sit at the wire's quantization floor with a ~1 %
 misprediction rate — the felt rollback was the *presentation* of tiny corrections
 (a local snap, and un-interpolated remote ships stuttering), not the sim
 disagreeing.
+
+> **Follow-up (M10 tick-alignment).** That floor was ~1 unit at the time, and the
+> developer went on to report a correction on *every* sampled second. It turned out
+> the floor itself was the fault: the wire rounded positions to whole units. It now
+> carries eighths, the ticks the wire loses are no longer dropped, and steady-state
+> straight-line flight at 250 ms reconciles at **0.06 u** — see
+> `docs/netcode-tick-alignment.md`.
 
 **Capture** (reproduce: `npx vitest run src/net/spike/reconcile-capture.test.ts`;
 `NetTelemetry` fed through a real client↔authority round trip over an

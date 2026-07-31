@@ -257,6 +257,24 @@ export interface SnapshotMessage {
   type: 'snapshot';
   tick: Tick;
   ackSeq: number;
+  /**
+   * The sim tick at which the input named by {@link ackSeq} was **actually
+   * simulated** — the other half of the ack, and the only way a client can learn
+   * whether the server ran its press when it thought it would.
+   *
+   * A predicting client stamps every input with the tick it predicted it at, and
+   * the server files it under that same tick (`./input-queue`) — *usually*. Late
+   * arrivals are re-filed onto the next unsimulated tick (`server/room.ts`), so a
+   * stalled wire can leave a press running several ticks after the tick it was
+   * predicted for; the client then replays it at one tick and authority ran it at
+   * another, and every reconcile pays the difference back. That is invisible from
+   * either end alone — the client knows only what it predicted, the server only
+   * what it ran — so the server states it and the client subtracts
+   * (`./telemetry` `appliedDeltaMean`, the M10 tick-alignment instrument).
+   *
+   * Zero before this slot has had any input simulated.
+   */
+  ackTick: Tick;
   payload: ArrayBuffer;
 }
 

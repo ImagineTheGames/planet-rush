@@ -51,6 +51,7 @@
 import type { Action, PlayerId, Vec2 } from '@shared/types';
 import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, stationOf, step } from '../sim';
 import type { BuildJob, MiningStation, World } from '../sim';
+import { ActionJournal } from './action-journal';
 import { applyEntityEvent } from './entity-events';
 import { StructureEcho } from './entity-echo';
 import { OrderLedger } from './order-ledger';
@@ -220,6 +221,29 @@ export interface ReconcileReport {
    */
   resynced: boolean;
   /**
+   * **Ticks between where this client predicted the acknowledged input and where
+   * the server actually ran it** — `ackTick − predictedTick`, and null when the ack
+   * names an input this client no longer holds a record of (the first snapshots of a
+   * match, or an ack for something a lead trim already dropped).
+   *
+   * Zero is the whole point of the number. A client stamps an input with the tick it
+   * predicted it at; the server files it under that tick and runs it there. When it
+   * cannot — the message arrived after that tick had already been simulated, so it was
+   * re-filed onto the next free one (`server/room.ts` `acceptInput`) — every prediction
+   * built on that input is standing at the wrong instant, and reconciliation pays the
+   * difference back on every snapshot for as long as it lasts. That is a *systematic*
+   * correction rather than a stochastic one, and it looks exactly like the constant
+   * small error the developer reported, which is why it is measured directly instead of
+   * inferred from a magnitude (`./telemetry` `appliedDeltaMean`; the M10 tick-alignment
+   * instrument).
+   *
+   * Positive means the server ran the press *later* than the client did, which is the
+   * only direction a late re-file can go. Negative would mean authority ran an input
+   * before the client predicted it — impossible over a wire, and worth a raised eyebrow
+   * if it ever shows up.
+   */
+  appliedDelta: number | null;
+  /**
    * True when the correction was **hard-snapped** rather than blended: it cleared
    * {@link SNAP_THRESHOLD}, so the ship teleported on screen instead of sliding
    * back over {@link RECONCILE_BLEND_FRAMES}. This is the event a player calls
@@ -267,6 +291,9 @@ export class PredictedMatch {
   /** Predicted orders awaiting authority's word, and their TTL clock — the whole
    *  of "one entity, never two" for anything the wheel buys (`./order-ledger`). */
   private readonly ledger = new OrderLedger();
+  /** What the player did and what authority said about it, for the pasted log
+   *  (`./action-journal`, M10 tick-alignment brief item 3). */
+  private readonly journal = new ActionJournal();
   /** The other half of "one entity, never two": a predicted turret and the
    *  authoritative turret it becomes are one turret (`./entity-echo`). */
   private readonly structures = new StructureEcho();
@@ -377,9 +404,28 @@ export class PredictedMatch {
     // echo has something to be *about* (`./order-ledger`).
     const orders = identifiedOrders(actions);
     const before = orders.length > 0 ? buildIdsOf(stationOf(this.world, this.local)) : null;
+    // The weapon's own clock, read either side of the step. It only ever counts
+    // *down* (`src/sim/step.ts`) except on the tick a shot leaves the barrel, when
+    // it is re-armed to the fire interval — so a cooldown that went *up* is a shot,
+    // exactly, and it is the only evidence of one this client will ever have (the
+    // firer's own shots are drawn from prediction, never from the wire —
+    // {@link harvestOwnShots}).
+    const cooldownBefore = this.localShip()?.weaponCooldown ?? 0;
 
     step(this.world, [{ id: this.local, actions }], this.dt);
 
+    if ((this.localShip()?.weaponCooldown ?? 0) > cooldownBefore) {
+      this.journal.record({ kind: 'volley', tick, inFlight: this.ownShotCount() });
+    }
+    for (const order of orders) {
+      this.journal.record({
+        kind: 'order',
+        tick,
+        orderId: order.orderId,
+        verb: order.verb,
+        what: order.what,
+      });
+    }
     if (before) this.ledgeOrders(orders, before, tick);
     this.holdHull();
     this.checkpoint();
@@ -401,8 +447,21 @@ export class PredictedMatch {
    */
   settleOrder(echo: OrderEcho): OrderOutcome | null {
     const outcome = this.ledger.settle(echo);
+    this.journal.record({
+      kind: 'echo',
+      tick: this.world.tick,
+      orderId: echo.orderId,
+      outcome: outcome === null ? 'unknown' : outcome.kind === 'adopt' ? 'adopt' : 'refused',
+      waited: outcome === null ? null : this.world.tick - outcome.order.tick,
+    });
     if (outcome) this.applyOrderOutcome(outcome);
     return outcome;
+  }
+
+  /** What the player did and what authority said about it, since the last drain
+   *  (`./action-journal`). Read by the playtest log; empty offline. */
+  get actions(): ActionJournal {
+    return this.journal;
   }
 
   /**
@@ -479,8 +538,13 @@ export class PredictedMatch {
    * @param snapshot the decoded snapshot (`./snapshot`).
    * @param ackSeq   the newest local input the server has **simulated** — not
    *                 merely received (`./input-queue`, `server/room.ts`).
+   * @param ackTick  the tick that input was simulated *at*, when the server states
+   *                 one (`./transport` `SnapshotMessage.ackTick`). Compared against
+   *                 the tick this client predicted the same input at to produce
+   *                 {@link ReconcileReport.appliedDelta}; omitted, the report says
+   *                 null and the alignment instrument simply has nothing to add.
    */
-  reconcile(snapshot: DecodedSnapshot, ackSeq: number): ReconcileReport {
+  reconcile(snapshot: DecodedSnapshot, ackSeq: number, ackTick?: Tick): ReconcileReport {
     // Snapshots are full state, not deltas, so an older one has nothing to add —
     // and applying it would drag the world backwards (docs/netcode-spike.md).
     if (snapshot.tick <= this.snapshotTick) {
@@ -492,6 +556,7 @@ export class PredictedMatch {
         trimmed: 0,
         resynced: false,
         snapped: false,
+        appliedDelta: null,
       };
     }
     this.snapshotTick = snapshot.tick;
@@ -517,6 +582,9 @@ export class PredictedMatch {
     // figure instead of on top of the client's own compounding one (`stageEconomy`).
     this.applyStagedEconomy(snapshot.tick);
 
+    // Read *before* the retire below throws the acked inputs away: the tick this
+    // client predicted `ackSeq` at is in that queue and nowhere else.
+    const appliedDelta = this.alignmentOf(ackSeq, ackTick);
     const acknowledged = this.retire(ackSeq);
     // Pull the clock back if a stall pushed it too far ahead. Done *before* the
     // replay, so the world lands at `snapshotTick + leadBudget` at worst and the
@@ -552,7 +620,19 @@ export class PredictedMatch {
     // Anything predicted long enough ago that authority should have answered by now
     // and did not — the order never arrived, or its echo never came back. Rolled
     // back, so a dropped press cannot leave a phantom assembling forever.
-    for (const outcome of this.ledger.sweep(this.world.tick)) this.applyOrderOutcome(outcome);
+    for (const outcome of this.ledger.sweep(this.world.tick)) {
+      // A prediction authority never answered at all. One is a lost message; a run
+      // of them is a wire that is not carrying orders, and either way the player
+      // watched a half-built ghost disappear.
+      this.journal.record({
+        kind: 'expiry',
+        tick: this.world.tick,
+        orderId: outcome.order.orderId,
+        what: outcome.order.what,
+        waited: this.world.tick - outcome.order.tick,
+      });
+      this.applyOrderOutcome(outcome);
+    }
 
     // Remote firing is the one thing the replay cannot produce: a ship the
     // client has no input for never fires, so the flag on the wire is the only
@@ -574,6 +654,7 @@ export class PredictedMatch {
       trimmed,
       resynced: checkpoint === null,
       snapped,
+      appliedDelta,
     };
   }
 
@@ -677,6 +758,25 @@ export class PredictedMatch {
       dropped++;
     }
     return dropped;
+  }
+
+  /**
+   * How far apart the two copies of one input stand, in ticks: the tick authority
+   * says it ran `ackSeq` at, minus the tick this client predicted that same seq at.
+   *
+   * Null when there is nothing to compare — no `ackTick` from the server (a wire
+   * older than the field, or an offline transport), an ack for input this client has
+   * already retired or trimmed, or the opening snapshots of a match before anything
+   * has been acknowledged at all. Null rather than 0, because "aligned" and "not
+   * measured" are different findings and the instrument must not average them
+   * together ({@link ReconcileReport.appliedDelta}).
+   */
+  private alignmentOf(ackSeq: number, ackTick: Tick | undefined): number | null {
+    if (ackTick === undefined || ackTick <= 0 || ackSeq <= 0) return null;
+    for (const input of this.queue) {
+      if (input.seq === ackSeq) return ackTick - input.tick;
+    }
+    return null;
   }
 
   /** Drop every pending input the server has told us it simulated. */
@@ -887,6 +987,21 @@ export class PredictedMatch {
     this.offset.y *= BLEND_DECAY;
     if (Math.abs(this.offset.x) < SMOOTHING_EPSILON) this.offset.x = 0;
     if (Math.abs(this.offset.y) < SMOOTHING_EPSILON) this.offset.y = 0;
+  }
+
+  /** The local ship, or null before the world has one. */
+  private localShip(): World['ships'][number] | null {
+    return this.world.ships.find((s) => s.id === this.local) ?? null;
+  }
+
+  /** The firer's own live ship shots — what a volley line reports, and the number
+   *  a "my shot came out twice" report is about. */
+  private ownShotCount(): number {
+    let n = 0;
+    for (const p of this.world.projectiles) {
+      if (p.active && p.owner === this.local && p.kind === 'ship') n++;
+    }
+    return n;
   }
 
   private localShipPos(): Vec2 {

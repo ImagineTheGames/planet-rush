@@ -8,12 +8,19 @@
  * 494 B, down from the day-0 measured 510 B: the v0.3 laser funeral retired the
  * ship `aim` field — see docs/design-amendments.md and docs/netcode-spike.md.)
  * Second, that a snapshot encoded from a real `World` decodes back to what the
- * server saw, at wire precision: quantization is allowed to lose sub-unit
- * detail, it is not allowed to lose a ship.
+ * server saw, at wire precision: quantization is allowed to lose an eighth of a
+ * unit ({@link POS_SCALE}), it is not allowed to lose a ship.
+ *
+ * The wire's *precision* is defended here too, and it is not a free parameter: it
+ * is the floor under every client-side prediction error there is (the M10
+ * constant-correction hunt — see the note on `POS_SCALE`), and it is bounded from
+ * the other side by the widest arena the game ships. Both ends are pinned below,
+ * so a future map that outgrows the wire fails the build instead of clamping a
+ * ship onto a wall.
  */
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { createWorld, step } from '../sim';
+import { MAPS, createWorld, step } from '../sim';
 import {
   decodeSnapshot,
   dequantizeAngle,
@@ -27,6 +34,8 @@ import {
   SHIP_BYTES,
   SHIP_FLAG,
   snapshotWorld,
+  MAX_WIRE_COORD,
+  POS_SCALE,
   WORST_CASE_BYTES,
 } from './snapshot';
 import { WORST_CASE_BYTES as SPIKE_WORST_CASE } from './spike/snapshot';
@@ -88,16 +97,46 @@ describe('encode → decode against the sim', () => {
       const ship = w.ships[i]!;
       const wire = decoded.ships[i]!;
       expect(wire.id).toBe(ship.id);
-      // Integer-quantized: within half a world unit of the truth, and the
-      // client interpolates the rest at 60 fps render (GDD §4.2).
-      expect(Math.abs(wire.posX - ship.pos.x)).toBeLessThanOrEqual(0.5);
-      expect(Math.abs(wire.posY - ship.pos.y)).toBeLessThanOrEqual(0.5);
-      expect(Math.abs(wire.velX - ship.vel.x)).toBeLessThanOrEqual(0.5);
+      // Fixed-point quantized: within half a wire step (1/16 u) of the truth,
+      // and the client interpolates the rest at 60 fps render (GDD §4.2).
+      const step_ = 1 / (2 * POS_SCALE);
+      expect(Math.abs(wire.posX - ship.pos.x)).toBeLessThanOrEqual(step_);
+      expect(Math.abs(wire.posY - ship.pos.y)).toBeLessThanOrEqual(step_);
+      expect(Math.abs(wire.velX - ship.vel.x)).toBeLessThanOrEqual(step_);
       expect(Math.abs(wire.hull - ship.hull)).toBeLessThanOrEqual(0.5);
       // Facing survives to well under a tenth of a degree.
       const angle = ((ship.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       expect(Math.abs(dequantizeAngle(wire.heading) - angle)).toBeLessThan(0.001);
     }
+  });
+
+  it('carries every shipped arena inside the range the wire can represent', () => {
+    // `POS_SCALE` buys precision by spending range: the `i16` reaches
+    // `32767 / POS_SCALE` world units, and a coordinate past that is *clamped*,
+    // which would pin a ship to a wall for the rest of the match. Positions are
+    // measured from the arena corner, so the widest map's far corner is the
+    // number to clear — with room left for a ship kicked past the boundary.
+    const widest = Math.max(...MAPS.map((m) => Math.max(m.bounds.width, m.bounds.height)));
+    expect(widest).toBeLessThan(MAX_WIRE_COORD);
+    // And with real headroom, not by a hair: a map that only just fits is a map
+    // one collision knock-back away from clamping.
+    expect(widest).toBeLessThan(MAX_WIRE_COORD * 0.85);
+  });
+
+  it('round-trips a coordinate to an eighth of a unit, sign included', () => {
+    const w = world();
+    // Sub-unit motion is the case the old whole-unit wire could not carry at all:
+    // a ship a third of a unit from a grid line decoded onto the line.
+    w.ships[0]!.pos.x = 1200.376;
+    w.ships[0]!.pos.y = -3.94;
+    w.ships[0]!.vel.x = 12.3;
+
+    const wire = decodeSnapshot(encodeWorldSnapshot(w)).ships[0]!;
+    expect(wire.posX).toBe(1200.375); // 9603 / 8, exactly representable
+    expect(wire.posY).toBe(-4); // −31.52 → −32 eighths, the nearest step
+    expect(wire.velX).toBe(12.25);
+    // Every decoded value lands on the fixed-point grid — no float slop.
+    expect(wire.posX * POS_SCALE).toBe(Math.round(wire.posX * POS_SCALE));
   });
 
   it('carries the flags the renderer cannot infer from numbers', () => {
