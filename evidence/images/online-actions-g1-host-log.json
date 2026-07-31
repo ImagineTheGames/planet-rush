@@ -1,0 +1,1490 @@
+{
+  "schema": "planet-rush.playtest-log",
+  "version": 1,
+  "summary": "Planet Rush playtest log — build ef4babe (2026-07-31T02:11:11.993Z) · session 2026-07-31T13:41:52.080Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+  "env": {
+    "build": "ef4babe",
+    "sha": "ef4babe",
+    "buildTime": "2026-07-31T02:11:11.993Z",
+    "dirty": false,
+    "startedAt": "2026-07-31T13:41:52.080Z",
+    "formFactor": "desktop",
+    "viewport": "1280x800",
+    "touch": false,
+    "connection": "4g"
+  },
+  "durationMs": 181048,
+  "capacity": 600,
+  "dropped": 0,
+  "events": [
+    {
+      "at": 0,
+      "kind": "session",
+      "msg": "session start",
+      "data": {
+        "build": "ef4babe",
+        "sha": "ef4babe",
+        "buildTime": "2026-07-31T02:11:11.993Z",
+        "dirty": false,
+        "startedAt": "2026-07-31T13:41:52.080Z",
+        "form": "desktop",
+        "viewport": "1280x800",
+        "touch": false,
+        "connection": "4g",
+        "schema": "planet-rush.playtest-log/1"
+      }
+    },
+    {
+      "at": 12,
+      "kind": "note",
+      "msg": "Planet Rush build ef4babe built 2026-07-31T02:11:11.993Z"
+    },
+    {
+      "at": 18,
+      "kind": "note",
+      "msg": "webgl",
+      "data": {
+        "api": "webgl2"
+      }
+    },
+    {
+      "at": 5550,
+      "kind": "connect",
+      "msg": "front door idle",
+      "data": {
+        "screen": "home"
+      }
+    },
+    {
+      "at": 5718,
+      "kind": "connect",
+      "msg": "front door connecting",
+      "data": {
+        "screen": "home"
+      }
+    },
+    {
+      "at": 5718,
+      "kind": "connect",
+      "msg": "allocate",
+      "data": {
+        "door": "create",
+        "allocator": "planet-rush-allocator.fly.dev",
+        "region": null
+      }
+    },
+    {
+      "at": 5718,
+      "kind": "connect",
+      "msg": "allocating",
+      "data": {
+        "door": "create",
+        "allocator": "planet-rush-allocator.fly.dev",
+        "line": "ALLOCATING ROOM…"
+      }
+    },
+    {
+      "at": 6605,
+      "kind": "connect",
+      "msg": "ticket",
+      "data": {
+        "room": "LKQK",
+        "machine": "d891dd0a1443e8",
+        "region": "gru",
+        "placement": "gru — your region",
+        "ticket": true,
+        "expiresInMs": 32323
+      }
+    },
+    {
+      "at": 6605,
+      "kind": "connect",
+      "msg": "ticketed",
+      "data": {
+        "room": "LKQK",
+        "machine": "d891dd0a1443e8",
+        "region": "gru",
+        "placement": "gru — your region",
+        "expiresInMs": 32323,
+        "line": "ROOM LKQK · TICKET SIGNED"
+      }
+    },
+    {
+      "at": 6605,
+      "kind": "connect",
+      "msg": "dial",
+      "data": {
+        "host": "planet-rush-gameserver.fly.dev",
+        "room": "LKQK",
+        "creator": true
+      }
+    },
+    {
+      "at": 6605,
+      "kind": "connect",
+      "msg": "dialing",
+      "data": {
+        "machine": "d891dd0a1443e8",
+        "host": "planet-rush-gameserver.fly.dev",
+        "room": "LKQK",
+        "line": "DIALING MACHINE d891dd0a…"
+      }
+    },
+    {
+      "at": 6870,
+      "kind": "connect",
+      "msg": "state connecting"
+    },
+    {
+      "at": 7022,
+      "kind": "connect",
+      "msg": "welcome",
+      "data": {
+        "seat": 0,
+        "room": "LKQK",
+        "tick": 0,
+        "reclaimable": true
+      }
+    },
+    {
+      "at": 7022,
+      "kind": "session",
+      "msg": "build tag",
+      "data": {
+        "build": "ef4babe · d891dd0a (gru)"
+      }
+    },
+    {
+      "at": 7022,
+      "kind": "connect",
+      "msg": "joined",
+      "data": {
+        "seat": 0,
+        "line": "JOINED · SEAT 1"
+      }
+    },
+    {
+      "at": 7142,
+      "kind": "connect",
+      "msg": "lobbyState",
+      "data": {
+        "slots": 8,
+        "bots": 0
+      },
+      "repeat": 2,
+      "lastAt": 7152
+    },
+    {
+      "at": 7193,
+      "kind": "connect",
+      "msg": "state open"
+    },
+    {
+      "at": 7194,
+      "kind": "connect",
+      "msg": "lobbyState",
+      "data": {
+        "slots": 8,
+        "bots": 0
+      },
+      "repeat": 4,
+      "lastAt": 9938
+    },
+    {
+      "at": 16919,
+      "kind": "match",
+      "msg": "matchStart",
+      "data": {
+        "tick": 0,
+        "seed": 2109396525,
+        "slots": 8,
+        "reclaim": false
+      }
+    },
+    {
+      "at": 21661,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 280,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 22208,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 302,
+        "inFlight": 2
+      }
+    },
+    {
+      "at": 22454,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 324,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 22960,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 346,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 23224,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 368,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 23683,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 390,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 23927,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 412,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 24381,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 434,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 24695,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 456,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 25203,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 478,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 25474,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 500,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 25721,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 522,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 26219,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 544,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 26476,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 566,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 26963,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 588,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 27217,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 610,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 27721,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 632,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 40581,
+      "kind": "connect",
+      "msg": "lobbyState",
+      "data": {
+        "slots": 8,
+        "bots": 6
+      }
+    },
+    {
+      "at": 57936,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1415,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 58180,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1437,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 58686,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1459,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 58924,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1481,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 59435,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1503,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 59657,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1525,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 60174,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1547,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 60460,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1569,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 60688,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1591,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 61162,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1613,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 61455,
+      "kind": "connect",
+      "msg": "state reconnecting"
+    },
+    {
+      "at": 61455,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1635,
+        "inFlight": 0
+      }
+    },
+    {
+      "at": 61918,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1657,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 62159,
+      "kind": "connect",
+      "msg": "joinError",
+      "data": {
+        "reason": "bad-ticket"
+      }
+    },
+    {
+      "at": 62159,
+      "kind": "session",
+      "msg": "build tag",
+      "data": {
+        "build": "ef4babe"
+      }
+    },
+    {
+      "at": 62225,
+      "kind": "connect",
+      "msg": "state closed",
+      "data": {
+        "closeReason": "join-rejected",
+        "rejectReason": "bad-ticket"
+      }
+    },
+    {
+      "at": 62226,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1679,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 62687,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1701,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 62956,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 1723,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 75219,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2453,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 75427,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2475,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 75978,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2497,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 76191,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2519,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 76591,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2541,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 77216,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2563,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 77438,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2585,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 77713,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2607,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 78046,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2629,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 78427,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2651,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 78872,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2673,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 79188,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2695,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 79448,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2717,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 80022,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2739,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 80202,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2761,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 80700,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2783,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 80916,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2805,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 81299,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2827,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 81681,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2849,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 82154,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2871,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 82411,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2893,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 82922,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2915,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 83126,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2937,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 83681,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2959,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 83918,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 2981,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 84404,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3003,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 84650,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3025,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 84938,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3047,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 85439,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3069,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 85920,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3091,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 86125,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3113,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 86426,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3135,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 86920,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3157,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 87181,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3179,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 87690,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3201,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 87951,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3223,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 88497,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3245,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 88658,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3267,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 89180,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3289,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 89429,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3311,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 89954,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3333,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 90152,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3355,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 90686,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3377,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 98924,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3884,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 99429,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3906,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 99656,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3928,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 100205,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3950,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 100440,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3972,
+        "inFlight": 0
+      }
+    },
+    {
+      "at": 100918,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 3994,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 101213,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4016,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 101686,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4038,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 101925,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4060,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 102413,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4082,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 102712,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4104,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 102949,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4126,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 103436,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4148,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 103679,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4170,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 104210,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4192,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 104469,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 4214,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 125701,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5480,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 125985,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5502,
+        "inFlight": 2
+      }
+    },
+    {
+      "at": 126234,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5524,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 126616,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5546,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 127171,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5568,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 127461,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5590,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 127925,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5612,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 128190,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5634,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 128671,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5656,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 128933,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5678,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 129198,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5700,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 129676,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5722,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 129937,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5744,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 130447,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5766,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 130663,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5788,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 131176,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5810,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 131475,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5832,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 131971,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5854,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 132220,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5876,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 132473,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5898,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 132940,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5920,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 133470,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5942,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 133692,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5964,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 133924,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 5986,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 134467,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6008,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 134696,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6030,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 135170,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6052,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 135414,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6074,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 136197,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6111,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 136427,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6133,
+        "inFlight": 2
+      }
+    },
+    {
+      "at": 136983,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6155,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 143791,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6577,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 144206,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6599,
+        "inFlight": 2
+      }
+    },
+    {
+      "at": 144683,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6621,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 144909,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6643,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 145413,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6665,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 145702,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6687,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 146214,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6709,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 146450,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6731,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 146942,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6753,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 147196,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6775,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 147629,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6797,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 147928,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6819,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 148422,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6841,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 148676,
+      "kind": "net",
+      "msg": "volley",
+      "data": {
+        "tick": 6863,
+        "inFlight": 1
+      }
+    },
+    {
+      "at": 178969,
+      "kind": "net",
+      "msg": "order",
+      "data": {
+        "tick": 8683,
+        "id": 1,
+        "verb": "buildOrder",
+        "what": "turret"
+      }
+    },
+    {
+      "at": 181048,
+      "kind": "net",
+      "msg": "order",
+      "data": {
+        "tick": 8808,
+        "id": 2,
+        "verb": "buildOrder",
+        "what": "turret"
+      }
+    }
+  ]
+}

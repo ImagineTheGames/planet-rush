@@ -1,0 +1,122 @@
+{
+  "probe": "reconnect-all-three-thirds",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-31T02:14:58.678Z",
+  "cargoTier1Cost": 2,
+  "startingOre": 3,
+  "room": "3CWM",
+  "machine": "d891dd0a1443e8",
+  "hostWelcomeDials": 1,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "tiersAtSpawn": {
+    "power": 0,
+    "speed": 0,
+    "engine": 0,
+    "cargo": 0,
+    "hull": 0
+  },
+  "cargoCapAtSpawn": 2,
+  "authorityTierAfterOrder": 1,
+  "authorityWalletAfterUpgrade": {
+    "held": 0,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "upgradeLanded": true,
+  "authorityHeldAfterMining": 1,
+  "authorityWalletBeforeDrop": {
+    "held": 1,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "clientWalletBeforeDrop": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 1,
+    "cargoCap": 4,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    },
+    "alive": true,
+    "hull": 35
+  },
+  "bankMovedOffSpawnDefault": true,
+  "tickAtDrop": 594,
+  "substitutionSeenByPeer": true,
+  "awayMs": 1500,
+  "reclaimTimedOut": true,
+  "reclaimError": "Error: timed out waiting for alice back on the live wire past the drop tick",
+  "aliceOpensAfterDrop": 1,
+  "joinErrorsPastDrop": 1,
+  "aliceState": "closed",
+  "aliceSaw": [
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "entityEvent",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "economy",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "snapshot",
+    "entityEvent",
+    "snapshot",
+    "joinError"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerSubstituted"
+  ],
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "3CWM",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    }
+  ]
+}
