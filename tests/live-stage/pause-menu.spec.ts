@@ -48,10 +48,16 @@ interface LobbySeam {
   visible: boolean;
   rush(): void;
 }
+/** The doors (`installOnlineSeam`) — PLAY opens these, and PLAY SOLO is the one
+ *  that reaches the offline lobby. */
+interface OnlineSeam {
+  solo(): void;
+}
 interface StageWindow {
   __pauseStage?: PauseStage;
   __mainMenu?: MainMenuSeam;
   __lobby?: LobbySeam;
+  __onlineMenu?: OnlineSeam;
 }
 declare const window: Window & StageWindow;
 
@@ -211,9 +217,19 @@ test('EXIT + confirm tears the world down to the menu; PLAY boots a fresh match'
   expect(onMenu.matchStarted, 'the match world is gone').toBe(false);
   expect(onMenu.worldGone, 'no stale match seam survived the teardown').toBe(true);
 
-  // PLAY → lobby → RUSH builds a FRESH match — the clean re-boot the developer
-  // asked for (§3).
+  // PLAY → PLAY SOLO → lobby → RUSH builds a FRESH match — the clean re-boot the
+  // developer asked for (§3).
+  //
+  // PLAY opens THE DOORS, not a lobby: the unified play flow made PLAY SOLO /
+  // CREATE / JOIN the three things that reach one, and this spec still walked the
+  // shape from before it. So it timed out here — a stale live-stage test, found by
+  // the M10 pause audit and fixed rather than skipped, because a red pause spec is
+  // the one thing that stops the next pause regression being seen.
   await page.evaluate(() => window.__mainMenu!.play());
+  await page.waitForFunction(() => typeof window.__onlineMenu?.solo === 'function', undefined, {
+    timeout: 20_000,
+  });
+  await page.evaluate(() => window.__onlineMenu!.solo());
   await page.waitForFunction(() => typeof window.__lobby?.rush === 'function', undefined, {
     timeout: 20_000,
   });

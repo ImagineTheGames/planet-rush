@@ -19,6 +19,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   writeBadgeRect,
+  badgeAvailableWidth,
+  fitBadgeTag,
   BADGE_ANCHOR,
   BADGE_ID,
   BADGE_MARGIN,
@@ -42,6 +44,17 @@ const TEXT_H = 12;
 /** …and of the connected one, "a1b2c3d · d891dd0a (gru)", which is much wider —
  *  the width the corner has to survive without escaping its zone. */
 const WIDE_W = 148;
+/**
+ * …and of the LONGEST tag the badge can ever draw, now that it carries connection
+ * stats too (ratified M10): `a1b2c3d* · d891dd0a (gru) · 240ms` — a dirty build,
+ * a full machine id, a region, and a three-digit round trip. 33 chars at the same
+ * ~6.2 px/char the two figures above are measured at.
+ *
+ * It is the width every clearance assertion below is really about: "it never
+ * covers a control" is a claim about the WIDEST thing the corner can become, and
+ * the tag just got a third field wider.
+ */
+const STATS_W = 205;
 
 describe('writeBadgeRect — the corner', () => {
   it('hugs the bottom-LEFT corner, inset by the margin on both edges', () => {
@@ -97,14 +110,71 @@ describe('badge placement vs its declared anchor', () => {
 
   it('sits inside its declared zone at every viewport, bare and connected, lifted or not', () => {
     for (const vp of VIEWPORTS) {
-      for (const w of [TEXT_W, WIDE_W]) {
+      for (const w of [TEXT_W, WIDE_W, STATS_W]) {
         for (const lift of [0, BADGE_STRIP_LIFT]) {
-          const r = writeBadgeRect(w, TEXT_H, vp.width, vp.height, rect(), lift);
+          // What the component would actually draw at this viewport: the stamp
+          // shortens the tag rather than crossing the midline (`fitBadgeTag`), so
+          // the width the zone check sees is the FITTED one, not the raw string.
+          const drawn = Math.min(w, badgeAvailableWidth(vp.width));
+          const r = writeBadgeRect(drawn, TEXT_H, vp.width, vp.height, rect(), lift);
           const zone = resolveAnchor(BADGE_ANCHOR, vp);
           expect(rectContains(zone, r), `badge escaped its zone at ${vp.width}x${vp.height}`).toBe(true);
         }
       }
     }
+  });
+
+  it('has room for the WHOLE stats tag at every viewport the game is played at', () => {
+    // The shortening below is a floor, not the normal case: on a real phone in
+    // landscape (the only orientation Planet Rush lays out in on touch) and on any
+    // desk, the developer's full string fits with room to spare. If a future field
+    // makes that false, this is the test that says so before a screenshot does.
+    for (const vp of [
+      { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+      { width: 844, height: 390 },
+      { width: 667, height: 375 }, // the smallest landscape phone we target
+    ]) {
+      expect(badgeAvailableWidth(vp.width), `no room for the stats tag at ${vp.width}px`)
+        .toBeGreaterThanOrEqual(STATS_W);
+    }
+  });
+});
+
+describe('fitBadgeTag — the tag shortens rather than escaping its zone', () => {
+  const FULL = '3d7cc6a · d891dd0a (gru) · 62ms';
+  /** A mono ruler: 6.2 px per glyph, near enough to the real 10 px face. */
+  const measure = (s: string): number => s.length * 6.2;
+
+  it('draws the whole developer-specified string when there is room', () => {
+    expect(fitBadgeTag(FULL, 1000, measure)).toBe(FULL);
+  });
+
+  it('drops the connection stat first — the newest field, and the least identifying', () => {
+    expect(fitBadgeTag(FULL, measure('3d7cc6a · d891dd0a (gru)'), measure)).toBe(
+      '3d7cc6a · d891dd0a (gru)',
+    );
+  });
+
+  it('then the server, before it gives up any of the build', () => {
+    expect(fitBadgeTag(FULL, measure('3d7cc6a') + 1, measure)).toBe('3d7cc6a');
+  });
+
+  it('NEVER drops the sha — a badge that cannot name its build is not a badge', () => {
+    expect(fitBadgeTag(FULL, 0, measure)).toBe('3d7cc6a');
+    expect(fitBadgeTag(FULL, -100, measure)).toBe('3d7cc6a');
+  });
+
+  it('leaves a single-field tag alone (the offline case, every menu screen)', () => {
+    expect(fitBadgeTag('3d7cc6a', 5, measure)).toBe('3d7cc6a');
+  });
+
+  it('fits inside the zone it was measured against, at the narrow width that forced it', () => {
+    const vp = { width: 390, height: 844 };
+    const fitted = fitBadgeTag(FULL, badgeAvailableWidth(vp.width), measure);
+    const r = writeBadgeRect(measure(fitted), TEXT_H, vp.width, vp.height, rect());
+    expect(rectContains(resolveAnchor(BADGE_ANCHOR, vp), r)).toBe(true);
+    expect(fitted, 'and it kept as much as it could').toBe('3d7cc6a · d891dd0a (gru)');
   });
 
   it('passes the registry placement check under the id main.ts registers', () => {
@@ -133,7 +203,7 @@ describe('the badge covers no control (m10-14: nothing may cover a button)', () 
     const flat = writeBadgeRect(WIDE_W, TEXT_H, 1280, H, rect(), 0);
     expect(overlaps(flat, strip), 'the un-lifted badge would sit in the bindings').toBe(true);
 
-    const lifted = writeBadgeRect(WIDE_W, TEXT_H, 1280, H, rect(), BADGE_STRIP_LIFT);
+    const lifted = writeBadgeRect(STATS_W, TEXT_H, 1280, H, rect(), BADGE_STRIP_LIFT);
     expect(overlaps(lifted, strip)).toBe(false);
     expect(lifted.y + lifted.height).toBeLessThanOrEqual(strip.y);
   });
@@ -148,7 +218,9 @@ describe('the badge covers no control (m10-14: nothing may cover a button)', () 
       for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
         const stick = affordanceRects(true, mode, vp.width, vp.height).leftStickZone;
         expect(stick, 'touch always draws a left stick').not.toBeNull();
-        const badge = writeBadgeRect(WIDE_W, TEXT_H, vp.width, vp.height, rect(), 0);
+        // The WIDEST tag, not merely a connected one: the stats field made the
+        // corner longer, and clearance is a claim about the longest string.
+        const badge = writeBadgeRect(STATS_W, TEXT_H, vp.width, vp.height, rect(), 0);
         expect(overlaps(badge, stick!), `badge hit the stick at ${vp.width}x${vp.height}`).toBe(false);
       }
     }

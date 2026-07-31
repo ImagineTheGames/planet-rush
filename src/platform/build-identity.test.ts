@@ -10,11 +10,13 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import {
+  BADGE_RTT_INTERVAL_MS,
   BuildIdentity,
   MACHINE_SHORT_LENGTH,
   UNKNOWN_MACHINE,
   buildIdentity,
   formatBuildTag,
+  formatRttSuffix,
   formatServerSuffix,
   normalizeRegion,
   resetBuildIdentity,
@@ -147,6 +149,110 @@ describe('BuildIdentity — one owner, so screen and log cannot disagree', () =>
     expect(() => id.connected(MACHINE, REGION)).not.toThrow();
     // …and the well-behaved listener still heard about it.
     expect(seen[seen.length - 1]).toBe('3d7cc6a · d891dd0a (gru)');
+  });
+});
+
+describe('the rtt field — the badge grows connection stats (ratified M10)', () => {
+  it('is the developer\'s third string, verbatim', () => {
+    expect(formatBuildTag(CLEAN, { machine: MACHINE, region: REGION }, 62)).toBe(
+      '3d7cc6a · d891dd0a (gru) · 62ms',
+    );
+  });
+
+  it('rounds once, so the badge and the log\'s `net` column print one integer', () => {
+    expect(formatRttSuffix(61.6)).toBe('62ms');
+    expect(formatRttSuffix(0)).toBe('0ms'); // a measured zero IS a measurement
+  });
+
+  it('shows NOTHING for anything that is not a measurement — never a lying 0ms', () => {
+    for (const bad of [null, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(formatRttSuffix(bad)).toBe('');
+    }
+    expect(formatBuildTag(CLEAN, { machine: MACHINE, region: REGION }, null)).toBe(
+      '3d7cc6a · d891dd0a (gru)',
+    );
+  });
+
+  it('never appends an rtt with no server behind it — a round trip to nowhere', () => {
+    expect(formatBuildTag(CLEAN, null, 62)).toBe('3d7cc6a');
+  });
+
+  it('reaches the tag on the first sample, without waiting out the interval', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(62, 1_000);
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru) · 62ms');
+    expect(id.rttMs).toBe(62);
+  });
+
+  it('changes the number at most once per ~2s, however often a frame loop offers one', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(62, 0);
+
+    // 120 frames of a wandering connection across the next two seconds.
+    for (let f = 1; f < 120; f++) id.sampleRtt(62 + f, f * (BADGE_RTT_INTERVAL_MS / 120));
+    expect(id.tag, 'the corner renumbered inside the interval').toBe(
+      '3d7cc6a · d891dd0a (gru) · 62ms',
+    );
+
+    // The frame that crosses the interval takes the current reading.
+    id.sampleRtt(180, BADGE_RTT_INTERVAL_MS);
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru) · 180ms');
+  });
+
+  it('drops a number that went absent immediately — a dead wire keeps no last good reading', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(62, 0);
+    id.sampleRtt(null, 16); // well inside the interval
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru)');
+    expect(id.rttMs).toBeNull();
+  });
+
+  it('loses the rtt with the socket — a stale 62ms must not outlive the session', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(62, 0);
+    id.disconnected();
+    expect(id.tag).toBe('3d7cc6a');
+    expect(id.rttMs).toBeNull();
+
+    // And the next session starts its own throttle, rather than inheriting a
+    // timestamp that would make its first reading two seconds late.
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(80, 10);
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru) · 80ms');
+  });
+
+  it('keeps the rtt across a re-welcome onto the same Machine (the grace window)', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    id.sampleRtt(62, 0);
+    id.connected(MACHINE, REGION);
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru) · 62ms');
+  });
+
+  it('tells subscribers about an rtt change — the badge is one of them', () => {
+    const id = new BuildIdentity(CLEAN);
+    const seen: string[] = [];
+    id.connected(MACHINE, REGION);
+    id.subscribe((tag) => seen.push(tag));
+    id.sampleRtt(62, 0);
+    expect(seen).toEqual(['3d7cc6a · d891dd0a (gru)', '3d7cc6a · d891dd0a (gru) · 62ms']);
+  });
+
+  it('leaves `identityTag` still — so the log\'s env is not rewritten every 2s', () => {
+    const id = new BuildIdentity(CLEAN);
+    id.connected(MACHINE, REGION);
+    const before = id.identityTag;
+    id.sampleRtt(62, 0);
+    id.sampleRtt(180, BADGE_RTT_INTERVAL_MS);
+    id.sampleRtt(240, BADGE_RTT_INTERVAL_MS * 2);
+    expect(id.identityTag).toBe(before);
+    expect(id.identityTag).toBe('3d7cc6a · d891dd0a (gru)');
+    // …while the badge itself did move.
+    expect(id.tag).toBe('3d7cc6a · d891dd0a (gru) · 240ms');
   });
 });
 

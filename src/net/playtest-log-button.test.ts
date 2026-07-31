@@ -13,12 +13,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
 import {
   COPY_LOG_BUTTON_ID,
+  COPY_LOG_DOWNLOAD_ID,
   COPY_LOG_HINT_ID,
   COPY_LOG_ROOT_ID,
   CopyLogAffordance,
   ERROR_OFFER_HINT,
   copyLogLabel,
   copyLogModel,
+  downloadLogLabel,
   disconnectOfferHint,
   hideCopyLog,
   installCopyLogButton,
@@ -63,7 +65,7 @@ function fakeDom(): CopyLogDom & { body: FakeElement; find: (id: string) => Fake
         html = value;
         // A write replaces the children: re-register the ids the markup declares, so
         // `getElementById` behaves like a browser's after an innerHTML write.
-        for (const id of [COPY_LOG_BUTTON_ID, COPY_LOG_HINT_ID]) {
+        for (const id of [COPY_LOG_BUTTON_ID, COPY_LOG_DOWNLOAD_ID, COPY_LOG_HINT_ID]) {
           registry.delete(id);
           if (value.includes(`id="${id}"`)) {
             const child = make();
@@ -421,5 +423,135 @@ describe('the shared affordance', () => {
     first.show({ reason: 'pause' });
     installCopyLogButton({ dom, log: newLog(), schedule: null });
     expect(dom.body.children[0]!.removed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The DOWNLOAD sibling (ratified M10 — "too large for mobile clipboard")
+// ---------------------------------------------------------------------------
+
+describe('the DOWNLOAD sibling', () => {
+  it('rests on the word that names what you get — a file', () => {
+    expect(downloadLogLabel('idle')).toBe('DOWNLOAD');
+    expect(downloadLogLabel('working')).toBe('SAVING…');
+    expect(downloadLogLabel('saved')).toBe('LOG SAVED');
+    expect(downloadLogLabel('shared')).toBe('LOG SENT');
+    expect(downloadLogLabel('failed')).toBe('SAVE FAILED');
+  });
+
+  it('is drawn beside COPY LOG, with its own id and the same 44-px touch target', () => {
+    const html = renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'idle'));
+    expect(html).toContain(`id="${COPY_LOG_BUTTON_ID}"`);
+    expect(html).toContain('COPY LOG');
+    expect(html).toContain(`id="${COPY_LOG_DOWNLOAD_ID}"`);
+    expect(html).toContain('DOWNLOAD');
+    expect(html).toContain('min-height:44px');
+    // The row wraps rather than pushing the second button off a narrow phone.
+    expect(html).toContain('flex-wrap:wrap');
+  });
+
+  it('wears its own answer, and leaves COPY LOG at rest', () => {
+    const m = copyLogModel({ reason: 'pause' }, 'saved', 'download');
+    expect(m.downloadLabel).toBe('LOG SAVED');
+    expect(m.label, 'the clipboard button claimed a press it never took').toBe('COPY LOG');
+    expect(m.hint).toContain('attach that file');
+  });
+
+  it('…and the converse: a copy answer leaves DOWNLOAD at rest', () => {
+    const m = copyLogModel({ reason: 'pause' }, 'copied', 'copy');
+    expect(m.label).toBe('LOG COPIED');
+    expect(m.downloadLabel).toBe('DOWNLOAD');
+  });
+
+  it('disables BOTH while either is working — one export at a time', () => {
+    const m = copyLogModel({ reason: 'pause' }, 'working', 'download');
+    expect(m.busy).toBe(true);
+    expect(m.downloadBusy).toBe(true);
+    // Both button elements carry the attribute (the CSS's own `[disabled]` rule
+    // is matched out, so this counts elements and not stylesheet selectors).
+    expect(renderCopyLogHtml(m).match(/<button[^>]* disabled>/g)).toHaveLength(2);
+  });
+
+  it('names the phone failure honestly rather than blaming the clipboard', () => {
+    expect(copyLogModel({ reason: 'pause' }, 'failed', 'download').hint).toBe(
+      'Could not save the log on this device.',
+    );
+  });
+
+  it('a press on it takes the FILE route — never the clipboard', async () => {
+    const dom = fakeDom();
+    const writeText = vi.fn(async (_t: string) => {});
+    const save = vi.fn();
+    const affordance = new CopyLogAffordance({
+      dom,
+      log: newLog(),
+      exportOptions: { share: null, clipboard: { writeText }, save },
+      schedule: null,
+    });
+    affordance.show({ reason: 'pause' });
+
+    const result = await affordance.download();
+
+    expect(result.ok && result.route).toBe('download');
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(writeText, 'DOWNLOAD reached for the clipboard').not.toHaveBeenCalled();
+    expect(affordance.state).toBe('saved');
+    expect(affordance.actingOn).toBe('download');
+    expect(dom.find(COPY_LOG_DOWNLOAD_ID)).not.toBeNull();
+    expect(dom.body.children[0]!.innerHTML).toContain('LOG SAVED');
+  });
+
+  it('is wired to the DOWNLOAD element, not to COPY LOG\'s', async () => {
+    const dom = fakeDom();
+    const save = vi.fn();
+    const affordance = new CopyLogAffordance({
+      dom,
+      log: newLog(),
+      exportOptions: { share: null, clipboard: null, save },
+      schedule: null,
+    });
+    affordance.show({ reason: 'pause' });
+
+    dom.find(COPY_LOG_DOWNLOAD_ID)!.listeners.forEach((fn) => fn());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(affordance.actingOn).toBe('download');
+  });
+
+  it('collapses a doubled thumb into one export', async () => {
+    const dom = fakeDom();
+    const save = vi.fn();
+    const affordance = new CopyLogAffordance({
+      dom,
+      log: newLog(),
+      exportOptions: { share: null, clipboard: null, save },
+      schedule: null,
+    });
+    affordance.show({ reason: 'pause' });
+
+    const [first, second] = await Promise.all([affordance.download(), affordance.download()]);
+    expect(first.ok).toBe(true);
+    expect(second.ok, 'the second press started a second write of a 40 KB file').toBe(false);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops back to a resting pair when a new screen makes a new offer', async () => {
+    const dom = fakeDom();
+    const affordance = new CopyLogAffordance({
+      dom,
+      log: newLog(),
+      exportOptions: { share: null, clipboard: null, save: vi.fn() },
+      schedule: null,
+    });
+    affordance.show({ reason: 'pause' });
+    await affordance.download();
+    expect(affordance.state).toBe('saved');
+
+    affordance.show({ reason: 'error', hint: 'Couldn’t reach the servers.' });
+    expect(affordance.state).toBe('idle');
+    expect(affordance.actingOn, 'a stale download answer survived onto another screen').toBe('copy');
+    expect(dom.body.children[0]!.innerHTML).toContain('DOWNLOAD');
   });
 });

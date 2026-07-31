@@ -212,6 +212,69 @@ export async function exportPlaytestLog(config: ExportConfig): Promise<ExportRes
   return { ok: false, reason: 'No clipboard and no download available on this device.' };
 }
 
+/**
+ * Get the log off the device **as a FILE**, and never as text.
+ *
+ * The developer's words, ratified: *"too large for mobile clipboard."* That is not
+ * a bug in {@link exportPlaytestLog} — its chain is correct — it is a chain whose
+ * middle rung can *succeed* and still leave the developer stuck. A 40 KB JSON blob
+ * that lands on a phone's clipboard is a paste no chat app will take and no human
+ * will scroll; the export reported success, and the log still did not travel. So
+ * the DOWNLOAD affordance is not a fallback of COPY LOG, it is a different
+ * promise: what comes out the other end is a named `.json` a thumb can attach.
+ *
+ * Two routes, and **the clipboard is not one of them**:
+ *
+ *  1. **The share sheet with the file** (`navigator.share` + `files:`) — where the
+ *     platform takes it, this is strictly the better version of a download on a
+ *     phone: the OS chooser puts the same named file straight into Messages, Mail
+ *     or Drive with no trip through a Downloads folder. Never the `text:`
+ *     variant — a share that degrades to text is the wall of JSON this route
+ *     exists to avoid, so a platform that refuses `files:` falls through instead.
+ *  2. **The blob download** — always available in a browser, works on mobile
+ *     Safari and Chrome, and lands in Downloads under
+ *     {@link playtestLogFilename}: `planet-rush-log-<sha>-<timestamp>.json`.
+ *
+ * Same injected seams as {@link exportPlaytestLog}, so both routes and the
+ * ordering are exercised in node with no browser.
+ */
+export async function downloadPlaytestLog(config: ExportConfig): Promise<ExportResult> {
+  const json = config.log.toJson();
+  const bytes = json.length;
+  const filename = playtestLogFilename(config.log.env);
+
+  const share = config.share === undefined ? defaultShare() : config.share;
+  const makeFile = config.makeShareFile === undefined ? defaultMakeShareFile() : config.makeShareFile;
+  if (share && makeFile) {
+    const file = makeFile(filename, json);
+    if (file) {
+      const payload: ShareData = { title: filename, text: SHARE_TEXT, files: [file] };
+      // `canShare` first: a browser that refuses `files:` rejects `share()` rather
+      // than degrading, and that refusal must cost the download nothing.
+      if (!share.canShare || share.canShare(payload)) {
+        try {
+          await share.share(payload);
+          return { ok: true, route: 'share', bytes };
+        } catch {
+          // Dismissed, unsupported, or outside a gesture. Down to the file.
+        }
+      }
+    }
+  }
+
+  const save = config.save === undefined ? defaultSave() : config.save;
+  if (save) {
+    try {
+      save(filename, json);
+      return { ok: true, route: 'download', bytes };
+    } catch (err) {
+      return { ok: false, reason: `The download failed (${String(err)}).` };
+    }
+  }
+
+  return { ok: false, reason: 'No way to save a file on this device.' };
+}
+
 /** The line that rides along in the share sheet, so the log arrives with a name
  *  on it rather than as an unexplained attachment. */
 export const SHARE_TEXT = 'Planet Rush playtest log';

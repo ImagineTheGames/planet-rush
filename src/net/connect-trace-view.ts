@@ -26,6 +26,11 @@
  * player has to go looking for an affordance to report is a failure that does not
  * get reported.
  *
+ * COPY LOG carries a **DOWNLOAD** sibling here too (ratified M10 — "COPY LOG
+ * buttons gain DOWNLOAD sibling"), because the developer's *"too large for mobile
+ * clipboard"* bites hardest on exactly this screen: a join that never landed is
+ * where a phone report starts, and a 40 KB paste is not how it travels.
+ *
  * It shows **nothing at all** while a connect is merely in progress — the title is
  * saying everything there is to say, and an affordance offered before there is
  * anything to report is just the pop-up again.
@@ -47,6 +52,7 @@ import { escapeHtml } from './playtest-log-button';
 export const CONNECT_TRACE_ROOT_ID = 'pr-connect-trace';
 export const CONNECT_TRACE_RETRY_ID = 'pr-connect-trace-retry';
 export const CONNECT_TRACE_COPY_ID = 'pr-connect-trace-copy';
+export const CONNECT_TRACE_DOWNLOAD_ID = 'pr-connect-trace-download';
 
 const CSS_CHALK = '#DCE3EC';
 const CSS_PLASMA = '#4DC3FF';
@@ -73,6 +79,13 @@ export function renderConnectTraceHtml(model: ConnectTraceModel): string {
   }
   if (model.offerCopyLog) {
     buttons.push(`<button id="${CONNECT_TRACE_COPY_ID}" type="button" class="pr-ct-button">COPY LOG</button>`);
+    // DOWNLOAD, beside it (ratified M10 — "COPY LOG buttons gain DOWNLOAD
+    // sibling"). "Buttons" is plural in the ratification and this is the other
+    // one: a join that never landed is the most likely place a phone report starts,
+    // and a clipboard paste is the route the developer told us does not survive it.
+    buttons.push(
+      `<button id="${CONNECT_TRACE_DOWNLOAD_ID}" type="button" class="pr-ct-button">DOWNLOAD</button>`,
+    );
   }
   if (buttons.length === 0) return '';
 
@@ -149,8 +162,12 @@ export interface ConnectTraceViewConfig {
   /** RETRY: start a *fresh* attempt (a new allocate), never a redial of a ticket
    *  that already lost. `src/main.ts` wires this to the door the player chose. */
   readonly onRetry: () => void;
-  /** COPY LOG: export the session log (`./playtest-log-export`). */
+  /** COPY LOG: export the session log by the best route this device has
+   *  (`./playtest-log-export` `exportPlaytestLog`). */
   readonly onCopyLog: () => void;
+  /** DOWNLOAD: get the log out as a FILE, never as text
+   *  (`./playtest-log-export` `downloadPlaytestLog`). */
+  readonly onDownloadLog: () => void;
 }
 
 /**
@@ -222,6 +239,9 @@ export class ConnectTraceView {
     this.config.dom
       .getElementById(CONNECT_TRACE_COPY_ID)
       ?.addEventListener('click', () => this.config.onCopyLog());
+    this.config.dom
+      .getElementById(CONNECT_TRACE_DOWNLOAD_ID)
+      ?.addEventListener('click', () => this.config.onDownloadLog());
   }
 
   private mount(): TraceElement | null {

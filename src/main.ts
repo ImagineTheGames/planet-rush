@@ -468,8 +468,16 @@ async function boot(): Promise<void> {
   //     to whatever the corner is now drawing, and the change lands on the
   //     timeline as its own event. So "logs and screen always agree" is a wire,
   //     not a discipline. Fires once immediately, seating the offline tag.
+  //
+  //     The log takes the STABLE half (`identityTag`: build + server, no rtt).
+  //     The badge's third field renumbers every ~2 s now (ratified: "badge grows
+  //     connection stats"), and `setBuild` records an event per change — piping
+  //     the live tag here would file ~360 `build tag` lines in a twelve-minute
+  //     match and evict the 600-slot ring with a number the telemetry samples
+  //     already carry per second. The subscription still fires on every tick of
+  //     the rtt; `setBuild` drops the ones where the identity half did not move.
   const identity = buildIdentity();
-  identity.subscribe((tag) => playtest.setBuild(tag));
+  identity.subscribe(() => playtest.setBuild(identity.identityTag));
 
   // Which build is this? One line, first thing in the console, every build —
   // so a bug report can carry the sha instead of "the version I had open"
@@ -628,6 +636,9 @@ async function boot(): Promise<void> {
     get server(): { machine: string; region: string } | null {
       const s = identity.server;
       return s ? { machine: s.machine, region: s.region } : null;
+    },
+    get rttMs(): number | null {
+      return identity.rttMs;
     },
     get bounds(): Rect | null {
       if (!buildBadge.visible) return null;
@@ -1001,8 +1012,21 @@ async function boot(): Promise<void> {
     installTapMarkerStage();
     installMinimapStage();
     installAudioStage();
-    installPauseStage();
   }
+
+  // The pause seam is installed on BOTH boots, unlike the debug stages above, and
+  // for the same reason `installBuildBadgeSeam` is: the thing it has to prove only
+  // exists on the CLEAN boot. `?debug=1` drops straight into an offline match with
+  // no menu (`mainMenu` is null above), so an online match is reachable only
+  // through the front door — and "an online pause must NOT pause the sim" (GDD
+  // §4.2, ratified M10) is exactly a claim about an online match. Gated, the
+  // ratified rule would be unprovable in a real browser, which is where the M2
+  // dark-matter class of bug lives.
+  //
+  // It is safe to ship for the same reason `__lobby` and `__mainMenu` are: pure
+  // read-back plus the physical points the client itself drew, no mutators, and it
+  // computes nothing until something calls `read()`.
+  installPauseStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -1725,17 +1749,33 @@ async function boot(): Promise<void> {
       // for every remaining frame, and `formatBuildTag` builds a string. One call
       // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
       if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
+      // The badge's third field (ratified, M10 — "3cb36f5 · d891dd0a (gru) ·
+      // 62ms") is NOT fed from here. It rides the session's own poll timer
+      // instead (`startSessionLog`), which is the only thing that spans the whole
+      // life of a connection — the lobby before this loop exists, and the drop
+      // after the menu is gone. Feeding it here left the lobby, the screen the
+      // region is actually read off, with no number on it at all.
+      //
+      // The one thing this loop still owes the badge is `?freeze=1`: a stamp that
+      // changes with the weather is exactly what a byte-deterministic golden
+      // screenshot cannot have. (Freeze implies `?debug=1`, which has no online
+      // session, so this is belt and braces — and cheap: one boolean, and the
+      // sample is a no-op once the field is already empty.)
+      if (flags.freeze) identity.sampleRtt(null, nowMs);
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
-      // Your own round trip, above the stamp (ratified developer): the SAME number
-      // the session log samples (`telemetry.hudRttMs` — the last finalized
-      // second's mean), so the corner and a pasted log never disagree about one
-      // connection. Null — and so nothing drawn — offline, under freeze, and the
-      // moment the socket closes: a ping is a live measurement or it is absent.
-      pingBadge.setRtt(
-        onlineSession && onlineSession.state !== 'closed' && !flags.freeze
-          ? onlineSession.telemetry.hudRttMs
-          : null,
-      );
+      // The standalone ping stamp is SUPERSEDED by the badge line above it, and is
+      // fed null rather than a second opinion (ratified, M10 — the badge carries
+      // the connection stats now, on every screen, not just in-match).
+      //
+      // Two reasons it cannot simply keep drawing. It sits one mono line directly
+      // above the badge, so a match would show two `ms` readings stacked in one
+      // corner; and it reads `telemetry.hudRttMs`, which is the COMPOSITE the same
+      // ratification rules out — the two lines would disagree, by a factor of
+      // eight on a healthy connection, about one connection. `@net/ping-badge` is
+      // left installed and untouched (it is the netcode lane's module) so that
+      // lane can re-point or retire it; this is the wiring's call, not the
+      // component's. See the PR body.
+      pingBadge.setRtt(null);
       pingBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
       // any frame) and show the re-enter affordance only once we've been fullscreen
@@ -4100,14 +4140,18 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Install `window.__pauseStage` — the ?debug=1 live-stage seam that proves, on a
-   * REAL boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
+   * Install `window.__pauseStage` — the live-stage seam that proves, on a REAL
+   * boot, that the pause menu is wired (developer p10): ESC/tap opens it, the
    * offline sim freezes while it is up and resumes on RESUME, SETTINGS round-trips,
    * and EXIT+confirm tears the world down to the menu. Pure READBACK plus the
    * physical press points the client itself drew each control at (through the
    * landscape-lock remap, the same shape `__mainMenu` uses), so a Playwright test
    * drives the WHOLE path with real ESC and real clicks — never a hit-test seam —
-   * and reads back only plain state. Behind ?debug=1; absent in a normal build.
+   * and reads back only plain state.
+   *
+   * Installed on BOTH boots (see the call site): the online half of the ratified
+   * pause rule — the sim keeps running under the overlay — is only reachable
+   * through the front door, which `?debug=1` skips.
    */
   function installPauseStage(): void {
     const physOf = (lx: number, ly: number): { x: number; y: number } => {
@@ -4149,10 +4193,13 @@ async function boot(): Promise<void> {
         pausable: boolean;
         frozen: boolean;
         simTicks: number;
+        online: boolean;
+        ship: { x: number; y: number; vx: number; vy: number } | null;
         controls: { kind: string; physicalCenter: { x: number; y: number } }[];
         buttonPoint: { x: number; y: number };
       } {
         const r = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
+        const ship = world.ships.find(isLocalShip) ?? null;
         return {
           screen: pauseScreen,
           open: isPauseOpen(pauseScreen),
@@ -4163,6 +4210,14 @@ async function boot(): Promise<void> {
           // The sim's own step counter — unchanging while frozen, advancing after
           // RESUME. The executable form of "ticks stop, resume continues."
           simTicks,
+          // Which world this is, so the audit can say WHY it expected what it saw
+          // rather than inferring the transport from the freeze it is testing.
+          online: !pausable,
+          // The local ship's live position and velocity. The ratified online rule is
+          // "the world keeps running, the ship keeps flying (or drifts)" — a tick
+          // counter proves the first half; only a ship that has MOVED across the
+          // pause proves the second, and a frozen offline one must not have.
+          ship: ship ? { x: ship.pos.x, y: ship.pos.y, vx: ship.vel.x, vy: ship.vel.y } : null,
           controls: controls(),
           // The touch corner button's physical centre (for the phone-profile path).
           buttonPoint: physOf(r.x + r.width / 2, r.y + r.height / 2),
@@ -5241,6 +5296,8 @@ function openMainMenu(
       if (retryDoor) void startResolve(retryDoor.door, retryDoor.room);
     },
     onCopyLog: () => void copyLogButton()?.copy(),
+    // The DOWNLOAD sibling (ratified M10): a FILE, never a 40 KB clipboard paste.
+    onDownloadLog: () => void copyLogButton()?.download(),
   });
 
   /**
@@ -5733,7 +5790,43 @@ function openMainMenu(
    */
   function startSessionLog(session: OnlineSession): void {
     onlineLogHandle = attachSessionLog({ log: playtest, session });
-    onlineLogTimer = setInterval(() => onlineLogHandle?.poll(), SESSION_LOG_POLL_MS);
+    onlineLogTimer = setInterval(() => {
+      onlineLogHandle?.poll();
+      // …and the badge's connection stat, on the same tick and for the same
+      // reason (ratified M10 §1: "every screen … when connected"). The first
+      // version of this fed the badge from the MATCH loop, and the lobby — the
+      // screen the developer actually reads a region off, and where a live-stage
+      // run photographs it — never showed a number at all, because no match loop
+      // exists yet. This timer is already the one thing that spans the whole life
+      // of a connection: the lobby wait before the match, and the drop after the
+      // menu is gone.
+      //
+      // `networkFloorMs` is the DECOMPOSED NETWORK figure: the ping probe's own
+      // round trip over the recent window, with no input lead and no broadcast
+      // cadence in it — never the composite. It is the number `@net/session`
+      // exposes as `networkPingMs` with the header "what the lobby and HUD
+      // readouts must read", which is exactly the distinction the ratification
+      // drew; read here through `telemetry.live` because that getter is the part
+      // of it on the `OnlineSession` INTERFACE, and widening a ratified interface
+      // is the Director's call, not this lane's. Same number, same source, so the
+      // badge and the lobby's roster pings cannot disagree.
+      //
+      // It is null until a probe has been answered, and the probe rides
+      // `sendInput` (`@net/session`) — so there is no reading until the match is
+      // predicting, and the tag correctly carries no stats field before then. "A
+      // number is a measurement or it is absent" (`@net/ping` rule 1); a `0ms` in
+      // the lobby would be a claim about a wire nobody has timed. (The lobby is
+      // not left blind: the roster already shows every seat's ping, measured by
+      // the server's own probe.)
+      //
+      // Offered four times a second; `sampleRtt` applies it at most once per ~2 s.
+      // `live` builds one small readout object per call — nothing at 4 Hz, and the
+      // reason this is on a timer rather than in a frame loop.
+      buildIdentity().sampleRtt(
+        session.state === 'closed' ? null : session.telemetry.live.networkFloorMs,
+        performance.now(),
+      );
+    }, SESSION_LOG_POLL_MS);
   }
 
   /** Stop logging a session that is being replaced (a fresh CREATE / JOIN). */
@@ -6860,12 +6953,16 @@ interface FullscreenSeam {
  * Read-only and structured-cloneable, like every other live-stage seam.
  */
 interface BuildBadgeSeam {
-  /** The string on screen: `'3d7cc6a'`, or `'3d7cc6a · d891dd0a (gru)'` connected. */
+  /** The string on screen: `'3d7cc6a'` offline, `'3d7cc6a · d891dd0a (gru)'`
+   *  connected, `'3d7cc6a · d891dd0a (gru) · 62ms'` once the wire is timed. */
   readonly text: string;
   /** False only under `?freeze=1`, where a changing stamp would break the goldens. */
   readonly visible: boolean;
   /** The server the tag's suffix came from, or null when there is no session. */
   readonly server: { machine: string; region: string } | null;
+  /** The round trip in the tag, ms, or null when the tag shows none — the
+   *  DECOMPOSED NETWORK figure (ratified: never the composite). */
+  readonly rttMs: number | null;
   /** The stamp's actual rect in logical (landscape) space, or null when hidden. */
   readonly bounds: Rect | null;
   /** Does that rect sit inside the declared `bottom-left` zone? */

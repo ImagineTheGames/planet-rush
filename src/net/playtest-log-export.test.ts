@@ -15,7 +15,14 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
-import { exportPlaytestLog, playtestLogFilename } from './playtest-log-export';
+import { downloadPlaytestLog, exportPlaytestLog, playtestLogFilename } from './playtest-log-export';
+
+/** The slice of a share payload these tests read back. */
+interface ShareDataLike {
+  title?: string;
+  text?: string;
+  files?: unknown[];
+}
 
 function newLog(): PlaytestLog {
   const log = new PlaytestLog({
@@ -244,5 +251,142 @@ describe('local-only', () => {
       save: (name) => void seen.push(`file:${name}`),
     });
     expect(seen).toEqual([`clipboard:${log.toJson().length}`]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// downloadPlaytestLog — the DOWNLOAD sibling (ratified M10)
+// ---------------------------------------------------------------------------
+
+/**
+ * The developer's complaint is not that COPY LOG fails — it is that it can
+ * *succeed* into a dead end: *"too large for mobile clipboard."* So the promise
+ * this route makes is narrower and stronger than the chain above's — what comes
+ * out the other end is a FILE — and the assertions here are mostly about the route
+ * it must never take.
+ */
+describe('downloadPlaytestLog — a file, never a clipboard', () => {
+  it('saves the log as parseable JSON under the build-and-timestamp name', async () => {
+    const log = newLog();
+    const save = vi.fn();
+
+    const result = await downloadPlaytestLog({ log, share: null, save });
+
+    expect(result).toEqual({ ok: true, route: 'download', bytes: log.toJson().length });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls[0]![0]).toBe(playtestLogFilename(log.env));
+    expect(save.mock.calls[0]![0]).toMatch(/^planet-rush-log-1a2b3c4-\d{8}-\d{6}\.json$/);
+    const parsed = JSON.parse(save.mock.calls[0]![1] as string) as { schema: string; events: unknown[] };
+    expect(parsed.schema).toBe('planet-rush.playtest-log');
+    expect(parsed.events.length).toBeGreaterThan(0);
+  });
+
+  it('NEVER touches the clipboard — the whole reason this button exists', async () => {
+    const log = newLog();
+    const writeText = vi.fn(async (_text: string) => {});
+    // A clipboard that would happily take it, offered on every seam the module has.
+    await downloadPlaytestLog({ log, share: null, clipboard: { writeText }, save: vi.fn() });
+    expect(writeText, 'the download route reached for the clipboard').not.toHaveBeenCalled();
+  });
+
+  it('prefers the share sheet WITH THE FILE where the platform takes it', async () => {
+    const log = newLog();
+    const shared: ShareDataLike[] = [];
+    const save = vi.fn();
+
+    const result = await downloadPlaytestLog({
+      log,
+      share: { share: async (d) => void shared.push(d), canShare: () => true },
+      makeShareFile: (filename, text) => ({ filename, text }),
+      save,
+    });
+
+    expect(result.ok && result.route).toBe('share');
+    expect(save, 'the sheet took it; nothing hit the Downloads folder').not.toHaveBeenCalled();
+    expect(shared[0]!.files).toHaveLength(1);
+    expect(shared[0]!.title).toBe(playtestLogFilename(log.env));
+  });
+
+  it('falls to the file when the platform refuses a `files:` share', async () => {
+    const log = newLog();
+    const save = vi.fn();
+    const result = await downloadPlaytestLog({
+      log,
+      // `canShare` says no — the platform would reject `share()` outright.
+      share: { share: async () => Promise.reject(new Error('unreachable')), canShare: () => false },
+      makeShareFile: (filename, text) => ({ filename, text }),
+      save,
+    });
+    expect(result.ok && result.route).toBe('download');
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls to the file when the developer dismisses the sheet', async () => {
+    const log = newLog();
+    const save = vi.fn();
+    const result = await downloadPlaytestLog({
+      log,
+      share: { share: async () => Promise.reject(new Error('AbortError')), canShare: () => true },
+      makeShareFile: (filename, text) => ({ filename, text }),
+      save,
+    });
+    expect(result.ok && result.route).toBe('download');
+  });
+
+  it('never shares TEXT — a platform with no File constructor goes straight to the file', async () => {
+    const log = newLog();
+    const share = vi.fn(async () => {});
+    const save = vi.fn();
+    const result = await downloadPlaytestLog({
+      log,
+      share: { share, canShare: () => true },
+      makeShareFile: () => null, // no `File` on this device
+      save,
+    });
+    // A `text:`-only share is the wall of JSON this button exists to avoid.
+    expect(share, 'it offered the sheet a payload with no file in it').not.toHaveBeenCalled();
+    expect(result.ok && result.route).toBe('download');
+  });
+
+  it('is honest when there is nowhere to put a file at all', async () => {
+    const log = newLog();
+    expect(await downloadPlaytestLog({ log, share: null, save: null })).toEqual({
+      ok: false,
+      reason: 'No way to save a file on this device.',
+    });
+  });
+
+  it('reports a download that throws rather than claiming a saved file', async () => {
+    const log = newLog();
+    const result = await downloadPlaytestLog({
+      log,
+      share: null,
+      save: () => {
+        throw new Error('SecurityError');
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.reason).toContain('SecurityError');
+  });
+
+  it('carries the WHOLE ring buffer, evictions counted', async () => {
+    // The one thing a report is for: everything that happened, or an honest count
+    // of what the ring dropped. A download that silently truncated would be worse
+    // than no download — it would look complete.
+    const log = new PlaytestLog({ env: newLog().env, capacity: 8 });
+    for (let i = 0; i < 20; i++) log.recordNote(`note ${i}`);
+    const save = vi.fn();
+
+    await downloadPlaytestLog({ log, share: null, save });
+
+    const parsed = JSON.parse(save.mock.calls[0]![1] as string) as {
+      events: { msg: string }[];
+      capacity: number;
+      dropped: number;
+    };
+    expect(parsed.capacity).toBe(8);
+    expect(parsed.events).toHaveLength(8);
+    expect(parsed.dropped, 'the export owns up to what the ring evicted').toBe(12);
+    expect(parsed.events[parsed.events.length - 1]!.msg).toBe('note 19');
   });
 });
