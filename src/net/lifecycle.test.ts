@@ -37,11 +37,14 @@ import {
   step,
 } from '../sim';
 import type { OreChunk, World, WorldConfig } from '../sim';
+import { combatantGetsBar } from '../ui/healthbar';
 import { shipLifecycleOf } from './entity-events';
 import { InputQueue } from './input-queue';
+import { RemoteInterpolator } from './interpolation';
 import { PredictedMatch, SNAP_THRESHOLD } from './prediction';
-import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
-import type { DecodedSnapshot } from './snapshot';
+import { PresentationLayer } from './presentation';
+import { SHIP_FLAG, decodeSnapshot, encodeWorldSnapshot } from './snapshot';
+import type { DecodedSnapshot, ShipSnap } from './snapshot';
 import type { EntityEventMessage, InputMessage, PlayerEconomy } from './transport';
 
 const LOCAL: PlayerId = 0;
@@ -477,5 +480,153 @@ describe('ore flights run on the sim\'s clock, online and off (GDD §2.3)', () =
       expect(seen.size).toBe(offline.couriers);
       expect(shipOf(match.client.world).cargo).toBeLessThan(1e-6);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3 & 4. One entity, one instant — the flickering bar and the lingering corpse
+// ---------------------------------------------------------------------------
+
+/**
+ * *"HP bars/numbers flicker"* and *"dead enemies linger"* are the same defect as the
+ * two above, seen by the renderer instead of by the simulation: a remote ship's body
+ * was drawn from the interpolation buffer while its hull, its life and its trigger
+ * were read off the newest snapshot. Two clocks on one entity.
+ *
+ * These run the real seam — {@link RemoteInterpolator} feeding
+ * {@link PresentationLayer} — and judge the result with the actual visibility rule the
+ * HUD applies (`src/ui/healthbar.ts` `combatantGetsBar`), because "the bar flickers"
+ * is a statement about that predicate and nothing else.
+ */
+
+/** One remote ship's wire record. */
+function snap(over: Partial<ShipSnap> = {}): ShipSnap {
+  return {
+    id: RIVAL,
+    posX: 1000,
+    posY: 1000,
+    velX: 0,
+    velY: 0,
+    heading: 0,
+    hull: 80,
+    flags: SHIP_FLAG.alive | SHIP_FLAG.firing,
+    ...over,
+  };
+}
+
+function frameOf(tick: number, ship: ShipSnap): DecodedSnapshot {
+  return { tick, ships: [ship], projectiles: [] };
+}
+
+/** The HUD's own rule, fed from a presented world exactly as `src/main.ts` feeds it:
+ *  hull, max hull, alive, and `firing` as the in-combat tell. */
+function getsBar(world: World, id: PlayerId): boolean {
+  const ship = shipOf(world, id);
+  return combatantGetsBar(
+    {
+      owner: ship.id,
+      hp: ship.hull,
+      maxHp: ship.maxHull,
+      alive: ship.alive,
+      inCombat: ship.firing,
+      pos: { x: 0, y: 0 },
+      radius: 10,
+    },
+    LOCAL,
+  );
+}
+
+describe('a remote ship is drawn from one instant (M10 lifecycle wire)', () => {
+  const DELAY = 100;
+  /** Snapshot cadence, ms — 30 Hz, against a 60 Hz render loop. */
+  const SNAP_MS = 1000 / 30;
+  const FRAME_MS = 1000 / 60;
+
+  /** The interpolator, the presentation layer, and a world to draw into. */
+  function seam(): {
+    world: World;
+    interp: RemoteInterpolator;
+    layer: PresentationLayer;
+    draw: (nowMs: number) => void;
+  } {
+    const world = createWorld(MATCH);
+    const interp = new RemoteInterpolator({ local: LOCAL, delayMs: DELAY });
+    const layer = new PresentationLayer(LOCAL);
+    return {
+      world,
+      interp,
+      layer,
+      draw: (nowMs: number): void => {
+        layer.apply(world, {
+          localOffset: { x: 0, y: 0 },
+          remotes: interp.sample(nowMs),
+          shots: interp.sampleShots(nowMs),
+        });
+      },
+    };
+  }
+
+  it('keeps the damage flag steady while the rival holds its trigger down', () => {
+    const { world, interp, layer, draw } = seam();
+    const rival = shipOf(world, RIVAL);
+    // Authority: a damaged rival, firing, in every snapshot. Nothing about what the
+    // player should see changes across this whole run.
+    for (let i = 0; i < 12; i++) {
+      interp.record(frameOf(i * 2, snap({ hull: 80 - i })), i * SNAP_MS);
+    }
+
+    const bars: boolean[] = [];
+    const hulls: number[] = [];
+    for (let frame = 0; frame < 20; frame++) {
+      const nowMs = DELAY + frame * FRAME_MS;
+      // What a predicted tick does to a rival between reconciles: `step()` clears
+      // the trigger of a ship this client has no input for, and runs its own
+      // collision guess over the hull. Both are what the bar used to read.
+      rival.firing = false;
+      rival.hull = 5;
+      draw(nowMs);
+      bars.push(getsBar(world, RIVAL));
+      hulls.push(rival.hull);
+      layer.restore(world);
+      // …and the simulation is untouched by the picture, as always.
+      expect(rival.firing).toBe(false);
+      expect(rival.hull).toBe(5);
+    }
+
+    // The bar is up for every frame of it — no 30 Hz strobe over an enemy that has
+    // been firing the whole time.
+    expect(bars.every((up) => up)).toBe(true);
+    // And the number beside it only ever moves the way authority moved it: down,
+    // through values that came off the wire, never through the local guess.
+    expect(hulls.every((h) => h !== 5)).toBe(true);
+    for (let i = 1; i < hulls.length; i++) expect(hulls[i]!).toBeLessThanOrEqual(hulls[i - 1]!);
+  });
+
+  it('clears a corpse when the render clock reaches the death, not seconds later', () => {
+    const { world, interp, layer, draw } = seam();
+    // Alive for three snapshots, then dead — the flag bit the death event doubles.
+    for (let i = 0; i < 3; i++) interp.record(frameOf(i * 2, snap()), i * SNAP_MS);
+    const deathMs = 3 * SNAP_MS;
+    interp.record(frameOf(6, snap({ flags: 0, hull: 0 })), deathMs);
+    for (let i = 4; i < 12; i++) {
+      interp.record(frameOf(i * 2, snap({ flags: 0, hull: 0 })), i * SNAP_MS);
+    }
+
+    let clearedAt: number | null = null;
+    for (let frame = 0; frame < 40; frame++) {
+      const nowMs = frame * FRAME_MS;
+      draw(nowMs);
+      const alive = shipOf(world, RIVAL).alive;
+      if (!alive && clearedAt === null) clearedAt = nowMs;
+      // A corpse gets no bar, and a living rival at 80/120 does.
+      expect(getsBar(world, RIVAL)).toBe(alive);
+      layer.restore(world);
+    }
+
+    expect(clearedAt).not.toBeNull();
+    // The corpse clears one interpolation delay after the death arrived — the same
+    // delay the body itself is drawn at — and inside a frame of it either way.
+    expect(clearedAt!).toBeGreaterThanOrEqual(deathMs + DELAY - FRAME_MS);
+    expect(clearedAt!).toBeLessThanOrEqual(deathMs + DELAY + FRAME_MS);
   });
 });
