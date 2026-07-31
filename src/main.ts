@@ -281,6 +281,11 @@ import {
   installPlaytestLog,
   playtestLog,
   showCopyLog,
+  // Your own ping, one mono line above the build stamp (ratified developer).
+  PingBadge,
+  PING_BADGE_ID,
+  PING_BADGE_ANCHOR,
+  PING_BADGE_STACK_LIFT,
 } from './net';
 import type {
   ResolveFailure,
@@ -594,6 +599,17 @@ async function boot(): Promise<void> {
   badgeRoot.addChild(buildBadge);
   buildBadge.update(transform.logicalWidth, transform.logicalHeight);
 
+  // Your own ping (ratified developer), stacked one mono line above the build
+  // stamp in the same corner and on the same root, so it rides the landscape-lock
+  // rotation identically. It shows itself only when there is a measurement to show
+  // — offline, in the menus, and before the first second of a match there is none,
+  // so this is invisible everywhere except a live online match. Never under
+  // `?freeze=1`: a number that changes with the weather is exactly what a
+  // byte-deterministic golden screenshot cannot have.
+  const pingBadge = new PingBadge();
+  badgeRoot.addChild(pingBadge);
+  pingBadge.update(transform.logicalWidth, transform.logicalHeight);
+
   // --- Read-only `window.__buildBadge` live-stage seam. The badge is Pixi text on
   //     a canvas, so a Playwright run cannot read it any other way — and "it is on
   //     every screen" is precisely the claim no unit test can make, because it is a
@@ -645,6 +661,7 @@ async function boot(): Promise<void> {
     // off-screen after an orientation flip is the field bug this file keeps re-learning.
     applyRootTransform(badgeRoot, transform);
     buildBadge.update(transform.logicalWidth, transform.logicalHeight);
+    pingBadge.update(transform.logicalWidth, transform.logicalHeight);
   }
 
   /** Map a raw physical pointer coordinate (`clientX/Y`) to the logical landscape
@@ -1000,6 +1017,9 @@ async function boot(): Promise<void> {
   //     of it. Nothing may cover a control (m10-14), and the strip's labels are
   //     no exception to that in the other direction either.
   buildBadge.lift = showControlsStrip(isTouch) ? BADGE_STRIP_LIFT : 0;
+  // …and the ping rides one line above the stamp, so the pair clears the strip
+  // together rather than the ping landing on top of the sha.
+  pingBadge.lift = buildBadge.lift + PING_BADGE_STACK_LIFT;
 
   // --- Re-enter-fullscreen affordance (fullscreen-affordance.ts): the small
   //     top-right button that appears only when the player has backed out of
@@ -1706,6 +1726,17 @@ async function boot(): Promise<void> {
       // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
       if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
+      // Your own round trip, above the stamp (ratified developer): the SAME number
+      // the session log samples (`telemetry.hudRttMs` — the last finalized
+      // second's mean), so the corner and a pasted log never disagree about one
+      // connection. Null — and so nothing drawn — offline, under freeze, and the
+      // moment the socket closes: a ping is a live measurement or it is absent.
+      pingBadge.setRtt(
+        onlineSession && onlineSession.state !== 'closed' && !flags.freeze
+          ? onlineSession.telemetry.hudRttMs
+          : null,
+      );
+      pingBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
       // any frame) and show the re-enter affordance only once we've been fullscreen
       // and no longer are (field request v0.1.1). Corner it in logical space.
@@ -4220,6 +4251,11 @@ async function boot(): Promise<void> {
     // squinting at a screenshot. Skipped when frozen, where the badge is hidden
     // (the registry records what is actually drawn, never what would have been).
     if (buildBadge.visible) reg.register(BADGE_ID, BADGE_ANCHOR, buildBadge.layoutBounds(w, h));
+
+    // The ping stamp above it: same corner, same rule — registered only while a
+    // measurement is actually on screen, so "it appears where it's supposed to"
+    // is checked against the frames that really carry it.
+    if (pingBadge.visible) reg.register(PING_BADGE_ID, PING_BADGE_ANCHOR, pingBadge.layoutBounds(w, h));
 
     // Re-enter-fullscreen affordance: declared top-right, actual rect measured
     // from the same corner math that draws it — so "no dead corners" (field

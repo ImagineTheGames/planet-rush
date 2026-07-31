@@ -62,9 +62,17 @@
  * the exact refusal with RETRY and COPY LOG on the panel itself. Same division as
  * the button: a pure model here, one DOM panel over the canvas, and `src/ui/`'s own
  * screens untouched.
+ *
+ * And `./ping` with `./ping-badge` are the round trip finally shown to the person
+ * whose connection it is (ratified developer): a pure grading model both surfaces
+ * share — the lobby row beside each human's name, and one mono line in the corner
+ * of the match — where before every measured millisecond went only to an
+ * instrument.
  */
 
 export * from './transport';
+export * from './ping';
+export * from './ping-badge';
 export * from './input-queue';
 export * from './snapshot';
 export * from './entity-events';

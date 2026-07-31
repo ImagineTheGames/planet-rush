@@ -202,6 +202,23 @@ export interface LobbySlot {
    * (spike §S2, Trap 7).
    */
   team?: number;
+  /**
+   * This seat's round trip to the server, **rounded ms** — the ping the lobby
+   * shows next to a human player's name (ratified developer; graded by
+   * `./ping`).
+   *
+   * Absent, never zero, whenever there is no measurement: on a **bot** seat
+   * always (a bot is inside the sim — it has no round trip, and `0ms` beside
+   * Vulture would flatter it against every human in the room), on an empty seat,
+   * on a seat whose socket has stopped answering the probe (`server/ws.ts`
+   * `RttProbe` lets a reading go stale rather than repeat itself), and from
+   * `LocalLoopback`, which has no wire to time.
+   *
+   * Costs the streamed snapshot nothing: it rides the lobby broadcast, which is
+   * re-sent on change at most every `LOBBY_PING_INTERVAL_MS` while the roster is
+   * on screen and not at all once the match is live (spike §S2, Trap 7).
+   */
+  rtt?: number;
 }
 
 /** Full lobby snapshot, broadcast on any change before the match starts. */

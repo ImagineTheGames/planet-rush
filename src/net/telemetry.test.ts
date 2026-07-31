@@ -62,6 +62,51 @@ describe('NetTelemetry — RTT', () => {
   });
 });
 
+describe('NetTelemetry — hudRttMs, the number shown to the player', () => {
+  it('IS the number the session log prints: the last finalized second mean, not\n' +
+    '     the last single round trip (ratified: "the session log already samples\n' +
+    '     it; show the same number")', () => {
+    const t = new NetTelemetry();
+    t.recordInput(1, 1000);
+    t.recordInput(2, 1100);
+    t.recordReconcile(OK, 1, 1100); // 100 ms
+    t.recordReconcile(OK, 2, 1300); // 200 ms
+    // Roll the second: the sample's mean is 150, while the last trip was 200.
+    t.recordInput(3, 2000);
+    t.recordReconcile(OK, 3, 2050);
+
+    expect(t.samples[0]!.rttMeanMs).toBe(150);
+    expect(t.hudRttMs).toBe(150);
+    // The live sub-second value is a different, jitterier truth — and is exactly
+    // what the corner must NOT be reading, or it would flicker every frame.
+    expect(t.live.rttMs).toBe(50);
+  });
+
+  it('shows the live reading before the first second has rolled, so a fresh match\n' +
+    '     is not a blank corner', () => {
+    const t = new NetTelemetry();
+    expect(t.hudRttMs).toBeNull();
+    t.recordInput(1, 1000);
+    t.recordReconcile(OK, 1, 1080);
+    expect(t.hudRttMs).toBe(80);
+  });
+
+  it('falls back to the live reading when a finalized second measured no round\n' +
+    '     trip at all', () => {
+    const t = new NetTelemetry();
+    t.recordInput(1, 1000);
+    t.recordReconcile(OK, 1, 1090); // 90 ms, but in the second that is about to roll
+    t.recordReconcile(OK, 9, 2000); // rolls; the new second's ack times nothing
+    t.recordReconcile(OK, 9, 3000); // rolls again: a sample with a null mean
+    expect(t.samples[1]!.rttMeanMs).toBeNull();
+    expect(t.hudRttMs).toBe(90);
+  });
+
+  it('reports nothing offline — no send, no ack, no number', () => {
+    expect(new NetTelemetry().hudRttMs).toBeNull();
+  });
+});
+
 describe('NetTelemetry — misprediction rate & correction', () => {
   it('counts a correction over the quantization floor as a misprediction', () => {
     const t = new NetTelemetry();
