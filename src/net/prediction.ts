@@ -37,6 +37,15 @@
  * snapshot 2 ticks later, and static entities are corrected by their own event
  * stream (`./entity-events`), so nothing drifts for long.
  *
+ * **Three things the replay is not allowed to decide.** Replaying steps the whole
+ * world, and `step()` resolves everything it touches — collisions, countdowns, the
+ * tractor. Three of those results are lies told with confidence, so each is
+ * re-asserted afterwards from the only source entitled to move it: **hull** is
+ * authority's ({@link PredictedMatch.holdHull}), **death** is authority's
+ * ({@link PredictedMatch.holdLifecycle}), and the **wallet** is the player's own
+ * timeline re-anchored to authority's last statement, never the replay's re-derived
+ * copy of either ({@link PredictedMatch.settleWallet}).
+ *
  * **The correction is not shown as a jump.** Reconciling can move the local ship
  * — by a hair every snapshot (the wire quantizes positions to whole units) or by
  * a lot after real divergence. {@link PredictedMatch.renderOffset} carries that
@@ -1601,21 +1610,23 @@ interface FrozenClocks {
   /** `[x, y, vx, vy, amount]` per entry of {@link chunks}, in the same order. */
   readonly chunkState: number[];
   /**
-   * Each ship's hold as the replay found it, in ship order — the ledger behind the
-   * conserved telegraph.
+   * Each ship's hold as the replay found it, in ship order — both the value the
+   * wallet is restored to afterwards ({@link PredictedMatch.settleWallet}) and the
+   * ledger behind the conserved telegraph.
    *
    * A courier is spawned on the hold's integer boundaries (`src/sim/step.ts`
-   * `updateDeposits`), and a reconcile writes authority's hold *over* the client's
-   * before replaying: so a boundary the player is owed a sprite for can be crossed
-   * inside a replay and nowhere else, and discarding the replay's chunk work whole
-   * would silently eat that sprite — one unit of ore that banks with nothing flying
-   * home for it. Comparing the hold the *player's* timeline reached against the one
-   * the replay ends on says exactly how many couriers the replay owes, and that many
-   * of the ones it spawned are kept.
+   * `updateDeposits`), and a reconcile can still move the hold *without* any
+   * predicted tick crossing one: authority's statement lands at the end of the
+   * reconcile and may take ore out of the hold that this client's own timeline had
+   * not drained yet. That is a boundary crossed nowhere the player could see it, and
+   * discarding the replay's chunk work whole would silently eat the sprite it owes —
+   * one unit of ore that banks with nothing flying home for it. Comparing the hold
+   * this was read at against the hold the reconcile settles on says exactly how many
+   * couriers are owed, and that many of the ones the replay spawned are kept.
    *
-   * Read at the top of the reconcile, before authority's wallet is applied — reading
-   * it after would measure the replay's own re-drain of ore already couriered, and
-   * mint a duplicate sprite per reconcile instead of the one the player earned.
+   * Read at the top of the reconcile, from the player's own timeline — the one
+   * quantity here that is *not* re-derived by the replay, because the replay's
+   * wallet work is thrown away ({@link PredictedMatch.settleWallet}).
    */
   readonly hold: readonly number[];
 }
