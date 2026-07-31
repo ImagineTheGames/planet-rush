@@ -91,6 +91,29 @@ export function allocatorUrlFromEnv(
 // The resolved connection, and the ways resolving can fail
 // ---------------------------------------------------------------------------
 
+/**
+ * Why the allocator chose the Machine it chose, as it came back on an allocate
+ * (`allocator/allocator.ts` `Placement`). Nothing routes on this — it exists so
+ * the decision is *explainable* from the player's side too: `detail` is the line
+ * that lands in the session log, so a "why am I on a US server?" report answers
+ * itself in the paste (`gru — your region`, `iad — gru full`).
+ *
+ * A join carries none (it places nothing), and an allocator that predates this
+ * field sends none, so it is optional the whole way down.
+ */
+export interface ConnectionPlacement {
+  /** The region asked for — client-named or edge-inferred — when there was one. */
+  readonly requested?: string;
+  /** The region the room actually landed in. */
+  readonly region: string;
+  /** The rule that decided it: `preferred` | `region-full` | `region-absent` |
+   *  `no-preference`. A bare string here — the allocator owns the union, and a
+   *  client that has not been redeployed must not choke on a new member. */
+  readonly reason: string;
+  /** The one human line: `gru — your region`. */
+  readonly detail: string;
+}
+
 /** Everything the socket layer needs, extracted from the allocator's decision. */
 export interface ResolvedConnection {
   /** The `ws(s)://` endpoint to open a {@link WebSocketTransport} against. */
@@ -105,6 +128,9 @@ export interface ResolvedConnection {
   readonly region: string;
   /** Epoch-ms the ticket goes stale — the caller races the socket against it. */
   readonly expiresAt: number;
+  /** Why this Machine, when the allocator said (allocate only — see
+   *  {@link ConnectionPlacement}). Absent on a join and on an older allocator. */
+  readonly placement?: ConnectionPlacement;
 }
 
 /**
@@ -237,6 +263,7 @@ interface AllocationBody {
   ticket?: unknown;
   expiresAt?: unknown;
   connectUrl?: unknown;
+  placement?: unknown;
 }
 
 /**
@@ -257,6 +284,7 @@ function toConnection(config: AllocatorClientConfig, payload: unknown): Resolved
       ? body.connectUrl
       : wsFromHttp(config.baseUrl);
 
+  const placement = toPlacement(body.placement);
   return {
     url,
     room: body.room,
@@ -264,6 +292,27 @@ function toConnection(config: AllocatorClientConfig, payload: unknown): Resolved
     machine: typeof body.machine === 'string' ? body.machine : '',
     region: typeof body.region === 'string' ? body.region : '',
     expiresAt: typeof body.expiresAt === 'number' ? body.expiresAt : 0,
+    ...(placement !== null ? { placement } : {}),
+  };
+}
+
+/**
+ * Read the allocator's placement reason, or `null` when it did not send a usable
+ * one — a join (which places nothing), an allocator older than the field, or a
+ * malformed object. Never load-bearing: a missing placement costs a log line, so
+ * this drops it rather than failing a connection that is otherwise perfectly good.
+ */
+function toPlacement(value: unknown): ConnectionPlacement | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const p = value as Record<string, unknown>;
+  if (typeof p['region'] !== 'string' || typeof p['reason'] !== 'string') return null;
+  return {
+    ...(typeof p['requested'] === 'string' ? { requested: p['requested'] } : {}),
+    region: p['region'],
+    reason: p['reason'],
+    // The line is what a human reads; if the allocator omitted it, say the parts
+    // we do have rather than an empty string.
+    detail: typeof p['detail'] === 'string' ? p['detail'] : `${p['region']} — ${p['reason']}`,
   };
 }
 

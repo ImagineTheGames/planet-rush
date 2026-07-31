@@ -5442,7 +5442,14 @@ function openMainMenu(
       return;
     }
     const config = { baseUrl: base };
-    const region = onlineRegions[0]?.id;
+    // The region the player CHOSE, and only that. At launch there is one region in
+    // the list and the picker is suppressed (`regionPickerVisible === false`), so
+    // nobody has chosen anything — and sending `iad` anyway is what pinned every
+    // creator to Virginia, including the one in Minas Gerais. Sent empty, the
+    // allocator infers the creator's region from Fly's edge and prefers it whenever
+    // it has capacity (`allocator/edge-region.ts`); a real picker, once there is one
+    // to pick from, overrides that inference exactly as before.
+    const region = regionPickerVisible(onlineRegions) ? onlineRegions[0]?.id : undefined;
     // Step 1 of the lifecycle the log carries end to end (brief §1): the allocate.
     // It is now also the first line the *player* reads — "ALLOCATING ROOM…" — and
     // every step below likewise reaches the screen through `traceStep`, so the
@@ -5468,10 +5475,16 @@ function openMainMenu(
     // Step 2: which machine, in which region, and that a signed ticket came back —
     // the machine id is the line that tells a "couldn't connect" report from a
     // "connected to the wrong Machine" one. The ticket VALUE is never logged.
+    // …and WHY that machine, when the allocator said (`placement.detail` — "gru —
+    // your region", "iad — gru full"). This is the line that makes a placement
+    // explainable from a pasted log: a report of "why am I on a US server?" now
+    // carries its own answer, and so does the good case.
+    const placement = result.connection.placement?.detail;
     playtest.recordConnect('ticket', {
       room: result.connection.room,
       machine: result.connection.machine,
       region: result.connection.region,
+      ...(placement !== undefined ? { placement } : {}),
       ticket: result.connection.ticket.length > 0,
       expiresInMs: result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
     });
@@ -5483,6 +5496,7 @@ function openMainMenu(
             room: result.connection.room,
             machine: result.connection.machine,
             region: result.connection.region,
+            ...(placement !== undefined ? { placement } : {}),
             expiresInMs:
               result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
           },
