@@ -1,5 +1,5 @@
 /**
- * src/net/playtest-log-button.ts — the COPY LOG button.
+ * src/net/playtest-log-button.ts — the COPY LOG button, and its DOWNLOAD sibling.
  * OWNER: Netcode Engineer (M10 playtest-log brief §2, §3).
  *
  * *"A COPY LOG button in the pause menu and on every error screen — the 'can't reach
@@ -29,9 +29,20 @@
  * words, steel for the frame. **No signal yellow and no threat red** — this button is
  * neither ore nor danger, and the RESERVED rule (style-guide §2) is not spent on a
  * diagnostic affordance.
+ *
+ * ── THE DOWNLOAD SIBLING (ratified M10) ─────────────────────────────────────
+ * The developer, from a phone: *"too large for mobile clipboard."* COPY LOG's
+ * chain can *succeed* into exactly that dead end — a 40 KB JSON blob on a phone's
+ * clipboard is a paste no chat app takes and no human scrolls, and the export
+ * reported success while the log went nowhere. So DOWNLOAD stands beside it with a
+ * different promise: what comes out is a **named `.json` file**, by the share
+ * sheet's file variant where the platform takes it and by a blob download where it
+ * does not (`./playtest-log-export` `downloadPlaytestLog`) — never text, never the
+ * clipboard. COPY LOG is unchanged and still leads, because on a desktop the
+ * clipboard remains the right first answer.
  */
 
-import { exportPlaytestLog } from './playtest-log-export';
+import { downloadPlaytestLog, exportPlaytestLog } from './playtest-log-export';
 import type { ExportConfig, ExportResult, ExportRoute } from './playtest-log-export';
 import { playtestLog } from './playtest-log';
 import type { PlaytestLog } from './playtest-log';
@@ -59,12 +70,28 @@ export interface CopyLogOffer {
  *  a button that looks inert for 200 ms gets pressed four times. */
 export type CopyLogPhase = 'idle' | 'working' | 'shared' | 'copied' | 'saved' | 'failed';
 
+/**
+ * Which of the two siblings a phase belongs to.
+ *
+ * The affordance offers **COPY LOG** and **DOWNLOAD** (ratified M10 — the
+ * developer: *"too large for mobile clipboard"*), and only one of them is ever
+ * reporting: a phase is a press's answer, so it must be attributed to the button
+ * that was pressed. Without this the download's "LOG SAVED" would appear on the
+ * clipboard button, which is the sort of wrong the screenshot then carries.
+ */
+export type CopyLogActor = 'copy' | 'download';
+
 export interface CopyLogModel {
   readonly label: string;
-  /** The line above the button, or `''` for none. */
+  /** The DOWNLOAD sibling's label. */
+  readonly downloadLabel: string;
+  /** The line above the buttons, or `''` for none. */
   readonly hint: string;
-  /** True while a press is in flight — the button is disabled. */
+  /** True while a COPY LOG press is in flight — that button is disabled. */
   readonly busy: boolean;
+  /** True while a DOWNLOAD press is in flight. Both go busy together: one export
+   *  at a time, so a doubled thumb cannot start a second write of a 40 KB file. */
+  readonly downloadBusy: boolean;
 }
 
 /** The label the button carries in each phase. `COPY LOG` is the resting state and
@@ -88,6 +115,34 @@ export function copyLogLabel(phase: CopyLogPhase): string {
   }
 }
 
+/**
+ * The DOWNLOAD sibling's label in each phase (ratified M10). `DOWNLOAD` is the
+ * resting word — it names the *thing you get*, a file, which is the whole reason
+ * it stands next to COPY LOG rather than behind it.
+ *
+ * `shared` is a real outcome here and not a lie about a download: this button's
+ * first route is the share sheet **with the file attached**, which is a download
+ * with the phone's own chooser in front of it (`./playtest-log-export`
+ * `downloadPlaytestLog`). The button says which one happened.
+ */
+export function downloadLogLabel(phase: CopyLogPhase): string {
+  switch (phase) {
+    case 'working':
+      return 'SAVING…';
+    case 'shared':
+      return 'LOG SENT';
+    case 'copied':
+      // Not a route this button takes; kept total so no phase can render blank.
+      return 'LOG COPIED';
+    case 'saved':
+      return 'LOG SAVED';
+    case 'failed':
+      return 'SAVE FAILED';
+    case 'idle':
+      return 'DOWNLOAD';
+  }
+}
+
 /** The auto-offer line an error screen shows, verbatim from the brief (§3). */
 export const ERROR_OFFER_HINT = 'COPY LOG to report this.';
 
@@ -97,7 +152,23 @@ export const ERROR_OFFER_HINT = 'COPY LOG to report this.';
  * screen makes the offer and the pause menu stays quiet: the button's own label is
  * self-explanatory there, and the pause menu is not a place for a paragraph.
  */
-export function copyLogHint(offer: CopyLogOffer, phase: CopyLogPhase): string {
+export function copyLogHint(
+  offer: CopyLogOffer,
+  phase: CopyLogPhase,
+  actor: CopyLogActor = 'copy',
+): string {
+  if (actor === 'download') {
+    switch (phase) {
+      case 'shared':
+        return 'Log sent as a file — pick where it went from the share sheet.';
+      case 'saved':
+        return 'Log saved to your downloads — attach that file.';
+      case 'failed':
+        return 'Could not save the log on this device.';
+      default:
+        return offer.reason === 'error' ? (offer.hint ?? ERROR_OFFER_HINT) : '';
+    }
+  }
   switch (phase) {
     case 'shared':
       return 'Log sent — pick where it went from the share sheet.';
@@ -126,13 +197,28 @@ export function disconnectOfferHint(state: string, closeReason?: string | null):
   return `Disconnected${reason} — ${ERROR_OFFER_HINT}`;
 }
 
-/** The whole frame model. Pure, so both the wording and the disabled state are
- *  asserted without a DOM. */
-export function copyLogModel(offer: CopyLogOffer, phase: CopyLogPhase): CopyLogModel {
+/**
+ * The whole frame model. Pure, so both the wording and the disabled state are
+ * asserted without a DOM.
+ *
+ * `actor` says which sibling the phase belongs to — the other one stays at rest,
+ * so a finished download leaves COPY LOG reading `COPY LOG` rather than claiming
+ * an answer it had nothing to do with. Defaults to `copy`, which is what every
+ * caller predating the DOWNLOAD sibling meant.
+ */
+export function copyLogModel(
+  offer: CopyLogOffer,
+  phase: CopyLogPhase,
+  actor: CopyLogActor = 'copy',
+): CopyLogModel {
+  const busy = phase === 'working';
   return {
-    label: copyLogLabel(phase),
-    hint: copyLogHint(offer, phase),
-    busy: phase === 'working',
+    label: copyLogLabel(actor === 'copy' ? phase : 'idle'),
+    downloadLabel: downloadLogLabel(actor === 'download' ? phase : 'idle'),
+    hint: copyLogHint(offer, phase, actor),
+    // One export at a time: whichever button is working, both refuse a press.
+    busy,
+    downloadBusy: busy,
   };
 }
 
@@ -151,6 +237,7 @@ const ROUTE_PHASE: Record<ExportRoute, CopyLogPhase> = {
 /** Element ids — the handles the affordance and any live test address. */
 export const COPY_LOG_ROOT_ID = 'playtest-copy-log';
 export const COPY_LOG_BUTTON_ID = 'playtest-copy-log-button';
+export const COPY_LOG_DOWNLOAD_ID = 'playtest-copy-log-download';
 export const COPY_LOG_HINT_ID = 'playtest-copy-log-hint';
 
 const CSS_HULL_STEEL = '#7E8894';
@@ -164,22 +251,32 @@ const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
 const FONT_BODY = 'Oxanium, "Segoe UI", system-ui, sans-serif';
 
 /**
- * The affordance's inner markup: a hint line over a button. Pure — a test asserts
- * that the words, the ids and the 44-px touch minimum are all present without a
- * browser.
+ * The affordance's inner markup: a hint line over a row of two buttons. Pure — a
+ * test asserts that the words, the ids and the 44-px touch minimum are all present
+ * without a browser.
  *
  * Bottom-**right**, inset past the safe area: the pause overlay stacks its own
  * buttons down the centre (`src/ui/pause-menu` `pauseLayout`) and the corner pause
  * affordance owns the top band, so the bottom-right corner is the one place this can
  * sit without covering a control the player is reaching for.
+ *
+ * **DOWNLOAD sits second, and reads as the quieter of the two** (chalk on steel,
+ * against COPY LOG's plasma). Both are one tap; the order is the desktop's, where
+ * the clipboard is still the right first answer (ratified: *"clipboard stays for
+ * desktop"*). The row wraps, so on the narrowest phone the second button drops
+ * under the first instead of off the screen.
  */
 export function renderCopyLogHtml(model: CopyLogModel): string {
   const hint = model.hint.length > 0 ? `<p id="${COPY_LOG_HINT_ID}" class="pr-log-hint" role="status" aria-live="polite">${escapeHtml(model.hint)}</p>` : '';
   return (
     `<style>${COPY_LOG_CSS}</style>` +
     hint +
+    `<div class="pr-log-actions">` +
     `<button id="${COPY_LOG_BUTTON_ID}" type="button" class="pr-log-button"` +
-    `${model.busy ? ' disabled' : ''}>${escapeHtml(model.label)}</button>`
+    `${model.busy ? ' disabled' : ''}>${escapeHtml(model.label)}</button>` +
+    `<button id="${COPY_LOG_DOWNLOAD_ID}" type="button" class="pr-log-button pr-log-secondary"` +
+    `${model.downloadBusy ? ' disabled' : ''}>${escapeHtml(model.downloadLabel)}</button>` +
+    `</div>`
   );
 }
 
@@ -197,11 +294,18 @@ const COPY_LOG_CSS =
   `#${COPY_LOG_ROOT_ID} .pr-log-hint{margin:0;padding:.35rem .55rem;border-radius:4px;` +
   `font-size:clamp(11px,2.8vw,13px);line-height:1.4;color:${CSS_CHALK};` +
   `background:${CSS_PANEL};border:1px solid rgba(126,136,148,.35);}` +
+  // The two siblings sit on one row, wrapping to two on a narrow phone rather than
+  // pushing the second one off the edge. Right-aligned with the rest of the card.
+  `#${COPY_LOG_ROOT_ID} .pr-log-actions{display:flex;gap:.5rem;flex-wrap:wrap;` +
+  `justify-content:flex-end;}` +
   `#${COPY_LOG_ROOT_ID} .pr-log-button{font-family:${FONT_HEADING};` +
   `font-size:clamp(12px,3vw,14px);letter-spacing:.1em;color:${CSS_PLASMA};` +
   `background:${CSS_PANEL};border:1px solid ${CSS_PLASMA};border-radius:4px;` +
   // 44px minimum: a real touch target on the phone (mobile amendment §1).
   `padding:.55rem 1.1rem;min-height:44px;min-width:44px;cursor:pointer;}` +
+  // DOWNLOAD is the quieter sibling: chalk on steel, so one plasma affordance
+  // leads (style-guide §1 — the emphasis colour is spent once per surface).
+  `#${COPY_LOG_ROOT_ID} .pr-log-secondary{color:${CSS_CHALK};border-color:${CSS_HULL_STEEL};}` +
   `#${COPY_LOG_ROOT_ID} .pr-log-button[disabled]{color:${CSS_HULL_STEEL};` +
   `border-color:${CSS_HULL_STEEL};cursor:default;}` +
   `#${COPY_LOG_ROOT_ID} .pr-log-button:hover,#${COPY_LOG_ROOT_ID} .pr-log-button:focus-visible` +
@@ -302,6 +406,8 @@ export class CopyLogAffordance {
   private root: CopyLogElement | null = null;
   private offer: CopyLogOffer | null = null;
   private phase: CopyLogPhase = 'idle';
+  /** Which sibling the current phase belongs to (see {@link CopyLogActor}). */
+  private actor: CopyLogActor = 'copy';
   /** Guards a doubled press while an export is in flight. */
   private inFlight = false;
   /** Counts presses so a stale revert timer cannot clear a newer answer. */
@@ -319,6 +425,11 @@ export class CopyLogAffordance {
     return this.phase;
   }
 
+  /** Which button that phase belongs to — `copy` at rest. */
+  get actingOn(): CopyLogActor {
+    return this.actor;
+  }
+
   /** Offer the button for `offer`'s reason. Re-showing the same offer is a no-op, so
    *  a press's answer is not wiped by the next frame's identical call. */
   show(offer: CopyLogOffer): void {
@@ -330,6 +441,7 @@ export class CopyLogAffordance {
     // A new screen is a new offer: drop the previous press's answer rather than
     // showing "LOG COPIED" over an unrelated failure.
     this.phase = 'idle';
+    this.actor = 'copy';
     this.render();
   }
 
@@ -347,20 +459,44 @@ export class CopyLogAffordance {
   }
 
   /**
-   * Do what a press does: export the log and report where it went. Exposed so the
-   * behaviour is testable (and drivable from a live-stage seam) without synthesizing
-   * a DOM click. Concurrent presses collapse into the first.
+   * Do what a COPY LOG press does: export the log by the best route this device
+   * has (share → clipboard → download) and report where it went. Exposed so the
+   * behaviour is testable (and drivable from a live-stage seam) without
+   * synthesizing a DOM click. Concurrent presses collapse into the first.
    */
   async copy(): Promise<ExportResult> {
-    if (this.inFlight) return { ok: false, reason: 'already copying' };
+    return this.run('copy', exportPlaytestLog);
+  }
+
+  /**
+   * Do what a DOWNLOAD press does: get the log out **as a file**, never as text
+   * (`./playtest-log-export` `downloadPlaytestLog`) — the share sheet with the
+   * file attached where the platform takes it, else the blob download. The
+   * developer's *"too large for mobile clipboard"* is exactly the case
+   * {@link copy} can satisfy and still leave stranded, so this is a separate
+   * promise rather than a fallback of that one.
+   */
+  async download(): Promise<ExportResult> {
+    return this.run('download', downloadPlaytestLog);
+  }
+
+  /** One press, whichever button made it: go busy, run the route, wear the answer,
+   *  and schedule the revert. The two siblings share this so they cannot drift in
+   *  their disabling, their ticketing, or their error handling. */
+  private async run(
+    actor: CopyLogActor,
+    route: (config: ExportConfig) => Promise<ExportResult>,
+  ): Promise<ExportResult> {
+    if (this.inFlight) return { ok: false, reason: 'already exporting' };
     this.inFlight = true;
     const ticket = ++this.press;
+    this.actor = actor;
     this.phase = 'working';
     this.render();
 
     let result: ExportResult;
     try {
-      result = await exportPlaytestLog({
+      result = await route({
         log: this.config.log ?? playtestLog(),
         ...(this.config.exportOptions ?? {}),
       });
@@ -399,12 +535,15 @@ export class CopyLogAffordance {
     const root = this.mount();
     if (!root) return;
     root.hidden = false;
-    root.innerHTML = renderCopyLogHtml(copyLogModel(offer, this.phase));
-    // The button element is replaced by each `innerHTML` write, so its listener is
-    // re-attached here rather than once at mount — one listener per live element,
-    // and no stale handler on a detached node.
+    root.innerHTML = renderCopyLogHtml(copyLogModel(offer, this.phase, this.actor));
+    // Both button elements are replaced by each `innerHTML` write, so their
+    // listeners are re-attached here rather than once at mount — one listener per
+    // live element, and no stale handler on a detached node.
     this.config.dom.getElementById(COPY_LOG_BUTTON_ID)?.addEventListener('click', () => {
       void this.copy();
+    });
+    this.config.dom.getElementById(COPY_LOG_DOWNLOAD_ID)?.addEventListener('click', () => {
+      void this.download();
     });
   }
 

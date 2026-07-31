@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONNECT_TRACE_COPY_ID,
+  CONNECT_TRACE_DOWNLOAD_ID,
   CONNECT_TRACE_RETRY_ID,
   CONNECT_TRACE_ROOT_ID,
   CONNECT_TRACE_TOP_PX,
@@ -121,6 +122,11 @@ describe('renderConnectTraceHtml', () => {
     expect(html).toContain(`id="${CONNECT_TRACE_COPY_ID}"`);
     expect(html).toContain('COPY LOG');
     expect(html).toContain('COPY LOG to report this.');
+    // And its DOWNLOAD sibling (ratified M10 — "COPY LOG buttons gain DOWNLOAD
+    // sibling"): a refused join is where a phone report starts, and the developer's
+    // "too large for mobile clipboard" is about exactly this paste.
+    expect(html).toContain(`id="${CONNECT_TRACE_DOWNLOAD_ID}"`);
+    expect(html).toContain('DOWNLOAD');
   });
 
   it('sits at the top of the screen, below the title — never at the foot of it', () => {
@@ -134,9 +140,12 @@ describe('renderConnectTraceHtml', () => {
     expect(html).toContain('pointer-events:auto');
   });
 
-  it('offers COPY LOG (and only COPY LOG) on a stall', () => {
+  it('offers the log buttons (and no RETRY) on a stall', () => {
     const html = renderConnectTraceHtml(connectTraceModel(dialingTrace(), T0 + 250 + STALL_MS));
     expect(html).toContain(`id="${CONNECT_TRACE_COPY_ID}"`);
+    // The DOWNLOAD sibling rides with the offer, not with RETRY: a stalled dial on
+    // a phone is precisely the report the clipboard route cannot carry.
+    expect(html).toContain(`id="${CONNECT_TRACE_DOWNLOAD_ID}"`);
     // The attempt is still live, so RETRY would race a socket that may yet open.
     expect(html).not.toContain(`id="${CONNECT_TRACE_RETRY_ID}"`);
     // The seconds are the title's tail (`connectTitleLine`), not a line down here.
@@ -163,7 +172,7 @@ describe('renderConnectTraceHtml', () => {
 describe('ConnectTraceView', () => {
   it('stays off the screen entirely while the connect is working', () => {
     const dom = fakeDom();
-    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
+    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {}, onDownloadLog: () => {} });
 
     // Four hundred milliseconds into a perfectly ordinary dial: nothing mounts, so
     // there is no second surface to disagree with the title — not even an empty one.
@@ -187,7 +196,7 @@ describe('ConnectTraceView', () => {
 
   it('withdraws again if the attempt gets moving after a stall', () => {
     const dom = fakeDom();
-    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
+    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {}, onDownloadLog: () => {} });
     view.update(dialingTrace(), T0 + 250 + STALL_MS);
     expect(view.visible).toBe(true);
     // The socket finally opened and the story moved on — the offer goes with it.
@@ -196,26 +205,30 @@ describe('ConnectTraceView', () => {
     expect(dom.root.hidden).toBe(true);
   });
 
-  it('wires RETRY and COPY LOG to their handlers', () => {
+  it('wires RETRY, COPY LOG and DOWNLOAD to their handlers', () => {
     const dom = fakeDom();
     let retried = 0;
     let copied = 0;
+    let downloaded = 0;
     const view = new ConnectTraceView({
       dom,
       onRetry: () => retried++,
       onCopyLog: () => copied++,
+      onDownloadLog: () => downloaded++,
     });
     view.update(connectRefused(dialingTrace(), 'bad-ticket', T0 + 300), T0 + 300);
 
     dom.byId.get(CONNECT_TRACE_RETRY_ID)?.listeners['click']?.forEach((fn) => fn());
     dom.byId.get(CONNECT_TRACE_COPY_ID)?.listeners['click']?.forEach((fn) => fn());
+    dom.byId.get(CONNECT_TRACE_DOWNLOAD_ID)?.listeners['click']?.forEach((fn) => fn());
     expect(retried).toBe(1);
     expect(copied).toBe(1);
+    expect(downloaded, 'the DOWNLOAD sibling reached its own handler').toBe(1);
   });
 
   it('takes itself off screen when the attempt ends', () => {
     const dom = fakeDom();
-    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {} });
+    const view = new ConnectTraceView({ dom, onRetry: () => {}, onCopyLog: () => {}, onDownloadLog: () => {} });
     view.update(connectRefused(dialingTrace(), 'bad-ticket', T0 + 300), T0 + 300);
     view.hide();
     expect(view.visible).toBe(false);
@@ -227,6 +240,7 @@ describe('ConnectTraceView', () => {
       dom: { body: null, createElement: () => fakeElement(), getElementById: () => null },
       onRetry: () => {},
       onCopyLog: () => {},
+      onDownloadLog: () => {},
     });
     const refused = connectRefused(dialingTrace(), 'bad-ticket', T0 + 300);
     expect(() => view.update(refused, T0 + 300)).not.toThrow();

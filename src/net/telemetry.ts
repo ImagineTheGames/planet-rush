@@ -559,6 +559,30 @@ export class NetTelemetry {
   }
 
   /**
+   * **The connection stat the build badge shows**, ms, or null before anything was
+   * measured — `@platform/build-identity`'s third tag field (ratified M10: "badge
+   * grows connection stats … · 62ms").
+   *
+   * The **decomposed NETWORK** figure, and the ratification is explicit that it is
+   * never the composite: exactly the `net` column {@link format} prints, exactly
+   * what {@link TelemetryReadout.networkRttMs} documents as "the number to show a
+   * player". The composite ({@link hudRttMs}) carries this client's own prediction
+   * lead and the server's broadcast cadence inside it, so it reads 215 ms on a
+   * wire a speedtest calls 24 — and the badge's whole job is to make a screenshot
+   * evidence about the host.
+   *
+   * Shaped exactly like {@link hudRttMs}: the last finalized second's mean, so the
+   * number is steady enough to read, falling back to the live single round trip
+   * only *before* the first second rolls over, so a fresh connection shows
+   * something within a frame or two rather than a blank field. Allocation-free
+   * (unlike {@link live}, which builds a readout object) — a frame loop reads it.
+   */
+  get hudNetworkRttMs(): number | null {
+    const last = this.history.length > 0 ? this.history[this.history.length - 1]! : null;
+    return last?.networkMeanMs ?? this.lastNetworkMs;
+  }
+
+  /**
    * A human-readable dump of the last `count` finalized seconds — the capture the
    * brief asks to be pasted into the PR. One line per second, newest last, plus a
    * one-line summary of the whole window.

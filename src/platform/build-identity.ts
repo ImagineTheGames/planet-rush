@@ -12,7 +12,7 @@
  * a live session is actually talking to — and the one string that joins them:
  *
  *   offline    `3d7cc6a`
- *   connected  `3d7cc6a · d891dd0a (gru)`
+ *   connected  `3d7cc6a · d891dd0a (gru) · 62ms`
  *
  * There is exactly ONE of that string in the process ({@link buildIdentity}), and
  * three consumers read it: the persistent corner badge (`@render/build-badge`),
@@ -20,6 +20,23 @@
  * singleton is the point — a screenshot and a pasted log must never disagree about
  * which Machine a session was on, which they would the moment two places each
  * formatted their own version of it.
+ *
+ * **The third field: the connection (ratified M10 — "badge grows connection
+ * stats").** A screenshot that names the build and the Machine still could not
+ * answer the next question anyone asks about a report — *how was the connection?*
+ * So a connected tag carries the round trip too, and the developer named which
+ * one: **the decomposed NETWORK number, never the composite.** The composite RTT
+ * contains this client's own prediction lead and the server's broadcast cadence,
+ * so it reads 215 ms on a wire a speedtest calls 24 (`@net/telemetry`
+ * `TelemetryReadout.networkRttMs` says exactly this) — a badge showing that
+ * number would put a libel about the host into every screenshot. The caller picks
+ * the number; {@link BuildIdentity.sampleRtt} enforces the *cadence*
+ * ({@link BADGE_RTT_INTERVAL_MS}, ~2 s), because a corner stamp that renumbers
+ * every frame is unreadable and rebuilds Pixi text 60 times a second.
+ *
+ * The rtt rides with the server, not beside it: no session, no number. A tag can
+ * never read `3d7cc6a · 62ms`, because a round trip with nothing at the far end
+ * of it is not a measurement of anything.
  *
  * **No time in the tag.** `formatBuildBadge` (build-info.ts) appends `HH:MMZ` and
  * still does, for the boot line and the boot-error screen; the on-screen tag is
@@ -83,14 +100,49 @@ export function formatServerSuffix(server: ServerIdentity | null): string {
 }
 
 /**
- * The one string: `"3d7cc6a"` offline, `"3d7cc6a · d891dd0a (gru)"` connected.
- * A dirty working tree still carries its `*` (`displaySha`), so "my fix isn't in
- * the build" and "my fix isn't committed" stay distinguishable on the phone.
+ * How often the badge's rtt field is allowed to change, ms (ratified: "updated
+ * ~2s"). Two seconds is slow enough to read off a phone held across the room and
+ * slow enough that the stamp's Pixi text is rebuilt roughly once per 120 frames
+ * instead of every one of them (GDD §4.3: nothing allocates per frame).
  */
-export function formatBuildTag(info: BuildInfo, server: ServerIdentity | null): string {
+export const BADGE_RTT_INTERVAL_MS = 2000;
+
+/**
+ * The rtt field on its own — `"62ms"`, or `''` for anything that is not a
+ * measurement.
+ *
+ * Same rule as `@net/ping` rule 1, restated here rather than imported because
+ * `src/platform` may not depend on `src/net`: null, negative, NaN and infinity are
+ * all "not measured yet" and draw *nothing*, never a `0ms` that would claim a
+ * perfect connection where there is simply no sample. Rounded once, so the number
+ * on the badge is the number the log's `net` column prints.
+ */
+export function formatRttSuffix(rttMs: number | null): string {
+  if (rttMs === null || !Number.isFinite(rttMs) || rttMs < 0) return '';
+  return `${Math.round(rttMs)}ms`;
+}
+
+/**
+ * The one string: `"3d7cc6a"` offline, `"3d7cc6a · d891dd0a (gru)"` connected,
+ * `"3d7cc6a · d891dd0a (gru) · 62ms"` once the wire has been timed.
+ *
+ * A dirty working tree still carries its `*` (`displaySha`), so "my fix isn't in
+ * the build" and "my fix isn't committed" stay distinguishable on the phone. The
+ * rtt is gated on the *server*, not merely on its own validity: a number with no
+ * session behind it is not a round trip to anywhere, so an offline tag is the bare
+ * sha however many milliseconds a caller passes.
+ */
+export function formatBuildTag(
+  info: BuildInfo,
+  server: ServerIdentity | null,
+  rttMs: number | null = null,
+): string {
   const suffix = formatServerSuffix(server);
   const sha = displaySha(info);
-  return suffix === '' ? sha : `${sha}${TAG_SEPARATOR}${suffix}`;
+  if (suffix === '') return sha;
+  const rtt = formatRttSuffix(rttMs);
+  const stats = rtt === '' ? suffix : `${suffix}${TAG_SEPARATOR}${rtt}`;
+  return `${sha}${TAG_SEPARATOR}${stats}`;
 }
 
 /** Notified with the new tag whenever it changes (and once on subscribe). */
@@ -109,12 +161,16 @@ export type BuildTagListener = (tag: string) => void;
 export class BuildIdentity {
   readonly info: BuildInfo;
   private srv: ServerIdentity | null = null;
+  private rtt: number | null = null;
+  /** When the rtt field last changed, on the caller's clock — the throttle's
+   *  only state. Null until a first sample is taken. */
+  private rttAtMs: number | null = null;
   private cached: string;
   private readonly listeners = new Set<BuildTagListener>();
 
   constructor(info: BuildInfo = BUILD_INFO) {
     this.info = info;
-    this.cached = formatBuildTag(info, null);
+    this.cached = formatBuildTag(info, null, null);
   }
 
   /** The server this session is on, or `null` when offline / disconnected. */
@@ -122,19 +178,73 @@ export class BuildIdentity {
     return this.srv;
   }
 
-  /** The string the badge draws and the log's env carries. */
+  /** The round trip in the tag right now, ms, or null when none is shown. The
+   *  NETWORK figure the caller sampled — never the composite (see the header). */
+  get rttMs(): number | null {
+    return this.rtt;
+  }
+
+  /** The string the badge draws — build, server, and the round trip. */
   get tag(): string {
     return this.cached;
   }
 
-  /** A session was welcomed onto a Machine (the allocator's `machine`/`region`). */
-  connected(machine: string, region: string): void {
-    this.set({ machine, region });
+  /**
+   * The **stable** half of the tag: build and server, with no rtt —
+   * `"3d7cc6a · d891dd0a (gru)"`. What the session log's env carries.
+   *
+   * The two are separate for one concrete reason. `@net/playtest-log`'s env is
+   * *session-static* and its `setBuild` records an event whenever it changes; a
+   * badge string that renumbers every two seconds would push a `build tag` line
+   * into the ring roughly 360 times in a twelve-minute match and evict the whole
+   * 600-slot log with a number that already has its own per-second column in the
+   * telemetry samples. The env answers "which build, on which server"; the badge
+   * answers that *and* "how is it right now".
+   */
+  get identityTag(): string {
+    return formatBuildTag(this.info, this.srv, null);
   }
 
-  /** The socket closed, or the player left the match: back to build-only. */
+  /** A session was welcomed onto a Machine (the allocator's `machine`/`region`). */
+  connected(machine: string, region: string): void {
+    this.set({ machine, region }, this.rtt);
+  }
+
+  /** The socket closed, or the player left the match: back to build-only. Drops
+   *  the round trip with it — the wire it measured is gone, and a stale `62ms`
+   *  surviving a disconnect is the sort of number a screenshot gets believed on. */
   disconnected(): void {
-    this.set(null);
+    this.rtt = null;
+    this.rttAtMs = null;
+    this.set(null, null);
+  }
+
+  /**
+   * Offer the badge a round trip, at whatever rate the caller has one — a frame
+   * loop may call this 60 times a second and it will change the tag at most once
+   * per {@link BADGE_RTT_INTERVAL_MS} (ratified: "updated ~2s").
+   *
+   * `rttMs` must be the **decomposed NETWORK** round trip (`@net/telemetry`
+   * `networkRttMs` / a finalized sample's `networkMeanMs`), never the composite —
+   * see the header for why that distinction is the whole point of the field.
+   *
+   * `nowMs` is the caller's monotonic clock (`performance.now()`), passed in so
+   * this module keeps no clock of its own and the cadence is testable as
+   * arithmetic. Two cases skip the throttle, because both are *news* rather than a
+   * refresh: the first sample of a session, and a measurement going absent — a
+   * connection that stopped answering must not leave its last good number on
+   * screen for two more seconds.
+   */
+  sampleRtt(rttMs: number | null, nowMs: number): void {
+    const next = formatRttSuffix(rttMs) === '' ? null : Math.round(rttMs as number);
+    if (next === this.rtt) return;
+    const due =
+      next === null || this.rtt === null || this.rttAtMs === null
+        ? true
+        : nowMs - this.rttAtMs >= BADGE_RTT_INTERVAL_MS;
+    if (!due) return;
+    this.rttAtMs = next === null ? null : nowMs;
+    this.set(this.srv, next);
   }
 
   /**
@@ -150,9 +260,10 @@ export class BuildIdentity {
     };
   }
 
-  private set(server: ServerIdentity | null): void {
-    const next = formatBuildTag(this.info, server);
+  private set(server: ServerIdentity | null, rttMs: number | null): void {
+    const next = formatBuildTag(this.info, server, rttMs);
     this.srv = server;
+    this.rtt = rttMs;
     if (next === this.cached) return;
     this.cached = next;
     for (const listener of this.listeners) notify(listener, next);

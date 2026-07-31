@@ -8,6 +8,7 @@
  *
  *   offline    `3d7cc6a`
  *   connected  `3d7cc6a · d891dd0a (gru)`
+ *   timed      `3d7cc6a · d891dd0a (gru) · 62ms`
  *
  * The developer's ask was blunt, twice. First: from a screenshot or a phone held
  * across the room, you must be able to say *which build that is* — so it is never
@@ -30,7 +31,7 @@
  * width.
  *
  * **It never covers a control** (the m10-14 lesson: nothing may cover a button).
- * Two mechanisms, because one is not enough:
+ * Three mechanisms, because one is not enough:
  *   - `eventMode = 'none'` — the badge is pointer-transparent, so even where it
  *     draws over something pressable, the press lands on the control.
  *   - {@link BuildBadge.lift} — in-match on desktop the controls strip owns the
@@ -39,6 +40,13 @@
  *     thrust-stick ghost is a circle whose bounding box stops well above the
  *     corner margin, so no lift is needed — see build-badge.test.ts, which
  *     asserts that clearance rather than assuming it.)
+ *   - {@link fitBadgeTag} — the tag grew a third field with the connection stats
+ *     (ratified M10), and at ~205 px it no longer fits the declared `bottom-left`
+ *     zone on a viewport under ~430 logical px wide: it would cross the midline
+ *     into the bottom-RIGHT zone, where the minimap lives. So the stamp drops
+ *     trailing fields until it fits rather than escaping its zone. The full string
+ *     is what every real viewport draws; the shortening is the narrow-window floor,
+ *     not the normal case.
  *
  * Render discipline (GDD §4.3): the text is rebuilt **only** when the identity
  * changes (a connect, a disconnect — twice a session, not twice a frame), and the
@@ -47,7 +55,7 @@
  */
 
 import { Container, Text } from 'pixi.js';
-import { buildIdentity, BuildIdentity } from '@platform/build-identity';
+import { buildIdentity, BuildIdentity, TAG_SEPARATOR } from '@platform/build-identity';
 import type { AnchorSpec, Rect } from '@platform/layout-registry';
 import { PALETTE } from './index';
 
@@ -102,6 +110,47 @@ export function writeBadgeRect(
 }
 
 /**
+ * How wide the stamp may draw before it escapes its declared `bottom-left` zone.
+ *
+ * That zone (`@platform/layout-registry` `resolveAnchor`) is the left HALF of the
+ * viewport, inset by the margin on the left and *not* on the right — its right
+ * edge is the screen's midline, because the bottom-right zone starts there and
+ * holds the minimap. So the room the badge has is `W/2 − margin`, and that is the
+ * number {@link fitBadgeTag} is measured against.
+ */
+export function badgeAvailableWidth(viewportW: number): number {
+  return Math.max(0, viewportW / 2 - BADGE_MARGIN);
+}
+
+/**
+ * The longest run of the tag's leading fields that fits `availableW`.
+ *
+ * Fields are ` · `-separated (`@platform/build-identity` `TAG_SEPARATOR`) and are
+ * dropped from the **right**, which is the order they were added in and the
+ * reverse of how load-bearing they are: the connection stat goes first, then the
+ * server, and the build sha is never dropped — a badge that cannot say which build
+ * it is has stopped being a badge, and one field over its zone is better than no
+ * identity at all.
+ *
+ * `measure` is injected (the component passes its live Pixi text metrics), so the
+ * decision is asserted in node against stated widths rather than a canvas. It is
+ * called at most once per candidate — three times for the longest tag, and only
+ * when the tag or the viewport width actually changed.
+ */
+export function fitBadgeTag(
+  tag: string,
+  availableW: number,
+  measure: (candidate: string) => number,
+): string {
+  const fields = tag.split(TAG_SEPARATOR);
+  for (let take = fields.length; take > 1; take--) {
+    const candidate = fields.slice(0, take).join(TAG_SEPARATOR);
+    if (measure(candidate) <= availableW) return candidate;
+  }
+  return fields[0] ?? tag;
+}
+
+/**
  * The badge layer. Added once, to a container that sits above every screen (see
  * main.ts's `badgeRoot`), then {@link update}d with the viewport size whenever the
  * layout changes. It subscribes to the process-wide {@link BuildIdentity}, so the
@@ -120,6 +169,13 @@ export class BuildBadge extends Container {
   /** Last viewport we were cornered for, so a text change re-corners itself. */
   private lastW = 0;
   private lastH = 0;
+  /** The identity's full tag — what the stamp shows unless the zone is too narrow
+   *  for it ({@link fitBadgeTag}). Kept apart from `stamp.text` so a widening
+   *  viewport restores the fields a narrow one dropped. */
+  private full = '';
+  /** The viewport width the current fit was computed for, so the (measuring) refit
+   *  runs on a resize and not on every frame. */
+  private fitW = -1;
   private readonly unsubscribe: () => void;
 
   constructor(identity: BuildIdentity = buildIdentity()) {
@@ -143,15 +199,17 @@ export class BuildBadge extends Container {
     this.addChild(this.stamp);
     // Fires immediately with the current tag, so this also seats the initial text.
     this.unsubscribe = identity.subscribe((tag) => {
-      if (this.stamp.text === tag) return;
-      this.stamp.text = tag;
+      if (this.full === tag) return;
+      this.full = tag;
+      this.refit();
       // Height can change with the glyph set; re-corner off the last known size
       // rather than waiting for the next resize to fix a one-pixel drift.
       if (this.lastH > 0) this.update(this.lastW, this.lastH);
     });
   }
 
-  /** The string on screen right now — the live-stage seam's single read. */
+  /** The string on screen right now — the live-stage seam's single read. Normally
+   *  the identity's whole tag; shortened only where the zone cannot hold it. */
   get text(): string {
     return this.stamp.text;
   }
@@ -169,12 +227,42 @@ export class BuildBadge extends Container {
     return this.raise;
   }
 
-  /** Re-corner the badge for the current viewport (CSS px). Per-frame safe. */
+  /** Re-corner the badge for the current viewport (CSS px). Per-frame safe: the
+   *  refit below is gated on the width actually changing, so the steady-state path
+   *  writes `x`/`y` and nothing else. */
   update(viewportW: number, viewportH: number): void {
     this.lastW = viewportW;
     this.lastH = viewportH;
+    if (viewportW !== this.fitW) this.refit();
     this.stamp.x = BADGE_MARGIN;
     this.stamp.y = viewportH - BADGE_MARGIN - this.raise;
+  }
+
+  /**
+   * Fit the full tag to the zone, dropping trailing fields only if it does not
+   * fit ({@link fitBadgeTag}). Measures through the live Pixi text — the real
+   * metrics of the real font, so a face that renders wider than expected shortens
+   * the tag instead of pushing it over the midline.
+   *
+   * Runs on a tag change and on a width change; never per frame. It measures by
+   * assigning candidates to the stamp, which is why it restores nothing at the end:
+   * the last assignment IS the answer.
+   */
+  private refit(): void {
+    this.fitW = this.lastW;
+    if (this.lastW <= 0) {
+      // No viewport yet (constructed before the first `update`): show it whole and
+      // let the first `update` decide, rather than measuring against nothing.
+      this.stamp.text = this.full;
+      this.fitW = -1;
+      return;
+    }
+    const available = badgeAvailableWidth(this.lastW);
+    const fitted = fitBadgeTag(this.full, available, (candidate) => {
+      this.stamp.text = candidate;
+      return this.stamp.width;
+    });
+    if (this.stamp.text !== fitted) this.stamp.text = fitted;
   }
 
   /** This frame's actual rendered rect, for the layout registry. Measured from

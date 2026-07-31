@@ -468,8 +468,16 @@ async function boot(): Promise<void> {
   //     to whatever the corner is now drawing, and the change lands on the
   //     timeline as its own event. So "logs and screen always agree" is a wire,
   //     not a discipline. Fires once immediately, seating the offline tag.
+  //
+  //     The log takes the STABLE half (`identityTag`: build + server, no rtt).
+  //     The badge's third field renumbers every ~2 s now (ratified: "badge grows
+  //     connection stats"), and `setBuild` records an event per change — piping
+  //     the live tag here would file ~360 `build tag` lines in a twelve-minute
+  //     match and evict the 600-slot ring with a number the telemetry samples
+  //     already carry per second. The subscription still fires on every tick of
+  //     the rtt; `setBuild` drops the ones where the identity half did not move.
   const identity = buildIdentity();
-  identity.subscribe((tag) => playtest.setBuild(tag));
+  identity.subscribe(() => playtest.setBuild(identity.identityTag));
 
   // Which build is this? One line, first thing in the console, every build —
   // so a bug report can carry the sha instead of "the version I had open"
@@ -628,6 +636,9 @@ async function boot(): Promise<void> {
     get server(): { machine: string; region: string } | null {
       const s = identity.server;
       return s ? { machine: s.machine, region: s.region } : null;
+    },
+    get rttMs(): number | null {
+      return identity.rttMs;
     },
     get bounds(): Rect | null {
       if (!buildBadge.visible) return null;
@@ -1725,17 +1736,32 @@ async function boot(): Promise<void> {
       // for every remaining frame, and `formatBuildTag` builds a string. One call
       // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
       if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
+      // The badge's third field: the live round trip (ratified, M10 — "badge
+      // grows connection stats … 3cb36f5 · d891dd0a (gru) · 62ms"). Offered every
+      // frame, applied at most every ~2 s by `sampleRtt`'s own throttle, so the
+      // Pixi text is rebuilt roughly once per 120 frames (GDD §4.3).
+      //
+      // `matchNetworkRtt()` is the DECOMPOSED NETWORK number, never the composite
+      // — the developer named that distinction in the ratification and
+      // `@net/telemetry` explains it: the composite carries this client's own
+      // prediction lead and the server's broadcast cadence, so it reads 215 ms on
+      // a wire a speedtest calls 24. A screenshot is evidence; the wrong number
+      // there is a libel about the host that outlives the session.
+      identity.sampleRtt(matchNetworkRtt(), nowMs);
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
-      // Your own round trip, above the stamp (ratified developer): the SAME number
-      // the session log samples (`telemetry.hudRttMs` — the last finalized
-      // second's mean), so the corner and a pasted log never disagree about one
-      // connection. Null — and so nothing drawn — offline, under freeze, and the
-      // moment the socket closes: a ping is a live measurement or it is absent.
-      pingBadge.setRtt(
-        onlineSession && onlineSession.state !== 'closed' && !flags.freeze
-          ? onlineSession.telemetry.hudRttMs
-          : null,
-      );
+      // The standalone ping stamp is SUPERSEDED by the badge line above it, and is
+      // fed null rather than a second opinion (ratified, M10 — the badge carries
+      // the connection stats now, on every screen, not just in-match).
+      //
+      // Two reasons it cannot simply keep drawing. It sits one mono line directly
+      // above the badge, so a match would show two `ms` readings stacked in one
+      // corner; and it reads `telemetry.hudRttMs`, which is the COMPOSITE the same
+      // ratification rules out — the two lines would disagree, by a factor of
+      // eight on a healthy connection, about one connection. `@net/ping-badge` is
+      // left installed and untouched (it is the netcode lane's module) so that
+      // lane can re-point or retire it; this is the wiring's call, not the
+      // component's. See the PR body.
+      pingBadge.setRtt(null);
       pingBadge.update(transform.logicalWidth, transform.logicalHeight);
       // Fullscreen: fold in the live state (a system-gesture/ESC exit can happen
       // any frame) and show the re-enter affordance only once we've been fullscreen
@@ -2012,6 +2038,25 @@ async function boot(): Promise<void> {
     match.close();
     const menuUrl = window.location.origin + window.location.pathname;
     window.location.assign(menuUrl);
+  }
+
+  /**
+   * This session's round trip for the build badge, ms, or null when there is none
+   * to show (ratified, M10 — "badge grows connection stats … · 62ms").
+   *
+   * The **decomposed NETWORK** number (`@net/telemetry` `hudNetworkRttMs`), which
+   * the ratification names in the same breath: *never the composite*. Offline
+   * there is no wire to time, a closed socket is no longer a connection, and under
+   * `?freeze=1` a number that changes with the weather is exactly what a
+   * byte-deterministic golden screenshot cannot have — all three read null, and a
+   * null draws nothing rather than a `0ms` claiming a perfect connection.
+   *
+   * Allocation-free: read every frame, and the badge's own throttle decides how
+   * often the answer reaches the screen.
+   */
+  function matchNetworkRtt(): number | null {
+    if (!onlineSession || onlineSession.state === 'closed' || flags.freeze) return null;
+    return onlineSession.telemetry.hudNetworkRttMs;
   }
 
   /** Draw whichever pause screen is up and the touch corner button, once per
@@ -5241,6 +5286,8 @@ function openMainMenu(
       if (retryDoor) void startResolve(retryDoor.door, retryDoor.room);
     },
     onCopyLog: () => void copyLogButton()?.copy(),
+    // The DOWNLOAD sibling (ratified M10): a FILE, never a 40 KB clipboard paste.
+    onDownloadLog: () => void copyLogButton()?.download(),
   });
 
   /**
@@ -6860,12 +6907,16 @@ interface FullscreenSeam {
  * Read-only and structured-cloneable, like every other live-stage seam.
  */
 interface BuildBadgeSeam {
-  /** The string on screen: `'3d7cc6a'`, or `'3d7cc6a · d891dd0a (gru)'` connected. */
+  /** The string on screen: `'3d7cc6a'` offline, `'3d7cc6a · d891dd0a (gru)'`
+   *  connected, `'3d7cc6a · d891dd0a (gru) · 62ms'` once the wire is timed. */
   readonly text: string;
   /** False only under `?freeze=1`, where a changing stamp would break the goldens. */
   readonly visible: boolean;
   /** The server the tag's suffix came from, or null when there is no session. */
   readonly server: { machine: string; region: string } | null;
+  /** The round trip in the tag, ms, or null when the tag shows none — the
+   *  DECOMPOSED NETWORK figure (ratified: never the composite). */
+  readonly rttMs: number | null;
   /** The stamp's actual rect in logical (landscape) space, or null when hidden. */
   readonly bounds: Rect | null;
   /** Does that rect sit inside the declared `bottom-left` zone? */
