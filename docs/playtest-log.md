@@ -45,7 +45,8 @@ Then a timeline, each entry stamped in ms since session start:
 |---|---|
 | `session` | build sha / time / dirty flag, the session instant, form factor, viewport, connection type |
 | `connect` | the whole lifecycle: `allocate` → `ticket` (room, **machine id**, region, expiry) → `dial` (host, room) → `welcome` / `joinError` **with the server's own reason**, plus every transport state change and its close reason |
-| `net` | one entry per finalized second of the #238 instrument: `rtt`/`rttMax` (ms), `corr`/`corrMax` (world units), `mispred` (rate), `recon`, `resync` (the snap events) |
+| `net` (`sample`) | one entry per finalized second of the #238 instrument: `rtt`/`rttMax` (ms), `jitter`, `corr`/`corrMax` (world units), `mispred` (rate), `recon`, `resync` (the snap events), `snap`, `lead` (ticks), and **`align`/`alignMax`/`alignN`** — how much later authority ran this client's input than the tick it was predicted at (M10 tick-alignment; `align 0` means the two clocks agree and a correction beside it is *not* a misalignment) |
+| `net` (`volley` / `order` / `echo` / `expiry`) | the action events — one line per shot fired, per one-shot order sent, per answer authority gave it (`adopt` / `refused` / `unknown`, with the ticks waited), and per prediction that was never answered and expired. A player reporting "I tapped twice and got three turrets" is describing an *event*; a per-second average is the wrong instrument for one (`src/net/action-journal.ts`) |
 | `match` | `matchStart` (and whether it was a reclaim replay), local `spawn` / `death` / `eliminated`, `playerSubstituted` / `playerReclaimed` with the grace seconds, `matchEnd` |
 | `error` | `console.error` / `console.warn` from our own code, uncaught errors, unhandled rejections |
 | `note` | the boot line, the WebGL API, anything else worth a marker |
