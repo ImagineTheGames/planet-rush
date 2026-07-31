@@ -118,6 +118,11 @@ interface Feel {
   jitterMs: number | null;
   rttMs: number | null;
   bufferMs: number;
+  /** Mean input-tick misalignment over the run, in ticks, or null when nothing
+   *  could be measured (`src/net/telemetry` `appliedDeltaMean`). */
+  meanAlignment: number | null;
+  /** Worst input-tick misalignment over the run, in ticks. */
+  peakAlignment: number;
 }
 
 function feelOf(result: LatencyMatchResult, index: number): Feel {
@@ -126,6 +131,10 @@ function feelOf(result: LatencyMatchResult, index: number): Feel {
   const reconciles = samples.reduce((n, s) => n + s.reconciles, 0);
   const weighted = samples.reduce((n, s) => n + s.correctionMeanUnits * s.reconciles, 0);
   const mispredictions = samples.reduce((n, s) => n + s.mispredictions, 0);
+  // Alignment is weighted by the reconciles that could state one, so a second
+  // that measured twice does not count as much as a second that measured thirty.
+  const alignN = samples.reduce((n, s) => n + s.appliedDeltaSamples, 0);
+  const alignSum = samples.reduce((n, s) => n + (s.appliedDeltaMean ?? 0) * s.appliedDeltaSamples, 0);
   return {
     worstCorrection: Math.max(0, ...samples.map((s) => s.correctionMaxUnits)),
     meanCorrection: reconciles > 0 ? weighted / reconciles : 0,
@@ -137,6 +146,8 @@ function feelOf(result: LatencyMatchResult, index: number): Feel {
     jitterMs: client.telemetry.live.rttJitterMs,
     rttMs: client.telemetry.live.rttMs,
     bufferMs: client.session.interpolation?.delayMs ?? 0,
+    meanAlignment: alignN > 0 ? alignSum / alignN : null,
+    peakAlignment: Math.max(0, ...samples.map((s) => s.appliedDeltaMax)),
   };
 }
 
@@ -148,7 +159,9 @@ function report(label: string, result: LatencyMatchResult): Feel[] {
     (f, i) =>
       `    client ${i}: corr ${f.meanCorrection.toFixed(2)}/${f.worstCorrection.toFixed(2)}u  ` +
       `mispred ${(f.mispredictionRate * 100).toFixed(0)}%  snaps ${f.snaps}  ` +
-      `lead ${f.meanLead.toFixed(0)}/${f.peakLead}t  rtt ${f.rttMs === null ? '—' : Math.round(f.rttMs)}ms  ` +
+      `lead ${f.meanLead.toFixed(0)}/${f.peakLead}t  ` +
+      `align ${f.meanAlignment === null ? '—' : f.meanAlignment.toFixed(2)}/${f.peakAlignment}t  ` +
+      `rtt ${f.rttMs === null ? '—' : Math.round(f.rttMs)}ms  ` +
       `jitter ${f.jitterMs === null ? '—' : Math.round(f.jitterMs)}ms  ` +
       `buffer ${Math.round(f.bufferMs)}ms  (${f.reconciles} recon)`,
   );
