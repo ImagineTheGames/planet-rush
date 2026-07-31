@@ -21,6 +21,9 @@ import { MatchServer } from '../../server/match-server';
 import type { WsConnection } from '../../server/ws';
 import {
   MAX_FRAME_BYTES,
+  RTT_PROBE_INTERVAL_MS,
+  RTT_STALE_AFTER_MS,
+  RttProbe,
   acceptKey,
   attachWebSocketServer,
   decodeFrame,
@@ -122,6 +125,72 @@ function readServerFrames(buffer: Buffer): { payloads: Buffer[]; rest: Buffer } 
   }
   return { payloads, rest };
 }
+
+describe('the RTT probe — the number the lobby shows', () => {
+  it('measures the round trip of the probe that was actually answered', () => {
+    const probe = new RttProbe();
+    const payload = probe.open(1_000);
+    expect(payload).not.toBeNull();
+    expect(probe.answer(payload!, 1_042)).toBe(42);
+    expect(probe.read(1_042)).toBe(42);
+  });
+
+  it('reports nothing before the first answer', () => {
+    const probe = new RttProbe();
+    expect(probe.read(1_000)).toBeNull();
+    probe.open(1_000);
+    // Asked, not yet answered: still no measurement.
+    expect(probe.read(1_100)).toBeNull();
+  });
+
+  it('holds one probe open at a time — a second call sends nothing', () => {
+    const probe = new RttProbe();
+    expect(probe.open(1_000)).not.toBeNull();
+    expect(probe.open(1_000 + RTT_PROBE_INTERVAL_MS)).toBeNull();
+  });
+
+  it('IGNORES a pong that answers a different question — the whole reason the\n' +
+    '     payload is sequenced. A late pong timed against a fresh ping would\n' +
+    '     report a round trip nobody made, flattering the failing connection', () => {
+    const probe = new RttProbe();
+    const first = probe.open(1_000);
+    // The first probe is abandoned (stale), a second goes out…
+    const second = probe.open(1_000 + RTT_STALE_AFTER_MS + 1);
+    expect(second).not.toBeNull();
+    // …and the first one's answer finally lands. It measures nothing.
+    expect(probe.answer(first!, 1_000 + RTT_STALE_AFTER_MS + 50)).toBeNull();
+    expect(probe.read(1_000 + RTT_STALE_AFTER_MS + 50)).toBeNull();
+  });
+
+  it('ignores a keepalive pong — an empty payload answers no probe', () => {
+    const probe = new RttProbe();
+    probe.open(1_000);
+    expect(probe.answer(Buffer.alloc(0), 1_050)).toBeNull();
+  });
+
+  it('gives up on a lost pong rather than wedging forever', () => {
+    const probe = new RttProbe();
+    probe.open(1_000);
+    const retry = probe.open(1_000 + RTT_STALE_AFTER_MS + 1);
+    expect(retry).not.toBeNull();
+    expect(probe.answer(retry!, 1_000 + RTT_STALE_AFTER_MS + 31)).toBe(30);
+  });
+
+  it('lets a measurement GO STALE — a socket that stopped answering has no\n' +
+    '     current round trip, and a stale number on screen is worse than a blank', () => {
+    const probe = new RttProbe();
+    const payload = probe.open(1_000);
+    probe.answer(payload!, 1_080);
+    expect(probe.read(1_080 + RTT_STALE_AFTER_MS)).toBe(80);
+    expect(probe.read(1_080 + RTT_STALE_AFTER_MS + 1)).toBeNull();
+  });
+
+  it('never mints a negative round trip from a clock that stepped backwards', () => {
+    const probe = new RttProbe();
+    const payload = probe.open(5_000);
+    expect(probe.answer(payload!, 4_000)).toBe(0);
+  });
+});
 
 describe('a real socket against a real server', () => {
   it('handshakes, joins a room, and is welcomed into a seat', async () => {
