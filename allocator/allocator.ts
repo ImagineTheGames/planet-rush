@@ -88,6 +88,39 @@ export const DEFAULT_TICKET_TTL_MS = 30_000;
  *  this bound only exists so a pathologically full keyspace fails loudly. */
 export const DEFAULT_MAX_CODE_ATTEMPTS = 100;
 
+/**
+ * Why a new room landed on the Machine it landed on. Placement is **policy, not
+ * luck** (the developer's ratified ask), and a policy nobody can read is
+ * indistinguishable from a coin flip — so every allocate carries its own reason.
+ *
+ *   • `preferred`     — the creator's region had a free slot and got the room.
+ *   • `region-full`   — the creator's region is live but has no free slot, so the
+ *                       fleet took it instead. A placed match beats a refused one.
+ *   • `region-absent` — nothing runs in the creator's region at all. Reads
+ *                       differently from `region-full` on purpose: one says *scale
+ *                       that region*, the other says *create it*.
+ *   • `no-preference` — nobody asked for a region and the edge did not say (off
+ *                       Fly, or a header-less caller). Whole-fleet spread, as before.
+ */
+export type PlacementReason = 'preferred' | 'region-full' | 'region-absent' | 'no-preference';
+
+/** The placement decision, in both the machine's words and a human's. */
+export interface Placement {
+  /** The region asked for — body-supplied or inferred from the edge — when known. */
+  readonly requested?: string;
+  /** The region the room actually landed in. */
+  readonly region: string;
+  /** The rule that decided it (see {@link PlacementReason}). */
+  readonly reason: PlacementReason;
+  /**
+   * One line an operator or a pasted session log can read without a lookup table:
+   * `gru — your region`, `iad — gru full`. This is the string the ratified ask
+   * names, and it is built here rather than in the HTTP layer so the response and
+   * the log cannot drift into two different explanations of one decision.
+   */
+  readonly detail: string;
+}
+
 /** What the allocator hands back: the signed routing decision a client acts on. */
 export interface Allocation {
   /** The room the client is bound to (new, or the one it asked to join). */
@@ -100,6 +133,13 @@ export interface Allocation {
   readonly ticket: string;
   /** Epoch-ms the ticket goes stale — `now` at issue plus the configured TTL. */
   readonly expiresAt: number;
+  /**
+   * Why *this* Machine — present on an {@link Allocator.allocate}, which makes a
+   * placement decision, and absent on an {@link Allocator.join}, which makes none:
+   * a join goes where the room already is, and there is nothing to explain. Keeping
+   * it off the join keeps that response byte-identical to the shape that shipped.
+   */
+  readonly placement?: Placement;
 }
 
 /** One region's live capacity, as a region picker reads it (GET /regions). */
@@ -188,9 +228,16 @@ export interface AllocatorConfig {
  *  requested shape (variable-slots Task C1). */
 export interface AllocateOptions {
   /**
-   * Preferred datacentre. A *preference*, not a demand: if the region has room
-   * the room goes there, but a full region falls back to the least-loaded
-   * Machine anywhere rather than failing — a placed match beats a refused one.
+   * The creator's datacentre — what they asked for, or where they *are*. The HTTP
+   * layer fills this from the request body when the client named one (a region
+   * picker), and otherwise from Fly's edge header (`./edge-region`), so a creator
+   * who never chose a region is still placed near themselves instead of wherever
+   * the tie-break lands. `undefined` only when neither says.
+   *
+   * A *preference*, not a demand: the region wins whenever it has a free slot, and
+   * a full one falls back to the least-loaded Machine anywhere rather than
+   * failing — a placed match beats a refused one. Which of those happened comes
+   * back on {@link Allocation.placement}.
    */
   readonly region?: string;
   /**
@@ -230,8 +277,8 @@ export class Allocator {
    * @throws {AllocatorError} `no-capacity` when no live Machine has a free slot.
    */
   allocate(opts: AllocateOptions, now: number): Allocation {
-    const machine = this.pickMachine(opts.region, now);
-    if (machine === null) {
+    const picked = this.pickMachine(opts.region, now);
+    if (picked === null) {
       throw new AllocatorError('no-capacity', 'no live machine has a free room slot');
     }
     const config = normalizeRoomConfig(opts);
@@ -240,8 +287,15 @@ export class Allocator {
     // boot gap (join can locate the room before its first heartbeat) and counts
     // against this Machine's capacity for the next allocation. The size/mode ride
     // along so the room's shape is advertisable before its first heartbeat.
-    this.registry.reserve(code, machine.machine, now, config);
-    return this.issue(code, machine.machine, machine.region, now, config);
+    this.registry.reserve(code, picked.view.machine, now, config);
+    return this.issue(
+      code,
+      picked.view.machine,
+      picked.view.region,
+      now,
+      config,
+      placementOf(opts.region, picked),
+    );
   }
 
   /**
@@ -330,26 +384,54 @@ export class Allocator {
   }
 
   /**
-   * Choose the Machine a new room goes on: prefer the requested region, spread
-   * onto the least-loaded candidate, fall back across regions when the preferred
-   * one is full. Returns `null` when nothing in the whole fleet has a free slot.
+   * Choose the Machine a new room goes on, **and say why**: prefer the creator's
+   * region whenever it has a free slot, spread onto the least-loaded candidate
+   * there, and fall back across the whole fleet only when it does not. Returns
+   * `null` when nothing in the whole fleet has a free slot.
+   *
+   * The semantics are exactly the ones that shipped — the region has always been a
+   * preference and a full region has always fallen back rather than refused. What
+   * is new is the second half of the return value: the *reason*, so the decision
+   * survives into the response and the log instead of being re-derived (or
+   * guessed at) by whoever reads it later.
    */
-  private pickMachine(region: string | undefined, now: number): MachineView | null {
+  private pickMachine(region: string | undefined, now: number): PickedMachine | null {
     const leases = this.registry.reservations(now);
-    const withFree = this.registry
-      .machines(now)
+    const fleet = this.registry.machines(now);
+    const withFree = fleet
       // A draining (cordoned) Machine still heartbeats free slots, but must take
       // no *new* room — exclude it from placement so its matches can end.
       .filter((m) => !this.excludeMachine(m.machine) && this.loadOf(m, leases) < m.capacity);
     if (withFree.length === 0) return null;
 
-    // Prefer the requested region, but only if it actually has a free slot —
-    // otherwise fall back to the whole fleet so the room still places.
-    const inRegion = region === undefined ? [] : withFree.filter((m) => m.region === region);
-    const pool = inRegion.length > 0 ? inRegion : withFree;
+    // Nobody said where they are (off Fly, or a header-less caller): whole-fleet
+    // spread, and the reason says so rather than implying a region was honoured.
+    if (region === undefined) {
+      return { view: this.leastLoaded(withFree, leases), reason: 'no-preference' };
+    }
 
-    // Least-loaded wins (spreads matches); ties break on machine id so the
-    // choice is deterministic for a seeded test.
+    // The guarantee: the creator's region wins WHENEVER it has capacity.
+    const inRegion = withFree.filter((m) => m.region === region);
+    if (inRegion.length > 0) {
+      return { view: this.leastLoaded(inRegion, leases), reason: 'preferred' };
+    }
+
+    // It does not. Fall back to the whole fleet — never refuse capacity the fleet
+    // has — and distinguish the two ways a region can fail to take a room, because
+    // they call for different actions: `region-full` means scale that region,
+    // `region-absent` means there is nothing there to scale. (A region whose only
+    // Machines are cordoned reads as `region-full`: it is live and has no slot to
+    // offer, which is what the word has to mean here.)
+    const liveThere = fleet.some((m) => m.region === region);
+    return {
+      view: this.leastLoaded(withFree, leases),
+      reason: liveThere ? 'region-full' : 'region-absent',
+    };
+  }
+
+  /** The least-loaded Machine of a non-empty pool (spreads matches); ties break on
+   *  machine id so the choice is deterministic for a seeded test. */
+  private leastLoaded(pool: readonly MachineView[], leases: readonly Reservation[]): MachineView {
     return pool.reduce((best, m) => {
       const dl = this.loadOf(m, leases) - this.loadOf(best, leases);
       if (dl < 0) return m;
@@ -408,6 +490,7 @@ export class Allocator {
     region: string,
     now: number,
     config: ReserveConfig = {},
+    placement?: Placement,
   ): Allocation {
     const expiresAt = now + this.ticketTtlMs;
     const ticket = signTicket(
@@ -420,7 +503,51 @@ export class Allocator {
       },
       this.secret,
     );
-    return { room, machine, region, ticket, expiresAt };
+    // Placement is deliberately NOT signed into the ticket: it explains a decision,
+    // it does not authorise one. The Machine verifies room+machine and could not
+    // act on a reason if it had it.
+    return { room, machine, region, ticket, expiresAt, ...(placement ? { placement } : {}) };
+  }
+}
+
+/** A chosen Machine and the rule that chose it — {@link Allocator.pickMachine}'s
+ *  return, kept internal because callers want the {@link Placement} it becomes. */
+interface PickedMachine {
+  readonly view: MachineView;
+  readonly reason: PlacementReason;
+}
+
+/**
+ * Turn a pick into the {@link Placement} that rides out on the response and into
+ * the session log. The `detail` wording is the ratified one — `gru — your region`,
+ * `iad — gru full` — and lives here, next to the rule that produced it, so the two
+ * can never disagree.
+ */
+function placementOf(requested: string | undefined, picked: PickedMachine): Placement {
+  const region = picked.view.region;
+  return {
+    ...(requested !== undefined ? { requested } : {}),
+    region,
+    reason: picked.reason,
+    detail: placementDetail(requested, region, picked.reason),
+  };
+}
+
+/** The human half of a {@link Placement}: `<chosen region> — <why>`. */
+function placementDetail(
+  requested: string | undefined,
+  region: string,
+  reason: PlacementReason,
+): string {
+  switch (reason) {
+    case 'preferred':
+      return `${region} — your region`;
+    case 'region-full':
+      return `${region} — ${requested ?? '?'} full`;
+    case 'region-absent':
+      return `${region} — no ${requested ?? '?'} machines`;
+    case 'no-preference':
+      return `${region} — no region preference`;
   }
 }
 

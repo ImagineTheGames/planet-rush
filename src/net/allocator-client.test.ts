@@ -162,6 +162,72 @@ describe('allocateRoom', () => {
     const result = await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch });
     expect(result).toEqual({ ok: false, reason: 'no-capacity' });
   });
+
+  it('sends NO region when the caller names none — the allocator infers it', async () => {
+    // The regression this guards: the shipped client used to send a hard-coded
+    // `iad` from a one-entry region list nobody could pick from, which outranked
+    // the edge inference and pinned every creator to Virginia (src/main.ts).
+    const { fetch, calls } = stubFetch({ status: 201, json: () => Promise.resolve(OK_BODY) });
+    await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch }, { size: 4 });
+    expect(JSON.parse(calls[0]?.body ?? '{}')).toEqual({ size: 4 });
+  });
+});
+
+describe('allocateRoom — the placement reason, carried to the session log', () => {
+  const PLACED = {
+    ...OK_BODY,
+    machine: 'd891dd0a1443e8',
+    region: 'gru',
+    placement: {
+      requested: 'gru',
+      region: 'gru',
+      reason: 'preferred',
+      detail: 'gru — your region',
+    },
+  };
+
+  it('reads the allocator\'s reason onto the resolved connection', async () => {
+    const { fetch } = stubFetch({ status: 201, json: () => Promise.resolve(PLACED) });
+    const result = await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch });
+
+    expect(result.ok && result.connection.placement).toEqual({
+      requested: 'gru',
+      region: 'gru',
+      reason: 'preferred',
+      detail: 'gru — your region',
+    });
+  });
+
+  it('leaves it absent when the allocator sent none — a join, or an older allocator', async () => {
+    const { fetch } = stubFetch({ status: 201, json: () => Promise.resolve(OK_BODY) });
+    const result = await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.connection.placement).toBeUndefined();
+  });
+
+  it('never fails a good connection over a malformed placement', async () => {
+    // The placement costs a log line, not a match. Junk is dropped, the room and
+    // the ticket still resolve.
+    for (const placement of [null, 'gru', 42, {}, { region: 'gru' }]) {
+      const { fetch } = stubFetch({
+        status: 201,
+        json: () => Promise.resolve({ ...OK_BODY, placement }),
+      });
+      const result = await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch });
+      expect(result.ok && result.connection.room).toBe('QK7P');
+      expect(result.ok && result.connection.placement).toBeUndefined();
+    }
+  });
+
+  it('synthesises a readable line when the allocator omitted the detail', async () => {
+    const { fetch } = stubFetch({
+      status: 201,
+      json: () => Promise.resolve({ ...OK_BODY, placement: { region: 'iad', reason: 'region-full' } }),
+    });
+    const result = await allocateRoom({ baseUrl: 'https://alloc.example.com', fetch });
+    expect(result.ok && result.connection.placement?.detail).toBe('iad — region-full');
+  });
 });
 
 describe('probeRoomLiveness', () => {

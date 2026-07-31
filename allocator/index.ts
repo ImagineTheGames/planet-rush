@@ -35,6 +35,14 @@
  * missing or wrong proof is a 401, never an admission. The read routes and the
  * client's own allocate/join carry no proof and need none.
  *
+ * **Placement is policy, not luck.** `POST /rooms` infers the creator's region
+ * from Fly's edge header when the client did not name one (`./edge-region`), hands
+ * it to the allocator as a preference, and returns the decision *with its reason*
+ * — `placement: { requested, region, reason, detail }`, e.g. `gru — your region` or
+ * `iad — gru full`. The same line goes to the process log. Nothing about capacity
+ * changed: the creator's region wins whenever it has a free slot, and a full one
+ * still falls back to the whole fleet rather than refusing.
+ *
  * **CORS (M10).** The game runs from GitHub Pages (a *different* origin from the
  * allocator), so a browser's `POST /rooms` is a cross-origin request the browser
  * gates on an `OPTIONS` preflight. This server answers that preflight (204 with
@@ -83,7 +91,8 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { mulberry32 } from '@shared/types';
 import { FLEET_AUTH_HEADER, verifyFleetRequest } from '../src/net/fleet-auth';
-import { Allocator, AllocatorError } from './allocator';
+import { Allocator, AllocatorError, type Allocation } from './allocator';
+import { edgeRegion } from './edge-region';
 import { InMemoryRoomRegistry, type Heartbeat, type RoomRegistry } from './registry';
 import { DirectRouter, FlyReplayRouter, type Router } from './router';
 import { InMemoryMachineProvider, type MachineProvider } from './provider';
@@ -114,6 +123,13 @@ export interface AllocatorServerDeps {
    * and the browser blocks it. Omitted → localhost dev only.
    */
   readonly allowOrigins?: readonly string[];
+  /**
+   * Where the one line a placement writes goes (`room ABCD → <machine> (gru — your
+   * region)`). Defaults to the process log; injected so a test can read the line
+   * back instead of printing it, and so `route` stays a pure function of its
+   * inputs plus the two seams it is handed.
+   */
+  readonly log?: (line: string) => void;
 }
 
 /** A dev origin is any localhost/127.0.0.1 on any port, over plain http — the
@@ -218,7 +234,7 @@ function route(
     return method === 'POST' ? heartbeatRoute(deps, request, raw, now) : methodNotAllowed();
   }
   if (pathname === '/rooms') {
-    return method === 'POST' ? allocateRoute(deps, raw, now) : methodNotAllowed();
+    return method === 'POST' ? allocateRoute(deps, request, raw, now) : methodNotAllowed();
   }
   const joinMatch = JOIN_PATH.exec(pathname);
   if (joinMatch) {
@@ -394,12 +410,30 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Allocate a new room; 201 with the signed decision, 503 when the fleet is full.
- *  The optional JSON body carries the room's requested shape: `region` (a routing
- *  preference), and `size`/`mode` (the match config, variable-slots Task C1). Each
- *  field is only honoured when well-typed; a malformed one is ignored, never a
- *  400, so a client on an old shape still allocates a default room. */
-function allocateRoute(deps: AllocatorServerDeps, raw: string, now: number): RouteResult {
+/**
+ * Allocate a new room; 201 with the signed decision, 503 when the fleet is full.
+ * The optional JSON body carries the room's requested shape: `region` (a routing
+ * preference), and `size`/`mode` (the match config, variable-slots Task C1). Each
+ * field is only honoured when well-typed; a malformed one is ignored, never a
+ * 400, so a client on an old shape still allocates a default room.
+ *
+ * **Where the region comes from, in order** (the ratified region-placement ask):
+ *
+ *   1. The **body**, when the client named one. A player who picked a region in
+ *      the lobby has said something the edge cannot know better, so it wins.
+ *   2. Fly's **edge header** otherwise (`./edge-region`) — the anycast POP that
+ *      accepted this request, which is by construction the one nearest the
+ *      creator. This is what turns "a Brazilian creator lands on Virginia by
+ *      tie-break" into "a Brazilian creator lands on gru whenever gru has room".
+ *   3. Neither → `undefined`, whole-fleet spread, exactly as before. Off Fly there
+ *      is no header, and a header-less request must still allocate.
+ */
+function allocateRoute(
+  deps: AllocatorServerDeps,
+  request: IncomingMessage,
+  raw: string,
+  now: number,
+): RouteResult {
   const opts: { region?: string; size?: number; mode?: string } = {};
   if (raw.trim().length > 0) {
     let parsed: unknown;
@@ -415,11 +449,39 @@ function allocateRoute(deps: AllocatorServerDeps, raw: string, now: number): Rou
       if (typeof body['mode'] === 'string') opts.mode = body['mode'];
     }
   }
+  // Only when the client did not name one — a stated preference outranks an
+  // inferred location, and an empty-string `region` counts as not stated.
+  if (opts.region === undefined || opts.region.length === 0) {
+    const inferred = edgeRegion(request.headers);
+    if (inferred !== undefined) opts.region = inferred;
+    else delete opts.region;
+  }
   try {
-    return decided(deps, deps.allocator.allocate(opts, now), 201);
+    const allocation = deps.allocator.allocate(opts, now);
+    logPlacement(deps, allocation);
+    return decided(deps, allocation, 201);
   } catch (e) {
     return errorResult(e);
   }
+}
+
+/**
+ * The placement decision, on the allocator's own log — one line per room, in the
+ * same words the client's session log will carry. `fly logs` is where an operator
+ * asks "why did that creator get Virginia?", and the answer has to be *there*,
+ * not reconstructed from a capacity snapshot taken minutes later.
+ *
+ * A `join` carries no {@link Placement} (it places nothing), so it logs nothing.
+ */
+function logPlacement(deps: AllocatorServerDeps, allocation: Allocation): void {
+  const p = allocation.placement;
+  if (p === undefined) return;
+  (deps.log ?? defaultLog)(`room ${allocation.room} → ${allocation.machine} (${p.detail})`);
+}
+
+/** The process's own log line, prefixed like every other line this server writes. */
+function defaultLog(line: string): void {
+  console.log(`[planet-rush] ${line}`);
 }
 
 /** Reach an existing room; 200 with a ticket, 404 when no live Machine hosts it. */
@@ -457,7 +519,7 @@ function roomInfoRoute(deps: AllocatorServerDeps, code: string, now: number): Ro
  */
 function decided(
   deps: AllocatorServerDeps,
-  allocation: ReturnType<Allocator['allocate']>,
+  allocation: Allocation,
   status: number,
 ): RouteResult {
   const instr = deps.router.routeTo({ machine: allocation.machine, region: allocation.region });
@@ -470,6 +532,10 @@ function decided(
       ticket: allocation.ticket,
       expiresAt: allocation.expiresAt,
       connectUrl: instr.connectUrl,
+      // Why this Machine — on an allocate only, so a join's body is unchanged.
+      // The client copies it into the session log, which is how a placement stays
+      // explainable after the fact from the player's side too.
+      ...(allocation.placement !== undefined ? { placement: allocation.placement } : {}),
     },
   };
 }

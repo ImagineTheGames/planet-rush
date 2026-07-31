@@ -149,10 +149,25 @@ export function beginConnect(door: 'create' | 'join', at: number, allocator?: st
   );
 }
 
-/** The allocator answered: a room, a Machine, and a signed ticket. */
+/**
+ * The allocator answered: a room, a Machine, and a signed ticket.
+ *
+ * `placement` is the allocator's reason for choosing *that* Machine
+ * (`./allocator-client` `ConnectionPlacement.detail` — `gru — your region`,
+ * `iad — gru full`). It rides in the step's structured data, so a pasted session
+ * log answers "why am I on a US server?" on its own; the *line* stays as it was,
+ * because the screen has one title and a routing rationale is not what a player
+ * waiting to connect needs it to say.
+ */
 export function connectTicketed(
   trace: ConnectTrace,
-  info: { room: string; machine: string; region?: string; expiresInMs?: number | null },
+  info: {
+    room: string;
+    machine: string;
+    region?: string;
+    expiresInMs?: number | null;
+    placement?: string;
+  },
   at: number,
 ): ConnectTrace {
   return advance(trace, {
@@ -163,6 +178,7 @@ export function connectTicketed(
       room: info.room,
       machine: info.machine,
       ...(info.region !== undefined ? { region: info.region } : {}),
+      ...(info.placement !== undefined ? { placement: info.placement } : {}),
       ...(info.expiresInMs != null ? { expiresInMs: info.expiresInMs } : {}),
     },
   });

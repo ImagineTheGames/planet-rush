@@ -359,6 +359,33 @@ describe('the verbose connecting screen', () => {
     expect(step.line).toBe('ROOM Q5RN · TICKET SIGNED'); // says it was signed, never what it is
   });
 
+  it('carries the placement reason into the log without changing the title', () => {
+    // "Why am I on a US server?" has to be answerable from the paste. It is NOT
+    // answerable from the screen: the title is one line and a player waiting to
+    // connect does not need a routing rationale in it.
+    const trace = connectTicketed(
+      beginConnect('create', T0),
+      { room: 'Q5RN', machine: MACHINE, region: 'gru', placement: 'gru — your region' },
+      T0 + 1,
+    );
+    const step = trace.steps[1]!;
+
+    expect(step.line).toBe('ROOM Q5RN · TICKET SIGNED');
+    expect(connectTraceLogEntry(step).data).toMatchObject({
+      region: 'gru',
+      placement: 'gru — your region',
+    });
+  });
+
+  it('omits the placement entirely when the allocator gave no reason', () => {
+    const trace = connectTicketed(
+      beginConnect('join', T0),
+      { room: 'Q5RN', machine: MACHINE, region: 'gru' },
+      T0 + 1,
+    );
+    expect(Object.keys(trace.steps[1]!.data)).not.toContain('placement');
+  });
+
   // --- Small things --------------------------------------------------------
 
   it('shortens a Fly machine id to something a person can compare', () => {

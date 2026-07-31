@@ -48,27 +48,31 @@ interface ServeOptions {
   readonly allowOrigins?: readonly string[];
 }
 
-/** A live server on an ephemeral port, plus a `now` the test controls. */
+/** A live server on an ephemeral port, plus a `now` the test controls. `logs`
+ *  captures the placement lines the process would otherwise print. */
 async function serve(opts: ServeOptions = {}): Promise<{
   base: string;
   registry: InMemoryRoomRegistry;
   now: { value: number };
+  logs: string[];
   server: Server;
 }> {
   const registry = new InMemoryRoomRegistry();
   const now = { value: 100_000 };
+  const logs: string[] = [];
   const allocator = new Allocator({ registry, rng: mulberry32(1), secret: SECRET });
   const server = createAllocatorServer({
     allocator,
     registry,
     router: opts.router ?? new DirectRouter((m) => `wss://${m}.test/`),
     now: () => now.value,
+    log: (line) => logs.push(line),
     ...(opts.secret !== undefined ? { secret: opts.secret } : {}),
     ...(opts.allowOrigins !== undefined ? { allowOrigins: opts.allowOrigins } : {}),
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
-  return { base: `http://127.0.0.1:${port}`, registry, now, server };
+  return { base: `http://127.0.0.1:${port}`, registry, now, logs, server };
 }
 
 let open: Server | null = null;
@@ -207,6 +211,144 @@ describe('POST /rooms — allocate a new room', () => {
     expect(res.status).toBe(201);
     expect(res.headers.get('fly-replay')).toBeNull();
     expect((await res.json()).connectUrl).toBe('wss://gs.test/play');
+  });
+});
+
+/**
+ * The ratified guarantee, over the wire: placement is *policy*, and the policy is
+ * "the creator's region whenever it has capacity". The fleet in these tests is the
+ * live one — iad ×2 + gru ×1 — and the creator is the developer in Minas Gerais,
+ * whose requests arrive through Fly's gru edge (verified live: `Fly-Region: gru`).
+ */
+describe('POST /rooms — the creator lands in their own region (region placement)', () => {
+  /** The live fleet's shape: two Virginia Machines and one São Paulo Machine. */
+  function liveFleet(registry: InMemoryRoomRegistry, at: number, gruCapacity = 8): void {
+    registry.observe(heartbeat('m-iad-a', 'iad', []), at);
+    registry.observe(heartbeat('m-iad-b', 'iad', []), at);
+    registry.observe(heartbeat('m-gru', 'gru', [], gruCapacity), at);
+  }
+
+  it('infers the region from Fly\'s edge header and prefers it', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value);
+
+    // No body at all — exactly what the shipped client now sends, since it has no
+    // region picker to speak for the player.
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-region': 'gru' },
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.machine).toBe('m-gru');
+    expect(body.region).toBe('gru');
+    expect(body.placement).toEqual({
+      requested: 'gru',
+      region: 'gru',
+      reason: 'preferred',
+      detail: 'gru — your region',
+    });
+  });
+
+  it('falls back to the fleet — with the reason — when the creator region is full', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value, 1);
+    registry.observe(heartbeat('m-gru', 'gru', ['AAAA'], 1), now.value); // gru: 1/1
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-region': 'gru' },
+    });
+    const body = await res.json();
+
+    // Never refuse capacity the fleet has: a placed match beats a refused one.
+    expect(res.status).toBe(201);
+    expect(body.region).toBe('iad');
+    expect(body.placement).toEqual({
+      requested: 'gru',
+      region: 'iad',
+      reason: 'region-full',
+      detail: 'iad — gru full',
+    });
+  });
+
+  it('still allocates when there is no header to read (off Fly, or a bare client)', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, { method: 'POST' });
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.machine).toBeTruthy();
+    expect(body.placement.reason).toBe('no-preference');
+    expect(body.placement.requested).toBeUndefined();
+  });
+
+  it('lets a body-supplied region outrank the edge — a chosen region is a choice', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'fly-region': 'gru' },
+      body: JSON.stringify({ region: 'iad' }),
+    });
+    const body = await res.json();
+
+    expect(body.region).toBe('iad');
+    expect(body.placement).toEqual({
+      requested: 'iad',
+      region: 'iad',
+      reason: 'preferred',
+      detail: 'iad — your region',
+    });
+  });
+
+  it('falls back to the edge when the body\'s region is an empty string', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'fly-region': 'gru' },
+      body: JSON.stringify({ region: '', size: 4 }),
+    });
+    expect((await res.json()).region).toBe('gru');
+  });
+
+  it('reads the region off the request id when the direct header is absent', async () => {
+    const { base, registry, now } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-request-id': '01KYTQS8FBEA8JW7GYH7KQYPGE-gru' },
+    });
+    expect((await res.json()).machine).toBe('m-gru');
+  });
+
+  it('writes the decision to the process log, in the same words', async () => {
+    const { base, registry, now, logs } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, { method: 'POST', headers: { 'fly-region': 'gru' } });
+    const body = await res.json();
+
+    expect(logs).toEqual([`room ${body.room} → m-gru (gru — your region)`]);
+  });
+
+  it('logs nothing for a join — a join makes no placement decision', async () => {
+    const { base, registry, now, logs } = await fixture();
+    registry.observe(heartbeat('m-gru', 'gru', ['AAAA']), now.value);
+
+    const res = await fetch(`${base}/rooms/AAAA/join`, { method: 'POST' });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.placement).toBeUndefined();
+    expect(logs).toEqual([]);
   });
 });
 
