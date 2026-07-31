@@ -418,22 +418,38 @@ function removeSatellite(world: World, id: number): boolean {
  * snapshot on this event's heels carries it (`./prediction` `holdHull`). What is
  * set is what the wire cannot otherwise say — where the hull is, whether it is
  * flying, and how long until it is.
+ *
+ * And a respawn does **not** move a ship this client has already revived. That is the
+ * designed case, not the exception: both sims run the same `respawn()` at the same tick
+ * from the same state, so by the time this message lands — a round trip after the tick
+ * it describes — the fresh hull has been flying under the player's hands for a round
+ * trip. Placing it at the spawn point again would rewind that flight for the frames
+ * before the next snapshot re-derives it, which is a visible jerk on the one event a
+ * player is already watching closely. Position is taken only from a respawn this client
+ * had not reached, which is a client that fell behind and genuinely needs telling.
  */
 function applyShipLifecycle(world: World, data: ShipLifecycleData): boolean {
   const ship = world.ships.find((s) => s.id === data.id);
   if (!ship) return false;
-  ship.pos.x = data.x;
-  ship.pos.y = data.y;
-  ship.vel.x = 0;
-  ship.vel.y = 0;
   if (data.alive) {
+    const wasDead = !ship.alive;
     ship.alive = true;
     ship.respawnTimer = 0;
     // A fresh hull at home is under spawn protection (GDD §2.1). The snapshot's
     // flag bit is what ends it; this only makes sure the glow starts.
     if (ship.spawnProtect <= 0) ship.spawnProtect = SPAWN_PROTECTION_S;
+    if (wasDead) {
+      ship.pos.x = data.x;
+      ship.pos.y = data.y;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+    }
     return true;
   }
+  ship.pos.x = data.x;
+  ship.pos.y = data.y;
+  ship.vel.x = 0;
+  ship.vel.y = 0;
   ship.alive = false;
   ship.hull = 0;
   ship.firing = false;

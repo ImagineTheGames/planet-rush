@@ -343,6 +343,81 @@ describe.each(WIRES)(
       expect(shipOf(match.client.world).hull).toBe(0);
     });
 
+    it('does not rewind the fresh hull when the respawn news finally lands', () => {
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(LOCAL);
+      // Through the death, the revival, and a round trip past it: the client ran its
+      // own `respawn()` at authority's tick, and has been flying the fresh hull since.
+      match.run(Math.round(RESPAWN_S / TICK_DT) + DELAY_FRAMES * 4);
+      const ship = shipOf(match.client.world);
+      expect(ship.alive).toBe(true);
+      const flying = { x: ship.pos.x, y: ship.pos.y };
+      expect(Math.hypot(flying.x - ship.home.x, flying.y - ship.home.y)).toBeGreaterThan(1);
+
+      // Now the respawn event for that revival tick, arriving late — which is when it
+      // always arrives, a round trip after the tick it describes. It names the spawn
+      // point, because that is where the hull was at that tick.
+      const applied = match.client.applyEvent({
+        type: 'entityEvent',
+        tick: match.server.world.tick,
+        kind: 'ship',
+        op: 'spawn',
+        data: {
+          id: LOCAL,
+          alive: true,
+          tick: match.server.world.tick,
+          x: ship.home.x,
+          y: ship.home.y,
+          respawnTick: -1,
+          eliminated: false,
+        },
+      });
+
+      // Applied — and it moved nothing. Both sims ran the same `respawn()` at the same
+      // tick from the same state, so this message is confirmation, not news; taking its
+      // coordinates would rewind a round trip of the player's own flying for the frames
+      // before the next snapshot re-derives the position.
+      expect(applied).toBe(true);
+      expect(ship.alive).toBe(true);
+      expect(ship.pos.x).toBe(flying.x);
+      expect(ship.pos.y).toBe(flying.y);
+    });
+
+    it('places a ship this client has NOT revived at the spawn point', () => {
+      // The other half of the same rule: a client that fell behind — a slept tab, a
+      // lost death event, a countdown still running — is genuinely being told
+      // something, and takes the position.
+      const match = new Match(DELAY_FRAMES);
+      match.run(40);
+      match.server.kill(LOCAL);
+      match.run(30);
+      const ship = shipOf(match.client.world);
+      expect(ship.alive).toBe(false);
+
+      const home = { x: ship.home.x, y: ship.home.y };
+      match.client.applyEvent({
+        type: 'entityEvent',
+        tick: match.client.tick,
+        kind: 'ship',
+        op: 'spawn',
+        data: {
+          id: LOCAL,
+          alive: true,
+          tick: match.client.tick,
+          x: home.x,
+          y: home.y,
+          respawnTick: -1,
+          eliminated: false,
+        },
+      });
+
+      expect(ship.alive).toBe(true);
+      expect(ship.pos.x).toBe(home.x);
+      expect(ship.pos.y).toBe(home.y);
+      expect(match.client.respawnIn(LOCAL)).toBeNull();
+    });
+
     it('survives a lost death event: the snapshot\'s own flag is the backstop', () => {
       const match = new Match(DELAY_FRAMES);
       match.run(40);
