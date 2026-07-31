@@ -49,10 +49,19 @@
  */
 
 import type { Action, PlayerId, Vec2 } from '@shared/types';
-import { PROJECTILE, SPAWN_PROTECTION_S, TICK_DT, refreshDerivedStats, stationOf, step } from '../sim';
-import type { BuildJob, MiningStation, World } from '../sim';
+import {
+  PROJECTILE,
+  RESPAWN_S,
+  SPAWN_PROTECTION_S,
+  TICK_DT,
+  refreshDerivedStats,
+  stationOf,
+  step,
+} from '../sim';
+import type { BuildJob, MiningStation, OreChunk, World } from '../sim';
 import { ActionJournal } from './action-journal';
-import { applyEntityEvent } from './entity-events';
+import { applyEntityEvent, respawnCountdown, respawnHold, respawnTicks } from './entity-events';
+import type { ShipLifecycleData } from './entity-events';
 import { StructureEcho } from './entity-echo';
 import { OrderLedger } from './order-ledger';
 import type { OrderEcho, OrderOutcome, OrderVerb } from './order-ledger';
@@ -300,6 +309,33 @@ export class PredictedMatch {
   /** Every ship's hull as authority last stated it — the only source there is
    *  ({@link holdHull}). Empty until the first snapshot. */
   private readonly hull = new Map<PlayerId, number>();
+  /**
+   * The last death authority stated for each ship, and the tick it says that ship
+   * comes back ({@link holdLifecycle}).
+   *
+   * A record is entered on a death and retired when **authority** states the revival
+   * that ends it — deliberately *not* when this client's own countdown runs out. The
+   * respawn tick is the only thing that can put a replay back on authority's
+   * revival, and a reconcile keeps rewinding to ticks before that deadline for a
+   * whole round trip after the ship has already launched: snapshots are 30 Hz and
+   * describe a tick the client passed `lead` ticks ago, so a client that threw the
+   * deadline away the moment it fired revived the ship at the first replayed tick
+   * instead, from home, while authority still had it lying at the death site. That is
+   * a 15-unit correction that repeats every reconcile for a round trip — the small,
+   * *surviving* half of the t=63 s signature.
+   */
+  private readonly lifecycle = new Map<PlayerId, ShipLifecycleData>();
+  /**
+   * The tick authority last stated a revival at, per ship — the guard that stops a
+   * snapshot describing an *earlier* tick from digging the ship up again.
+   *
+   * Snapshots are 30 Hz and a round trip behind, so at the instant authority revives
+   * a ship there are still frames in flight describing ticks when it was dead. Their
+   * `alive` bit is perfectly honest about the tick they describe and says nothing
+   * about now, and building a fresh five-second countdown out of one would bury a
+   * ship that had just launched.
+   */
+  private readonly revivedAt = new Map<PlayerId, Tick>();
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
@@ -428,6 +464,7 @@ export class PredictedMatch {
     }
     if (before) this.ledgeOrders(orders, before, tick);
     this.holdHull();
+    this.holdLifecycle();
     this.checkpoint();
     this.decayOffset();
     return tick;
@@ -569,6 +606,10 @@ export class PredictedMatch {
     // before authority flattens the pool and put back after the replay
     // (`settleShots`, audit item 2b).
     const carried = this.harvestOwnShots();
+    // Every hold as the *player's own timeline* left it, read before authority's
+    // wallet is written over it: the ledger behind the conserved courier telegraph
+    // ({@link FrozenClocks.hold}).
+    const hold = this.world.ships.map((ship) => ship.cargo);
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -577,6 +618,13 @@ export class PredictedMatch {
         : 0;
 
     const wireSlots = applySnapshot(this.world, snapshot, { suppressShipShotsFrom: this.local });
+    // Who authority currently has dead, read off the same flag bits — the backstop
+    // under the lifecycle event channel ({@link readLifecycle}).
+    this.readLifecycle(snapshot);
+    // The respawn countdown as it stood *at the tick the world was just rewound to*,
+    // so the replay below revives a corpse on authority's tick rather than on its
+    // first replayed one ({@link seedRespawnClocks}).
+    this.seedRespawnClocks(snapshot.tick);
     // The wallet is corrected here, in the same breath as position and hull, and
     // *before* the replay: unacked mining is then re-earned on top of authority's
     // figure instead of on top of the client's own compounding one (`stageEconomy`).
@@ -593,7 +641,7 @@ export class PredictedMatch {
     // The construction and repair clocks as they stood before any of this — put
     // back after the replay, because a replay must not spend them twice
     // ({@link freezeClocks}).
-    const clocks = freezeClocks(this.world);
+    const clocks = freezeClocks(this.world, hold);
     const clocksAt = tickBefore;
     for (const input of this.queue) {
       // **A one-shot order is never replayed.** The rewind puts the world's
@@ -643,6 +691,10 @@ export class PredictedMatch {
     // collisions over it. Put authority's numbers back ({@link holdHull}).
     this.readHull(snapshot);
     this.holdHull();
+    // …and so is death. The replay just ran `respawnTimer -= dt` once per pending
+    // input over a countdown it has already spent, so a corpse the replay revived
+    // is put back in the ground here, on authority's clock ({@link holdLifecycle}).
+    this.holdLifecycle();
     this.settleShots(wireSlots, carried);
 
     const snapped = this.absorb(before);
@@ -666,8 +718,35 @@ export class PredictedMatch {
    * that bought one turret leaves one turret standing and not two (`./entity-echo`).
    */
   applyEvent(message: EntityEventMessage): boolean {
+    // A ship's death or respawn is not a structure and has no echo to reconcile —
+    // it is authority stating a lifecycle, and it is held from here on
+    // ({@link holdLifecycle}).
+    if (message.kind === 'ship') return this.applyLifecycle(message);
     this.structures.reconcileSpawn(this.world, message);
     return applyEntityEvent(this.world, message);
+  }
+
+  /** True while this ship is dead — the client is showing a death and running a
+   *  respawn countdown for it, and is predicting nothing on its behalf. Read off the
+   *  world, which the lifecycle wire is what keeps honest ({@link holdLifecycle}). */
+  isDead(player: PlayerId): boolean {
+    const ship = this.shipOf(player);
+    return ship ? !ship.alive : false;
+  }
+
+  /**
+   * Seconds left on a ship's respawn countdown as authority stated it, or null when
+   * that ship is not on a countdown (it is flying, or it was eliminated and is not
+   * coming back). This is the number the death presentation counts down — the same
+   * `Ship.respawnTimer` an offline match shows, sourced from authority instead of
+   * from a local guess (GDD §2.7, §2.4 parity).
+   */
+  respawnIn(player: PlayerId): number | null {
+    const ship = this.shipOf(player);
+    if (!ship || ship.alive) return null;
+    const record = this.lifecycle.get(player);
+    if (!record || record.eliminated || record.respawnTick < 0) return null;
+    return respawnCountdown(record, this.world.tick, this.dt);
   }
 
   /** The structure-echo bookkeeping — which ids authority has named so far. */
@@ -982,6 +1061,174 @@ export class PredictedMatch {
     }
   }
 
+  // --- Death is authority's too (M10 lifecycle wire) ------------------------
+
+  /**
+   * Take one lifecycle event — a death or a respawn — and enter it in the record
+   * that holds it from here on (`./entity-events` {@link ShipLifecycleData}).
+   *
+   * A **death** stops the ship where it fell and starts the countdown authority is
+   * running. A **respawn** retires the record, and from that tick on the ship is an
+   * ordinary predicted ship again: the local one resumes prediction from the state
+   * the sim's own `respawn()` produced (home, full hull, spawn protection — the same
+   * deterministic state authority produced at the same tick), and a remote one goes
+   * back to being interpolated off the wire.
+   */
+  private applyLifecycle(message: EntityEventMessage): boolean {
+    const data = message.data as ShipLifecycleData | null;
+    if (!data || typeof data.id !== 'number' || typeof data.alive !== 'boolean') return false;
+    if (!applyEntityEvent(this.world, message)) return false;
+    if (data.alive) {
+      this.lifecycle.delete(data.id);
+      this.revivedAt.set(data.id, data.tick);
+    } else {
+      this.lifecycle.set(data.id, data);
+    }
+    this.holdLifecycle();
+    return true;
+  }
+
+  /**
+   * The backstop under the lifecycle event channel: every ship the snapshot's own
+   * `alive` bit says is dead and this client has no death event for.
+   *
+   * An event can be lost, or simply not have arrived yet, or belong to a death that
+   * happened before this client joined — and in every one of those cases the old
+   * client revived the ship locally on its next tick, which is the whole bug. The
+   * flag bit is on every snapshot, thirty times a second, so it is enough on its own
+   * to know *that* a ship is dead; what it cannot say is *when* it comes back, so a
+   * record built from it assumes the death was fresh as of this snapshot. That
+   * over-estimates the countdown by at most the age of the death when the client
+   * first saw it, and the authoritative respawn — event or flag — ends it exactly
+   * either way.
+   *
+   * The bit going *set* is authoritative in the other direction, and retires the
+   * record: whatever this client believed about a countdown, the ship is flying.
+   */
+  private readLifecycle(snapshot: DecodedSnapshot): void {
+    const ticks = respawnTicks(RESPAWN_S, this.dt);
+    for (const snap of snapshot.ships) {
+      if ((snap.flags & SHIP_FLAG.alive) !== 0) {
+        // Authority has it flying as of this tick, so any death it describes is over.
+        // Guarded on the death's own tick all the same: a record newer than the frame
+        // in hand is news the frame cannot contradict.
+        const record = this.lifecycle.get(snap.id);
+        if (record && record.tick <= snapshot.tick) this.lifecycle.delete(snap.id);
+        this.revivedAt.set(snap.id, Math.max(this.revivedAt.get(snap.id) ?? -1, snapshot.tick));
+        continue;
+      }
+      // A record this frame cannot contradict: it is counting down toward a revival
+      // the frame is older than, and an elimination has no deadline to outlive at all.
+      // Past that deadline with the ship *still* dead, the revival never happened —
+      // the news was lost, or a second death landed on the same slot — and this frame
+      // is the freshest word there is, so the record is rebuilt from it.
+      const record = this.lifecycle.get(snap.id);
+      if (record && (record.eliminated || snapshot.tick <= record.respawnTick)) continue;
+      // A frame from before a revival this client has already seen. It is telling
+      // the truth about its own tick and nothing about now ({@link revivedAt}).
+      if ((this.revivedAt.get(snap.id) ?? -1) >= snapshot.tick) continue;
+      const eliminated = (snap.flags & SHIP_FLAG.eliminated) !== 0;
+      this.lifecycle.set(snap.id, {
+        id: snap.id,
+        alive: false,
+        tick: snapshot.tick,
+        x: snap.posX,
+        y: snap.posY,
+        respawnTick: eliminated ? -1 : snapshot.tick + ticks,
+        eliminated,
+      });
+    }
+  }
+
+  /**
+   * **No client ever revives a ship it draws** — the lifecycle half of
+   * {@link holdHull}, and for the same reason.
+   *
+   * `step()` runs the whole world, and its very first act on a dead ship is to take
+   * `dt` off `respawnTimer` and revive it at zero. The timer is not on the wire, so
+   * a client's copy starts at zero, so *every* dead ship — the local one and every
+   * rival — came back on the client's next tick while authority still had five
+   * seconds to run. For the local slot that is a ghost fighting a corpse and a
+   * correction of hundreds of units that cannot converge until authority catches up
+   * (the developer's t=63 s capture); for a rival it is a dead enemy that never
+   * stops being drawn.
+   *
+   * So a corpse is *held*: stopped where it died, hull at zero, trigger off, and its
+   * countdown recomputed from authority's respawn tick against this client's own
+   * clock every time it is asserted. Recomputed rather than decremented on purpose —
+   * a rewind/replay spends the same tick several times ({@link freezeClocks} is the
+   * general form of that problem), and a countdown derived from a tick number cannot
+   * be spent twice however many times the world is stepped over it.
+   *
+   * The hold ends one tick *before* the stated deadline, at which point the timer it
+   * last wrote is exactly `dt` — so the sim's own countdown takes the last step and
+   * `respawn()` fires at `respawnTick` itself, the same tick authority's iterative
+   * countdown lands on. Not a tick earlier (a ghost) and not a tick later (a corpse
+   * authority has already flown away from): the same code, at the same tick, from the
+   * same state, on both sides of the wire (GDD §2.4 parity).
+   */
+  private holdLifecycle(): void {
+    if (this.lifecycle.size === 0) return;
+    for (const [id, record] of this.lifecycle) {
+      const ship = this.shipOf(id);
+      if (!ship) continue;
+      // Past the deadline this client is holding it to: the revival belongs to
+      // `step()` now. The record stays — a reconcile keeps rewinding to ticks before
+      // the deadline for a round trip yet, and it is the only thing that can put the
+      // replay's revival back on authority's tick ({@link seedRespawnClocks}).
+      if (this.releasable(record)) continue;
+      ship.alive = false;
+      ship.hull = 0;
+      ship.firing = false;
+      ship.vel.x = 0;
+      ship.vel.y = 0;
+      ship.pos.x = record.x;
+      ship.pos.y = record.y;
+      ship.eliminated = record.eliminated;
+      ship.respawnTimer = respawnHold(record, this.world.tick, this.dt);
+    }
+  }
+
+  /** True once the world's clock has reached the deadline a death record states, so
+   *  the sim's own countdown owns the revival from here ({@link holdLifecycle}). An
+   *  elimination is never releasable: there is no revival behind it (GDD §2.7). */
+  private releasable(record: ShipLifecycleData): boolean {
+    if (record.eliminated || record.respawnTick < 0) return false;
+    return this.world.tick >= record.respawnTick;
+  }
+
+  /**
+   * Put every held countdown back to what it was **at `tick`** — the tick the world
+   * has just been rewound to, before the replay runs over it.
+   *
+   * This is the lifecycle's answer to the problem {@link freezeClocks} solves for
+   * construction: the respawn clock is not on the wire, so a rewind cannot restore it
+   * from the snapshot and the replay inherits whatever the *present* had. Present
+   * tense on a corpse means zero, and `step()`'s first act on a dead ship with a zero
+   * timer is to revive it — so the replay launched the ship from home at the first
+   * tick it replayed, however many ticks short of authority's revival that was, and
+   * the reconcile then reported the death site against home as a fresh correction.
+   * Every snapshot for the rest of a round trip did it again: the *same* 15-unit
+   * error, repeated, converging on nothing.
+   *
+   * Seeded from the stated respawn tick, the replay counts the same clock down that
+   * authority counted and `respawn()` fires inside the replay at exactly the tick it
+   * fired at on the server.
+   */
+  private seedRespawnClocks(tick: Tick): void {
+    if (this.lifecycle.size === 0) return;
+    for (const record of this.lifecycle.values()) {
+      const ship = this.shipOf(record.id);
+      if (!ship || ship.alive) continue;
+      ship.respawnTimer = respawnHold(record, tick, this.dt);
+    }
+  }
+
+  /** One ship by player id, or null. A ship's id is its player id (`src/sim`). */
+  private shipOf(player: PlayerId): World['ships'][number] | null {
+    return this.world.ships.find((s) => s.id === player) ?? null;
+  }
+
   private decayOffset(): void {
     this.offset.x *= BLEND_DECAY;
     this.offset.y *= BLEND_DECAY;
@@ -1124,9 +1371,71 @@ interface FrozenClocks {
   readonly repair: number[];
   /** Seconds until each ship's weapon may fire again, in ship order. */
   readonly weapon: number[];
+  /**
+   * **"Ore goes super fast to base online."**
+   *
+   * The ore-flight courier is the same class of clock as a construction countdown,
+   * expressed as a position instead of a number — and it is the one the developer
+   * could actually *see*. Banking inside your own collection field spins off one
+   * courier per whole unit banked and flies it home at `DEPOSIT.flightSpeed`
+   * (`src/sim/step.ts` `updateDepositFlight`, GDD §2.3), integrated one tick at a
+   * time. A rewind restores the world's scalars; it does not restore `world.chunks`.
+   * So every replayed tick flew each courier *again*, on top of the flight it had
+   * already made — and there are `lead` of those per snapshot, thirty times a
+   * second. At 150 ms the couriers travelled about ten times too fast and the whole
+   * deposit read as a line snapping instantly into the station instead of the beat
+   * the design asks a player to watch.
+   *
+   * Worse, the replay does not only *move* couriers, it **spawns** them: the drain
+   * runs again over the same integer boundary of the hold, so an unacknowledged
+   * second of banking emitted its couriers once per reconcile it survived. That is
+   * the conserved-telegraph rule (one sprite per unit banked) broken from the
+   * client's side.
+   *
+   * So the chunk field is lifted out of the rewind/replay entirely and put back
+   * **exactly as the replay found it** — not advanced by the reconcile's net clock
+   * change, which is the one difference from every other clock here. A build
+   * countdown is a fact about the world and owes the world whatever time really
+   * passed; a courier's flight is a *presentation* the player watches, and what the
+   * player watched is one frame per predicted tick. Letting a reconcile that nudges
+   * the clock two ticks forward also nudge the courier two ticks along its line is
+   * how the animation ends up shorter online than off — a smaller version of the
+   * same bug, paid once per lead adjustment instead of once per replayed tick.
+   *
+   * The chunks a replay spawned are discarded with the rest of its chunk work, minus
+   * the couriers the net drain still owes ({@link FrozenClocks.hold}): the ore a
+   * replayed tick telegraphs was already banked and already couriered when that tick
+   * was first predicted. Online and offline then run the same flight at the same
+   * speed (GDD §2.4 parity), and the courier stream stays the conserved one sprite
+   * per unit banked it is specified to be.
+   *
+   * Mined chunks ride along for free, and should: they drift and are tractored on
+   * the same per-tick integration, so the replay was over-flying those too.
+   */
+  readonly chunks: readonly OreChunk[];
+  /** `[x, y, vx, vy, amount]` per entry of {@link chunks}, in the same order. */
+  readonly chunkState: number[];
+  /**
+   * Each ship's hold as the replay found it, in ship order — the ledger behind the
+   * conserved telegraph.
+   *
+   * A courier is spawned on the hold's integer boundaries (`src/sim/step.ts`
+   * `updateDeposits`), and a reconcile writes authority's hold *over* the client's
+   * before replaying: so a boundary the player is owed a sprite for can be crossed
+   * inside a replay and nowhere else, and discarding the replay's chunk work whole
+   * would silently eat that sprite — one unit of ore that banks with nothing flying
+   * home for it. Comparing the hold the *player's* timeline reached against the one
+   * the replay ends on says exactly how many couriers the replay owes, and that many
+   * of the ones it spawned are kept.
+   *
+   * Read at the top of the reconcile, before authority's wallet is applied — reading
+   * it after would measure the replay's own re-drain of ore already couriered, and
+   * mint a duplicate sprite per reconcile instead of the one the player earned.
+   */
+  readonly hold: readonly number[];
 }
 
-function freezeClocks(world: World): FrozenClocks {
+function freezeClocks(world: World, hold: readonly number[]): FrozenClocks {
   const builds: number[] = [];
   const repair: number[] = [];
   // The weapon cooldown is the same class of clock as the construction countdown,
@@ -1145,7 +1454,15 @@ function freezeClocks(world: World): FrozenClocks {
     }
     repair.push(station.repairGate ?? 0, station.repairCooldown ?? 0);
   }
-  return { builds, repair, weapon };
+  // The chunk field, held by reference plus the four numbers a tick of flight
+  // moves. One small array per reconcile against a few dozen chunks — the same
+  // trade the rest of this function already makes.
+  const chunks = world.chunks.slice();
+  const chunkState: number[] = [];
+  for (const chunk of chunks) {
+    chunkState.push(chunk.pos.x, chunk.pos.y, chunk.vel.x, chunk.vel.y, chunk.amount);
+  }
+  return { builds, repair, weapon, chunks, chunkState, hold };
 }
 
 /**
@@ -1173,6 +1490,55 @@ function thawClocks(world: World, clocks: FrozenClocks, elapsed: number): void {
     const held = clocks.weapon[i];
     if (held !== undefined) world.ships[i]!.weaponCooldown = Math.max(0, held - elapsed);
   }
+  // The chunk field as the replay found it — position for position, velocity for
+  // velocity, and *not* flown on by `elapsed` ({@link FrozenClocks.chunks}): a
+  // courier's flight is one tick per tick the player watched, and no more.
+  //
+  // Held by object identity rather than by id, because the rewind puts
+  // `world.nextEntityId` back too — so a chunk the replay spawned can legitimately
+  // carry the same id as one the client predicted before the reconcile.
+  const held = new Set<OreChunk>(clocks.chunks);
+  const spawned: OreChunk[] = [];
+  for (const chunk of world.chunks) {
+    if (chunk.deposit === true && !held.has(chunk)) spawned.push(chunk);
+  }
+  const owed = depositDebt(world, clocks);
+  world.chunks.length = 0;
+  for (let i = 0; i < clocks.chunks.length; i++) {
+    const chunk = clocks.chunks[i]!;
+    const at = i * 5;
+    chunk.pos.x = clocks.chunkState[at]!;
+    chunk.pos.y = clocks.chunkState[at + 1]!;
+    chunk.vel.x = clocks.chunkState[at + 2]!;
+    chunk.vel.y = clocks.chunkState[at + 3]!;
+    chunk.amount = clocks.chunkState[at + 4]!;
+    world.chunks.push(chunk);
+  }
+  // The couriers the net drain owes, newest first-served: their boundaries were
+  // crossed inside the replay and nowhere else, so this is the only place their
+  // sprite can come from ({@link FrozenClocks.hold}).
+  for (let i = Math.max(0, spawned.length - owed); i < spawned.length; i++) {
+    world.chunks.push(spawned[i]!);
+  }
+}
+
+/**
+ * How many deposit couriers the replay owes the player: the whole units that left
+ * a hold across this reconcile, summed over every ship
+ * ({@link FrozenClocks.hold}).
+ *
+ * Zero whenever the reconcile left the holds where it found them, which is the
+ * steady state — the boundary is crossed in a predicted tick, the courier is spawned
+ * there, and it survives the reconcile untouched like any other chunk.
+ */
+function depositDebt(world: World, clocks: FrozenClocks): number {
+  let owed = 0;
+  for (let i = 0; i < world.ships.length; i++) {
+    const before = clocks.hold[i];
+    if (before === undefined) continue;
+    owed += Math.max(0, Math.floor(before) - Math.floor(world.ships[i]!.cargo));
+  }
+  return owed;
 }
 
 /** One of the firer's own predicted shots, held across a reconcile. */

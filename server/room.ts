@@ -64,7 +64,12 @@ import { encodeServerMessage } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
 import { TICK_DT, createWorld, isOver, step } from '../src/sim';
 import type { Bounds, MatchMode, PlayerInput, World } from '../src/sim';
-import { FogTracker, StaticEntityTracker, fullEntityState } from './static-events';
+import {
+  FogTracker,
+  ShipLifecycleTracker,
+  StaticEntityTracker,
+  fullEntityState,
+} from './static-events';
 
 // ---------------------------------------------------------------------------
 // The socket seam
@@ -273,6 +278,9 @@ export class MatchRoom {
   private readonly matchMode: MatchMode;
   private readonly queue = new InputQueue();
   private readonly statics = new StaticEntityTracker();
+  /** Watches every ship's `alive` flag so a death and a respawn reach the clients
+   *  that must stop predicting through them (M10 lifecycle wire, `./static-events`). */
+  private readonly lifecycle = new ShipLifecycleTracker();
   private readonly graceMs: number;
   private readonly dt: number;
   private readonly snapshotInterval: number;
@@ -662,6 +670,7 @@ export class MatchRoom {
       for (const event of fullEntityState(this.authoritative)) this.sendTo(slot, event);
     }
     this.statics.prime(this.authoritative);
+    this.lifecycle.prime(this.authoritative);
     this.broadcastLobby();
     this.broadcastSnapshot(this.authoritative);
   }
@@ -720,6 +729,13 @@ export class MatchRoom {
     step(world, rows, this.dt);
 
     if (before) this.echoOrders(world, orders, before);
+    // Death and respawn, **every tick and ahead of the snapshot**. Every tick
+    // because a client that learns about a death on the next 10 Hz static-entity
+    // sample has spent 100 ms flying a ghost; ahead of the snapshot because the
+    // transport preserves order, so the client applies the lifecycle before it
+    // reconciles the frame that carries the same news as one bit
+    // (`src/net/entity-events` `ShipLifecycleData`).
+    for (const event of this.lifecycle.diff(world, this.dt)) this.broadcast(event);
     if (world.tick % this.snapshotInterval === 0) this.broadcastSnapshot(world);
     if (world.tick % this.eventInterval === 0) {
       for (const event of this.statics.diff(world)) this.broadcast(event);

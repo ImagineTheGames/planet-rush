@@ -289,11 +289,25 @@ export interface SnapshotMessage {
  * (docs/netcode-audit.md §6, gap 2). Additive: an unrecognized kind was already
  * dropped rather than guessed at, so the only code that had to change is the
  * code that wanted to see one.
+ *
+ * `'ship'` is the M10 lifecycle wire, and it is the one kind here that is *not* a
+ * static entity — which is the point. A ship's position streams thirty times a
+ * second, but the two instants that matter most about it, **the tick it died and
+ * the tick it comes back**, were on no channel at all: the snapshot spends one bit
+ * on "alive" and says nothing about the five-second respawn clock behind it. So a
+ * predicting client ran that clock itself, from a `respawnTimer` that started at
+ * zero, and revived the ship on the very next tick — a live ghost flying against a
+ * corpse authority had not moved, and a correction that grows with every second the
+ * real countdown still has to run (the developer's t=63 s capture: corr 0.5 → 288
+ * → 509 u, mispred 1.0, for five seconds). Death and respawn are **events**: they
+ * happen a handful of times a match, they carry a tick rather than a position, and
+ * they are exactly what this channel is for (GDD §4.2). See
+ * `./entity-events` `ShipLifecycleData`.
  */
 export interface EntityEventMessage {
   type: 'entityEvent';
   tick: Tick;
-  kind: 'asteroid' | 'turret' | 'shield' | 'satellite' | 'wreck' | 'station';
+  kind: 'asteroid' | 'turret' | 'shield' | 'satellite' | 'wreck' | 'station' | 'ship';
   op: 'spawn' | 'update' | 'destroy';
   data: unknown;
 }
