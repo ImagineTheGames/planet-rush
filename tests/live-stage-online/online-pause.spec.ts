@@ -281,20 +281,41 @@ for (const [name, profile] of [
       expect(paused.frozen, 'an online overlay must never freeze the sim').toBe(false);
 
       // --- …and the world does NOT stop. -------------------------------------
-      const before = await readPause(client.page);
-      await client.page.waitForTimeout(DWELL_MS);
-      const after = await readPause(client.page);
+      //
+      // Thrust is HELD across the whole dwell. A ship sitting at zero velocity
+      // with no input does not move even in a perfectly live sim — Euler plus
+      // drag, and nothing to integrate — so an unmoved ship would have proved
+      // nothing either way. (That is not a hypothetical: the first run of this
+      // spec failed here for exactly that reason, on a sim the tick counter
+      // showed running.) Holding W makes the clause checkable and, as a bonus,
+      // checks the thing behind it: a player's input still reaches an online sim
+      // while the overlay is up, which is what "the ship keeps flying" means from
+      // the cockpit.
+      //
+      // The keyboard on both profiles is deliberate. The form factor under test
+      // here is how the overlay is OPENED — ESC versus a thumb through the
+      // landscape-lock remap — and the sim advancing a ship underneath it is the
+      // same code either way; a synthetic virtual-stick drag would test
+      // `touch.ts`, which `tests/live-stage/input-parity.spec.ts` already owns.
+      await client.page.keyboard.down('KeyW');
+      try {
+        const before = await readPause(client.page);
+        await client.page.waitForTimeout(DWELL_MS);
+        const after = await readPause(client.page);
 
-      expect(
-        after.simTicks,
-        'the sim stopped under an online pause — one player paused eight',
-      ).toBeGreaterThan(before.simTicks);
-      // Half a second is ~30 ticks at 60 Hz; anything in double figures is a
-      // running loop rather than a stray frame or two.
-      expect(after.simTicks - before.simTicks, 'the sim barely ticked').toBeGreaterThan(10);
-      // "the ship keeps flying (or drifts)" — the clause a tick counter cannot see.
-      const moved = Math.hypot(after.ship!.x - before.ship!.x, after.ship!.y - before.ship!.y);
-      expect(moved, 'the ship was pinned in place while the overlay was up').toBeGreaterThan(0);
+        expect(
+          after.simTicks,
+          'the sim stopped under an online pause — one player paused eight',
+        ).toBeGreaterThan(before.simTicks);
+        // Half a second is ~30 ticks at 60 Hz; anything in double figures is a
+        // running loop rather than a stray frame or two.
+        expect(after.simTicks - before.simTicks, 'the sim barely ticked').toBeGreaterThan(10);
+        // "the ship keeps flying (or drifts)" — the clause a tick counter cannot see.
+        const moved = Math.hypot(after.ship!.x - before.ship!.x, after.ship!.y - before.ship!.y);
+        expect(moved, 'the ship was pinned in place while the overlay was up').toBeGreaterThan(1);
+      } finally {
+        await client.page.keyboard.up('KeyW');
+      }
 
       await client.page.screenshot({
         path: `tests/live-stage-online/online-pause-${evidence}-evidence.png`,

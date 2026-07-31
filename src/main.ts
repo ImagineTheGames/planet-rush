@@ -1749,18 +1749,19 @@ async function boot(): Promise<void> {
       // for every remaining frame, and `formatBuildTag` builds a string. One call
       // on the edge, none after — the frame loop allocates nothing here, GDD §4.3.)
       if (identity.server !== null && onlineSession?.state === 'closed') identity.disconnected();
-      // The badge's third field: the live round trip (ratified, M10 — "badge
-      // grows connection stats … 3cb36f5 · d891dd0a (gru) · 62ms"). Offered every
-      // frame, applied at most every ~2 s by `sampleRtt`'s own throttle, so the
-      // Pixi text is rebuilt roughly once per 120 frames (GDD §4.3).
+      // The badge's third field (ratified, M10 — "3cb36f5 · d891dd0a (gru) ·
+      // 62ms") is NOT fed from here. It rides the session's own poll timer
+      // instead (`startSessionLog`), which is the only thing that spans the whole
+      // life of a connection — the lobby before this loop exists, and the drop
+      // after the menu is gone. Feeding it here left the lobby, the screen the
+      // region is actually read off, with no number on it at all.
       //
-      // `matchNetworkRtt()` is the DECOMPOSED NETWORK number, never the composite
-      // — the developer named that distinction in the ratification and
-      // `@net/telemetry` explains it: the composite carries this client's own
-      // prediction lead and the server's broadcast cadence, so it reads 215 ms on
-      // a wire a speedtest calls 24. A screenshot is evidence; the wrong number
-      // there is a libel about the host that outlives the session.
-      identity.sampleRtt(matchNetworkRtt(), nowMs);
+      // The one thing this loop still owes the badge is `?freeze=1`: a stamp that
+      // changes with the weather is exactly what a byte-deterministic golden
+      // screenshot cannot have. (Freeze implies `?debug=1`, which has no online
+      // session, so this is belt and braces — and cheap: one boolean, and the
+      // sample is a no-op once the field is already empty.)
+      if (flags.freeze) identity.sampleRtt(null, nowMs);
       buildBadge.update(transform.logicalWidth, transform.logicalHeight);
       // The standalone ping stamp is SUPERSEDED by the badge line above it, and is
       // fed null rather than a second opinion (ratified, M10 — the badge carries
@@ -2051,25 +2052,6 @@ async function boot(): Promise<void> {
     match.close();
     const menuUrl = window.location.origin + window.location.pathname;
     window.location.assign(menuUrl);
-  }
-
-  /**
-   * This session's round trip for the build badge, ms, or null when there is none
-   * to show (ratified, M10 — "badge grows connection stats … · 62ms").
-   *
-   * The **decomposed NETWORK** number (`@net/telemetry` `hudNetworkRttMs`), which
-   * the ratification names in the same breath: *never the composite*. Offline
-   * there is no wire to time, a closed socket is no longer a connection, and under
-   * `?freeze=1` a number that changes with the weather is exactly what a
-   * byte-deterministic golden screenshot cannot have — all three read null, and a
-   * null draws nothing rather than a `0ms` claiming a perfect connection.
-   *
-   * Allocation-free: read every frame, and the badge's own throttle decides how
-   * often the answer reaches the screen.
-   */
-  function matchNetworkRtt(): number | null {
-    if (!onlineSession || onlineSession.state === 'closed' || flags.freeze) return null;
-    return onlineSession.telemetry.hudNetworkRttMs;
   }
 
   /** Draw whichever pause screen is up and the touch corner button, once per
@@ -5808,7 +5790,43 @@ function openMainMenu(
    */
   function startSessionLog(session: OnlineSession): void {
     onlineLogHandle = attachSessionLog({ log: playtest, session });
-    onlineLogTimer = setInterval(() => onlineLogHandle?.poll(), SESSION_LOG_POLL_MS);
+    onlineLogTimer = setInterval(() => {
+      onlineLogHandle?.poll();
+      // …and the badge's connection stat, on the same tick and for the same
+      // reason (ratified M10 §1: "every screen … when connected"). The first
+      // version of this fed the badge from the MATCH loop, and the lobby — the
+      // screen the developer actually reads a region off, and where a live-stage
+      // run photographs it — never showed a number at all, because no match loop
+      // exists yet. This timer is already the one thing that spans the whole life
+      // of a connection: the lobby wait before the match, and the drop after the
+      // menu is gone.
+      //
+      // `networkFloorMs` is the DECOMPOSED NETWORK figure: the ping probe's own
+      // round trip over the recent window, with no input lead and no broadcast
+      // cadence in it — never the composite. It is the number `@net/session`
+      // exposes as `networkPingMs` with the header "what the lobby and HUD
+      // readouts must read", which is exactly the distinction the ratification
+      // drew; read here through `telemetry.live` because that getter is the part
+      // of it on the `OnlineSession` INTERFACE, and widening a ratified interface
+      // is the Director's call, not this lane's. Same number, same source, so the
+      // badge and the lobby's roster pings cannot disagree.
+      //
+      // It is null until a probe has been answered, and the probe rides
+      // `sendInput` (`@net/session`) — so there is no reading until the match is
+      // predicting, and the tag correctly carries no stats field before then. "A
+      // number is a measurement or it is absent" (`@net/ping` rule 1); a `0ms` in
+      // the lobby would be a claim about a wire nobody has timed. (The lobby is
+      // not left blind: the roster already shows every seat's ping, measured by
+      // the server's own probe.)
+      //
+      // Offered four times a second; `sampleRtt` applies it at most once per ~2 s.
+      // `live` builds one small readout object per call — nothing at 4 Hz, and the
+      // reason this is on a timer rather than in a frame loop.
+      buildIdentity().sampleRtt(
+        session.state === 'closed' ? null : session.telemetry.live.networkFloorMs,
+        performance.now(),
+      );
+    }, SESSION_LOG_POLL_MS);
   }
 
   /** Stop logging a session that is being replaced (a fresh CREATE / JOIN). */

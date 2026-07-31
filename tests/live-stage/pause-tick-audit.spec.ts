@@ -171,7 +171,20 @@ for (const [name, profile] of [
       expect(running.frozen).toBe(false);
       expect(running.ship, 'the harness boot puts a local ship in the world').not.toBeNull();
 
-      // --- Pause. -------------------------------------------------------------
+      // --- First: prove the ship CAN move, so "it didn't" means something. ----
+      // A ship at zero velocity with no input does not move even in a perfectly
+      // live sim — Euler plus drag, and nothing to integrate. Without this the
+      // freeze assertion below would pass over a running world.
+      await client.page.keyboard.down('KeyW');
+      const thrustFrom = await readPause(client.page);
+      await client.page.waitForTimeout(DWELL_MS);
+      const thrustTo = await readPause(client.page);
+      expect(
+        Math.hypot(thrustTo.ship!.x - thrustFrom.ship!.x, thrustTo.ship!.y - thrustFrom.ship!.y),
+        'the ship did not move under thrust in a RUNNING offline match',
+      ).toBeGreaterThan(1);
+
+      // --- Pause, with the thrust still held down. ---------------------------
       await openPause(client);
       const paused = await readPause(client.page);
       expect(paused.screen).toBe('menu');
@@ -182,19 +195,26 @@ for (const [name, profile] of [
       const kinds = paused.controls.map((c) => c.kind);
       expect(kinds).toEqual(['resume', 'settings', 'exit']);
 
-      // --- Half a second of real time, and NOTHING moved. --------------------
-      const before = await readPause(client.page);
-      await client.page.waitForTimeout(DWELL_MS);
-      const after = await readPause(client.page);
+      // --- Half a second of real time, thrust held, and NOTHING moved. -------
+      try {
+        const before = await readPause(client.page);
+        await client.page.waitForTimeout(DWELL_MS);
+        const after = await readPause(client.page);
 
-      expect(after.simTicks, 'a tick advanced under a frozen offline overlay').toBe(
-        before.simTicks,
-      );
-      // The half a tick counter cannot see: the world itself is still.
-      expect(after.ship!.x, 'the ship drifted while the match was paused').toBe(before.ship!.x);
-      expect(after.ship!.y).toBe(before.ship!.y);
-      expect(after.ship!.vx).toBe(before.ship!.vx);
-      expect(after.ship!.vy).toBe(before.ship!.vy);
+        expect(after.simTicks, 'a tick advanced under a frozen offline overlay').toBe(
+          before.simTicks,
+        );
+        // The half a tick counter cannot see: the world itself is still — and
+        // still under a held throttle, which is the strong form of the claim.
+        expect(after.ship!.x, 'the ship flew on while the match was paused').toBe(before.ship!.x);
+        expect(after.ship!.y).toBe(before.ship!.y);
+        expect(after.ship!.vx, 'the ship kept accelerating while the match was paused').toBe(
+          before.ship!.vx,
+        );
+        expect(after.ship!.vy).toBe(before.ship!.vy);
+      } finally {
+        await client.page.keyboard.up('KeyW');
+      }
 
       await client.page.screenshot({
         path: `tests/live-stage/pause-tick-audit-offline-${profile.touch ? 'phone' : 'pc'}-evidence.png`,
@@ -205,9 +225,10 @@ for (const [name, profile] of [
       await client.page.waitForFunction(() => window.__pauseStage!.read().open === false, undefined, {
         timeout: 10_000,
       });
+      const frozenAt = (await readPause(client.page)).simTicks;
       await client.page.waitForFunction(
         (prev) => window.__pauseStage!.read().simTicks > prev,
-        after.simTicks,
+        frozenAt,
         { timeout: 10_000 },
       );
 
