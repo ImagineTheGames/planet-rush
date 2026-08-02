@@ -157,6 +157,21 @@ export function shipTopSpeed(loadout: ShipLoadout): number {
   return applyTier(base, UPGRADES[UpgradeTrack.Engine], tierOf(loadout, UpgradeTrack.Engine));
 }
 
+/**
+ * Top speed of a hull *class alone*, before any engine ladder — the speed you
+ * can read off a silhouette.
+ *
+ * This is the fog-honest half of {@link shipTopSpeed}: a hull's class is public
+ * (GDD §2.11 — "a silhouette on the minimap is information"), the engine tiers
+ * bought onto it are not. So anything reasoning about a ship it has merely
+ * *seen* — the cornered read's blockader (`./blockade`), a chase, a stand-off —
+ * prices it from here and is honestly wrong in the safe direction: it
+ * under-estimates an upgraded engine rather than reading a stat it never scouted.
+ */
+export function classTopSpeed(shipClass: ShipClass): number {
+  return BASE_SPEED * SHIP_STATS[shipClass].speedMul;
+}
+
 /** Acceleration (units/s²) at full thrust — class multiplier over `BASE_ACCEL`,
  *  scaled by the *same* engine tier as top speed: one engine, both numbers. */
 export function shipAccel(loadout: ShipLoadout): number {

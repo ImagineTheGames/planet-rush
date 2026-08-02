@@ -45,3 +45,6 @@ export * from './damage';
 export * from './combat-view';
 // Read model: the per-player minimap fog-of-war sensed-set (radar satellite, f1).
 export * from './sensing';
+// Read model: is a safe point reachable, or is a ship parked on the road to it
+// (the cornered geometry, ratified p15).
+export * from './blockade';
