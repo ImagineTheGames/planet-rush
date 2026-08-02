@@ -440,10 +440,16 @@ export class LobbyView extends Container {
   }
 
   /**
-   * The TEAM chip — the seat's side (A…D, {@link LobbySeatView.teamLabel}), drawn
-   * in TEAMS on every non-closed seat and composed to the LEFT of the difficulty
-   * chip (n2), so it adds to the slot editor rather than replacing it. FFA is
-   * teams-of-one, so it is hidden there. Returns whether it was drawn.
+   * The TEAM chip — the seat's side, drawn in TEAMS on every non-closed seat and
+   * composed to the LEFT of the difficulty chip (n2), so it adds to the slot editor
+   * rather than replacing it. FFA is teams-of-one, so it is hidden there. Returns
+   * whether it was drawn.
+   *
+   * It carries the WORD — `TEAM A`, {@link LobbySeatView.teamName} — not the bare
+   * letter it used to. The developer played a teams match and could not tell who
+   * was on their side; a lone `A` on a roster chip is a legend nobody was given,
+   * and the in-match nameplates now say `TEAM A` in full (`./nameplates`), so the
+   * lobby says it the same way and a player learns the vocabulary before RUSH!.
    */
   private drawTeamChip(
     nodes: SeatNodes,
@@ -463,7 +469,7 @@ export class LobbyView extends Container {
       .fill({ color: PALETTE.hullSteel, alpha: 0.16 })
       .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
       .stroke({ width: 1, color: PALETTE.plasma, alpha: 0.85 });
-    nodes.teamChipLabel.text = seat.teamLabel;
+    nodes.teamChipLabel.text = seat.teamName;
     nodes.teamChipLabel.style.fill = TEXT_PRIMARY;
     nodes.teamChipLabel.x = chip.x + chip.width / 2;
     nodes.teamChipLabel.y = chip.y + chip.height / 2;

@@ -232,6 +232,7 @@ import type {
   MinimapFog,
   Nameable,
   NameTable,
+  TeamTable,
   SettingsState,
   SettingsTarget,
   MainMenuOption,
@@ -1617,6 +1618,11 @@ async function boot(): Promise<void> {
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
   let playerDifficulties: DifficultyTable = [];
+  /** Each slot's side, and whether the match has sides worth naming (m10 teams).
+   *  Rebuilt with the name table, from the same live world, on every boot and
+   *  rematch — so a rematch that changed the split relabels with it. */
+  let playerTeams: TeamTable = [];
+  let teamsMode = false;
 
   // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
   //     stations, ships, ore-field hints, the collapse ring — pooled and reused so
@@ -1679,6 +1685,34 @@ async function boot(): Promise<void> {
     }
     playerNames = table;
     playerDifficulties = tiers;
+    rebuildTeamTable();
+  }
+
+  /**
+   * Rebuild the per-slot side table from the LIVE WORLD (m10 teams).
+   *
+   * The world is the authority on allegiance in both form factors — offline it is
+   * the loopback's own authoritative world, online it is the predicted world
+   * `matchStart` built from the server's roster — so reading `ship.team` here means
+   * the `TEAM A` a player reads over a hull is the same number `areEnemies` uses to
+   * decide whether they can shoot it. Reading the lobby instead would let the label
+   * drift from the simulation, which is the exact class of bug this milestone is
+   * fixing.
+   *
+   * Sides are worth *naming* only when there are fewer sides than players: FFA is
+   * teams-of-one, where `ship.team === ship.id` for everyone and a label would just
+   * repeat the nameplate.
+   */
+  function rebuildTeamTable(): void {
+    const sides: (number | undefined)[] = [];
+    const distinct = new Set<number>();
+    for (const ship of world.ships) {
+      const side = ship.team ?? ship.id;
+      sides[ship.id] = side;
+      distinct.add(side);
+    }
+    playerTeams = sides;
+    teamsMode = distinct.size > 0 && distinct.size < world.ships.length;
   }
   rebuildNameTable();
 
@@ -2737,6 +2771,12 @@ async function boot(): Promise<void> {
     hudFrame.nameables = nameableFrame;
     hudFrame.names = playerNames;
     hudFrame.difficulties = playerDifficulties;
+    // The side each slot fights for, and whether to say it out loud (m10 teams).
+    // Read straight off the live world's ships rather than off the lobby, so the
+    // label and the friend/foe predicate can never disagree — the nameplate says
+    // exactly what `areEnemies` will act on.
+    hudFrame.playerTeams = playerTeams;
+    hudFrame.teamsMode = teamsMode;
   }
 
   /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */

@@ -37,6 +37,14 @@
  *    read through the SAME roster resolver [[station-hp]] and [[healthbar]] use, so
  *    a ship's trim, its bar and its name can never disagree. Never signal yellow
  *    or threat red — those are RESERVED (style-guide §2).
+ *  - **Which side, in words.** In TEAMS every label carries `TEAM A` / `TEAM B`
+ *    beside the name ({@link resolveTeamLabel}) — ratified by the developer after
+ *    a match they described as *"impossible to know who is on your team."* Colour
+ *    was never able to answer it: identity colour is per-SLOT (style-guide §3.1),
+ *    so a side owns no hue, and **colour alone is insufficient** is the
+ *    ratification. In FFA the label is empty on every plate — teams-of-one has no
+ *    side worth naming — so the free-for-all HUD is unchanged, character for
+ *    character.
  *  - **Fade under combat clutter.** A label over an entity that is damaged or
  *    fighting drops to {@link NAMEPLATE_FADE_ALPHA} so it never fights the health
  *    bar for the eye during a brawl (field request rule 3). It is *also* stacked
@@ -49,6 +57,7 @@
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import { playerColor } from './station-hp';
+import { teamName } from './lobby';
 
 // ---------------------------------------------------------------------------
 // Text policy
@@ -125,6 +134,15 @@ export interface Nameplate {
    *  separate from {@link text} precisely so the two can be weighted differently;
    *  it flows through the SAME per-slot seam the name does ({@link resolveDifficultySuffix}). */
   readonly suffix: string;
+  /**
+   * The owner's **side, in words** — `TEAM A` / `TEAM B` (ratified developer, m10
+   * teams) — or `''` in FFA and for any slot with no side on record.
+   *
+   * Kept separate from {@link text} and {@link suffix} for the same reason those
+   * two are separate from each other: the view weights them differently, and a
+   * test can assert *which* string is the team without parsing a run-on label.
+   */
+  readonly teamLabel: string;
   /** The owner's identity colour (style-guide §3), from the ratified roster. */
   readonly color: number;
   /** Entity centre, screen px — the view centres the label here and offsets it up. */
@@ -159,9 +177,29 @@ export type NameTable = readonly (string | undefined)[];
  */
 export type DifficultyTable = readonly (string | undefined)[];
 
+/**
+ * The per-slot **side** table, the third mirror of {@link NameTable} and fed
+ * through the same seam (m10 teams). Indexed by {@link PlayerId}; each entry is
+ * the raw team number the sim carries on that slot's ship
+ * (`Ship.team` / `src/sim/allegiance`), so the HUD reads sides from the SAME table
+ * targeting, friendly fire and spawn placement read them from — a nameplate can
+ * never claim an allegiance the simulation disagrees with.
+ *
+ * A slot with no entry shows no team label. Offline it is built from the booted
+ * world's roster; online from the server's `matchStart` slots — the same array
+ * either way, which is what makes the two form factors show the same sides.
+ */
+export type TeamTable = readonly (number | undefined)[];
+
 /** Tunable knobs for {@link nameplateModel}. All optional; the defaults are the
  *  field-request calls (own-ship label off, the two alpha levels above). */
 export interface NameplateOptions {
+  /**
+   * Show the `TEAM A` / `TEAM B` side label on every plate. **TEAMS only** — pass
+   * `mode === 'teams'`. Default false, so FFA (teams-of-one, where a "side" is
+   * just the player again) draws exactly the labels it always has.
+   */
+  readonly showTeamLabels?: boolean;
   /** Show the local player's OWN ship label. Default **false** — a name pinned to
    *  screen-centre reads as noise (field request rule 3; the own station is still
    *  labelled either way). Wire this to a settings toggle if a player disagrees. */
@@ -217,6 +255,28 @@ export function resolveDifficultySuffix(difficulties: DifficultyTable, owner: Pl
 }
 
 /**
+ * Resolve a slot's **side label** from the team table (m10 teams): `TEAM A` /
+ * `TEAM B`, the ratified wording, shared with the lobby roster (`./lobby`
+ * {@link teamName}) so the two screens name a side identically.
+ *
+ * Empty unless team labels are on — that is FFA's answer, and it is the whole of
+ * it: in teams-of-one every plate would read a different side, which is noise
+ * dressed as information. Empty too for a slot the table does not name, so a
+ * partially-known roster degrades to no claim rather than a wrong one.
+ */
+export function resolveTeamLabel(
+  teams: TeamTable,
+  owner: PlayerId,
+  opts: NameplateOptions = {},
+): string {
+  if (!(opts.showTeamLabels ?? false)) return '';
+  if (!isOwnedSlot(owner)) return '';
+  const side = teams[Math.floor(owner)];
+  if (typeof side !== 'number' || !Number.isFinite(side) || side < 0) return '';
+  return teamName(side);
+}
+
+/**
  * Whether this entity gets a label this frame, in one place so it can be
  * unit-tested: owned, alive, and — for the local ship only — not suppressed.
  */
@@ -240,6 +300,7 @@ export function nameplateModel(
   names: NameTable,
   opts: NameplateOptions = {},
   difficulties: DifficultyTable = [],
+  teams: TeamTable = [],
 ): Nameplate[] {
   const full = opts.fullAlpha ?? NAMEPLATE_FULL_ALPHA;
   const fade = opts.fadeAlpha ?? NAMEPLATE_FADE_ALPHA;
@@ -251,6 +312,7 @@ export function nameplateModel(
       kind: e.kind,
       text: resolveName(names, e.owner),
       suffix: resolveDifficultySuffix(difficulties, e.owner),
+      teamLabel: resolveTeamLabel(teams, e.owner, opts),
       color: playerColor(e.owner),
       x: e.pos.x,
       y: e.pos.y,

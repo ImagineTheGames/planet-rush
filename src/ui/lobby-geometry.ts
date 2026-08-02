@@ -194,14 +194,17 @@ export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /** Inset of the chip from the row's edges. */
 export const SEAT_CHIP_PAD = 3;
 
-/** Width of a roster row's TEAM chip (TEAMS only) — a single side letter (A…D),
- *  so it is narrow. It COMPOSES with the difficulty chip rather than replacing it
+/** Width of a roster row's TEAM chip (TEAMS only) — wide enough for the WORD,
+ *  `TEAM A`, which is what the chip carries since the developer reported a teams
+ *  match they could not read sides in (m10; a bare letter is a legend nobody was
+ *  given, and the in-match nameplates say it in full too).
+ *  It COMPOSES with the difficulty chip rather than replacing it
  *  (n2): laid out immediately left of the difficulty chip and always kept strictly
  *  right of the row's centre, so the row body stays tappable and the shared
  *  difficulty control keeps its place. In FFA a seat's side is its slot
  *  (teams-of-one), so the team chip is laid out but drawn away and a tap on it is a
  *  no-op in the model — the geometry stays mode-blind, the flow routes by mode. */
-export const SEAT_TEAM_CHIP_WIDTH = 30;
+export const SEAT_TEAM_CHIP_WIDTH = 64;
 
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;

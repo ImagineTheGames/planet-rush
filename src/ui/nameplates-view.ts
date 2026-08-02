@@ -68,6 +68,21 @@ export const NAMEPLATE_SUFFIX_GAP = 3;
  *  on the name's own alpha so it recedes in step through the combat fade too. */
 export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
 
+/** Horizontal gap between the name and the `TEAM A` side label that follows it,
+ *  CSS px — the same beat as the difficulty gap, so a plate reads as one row. */
+export const NAMEPLATE_TEAM_GAP = 4;
+/**
+ * How much dimmer the side label is than the name it trails.
+ *
+ * Deliberately close to full: the difficulty tag is metadata and recedes hard
+ * ({@link NAMEPLATE_SUFFIX_ALPHA}), but the side is the thing the developer could
+ * not read at all — *"impossible to know who is on your team"* — so it steps back
+ * from the name without ever becoming decoration. Applied as a factor on the
+ * plate's own alpha, so it fades in step through the combat fade like everything
+ * else in the row.
+ */
+export const NAMEPLATE_TEAM_ALPHA = 0.85;
+
 /**
  * One label the layer actually drew this frame (post-cull), captured only when
  * {@link NameplateView.enableDebugCapture} has been called — the ?debug=1
@@ -84,6 +99,10 @@ export interface DrawnNameplate {
   /** The recessive difficulty suffix drawn beside the name — `(HARD)` etc., or
    *  `''` for a human seat (field request v0.2.2). */
   suffix: string;
+  /** The side label drawn beside the name — `TEAM A` / `TEAM B` in TEAMS, `''` in
+   *  FFA (m10 teams). This is the readback a live-stage teams match asserts on:
+   *  proof the label a player is supposed to be able to read actually DREW. */
+  teamLabel: string;
   /** The tint (owner identity colour) applied. */
   color: number;
   /** Label centre-x in screen space, CSS px (the entity it tracks). */
@@ -99,6 +118,9 @@ export class NameplateView extends Container {
   /** Parallel pool for the recessive difficulty suffix, one per name slot; a name
    *  with no suffix (a human, or an unfed difficulty table) hides its entry. */
   private readonly suffixes: Text[] = [];
+  /** Parallel pool for the `TEAM A` side label, one per name slot; a plate with no
+   *  side (every plate in FFA) hides its entry. */
+  private readonly teamTags: Text[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew. */
   private drawnBounds: Rect | null = null;
 
@@ -127,6 +149,16 @@ export class NameplateView extends Container {
       t.tint = plate.color;
       t.alpha = plate.alpha;
 
+      // The side label (m10 teams) — `TEAM A`, in words, immediately after the
+      // name, because colour cannot say it: identity colour is per-SLOT, so a side
+      // has no hue of its own (style-guide §3.1; "colour alone insufficient",
+      // ratified). Empty in FFA, where every plate would otherwise read a different
+      // side and say nothing.
+      const tm = this.teamSlot(drawn);
+      if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
+      const hasTeam = plate.teamLabel.length > 0;
+      const teamWidth = hasTeam ? NAMEPLATE_TEAM_GAP + tm.width : 0;
+
       // The recessive difficulty suffix (field request v0.2.2), trailing the name
       // in the owner colour but a step dimmer, so it reads as metadata not identity.
       const st = this.suffixSlot(drawn);
@@ -140,26 +172,35 @@ export class NameplateView extends Container {
       const width = t.width;
       const height = t.height;
       const left = plate.x - width / 2;
-      // The suffix hangs off the name's right edge, so the drawn unit runs a touch
-      // wider than the name alone — cull and bounds must count it as one piece.
-      const right = left + width + suffixWidth;
+      // Side label and suffix hang off the name's right edge, so the drawn unit
+      // runs wider than the name alone — cull and bounds count it as one piece.
+      const right = left + width + teamWidth + suffixWidth;
       const top = bottom - height;
 
       // Cull anything that would spill off the canvas: a partial label reads worse
       // than none, and a clipped rect would break the `full` contract.
       if (left < 0 || top < 0 || right > viewportWidth || top + height > viewportHeight) {
+        tm.visible = false;
         st.visible = false;
         continue;
       }
 
       t.visible = true;
       t.position.set(plate.x, bottom);
+      if (hasTeam) {
+        tm.visible = true;
+        tm.tint = plate.color;
+        tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
+        tm.position.set(left + width + NAMEPLATE_TEAM_GAP, bottom);
+      } else {
+        tm.visible = false;
+      }
       if (hasSuffix) {
         st.visible = true;
         st.tint = plate.color;
         st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
-        // Left-anchored just past the name's right edge, sharing its baseline.
-        st.position.set(left + width + NAMEPLATE_SUFFIX_GAP, bottom);
+        // Left-anchored past the name and its side label, sharing their baseline.
+        st.position.set(left + width + teamWidth + NAMEPLATE_SUFFIX_GAP, bottom);
       } else {
         st.visible = false;
       }
@@ -209,7 +250,7 @@ export class NameplateView extends Container {
   private recordDebug(i: number, plate: Nameplate, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, color: plate.color, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, color: plate.color, x: plate.x, y: top, local: plate.local };
       this.debugDrawn[i] = d;
       return;
     }
@@ -217,6 +258,7 @@ export class NameplateView extends Container {
     d.kind = plate.kind;
     d.text = plate.text;
     d.suffix = plate.suffix;
+    d.teamLabel = plate.teamLabel;
     d.color = plate.color;
     d.x = plate.x;
     d.y = top;
@@ -276,6 +318,22 @@ export class NameplateView extends Container {
     return t;
   }
 
+  /** The pooled `TEAM A` Text for name slot `i` — same left anchor and baseline as
+   *  the difficulty suffix, and pooled the same way (m10 teams). */
+  private teamSlot(i: number): Text {
+    let t = this.teamTags[i];
+    if (!t) {
+      t = new Text({
+        text: '',
+        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: 0.5 },
+      });
+      t.anchor.set(0, 1);
+      this.teamTags[i] = t;
+      this.addChild(t);
+    }
+    return t;
+  }
+
   private hideFrom(count: number): void {
     for (let i = count; i < this.labels.length; i++) {
       const t = this.labels[i];
@@ -283,6 +341,10 @@ export class NameplateView extends Container {
     }
     for (let i = count; i < this.suffixes.length; i++) {
       const t = this.suffixes[i];
+      if (t) t.visible = false;
+    }
+    for (let i = count; i < this.teamTags.length; i++) {
+      const t = this.teamTags[i];
       if (t) t.visible = false;
     }
   }

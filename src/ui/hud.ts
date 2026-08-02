@@ -82,7 +82,7 @@ import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
 import { nameplateModel } from './nameplates';
-import type { DifficultyTable, Nameable, NameTable } from './nameplates';
+import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
 import type { DrawnNameplate } from './nameplates-view';
 import { tapMarkersModel } from './tap-markers';
@@ -305,6 +305,19 @@ export interface HudFrame {
    *  bot seat's tier becomes a recessive `(EASY)`/`(MEDIUM)`/`(HARD)` suffix, a
    *  human seat is left empty so it shows none. Default: none ⇒ no suffixes. */
   readonly difficulties?: DifficultyTable;
+  /**
+   * Per-slot **side** table, the third mirror of {@link names} (m10 teams): the
+   * raw `team` the sim carries on that slot's ship, turned into a `TEAM A` /
+   * `TEAM B` label beside the name when {@link teams} mode is on.
+   *
+   * Default: none ⇒ no side labels, which is also FFA's answer. Fed from the
+   * booted world's own roster, so the HUD names a side from the same number
+   * targeting and friendly fire read (`src/sim/allegiance`).
+   */
+  readonly playerTeams?: TeamTable;
+  /** TEAMS mode — the gate on the side labels above. FFA is teams-of-one, where a
+   *  side label would repeat the player and inform nobody. Default false. */
+  readonly teamsMode?: boolean;
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
@@ -347,6 +360,8 @@ const NO_COMBATANTS: readonly Combatant[] = [];
 const NO_NAMEABLES: readonly Nameable[] = [];
 const NO_NAMES: NameTable = [];
 const NO_DIFFICULTIES: DifficultyTable = [];
+/** Shared empty side table — no slot has a side, so no plate carries a label. */
+const NO_TEAMS: TeamTable = [];
 
 /** Fallback screen radius for the own-ship over-bar when the frame carries no
  *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
@@ -1016,8 +1031,15 @@ export class Hud extends Container {
     const plates = nameplateModel(
       entities,
       frame.names ?? NO_NAMES,
-      { showOwnShipLabel: frame.showOwnShipLabel ?? false },
+      {
+        showOwnShipLabel: frame.showOwnShipLabel ?? false,
+        // Side labels are TEAMS-only (m10 teams) — in FFA every plate would carry
+        // a different side and tell a player nothing they did not already read
+        // from the name.
+        showTeamLabels: frame.teamsMode ?? false,
+      },
       frame.difficulties ?? NO_DIFFICULTIES,
+      frame.playerTeams ?? NO_TEAMS,
     );
     this.nameplates.update(plates, this.screenWidth, this.screenHeight);
   }

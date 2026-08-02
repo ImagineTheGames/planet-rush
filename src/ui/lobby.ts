@@ -142,6 +142,26 @@ export function teamLabel(team: number): string {
   return TEAM_LABELS[Math.floor(team) % TEAM_LABELS.length]!;
 }
 
+/** The word the roster chip carries, so a lone letter never has to be decoded. */
+export const TEAM_WORD = 'TEAM';
+
+/**
+ * A side's **player-facing name** — `TEAM A`, `TEAM B` — the one string both the
+ * lobby roster and the in-match nameplates show (`./nameplates`).
+ *
+ * Ratified by the developer after playing a TEAMS match: *"impossible to know who
+ * is on your team."* Colour could not answer that and was never going to — the
+ * eight identity colours are per-SLOT (style-guide §3.1), so a side has no hue of
+ * its own to read, and the bare letter on the lobby chip did not survive the trip
+ * into a fight. The label is words, over every nameplate, in both form factors:
+ * **colour alone is insufficient** is the ratification, and this function is the
+ * single place the wording lives so the lobby and the battlefield can never
+ * disagree about what a side is called.
+ */
+export function teamName(team: number): string {
+  return `${TEAM_WORD} ${teamLabel(team)}`;
+}
+
 /** The default side a slot starts on when TEAMS is picked: alternating by slot,
  *  so any active count of two or more already has both sides manned (an even
  *  split at 4v4, 2v1 at three, 1v1 at two) — the host re-assigns from there. A
@@ -1017,6 +1037,11 @@ export interface LobbySeatView {
   /** …and its label (`A`…`D`), so the row reads the team with the hue removed —
    *  colour is identity, the letter is the team (style-guide §3 rule 3). */
   readonly teamLabel: string;
+  /** …and the same side as the WORD a player reads — `TEAM A` (ratified developer,
+   *  m10: *"impossible to know who is on your team"*). The chip carries this rather
+   *  than the bare letter, and the in-match nameplates carry the identical string
+   *  ({@link teamName}), so the roster and the battlefield teach one vocabulary. */
+  readonly teamName: string;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
   /**
@@ -1140,6 +1165,7 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
+    teamName: teamName(seat.team),
     // An open seat stops being claimable the moment the match starts; a seat the
     // server has already seated a bot in was never claimable to begin with; a
     // closed seat is a shut door; and offline there is no wire for a second player
