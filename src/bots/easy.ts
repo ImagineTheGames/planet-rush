@@ -28,10 +28,12 @@ import { SHIELD, TURRET } from '../sim';
 import type { Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
+  corneredBlockader,
   coreUnderFinalAssault,
   defendHome,
   engage,
   haulHome,
+  fightBlockade,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -42,6 +44,7 @@ import {
   scavenge,
   spendAtHome,
   upgrade,
+  wantsCorneredFight,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -115,6 +118,20 @@ export const easyTree: Node = selector('easy', [
   // A core under final assault outranks even an over-defender's own skin
   // (v0.2.2 field report): above the retreat, and interrupts a committed one.
   when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // Cornered: the road home runs through the ship that is scaring it (developer
+  // report p15, ratified). Fear says back off, home says come through, and the
+  // two cancel on the line between them — so the bot stops asking and FIGHTS,
+  // for a committed window with its nerve switched off (`./cornered`). Above the
+  // retreat, because it is the branch that says the retreat does not exist.
+  when(
+    'cornered-fight',
+    (ctx) => wantsCorneredFight(ctx),
+    (ctx) => {
+      const blockader = corneredBlockader(ctx);
+      return blockader ? fightBlockade(ctx, blockader) : null;
+    },
+  ),
 
   // "retreats at half hull" — above everything except being alive and the last
   // stand. Latched so it does not flap: once an Easy bot turns to run it commits
