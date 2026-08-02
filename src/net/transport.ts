@@ -33,6 +33,10 @@
 //     shared `InputQueue` (./input-queue.ts) on the authoritative side.
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
+// Type-only, so this file stays fully erasable: the mode union is the sim's own
+// (`MatchConfig`), because the lobby, the wire and the world must all spell the
+// two modes identically or "TEAMS" means something different at each hop.
+import type { MatchMode } from '../sim/match-config';
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -98,6 +102,35 @@ export interface LobbyChoiceMessage {
   fireMode: FireMode;
   /** Only honored from the room creator; ignored otherwise (GDD §4.2). */
   botDifficulties?: readonly BotDifficulty[];
+  /**
+   * The match MODE the host's lobby is on — FFA or TEAMS (GDD §2.1).
+   *
+   * A room is *allocated* with an advertised mode (`src/net/ticket`, the room ad),
+   * but the mode toggle lives in the lobby and the host may flip it after the room
+   * exists. Without this the server never hears about it: the room stays FFA, every
+   * seat keeps `team === player`, and a lobby that says TEAMS builds a
+   * free-for-all world — the developer's "everyone attacked me and I could attack
+   * everyone." Honored from the room creator only, like {@link botDifficulties};
+   * absent from a joiner and from a pre-teams client, which reads as "no opinion."
+   */
+  mode?: MatchMode;
+  /**
+   * The host's per-seat TEAM assignment, indexed by slot id (0..7) — the lobby's
+   * team chips, on the wire.
+   *
+   * Allegiance is static match config, so it rides this low-frequency lobby
+   * message and costs the streamed snapshot zero bytes (GDD §4.2, spike §S2 Trap
+   * 7): the server stamps it onto its seats, echoes it in `lobbyState`, and hands
+   * it to `createWorld` and to `matchStart` at RUSH! so every client's predicted
+   * world groups allies exactly as authority does.
+   *
+   * Only meaningful in TEAMS; in FFA the server forces teams-of-one regardless of
+   * what arrives here, so a stale array can never regroup a free-for-all. Honored
+   * from the room creator only — a joiner cannot re-side the room. Entries are
+   * plain side numbers, compared for EQUALITY alone (`src/sim/allegiance`), so
+   * only which seats share a value matters, never the value itself.
+   */
+  teams?: readonly number[];
 }
 
 /** The room creator starts the match (fills empty slots with bots server-side). */

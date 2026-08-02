@@ -44,6 +44,23 @@ export interface MatchBootConfig {
   readonly mapId?: string;
   /** Slots in the match. Defaults to the design's eight (GDD §2.1). */
   readonly slots?: number;
+  /**
+   * Which side each seat fights for, indexed by player id — the lobby's TEAMS
+   * assignment, in the dense order `createWorld` builds its roster in
+   * (`src/sim/match-config` `configToPlayers`; m10 teams-wire).
+   *
+   * Omitted — under `?debug=1`, in the harness, and in every FFA match — each ship
+   * defaults to its own side at world-build (`makeShip`), which IS free-for-all, so
+   * the offline game is byte-identical to before. Supplied, it is the one thing that
+   * makes an offline TEAMS match a teams match: the sim asks "are these two enemies?"
+   * through a single `team` comparison (`src/sim/allegiance`), so allies stop being
+   * targetable, their shots stop landing, and their homes spawn adjacent — all from
+   * this table and nothing else.
+   *
+   * A seat the table does not name keeps its default (its own side), so a short or
+   * absent table can never crash a boot, only leave a seat in FFA.
+   */
+  readonly teams?: readonly number[];
   /** Fixed timestep. Defaults to the sim's canonical 60 Hz tick. */
   readonly dt?: number;
 }
@@ -81,6 +98,16 @@ export function bootOfflineMatch(config: MatchBootConfig): MatchBoot {
     ...botLobby(seats),
   ];
   roster.sort((a, b) => a.id - b.id);
+  // Stamp the lobby's sides onto the roster (m10 teams-wire). Only the `team` is
+  // taken from the table — the hull stays whatever seated the slot, so a bot keeps
+  // flying its character's silhouette (style-guide §4) while changing sides.
+  const teams = config.teams;
+  if (teams) {
+    for (let i = 0; i < roster.length; i++) {
+      const side = teams[roster[i]!.id];
+      if (side !== undefined) roster[i] = { ...roster[i]!, team: side };
+    }
+  }
 
   const transport = new LocalLoopback({
     match: {

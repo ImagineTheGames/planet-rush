@@ -27,7 +27,7 @@
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
 import { TICK_DT, createWorld } from '../sim';
-import type { World } from '../sim';
+import type { MatchMode, World } from '../sim';
 import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
@@ -274,17 +274,22 @@ export class TransportSession implements MatchSession {
   }
 
   /** Send the lobby choice: hull, fire mode, and — honoured only from the room
-   *  creator — the bots' difficulties (GDD §2.1, §2.11, §4.2). */
+   *  creator — the bots' difficulties, the match MODE and the per-seat TEAM
+   *  assignment (GDD §2.1, §2.11, §4.2; m10 teams-wire). */
   chooseInLobby(options: {
     shipClass: ShipClass;
     fireMode?: FireMode;
     botDifficulties?: readonly BotDifficulty[];
+    mode?: MatchMode;
+    teams?: readonly number[];
   }): void {
     this.transport.send({
       type: 'lobbyChoice',
       shipClass: options.shipClass,
       fireMode: options.fireMode ?? 'manual',
       ...(options.botDifficulties ? { botDifficulties: options.botDifficulties } : {}),
+      ...(options.mode ? { mode: options.mode } : {}),
+      ...(options.teams ? { teams: options.teams } : {}),
     });
   }
 
@@ -869,11 +874,14 @@ function readOptionalString(transport: unknown, key: string): string | null {
 
 /** An online session, with the two lobby gestures a room needs. */
 export interface OnlineSession extends MatchSession {
-  /** Re-send the lobby choice (hull, fire mode, bot difficulties). */
+  /** Re-send the lobby choice (hull, fire mode, bot difficulties, and — from the
+   *  host — the match mode and the per-seat team assignment). */
   chooseInLobby(options: {
     shipClass: ShipClass;
     fireMode?: FireMode;
     botDifficulties?: readonly BotDifficulty[];
+    mode?: MatchMode;
+    teams?: readonly number[];
   }): void;
   /** RUSH! — the room creator starts the match. */
   startMatch(): void;

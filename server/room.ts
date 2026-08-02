@@ -335,8 +335,17 @@ export class MatchRoom {
   readonly code: RoomCode;
 
   private readonly slots: Slot[];
-  /** The room's advertised mode (Task C3); `'ffa'` unless the lobby said teams. */
-  private readonly matchMode: MatchMode;
+  /**
+   * The room's advertised mode (Task C3); `'ffa'` unless the lobby said teams.
+   *
+   * Settable, and it has to be: a room is *allocated* with a mode, but the mode
+   * toggle lives in the lobby and the host may flip it after the room exists
+   * (`lobbyChoice.mode`, m10 teams-wire). Before that this was `readonly`, so an
+   * online room could never be anything but FFA — the lobby said TEAMS, the room
+   * ad said FFA, and the world was built teams-of-one. Lobby-phase only; once the
+   * match is live the mode is the world's, not the room's.
+   */
+  private matchMode: MatchMode;
   private readonly queue = new InputQueue();
   private readonly statics = new StaticEntityTracker();
   /** Watches every ship's `alive` flag so a death and a respawn reach the clients
@@ -673,10 +682,15 @@ export class MatchRoom {
       case 'lobbyChoice':
         if (this.phase !== 'lobby') return; // a hull is locked for the match (§2.11)
         slot.shipClass = message.shipClass;
-        // Only the room creator picks the bots' difficulties (GDD §4.2).
+        // Only the room creator picks the bots' difficulties (GDD §4.2)…
         if (player === this.creator && message.botDifficulties) {
           this.botDifficulties = message.botDifficulties;
         }
+        // …and only the creator shapes the match: the MODE and the per-seat SIDE
+        // (m10 teams-wire). A joiner's copy of either is their own screen's local
+        // state and is ignored here, or a guest could re-side the room under the
+        // host.
+        if (player === this.creator) this.applyTeamConfig(message.mode, message.teams);
         this.broadcastLobby();
         break;
       case 'startMatch':
@@ -809,10 +823,43 @@ export class MatchRoom {
   // --- The match ----------------------------------------------------------
 
   /**
+   * Fold the host's match SHAPE into the room: the mode, and the per-seat side
+   * (m10 teams-wire, GDD §2.1). Lobby-phase only, creator-only — the caller has
+   * already checked both.
+   *
+   * This is the hop that was missing. Every other link in the chain was already
+   * built: `Slot.team` existed, `matchStart` carried it, `createWorld` consumed
+   * it, and the client threaded it into its predicted world. But nothing ever
+   * *wrote* it — every seat kept the teams-of-one `team = player` it was
+   * constructed with — so a TEAMS lobby produced a free-for-all world and the
+   * developer's report followed exactly: everyone attacked me, and I could attack
+   * everyone.
+   *
+   * **FFA is enforced, not assumed.** In FFA every seat is put back on its own
+   * side unconditionally, so a stale array from a host who flipped TEAMS → FFA
+   * cannot leave allies behind in a free-for-all. A seat the array does not name
+   * keeps the side it had; the values are compared for equality alone
+   * (`src/sim/allegiance`), so only which seats share one matters.
+   */
+  private applyTeamConfig(mode: MatchMode | undefined, teams: readonly number[] | undefined): void {
+    if (mode !== undefined) this.matchMode = mode;
+    if (this.matchMode === 'ffa') {
+      for (const slot of this.slots) slot.team = slot.player;
+      return;
+    }
+    if (!teams) return;
+    for (const slot of this.slots) {
+      const side = teams[slot.player];
+      if (side === undefined) continue;
+      slot.team = side;
+    }
+  }
+
+  /**
    * RUSH! (GDD §2.1). Every seat without a human becomes a bot — server-side,
    * so a three-human classroom match is still an eight-station war (GDD §4.2) —
    * and the world is built from the lobby as it stands, so a hull picked a
-   * moment ago is the hull that spawns.
+   * moment ago is the hull that spawns — and the side the host put it on.
    */
   startMatch(): void {
     if (this.phase !== 'lobby') return;
