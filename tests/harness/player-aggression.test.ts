@@ -50,8 +50,14 @@ import { createBot } from '../../src/bots/bot';
 import { botInputs, createBots, runHeadlessMatch } from '../../src/bots/harness';
 import type { BotView } from '../../src/bots/perception';
 import { mediumTarget } from '../../src/bots/medium';
-import type { PersonalityId } from '../../src/bots/personalities';
-import { Difficulty, PERSONALITIES, ROSTER, rosterAt } from '../../src/bots/personalities';
+import type { DifficultyTuning, PersonalityId } from '../../src/bots/personalities';
+import {
+  DIFFICULTY_TUNING,
+  Difficulty,
+  PERSONALITIES,
+  ROSTER,
+  rosterAt,
+} from '../../src/bots/personalities';
 import {
   bestTarget,
   homeIntruder,
@@ -68,6 +74,10 @@ const SEEDS = Array.from({ length: 10 }, (_, i) => i + 1);
 /** Sim seconds per match. Long enough to clear spawn protection, run several ore
  *  waves, and let the cast go looking for fights. */
 const MATCH_SECS = 180;
+/** The appetite the p15 note ratified for HARD ("seek the fight more"). It is
+ *  measured here, not shipped — see the A/B gate at the foot of this file and
+ *  `docs/bot-player-aggression-p15.md` §3. */
+const RATIFIED_APPETITE = 1.6;
 
 // ---------------------------------------------------------------------------
 // The scripted human
@@ -247,6 +257,20 @@ interface Tally {
    *  besieger sitting outside the home ring, say) is invisible in the victim
    *  tallies but very visible here. */
   readonly leaves: Map<string, number>;
+  /**
+   * Decisions spent engaging the HUMAN, split by the **attacker's tier**.
+   *
+   * The aggregate human column answers "how much fire do I draw"; this answers
+   * the ratified question, which is narrower — *"Hard enemies should attack
+   * more"*. In a mixed roster only some seats are Hard, and the tiers do not
+   * move together: a change to Hard's appetite reaches Easy and Medium seats
+   * only through the world it leaves them (different rocks mined, different
+   * rivals still alive), so an aggregate that fell can still be hiding a Hard
+   * column that rose, and vice versa.
+   */
+  readonly humanDwellByTier: Map<Difficulty, number>;
+  /** Initiations on the HUMAN, split by the attacker's tier. */
+  readonly humanInitByTier: Map<Difficulty, number>;
 }
 
 function newTally(): Tally {
@@ -261,6 +285,8 @@ function newTally(): Tally {
     alive: new Array(SLOTS).fill(0),
     eliminatedAt: new Array(SLOTS).fill(Number.POSITIVE_INFINITY),
     leaves: new Map(),
+    humanDwellByTier: new Map(),
+    humanInitByTier: new Map(),
   };
 }
 
@@ -290,6 +316,13 @@ function instrument(bots: readonly Bot[], tally: Tally): void {
         if (victim !== previous) {
           tally.initiations[victim]!++;
           if (view.time < tally.firstAttack[victim]!) tally.firstAttack[victim] = view.time;
+        }
+        if (victim === HUMAN) {
+          const tier = bot.brain.personality.difficulty;
+          tally.humanDwellByTier.set(tier, (tally.humanDwellByTier.get(tier) ?? 0) + 1);
+          if (victim !== previous) {
+            tally.humanInitByTier.set(tier, (tally.humanInitByTier.get(tier) ?? 0) + 1);
+          }
         }
         lastVictim.set(bot.seat.id, victim);
       }
@@ -354,7 +387,27 @@ function castFor(cast: Cast): PersonalityId[] {
   return seats;
 }
 
-function measure(tier: Cast, probe: Probe, seed: number, tally: Tally): void {
+/**
+ * The A/B arm: force every bot's appetite (`DifficultyTuning.aggression`) to a
+ * given value, so the ratified p15 tuning can be measured against the build it
+ * replaced *in the same process, on the same seeds*. `null` means "run the
+ * shipped table", which is the only arm the report columns are quoted from.
+ *
+ * Written straight onto the brain because that is where the tree reads it
+ * (`buildCtx` — `ctx.tuning` IS `brain.tuning`), and nothing about the match is
+ * touched beyond it: same seeds, same cast, same world.
+ */
+type Appetite = number | null;
+
+function forceAppetite(bots: readonly Bot[], appetite: Appetite): void {
+  if (appetite === null) return;
+  for (const bot of bots) {
+    const brain = bot.brain as { tuning: DifficultyTuning };
+    brain.tuning = { ...brain.tuning, aggression: appetite };
+  }
+}
+
+function measure(tier: Cast, probe: Probe, seed: number, tally: Tally, appetite: Appetite): void {
   const cast = castFor(tier);
   const seats: BotSeat[] = [];
   for (let id = 0, k = 0; id < SLOTS; id++) {
@@ -371,12 +424,14 @@ function measure(tier: Cast, probe: Probe, seed: number, tally: Tally): void {
 
   const world = createWorld({ seed, players });
   const bots = createBots(seats, { seed });
+  forceAppetite(bots, appetite);
   instrument(bots, tally);
 
   // The clone probe flies the same tree the cast does, so behaviour is held
   // constant and only the seat differs.
   const clone: Bot | null =
     probe === 'clone' ? createBot({ id: HUMAN, personality: cast[0]! }, { seed }) : null;
+  if (clone) forceAppetite([clone], appetite);
   const extraInputs = (w: World): Inputs =>
     clone ? botInputs(w, [clone]) : [{ id: HUMAN, actions: playerPilot(w, HUMAN) }];
 
@@ -390,14 +445,14 @@ function measure(tier: Cast, probe: Probe, seed: number, tally: Tally): void {
   tally.played += result.seconds;
 }
 
-/** Run every seed for one (tier, probe) and return the summed tally. */
+/** Run every seed for one (tier, probe, arm) and return the summed tally. */
 const runCache = new Map<string, Tally>();
-function sweep(tier: Cast, probe: Probe): Tally {
-  const key = `${tier}:${probe}`;
+function sweep(tier: Cast, probe: Probe, appetite: Appetite = null): Tally {
+  const key = `${tier}:${probe}:${appetite ?? 'shipped'}`;
   const cached = runCache.get(key);
   if (cached) return cached;
   const tally = newTally();
-  for (const seed of SEEDS) measure(tier, probe, seed, tally);
+  for (const seed of SEEDS) measure(tier, probe, seed, tally, appetite);
   runCache.set(key, tally);
   return tally;
 }
@@ -519,5 +574,73 @@ describe('bots fight the human, not just each other (p15)', () => {
       expect(contact).toBeLessThan(MATCH_SECS);
       expect(attacked).toBeLessThan(contact + N_MINUTES * 60);
     }
+  }, 300_000);
+
+  it('the ratified HARD appetite raise costs the player fire in the shipped roster', () => {
+    // The brief's point 3, as a standing A/B. Both arms run the same seeds in
+    // the same process and differ only by `DifficultyTuning.aggression`, so the
+    // delta is the dial and nothing else. The shipped arm is the table as it
+    // stands (every tier 1.0); the raised arm is the value the note ratified.
+    const control = sweep(Difficulty.Hard, 'player');
+    const raised = sweep(Difficulty.Hard, 'player', RATIFIED_APPETITE);
+    const rosterControl = sweep('roster', 'player');
+    const rosterRaised = sweep('roster', 'player', RATIFIED_APPETITE);
+
+    const share = (t: Tally): number => {
+      const hull = columns(t, 'hullDamage').human;
+      const struct = columns(t, 'structureDamage').human;
+      return hull / Math.max(1e-9, hull + struct);
+    };
+    /** Who is doing the attacking, per minute the human is alive — the ratified
+     *  ask is about HARD seats, and in a mixed roster they are a minority. */
+    const attackers = (t: Tally): string => {
+      const per = (n: number): string => ((60 * n) / Math.max(1e-9, t.alive[HUMAN]!)).toFixed(1);
+      return TIERS.map(
+        (tier) =>
+          `${tier} ${per(t.humanInitByTier.get(tier) ?? 0)}/${per(t.humanDwellByTier.get(tier) ?? 0)}`,
+      ).join('  ');
+    };
+    const row = (label: string, t: Tally): string =>
+      `  ${label.padEnd(16)}${columns(t, 'initiations').human.toFixed(1).padStart(6)}` +
+      `${columns(t, 'dwell').human.toFixed(0).padStart(7)}` +
+      `${columns(t, 'hullDamage').human.toFixed(1).padStart(8)}` +
+      `${columns(t, 'structureDamage').human.toFixed(1).padStart(8)}` +
+      `${(100 * share(t)).toFixed(0).padStart(7)}%` +
+      `   human alive ${(t.alive[HUMAN]! / SEEDS.length).toFixed(0)}s   by attacker (init/dwell): ${attackers(t)}`;
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n[p15] HARD appetite A/B — on the HUMAN, per minute ALIVE\n` +
+        `                    init  dwell    hull  struct  on-ship\n` +
+        `${row('hard 1.0', control)}\n${row(`hard ${RATIFIED_APPETITE}`, raised)}\n` +
+        `${row('roster 1.0', rosterControl)}\n${row(`roster ${RATIFIED_APPETITE}`, rosterRaised)}`,
+    );
+
+    // What ships: the dial exists, and it is a no-op everywhere. This branch
+    // changes no bot's behaviour — the measurement below is why.
+    for (const tier of TIERS) expect(DIFFICULTY_TUNING[tier].aggression).toBe(1);
+
+    // In an ALL-HARD cast the raise does what the note wanted: more hull damage
+    // on the player, and the fire stays on their ship rather than moving to
+    // their home. This half of the finding is real and is why the dial is kept.
+    expect(columns(raised, 'hullDamage').human).toBeGreaterThan(
+      columns(control, 'hullDamage').human,
+    );
+    expect(share(raised)).toBeGreaterThanOrEqual(share(control));
+
+    // And in the SHIPPED roster — the cast a solo player actually meets, and the
+    // condition the report was written under — the same raise does the opposite:
+    // the player draws LESS fire, and it is the Hard seats themselves that back
+    // off (their initiations on the human fall by more than a third). A Hard bot
+    // with a cheaper attack floor spends it on the softest hull in range, and in
+    // a mixed roster that is an Easy or Medium bot, not a juking human.
+    //
+    // This gate pins the finding, not a preference. If it ever fails, the raise
+    // has stopped being harmful and §3 of `docs/bot-player-aggression-p15.md`
+    // needs re-measuring before the Director's answer changes.
+    expect(columns(rosterRaised, 'hullDamage').human).toBeLessThan(
+      columns(rosterControl, 'hullDamage').human,
+    );
+    const hardInit = (t: Tally): number => t.humanInitByTier.get(Difficulty.Hard) ?? 0;
+    expect(hardInit(rosterRaised)).toBeLessThan(hardInit(rosterControl));
   }, 300_000);
 });

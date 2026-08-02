@@ -73,36 +73,65 @@ does not ask for it. **Director: this dial, not the targeting ladder, is what
 is Hard's `aimLatency` (0.20 s) / `aimJitter` (0.05), and the harness above
 measures the result in one run.
 
-## 3. The ratified appetite tuning: built, measured, NOT shipped
+## 3. The ratified appetite tuning: built, measured, shipped at 1.0
 
-Implemented exactly as the note specifies — one Hard-only tier knob
-(`DifficultyTuning.aggression`, Easy and Medium left at 1.0, "EASY stays timid")
-moving the three named dials, each a no-op at 1.0:
+Implemented exactly as the note specifies — one tier knob
+(`DifficultyTuning.aggression`) that the note raises for Hard alone, leaving Easy
+and Medium where they are ("EASY stays timid"), moving the three named dials,
+each a no-op at 1.0:
 
 - **initiation range** — `hardAttackFloor` divided by the appetite (0.34 → 0.21);
 - **siege willingness** — an enemy home's score leaned up against a duel;
 - **target-the-leader weighting** — the owner's standing counted for more inside
   a home's threat term.
 
-Measured A/B, all-Hard cast, per minute the human is alive, **both arms carrying
-the wedge fix of §4** so the comparison isolates the tuning:
+The last two were measured and dropped first: at appetite 1.6 they move fire off
+the player's *ship* (−19%) and onto their *home* (+12%), and a Hard bot that
+stops duelling reads as **less** interested in you — the exact complaint. What
+remains in the tree is the initiation range, the half that answers the note
+directly, and it is the arm every number below is quoted from.
 
-| arm | initiations | dwell | hull dmg | struct dmg | total dmg | human survives |
+The dial ships at **1.0 in every tier** — present, wired, and a no-op. The A/B is
+a standing test (`tests/harness/player-aggression.test.ts`), both arms on the
+same seeds in the same process, per minute the human is alive:
+
+| arm | initiations | dwell | hull dmg | struct dmg | on their ship | human survives |
 | --- | --- | --- | --- | --- | --- | --- |
-| shipped (appetite 1.0) | 24.9 | 644 | 91.3 | 50.7 | 142.0 | 99 s |
-| appetite 1.6, full | 17.2 | 626 | 73.7 | 56.6 | 130.3 | 98 s |
-| appetite 1.6, floor only | 21.8 | 734 | 106.7 | 48.0 | 154.7 | 110 s |
+| all-Hard cast, 1.0 | 24.9 | 644 | 91.3 | 50.7 | 64% | 99 s |
+| all-Hard cast, **1.6** | 25.2 | 728 | **105.4** | 49.5 | 68% | 104 s |
+| shipped roster, 1.0 | 13.7 | 413 | 58.3 | 8.1 | 88% | 180 s |
+| shipped roster, **1.6** | 10.5 | 321 | **46.2** | 3.6 | 93% | 180 s |
 
-**It does not deliver.** Total fire on the player moves −8% (full) to +9% (floor
-only), the human's life expectancy does not move, and what the dial really does
-is trade duels for sieges: at the full setting the fire on the player's *ship*
-drops 19% while the fire on their *home* rises 12%. A Hard bot that stops
-duelling reads as *less* interested in you — the exact complaint being answered.
+**The raise works in the cast nobody plays and backfires in the cast everybody
+does.** Against an all-Hard cast it delivers what the note asked for: +15% hull
+damage on the player, +13% dwell, and the fire stays on their *ship*. Against the
+shipped mixed roster — what `fillEmptySlots` seats for a solo offline player, and
+the condition the report was written under — the same number costs the player
+**21% of the hull damage they draw**.
 
-Shipping a ratified behaviour change that measurably fails its own goal is worse
-than reporting it, so `src/bots/` is untouched by this PR. The dials, the values,
-and this table are the whole implementation; re-landing it is an afternoon if the
-Director wants it anyway.
+It is not a bookkeeping artefact of the other tiers. Split by *who is attacking*,
+per minute the human is alive (initiations / dwell), it is the Hard seats
+themselves that back off:
+
+| roster arm | easy | medium | **hard** |
+| --- | --- | --- | --- |
+| 1.0 | 0.7 / 15.0 | 5.5 / 196.9 | **7.6 / 201.5** |
+| 1.6 | 0.8 / 14.5 | 5.0 / 154.0 | **4.7 / 152.3** |
+
+Hard's initiations on the human fall **38%**. The mechanism is the floor itself: a
+Hard bot with a cheaper attack floor prices *more* targets as worth the trip and
+spends the difference on the **softest hull in range**. In an all-Hard cast every
+rival is equally tough, so the extra appetite lands on the human; in a mixed
+roster there are Easy and Medium hulls to pick off instead, and a juking human is
+the *least* attractive thing on the board. Making Hard hungrier makes it hunt
+easier prey than you.
+
+**Director:** the ratified note is built and the answer is one constant —
+`DIFFICULTY_TUNING[Hard].aggression`. Set it to 1.6 and the A/B gate flips to
+red with the table above as its reason. If "Hard should attack more" is wanted in
+the cast players actually meet, the lever is not appetite; it is §2's aim dial,
+or a target-scoring change that ranks the human *above* soft bot prey rather than
+lowering the bar for everyone.
 
 **An earlier reading of this table said +38%.** It was measured against raw
 per-match totals, before the two normalisations below, and against a build that
@@ -174,5 +203,10 @@ brief. It is a real bug a player can meet today.
 
 ## 5. Ownership
 
-Everything in this PR is Gameplay Engineer territory: `src/sim/` and the QA
-harness. `src/bots/` is deliberately untouched — see §3.
+Almost everything in this PR is Gameplay Engineer territory: `src/sim/` and the
+QA harness. One commit is **not**, and is split out for the Bot Engineer to
+review on its own: the `DifficultyTuning.aggression` dial and its single consumer
+in `src/bots/hard.ts` (`hardAttackFloor`). It ships at 1.0 in every tier, so it
+changes no bot's behaviour — the per-tier tables in §1 are identical before and
+after it. It is here because the ratified note asked for the tuning to exist, and
+because the A/B that measured it needs something to turn.
