@@ -1,5 +1,5 @@
 /**
- * src/net/connect-trace-view.ts — RETRY and COPY LOG, under the connecting
+ * src/net/connect-trace-view.ts — RETRY and DOWNLOAD LOG, under the connecting
  * screen's title. OWNER: Netcode Engineer (GDD §4.2; M10, the developer's ask, now
  * on its third pass).
  *
@@ -16,20 +16,20 @@
  * one text element at the top of the screen — and what is left here is the part a
  * title cannot be: the two things a *failure* has to offer.
  *
- * **DOM, not PixiJS**, for exactly the reason the COPY LOG button is
+ * **DOM, not PixiJS**, for exactly the reason the log button is
  * (`./playtest-log-button`, `@platform/boot-error`): the moments these buttons
  * exist for are the moments the game may not be drawing — a socket that never
  * opened, a join the server refused. A DOM button over the canvas cannot be taken
- * down by the renderer's troubles, and it is one `innerHTML` write. RETRY and COPY
- * LOG sit together, right under the line that just told the player what went wrong,
- * because "with RETRY and COPY LOG right there" was the original ask: a failure the
- * player has to go looking for an affordance to report is a failure that does not
- * get reported.
+ * down by the renderer's troubles, and it is one `innerHTML` write. RETRY and
+ * DOWNLOAD LOG sit together, right under the line that just told the player what
+ * went wrong, because "with RETRY and the log right there" was the original ask: a
+ * failure the player has to go looking for an affordance to report is a failure that
+ * does not get reported.
  *
- * COPY LOG carries a **DOWNLOAD** sibling here too (ratified M10 — "COPY LOG
- * buttons gain DOWNLOAD sibling"), because the developer's *"too large for mobile
- * clipboard"* bites hardest on exactly this screen: a join that never landed is
- * where a phone report starts, and a 40 KB paste is not how it travels.
+ * The log affordance here is **one button, and it says DOWNLOAD LOG** (ratified
+ * M10 — *"Clipboard goes away for all (PC and mobile)"*). This screen is where that
+ * ratification bites hardest: a join that never landed is where a phone report
+ * starts, and a 40 KB clipboard paste is not how it travels.
  *
  * It shows **nothing at all** while a connect is merely in progress — the title is
  * saying everything there is to say, and an affordance offered before there is
@@ -51,7 +51,6 @@ import { escapeHtml } from './playtest-log-button';
 /** Element ids — the handles the affordance, a test, and the live-stage seam use. */
 export const CONNECT_TRACE_ROOT_ID = 'pr-connect-trace';
 export const CONNECT_TRACE_RETRY_ID = 'pr-connect-trace-retry';
-export const CONNECT_TRACE_COPY_ID = 'pr-connect-trace-copy';
 export const CONNECT_TRACE_DOWNLOAD_ID = 'pr-connect-trace-download';
 
 const CSS_CHALK = '#DCE3EC';
@@ -77,14 +76,13 @@ export function renderConnectTraceHtml(model: ConnectTraceModel): string {
       `<button id="${CONNECT_TRACE_RETRY_ID}" type="button" class="pr-ct-button pr-ct-primary">RETRY</button>`,
     );
   }
-  if (model.offerCopyLog) {
-    buttons.push(`<button id="${CONNECT_TRACE_COPY_ID}" type="button" class="pr-ct-button">COPY LOG</button>`);
-    // DOWNLOAD, beside it (ratified M10 — "COPY LOG buttons gain DOWNLOAD
-    // sibling"). "Buttons" is plural in the ratification and this is the other
-    // one: a join that never landed is the most likely place a phone report starts,
-    // and a clipboard paste is the route the developer told us does not survive it.
+  if (model.offerDownloadLog) {
+    // One log control, and it names the file it produces (ratified M10). A join
+    // that never landed is the most likely place a phone report starts, and a
+    // clipboard paste is the route the developer told us does not survive it — so
+    // there is no second button here offering one.
     buttons.push(
-      `<button id="${CONNECT_TRACE_DOWNLOAD_ID}" type="button" class="pr-ct-button">DOWNLOAD</button>`,
+      `<button id="${CONNECT_TRACE_DOWNLOAD_ID}" type="button" class="pr-ct-button">DOWNLOAD LOG</button>`,
     );
   }
   if (buttons.length === 0) return '';
@@ -110,7 +108,7 @@ export const CONNECT_TRACE_TOP_PX = 92;
 const CONNECT_TRACE_CSS =
   // Centred at the TOP now, under the title that is doing the talking, rather than
   // at the foot of the screen where the developer found it and did not want it. One
-  // z-index below the COPY LOG button's maximum, so the two never fight.
+  // z-index below the corner log button's maximum, so the two never fight.
   //
   // `pointer-events:none` on the container with `auto` on the buttons: on the
   // shortest landscape phone the doors begin barely under the title band, and a
@@ -162,10 +160,7 @@ export interface ConnectTraceViewConfig {
   /** RETRY: start a *fresh* attempt (a new allocate), never a redial of a ticket
    *  that already lost. `src/main.ts` wires this to the door the player chose. */
   readonly onRetry: () => void;
-  /** COPY LOG: export the session log by the best route this device has
-   *  (`./playtest-log-export` `exportPlaytestLog`). */
-  readonly onCopyLog: () => void;
-  /** DOWNLOAD: get the log out as a FILE, never as text
+  /** DOWNLOAD LOG: get the session log out as a FILE, never as text
    *  (`./playtest-log-export` `downloadPlaytestLog`). */
   readonly onDownloadLog: () => void;
 }
@@ -236,9 +231,6 @@ export class ConnectTraceView {
     this.config.dom
       .getElementById(CONNECT_TRACE_RETRY_ID)
       ?.addEventListener('click', () => this.config.onRetry());
-    this.config.dom
-      .getElementById(CONNECT_TRACE_COPY_ID)
-      ?.addEventListener('click', () => this.config.onCopyLog());
     this.config.dom
       .getElementById(CONNECT_TRACE_DOWNLOAD_ID)
       ?.addEventListener('click', () => this.config.onDownloadLog());

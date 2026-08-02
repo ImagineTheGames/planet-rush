@@ -34,7 +34,7 @@
  *     event actually occurs, so a screen showing "TICKET SIGNED" means a ticket
  *     was signed. A screen stuck on "ALLOCATING ROOM…" is itself the diagnosis.
  *   • **A stall is a state, not a silence.** {@link STALL_MS} in *one* state flips
- *     {@link ConnectTraceModel.stalled}, which is what auto-offers COPY LOG — the
+ *     {@link ConnectTraceModel.stalled}, which is what auto-offers DOWNLOAD LOG — the
  *     report gets made while the developer is still looking at the failure.
  *
  * **What a stall is measured against** (m10-15, the developer: *"I joined a room but
@@ -60,7 +60,7 @@
  * {@link connectTitleLine} to the entry screen's title slot (`src/ui/lobby-entry`
  * `entryModel(state, narration)`), so there is exactly ONE text element and it is
  * the big one at the top. `./connect-trace-view` is no longer a panel of its own —
- * it is reduced to the two affordances a failure needs, RETRY and COPY LOG, sitting
+ * it is reduced to the two affordances a failure needs, RETRY and DOWNLOAD LOG, sitting
  * under that title. `src/main.ts` drives both from the real allocator round trip
  * and the real transport.
  */
@@ -94,8 +94,8 @@ export type ConnectStage =
 /** Terminal stages — nothing further will happen without another tap. */
 const TERMINAL: ReadonlySet<ConnectStage> = new Set(['joined', 'refused', 'failed']);
 
-/** How long **one state** may sit without progress before the screen offers COPY
- *  LOG. Five seconds is the brief's number, and it is about right *for a single
+/** How long **one state** may sit without progress before the screen offers
+ *  DOWNLOAD LOG. Five seconds is the brief's number, and it is about right *for a single
  *  state*: a healthy allocate is well under a second, so five in one of them is
  *  "something is wrong" and not "the network is being slow". It is emphatically not
  *  a budget for the whole join — see the module note on the m10-15 report. */
@@ -330,7 +330,7 @@ export interface ConnectTraceModel {
   /** The failure line, or `''` — refusals and failures only, drawn in threat red. */
   readonly error: string;
   /** {@link STALL_MS} in the CURRENT state with no advance of any kind. Auto-offers
-   *  COPY LOG (brief §2). Always false once the attempt has finished — a seat, a
+   *  DOWNLOAD LOG (brief §2). Always false once the attempt has finished — a seat, a
    *  refusal and a failure are all endings, and an ending is not a stall. */
   readonly stalled: boolean;
   /** Milliseconds the current *state* has been sitting, for a "…12s" tail. Zero
@@ -338,8 +338,8 @@ export interface ConnectTraceModel {
   readonly waitedMs: number;
   /** Offer RETRY: a terminal failure that another attempt could plausibly fix. */
   readonly canRetry: boolean;
-  /** Offer COPY LOG: any failure, or any stall. */
-  readonly offerCopyLog: boolean;
+  /** Offer DOWNLOAD LOG: any failure, or any stall. */
+  readonly offerDownloadLog: boolean;
 }
 
 /** Build the frame model. Pure — `now` is the caller's clock, so a five-second
@@ -365,7 +365,7 @@ export function connectTraceModel(trace: ConnectTrace, now: number): ConnectTrac
     stalled: stalled && !seated,
     waitedMs,
     canRetry: failed,
-    offerCopyLog: !seated && (failed || stalled),
+    offerDownloadLog: !seated && (failed || stalled),
   };
 }
 
@@ -397,15 +397,15 @@ export function connectTitleFailed(model: ConnectTraceModel): boolean {
 }
 
 /**
- * The line the COPY LOG affordance shows above itself, so the offer names what it
- * is offering to report rather than appearing out of nowhere
- * (`./playtest-log-button` `CopyLogOffer.hint`).
+ * The line the DOWNLOAD LOG affordance shows above itself, so the offer names what
+ * it is offering to report rather than appearing out of nowhere
+ * (`./playtest-log-button` `DownloadLogOffer.hint`).
  */
 export function connectOfferHint(model: ConnectTraceModel): string {
   // The reason — and, on a stall, the seconds — are already the TITLE, one line
   // above (`connectTitleLine`). The hint names the offer and nothing else, or the
   // screen says the same sentence twice in two sizes.
-  return model.error || model.stalled ? 'COPY LOG to report this.' : '';
+  return model.error || model.stalled ? 'DOWNLOAD LOG to report this.' : '';
 }
 
 // ---------------------------------------------------------------------------
