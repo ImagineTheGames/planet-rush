@@ -576,6 +576,24 @@ describe('bots fight the human, not just each other (p15)', () => {
     }
   }, 300_000);
 
+  it('the soak invariant is deterministic — the same seed measured twice is identical', () => {
+    // The invariant above is only a standing gate if its numbers reproduce, and
+    // `sweep` memoises, so re-reading it would prove nothing. This runs a whole
+    // match twice through the *uncached* path and compares the entire tally —
+    // every per-slot column, both first-contact clocks, and the leaf histogram.
+    // Any Math.random, Date.now, or map-iteration-order leak in the sim, the
+    // trees, or the scripted pilot separates the two.
+    const first = newTally();
+    measure('roster', 'player', SEEDS[0]!, first, null);
+    const second = newTally();
+    measure('roster', 'player', SEEDS[0]!, second, null);
+    expect(second).toEqual(first);
+    // ...and it is not vacuously equal: the run it compares is a real fight in
+    // which the human was seen and attacked.
+    expect(first.initiations[HUMAN]!).toBeGreaterThan(0);
+    expect(first.firstAttack[HUMAN]!).toBeLessThan(Number.POSITIVE_INFINITY);
+  }, 300_000);
+
   it('the ratified HARD appetite raise costs the player fire in the shipped roster', () => {
     // The brief's point 3, as a standing A/B. Both arms run the same seeds in
     // the same process and differ only by `DifficultyTuning.aggression`, so the

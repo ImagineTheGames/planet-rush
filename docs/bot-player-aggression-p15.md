@@ -14,6 +14,14 @@ uniqueness across every slot with the human in every seat, the untagged-roster
 default, and end-to-end proof through `step` that a rival's auto-aim and a
 rival's turret both put fire on the human.
 
+**Soak invariant** (the note's point 4), standing in the harness: in every cast,
+the human is seen and then *attacked* within two minutes of that first sensor
+contact — measured, not assumed, at 10.0 s (§1). Determinism is its own gate
+beside it: the same seed measured twice through the uncached path must produce a
+byte-identical tally — every per-slot column, both first-contact clocks, and the
+leaf histogram — so the invariant's numbers reproduce rather than merely passing
+once.
+
 Three findings, in the order they were reached.
 
 ---
