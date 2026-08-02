@@ -138,6 +138,24 @@ this lane cannot produce — a browser, and therefore the screenshot.
   the behaviour is visible and it contradicts GDD §2.9's "a bot never targets an
   ally." One filter, in the Bot Engineer's lane, not this one. **A teams match
   with bots on both sides will look wrong before it plays wrong.**
+- **The landscape phone spends its lobby ping to read its sides.** The word
+  `TEAM A` needs a chip of 64 px where the bare letter needed 30, and on a 221 px
+  landscape-phone row `teamChipRect` clamps that chip strictly right of centre —
+  so its left edge, the edge the ping measures against, moves in to the centre pad
+  whatever the constant says. No chip wide enough to hold the word leaves a 56 px
+  `· 245ms` room on that row: the two ratified features want the same 50 px and
+  only one can have them. The label wins — it answers the reported bug and is
+  ratified for **both** form factors, and the ping already owns a graceful way to
+  lose (`pingFits` drops the number rather than drawing it under a chip). The cost,
+  bounded: on a landscape phone **in TEAMS**, a human seat's roster ping is now
+  dropped at every name length instead of only near-maximum ones. FFA on the same
+  phone is untouched, and every wider form factor still draws a full-length
+  callsign *and* its number in TEAMS. `tests/net/lobby-ping-fit.test.ts` records
+  the new boundary (it was written to fail loudly on exactly this change, and did).
+  **Director's call if the number should be bought back**: dropping the `· `
+  separator, or the `ms` unit, on a row this narrow returns 16–24 px, which is
+  enough — but that is a change to a merged feature's presentation, so this lane
+  left it alone rather than redesigning it in a teams brief.
 - **Abundance is still not threaded offline.** It rides the same `MatchConfig`
   seam and is the other half of Task C4: a player who picks RICH in a solo lobby
   still gets the SCARCE default. Out of this brief's scope, so it is left where it
