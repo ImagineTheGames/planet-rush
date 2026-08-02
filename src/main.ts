@@ -6877,14 +6877,19 @@ function openLobby(
         break;
       case 'seatTeamChip':
         // The TEAM chip — the side cycle, composed alongside the difficulty chip in
-        // TEAMS (n2). A model no-op in FFA (teams-of-one).
+        // TEAMS (n2). A model no-op in FFA (teams-of-one). The room is told, because
+        // a side authored here and never sent is a lobby that says TEAMS over a
+        // free-for-all world (m10 teams-wire).
         state = cycleSeatTeam(state, hit.index);
+        sendChoice();
         render();
         break;
       case 'mode':
-        // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode.
+        // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode — and
+        // sent, because the room advertises its mode and builds its world from it.
         state = toggleMode(state);
         platform.storage.set(MATCH_MODE_KEY, state.mode);
+        sendChoice();
         render();
         break;
       case 'abundance':

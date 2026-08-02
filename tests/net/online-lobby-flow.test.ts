@@ -44,7 +44,9 @@ import {
   cycleAbundance,
   cycleBotDifficulty,
   cycleSeatState,
+  cycleSeatTeam,
   lobbyModel,
+  lobbyWireTeams,
   matchSizeOf,
   pressRush,
   selectMap,
@@ -57,6 +59,7 @@ import {
 import type { LobbyState } from '../../src/ui/lobby';
 import type { LobbySlot } from '../../src/net/transport';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
+import { areEnemies, canDamage } from '../../src/sim';
 
 // ---------------------------------------------------------------------------
 // The client, assembled the way `main.ts` assembles it
@@ -93,12 +96,18 @@ function openClient(
   let started = false;
 
   const send = (): void => {
+    const isHost = state.you === state.host;
     session.chooseInLobby({
       shipClass: state.shipClass,
       // Honoured only from the creator (`server/room.ts` — "only the room creator
       // picks the bots' difficulties"), so a guest sending them costs nothing; the
       // shipped client omits them from a guest anyway.
-      ...(state.you === state.host ? { botDifficulties: botDifficulties(state) } : {}),
+      ...(isHost ? { botDifficulties: botDifficulties(state) } : {}),
+      // The match SHAPE, host-only (m10 teams-wire): the MODE and the per-SLOT
+      // side. Until this rode along, the mode toggle three screens up moved nothing
+      // on the server — the room stayed FFA and built a free-for-all world under a
+      // lobby that said TEAMS.
+      ...(isHost ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
     });
   };
 
@@ -430,5 +439,86 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     const named = setPlayerName(guest.lobby(), 'ZEPHYR');
     const ownSeat = lobbyModel(named).seats.find((s) => s.isYou);
     expect(ownSeat?.name, 'your own seat is you, by name').toBe('ZEPHYR');
+  }, 30_000);
+});
+
+describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
+  it('carries the host\'s split to both rosters, both predicted worlds, and authority', async () => {
+    // The closest thing to the developer's own report this lane can run: two real
+    // clients on real sockets, one server, the CURRENT unified lobby, TEAMS picked
+    // in it. The browser screenshot of the TEAM labels rides QA's round (no
+    // browser here); everything underneath the labels is proven here.
+    const harness = await startMatchServer({ seed: 909, slots: 4, asteroidCount: 10 });
+    const sessions: OnlineSession[] = [];
+    cleanup = async (): Promise<void> => {
+      for (const session of sessions) session.close();
+      await harness.stop();
+    };
+
+    const hostSession = createOnlineSession({
+      url: harness.url,
+      room: 'TEAM',
+      shipClass: ShipClass.Vanguard,
+      transport: { connect: nodeWebSocket },
+    });
+    sessions.push(hostSession);
+    await until('the host to be seated', () => harness.matches.room('TEAM') !== undefined);
+    const room = harness.matches.room('TEAM');
+    if (!room) throw new Error('the room was never created');
+    const host = openClient(hostSession, 'TEAM', hostSession.you, hostSession.you);
+
+    const guestSession = createOnlineSession({
+      url: harness.url,
+      room: 'TEAM',
+      shipClass: ShipClass.Interceptor,
+      transport: { connect: nodeWebSocket },
+    });
+    sessions.push(guestSession);
+    await until('both seats to be filled', () => room.humanCount === 2);
+    const guest = openClient(guestSession, 'TEAM', guestSession.you, hostSession.you);
+
+    // The host flips TEAMS and puts the two humans on ONE side, the two bot seats
+    // on the other — a 2v2 with the humans allied, which is the shape the report
+    // was played in.
+    host.apply((s) => toggleMode(s));
+    await until('the room to advertise TEAMS', () => room.mode === 'teams');
+
+    const sideOf = (player: number): number => host.lobby().seats[player]!.team;
+    const wanted = [0, 0, 1, 1];
+    for (let player = 0; player < 4; player++) {
+      for (let guard = 0; guard < 8 && sideOf(player) !== wanted[player]; guard++) {
+        host.apply((s) => cycleSeatTeam(s, player));
+      }
+      expect(sideOf(player)).toBe(wanted[player]);
+    }
+
+    // Both rosters agree, because the sides came back down the authoritative
+    // `lobbyState` rather than being each screen's private opinion.
+    await until('the guest roster to show the split', () =>
+      lobbyModel(guest.lobby()).seats.slice(0, 4).map((s) => s.team).join() === wanted.join(),
+    );
+    expect(lobbyModel(guest.lobby()).seats.slice(0, 4).map((s) => s.teamName)).toEqual([
+      'TEAM A',
+      'TEAM A',
+      'TEAM B',
+      'TEAM B',
+    ]);
+
+    runCountdown(host);
+    await until('both clients to have a world', () => hostSession.world !== null && guestSession.world !== null);
+
+    // Authority, and both PREDICTED worlds, group allies identically. A client that
+    // guessed here would reconcile against a different match forever.
+    expect(room.world!.ships.map((s) => s.team)).toEqual(wanted);
+    expect(hostSession.world!.ships.map((s) => s.team)).toEqual(wanted);
+    expect(guestSession.world!.ships.map((s) => s.team)).toEqual(wanted);
+
+    // And the one question the whole sim asks comes back the same on both ends.
+    for (const world of [room.world!, hostSession.world!, guestSession.world!]) {
+      expect(areEnemies(world, 0, 1)).toBe(false);
+      expect(areEnemies(world, 2, 3)).toBe(false);
+      expect(areEnemies(world, 0, 2)).toBe(true);
+      expect(canDamage(world, 0, 1)).toBe(false);
+    }
   }, 30_000);
 });
