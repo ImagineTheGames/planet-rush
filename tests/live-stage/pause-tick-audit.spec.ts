@@ -35,7 +35,7 @@
  * ── HAS THIS RUN? ──────────────────────────────────────────────────────────
  * Recorded in the PR body with the evidence PNGs it writes. Chromium in this lane
  * needs its shared libraries staged on `LD_LIBRARY_PATH` before it will launch —
- * the same condition `./copy-log-touch.spec.ts` documents.
+ * the same condition `./log-download.spec.ts` documents.
  *
  *   npx playwright test --config tests/live-stage/playwright.config.ts pause-tick-audit
  */

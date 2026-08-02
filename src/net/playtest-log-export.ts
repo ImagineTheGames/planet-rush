@@ -1,30 +1,38 @@
 /**
- * src/net/playtest-log-export.ts — ONE TAP, PASTE INTO CHAT.
+ * src/net/playtest-log-export.ts — ONE TAP, AND A FILE COMES OUT.
  * OWNER: Netcode Engineer (M10 playtest-log brief §2, §3).
  *
- * The log is only worth keeping if getting it out is trivial: *"clipboard as JSON,
- * plus a DOWNLOAD fallback. One tap, paste into chat"*. This module is that gesture,
- * and it is deliberately the only place in the whole feature that can move the log
- * anywhere — by exactly three routes, tried in the order a **phone** wants them
- * (M10 action-echo §5: *"the developer had NO way to send them"*):
+ * The log is only worth keeping if getting it out is trivial. This module is that
+ * gesture, and it is deliberately the only place in the whole feature that can move
+ * the log anywhere — by exactly two routes, tried in the order a **phone** wants
+ * them (M10 action-echo §5: *"the developer had NO way to send them"*):
  *
- *   1. **The share sheet** (`navigator.share`), where the OS asks the developer
- *      where the log should go and it arrives there as a named file. On a phone
- *      this is the route that exists for precisely this, and the only one that
- *      reliably survives Safari's clipboard rules.
- *   2. **The clipboard** (`navigator.clipboard.writeText`) — the desktop's one-tap
- *      path, and the phone's when there is no sheet.
- *   3. **A downloaded file**, when both refuse — which happens more often than one
- *      would like: an insecure origin, a gesture-context rule, a denied permission.
- *      A COPY LOG button that silently fails on the phone the developer actually
- *      plays on would be worse than no button, so the fallbacks are not an
- *      afterthought: they are tried automatically and reported honestly.
+ *   1. **The share sheet with the file attached** (`navigator.share` + `files:`),
+ *      where the OS asks the developer where the log should go and it arrives there
+ *      as a named `.json`. On a phone this is the route that exists for precisely
+ *      this, and it is a download with the phone's own chooser in front of it.
+ *   2. **A downloaded file**, where there is no sheet or the platform refuses the
+ *      payload — always available in a browser, and it lands in Downloads under
+ *      {@link playtestLogFilename}.
+ *
+ * ── WHY THERE IS NO THIRD ROUTE (ratified M10) ──────────────────────────────
+ * There used to be one, in the middle: the clipboard. The developer, from a phone:
+ * *"too large for mobile clipboard."* That was never a bug in the chain — the chain
+ * worked — it was a rung that could **succeed and still strand the log**. A 40 KB
+ * JSON blob on a phone's clipboard is a paste no chat app takes and no human
+ * scrolls, and the export reported success while nothing travelled. The developer
+ * then ratified it for every device, desktop included: *"Clipboard goes away for all
+ * (PC and mobile)"*, with the one surviving control named for the file it saves. So
+ * the clipboard is not a fallback here, not a desktop special case, and not reachable
+ * at all: there is no `navigator.clipboard` seam in this file and no route that
+ * produces text. What comes out the other end is always a named file a thumb can
+ * attach.
  *
  * **It never uploads.** There is no `fetch` here and no endpoint anywhere in the
  * feature. The share sheet is not an exception to that: it hands the file to the
  * operating system's own chooser and the *developer* picks the destination — the
- * same "you decide what to send" property pasting has (brief §3), with the phone
- * doing the carrying instead of the person.
+ * same "you decide what to send" property a download has, with the phone doing the
+ * carrying instead of the person.
  *
  * Both seams are injected and default lazily to the browser's, so the whole export
  * path is exercised in node — including the fallback ordering, which is the part a
@@ -37,27 +45,19 @@ import type { PlaytestLog, PlaytestLogEnvironment } from './playtest-log';
 // Seams
 // ---------------------------------------------------------------------------
 
-/** The one clipboard method used. `navigator.clipboard` satisfies it structurally. */
-export interface ClipboardLike {
-  writeText(text: string): Promise<void>;
-}
-
 /**
  * The Web Share seam — `navigator.share`, satisfied structurally.
  *
  * **The developer had no way to send a log off the phone**, which is the whole
- * reason this feature exists, and on a phone the clipboard is the *worst* of the
- * three routes even when it works: a pasted 40 KB JSON blob is a wall of text in a
- * chat app, iOS Safari refuses `writeText` outside a narrow gesture window, and
- * "paste it somewhere" is a step a person has to invent for themselves. The share
- * sheet is the gesture a phone actually has — one tap opens the OS chooser and the
- * log goes to Messages, Mail, Drive, or whatever the developer already uses, as a
- * *file*, named after the build it came from.
+ * reason this feature exists. The share sheet is the gesture a phone actually has —
+ * one tap opens the OS chooser and the log goes to Messages, Mail, Drive, or
+ * whatever the developer already uses, as a *file*, named after the build it came
+ * from.
  *
  * `canShare` is checked before `share` because Android and iOS disagree about which
  * payloads they will take (a `files:` share is refused outright by some browsers,
  * which then reject `share()` rather than degrade), and because a share the platform
- * will not accept must fall through to the clipboard instead of failing the export.
+ * will not accept must fall through to the download instead of failing the export.
  */
 export interface ShareLike {
   share(data: ShareData): Promise<void>;
@@ -85,16 +85,15 @@ export interface ExportConfig {
   readonly log: PlaytestLog;
   /** Defaults to `navigator` when it can share — the phone's own route out. */
   readonly share?: ShareLike | null;
-  /** Defaults to `navigator.clipboard` when the page has one. */
-  readonly clipboard?: ClipboardLike | null;
   /** Defaults to the Blob + anchor download. */
   readonly save?: SaveFile | null;
   /** Defaults to the browser's `File`. */
   readonly makeShareFile?: MakeShareFile | null;
 }
 
-/** Which route the log actually took out. */
-export type ExportRoute = 'share' | 'clipboard' | 'download';
+/** Which route the log actually took out. Both produce a file; they differ only in
+ *  who chooses where it lands. There is no clipboard route (ratified M10). */
+export type ExportRoute = 'share' | 'download';
 
 /** What an export attempt produced. On failure both routes were tried and both
  *  refused — the button says so rather than pretending it worked. */
@@ -141,87 +140,11 @@ function safeToken(s: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Get the log off the device, by the best route the device actually has.
- *
- * **Share sheet → clipboard → download**, and the order is the phone's, because the
- * phone is where the log has to come from (*"MOBILE LOGS — the developer had NO way
- * to send them"*). Every step is one tap; what changes down the list is how much
- * the developer has to invent afterwards:
- *
- *  1. **The share sheet** (`navigator.share`) hands the OS a *named file* and lets
- *     the developer pick where it goes — Messages, Mail, Drive. On a phone this is
- *     the gesture that already exists for exactly this, and it is the only one of
- *     the three that reliably survives Safari's clipboard rules.
- *  2. **The clipboard** — one tap, paste into chat. Still the right answer on a
- *     desktop, where a share sheet mostly does not exist and pasting is native.
- *  3. **A downloaded file** — always available, one extra step to attach.
- *
- * A route that is absent, refuses, or rejects falls through to the next without
- * bothering the developer about why; only *all three* failing is worth a message.
- * A share the user dismisses is the one ambiguous case, and it is treated as a
- * failure of that route (the sheet reports a cancel as a rejection and does not
- * distinguish it) — so a cancelled share still leaves the log on the clipboard,
- * which is a strictly better outcome than a dead end.
- */
-export async function exportPlaytestLog(config: ExportConfig): Promise<ExportResult> {
-  const json = config.log.toJson();
-  const bytes = json.length;
-  const filename = playtestLogFilename(config.log.env);
-
-  const share = config.share === undefined ? defaultShare() : config.share;
-  const makeFile = config.makeShareFile === undefined ? defaultMakeShareFile() : config.makeShareFile;
-  if (share && makeFile) {
-    const file = makeFile(filename, json);
-    if (file) {
-      const payload: ShareData = { title: filename, text: SHARE_TEXT, files: [file] };
-      // Ask first where the platform will say: a browser that refuses `files:`
-      // rejects `share()` rather than degrading, and that must cost the clipboard
-      // route nothing.
-      if (!share.canShare || share.canShare(payload)) {
-        try {
-          await share.share(payload);
-          return { ok: true, route: 'share', bytes };
-        } catch {
-          // Dismissed, unsupported, or outside a gesture. Next route.
-        }
-      }
-    }
-  }
-
-  const clipboard = config.clipboard === undefined ? defaultClipboard() : config.clipboard;
-  if (clipboard) {
-    try {
-      await clipboard.writeText(json);
-      return { ok: true, route: 'clipboard', bytes };
-    } catch {
-      // Insecure origin, denied permission, or outside a user-gesture context.
-      // Not an error worth showing — it is exactly why the fallback exists.
-    }
-  }
-
-  const save = config.save === undefined ? defaultSave() : config.save;
-  if (save) {
-    try {
-      save(filename, json);
-      return { ok: true, route: 'download', bytes };
-    } catch {
-      return { ok: false, reason: 'The clipboard was refused and the download failed.' };
-    }
-  }
-
-  return { ok: false, reason: 'No clipboard and no download available on this device.' };
-}
-
-/**
  * Get the log off the device **as a FILE**, and never as text.
  *
- * The developer's words, ratified: *"too large for mobile clipboard."* That is not
- * a bug in {@link exportPlaytestLog} — its chain is correct — it is a chain whose
- * middle rung can *succeed* and still leave the developer stuck. A 40 KB JSON blob
- * that lands on a phone's clipboard is a paste no chat app will take and no human
- * will scroll; the export reported success, and the log still did not travel. So
- * the DOWNLOAD affordance is not a fallback of COPY LOG, it is a different
- * promise: what comes out the other end is a named `.json` a thumb can attach.
+ * This is the whole export. The developer's words, ratified for every device:
+ * *"Clipboard goes away for all (PC and mobile)"*. What comes out the other end is a
+ * named `.json` a thumb can attach — on a phone, on a desk, on either.
  *
  * Two routes, and **the clipboard is not one of them**:
  *
@@ -235,8 +158,8 @@ export async function exportPlaytestLog(config: ExportConfig): Promise<ExportRes
  *     Safari and Chrome, and lands in Downloads under
  *     {@link playtestLogFilename}: `planet-rush-log-<sha>-<timestamp>.json`.
  *
- * Same injected seams as {@link exportPlaytestLog}, so both routes and the
- * ordering are exercised in node with no browser.
+ * Every seam is injected, so both routes and the ordering are exercised in node
+ * with no browser.
  */
 export async function downloadPlaytestLog(config: ExportConfig): Promise<ExportResult> {
   const json = config.log.toJson();
@@ -287,8 +210,8 @@ function defaultShare(): ShareLike | null {
 }
 
 /** The browser's `File`, or null where there is none — a share without a file
- *  would put 40 KB of JSON into a text field, which is the clipboard route with
- *  extra steps. */
+ *  would put 40 KB of JSON into a text field, which is the wall of text this
+ *  export exists to avoid. Without a `File` the share route is skipped entirely. */
 function defaultMakeShareFile(): MakeShareFile | null {
   const FileCtor = (
     globalThis as {
@@ -297,13 +220,6 @@ function defaultMakeShareFile(): MakeShareFile | null {
   ).File;
   if (!FileCtor) return null;
   return (filename, text) => new FileCtor([text], filename, { type: 'application/json' });
-}
-
-/** `navigator.clipboard`, or null where there is none (node, an old browser). */
-function defaultClipboard(): ClipboardLike | null {
-  const nav = (globalThis as { navigator?: { clipboard?: ClipboardLike } }).navigator;
-  const clipboard = nav?.clipboard;
-  return clipboard && typeof clipboard.writeText === 'function' ? clipboard : null;
 }
 
 /**

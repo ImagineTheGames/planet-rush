@@ -25,7 +25,7 @@ import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
 import { PlaytestLog, describeEnvironment } from '../../src/net/playtest-log';
 import { attachSessionLog } from '../../src/net/playtest-log-attach';
-import { exportPlaytestLog } from '../../src/net/playtest-log-export';
+import { downloadPlaytestLog } from '../../src/net/playtest-log-export';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -113,18 +113,18 @@ describe('the playtest log over a real socket', () => {
     expect(closed.data!['closeReason']).toBe('join-rejected');
     expect(closed.data!['rejectReason']).toBe('bad-ticket');
 
-    // The whole thing is exportable as the versioned payload a paste carries.
+    // The whole thing is exportable as the versioned payload the saved file carries.
     const written: string[] = [];
-    const result = await exportPlaytestLog({
+    const result = await downloadPlaytestLog({
       log,
-      clipboard: { writeText: async (text) => void written.push(text) },
-      save: null,
+      share: null,
+      save: (_name, text) => void written.push(text),
     });
-    expect(result.ok && result.route).toBe('clipboard');
-    const pasted = JSON.parse(written[0]!) as { schema: string; version: number; summary: string };
-    expect(pasted.schema).toBe('planet-rush.playtest-log');
-    expect(pasted.version).toBe(1);
-    expect(pasted.summary).toContain('build e2e0001');
+    expect(result.ok && result.route).toBe('download');
+    const saved = JSON.parse(written[0]!) as { schema: string; version: number; summary: string };
+    expect(saved.schema).toBe('planet-rush.playtest-log');
+    expect(saved.version).toBe(1);
+    expect(saved.summary).toContain('build e2e0001');
   }, 30_000);
 
   it('records a healthy match: welcome, RUSH!, and per-second net telemetry', async () => {

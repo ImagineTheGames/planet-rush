@@ -1,36 +1,38 @@
 /**
- * src/net/playtest-log-button.test.ts — the COPY LOG affordance
+ * src/net/playtest-log-button.test.ts — the DOWNLOAD LOG affordance
  * (`./playtest-log-button`, M10 playtest-log brief §2, §3).
  *
  * The button is the whole feature from the developer's side: if its words are wrong,
- * or if a press looks like it did nothing, the log never gets pasted. So the wording
+ * or if a press looks like it did nothing, the log never travels. So the wording
  * and the phases are asserted through the pure model, and the DOM half is driven with
  * a fake document — the same split (and the same reason) as
  * `@platform/boot-error`'s tests, since this repo has no jsdom.
+ *
+ * The ratification these tests now enforce (M10): *"Clipboard goes away for all (PC
+ * and mobile)"*. There is ONE control here, it reads DOWNLOAD LOG, and no press it
+ * can take reaches a clipboard on any device.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
 import {
-  COPY_LOG_BUTTON_ID,
-  COPY_LOG_DOWNLOAD_ID,
-  COPY_LOG_HINT_ID,
-  COPY_LOG_ROOT_ID,
-  CopyLogAffordance,
+  DOWNLOAD_LOG_BUTTON_ID,
+  DOWNLOAD_LOG_HINT_ID,
+  DOWNLOAD_LOG_ROOT_ID,
+  DownloadLogAffordance,
   ERROR_OFFER_HINT,
-  copyLogLabel,
-  copyLogModel,
   downloadLogLabel,
+  downloadLogModel,
   disconnectOfferHint,
-  hideCopyLog,
-  installCopyLogButton,
-  renderCopyLogHtml,
-  resetCopyLogButton,
-  showCopyLog,
+  hideDownloadLog,
+  installDownloadLogButton,
+  renderDownloadLogHtml,
+  resetDownloadLogButton,
+  showDownloadLog,
 } from './playtest-log-button';
-import type { CopyLogDom, CopyLogElement } from './playtest-log-button';
+import type { DownloadLogDom, DownloadLogElement } from './playtest-log-button';
 
-afterEach(() => resetCopyLogButton());
+afterEach(() => resetDownloadLogButton());
 
 function newLog(): PlaytestLog {
   const log = new PlaytestLog({ env: describeEnvironment({ sha: 'abc1234' }) });
@@ -42,13 +44,16 @@ function newLog(): PlaytestLog {
 // A fake document, just enough to mount into
 // ---------------------------------------------------------------------------
 
-interface FakeElement extends CopyLogElement {
+interface FakeElement extends DownloadLogElement {
   readonly listeners: (() => void)[];
   readonly children: FakeElement[];
   removed: boolean;
 }
 
-function fakeDom(): CopyLogDom & { body: FakeElement; find: (id: string) => FakeElement | null } {
+function fakeDom(): DownloadLogDom & {
+  body: FakeElement;
+  find: (id: string) => FakeElement | null;
+} {
   const registry = new Map<string, FakeElement>();
 
   const make = (): FakeElement => {
@@ -65,7 +70,7 @@ function fakeDom(): CopyLogDom & { body: FakeElement; find: (id: string) => Fake
         html = value;
         // A write replaces the children: re-register the ids the markup declares, so
         // `getElementById` behaves like a browser's after an innerHTML write.
-        for (const id of [COPY_LOG_BUTTON_ID, COPY_LOG_DOWNLOAD_ID, COPY_LOG_HINT_ID]) {
+        for (const id of [DOWNLOAD_LOG_BUTTON_ID, DOWNLOAD_LOG_HINT_ID]) {
           registry.delete(id);
           if (value.includes(`id="${id}"`)) {
             const child = make();
@@ -89,8 +94,8 @@ function fakeDom(): CopyLogDom & { body: FakeElement; find: (id: string) => Fake
   const body = make();
   return {
     body,
-    createElement: (): CopyLogElement => make(),
-    getElementById: (id): CopyLogElement | null => registry.get(id) ?? null,
+    createElement: (): DownloadLogElement => make(),
+    getElementById: (id): DownloadLogElement | null => registry.get(id) ?? null,
     find: (id): FakeElement | null => registry.get(id) ?? null,
   };
 }
@@ -100,39 +105,48 @@ function fakeDom(): CopyLogDom & { body: FakeElement; find: (id: string) => Fake
 // ---------------------------------------------------------------------------
 
 describe('the words on the button', () => {
-  it('rests on COPY LOG — the label the brief names', () => {
-    expect(copyLogLabel('idle')).toBe('COPY LOG');
+  it('rests on DOWNLOAD LOG — the label the ratification names', () => {
+    expect(downloadLogLabel('idle')).toBe('DOWNLOAD LOG');
   });
 
   it('answers a press, so it never looks dead', () => {
-    expect(copyLogLabel('working')).toBe('COPYING…');
+    expect(downloadLogLabel('working')).toBe('SAVING…');
     // The share sheet is the phone's route out (M10 action-echo §5), and the
-    // button says where the log actually went rather than claiming a clipboard it
-    // never touched.
-    expect(copyLogLabel('shared')).toBe('LOG SENT');
-    expect(copyLogLabel('copied')).toBe('LOG COPIED');
-    expect(copyLogLabel('saved')).toBe('LOG SAVED');
-    expect(copyLogLabel('failed')).toBe('COPY FAILED');
+    // button says where the file actually went rather than claiming a Downloads
+    // folder it never reached.
+    expect(downloadLogLabel('shared')).toBe('LOG SENT');
+    expect(downloadLogLabel('saved')).toBe('LOG SAVED');
+    expect(downloadLogLabel('failed')).toBe('SAVE FAILED');
+  });
+
+  it('never offers a clipboard word in any phase (ratified M10)', () => {
+    const phases = ['idle', 'working', 'shared', 'saved', 'failed'] as const;
+    for (const phase of phases) {
+      expect(downloadLogLabel(phase), `phase ${phase} spoke of copying`).not.toMatch(/COP/i);
+    }
   });
 
   it('offers the report on an error screen (the auto-offer, brief §3)', () => {
-    expect(copyLogModel({ reason: 'error' }, 'idle').hint).toBe(ERROR_OFFER_HINT);
+    expect(downloadLogModel({ reason: 'error' }, 'idle').hint).toBe(ERROR_OFFER_HINT);
+    expect(ERROR_OFFER_HINT).toBe('DOWNLOAD LOG to report this.');
   });
 
   it('lets an error screen name its own failure instead', () => {
     const hint = "Couldn't reach the servers.";
-    expect(copyLogModel({ reason: 'error', hint }, 'idle').hint).toBe(hint);
+    expect(downloadLogModel({ reason: 'error', hint }, 'idle').hint).toBe(hint);
   });
 
   it('stays quiet on the pause menu — the label says enough there', () => {
-    expect(copyLogModel({ reason: 'pause' }, 'idle').hint).toBe('');
+    expect(downloadLogModel({ reason: 'pause' }, 'idle').hint).toBe('');
   });
 
-  it('tells the developer where the log went, including the download case', () => {
-    expect(copyLogModel({ reason: 'pause' }, 'copied').hint).toContain('paste it into chat');
-    expect(copyLogModel({ reason: 'pause' }, 'saved').hint).toContain('downloaded as a file');
-    expect(copyLogModel({ reason: 'pause' }, 'shared').hint).toContain('share sheet');
-    expect(copyLogModel({ reason: 'error' }, 'failed').hint).toContain('Could not copy');
+  it('tells the developer where the file went, and that it is a file', () => {
+    expect(downloadLogModel({ reason: 'pause' }, 'saved').hint).toContain('attach that file');
+    expect(downloadLogModel({ reason: 'pause' }, 'shared').hint).toContain('share sheet');
+    // The failure names the device, not a clipboard that is no longer in the chain.
+    expect(downloadLogModel({ reason: 'error' }, 'failed').hint).toBe(
+      'Could not save the log on this device.',
+    );
   });
 
   it('names what happened before it asks for the log, on a drop', () => {
@@ -145,18 +159,18 @@ describe('the words on the button', () => {
   });
 
   it('disables the button only while a press is in flight', () => {
-    expect(copyLogModel({ reason: 'pause' }, 'working').busy).toBe(true);
-    expect(copyLogModel({ reason: 'pause' }, 'idle').busy).toBe(false);
+    expect(downloadLogModel({ reason: 'pause' }, 'working').busy).toBe(true);
+    expect(downloadLogModel({ reason: 'pause' }, 'idle').busy).toBe(false);
   });
 });
 
 describe('the markup', () => {
   it('carries the ids, a real touch target, and no reserved colour', () => {
-    const html = renderCopyLogHtml(copyLogModel({ reason: 'error' }, 'idle'));
+    const html = renderDownloadLogHtml(downloadLogModel({ reason: 'error' }, 'idle'));
 
-    expect(html).toContain(`id="${COPY_LOG_BUTTON_ID}"`);
-    expect(html).toContain(`id="${COPY_LOG_HINT_ID}"`);
-    expect(html).toContain('COPY LOG');
+    expect(html).toContain(`id="${DOWNLOAD_LOG_BUTTON_ID}"`);
+    expect(html).toContain(`id="${DOWNLOAD_LOG_HINT_ID}"`);
+    expect(html).toContain('DOWNLOAD LOG');
     // 44px minimum touch target (mobile amendment §1).
     expect(html).toContain('min-height:44px');
     // Signal yellow means ore or danger; threat red means damage (style-guide §2).
@@ -165,21 +179,30 @@ describe('the markup', () => {
     expect(html.toUpperCase()).not.toContain('B23A3A');
   });
 
+  it('draws exactly one button — there is no sibling to choose between', () => {
+    // The ratification's whole point: one control, so the developer never has to
+    // pick the route that works. Counts elements, not stylesheet selectors.
+    const html = renderDownloadLogHtml(downloadLogModel({ reason: 'pause' }, 'idle'));
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+
   it('omits the hint element entirely when there is no hint', () => {
-    const html = renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'idle'));
-    expect(html).not.toContain(COPY_LOG_HINT_ID);
+    const html = renderDownloadLogHtml(downloadLogModel({ reason: 'pause' }, 'idle'));
+    expect(html).not.toContain(DOWNLOAD_LOG_HINT_ID);
   });
 
   it('escapes a hint, which can carry a server’s own words', () => {
-    const html = renderCopyLogHtml(
-      copyLogModel({ reason: 'error', hint: '<script>alert("x")</script>' }, 'idle'),
+    const html = renderDownloadLogHtml(
+      downloadLogModel({ reason: 'error', hint: '<script>alert("x")</script>' }, 'idle'),
     );
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
   });
 
   it('marks the button disabled while working', () => {
-    expect(renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'working'))).toContain('disabled');
+    expect(renderDownloadLogHtml(downloadLogModel({ reason: 'pause' }, 'working'))).toContain(
+      'disabled',
+    );
   });
 
   // The landscape lock (`@platform/orientation`). The game root is rotated +90° on a
@@ -189,7 +212,7 @@ describe('the markup', () => {
   // whole mechanism: there is no JS to exercise, which is the point of doing it with
   // a media query rather than a resize handler this module would have to own.
   describe('under the landscape lock', () => {
-    const css = renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'idle'));
+    const css = renderDownloadLogHtml(downloadLogModel({ reason: 'pause' }, 'idle'));
 
     it('rotates only on a touch viewport held portrait — the lock’s own condition', () => {
       // `pointer:coarse` is the `isTouch` main.ts hands `computeRootTransform`;
@@ -237,14 +260,14 @@ describe('the markup', () => {
 // The DOM edge
 // ---------------------------------------------------------------------------
 
-describe('CopyLogAffordance', () => {
+describe('DownloadLogAffordance', () => {
   it('mounts on the first show and hides rather than unmounting', () => {
     const dom = fakeDom();
-    const affordance = new CopyLogAffordance({ dom, log: newLog(), schedule: null });
+    const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
 
     affordance.show({ reason: 'pause' });
     expect(dom.body.children).toHaveLength(1);
-    expect(dom.body.children[0]!.id).toBe(COPY_LOG_ROOT_ID);
+    expect(dom.body.children[0]!.id).toBe(DOWNLOAD_LOG_ROOT_ID);
     expect(dom.body.children[0]!.hidden).toBe(false);
 
     affordance.hide();
@@ -259,275 +282,83 @@ describe('CopyLogAffordance', () => {
 
   it('is a no-op on a repeat of the same offer, so a per-frame caller is free', () => {
     const dom = fakeDom();
-    const affordance = new CopyLogAffordance({ dom, log: newLog(), schedule: null });
+    const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
     affordance.show({ reason: 'pause' });
-    const button = dom.find(COPY_LOG_BUTTON_ID)!;
+    const button = dom.find(DOWNLOAD_LOG_BUTTON_ID)!;
 
     for (let i = 0; i < 100; i++) affordance.show({ reason: 'pause' });
     // The element was not rewritten, so no listener piled up on it.
-    expect(dom.find(COPY_LOG_BUTTON_ID)).toBe(button);
+    expect(dom.find(DOWNLOAD_LOG_BUTTON_ID)).toBe(button);
     expect(button.listeners).toHaveLength(1);
   });
 
-  it('copies the log when the button is pressed', async () => {
+  it('hands the share sheet a FILE when the platform takes one', async () => {
     const dom = fakeDom();
-    const log = newLog();
-    const writeText = vi.fn(async (_text: string) => {});
-    const affordance = new CopyLogAffordance({
+    const shared: { title?: string; files?: unknown[] }[] = [];
+    const affordance = new DownloadLogAffordance({
       dom,
-      log,
+      log: newLog(),
       schedule: null,
-      exportOptions: { clipboard: { writeText }, save: null },
+      exportOptions: {
+        share: { share: async (d) => void shared.push(d) },
+        makeShareFile: (name, text) => ({ name, text }),
+        save: null,
+      },
     });
 
     affordance.show({ reason: 'error', hint: "Couldn't reach the servers." });
-    const result = await affordance.copy();
+    const result = await affordance.download();
 
-    expect(result.ok && result.route).toBe('clipboard');
-    expect(JSON.parse(writeText.mock.calls[0]![0])).toMatchObject({
-      schema: 'planet-rush.playtest-log',
-    });
-    expect(affordance.state).toBe('copied');
-    expect(dom.body.children[0]!.innerHTML).toContain('LOG COPIED');
+    expect(result.ok && result.route).toBe('share');
+    expect(shared[0]!.files).toHaveLength(1);
+    expect(affordance.state).toBe('shared');
+    expect(dom.body.children[0]!.innerHTML).toContain('LOG SENT');
   });
 
-  it('reports the download fallback in its own words', async () => {
+  it('saves a parseable file when there is no share sheet', async () => {
     const dom = fakeDom();
-    const affordance = new CopyLogAffordance({
+    const saved: { name: string; text: string }[] = [];
+    const affordance = new DownloadLogAffordance({
       dom,
       log: newLog(),
       schedule: null,
-      exportOptions: { clipboard: null, save: () => {} },
-    });
-    affordance.show({ reason: 'pause' });
-
-    await affordance.copy();
-    expect(affordance.state).toBe('saved');
-    expect(dom.body.children[0]!.innerHTML).toContain('LOG SAVED');
-  });
-
-  it('says COPY FAILED rather than pretending', async () => {
-    const dom = fakeDom();
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      schedule: null,
-      exportOptions: { clipboard: null, save: null },
-    });
-    affordance.show({ reason: 'pause' });
-
-    await affordance.copy();
-    expect(affordance.state).toBe('failed');
-    expect(dom.body.children[0]!.innerHTML).toContain('COPY FAILED');
-  });
-
-  it('collapses a doubled press into one export', async () => {
-    const dom = fakeDom();
-    let writes = 0;
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      schedule: null,
-      exportOptions: { clipboard: { writeText: async () => void writes++ }, save: null },
-    });
-    affordance.show({ reason: 'pause' });
-
-    const [first, second] = await Promise.all([affordance.copy(), affordance.copy()]);
-    expect(first.ok).toBe(true);
-    expect(second.ok).toBe(false);
-    expect(writes).toBe(1);
-  });
-
-  it('reverts to COPY LOG once the answer has been read', async () => {
-    const dom = fakeDom();
-    const pending: (() => void)[] = [];
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      schedule: (fn) => void pending.push(fn),
-      exportOptions: { clipboard: { writeText: async () => {} }, save: null },
-    });
-    affordance.show({ reason: 'pause' });
-
-    await affordance.copy();
-    expect(affordance.state).toBe('copied');
-    pending.forEach((fn) => fn());
-    expect(affordance.state).toBe('idle');
-    expect(dom.body.children[0]!.innerHTML).toContain('COPY LOG');
-  });
-
-  it('does not let a stale revert wipe a newer press’s answer', async () => {
-    const dom = fakeDom();
-    const pending: (() => void)[] = [];
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      schedule: (fn) => void pending.push(fn),
-      exportOptions: { clipboard: { writeText: async () => {} }, save: null },
-    });
-    affordance.show({ reason: 'pause' });
-
-    await affordance.copy();
-    await affordance.copy(); // a second press before the first timer fires
-    pending[0]!(); // the FIRST press's revert, now stale
-    expect(affordance.state).toBe('copied');
-  });
-
-  it('drops a previous answer when a new screen makes a new offer', async () => {
-    const dom = fakeDom();
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      schedule: null,
-      exportOptions: { clipboard: { writeText: async () => {} }, save: null },
-    });
-    affordance.show({ reason: 'pause' });
-    await affordance.copy();
-    expect(affordance.state).toBe('copied');
-
-    affordance.show({ reason: 'error', hint: 'Lost the match server.' });
-    expect(affordance.state).toBe('idle');
-    expect(dom.body.children[0]!.innerHTML).toContain('Lost the match server.');
-  });
-
-  it('survives a page with no body to mount into', () => {
-    const dom: CopyLogDom = {
-      body: null,
-      createElement: fakeDom().createElement,
-      getElementById: () => null,
-    };
-    const affordance = new CopyLogAffordance({ dom, log: newLog(), schedule: null });
-    expect(() => affordance.show({ reason: 'pause' })).not.toThrow();
-  });
-});
-
-describe('the shared affordance', () => {
-  it('does nothing where none was installed — a caller needs no null check', () => {
-    expect(() => showCopyLog({ reason: 'pause' })).not.toThrow();
-    expect(() => hideCopyLog()).not.toThrow();
-  });
-
-  it('routes show/hide to the installed one', () => {
-    const dom = fakeDom();
-    const affordance = installCopyLogButton({ dom, log: newLog(), schedule: null });
-
-    showCopyLog({ reason: 'error' });
-    expect(affordance.visible).toBe(true);
-    hideCopyLog();
-    expect(affordance.visible).toBe(false);
-  });
-
-  it('tears the old element down when a new affordance is installed', () => {
-    const dom = fakeDom();
-    const first = installCopyLogButton({ dom, log: newLog(), schedule: null });
-    first.show({ reason: 'pause' });
-    installCopyLogButton({ dom, log: newLog(), schedule: null });
-    expect(dom.body.children[0]!.removed).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// The DOWNLOAD sibling (ratified M10 — "too large for mobile clipboard")
-// ---------------------------------------------------------------------------
-
-describe('the DOWNLOAD sibling', () => {
-  it('rests on the word that names what you get — a file', () => {
-    expect(downloadLogLabel('idle')).toBe('DOWNLOAD');
-    expect(downloadLogLabel('working')).toBe('SAVING…');
-    expect(downloadLogLabel('saved')).toBe('LOG SAVED');
-    expect(downloadLogLabel('shared')).toBe('LOG SENT');
-    expect(downloadLogLabel('failed')).toBe('SAVE FAILED');
-  });
-
-  it('is drawn beside COPY LOG, with its own id and the same 44-px touch target', () => {
-    const html = renderCopyLogHtml(copyLogModel({ reason: 'pause' }, 'idle'));
-    expect(html).toContain(`id="${COPY_LOG_BUTTON_ID}"`);
-    expect(html).toContain('COPY LOG');
-    expect(html).toContain(`id="${COPY_LOG_DOWNLOAD_ID}"`);
-    expect(html).toContain('DOWNLOAD');
-    expect(html).toContain('min-height:44px');
-    // The row wraps rather than pushing the second button off a narrow phone.
-    expect(html).toContain('flex-wrap:wrap');
-  });
-
-  it('wears its own answer, and leaves COPY LOG at rest', () => {
-    const m = copyLogModel({ reason: 'pause' }, 'saved', 'download');
-    expect(m.downloadLabel).toBe('LOG SAVED');
-    expect(m.label, 'the clipboard button claimed a press it never took').toBe('COPY LOG');
-    expect(m.hint).toContain('attach that file');
-  });
-
-  it('…and the converse: a copy answer leaves DOWNLOAD at rest', () => {
-    const m = copyLogModel({ reason: 'pause' }, 'copied', 'copy');
-    expect(m.label).toBe('LOG COPIED');
-    expect(m.downloadLabel).toBe('DOWNLOAD');
-  });
-
-  it('disables BOTH while either is working — one export at a time', () => {
-    const m = copyLogModel({ reason: 'pause' }, 'working', 'download');
-    expect(m.busy).toBe(true);
-    expect(m.downloadBusy).toBe(true);
-    // Both button elements carry the attribute (the CSS's own `[disabled]` rule
-    // is matched out, so this counts elements and not stylesheet selectors).
-    expect(renderCopyLogHtml(m).match(/<button[^>]* disabled>/g)).toHaveLength(2);
-  });
-
-  it('names the phone failure honestly rather than blaming the clipboard', () => {
-    expect(copyLogModel({ reason: 'pause' }, 'failed', 'download').hint).toBe(
-      'Could not save the log on this device.',
-    );
-  });
-
-  it('a press on it takes the FILE route — never the clipboard', async () => {
-    const dom = fakeDom();
-    const writeText = vi.fn(async (_t: string) => {});
-    const save = vi.fn();
-    const affordance = new CopyLogAffordance({
-      dom,
-      log: newLog(),
-      exportOptions: { share: null, clipboard: { writeText }, save },
-      schedule: null,
+      exportOptions: { share: null, save: (name, text) => void saved.push({ name, text }) },
     });
     affordance.show({ reason: 'pause' });
 
     const result = await affordance.download();
-
     expect(result.ok && result.route).toBe('download');
-    expect(save).toHaveBeenCalledTimes(1);
-    expect(writeText, 'DOWNLOAD reached for the clipboard').not.toHaveBeenCalled();
+    // Named for the build, and a `.json` — the timestamp half is
+    // `playtestLogFilename`'s own test, since node has no clock to stamp here.
+    expect(saved[0]!.name).toMatch(/^planet-rush-log-abc1234-.+\.json$/);
+    expect(JSON.parse(saved[0]!.text)).toMatchObject({ schema: 'planet-rush.playtest-log' });
     expect(affordance.state).toBe('saved');
-    expect(affordance.actingOn).toBe('download');
-    expect(dom.find(COPY_LOG_DOWNLOAD_ID)).not.toBeNull();
     expect(dom.body.children[0]!.innerHTML).toContain('LOG SAVED');
   });
 
-  it('is wired to the DOWNLOAD element, not to COPY LOG\'s', async () => {
+  it('says SAVE FAILED rather than pretending', async () => {
     const dom = fakeDom();
-    const save = vi.fn();
-    const affordance = new CopyLogAffordance({
+    const affordance = new DownloadLogAffordance({
       dom,
       log: newLog(),
-      exportOptions: { share: null, clipboard: null, save },
       schedule: null,
+      exportOptions: { share: null, save: null },
     });
     affordance.show({ reason: 'pause' });
 
-    dom.find(COPY_LOG_DOWNLOAD_ID)!.listeners.forEach((fn) => fn());
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(save).toHaveBeenCalledTimes(1);
-    expect(affordance.actingOn).toBe('download');
+    await affordance.download();
+    expect(affordance.state).toBe('failed');
+    expect(dom.body.children[0]!.innerHTML).toContain('SAVE FAILED');
   });
 
   it('collapses a doubled thumb into one export', async () => {
     const dom = fakeDom();
     const save = vi.fn();
-    const affordance = new CopyLogAffordance({
+    const affordance = new DownloadLogAffordance({
       dom,
       log: newLog(),
-      exportOptions: { share: null, clipboard: null, save },
       schedule: null,
+      exportOptions: { share: null, save },
     });
     affordance.show({ reason: 'pause' });
 
@@ -537,21 +368,109 @@ describe('the DOWNLOAD sibling', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
-  it('drops back to a resting pair when a new screen makes a new offer', async () => {
+  it('is wired to the button element a tap actually hits', async () => {
     const dom = fakeDom();
-    const affordance = new CopyLogAffordance({
+    const save = vi.fn();
+    const affordance = new DownloadLogAffordance({
       dom,
       log: newLog(),
-      exportOptions: { share: null, clipboard: null, save: vi.fn() },
       schedule: null,
+      exportOptions: { share: null, save },
+    });
+    affordance.show({ reason: 'pause' });
+
+    dom.find(DOWNLOAD_LOG_BUTTON_ID)!.listeners.forEach((fn) => fn());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('reverts to DOWNLOAD LOG once the answer has been read', async () => {
+    const dom = fakeDom();
+    const pending: (() => void)[] = [];
+    const affordance = new DownloadLogAffordance({
+      dom,
+      log: newLog(),
+      schedule: (fn) => void pending.push(fn),
+      exportOptions: { share: null, save: () => {} },
+    });
+    affordance.show({ reason: 'pause' });
+
+    await affordance.download();
+    expect(affordance.state).toBe('saved');
+    pending.forEach((fn) => fn());
+    expect(affordance.state).toBe('idle');
+    expect(dom.body.children[0]!.innerHTML).toContain('DOWNLOAD LOG');
+  });
+
+  it('does not let a stale revert wipe a newer press’s answer', async () => {
+    const dom = fakeDom();
+    const pending: (() => void)[] = [];
+    const affordance = new DownloadLogAffordance({
+      dom,
+      log: newLog(),
+      schedule: (fn) => void pending.push(fn),
+      exportOptions: { share: null, save: () => {} },
+    });
+    affordance.show({ reason: 'pause' });
+
+    await affordance.download();
+    await affordance.download(); // a second press before the first timer fires
+    pending[0]!(); // the FIRST press's revert, now stale
+    expect(affordance.state).toBe('saved');
+  });
+
+  it('drops a previous answer when a new screen makes a new offer', async () => {
+    const dom = fakeDom();
+    const affordance = new DownloadLogAffordance({
+      dom,
+      log: newLog(),
+      schedule: null,
+      exportOptions: { share: null, save: () => {} },
     });
     affordance.show({ reason: 'pause' });
     await affordance.download();
     expect(affordance.state).toBe('saved');
 
-    affordance.show({ reason: 'error', hint: 'Couldn’t reach the servers.' });
+    affordance.show({ reason: 'error', hint: 'Lost the match server.' });
     expect(affordance.state).toBe('idle');
-    expect(affordance.actingOn, 'a stale download answer survived onto another screen').toBe('copy');
-    expect(dom.body.children[0]!.innerHTML).toContain('DOWNLOAD');
+    expect(dom.body.children[0]!.innerHTML).toContain('Lost the match server.');
+    expect(dom.body.children[0]!.innerHTML).toContain('DOWNLOAD LOG');
+  });
+
+  it('survives a page with no body to mount into', () => {
+    const dom: DownloadLogDom = {
+      body: null,
+      createElement: fakeDom().createElement,
+      getElementById: () => null,
+    };
+    const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
+    expect(() => affordance.show({ reason: 'pause' })).not.toThrow();
+  });
+});
+
+describe('the shared affordance', () => {
+  it('does nothing where none was installed — a caller needs no null check', () => {
+    expect(() => showDownloadLog({ reason: 'pause' })).not.toThrow();
+    expect(() => hideDownloadLog()).not.toThrow();
+  });
+
+  it('routes show/hide to the installed one', () => {
+    const dom = fakeDom();
+    const affordance = installDownloadLogButton({ dom, log: newLog(), schedule: null });
+
+    showDownloadLog({ reason: 'error' });
+    expect(affordance.visible).toBe(true);
+    hideDownloadLog();
+    expect(affordance.visible).toBe(false);
+  });
+
+  it('tears the old element down when a new affordance is installed', () => {
+    const dom = fakeDom();
+    const first = installDownloadLogButton({ dom, log: newLog(), schedule: null });
+    first.show({ reason: 'pause' });
+    installDownloadLogButton({ dom, log: newLog(), schedule: null });
+    expect(dom.body.children[0]!.removed).toBe(true);
   });
 });

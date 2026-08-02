@@ -70,7 +70,7 @@
  * live sub-second numbers are always readable off {@link NetTelemetry.live}, and
  * {@link NetTelemetry.format} dumps the recent history as text — the "paste a real
  * capture in the PR" the brief asks for. In the shipped client the route to a
- * player is **COPY LOG**: every finalized second is copied into the playtest log
+ * player is **DOWNLOAD LOG**: every finalized second is copied into the playtest log
  * (`./playtest-log-attach`, docs/playtest-log.md). There is no on-screen netgraph;
  * #238's comments said there was, and the audit found otherwise.
  *

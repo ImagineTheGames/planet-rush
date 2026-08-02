@@ -2,20 +2,20 @@
  * src/net/playtest-log-export.test.ts — getting the log out
  * (`./playtest-log-export`, M10 playtest-log brief §2, §3).
  *
- * The brief's export is "clipboard as JSON, plus a DOWNLOAD fallback", and the
- * fallback is the part that matters most in practice: the phone the developer plays
- * on is exactly where `navigator.clipboard` is most likely to refuse (an insecure
- * origin, a gesture-context rule, a denied permission). So the ordering, the silent
- * failover, and the honest final failure are each asserted here — none of them is
- * reachable in a live test on demand.
+ * The export is now a single promise, ratified for every device: what comes out is a
+ * **named `.json` file**, by the share sheet where the platform takes it and by a
+ * blob download where it does not. *"Clipboard goes away for all (PC and mobile)"* —
+ * so the assertions here are as much about the route the module must never take as
+ * about the two it does. The ordering and the silent failover are asserted in node
+ * because neither is reachable in a live test on demand.
  *
  * Also asserted: nothing in this module can upload. There is no network seam to
  * inject, and the export is a pure function of the log plus two local sinks.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
-import { downloadPlaytestLog, exportPlaytestLog, playtestLogFilename } from './playtest-log-export';
+import { downloadPlaytestLog, playtestLogFilename } from './playtest-log-export';
 
 /** The slice of a share payload these tests read back. */
 interface ShareDataLike {
@@ -40,182 +40,7 @@ function newLog(): PlaytestLog {
   return log;
 }
 
-describe('exportPlaytestLog', () => {
-  it('puts the log on the clipboard as parseable JSON', async () => {
-    const log = newLog();
-    const writeText = vi.fn(async (_text: string) => {});
-
-    const result = await exportPlaytestLog({ log, clipboard: { writeText }, save: null });
-
-    expect(result).toEqual({ ok: true, route: 'clipboard', bytes: log.toJson().length });
-    const pasted = JSON.parse(writeText.mock.calls[0]![0]) as { schema: string; summary: string };
-    expect(pasted.schema).toBe('planet-rush.playtest-log');
-    expect(pasted.summary).toBe(log.summaryLine());
-  });
-
-  it('falls back to a download when the clipboard rejects', async () => {
-    const log = newLog();
-    const save = vi.fn();
-
-    const result = await exportPlaytestLog({
-      log,
-      clipboard: { writeText: async () => Promise.reject(new Error('NotAllowedError')) },
-      save,
-    });
-
-    expect(result).toEqual({ ok: true, route: 'download', bytes: log.toJson().length });
-    expect(save).toHaveBeenCalledTimes(1);
-    expect(save.mock.calls[0]![0]).toBe(playtestLogFilename(log.env));
-    expect(JSON.parse(save.mock.calls[0]![1] as string)).toBeTruthy();
-  });
-
-  it('falls back to a download when there is no clipboard at all', async () => {
-    const log = newLog();
-    const save = vi.fn();
-    const result = await exportPlaytestLog({ log, clipboard: null, save });
-    expect(result.ok && result.route).toBe('download');
-  });
-
-  it('tries the clipboard FIRST — one tap, paste into chat', async () => {
-    const log = newLog();
-    const order: string[] = [];
-    await exportPlaytestLog({
-      log,
-      clipboard: { writeText: async () => void order.push('clipboard') },
-      save: () => void order.push('download'),
-    });
-    expect(order).toEqual(['clipboard']);
-  });
-
-  it('says so plainly when both routes refuse', async () => {
-    const log = newLog();
-    const result = await exportPlaytestLog({
-      log,
-      clipboard: { writeText: async () => Promise.reject(new Error('no')) },
-      save: () => {
-        throw new Error('no download either');
-      },
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toContain('download failed');
-  });
-
-  it('reports the honest failure when the device offers neither sink', async () => {
-    const result = await exportPlaytestLog({ log: newLog(), clipboard: null, save: null });
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toContain('No clipboard');
-  });
-});
-
-describe('the share sheet — the phone’s own route out (M10 action-echo §5)', () => {
-  /** A `navigator.share` stand-in that records what it was handed. */
-  function shareSpy(options: { canShare?: boolean; reject?: boolean } = {}): {
-    share: ReturnType<typeof vi.fn>;
-    canShare: ReturnType<typeof vi.fn>;
-  } {
-    return {
-      share: vi.fn(async () => {
-        if (options.reject) throw new Error('dismissed');
-      }),
-      canShare: vi.fn(() => options.canShare !== false),
-    };
-  }
-
-  /** A `File` stand-in: the payload's identity is its name and its contents. */
-  const makeShareFile = (filename: string, text: string): unknown => ({ filename, text });
-
-  it('shares a NAMED FILE first, ahead of the clipboard', async () => {
-    const log = newLog();
-    const sheet = shareSpy();
-    const writeText = vi.fn(async (_t: string) => {});
-
-    const result = await exportPlaytestLog({
-      log,
-      share: sheet,
-      makeShareFile,
-      clipboard: { writeText },
-      save: null,
-    });
-
-    expect(result).toEqual({ ok: true, route: 'share', bytes: log.toJson().length });
-    // The clipboard was never touched: on a phone, a share sheet is the gesture
-    // that exists, and pasting 40 KB of JSON into a chat app is not.
-    expect(writeText).not.toHaveBeenCalled();
-    const payload = sheet.share.mock.calls[0]![0] as { title: string; files: { filename: string; text: string }[] };
-    expect(payload.title).toBe(playtestLogFilename(log.env));
-    // A file, named for the build it came from — not a wall of text.
-    expect(payload.files[0]!.filename).toBe(playtestLogFilename(log.env));
-    expect(JSON.parse(payload.files[0]!.text)).toMatchObject({ env: { sha: '1a2b3c4' } });
-  });
-
-  it('falls through to the clipboard when the share is dismissed', async () => {
-    const log = newLog();
-    const writeText = vi.fn(async (_t: string) => {});
-    const result = await exportPlaytestLog({
-      log,
-      share: shareSpy({ reject: true }),
-      makeShareFile,
-      clipboard: { writeText },
-      save: null,
-    });
-    // A cancelled sheet reports as a rejection and says nothing about *why*, so it
-    // costs the developer the next route rather than the whole export.
-    expect(result.ok && result.route).toBe('clipboard');
-    expect(writeText).toHaveBeenCalledOnce();
-  });
-
-  it('does not even try when the platform says it cannot share files', async () => {
-    const log = newLog();
-    const sheet = shareSpy({ canShare: false });
-    const writeText = vi.fn(async (_t: string) => {});
-    const result = await exportPlaytestLog({
-      log,
-      share: sheet,
-      makeShareFile,
-      clipboard: { writeText },
-      save: null,
-    });
-    expect(sheet.share).not.toHaveBeenCalled();
-    expect(result.ok && result.route).toBe('clipboard');
-  });
-
-  it('skips the sheet on a device with no File constructor', async () => {
-    const log = newLog();
-    const sheet = shareSpy();
-    const writeText = vi.fn(async (_t: string) => {});
-    const result = await exportPlaytestLog({
-      log,
-      share: sheet,
-      makeShareFile: () => null,
-      clipboard: { writeText },
-      save: null,
-    });
-    expect(sheet.share).not.toHaveBeenCalled();
-    expect(result.ok && result.route).toBe('clipboard');
-  });
-
-  it('still reaches the download when the sheet AND the clipboard refuse', async () => {
-    const log = newLog();
-    const saved: string[] = [];
-    const result = await exportPlaytestLog({
-      log,
-      share: shareSpy({ reject: true }),
-      makeShareFile,
-      clipboard: { writeText: async () => Promise.reject(new Error('insecure origin')) },
-      save: (filename) => saved.push(filename),
-    });
-    expect(result.ok && result.route).toBe('download');
-    expect(saved).toEqual([playtestLogFilename(log.env)]);
-  });
-
-  it('is absent on a desktop browser with no share API, and that is not a failure', async () => {
-    const log = newLog();
-    const writeText = vi.fn(async (_t: string) => {});
-    const result = await exportPlaytestLog({ log, share: null, clipboard: { writeText }, save: null });
-    expect(result.ok && result.route).toBe('clipboard');
-  });
-});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('playtestLogFilename', () => {
   it('leads with the build sha and then the UTC instant', () => {
@@ -239,31 +64,16 @@ describe('playtestLogFilename', () => {
   });
 });
 
-describe('local-only', () => {
-  it('exports only to the two local sinks it was handed', async () => {
-    // The whole module surface: a log in, a clipboard and a file out. There is no
-    // third seam a future edit could point at a server without this test failing.
-    const log = newLog();
-    const seen: string[] = [];
-    await exportPlaytestLog({
-      log,
-      clipboard: { writeText: async (text) => void seen.push(`clipboard:${text.length}`) },
-      save: (name) => void seen.push(`file:${name}`),
-    });
-    expect(seen).toEqual([`clipboard:${log.toJson().length}`]);
-  });
-});
-
 // ---------------------------------------------------------------------------
-// downloadPlaytestLog — the DOWNLOAD sibling (ratified M10)
+// downloadPlaytestLog — the whole export (ratified M10)
 // ---------------------------------------------------------------------------
 
 /**
- * The developer's complaint is not that COPY LOG fails — it is that it can
- * *succeed* into a dead end: *"too large for mobile clipboard."* So the promise
- * this route makes is narrower and stronger than the chain above's — what comes
- * out the other end is a FILE — and the assertions here are mostly about the route
- * it must never take.
+ * The developer's complaint was never that the export failed — it was that it could
+ * *succeed* into a dead end: *"too large for mobile clipboard."* A 40 KB paste is not
+ * a report. So the promise this module makes is narrow and strong — what comes out
+ * the other end is a FILE — and a good half of these assertions are about the route
+ * it must never take, on a phone or on a desk.
  */
 describe('downloadPlaytestLog — a file, never a clipboard', () => {
   it('saves the log as parseable JSON under the build-and-timestamp name', async () => {
@@ -276,17 +86,38 @@ describe('downloadPlaytestLog — a file, never a clipboard', () => {
     expect(save).toHaveBeenCalledTimes(1);
     expect(save.mock.calls[0]![0]).toBe(playtestLogFilename(log.env));
     expect(save.mock.calls[0]![0]).toMatch(/^planet-rush-log-1a2b3c4-\d{8}-\d{6}\.json$/);
-    const parsed = JSON.parse(save.mock.calls[0]![1] as string) as { schema: string; events: unknown[] };
+    const parsed = JSON.parse(save.mock.calls[0]![1] as string) as {
+      schema: string;
+      summary: string;
+      events: unknown[];
+    };
     expect(parsed.schema).toBe('planet-rush.playtest-log');
+    expect(parsed.summary).toBe(log.summaryLine());
     expect(parsed.events.length).toBeGreaterThan(0);
   });
 
-  it('NEVER touches the clipboard — the whole reason this button exists', async () => {
-    const log = newLog();
+  it('NEVER touches the clipboard, even when the browser offers a working one', async () => {
+    // The seam is gone from `ExportConfig` entirely, so the only clipboard this
+    // module could still reach is the ambient one. Hand it a `navigator.clipboard`
+    // that would happily take the paste and prove it is never asked — this is the
+    // ratification (*"Clipboard goes away for all (PC and mobile)"*) as a test that
+    // fails if a future edit reintroduces the route by default.
     const writeText = vi.fn(async (_text: string) => {});
-    // A clipboard that would happily take it, offered on every seam the module has.
-    await downloadPlaytestLog({ log, share: null, clipboard: { writeText }, save: vi.fn() });
-    expect(writeText, 'the download route reached for the clipboard').not.toHaveBeenCalled();
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    await downloadPlaytestLog({ log: newLog(), share: null, save: vi.fn() });
+
+    expect(writeText, 'the export reached for the clipboard').not.toHaveBeenCalled();
+  });
+
+  it('still produces a file when the clipboard is the only thing the page has', async () => {
+    // A desktop with a clipboard and no share sheet used to be the clipboard's case.
+    // It is now just a download, and the developer never has to choose.
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn(async () => {}) } });
+    const save = vi.fn();
+    const result = await downloadPlaytestLog({ log: newLog(), share: null, save });
+    expect(result.ok && result.route).toBe('download');
+    expect(save).toHaveBeenCalledTimes(1);
   });
 
   it('prefers the share sheet WITH THE FILE where the platform takes it', async () => {
@@ -301,10 +132,14 @@ describe('downloadPlaytestLog — a file, never a clipboard', () => {
       save,
     });
 
-    expect(result.ok && result.route).toBe('share');
+    expect(result).toEqual({ ok: true, route: 'share', bytes: log.toJson().length });
     expect(save, 'the sheet took it; nothing hit the Downloads folder').not.toHaveBeenCalled();
     expect(shared[0]!.files).toHaveLength(1);
     expect(shared[0]!.title).toBe(playtestLogFilename(log.env));
+    const file = shared[0]!.files![0] as { filename: string; text: string };
+    // A file, named for the build it came from — not a wall of text.
+    expect(file.filename).toBe(playtestLogFilename(log.env));
+    expect(JSON.parse(file.text)).toMatchObject({ env: { sha: '1a2b3c4' } });
   });
 
   it('falls to the file when the platform refuses a `files:` share', async () => {
@@ -333,6 +168,21 @@ describe('downloadPlaytestLog — a file, never a clipboard', () => {
     expect(result.ok && result.route).toBe('download');
   });
 
+  it('asks the sheet even where `canShare` is absent, since a rejection is caught', async () => {
+    // Older implementations ship `share` without `canShare`; "ask and find out" is
+    // safe because the rejection costs the download nothing.
+    const log = newLog();
+    const share = vi.fn(async () => {});
+    const result = await downloadPlaytestLog({
+      log,
+      share: { share },
+      makeShareFile: (filename, text) => ({ filename, text }),
+      save: vi.fn(),
+    });
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(result.ok && result.route).toBe('share');
+  });
+
   it('never shares TEXT — a platform with no File constructor goes straight to the file', async () => {
     const log = newLog();
     const share = vi.fn(async () => {});
@@ -343,8 +193,13 @@ describe('downloadPlaytestLog — a file, never a clipboard', () => {
       makeShareFile: () => null, // no `File` on this device
       save,
     });
-    // A `text:`-only share is the wall of JSON this button exists to avoid.
+    // A `text:`-only share is the wall of JSON this export exists to avoid.
     expect(share, 'it offered the sheet a payload with no file in it').not.toHaveBeenCalled();
+    expect(result.ok && result.route).toBe('download');
+  });
+
+  it('is absent on a desktop browser with no share API, and that is not a failure', async () => {
+    const result = await downloadPlaytestLog({ log: newLog(), share: null, save: vi.fn() });
     expect(result.ok && result.route).toBe('download');
   });
 
@@ -388,5 +243,20 @@ describe('downloadPlaytestLog — a file, never a clipboard', () => {
     expect(parsed.events).toHaveLength(8);
     expect(parsed.dropped, 'the export owns up to what the ring evicted').toBe(12);
     expect(parsed.events[parsed.events.length - 1]!.msg).toBe('note 19');
+  });
+});
+
+describe('local-only', () => {
+  it('exports only to the two local sinks it was handed', async () => {
+    // The whole module surface: a log in, a share sheet and a file out. There is no
+    // third seam a future edit could point at a server without this test failing.
+    const log = newLog();
+    const seen: string[] = [];
+    await downloadPlaytestLog({
+      log,
+      share: null,
+      save: (name) => void seen.push(`file:${name}`),
+    });
+    expect(seen).toEqual([`file:${playtestLogFilename(log.env)}`]);
   });
 });

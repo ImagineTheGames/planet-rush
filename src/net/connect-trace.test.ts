@@ -54,7 +54,7 @@ describe('the verbose connecting screen', () => {
     expect(model.stage).toBe('joined');
     expect(model.busy).toBe(false);
     expect(model.error).toBe('');
-    expect(model.offerCopyLog).toBe(false);
+    expect(model.offerDownloadLog).toBe(false);
   });
 
   it('names the hand-off when the dial has to go round again', () => {
@@ -98,9 +98,9 @@ describe('the verbose connecting screen', () => {
     expect(model.busy).toBe(false);
     // Both affordances, on the panel, at the moment of failure.
     expect(model.canRetry).toBe(true);
-    expect(model.offerCopyLog).toBe(true);
+    expect(model.offerDownloadLog).toBe(true);
     // The reason is already the last step, so the offer line does not repeat it.
-    expect(connectOfferHint(model)).toBe('COPY LOG to report this.');
+    expect(connectOfferHint(model)).toBe('DOWNLOAD LOG to report this.');
   });
 
   it('glosses the reasons the server actually sends, and invents nothing for the rest', () => {
@@ -118,26 +118,26 @@ describe('the verbose connecting screen', () => {
     const model = connectTraceModel(connectFailed(beginConnect('create', T0), 'no-capacity', T0), T0);
     expect(model.current).toBe('FAILED: no-capacity');
     expect(model.canRetry).toBe(true);
-    expect(model.offerCopyLog).toBe(true);
+    expect(model.offerDownloadLog).toBe(true);
   });
 
   // --- The stall -----------------------------------------------------------
 
-  it('auto-offers COPY LOG after five seconds in any state', () => {
+  it('auto-offers DOWNLOAD LOG after five seconds in any state', () => {
     const trace = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 10);
     const justBefore = connectTraceModel(trace, T0 + 10 + STALL_MS - 1);
     expect(justBefore.stalled).toBe(false);
-    expect(justBefore.offerCopyLog).toBe(false);
+    expect(justBefore.offerDownloadLog).toBe(false);
 
     const stalled = connectTraceModel(trace, T0 + 10 + STALL_MS);
     expect(stalled.stalled).toBe(true);
-    expect(stalled.offerCopyLog).toBe(true);
+    expect(stalled.offerDownloadLog).toBe(true);
     // RETRY is NOT offered on a stall: the attempt is still live, and a second
     // allocate over the top of a socket that may yet open is how you get two rooms.
     expect(stalled.canRetry).toBe(false);
     // The step and the seconds are the TITLE's to say, so the offer names only the
     // offer — the screen never says the same sentence twice in two sizes.
-    expect(connectOfferHint(stalled)).toBe('COPY LOG to report this.');
+    expect(connectOfferHint(stalled)).toBe('DOWNLOAD LOG to report this.');
     expect(connectTitleLine(stalled)).toBe('DIALING MACHINE 0800d5b6… 5s');
   });
 
@@ -153,7 +153,7 @@ describe('the verbose connecting screen', () => {
     // begging for the log.
     const model = connectTraceModel(happyPath(), T0 + 900 + 10 * STALL_MS);
     expect(model.stalled).toBe(false);
-    expect(model.offerCopyLog).toBe(false);
+    expect(model.offerDownloadLog).toBe(false);
   });
 
   // --- The clock the stall is measured on (m10-15) --------------------------
@@ -189,7 +189,7 @@ describe('the verbose connecting screen', () => {
     for (let now = T0; now <= T0 + 4 * STEP; now += 250) {
       const at = advances.filter((t) => t.since <= now).pop()!;
       const model = connectTraceModel(at, now);
-      expect({ now: now - T0, stalled: model.stalled, offer: model.offerCopyLog }).toEqual({
+      expect({ now: now - T0, stalled: model.stalled, offer: model.offerDownloadLog }).toEqual({
         now: now - T0,
         stalled: false,
         offer: false,
@@ -214,7 +214,7 @@ describe('the verbose connecting screen', () => {
     // the server took the join and never answered it.
     const stalled = connectTraceModel(trace, T0 + 900 + 9_000);
     expect(stalled.stalled).toBe(true);
-    expect(stalled.offerCopyLog).toBe(true);
+    expect(stalled.offerDownloadLog).toBe(true);
     // Measured from the open, not from the dial — 9s, not 9.5s.
     expect(connectTitleLine(stalled)).toBe('DIALING MACHINE 0800d5b6… 9s');
     // And a stall is not a failure: nothing is red and RETRY is not on offer.
@@ -227,12 +227,12 @@ describe('the verbose connecting screen', () => {
     // welcome lands. The offer goes in the same frame, unconditionally.
     const dialing = connectDialing(beginConnect('create', T0), { machine: MACHINE }, T0 + 100);
     const due = connectTraceModel(dialing, T0 + 100 + 12 * STALL_MS);
-    expect(due.offerCopyLog).toBe(true);
+    expect(due.offerDownloadLog).toBe(true);
 
     const seated = connectJoined(dialing, 1, T0 + 100 + 12 * STALL_MS);
     const model = connectTraceModel(seated, T0 + 100 + 12 * STALL_MS);
     expect(model.stalled).toBe(false);
-    expect(model.offerCopyLog).toBe(false);
+    expect(model.offerDownloadLog).toBe(false);
     expect(model.canRetry).toBe(false);
     // Nothing to say about it either — the title is the seat, with no clock on it.
     expect(connectOfferHint(model)).toBe('');

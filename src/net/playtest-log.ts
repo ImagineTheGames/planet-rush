@@ -247,7 +247,7 @@ export function describeEnvironment(probe: EnvironmentProbe = {}): PlaytestLogEn
 // ---------------------------------------------------------------------------
 
 /**
- * Exactly what a COPY LOG produces (as JSON). Field order is deliberate: `summary`
+ * Exactly what a DOWNLOAD LOG produces (as JSON). Field order is deliberate: `summary`
  * is first after the schema so the very top of a paste is the human-readable line.
  */
 export interface PlaytestLogExport {
@@ -484,7 +484,7 @@ export class PlaytestLog {
     };
   }
 
-  /** The export as JSON text — what the clipboard and the download file carry.
+  /** The export as JSON text — what the downloaded file carries.
    *  Indented by two: a human is the first reader of this. */
   toJson(): string {
     return JSON.stringify(this.snapshot(), null, 2);
