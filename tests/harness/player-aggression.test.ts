@@ -44,7 +44,7 @@ import { describe, expect, it } from 'vitest';
 import type { Action, PlayerId, Vec2 } from '../../src/shared/types';
 import { ShipClass } from '../../src/shared/types';
 import type { Inputs, World } from '../../src/sim';
-import { createWorld, shieldPool } from '../../src/sim';
+import { TICK_DT, createWorld, shieldPool } from '../../src/sim';
 import type { Bot, BotSeat } from '../../src/bots/bot';
 import { createBot } from '../../src/bots/bot';
 import { botInputs, createBots, runHeadlessMatch } from '../../src/bots/harness';
@@ -64,7 +64,7 @@ const SLOTS = 8;
 /** The seat the human flies. Slot-position fairness is p8's question, already
  *  pinned there; one seat keeps this sweep affordable. */
 const HUMAN = 3;
-const SEEDS = [1, 2, 3];
+const SEEDS = Array.from({ length: 10 }, (_, i) => i + 1);
 /** Sim seconds per match. Long enough to clear spawn protection, run several ore
  *  waves, and let the cast go looking for fights. */
 const MATCH_SECS = 180;
@@ -218,6 +218,35 @@ interface Tally {
   readonly firstSeen: number[];
   /** Sim time a bot first initiated on this slot, or Infinity. */
   readonly firstAttack: number[];
+  /**
+   * Sim seconds actually played across the seeds in this sweep — the
+   * denominator every count below is quoted against.
+   *
+   * It is not a constant: a more aggressive cast kills faster and a match that
+   * reaches its result early simply stops (`runHeadlessMatch`). Comparing raw
+   * totals across a tuning change would therefore read "more aggression, fewer
+   * attacks" when what happened is "more aggression, shorter matches", which is
+   * the opposite conclusion. Rates per match-minute are the honest column.
+   */
+  played: number;
+  /**
+   * Sim seconds each slot spent **still in the match** (not eliminated) — the
+   * denominator for that slot's own columns.
+   *
+   * Total sim time is not enough. A slot whose core falls at 90 seconds cannot
+   * be shot at for the remaining 90, so quoting its attention against the whole
+   * match reads a *faster kill* as *less aggression* — precisely backwards.
+   * Per-alive-minute asks the question that survives a tuning change: how much
+   * fire does this slot draw for every minute it is there to draw it?
+   */
+  readonly alive: number[];
+  /** Sim time this slot was eliminated, or Infinity if it survived. */
+  readonly eliminatedAt: number[];
+  /** Every decision taken, by winning leaf — the "what are they doing instead?"
+   *  column. A fighting leaf that resolves to no victim (a `defend` with the
+   *  besieger sitting outside the home ring, say) is invisible in the victim
+   *  tallies but very visible here. */
+  readonly leaves: Map<string, number>;
 }
 
 function newTally(): Tally {
@@ -228,6 +257,10 @@ function newTally(): Tally {
     structureDamage: new Array(SLOTS).fill(0),
     firstSeen: new Array(SLOTS).fill(Number.POSITIVE_INFINITY),
     firstAttack: new Array(SLOTS).fill(Number.POSITIVE_INFINITY),
+    played: 0,
+    alive: new Array(SLOTS).fill(0),
+    eliminatedAt: new Array(SLOTS).fill(Number.POSITIVE_INFINITY),
+    leaves: new Map(),
   };
 }
 
@@ -246,6 +279,8 @@ function instrument(bots: readonly Bot[], tally: Tally): void {
       for (const seen of view.ships) {
         if (tally.firstSeen[seen.id]! > view.time) tally.firstSeen[seen.id] = view.time;
       }
+      const leaf = bot.brain.lastBehavior;
+      tally.leaves.set(leaf, (tally.leaves.get(leaf) ?? 0) + 1);
       const victim = engagedVictim(bot, view);
       const previous = lastVictim.get(bot.seat.id) ?? -1;
       if (victim === null) {
@@ -274,9 +309,15 @@ function pools(world: World, id: PlayerId): [number, number, number] {
 }
 
 /** Fold this tick's fresh damage into the tally (increases — respawn, regen,
- *  repair, a newly-built turret — are not fire dealt and do not count). */
-function sampleDamage(world: World, tally: Tally, last: number[][]): void {
+ *  repair, a newly-built turret — are not fire dealt and do not count), and
+ *  accrue each slot's time still in the match. */
+function sampleDamage(world: World, tally: Tally, last: number[][], dt: number): void {
   for (let id = 0; id < SLOTS; id++) {
+    const ship = world.ships.find((s) => s.id === id);
+    if (ship && !ship.eliminated) tally.alive[id]! += dt;
+    else if (ship && tally.eliminatedAt[id]! === Number.POSITIVE_INFINITY) {
+      tally.eliminatedAt[id] = world.time;
+    }
     const now = pools(world, id);
     const prev = last[id]!;
     for (let k = 0; k < now.length; k++) {
@@ -341,11 +382,12 @@ function measure(tier: Cast, probe: Probe, seed: number, tally: Tally): void {
 
   const last = Array.from({ length: SLOTS }, (_, id) => pools(world, id) as number[]);
 
-  runHeadlessMatch(world, bots, {
+  const result = runHeadlessMatch(world, bots, {
     maxSeconds: MATCH_SECS,
     extraInputs,
-    onTick: () => sampleDamage(world, tally, last),
+    onTick: () => sampleDamage(world, tally, last, TICK_DT),
   });
+  tally.played += result.seconds;
 }
 
 /** Run every seed for one (tier, probe) and return the summed tally. */
@@ -370,12 +412,13 @@ function columns(tally: Tally, field: Metric): {
   ratio: number;
 } {
   const values = tally[field];
-  const human = values[HUMAN]!;
+  const perMinute = (id: number): number => (60 * values[id]!) / Math.max(1e-9, tally.alive[id]!);
+  const human = perMinute(HUMAN);
   let sum = 0;
   let n = 0;
   for (let id = 0; id < SLOTS; id++) {
     if (id === HUMAN) continue;
-    sum += values[id]!;
+    sum += perMinute(id);
     n++;
   }
   const bot = sum / n;
@@ -385,10 +428,12 @@ function columns(tally: Tally, field: Metric): {
 const TIERS: Difficulty[] = [Difficulty.Easy, Difficulty.Medium, Difficulty.Hard];
 const CASTS: Cast[] = [...TIERS, 'roster'];
 
-/** One `human | bot (×ratio)` cell. */
-function cell(tally: Tally, field: Metric, width = 5): string {
+/** One `human | bot (×ratio)` cell, **per minute that slot was alive in the
+ *  match**, so neither a shorter match nor a faster kill can masquerade as less
+ *  aggression (see `Tally.alive`). */
+function cell(tally: Tally, field: Metric, digits = 1): string {
   const c = columns(tally, field);
-  return `${c.human.toFixed(0).padStart(width)} |${c.bot.toFixed(0).padStart(width)} ×${c.ratio.toFixed(2).padStart(5)}`;
+  return `${c.human.toFixed(digits).padStart(6)} |${c.bot.toFixed(digits).padStart(6)} ×${c.ratio.toFixed(2).padStart(5)}`;
 }
 
 /**
@@ -403,8 +448,8 @@ function cell(tally: Tally, field: Metric, width = 5): string {
 function report(probe: Probe, label = ''): void {
   // eslint-disable-next-line no-console
   console.log(
-    `\n[p15]${label} probe=${probe} — HUMAN | per-BOT-rival (×human/bot)\n` +
-      `        ${'initiations'.padEnd(20)}${'dwell'.padEnd(22)}${'hull dmg'.padEnd(20)}${'struct dmg'.padEnd(20)}hit/100 dwell`,
+    `\n[p15]${label} probe=${probe} — per minute ALIVE: HUMAN | per-BOT-rival (×human/bot)\n` +
+      `        ${'initiations'.padEnd(22)}${'dwell'.padEnd(22)}${'hull dmg'.padEnd(22)}${'struct dmg'.padEnd(22)}hit/100 dwell`,
   );
   for (const tier of CASTS) {
     const tally = sweep(tier, probe);
@@ -414,10 +459,20 @@ function report(probe: Probe, label = ''): void {
     const rateBot = dwell.bot > 0 ? (100 * hull.bot) / dwell.bot : 0;
     // eslint-disable-next-line no-console
     console.log(
-      `  ${tier.padEnd(6)}${cell(tally, 'initiations')}  ${cell(tally, 'dwell', 6)}  ` +
+      `  ${tier.padEnd(6)}${cell(tally, 'initiations')}  ${cell(tally, 'dwell', 0)}  ` +
         `${cell(tally, 'hullDamage')}  ${cell(tally, 'structureDamage')}  ` +
         `${rateHuman.toFixed(1).padStart(5)} |${rateBot.toFixed(1).padStart(5)} ×${(rateBot > 0 ? rateHuman / rateBot : 0).toFixed(2)}` +
+        `   ${(tally.played / SEEDS.length).toFixed(0)}s/match, human alive ${(tally.alive[HUMAN]! / SEEDS.length).toFixed(0)}s` +
         `   contact ${tally.firstSeen[HUMAN]!.toFixed(1)}s → 1st attack ${tally.firstAttack[HUMAN]!.toFixed(1)}s`,
+    );
+    const total = [...tally.leaves.values()].reduce((a, b) => a + b, 0);
+    const share = [...tally.leaves.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, n]) => `${name} ${((100 * n) / total).toFixed(0)}%`)
+      .join('  ');
+    // eslint-disable-next-line no-console
+    console.log(
+      `         ${((60 * total) / tally.played).toFixed(0)} decisions/min — ${share}`,
     );
   }
 }
