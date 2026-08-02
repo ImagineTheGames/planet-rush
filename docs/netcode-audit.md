@@ -269,8 +269,8 @@ Stated plainly rather than left for the next report.
    reads `NetTelemetry.live` per frame; grepping the client for it returns
    nothing, in `main.ts`, `debug-hook.ts` or `src/ui/`. It was never built. This
    audit corrected the comments rather than build it, because the *instrument*
-   does reach a human by a route that works — COPY LOG copies every finalized
-   second into the playtest log (`playtest-log-attach.ts`), which is what QA and
+   does reach a human by a route that works — DOWNLOAD LOG exports every finalized
+   second in the playtest log (`playtest-log-attach.ts`), which is what QA and
    the developer actually hand back. A netgraph would be a nicer live read and is
    worth having; it is a `?debug=1` HUD overlay, so it belongs to Platform or UI,
    not to this lane.
@@ -332,8 +332,9 @@ fiction online, and it stays open for the reason stated there.
 
 For the follow-up gate riding the next evidence round, on the live fleet:
 
-- **Press COPY LOG and paste it.** That is the whole instrument path in the
-  shipped client: every finalized second is already in the playtest log, now
+- **Press DOWNLOAD LOG and attach the file.** That is the whole instrument path in
+  the shipped client — one control, a `.json` file, no clipboard on any device
+  (ratified M10): every finalized second is already in the playtest log, now
   carrying `jitter`, `snap` and `lead` alongside the #238 numbers
   (`docs/playtest-log.md`). There is **no on-screen netgraph** — see §6, gap 4.
 - The verdict belongs in numbers, not vibes: **worst correction (u), visual snaps,

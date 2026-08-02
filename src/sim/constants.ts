@@ -1456,3 +1456,43 @@ export const DEPOSIT = {
 /** Spatial-hash cell size ≈ 2× the largest collider radius (GDD §4.1), so a
  *  body only ever overlaps its own cell and the eight adjacent ones. TUNABLE */
 export const HASH_CELL_SIZE: Tunable<number> = 2 * ASTEROID.maxRadius;
+
+// ---------------------------------------------------------------------------
+// Blockade geometry (p15 — ratified: a blockaded bot FIGHTS)
+// ---------------------------------------------------------------------------
+
+/**
+ * BLOCKADE — the two dials the cornered read is taken with (`./blockade`).
+ *
+ * The developer's frame: a damaged bot, its own station behind an enemy ship
+ * parked squarely on the line between them. Fear pushes it back, home pulls it
+ * through, and it dithers. The ratified answer is that a bot in that geometry is
+ * CORNERED and commits to the fight — but "in that geometry" needs two numbers
+ * to be a rule rather than a feeling: how wide is the lane a blockader shuts,
+ * and how much extra flying is a way around still worth?
+ *
+ * Both are TUNABLE and both are deliberately conservative — a false *positive*
+ * here makes a bot fight when it could have run, which is the failure the
+ * developer would rather have; a false *negative* puts the dithering back.
+ */
+export const BLOCKADE = {
+  /**
+   * Half-width of the lane a blockading ship shuts, world units. Set to the
+   * weapon's own reach: a ship cannot slide past closer than this without
+   * spending the whole pass inside the blockader's gun, which is not passing —
+   * it is taking the fight at the worst possible moment, on the move, with its
+   * back turned. Anything wider would call an idling bystander a blockade;
+   * anything narrower would let a ship "thread" a lane it gets shot down in.
+   * TUNABLE
+   */
+  corridor: WEAPON_RANGE,
+  /**
+   * Seconds of extra flight a detour may cost — measured against the *speed
+   * margin* over the blockader, not raw top speed, because that margin is the
+   * only rate at which a ship actually gets around something that follows it
+   * (`detourIsCheap`). Roughly the time a wave-to-wave errand can absorb without
+   * the trip home becoming the whole decision; past it, engaging is the cheaper
+   * plan and the ratified rule says take it. TUNABLE
+   */
+  detourBudgetSeconds: 2.5,
+} as const;

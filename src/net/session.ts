@@ -86,7 +86,7 @@ export interface MatchSession {
    * Client-side reconciliation telemetry — misprediction rate, correction
    * magnitude, and measured RTT, sampled per second (`./telemetry`, M10 reconcile
    * brief). Populated only online, where there is prediction to measure; a
-   * Every finalized second reaches the player through COPY LOG
+   * Every finalized second reaches the player through DOWNLOAD LOG
    * (`./playtest-log-attach`); {@link NetTelemetry.format} dumps a capture for a
    * console or a test. (#238's comments promised a `?debug=1` netgraph reading
    * {@link NetTelemetry.live} per frame — it was never built. See
@@ -226,7 +226,7 @@ export class TransportSession implements MatchSession {
   private readonly dt: number;
   private readonly clock: () => number;
   /** The reconciliation instrument — fed on every send and every applied
-   *  reconcile, and handed back through COPY LOG (`./telemetry`). Inert offline. */
+   *  reconcile, and handed back through DOWNLOAD LOG (`./telemetry`). Inert offline. */
   private readonly netTelemetry = new NetTelemetry();
   /** Probe ids, and the clock reading of the last probe sent ({@link PING_INTERVAL_MS}). */
   private pingId = 0;

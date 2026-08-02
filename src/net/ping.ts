@@ -113,3 +113,32 @@ export function seatPing(seat: PingSeat): PingReadout | null {
   if (seat.isBot) return null;
   return pingReadout(seat.rtt);
 }
+
+/** Air the ping keeps between itself and whatever the row's right edge holds —
+ *  the same 8px pad the roster's own furniture is spaced by. */
+export const PING_CHIP_GAP = 8;
+
+/**
+ * Does the readout fit on this row, whole?
+ *
+ * The lobby row is the tightest place either surface has to draw a number, and on
+ * a phone in landscape — **the** form factor for a landscape game (§4.3; the
+ * roster row is 221px wide there) — it is tight enough that the answer is
+ * genuinely sometimes no. The rule:
+ *
+ *  - The number is drawn only if it fits **entirely** to the left of whatever
+ *    ends the row. Testing the start position alone is not enough: a readout that
+ *    begins in clear space and ends underneath the TEAM chip is the overlap the
+ *    check exists to prevent.
+ *  - `chipsLeft` is the row's *actual* content edge — the leftmost trailing chip
+ *    that is really drawn, or the row's right edge when none is. A human seat in
+ *    FFA carries no trailing chip at all (the tier chip is a bot control), so it
+ *    gets the whole row; reserving a fixed width for furniture that never appears
+ *    on a ping-bearing row is what used to cost the phone its number.
+ *
+ * Pure and unit-shaped — the widths arrive already measured, so both form factors
+ * can be asserted against the real layout with no canvas in the room.
+ */
+export function pingFits(pingX: number, pingWidth: number, chipsLeft: number, gap = PING_CHIP_GAP): boolean {
+  return pingX + pingWidth <= chipsLeft - gap;
+}

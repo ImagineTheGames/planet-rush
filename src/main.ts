@@ -262,7 +262,7 @@ import {
   attachSessionLog,
   // The verbose connecting screen (M10): every step of the join named as it
   // happens **in the screen's own title**, or the exact refusal there with RETRY
-  // and COPY LOG under it.
+  // and DOWNLOAD LOG under it.
   beginConnect,
   connectDialing,
   connectFailed,
@@ -277,21 +277,17 @@ import {
   hideConnectTrace,
   installConnectTraceView,
   showConnectTrace,
-  // The connection dying LOUDLY (m10 disconnect honesty): the overlay that names
-  // what was detected and offers RECONNECT / ABANDON MATCH.
-  installLinkLossView,
-  showLinkLoss,
-  copyLogButton,
+  downloadLogButton,
   describeEnvironment,
   disconnectOfferHint,
   ERROR_OFFER_HINT,
-  hideCopyLog,
+  hideDownloadLog,
   installConsoleCapture,
-  installCopyLogButton,
+  installDownloadLogButton,
   installErrorCapture,
   installPlaytestLog,
   playtestLog,
-  showCopyLog,
+  showDownloadLog,
   // Your own ping, one mono line above the build stamp (ratified developer).
   PingBadge,
   PING_BADGE_ID,
@@ -470,8 +466,8 @@ async function boot(): Promise<void> {
   installConsoleCapture({ log: playtest, origin: pageOrigin() });
   installErrorCapture({ log: playtest });
   // And the one affordance that gets the log out: hidden until a screen offers it
-  // (the pause menu, or an error screen — see `syncCopyLog` and `failOnline`).
-  installCopyLogButton({ dom: document, log: playtest });
+  // (the pause menu, or an error screen — see `syncDownloadLog` and `failOnline`).
+  installDownloadLogButton({ dom: document, log: playtest });
 
   // --- Build identity → the log's env (ratified, M10 §3). The badge string and
   //     the log header are ONE string: whenever the identity changes — a welcome
@@ -892,56 +888,6 @@ async function boot(): Promise<void> {
     session.observe((message) => {
       if (message.type === 'matchStart' && session.world) world = session.world;
     });
-  }
-
-  // --- Disconnect honesty (m10; the developer's zombie-match report) ---------
-  //     *"Left browser, came back, disconnected — bots frozen but I could still
-  //     move. I should get kicked out and presented reconnect / abandon buttons."*
-  //
-  //     The three halves of that, wired: the page tells the session when it goes
-  //     away and comes back (the browser event nothing else in the match reads),
-  //     the session's watchdog decides whether the link survived it
-  //     (`src/net/link-loss`), and the DOM overlay says which and offers the two
-  //     doors. The freeze itself needs no wiring here — it lives in `sendInput`,
-  //     so a lost link stops the world wherever the loop happens to be.
-  //
-  //     Offline none of this exists: there is no wire to lose.
-  let linkLossTimer: ReturnType<typeof setInterval> | null = null;
-  if (onlineSession) {
-    const session = onlineSession;
-    installLinkLossView({
-      dom: document,
-      onReconnect: () => {
-        session.reconnect();
-        syncLinkLoss();
-      },
-      // ABANDON MATCH: say it on the wire so the seat is freed rather than held
-      // for a minute (`src/net/transport` LeaveMessage), then leave the way every
-      // other exit leaves — `exitToMenu` is the one teardown.
-      onAbandon: () => {
-        session.leave();
-        exitToMenu();
-      },
-      onMenu: () => exitToMenu(),
-    });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) session.linkHidden();
-      else session.linkShown();
-      syncLinkLoss();
-    });
-    // The render loop is not enough on its own: a throttled tab stops painting, and
-    // a countdown nobody looks at does not tick. A quarter second is free.
-    linkLossTimer = setInterval(syncLinkLoss, SESSION_LOG_POLL_MS);
-    window.addEventListener('pagehide', () => {
-      if (linkLossTimer !== null) clearInterval(linkLossTimer);
-    });
-  }
-
-  /** Sample the link and draw (or withdraw) the overlay. Cheap by construction:
-   *  while the link is live this is one clock read and one string comparison. */
-  function syncLinkLoss(): void {
-    if (!onlineSession) return;
-    showLinkLoss(onlineSession.pollLink());
   }
 
   // The match world now exists — flip the menu's test seam so a clean-boot
@@ -1894,10 +1840,6 @@ async function boot(): Promise<void> {
       // touch corner button. Runs every rendered frame, including while the sim is
       // frozen above — so the overlay stays live over a stopped world.
       syncPause();
-      // The connection, watched (m10 disconnect honesty). Also on a timer of its
-      // own — a dead link is detected by *nothing happening*, and a tab that stops
-      // being rendered is exactly the case this exists for.
-      syncLinkLoss();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -2172,11 +2114,11 @@ async function boot(): Promise<void> {
     pauseSettings.visible = settingsUp;
     if (settingsUp) pauseSettings.update(settingsModel(matchSettings, fireMode, controlScheme));
     pauseView.updateButton(pauseButtonVisible({ isTouch, available: pauseAvailable() }));
-    syncCopyLog();
+    syncDownloadLog();
   }
 
   /**
-   * Offer COPY LOG in the match, and only where the brief puts it (§2, §3):
+   * Offer DOWNLOAD LOG in the match, and only where the brief puts it (§2, §3):
    *
    *   1. **A lost or losing connection first.** Online, `reconnecting` and `closed`
    *      are the two states a "it kept dropping" report is about, and the offer names
@@ -2190,28 +2132,20 @@ async function boot(): Promise<void> {
    * Called once per rendered frame from {@link syncPause}; a repeated identical offer
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
-  function syncCopyLog(): void {
-    // A silently-killed socket never leaves `open` (m10 disconnect honesty), so the
-    // state check below would miss the exact failure the developer reported. The
-    // watchdog's verdict is checked first, and it covers the state cases too — but
-    // they stay, because a session with no watchdog (offline) still has states.
-    if (onlineSession?.frozen) {
-      showCopyLog({ reason: 'error', hint: 'COPY LOG to report this disconnect.' });
-      return;
-    }
+  function syncDownloadLog(): void {
     const state = onlineSession?.state;
     if (state === 'reconnecting' || state === 'closed') {
-      showCopyLog({
+      showDownloadLog({
         reason: 'error',
         hint: disconnectOfferHint(state, onlineSession?.closeReason ?? null),
       });
       return;
     }
     if (isPauseOpen(pauseScreen)) {
-      showCopyLog({ reason: 'pause' });
+      showDownloadLog({ reason: 'pause' });
       return;
     }
-    hideCopyLog();
+    hideDownloadLog();
   }
 
   /** Merge every device's control state into one, then map to abstract actions.
@@ -5416,9 +5350,8 @@ function openMainMenu(
     onRetry: () => {
       if (retryDoor) void startResolve(retryDoor.door, retryDoor.room);
     },
-    onCopyLog: () => void copyLogButton()?.copy(),
-    // The DOWNLOAD sibling (ratified M10): a FILE, never a 40 KB clipboard paste.
-    onDownloadLog: () => void copyLogButton()?.download(),
+    // The one log control (ratified M10): a FILE, never a 40 KB clipboard paste.
+    onDownloadLog: () => void downloadLogButton()?.download(),
   });
 
   /**
@@ -5462,7 +5395,7 @@ function openMainMenu(
   }
 
   /** Keep the panel's clock running while an attempt is live, so a stall crosses
-   *  STALL_MS on its own and auto-offers COPY LOG with nothing else happening. */
+   *  STALL_MS on its own and auto-offers DOWNLOAD LOG with nothing else happening. */
   function startTraceTicker(): void {
     if (connectTraceTimer !== null) return;
     connectTraceTimer = setInterval(() => {
@@ -5478,7 +5411,7 @@ function openMainMenu(
       render();
       // A stall crosses STALL_MS with nothing else happening, so the corner
       // affordance has to be re-decided here too rather than only on a render.
-      syncCopyLog();
+      syncDownloadLog();
     }, SESSION_LOG_POLL_MS);
   }
 
@@ -5585,7 +5518,7 @@ function openMainMenu(
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
-    syncCopyLog();
+    syncDownloadLog();
     updateSeamLayout();
   }
 
@@ -5871,7 +5804,7 @@ function openMainMenu(
       // The two ends of the story, straight from the wire. A refusal is terminal
       // (`src/net/websocket-transport` `rejectJoin`), so the TITLE keeps the exact
       // reason on screen — "REFUSED: bad-ticket — machine mismatch" — with RETRY
-      // and COPY LOG under it, instead of a word that never resolves.
+      // and DOWNLOAD LOG under it, instead of a word that never resolves.
       if (message.type === 'joinError') {
         // Refused is not connected: whatever the dial hoped for, the badge must
         // not claim a Machine this client was never seated on.
@@ -5984,29 +5917,30 @@ function openMainMenu(
 
   /** Show an allocator refusal on the front door, keeping the typed code so a
    *  retry is one tap (`entryFailed`), and speaking the reason's own words. The
-   *  COPY LOG offer follows from the screen's `error` status (`syncCopyLog`), so the
-   *  "can't reach the servers" page always carries it (brief §3). */
+   *  DOWNLOAD LOG offer follows from the screen's `error` status
+   *  (`syncDownloadLog`), so the "can't reach the servers" page always carries it
+   *  (brief §3). */
   function failOnline(reason: ResolveFailure): void {
     entry = entryFailed(entry, entryErrorFor(reason));
     render();
   }
 
   /**
-   * Offer COPY LOG on the front door's error screen, and withdraw it everywhere else
-   * in the menus (brief §2, §3). Driven from `render`, so it follows the screen's own
-   * state rather than needing a call at each failure site.
+   * Offer DOWNLOAD LOG on the front door's error screen, and withdraw it everywhere
+   * else in the menus (brief §2, §3). Driven from `render`, so it follows the
+   * screen's own state rather than needing a call at each failure site.
    */
-  function syncCopyLog(): void {
-    // The connect panel carries its own COPY LOG now, right under the failure it
+  function syncDownloadLog(): void {
+    // The connect panel carries its own DOWNLOAD LOG now, right under the failure it
     // is reporting (M10). Two buttons offering the same export, one of them in a
     // far corner, is worse than one in the right place — so the corner affordance
     // stands down for exactly as long as the panel is making the offer.
-    if (connectTrace !== null && connectTraceModel(connectTrace, Date.now()).offerCopyLog) {
-      hideCopyLog();
+    if (connectTrace !== null && connectTraceModel(connectTrace, Date.now()).offerDownloadLog) {
+      hideDownloadLog();
       return;
     }
-    if (screen === 'online' && entry.status === 'error') showCopyLog({ reason: 'error' });
-    else hideCopyLog();
+    if (screen === 'online' && entry.status === 'error') showDownloadLog({ reason: 'error' });
+    else hideDownloadLog();
   }
 
   /**
@@ -6907,8 +6841,8 @@ function openLobby(
         rush();
         break;
       case 'roomCode':
-        // The code is a label, not a control — hit-testable so a caller could offer
-        // copy-to-clipboard, and hidden entirely offline. A tap never disturbs the
+        // The code is a label, not a control — hit-testable so a caller could act
+        // on it, and hidden entirely offline. A tap never disturbs the
         // roster (the same rule `./ui/lobby-flow` keeps).
         break;
     }
@@ -7192,8 +7126,8 @@ function presentBootFailure(err: unknown): void {
     // And offer the playtest log on this screen too (brief §3: *every* error screen).
     // A boot failure may well have happened before `boot()` installed the affordance,
     // so install one here if there is none; the log itself always exists.
-    if (!copyLogButton()) installCopyLogButton({ dom: document });
-    showCopyLog({ reason: 'error', hint: `Boot failed — ${ERROR_OFFER_HINT}` });
+    if (!downloadLogButton()) installDownloadLogButton({ dom: document });
+    showDownloadLog({ reason: 'error', hint: `Boot failed — ${ERROR_OFFER_HINT}` });
   } catch (screenErr) {
     // The failure path must not fail silently on top of the original failure.
     console.error('Planet Rush: could not render the boot-error screen', screenErr);

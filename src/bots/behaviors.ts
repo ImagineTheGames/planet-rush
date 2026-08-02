@@ -14,7 +14,17 @@
  */
 
 import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } from '@shared/types';
-import { CORE_HP, REPAIR_HP_PER_ORE, WEAPON_RANGE, STATION, SHIELD, SHIP_RADIUS, TURRET } from '../sim';
+import {
+  CORE_HP,
+  REPAIR_HP_PER_ORE,
+  WEAPON_RANGE,
+  STATION,
+  SHIELD,
+  SHIP_RADIUS,
+  TURRET,
+  classTopSpeed,
+  corneredReading,
+} from '../sim';
 import type { PerceivedShip } from './perception';
 import {
   ARRIVE_RADIUS,
@@ -32,10 +42,12 @@ import {
   rotate,
   standOff,
   thrust,
+  topSpeedOf,
   toward,
 } from './steering';
 import { commit, release } from './commitment';
-import { homeIntruder, isEngageable, retreatThreshold } from './targeting';
+import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
+import { homeIntruder, isEngageable, isWounded, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -616,6 +628,16 @@ export function wantsRetreat(ctx: BotCtx): boolean {
     release(latch);
     return false;
   }
+  // Cornered and committed: there is no retreat to want, because the road home
+  // runs through the thing being run from (`./cornered`; ratified p15 point 2 —
+  // "no fear re-evaluation mid-commitment"). The flee latch is *released* rather
+  // than merely ignored, so when the commitment lifts the bot re-reads its nerve
+  // from scratch instead of silently resuming a run it abandoned to fight —
+  // exactly how the last stand pre-empts a retreat.
+  if (corneredCommitted(ctx.brain.cornered, ctx.view.time)) {
+    release(latch);
+    return false;
+  }
   const wounded = ctx.self.hullFraction < retreatThreshold(ctx.tuning, ctx.weights);
   const enter = wounded && incomingThreat(ctx) !== null;
   const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
@@ -660,11 +682,164 @@ export function wantsRetreat(ctx: BotCtx): boolean {
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
   const station = ctx.self.station;
-  const threatAtHome =
-    station !== null && station.alive && threat !== null && dist(threat.pos, station.pos) < GUARD_RADIUS * 2;
-  if (station && station.alive && !threatAtHome) return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
+  if (station && station.alive && !threatAtHome(ctx, threat)) {
+    return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
+  }
   if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false)];
   return [thrust({ x: 0, y: 0 }), fire(false)];
+}
+
+/**
+ * Is the thing this bot is afraid of already sitting *on* its home?
+ *
+ * The one place that question is answered, because two behaviors need the same
+ * answer and must not drift apart: {@link retreat} uses it to decide that
+ * running home is running into the siege, and {@link corneredBlockader} uses it
+ * to rule out calling a siege a blockade — a ship parked on the destination is
+ * not standing between the bot and the destination, and the defend/last-stand
+ * branches already own that case (GDD §2.6).
+ */
+export function threatAtHome(ctx: BotCtx, threat: PerceivedShip | null): boolean {
+  const station = ctx.self.station;
+  return (
+    station !== null && station.alive && threat !== null && dist(threat.pos, station.pos) < GUARD_RADIUS * 2
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cornered — the blockade, and the commitment to fight it (developer report
+// p15, ratified: "a blockaded bot FIGHTS — no dithering")
+// ---------------------------------------------------------------------------
+
+/**
+ * The minimum window a cornered bot fights for, seconds, with its fear model
+ * switched off (`./cornered`; ratified point 2).
+ *
+ * It has to outlast the thing it is fixing, exactly like the wedge escape run
+ * ({@link ESCAPE_SECONDS}) does: a one-decision "commitment" is another twitch.
+ * Long enough to actually close the stand-off and land shots — several seconds
+ * of weapon time at any tier's cadence — and short enough that a bot whose
+ * blockade genuinely lifts is not still swinging at a ship that left. The
+ * commitment renews itself for as long as the geometry stays shut, so this is a
+ * floor on how briefly a bot may change its mind, never a ceiling on the fight.
+ * TUNABLE
+ */
+export const CORNERED_COMMIT_SECONDS = 4;
+
+/** The ship in view with this slot, if it is still worth fighting and still
+ *  here. `null` covers all three ways a commitment ends on its own — it died,
+ *  it was eliminated, or it broke off past the retreat band. */
+function blockaderInView(ctx: BotCtx, id: PlayerId): PerceivedShip | null {
+  for (const ship of ctx.view.ships) {
+    if (ship.id !== id) continue;
+    if (!isEngageable(ship) || ship.distance > RETREAT_CLEAR_RANGE) return null;
+    return ship;
+  }
+  return null;
+}
+
+/**
+ * The ship this bot is cornered by and has committed to fighting, or `null`.
+ *
+ * The developer's frame, in code: a damaged bot, its own station behind an enemy
+ * parked on the line between them, fear and home pulling exactly against each
+ * other. This is the read that breaks the tie, and it runs in two modes:
+ *
+ *  - **Committed.** Inside the minimum window, with the blockader still alive
+ *    and still here, nothing is re-derived and nothing is re-voted on. That is
+ *    ratified point 2 — "no fear re-evaluation mid-commitment" — and it is why
+ *    this check comes first. The commitment ends by itself the moment the
+ *    blockader dies or breaks off (`blockaderInView` returns `null`).
+ *  - **Reading.** Otherwise: is this bot even afraid (`isWounded` — only fear
+ *    can build the trap fear is caught in), is there a threat, is it *not*
+ *    simply besieging the destination, and does `@sim/blockade` say the road is
+ *    shut? An unbroken run of shut reads longer than the tier's
+ *    `blockadeDetectSeconds` commits (ratified point 3: Hard almost at once,
+ *    Easy after a visible wobble).
+ *
+ * Fog-honest throughout: positions and hull class come from the view — a
+ * silhouette is public information (GDD §2.11) — and the blockader's speed is
+ * priced off its class alone (`classTopSpeed`), never off engine tiers this bot
+ * never scouted.
+ */
+export function corneredBlockader(ctx: BotCtx): PerceivedShip | null {
+  const latch = ctx.brain.cornered;
+  const now = ctx.view.time;
+  const station = ctx.self.station;
+  // No home to be cut off from, no life to save, and in collapse there is
+  // nothing to run to anyway (GDD §2.3) — every tier already fights to the end.
+  if (!ctx.self.alive || ctx.view.collapsed || station === null || !station.alive) {
+    resetCornered(latch);
+    return null;
+  }
+
+  const heldId = corneredHeld(latch, now);
+  if (heldId >= 0) {
+    const held = blockaderInView(ctx, heldId);
+    if (held !== null) {
+      release(ctx.brain.fleeing);
+      return held;
+    }
+    resetCornered(latch); // it died, or it broke off: the path is open again
+    return null;
+  }
+
+  // Prefer re-reading against the ship already under suspicion, so a threat that
+  // has held the lane keeps its detection clock rather than restarting it every
+  // time another hull drifts marginally closer.
+  const threat = (latch.target >= 0 ? blockaderInView(ctx, latch.target) : null)
+    ?? nearestThreat(ctx, RETREAT_CLEAR_RANGE);
+  if (threat === null || !isWounded(ctx) || threatAtHome(ctx, threat)) {
+    resetCornered(latch);
+    return null;
+  }
+
+  const shut = corneredReading({
+    from: ctx.self.pos,
+    to: station.pos,
+    threat: threat.pos,
+    ownSpeed: topSpeedOf(ctx.self),
+    threatSpeed: classTopSpeed(threat.shipClass),
+  }).cornered;
+  const committedTo = corneredCommit(
+    latch,
+    now,
+    threat.id,
+    shut,
+    ctx.tuning.blockadeDetectSeconds,
+    CORNERED_COMMIT_SECONDS,
+  );
+  if (committedTo < 0) return null;
+  // A committed bot is not fleeing — say so in the state, not just in the tree's
+  // priority order. The flee latch is dropped at the moment of commitment (and
+  // on every decision the commitment holds), so when the window finally closes
+  // the bot re-reads its nerve from scratch instead of silently resuming the run
+  // it abandoned to fight. `wantsRetreat`'s own guard is then a safety net for
+  // any future tree that orders these two differently, rather than the only
+  // thing holding the invariant up.
+  release(ctx.brain.fleeing);
+  return threat;
+}
+
+/** Does this bot want to be fighting its way out right now? The tree's test —
+ *  `./easy`, `./medium` and `./hard` all place it directly above the retreat,
+ *  because it is the branch that says the retreat is not available. */
+export function wantsCorneredFight(ctx: BotCtx): boolean {
+  return corneredBlockader(ctx) !== null;
+}
+
+/**
+ * Fight the blockade: full engagement on the ship in the way, at knife range,
+ * until it dies, breaks off, or the path opens (ratified point 2).
+ *
+ * Deliberately the same `engage` every other attack uses — a cornered bot is not
+ * given a special weapon or a special aim, only a decision it holds to. Its
+ * tier's spread and lead-lag still apply, so an Easy bot cornered is an Easy bot
+ * *fighting*, which is the point: "the blockader is often weaker than the fear
+ * model assumes" (the developer's own hull was 22/60 in the frame).
+ */
+export function fightBlockade(ctx: BotCtx, threat: PerceivedShip): readonly Action[] {
+  return engage(ctx, threat.pos, SHIP_RADIUS, WEAPON_RANGE * 0.6, threat.vel, threat.id);
 }
 
 /**
@@ -680,6 +855,11 @@ export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Act
  */
 export function lastStandDefend(ctx: BotCtx): readonly Action[] | null {
   release(ctx.brain.fleeing);
+  // The cornered commitment is a commitment like any other, and a core about to
+  // die outranks it too: drop it, so a bot that was fighting its way home stops
+  // fighting *out there* and comes back to the thing that is not cheap (GDD
+  // §2.7). It re-earns the read from scratch if the blockade is still up after.
+  resetCornered(ctx.brain.cornered);
   return defendHome(ctx);
 }
 

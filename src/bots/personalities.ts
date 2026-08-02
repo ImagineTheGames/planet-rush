@@ -95,6 +95,21 @@ export interface DifficultyTuning {
    * because it re-scouts, never because it re-reads the world. TUNABLE
    */
   readonly memorySeconds: number;
+  /**
+   * Seconds the road home must read *shut* before this tier believes it is
+   * cornered and commits to fighting the blockader (`./cornered`; developer
+   * report p15, ratified point 3).
+   *
+   * This is the whole difficulty texture of the cornered rule, expressed as
+   * reaction time rather than as three different rules: a Hard bot reads the
+   * trap almost at once and commits ruthlessly, an Easy bot takes long enough
+   * that "a visible couple of oscillations" happen first — which the developer
+   * ratified as acceptable AT EASY ONLY — and then commits exactly as hard as
+   * anyone else. Nobody gets a *different* answer; the ladder is only in how
+   * long they take to reach it, which is the same principle as `aimLatency`.
+   * TUNABLE
+   */
+  readonly blockadeDetectSeconds: number;
 }
 
 /** Per-tier competence. All TUNABLE, all owned by this agent. */
@@ -105,6 +120,11 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     aimLatency: 0.6,
     retreatHullFraction: 0.5,
     memorySeconds: 6,
+    // ~10 decisions at Easy's 1/6 s cadence, and long enough for the flee latch
+    // to enter and release a couple of times: the "visible couple of
+    // oscillations" the developer ratified as acceptable at this tier, and then
+    // Rusty stops being scared.
+    blockadeDetectSeconds: 1.6,
   },
   [Difficulty.Medium]: {
     reactionInterval: 1 / 12,
@@ -112,6 +132,8 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     aimLatency: 0.32,
     retreatHullFraction: 0.35,
     memorySeconds: 12,
+    /** Half a beat of confusion, then it turns and fights. */
+    blockadeDetectSeconds: 0.6,
   },
   [Difficulty.Hard]: {
     // Tuned *down* from v0.2.2's perfection (aimJitter 0.02, no latency): the
@@ -127,6 +149,9 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     aimLatency: 0.2,
     retreatHullFraction: 0.2,
     memorySeconds: 20,
+    // Three decisions at 1/20 s. A Hard bot reads a blockade the way a good
+    // human does — instantly — and commits ruthlessly (ratified point 3).
+    blockadeDetectSeconds: 0.15,
   },
 };
 

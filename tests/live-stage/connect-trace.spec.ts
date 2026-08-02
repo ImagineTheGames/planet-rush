@@ -26,7 +26,7 @@
  *                                         announced it is asserted from the sampled
  *                                         record below, which cannot miss a frame.
  *   connect-trace-refused-evidence.png  — REFUSED: bad-ticket — machine mismatch
- *                                         in the title, RETRY and COPY LOG below it
+ *                                         in the title, RETRY and DOWNLOAD LOG below it
  *
  *   connect-trace-phone-*-evidence.png  — the same three, at {@link PHONE}
  *
@@ -75,11 +75,13 @@ import { test, expect, type Page } from '@playwright/test';
 
 const EDGE_CONTROL = 'http://127.0.0.1:8792/_edge/land';
 
-/** The affordances `src/net/connect-trace-view.ts` mounts — RETRY and COPY LOG,
- *  and, since the developer's third pass, nothing else. */
+/** The affordances `src/net/connect-trace-view.ts` mounts — RETRY and DOWNLOAD LOG,
+ *  and, since the developer's third pass, nothing else. The log affordance is ONE
+ *  button and it is a download: the clipboard route was ratified away for every
+ *  device, so there is no sibling here to select between (`./log-download.spec.ts`). */
 const PANEL = '#pr-connect-trace';
 const RETRY = '#pr-connect-trace-retry';
-const COPY = '#pr-connect-trace-copy';
+const DOWNLOAD = '#pr-connect-trace-download';
 
 /** The phone the second half of this spec runs in, held PORTRAIT so the landscape
  *  lock's rotation remap is in play — the same profile the play-flow walk contracts
@@ -222,9 +224,16 @@ async function connectToARefusal(page: Page, evidence: string): Promise<void> {
   // Both affordances, under that line, at the moment of failure — the ask,
   // verbatim. And the failure is said ONCE: the buttons do not repeat it.
   await expect(page.locator(RETRY)).toBeVisible();
-  await expect(page.locator(COPY)).toBeVisible();
-  await expect(page.locator(`${PANEL} .pr-ct-hint`)).toContainText('COPY LOG to report this.');
+  await expect(page.locator(DOWNLOAD)).toBeVisible();
+  await expect(page.locator(DOWNLOAD)).toHaveText('DOWNLOAD LOG');
+  await expect(page.locator(`${PANEL} .pr-ct-hint`)).toContainText('DOWNLOAD LOG to report this.');
   await expect(page.locator(PANEL)).not.toContainText('machine mismatch');
+
+  // Two buttons under the refusal, not three: a screen that still offered a
+  // clipboard beside the download would be the ratified-away shape growing back
+  // on the surface nobody photographs.
+  await expect(page.locator(`${PANEL} .pr-ct-button`)).toHaveCount(2);
+  await expect(page.locator(PANEL)).not.toContainText(/COP/i);
 
   // "I see the verbosity (it's on the bottom)" — measured, on whatever screen this
   // is running on: the affordances sit in the top half, under the title, not down
@@ -258,7 +267,7 @@ test.describe('the connecting screen says what it is doing, in its title', () =>
     expectTheTitleAdvanced(await connectToASeat(page, 'connect-trace'));
   });
 
-  test('stops the title on the exact refusal, with RETRY and COPY LOG below it', async ({ page }) => {
+  test('stops the title on the exact refusal, with RETRY and DOWNLOAD LOG below it', async ({ page }) => {
     await connectToARefusal(page, 'connect-trace');
 
     // RETRY means a FRESH allocate, never a redial of the ticket that just lost —

@@ -29,10 +29,12 @@ import type { Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
   attack,
+  corneredBlockader,
   coreUnderFinalAssault,
   defendHome,
   haulHome,
   hunt,
+  fightBlockade,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -43,6 +45,7 @@ import {
   scavenge,
   spendAtHome,
   upgrade,
+  wantsCorneredFight,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -155,6 +158,20 @@ export const mediumTree: Node = selector('medium', [
   // A core under final assault outranks self-preservation (v0.2.2 field report):
   // above the retreat, and the one thing that interrupts a committed one.
   when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // Cornered: the road home runs through the ship that is scaring it (developer
+  // report p15, ratified). Fear says back off, home says come through, and the
+  // two cancel on the line between them — so the bot stops asking and FIGHTS,
+  // for a committed window with its nerve switched off (`./cornered`). Above the
+  // retreat, because it is the branch that says the retreat does not exist.
+  when(
+    'cornered-fight',
+    (ctx) => wantsCorneredFight(ctx),
+    (ctx) => {
+      const blockader = corneredBlockader(ctx);
+      return blockader ? fightBlockade(ctx, blockader) : null;
+    },
+  ),
 
   // Breaks off wounded, and *stays* broken off — the retreat is latched so it
   // cannot flap between fleeing and re-engaging (`./commitment`; v0.2.2 field
