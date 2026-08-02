@@ -40,6 +40,7 @@ import {
   shieldPool,
   turretCount,
   sensorSources,
+  rememberedOreIds,
 } from './sim';
 import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
@@ -1584,26 +1585,30 @@ async function boot(): Promise<void> {
   const minimapShips: MinimapShip[] = [];
   const minimapSatellitePool: MutMinimapSatellite[] = [];
   const minimapSatellites: MinimapSatellite[] = [];
-  const minimapOrePool: { x: number; y: number }[] = [];
-  const minimapOre: { x: number; y: number }[] = [];
+  const minimapOrePool: { x: number; y: number; id: number }[] = [];
+  const minimapOre: { x: number; y: number; id: number }[] = [];
   const minimapCollapse: { x: number; y: number; radius: number } = { x: 0, y: 0, radius: 0 };
   // --- Fog of war (feature f1): the viewer's current sensor-coverage discs +
-  //     the remembered-station bitmask, fed each frame so the minimap renders ONLY
-  //     the sensed-state (`../sim/sensing`). Discs are pooled; the mask is a plain
-  //     number. The fog GATING (what's dark / dimmed / live) is the pure model's
-  //     job (src/ui/minimap.ts) — main only supplies the raw coverage geometry.
+  //     the REMEMBERED static geography (the station bitmask and the scouted-ore
+  //     id set), fed each frame so the minimap renders ONLY the sensed-state
+  //     (`../sim/sensing`). Discs are pooled; the mask is a plain number; the ore
+  //     set is one reused `Set` refilled in place. The fog GATING (what's dark /
+  //     dimmed / live) is the pure model's job (src/ui/minimap.ts) — main only
+  //     supplies the raw coverage geometry and the memory.
   const minimapCoveragePool: MutMinimapCoverage[] = [];
   const minimapCoverage: MinimapCoverage[] = [];
+  const minimapRememberedOre = new Set<number>();
   const minimapFog: { -readonly [K in keyof MinimapFog]: MinimapFog[K] } = {
     coverage: minimapCoverage,
     rememberedMask: 0,
+    rememberedOre: minimapRememberedOre,
   };
   const minimapFrame: {
     bounds: { width: number; height: number };
     stations: MinimapStation[];
     ships: MinimapShip[];
     satellites: MinimapSatellite[];
-    oreHints: { x: number; y: number }[];
+    oreHints: { x: number; y: number; id: number }[];
     collapse: { x: number; y: number; radius: number } | null;
     fog: MinimapFog | null;
   } = {
@@ -2839,6 +2844,7 @@ async function boot(): Promise<void> {
       const r = minimapOreSlot(on++);
       r.x = a.pos.x;
       r.y = a.pos.y;
+      r.id = a.id; // the key the fog's remembered-ore set is looked up by
     }
     minimapOre.length = 0;
     for (let i = 0; i < on; i++) minimapOre.push(minimapOrePool[i]!);
@@ -2869,11 +2875,12 @@ async function boot(): Promise<void> {
   }
 
   /** Fill the fog feed for the local player (feature f1): copy the sim's current
-   *  coverage discs into the pooled array and read the remembered-station mask. A
-   *  short-lived `sensorSources` allocation (≤ ~17 tiny records) each frame is the
-   *  honest cost of consuming the ratified seam rather than duplicating its
-   *  three-source union here — the same off-hot-path selector pattern as
-   *  `muzzleFlashes`. */
+   *  coverage discs into the pooled array and read the REMEMBERED geography — the
+   *  station mask and the scouted-ore ids. A short-lived `sensorSources` allocation
+   *  (≤ ~17 tiny records) each frame is the honest cost of consuming the ratified
+   *  seam rather than duplicating its three-source union here — the same
+   *  off-hot-path selector pattern as `muzzleFlashes`. The ore set is refilled in
+   *  place from the sim's own ascending list, never rebuilt. */
   function feedMinimapFog(): void {
     const sources: SensorSource[] = sensorSources(world, LOCAL_PLAYER);
     let cn = 0;
@@ -2886,6 +2893,8 @@ async function boot(): Promise<void> {
     minimapCoverage.length = 0;
     for (let i = 0; i < cn; i++) minimapCoverage.push(minimapCoveragePool[i]!);
     minimapFog.rememberedMask = world.sensory?.seenStations[LOCAL_PLAYER] ?? 0;
+    minimapRememberedOre.clear();
+    for (const id of rememberedOreIds(world, LOCAL_PLAYER)) minimapRememberedOre.add(id);
     minimapFrame.fog = minimapFog;
   }
 
@@ -2910,10 +2919,10 @@ async function boot(): Promise<void> {
   }
 
   /** Pooled minimap ore-hint point `i`, grown to fit and reused (GDD §4.3). */
-  function minimapOreSlot(i: number): { x: number; y: number } {
+  function minimapOreSlot(i: number): { x: number; y: number; id: number } {
     let r = minimapOrePool[i];
     if (!r) {
-      r = { x: 0, y: 0 };
+      r = { x: 0, y: 0, id: -1 };
       minimapOrePool[i] = r;
     }
     return r;

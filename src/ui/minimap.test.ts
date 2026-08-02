@@ -42,6 +42,7 @@ import {
   MINIMAP_SPAWN_PROTECT_ALPHA,
   MINIMAP_ORE_ALPHA,
   MINIMAP_REMEMBERED_ALPHA,
+  MINIMAP_REMEMBERED_ORE_ALPHA,
 } from './minimap';
 import type { MinimapFrame, MinimapShip, MinimapFog, MinimapCoverage } from './minimap';
 
@@ -281,9 +282,10 @@ function disc(x: number, y: number, radius: number): MinimapCoverage {
   return { x, y, radius };
 }
 
-/** A fog descriptor: coverage discs + a remembered-station bitmask. */
-function fog(coverage: MinimapCoverage[], rememberedMask = 0): MinimapFog {
-  return { coverage, rememberedMask };
+/** A fog descriptor: coverage discs + a remembered-station bitmask + the
+ *  remembered-ore ids (`../sim/sensing` `SensoryMemory`). */
+function fog(coverage: MinimapCoverage[], rememberedMask = 0, rememberedOre?: number[]): MinimapFog {
+  return { coverage, rememberedMask, ...(rememberedOre ? { rememberedOre: new Set(rememberedOre) } : {}) };
 }
 
 describe('minimapScene fog — sensed / remembered / fogged tri-state (feature f1)', () => {
@@ -402,6 +404,65 @@ describe('minimapScene fog — sensed / remembered / fogged tri-state (feature f
       RECT,
     );
     expect(scene.oreDots).toHaveLength(1);
+  });
+
+  // Ore is STATIC geography (a rock never moves, it only depletes), so it takes
+  // the same tri-state a station does — the developer report p15, "radar built,
+  // fog stayed": a field scouted once must not go dark again when you fly home.
+  it('a REMEMBERED ore field stays on the map, DIMMED, once coverage moves off it', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        oreHints: [
+          { x: 500, y: 500, id: 11 }, // under coverage right now
+          { x: 900, y: 900, id: 22 }, // scouted earlier, coverage long gone
+          { x: 20, y: 900, id: 33 }, // never seen
+        ],
+        fog: fog([disc(500, 500, 200)], 0, [22]),
+      }),
+      RECT,
+    );
+    expect(scene.oreDots, 'the never-scouted field stays fogged').toHaveLength(2);
+    const alphas = scene.oreDots.map((d) => d.alpha).sort();
+    expect(alphas).toEqual([MINIMAP_REMEMBERED_ORE_ALPHA, MINIMAP_ORE_ALPHA].sort());
+    expect(MINIMAP_REMEMBERED_ORE_ALPHA).toBeLessThan(MINIMAP_ORE_ALPHA);
+  });
+
+  it('a remembered field re-entering coverage brightens back to full', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        oreHints: [{ x: 500, y: 500, id: 11 }],
+        fog: fog([disc(500, 500, 200)], 0, [11]), // remembered AND covered
+      }),
+      RECT,
+    );
+    expect(scene.oreDots[0]!.alpha).toBe(MINIMAP_ORE_ALPHA);
+  });
+
+  it('an ore hint with no id is never remembered (older feeds gate exactly as before)', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [],
+        oreHints: [{ x: 900, y: 900 }],
+        fog: fog([disc(500, 500, 200)], 0, [22]),
+      }),
+      RECT,
+    );
+    expect(scene.oreDots).toHaveLength(0);
+  });
+
+  it('the satellite-killed moment does NOT erase the fields it mapped', () => {
+    const field = frame({
+      stations: [],
+      oreHints: [{ x: 800, y: 800, id: 7 }],
+    });
+    const lit = minimapScene({ ...field, fog: fog([disc(800, 800, 300)], 0, [7]) }, RECT);
+    expect(lit.oreDots[0]!.alpha).toBe(MINIMAP_ORE_ALPHA);
+    // Coverage collapses with the satellite; the rock it found is still known.
+    const afterKill = minimapScene({ ...field, fog: fog([], 0, [7]) }, RECT);
+    expect(afterKill.oreDots).toHaveLength(1);
+    expect(afterKill.oreDots[0]!.alpha).toBe(MINIMAP_REMEMBERED_ORE_ALPHA);
   });
 
   it('projects coverage discs into screen space (faintly-visible radar reach)', () => {
