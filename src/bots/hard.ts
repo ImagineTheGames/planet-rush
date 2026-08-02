@@ -149,9 +149,14 @@ export function hardSpendPlan(ctx: BotCtx): Purchase | null {
  * lost hull costs five free seconds, and the only number still moving is core
  * HP. A bot that kept weighing "is this fight worth it?" against an economy that
  * no longer exists would be playing the wrong game.
+ *
+ * Below that, the tier's appetite divides it (`DifficultyTuning.aggression`,
+ * ratified p15 point 3 — "HARD bots seek the fight more"): a hungrier tier
+ * prices the same target as worth the trip sooner. A no-op at 1.0, which is
+ * where Easy and Medium stay.
  */
 export function hardAttackFloor(ctx: BotCtx): number {
-  return ctx.view.collapsed ? 0 : HARD_ATTACK_FLOOR;
+  return ctx.view.collapsed ? 0 : HARD_ATTACK_FLOOR / ctx.tuning.aggression;
 }
 
 /** Does this bot's character send it to the wreck first? The scavenge dial:

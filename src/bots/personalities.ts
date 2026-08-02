@@ -110,6 +110,30 @@ export interface DifficultyTuning {
    * TUNABLE
    */
   readonly blockadeDetectSeconds: number;
+  /**
+   * How hard this tier *wants* the fight — the appetite the developer ratified
+   * in the p15 note ("HARD bots seek the fight more … EASY stays timid").
+   *
+   * It divides the score a target must clear before the tier will leave the
+   * economy for it (`./hard` `hardAttackFloor`), so a bigger appetite means a
+   * bot breaks off mining for a fight it would previously have priced as not
+   * worth the trip. 1.0 is exactly the shipped behaviour, which is why Easy and
+   * Medium sit there: the ladder is one tier wide by design.
+   *
+   * It is deliberately *only* the initiation range. The note also named siege
+   * willingness and target-the-leader weighting; both were built and A/B'd, and
+   * both move fire off the player's **ship** and onto their **home** (−19% /
+   * +12% at appetite 1.6), which reads from the cockpit as a Hard bot that has
+   * lost interest in you — the exact complaint.
+   *
+   * Every tier ships at 1.0, i.e. this dial is currently a no-op: the raise the
+   * note ratified is measured to *reduce* the fire a player draws in the cast
+   * they actually meet (see {@link DIFFICULTY_TUNING}'s Hard entry). It exists
+   * so the Director's decision is one constant, and so the A/B that produced
+   * that finding can keep running as a test. Numbers in
+   * `docs/bot-player-aggression-p15.md` §3. TUNABLE
+   */
+  readonly aggression: number;
 }
 
 /** Per-tier competence. All TUNABLE, all owned by this agent. */
@@ -125,6 +149,8 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     // oscillations" the developer ratified as acceptable at this tier, and then
     // Rusty stops being scared.
     blockadeDetectSeconds: 1.6,
+    /** "EASY stays timid" — the shipped floor, untouched. */
+    aggression: 1,
   },
   [Difficulty.Medium]: {
     reactionInterval: 1 / 12,
@@ -134,6 +160,8 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     memorySeconds: 12,
     /** Half a beat of confusion, then it turns and fights. */
     blockadeDetectSeconds: 0.6,
+    /** The note raises HARD only; Medium keeps the balance it was tuned to. */
+    aggression: 1,
   },
   [Difficulty.Hard]: {
     // Tuned *down* from v0.2.2's perfection (aimJitter 0.02, no latency): the
@@ -152,6 +180,17 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     // Three decisions at 1/20 s. A Hard bot reads a blockade the way a good
     // human does — instantly — and commits ruthlessly (ratified point 3).
     blockadeDetectSeconds: 0.15,
+    // The ratified raise is 1.6 (p15 point 3), and it is NOT set here: measured,
+    // it costs the player fire in the cast they actually meet. Raising it drops
+    // Hard's attack floor 0.34 → 0.21, and a Hard bot that prices targets that
+    // cheaply spends the difference on the *softest* thing in range. In an
+    // all-Hard cast every rival is equally tough, so the human absorbs it (+15%
+    // hull); in the shipped mixed roster there are Easy and Medium hulls to pick
+    // off instead, and the Hard seats' own initiations on the human fall 38%.
+    // The A/B is a standing test — `tests/harness/player-aggression.test.ts`,
+    // table in `docs/bot-player-aggression-p15.md` §3. TUNABLE, and the whole
+    // implementation of the ratified note is this one number.
+    aggression: 1,
   },
 };
 
