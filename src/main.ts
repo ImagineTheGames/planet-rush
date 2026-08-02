@@ -843,8 +843,9 @@ async function boot(): Promise<void> {
   // The match SIZE the lobby resolved (variable-slots Milestone E). Threads into
   // `bootOfflineMatch` as the seat count, so closing seats in the lobby actually
   // builds a smaller world (local + N-1 bots). Undefined = the design's eight.
-  // (Mode/abundance/team also ride the resolved config, but their offline
-  // world-build wiring is Task C4 — Netcode — so only size takes effect here.)
+  // (The TEAM table threads through below, m10; the ore ABUNDANCE rides the same
+  // resolved config and is the last thing still awaiting its offline world-build
+  // wiring — Task C4, Netcode.)
   const chosenSize = chosen.size;
   // The sides the lobby authored, in the sim's dense player order (m10 teams-wire).
   // THIS is the offline half of teams: without it the roster reached `createWorld`
@@ -6345,7 +6346,6 @@ interface LobbyChoice {
    */
   readonly teams?: readonly number[];
 }
-
 
 /**
  * The room this lobby is a lobby *for*, when there is one. Absent for PLAY SOLO —
