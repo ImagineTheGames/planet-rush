@@ -190,6 +190,14 @@ wait is a stale prediction the next entity event corrects anyway.
 
 ## Mobile logs — the share sheet
 
+> **Superseded in part (ratified M10, "DOWNLOAD LOG only").** The chain below is now
+> **share → download**, with no clipboard step at any position and on any device —
+> *"Clipboard goes away for all (PC and mobile). It should be DOWNLOAD LOG not COPY
+> LOG."* The button reads DOWNLOAD LOG on both form factors, and a platform that
+> refuses a `files:` share falls through to the blob download rather than to text. See
+> `docs/playtest-log.md` for the shipped behaviour; the account below is kept as the
+> record of why the share sheet was reached for in the first place.
+
 *"The developer had NO way to send them."* COPY LOG has been on the pause menu since
 the playtest-log brief, and on a phone its one route out was the clipboard: a 40 KB
 JSON blob pasted into a chat app, on the platform whose clipboard rules refuse

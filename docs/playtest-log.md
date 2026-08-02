@@ -15,22 +15,36 @@ build was on the phone, which Machine it dialled, or what the socket actually sa
 
 1. Play. Logging is always on — there is no flag to remember, because a bug that
    reproduces once must not require you to have guessed beforehand.
-2. When something goes wrong (or any time from the pause menu), press **COPY LOG**.
+2. When something goes wrong (or any time from the pause menu), press **DOWNLOAD LOG**.
    It sits bottom-right and appears on exactly three occasions:
    - the **pause menu**,
    - a **dropped or refused connection** (it names which: *"Disconnected
-     (grace-elapsed) — COPY LOG to report this."*),
+     (grace-elapsed) — DOWNLOAD LOG to report this."*),
    - the **boot-error screen** ("the can't reach servers page especially").
-3. Paste it into chat. That is the whole workflow.
+3. Attach the file to chat. That is the whole workflow.
 
-If the clipboard refuses — an insecure origin, a Safari gesture rule, a denied
-permission, all of which happen on real phones — the button says **LOG SAVED** and the
-log is downloaded as `planet-rush-log-<sha>-<UTC>.json` instead. Attach that file.
+**There is one control, and it produces a file — never a clipboard paste, on any
+device.** Ratified by the developer at M10: *"Clipboard goes away for all (PC and
+mobile). It should be DOWNLOAD LOG not COPY LOG."* A 40 KB JSON blob on a clipboard is
+a paste no chat app takes and no human scrolls, so the old route could report success
+while the log went nowhere — a failure that is not smaller on a desktop, just quieter.
+
+The press answers itself in the label: **SAVING…**, then **LOG SENT** (the share sheet
+took it), **LOG SAVED** (it landed in Downloads) or **SAVE FAILED**, reverting to
+DOWNLOAD LOG after four seconds. Two routes, both producing the same named
+`planet-rush-log-<sha>-<YYYYMMDD-HHMMSS>.json`:
+
+- **The share sheet with the file** (`navigator.share` + `files:`), where the platform
+  takes it — the OS chooser puts the file straight into Messages, Mail or Drive with no
+  trip through a Downloads folder. Never the `text:` variant: a share that degrades to
+  text is the wall of JSON this route exists to avoid, so a browser that refuses
+  `files:` falls through to the download rather than pasting.
+- **The blob download**, always available in a browser, landing in Downloads.
 
 **It never uploads anything.** There is no endpoint in the feature; you choose what to
 share.
 
-## What a pasted log says
+## What a downloaded log says
 
 The first line answers *"which build were you on?"* by itself:
 
@@ -85,8 +99,9 @@ quietly.
 | `src/net/playtest-log.ts` | the ring, the header, the versioned export |
 | `src/net/playtest-log-capture.ts` | console + uncaught-error capture (`isOurFrame` filters extensions and third-party origins) |
 | `src/net/playtest-log-attach.ts` | a live `OnlineSession` → log events |
-| `src/net/playtest-log-export.ts` | clipboard, then download fallback |
-| `src/net/playtest-log-button.ts` | the COPY LOG affordance (DOM, pure model + markup + one DOM edge) |
+| `src/net/playtest-log-export.ts` | `downloadPlaytestLog` — share-sheet-with-file, then blob download. No clipboard seam exists in this file |
+| `src/net/playtest-log-button.ts` | the DOWNLOAD LOG affordance (DOM, pure model + markup + one DOM edge) |
+| `src/net/connect-trace-view.ts` | the refusal panel's own pair: RETRY and DOWNLOAD LOG, under the line that named the failure |
 | `src/main.ts` | the wiring: install at boot, the allocate/ticket/dial lifecycle, and where the button is offered |
 
 Tests: `src/net/playtest-log*.test.ts` (unit, node) and
@@ -105,5 +120,14 @@ does, so the HUD budget is untouched and `src/ui/` keeps its screens.
 
 **Open handoff for UI (not blocking):** if a native Pixi row is wanted inside the pause
 overlay later, `pauseButtons()` / `PauseButton` in `src/ui/pause-menu.ts` would gain a
-`copyLog` id, and its handler calls `copyLogButton()?.copy()` — the export path needs
-no change. That is a UI-owned edit, which is why it was not made here.
+`downloadLog` id, and its handler calls `downloadLogButton()?.download()` — the export
+path needs no change. That is a UI-owned edit, which is why it was not made here.
+
+### Proved on both form factors
+
+`tests/live-stage/log-download.spec.ts` runs the same spec under two projects
+(`playwright.log-download.config.ts`): the 390×844 DPR-3 phone and the 1280×800 desk.
+Each asserts the affordance offers **exactly one** button, that it reads `DOWNLOAD LOG`,
+and that a real press produces a file the test then `JSON.parse`s — on the phone by the
+share sheet's `files:` payload as well as the download. "For all (PC and mobile)" is a
+claim about two devices, so a phone-only spec could only ever assert half of it.
