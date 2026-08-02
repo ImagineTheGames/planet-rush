@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
   pointSensed,
+  rememberedOreIds,
   rememberedStationMask,
   sensedState,
   sensorSources,
@@ -26,7 +27,7 @@ import {
 } from './sensing';
 import { SATELLITE, SHIP_SENSOR_RANGE, STATION_SENSOR_RANGE, CORE_HP, STATION, SHIP_RADIUS, SHIELD } from './constants';
 import { stockTiers } from './upgrades';
-import type { MiningStation, RadarSatellite, Ship, SensoryMemory, World } from './state';
+import type { Asteroid, MiningStation, RadarSatellite, Ship, SensoryMemory, World } from './state';
 
 // --- builders (hand-built worlds, station-relative so geometry reads direct) --
 
@@ -78,14 +79,24 @@ function makeSat(id: number, owner: number, pos: { x: number; y: number }, hp = 
   return { id, owner, pos: { ...pos }, radius: SATELLITE.radius, hp, maxHp: SATELLITE.hp, orbitAngle: 0 };
 }
 
-function makeWorld(ships: Ship[], stations: MiningStation[], sensory?: SensoryMemory): World {
+/** A rock at a point — static geography, so the memory pass should remember it. */
+function makeRock(id: number, pos: { x: number; y: number }, radius = 30): Asteroid {
+  return { id, pos: { ...pos }, radius, ore: 3, maxOre: 3, crackStage: 0, mineBuffer: 0, home: null };
+}
+
+function makeWorld(
+  ships: Ship[],
+  stations: MiningStation[],
+  sensory?: SensoryMemory,
+  asteroids: Asteroid[] = [],
+): World {
   return {
     time: 0,
     tick: 0,
     rngState: 1,
     nextEntityId: 1000,
     ships,
-    asteroids: [],
+    asteroids,
     chunks: [],
     stations,
     projectiles: [],
@@ -234,6 +245,117 @@ describe('remembered static geography vs live entities (f1, item 1)', () => {
   });
 });
 
+// --- 4b. ore fields are static geography too (developer report p15) --------
+//
+// The p15 report: "I built the radar but I still had fog of war over what I was
+// discovering." The radar's coverage was never the bug (it grows — section 1);
+// the bug was that ORE, the thing a player actually discovers, was gated on
+// CURRENT coverage like a live ship, so every field scouted went dark again the
+// moment the player flew home. A rock never moves — it only depletes — so it is
+// static geography and takes the same remember-once-seen rule a home does.
+
+describe('ore fields are REMEMBERED once scouted (developer report p15)', () => {
+  it('a rock under coverage is remembered, and STAYS remembered after coverage leaves', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const ship = makeShip(0, { x: 0, y: 0 });
+    const far = makeRock(300, { x: 5000, y: 0 });
+    const sensory: SensoryMemory = { seenStations: [0], seenOre: [[]] };
+    const world = makeWorld([ship], [own], sensory, [far]);
+
+    // Home: the distant field is outside every disc — unknown.
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).not.toContain(300);
+    expect(sensedState(world, 0).rememberedOre).not.toContain(300);
+
+    // Fly out to it: it enters the ship's own sensor and is written to memory.
+    ship.pos.x = 5000;
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).toContain(300);
+
+    // Fly home. THE REGRESSION: before this fix the field went dark again here.
+    ship.pos.x = 0;
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).toContain(300); // monotonic — never forgotten
+    expect(sensedState(world, 0).rememberedOre).toContain(300);
+  });
+
+  it('a radar satellite permanently maps every rock inside its disc', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const inDisc = makeRock(301, { x: SATELLITE.sensorRange - 50, y: 0 });
+    const outside = makeRock(302, { x: SATELLITE.sensorRange + 400, y: 0 });
+    const sensory: SensoryMemory = { seenStations: [0], seenOre: [[]] };
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], sensory, [inDisc, outside]);
+
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).not.toContain(301); // ship+station don't reach
+
+    own.satellites = [makeSat(50, 0, { x: 114, y: 0 })];
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).toContain(301);
+    expect(rememberedOreIds(world, 0)).not.toContain(302); // still beyond the disc
+
+    // The satellite dies: LIVE coverage collapses, but what it mapped is kept —
+    // the ore it revealed was bought and paid for.
+    own.satellites![0]!.hp = 0;
+    updateSensory(world);
+    expect(sensorSources(world, 0).some((s) => s.kind === 'satellite')).toBe(false);
+    expect(sensedState(world, 0).rememberedOre).toContain(301);
+  });
+
+  it('remembers a rock whose SURFACE enters coverage, like a sized station body', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const grazing = makeRock(303, { x: SHIP_SENSOR_RANGE + 20, y: 0 }, 40); // centre out, edge in
+    const sensory: SensoryMemory = { seenStations: [0], seenOre: [[]] };
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], sensory, [grazing]);
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).toContain(303);
+  });
+
+  it('a remembered rock that is mined out of existence stops being reported', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const rock = makeRock(304, { x: 100, y: 0 });
+    const sensory: SensoryMemory = { seenStations: [0], seenOre: [[]] };
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], sensory, [rock]);
+    updateSensory(world);
+    expect(sensedState(world, 0).rememberedOre).toContain(304);
+
+    world.asteroids = []; // `step` filters a depleted rock out of the field
+    // The raw memory still holds the id, but the resolved read-model does not —
+    // so no consumer ever draws a phantom field over empty space.
+    expect(rememberedOreIds(world, 0)).toContain(304);
+    expect(sensedState(world, 0).rememberedOre).not.toContain(304);
+  });
+
+  it('the memory is per-player: one scout does not reveal the field to everyone', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const theirs = makeStation(1, 1, { x: 6000, y: 0 });
+    const rock = makeRock(305, { x: 100, y: 0 });
+    const sensory: SensoryMemory = { seenStations: [0, 0], seenOre: [[], []] };
+    const world = makeWorld(
+      [makeShip(0, { x: 0, y: 0 }), makeShip(1, { x: 6000, y: 0 })],
+      [own, theirs],
+      sensory,
+      [rock],
+    );
+    updateSensory(world);
+    expect(rememberedOreIds(world, 0)).toContain(305);
+    expect(rememberedOreIds(world, 1)).not.toContain(305);
+  });
+
+  it('degrades gracefully: a memory built without an ore list still folds', () => {
+    const own = makeStation(0, 0, { x: 0, y: 0 });
+    const rock = makeRock(306, { x: 100, y: 0 });
+    const sensory = { seenStations: [0] } as SensoryMemory; // no `seenOre` at all
+    const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], sensory, [rock]);
+    expect(() => updateSensory(world)).not.toThrow();
+    expect(rememberedOreIds(world, 0)).toContain(306);
+
+    // …and with NO memory at all, the read model falls back to current coverage.
+    const bare = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], undefined, [rock]);
+    expect(sensedState(bare, 0).rememberedOre).toContain(306);
+  });
+});
+
 // --- 5. determinism --------------------------------------------------------
 
 describe('sensory memory — determinism (f1, GDD §4.8)', () => {
@@ -248,5 +370,19 @@ describe('sensory memory — determinism (f1, GDD §4.8)', () => {
       return world.sensory!;
     };
     expect(build()).toEqual(build());
+  });
+
+  it('the remembered-ore list is ASCENDING however the field is ordered', () => {
+    const fold = (order: number[]): readonly number[] => {
+      const own = makeStation(0, 0, { x: 0, y: 0 });
+      const sensory: SensoryMemory = { seenStations: [0], seenOre: [[]] };
+      const rocks = order.map((id, i) => makeRock(id, { x: 40 * i, y: 0 }));
+      const world = makeWorld([makeShip(0, { x: 0, y: 0 })], [own], sensory, rocks);
+      updateSensory(world);
+      return rememberedOreIds(world, 0);
+    };
+    // Same ids, arriving in different field order ⇒ the same stored list, sorted.
+    expect(fold([7, 3, 9, 1])).toEqual([1, 3, 7, 9]);
+    expect(fold([1, 3, 7, 9])).toEqual([1, 3, 7, 9]);
   });
 });

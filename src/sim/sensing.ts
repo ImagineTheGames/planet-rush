@@ -17,11 +17,13 @@
  *
  * Two kinds of thing are sensed differently, and the split is the whole mechanic:
  *
- *  - **Static geography** (station positions) is REMEMBERED once seen — it stays
- *    on the minimap after coverage moves off it, because a home does not move and
- *    a wreck stays on the map all match (GDD §2.7). That persistence is the only
- *    stored state here: `world.sensory` (`SensoryMemory`), a per-player bitmask of
- *    station board-ids ever sensed, grown by {@link updateSensory} each tick.
+ *  - **Static geography** (station positions AND ore fields) is REMEMBERED once
+ *    seen — it stays on the minimap after coverage moves off it, because a home
+ *    does not move, a wreck stays on the map all match (GDD §2.7), and neither
+ *    does a rock: an asteroid never moves, it only depletes. That persistence is
+ *    the only stored state here: `world.sensory` (`SensoryMemory`), a per-player
+ *    bitmask of station board-ids plus a per-player list of asteroid ids ever
+ *    sensed, both grown by {@link updateSensory} each tick.
  *  - **Live entities** (ships, projectiles, satellites) are visible ONLY under
  *    CURRENT coverage — recomputed every read, no memory. So the instant a radar
  *    satellite dies, the large disc it projected is gone and everything that was
@@ -155,6 +157,12 @@ export interface SensedState {
   /** Station board-ids REMEMBERED — seen at least once (or owned, or sensed now).
    *  Static geography persists; a wreck stays remembered all match. */
   readonly rememberedStations: readonly number[];
+  /** Asteroid ids REMEMBERED — scouted at least once (or sensed now). The other
+   *  half of static geography: an ore field a player has flown over stays on
+   *  their minimap after they leave, so scouting a field is worth doing once. Ids
+   *  only, so a rock mined out of existence simply stops being drawn — a
+   *  remembered field is never a phantom the player can fly to and find empty. */
+  readonly rememberedOre: readonly number[];
 }
 
 /**
@@ -201,20 +209,77 @@ export function sensedState(world: World, viewer: PlayerId): SensedState {
     if (p.owner === viewer || pointSensed(sources, p.pos)) projectiles.push(p.id);
   }
 
-  return { viewer, sources, ships, satellites, projectiles, rememberedStations };
+  // Ore fields: remembered from the stored list, unioned with the rocks under
+  // coverage right now (surface-aware — a rock has size), so the set is correct on
+  // the very first tick and degrades to "currently covered" for a foreign world
+  // that carries no memory. `world.asteroids` is the iteration order, so the
+  // result is ascending by construction (the field list is id-ordered) and holds
+  // only rocks that still exist — a mined-out one drops out on its own.
+  const oreMemory = world.sensory?.seenOre?.[viewer];
+  const rememberedOre: number[] = [];
+  for (const a of world.asteroids) {
+    if (sortedHas(oreMemory, a.id) || pointSensed(sources, a.pos, a.radius)) {
+      rememberedOre.push(a.id);
+    }
+  }
+
+  return { viewer, sources, ships, satellites, projectiles, rememberedStations, rememberedOre };
 }
 
 // ---------------------------------------------------------------------------
 // The per-tick memory pass
 // ---------------------------------------------------------------------------
 
+/** Is `id` in an ASCENDING id list? Binary search, so the fold can skip the disc
+ *  test for every rock a player already remembers — the reason the ore pass costs
+ *  a lookup per rock rather than a coverage test per rock once a field is known.
+ *  A missing list (a foreign memory) remembers nothing. */
+function sortedHas(list: readonly number[] | undefined, id: number): boolean {
+  if (!list) return false;
+  let lo = 0;
+  let hi = list.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const v = list[mid]!;
+    if (v === id) return true;
+    if (v < id) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return false;
+}
+
+/** Insert `id` into an ASCENDING id list, keeping it sorted (no-op if present).
+ *  Ids come from `nextEntityId`, which only counts up, so this appends far more
+ *  often than it splices. Deterministic: the result depends only on the set of
+ *  ids inserted, never on the order they arrived. */
+function sortedInsert(list: number[], id: number): void {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid]! < id) lo = mid + 1;
+    else hi = mid;
+  }
+  if (list[lo] === id) return;
+  list.splice(lo, 0, id);
+}
+
 /**
  * Fold this tick's coverage into the persistent "remembered geography" memory
  * (feature f1, item 1). For every live player, any station whose body their
- * coverage reaches has its board-id bit set in `world.sensory.seenStations` — and
- * bits are only ever SET, never cleared, so remembered geography grows
- * monotonically as a match is explored and never un-remembers a home already
- * scouted (a wreck included).
+ * coverage reaches has its board-id bit set in `world.sensory.seenStations`, and
+ * any ASTEROID their coverage reaches has its id inserted into
+ * `world.sensory.seenOre[player]` — and bits are only ever SET and ids only ever
+ * inserted, never cleared, so remembered geography grows monotonically as a match
+ * is explored and never un-remembers a home already scouted (a wreck included) or
+ * an ore field already found.
+ *
+ * The ore half is why a scouting run pays off: a player who flies out to a distant
+ * field keeps it on their minimap after they fly home, and a radar satellite
+ * permanently maps every rock inside its disc rather than lighting them only while
+ * it lives (developer report p15 — the fog kept closing over what was discovered).
+ * Rocks already remembered skip the coverage test entirely (a binary-search
+ * lookup instead), so the pass gets CHEAPER as a field becomes known.
  *
  * A no-op when the world carries no `sensory` memory (a foreign/hand-built world),
  * exactly like `ledgerAdd` — `createWorld` always attaches one. Runs once per
@@ -236,6 +301,19 @@ export function updateSensory(world: World): void {
       if (pointSensed(sources, station.pos, station.radius)) mask |= 1 << station.id;
     }
     mem.seenStations[viewer] = mask;
+
+    // Ore fields — the other static geography. Materialise the list for a memory
+    // built before ore was remembered, then insert every rock under coverage.
+    if (!mem.seenOre) mem.seenOre = [];
+    let ore = mem.seenOre[viewer];
+    if (!ore) {
+      ore = [];
+      mem.seenOre[viewer] = ore;
+    }
+    for (const rock of world.asteroids) {
+      if (sortedHas(ore, rock.id)) continue; // already known — skip the disc test
+      if (pointSensed(sources, rock.pos, rock.radius)) sortedInsert(ore, rock.id);
+    }
   }
 }
 
@@ -244,4 +322,12 @@ export function updateSensory(world: World): void {
  *  {@link SensedState}. */
 export function rememberedStationMask(world: World, viewer: PlayerId): number {
   return world.sensory?.seenStations[viewer] ?? 0;
+}
+
+/** A player's raw remembered-ore list (ascending asteroid ids), or an empty array
+ *  — the ore counterpart of {@link rememberedStationMask}. Includes ids of rocks
+ *  since mined out of existence; {@link sensedState} intersects with the live
+ *  field, which is what a consumer drawing dots wants. */
+export function rememberedOreIds(world: World, viewer: PlayerId): readonly number[] {
+  return world.sensory?.seenOre?.[viewer] ?? [];
 }
