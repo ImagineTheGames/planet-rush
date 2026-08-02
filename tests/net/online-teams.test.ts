@@ -381,3 +381,107 @@ describe('the room refuses the two ways a split could go wrong', () => {
     expect(server.room(code)!.mode).toBe('teams');
   });
 });
+
+// ---------------------------------------------------------------------------
+// The evidence ledger — a sustained 2v2 with nothing but allies in reach
+// ---------------------------------------------------------------------------
+
+/**
+ * The headless half of the `online-teams` evidence gate.
+ *
+ * The gate's other half is a live two-client screenshot of the TEAM labels, which
+ * needs a browser this lane cannot launch (no `libnss3`, no root) — so it rides
+ * QA's round. What CAN be produced here honestly is the log excerpt: a real
+ * server-built 2v2, run for thirty seconds of simulated time with **only allies
+ * in weapon reach of each other**, both of them holding fire the whole way. Every
+ * point of damage recorded in that arrangement is by construction friendly
+ * damage, so the ledger's job is to print a zero somebody can read.
+ *
+ * The enemies are parked out of reach rather than removed: a two-ship world would
+ * be a different match, and the point is that this is the same 2v2 the previous
+ * tests started.
+ */
+describe('EVIDENCE — thirty seconds of allies at point-blank', () => {
+  it('records zero friendly damage events, and says so out loud', () => {
+    const { world } = started2v2();
+    clearField(world);
+
+    const shipOf = (id: PlayerId) => world.ships.find((s) => s.id === id)!;
+    const stationOf = (owner: PlayerId) => world.stations.find((s) => s.owner === owner)!;
+    const sideA: PlayerId[] = [0, 2];
+    const sideB: PlayerId[] = [1, 3];
+
+    for (const id of sideA) {
+      stationOf(id).spawnProtect = 0; // no free pass for the reactors either
+    }
+    const hullBefore = new Map(sideA.map((id) => [id, shipOf(id).hull]));
+    const coreBefore = new Map(sideA.map((id) => [id, stationOf(id).coreHp]));
+
+    const TICKS = 1800; // 30 s at the 60 Hz sim
+    let allyShots = 0;
+    for (let t = 0; t < TICKS; t++) {
+      // The two allies nose to nose, in front of one of their own reactors.
+      const home = stationOf(2).pos;
+      place(world, 0, home.x + 150, home.y, WEST);
+      place(world, 2, home.x + 90, home.y, EAST);
+      // The two enemies parked well outside anyone's weapon reach.
+      place(world, 1, home.x + 1000, home.y + 1000);
+      place(world, 3, home.x - 1000, home.y - 1000);
+
+      step(
+        world,
+        sideA.map((id) => ({ id, actions: [HOLD_FIRE] })),
+        TICK_DT,
+      );
+      allyShots += world.projectiles.filter((p) => p.active && sideA.includes(p.owner)).length;
+    }
+
+    const hullLost = sideA.reduce((sum, id) => sum + (hullBefore.get(id)! - shipOf(id).hull), 0);
+    const coreLost = sideA.reduce((sum, id) => sum + (coreBefore.get(id)! - stationOf(id).coreHp), 0);
+
+    // The excerpt the PR quotes. Printed rather than merely asserted because the
+    // gate is somebody READING a zero, not a green tick they have to trust.
+    // eslint-disable-next-line no-console
+    console.log(
+      [
+        '',
+        '===== ONLINE TEAMS — FRIENDLY-DAMAGE LEDGER =====',
+        `mode           : teams (room-advertised)`,
+        `split          : TEAM A = slots ${sideA.join(',')} · TEAM B = slots ${sideB.join(',')}`,
+        `simulated      : ${TICKS} ticks (${(TICKS * TICK_DT).toFixed(0)}s), allies at point-blank, fire held`,
+        `ally shot-ticks: ${allyShots}`,
+        `ally hull lost : ${hullLost}`,
+        `ally core lost : ${coreLost}`,
+        `friendly damage events: ${hullLost + coreLost === 0 ? 0 : 'NON-ZERO'}`,
+        '',
+      ].join('\n'),
+    );
+
+    // Shots were genuinely in the air the whole time — a silent weapon would make
+    // the zero above meaningless.
+    expect(allyShots).toBeGreaterThan(0);
+    expect(hullLost).toBe(0);
+    expect(coreLost).toBe(0);
+  });
+
+  it('shows the same arrangement bleeding in FFA — the instrument is not stuck at zero', () => {
+    // The control. Identical geometry, identical input, one difference: the host
+    // never sent a split, so these two are not allies. If this did not bleed, the
+    // ledger above would be measuring nothing and reporting a zero for it.
+    const { server, code, seats } = room4();
+    seats[0]!.connection.receive(encodeClientMessage({ type: 'startMatch' }));
+    const world = server.room(code)!.world!;
+    clearField(world);
+
+    const victim = world.ships.find((s) => s.id === 2)!;
+    const before = victim.hull;
+    const home = world.stations.find((s) => s.owner === 2)!.pos;
+    for (let t = 0; t < 300; t++) {
+      place(world, 0, home.x + 150, home.y, WEST);
+      place(world, 2, home.x + 90, home.y, EAST);
+      step(world, [{ id: 0, actions: [HOLD_FIRE] }], TICK_DT);
+    }
+
+    expect(victim.hull).toBeLessThan(before);
+  });
+});
