@@ -17,11 +17,20 @@
  *     30 s of pursuit the flee/fight flip count stays bounded;
  *  4. the priority exception — a core under final assault — still interrupts a
  *     committed retreat; and determinism holds across identical runs.
+ *
+ * And, since p15, the invariant is extended with the **blockade recipe** the
+ * developer's second screenshot names: a damaged bot, an enemy held stationary
+ * on the line between it and its own station. That geometry is the one the
+ * hysteresis here cannot resolve on its own — fleeing and going home point
+ * opposite ways along a single line — so the flip ceiling is re-asserted against
+ * a wall as well as against a pursuer, for the whole shipped cast, together with
+ * the two things a bounded flip count alone would not prove: that the bot
+ * actually *fights* (`./cornered`), and that it actually *gets home*.
  */
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { SPAWN_PROTECTION_S, TICK_DT, createWorld, step, type World } from '../sim';
+import { DEPOSIT_RANGE, SPAWN_PROTECTION_S, TICK_DT, createWorld, step, type World } from '../sim';
 import {
   RETREAT_CLEAR_RANGE,
   THREAT_RANGE,
@@ -236,6 +245,92 @@ describe('a committed retreat goes somewhere (the screenshot scenario)', () => {
     const MAX_FLIPS = 20;
     expect(flips).toBeLessThan(MAX_FLIPS);
   });
+});
+
+describe('the blockade recipe — bounded flips against a stationary blockader (p15)', () => {
+  /**
+   * The extension the p15 ratification asks for (point 4): the bounded-flip
+   * invariant above proves a bot does not flap against a *pursuer*, and this
+   * proves it does not flap against a *wall* — the geometry the hysteresis alone
+   * cannot resolve.
+   *
+   * The recipe is the developer's screenshot, made a fixture: a damaged bot, an
+   * enemy parked squarely on the line between it and its own station, and that
+   * enemy held stationary and at full hull every tick so it stays a genuine wall
+   * for the whole soak. Nothing else is on the board. Pre-p15 this is the exact
+   * shape that dithers, because fleeing and going home point opposite ways along
+   * one line and neither ever wins.
+   */
+  function stationaryBlockade(personality: keyof typeof PERSONALITIES): {
+    flips: number;
+    fightTicks: number;
+    closestToHome: number;
+  } {
+    const world = board(11);
+    const home = world.stations.find((s) => s.owner === 0)!;
+    const me = world.ships[0]!;
+    const wall = world.ships[1]!;
+
+    // Out toward the arena centre — the way back from the field.
+    const dx = world.bounds.width / 2 - home.pos.x;
+    const dy = world.bounds.height / 2 - home.pos.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const out = { x: dx / d, y: dy / d };
+    me.pos = { x: home.pos.x + out.x * 700, y: home.pos.y + out.y * 700 };
+    me.vel = { x: 0, y: 0 };
+    const woundedAt = me.maxHull * 0.12; // past every tier's nerve
+    const post = { x: home.pos.x + out.x * 350, y: home.pos.y + out.y * 350 };
+    for (const s of world.ships) if (s.id !== 0 && s.id !== 1) s.alive = false;
+
+    const bot = createBot({ id: 0, personality }, { seed: 3 });
+    let flips = 0;
+    let wasFleeing = false;
+    let fightTicks = 0;
+    let closestToHome = Number.POSITIVE_INFINITY;
+
+    for (let t = 0; t < Math.round(30 / TICK_DT); t++) {
+      // Hold the wall exactly where it is, at full hull: a blockade that drifts
+      // or dies would let the bot off the hook the fixture is about.
+      wall.pos = { x: post.x, y: post.y };
+      wall.vel = { x: 0, y: 0 };
+      wall.hull = wall.maxHull;
+      // And hold the bot wounded, so the fear that builds the trap never lifts.
+      me.hull = woundedAt;
+
+      step(world, botInputs(world, [bot]), TICK_DT);
+
+      closestToHome = Math.min(closestToHome, dist(me.pos, home.pos));
+      if (bot.brain.lastBehavior === 'cornered-fight') fightTicks++;
+      const fleeing = bot.brain.lastBehavior === 'retreat';
+      if (fleeing !== wasFleeing) flips++;
+      wasFleeing = fleeing;
+    }
+    return { flips, fightTicks, closestToHome };
+  }
+
+  /** The ceiling on mind-changes against a wall over 30 s, for the whole cast.
+   *  A cornered bot changes its mind on real events — noticing the trap,
+   *  breaking through it — never on the tick rate. Measured worst across the
+   *  shipped cast is 7; this sits above it with headroom and an order of
+   *  magnitude under the bug. TUNABLE */
+  const MAX_BLOCKADE_FLIPS = 12;
+
+  for (const id of Object.keys(PERSONALITIES) as Array<keyof typeof PERSONALITIES>) {
+    it(`${id} commits and gets home instead of dithering on the line`, () => {
+      const { flips, fightTicks, closestToHome } = stationaryBlockade(id);
+
+      // 1. It stops asking. No flapping between attack and flee.
+      expect(flips, `${id} flipped ${flips} times against a stationary wall`).toBeLessThan(
+        MAX_BLOCKADE_FLIPS,
+      );
+      // 2. It fights — the ratified verb, not a shorter retreat.
+      expect(fightTicks, `${id} never committed to the fight`).toBeGreaterThan(0);
+      // 3. And it *goes somewhere*: the photograph's whole complaint was a ship
+      //    that "never actually went anywhere". It ends up inside its own
+      //    collection field, on the far side of the thing that was blocking it.
+      expect(closestToHome, `${id} never reached its own station`).toBeLessThan(DEPOSIT_RANGE);
+    });
+  }
 });
 
 describe('the priority exception interrupts a committed retreat', () => {

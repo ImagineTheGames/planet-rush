@@ -36,10 +36,12 @@ import type { Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
   attack,
+  corneredBlockader,
   coreUnderFinalAssault,
   defendHome,
   haulHome,
   hunt,
+  fightBlockade,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -51,6 +53,7 @@ import {
   spendAtHome,
   suppressTurrets,
   upgrade,
+  wantsCorneredFight,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -165,6 +168,20 @@ export const hardTree: Node = selector('hard', [
   // thing allowed to interrupt a committed one. A territorial Hard bot dies on
   // its own doorstep rather than saving a hull that respawns free (GDD §2.7).
   when('last-stand', (ctx) => coreUnderFinalAssault(ctx), (ctx) => lastStandDefend(ctx)),
+
+  // Cornered: the road home runs through the ship that is scaring it (developer
+  // report p15, ratified). Fear says back off, home says come through, and the
+  // two cancel on the line between them — so the bot stops asking and FIGHTS,
+  // for a committed window with its nerve switched off (`./cornered`). Above the
+  // retreat, because it is the branch that says the retreat does not exist.
+  when(
+    'cornered-fight',
+    (ctx) => wantsCorneredFight(ctx),
+    (ctx) => {
+      const blockader = corneredBlockader(ctx);
+      return blockader ? fightBlockade(ctx, blockader) : null;
+    },
+  ),
 
   // Hard holds its nerve to 20% hull — and then leaves, because a dead ship
   // drops half its hold to the player who just earned it (GDD §2.7). The break

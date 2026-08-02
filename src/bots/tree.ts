@@ -25,6 +25,8 @@
 import type { Action, Rng, Vec2 } from '@shared/types';
 import type { Latch } from './commitment';
 import { newLatch, release } from './commitment';
+import type { CorneredLatch } from './cornered';
+import { newCorneredLatch, resetCornered } from './cornered';
 import { BotMemory } from './memory';
 import type { BotView, SelfView } from './perception';
 import type { DifficultyTuning, Personality, PersonalityWeights } from './personalities';
@@ -104,6 +106,20 @@ export interface Brain {
    */
   readonly fleeing: Latch;
   /**
+   * The **cornered** commitment (`./cornered`; developer report p15). A damaged
+   * bot whose own station sits behind a ship parked on the line between them is
+   * in a trap the flee latch above cannot see: fear pushes it back, home pulls
+   * it through, and the two cancel. This latch is what lets the bot notice
+   * (after its tier's lag) and then *commit to the fight* for a minimum window
+   * during which its fear model gets no vote at all — the ratified
+   * "CORNERED = COMMIT TO ATTACK".
+   *
+   * Beside {@link Brain.fleeing} rather than folded into it because the two are
+   * different kinds of memory: the flee latch remembers a *state*, this one
+   * remembers a *decision and its deadline*.
+   */
+  readonly cornered: CorneredLatch;
+  /**
    * The asteroid id this bot committed to mining on its last mining decision, or
    * `-1` when it is not mining (`./behaviors`'s `mine`). Two things read it, both
    * from the re-site work (p11 field report — "kept going back and forth" to a
@@ -164,6 +180,7 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     escapeDir: { x: 0, y: 0 },
     aim: newAimTrack(),
     fleeing: newLatch(),
+    cornered: newCorneredLatch(),
     mineSite: -1,
     tabu: new Map(),
     endowment: -1,
@@ -220,8 +237,12 @@ export function context(view: BotView, brain: Brain): BotCtx {
   brain.memory.observe(view);
   trackStuck(view, brain);
   // A dead ship holds no commitment: it respawns at full hull (GDD §2.7), so its
-  // flee latch must not carry the last life's panic into the next one.
-  if (!view.self.alive) release(brain.fleeing);
+  // flee latch must not carry the last life's panic into the next one — nor its
+  // cornered commitment the last life's blockade, which the respawn just broke.
+  if (!view.self.alive) {
+    release(brain.fleeing);
+    resetCornered(brain.cornered);
+  }
   // Book the endowment once, on the first decision. A bot seated at the opening
   // (`tick 0`) earns its `STARTING_ORE` grant and owes nothing; a bot that takes
   // over after the match has begun inherits a dropped pilot's ore and must leave
