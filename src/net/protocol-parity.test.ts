@@ -235,3 +235,80 @@ describe('THE CLASS GUARD — the wire parses every order the client can emit', 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// The MATCH-SHAPE guard — same class, one boundary further in
+// ---------------------------------------------------------------------------
+
+/**
+ * A verb the wire admits but strips a field from is the same defect wearing a
+ * different hat: the message arrives, so nothing looks broken, and the feature it
+ * carried is invisible. Defect #2 on this file's list was exactly that shape —
+ * *"Teams mode ate the difficulty picker: the mode existed, its control did not."*
+ *
+ * m10 is the third act of it. TEAMS existed, the sim read a `team` on every ship,
+ * `matchStart` had a field for it — and no message the client could send ever set
+ * one, so a TEAMS lobby produced a free-for-all world and the developer reported
+ * being attacked by their own side. So the two match-shape fields are pinned here
+ * beside the verbs: the client's authored SIDES going out, and the roster's SIDES
+ * coming back.
+ *
+ * The end-to-end proof that the server then acts on them is
+ * `tests/net/online-teams.test.ts`; this is the cheap structural guard that fails
+ * the moment the field stops surviving the trip.
+ */
+describe('THE MATCH-SHAPE GUARD — the wire carries allegiance, both directions', () => {
+  it('carries the host\'s mode and per-seat split out, unchanged', () => {
+    const authored: ClientMessage = {
+      type: 'lobbyChoice',
+      shipClass: ShipClass.Vanguard,
+      fireMode: 'manual',
+      mode: 'teams',
+      // Interleaved, so a parser that returned indices instead of values passes
+      // nothing: `[0,1,0,1]` is not `[0,1,2,3]` under any off-by-one.
+      teams: [0, 1, 0, 1],
+    };
+    const parsed = parseClientMessage(encodeClientMessage(authored));
+    expect(parsed).toEqual(authored);
+  });
+
+  it('carries the seated roster\'s side back in matchStart', () => {
+    const start = {
+      type: 'matchStart' as const,
+      tick: 0,
+      seed: 1,
+      slots: [
+        { player: 0, shipClass: ShipClass.Vanguard, team: 0 },
+        { player: 1, shipClass: ShipClass.Vanguard, team: 1 },
+        { player: 2, shipClass: ShipClass.Vanguard, team: 0 },
+        { player: 3, shipClass: ShipClass.Vanguard, team: 1 },
+      ],
+    };
+    const parsed = parseServerMessage(JSON.stringify(start));
+    // `matchStart` IS the client's world-constructor call (`./transport`): a side
+    // lost here is a predicted world that groups allies differently from
+    // authority, and every reconcile after it pays for the difference.
+    expect(parsed).toEqual(start);
+    expect(parsed?.type === 'matchStart' && parsed.slots.map((s) => s.team)).toEqual([0, 1, 0, 1]);
+  });
+
+  it('refuses a side the lobby could not have authored, without eating the message', () => {
+    // Hostile input is bounded, not trusted: the sides are dropped and the hull
+    // pick — the thing the sender actually cares about — still lands.
+    const parsed = parseClientMessage(
+      JSON.stringify({
+        type: 'lobbyChoice',
+        shipClass: ShipClass.Hauler,
+        fireMode: 'manual',
+        mode: 'teams',
+        teams: [0, 1, 0, 4096],
+      }),
+    );
+    expect(parsed).toEqual({
+      type: 'lobbyChoice',
+      shipClass: ShipClass.Hauler,
+      fireMode: 'manual',
+      mode: 'teams',
+    });
+  });
+});

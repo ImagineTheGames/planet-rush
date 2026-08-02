@@ -47,7 +47,7 @@ import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './
 import { buyUpgrade, turretTier, satelliteOrbitPos } from './sim/buildings';
 // Match-config bounds + types for the lobby's variable-size / mode / abundance
 // controls (variable-slots Milestone E) — persisted and threaded into the world.
-import { MAX_MATCH_SIZE, MIN_MATCH_SIZE, configToPlayers } from './sim/match-config';
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from './sim/match-config';
 import type { MatchMode } from './sim/match-config';
 import type { Abundance } from './sim/constants';
 // SATELLITE tunables — used only by the ?debug=1 minimap-fog live-stage seam to
@@ -189,11 +189,12 @@ import {
   // the host's per-seat difficulties ride `botDifficulties` in empty-seat order.
   applyLobbySlots,
   botDifficulties,
-  // The one authored `MatchConfig` the lobby produces (`src/ui/lobby`) — the
-  // single handoff to BOTH the wire (the host's `lobbyChoice.teams`) and the world
-  // (`bootOfflineMatch`'s dense team table). Reading the same object for both is
-  // what makes an offline TEAMS match and an online one the same match (m10).
-  lobbyMatchConfig,
+  // The sides the lobby authored, in the two orders the two ends index by (m10):
+  // per-SLOT for the server's seats, DENSE for the world the client builds. Both
+  // read the one authored `MatchConfig`, which is what makes an offline TEAMS
+  // match and an online one the same match.
+  lobbyRosterTeams,
+  lobbyWireTeams,
   startLobbyMatch,
   wireFireMode,
   selectShipClass,
@@ -6345,21 +6346,6 @@ interface LobbyChoice {
   readonly teams?: readonly number[];
 }
 
-/** The host's per-SLOT side, as `lobbyChoice.teams` spells it on the wire: one
- *  entry per physical lobby slot (0..7), including closed ones, because the
- *  server's seats are physical slots and it indexes this by `slot.player`
- *  (`server/room.ts` `applyTeamConfig`). FFA reads as teams-of-one. */
-function lobbyTeams(state: LobbyState): number[] {
-  return lobbyMatchConfig(state).slots.map((slot) => slot.team);
-}
-
-/** The same authored sides in the **dense** order `createWorld` uses — closed
- *  slots dropped, survivors re-indexed 0..N-1 (`configToPlayers`). This is the
- *  offline half of the exact same handoff {@link lobbyTeams} makes to the wire, so
- *  a TEAMS match plays identically with and without a server. */
-function lobbyDenseTeams(state: LobbyState): number[] {
-  return configToPlayers(lobbyMatchConfig(state)).map((spec) => spec.team ?? spec.id);
-}
 
 /**
  * The room this lobby is a lobby *for*, when there is one. Absent for PLAY SOLO —
@@ -6742,7 +6728,7 @@ function openLobby(
       // (GDD §4.2; spike §S2, Trap 7). A joiner sends neither: the room's shape is
       // the host's, and their own toggles are local screen state until the
       // authoritative `lobbyState` folds the truth back in.
-      ...(host ? { mode: state.mode, teams: lobbyTeams(state) } : {}),
+      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
     });
   }
 
@@ -6850,7 +6836,7 @@ function openLobby(
       // world-build wiring that was missing (Task C4). Online this is ignored: the
       // world is the server's, built from the sides the same lobby already sent it
       // (`sendChoice`), and `matchStart` hands them back for the predicted world.
-      teams: lobbyDenseTeams(state),
+      teams: lobbyRosterTeams(state),
     };
     teardown();
     seam.visible = false;

@@ -63,7 +63,7 @@ import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
 import { seatPing } from '../net/ping';
 import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
-import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from '../sim/match-config';
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE, configToPlayers } from '../sim/match-config';
 import type { Abundance } from '../sim/constants';
 import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import { playerColor } from './station-hp';
@@ -862,6 +862,33 @@ export function lobbyMatchConfig(state: LobbyState): MatchConfig {
     };
   });
   return { mode: state.mode, slots, abundance: state.abundance };
+}
+
+/**
+ * The authored sides as **the wire spells them**: one entry per physical lobby
+ * slot 0..7, closed seats included (m10 teams-wire).
+ *
+ * Physical because that is what the other end indexes by — the server's seats are
+ * slots and it reads this by `slot.player` (`server/room.ts` `applyTeamConfig`).
+ * FFA reads as teams-of-one, so sending it in FFA is a no-op rather than a
+ * special case the caller has to remember.
+ */
+export function lobbyWireTeams(state: LobbyState): number[] {
+  return lobbyMatchConfig(state).slots.map((slot) => slot.team);
+}
+
+/**
+ * The same authored sides as **the world builds them**: dense, closed slots
+ * dropped and the survivors re-indexed 0..N-1 ({@link configToPlayers}, spike
+ * Trap 6), so entry `i` is the side of the ship the sim will call player `i`.
+ *
+ * The offline half of the identical handoff {@link lobbyWireTeams} makes to the
+ * server — `bootOfflineMatch` stamps this onto its roster. Two functions rather
+ * than one because the two ends genuinely index differently, and one function
+ * pretending otherwise is how the sparse lobby id {0,2,5} gets into the sim.
+ */
+export function lobbyRosterTeams(state: LobbyState): number[] {
+  return configToPlayers(lobbyMatchConfig(state)).map((spec) => spec.team ?? spec.id);
 }
 
 /** One seat's occupancy as the config's {@link SlotState}: an OPEN preview is a

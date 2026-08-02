@@ -373,6 +373,10 @@ export {
   isJoinableRoomCode,
   lobbyMatchConfig,
   lobbyModel,
+  // The authored sides, in the two orders the two ends index by (m10 teams-wire):
+  // per-SLOT for the server, DENSE for the world the client builds itself.
+  lobbyRosterTeams,
+  lobbyWireTeams,
   makeRoomCode,
   matchSizeOf,
   nameFor,
