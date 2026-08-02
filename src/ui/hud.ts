@@ -308,7 +308,7 @@ export interface HudFrame {
   /**
    * Per-slot **side** table, the third mirror of {@link names} (m10 teams): the
    * raw `team` the sim carries on that slot's ship, turned into a `TEAM A` /
-   * `TEAM B` label beside the name when {@link teams} mode is on.
+   * `TEAM B` label beside the name when {@link teamsMode} is on.
    *
    * Default: none ⇒ no side labels, which is also FFA's answer. Fed from the
    * booted world's own roster, so the HUD names a side from the same number
