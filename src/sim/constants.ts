@@ -1329,6 +1329,45 @@ export const WEDGE_SLIDE_KICK: Tunable<number> = 60;
  */
 export const WEDGE_CONTACT_S: Tunable<number> = 0.5;
 
+/**
+ * Net headway (world units) a ship pressing into a body must make within
+ * `WEDGE_CONTACT_S` to count as **going somewhere** — the escape hatch's real
+ * question, and the p15 correction to asking it about *speed*.
+ *
+ * Speed and progress are not the same thing when a hull is pinned. The p14 hatch
+ * gated on "held below `WEDGE_SLIDE_SPEED`", which is exactly right for the
+ * radial press it was written for (a ship steering into its own station grinds
+ * to a dead stop) and blind to the pocket: a hull wedged in the V between two
+ * asteroids keeps ~90% of cruise on the clock, because each body reflects only
+ * its own inward component and what survives points straight into the other. The
+ * old ramp then scaled its rescue kick to nearly nothing on the grounds that the
+ * ship was "already moving", and a bot sat spinning in that pocket at full
+ * throttle for the rest of the match (`tests/harness/unstuck.test.ts` — the
+ * shipped build does it at seeds 25-48, which that soak did not cover).
+ *
+ * One ship diameter is the honest line: a hull that has not moved its own width
+ * in half a second, while pressed into something solid, is pinned no matter what
+ * its velocity says. Comfortably under the ~26 units a ship at the old speed
+ * threshold covers in that window, so nothing that was making real progress
+ * starts earning a kick. TUNABLE
+ */
+export const WEDGE_ESCAPE_PROGRESS: Tunable<number> = SHIP_RADIUS;
+
+/**
+ * How long one committed escape slide runs before the hatch gives up on that
+ * direction and tries the other way along the surface (p15).
+ *
+ * There are only two ways round a body, so a failed run is not a search space —
+ * it is a coin the hatch has already spent. What the window has to buy is
+ * *distance*: at `WEDGE_SLIDE_KICK` this is ~90 units of travel, which clears
+ * the widest late-wave rock cluster the arena packs into its centre (GDD §2.3 —
+ * every wave lands closer in than the last, and a hull can end up several
+ * overlapping radii deep). Too short and the two directions simply cancel: the
+ * hull shivers between them and never leaves, which is the failure this constant
+ * exists to name. TUNABLE
+ */
+export const WEDGE_SLIDE_RUN_S: Tunable<number> = 1.5;
+
 // ---------------------------------------------------------------------------
 // Weapon acquisition range (GDD §2.4 — auto-aim engagement radius)
 // ---------------------------------------------------------------------------
