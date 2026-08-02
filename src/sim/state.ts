@@ -538,12 +538,24 @@ export interface Bounds {
  * memory; but static geography a player has scouted stays on the minimap after
  * their coverage moves off it, and that persistence has to be stored.
  *
- * Kept deliberately tiny and serializable: `seenStations[playerId]` is a BITMASK
- * of station board-ids (`MiningStation.id`, 0..7 — well under 32 bits) that player
- * has ever sensed. Monotonic — bits are only ever set, never cleared — so
- * "remembered" grows as a match is explored. Plain numbers, so it hashes and
- * snapshots with the rest of the world and can never desync a replay
- * (`./sensing` `updateSensory` writes it; `sensedState` reads it).
+ * TWO kinds of static geography are remembered, because the arena holds two:
+ *
+ *  - **Homes.** `seenStations[playerId]` is a BITMASK of station board-ids
+ *    (`MiningStation.id`, 0..7 — well under 32 bits) that player has ever sensed.
+ *  - **Ore fields.** `seenOre[playerId]` is an ASCENDING list of `Asteroid.id`s
+ *    that player has ever sensed. A rock is as static as a home — it never moves,
+ *    it only depletes (`step` filters exhausted ones out) — so a field a player
+ *    scouted stays on their minimap after they fly away, which is the whole point
+ *    of scouting it (developer report p15, "radar built, fog stayed": the fog kept
+ *    closing over the ore the player had just discovered). A list rather than a
+ *    bitmask because ids run past 32 across five waves; ascending because
+ *    `nextEntityId` only counts up, so the fold appends far more often than it
+ *    splices, and a sorted list reads back deterministically.
+ *
+ * Both are monotonic — a bit is only ever set, an id only ever inserted — so
+ * "remembered" grows as a match is explored and never un-remembers. Plain numbers
+ * either way, so it hashes and snapshots with the rest of the world and can never
+ * desync a replay (`./sensing` `updateSensory` writes it; `sensedState` reads it).
  *
  * Determinism: derived purely from world state each tick, so a replay from the
  * same inputs reproduces it exactly. It is sim-internal read-model support, not on
@@ -552,6 +564,10 @@ export interface Bounds {
 export interface SensoryMemory {
   /** `seenStations[playerId]` = bitmask of remembered `MiningStation.id`s. */
   seenStations: number[];
+  /** `seenOre[playerId]` = ascending ids of remembered `Asteroid`s. Optional so a
+   *  hand-built memory from before ore was remembered still folds (the pass
+   *  materialises it); the sim's own `createWorld` always attaches one. */
+  seenOre?: number[][];
 }
 
 /**
@@ -830,10 +846,13 @@ function makeDerelictStation(index: number, pos: Vec2, angle: number): MiningSta
 }
 
 /** A fresh per-player sensory memory: nobody has scouted anything yet (every
- *  mask starts at 0). One slot per live player (`./sensing` `updateSensory` fills
- *  them each tick, own station included on the first pass). */
+ *  mask starts at 0, every remembered-ore list empty). One slot per live player
+ *  (`./sensing` `updateSensory` fills them each tick, own station and the ore in
+ *  its own back yard included on the first pass). */
 function initialSensory(playerCount: number): SensoryMemory {
-  return { seenStations: new Array<number>(playerCount).fill(0) };
+  const seenOre: number[][] = [];
+  for (let i = 0; i < playerCount; i++) seenOre.push([]);
+  return { seenStations: new Array<number>(playerCount).fill(0), seenOre };
 }
 
 /** A fresh match's clock: nothing has spawned, collapsed, or been won yet. */

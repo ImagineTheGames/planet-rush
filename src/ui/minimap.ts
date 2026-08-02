@@ -169,14 +169,20 @@ export const MINIMAP_SPAWN_PROTECT_ALPHA = 0.4;
  *  enough never to compete with the station/ship dots. Signal yellow is correct
  *  here: it is the RESERVED ore colour (style-guide §2), and this *is* ore. */
 export const MINIMAP_ORE_ALPHA = 0.28;
+/** A REMEMBERED ore field — scouted once, not under coverage right now. Dimmer
+ *  still than a live hint (the same "known, not sensed" step the station tri-state
+ *  makes), so the map distinguishes "I can see this field" from "I found this
+ *  field earlier" without either one shouting. */
+export const MINIMAP_REMEMBERED_ORE_ALPHA = 0.14;
 
 // ---------------------------------------------------------------------------
 // Fog of war (RATIFIED feature f1 — the minimap renders ONLY the player's
 // sensed-state, `../sim/sensing`). Three visual states, item 1 of the brief:
 //   - FOGGED regions read dark (Cold Vacuum) — no coverage, so nothing shows;
-//   - REMEMBERED static geography (a station scouted at least once) stays on the
-//     map but DIMMED, because a home does not move (GDD §2.7);
-//   - LIVE dots (ships, satellites, ore) show ONLY under CURRENT coverage — the
+//   - REMEMBERED static geography (a station or an ORE FIELD scouted at least
+//     once) stays on the map but DIMMED, because neither a home nor a rock moves
+//     (GDD §2.7) — a field you flew over is still there when you fly home;
+//   - LIVE dots (ships, satellites) show ONLY under CURRENT coverage — the
 //     instant a satellite dies its disc is gone and everything only under it
 //     drops the same tick (the "satellite-killed moment").
 // The pure model here decides WHICH of the three a body is in (the coverage math
@@ -274,6 +280,12 @@ export interface MinimapFog {
    *  sensed at least once, so its static geography persists on the map even after
    *  coverage moves off it (`../sim/sensing` `SensoryMemory`). */
   readonly rememberedMask: number;
+  /** REMEMBERED asteroid ids — the ore half of the same memory (`../sim/sensing`
+   *  `SensoryMemory.seenOre`): a field the viewer has scouted stays on the map
+   *  after coverage moves off it, dimmed. A set, so the gate is O(1) per hint.
+   *  Optional: a feed that carries none behaves exactly as before (ore shows only
+   *  under current coverage), which is what every pre-existing fixture wants. */
+  readonly rememberedOre?: ReadonlySet<number>;
 }
 
 /** Everything the minimap draws for one frame, all in **map (world) space** — the
@@ -290,8 +302,10 @@ export interface MinimapFrame {
   readonly satellites?: readonly MinimapSatellite[];
   /** The collapse ring, present only while collapse is active (GDD §2.3). */
   readonly collapse?: MinimapRing | null;
-  /** Faint ore-field hints — asteroid centres, map space (GDD §2.3, §5.5). */
-  readonly oreHints?: readonly { readonly x: number; readonly y: number }[];
+  /** Faint ore-field hints — asteroid centres, map space (GDD §2.3, §5.5). `id` is
+   *  the rock's `Asteroid.id`, which the fog's remembered-ore set is keyed by; a
+   *  hint with no id is simply never remembered (older feeds and fixtures). */
+  readonly oreHints?: readonly { readonly x: number; readonly y: number; readonly id?: number }[];
   /** Fog-of-war coverage (feature f1). Present ⇒ the whole scene is fog-gated
    *  (dark outside coverage, remembered geography dimmed, live dots only under
    *  coverage). Absent / null ⇒ no fog, everything renders (backward compatible). */
@@ -549,7 +563,10 @@ function pointInCoverage(
  *   - a station REMEMBERED but not currently covered draws DIMMED
  *     ({@link MINIMAP_REMEMBERED_ALPHA}) — known geography that persists;
  *   - a station currently under coverage draws at full (a wreck still derelict-dim);
- *   - live ships / satellites / ore draw ONLY under CURRENT coverage — so the tick
+ *   - an ORE hint takes the SAME tri-state (a rock is static geography too): full
+ *     under coverage, {@link MINIMAP_REMEMBERED_ORE_ALPHA} once `fog.rememberedOre`
+ *     holds its id, fogged if never scouted;
+ *   - live ships / satellites draw ONLY under CURRENT coverage — so the tick
  *     a radar satellite dies its disc vanishes and anything only under it drops.
  * **Always-visible exceptions** (documented, brief item 3): the viewer's OWN ship
  * is always its {@link ownDot} (cockpit knowledge), the viewer's OWN stations sit
@@ -629,9 +646,20 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
 
   const oreDots: MinimapDot[] = [];
   for (const o of frame.oreHints ?? []) {
-    if (fog && !pointInCoverage(coverage, o.x, o.y, 0)) continue; // ore only where you sense
+    // Ore is STATIC geography, so it gets the station tri-state, not the live-dot
+    // gate: full under current coverage, dimmed once scouted, fogged if never
+    // seen. A rock mined out of existence is simply absent from the feed.
+    let alpha = MINIMAP_ORE_ALPHA;
+    if (fog) {
+      const sensedNow = pointInCoverage(coverage, o.x, o.y, 0);
+      if (!sensedNow) {
+        const remembered = o.id !== undefined && (fog.rememberedOre?.has(o.id) ?? false);
+        if (!remembered) continue; // fogged — never scouted
+        alpha = MINIMAP_REMEMBERED_ORE_ALPHA; // remembered, dimmed
+      }
+    }
     const s = mapPoint(transform, o.x, o.y);
-    oreDots.push({ x: s.x, y: s.y, radius: oreR, color: PALETTE.signalYellow, alpha: MINIMAP_ORE_ALPHA });
+    oreDots.push({ x: s.x, y: s.y, radius: oreR, color: PALETTE.signalYellow, alpha });
   }
 
   // Coverage discs → screen space, for the view to reveal + ring ("you see what
