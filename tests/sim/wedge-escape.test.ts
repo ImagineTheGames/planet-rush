@@ -167,6 +167,94 @@ describe('bot-home-rim wedge is escaped in the real step() loop (developer repor
   });
 });
 
+// ---------------------------------------------------------------------------
+// The pocket (p15) — the pin the p14 speed gate could not see
+// ---------------------------------------------------------------------------
+
+describe('a hull wedged in the V between two rocks gets out (developer report p15)', () => {
+  /**
+   * The case that survived p14 and cost a bot the rest of its match
+   * (`tests/harness/unstuck.test.ts`, and the shipped build still does it on the
+   * seeds that soak does not cover). Two rocks a hull-width apart, the ship
+   * pressed into the notch between them, steering through the gap.
+   *
+   * It is invisible to a *speed* gate, which is why the p14 hatch let it stand:
+   * each rock reflects only its own inward component, so what survives points
+   * into the other one and comes straight back — the hull keeps most of cruise on
+   * the clock while its net displacement is a couple of units a minute. The p15
+   * hatch asks about net headway instead (`WEDGE_ESCAPE_PROGRESS`) and commits to
+   * ONE slide direction until the hull has actually gone somewhere.
+   */
+  function wedgedInPocket(): { world: World; ship: Ship; notch: Vec2 } {
+    const world = createWorld({ seed: 5, players, asteroidCount: 0 });
+    const rock = (id: number, x: number, y: number, radius: number) => ({
+      id,
+      pos: { x, y },
+      radius,
+      ore: 100,
+      maxOre: 100,
+      crackStage: 0,
+      mineBuffer: 0,
+      home: null,
+    });
+    // Two rocks side by side with a gap narrower than a hull, and the notch
+    // between them straight ahead of the ship.
+    const cx = world.bounds.width / 2;
+    const cy = world.bounds.height / 2;
+    const gap = SHIP_RADIUS * 1.2; // no hull fits through
+    world.asteroids = [
+      rock(1, cx - (30 + gap / 2), cy, 30),
+      rock(2, cx + (30 + gap / 2), cy, 30),
+    ];
+    const ship = shipOf(world, LOCAL)!;
+    stationOf(world, LOCAL)!.pos = { x: 60, y: 60 }; // its home, well out of the way
+    ship.spawnProtect = 0;
+    // Pressed up into the notch from below, already touching both rocks: at this
+    // stand-off the hull overlaps each of them, and the gap ahead is too narrow
+    // to pass — the exact geometry a late-wave cluster makes by the dozen.
+    ship.pos = { x: cx, y: cy + 18 };
+    ship.vel = { x: 0, y: -40 };
+    return { world, ship, notch: { x: cx, y: cy - 400 } };
+  }
+
+  it('does not stay pinned in the notch, however hard it keeps steering through it', () => {
+    const { world, ship, notch } = wedgedInPocket();
+    const WEDGE_R = 8;
+    let holdStart = { x: ship.pos.x, y: ship.pos.y, t: world.time };
+    let worstHeld = 0;
+    for (let i = 0; i < Math.round(10 / TICK_DT); i++) {
+      step(world, thrustToward(ship, notch));
+      const dx = ship.pos.x - holdStart.x;
+      const dy = ship.pos.y - holdStart.y;
+      if (dx * dx + dy * dy > WEDGE_R * WEDGE_R) holdStart = { x: ship.pos.x, y: ship.pos.y, t: world.time };
+      else worstHeld = Math.max(worstHeld, world.time - holdStart.t);
+    }
+    // The whole point: a treadmill is not progress. Well under the standing 12 s
+    // ceiling the harness soak enforces.
+    expect(worstHeld).toBeLessThan(4);
+  });
+
+  it('leaves the pocket entirely — it is displaced, not just jiggled', () => {
+    const { world, ship, notch } = wedgedInPocket();
+    const start = { x: ship.pos.x, y: ship.pos.y };
+    for (let i = 0; i < Math.round(10 / TICK_DT); i++) step(world, thrustToward(ship, notch));
+    const travelled = Math.hypot(ship.pos.x - start.x, ship.pos.y - start.y);
+    expect(travelled).toBeGreaterThan(SHIP_RADIUS * 3);
+  });
+
+  it('is deterministic — two identical pocket runs match tick for tick', () => {
+    const run = (): Ship => {
+      const { world, ship, notch } = wedgedInPocket();
+      for (let i = 0; i < Math.round(5 / TICK_DT); i++) step(world, thrustToward(ship, notch));
+      return ship;
+    };
+    const a = run();
+    const b = run();
+    expect(a.pos).toEqual(b.pos);
+    expect(a.vel).toEqual(b.vel);
+  });
+});
+
 describe('the escape hatch is surgical — it perturbs nothing else', () => {
   it('a ship in open space, not touching any body, is untouched by the slide', () => {
     const world = createWorld({ seed: 3, players, asteroidCount: 0 });

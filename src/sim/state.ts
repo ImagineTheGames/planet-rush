@@ -134,6 +134,33 @@ export interface Ship {
    * it from its own contacts. Optional on the same backward-compatible terms as
    * `weaponCooldown`; `makeShip` always sets it to 0 and respawn clears it. */
   wedgeContactS?: number;
+  /**
+   * Where the current grind began — the position {@link wedgeContactS} is timed
+   * against (p15). The escape hatch asks "has this hull actually GONE anywhere?",
+   * not "is it slow?", because the two are not the same question: a ship pinned in
+   * the V between two rocks keeps most of its speed (each body reflects only its
+   * own inward component, and what survives points into the other) while its net
+   * displacement is a couple of units per minute. Measuring the pin off *net
+   * headway from this anchor* catches that treadmill and the near-still radial
+   * press with one rule. Re-anchored the moment the ship clears
+   * `WEDGE_ESCAPE_PROGRESS` of it, and dropped when contact breaks.
+   *
+   * Local grind-state scratch on the same terms as `wedgeContactS`: not on the
+   * wire, optional, always set by `makeShip`, cleared on respawn. */
+  wedgeAnchor?: Vec2;
+  /**
+   * The slide direction a *committed* escape is walking along, or absent when no
+   * escape is running (p15).
+   *
+   * Latched, not recomputed, and that is the load-bearing part: the tangent is
+   * taken about the body the hull last pressed into, and a hull wedged in a V
+   * presses into a different one every tick, so a freshly-derived tangent flips
+   * direction as fast as the contact does and the two cancel — the ship shivers in
+   * the pocket at full throttle instead of leaving it. One direction, held until
+   * the hull has actually gone somewhere, walks it out.
+   *
+   * Local grind-state scratch on the same terms as `wedgeContactS`. */
+  wedgeSlide?: Vec2;
 }
 
 /** A minable asteroid — the economy (GDD §2.3, §5.5). */
@@ -733,6 +760,8 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     firing: false,
     weaponCooldown: 0,
     wedgeContactS: 0,
+    wedgeAnchor: { x: pos.x, y: pos.y },
+    wedgeSlide: { x: 0, y: 0 },
   };
 }
 

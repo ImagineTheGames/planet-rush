@@ -51,8 +51,9 @@ import {
   SPAWN_PROTECTION_S,
   TICK_DT,
   TRACTOR,
-  WEDGE_SLIDE_SPEED,
+  WEDGE_ESCAPE_PROGRESS,
   WEDGE_SLIDE_KICK,
+  WEDGE_SLIDE_RUN_S,
   WEDGE_CONTACT_S,
 } from './constants';
 import {
@@ -529,20 +530,89 @@ function reflectOffCircle(ship: Ship, center: Vec2, radius: number, contact: Wed
  * pre-p14 path (no shove) is what keeps the netcode's snapshot-quantized
  * prediction convergent (`src/net/prediction`; `WEDGE_CONTACT_S`).
  */
+/** Drop any committed escape slide, in place — the zero vector IS "no slide",
+ *  so a ship never allocates one per contact (GDD §4.3). */
+function clearSlide(ship: Ship): void {
+  const slide = ship.wedgeSlide;
+  if (slide) {
+    slide.x = 0;
+    slide.y = 0;
+  }
+}
+
 function updateWedgeEscape(ship: Ship, contact: WedgeContact, dt: number): void {
-  const sp = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);
-  if (!contact.pressedIn || sp >= WEDGE_SLIDE_SPEED) {
+  // The anchor is the whole memory of a grind, and it is dropped for EXACTLY one
+  // reason: the hull actually went somewhere. Not for a tick without contact — a
+  // hull rattling in a pocket loses its press for single ticks all the time, and
+  // resetting on that was the loop this hatch was written to break: press in,
+  // two futile seconds of slide, one free tick, forget everything, repeat, for
+  // the rest of the match.
+  const anchor = ship.wedgeAnchor;
+  if (!anchor) {
+    if (contact.pressedIn) ship.wedgeAnchor = { x: ship.pos.x, y: ship.pos.y };
     ship.wedgeContactS = 0;
+    clearSlide(ship);
     return;
   }
+  const dx = ship.pos.x - anchor.x;
+  const dy = ship.pos.y - anchor.y;
+  if (dx * dx + dy * dy >= WEDGE_ESCAPE_PROGRESS * WEDGE_ESCAPE_PROGRESS) {
+    // Real headway — sliding along a rim, bouncing off, rounding a station, or a
+    // committed escape that worked. Re-anchor here; nothing is pinned.
+    anchor.x = ship.pos.x;
+    anchor.y = ship.pos.y;
+    ship.wedgeContactS = 0;
+    clearSlide(ship);
+    return;
+  }
+  // Still inside the ring, but not pressing into anything this tick: hold the
+  // commitment (above) and simply do not accrue pin time. A hull drifting free
+  // will clear the ring on its own in a fraction of a second.
+  if (!contact.pressedIn) return;
+
   const held = (ship.wedgeContactS ?? 0) + dt;
   ship.wedgeContactS = held;
   if (held < WEDGE_CONTACT_S) return;
 
-  const kick = WEDGE_SLIDE_KICK * (1 - sp / WEDGE_SLIDE_SPEED);
-  // Tangent = outward normal rotated +90° (CCW): (-ny, nx).
-  ship.vel.x += -contact.ny * kick;
-  ship.vel.y += contact.nx * kick;
+  // Commit to ONE slide direction for the whole escape (`Ship.wedgeSlide`): the
+  // tangent is taken about the body last pressed into, and a hull in a V presses
+  // into a different one every tick, so a freshly-derived tangent flips as fast
+  // as the contact does and the two cancel.
+  let slide = ship.wedgeSlide;
+  // A committed run that has itself gone nowhere for a full window is pushing
+  // into the pocket's other wall. Turn it a quarter-turn and try again: the
+  // tangent first, then *outward along the contact normal* — back out the way the
+  // hull came, which is the only exit from a symmetric notch and the one no
+  // tangential slide can ever find — then the other tangent, then inward. Four
+  // quarter-turns is the whole neighbourhood of a contact, so the search is
+  // bounded, and each is a coordinate swap: deterministic, no RNG, no clock.
+  if (slide && (slide.x !== 0 || slide.y !== 0) && held >= WEDGE_CONTACT_S + WEDGE_SLIDE_RUN_S) {
+    const { x, y } = slide;
+    slide.x = y;
+    slide.y = -x;
+    ship.wedgeContactS = WEDGE_CONTACT_S;
+  } else if (!slide || (slide.x === 0 && slide.y === 0)) {
+    // Tangent = outward normal rotated +90° (CCW): (-ny, nx). Fixed handedness,
+    // so the response stays deterministic — no RNG, no clock (GDD §4.8).
+    if (slide) {
+      slide.x = -contact.ny;
+      slide.y = contact.nx;
+    } else {
+      slide = { x: -contact.ny, y: contact.nx };
+      ship.wedgeSlide = slide;
+    }
+  }
+
+  // Bring the along-slide component UP TO the slide speed rather than adding to
+  // it every tick: self-limiting by construction, so a pin that lasts a second
+  // reads as a slide off the rim and never as a launch, whatever the hull's other
+  // velocity is doing.
+  const along = ship.vel.x * slide.x + ship.vel.y * slide.y;
+  if (along < WEDGE_SLIDE_KICK) {
+    const add = WEDGE_SLIDE_KICK - along;
+    ship.vel.x += slide.x * add;
+    ship.vel.y += slide.y * add;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1030,4 +1100,6 @@ function respawn(ship: Ship): void {
   ship.spawnProtect = SPAWN_PROTECTION_S;
   ship.weaponCooldown = 0;
   ship.wedgeContactS = 0; // a fresh hull at home is not mid-grind (p14).
+  ship.wedgeAnchor = { x: ship.pos.x, y: ship.pos.y };
+  clearSlide(ship);
 }
