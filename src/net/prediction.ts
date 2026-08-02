@@ -37,6 +37,15 @@
  * snapshot 2 ticks later, and static entities are corrected by their own event
  * stream (`./entity-events`), so nothing drifts for long.
  *
+ * **Three things the replay is not allowed to decide.** Replaying steps the whole
+ * world, and `step()` resolves everything it touches — collisions, countdowns, the
+ * tractor. Three of those results are lies told with confidence, so each is
+ * re-asserted afterwards from the only source entitled to move it: **hull** is
+ * authority's ({@link PredictedMatch.holdHull}), **death** is authority's
+ * ({@link PredictedMatch.holdLifecycle}), and the **wallet** is the player's own
+ * timeline re-anchored to authority's last statement, never the replay's re-derived
+ * copy of either ({@link PredictedMatch.settleWallet}).
+ *
  * **The correction is not shown as a jump.** Reconciling can move the local ship
  * — by a hair every snapshot (the wire quantizes positions to whole units) or by
  * a lot after real divergence. {@link PredictedMatch.renderOffset} carries that
@@ -339,6 +348,22 @@ export class PredictedMatch {
   /** The newest authoritative wallet the server has volunteered, waiting for the
    *  reconcile of its own tick (`./transport` EconomyMessage). */
   private staged: { tick: Tick; economy: PlayerEconomy } | null = null;
+  /**
+   * The local hold and bank at the end of every **predicted** tick — the player's
+   * own timeline of their wallet, and the ruler authority's word is measured
+   * against ({@link settleWallet}).
+   *
+   * Written by {@link predict} and by nothing else. The replay deliberately does
+   * not append to it: a replayed tick re-derives movement this trail already
+   * records, and letting it write would make the ruler grow every time it was
+   * read. {@link history} cannot serve here for exactly that reason — it is
+   * cleared and rebuilt by every rewind.
+   */
+  private readonly wallet: { tick: Tick; cargo: number; banked: number }[] = [];
+  /** Whether authority has ever stated this seat's wallet. Until it has, the wallet
+   *  is prediction's outright — the offline/loopback shape, where the sim the client
+   *  is running IS authority ({@link holdInflow}). */
+  private heard = false;
 
   constructor(config: PredictedMatchConfig) {
     this.world = config.world;
@@ -346,6 +371,7 @@ export class PredictedMatch {
     this.dt = config.dt ?? TICK_DT;
     this.maxPending = config.maxPending ?? MAX_PENDING_INPUTS;
     this.checkpoint();
+    this.markWallet();
   }
 
   // --- Read-only surface --------------------------------------------------
@@ -447,9 +473,13 @@ export class PredictedMatch {
     // firer's own shots are drawn from prediction, never from the wire —
     // {@link harvestOwnShots}).
     const cooldownBefore = this.localShip()?.weaponCooldown ?? 0;
+    // The hold as this tick found it: what a predicted tick may take out of it is
+    // the player's own business, what it puts in is authority's ({@link holdInflow}).
+    const holdBefore = this.localShip()?.cargo ?? null;
 
     step(this.world, [{ id: this.local, actions }], this.dt);
 
+    this.holdInflow(holdBefore);
     if ((this.localShip()?.weaponCooldown ?? 0) > cooldownBefore) {
       this.journal.record({ kind: 'volley', tick, inFlight: this.ownShotCount() });
     }
@@ -466,6 +496,10 @@ export class PredictedMatch {
     this.holdHull();
     this.holdLifecycle();
     this.checkpoint();
+    // The one place the player's own wallet timeline is written down: this tick
+    // mined, banked or spent, and the trail is what lets the next reconcile add
+    // that movement back on top of authority's figure ({@link settleWallet}).
+    this.markWallet();
     this.decayOffset();
     return tick;
   }
@@ -606,10 +640,12 @@ export class PredictedMatch {
     // before authority flattens the pool and put back after the replay
     // (`settleShots`, audit item 2b).
     const carried = this.harvestOwnShots();
-    // Every hold as the *player's own timeline* left it, read before authority's
-    // wallet is written over it: the ledger behind the conserved courier telegraph
-    // ({@link FrozenClocks.hold}).
+    // Every hold and bank as the *player's own timeline* left them, read before the
+    // replay runs: the wallet is restored from these afterwards, and the hold is
+    // also the ledger behind the conserved courier telegraph
+    // ({@link FrozenClocks.hold}, {@link settleWallet}).
     const hold = this.world.ships.map((ship) => ship.cargo);
+    const bank = this.world.ships.map((ship) => ship.banked);
     const checkpoint = this.rewind(snapshot.tick);
     const authoritative = snapshot.ships.find((s) => s.id === this.local);
     this.error =
@@ -625,10 +661,6 @@ export class PredictedMatch {
     // so the replay below revives a corpse on authority's tick rather than on its
     // first replayed one ({@link seedRespawnClocks}).
     this.seedRespawnClocks(snapshot.tick);
-    // The wallet is corrected here, in the same breath as position and hull, and
-    // *before* the replay: unacked mining is then re-earned on top of authority's
-    // figure instead of on top of the client's own compounding one (`stageEconomy`).
-    this.applyStagedEconomy(snapshot.tick);
 
     // Read *before* the retire below throws the acked inputs away: the tick this
     // client predicted `ackSeq` at is in that queue and nowhere else.
@@ -661,6 +693,11 @@ export class PredictedMatch {
       step(this.world, [{ id: this.local, actions: withoutOrders(input.actions) }], this.dt);
       this.checkpoint();
     }
+    // The wallet, before the chunk field it is paid from is put back: the replay's
+    // holds are discarded and authority's word is re-anchored onto the player's own
+    // timeline ({@link settleWallet}). Ahead of `thawClocks` because the courier
+    // debt is measured against the hold this leaves behind ({@link depositDebt}).
+    this.settleWallet(hold, bank, snapshot.tick);
     // Put the construction and repair clocks back where the replay found them,
     // moved on by the *net* time this reconcile actually advanced the world — which
     // in a steady state is nothing at all.
@@ -761,13 +798,13 @@ export class PredictedMatch {
    * world at the reconcile for that tick (`./transport` EconomyMessage).
    *
    * Staged rather than applied on arrival, because *when* it lands decides whether
-   * the player's own unacked mining survives. The server sends it immediately
-   * ahead of the snapshot for the same tick, so by the time that snapshot is
-   * reconciled the correct wallet is already here: rewind, write authority (ships,
-   * hull, and now the wallet), then replay — and the ore the client tractored in
-   * during the ticks the server has not simulated yet is added back on top, once.
-   * Applying it on arrival instead would stamp a wallet from tick `T` onto a world
-   * predicted to `T + RTT` and drop that window's earnings on every snapshot.
+   * the player's own unacked mining survives. The server sends it immediately ahead
+   * of the snapshot for the same tick, so by the time that snapshot is reconciled
+   * the wallet for that exact tick is already here — and a statement about tick `T`
+   * is only meaningful against what this client's own timeline held at `T`
+   * ({@link settleWallet}). Applying it on arrival instead would stamp a wallet from
+   * tick `T` onto a world predicted to `T + RTT` and drop that window's earnings on
+   * every snapshot.
    *
    * A wallet for a tick the client has already reconciled past is applied at the
    * next reconcile (the newest word always wins; the ticks between are replayed
@@ -775,6 +812,9 @@ export class PredictedMatch {
    * diff, so an older one has nothing left to say.
    */
   stageEconomy(economy: PlayerEconomy, tick: Tick): void {
+    // From the first statement on, this seat's hold fills on authority's word rather
+    // than on a local guess ({@link holdInflow}).
+    this.heard = true;
     if (this.staged && this.staged.tick > tick) return;
     this.staged = { tick, economy };
   }
@@ -787,12 +827,166 @@ export class PredictedMatch {
 
   // --- Internals ----------------------------------------------------------
 
-  /** Write the staged wallet if it describes this snapshot's tick or an earlier
-   *  one; a wallet from the future stays staged until its tick arrives. */
-  private applyStagedEconomy(tick: Tick): void {
+  /**
+   * Settle the wallet after a replay — **the hold the player reads has one owner.**
+   *
+   * *"Picked up ore, the HUD flashed a FULL hold, then corrected to the real
+   * amount."* Held ore was flapping between two writers, the same fault the hull
+   * had (M10 {@link holdHull}) with the sign reversed: instead of a bar popping
+   * back up, a hold that climbed to the cap and stayed there.
+   *
+   * The mechanism is the chunk field. A rewind restores the world's *scalars*; it
+   * does not restore `world.chunks`, and `thawClocks` deliberately puts the chunk
+   * field back exactly as the replay found it ({@link FrozenClocks.chunks}) — so a
+   * chunk the replay tractors into the hold is *returned to the field afterwards*
+   * while the ore it paid stays in `cargo`. Every reconcile re-loots the same
+   * restored chunk, and at 150 ms there are five a snapshot: a single 1-ore chunk
+   * measured **2.0 in a 2-slot hold within two frames**, pinned at the cap until
+   * authority's own statement finally arrived to drag it back down. That drop is
+   * the "correction" the developer watched, and it is also, from the seat of a
+   * player who has just banked, ore that visibly went missing.
+   *
+   * So the hold and the chunk field are treated as the one accounting system they
+   * are: **whatever the reconcile does to the chunks, it does to the wallet.** The
+   * replay's wallet work is discarded wholesale, exactly as its chunk work is —
+   * sound for the same reason {@link settleShots} gives, since every tick a replay
+   * re-runs was predicted once already and its earnings are in `hold`/`bank`
+   * already. What is left is one writer per source:
+   *
+   *  - **the player's own predicted ticks** move the wallet, so a pickup shows the
+   *    instant the tractor closes and the deposit telegraph keeps its beat;
+   *  - **authority's word** re-anchors it — `authority's figure at tick T` plus
+   *    `whatever this client's own timeline has done since T` ({@link wallet}),
+   *    which is nothing at all when the two agree, and exactly the disagreement
+   *    when they do not.
+   *
+   * Nothing races, so the number only moves when the player earns or spends, or
+   * when the server says something new. The trail is rebased by the same
+   * correction, or the next statement would charge for this one twice.
+   */
+  private settleWallet(hold: readonly number[], bank: readonly number[], tick: Tick): void {
+    for (let i = 0; i < this.world.ships.length; i++) {
+      const ship = this.world.ships[i]!;
+      const cargo = hold[i];
+      const banked = bank[i];
+      if (cargo !== undefined) ship.cargo = cargo;
+      if (banked !== undefined) ship.banked = banked;
+    }
     if (!this.staged || this.staged.tick > tick) return;
-    applyPlayerEconomy(this.world, this.local, this.staged.economy);
+    const { economy, tick: at } = this.staged;
     this.staged = null;
+
+    const ship = this.shipOf(this.local);
+    // The player's own timeline as it stands right now, read before authority's
+    // figure is written over it.
+    const mine = ship ? { cargo: ship.cargo, banked: ship.banked } : null;
+    // Tiers (and the ceilings they scale) are authority's outright — there is no
+    // "since then" to preserve on a number the player buys once.
+    applyPlayerEconomy(this.world, this.local, economy);
+    if (!ship || !mine) return;
+    const spent = this.outflowSince(at);
+    if (!spent) return; // a statement older than the trail: take it exactly as read
+
+    // Held: authority's level, less what has left the hold since — never plus what
+    // arrived, which is authority's to state ({@link holdInflow}).
+    const held = Math.min(Math.max(economy.held - spent.cargo, 0), ship.cargoCap);
+    // Banked: every direction of it is the player's own — the drain fills it and an
+    // order empties it, and both run a lead ahead of the tick being stated.
+    const safe = Math.max(economy.banked + spent.banked, 0);
+    this.rebaseWallet(at, held - mine.cargo, safe - mine.banked);
+    ship.cargo = held;
+    ship.banked = safe;
+  }
+
+  /**
+   * What this client's own timeline has done to the local wallet since `tick`:
+   * `cargo` is the ore that has **left** the hold (the drain, an order's price —
+   * inflow is not counted, see {@link settleWallet}), `banked` is the net movement
+   * of the bank in either direction.
+   *
+   * Null when the trail does not reach back to `tick` at all, which is a statement
+   * this client can no longer place against its own history — the caller then takes
+   * authority's figure outright rather than measure against a ruler that starts in
+   * the wrong place.
+   */
+  private outflowSince(tick: Tick): { cargo: number; banked: number } | null {
+    let from = -1;
+    for (let i = 0; i < this.wallet.length; i++) {
+      const entry = this.wallet[i]!;
+      if (entry.tick <= tick && (from < 0 || entry.tick > this.wallet[from]!.tick)) from = i;
+    }
+    if (from < 0) return null;
+    let cargo = 0;
+    for (let i = from + 1; i < this.wallet.length; i++) {
+      cargo += Math.max(0, this.wallet[i - 1]!.cargo - this.wallet[i]!.cargo);
+    }
+    const first = this.wallet[from]!;
+    const last = this.wallet[this.wallet.length - 1]!;
+    return { cargo, banked: last.banked - first.banked };
+  }
+
+  /**
+   * Undo the ore a predicted tick tractored into the local hold — **what enters
+   * the hold is authority's to say.**
+   *
+   * This is not the usual "the client is a round trip ahead" trade, and that is the
+   * whole reason it can be given away for free. The chunk field is deliberately
+   * lifted out of the rewind and put back exactly as the replay found it
+   * ({@link FrozenClocks.chunks}, the M10 courier fix), so it advances one tick per
+   * *predicted* tick and no faster — the client's chunks and authority's chunks
+   * drift along the same clock, and the two sides collect the same chunk at very
+   * nearly the same moment. Predicting the pickup therefore wins the player almost
+   * nothing, while paying for it twice: with the tick of slop in either direction
+   * the geometry allows, a client that collects **early** double-counts when
+   * authority's statement lands on top, and a client that collects **late** adds a
+   * unit authority already counted — and, since a wallet that has not moved sends
+   * nothing (`server/room.ts` `syncEconomy`), *nothing ever comes to correct it*.
+   * That is the developer's FULL hold: a 1-ore chunk reading 2.0 in a 2-slot hold.
+   *
+   * Ore leaving the hold is the opposite case and stays predicted: the atmosphere
+   * drain runs on the ship's own position and an order's price is paid on the
+   * player's own thumb, both a lead ahead of the tick authority is describing. Those
+   * must show at once or the banking beat and the build wheel go dead
+   * ({@link settleWallet}).
+   *
+   * Only while authority is actually speaking about the wallet. A transport that
+   * never states one is a transport where prediction *is* authority (offline, and
+   * the loopback the parity tests run), and there the hold is the client's alone.
+   */
+  private holdInflow(before: number | null): void {
+    if (!this.heard || before === null) return;
+    const ship = this.localShip();
+    if (ship && ship.cargo > before) ship.cargo = before;
+  }
+
+  /** Append this predicted tick's wallet to the trail, bounded like the input
+   *  queue it is read against ({@link wallet}). */
+  private markWallet(): void {
+    const ship = this.localShip();
+    if (!ship) return;
+    this.wallet.push({ tick: this.world.tick, cargo: ship.cargo, banked: ship.banked });
+    while (this.wallet.length > this.maxPending + 1) this.wallet.shift();
+  }
+
+  /**
+   * Re-base the trail onto the timeline a correction just created: entries from
+   * `tick` on are shifted by the correction, older ones are dropped.
+   *
+   * Without this the ruler and the world would disagree by exactly the correction,
+   * and the *next* statement would re-apply it as if it were the player's own
+   * earnings — one nudge compounding into a drift, which is the class of bug this
+   * whole path exists to end.
+   */
+  private rebaseWallet(tick: Tick, cargo: number, banked: number): void {
+    for (let i = this.wallet.length - 1; i >= 0; i--) {
+      const entry = this.wallet[i]!;
+      if (entry.tick < tick) {
+        this.wallet.splice(i, 1);
+        continue;
+      }
+      entry.cargo += cargo;
+      entry.banked += banked;
+    }
   }
 
   /**
@@ -1416,21 +1610,23 @@ interface FrozenClocks {
   /** `[x, y, vx, vy, amount]` per entry of {@link chunks}, in the same order. */
   readonly chunkState: number[];
   /**
-   * Each ship's hold as the replay found it, in ship order — the ledger behind the
-   * conserved telegraph.
+   * Each ship's hold as the replay found it, in ship order — both the value the
+   * wallet is restored to afterwards ({@link PredictedMatch.settleWallet}) and the
+   * ledger behind the conserved telegraph.
    *
    * A courier is spawned on the hold's integer boundaries (`src/sim/step.ts`
-   * `updateDeposits`), and a reconcile writes authority's hold *over* the client's
-   * before replaying: so a boundary the player is owed a sprite for can be crossed
-   * inside a replay and nowhere else, and discarding the replay's chunk work whole
-   * would silently eat that sprite — one unit of ore that banks with nothing flying
-   * home for it. Comparing the hold the *player's* timeline reached against the one
-   * the replay ends on says exactly how many couriers the replay owes, and that many
-   * of the ones it spawned are kept.
+   * `updateDeposits`), and a reconcile can still move the hold *without* any
+   * predicted tick crossing one: authority's statement lands at the end of the
+   * reconcile and may take ore out of the hold that this client's own timeline had
+   * not drained yet. That is a boundary crossed nowhere the player could see it, and
+   * discarding the replay's chunk work whole would silently eat the sprite it owes —
+   * one unit of ore that banks with nothing flying home for it. Comparing the hold
+   * this was read at against the hold the reconcile settles on says exactly how many
+   * couriers are owed, and that many of the ones the replay spawned are kept.
    *
-   * Read at the top of the reconcile, before authority's wallet is applied — reading
-   * it after would measure the replay's own re-drain of ore already couriered, and
-   * mint a duplicate sprite per reconcile instead of the one the player earned.
+   * Read at the top of the reconcile, from the player's own timeline — the one
+   * quantity here that is *not* re-derived by the replay, because the replay's
+   * wallet work is thrown away ({@link PredictedMatch.settleWallet}).
    */
   readonly hold: readonly number[];
 }

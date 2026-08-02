@@ -1,0 +1,219 @@
+{
+  "probe": "reconnect-all-three-thirds",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-07-31T02:19:11.668Z",
+  "cargoTier1Cost": 2,
+  "startingOre": 3,
+  "room": "8F67",
+  "machine": "d891dd0a1443e8",
+  "hostWelcomeDials": 1,
+  "bothInSameRoom": true,
+  "aliceSeat": 0,
+  "bobSeat": 1,
+  "bankedAtSpawn": 3,
+  "tiersAtSpawn": {
+    "power": 0,
+    "speed": 0,
+    "engine": 0,
+    "cargo": 0,
+    "hull": 0
+  },
+  "cargoCapAtSpawn": 2,
+  "authorityTierAfterOrder": 1,
+  "authorityWalletAfterUpgrade": {
+    "held": 0,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "upgradeLanded": true,
+  "authorityHeldAfterMining": 1,
+  "authorityWalletBeforeDrop": {
+    "held": 1,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "clientWalletBeforeDrop": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 1,
+    "cargoCap": 4,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    },
+    "alive": true,
+    "hull": 35
+  },
+  "bankMovedOffSpawnDefault": true,
+  "tickAtDrop": 252,
+  "substitutionSeenByPeer": true,
+  "awayMs": 1500,
+  "walletQuiescedMs": 1507,
+  "walletQuiesced": true,
+  "afterReclaimAlice": {
+    "shipClass": "interceptor",
+    "banked": 1,
+    "cargo": 2,
+    "cargoCap": 4,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    },
+    "alive": true,
+    "hull": 35
+  },
+  "tickAfterReclaim": 708,
+  "reclaimedSameSeat": true,
+  "aliceOpensAfterDrop": 1,
+  "joinErrorsPastDrop": 0,
+  "joinErrorReasonsPastDrop": [],
+  "aliceSawReclaimBroadcast": true,
+  "bobSawReclaimBroadcast": true,
+  "aliceSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "orderEcho",
+    "playerReclaimed"
+  ],
+  "bobSaw": [
+    "welcome",
+    "lobbyState",
+    "matchStart",
+    "entityEvent",
+    "economy",
+    "snapshot",
+    "playerSubstituted",
+    "playerReclaimed"
+  ],
+  "aliceState": "open",
+  "welcomes": [
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "8F67",
+      "tick": 0,
+      "hasReclaimToken": true,
+      "afterDrop": false
+    },
+    {
+      "type": "welcome",
+      "you": 0,
+      "room": "8F67",
+      "tick": 614,
+      "economy": {
+        "held": 2,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "hasReclaimToken": true,
+      "afterDrop": true
+    }
+  ],
+  "economyFrames": [
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 0,
+      "economy": {
+        "held": 0,
+        "banked": 3,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 0,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 6,
+      "economy": {
+        "held": 0,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    },
+    {
+      "type": "economy",
+      "player": 0,
+      "tick": 250,
+      "economy": {
+        "held": 1,
+        "banked": 1,
+        "tiers": {
+          "power": 0,
+          "speed": 0,
+          "engine": 0,
+          "cargo": 1,
+          "hull": 0
+        }
+      },
+      "afterDrop": false
+    }
+  ],
+  "joinWelcomeCarriedEconomy": false,
+  "reclaimWelcomeEconomy": {
+    "held": 2,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "economyMovedAfterReclaimWelcome": false,
+  "authoritysLatestWallet": {
+    "held": 2,
+    "banked": 1,
+    "tiers": {
+      "power": 0,
+      "speed": 0,
+      "engine": 0,
+      "cargo": 1,
+      "hull": 0
+    }
+  },
+  "heldThirdProven": true,
+  "reclaimWalletIsSpawnDefault": false
+}

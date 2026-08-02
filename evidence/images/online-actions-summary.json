@@ -1,0 +1,629 @@
+{
+  "probe": "online-actions across the round",
+  "sessions": 14,
+  "sessionsWithBuildOrders": 6,
+  "sessionsWhoseOrdersWereAllAnswered": 5,
+  "sessionsWithUnansweredOrders": [
+    {
+      "session": "g1-host",
+      "orders": 2,
+      "unanswered": 2,
+      "onWireAtLog": false,
+      "badgeAtLog": "ef4babe"
+    }
+  ],
+  "exportsThatDroppedEvents": [
+    {
+      "session": "k1-guest",
+      "dropped": 1,
+      "durationMs": 468186
+    },
+    {
+      "session": "m1-guest",
+      "dropped": 201,
+      "durationMs": 799081
+    },
+    {
+      "session": "m1-host",
+      "dropped": 193,
+      "durationMs": 793634
+    }
+  ],
+  "orders": 12,
+  "echoes": 10,
+  "adopted": 5,
+  "refused": 5,
+  "unknown": 0,
+  "expiries": 0,
+  "ordersWithoutEcho": 2,
+  "volleysAllSessions": 1261,
+  "inFlightAllSessions": {
+    "0": 16,
+    "1": 1032,
+    "2": 190,
+    "3": 20,
+    "4": 2,
+    "9": 1
+  },
+  "rows": [
+    {
+      "tag": "c1",
+      "who": "guest",
+      "room": "57KU",
+      "abundance": "scarce",
+      "durationMs": 217776,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": null,
+      "orderRecordComplete": true,
+      "volleys": 11,
+      "inFlightHistogram": {
+        "1": 9,
+        "2": 2
+      },
+      "maxInFlight": 2,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@15496"
+      ],
+      "steadyStateMeanCorrection": 0.02,
+      "steadyStateWorstCorrection": 0.748,
+      "steadyStateSeconds": 138,
+      "sessionPasses": 5,
+      "outsideBreachPasses": 5,
+      "breachSeconds": 0,
+      "breachCorrections": []
+    },
+    {
+      "tag": "c1",
+      "who": "host",
+      "room": "57KU",
+      "abundance": "scarce",
+      "durationMs": 215713,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": null,
+      "orderRecordComplete": true,
+      "volleys": 77,
+      "inFlightHistogram": {
+        "1": 51,
+        "2": 22,
+        "3": 4
+      },
+      "maxInFlight": 3,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@16952"
+      ],
+      "steadyStateMeanCorrection": 12.676,
+      "steadyStateWorstCorrection": 330.952,
+      "steadyStateSeconds": 129,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 5,
+      "breachSeconds": 6,
+      "breachCorrections": [
+        330.952
+      ]
+    },
+    {
+      "tag": "e1",
+      "who": "guest",
+      "room": "8AN4",
+      "abundance": "scarce",
+      "durationMs": 213290,
+      "droppedEvents": 0,
+      "onWireAtLog": false,
+      "badgeAtLog": "ef4babe",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 31,
+      "inFlightHistogram": {
+        "1": 26,
+        "2": 3,
+        "3": 1,
+        "4": 1
+      },
+      "maxInFlight": 4,
+      "orders": 2,
+      "echoAdopted": 1,
+      "echoRefused": 1,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": {
+        "min": 8,
+        "max": 9,
+        "mean": 8.5
+      },
+      "matchEvents": [
+        "matchStart@14526"
+      ],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 25,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 6,
+      "breachCorrections": [
+        329.738
+      ]
+    },
+    {
+      "tag": "e1",
+      "who": "host",
+      "room": "8AN4",
+      "abundance": "scarce",
+      "durationMs": 250166,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 48,
+      "inFlightHistogram": {
+        "1": 40,
+        "2": 4,
+        "3": 3,
+        "9": 1
+      },
+      "maxInFlight": 9,
+      "orders": 2,
+      "echoAdopted": 1,
+      "echoRefused": 1,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": {
+        "min": 9,
+        "max": 10,
+        "mean": 9.5
+      },
+      "matchEvents": [
+        "matchStart@15407",
+        "playerSubstituted@183756"
+      ],
+      "steadyStateMeanCorrection": 0.027,
+      "steadyStateWorstCorrection": 0.833,
+      "steadyStateSeconds": 67,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 6,
+      "breachCorrections": [
+        218.642,
+        218.879,
+        219.342,
+        218.651,
+        218.668
+      ]
+    },
+    {
+      "tag": "f1",
+      "who": "guest",
+      "room": "8VKW",
+      "abundance": "scarce",
+      "durationMs": 308135,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": false,
+      "orderRecordComplete": true,
+      "volleys": 89,
+      "inFlightHistogram": {
+        "1": 66,
+        "2": 22,
+        "3": 1
+      },
+      "maxInFlight": 3,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@15787",
+        "death@162656",
+        "eliminated@162656"
+      ],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 146,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 11,
+      "breachCorrections": [
+        525.529,
+        526.22,
+        482.27,
+        481.569
+      ]
+    },
+    {
+      "tag": "f1",
+      "who": "host",
+      "room": "8VKW",
+      "abundance": "scarce",
+      "durationMs": 305727,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 100,
+      "inFlightHistogram": {
+        "0": 1,
+        "1": 84,
+        "2": 13,
+        "3": 2
+      },
+      "maxInFlight": 3,
+      "orders": 2,
+      "echoAdopted": 1,
+      "echoRefused": 1,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": {
+        "min": 9,
+        "max": 10,
+        "mean": 9.5
+      },
+      "matchEvents": [
+        "matchStart@17325"
+      ],
+      "steadyStateMeanCorrection": 0.01,
+      "steadyStateWorstCorrection": 0.846,
+      "steadyStateSeconds": 169,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 12,
+      "breachCorrections": [
+        505.326,
+        504.712,
+        249.29,
+        249.887,
+        248.694
+      ]
+    },
+    {
+      "tag": "g1",
+      "who": "guest",
+      "room": "LKQK",
+      "abundance": "scarce",
+      "durationMs": 325270,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 138,
+      "inFlightHistogram": {
+        "0": 1,
+        "1": 111,
+        "2": 26
+      },
+      "maxInFlight": 2,
+      "orders": 2,
+      "echoAdopted": 1,
+      "echoRefused": 1,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": {
+        "min": 9,
+        "max": 10,
+        "mean": 9.5
+      },
+      "matchEvents": [
+        "matchStart@15992",
+        "playerSubstituted@41155"
+      ],
+      "steadyStateMeanCorrection": 0.027,
+      "steadyStateWorstCorrection": 0.147,
+      "steadyStateSeconds": 58,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 12,
+      "breachCorrections": [
+        568.971,
+        568.925,
+        569.624,
+        40.801
+      ]
+    },
+    {
+      "tag": "g1",
+      "who": "host",
+      "room": "LKQK",
+      "abundance": "scarce",
+      "durationMs": 181048,
+      "droppedEvents": 0,
+      "onWireAtLog": false,
+      "badgeAtLog": "ef4babe",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 136,
+      "inFlightHistogram": {
+        "0": 2,
+        "1": 130,
+        "2": 4
+      },
+      "maxInFlight": 2,
+      "orders": 2,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 2,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@16919"
+      ],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 0,
+      "sessionPasses": 6,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 0,
+      "breachCorrections": []
+    },
+    {
+      "tag": "h1",
+      "who": "guest",
+      "room": "J7PU",
+      "abundance": "rich",
+      "durationMs": 345941,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": false,
+      "orderRecordComplete": true,
+      "volleys": 213,
+      "inFlightHistogram": {
+        "0": 8,
+        "1": 158,
+        "2": 41,
+        "3": 5,
+        "4": 1
+      },
+      "maxInFlight": 4,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@16286",
+        "death@127408",
+        "eliminated@127408"
+      ],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0.105,
+      "steadyStateSeconds": 219,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 12,
+      "breachCorrections": [
+        578.326,
+        578.138,
+        578.813,
+        544.712
+      ]
+    },
+    {
+      "tag": "h1",
+      "who": "host",
+      "room": "J7PU",
+      "abundance": "rich",
+      "durationMs": 343499,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": true,
+      "orderRecordComplete": true,
+      "volleys": 170,
+      "inFlightHistogram": {
+        "0": 2,
+        "1": 145,
+        "2": 22,
+        "3": 1
+      },
+      "maxInFlight": 3,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@17488",
+        "death@322958",
+        "eliminated@322958"
+      ],
+      "steadyStateMeanCorrection": 0.008,
+      "steadyStateWorstCorrection": 4.417,
+      "steadyStateSeconds": 21,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 5,
+      "breachSeconds": 18,
+      "breachCorrections": [
+        256.894,
+        256.638,
+        588.326,
+        588.384,
+        588.27,
+        499.082,
+        4.417
+      ]
+    },
+    {
+      "tag": "k1",
+      "who": "guest",
+      "room": "8DH7",
+      "abundance": "rich",
+      "durationMs": 468186,
+      "droppedEvents": 1,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": true,
+      "orderRecordComplete": false,
+      "volleys": 133,
+      "inFlightHistogram": {
+        "0": 2,
+        "1": 117,
+        "2": 13,
+        "3": 1
+      },
+      "maxInFlight": 3,
+      "orders": 2,
+      "echoAdopted": 1,
+      "echoRefused": 1,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": {
+        "min": 23,
+        "max": 24,
+        "mean": 23.5
+      },
+      "matchEvents": [
+        "matchStart@16653"
+      ],
+      "steadyStateMeanCorrection": 0.016,
+      "steadyStateWorstCorrection": 0.819,
+      "steadyStateSeconds": 140,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 12,
+      "breachCorrections": [
+        566.401,
+        566.185,
+        566.852,
+        47.95
+      ]
+    },
+    {
+      "tag": "k1",
+      "who": "host",
+      "room": "8DH7",
+      "abundance": "rich",
+      "durationMs": 462897,
+      "droppedEvents": 0,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": false,
+      "orderRecordComplete": true,
+      "volleys": 115,
+      "inFlightHistogram": {
+        "1": 95,
+        "2": 18,
+        "3": 2
+      },
+      "maxInFlight": 3,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [
+        "matchStart@17615",
+        "death@63869",
+        "spawn@64659",
+        "death@73378",
+        "eliminated@73378"
+      ],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 379,
+      "sessionPasses": 3,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 11,
+      "breachCorrections": [
+        114.296,
+        516.6,
+        515.915,
+        515.77
+      ]
+    },
+    {
+      "tag": "m1",
+      "who": "guest",
+      "room": "GTE7",
+      "abundance": "rich",
+      "durationMs": 799081,
+      "droppedEvents": 201,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": false,
+      "orderRecordComplete": false,
+      "volleys": 0,
+      "inFlightHistogram": {},
+      "maxInFlight": null,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 600,
+      "sessionPasses": 6,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 0,
+      "breachCorrections": []
+    },
+    {
+      "tag": "m1",
+      "who": "host",
+      "room": "GTE7",
+      "abundance": "rich",
+      "durationMs": 793634,
+      "droppedEvents": 193,
+      "onWireAtLog": true,
+      "badgeAtLog": "ef4babe · d891dd0a (gru)",
+      "wheelOpened": false,
+      "orderRecordComplete": false,
+      "volleys": 0,
+      "inFlightHistogram": {},
+      "maxInFlight": null,
+      "orders": 0,
+      "echoAdopted": 0,
+      "echoRefused": 0,
+      "echoUnknown": 0,
+      "expiries": 0,
+      "ordersWithoutEcho": 0,
+      "waitedTicks": null,
+      "matchEvents": [],
+      "steadyStateMeanCorrection": 0,
+      "steadyStateWorstCorrection": 0,
+      "steadyStateSeconds": 600,
+      "sessionPasses": 6,
+      "outsideBreachPasses": 6,
+      "breachSeconds": 0,
+      "breachCorrections": []
+    }
+  ]
+}

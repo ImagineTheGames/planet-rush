@@ -137,8 +137,11 @@ describe('the post-respawn correction tail', () => {
         cp: found ? { x: +found.x.toFixed(3), y: +found.y.toFixed(3) } : null,
         auth: auth ? { x: auth.posX, y: auth.posY } : null,
         authPresent: auth !== null,
+        // Hull to three decimals, not rounded: the "health went down then back up"
+        // report is about a RISE, and a rise smaller than a whole point is still a
+        // rise. Rounding here would be the instrument deciding the answer.
         world: me
-          ? { x: Math.round(me.pos.x), y: Math.round(me.pos.y), alive: me.alive, hull: Math.round(me.hull) }
+          ? { x: Math.round(me.pos.x), y: Math.round(me.pos.y), alive: me.alive, hull: +me.hull.toFixed(3) }
           : null,
         queueLen: (pred.queue as unknown[]).length,
       };
@@ -221,6 +224,28 @@ describe('the post-respawn correction tail', () => {
     const deadRecs = withShip.filter((r) => !r.world!.alive);
     const hulls = withShip.map((r) => r.world!.hull);
 
+    /**
+     * THE HULL YO-YO, at the wire. The developer's second symptom was "my health
+     * went down then back up after taking damage" — a DISCRETE event that no
+     * correction average can see, and that a screenshot burst can only catch if it
+     * happens to be looking. This reads the predicted world's own hull before
+     * every reconcile, so a rise between two consecutive reconciles is exactly the
+     * reported symptom, measured at the rate the defect would occur at.
+     *
+     * A rise ACROSS a death is a respawn refilling the hull and is not the
+     * symptom, so only rises with the ship alive on BOTH sides are counted. Each
+     * one is kept with its neighbours: if this is ever non-empty, the numbers are
+     * the report, not a summary of it.
+     */
+    const risesWhileAlive: { n: number; ms: number; from: number; to: number; delta: number }[] = [];
+    for (let i = 1; i < withShip.length; i++) {
+      const prev = withShip[i - 1]!;
+      const cur = withShip[i]!;
+      if (!prev.world!.alive || !cur.world!.alive) continue;
+      const delta = +(cur.world!.hull - prev.world!.hull).toFixed(3);
+      if (delta > 0) risesWhileAlive.push({ n: cur.n, ms: cur.ms, from: prev.world!.hull, to: cur.world!.hull, delta });
+    }
+
     const out = {
       probe: 'respawn-tail',
       allocator: ALLOCATOR,
@@ -237,6 +262,22 @@ describe('the post-respawn correction tail', () => {
         : null,
       minHullSeen: hulls.length ? Math.min(...hulls) : null,
       maxHullSeen: hulls.length ? Math.max(...hulls) : null,
+      /** The developer's second symptom, counted: hull rising with the ship alive
+       *  on both sides of the step. Zero is the pass; every rise is listed. */
+      hullRisesWhileAlive: risesWhileAlive.length,
+      hullRises: risesWhileAlive.slice(0, 40),
+      /** How much damage the run actually saw. A run with no falls proves nothing
+       *  about a yo-yo, exactly as a run with no death proves nothing about a
+       *  respawn — so the denominator is reported beside the count. */
+      hullFallsWhileAlive: (() => {
+        let falls = 0;
+        for (let i = 1; i < withShip.length; i++) {
+          const p = withShip[i - 1]!;
+          const c = withShip[i]!;
+          if (p.world!.alive && c.world!.alive && c.world!.hull < p.world!.hull) falls++;
+        }
+        return falls;
+      })(),
       breachingReconciles: breaches.length,
       breachSpanMs: first && breaches.length ? breaches[breaches.length - 1]!.ms - first.ms : null,
       distinctErrorValuesInBreach: errValues,
@@ -248,7 +289,10 @@ describe('the post-respawn correction tail', () => {
       authPresentDuringBreach: [...new Set(breaches.map((r) => r.authPresent))],
       window,
     };
-    writeFileSync(join(OUT, 'online-feel-respawn-tail.json'), JSON.stringify(out, null, 2));
+    writeFileSync(
+      join(OUT, process.env.QA_TRANSCRIPT ?? 'online-feel-respawn-tail.json'),
+      JSON.stringify(out, null, 2),
+    );
     console.log(
       'RESPAWN-TAIL:',
       JSON.stringify({ ...out, window: `${window.length} reconciles` }, null, 2),

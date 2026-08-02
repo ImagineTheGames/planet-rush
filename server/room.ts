@@ -85,6 +85,19 @@ export interface ServerSocket {
   send(frame: WireFrame): void;
   /** Hang up. */
   close(): void;
+  /**
+   * This connection's measured round trip in ms, null when nothing current has
+   * been measured, and **absent entirely on a socket that does not measure** —
+   * a test double, or a transport that has no wire to time. `server/ws.ts` fills
+   * it from its RFC 6455 ping/pong probe ({@link RttProbe}); the room only ever
+   * reads it and hands it to the lobby (`lobbyState`, ratified developer: "show
+   * ping next to each player in the lobby").
+   *
+   * Optional so the seam stays what its header says it is — *deliberately tiny*.
+   * A socket with no measurement is a seat with no ping, and that path is drawn
+   * every day: offline, and every unit test in this directory.
+   */
+  readonly rttMs?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +110,18 @@ export const DEFAULT_GRACE_MS = 60_000;
 /** Snapshot every 2nd sim tick = 30 Hz, the rate the day-0 spike decided
  *  (docs/netcode-spike.md). */
 export const DEFAULT_SNAPSHOT_INTERVAL_TICKS = 2;
+
+/**
+ * How often the lobby re-publishes per-seat ping (ratified developer: "rounded
+ * ms, updated ~2s cadence"). Matched to `server/ws.ts` `RTT_PROBE_INTERVAL_MS`,
+ * so the roster never shows a number older than one probe — and re-broadcast only
+ * when a rounded value actually *moved*, so a still lobby stays silent.
+ *
+ * Lobby only. Once the match is live nobody is reading the roster, and a client's
+ * own ping in the HUD comes from its own telemetry (`src/net/telemetry`), not
+ * from here.
+ */
+export const LOBBY_PING_INTERVAL_MS = 2_000;
 
 /** Static-entity diffs every 6th tick = 10 Hz. A turret builds over ten seconds
  *  and a wave lands every two and a half minutes (GDD §2.8), so this is already
@@ -348,6 +373,13 @@ export class MatchRoom {
   /** Fractional tick time carried between updates — dropping it would make the
    *  match run slow by up to one tick per update forever. */
   private carryMs = 0;
+  /** The per-seat ping the roster was last *told*, indexed by slot — the change
+   *  detection behind {@link refreshLobbyPings}. Same discipline as `Slot.wallet`:
+   *  comparing against what went out last is what keeps "nothing moved" free. */
+  private readonly publishedRtt: (number | null)[];
+  /** Wall clock of the last ping sweep, -1 before the first (so the first update
+   *  after a join publishes rather than waiting out a cadence). */
+  private lastPingSweepMs = -1;
 
   constructor(private readonly config: RoomConfig) {
     this.code = config.code;
@@ -380,6 +412,7 @@ export class MatchRoom {
       wallet: null,
       orders: [],
     }));
+    this.publishedRtt = Array.from({ length: count }, () => null);
   }
 
   // --- Read-only surface --------------------------------------------------
@@ -434,14 +467,34 @@ export class MatchRoom {
 
   /** The public lobby view (GDD §2.1; player colors are the slot index, §5.2). */
   lobbyState(): LobbySlot[] {
-    return this.slots.map((slot) => ({
-      player: slot.player,
-      isBot: slot.bot !== null,
-      ...(slot.difficulty ? { botDifficulty: slot.difficulty } : {}),
-      shipClass: slot.shipClass,
-      team: slot.team,
-      ready: slot.ready,
-    }));
+    return this.slots.map((slot) => {
+      const rtt = this.seatRtt(slot);
+      return {
+        player: slot.player,
+        isBot: slot.bot !== null,
+        ...(slot.difficulty ? { botDifficulty: slot.difficulty } : {}),
+        shipClass: slot.shipClass,
+        team: slot.team,
+        ready: slot.ready,
+        ...(rtt === null ? {} : { rtt }),
+      };
+    });
+  }
+
+  /**
+   * One seat's published ping, ms — rounded, or null when there is none.
+   *
+   * **A bot never has one** (ratified: bots are inside the sim; `0ms` next to
+   * Vulture would be a lie), and neither does a seat whose socket is gone, has
+   * not been probed yet, or has stopped answering (`server/ws.ts` `RttProbe`
+   * lets a measurement go stale rather than repeat itself). Rounded here so the
+   * wire carries whole milliseconds and every client grades the same integer.
+   */
+  private seatRtt(slot: Slot): number | null {
+    if (slot.bot !== null || slot.socket === null) return null;
+    const rtt = slot.socket.rttMs;
+    if (rtt === null || rtt === undefined || !Number.isFinite(rtt) || rtt < 0) return null;
+    return Math.round(rtt);
   }
 
   // --- Joining, dropping, reclaiming --------------------------------------
@@ -549,6 +602,32 @@ export class MatchRoom {
    * the grace clock starts (GDD §4.2).
    */
   disconnect(player: PlayerId, nowMs: number): void {
+    this.vacate(player, nowMs + this.graceMs);
+  }
+
+  /**
+   * **ABANDON MATCH** — the player said they were done (`src/net/transport`
+   * LeaveMessage, m10 disconnect-honesty).
+   *
+   * Same substitution as a drop, and then the opposite treatment of the window: a
+   * seat nobody is coming back to is not held. The grace closes here rather than
+   * sixty seconds from now, so the token stops working immediately, the roster
+   * stops showing a ghost, and in the lobby the seat is free for the next player
+   * in the same broadcast.
+   *
+   * Peers see the substitution exactly as they would for a drop — `graceSeconds: 0`
+   * is the one difference, and it is the honest one: there is no window.
+   */
+  abandon(player: PlayerId): void {
+    this.vacate(player, -1);
+  }
+
+  /**
+   * The seat loses its connection, for whichever of the two reasons. `graceUntil`
+   * is the whole difference: a wall-clock deadline for a drop (the player may be
+   * back), `-1` for a stated leave (they will not be).
+   */
+  private vacate(player: PlayerId, graceUntil: number): void {
     const slot = this.slots[player];
     if (!slot || slot.socket === null) return;
     slot.socket = null;
@@ -566,11 +645,14 @@ export class MatchRoom {
     }
 
     this.seatBot(slot, this.substituteFor(slot.player));
-    slot.graceUntil = nowMs + this.graceMs;
+    slot.graceUntil = graceUntil;
+    // An abandoned seat's token dies with the window: a reclaim would be answered
+    // `reclaim-expired`, which is exactly what it is.
+    if (graceUntil < 0) slot.token = null;
     this.broadcast({
       type: 'playerSubstituted',
       player: slot.player,
-      graceSeconds: this.graceMs / 1000,
+      graceSeconds: graceUntil < 0 ? 0 : this.graceMs / 1000,
     });
     this.broadcastLobby();
   }
@@ -622,6 +704,12 @@ export class MatchRoom {
           queueMs: slot.queueTicks * this.dt * 1000,
           loopLagMs: this.loopLagMs,
         });
+        break;
+      // ABANDON MATCH. Handled before the socket closes so the *reason* for the
+      // close is known when it arrives: the connection's own `close()` then finds a
+      // seat already vacated and does nothing (`server/match-server.ts`).
+      case 'leave':
+        this.abandon(player);
         break;
     }
   }
@@ -776,6 +864,7 @@ export class MatchRoom {
    */
   update(nowMs: number): void {
     this.sweepGrace(nowMs);
+    this.refreshLobbyPings(nowMs);
 
     const world = this.authoritative;
     if (!world || this.phase !== 'live') {
@@ -1188,7 +1277,38 @@ export class MatchRoom {
   }
 
   private broadcastLobby(): void {
-    this.broadcast({ type: 'lobbyState', slots: this.lobbyState() });
+    const slots = this.lobbyState();
+    // Record what actually went out, so the next ping sweep compares against the
+    // roster on the players' screens rather than against its own last sweep — a
+    // join or a hull pick already carried fresh numbers.
+    for (const slot of slots) this.publishedRtt[slot.player] = slot.rtt ?? null;
+    this.broadcast({ type: 'lobbyState', slots });
+  }
+
+  /**
+   * Re-publish the roster when a seat's ping moved, at most once every
+   * {@link LOBBY_PING_INTERVAL_MS} (ratified: "~2s cadence").
+   *
+   * Change-detected, not timer-driven: a lobby where nobody's round trip has
+   * moved a whole millisecond sends nothing at all, and a lobby where one has
+   * sends one small JSON roster — against a screen that is otherwise completely
+   * idle. Lobby-phase only; a live match has no roster on screen to update, and
+   * the per-tick snapshot is not the place for a number that changes twice a
+   * second (spike §S2, Trap 7: static/low-frequency config never rides a tick).
+   */
+  private refreshLobbyPings(nowMs: number): void {
+    if (this.phase !== 'lobby') return;
+    if (this.lastPingSweepMs >= 0 && nowMs - this.lastPingSweepMs < LOBBY_PING_INTERVAL_MS) return;
+    this.lastPingSweepMs = nowMs;
+
+    let moved = false;
+    for (const slot of this.slots) {
+      if (this.seatRtt(slot) !== this.publishedRtt[slot.player]) {
+        moved = true;
+        break;
+      }
+    }
+    if (moved) this.broadcastLobby();
   }
 
   private broadcast(message: ServerMessage | EntityEventMessage): void {

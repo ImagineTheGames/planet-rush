@@ -60,6 +60,8 @@ import { PLAYER_COLORS } from '@render/index';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
+import { seatPing } from '../net/ping';
+import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
 import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from '../sim/match-config';
 import type { Abundance } from '../sim/constants';
@@ -373,6 +375,13 @@ export interface LobbySeat {
    *  ignores it (teams-of-one, `team === slot`); TEAMS shares one value across
    *  allies. Kept on every seat so switching modes never loses an assignment. */
   readonly team: number;
+  /**
+   * This seat's round trip to the match server, rounded ms — the ping shown next
+   * to a human player's name (ratified developer; the wire's `LobbySlot.rtt`,
+   * graded by `src/net/ping`). Null on a bot seat always, on an empty or closed
+   * seat, offline (no wire to time), and before the server's first probe answers.
+   */
+  readonly rtt: number | null;
 }
 
 /** Lobby phases. The view draws nothing once the match owns the screen. */
@@ -500,6 +509,8 @@ export function createLobby(options: LobbyOptions): LobbyState {
       difficulty: human || closed ? 'medium' : defaultDifficultyForEmptySeat(emptyIndex++),
       personality: null,
       team: defaultTeamForSlot(player),
+      // Nobody has been measured yet — and offline nobody ever will be.
+      rtt: null,
     });
   }
   return withCast({
@@ -889,6 +900,11 @@ export function applyLobbySlots(state: LobbyState, slots: readonly LobbySlot[]):
       // Allegiance is static config the server carries on the slot (Task C4);
       // absent (a pre-teams host), the seat keeps the side it already had.
       team: wire.team ?? seat.team,
+      // Ping is a *measurement*, so it is taken wholesale from the broadcast that
+      // carries it rather than remembered: a seat the server has stopped
+      // measuring (a bot took it, the socket went quiet) blanks, and never keeps
+      // showing the last number it had. A bot never carries one at all.
+      rtt: occupant === 'human' ? (wire.rtt ?? null) : null,
     };
   });
   return withCast({ ...state, seats });
@@ -1003,6 +1019,14 @@ export interface LobbySeatView {
   readonly teamLabel: string;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
+  /**
+   * This player's ping, ready to draw — `{ ms, label, grade }` — or **null**, and
+   * null is the common case: a bot row never carries one (ratified: bots are in
+   * the sim, `0ms` would be a lie), and neither does an empty or closed seat, an
+   * offline lobby, or a human the server has not measured yet
+   * (`src/net/ping` `seatPing`, which owns both rules).
+   */
+  readonly ping: PingReadout | null;
 }
 
 /** A side's active headcount, for the always-visible TEAMS tally (ratified:
@@ -1122,6 +1146,10 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     // to arrive on, so nothing is ever "claimable by room code" (the empty seats
     // are simply the bot cast).
     openToJoin: seat.occupant === 'open' && state.phase !== 'started' && state.online,
+    // `isBot` here is the OPEN-or-BOT predicate, so an unclaimed seat previewing a
+    // character is covered by the same rule the wire keeps: no number on a row
+    // nobody is dialing in from.
+    ping: seatPing({ isBot: isBot || isClosed, rtt: seat.rtt }),
     ...(isBot ? { botDifficulty: seat.difficulty } : {}),
   };
 }

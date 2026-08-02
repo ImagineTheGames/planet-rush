@@ -1,7 +1,7 @@
 {
   "probe": "copylog-reach",
   "base": "https://imaginethegames.github.io/planet-rush/",
-  "capturedAt": "2026-07-30T22:02:34.282Z",
+  "capturedAt": "2026-07-31T14:20:58.421Z",
   "results": [
     {
       "profile": "desktop",
@@ -36,10 +36,10 @@
       "buttonInDom": true,
       "buttonLabel": "COPY LOG",
       "buttonRect": {
-        "x": 270,
-        "y": 788,
-        "w": 108,
-        "h": 44
+        "x": 12,
+        "y": 724,
+        "w": 44,
+        "h": 108
       },
       "rectInsideViewport": true,
       "elementAtButtonCentre": "CANVAS",

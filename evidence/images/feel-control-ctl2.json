@@ -1,0 +1,13 @@
+{
+  "probe": "feel-control",
+  "tag": "ctl2",
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "flySeconds": 105,
+  "capturedAt": "2026-07-31T13:38:46.850Z",
+  "room": "3FD4",
+  "summary_host": "Planet Rush playtest log — build ef4babe · d891dd0a (gru) (2026-07-31T02:11:11.993Z) · session 2026-07-31T13:38:44.481Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+  "dropped_host": 0,
+  "summary_guest": "Planet Rush playtest log — build ef4babe · d891dd0a (gru) (2026-07-31T02:11:11.993Z) · session 2026-07-31T13:38:45.666Z · desktop 1280x800 · net 4g · planet-rush.playtest-log/1",
+  "dropped_guest": 0,
+  "ok": true
+}

@@ -201,6 +201,92 @@ export class WebSocketTransport implements Transport {
     this.stateHandler = handler;
   }
 
+  /**
+   * **Dial again, now** — the RECONNECT button, and the one automatic attempt a
+   * returning tab is owed (`./link-loss`, m10 disconnect-honesty).
+   *
+   * The redial loop below only ever starts from `onclose`, which is precisely the
+   * event a *backgrounded* socket never fires: the browser throttles the page, the
+   * connection dies, and the `WebSocket` object sits there reading `open` forever.
+   * From outside, nothing distinguishes that from a healthy quiet moment — but the
+   * client can see the silence (`./link-loss`), and this is how it acts on what it
+   * saw. The socket is hung up *first* so the dead one cannot fire a late `onclose`
+   * into the loop we are about to start ourselves.
+   *
+   * Returns false when there is nothing to dial for: a deliberate leave, a refused
+   * join, a dead room, or a spent grace window — and in the last two it closes with
+   * the reason, so the overlay stops asking and says what happened instead.
+   *
+   * Backoff resets: this is a human (or a tab-return) saying "try now", and making
+   * them wait out an exponential delay they cannot see would be the same silence
+   * this whole feature exists to remove.
+   */
+  redial(): boolean {
+    if (this.left || this.rejected) return false;
+    const now = this.now();
+    // A silent death has no `onclose`, so the drop clock may never have started.
+    // The caller's detection is the earliest honest reading we have.
+    if (this.droppedAt < 0) this.droppedAt = now;
+
+    const decision = decideReconnect({
+      elapsedMs: now - this.droppedAt,
+      graceWindowMs: this.windowMs,
+      roomLiveness: this.roomLiveness,
+      room: this.config.room,
+    });
+    if (decision.action === 'stop') {
+      this.stop(decision.reason);
+      return false;
+    }
+
+    if (this.retry !== null) {
+      this.cancel(this.retry);
+      this.retry = null;
+    }
+    // Detach before closing: `onclose` bails when `this.socket !== socket`, so the
+    // dead socket's close cannot re-enter `onDrop` behind this dial.
+    const dead = this.socket;
+    this.socket = null;
+    dead?.close();
+
+    this.attempt = 0;
+    this.setState('reconnecting');
+    this.open();
+    return true;
+  }
+
+  /**
+   * How long the reclaim window has left, ms, or null when nothing is being
+   * recovered. The transport's own reading — measured from the drop *it* saw, which
+   * is the closest thing on this side of the wire to the clock `server/room.ts`
+   * started (`Slot.graceUntil`). A silently-killed socket has no such reading until
+   * {@link redial} supplies one, which is why `./link-loss` keeps an estimate of its
+   * own from the last frame it received.
+   */
+  graceRemainingMs(now: number = this.now()): number | null {
+    if (this.droppedAt < 0) return null;
+    return Math.max(0, this.windowMs - (now - this.droppedAt));
+  }
+
+  /**
+   * **ABANDON MATCH**: say so, then hang up (`./transport` LeaveMessage).
+   *
+   * The difference between this and {@link close} is one frame on the wire, and it
+   * is the difference between a seat held empty for a minute and a seat freed now:
+   * the server substitutes the bot either way, but a stated leave closes the grace
+   * window immediately (`server/room.ts` `abandon`). Sent best-effort — if the
+   * socket is already gone there is nobody to tell, and the grace rule handles it.
+   */
+  leave(reason?: string): void {
+    if (this.left) return;
+    if (this.connection === 'open' && this.socket) {
+      this.socket.send(
+        encodeClientMessage({ type: 'leave', ...(reason !== undefined ? { reason } : {}) }),
+      );
+    }
+    this.close();
+  }
+
   /** Leave the match: hang up, cancel any pending retry, and stop redialling.
    *  This ends the reclaim window from our side (GDD §4.2). */
   close(): void {

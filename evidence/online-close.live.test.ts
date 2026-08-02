@@ -154,6 +154,12 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
     let aliceSocket: WebSocket | null = null;
     let aliceOpens = 0;
     let joinErrorsPastDrop = 0;
+    /** WHY a refused redial was refused, verbatim. A count alone cannot tell
+     *  `bad-ticket` (Fly's edge landed the redial on the wrong Machine — the
+     *  fleet's socket-hop pin, not the client) from `grace-expired` or
+     *  `room-full` (which would be the client returning too late or to the wrong
+     *  room). The reclaim third is only readable next to this reason. */
+    const joinErrorReasonsPastDrop: string[] = [];
     let dropped = false;
     const welcomes: Record<string, unknown>[] = [];
     const economies: Record<string, unknown>[] = [];
@@ -175,6 +181,7 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
           if (m.type === 'economy') economies.push({ ...m, afterDrop: dropped });
           if (m.type === 'joinError' && dropped) {
             joinErrorsPastDrop++;
+            joinErrorReasonsPastDrop.push(String(m.reason ?? 'unstated'));
             ws.close();
           }
         } catch {
@@ -301,6 +308,7 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
       t.reclaimError = String(e);
       t.aliceOpensAfterDrop = aliceOpens;
       t.joinErrorsPastDrop = joinErrorsPastDrop;
+      t.joinErrorReasonsPastDrop = joinErrorReasonsPastDrop;
       t.aliceState = alice.state;
       t.aliceSaw = aliceSaw.slice(-30);
       t.bobSaw = [...new Set(bobSaw)];
@@ -336,6 +344,7 @@ describe('LIVE reconnect mid-match — bank, cargo AND upgrades come back', () =
     t.reclaimedSameSeat = alice.you === seat;
     t.aliceOpensAfterDrop = aliceOpens;
     t.joinErrorsPastDrop = joinErrorsPastDrop;
+    t.joinErrorReasonsPastDrop = joinErrorReasonsPastDrop;
     t.aliceSawReclaimBroadcast = aliceSaw.includes('playerReclaimed');
     t.bobSawReclaimBroadcast = bobSaw.includes('playerReclaimed');
     t.aliceSaw = [...new Set(aliceSaw)];

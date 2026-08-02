@@ -39,6 +39,9 @@ import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
 import { MapPickerView } from './map-picker-view';
 import { mapPickerModel } from './map-picker';
 import type { MapPickerLayout } from './map-picker';
+// One grade→colour table for both surfaces that show a ping, so the roster row
+// and the in-match stamp can never disagree about what "amber" means.
+import { PING_GRADE_COLORS } from '../net/ping-badge';
 
 // ---------------------------------------------------------------------------
 // Typography & neutrals (style-guide §7 — shared with the HUD and the wheel)
@@ -50,6 +53,13 @@ const FONT_BODY = 'Oxanium, "DejaVu Sans Mono", monospace';
 /** Neutral light UI text. Chalk-white — never signal yellow (style-guide §2). */
 const TEXT_PRIMARY = 0xdce3ec;
 const TEXT_DIM = PALETTE.hullSteel;
+
+/** Air between a player's name and their ping — `reivi · 245ms`. */
+const PING_GAP = 8;
+
+/** How much of a row's right edge the ping keeps clear of the trailing chips.
+ *  A name long enough to push the number into them loses the number. */
+const PING_RIGHT_GUARD = 120;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
@@ -82,6 +92,9 @@ interface SeatNodes {
   readonly underline: Graphics;
   /** "OPEN" while a bot seat is still claimable by room code. */
   readonly open: Text;
+  /** `· 245ms` — this player's round trip, beside their name, colour-graded
+   *  (ratified developer). Human rows only; a bot has no ping (`src/net/ping`). */
+  readonly ping: Text;
 }
 
 interface ClassNodes {
@@ -346,6 +359,26 @@ export class LobbyView extends Container {
     nodes.name.x = textX;
     nodes.name.y = rect.y + rect.height / 2 - (rect.height > 46 ? 15 : 8);
 
+    // The ping, beside the name (ratified developer): `reivi · 245ms`, graded
+    // green/amber/red by `src/net/ping`. Drawn on the name's own line because it
+    // is a fact about the *person* in the seat, not about the hull under them —
+    // and never at all on a bot row, where a number would be a lie the model
+    // refuses to produce (`seat.ping === null`).
+    //
+    // The name is left-anchored, so the ping simply follows its measured width; a
+    // long name that would push the number under the trailing chips drops it
+    // instead, because a roster that overlaps itself is worse than one without a
+    // ping on one row.
+    const pingRight = rect.x + rect.width - PING_RIGHT_GUARD;
+    const pingX = nodes.name.x + nodes.name.width + PING_GAP;
+    nodes.ping.visible = seat.ping !== null && pingX < pingRight;
+    if (seat.ping && nodes.ping.visible) {
+      nodes.ping.text = `· ${seat.ping.label}`;
+      nodes.ping.style.fill = PING_GRADE_COLORS[seat.ping.grade];
+      nodes.ping.x = pingX;
+      nodes.ping.y = nodes.name.y + 2;
+    }
+
     // Colour named in words, beside the hull. This is the line that makes the
     // roster readable with the hue removed (style-guide §3 rule 3, §9).
     nodes.detail.text = closed ? 'out of the match' : `${seat.className} · ${seat.colorName}`;
@@ -456,8 +489,11 @@ export class LobbyView extends Container {
     const underline = new Graphics();
     const open = makeText('OPEN', FONT_BODY, 10, TEXT_DIM);
     open.anchor.set(1, 0.5);
+    // Numerals face, like every other number on this screen; the colour is set
+    // per-frame from the grade.
+    const ping = makeText('', FONT_BODY, 11, PING_GRADE_COLORS.good);
 
-    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, teamChip, teamChipLabel, open);
+    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, teamChip, teamChipLabel, open, ping);
     const nodes: SeatNodes = {
       body,
       chip,
@@ -470,6 +506,7 @@ export class LobbyView extends Container {
       teamChipLabel,
       underline,
       open,
+      ping,
     };
     this.seatNodes[index] = nodes;
     return nodes;

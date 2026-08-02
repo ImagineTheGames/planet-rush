@@ -537,6 +537,28 @@ export class NetTelemetry {
   }
 
   /**
+   * **The ping to show the player**, ms, or null before anything was measured —
+   * the in-match HUD readout (`./ping-badge`, ratified developer: "the session
+   * log already samples it; show the same number").
+   *
+   * It IS the same number: the last finalized second's mean round trip, exactly
+   * the `rtt` column {@link format} prints and `./playtest-log-attach` pastes into
+   * a report. A per-frame reading of the most recent single round trip
+   * ({@link live}`.rttMs`) would be the truth too, and it would flicker by tens of
+   * milliseconds every frame — unreadable, and it would make two instruments
+   * disagree about one connection. The live value is used only *before* the first
+   * second rolls over, so a fresh match shows a number within a frame or two
+   * instead of a blank quarter-screen.
+   *
+   * Allocation-free (unlike {@link live}, which builds a readout object): this is
+   * read every frame.
+   */
+  get hudRttMs(): number | null {
+    const last = this.history.length > 0 ? this.history[this.history.length - 1]! : null;
+    return last?.rttMeanMs ?? this.lastRttMs;
+  }
+
+  /**
    * A human-readable dump of the last `count` finalized seconds — the capture the
    * brief asks to be pasted into the PR. One line per second, newest last, plus a
    * one-line summary of the whole window.

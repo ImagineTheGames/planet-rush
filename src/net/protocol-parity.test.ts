@@ -91,6 +91,11 @@ const ALL_CLIENT_MESSAGES: Record<ClientMessage['type'], ClientMessage> = {
   // rest: a verb the wire's front door does not admit is a feature that silently
   // does not exist, and this one's absence would read as "the network is fine".
   ping: { type: 'ping', id: 7 },
+  // ABANDON MATCH (m10 disconnect honesty). On this list for the sharpest version
+  // of the same reason: a `leave` the front door drops is not a visible bug at all
+  // — the socket closes a moment later either way — it just silently downgrades a
+  // stated exit into the sixty-second grace hold it was meant to skip.
+  leave: { type: 'leave', reason: 'abandoned' },
 };
 
 /** Every server message type. `joinError` is here because its *absence* from the
