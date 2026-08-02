@@ -270,6 +270,10 @@ import {
   hideConnectTrace,
   installConnectTraceView,
   showConnectTrace,
+  // The connection dying LOUDLY (m10 disconnect honesty): the overlay that names
+  // what was detected and offers RECONNECT / ABANDON MATCH.
+  installLinkLossView,
+  showLinkLoss,
   copyLogButton,
   describeEnvironment,
   disconnectOfferHint,
@@ -872,6 +876,56 @@ async function boot(): Promise<void> {
     session.observe((message) => {
       if (message.type === 'matchStart' && session.world) world = session.world;
     });
+  }
+
+  // --- Disconnect honesty (m10; the developer's zombie-match report) ---------
+  //     *"Left browser, came back, disconnected — bots frozen but I could still
+  //     move. I should get kicked out and presented reconnect / abandon buttons."*
+  //
+  //     The three halves of that, wired: the page tells the session when it goes
+  //     away and comes back (the browser event nothing else in the match reads),
+  //     the session's watchdog decides whether the link survived it
+  //     (`src/net/link-loss`), and the DOM overlay says which and offers the two
+  //     doors. The freeze itself needs no wiring here — it lives in `sendInput`,
+  //     so a lost link stops the world wherever the loop happens to be.
+  //
+  //     Offline none of this exists: there is no wire to lose.
+  let linkLossTimer: ReturnType<typeof setInterval> | null = null;
+  if (onlineSession) {
+    const session = onlineSession;
+    installLinkLossView({
+      dom: document,
+      onReconnect: () => {
+        session.reconnect();
+        syncLinkLoss();
+      },
+      // ABANDON MATCH: say it on the wire so the seat is freed rather than held
+      // for a minute (`src/net/transport` LeaveMessage), then leave the way every
+      // other exit leaves — `exitToMenu` is the one teardown.
+      onAbandon: () => {
+        session.leave();
+        exitToMenu();
+      },
+      onMenu: () => exitToMenu(),
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) session.linkHidden();
+      else session.linkShown();
+      syncLinkLoss();
+    });
+    // The render loop is not enough on its own: a throttled tab stops painting, and
+    // a countdown nobody looks at does not tick. A quarter second is free.
+    linkLossTimer = setInterval(syncLinkLoss, SESSION_LOG_POLL_MS);
+    window.addEventListener('pagehide', () => {
+      if (linkLossTimer !== null) clearInterval(linkLossTimer);
+    });
+  }
+
+  /** Sample the link and draw (or withdraw) the overlay. Cheap by construction:
+   *  while the link is live this is one clock read and one string comparison. */
+  function syncLinkLoss(): void {
+    if (!onlineSession) return;
+    showLinkLoss(onlineSession.pollLink());
   }
 
   // The match world now exists — flip the menu's test seam so a clean-boot
@@ -1791,6 +1845,10 @@ async function boot(): Promise<void> {
       // touch corner button. Runs every rendered frame, including while the sim is
       // frozen above — so the overlay stays live over a stopped world.
       syncPause();
+      // The connection, watched (m10 disconnect honesty). Also on a timer of its
+      // own — a dead link is detected by *nothing happening*, and a tab that stops
+      // being rendered is exactly the case this exists for.
+      syncLinkLoss();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.
@@ -2084,6 +2142,14 @@ async function boot(): Promise<void> {
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
   function syncCopyLog(): void {
+    // A silently-killed socket never leaves `open` (m10 disconnect honesty), so the
+    // state check below would miss the exact failure the developer reported. The
+    // watchdog's verdict is checked first, and it covers the state cases too — but
+    // they stay, because a session with no watchdog (offline) still has states.
+    if (onlineSession?.frozen) {
+      showCopyLog({ reason: 'error', hint: 'COPY LOG to report this disconnect.' });
+      return;
+    }
     const state = onlineSession?.state;
     if (state === 'reconnecting' || state === 'closed') {
       showCopyLog({

@@ -35,6 +35,8 @@
  */
 
 import type { ActionEvent } from './action-journal';
+import { linkLossLogEntry } from './link-loss';
+import type { LinkStatus } from './link-loss';
 import type { PlaytestLog } from './playtest-log';
 import type { PlayerId } from '@shared/types';
 import type { ConnectionState, ServerMessage } from './transport';
@@ -86,6 +88,9 @@ export interface LoggedSession {
   readonly closeReason?: string | null;
   /** The server's reason for refusing a join, when there is one. */
   readonly rejectReason?: string | null;
+  /** Where the link stands (`./link-loss`). Absent on a session with no watchdog
+   *  (offline, and any older structural stand-in), which simply logs nothing. */
+  readonly link?: LinkStatus;
   observe(handler: (message: ServerMessage) => void): void;
 }
 
@@ -123,6 +128,10 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
   let lastState: ConnectionState | null = null;
   /** `atMs` of the newest telemetry sample already copied into the log. */
   let lastSampleAt = -1;
+  /** The link phase + attempt already logged, so a transition writes one line and a
+   *  ticking countdown writes none. Starts at the live phase's key: a session that
+   *  never drops never mentions the link at all. */
+  let lastLinkKey = 'live/0/';
   /** Local ship liveness, so a death and a respawn are each logged once. */
   let wasAlive: boolean | null = null;
   let wasEliminated = false;
@@ -194,6 +203,25 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
           ...(session.closeReason ? { closeReason: session.closeReason } : {}),
           ...(session.rejectReason ? { rejectReason: session.rejectReason } : {}),
         });
+      }
+
+      // 1b. **The link, every time it moves** (m10 disconnect-honesty brief §4:
+      //     "session log gets every transition — lost/cause, redial attempts,
+      //     reclaim result, abandon"). `ConnectionState` cannot say any of that: a
+      //     silently-killed socket never leaves `open`, so the lifecycle line above
+      //     stays silent through the exact failure the developer reported. This is
+      //     the line that says `link lost cause=backgrounded silentMs=8140`.
+      //
+      //     Keyed on the phase *and* the attempt count, so each redial is its own
+      //     line while a countdown ticking inside one phase is not.
+      const link = session.link;
+      if (link) {
+        const key = `${link.phase}/${link.attempts}/${link.ending ?? ''}`;
+        if (key !== lastLinkKey) {
+          lastLinkKey = key;
+          const entry = linkLossLogEntry(link);
+          log.recordConnect(entry.step, entry.data);
+        }
       }
 
       // 2. Every finalized one-second telemetry sample, copied across once.

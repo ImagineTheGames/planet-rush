@@ -351,3 +351,118 @@ describe('WebSocketTransport', () => {
     expect(h.sockets).toHaveLength(2); // no further dials
   });
 });
+
+/**
+ * The half of the reconnect rule that only exists because of the developer's
+ * zombie-match report: a socket can die **without ever firing `onclose`** (a
+ * backgrounded tab), and from in here that is indistinguishable from a quiet
+ * moment. `./link-loss` sees the silence; `redial()` is how it acts on it.
+ */
+describe('WebSocketTransport.redial — the dial nobody asked the socket for', () => {
+  it('re-dials a socket that never closed, and reclaims the seat', () => {
+    const h = harness();
+    h.latest().open();
+    h.latest().deliver({ type: 'welcome', you: 2, room: 'QK7P', tick: 0, reclaimToken: 'tok-2' });
+    const dead = h.latest();
+    // No `drop()`: the socket is "open" and simply stopped delivering, exactly as a
+    // throttled tab leaves it. Nothing in the transport would ever notice.
+    expect(h.transport.state).toBe('open');
+
+    expect(h.transport.redial()).toBe(true);
+    // The zombie is hung up on first, so its late close cannot re-enter the loop.
+    expect(dead.closedByClient).toBe(true);
+    expect(h.sockets).toHaveLength(2);
+
+    h.latest().open();
+    const join = h.latest().messages()[0];
+    expect(join).toMatchObject({ type: 'join', room: 'QK7P', reclaim: 2, reclaimToken: 'tok-2' });
+    expect(h.transport.state).toBe('open');
+  });
+
+  it('a late close from the abandoned socket does not restart the loop', () => {
+    const h = harness();
+    h.latest().open();
+    const dead = h.latest();
+    h.transport.redial();
+    h.latest().open();
+    expect(h.sockets).toHaveLength(2);
+
+    dead.drop(); // arrives seconds late, from a socket nobody is using
+    expect(h.transport.state).toBe('open');
+    h.tick(60_000);
+    expect(h.sockets).toHaveLength(2);
+  });
+
+  it('resets the backoff — a human pressing RECONNECT does not wait out a delay they cannot see', () => {
+    const h = harness();
+    h.latest().open();
+    h.latest().drop();
+    h.tick(500);
+    h.latest().drop();
+    h.tick(1_000); // the backoff has doubled to 1 s and would double again
+
+    h.transport.redial();
+    const dialsBefore = h.sockets.length;
+    h.latest().drop();
+    h.tick(500); // …but the next retry is the *base* delay again
+    expect(h.sockets.length).toBe(dialsBefore + 1);
+  });
+
+  it('refuses once the grace window is spent, and closes with the reason', () => {
+    const h = harness({ reconnectWindowMs: 10_000 });
+    h.latest().open();
+    h.latest().drop(); // the drop clock starts here
+    h.tick(11_000);
+
+    expect(h.transport.redial()).toBe(false);
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('grace-elapsed');
+  });
+
+  it('refuses after a deliberate leave — that door does not reopen', () => {
+    const h = harness();
+    h.latest().open();
+    h.transport.close();
+    expect(h.transport.redial()).toBe(false);
+    expect(h.sockets).toHaveLength(1);
+  });
+
+  it('reports the grace remaining, and nothing at all before a drop', () => {
+    const h = harness({ reconnectWindowMs: 10_000 });
+    h.latest().open();
+    expect(h.transport.graceRemainingMs()).toBeNull();
+
+    h.latest().drop();
+    h.tick(3_000);
+    expect(h.transport.graceRemainingMs()).toBe(7_000);
+  });
+});
+
+describe('WebSocketTransport.leave — ABANDON MATCH', () => {
+  it('tells the server before hanging up, so the seat is freed not held', () => {
+    const h = harness();
+    h.latest().open();
+    const socket = h.latest();
+    h.transport.leave('abandoned');
+
+    expect(socket.messages().map((m) => m.type)).toEqual(['join', 'leave']);
+    expect(socket.messages()[1]).toMatchObject({ type: 'leave', reason: 'abandoned' });
+    expect(socket.closedByClient).toBe(true);
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('left');
+  });
+
+  it('is still a clean exit when the socket is already gone', () => {
+    const h = harness();
+    h.latest().open();
+    h.latest().drop();
+    expect(h.transport.state).toBe('reconnecting');
+
+    h.transport.leave();
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.closeReason).toBe('left');
+    // And no redial is left pending behind it.
+    h.tick(60_000);
+    expect(h.sockets).toHaveLength(1);
+  });
+});
