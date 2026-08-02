@@ -189,6 +189,12 @@ import {
   // the host's per-seat difficulties ride `botDifficulties` in empty-seat order.
   applyLobbySlots,
   botDifficulties,
+  // The sides the lobby authored, in the two orders the two ends index by (m10):
+  // per-SLOT for the server's seats, DENSE for the world the client builds. Both
+  // read the one authored `MatchConfig`, which is what makes an offline TEAMS
+  // match and an online one the same match.
+  lobbyRosterTeams,
+  lobbyWireTeams,
   startLobbyMatch,
   wireFireMode,
   selectShipClass,
@@ -227,6 +233,7 @@ import type {
   MinimapFog,
   Nameable,
   NameTable,
+  TeamTable,
   SettingsState,
   SettingsTarget,
   MainMenuOption,
@@ -832,9 +839,17 @@ async function boot(): Promise<void> {
   // The match SIZE the lobby resolved (variable-slots Milestone E). Threads into
   // `bootOfflineMatch` as the seat count, so closing seats in the lobby actually
   // builds a smaller world (local + N-1 bots). Undefined = the design's eight.
-  // (Mode/abundance/team also ride the resolved config, but their offline
-  // world-build wiring is Task C4 — Netcode — so only size takes effect here.)
+  // (The TEAM table threads through below, m10; the ore ABUNDANCE rides the same
+  // resolved config and is the last thing still awaiting its offline world-build
+  // wiring — Task C4, Netcode.)
   const chosenSize = chosen.size;
+  // The sides the lobby authored, in the sim's dense player order (m10 teams-wire).
+  // THIS is the offline half of teams: without it the roster reached `createWorld`
+  // with no `team` at all, every ship defaulted to its own side, and a TEAMS lobby
+  // built a free-for-all — the developer's "everyone attacked me and I could attack
+  // everyone," reproduced offline through the unified lobby. In FFA the table is
+  // `[0,1,2,…]`, which is exactly what the world defaulted to, so nothing moves.
+  const chosenTeams = chosen.teams;
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
@@ -845,6 +860,7 @@ async function boot(): Promise<void> {
       shipClass: chosenShipClass,
       mapId: chosenMapId,
       ...(chosenSize !== undefined ? { slots: chosenSize } : {}),
+      ...(chosenTeams !== undefined ? { teams: chosenTeams } : {}),
     });
   }
   // Online the match is already running on the server: present the live session as
@@ -1550,6 +1566,11 @@ async function boot(): Promise<void> {
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
   let playerDifficulties: DifficultyTable = [];
+  /** Each slot's side, and whether the match has sides worth naming (m10 teams).
+   *  Rebuilt with the name table, from the same live world, on every boot and
+   *  rematch — so a rematch that changed the split relabels with it. */
+  let playerTeams: TeamTable = [];
+  let teamsMode = false;
 
   // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
   //     stations, ships, ore-field hints, the collapse ring — pooled and reused so
@@ -1612,6 +1633,34 @@ async function boot(): Promise<void> {
     }
     playerNames = table;
     playerDifficulties = tiers;
+    rebuildTeamTable();
+  }
+
+  /**
+   * Rebuild the per-slot side table from the LIVE WORLD (m10 teams).
+   *
+   * The world is the authority on allegiance in both form factors — offline it is
+   * the loopback's own authoritative world, online it is the predicted world
+   * `matchStart` built from the server's roster — so reading `ship.team` here means
+   * the `TEAM A` a player reads over a hull is the same number `areEnemies` uses to
+   * decide whether they can shoot it. Reading the lobby instead would let the label
+   * drift from the simulation, which is the exact class of bug this milestone is
+   * fixing.
+   *
+   * Sides are worth *naming* only when there are fewer sides than players: FFA is
+   * teams-of-one, where `ship.team === ship.id` for everyone and a label would just
+   * repeat the nameplate.
+   */
+  function rebuildTeamTable(): void {
+    const sides: (number | undefined)[] = [];
+    const distinct = new Set<number>();
+    for (const ship of world.ships) {
+      const side = ship.team ?? ship.id;
+      sides[ship.id] = side;
+      distinct.add(side);
+    }
+    playerTeams = sides;
+    teamsMode = distinct.size > 0 && distinct.size < world.ships.length;
   }
   rebuildNameTable();
 
@@ -2658,6 +2707,12 @@ async function boot(): Promise<void> {
     hudFrame.nameables = nameableFrame;
     hudFrame.names = playerNames;
     hudFrame.difficulties = playerDifficulties;
+    // The side each slot fights for, and whether to say it out loud (m10 teams).
+    // Read straight off the live world's ships rather than off the lobby, so the
+    // label and the friend/foe predicate can never disagree — the nameplate says
+    // exactly what `areEnemies` will act on.
+    hudFrame.playerTeams = playerTeams;
+    hudFrame.teamsMode = teamsMode;
   }
 
   /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
@@ -6200,9 +6255,10 @@ function installOnlineSeam(seam: object): void {
 
 /** The choices the player locks in at RUSH! — the hull, the arena (p2), the
  *  name shown over their ship and station (field request v0.2.1), and the match
- *  shape (variable-slots Milestone E): the MODE, the ore ABUNDANCE, and the SIZE
- *  (`N`). Size threads into `bootOfflineMatch` today; mode/abundance ride the
- *  config seam the sim consumes and await the offline world-build wiring (Task C4). */
+ *  shape (variable-slots Milestone E): the MODE, the ore ABUNDANCE, the SIZE
+ *  (`N`) and the per-player TEAM table. Size and teams thread into
+ *  `bootOfflineMatch`; abundance still rides the config seam awaiting the rest of
+ *  the offline world-build wiring (Task C4). */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
@@ -6211,6 +6267,18 @@ interface LobbyChoice {
   readonly abundance: Abundance;
   /** `N`, the active-seat count (2..8). Undefined means every seat open (eight). */
   readonly size?: number;
+  /**
+   * Which side each player fights for, indexed by the **dense** player id the sim
+   * builds its world with (`configToPlayers` — closed seats are dropped and the
+   * survivors re-indexed 0..N-1, spike Trap 6), so entry `i` is the team of the
+   * ship the sim will call player `i`.
+   *
+   * Absent under `?debug=1`, where there is no lobby to author one; the world then
+   * defaults each ship to its own side (`makeShip`) — FFA, byte-identical to
+   * before. In FFA this is `[0,1,2,…]` and equally a no-op; it does real work only
+   * in TEAMS, where it is the whole feature (m10 teams-wire).
+   */
+  readonly teams?: readonly number[];
 }
 
 /**
@@ -6581,10 +6649,20 @@ function openLobby(
    */
   function sendChoice(): void {
     if (!room) return;
+    const host = state.you === state.host;
     room.session.chooseInLobby({
       shipClass: state.shipClass,
       fireMode: wireFireMode(readFireMode(platform, isTouch)),
-      ...(state.you === state.host ? { botDifficulties: botDifficulties(state) } : {}),
+      ...(host ? { botDifficulties: botDifficulties(state) } : {}),
+      // The match SHAPE, from the host only (m10 teams-wire): the MODE and the
+      // per-seat SIDE, indexed by slot. Sent on every lobby change like the hulls
+      // and the difficulties, so the room's advertised mode and every seat's
+      // allegiance are already true when RUSH! builds the world — teams are static
+      // match config and must be settled *before* the sim exists, never after
+      // (GDD §4.2; spike §S2, Trap 7). A joiner sends neither: the room's shape is
+      // the host's, and their own toggles are local screen state until the
+      // authoritative `lobbyState` folds the truth back in.
+      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
     });
   }
 
@@ -6688,6 +6766,11 @@ function openLobby(
       mode: state.mode,
       abundance: state.abundance,
       size: matchSizeOf(state),
+      // The sides the host authored, in the sim's dense player order — the offline
+      // world-build wiring that was missing (Task C4). Online this is ignored: the
+      // world is the server's, built from the sides the same lobby already sent it
+      // (`sendChoice`), and `matchStart` hands them back for the predicted world.
+      teams: lobbyRosterTeams(state),
     };
     teardown();
     seam.visible = false;
@@ -6728,14 +6811,19 @@ function openLobby(
         break;
       case 'seatTeamChip':
         // The TEAM chip — the side cycle, composed alongside the difficulty chip in
-        // TEAMS (n2). A model no-op in FFA (teams-of-one).
+        // TEAMS (n2). A model no-op in FFA (teams-of-one). The room is told, because
+        // a side authored here and never sent is a lobby that says TEAMS over a
+        // free-for-all world (m10 teams-wire).
         state = cycleSeatTeam(state, hit.index);
+        sendChoice();
         render();
         break;
       case 'mode':
-        // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode.
+        // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode — and
+        // sent, because the room advertises its mode and builds its world from it.
         state = toggleMode(state);
         platform.storage.set(MATCH_MODE_KEY, state.mode);
+        sendChoice();
         render();
         break;
       case 'abundance':

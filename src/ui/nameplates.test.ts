@@ -21,12 +21,13 @@ import {
   nameplateGetsLabel,
   resolveName,
   resolveDifficultySuffix,
+  resolveTeamLabel,
   fallbackName,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
   NAMEPLATE_MAX_CHARS,
 } from './nameplates';
-import type { DifficultyTable, Nameable, NameTable } from './nameplates';
+import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
 
 /** A live enemy SHIP at owner 3 — the labelled baseline each test perturbs. */
 function ship(over: Partial<Nameable> = {}): Nameable {
@@ -43,6 +44,13 @@ const NAMES: NameTable = ['YOU', 'Rusty', 'Bolt', 'Warden'];
 /** Difficulty table mirroring {@link NAMES}: slot 0 is the HUMAN (left empty, no
  *  suffix), the bot seats each carry their tier. */
 const DIFFS: DifficultyTable = [undefined, 'easy', 'medium', 'hard'];
+
+/** A 2v2 split by slot: 0 and 2 on side A, 1 and 3 on side B — the same table
+ *  `main.ts` builds from the live world's `ship.team` (m10 teams). */
+const TEAMS: TeamTable = [0, 1, 0, 1];
+
+/** TEAMS mode — the gate every side label is behind. */
+const IN_TEAMS = { showTeamLabels: true } as const;
 
 describe('who gets a label', () => {
   it('labels a live enemy ship', () => {
@@ -205,5 +213,72 @@ describe('the whole frame', () => {
     );
     expect(shipPlate!.local).toBe(true);
     expect(stationPlate!.local).toBe(false);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// The side label (m10 teams — ratified: colour alone is insufficient)
+// ---------------------------------------------------------------------------
+
+describe('the side label', () => {
+  it('names the side in words, not as a letter or a hue', () => {
+    // The developer could not tell who was on their team. `A` is a legend nobody
+    // was given; `TEAM A` is the answer, and it is the same string the lobby chip
+    // carries (`./lobby` teamName).
+    expect(resolveTeamLabel(TEAMS, 0, IN_TEAMS)).toBe('TEAM A');
+    expect(resolveTeamLabel(TEAMS, 1, IN_TEAMS)).toBe('TEAM B');
+    expect(resolveTeamLabel(TEAMS, 2, IN_TEAMS)).toBe('TEAM A');
+  });
+
+  it('says nothing at all in FFA', () => {
+    // Teams-of-one: every plate would read a different side, which is noise
+    // dressed as information — and the free-for-all HUD must be unchanged.
+    expect(resolveTeamLabel([0, 1, 2, 3], 2)).toBe('');
+    expect(nameplateModel([ship({ owner: 2 })], NAMES, {}, DIFFS, [0, 1, 2, 3])[0]!.teamLabel).toBe('');
+  });
+
+  it('makes no claim about a slot the table does not name', () => {
+    // A partially-known roster degrades to no claim rather than a wrong one.
+    expect(resolveTeamLabel([0, undefined, 1], 1, IN_TEAMS)).toBe('');
+    expect(resolveTeamLabel([], 0, IN_TEAMS)).toBe('');
+    expect(resolveTeamLabel(TEAMS, -1, IN_TEAMS)).toBe('');
+  });
+
+  it('folds a side number past the roster back into a readable letter', () => {
+    // Four sides is the lobby's ceiling; a stray value must still READ, because a
+    // blank where a side belongs is the exact failure this label exists to fix.
+    expect(resolveTeamLabel([4], 0, IN_TEAMS)).toBe('TEAM A');
+    expect(resolveTeamLabel([5], 0, IN_TEAMS)).toBe('TEAM B');
+  });
+
+  it('puts the side on every plate in a teams match — ships and homes alike', () => {
+    const plates = nameplateModel(
+      [ship({ owner: 0 }), station({ owner: 1 }), ship({ owner: 3 })],
+      NAMES,
+      IN_TEAMS,
+      DIFFS,
+      TEAMS,
+    );
+    expect(plates.map((p) => [p.owner, p.kind, p.teamLabel])).toEqual([
+      [0, 'ship', 'TEAM A'],
+      [1, 'station', 'TEAM B'],
+      [3, 'ship', 'TEAM B'],
+    ]);
+  });
+
+  it('keeps the side separate from the name and the difficulty tag', () => {
+    // Three fields, not one string: the view weights them differently, and a test
+    // must be able to say WHICH part is the side without parsing a run-on label.
+    const [plate] = nameplateModel([ship({ owner: 3 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
+    expect(plate!.text).toBe('Warden');
+    expect(plate!.suffix).toBe('(HARD)');
+    expect(plate!.teamLabel).toBe('TEAM B');
+  });
+
+  it('leaves a human seat its side and no difficulty tag', () => {
+    const [plate] = nameplateModel([ship({ owner: 0 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
+    expect(plate!.suffix).toBe(''); // humans never carry a tier
+    expect(plate!.teamLabel).toBe('TEAM A'); // but they do carry a side
   });
 });

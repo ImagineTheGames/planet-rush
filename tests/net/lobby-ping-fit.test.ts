@@ -104,18 +104,41 @@ describe('the roster ping fits the row it is drawn on', () => {
     expect(pingFits(100, 40, 148)).toBe(true);
   });
 
-  it('still shows the phone its ping in TEAMS for an ordinary-length callsign', () => {
+  it('spends the phone\'s TEAMS ping on the word the side chip now carries', () => {
     // The one place the feature is genuinely width-bound: a landscape phone (221px
-    // row) in TEAMS, where the side chip claims 90px. A short-to-ordinary name
-    // keeps its number; only a near-maximum one spends the space. Recorded here so
-    // the boundary is a known, checked property of the layout rather than a
-    // surprise a player finds — and so that widening the row would fail this test
-    // loudly instead of silently.
+    // row) in TEAMS. This assertion used to read the other way — a short name kept
+    // its number, only a near-maximum one spent the space — and it is written to
+    // fail loudly when the row's furniture changes. It did exactly that, so the
+    // new boundary is recorded rather than wished away.
+    //
+    // What changed: the side chip carries the WORD (`TEAM A`, m10 teams-wire —
+    // the developer reported a teams match they could not read sides in, and
+    // ratified that colour alone is insufficient), so `SEAT_TEAM_CHIP_WIDTH` went
+    // 30 → 64. On this row the chip is not even that wide: `teamChipRect` clamps
+    // it strictly right of centre, so it lands at 47.68px and its LEFT EDGE — the
+    // edge the ping measures against — sits at the centre pad whatever the
+    // constant says. There is no chip width above ~34px that leaves a 56px readout
+    // room here, so the two ratified features cannot both have this row.
+    //
+    // The side label wins: it answers a reported bug and is ratified for both form
+    // factors, and the ping already owns a graceful way to lose — `pingFits` drops
+    // the number instead of drawing it under the chip. So on a landscape phone in
+    // TEAMS the roster ping is dropped at EVERY name length, not just long ones.
+    // Narrow in scope and named in `docs/netcode-teams-wire.md` §5: FFA on the same
+    // phone is untouched (the case above), and every wider form factor still holds
+    // a full-length callsign AND its number in TEAMS.
     const layout = lobbyLayout({ width: 844, height: 390 }, { isTouch: true });
     const rect = layout.seats[0]!;
     const chipsLeft = layout.seatTeamChips[0]!.x;
-    expect(pingFits(pingXFor(rect, 4), READOUT_W, chipsLeft)).toBe(true);
+    expect(pingFits(pingXFor(rect, 4), READOUT_W, chipsLeft)).toBe(false);
     expect(pingFits(pingXFor(rect, PLAYER_NAME_MAX_CHARS), READOUT_W, chipsLeft)).toBe(false);
+
+    // The trade is a *width* fact, not a mode fact: give the row a desktop's width
+    // and the number comes back with the word still on it. This is what makes the
+    // line above a documented cost rather than the feature being broken.
+    const wide = lobbyLayout({ width: 1280, height: 720 }, { isTouch: false });
+    const wideRect = wide.seats[0]!;
+    expect(pingFits(pingXFor(wideRect, 4), READOUT_W, wide.seatTeamChips[0]!.x)).toBe(true);
   });
 
   it('gives a human FFA seat the whole row, and a TEAMS seat measurably less', () => {

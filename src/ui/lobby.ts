@@ -63,7 +63,7 @@ import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
 import { seatPing } from '../net/ping';
 import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
-import { MAX_MATCH_SIZE, MIN_MATCH_SIZE } from '../sim/match-config';
+import { MAX_MATCH_SIZE, MIN_MATCH_SIZE, configToPlayers } from '../sim/match-config';
 import type { Abundance } from '../sim/constants';
 import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import { playerColor } from './station-hp';
@@ -140,6 +140,26 @@ export const TEAM_LABELS: readonly string[] = ['A', 'B', 'C', 'D'];
 export function teamLabel(team: number): string {
   if (!Number.isFinite(team) || team < 0) return TEAM_LABELS[0]!;
   return TEAM_LABELS[Math.floor(team) % TEAM_LABELS.length]!;
+}
+
+/** The word the roster chip carries, so a lone letter never has to be decoded. */
+export const TEAM_WORD = 'TEAM';
+
+/**
+ * A side's **player-facing name** — `TEAM A`, `TEAM B` — the one string both the
+ * lobby roster and the in-match nameplates show (`./nameplates`).
+ *
+ * Ratified by the developer after playing a TEAMS match: *"impossible to know who
+ * is on your team."* Colour could not answer that and was never going to — the
+ * eight identity colours are per-SLOT (style-guide §3.1), so a side has no hue of
+ * its own to read, and the bare letter on the lobby chip did not survive the trip
+ * into a fight. The label is words, over every nameplate, in both form factors:
+ * **colour alone is insufficient** is the ratification, and this function is the
+ * single place the wording lives so the lobby and the battlefield can never
+ * disagree about what a side is called.
+ */
+export function teamName(team: number): string {
+  return `${TEAM_WORD} ${teamLabel(team)}`;
 }
 
 /** The default side a slot starts on when TEAMS is picked: alternating by slot,
@@ -844,6 +864,33 @@ export function lobbyMatchConfig(state: LobbyState): MatchConfig {
   return { mode: state.mode, slots, abundance: state.abundance };
 }
 
+/**
+ * The authored sides as **the wire spells them**: one entry per physical lobby
+ * slot 0..7, closed seats included (m10 teams-wire).
+ *
+ * Physical because that is what the other end indexes by — the server's seats are
+ * slots and it reads this by `slot.player` (`server/room.ts` `applyTeamConfig`).
+ * FFA reads as teams-of-one, so sending it in FFA is a no-op rather than a
+ * special case the caller has to remember.
+ */
+export function lobbyWireTeams(state: LobbyState): number[] {
+  return lobbyMatchConfig(state).slots.map((slot) => slot.team);
+}
+
+/**
+ * The same authored sides as **the world builds them**: dense, closed slots
+ * dropped and the survivors re-indexed 0..N-1 ({@link configToPlayers}, spike
+ * Trap 6), so entry `i` is the side of the ship the sim will call player `i`.
+ *
+ * The offline half of the identical handoff {@link lobbyWireTeams} makes to the
+ * server — `bootOfflineMatch` stamps this onto its roster. Two functions rather
+ * than one because the two ends genuinely index differently, and one function
+ * pretending otherwise is how the sparse lobby id {0,2,5} gets into the sim.
+ */
+export function lobbyRosterTeams(state: LobbyState): number[] {
+  return configToPlayers(lobbyMatchConfig(state)).map((spec) => spec.team ?? spec.id);
+}
+
 /** One seat's occupancy as the config's {@link SlotState}: an OPEN preview is a
  *  joinable seat online but a bot offline (no wire for a joiner). */
 function seatSlotState(occupant: SeatOccupant, online: boolean): SlotState {
@@ -1017,6 +1064,11 @@ export interface LobbySeatView {
   /** …and its label (`A`…`D`), so the row reads the team with the hue removed —
    *  colour is identity, the letter is the team (style-guide §3 rule 3). */
   readonly teamLabel: string;
+  /** …and the same side as the WORD a player reads — `TEAM A` (ratified developer,
+   *  m10: *"impossible to know who is on your team"*). The chip carries this rather
+   *  than the bare letter, and the in-match nameplates carry the identical string
+   *  ({@link teamName}), so the roster and the battlefield teach one vocabulary. */
+  readonly teamName: string;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
   /**
@@ -1140,6 +1192,7 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
+    teamName: teamName(seat.team),
     // An open seat stops being claimable the moment the match starts; a seat the
     // server has already seated a bot in was never claimable to begin with; a
     // closed seat is a shut door; and offline there is no wire for a second player

@@ -289,12 +289,23 @@ export {
   nameplateGetsLabel,
   resolveName,
   resolveDifficultySuffix,
+  // The `TEAM A` / `TEAM B` side label every nameplate carries in TEAMS (m10 —
+  // ratified: colour alone is insufficient, because identity colour is per-SLOT).
+  resolveTeamLabel,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
 } from './nameplates';
-export type { DifficultyTable, Nameable, Nameplate, NameplateKind, NameplateOptions, NameTable } from './nameplates';
+export type {
+  DifficultyTable,
+  Nameable,
+  Nameplate,
+  NameplateKind,
+  NameplateOptions,
+  NameTable,
+  TeamTable,
+} from './nameplates';
 
 export {
   NameplateView,
@@ -362,6 +373,10 @@ export {
   isJoinableRoomCode,
   lobbyMatchConfig,
   lobbyModel,
+  // The authored sides, in the two orders the two ends index by (m10 teams-wire):
+  // per-SLOT for the server, DENSE for the world the client builds itself.
+  lobbyRosterTeams,
+  lobbyWireTeams,
   makeRoomCode,
   matchSizeOf,
   nameFor,
@@ -374,6 +389,10 @@ export {
   selectShipClass,
   setPlayerName,
   startLobbyMatch,
+  // The one place a side's player-facing name lives — `TEAM A` / `TEAM B` — shared
+  // by the lobby roster and the in-match nameplates so they can never disagree.
+  teamLabel,
+  teamName,
   tickLobby,
   toggleMode,
   typeRoomCode,

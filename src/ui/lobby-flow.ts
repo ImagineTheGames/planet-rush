@@ -93,6 +93,7 @@ import {
   CLASS_ORDER,
   applyLobbySlots,
   botDifficulties,
+  lobbyWireTeams,
   createLobby,
   cycleAbundance,
   cycleBotDifficulty,
@@ -267,6 +268,13 @@ function choiceFor(state: FlowState, lobby: LobbyState): FlowEffect {
       shipClass: lobby.shipClass,
       fireMode: wireFireMode(state.fireMode),
       ...(host ? { botDifficulties: botDifficulties(lobby) } : {}),
+      // The match SHAPE, from the host only (m10 teams-wire): the MODE and the
+      // per-SLOT side. It rides every choice for the same reason the difficulties
+      // do — `lobbyState` is broadcast on any change, so a roster showing a split
+      // the server was never told about is a roster that lies about the match being
+      // built. A side authored and never sent is the whole of the developer's
+      // report: a lobby that says TEAMS over a free-for-all world.
+      ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby) } : {}),
     },
   };
 }

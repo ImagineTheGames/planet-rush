@@ -56,6 +56,7 @@
 import type { Action, ActionType, BuildItem, Vec2 } from '@shared/types';
 import { ShipClass, UpgradeTrack } from '@shared/types';
 import { playtestLog } from './playtest-log';
+import type { MatchMode } from '../sim/match-config';
 import type {
   BotDifficulty,
   ClientMessage,
@@ -189,11 +190,19 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       const fireMode = parseFireMode(raw['fireMode']);
       if (shipClass === null || fireMode === null) return null;
       const difficulties = parseBotDifficulties(raw['botDifficulties']);
+      // The match SHAPE the host is on (m10 teams-wire): the mode and the per-seat
+      // side. Both are optional and both are dropped rather than refused when
+      // malformed — a bad team array must not cost the sender their hull pick, and
+      // the server ignores them from anyone but the creator anyway.
+      const mode = parseMatchMode(raw['mode']);
+      const teams = parseTeams(raw['teams']);
       return {
         type: 'lobbyChoice',
         shipClass,
         fireMode,
         ...(difficulties ? { botDifficulties: difficulties } : {}),
+        ...(mode ? { mode } : {}),
+        ...(teams ? { teams } : {}),
       };
     }
     case 'startMatch':
@@ -355,6 +364,39 @@ function parseShipClass(value: unknown): ShipClass | null {
 function parseFireMode(value: unknown): FireMode | null {
   return value === 'manual' || value === 'auto' ? value : null;
 }
+
+/** The match mode a host's `lobbyChoice` claims (m10 teams-wire), or null for
+ *  absent/unknown — the server then keeps the mode the room was allocated with. */
+function parseMatchMode(value: unknown): MatchMode | null {
+  return value === 'ffa' || value === 'teams' ? value : null;
+}
+
+/**
+ * The host's per-seat team assignment (m10 teams-wire). Bounded like every other
+ * field on this hostile surface: at most one entry per seat, each a small
+ * non-negative integer.
+ *
+ * The ceiling is {@link MAX_TEAMS_ON_WIRE} rather than "any number", because the
+ * values are compared for equality alone (`src/sim/allegiance`) and an unbounded
+ * one buys a sender nothing but a way to feed the roster a `1e308`. Anything
+ * malformed returns null and the whole array is dropped — the room then keeps the
+ * sides it already had, which is always a legal match.
+ */
+function parseTeams(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length > MAX_PLAYERS) return null;
+  const out: number[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'number' || !Number.isInteger(entry)) return null;
+    if (entry < 0 || entry >= MAX_TEAMS_ON_WIRE) return null;
+    out.push(entry);
+  }
+  return out;
+}
+
+/** Sides a room can split into on the wire — the lobby's `MAX_TEAMS` ceiling
+ *  (`src/ui/lobby`), restated here because the wire may not import the UI. Eight
+ *  seats can never usefully hold more sides than the lobby can author. */
+export const MAX_TEAMS_ON_WIRE = 4;
 
 function parseBotDifficulties(value: unknown): BotDifficulty[] | null {
   if (!Array.isArray(value) || value.length > MAX_PLAYERS) return null;
