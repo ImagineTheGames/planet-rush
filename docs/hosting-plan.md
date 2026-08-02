@@ -324,7 +324,7 @@ Every allocate now answers with *why*:
   (`room H3HX → d891dd0a1443e8 (gru — your region)`), which is where `fly logs`
   answers "why did that creator get Virginia?";
 - the client copies `detail` into the **session log** (`connect`/`ticket` step),
-  so a pasted COPY LOG carries the machine id *and* the reason.
+  so a downloaded DOWNLOAD LOG file carries the machine id *and* the reason.
 
 A `join` carries no placement and logs none: it goes where the room already is,
 and there is nothing to explain.
