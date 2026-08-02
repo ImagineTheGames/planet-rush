@@ -205,6 +205,17 @@ anywhere in the feature.
 
 ### …and the button was sideways
 
+> **Superseded (ratified M10, "DOWNLOAD LOG only").** The spec and config named in
+> this section no longer exist: the developer killed the clipboard route on every
+> device — *"Clipboard goes away for all (PC and mobile)"* — so the phone-only
+> `copy-log-touch.spec.ts` and its `playwright.copy-log.config.ts` were replaced by
+> `tests/live-stage/log-download.spec.ts` under
+> `tests/live-stage/playwright.log-download.config.ts`, which runs the same ground on
+> **two** projects (`phone` and `desk`). The account below is kept as written because
+> it is the record of a run that happened, and the `LD_LIBRARY_PATH` recipe in it is
+> still exactly how Chromium is made to start in this lane — only the config path at
+> the end of the command has changed.
+
 `tests/live-stage/copy-log-touch.spec.ts` **has now run**, green, both tests, on the
 phone profile against the shipped bundle. Getting it to run needed no root after all,
 which is worth writing down because the same recipe unblocks `connect-trace.spec.ts`
@@ -284,5 +295,7 @@ player reads is one the server stated (`src/net/hull-authority.test.ts`).
 `tests/live-stage/copy-log-touch.spec.ts` proves the export path on a phone profile
 in the real bundle, and **it is green** — see the section above for the run and for
 the two defects the run found. Evidence: `copy-log-touch-pause-evidence.png` and
-`copy-log-touch-shared-evidence.png`, both portrait, both showing COPY LOG turned
-with the game.
+`copy-log-touch-shared-evidence.png`, both portrait, both showing the button turned
+with the game. (Both spec and evidence were superseded by
+`tests/live-stage/log-download.spec.ts` under the M10 download-only ratification —
+see the note above.)
