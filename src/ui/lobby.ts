@@ -165,17 +165,14 @@ export const SIDE_WORDS: Readonly<Record<SideRelation, string>> = {
   neutral: 'TEAM',
 };
 
-/** The viewer-less word, kept under its old name for the call sites that mean
- *  "the side, with nobody looking" (see {@link SIDE_WORDS}). */
-export const TEAM_WORD = SIDE_WORDS.neutral;
-
 /**
  * Which relation `team` bears to the player viewing it.
  *
  * `viewerTeam` is the VIEWING player's own side. Absent (or not a real side) means
  * there is no local player — a spectator, a replay, a lobby nobody is seated in —
  * and that resolves to `neutral`, never to `enemy`: a view with no "friendly" must
- * not answer by declaring everyone hostile.
+ * not answer by declaring everyone hostile. A `team` that is not a real side is
+ * neutral for the same reason: an unknown side is not an enemy side.
  */
 export function sideRelation(team: number, viewerTeam?: number): SideRelation {
   if (viewerTeam === undefined || !Number.isFinite(viewerTeam) || viewerTeam < 0) return 'neutral';
