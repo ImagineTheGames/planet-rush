@@ -1,0 +1,43 @@
+{
+  "base": "http://localhost:4173",
+  "frames": [
+    {
+      "frame": "rings-pointer",
+      "viewport": "1280x800 dpr1",
+      "touch": false,
+      "errors": 0
+    },
+    {
+      "frame": "button-landscape",
+      "viewport": "844x390 dpr3",
+      "touch": true,
+      "buildButtonDrawn": true,
+      "buildButtonBounds": {
+        "x": 54,
+        "y": 140,
+        "width": 76,
+        "height": 76
+      },
+      "stagedAt": "station.radius + ship.radius + 30 = 110 u from own centre",
+      "dockRange": 160,
+      "depositRange": 256,
+      "errors": 0
+    },
+    {
+      "frame": "button-portrait",
+      "viewport": "390x844 dpr3",
+      "touch": true,
+      "buildButtonDrawn": true,
+      "buildButtonBounds": {
+        "x": 54,
+        "y": 140,
+        "width": 76,
+        "height": 76
+      },
+      "stagedAt": "station.radius + ship.radius + 30 = 110 u from own centre",
+      "dockRange": 160,
+      "depositRange": 256,
+      "errors": 0
+    }
+  ]
+}

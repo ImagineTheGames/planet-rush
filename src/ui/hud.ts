@@ -307,8 +307,9 @@ export interface HudFrame {
   readonly difficulties?: DifficultyTable;
   /**
    * Per-slot **side** table, the third mirror of {@link names} (m10 teams): the
-   * raw `team` the sim carries on that slot's ship, turned into a `TEAM A` /
-   * `TEAM B` label beside the name when {@link teamsMode} is on.
+   * raw `team` the sim carries on that slot's ship, turned into a `FRIENDLY A` /
+   * `ENEMY B` label beside the name when {@link teamsMode} is on (u3 — the word is
+   * relative to {@link viewerTeam}, the letter is absolute).
    *
    * Default: none ⇒ no side labels, which is also FFA's answer. Fed from the
    * booted world's own roster, so the HUD names a side from the same number
@@ -318,6 +319,20 @@ export interface HudFrame {
   /** TEAMS mode — the gate on the side labels above. FFA is teams-of-one, where a
    *  side label would repeat the player and inform nobody. Default false. */
   readonly teamsMode?: boolean;
+  /**
+   * The **viewing player's own side** (u3): the local ship's `team`, which is what
+   * turns each label's word into `FRIENDLY` or `ENEMY`. The letter beside it never
+   * depends on this — team 1 is `B` on every screen.
+   *
+   * Default: none ⇒ every plate reads the neutral `TEAM <letter>`. That is the
+   * documented spectator/replay answer, and it is deliberately not "everyone is an
+   * enemy" (`./nameplates` `NameplateOptions.viewerTeam`).
+   *
+   * Explicitly `| undefined` so the per-frame feed can write "no viewer" into its
+   * REUSED frame object rather than deleting a key every frame (GDD §4.3 — the
+   * render loop allocates nothing).
+   */
+  readonly viewerTeam?: number | undefined;
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
@@ -1037,6 +1052,11 @@ export class Hud extends Container {
         // a different side and tell a player nothing they did not already read
         // from the name.
         showTeamLabels: frame.teamsMode ?? false,
+        // Whose side is "FRIENDLY". Passed through rather than derived here, so
+        // the HUD reads the viewer from the same world the labels came from — and
+        // an absent viewer (a spectator / replay) falls back to the neutral
+        // `TEAM <letter>` instead of calling every hull an enemy (u3).
+        ...(frame.viewerTeam !== undefined ? { viewerTeam: frame.viewerTeam } : {}),
       },
       frame.difficulties ?? NO_DIFFICULTIES,
       frame.playerTeams ?? NO_TEAMS,
@@ -1117,13 +1137,21 @@ export class Hud extends Container {
   }
 
   /**
-   * Route a click/tap at a screen point to the minimap. If it lands on the active
-   * surface (the corner square, or the whole overlay when expanded) the model
-   * toggles and this returns `true` — the caller then consumes the event so the
-   * same press never also flies the ship or engages a stick under it. Returns
-   * `false` (leaving the event to fall through) when the minimap isn't showing or
-   * the point missed. The ONE entry point PC clicks and mobile taps share, so the
-   * two platforms can never diverge (docs/input-parity.md; ./minimap.test.ts).
+   * Route a click/tap at a screen point to the minimap, and report whether the
+   * caller must consume the event (so the same press never also flies the ship or
+   * engages a stick under it). The ONE entry point PC clicks and mobile taps
+   * share, so the two platforms can never diverge (docs/input-parity.md;
+   * ./minimap.test.ts). Its two states answer differently, deliberately
+   * ({@link ./minimap} `Minimap.tap`, developer report u6-01):
+   *
+   * - **EXPANDED** — the overlay is MODAL. *Every* press collapses it and returns
+   *   `true`, whether it landed on the overlay or outside it. Previously an
+   *   outside press returned `false`, fell through to gameplay, and left the
+   *   overlay open — the defect u6-01 fixes.
+   * - **COLLAPSED** — only a press that lands ON the corner square returns `true`;
+   *   a miss returns `false` and falls through, because the player is flying.
+   *
+   * `false` also when the minimap isn't showing at all.
    */
   minimapTap(x: number, y: number): boolean {
     if (!this.minimap.visible) return false;

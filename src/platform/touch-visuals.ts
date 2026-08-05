@@ -310,11 +310,30 @@ export class TouchVisuals extends Container {
     // "BUILD & UPGRADE" is what the strip says on desktop (GDD §2.5: a player
     // who doesn't know upgrades exist will never look for them), so the button
     // carries the second word as a subtitle rather than dropping it.
+    //
+    // Drawn LIT, always — because it is only ever on screen while the ship is
+    // docked (`buildButtonVisible`/`buildButtonHighlighted`, @ui/build-button),
+    // and that is exactly the moment a field report asked it to announce itself:
+    // "once you are in build distance it should highlight the build button (make
+    // it stand out)" (2026-08-05). The lit chrome is a CHILD of the group whose
+    // visibility is `docked`, so the two can never come apart — there is no
+    // second signal to get out of step, which is the same discipline the
+    // visibility rule itself is written under.
+    //
+    // It stood out from nothing before: fill 0.16 and a 3px ring is the FIRE
+    // button's own weight, so the button that means "a whole new verb just
+    // opened up" arrived looking like the one that has been there all match.
     this.buildGroup.label = 'build-button';
+    // Two soft plasma haloes outside the rim: the glow that carries the read
+    // across a busy screen, at the periphery of vision, without growing the hit
+    // rect (`buildButtonRect` — the layout contract stays put).
+    const buildGlow = new Graphics();
+    buildGlow.circle(0, 0, R_BUILD + 10).fill({ color: PALETTE.plasma, alpha: 0.1 });
+    buildGlow.circle(0, 0, R_BUILD + 4).fill({ color: PALETTE.plasma, alpha: 0.14 });
     const buildFill = new Graphics();
-    buildFill.circle(0, 0, R_BUILD).fill({ color: PALETTE.plasma, alpha: 0.16 });
+    buildFill.circle(0, 0, R_BUILD).fill({ color: PALETTE.plasma, alpha: 0.38 });
     const buildRing = new Graphics();
-    buildRing.circle(0, 0, R_BUILD).stroke({ width: 3, color: PALETTE.plasma, alpha: 0.85 });
+    buildRing.circle(0, 0, R_BUILD).stroke({ width: 5, color: PALETTE.plasma, alpha: 1 });
     const buildLabel = new Text({
       text: 'BUILD',
       style: { fontFamily: FIRE_LABEL, fontSize: 15, fill: PALETTE.plasma, fontWeight: 'bold', letterSpacing: 1 },
@@ -327,7 +346,7 @@ export class TouchVisuals extends Container {
     });
     buildSub.anchor.set(0.5);
     buildSub.y = 9;
-    this.buildGroup.addChild(buildFill, buildRing, buildLabel, buildSub);
+    this.buildGroup.addChild(buildGlow, buildFill, buildRing, buildLabel, buildSub);
     this.buildGroup.visible = false;
 
     // Back-to-front: ghosts, live bases, knobs, FIRE, BUILD.
@@ -398,6 +417,11 @@ export class TouchVisuals extends Container {
     this.fireGroup.scale.set(pressed ? 0.94 : 1);
 
     // --- BUILD button: contextual, at your own station and nowhere else. ------
+    // `docked` here is `buildButtonVisible` from the call site, which is also
+    // `buildButtonHighlighted` (@ui/build-button) — the button appearing and the
+    // button being lit are one event, because crossing STATION.dockRange is one
+    // event. Its lit chrome is built into the group (constructor), so there is no
+    // second flag here that could fall out of step with the wheel's availability.
     this.buildGroup.visible = docked;
     if (docked) {
       const c = buildButtonCenter(w, h);

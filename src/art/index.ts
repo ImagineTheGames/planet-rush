@@ -41,6 +41,7 @@
 export * from './palette';
 export * from './shapes';
 export * from './raster';
+export * from './ring-scan';
 export * from './decals';
 export * from './ships';
 export * from './stations';

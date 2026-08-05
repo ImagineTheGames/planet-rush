@@ -38,6 +38,7 @@ import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
 import { TICK_DT, createWorld, oreResidual } from '../../src/sim';
 import type { Ship, World } from '../../src/sim';
+import { netBudget } from './budgets';
 
 /** A four-seat room in a cramped world: two humans, two lobby bots, and enough
  *  rock within reach that a substitute bot finds ore in tens of seconds rather
@@ -210,5 +211,8 @@ describe('the ore ledger across a reconnect', () => {
     // across a wire without minting or destroying a unit of ore.
     expect(brokeAtTick, 'the ore ledger never broke tolerance').toBe(-1);
     expect(worstResidual).toBeLessThan(CONSERVATION_TOL);
-  }, 60_000);
+  }, netBudget({
+    work: 'drive a MatchServer on an injected clock through a whole drop → substitute → reclaim cycle, sampling the ore residual every tick',
+    measuredSeconds: 0.8,
+  }));
 });

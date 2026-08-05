@@ -65,7 +65,11 @@ under fire reading a refusal needs the reason, not the fiction.
 | `[FIXED]` | Ratified elsewhere. Not the voice's to touch. See §5. |
 
 Line numbers are as of this branch (`53d2f20`). **Match on the string, not the
-line** — every entry quotes the exact literal.
+line** — every entry quotes the exact literal. This branch has since merged `main`,
+which moved `src/ui/lobby.ts`, `lobby-view.ts`, `nameplates.ts` and `hud.ts` under
+u3-01 / u4-01 / u5-01, so **every line number below is stale by construction** and
+the string is the only reliable key. The literals themselves were re-greped after
+that merge and all of them still exist, so the work order stands unchanged.
 
 Every row's "current" text was read out of the source, not remembered. The grep
 commands that produced this inventory are in §9 so the sweep is reproducible.

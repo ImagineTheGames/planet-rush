@@ -104,7 +104,12 @@ export type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 //     fixture near your own station (GDD §2.2, §2.4); drawn by touch-visuals,
 //     its persistence rule + layout contract owned here.
 
-export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
+export {
+  BUILD_BUTTON_ID,
+  BUILD_BUTTON_ANCHOR,
+  buildButtonVisible,
+  buildButtonHighlighted,
+} from './build-button';
 export type { BuildButtonSignals } from './build-button';
 
 // --- Upgrade WHEEL — the only place ship stats appear (GDD §2.2, §2.5) ------
@@ -289,9 +294,11 @@ export {
   nameplateGetsLabel,
   resolveName,
   resolveDifficultySuffix,
-  // The `TEAM A` / `TEAM B` side label every nameplate carries in TEAMS (m10 —
-  // ratified: colour alone is insufficient, because identity colour is per-SLOT).
+  // The `FRIENDLY A` / `ENEMY B` side label every nameplate carries in TEAMS (m10
+  // — ratified: colour alone is insufficient, because identity colour is per-SLOT
+  // — worded relative to the viewer since u3), and its blue/red motif colour.
   resolveTeamLabel,
+  resolveTeamRelation,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
   NAMEPLATE_FULL_ALPHA,
@@ -351,10 +358,18 @@ export {
   DIFFICULTY_CYCLE,
   DIFFICULTY_LABELS,
   LOBBY_SLOTS,
+  MAX_TEAMS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   RUSH_COUNTDOWN_SECONDS,
   RUSH_LABEL,
+  // The hull tiles' stats — pips AND numbers (u4, ratified 2026-08-05; GDD §2.5
+  // / §2.11 amended). `shipStatLines` derives both channels from ONE value off
+  // the sim's `SHIP_STATS`, so nothing downstream can print a figure that
+  // disagrees with its bar. `STAT_PIP_COLORS` pins the pips as chrome.
+  STAT_PIPS,
+  STAT_PIP_COLORS,
+  shipStatLines,
   applyLobbySlots,
   botDifficulties,
   canStart,
@@ -389,10 +404,16 @@ export {
   selectShipClass,
   setPlayerName,
   startLobbyMatch,
-  // The one place a side's player-facing name lives — `TEAM A` / `TEAM B` — shared
-  // by the lobby roster and the in-match nameplates so they can never disagree.
+  // The one place a side's player-facing name lives — `FRIENDLY A` / `ENEMY B`,
+  // the WORD relative to the viewer and the LETTER absolute — shared by the lobby
+  // roster and the in-match nameplates so they can never disagree. `SIDE_COLORS`
+  // is the motif's blue/red reinforcement (u3, ratified 2026-08-05).
+  SIDE_COLORS,
+  SIDE_WORDS,
+  sideRelation,
   teamLabel,
   teamName,
+  viewerTeamOf,
   tickLobby,
   toggleMode,
   typeRoomCode,
@@ -400,6 +421,7 @@ export {
 export type {
   LobbyModel,
   LobbyOptions,
+  SideRelation,
   LobbyPhase,
   LobbySeat,
   LobbySeatView,
@@ -407,11 +429,19 @@ export type {
   LobbyTeamCount,
   SeatOccupant,
   ShipClassOption,
+  ShipStatKey,
+  ShipStatLine,
 } from './lobby';
 
 export {
   CLASS_TILE_MAX,
   CLASS_TILE_MIN,
+  // Inside one hull tile: which of its four blocks fit at this size, and where
+  // each stat cell goes (u4). The view draws what these return and decides
+  // nothing, so "six stats legible at phone scale" is a headless assertion.
+  STAT_COUNT,
+  classStatCell,
+  classTileContent,
   LOBBY_PAD,
   RUSH_HEIGHT,
   RUSH_HEIGHT_TOUCH,
@@ -421,7 +451,14 @@ export {
   lobbyHitTest,
   lobbyLayout,
 } from './lobby-geometry';
-export type { Insets, LobbyLayout, LobbyLayoutOptions, LobbyTarget, TileShape } from './lobby-geometry';
+export type {
+  ClassTileContent,
+  Insets,
+  LobbyLayout,
+  LobbyLayoutOptions,
+  LobbyTarget,
+  TileShape,
+} from './lobby-geometry';
 
 export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 

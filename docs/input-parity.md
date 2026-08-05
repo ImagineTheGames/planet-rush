@@ -112,10 +112,21 @@ is recorded here and backed by its own CI test:
   — the two platforms cannot diverge. `main.ts` routes the canvas `pointerdown` to
   it (mouse and touch alike) before the sticks, so a press on the map never also
   flies the ship.
+- **Dismissal is the same one path** (u6-01, 2026-08-05). While the overlay is
+  EXPANDED it is **modal: every press collapses it and is consumed**, on the map or
+  off it — there is deliberately no second, touch-only "tap away" gesture, because
+  a dismissal that existed on one platform only is exactly the hole this document
+  exists to close. While COLLAPSED nothing is modal: a press that misses the corner
+  square still falls through and flies the ship. The asymmetry is the design — a
+  glance widget that ate presses while the player is flying would be the worse bug
+  — and it holds identically for pointer and touch.
 - **`M` on PC** is the desktop keyboard convenience over the click, mirroring the
   `F` (fire mode) and `C` (control scheme) shortcuts — `MINIMAP_TOGGLE_KEY` in
   `src/ui/minimap.ts`, wired in `main.ts`'s keydown handler.
 - **Its CI test** is `src/ui/minimap.test.ts` (runs under `npm test`): it asserts
-  click (PC) and tap (mobile) reach the same toggle, and that the shortcut is `M`.
-  `tests/live-stage/minimap.spec.ts` proves the toggle under REAL input on the
-  booted client (the p1a rule).
+  click (PC) and tap (mobile) reach the same toggle, that the shortcut is `M`, and
+  that the expanded-modal / collapsed-fall-through asymmetry holds on both — routed
+  through the same boolean `main.ts` gates gameplay on, so "gameplay never saw the
+  press" is what is asserted. `tests/live-stage/minimap.spec.ts` proves it under
+  REAL input on the booted client (the p1a rule), pointer and touch, landscape- and
+  portrait-held.

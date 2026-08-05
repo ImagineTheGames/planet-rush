@@ -68,7 +68,7 @@ export const NAMEPLATE_SUFFIX_GAP = 3;
  *  on the name's own alpha so it recedes in step through the combat fade too. */
 export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
 
-/** Horizontal gap between the name and the `TEAM A` side label that follows it,
+/** Horizontal gap between the name and the `FRIENDLY A` side label after it,
  *  CSS px — the same beat as the difficulty gap, so a plate reads as one row. */
 export const NAMEPLATE_TEAM_GAP = 4;
 /**
@@ -99,10 +99,14 @@ export interface DrawnNameplate {
   /** The recessive difficulty suffix drawn beside the name — `(HARD)` etc., or
    *  `''` for a human seat (field request v0.2.2). */
   suffix: string;
-  /** The side label drawn beside the name — `TEAM A` / `TEAM B` in TEAMS, `''` in
-   *  FFA (m10 teams). This is the readback a live-stage teams match asserts on:
-   *  proof the label a player is supposed to be able to read actually DREW. */
+  /** The side label drawn beside the name — `FRIENDLY A` / `ENEMY B` in TEAMS,
+   *  `''` in FFA (m10 teams, u3 wording). This is the readback a live-stage teams
+   *  match asserts on: proof the label a player is supposed to be able to read
+   *  actually DREW. */
   teamLabel: string;
+  /** …and the tint it drew in — blue for the viewer's own side, red for a rival
+   *  (`./lobby` SIDE_COLORS), so a screenshot's colour claim is checkable too. */
+  teamColor: number;
   /** The tint (owner identity colour) applied. */
   color: number;
   /** Label centre-x in screen space, CSS px (the entity it tracks). */
@@ -118,7 +122,7 @@ export class NameplateView extends Container {
   /** Parallel pool for the recessive difficulty suffix, one per name slot; a name
    *  with no suffix (a human, or an unfed difficulty table) hides its entry. */
   private readonly suffixes: Text[] = [];
-  /** Parallel pool for the `TEAM A` side label, one per name slot; a plate with no
+  /** Parallel pool for the side label, one per name slot; a plate with no
    *  side (every plate in FFA) hides its entry. */
   private readonly teamTags: Text[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew. */
@@ -149,10 +153,12 @@ export class NameplateView extends Container {
       t.tint = plate.color;
       t.alpha = plate.alpha;
 
-      // The side label (m10 teams) — `TEAM A`, in words, immediately after the
-      // name, because colour cannot say it: identity colour is per-SLOT, so a side
-      // has no hue of its own (style-guide §3.1; "colour alone insufficient",
-      // ratified). Empty in FFA, where every plate would otherwise read a different
+      // The side label (m10 teams, u3 wording) — `FRIENDLY A` / `ENEMY B`, in
+      // words, immediately after the name, because colour cannot say it on its own:
+      // identity colour is per-SLOT, so a side has no hue (style-guide §3.1;
+      // "colour alone insufficient", ratified). Its own tint IS the side colour —
+      // blue ally / red rival — but only as reinforcement over a word that already
+      // says it. Empty in FFA, where every plate would otherwise read a different
       // side and say nothing.
       const tm = this.teamSlot(drawn);
       if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
@@ -189,7 +195,7 @@ export class NameplateView extends Container {
       t.position.set(plate.x, bottom);
       if (hasTeam) {
         tm.visible = true;
-        tm.tint = plate.color;
+        tm.tint = plate.teamColor;
         tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
         tm.position.set(left + width + NAMEPLATE_TEAM_GAP, bottom);
       } else {
@@ -250,7 +256,7 @@ export class NameplateView extends Container {
   private recordDebug(i: number, plate: Nameplate, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, color: plate.color, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, x: plate.x, y: top, local: plate.local };
       this.debugDrawn[i] = d;
       return;
     }
@@ -259,6 +265,7 @@ export class NameplateView extends Container {
     d.text = plate.text;
     d.suffix = plate.suffix;
     d.teamLabel = plate.teamLabel;
+    d.teamColor = plate.teamColor;
     d.color = plate.color;
     d.x = plate.x;
     d.y = top;
@@ -318,7 +325,7 @@ export class NameplateView extends Container {
     return t;
   }
 
-  /** The pooled `TEAM A` Text for name slot `i` — same left anchor and baseline as
+  /** The pooled side-label Text for name slot `i` — same left anchor and baseline as
    *  the difficulty suffix, and pooled the same way (m10 teams). */
   private teamSlot(i: number): Text {
     let t = this.teamTags[i];

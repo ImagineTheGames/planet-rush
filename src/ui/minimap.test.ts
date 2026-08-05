@@ -16,6 +16,11 @@
  *    contract this element signs (docs/input-parity.md): a click (PC) and a tap
  *    (mobile) both reach {@link Minimap.tap} and both flip the state, and the PC
  *    shortcut is `M` ({@link MINIMAP_TOGGLE_KEY}).
+ *  - **The EXPANDED overlay is modal, the COLLAPSED corner is not** (u6-01) — a
+ *    press outside the open overlay dismisses it *and is consumed*, so it never
+ *    also flies the ship; a press that misses the corner square still falls
+ *    through, because the player is flying. The asymmetry is asserted through the
+ *    same boolean seam `main.ts:1503` gates gameplay on, on pointer AND touch.
  */
 import { describe, it, expect } from 'vitest';
 import { PALETTE } from '@render/index';
@@ -624,5 +629,196 @@ describe('Minimap — toggle + hit test', () => {
     m.expand();
     // Expanded: the overlay centre is now the live surface.
     expect(m.hitTest(overlay.x, overlay.y, PHONE_WIDE, true)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The expanded overlay is MODAL — u6-01 ("with the radar open, a press outside
+// it flies your ship")
+//
+// The pre-existing coverage above asserts a press ON the overlay toggles, and it
+// passed while the defect shipped — so it never had a chance to catch this. What
+// follows pins the *other* press: while EXPANDED, a press OUTSIDE the overlay
+// must collapse it AND report the event consumed, so it never also reaches
+// gameplay. And the asymmetry that keeps the fix from eating flight input: while
+// COLLAPSED, a press that misses the corner square must still fall through.
+// ---------------------------------------------------------------------------
+
+/** A press point provably OUTSIDE both minimap rects for a viewport — the far
+ *  left edge, which neither the bottom-right corner square nor the centred
+ *  overlay ever reaches. Asserted rather than assumed, so a geometry change
+ *  cannot quietly turn "outside" into "inside" and make these tests vacuous. */
+function outsideBothRects(viewport: { width: number; height: number }, isTouch: boolean): { x: number; y: number } {
+  const p = { x: 4, y: Math.round(viewport.height / 2) };
+  expect(pointInRect(p.x, p.y, collapsedRect(viewport, isTouch)), 'fixture point misses the corner square').toBe(
+    false,
+  );
+  expect(pointInRect(p.x, p.y, expandedRect(viewport, isTouch)), 'fixture point misses the overlay').toBe(false);
+  return p;
+}
+
+/**
+ * The dispatch seam `main.ts` presses through, modelled: `main.ts:1503` calls
+ * `Hud.minimapTap` → {@link Minimap.tap} and, **only when it returns `false`**,
+ * lets the press fall through to the code below it — the Tap-Commander pilot that
+ * flies the ship, and (on touch) the dynamic stick bound to the same canvas, which
+ * the `stopImmediatePropagation` on a consumed press is what stops.
+ *
+ * So the bug under test is not "did the model collapse" — it is "did gameplay see
+ * this press". Routing through the same boolean is how these tests ask that
+ * question rather than inspecting the minimap alone.
+ */
+class PressRouter {
+  /** Move orders the Tap-Commander pilot would have taken from these presses. */
+  shipOrders = 0;
+  /** Virtual sticks that would have engaged under these presses. */
+  sticksEngaged = 0;
+
+  constructor(
+    private readonly minimap: Minimap,
+    private readonly viewport: { width: number; height: number },
+    private readonly isTouch: boolean,
+  ) {}
+
+  /** Route one press; returns whether the minimap consumed it. */
+  press(x: number, y: number): boolean {
+    if (this.minimap.tap(x, y, this.viewport, this.isTouch)) return true; // consumed → return, as main.ts does
+    this.shipOrders++; // the pilot takes the order (main.ts, the Tap Commander block)
+    if (this.isTouch) this.sticksEngaged++; // …and the stick under the finger engages
+    return false;
+  }
+
+  /** Nothing downstream of the minimap saw a press. */
+  get gameplayUntouched(): boolean {
+    return this.shipOrders === 0 && this.sticksEngaged === 0;
+  }
+}
+
+describe('Minimap — the EXPANDED overlay is modal (u6-01)', () => {
+  // Pointer (PC) and touch run the SAME assertions, because ONE code path serves
+  // both (docs/input-parity.md): a divergence here would be a parity hole, not a
+  // device quirk.
+  const PROFILES = [
+    { name: 'pointer (desktop)', viewport: DESKTOP, isTouch: false },
+    { name: 'touch (landscape phone)', viewport: PHONE_WIDE, isTouch: true },
+    { name: 'touch (narrow phone)', viewport: PHONE_NARROW, isTouch: true },
+  ] as const;
+
+  for (const { name, viewport, isTouch } of PROFILES) {
+    describe(name, () => {
+      it('expanded + a press OUTSIDE collapses, and reports the event CONSUMED', () => {
+        const m = new Minimap();
+        m.expand();
+        const out = outsideBothRects(viewport, isTouch);
+
+        expect(m.tap(out.x, out.y, viewport, isTouch), 'the press is consumed').toBe(true);
+        expect(m.state, 'the overlay dismissed').toBe('collapsed');
+      });
+
+      it('expanded + a press OUTSIDE never reaches gameplay — no ship order, no stick', () => {
+        // The actual bug: `false` meant "not consumed", so the same press flew the
+        // ship / engaged a stick under the open overlay. Asserted through the seam
+        // main.ts presses (main.ts:1503), not by reading the minimap's own state.
+        const m = new Minimap();
+        m.expand();
+        const router = new PressRouter(m, viewport, isTouch);
+        const out = outsideBothRects(viewport, isTouch);
+
+        expect(router.press(out.x, out.y), 'the minimap claimed the press').toBe(true);
+        expect(router.shipOrders, 'the ship took no order').toBe(0);
+        expect(router.sticksEngaged, 'no virtual stick engaged').toBe(0);
+        expect(router.gameplayUntouched).toBe(true);
+        expect(m.state).toBe('collapsed');
+      });
+
+      it('COLLAPSED + a press outside still FALLS THROUGH — the fix never eats flight input', () => {
+        // The asymmetry, guarded. A glance widget that consumed every press while
+        // the player is flying would be a worse bug than the one being fixed.
+        const m = new Minimap();
+        const router = new PressRouter(m, viewport, isTouch);
+        const out = outsideBothRects(viewport, isTouch);
+
+        expect(router.press(out.x, out.y), 'the press is NOT consumed').toBe(false);
+        expect(m.state, 'and nothing toggled').toBe('collapsed');
+        expect(router.shipOrders, 'gameplay got the press, as it must').toBe(1);
+      });
+
+      it('a press ON the overlay still collapses and consumes (unchanged)', () => {
+        const m = new Minimap();
+        m.expand();
+        const router = new PressRouter(m, viewport, isTouch);
+        const on = centre(expandedRect(viewport, isTouch));
+
+        expect(router.press(on.x, on.y)).toBe(true);
+        expect(m.state).toBe('collapsed');
+        expect(router.gameplayUntouched).toBe(true);
+      });
+
+      it('a press on the corner square still expands and consumes (unchanged)', () => {
+        const m = new Minimap();
+        const router = new PressRouter(m, viewport, isTouch);
+        const corner = centre(collapsedRect(viewport, isTouch));
+
+        expect(router.press(corner.x, corner.y)).toBe(true);
+        expect(m.state).toBe('expanded');
+        expect(router.gameplayUntouched).toBe(true);
+      });
+
+      it('the full round trip: open on the corner, dismiss with a press anywhere', () => {
+        const m = new Minimap();
+        const router = new PressRouter(m, viewport, isTouch);
+        const corner = centre(collapsedRect(viewport, isTouch));
+        const out = outsideBothRects(viewport, isTouch);
+
+        router.press(corner.x, corner.y);
+        expect(m.state).toBe('expanded');
+        router.press(out.x, out.y);
+        expect(m.state).toBe('collapsed');
+        // …and the map is a glance widget again: the very next press off it flies.
+        router.press(out.x, out.y);
+        expect(router.shipOrders, 'only the post-dismissal press reached gameplay').toBe(1);
+      });
+    });
+  }
+
+  it('the M shortcut is unaffected — it toggles from either state', () => {
+    // `M` drives `toggle()` (main.ts's keydown handler), which the modal press
+    // path does not touch: it still opens a collapsed map and closes an open one.
+    const m = new Minimap();
+    m.toggle();
+    expect(m.state).toBe('expanded');
+    m.toggle();
+    expect(m.state).toBe('collapsed');
+
+    // …including closing an overlay that a press opened, and opening one a press
+    // dismissed — the two paths share one state and cannot disagree.
+    const corner = centre(collapsedRect(DESKTOP, false));
+    m.tap(corner.x, corner.y, DESKTOP, false);
+    expect(m.state).toBe('expanded');
+    m.toggle();
+    expect(m.state).toBe('collapsed');
+  });
+
+  it('parity: pointer and touch agree on every answer, press for press', () => {
+    // One code path serves both, so the two must produce identical verdicts for
+    // the same sequence — the contract docs/input-parity.md signs for this element.
+    const sequence = (viewport: { width: number; height: number }, isTouch: boolean): boolean[] => {
+      const m = new Minimap();
+      const corner = centre(collapsedRect(viewport, isTouch));
+      const out = outsideBothRects(viewport, isTouch);
+      const on = centre(expandedRect(viewport, isTouch));
+      return [
+        m.tap(out.x, out.y, viewport, isTouch), // collapsed + outside → falls through
+        m.tap(corner.x, corner.y, viewport, isTouch), // on the corner → opens
+        m.tap(out.x, out.y, viewport, isTouch), // expanded + outside → dismisses
+        m.tap(corner.x, corner.y, viewport, isTouch), // on the corner → opens
+        m.tap(on.x, on.y, viewport, isTouch), // expanded + on it → dismisses
+        m.tap(out.x, out.y, viewport, isTouch), // collapsed again → falls through
+      ];
+    };
+    const pc = sequence(DESKTOP, false);
+    const touch = sequence(PHONE_WIDE, true);
+    expect(pc).toEqual([false, true, true, true, true, false]);
+    expect(touch).toEqual(pc);
   });
 });

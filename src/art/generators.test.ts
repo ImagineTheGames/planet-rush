@@ -35,8 +35,11 @@ import {
   stationVariantFor,
   repairAuraSprite,
   ATMOSPHERE_HALO_RADIUS,
+  BUILD_RING_RADIUS,
   STATION_VARIANT_COUNT,
 } from './stations';
+import { RING_JND, scanRings } from './ring-scan';
+import { PALETTE } from './palette';
 import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { shipSprite } from './ships';
 import { satelliteSprite, satelliteWreckSprite, type SatelliteState } from './satellite';
@@ -58,9 +61,26 @@ const REPEATABLE: readonly (() => SpriteDef)[] = [
   () => stationWreckSprite(1),
   () => debrisFieldSprite(2),
   () => atmosphereHaloSprite(0),
+  () => atmosphereHaloSprite(0, true),
   () => satelliteSprite({ playerId: 2, state: 'sweeping' }),
   () => satelliteWreckSprite(3),
 ];
+
+/** How far the sprite's painted mass actually reaches, in unit space — over
+ *  discs and polygons alike, so a range ring drawn as a band is measured the same
+ *  as one drawn as a disc. */
+function outerRadius(def: SpriteDef): number {
+  let r = 0;
+  for (const s of def.shapes) {
+    if (s.path.kind === 'circle') {
+      r = Math.max(r, Math.hypot(s.path.cx, s.path.cy) + s.path.r);
+    } else {
+      const p = s.path.points;
+      for (let i = 0; i < p.length; i += 2) r = Math.max(r, Math.hypot(p[i]!, p[i + 1]!));
+    }
+  }
+  return r;
+}
 
 describe('determinism (GDD §4.1)', () => {
   it('gives deep-equal output for identical inputs, every generator', () => {
@@ -212,26 +232,102 @@ describe('stations — four variants, arrangement only (style-guide §5)', () =>
     // the halo is the sim constant, expressed as art.
     expect(ATMOSPHERE_HALO_RADIUS).toBe(DEPOSIT_RANGE / STATION.radius);
 
-    const def = atmosphereHaloSprite(0);
-    // The outermost disc *is* the atmosphere edge; scaled by the station radius
-    // (how the renderer draws it) it lands on DEPOSIT_RANGE world units exactly.
-    const outerUnit = Math.max(
-      ...def.shapes.map((s) => (s.path.kind === 'circle' ? s.path.r : 0)),
-    );
-    expect(outerUnit).toBe(ATMOSPHERE_HALO_RADIUS);
-    expect(outerUnit * STATION.radius).toBeCloseTo(DEPOSIT_RANGE, 4);
-    // The sprite's own square is sized to the halo, not clipped to the station.
-    expect(def.extent).toBe(ATMOSPHERE_HALO_RADIUS);
+    for (const def of [atmosphereHaloSprite(0), atmosphereHaloSprite(0, true)]) {
+      // The outermost shape *is* the atmosphere edge; scaled by the station radius
+      // (how the renderer draws it) it lands on DEPOSIT_RANGE world units exactly.
+      const outerUnit = outerRadius(def);
+      expect(outerUnit, def.name).toBeCloseTo(ATMOSPHERE_HALO_RADIUS, 3);
+      expect(outerUnit * STATION.radius, def.name).toBeCloseTo(DEPOSIT_RANGE, 2);
+      // The sprite's own square is sized to the halo, not clipped to the station.
+      expect(def.extent, def.name).toBe(ATMOSPHERE_HALO_RADIUS);
+    }
   });
 
-  it('paints the halo only in the player colour — air is identity trim, never a material (§3)', () => {
+  it('draws the build ring at exactly STATION.dockRange (a4-01)', () => {
+    // The wheel's own radius, expressed as art — never a second literal, so
+    // retuning docking moves the dashes the player flies across in lockstep.
+    expect(BUILD_RING_RADIUS).toBe(STATION.dockRange / STATION.radius);
+    expect(BUILD_RING_RADIUS * STATION.radius).toBe(STATION.dockRange);
+    // And it is inside the atmosphere, because the rule is (DEPOSIT_RANGE >
+    // dockRange): you are in your air well before you are in reach.
+    expect(BUILD_RING_RADIUS).toBeLessThan(ATMOSPHERE_HALO_RADIUS);
+  });
+
+  it('shows EXACTLY TWO rings around an own station, at the two radii that mean something (a4-01)', () => {
+    // The field report, 2026-08-05: "theres a bunch of rings around the station
+    // (planet) we only need 2". They were counting the steps of a five-stop
+    // gradient. So this counts what a player counts — edges in the composited
+    // alpha profile big enough to see (./ring-scan) — rather than how many
+    // ring-shaped primitives happen to be in the sprite. A future gradient with
+    // one step too coarse fails here, which is the whole point.
+    for (const reduced of [false, true]) {
+      const def = atmosphereHaloSprite(0, reduced);
+      const scan = scanRings(def);
+      const where = `${def.name}: rings at ${scan.rings.map((r) => r.outer.toFixed(2)).join(', ')}`;
+
+      expect(scan.rings.length, where).toBe(2);
+      // Two rings and nothing else: every visible step belongs to one of them.
+      expect(scan.edges.length, where).toBe(4);
+
+      const [build, atmosphere] = scan.rings;
+      expect(build!.outer, `${where} — build ring`).toBeCloseTo(BUILD_RING_RADIUS, 1);
+      expect(atmosphere!.outer, `${where} — atmosphere edge`).toBeCloseTo(ATMOSPHERE_HALO_RADIUS, 1);
+      // Both rings are known to a sample step, so pin that the scan is fine
+      // enough for "close to" to mean "on it".
+      expect(Math.abs(build!.outer - BUILD_RING_RADIUS), where).toBeLessThanOrEqual(scan.step);
+      expect(Math.abs(atmosphere!.outer - ATMOSPHERE_HALO_RADIUS), where).toBeLessThanOrEqual(scan.step);
+    }
+  });
+
+  it('keeps the atmosphere gradient smooth — no interior step reads as its own ring (a4-01)', () => {
+    const scan = scanRings(atmosphereHaloSprite(0));
+    // Everything strictly inside the build ring is haze: the gradient, and the
+    // part of it hidden behind the station body. Not one step in it may be
+    // findable, however many discs the gradient is built from.
+    let worst = 0;
+    for (let i = 0; i + 1 < scan.alpha.length; i++) {
+      if (scan.radii[i + 1]! >= BUILD_RING_RADIUS - 0.1) break;
+      worst = Math.max(worst, Math.abs(scan.alpha[i + 1]! - scan.alpha[i]!));
+    }
+    expect(worst, `worst interior alpha step ${worst.toFixed(4)}`).toBeLessThan(RING_JND);
+    // The shipped five-stop halo stepped by ~0.067 here — sixteen levels against
+    // Vacuum. Assert real headroom, not a hairline pass.
+    expect(worst).toBeLessThan(RING_JND / 2);
+  });
+
+  it('gives a rival station neither ring — both are affordances you do not have there', () => {
+    // Enforced structurally rather than by the renderer's good intentions: the
+    // halo is the ONLY sprite carrying either radius, and the renderer draws it
+    // for the viewer's own station alone (`drawAtmosphere`). Nothing else in the
+    // catalogue reaches past a station's own beacon.
+    const reach = ALL_SPRITES.filter((d) => d.name.startsWith('station/') && !d.name.includes('atmosphere'));
+    expect(reach.length).toBeGreaterThan(0);
+    for (const def of reach) {
+      expect(def.extent, `${def.name} reaches past a station's own furniture`).toBeLessThan(BUILD_RING_RADIUS);
+    }
+  });
+
+  it('paints the air in the player colour and the reach in plasma — two kinds of boundary (§1, §3)', () => {
     for (const slot of [0, 3, 7]) {
-      const def = atmosphereHaloSprite(slot);
-      expect(def.shapes.length).toBeGreaterThan(0);
-      expect(def.shapes.every((s) => s.role === 'identity')).toBe(true);
+      for (const reduced of [false, true]) {
+        const def = atmosphereHaloSprite(slot, reduced);
+        expect(def.shapes.length).toBeGreaterThan(0);
+        // Air is identity trim; the build ring is plasma energy — the same colour
+        // the BUILD button it lights wears. Nothing else is in there.
+        const roles = new Set(def.shapes.map((s) => s.role));
+        expect([...roles].sort(), def.name).toEqual(['energy', 'identity']);
+        for (const s of def.shapes) {
+          if (s.role !== 'energy') continue;
+          expect(s.fill?.color, def.name).toBe(PALETTE.plasma);
+        }
+      }
     }
     // Distinct owners ⇒ distinct halos (colour and cache key both move).
     expect(atmosphereHaloSprite(0)).not.toEqual(atmosphereHaloSprite(1));
+    // The build ring does NOT move with the owner: it is the same rule for
+    // everyone, so the two owners' halos differ only in their air.
+    const plasmaOf = (id: number) => JSON.stringify(atmosphereHaloSprite(id).shapes.filter((s) => s.role === 'energy'));
+    expect(plasmaOf(0)).toBe(plasmaOf(5));
   });
 
   it('fills red as core HP is LOST, quantised so the pool holds (p11 grammar)', () => {

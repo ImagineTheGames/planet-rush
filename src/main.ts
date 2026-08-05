@@ -95,7 +95,12 @@ import {
   resolveAnchor,
   rectContains,
 } from '@platform/layout-registry';
-import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
+import type {
+  AnchorSpec,
+  DebugFlags,
+  Rect,
+  Viewport as LayoutViewport,
+} from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, stampDefenseShowcase, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
@@ -203,6 +208,10 @@ import {
   cycleBotDifficulty,
   cycleSeatState,
   cycleSeatTeam,
+  // The lobby's own side ceiling and seat count — read by the debug `?sides=N`
+  // switch so the harness can never author a split the lobby itself could not.
+  MAX_TEAMS,
+  LOBBY_SLOTS,
   toggleMode,
   cycleAbundance,
   matchSizeOf,
@@ -781,15 +790,24 @@ async function boot(): Promise<void> {
   // Under ?debug=1 there is no lobby, so both fall back to the persisted-or-default
   // values.
   const debugSize = readMatchSize(platform);
+  // `?debug=1&sides=N` — the debug boot's TEAMS switch (u3). There is no lobby
+  // under ?debug=1, so a harness that needs a SIDED world (the teams goldens, and
+  // any future teams live-stage run) has no other way to ask for one; without it
+  // the frozen scene is always free-for-all and a side label can never appear in a
+  // screenshot. It only fills in the same `teams` table the lobby would have
+  // authored, so the world is built by the ordinary path — real allegiance, real
+  // spawn placement, not a poked label.
+  const debugTeams = readDebugSides(flags, debugSize ?? LOBBY_SLOTS);
   const chosen: LobbyChoice = lobby
     ? await lobby.untilRush()
     : {
         shipClass: readShipClass(platform),
         mapId: readMapId(platform),
         name: readPlayerName(platform),
-        mode: readMatchMode(platform),
+        mode: debugTeams ? 'teams' : readMatchMode(platform),
         abundance: readAbundance(platform),
         ...(debugSize !== undefined ? { size: debugSize } : {}),
+        ...(debugTeams ? { teams: debugTeams } : {}),
       };
   const chosenShipClass = chosen.shipClass;
   // The name shown over the local ship and station (field request v0.2.1) — the
@@ -1473,8 +1491,10 @@ async function boot(): Promise<void> {
     }
 
     // The minimap (field request v0.2.2): a click/tap on the corner square opens
-    // the centred overlay; a tap anywhere on the overlay collapses it again. The
-    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
+    // the centred overlay; while the overlay is OPEN it is modal — a press
+    // anywhere collapses it, on the map or off it, and is consumed here rather
+    // than falling through to the pilot/sticks below (developer report u6-01).
+    // The SAME gesture on PC and mobile — `pressPoint` is already in logical space,
     // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
     // both platforms use (docs/input-parity.md). Checked LAST among the interactive
     // surfaces — after the end/fullscreen overlays, the BUILD button and the open
@@ -1482,6 +1502,9 @@ async function boot(): Promise<void> {
     // a control drawn near or over it always wins the press, and the map only takes
     // one that lands on nothing else. When it does claim a press we consume the
     // event so the same press never also flies the ship or engages a stick under it.
+    // (COLLAPSED it claims only a press that lands on the corner square, so a press
+    // that misses the glance widget still flies the ship — the deliberate half of
+    // the asymmetry, since the player is flying.)
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
       audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
@@ -1572,6 +1595,13 @@ async function boot(): Promise<void> {
    *  rematch — so a rematch that changed the split relabels with it. */
   let playerTeams: TeamTable = [];
   let teamsMode = false;
+  /** The VIEWING player's own side — what makes a nameplate read `FRIENDLY A`
+   *  rather than `ENEMY B` (u3). Read off the local ship's own `team`, the exact
+   *  number `areEnemies` acts on, so the word over a hull and the friend/foe rule
+   *  are the same fact. `undefined` when this client has no ship in the world (a
+   *  spectator / replay), which the HUD renders as the neutral `TEAM <letter>`
+   *  rather than declaring every hull hostile. */
+  let viewerTeam: number | undefined;
 
   // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
   //     stations, ships, ore-field hints, the collapse ring — pooled and reused so
@@ -1647,10 +1677,12 @@ async function boot(): Promise<void> {
    * The world is the authority on allegiance in both form factors — offline it is
    * the loopback's own authoritative world, online it is the predicted world
    * `matchStart` built from the server's roster — so reading `ship.team` here means
-   * the `TEAM A` a player reads over a hull is the same number `areEnemies` uses to
-   * decide whether they can shoot it. Reading the lobby instead would let the label
-   * drift from the simulation, which is the exact class of bug this milestone is
-   * fixing.
+   * the `FRIENDLY A` / `ENEMY B` a player reads over a hull is the same number
+   * `areEnemies` uses to decide whether they can shoot it. Reading the lobby
+   * instead would let the label drift from the simulation, which is the exact
+   * class of bug this milestone is fixing. The VIEWER's own side — the half that
+   * decides `FRIENDLY` from `ENEMY` (u3) — is read from the same pass, off the
+   * same ships, for the same reason.
    *
    * Sides are worth *naming* only when there are fewer sides than players: FFA is
    * teams-of-one, where `ship.team === ship.id` for everyone and a label would just
@@ -1666,6 +1698,8 @@ async function boot(): Promise<void> {
     }
     playerTeams = sides;
     teamsMode = distinct.size > 0 && distinct.size < world.ships.length;
+    const local = world.ships.find(isLocalShip);
+    viewerTeam = local ? (local.team ?? local.id) : undefined;
   }
   rebuildNameTable();
 
@@ -2718,6 +2752,9 @@ async function boot(): Promise<void> {
     // exactly what `areEnemies` will act on.
     hudFrame.playerTeams = playerTeams;
     hudFrame.teamsMode = teamsMode;
+    // …and whose side is FRIENDLY (u3). Same source, same rebuild, so a rematch
+    // that moves this player to the other side re-words every plate with them.
+    hudFrame.viewerTeam = viewerTeam;
   }
 
   /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
@@ -4027,6 +4064,24 @@ async function boot(): Promise<void> {
       state(): ReturnType<typeof hud.debugMinimap> {
         return hud.debugMinimap();
       },
+      /** The LOGICAL (landscape) viewport the minimap lays out in — so a test can
+       *  pick a press point that is provably OUTSIDE the drawn rect (u6-01: the
+       *  press off the open overlay) instead of hardcoding a corner that a layout
+       *  change could quietly move onto the map. */
+      viewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** The PHYSICAL (CSS px) point a REAL press must land on to arrive at a
+       *  LOGICAL point — the landscape lock's rotation, applied for the test.
+       *  Identity on desktop and on any already-landscape viewport; on a PORTRAIT
+       *  handset the root is rotated 90°, so a test that wants to press "off the
+       *  map" has to press the rotated point or it presses somewhere else entirely.
+       *  Read-back only: the press itself is still a real synthesized pointer/touch
+       *  on the canvas, crossing the same `toLogical` every real press crosses
+       *  (the same discipline as `__repairStage`'s wedge point). */
+      physicalPoint(lx: number, ly: number): Vec2 {
+        return logicalToPhysical(lx, ly, transform);
+      },
       /**
        * Stage a radar satellite on the local station (feature f1) and park a
        * distant enemy in the band only that satellite's LARGE sensor can reach —
@@ -4914,6 +4969,27 @@ function readPlayerName(platform: ReturnType<typeof createBrowserPlatform>): str
  *  the default (`octagon`), so a bad key can never reach the sim. */
 function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
   return normalizeMapId(platform.storage.get(MAP_STORAGE_KEY));
+}
+
+/**
+ * `?sides=N` (debug only) — the side table a `?debug=1` boot builds its world
+ * with, or `null` for the ordinary free-for-all.
+ *
+ * The debug boot skips the lobby by contract, which also skipped the one control
+ * that authors sides; this is the missing half, and nothing more than it. `N` is
+ * folded into 2..{@link MAX_TEAMS} and the split is the lobby's own default —
+ * alternating by slot (`ui/lobby` `defaultTeamForSlot` generalised to N), so
+ * `?sides=2` is the 4v4 a host gets by tapping TEAMS and nothing else. Ignored
+ * without `?debug=1`, exactly like `?freeze=1`.
+ */
+function readDebugSides(flags: DebugFlags, slots: number): number[] | null {
+  if (!flags.debug) return null;
+  const search = typeof window !== 'undefined' ? window.location.search : '';
+  const raw = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('sides');
+  const sides = Math.floor(Number(raw));
+  if (!Number.isFinite(sides) || sides < 2) return null;
+  const n = Math.min(sides, MAX_TEAMS);
+  return Array.from({ length: Math.max(2, Math.floor(slots)) }, (_, i) => i % n);
 }
 
 /** The match MODE the lobby opens on (variable-slots Milestone E): the last one
@@ -6380,6 +6456,36 @@ interface LobbySeam {
   content: Rect;
   /** One roster row's height — a thumb-size assertion target. */
   seatHeight: number;
+  /** The eight roster rows' logical rects — the anchor each per-row control has to
+   *  sit inside (u5). */
+  seatRows: readonly Rect[];
+  /**
+   * Each roster row's LEADING STATE control, as it was actually DRAWN (u5) — the
+   * word on it, whether it reads live or dead, its logical rect, and the physical
+   * point a real press must land on (through the landscape-lock rotation, like
+   * {@link rushControl}).
+   *
+   * Read-back only. The mobile suite presses the physical point for real and reads
+   * the label back from here — "test the door as a door": a seam is for observing
+   * what happened, never for opening the thing under test.
+   */
+  seatStates: readonly {
+    index: number;
+    /** `OPEN` / `BOT` / `CLOSED` / `TAKEN` — the current state, in words. */
+    label: string;
+    /** Whether this client may cycle this seat right now: the host, before RUSH!,
+     *  and never a human seat. What decides whether the control draws pressable. */
+    live: boolean;
+    logical: Rect;
+    physicalCenter: { x: number; y: number };
+    /** The same rect in PHYSICAL (un-rotated, CSS-px) space — both corners mapped
+     *  through the landscape-lock transform and re-normalised, so it is a real box
+     *  in either orientation. The mobile suite turns it into a screenshot region
+     *  and counts the pixels inside it: this control's whole defect was that it
+     *  was never DRAWN, and a seam that only reported rects would have said it was
+     *  fine on the day it was invisible (`playwright.config.ts`). */
+    physicalBounds: Rect;
+  }[];
   /** RUSH!'s height — likewise. */
   rushHeight: number;
   /** The RUSH! control's logical rect + the physical point a tap must land on to
@@ -6534,6 +6640,8 @@ function openLobby(
     logicalViewport: { width: size0.w, height: size0.h },
     content: { x: 0, y: 0, width: 0, height: 0 },
     seatHeight: 0,
+    seatRows: [],
+    seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
@@ -6585,6 +6693,31 @@ function openLobby(
     seam.logicalViewport = { width: w, height: h };
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
+    seam.seatRows = layout.seats.map((r) => ({ ...r }));
+    // The per-row STATE controls, exactly as drawn (u5): the word, the live/dead
+    // look, the rect and the physical press point. Built from the SAME layout the
+    // view drew from and the SAME model row it drew the word from, so the seam
+    // cannot report a control the screen does not have.
+    seam.seatStates = layout.seatStates.map((r, i) => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        index: i,
+        label: model.seats[i]?.stateLabel ?? '',
+        live: model.seats[i]?.canCycleState ?? false,
+        logical: { ...r },
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+        // Both corners through the rotation, then re-normalised — under the
+        // landscape lock the two corners swap sides, so a raw (x, y, w, h) built
+        // from one of them would be a backwards box on a phone.
+        physicalBounds: {
+          x: Math.min(a.x, b.x),
+          y: Math.min(a.y, b.y),
+          width: Math.abs(b.x - a.x),
+          height: Math.abs(b.y - a.y),
+        },
+      };
+    });
     seam.rushHeight = layout.rushButton.height;
     // The RUSH! rect in logical (landscape) space and the physical tap point it
     // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
@@ -6799,8 +6932,12 @@ function openLobby(
         selectMapAt(hit.index);
         break;
       case 'seat':
-        // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
-        // Milestone E) — the host shrinks or shapes the match here. Persist the
+      case 'seatState':
+        // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E) — the
+        // host shrinks or shapes the match here. Reached from the row BODY, where
+        // it has always lived, and from the row's LEADING STATE control, the drawn
+        // and labelled button u5 added because nothing on this screen said a slot
+        // could be closed at all. One case, so the two can never diverge. Persist the
         // resulting size so a returning host reopens on the same count, and tell the
         // room: closing a seat changes which bots it will cast, and the cast list
         // rides the host's own `lobbyChoice`.

@@ -36,6 +36,7 @@ import type { OnlineSession } from '../../src/net/session';
 import { startLocalFleet } from './local-fleet';
 import type { LocalFleet } from './local-fleet';
 import { nodeWebSocket, until } from './node-websocket';
+import { netBudget } from './budgets';
 
 let fleet: LocalFleet | null = null;
 const open: OnlineSession[] = [];
@@ -126,7 +127,10 @@ describe('the LIVE-shape dial: shared connectUrl, two Machines, the pin holding'
     // Two humans, one room, reached through the shared endpoint from either hop.
     const room = fleet.machineOf(host)?.matches.room(connection.room);
     await until('both seats filled', () => (room?.humanCount ?? 0) === 2);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a two-Machine fleet and an allocator → allocate → dial through the shared edge onto the WRONG Machine and then the right one → assert the replay and both seats',
+    measuredSeconds: 0.7,
+  }));
 
   it('holds across repeated allocations — six rounds, alternating first hops', async () => {
     // The permanent form of the Director's 6/6 wire probe, run against the local
@@ -156,7 +160,10 @@ describe('the LIVE-shape dial: shared connectUrl, two Machines, the pin holding'
     expect(outcomes.every((o) => o.seat >= 0)).toBe(true);
     // And the wrong-machine path was genuinely taken, not merely available.
     expect(outcomes.filter((o) => o.landedOn !== o.host).length).toBe(3);
-  }, 60_000);
+  }, netBudget({
+    work: 'boot a two-Machine fleet → six independent allocate→dial rounds, alternating which Machine the edge lands on',
+    measuredSeconds: 0.4,
+  }));
 
   it('REPRODUCES the production failure with the pin disarmed — bad-ticket on the wrong hop', async () => {
     // The proof that this harness can see the bug at all. With `MATCH_ROUTER`
@@ -181,7 +188,10 @@ describe('the LIVE-shape dial: shared connectUrl, two Machines, the pin holding'
     const second = connectionOf(await joinRoom(client, connection.room));
     const { seat } = await dial(second, client);
     expect(seat).toBeGreaterThanOrEqual(0);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a two-Machine fleet with the pin disarmed → assert the wrong hop is refused bad-ticket and the right hop still works',
+    measuredSeconds: 0.15,
+  }));
 
   it('refuses honestly when a ticket names a machine the fleet cannot reach', async () => {
     // The pin must not paper over a genuinely bad ticket: an unverifiable one is
@@ -193,5 +203,8 @@ describe('the LIVE-shape dial: shared connectUrl, two Machines, the pin holding'
     const forged: ResolvedConnection = { ...connection, ticket: `${connection.ticket}tamper` };
 
     await expect(dial(forged, client)).rejects.toThrow(/bad-ticket/);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a two-Machine fleet → dial with a tampered ticket → assert an honest bad-ticket refusal',
+    measuredSeconds: 0.1,
+  }));
 });

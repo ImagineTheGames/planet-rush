@@ -32,6 +32,7 @@ import type { World } from '../../src/sim';
 import { projIsShipShot } from '../../src/net/snapshot';
 import { runLatencyMatch } from './latency-harness';
 import type { HarnessClient, WireProfile } from './latency-harness';
+import { netBudget } from './budgets';
 
 /** The developer's condition, named in the brief: 150 ms. Jitter and a little loss,
  *  because a clean wire is not where duplicates come from. */
@@ -129,7 +130,10 @@ describe('one volley at 150 ms', () => {
     // matters is what authority *discarded*, and it is zero. A re-used tick number
     // is no longer a lost message, which is why it is only reported.
     expect(result.droppedInputs, 'no input message was thrown away by authority').toBe(0);
-  });
+  }, netBudget({
+    work: 'one scripted 140-frame match at phone latency → count the shots each screen drew for one trigger pull',
+    measuredSeconds: 0.9,
+  }));
 
   it('holds the line while the trigger is HELD — one shot in flight per interval', () => {
     // The steady state, which is where a duplicate is easiest to hide: a ship
@@ -163,7 +167,10 @@ describe('one volley at 150 ms', () => {
     expect(peak[1], 'the rival draws the same stream once').toBeLessThanOrEqual(inFlight);
     expect(peak[0], 'and the stream was actually there').toBeGreaterThan(0);
     expect(peak[1]).toBeGreaterThan(0);
-  });
+  }, netBudget({
+    work: 'one scripted 180-frame match at phone latency → count the shots alive on each screen through a held trigger',
+    measuredSeconds: 0.5,
+  }));
 
   it('the firer draws its OWN shot, at zero latency — not authority’s copy', () => {
     // Why suppression rather than "draw whichever arrives": the wire's copy is a
@@ -196,7 +203,10 @@ describe('one volley at 150 ms', () => {
 
     expect(localSlots, 'the firer’s shot is the predicted one').toBeGreaterThan(0);
     expect(wireSlots, 'and authority’s copy of it is never drawn beside it').toBe(0);
-  });
+  }, netBudget({
+    work: 'one scripted 140-frame match at phone latency → assert the firer draws the predicted shot and never authority\'s copy',
+    measuredSeconds: 0.4,
+  }));
 });
 
 describe('the capture — what the two screens actually showed', () => {
@@ -246,7 +256,10 @@ describe('the capture — what the two screens actually showed', () => {
     // The readout is only worth reading if it is also the gate.
     expect(rows.some((r) => r.includes('firer 1'))).toBe(true);
     expect(rows.every((r) => !r.includes('firer 2') && !r.includes('rival 2'))).toBe(true);
-  });
+  }, netBudget({
+    work: 'one scripted 130-frame match at phone latency → print the two screens frame by frame as the PR\'s evidence',
+    measuredSeconds: 0.3,
+  }));
 });
 
 /** The first pool slot reserved for locally-predicted own shots. Restated from
@@ -259,4 +272,7 @@ const LOCAL_BASE = 64;
 it('the fire interval is longer than a frame — so a 3-frame hold is one shot', () => {
   expect(SHIP_WEAPON.fireInterval).toBeGreaterThan(FIRE_FRAMES * TICK_DT);
   expect(projIsShipShot(0b1000)).toBe(true);
-});
+}, netBudget({
+  work: 'two constants — no match',
+  measuredSeconds: 0.05,
+}));

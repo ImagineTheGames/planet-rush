@@ -40,6 +40,11 @@ import {
   RUSH_COUNTDOWN_SECONDS,
   RUSH_LABEL,
   SEAT_STATE_CYCLE,
+  SEAT_STATE_LABELS,
+  SIDE_COLORS,
+  SIDE_WORDS,
+  STAT_PIPS,
+  STAT_PIP_COLORS,
   TEAM_LABELS,
   activeTeams,
   applyLobbySlots,
@@ -71,17 +76,28 @@ import {
   selectMap,
   selectShipClass,
   setPlayerName,
+  shipStatLines,
+  sideRelation,
   startLobbyMatch,
   teamLabel,
+  teamName,
   tickLobby,
   toggleMode,
+  viewerTeamOf,
   typeRoomCode,
   DEFAULT_PLAYER_NAME,
   PLAYER_NAME_MAX_CHARS,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import { nameplateModel, resolveTeamLabel } from './nameplates';
+// The art direction itself, so the two side hues are pinned to the frozen palette
+// and its declared ramp rather than to a hex typed twice (the same cross-check
+// `./chrome.test` runs on the panel chrome).
+import { PALETTE as ART_PALETTE, DERIVED, tint } from '../art/palette';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
-import { DEFAULT_ABUNDANCE } from '../sim/constants';
+// The sim's own class table — the source the hull tiles' figures must match
+// exactly (u4: never a hand-copied table).
+import { DEFAULT_ABUNDANCE, SHIP_STATS } from '../sim/constants';
 import {
   MAX_MATCH_SIZE,
   MIN_MATCH_SIZE,
@@ -91,6 +107,27 @@ import {
 } from '../sim/match-config';
 
 const ROOM = 'K7QM';
+
+/**
+ * WCAG relative-contrast of a UI colour against the Vacuum backdrop `#0D1015` —
+ * the one thing style-guide §1's "every entity must read against Vacuum on its
+ * own" can actually be measured as. Used to keep the side hues legible at 11–12px
+ * on a phone, where a dim tone that looked fine in a desktop mock disappears.
+ */
+function contrastOnVacuum(color: number): number {
+  const lum = (c: number): number => {
+    const ch = (v: number): number => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((c >> 16) & 0xff) + 0.7152 * ch((c >> 8) & 0xff) + 0.0722 * ch(c & 0xff)
+    );
+  };
+  const a = lum(color) + 0.05;
+  const b = lum(ART_PALETTE.vacuum) + 0.05;
+  return a > b ? a / b : b / a;
+}
 
 function lobby(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): LobbyState {
   return createLobby({ room: ROOM, you: 0, ...overrides });
@@ -224,14 +261,30 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
     expect(new Set(Object.values(ShipClass))).toEqual(new Set(CLASS_ORDER));
   });
 
-  it('gives each hull a name, a hull and a role blurb — and no number', () => {
-    // GDD §2.2/§2.5: ship stats appear in the upgrade panel and nowhere else.
-    // The tile carries words only, which is why the type has no numeric field.
+  it('gives each hull a name, a hull, a role blurb — AND its stats (u4)', () => {
+    // This assertion is the INVERSION of the one that stood here until
+    // 2026-08-05, which required `${name} ${hull} ${blurb}` to contain no digit
+    // at all — the enforcement of "ship stats appear only in the upgrade panel".
+    // The developer ratified the opposite ("both pips and numbers") and GDD §2.5
+    // / §2.11 were amended, so the gate is rewritten to describe the design that
+    // exists rather than left skipped as furniture.
     for (const option of CLASS_OPTIONS) {
       expect(option.name.length).toBeGreaterThan(0);
       expect(option.hull.length).toBeGreaterThan(0);
       expect(option.blurb.length).toBeGreaterThan(0);
+      // The prose is still prose — a stat belongs in the stat block, not smuggled
+      // into a sentence where nothing lines it up against the other three hulls.
       expect(`${option.name} ${option.hull} ${option.blurb}`).not.toMatch(/\d/);
+      // …and the stats are there, in GDD §2.11's table order, every one of them
+      // carrying BOTH channels: a figure and a pip count.
+      expect(option.stats.map((s) => s.key)).toEqual(STAT_KEYS);
+      for (const stat of option.stats) {
+        expect(stat.label.length, `${option.name} ${stat.key} label`).toBeGreaterThan(0);
+        expect(stat.text, `${option.name} ${stat.key} figure`).toMatch(/\d/);
+        expect(stat.pips).toBeGreaterThanOrEqual(1);
+        expect(stat.pips).toBeLessThanOrEqual(STAT_PIPS);
+        expect(stat.pipMax).toBe(STAT_PIPS);
+      }
     }
     expect(CLASS_OPTIONS.map((o) => o.hull)).toEqual(['Quadfin', 'Anvil', 'Pincer', 'Hammerhead']);
   });
@@ -268,6 +321,152 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
     const picked = selectShipClass(lobby(), ShipClass.Hauler);
     const echoed = applyLobbySlots(picked, wireSlots(['human', 'open', 'open', 'open', 'open', 'open', 'open', 'open']));
     expect(echoed.seats[0]?.shipClass).toBe(ShipClass.Hauler);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2a. Ship stats on ship-select — pips AND numbers (u4, ratified 2026-08-05)
+// ---------------------------------------------------------------------------
+//
+// The developer, asked whether ship stats could appear on ship-select having been
+// shown coarse pips: **"both pips and numbers."** GDD §2.5 and §2.11 carry the
+// matching *(amended 2026-08-05)* marker. These are the two guarantees that make
+// the reversal safe rather than merely permitted:
+//
+//   1. the figures come from the SIM's own class table, so the screen cannot
+//      advertise a game the simulation is not running; and
+//   2. the pips and the figure are two renderings of ONE value, so a tile cannot
+//      show four pips beside a number that means three.
+//
+// The build wheel is deliberately untouched by all of this: a segment's numeric
+// keys are still exactly `['angle', 'cost']` and UPGRADE SHIP still carries an
+// arrow rather than a number — pinned in `./build-wheel.test.ts`, which this
+// brief did not go near.
+
+/** GDD §2.11's table columns, in order — the stats a tile shows. */
+const STAT_KEYS = ['speed', 'accel', 'turn', 'hull', 'power', 'cargo'] as const;
+
+/** The `SHIP_STATS` field each key is read from — the mapping this screen claims
+ *  to make, restated independently here so the test would catch it silently
+ *  reading `accelMul` under the SPD label. */
+const STAT_SOURCE: Readonly<Record<(typeof STAT_KEYS)[number], keyof (typeof SHIP_STATS)[ShipClass.Vanguard]>> = {
+  speed: 'speedMul',
+  accel: 'accelMul',
+  turn: 'turnMul',
+  hull: 'hull',
+  power: 'power',
+  cargo: 'cargo',
+};
+
+/** The figure as a NUMBER again — `130%` → 1.3, `35` → 35. Reading the printed
+ *  string back is the only way to assert the *player's* number is the sim's; an
+ *  assertion against `stat.value` alone would pass on a broken formatter. */
+function parseFigure(text: string): number {
+  const n = Number.parseFloat(text);
+  return text.trim().endsWith('%') ? n / 100 : n;
+}
+
+describe('ship stats on ship-select (u4 — "both pips and numbers")', () => {
+  it('reads every figure off the SIM class table, never a hand-copied one', () => {
+    for (const option of CLASS_OPTIONS) {
+      const source = SHIP_STATS[option.shipClass];
+      for (const stat of option.stats) {
+        expect(stat.value, `${option.name} ${stat.key}`).toBe(source[STAT_SOURCE[stat.key]]);
+      }
+    }
+    // …and the accessor is the same one the tiles were built from, so a caller
+    // that asks for a class's stats gets exactly what its tile shows.
+    for (const cls of CLASS_ORDER) {
+      const tile = CLASS_OPTIONS.find((o) => o.shipClass === cls)!;
+      expect(shipStatLines(cls)).toEqual(tile.stats);
+    }
+  });
+
+  it('prints the number the sim honours — the figure IS the value', () => {
+    for (const option of CLASS_OPTIONS) {
+      for (const stat of option.stats) {
+        expect(parseFigure(stat.text), `${option.name} ${stat.key} = ${stat.text}`).toBeCloseTo(
+          stat.value,
+          6,
+        );
+      }
+    }
+    // Spot-checked against GDD §2.11's own table, so a silent unit change (a
+    // multiplier printed raw as `1.3`) fails here rather than on a phone.
+    const interceptor = CLASS_OPTIONS.find((o) => o.shipClass === ShipClass.Interceptor)!;
+    expect(interceptor.stats.map((s) => s.text)).toEqual(['130%', '120%', '140%', '35', '8', '2']);
+    const hauler = CLASS_OPTIONS.find((o) => o.shipClass === ShipClass.Hauler)!;
+    expect(hauler.stats.map((s) => s.text)).toEqual(['85%', '80%', '85%', '70', '9', '3']);
+  });
+
+  it('never shows pips that disagree with the number beside them', () => {
+    // The load-bearing assertion of this brief. Both channels hang off one
+    // `value`, so across the four hulls the pip order can never contradict the
+    // figure order: a hull that shows MORE pips than another must also show a
+    // BIGGER number for that stat, on every stat, for every pair of hulls.
+    for (const key of STAT_KEYS) {
+      const rows = CLASS_OPTIONS.map((o) => ({
+        name: o.name,
+        stat: o.stats.find((s) => s.key === key)!,
+      }));
+      for (const a of rows) {
+        for (const b of rows) {
+          if (a.stat.pips === b.stat.pips) continue;
+          const claim = `${key}: ${a.name} ${a.stat.text}/${a.stat.pips}pip vs ${b.name} ${b.stat.text}/${b.stat.pips}pip`;
+          expect(a.stat.pips > b.stat.pips, claim).toBe(
+            parseFigure(a.stat.text) > parseFigure(b.stat.text),
+          );
+        }
+      }
+    }
+  });
+
+  it('spends the whole bar on the four hulls, so the pips actually compare', () => {
+    // A pip bar that reads 4/5 on every hull compares nothing. Each stat's scale
+    // is the spread across the roster, so the roster's worst hull reads one pip
+    // and its best reads five — and the FIGURE beside it is what keeps the
+    // absolute truth on screen.
+    for (const key of STAT_KEYS) {
+      const stats = CLASS_OPTIONS.map((o) => o.stats.find((s) => s.key === key)!);
+      const values = stats.map((s) => s.value);
+      const pips = stats.map((s) => s.pips);
+      if (Math.min(...values) === Math.max(...values)) {
+        // No spread to show (every hull equal) — every tile reads full rather
+        // than parking the roster on some arbitrary middle rung.
+        expect(new Set(pips)).toEqual(new Set([STAT_PIPS]));
+        continue;
+      }
+      expect(Math.min(...pips), `${key} floor`).toBe(1);
+      expect(Math.max(...pips), `${key} ceiling`).toBe(STAT_PIPS);
+    }
+    // The Interceptor is the roster's fast, nimble, papery knife and the Hauler
+    // its hold-carrying tank (GDD §2.11) — the pips say so at a glance.
+    const stat = (cls: ShipClass, key: (typeof STAT_KEYS)[number]) =>
+      CLASS_OPTIONS.find((o) => o.shipClass === cls)!.stats.find((s) => s.key === key)!.pips;
+    expect(stat(ShipClass.Interceptor, 'speed')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Interceptor, 'hull')).toBe(1);
+    expect(stat(ShipClass.Hauler, 'hull')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Hauler, 'cargo')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Excavator, 'power')).toBe(STAT_PIPS);
+  });
+
+  it('draws the pips in CHROME — never signal yellow, never threat red', () => {
+    // Cold Vacuum's load-bearing rule (style-guide §2): signal yellow means ore
+    // or danger and nothing else, and threat red is damage. A pip is neither, so
+    // it takes a hue the screen already uses — plasma (the selection accent),
+    // chalk (its body text), hull steel (its chrome) — and adds none.
+    const pips = Object.values(STAT_PIP_COLORS);
+    for (const color of pips) {
+      expect(color).not.toBe(PALETTE.signalYellow);
+      expect(color).not.toBe(ART_PALETTE.signalYellow);
+      expect(color).not.toBe(PALETTE.threatRed);
+      expect(color).not.toBe(SIDE_COLORS.enemy);
+    }
+    expect(STAT_PIP_COLORS.selected).toBe(PALETTE.plasma);
+    expect(STAT_PIP_COLORS.empty).toBe(PALETTE.hullSteel);
+    // The filled-but-unselected pip is the lobby's own chalk, and it has to read
+    // at 3px against Vacuum — the same bar every other tone on this screen clears.
+    expect(contrastOnVacuum(STAT_PIP_COLORS.filled)).toBeGreaterThan(4.5);
   });
 });
 
@@ -627,6 +826,97 @@ describe('the seat-state cycle (variable-slots E — OPEN → BOT → CLOSED →
   });
 });
 
+describe('the seat-state control SAYS what it is (u5 — the affordance, not the cycle)', () => {
+  // The developer's report — "theres no way visible way to know that you can close
+  // slots right now" — is a defect the tests above could never have caught: they
+  // assert the cycle WORKS, and it always did. What was missing is that nothing
+  // said so. These assert the words and the live/dead look the row's leading
+  // control is drawn from (`./lobby-view` drawSeatState), which is the half of the
+  // fix that lives in a model rather than in pixels.
+
+  it('names every state there is — including the one the ring does not contain', () => {
+    // A control that states the current state needs a word for every state; the
+    // one it forgets is the one drawn blank. `human` is not on the ring (you
+    // cannot cycle a seat somebody is sitting in), and still needs a word.
+    for (const occupant of SEAT_STATE_CYCLE) {
+      expect(SEAT_STATE_LABELS[occupant], `no word for ${occupant}`).toBeTruthy();
+    }
+    expect(SEAT_STATE_LABELS.human).toBeTruthy();
+    expect(SEAT_STATE_LABELS).toEqual({
+      open: 'OPEN',
+      bot: 'BOT',
+      closed: 'CLOSED',
+      human: 'TAKEN',
+    });
+  });
+
+  it('reads the CURRENT state on every row, and changes as the state changes', () => {
+    let state = lobby();
+    // Row 0 is you — a seat nobody can cycle, and it says so rather than lying
+    // about being one tap from OPEN.
+    expect(lobbyModel(state).seats[0]!.stateLabel).toBe('TAKEN');
+
+    // …and row 1 walks the ring, in words, one label per state.
+    const walked: string[] = [lobbyModel(state).seats[1]!.stateLabel];
+    for (let i = 0; i < 3; i++) {
+      state = cycleSeatState(state, 1);
+      walked.push(lobbyModel(state).seats[1]!.stateLabel);
+    }
+    expect(walked).toEqual(['OPEN', 'BOT', 'CLOSED', 'OPEN']);
+
+    // The word is the seat's own state, never a neighbour's: closing row 1 does
+    // not relabel row 2.
+    const closed = cycleSeatState(cycleSeatState(lobby(), 1), 1);
+    expect(lobbyModel(closed).seats[1]!.stateLabel).toBe('CLOSED');
+    expect(lobbyModel(closed).seats[2]!.stateLabel).toBe('OPEN');
+  });
+
+  it('reads DEAD in exactly the three cases the cycle refuses — never live-then-refusing', () => {
+    // One flag, from the mutation's own refusals, because a control that looks
+    // live and then does nothing is worse than one that looks unavailable.
+    const host = lobby();
+    const hostModel = lobbyModel(host);
+    expect(hostModel.seats[1]!.canCycleState, 'a host may cycle an empty seat').toBe(true);
+    expect(hostModel.seats[0]!.canCycleState, 'nobody may cycle an occupied seat').toBe(false);
+
+    // 1. A GUEST holds no slot editor at all — every row, not just the bot rows.
+    const guest = lobbyModel(lobby({ you: 2, host: 0 }));
+    expect(guest.seats.every((s) => !s.canCycleState), 'a guest sees a live control').toBe(true);
+
+    // 2. After RUSH! the match shape is locked, so the whole roster goes dead.
+    const counting = lobbyModel(pressRush(lobby()));
+    expect(counting.seats.every((s) => !s.canCycleState), 'a control is live past RUSH!').toBe(true);
+
+    // 3. …and a CLOSED seat stays live for the host, which is the one that would
+    //    strand a player if it were wrong: the control is the only way back out
+    //    of CLOSED, so a closed row must never read as dead.
+    const shut = cycleSeatState(cycleSeatState(lobby(), 5), 5);
+    expect(lobbyModel(shut).seats[5]!.stateLabel).toBe('CLOSED');
+    expect(lobbyModel(shut).seats[5]!.canCycleState, 'a closed seat cannot be reopened').toBe(true);
+  });
+
+  it('agrees with the mutation on every seat, in every state (the flag cannot drift)', () => {
+    // The property behind the three cases: `canCycleState` is true exactly when
+    // `cycleSeatState` actually moves. Exhaustive over the roster in four lobbies,
+    // so a fourth refusal added to the mutation and not to the flag fails here.
+    const LOBBIES: readonly { readonly name: string; readonly state: LobbyState }[] = [
+      { name: 'host, gathering', state: lobby() },
+      { name: 'guest', state: lobby({ you: 2, host: 0 }) },
+      { name: 'counting (post-RUSH!)', state: pressRush(lobby()) },
+      { name: 'host with a closed seat', state: cycleSeatState(cycleSeatState(lobby(), 5), 5) },
+    ];
+    for (const { name, state } of LOBBIES) {
+      const model = lobbyModel(state);
+      for (const row of model.seats) {
+        const moved = cycleSeatState(state, row.player) !== state;
+        expect(row.canCycleState, `${name}: row ${row.player} draws ${row.canCycleState} but moves ${moved}`).toBe(
+          moved,
+        );
+      }
+    }
+  });
+});
+
 describe('RUSH! gating on size and sides (variable-slots E)', () => {
   it('refuses a start with fewer than two live players', () => {
     // Close every seat but the host's.
@@ -704,6 +994,177 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
     expect(byLabel[teamLabel(1)]).toBe(1);
     expect(counts.reduce((n, c) => n + c.count, 0)).toBe(4);
     expect(canStart(state)).toBe(true); // shown, not blocked
+  });
+});
+
+describe('a side says FRIENDLY or ENEMY, and says it to the right player (u3)', () => {
+  // Ratified 2026-08-05, refining m10's `TEAM A`: "Friendly/Enemy plus Letters —
+  // Friendly A, Enemy B, Enemy C, Enemy D etc...". The grammar is WORD + LETTER,
+  // and the two halves behave differently — which is what these tests pin down.
+
+  it('reads FRIENDLY to its own members and ENEMY to everyone else', () => {
+    // The same side, from two different viewers. Nothing about the side changed
+    // between these two lines; only who is looking.
+    expect(teamName(0, 0)).toBe('FRIENDLY A');
+    expect(teamName(0, 1)).toBe('ENEMY A');
+    expect(teamName(1, 1)).toBe('FRIENDLY B');
+    expect(teamName(1, 0)).toBe('ENEMY B');
+
+    expect(sideRelation(0, 0)).toBe('friendly');
+    expect(sideRelation(0, 1)).toBe('enemy');
+    expect(SIDE_WORDS).toEqual({ friendly: 'FRIENDLY', enemy: 'ENEMY', neutral: 'TEAM' });
+  });
+
+  it('keeps the LETTER absolute — team 1 is B no matter who looks', () => {
+    for (let viewer = 0; viewer < MAX_TEAMS; viewer++) {
+      for (let team = 0; team < MAX_TEAMS; team++) {
+        const [, letter] = teamName(team, viewer).split(' ');
+        expect(letter, `team ${team} seen by ${viewer}`).toBe(TEAM_LABELS[team]);
+      }
+    }
+    // Absolute is the whole point: two players on opposite sides name the same
+    // third side by the same letter, and differ only in the word.
+    expect(teamName(2, 0)).toBe('ENEMY C');
+    expect(teamName(2, 1)).toBe('ENEMY C');
+  });
+
+  it('names a 3-team and a 4-team match as one FRIENDLY and distinct ENEMYs', () => {
+    for (const sides of [3, 4]) {
+      const viewer = 0;
+      const named = Array.from({ length: sides }, (_, team) => teamName(team, viewer));
+      expect(named.filter((n) => n.startsWith('FRIENDLY'))).toEqual(['FRIENDLY A']);
+      const enemies = named.filter((n) => n.startsWith('ENEMY'));
+      expect(enemies).toHaveLength(sides - 1);
+      // No two enemies share a letter — the letter is what tells them apart.
+      expect(new Set(enemies).size).toBe(enemies.length);
+    }
+    expect(Array.from({ length: 4 }, (_, t) => teamName(t, 0))).toEqual([
+      'FRIENDLY A',
+      'ENEMY B',
+      'ENEMY C',
+      'ENEMY D',
+    ]);
+  });
+
+  it('falls back to the bare TEAM <letter> when there is no viewer, never to ENEMY', () => {
+    // A replay, a spectator, any view with no local player. It has no "friendly",
+    // and it must not answer that by declaring everyone hostile.
+    for (const viewer of [undefined, -1, Number.NaN]) {
+      expect(teamName(0, viewer)).toBe('TEAM A');
+      expect(teamName(1, viewer)).toBe('TEAM B');
+      expect(sideRelation(1, viewer)).toBe('neutral');
+    }
+    // The lobby's own viewer-less case: a roster nobody in it is you.
+    const spectating = { ...toggleMode(lobby()), you: 99 };
+    expect(viewerTeamOf(spectating)).toBeUndefined();
+    expect(lobbyModel(spectating).seats.map((s) => s.teamName.split(' ')[0])).toEqual(
+      new Array(LOBBY_SLOTS).fill('TEAM'),
+    );
+    expect(lobbyModel(spectating).seats.every((s) => s.side === 'neutral')).toBe(true);
+  });
+
+  it('re-words the whole roster when the viewer changes sides', () => {
+    const teams = toggleMode(lobby()); // you are slot 0 ⇒ side A by default
+    const before = lobbyModel(teams);
+    expect(viewerTeamOf(teams)).toBe(0);
+    expect(before.viewerTeam).toBe(0);
+    expect(before.seats[0]!.teamName).toBe('FRIENDLY A');
+    expect(before.seats[1]!.teamName).toBe('ENEMY B');
+
+    // Walk YOUR OWN seat onto side B. The letters do not move; the words swap.
+    let state = teams;
+    while (state.seats[0]!.team !== 1) state = cycleSeatTeam(state, 0);
+    const after = lobbyModel(state);
+    expect(after.seats[0]!.teamName).toBe('FRIENDLY B');
+    expect(after.seats[1]!.teamName).toBe('FRIENDLY B'); // slot 1 was already B
+    expect(after.seats[2]!.teamName).toBe('ENEMY A'); // and A is now the far side
+    // Every OTHER seat's letter is untouched — the letter is the side's identity,
+    // not the viewer's opinion of it. (Slot 0's own letter moved because slot 0
+    // genuinely changed sides.)
+    expect(after.seats.slice(1).map((s) => s.teamLabel)).toEqual(
+      before.seats.slice(1).map((s) => s.teamLabel),
+    );
+  });
+
+  it('colours the motif blue for friendly and red for enemy — as reinforcement', () => {
+    const teams = toggleMode(lobby());
+    const model = lobbyModel(teams);
+    expect(SIDE_COLORS[model.seats[0]!.side]).toBe(SIDE_COLORS.friendly);
+    expect(SIDE_COLORS[model.seats[1]!.side]).toBe(SIDE_COLORS.enemy);
+
+    // The words carry the meaning on their own: strip every colour and the roster
+    // still says which side each row is on. This is the m10 ratification (colour
+    // alone is insufficient) surviving u3's addition of colour.
+    const worded = model.seats.map((s) => s.teamName);
+    expect(new Set(worded)).toEqual(new Set(['FRIENDLY A', 'ENEMY B']));
+
+    // …and the identity colours do NOT move: they are per-SLOT (style-guide
+    // §3.1) and are how a player tells two ENEMIES apart.
+    expect(model.seats.map((s) => s.color)).toEqual(PLAYER_COLORS.slice(0, LOBBY_SLOTS));
+  });
+
+  it('paints the two side hues from the frozen palette, legible on Vacuum', () => {
+    // Blue is plasma; red is threat red lifted one declared rung toward white
+    // (`shotEnemy2` of the enemy-fire ramp) — no seventh hue enters the palette.
+    expect(SIDE_COLORS.friendly).toBe(PALETTE.plasma);
+    expect(SIDE_COLORS.enemy).toBe(tint(ART_PALETTE.threatRed, 0.32));
+    expect(SIDE_COLORS.enemy).toBe(DERIVED.shotEnemy2);
+    expect(SIDE_COLORS.neutral).toBe(PALETTE.patina);
+
+    // And both hold against the backdrop at both form factors: raw threat red is
+    // 3.2:1 on Vacuum — fine for a filling damage ring, too dim for an 11px word
+    // on a phone — so the lifted rung is the one that ships.
+    for (const key of ['friendly', 'enemy'] as const) {
+      expect(contrastOnVacuum(SIDE_COLORS[key]), `${key} contrast`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrastOnVacuum(ART_PALETTE.threatRed)).toBeLessThan(4.5);
+  });
+
+  it('shows no side label in FFA — a side there is the player again', () => {
+    const ffa = lobbyModel(lobby());
+    // FFA is teams-of-one (GDD §2.1 / sim/constants), so a side label there would
+    // repeat the nameplate. The mode flag is what the view gates the chip on…
+    expect(ffa.mode).toBe('ffa');
+    expect(lobbyMatchConfig(lobby()).mode).toBe('ffa');
+    // …and the nameplate gate is the same fact on the battlefield: no label, on
+    // any slot, whatever the team table happens to hold.
+    const plates = nameplateModel(
+      Array.from({ length: 4 }, (_, owner) => ({
+        owner,
+        kind: 'ship' as const,
+        alive: true,
+        pos: { x: 0, y: 0 },
+        radius: 8,
+      })),
+      [],
+      { showTeamLabels: false, viewerTeam: 0 },
+      [],
+      [0, 1, 2, 3],
+    );
+    expect(plates.map((p) => p.teamLabel)).toEqual(['', '', '', '']);
+    expect(plates.every((p) => p.teamColor === SIDE_COLORS.neutral)).toBe(true);
+  });
+
+  it('says the SAME string on the roster row and over that seat\'s hull', () => {
+    // One vocabulary, asserted rather than assumed: whatever the lobby row says
+    // about a seat is exactly what the nameplate says about it, for the same
+    // viewer — including when the viewer is nobody.
+    for (const viewerSlot of [0, 1]) {
+      let state = toggleMode(lobby({ you: viewerSlot }));
+      // A three-side split, so the assertion covers more than "us and them".
+      while (state.seats[2]!.team !== 2) state = cycleSeatTeam(state, 2);
+      const model = lobbyModel(state);
+      const teams = model.seats.map((s) => s.team);
+      for (const seat of model.seats) {
+        expect(
+          resolveTeamLabel(teams, seat.player, {
+            showTeamLabels: true,
+            ...(model.viewerTeam !== undefined ? { viewerTeam: model.viewerTeam } : {}),
+          }),
+          `seat ${seat.player} seen by ${viewerSlot}`,
+        ).toBe(seat.teamName);
+      }
+    }
   });
 });
 

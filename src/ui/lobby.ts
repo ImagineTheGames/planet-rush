@@ -30,10 +30,26 @@
  *     match"). {@link selectShipClass} refuses once the countdown has started,
  *     which is the same instant the server stops honouring `lobbyChoice`
  *     (`server/room.ts`: "a hull is locked for the match").
- *  4. **No ship stats on this screen.** A {@link ShipClassOption} carries a
- *     name, a hull and a role blurb — and no number. Stats live in the upgrade
- *     panel and nowhere else (GDD §2.2, §2.5), so the type simply gives the view
- *     nothing it *could* print.
+ *  4. **Ship stats DO appear here — as pips AND numbers** *(u4, ratified by the
+ *     developer 2026-08-05: "both pips and numbers"; GDD §2.5 and §2.11 amended
+ *     the same day)*. This reverses the rule this file used to keep ("no ship
+ *     stats on this screen"): a {@link ShipClassOption} now carries a name, a
+ *     hull, a role blurb **and** its {@link ShipStatLine} row — a coarse pip bar
+ *     to compare four hulls at a glance, beside the actual figure for the player
+ *     who wants it. Never one or the other: both, together, on every hull.
+ *
+ *     Two guarantees hold the reversal up, and they are what the tests pin:
+ *     the numbers are read from the **sim's own** `SHIP_STATS`
+ *     (`../sim/constants`), never a table hand-copied into the UI — a screen
+ *     that prints a stat the sim does not honour is worse than one with no
+ *     stats; and the pips and the number are derived from the **same** `value`
+ *     in {@link statLine}, so a hull can never show four pips beside a figure
+ *     that means three.
+ *
+ *     The upgrade panel ({@link ./upgrade-wheel}) is unaffected and keeps
+ *     showing what it shows; the **build wheel** is untouched — a segment's only
+ *     number is still its cost (GDD §2.5), and "stats are allowed on
+ *     ship-select" does not leak into it.
  *
  * ---------------------------------------------------------------------------
  * WHAT THE EMPTY SEATS SHOW
@@ -56,7 +72,7 @@
 
 import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { PLAYER_COLORS } from '@render/index';
+import { PALETTE, PLAYER_COLORS } from '@render/index';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
@@ -64,8 +80,11 @@ import { seatPing } from '../net/ping';
 import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
 import { MAX_MATCH_SIZE, MIN_MATCH_SIZE, configToPlayers } from '../sim/match-config';
-import type { Abundance } from '../sim/constants';
-import { DEFAULT_ABUNDANCE } from '../sim/constants';
+import type { Abundance, ShipStats } from '../sim/constants';
+// The hull tiles' numbers come from the SIM's own class table (u4) — never a
+// table hand-copied into the UI, so a retune in `../sim/constants` moves the
+// lobby with it and the screen cannot advertise a game the sim is not running.
+import { DEFAULT_ABUNDANCE, SHIP_STATS } from '../sim/constants';
 import { playerColor } from './station-hp';
 import { CLASS_NAMES } from './upgrade-wheel';
 import { normalizeMapId } from './map-picker';
@@ -123,6 +142,25 @@ export const MODE_LABELS: Readonly<Record<MatchMode, string>> = {
 export const SEAT_STATE_CYCLE: readonly SeatOccupant[] = ['open', 'bot', 'closed'];
 
 /**
+ * The word a seat's state is shown as, on the row's leading STATE control (u5,
+ * 2026-08-05 — the developer's report: *"theres no way visible way to know that
+ * you can close slots right now"*).
+ *
+ * The cycle above walks three of these; the fourth — `human` — is the state you
+ * cannot cycle *to* or *from*, because you cannot cycle a seat somebody is
+ * sitting in ({@link cycleSeatState}), so its word says the seat is spoken for
+ * rather than naming a rung of a ring the row is not on. Every occupant has a
+ * word: a control that states the current state must have one for every state
+ * there is, or the one it forgets is the one drawn blank.
+ */
+export const SEAT_STATE_LABELS: Readonly<Record<SeatOccupant, string>> = {
+  open: 'OPEN',
+  bot: 'BOT',
+  closed: 'CLOSED',
+  human: 'TAKEN',
+};
+
+/**
  * How many sides TEAMS can split into. Two is the common game (1v1..4v4, and any
  * uneven split — the developer ratified "any team split allowed, show counts,
  * never block"); the ring runs to four so 2v2v2v2 and three-corner games are
@@ -133,7 +171,10 @@ export const MAX_TEAMS = 4;
 
 /** A team's label — a letter, not a colour: the eight identity colours stay
  *  per-SLOT (style-guide §3.1, ratified), and the team is the *motif* over them
- *  (nameplate underline), so it needs a hue-independent name of its own. */
+ *  (nameplate underline), so it needs a hue-independent name of its own.
+ *
+ *  The letter is the **ABSOLUTE** half of the side grammar ({@link teamName}):
+ *  team 1 is `B` to everyone, always, whoever is looking. */
 export const TEAM_LABELS: readonly string[] = ['A', 'B', 'C', 'D'];
 
 /** A team number's label, folded into range so a stray value still reads. */
@@ -142,25 +183,123 @@ export function teamLabel(team: number): string {
   return TEAM_LABELS[Math.floor(team) % TEAM_LABELS.length]!;
 }
 
-/** The word the roster chip carries, so a lone letter never has to be decoded. */
-export const TEAM_WORD = 'TEAM';
+/**
+ * How a side reads **to the viewer looking at it** — the RELATIVE half of the
+ * side grammar ({@link teamName}). The same side is `friendly` to its own members
+ * and `enemy` to everyone else; `neutral` is the viewer-less case (a spectator, a
+ * replay, any view with no local player), where nobody is an ally and — the point
+ * — nobody may be called an enemy either.
+ */
+export type SideRelation = 'friendly' | 'enemy' | 'neutral';
 
 /**
- * A side's **player-facing name** — `TEAM A`, `TEAM B` — the one string both the
- * lobby roster and the in-match nameplates show (`./nameplates`).
- *
- * Ratified by the developer after playing a TEAMS match: *"impossible to know who
- * is on your team."* Colour could not answer that and was never going to — the
- * eight identity colours are per-SLOT (style-guide §3.1), so a side has no hue of
- * its own to read, and the bare letter on the lobby chip did not survive the trip
- * into a fight. The label is words, over every nameplate, in both form factors:
- * **colour alone is insufficient** is the ratification, and this function is the
- * single place the wording lives so the lobby and the battlefield can never
- * disagree about what a side is called.
+ * The word each relation carries. `WORD + LETTER` is the whole grammar:
+ * `FRIENDLY A`, `ENEMY B`, `ENEMY C` — and `TEAM B` when there is no viewer to be
+ * friendly to. One table, so nothing else in the UI ever spells a side by hand.
  */
-export function teamName(team: number): string {
-  return `${TEAM_WORD} ${teamLabel(team)}`;
+export const SIDE_WORDS: Readonly<Record<SideRelation, string>> = {
+  friendly: 'FRIENDLY',
+  enemy: 'ENEMY',
+  neutral: 'TEAM',
+};
+
+/**
+ * Which relation `team` bears to the player viewing it.
+ *
+ * `viewerTeam` is the VIEWING player's own side. Absent (or not a real side) means
+ * there is no local player — a spectator, a replay, a lobby nobody is seated in —
+ * and that resolves to `neutral`, never to `enemy`: a view with no "friendly" must
+ * not answer by declaring everyone hostile. A `team` that is not a real side is
+ * neutral for the same reason: an unknown side is not an enemy side.
+ */
+export function sideRelation(team: number, viewerTeam?: number): SideRelation {
+  if (viewerTeam === undefined || !Number.isFinite(viewerTeam) || viewerTeam < 0) return 'neutral';
+  if (!Number.isFinite(team) || team < 0) return 'neutral';
+  return Math.floor(team) === Math.floor(viewerTeam) ? 'friendly' : 'enemy';
 }
+
+/**
+ * A side's **player-facing name** — `FRIENDLY A`, `ENEMY B`, `ENEMY C` — the one
+ * string both the lobby roster and the in-match nameplates show (`./nameplates`).
+ *
+ * ---------------------------------------------------------------------------
+ * THE RATIFICATION CHAIN (read this before changing the wording)
+ * ---------------------------------------------------------------------------
+ *
+ * **m10, ratified after a TEAMS match:** *"impossible to know who is on your
+ * team."* Colour could not answer that and was never going to — the eight
+ * identity colours are per-SLOT (style-guide §3.1), so a side has no hue of its
+ * own to read, and the bare letter on the lobby chip did not survive the trip
+ * into a fight. The conclusion: **colour alone is insufficient**; the label is
+ * words, over every nameplate, in both form factors. That produced `TEAM A`.
+ *
+ * **u3, ratified 2026-08-05 — a REFINEMENT of that, not a reversal:** *"I don't
+ * think we should show teams like Team A Team B in the match (perhaps just
+ * Friendly, and Enemy, with colors like Blue for Friendly, Red for Enemy)"* and,
+ * on more than two sides, *"Friendly/Enemy plus Letters — Friendly A, Enemy B,
+ * Enemy C, Enemy D etc..."*. `TEAM A` only ever helped a player who remembered
+ * which team *they* were; `FRIENDLY A` answers the original complaint directly.
+ * The words still carry the whole meaning — colour came back as **reinforcement,
+ * never as the sole signal** ({@link SIDE_COLORS}, on the team motif only), which
+ * is what keeps the readout usable with the hue removed.
+ *
+ * ---------------------------------------------------------------------------
+ * THE GRAMMAR: `WORD + LETTER`, and the two halves behave differently
+ * ---------------------------------------------------------------------------
+ *
+ *  - **The letter is ABSOLUTE** ({@link teamLabel}) — team 1 is `B` to everyone,
+ *    always. It is the side's identity and does not depend on who is looking, so
+ *    two players on opposite sides still name the same third side identically.
+ *  - **The word is RELATIVE to the viewer** ({@link sideRelation}) — the same side
+ *    reads `FRIENDLY` to its own members and `ENEMY` to everyone else.
+ *
+ * `viewerTeam` is therefore required for the word to mean anything; omitting it is
+ * the documented **viewer-less** case (spectator / replay / no local player) and
+ * degrades to the bare `TEAM <letter>` rather than calling everybody an enemy.
+ *
+ * This function stays the SINGLE place the wording lives, so the lobby roster and
+ * the in-match nameplates can never disagree about what a side is called — every
+ * call site passes the viewer's team rather than inventing its own wording.
+ */
+export function teamName(team: number, viewerTeam?: number): string {
+  return `${SIDE_WORDS[sideRelation(team, viewerTeam)]} ${teamLabel(team)}`;
+}
+
+/**
+ * The **team motif's** colour, by relation — blue for friendly, red for enemy
+ * (ratified u3, 2026-08-05: *"with colors like Blue for Friendly, Red for
+ * Enemy"*).
+ *
+ * Where it is allowed to land: the **motif only** — the roster row's team
+ * underline and its side chip, and the side tag on a nameplate. Never a hull,
+ * never a ship's trim, never an HP bar. The eight identity colours are per-SLOT
+ * and ratified (style-guide §3.1): they are how a player tells two *enemies*
+ * apart, and at three and four sides they are doing real work alongside the
+ * letter. The motif is exactly the hue-independent layer this file already
+ * described, so blue/red belongs there and nowhere else.
+ *
+ * Why these two hues, from the frozen palette rather than invented
+ * (`src/art/tokens.ts`; pinned in `./lobby.test`):
+ *
+ *  - **friendly = plasma `#4DC3FF`** — the cold energy blue this UI already
+ *    accents with (selection strokes, the lobby's own chips). 9.5:1 against
+ *    Vacuum `#0D1015`, so it holds at 11px on a phone.
+ *  - **enemy = threat red, lifted toward white** (`tint(threatRed, 0.32)` =
+ *    `#CB7979`, the declared `shotEnemy2` rung of the enemy-fire ramp). Raw
+ *    threat red `#B23A3A` is only 3.2:1 on Vacuum — right for a filling damage
+ *    ring, too dim for a 12px word on a phone — and the ramp already owns the
+ *    brighter rung, so no seventh hue enters the palette. It stays inside the
+ *    RESERVED rule (style-guide §2: red is "damage, alarm, enemy fire") because
+ *    an ENEMY tag is precisely the danger channel; it is never worn by a
+ *    friendly or neutral side.
+ *  - **neutral = patina** — what the roster underline already drew, and the right
+ *    answer for a viewer-less view, which has no friend or foe to colour.
+ */
+export const SIDE_COLORS: Readonly<Record<SideRelation, number>> = {
+  friendly: PALETTE.plasma,
+  enemy: 0xcb7979,
+  neutral: PALETTE.patina,
+};
 
 /** The default side a slot starts on when TEAMS is picked: alternating by slot,
  *  so any active count of two or more already has both sides manned (an even
@@ -199,7 +338,14 @@ export const COLOR_NAMES: readonly string[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// The four hulls (GDD §2.11) — words only, never a stat
+// The four hulls (GDD §2.11) — words, AND pips, AND numbers
+//
+// Ratified by the developer 2026-08-05 (u4), asked whether ship stats could
+// appear on ship-select having been shown coarse pips: **"both pips and
+// numbers."** So both, together — pips to compare four hulls at a glance,
+// numbers for the player who wants the actual figure. GDD §2.5 and §2.11 carry
+// the matching *(amended 2026-08-05)* marker; the superseded rule this file used
+// to enforce ("no ship stats on this screen") is gone, not routed around.
 // ---------------------------------------------------------------------------
 
 /** Tile order, left to right / top to bottom. The order GDD §2.11 tables them
@@ -242,10 +388,159 @@ export function normalizePlayerName(raw: string | undefined): string {
   return trimmed.length > PLAYER_NAME_MAX_CHARS ? trimmed.slice(0, PLAYER_NAME_MAX_CHARS) : trimmed;
 }
 
+/** Pips in one stat's bar. Five is coarse on purpose — a pip bar answers
+ *  "which of these four is the fast one?", and the **number beside it** answers
+ *  "by how much". Neither is asked to do the other's job. */
+export const STAT_PIPS = 5;
+
 /**
- * One hull tile. A name, a hull, a role — **and no number**. This type is the
- * enforcement of GDD §2.5's "ship stats … appear only in the upgrade panel":
- * the view cannot print a stat here because the model never carries one.
+ * What a stat pip is drawn in (u4). Lives here, beside {@link SIDE_COLORS} and
+ * for the same reason: the frozen palette's reserved rules are a contract, so
+ * the colours are pinned by a unit test rather than trusted to a view.
+ *
+ * **Pips are CHROME.** They are not ore and they are not danger, so signal
+ * yellow `#F2D24B` and threat red `#B23A3A` are both out (style-guide §2 — "signal
+ * yellow means ore or danger, and nothing else"), and no seventh hue enters the
+ * palette either: a filled pip is the plasma this screen already selects with,
+ * or the chalk it already writes in, and the unfilled remainder is hull steel at
+ * a glance-level alpha.
+ */
+export const STAT_PIP_COLORS = {
+  /** Filled, on the hull you have picked — the lobby's own selection accent. */
+  selected: PALETTE.plasma,
+  /** Filled, on any other tile — neutral chalk, the lobby's primary text tone. */
+  filled: 0xdce3ec,
+  /** The unfilled remainder of a bar. */
+  empty: PALETTE.hullSteel,
+} as const;
+
+/** The stats a hull tile shows, in GDD §2.11's own table order. Exactly the six
+ *  columns of that table — the five core attributes the hull choice "sets"
+ *  (speed, acceleration, turn rate, armor, weapon power) plus the cargo hold,
+ *  which is the sixth column and the Hauler's whole argument. */
+export type ShipStatKey = 'speed' | 'accel' | 'turn' | 'hull' | 'power' | 'cargo';
+
+/**
+ * One stat on one hull tile: a short label, the sim's own value, that value
+ * **printed**, and that same value **as pips**.
+ *
+ * `text` and `pips` are two renderings of the one `value` ({@link statLine}),
+ * which is the whole reason this type carries all three: a tile can never show
+ * four pips beside a figure that means three, because there is only ever one
+ * number in play and the view does no arithmetic of its own.
+ */
+export interface ShipStatLine {
+  readonly key: ShipStatKey;
+  /** The label on the cell — short, because six of these share a phone tile. */
+  readonly label: string;
+  /** The sim's value, verbatim from `SHIP_STATS` (a multiplier, HP, or slots). */
+  readonly value: number;
+  /** …the same value as the player reads it: `130%`, `35`, `8`, `3`. */
+  readonly text: string;
+  /** …and the same value as a coarse bar, 1..{@link STAT_PIPS} filled. */
+  readonly pips: number;
+  /** Pips in the bar — {@link STAT_PIPS}, carried so the view never hard-codes it. */
+  readonly pipMax: number;
+}
+
+/**
+ * How each stat is read off the sim's table and shown. The `read` functions are
+ * the ONLY coupling to `SHIP_STATS`, and there is deliberately no per-class
+ * literal anywhere in this file: retune a hull in `../sim/constants` and this
+ * screen retunes with it, which is what keeps the tile from advertising a game
+ * the sim is not running.
+ */
+const STAT_SPECS: readonly {
+  readonly key: ShipStatKey;
+  readonly label: string;
+  readonly read: (stats: ShipStats) => number;
+  readonly format: (value: number) => string;
+}[] = [
+  { key: 'speed', label: 'SPD', read: (s) => s.speedMul, format: percent },
+  { key: 'accel', label: 'ACC', read: (s) => s.accelMul, format: percent },
+  { key: 'turn', label: 'TRN', read: (s) => s.turnMul, format: percent },
+  { key: 'hull', label: 'HULL', read: (s) => s.hull, format: whole },
+  { key: 'power', label: 'PWR', read: (s) => s.power, format: whole },
+  { key: 'cargo', label: 'HOLD', read: (s) => s.cargo, format: whole },
+];
+
+/** Speed, acceleration and turn are multipliers over the Vanguard (GDD §2.11
+ *  tables them as percentages), so they read as percentages here too. */
+function percent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+/** Hull HP, power and hold are absolute counts — printed as they are. */
+function whole(value: number): string {
+  return String(Math.round(value));
+}
+
+/**
+ * A stat's pip scale: the **spread across the four hulls**, so the pips answer
+ * the question the screen is actually for — *which of these four is the fast
+ * one?* The roster's slowest hull gets one pip and its fastest gets five, and
+ * every other tile is placed between them.
+ *
+ * A scale anchored at zero instead would flatten the roster into four
+ * near-identical bars (every hull's speed sits between 85% and 130%), which is a
+ * pip bar that compares nothing. The **number** beside it is what keeps the
+ * absolute truth on screen, so the coarse scale costs the player nothing.
+ *
+ * A stat every hull shares — cargo, the day a retune levels it — has no spread
+ * to show, so every tile reads full rather than an arbitrary rung.
+ */
+function pipScale(read: (stats: ShipStats) => number): { min: number; max: number } {
+  const values = CLASS_ORDER.map((cls) => read(SHIP_STATS[cls]));
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function pipsFor(value: number, scale: { min: number; max: number }): number {
+  if (!(scale.max > scale.min)) return STAT_PIPS;
+  const t = (value - scale.min) / (scale.max - scale.min);
+  return Math.min(STAT_PIPS, Math.max(1, Math.round(1 + t * (STAT_PIPS - 1))));
+}
+
+/**
+ * One stat line — and the **one place** the number and the pips are decided.
+ *
+ * `value` is read once, and both renderings hang off that single read. There is
+ * no second path by which a tile could print one hull's figure beside another
+ * hull's bar, which is the guarantee the brief asked for stated as code rather
+ * than as care.
+ */
+function statLine(
+  spec: (typeof STAT_SPECS)[number],
+  stats: ShipStats,
+  scale: { min: number; max: number },
+): ShipStatLine {
+  const value = spec.read(stats);
+  return {
+    key: spec.key,
+    label: spec.label,
+    value,
+    text: spec.format(value),
+    pips: pipsFor(value, scale),
+    pipMax: STAT_PIPS,
+  };
+}
+
+/** The six stat lines for one hull, in {@link STAT_SPECS} order — read straight
+ *  off the sim's `SHIP_STATS[cls]`, so what the lobby shows is what the match
+ *  honours. */
+export function shipStatLines(shipClass: ShipClass): readonly ShipStatLine[] {
+  const stats = SHIP_STATS[shipClass];
+  return STAT_SPECS.map((spec) => statLine(spec, stats, pipScale(spec.read)));
+}
+
+/**
+ * One hull tile: a name, a hull, a role — **and its stats, as pips and numbers**
+ * (u4, ratified 2026-08-05; GDD §2.5 / §2.11 amended).
+ *
+ * The type used to be the enforcement of "ship stats appear only in the upgrade
+ * panel" by carrying no numeric field at all. That rule is superseded: the tile
+ * carries {@link stats} now, sourced from the sim and rendered as both a bar and
+ * a figure. What has *not* changed is where the numbers come from — never a
+ * literal typed into this file.
  */
 export interface ShipClassOption {
   readonly shipClass: ShipClass;
@@ -254,8 +549,10 @@ export interface ShipClassOption {
   /** The hull's name (GDD §2.11's parenthetical: Quadfin, Anvil, Pincer,
    *  Hammerhead) — the silhouette a player learns to read at 24px (§5.3). */
   readonly hull: string;
-  /** The role, in the design's own words. Words only: no speeds, no HP. */
+  /** The role, in the design's own words. */
   readonly blurb: string;
+  /** The six stats of GDD §2.11's table, each as a pip bar **and** a figure. */
+  readonly stats: readonly ShipStatLine[];
 }
 
 /** The four tiles (GDD §2.11), in {@link CLASS_ORDER}. */
@@ -265,24 +562,28 @@ export const CLASS_OPTIONS: readonly ShipClassOption[] = [
     name: CLASS_NAMES[ShipClass.Interceptor],
     hull: 'Quadfin',
     blurb: 'Scout and miner-hunter. Catches miners in the open; melts against turrets.',
+    stats: shipStatLines(ShipClass.Interceptor),
   },
   {
     shipClass: ShipClass.Vanguard,
     name: CLASS_NAMES[ShipClass.Vanguard],
     hull: 'Anvil',
     blurb: 'All-rounder. Does everything second-best — the one to learn the game in.',
+    stats: shipStatLines(ShipClass.Vanguard),
   },
   {
     shipClass: ShipClass.Excavator,
     name: CLASS_NAMES[ShipClass.Excavator],
     hull: 'Pincer',
     blurb: 'Mining engine and close bruiser. Out-earns everyone, and cannot run.',
+    stats: shipStatLines(ShipClass.Excavator),
   },
   {
     shipClass: ShipClass.Hauler,
     name: CLASS_NAMES[ShipClass.Hauler],
     hull: 'Hammerhead',
     blurb: 'Logistics and siege tank. Hauls the biggest hold and tanks a siege; arrives late.',
+    stats: shipStatLines(ShipClass.Hauler),
   },
 ];
 
@@ -1057,18 +1358,39 @@ export interface LobbySeatView {
   /** The seat's occupancy (variable-slots Milestone E) — the view dims a `closed`
    *  row and shows the OPEN/BOT/CLOSED cycle state. */
   readonly state: SeatOccupant;
+  /** …and that state IN WORDS, for the row's leading state control (u5):
+   *  `OPEN` / `BOT` / `CLOSED`, or `TAKEN` on a seat with a person in it
+   *  ({@link SEAT_STATE_LABELS}). The control states the state it is on, so a
+   *  player can answer "can I close this slot?" without experimenting. */
+  readonly stateLabel: string;
+  /**
+   * Whether *this client, right now* may cycle this seat's state — exactly the
+   * three refusals {@link cycleSeatState} already keeps: the host only, before
+   * RUSH!, and never on a human seat.
+   *
+   * It is on the seat view because the control has to LOOK unavailable in each of
+   * those cases rather than look live and then refuse (u5): a dead-looking button
+   * beats a lying one. Deriving it here — from the same predicate the mutation
+   * uses — is what keeps the drawn state and the real refusal from drifting.
+   */
+  readonly canCycleState: boolean;
   /** Out of the match: no station, no player. The view draws it as a shut seat. */
   readonly isClosed: boolean;
   /** The side this slot fights for (raw team number, TEAMS). */
   readonly team: number;
   /** …and its label (`A`…`D`), so the row reads the team with the hue removed —
-   *  colour is identity, the letter is the team (style-guide §3 rule 3). */
+   *  colour is identity, the letter is the team (style-guide §3 rule 3). The
+   *  letter is ABSOLUTE: this row is `B` on every player's screen. */
   readonly teamLabel: string;
-  /** …and the same side as the WORD a player reads — `TEAM A` (ratified developer,
-   *  m10: *"impossible to know who is on your team"*). The chip carries this rather
-   *  than the bare letter, and the in-match nameplates carry the identical string
+  /** …and the same side as the WORD *you* read — `FRIENDLY A` on your own side,
+   *  `ENEMY B` on any other (ratified u3, 2026-08-05, refining m10's `TEAM A`).
+   *  The chip carries this rather than the bare letter, and the in-match
+   *  nameplates carry the identical string for the same seat and viewer
    *  ({@link teamName}), so the roster and the battlefield teach one vocabulary. */
   readonly teamName: string;
+  /** …and that same relation as a token, so the view can colour the team motif
+   *  (blue friendly / red enemy, {@link SIDE_COLORS}) without re-deciding it. */
+  readonly side: SideRelation;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
   /**
@@ -1109,8 +1431,13 @@ export interface LobbyModel {
   /** `N` — active (non-closed) seats, 2..8. The size the world will build at. */
   readonly size: number;
   /** Per-side active headcounts, always present so TEAMS shows them and never
-   *  blocks a split (ratified). Sorted by team; empty of nothing active. */
+   *  blocks a split (ratified). Sorted by team; empty of nothing active. The
+   *  tally is by the ABSOLUTE letter (`A 4 · B 4`) — it counts sides, and a
+   *  headcount is the one place on this screen that is nobody's point of view. */
   readonly teamCounts: readonly LobbyTeamCount[];
+  /** The viewing player's own side ({@link viewerTeamOf}) — what makes every
+   *  row's word `FRIENDLY` or `ENEMY`. `undefined` in a viewer-less roster. */
+  readonly viewerTeam: number | undefined;
   readonly classLocked: boolean;
   readonly countdown: { readonly active: boolean; readonly label: string; readonly seconds: number };
   readonly canStart: boolean;
@@ -1125,7 +1452,12 @@ export interface LobbyModel {
 
 /** Build the frame model. Pure: the view draws exactly this and decides nothing. */
 export function lobbyModel(state: LobbyState): LobbyModel {
-  const seats = state.seats.map((seat) => seatView(state, seat));
+  const viewer = viewerTeamOf(state);
+  // Read ONCE, from the same predicate the mutations use, and handed to every row:
+  // whether this client may edit the slots at all (the host, before RUSH!). It is
+  // what makes each row's state control draw live or dead — honestly, per seat.
+  const canEdit = hostControls(state);
+  const seats = state.seats.map((seat) => seatView(state, seat, viewer, canEdit));
   // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
   // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
   const active = seats.filter((s) => !s.isClosed);
@@ -1143,6 +1475,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     abundance: state.abundance,
     size: active.length,
     teamCounts: teamCountsOf(active),
+    viewerTeam: viewer,
     classLocked: classLocked(state),
     countdown: {
       active: state.phase === 'counting',
@@ -1167,7 +1500,27 @@ function teamCountsOf(active: readonly LobbySeatView[]): LobbyTeamCount[] {
     .map(([team, count]) => ({ team, label: teamLabel(team), count }));
 }
 
-function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
+/**
+ * The VIEWING player's own side — the relative half of every side label on this
+ * screen ({@link teamName}).
+ *
+ * Read off the seat the local player is actually sitting in, so a host who
+ * re-assigns their own side sees the whole roster re-word itself in the same
+ * frame. `undefined` when no seat is the viewer's — the documented viewer-less
+ * case (a spectator, or a roster rendered with no local player), where every row
+ * reads the neutral `TEAM <letter>` rather than being declared hostile.
+ */
+export function viewerTeamOf(state: LobbyState): number | undefined {
+  const seat = state.seats.find((s) => s.player === state.you);
+  return seat ? seat.team : undefined;
+}
+
+function seatView(
+  state: LobbyState,
+  seat: LobbySeat,
+  viewerTeam: number | undefined,
+  canEdit: boolean,
+): LobbySeatView {
   const isBot = isBotSeat(seat.occupant);
   const isClosed = seat.occupant === 'closed';
   const character = seat.personality ? PERSONALITIES[seat.personality] : null;
@@ -1189,10 +1542,17 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isYou: seat.player === state.you,
     isHost: seat.player === state.host && seat.occupant === 'human',
     state: seat.occupant,
+    stateLabel: SEAT_STATE_LABELS[seat.occupant],
+    // The control's live/dead look, from the mutation's own three refusals: the
+    // host, before RUSH! (both folded into `canEdit`), and never a human seat.
+    canCycleState: canEdit && seat.occupant !== 'human',
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
-    teamName: teamName(seat.team),
+    // The WORD is the viewer's ("FRIENDLY A" on your own side), the LETTER is
+    // everyone's — one formatter, so this row and that row's nameplate cannot drift.
+    teamName: teamName(seat.team, viewerTeam),
+    side: sideRelation(seat.team, viewerTeam),
     // An open seat stops being claimable the moment the match starts; a seat the
     // server has already seated a bot in was never claimable to begin with; a
     // closed seat is a shut door; and offline there is no wire for a second player

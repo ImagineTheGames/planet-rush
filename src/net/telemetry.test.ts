@@ -178,6 +178,51 @@ describe('NetTelemetry — per-second bucketing', () => {
     expect(t.samples.length).toBe(3);
     expect(t.samples[0]!.atMs).toBe(3000);
   });
+
+  /**
+   * The first finalized "second" is a FRAGMENT, and a fragment can be incomplete.
+   *
+   * Buckets are keyed on `floor(now / SAMPLE_INTERVAL_MS)`, so the first one a
+   * session ever closes covers only however much of a wall-clock second was left
+   * when it joined — a millisecond, if it joined at .999. That sample is real and
+   * it is finalized, but the numbers in it are whatever happened to land inside the
+   * fragment, and `rttMeanMs` in particular is null unless a reconcile in there
+   * acknowledged an input this client still had a send time for.
+   *
+   * This is not a curiosity: n4-01 held `main` red on it. `tests/net/playtest-log-
+   * online.test.ts` waited for a telemetry sample to *exist* and then asserted its
+   * `rtt` was populated, so on a phase where the opening fragment was short the
+   * assertion raced the sample's own population. Reproduced there at 1 run in 20,
+   * and every run once the phase is forced. Pinned here so the shape the fix is
+   * written around cannot change silently underneath it.
+   */
+  it('finalizes an opening FRAGMENT of a second with a null RTT — a real sample, incomplete', () => {
+    const t = new NetTelemetry();
+    // Joined at .999: the opening bucket is one millisecond wide. A reconcile lands
+    // in it whose ack names an input this client has no send time for — a stale ack,
+    // an input already retired, or simply the first snapshot after a join.
+    t.recordReconcile(OK, 7, 1999);
+    // …and the next event crosses the boundary, closing that fragment.
+    t.recordReconcile(OK, 7, 2000);
+
+    const fragment = t.samples[0]!;
+    expect(fragment.atMs).toBe(1000);
+    // Finalized, and not empty — which is exactly why "a sample exists" is not the
+    // same question as "a sample is complete".
+    expect(fragment.reconciles).toBe(1);
+    expect(fragment.rttMeanMs).toBeNull();
+    expect(fragment.rttMaxMs).toBeNull();
+
+    // And the implication the e2e assertion leans on, stated once: an rtt is only
+    // ever recorded from inside `recordReconcile`, which has already counted the
+    // reconcile — so a sample WITH a round trip always has `reconciles > 0`.
+    t.recordInput(9, 2100);
+    t.recordReconcile(OK, 9, 2150);
+    t.recordReconcile(OK, 9, 3000); // close the second
+    const complete = t.samples[1]!;
+    expect(complete.rttMeanMs).toBe(50);
+    expect(complete.reconciles).toBeGreaterThan(0);
+  });
 });
 
 describe('NetTelemetry — dump', () => {
