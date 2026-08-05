@@ -58,6 +58,7 @@ import {
 } from '../../src/ui/lobby';
 import type { LobbyState } from '../../src/ui/lobby';
 import type { LobbySlot } from '../../src/net/transport';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 import { areEnemies, canDamage } from '../../src/sim';
 
@@ -130,6 +131,20 @@ function openClient(
     },
     started: () => started,
   };
+}
+
+/**
+ * One seat on the SERVER's own roster, by player id — authority's view of the
+ * lobby, read directly rather than through a client's copy of it.
+ *
+ * Used as an **ordering barrier**: the room handles one socket's messages in the
+ * order they arrive, so the server's roster reflecting a message proves it has
+ * already handled everything that socket sent before it. That is how the two
+ * "nothing happened" assertions in this file wait for a non-event honestly
+ * instead of sleeping for however long it usually takes.
+ */
+function seatOf(room: { lobbyState(): LobbySlot[] }, player: PlayerId): LobbySlot | undefined {
+  return room.lobbyState().find((slot) => slot.player === player);
 }
 
 /** Run the RUSH! countdown the way the render ticker does, and send `startMatch` on
@@ -256,7 +271,10 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     // Eight seats, two humans: the rest are the cast, exactly as the roster previewed.
     expect(matchSizeOf(host.lobby())).toBe(8);
     expect(authority.ships.length).toBe(8);
-  });
+  }, netBudget({
+    work: 'boot an 8-seat server → host CREATE ROOM → six lobby configuration gestures → a guest joins by code → RUSH! countdown → both predicted worlds and authority agree on the roster',
+    measuredSeconds: 0.35,
+  }));
 
   it('never starts the match from a guest — the room waits for its host', async () => {
     const harness = await startMatchServer({ seed: 77, slots: 4, asteroidCount: 8 });
@@ -292,7 +310,21 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     // sending the message directly, past the UI, must not start the match.
     expect(pressRush(guest.lobby()), 'the model refuses a guest').toBe(guest.lobby());
     guestSession.startMatch();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // You cannot wait for a non-event, and a bare 200 ms sleep does not try to: it
+    // asserts "no match started" at whatever moment this machine happened to reach,
+    // which on a loaded runner can be *before* the server has even read the message
+    // being refused. So send a message the server DOES answer, on the SAME socket,
+    // right behind the one under test: TCP delivers in order and the room handles a
+    // socket's messages in order, so the room reflecting the second is proof it has
+    // already seen — and refused — the first.
+    guest.apply((s) => selectShipClass(s, ShipClass.Excavator));
+    await until(
+      'the room to reflect a lobby change the guest sent AFTER the refused start',
+      () => seatOf(room, guestSession.you)?.shipClass === ShipClass.Excavator,
+      5_000,
+      () => `guest seat hull ${seatOf(room, guestSession.you)?.shipClass}`,
+    );
     expect(room.world, 'the server refuses a non-creator’s start').toBeNull();
     expect(guest.started(), 'and the guest lobby is still gathering').toBe(false);
 
@@ -300,7 +332,10 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     hostSession.startMatch();
     await until('the match to start', () => room.world !== null);
     await until('the guest lobby to end on authority', () => guest.started());
-  });
+  }, netBudget({
+    work: 'boot a server → seat a host and a guest → the guest’s RUSH! is refused twice over → prove the refusal was handled → the host’s start is honoured and ends both lobbies',
+    measuredSeconds: 0.35,
+  }));
 
   it('lets go of the room when a client leaves it (BACK — no ghost rooms, u2 item 4)', async () => {
     // BACK out of the online lobby closes the socket before it reloads onto the menu
@@ -345,6 +380,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
     const guest = openClient(guestSession, 'BACK', guestSession.you, hostSession.you);
+    const host = openClient(hostSession, 'BACK', hostSession.you, hostSession.you);
 
     // The guest presses BACK: the socket closes for good.
     guestSession.close();
@@ -355,10 +391,18 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     // it: no world, and a lobby that never started.
     hostSession.startMatch();
     await until('the room to start without the guest', () => room.world !== null);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The barrier for the negative claim below: `matchStart` has not merely been
+    // *sent*, it has been **delivered** — the host's own lobby ended on it. The guest
+    // would have been told in that same broadcast if it were going to be told at all,
+    // so this is the first moment "the guest never started" is a fact rather than a
+    // stopwatch reading, and it stays a fact however slow the host is.
+    await until('the host lobby to end on the match it started', () => host.started(), 5_000);
     expect(guest.started(), 'a client that left never enters the match it left').toBe(false);
     expect(guestSession.world, 'and never builds its world').toBeNull();
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat a host and a guest → the guest closes its socket → the host starts the match → wait for matchStart to be delivered → assert the departed client was never dragged in',
+    measuredSeconds: 0.3,
+  }));
 
   it('fills the seat live — but the joiner’s NAME never crosses the wire (pinned for Netcode)', async () => {
     // Requirement 2 of the ratification asks that "joiners fill HUMAN-open slots live
@@ -439,7 +483,10 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     const named = setPlayerName(guest.lobby(), 'ZEPHYR');
     const ownSeat = lobbyModel(named).seats.find((s) => s.isYou);
     expect(ownSeat?.name, 'your own seat is you, by name').toBe('ZEPHYR');
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat a host and a joiner → assert the live roster fill and pin the absent name field on both the wire and the host screen',
+    measuredSeconds: 0.1,
+  }));
 });
 
 describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
@@ -520,5 +567,8 @@ describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
       expect(areEnemies(world, 0, 2)).toBe(true);
       expect(canDamage(world, 0, 1)).toBe(false);
     }
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a 4-seat server → seat a host and a guest → the host picks TEAMS and a 2v2 split → RUSH! → assert the split on both rosters, both predicted worlds and authority',
+    measuredSeconds: 0.1,
+  }));
 });

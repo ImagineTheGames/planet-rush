@@ -23,12 +23,33 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
+import type { PlaytestLogEvent } from '../../src/net/playtest-log';
 import { PlaytestLog, describeEnvironment } from '../../src/net/playtest-log';
 import { attachSessionLog } from '../../src/net/playtest-log-attach';
 import { downloadPlaytestLog } from '../../src/net/playtest-log-export';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * A telemetry sample the log has finished writing — i.e. one that measured a
+ * round trip.
+ *
+ * This predicate is the whole n4-01 fix. `kind === 'net'` says a sample *exists*;
+ * it does not say the sample is complete. `NetTelemetry` keys its buckets on
+ * `floor(now / 1000)` (src/net/telemetry.ts), so the FIRST finalized second is a
+ * fragment of a wall-clock second — however much of it was left when the match
+ * started — and a fragment can easily contain one reconcile whose `ackSeq` matched
+ * no outstanding send, which finalizes as `rtt: null`. Reproduced on this hardware
+ * at 1 run in 20; on CI's ~6× slower runners, often enough to redden `main`.
+ *
+ * `rtt` is the one field here that can be absent from a real sample, and it is the
+ * one to wait on: `matchRtt` is only ever reached from `recordReconcile`, which has
+ * already counted `reconciles++` on the same bucket, so a measured round trip
+ * implies `recon > 0` rather than assuming it — which is why that assertion below
+ * is still worth making instead of being folded into this wait.
+ */
+const isCompleteSample = (e: PlaytestLogEvent): boolean =>
+  e.kind === 'net' && e.data !== undefined && e.data['rtt'] !== null;
 
 /** A log with a fixed identity, so an assertion reads the session rather than the
  *  checkout's git sha. */
@@ -125,7 +146,10 @@ describe('the playtest log over a real socket', () => {
     expect(saved.schema).toBe('planet-rush.playtest-log');
     expect(saved.version).toBe(1);
     expect(saved.summary).toContain('build e2e0001');
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a ticket-enforcing Machine → dial it with no ticket → wait out the refusal and the terminal close → export the versioned payload',
+    measuredSeconds: 0.1,
+  }));
 
   it('records a healthy match: welcome, RUSH!, and per-second net telemetry', async () => {
     const harness = await startMatchServer({ seed: 77, slots: 2, asteroidCount: 10 });
@@ -150,22 +174,44 @@ describe('the playtest log over a real socket', () => {
     session.startMatch();
     await until('the match to start', () => log.events.some((e) => e.msg === 'matchStart'), 5_000);
 
-    // Fly for over a second of wall clock, filing input every 16 ms as the loop does,
-    // so the telemetry instrument finalizes at least one one-second sample and the log
-    // copies it across.
+    // Fly, filing input every 16 ms as the loop does, so the telemetry instrument has
+    // reconciles to measure and the log has samples to copy across.
     const flying = setInterval(() => session.sendInput([{ type: 'thrust', dir: { x: 1, y: 0 } }]), 16);
+
+    // ── THE WAIT THIS TEST IS ABOUT (n4-01) ─────────────────────────────────────
+    // It used to wait for `kind === 'net'` — a net event *existing* — and then assert
+    // `rtt` on it, which is a field that event may not have filled in. Those are two
+    // different conditions, and on a slow host the assertion lost the race to the
+    // sample's own population. Waiting for the sample the assertions are about makes
+    // the wait honest: what arrives here is a finalized second WITH a measured round
+    // trip in it, so what follows is a claim about correctness rather than timing.
+    //
+    // The bound is a liveness bound, not the budget. Telemetry buckets are keyed on
+    // the wall-clock second, so a complete one is at most ~2 s away (the fragment the
+    // match started inside, then a whole second) however fast the host is; 8 s is
+    // several times that, and the journey's own ceiling is declared at the bottom.
     await until(
-      'a finalized telemetry second to reach the log',
-      () => log.events.some((e) => e.kind === 'net'),
+      'a finalized telemetry second WITH a measured round trip in it',
+      () => log.events.some(isCompleteSample),
       8_000,
+      () =>
+        `${log.events.filter((e) => e.kind === 'net').length} net sample(s), rtt = ` +
+        log.events
+          .filter((e) => e.kind === 'net')
+          .map((e) => String(e.data?.['rtt']))
+          .join(', '),
     );
     clearInterval(flying);
     clearInterval(poll);
-    await sleep(20);
 
-    const sample = log.events.find((e) => e.kind === 'net')!;
+    const sample = log.events.find(isCompleteSample)!;
     // A measured round trip over loopback is small but real, and the correction is the
-    // wire's quantization rather than drift — the same numbers the netgraph shows.
+    // wire's quantization rather than drift — the same numbers a pasted log shows.
+    //
+    // `recon > 0` is NOT restating the wait: the round trip is matched inside
+    // `recordReconcile` (src/net/telemetry.ts), so a sample with an `rtt` is a sample
+    // that counted at least one reconcile — an implication of the instrument's shape,
+    // and worth failing on if that shape ever changes.
     expect(sample.data!['recon']).toBeGreaterThan(0);
     expect(sample.data!['rtt']).not.toBeNull();
     expect(Number(sample.data!['corrMax'])).toBeLessThan(5);
@@ -179,5 +225,8 @@ describe('the playtest log over a real socket', () => {
     // real match does not silently truncate its own beginning.
     expect(log.dropped).toBe(0);
     expect(log.events.length).toBeLessThan(log.capacity);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat and welcome a client → RUSH! → fly under 60 Hz input until a COMPLETE telemetry second lands → assert the sample and the lifecycle',
+    measuredSeconds: 1.6,
+  }));
 });

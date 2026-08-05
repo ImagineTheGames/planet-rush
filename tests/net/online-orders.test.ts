@@ -40,9 +40,8 @@ import { SATELLITE, ledgerAdd, nextUpgradeCost } from '../../src/sim';
 import type { World } from '../../src/sim';
 import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Enough ore in the bank to afford both purchases with room to spare — a mining
  *  montage is not what is under test here. Added through the ledger, so the
@@ -135,7 +134,15 @@ describe('buying things in an online match', () => {
       bob.sendInput([]);
     }, 1000 / 60);
 
-    await sleep(250); // let the stake reach the client
+    // Wait for the stake to *be on the client*, not for a quarter second in which it
+    // usually is: the economy channel is what carries it (`server/room.ts`
+    // syncEconomy), and the baseline below is only a baseline once it has landed.
+    await until(
+      'the staked wallet to reach alice’s client down the economy channel',
+      () => shipOf(alice.world!, 0).banked >= wallet,
+      5_000,
+      () => `client wallet ${alice.world === null ? 'no world' : shipOf(alice.world, 0).banked} of ${wallet}`,
+    );
     // The baseline everything below moves off: no tier, no satellite, on the
     // server and on both clients.
     expect(aliceShip.tiers[UpgradeTrack.Power]).toBe(0);
@@ -153,11 +160,20 @@ describe('buying things in an online match', () => {
     // Charged, not merely acknowledged.
     expect(aliceShip.banked).toBeCloseTo(wallet - upgradeCost, 6);
 
-    await sleep(400); // the economy channel's trip home
     // THE VISIBLE PROOF: the tier is on the *client's* ship, which is the exact
     // expression the DAMAGE ramp reads to tint a shot
     // (`src/render/index.ts` shotTier → `owner.tiers[UpgradeTrack.Power]`).
     // Before the fix this stayed 0 for the whole match, in every online game.
+    //
+    // The wait is for the tier arriving, not for 400 ms of economy channel: the
+    // channel's cadence is the server's business and the runner's load moves it,
+    // and a fixed sleep only ever encodes how fast this machine happened to be.
+    await until(
+      'the bought DAMAGE tier to come home down the economy channel',
+      () => shipOf(alice.world!, 0).tiers[UpgradeTrack.Power] === 1,
+      5_000,
+      () => `client tier ${alice.world === null ? 'no world' : shipOf(alice.world, 0).tiers[UpgradeTrack.Power]}`,
+    );
     expect(shipOf(alice.world!, 0).tiers[UpgradeTrack.Power]).toBe(1);
     // Bought once, not once per replayed tick: prediction replays pending input
     // every frame until it is acknowledged, and a one-shot order that re-charged
@@ -179,7 +195,15 @@ describe('buying things in an online match', () => {
     for (const job of station.builds) if (job.kind === 'satellite') job.remaining = 1 / 60;
     await until('the server to finish building it', () => satelliteCount(authority, 0) === 1);
 
-    await sleep(600); // several of the entity stream's 10 Hz intervals
+    // Wait for the satellite to reach BOTH clients — the thing under test — rather
+    // than for 600 ms of the entity stream's 10 Hz cadence, which is how long it
+    // takes here and not how long it takes on a loaded runner.
+    await until(
+      'the finished satellite to reach both clients on the entity-event stream',
+      () => satelliteCount(alice.world, 0) === 1 && satelliteCount(bob.world, 0) === 1,
+      5_000,
+      () => `alice ${satelliteCount(alice.world, 0)}, bob ${satelliteCount(bob.world, 0)}`,
+    );
     // The owner sees the satellite she paid for…
     expect(satelliteCount(alice.world, 0)).toBe(1);
     // …and so does the rival who has to be able to shoot it (feature f1).
@@ -190,5 +214,8 @@ describe('buying things in an online match', () => {
     if (!serverSat || !bobSat) throw new Error('the satellite went missing mid-test');
     expect(bobSat.id).toBe(serverSat.id);
     expect(bobSat.owner).toBe(0);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → stake a wallet and wait for it on the client → buy a DAMAGE tier over the wire and wait for it home → order a satellite, wind the job down, wait for it on both clients',
+    measuredSeconds: 1.6,
+  }));
 });
