@@ -39,6 +39,7 @@
  */
 
 export * from './palette';
+export * from './materials';
 export * from './shapes';
 export * from './raster';
 export * from './ring-scan';
