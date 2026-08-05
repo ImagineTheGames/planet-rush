@@ -76,6 +76,19 @@ removed (and therefore colour-blind-safe, the same path the hull decal takes).
 
 ### Known-open
 
+- **A nameplate crossing the station's own ring strokes loses contrast — the side
+  tag inherits this, it does not introduce it.** Both hues clear the 4.5:1 floor
+  against Vacuum, which is the backdrop this amendment declares and pins by test
+  (measured 9.4:1 for friendly in dark space). But the nameplate layer draws no
+  backing plate, so where a plate happens to cross the bright blue shield/beacon
+  rings, the *whole* plate — the name as much as the side tag — drops to ~2.1:1
+  (p90 of the backdrop under the glyphs) and ~1.6:1 at the brightest stroke. This
+  is visible in all three new baselines on `YOU FRIENDLY A`, because a ship spawns
+  orbiting its own station and the frozen scene is t≈0. It is **pre-existing, not
+  a regression**: `desktop-frozen` on `main` shows the bare name `YOU` washing out
+  identically in the same place, in a different colour, before this change. The
+  fix is a backing plate or outline on the nameplate layer, which would move the
+  FFA baselines too and is deliberately out of this brief's scope.
 - `docs/netcode-teams-wire.md` §3/§5 still quotes the superseded `TEAM A` wording
   and the 64px chip; it is the Netcode lane's record of the m10 round and was left
   for its owner rather than rewritten from this lane. The GDD (§2.1, §2.2, §5.2)
