@@ -117,6 +117,15 @@ const bodyPoint = (r: Rect): { x: number; y: number } => ({
   y: r.y + r.height / 2,
 });
 
+/** The widest side label the chip ever carries — `FRIENDLY A` — in CSS px at the
+ *  chip's 11px Audiowide, measured in the studio container (`ENEMY B` is 50,
+ *  `TEAM A` was 41). Geometry runs in node with no font to measure, so the number
+ *  is stated here and the constant it justifies lives next door
+ *  (`SEAT_TEAM_CHIP_WIDTH` = 88 = this + its padding, rounded up). */
+const LONGEST_SIDE_LABEL_PX = 64;
+/** Mirrors `lobby-view`'s own `TEAM_CHIP_LABEL_PAD` — the inset the word keeps. */
+const TEAM_CHIP_LABEL_PAD = 6;
+
 // ---------------------------------------------------------------------------
 // 1. Containment
 // ---------------------------------------------------------------------------
@@ -451,6 +460,18 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
             kind: 'seatChip',
             index: i,
           });
+        }
+
+        // …and it is wide enough to actually SAY the side (u3). The word is the
+        // whole feature — `FRIENDLY A` measures 64px in the chip's 11px Audiowide
+        // (measured in-container, the same way the 88px constant was chosen) — so
+        // a chip that cannot hold it is a chip that would draw the word over the
+        // name beside it. Every profile that draws a chip at all must fit it.
+        if (teamChip.width > 0 && teamChip.height > 0) {
+          expect(
+            teamChip.width,
+            `team chip ${i} cannot hold "FRIENDLY A" on ${name}`,
+          ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
         }
 
         // The team chip — composed to the LEFT of the difficulty chip (TEAMS) —

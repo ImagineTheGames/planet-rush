@@ -214,14 +214,15 @@ export const SEAT_TEAM_CHIP_WIDTH = 88;
  * body, which is the seat-state cycle's tap target.
  *
  * It used to be "strictly right of centre" (0.5), and that was affordable while
- * the chip said `TEAM A`. `FRIENDLY A` needs ~76px including its padding, and the
- * landscape phone's 221px row has only 48 to the right of centre: the word would
- * have spilled out of the chip drawn around it. 0.38 leaves the phone chip 78px —
- * the word fits, with the left 84px of the row (a 84×19 target, and the whole row
- * height) still body. Every wider form factor is bound by
- * {@link SEAT_TEAM_CHIP_WIDTH} instead and never reaches this clamp at all.
+ * the chip said `TEAM A`. `FRIENDLY A` needs 76px including its padding (64px of
+ * word at 11px Audiowide, measured), and the landscape phone's 221px row has only
+ * 48 to the right of centre: the word would have spilled out of the chip drawn
+ * around it. 0.36 leaves that row's chip 79px — the word fits at full size, with
+ * the leading 80px of the row (80×19, the whole row height) still body. Every
+ * wider form factor is bound by {@link SEAT_TEAM_CHIP_WIDTH} instead and never
+ * reaches this clamp at all. `./lobby-geometry.test` asserts both halves.
  */
-export const SEAT_TEAM_CHIP_MIN_BODY = 0.38;
+export const SEAT_TEAM_CHIP_MIN_BODY = 0.36;
 
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;

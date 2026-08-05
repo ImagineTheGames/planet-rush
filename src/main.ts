@@ -1672,10 +1672,12 @@ async function boot(): Promise<void> {
    * The world is the authority on allegiance in both form factors — offline it is
    * the loopback's own authoritative world, online it is the predicted world
    * `matchStart` built from the server's roster — so reading `ship.team` here means
-   * the `TEAM A` a player reads over a hull is the same number `areEnemies` uses to
-   * decide whether they can shoot it. Reading the lobby instead would let the label
-   * drift from the simulation, which is the exact class of bug this milestone is
-   * fixing.
+   * the `FRIENDLY A` / `ENEMY B` a player reads over a hull is the same number
+   * `areEnemies` uses to decide whether they can shoot it. Reading the lobby
+   * instead would let the label drift from the simulation, which is the exact
+   * class of bug this milestone is fixing. The VIEWER's own side — the half that
+   * decides `FRIENDLY` from `ENEMY` (u3) — is read from the same pass, off the
+   * same ships, for the same reason.
    *
    * Sides are worth *naming* only when there are fewer sides than players: FFA is
    * teams-of-one, where `ship.team === ship.id` for everyone and a label would just

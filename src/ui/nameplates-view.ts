@@ -68,7 +68,7 @@ export const NAMEPLATE_SUFFIX_GAP = 3;
  *  on the name's own alpha so it recedes in step through the combat fade too. */
 export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
 
-/** Horizontal gap between the name and the `TEAM A` side label that follows it,
+/** Horizontal gap between the name and the `FRIENDLY A` side label after it,
  *  CSS px — the same beat as the difficulty gap, so a plate reads as one row. */
 export const NAMEPLATE_TEAM_GAP = 4;
 /**
@@ -122,7 +122,7 @@ export class NameplateView extends Container {
   /** Parallel pool for the recessive difficulty suffix, one per name slot; a name
    *  with no suffix (a human, or an unfed difficulty table) hides its entry. */
   private readonly suffixes: Text[] = [];
-  /** Parallel pool for the `TEAM A` side label, one per name slot; a plate with no
+  /** Parallel pool for the side label, one per name slot; a plate with no
    *  side (every plate in FFA) hides its entry. */
   private readonly teamTags: Text[] = [];
   /** Union of the rects drawn this frame, or null when nothing drew. */
@@ -325,7 +325,7 @@ export class NameplateView extends Container {
     return t;
   }
 
-  /** The pooled `TEAM A` Text for name slot `i` — same left anchor and baseline as
+  /** The pooled side-label Text for name slot `i` — same left anchor and baseline as
    *  the difficulty suffix, and pooled the same way (m10 teams). */
   private teamSlot(i: number): Text {
     let t = this.teamTags[i];
