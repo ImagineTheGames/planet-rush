@@ -574,22 +574,25 @@ export class Renderer {
   }
 
   /**
-   * The atmosphere halo (GDD §2.3, p4-12): the deposit range, made visible. A
-   * soft, low-opacity air-glow at exactly `DEPOSIT_RANGE`, drawn only around the
-   * viewer's OWN living station — the halo *is* the affordance, so a rival's world
-   * (where you cannot deposit) gets none. The radius derives from `DEPOSIT_RANGE`
-   * inside the sprite (`atmosphereHaloSprite`), so the air and the rule are one
-   * number; here we only place and fade it.
+   * The two own-station range rings (GDD §2.3, §2.5, §5.4; p4-12, a4-01): the
+   * atmosphere out to exactly `DEPOSIT_RANGE`, and the dashed plasma build ring
+   * at exactly `STATION.dockRange`. Drawn only around the viewer's OWN living
+   * station — both are affordances ("where do I unload?", "where can I build?"),
+   * so a rival's world gets neither. Both radii derive from the sim constants
+   * inside the sprite (`atmosphereHaloSprite`), so the art and the rules are one
+   * number each; here we only place and fade them.
    *
    * Static-render discipline (GDD §4.3): the geometry is built once per owner and
    * then **baked to a single texture** (`cacheAsTexture`), so per frame the halo
-   * is one textured quad the GPU blits — not five stacked translucent discs it
-   * re-blends every frame. That overdraw (five large alpha fills at the atmosphere
+   * is one textured quad the GPU blits — not a stack of translucent discs it
+   * re-blends every frame. That overdraw (large alpha fills at the atmosphere
    * radius) was the mobile frame-budget cost this VFX was tuned to shed: on the
    * software-GL profile it dropped the frame rate below the boot-path budget until
-   * it was baked. The bake survives every per-frame change we make — position (the
-   * camera pan) and alpha (the breath) are display properties applied to the quad,
-   * never a re-rasterise of the gradient.
+   * it was baked. The bake is also what makes the gradient affordable at the step
+   * count it now needs to read as genuinely smooth (a4-01) — the discs blend once,
+   * at match start, and never again. The bake survives every per-frame change we
+   * make — position (the camera pan) and alpha (the breath) are display properties
+   * applied to the quad, never a re-rasterise of the gradient.
    *
    * Per frame the halo only moves and fades: a gentle breath keyed to sim time
    * (deterministic, so the frozen golden holds still), lifted toward full while a
@@ -599,10 +602,13 @@ export class Renderer {
    *
    * VfxAutoQuality tier (GDD §4.3 risk 5): when the auto-reducer has throttled a
    * struggling device (`reduceVfx`), even the one baked quad's full-disc fill is
-   * too dear, so the halo is rebuilt as the **simpler ring** — a thin edge band at
-   * `DEPOSIT_RANGE` that blends only its own annulus, not a full disc. It is left
-   * un-baked on purpose: a cached quad would blit the whole bounding box (the
-   * transparent centre included), which is the very cost the ring exists to dodge.
+   * too dear, so the halo is rebuilt as the **rings alone** — the same edge band
+   * at `DEPOSIT_RANGE` and the same build ring at `STATION.dockRange`, with the
+   * haze between them dropped, blending only their own annuli rather than a full
+   * disc. Both questions still get an answer at this tier; only the air is cut.
+   * It is left un-baked on purpose: a cached quad would blit the whole bounding
+   * box (the transparent centre included), which is the very cost this tier exists
+   * to dodge.
    */
   private drawAtmosphere(
     index: number,
@@ -622,8 +628,8 @@ export class Renderer {
       g?.destroy();
       g = spriteGraphics(atmosphereHaloSprite(station.owner, reduced === 1), station.radius);
       g.label = `atmosphere-${index}`;
-      // Full gradient: bake it to one texture so the five discs blend once, ever.
-      // The ring tier stays vector — its thin band is cheaper drawn than blitted.
+      // Full gradient: bake it to one texture so its discs blend once, ever.
+      // The ring tier stays vector — its thin bands are cheaper drawn than blitted.
       if (reduced === 0) g.cacheAsTexture(true);
       this.stationHalo[index] = g;
       this.stationHaloOwner[index] = station.owner;

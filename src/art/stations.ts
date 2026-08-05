@@ -226,8 +226,45 @@ export function repairAuraSprite(): SpriteDef {
 }
 
 // ---------------------------------------------------------------------------
-// The atmosphere halo (p4-12) — the deposit range, made visible
+// The two rings around your own station (a4-01) — the ranges, made visible
 // ---------------------------------------------------------------------------
+
+/**
+ * TWO rings around your own home, and exactly two, because there are exactly two
+ * radii a player has to know about (field report 2026-08-05, with a screenshot:
+ * *"theres a bunch of rings around the station (planet) we only need 2"*):
+ *
+ *  - the **atmosphere edge** at `DEPOSIT_RANGE` — inside it your hold empties
+ *    itself into the bank ({@link ATMOSPHERE_HALO_RADIUS});
+ *  - the **build ring** at `STATION.dockRange` — inside it the Build & Upgrade
+ *    wheel is live ({@link BUILD_RING_RADIUS}).
+ *
+ * Both radii already existed and already drove the sim; neither moves here. What
+ * changed is that the atmosphere used to *look* like five rings (a five-step
+ * gradient whose every step was a findable edge) and the build radius was drawn
+ * nowhere at all — so the player could count five boundaries and none of them was
+ * the one that gates building.
+ *
+ * The two are deliberately different **kinds** of boundary, so they can never be
+ * mistaken for the same rule stated twice, and so they still separate with colour
+ * removed (style-guide §3 rule 4 — form carries information, colour is the fast
+ * read):
+ *
+ * | | atmosphere edge | build ring |
+ * |---|---|---|
+ * | radius | `DEPOSIT_RANGE` (4·station radius) | `STATION.dockRange` (2.5·) |
+ * | form | one continuous soft band | short dashes, a threshold scale |
+ * | colour | the owner's roster colour (`identity`) | plasma (`energy`) |
+ * | reads as | "your air reaches to here" | "your hands reach to here" |
+ *
+ * Plasma is the game's interactive/energy colour (style-guide §1) and is already
+ * what the BUILD button wears, so the ring in the world and the button on the
+ * thumb are visibly the same affordance — cross the plasma dashes and the plasma
+ * button lights up ({@link ../ui/build-button}).
+ *
+ * `ring-scan.ts` measures both as a player sees them and `generators.test.ts`
+ * asserts the count, so the next well-meaning gradient cannot quietly add a third.
+ */
 
 /**
  * The halo's outer edge, in **unit space** (station radius = 1) — derived from
@@ -244,61 +281,171 @@ export function repairAuraSprite(): SpriteDef {
 export const ATMOSPHERE_HALO_RADIUS = DEPOSIT_RANGE / STATION.radius;
 
 /**
- * The atmosphere halo (p4-12; GDD §2.3): a soft, low-opacity air-glow around a
- * player's **own** station, reaching to exactly `DEPOSIT_RANGE` — the radius
- * inside which a ship's hold auto-deposits (ratified p4: "just be in that
- * atmosphere"). The halo *is* the affordance: enemy stations get none, because
- * you cannot deposit there, so a ring of your own colour is the visible answer
- * to "where do I unload?".
+ * The build ring's radius, in the same **unit space** — `STATION.dockRange` and
+ * nothing else, so the dashes the player flies across and the radius the wheel
+ * gates on are one number. `STATION.dockRange` is the sim's own docking test
+ * (`isDocked`, src/sim/buildings.ts), which is what the Build & Upgrade wheel
+ * opens on (GDD §2.5, "your ship must sit at your station") and what lights the
+ * BUILD button. Comfortably inside {@link ATMOSPHERE_HALO_RADIUS} — 2.5 station
+ * radii against 4 — which is the rule (`DEPOSIT_RANGE > STATION.dockRange`)
+ * showing itself: you are in your air well before you are in reach.
+ */
+export const BUILD_RING_RADIUS = STATION.dockRange / STATION.radius;
+
+// --- The atmosphere gradient ------------------------------------------------
+//
+// Steps, and the profile they approximate. The count is the fix: the shipped
+// halo used five, whose cumulative alpha stepped by ~0.067 a band — sixteen
+// levels of a channel against Vacuum, which is not a gradient, it is four extra
+// rings. At 40 steps over the same alpha range each step is ~0.0045, about ONE
+// level: under 8-bit quantisation, and a quarter of `RING_JND` (./ring-scan).
+// The whole stack is baked to one texture per owner by the renderer, so the cost
+// of the extra discs is paid once, at match start, and never per frame.
+
+/** Discs in the gradient. See the note above for why it is this many. */
+const HALO_STEPS = 40;
+/** Innermost disc, as a fraction of the halo radius. 0.26·4 ≈ 1.04 unit — laps
+ *  just over the station limb, so the halo never seams against the ocean body. */
+const HALO_INNER = 0.26;
+/** Composited alpha at the innermost disc (mostly hidden behind the station). */
+const HALO_INNER_ALPHA = 0.17;
+/** Composited alpha where the air runs out, just inside the edge band. */
+const HALO_EDGE_ALPHA = 0.025;
+/** Falloff shape: >1 thins the air faster on the way out, which is what makes it
+ *  read as an atmosphere rather than a flat translucent disc. */
+const HALO_FALLOFF = 1.25;
+
+/** Target composited alpha at radius fraction `t` (1 = the atmosphere edge). */
+function haloAlphaAt(t: number): number {
+  const s = (t - HALO_INNER) / (1 - HALO_INNER);
+  const k = s <= 0 ? 1 : s >= 1 ? 0 : Math.pow(1 - s, HALO_FALLOFF);
+  return HALO_EDGE_ALPHA + (HALO_INNER_ALPHA - HALO_EDGE_ALPHA) * k;
+}
+
+/**
+ * The gradient as stacked discs, largest (and faintest) first.
  *
- * It reads as air, not a UI circle (the brief): concentric discs in the player's
- * colour, densest at the station limb and thinning to nothing at the atmosphere
- * edge — a radial gradient approximated in the flat-fill IR. Drawn behind the
- * station, so only the outward glow past the limb is seen; the dense inner discs
- * fall behind the ocean body. Player colour ⇒ role `identity` (style-guide §3),
- * the same channel the beacon ring wears.
+ * Each disc's own alpha is *derived* from the target profile rather than
+ * authored: a disc lands on everything the larger ones already painted, so
+ * hitting a wanted composite `A` over an existing `below` needs
+ * `(A − below) / (1 − below)`. Authoring the per-disc alphas by hand is what let
+ * the old five-stop table compose into steps nobody intended.
+ */
+function haloGradient(color: number, r: number): Shape[] {
+  const out: Shape[] = [];
+  let below = 0;
+  for (let i = 0; i < HALO_STEPS; i++) {
+    const t = 1 - (i / (HALO_STEPS - 1)) * (1 - HALO_INNER);
+    const want = haloAlphaAt(t);
+    out.push(circle(0, 0, round(r * t), fill(color, 'identity', round((want - below) / (1 - below)))));
+    below = want;
+  }
+  return out;
+}
+
+/** The edge band's thickness, as a fraction of the halo radius (≈5 world units)
+ *  — thick enough to read as air condensing at the limb of the atmosphere, thin
+ *  enough that it is unmistakably a boundary and not another disc. */
+const HALO_EDGE_BAND = 0.022;
+/** The edge band's own alpha, over whatever the gradient has already laid down.
+ *  This is the ONE step in the atmosphere the eye is meant to find. */
+const HALO_EDGE_BAND_ALPHA = 0.2;
+
+/** The single unambiguous atmosphere boundary: one band, outer edge exactly at
+ *  `DEPOSIT_RANGE`. Identity colour, like the beacon ring — this is your air. */
+function atmosphereEdgeBand(color: number, r: number): Shape {
+  return poly(
+    annulusPoints(0, 0, round(r), round(r * (1 - HALO_EDGE_BAND)), 0, Math.PI * 2, 64),
+    fill(color, 'identity', HALO_EDGE_BAND_ALPHA),
+  );
+}
+
+// --- The build ring ---------------------------------------------------------
+
+/** Dashes around the build ring. Enough to read as a measured threshold rather
+ *  than a solid wall, few enough that each dash is a confident mark. */
+const BUILD_RING_DASHES = 12;
+/** Dash length as a fraction of the pitch — the rest is gap. */
+const BUILD_RING_DUTY = 0.62;
+/** Band thickness in unit space (≈3.5 world units): a crisp line, deliberately
+ *  thinner than the atmosphere's soft edge band. */
+const BUILD_RING_WIDTH = 0.055;
+/** Alpha. High, because the renderer breathes the whole halo down toward ~0.5
+ *  while it is idle and this ring has to stay legible through that. */
+const BUILD_RING_ALPHA = 0.8;
+
+/**
+ * The build ring: dashed plasma at exactly `STATION.dockRange`, its OUTER edge
+ * on the radius — the same convention the atmosphere band uses, so both rings
+ * mean "the rule ends at the outside of this band".
+ *
+ * Plasma on role `energy` (style-guide §1: beams, cockpits, **energy**) — the
+ * colour the BUILD button and every other interactive affordance already wear,
+ * and pointedly *not* the owner's identity colour, which is what the atmosphere
+ * and the beacon ring use. Dashes against the atmosphere's continuous band give
+ * the pair a second, colour-free channel of difference.
+ */
+function buildRangeRing(): Shape[] {
+  const outer = round(BUILD_RING_RADIUS);
+  const inner = round(outer - BUILD_RING_WIDTH);
+  const pitch = (Math.PI * 2) / BUILD_RING_DASHES;
+  const span = pitch * BUILD_RING_DUTY;
+  const out: Shape[] = [];
+  for (let i = 0; i < BUILD_RING_DASHES; i++) {
+    const from = i * pitch - span / 2;
+    out.push(
+      poly(annulusPoints(0, 0, outer, inner, from, from + span, 6), fill(PALETTE.plasma, 'energy', BUILD_RING_ALPHA)),
+    );
+  }
+  return out;
+}
+
+/**
+ * The own-station range rings (p4-12, a4-01; GDD §2.3, §2.5): the atmosphere out
+ * to exactly `DEPOSIT_RANGE`, and the build ring at exactly `STATION.dockRange`.
+ * Drawn around a player's **own** station and nowhere else — both are affordances
+ * ("where do I unload?", "where can I build?"), and neither question has an answer
+ * at a rival's world, so a rival's world gets neither ring.
+ *
+ * The atmosphere reads as air, not a UI circle (the p4 brief): a genuinely smooth
+ * gradient, densest behind the station and thinning outward, closed by ONE soft
+ * band at the edge. It used to be five discs whose steps the eye could count, and
+ * a player counted them and asked what each one meant — see the header of this
+ * section, and {@link HALO_STEPS} for the arithmetic that replaced them.
  *
  * The alpha here is the **bright, ore-flowing** density. The renderer breathes it
  * gently on `world.time` and, while a deposit is actually flowing, holds it near
  * full — an idle halo is dimmed to a hush, a depositing one brightens (pairs with
- * the ore-flight couriers). Static-render discipline: the renderer bakes this to a
- * single texture once per owner (`cacheAsTexture`) and thereafter only fades the
- * one quad — the gradient is never re-rasterised, and the five stacked translucent
- * discs never re-blend per frame (that overdraw was the mobile frame-budget cost
- * this VFX was tuned to shed, GDD §4.3 risk 5).
+ * the ore-flight couriers). The build ring breathes with it, which is why it is
+ * the brightest thing in the sprite: your home's air and your home's reach are one
+ * object, and they fade together rather than arguing.
+ *
+ * Static-render discipline: the renderer bakes this to a single texture once per
+ * owner (`cacheAsTexture`) and thereafter only fades the one quad — the gradient
+ * is never re-rasterised, and its stacked translucent discs never re-blend per
+ * frame (that overdraw was the mobile frame-budget cost this VFX was tuned to
+ * shed, GDD §4.3 risk 5).
  *
  * On a device the auto-reducer has throttled (`reduced`), the full gradient's
- * fill is too dear even baked, so the halo drops to the **simpler ring** the tier
- * promises: one thin edge band at `DEPOSIT_RANGE`, in the same identity colour.
- * A thin annulus blends only its own band, not a full-disc quad, so the slow
- * profile buys its frame time back while the affordance — "your air reaches to
- * here" — still reads.
+ * fill is too dear even baked, so the halo drops to the **rings alone**: the same
+ * edge band at `DEPOSIT_RANGE` and the same dashed build ring, with the haze
+ * between them dropped. Thin annuli blend only their own bands, not a full-disc
+ * quad, so the slow profile buys its frame time back while both affordances still
+ * read — and the tier answers exactly the same two questions as the full one,
+ * which is what "coherent" has to mean here.
  */
 export function atmosphereHaloSprite(playerId: number, reduced = false): SpriteDef {
   const color = playerColor(playerId);
   const r = ATMOSPHERE_HALO_RADIUS;
   if (reduced) {
-    // The reduced tier: a soft double band hugging the atmosphere edge, marking
-    // exactly where the deposit range ends. Two thin annuli (not a filled disc)
-    // so the fill is a hair of the gradient's — the whole point of the tier.
     return sprite(`station/atmosphere/p${playerId}/reduced`, round(r), [
-      poly(annulusPoints(0, 0, round(r), round(r * 0.9), 0, Math.PI * 2, 44), fill(color, 'identity', 0.09)),
-      poly(annulusPoints(0, 0, round(r * 0.88), round(r * 0.82), 0, Math.PI * 2, 44), fill(color, 'identity', 0.06)),
+      atmosphereEdgeBand(color, r),
+      ...buildRangeRing(),
     ]);
   }
-  // [fraction of the halo radius, fill alpha] — largest/faintest first so the
-  // discs stack back-to-front into a limb-bright, edge-faint gradient. The
-  // outermost disc sits at the full radius: the atmosphere edge is DEPOSIT_RANGE.
-  const stops: readonly (readonly [number, number])[] = [
-    [1.0, 0.035], // the atmosphere edge — exactly DEPOSIT_RANGE
-    [0.8, 0.05],
-    [0.6, 0.065],
-    [0.4, 0.08],
-    [0.26, 0.1], // 0.26·4 ≈ r 1.04: laps just over the station limb, no seam
-  ];
-  return sprite(
-    `station/atmosphere/p${playerId}`,
-    round(r),
-    stops.map(([frac, alpha]) => circle(0, 0, round(r * frac), fill(color, 'identity', alpha))),
-  );
+  return sprite(`station/atmosphere/p${playerId}`, round(r), [
+    ...haloGradient(color, r),
+    atmosphereEdgeBand(color, r),
+    ...buildRangeRing(),
+  ]);
 }

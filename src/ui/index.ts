@@ -104,7 +104,12 @@ export type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
 //     fixture near your own station (GDD §2.2, §2.4); drawn by touch-visuals,
 //     its persistence rule + layout contract owned here.
 
-export { BUILD_BUTTON_ID, BUILD_BUTTON_ANCHOR, buildButtonVisible } from './build-button';
+export {
+  BUILD_BUTTON_ID,
+  BUILD_BUTTON_ANCHOR,
+  buildButtonVisible,
+  buildButtonHighlighted,
+} from './build-button';
 export type { BuildButtonSignals } from './build-button';
 
 // --- Upgrade WHEEL — the only place ship stats appear (GDD §2.2, §2.5) ------
