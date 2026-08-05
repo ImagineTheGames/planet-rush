@@ -32,6 +32,7 @@
  * what the registry can actually see, and lights the rest up with no change here.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { budgetTest } from './budgets';
 
 // --- Profiles --------------------------------------------------------------
 
@@ -229,6 +230,10 @@ test('layout contract: portrait-held phone reports a landscape logical viewport,
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only (portrait is the native touch orientation)');
+  budgetTest({
+    work: 'portrait boot of the frozen build → one registry probe → contract check over every registered element',
+    measuredSeconds: 6,
+  });
 
   // Field report v0.1.1 (ratified, Platform Engineer): the game IS landscape on
   // mobile, always. A phone held in portrait is rotated to landscape and the
@@ -246,6 +251,10 @@ test('layout contract: portrait-held phone reports a landscape logical viewport,
 
 test('layout contract: every registered element within its anchor — landscape', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen build → one registry probe → contract check',
+    measuredSeconds: 6,
+  });
 
   await rotate(page); // portrait → landscape before boot
   const probe = await probeLayout(page);
@@ -261,6 +270,10 @@ test('layout contract: every registered element within its anchor — landscape'
 
 test('layout contract: desktop elements within anchors, no touch affordances leak', async ({ page }, testInfo) => {
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
+  budgetTest({
+    work: 'desktop boot of the frozen build → one registry probe → contract check + touch-affordance leak guard',
+    measuredSeconds: 2,
+  });
 
   const probe = await probeLayout(page);
   const problems = contractViolations(probe, DECLARED_DESKTOP, `${testInfo.project.name}/desktop`);

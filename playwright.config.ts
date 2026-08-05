@@ -30,6 +30,19 @@ export default defineConfig({
   testDir: './tests/mobile',
   // A hung page load is a failed test, never a hung suite (QA charter: enforced
   // timeouts). These bound each test and each assertion.
+  //
+  // `timeout` here is the FLOOR, not the suite's budget. It is the right number
+  // for a two-assertion test and the wrong one for a journey — orient, boot, hold
+  // thrust, settle, assert — which on a software-GL CI runner costs ~6× what it
+  // costs on this hardware. A flat 60 s cut centering.spec.ts off mid-journey and
+  // held `main` red for two days (q7-01), after flaking a green PR four times
+  // before that.
+  //
+  // DO NOT RAISE THIS NUMBER to fix a slow test. A blanket bump buys silence
+  // across the whole suite and hides the next genuine hang. Every test in
+  // tests/mobile/ instead declares the work it does and takes the budget that
+  // follows, via `budgetTest()` in tests/mobile/budgets.ts — and
+  // tests/mobile-budget-contract.test.ts fails the build if one forgets to.
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

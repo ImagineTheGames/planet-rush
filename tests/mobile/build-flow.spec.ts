@@ -29,6 +29,8 @@
  * actually honours it end to end.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { budgetTest } from './budgets';
+import { waitForSimTicks } from './sim-clock';
 
 const TOUCH_PROJECTS = ['iphone', 'pixel'];
 const isTouchProject = (name: string): boolean => TOUCH_PROJECTS.includes(name);
@@ -132,21 +134,15 @@ async function useLandscape(page: Page): Promise<void> {
 }
 
 /** Wait for the sim to advance `n` fixed steps from now — render-rate
- *  independent (rAF-polled against the sim's own clock). */
-async function advanceSimTicks(page: Page, n: number): Promise<void> {
-  await page.evaluate(
-    (want) =>
-      new Promise<void>((resolve) => {
-        const pr = (window as unknown as { __planetRush: { ticks: number } }).__planetRush;
-        const t0 = pr.ticks;
-        const poll = (): void => {
-          if (pr.ticks - t0 >= want) resolve();
-          else requestAnimationFrame(poll);
-        };
-        requestAnimationFrame(poll);
-      }),
-    n,
-  );
+ *  independent (rAF-polled against the sim's own clock).
+ *
+ *  Delegates to the suite's shared waiter (./sim-clock.ts), which adds the piece
+ *  this local copy lacked: a stall watchdog. A construction wait that never
+ *  advances now fails in 10 s naming how far it got, instead of quietly eating
+ *  the whole journey budget and reporting as "slow" (QA charter: a hung match is
+ *  a failed test, never a hung harness). */
+async function advanceSimTicks(page: Page, n: number, what?: string): Promise<void> {
+  await waitForSimTicks(page, n, what ? { what } : {});
 }
 
 /** A discrete touch tap, then let a couple of sim ticks apply it. */
@@ -169,14 +165,20 @@ test.describe('build button persists through the whole build cycle', () => {
     // most MAX_FRAME_SECONDS (0.25 s ⇒ 15 steps) of catch-up per frame, so those
     // 650 steps alone cost ~44 render frames ≈ ~45 s of wall clock — before the
     // several tap→settle round-trips on top. That is irreducible without weakening
-    // what the test proves (the button survives a completed build), and it sits
-    // right at the default 60 s budget, so it flakes/times out there (#147). It is
-    // NOT a minimap cost — the map's per-frame render is negligible (an A/B removing
-    // its offscreen texture pass moved the advance by 0 ms), and the BUILD button is
+    // what the test proves (the button survives a completed build). It is NOT a
+    // minimap cost — the map's per-frame render is negligible (an A/B removing its
+    // offscreen texture pass moved the advance by 0 ms), and the BUILD button is
     // claimed before the minimap in the pointer handler (main.ts), on the opposite
-    // screen corner. Mark the cycle legitimately slow so the slow runner gets the
-    // 3× budget it genuinely needs. Touch-only (desktop is skipped above).
-    test.slow();
+    // screen corner. Touch-only (desktop is skipped above).
+    //
+    // This used to be `test.slow()` — a blanket 3× of whatever the global cap
+    // happened to be, which says nothing about the work and moves silently when
+    // someone edits the config. Budget the journey from what it does instead
+    // (q7-01, ./budgets.ts).
+    budgetTest({
+      work: 'landscape boot → tap BUILD → order a turret → 650 sim ticks of construction → 3 more taps',
+      measuredSeconds: 28,
+    });
 
     await useLandscape(page);
     await bootDebug(page);
@@ -231,7 +233,7 @@ test.describe('build button persists through the whole build cycle', () => {
     // Let the turret's ~10 s build run out (buildTime 10 s = 600 ticks), then a
     // little past it — "after construction". The idle ship never undocks, so the
     // button is a fixture the whole time.
-    await advanceSimTicks(page, 650);
+    await advanceSimTicks(page, 650, 'turret construction (10 s buildTime = 600 ticks)');
     const after = await snapshot(page);
     const btnAfter = find(after, 'build-button');
     expect(btnAfter, `[${label}] AFTER: the button disappeared once construction finished — the reported bug`).toBeTruthy();
@@ -262,6 +264,10 @@ test.describe('the wheel BACK cycle — drill in, hub-tap back out (field report
     page,
   }, testInfo) => {
     test.skip(!isTouchProject(testInfo.project.name), 'the wheel is tap-operated on touch (GDD §2.4)');
+    budgetTest({
+      work: 'landscape boot → 6 wheel taps (drill BUILD → UPGRADE → WEAPON, then BACK ×3), each with a 2-tick settle',
+      measuredSeconds: 24,
+    });
 
     await useLandscape(page);
     await bootDebug(page);

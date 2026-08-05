@@ -22,6 +22,7 @@
  * the live run belongs in the mobile container against the built bundle.
  */
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
+import { budgetTest } from './budgets';
 
 // Touch profiles rotate a portrait viewport to landscape; the desktop control
 // never does (it is the un-rotated baseline). See playwright.config.ts.
@@ -211,6 +212,11 @@ function assertMenuInside(m: MenuSeam, tag: string): void {
 // ===========================================================================
 
 test('portrait boot: the menu lays out inside the logical landscape viewport', async ({ page }, testInfo) => {
+  budgetTest({
+    work: 'portrait boot of the clean menu → read the menu seam → assert every control inside the logical viewport',
+    measuredSeconds: 4,
+  });
+
   await setOrientation(page, 'portrait');
   await bootMenu(page);
   const m = await readMenu(page);
@@ -238,6 +244,10 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the landscape lock is a mobile concern');
+  budgetTest({
+    work: 'portrait boot → rotate to landscape (re-layout) → rotate back to portrait (re-layout), asserting anchors at each stop',
+    measuredSeconds: 7,
+  });
 
   // Boot portrait (the developer's mistaken opening orientation).
   await setOrientation(page, 'portrait');
@@ -294,12 +304,16 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the touch remap only rotates on mobile');
-  // This is the longest journey any mobile test takes (portrait boot ->
-  // rotation -> menu tap -> lobby tap -> full match assembly) and CI's
+  // This is the longest journey any mobile test takes (portrait boot -> rotation
+  // -> menu tap -> doors tap -> lobby tap -> full match assembly) and CI's
   // software-GL runners spend most of a default 60s budget on the preamble
   // alone — it flaked #71 four times and then main itself. Budget the whole
-  // journey, not just the waits.
-  test.setTimeout(180_000);
+  // journey, not just the waits. (Was a hand-written 180_000; the number now comes
+  // from the same measured model as every other test in the suite — q7-01.)
+  budgetTest({
+    work: 'portrait boot → tap PLAY → doors → tap PLAY SOLO → lobby → pick a hull → tap RUSH! → full match-world assembly',
+    measuredSeconds: 28,
+  });
 
   const vp = page.viewportSize()!;
   /** A remapped tap point must sit inside the PHYSICAL portrait canvas — proof the
@@ -407,6 +421,11 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
 test('in-match: a portrait viewport keeps the ship centred in logical (landscape) space', async ({
   page,
 }, testInfo) => {
+  budgetTest({
+    work: 'portrait boot straight into a match (?debug=1) → one centring sample in logical space',
+    measuredSeconds: 4,
+  });
+
   // ?debug=1 skips the menu and boots straight into a match, exposing the centring
   // instrument. It must report the LOGICAL viewport and a centred ship under rotation.
   await setOrientation(page, 'portrait');
