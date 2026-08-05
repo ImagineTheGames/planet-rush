@@ -8,6 +8,92 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## The INTERFACE VOICE — the game talks like paperwork
+
+**Date:** 2026-08-05 · branch `agent/architect/l2-industrial-voice`
+**Ratified by:** Developer (Reinaldo)
+**Amends:** GDD §4.7, folded in directly (not by reference) — the section is now
+titled *"Tone and voice"* and names **two registers** where it previously held one
+paragraph doing two jobs. **No mechanic, number, or rule changes.**
+
+### The ratification, verbatim
+
+The UI design handoff proposed that the interface speak as a mining authority —
+contracts, rigs, operators, seals — rather than as a game menu, and flagged it as a
+lore call rather than a design one. Asked to decide:
+
+> "doesn't sound like a question to me"
+
+Read as: it is a given. Adopt it.
+
+### Why it landed in the GDD before any copy moved
+
+The GDD's tone paragraph is **pinned verbatim into every player-facing-copy prompt**
+— a standing content rule learned in the Assignment-4 codex pipeline, where lexical
+retrieval provably never surfaced a tone section on its own (0/4 query types), so
+tone is injected by hand or not at all. A copy sweep run against a tone nobody wrote
+down produces four agents' four opinions. So the tone paragraph *is* the artifact:
+amend it first, and the sweep that follows has something exact to obey.
+
+### What changed
+
+- **§4.7 now names two registers.** Register 1, **the emotional tone** — the
+  Saturday-morning paragraph, judging art/VFX/audio and the shape of a moment — is
+  **unchanged**. Register 2, **the interface voice**, is new: the claim's operating
+  authority addressing a contracted operator. Procedural, unglamorous, faintly
+  bureaucratic; it does not sell, congratulate, or wink.
+- They are not in tension, and the reconciliation is the point: the game *looks* like
+  a toy and *talks* like paperwork. Where they genuinely compete, register 1 wins on
+  **moments**, register 2 wins on **words**.
+- The voice block is written to be **pinned** — who speaks and to whom, five things
+  the voice IS, six it is NOT, a vocabulary table (in *and* out), and worked examples
+  of the same string in both registers. Vague adjectives ("gritty", "industrial") are
+  exactly what fails the two-agents-one-game test, so there are none.
+- **One rule outranks the voice: clarity always wins over flavour.** A refusal names
+  its reason in the first three words; where the flavour word and the plain word
+  compete on comprehension the plain word ships; and **length is part of clarity** —
+  an in-register word that ellipsizes at 11px has traded information for flavour.
+- **The match/machine scope line.** The authority speaks about the claim; it does not
+  speak about the machine. Boot failures, WebGL, connection status, the connect
+  trace, the build badge, the playtest log, numbers and clocks stay **plain** — when
+  the machine has failed there is no claim for an authority to have jurisdiction over.
+- **An accessibility clause.** An in-register headline may replace a plain one *only*
+  when the line beneath states the outcome plainly (`CLAIM HELD` is permitted because
+  `You took the claim.` sits under it). State is never carried by flavour alone.
+- **A fixed-strings list** the voice does not get to revisit: `teamName()`'s
+  `FRIENDLY A` / `ENEMY B` (ratified the same day, u3-01), every §2.5 wheel label and
+  upgrade track, every settings row, `RUSH!`, the §2.1 slot states, bot and ship-class
+  names, and **`HOME`** — the one deliberately warm word in the interface, load-bearing
+  on register 1 ("the pitch is a clock, and a home", §1).
+
+### Execution
+
+`docs/copy-sweep-industrial-voice.md` is the string-by-string work order for l2-02:
+every player-facing string by file with its current text and proposed replacement,
+an explicit not-in-scope list, the five test assertions that move, the collisions,
+and eight questions for the developer. **Roughly 19 strings move** — two end-screen
+headlines, three door labels, two hints, four error lines, three lobby labels, four
+machine-copy door references — concentrated on the main menu, the doors, and the
+lobby.
+
+The measured surprise, and the reason the sweep is small: most player-facing copy is
+**already in this register**. All four onboarding prompts, every build-wheel refusal,
+the ship-class blurbs, and the pause-menu confirm line were written this way before
+anybody named it. The GDD specifies most of its own UI words, and the lore pivot
+(v0.7) already moved the nouns. The ratification is less a change of direction than
+a decision to stop making the exception for menus.
+
+### Still open (flagged, not fixed)
+
+The tone paragraph is mirrored outside the GDD in two places that both claim to quote
+§4.7 verbatim and are now stale: **`style-guide.md` §8** (register 1 only, and still
+pre-pivot — "when a *planet* dies"; frozen, Director-only by its own last line) and
+**`content/codex/pipeline/tone.md`** (pins register 1 into every codex generation, so
+the next run would reproduce the old voice). Neither is in the architect's write
+scope. Questions 3 and 4 of the sweep doc.
+
+---
+
 ## REPAIR has a 15-second COOLDOWN (per station)
 
 **Date:** 2026-07-28 · branch `agent/gameplay/p12-repair-cooldown`
