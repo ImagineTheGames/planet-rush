@@ -6455,6 +6455,13 @@ interface LobbySeam {
     live: boolean;
     logical: Rect;
     physicalCenter: { x: number; y: number };
+    /** The same rect in PHYSICAL (un-rotated, CSS-px) space — both corners mapped
+     *  through the landscape-lock transform and re-normalised, so it is a real box
+     *  in either orientation. The mobile suite turns it into a screenshot region
+     *  and counts the pixels inside it: this control's whole defect was that it
+     *  was never DRAWN, and a seam that only reported rects would have said it was
+     *  fine on the day it was invisible (`playwright.config.ts`). */
+    physicalBounds: Rect;
   }[];
   /** RUSH!'s height — likewise. */
   rushHeight: number;
@@ -6668,13 +6675,26 @@ function openLobby(
     // look, the rect and the physical press point. Built from the SAME layout the
     // view drew from and the SAME model row it drew the word from, so the seam
     // cannot report a control the screen does not have.
-    seam.seatStates = layout.seatStates.map((r, i) => ({
-      index: i,
-      label: model.seats[i]?.stateLabel ?? '',
-      live: model.seats[i]?.canCycleState ?? false,
-      logical: { ...r },
-      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
-    }));
+    seam.seatStates = layout.seatStates.map((r, i) => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        index: i,
+        label: model.seats[i]?.stateLabel ?? '',
+        live: model.seats[i]?.canCycleState ?? false,
+        logical: { ...r },
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+        // Both corners through the rotation, then re-normalised — under the
+        // landscape lock the two corners swap sides, so a raw (x, y, w, h) built
+        // from one of them would be a backwards box on a phone.
+        physicalBounds: {
+          x: Math.min(a.x, b.x),
+          y: Math.min(a.y, b.y),
+          width: Math.abs(b.x - a.x),
+          height: Math.abs(b.y - a.y),
+        },
+      };
+    });
     seam.rushHeight = layout.rushButton.height;
     // The RUSH! rect in logical (landscape) space and the physical tap point it
     // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
