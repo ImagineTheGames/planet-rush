@@ -1137,13 +1137,21 @@ export class Hud extends Container {
   }
 
   /**
-   * Route a click/tap at a screen point to the minimap. If it lands on the active
-   * surface (the corner square, or the whole overlay when expanded) the model
-   * toggles and this returns `true` — the caller then consumes the event so the
-   * same press never also flies the ship or engages a stick under it. Returns
-   * `false` (leaving the event to fall through) when the minimap isn't showing or
-   * the point missed. The ONE entry point PC clicks and mobile taps share, so the
-   * two platforms can never diverge (docs/input-parity.md; ./minimap.test.ts).
+   * Route a click/tap at a screen point to the minimap, and report whether the
+   * caller must consume the event (so the same press never also flies the ship or
+   * engages a stick under it). The ONE entry point PC clicks and mobile taps
+   * share, so the two platforms can never diverge (docs/input-parity.md;
+   * ./minimap.test.ts). Its two states answer differently, deliberately
+   * ({@link ./minimap} `Minimap.tap`, developer report u6-01):
+   *
+   * - **EXPANDED** — the overlay is MODAL. *Every* press collapses it and returns
+   *   `true`, whether it landed on the overlay or outside it. Previously an
+   *   outside press returned `false`, fell through to gameplay, and left the
+   *   overlay open — the defect u6-01 fixes.
+   * - **COLLAPSED** — only a press that lands ON the corner square returns `true`;
+   *   a miss returns `false` and falls through, because the player is flying.
+   *
+   * `false` also when the minimap isn't showing at all.
    */
   minimapTap(x: number, y: number): boolean {
     if (!this.minimap.visible) return false;

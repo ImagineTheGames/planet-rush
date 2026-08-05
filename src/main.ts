@@ -1491,8 +1491,10 @@ async function boot(): Promise<void> {
     }
 
     // The minimap (field request v0.2.2): a click/tap on the corner square opens
-    // the centred overlay; a tap anywhere on the overlay collapses it again. The
-    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
+    // the centred overlay; while the overlay is OPEN it is modal — a press
+    // anywhere collapses it, on the map or off it, and is consumed here rather
+    // than falling through to the pilot/sticks below (developer report u6-01).
+    // The SAME gesture on PC and mobile — `pressPoint` is already in logical space,
     // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
     // both platforms use (docs/input-parity.md). Checked LAST among the interactive
     // surfaces — after the end/fullscreen overlays, the BUILD button and the open
@@ -1500,6 +1502,9 @@ async function boot(): Promise<void> {
     // a control drawn near or over it always wins the press, and the map only takes
     // one that lands on nothing else. When it does claim a press we consume the
     // event so the same press never also flies the ship or engages a stick under it.
+    // (COLLAPSED it claims only a press that lands on the corner square, so a press
+    // that misses the glance widget still flies the ship — the deliberate half of
+    // the asymmetry, since the player is flying.)
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
       audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
@@ -4058,6 +4063,24 @@ async function boot(): Promise<void> {
        *  the fog-gated counts (coverage discs + sensed enemy ships). */
       state(): ReturnType<typeof hud.debugMinimap> {
         return hud.debugMinimap();
+      },
+      /** The LOGICAL (landscape) viewport the minimap lays out in — so a test can
+       *  pick a press point that is provably OUTSIDE the drawn rect (u6-01: the
+       *  press off the open overlay) instead of hardcoding a corner that a layout
+       *  change could quietly move onto the map. */
+      viewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** The PHYSICAL (CSS px) point a REAL press must land on to arrive at a
+       *  LOGICAL point — the landscape lock's rotation, applied for the test.
+       *  Identity on desktop and on any already-landscape viewport; on a PORTRAIT
+       *  handset the root is rotated 90°, so a test that wants to press "off the
+       *  map" has to press the rotated point or it presses somewhere else entirely.
+       *  Read-back only: the press itself is still a real synthesized pointer/touch
+       *  on the canvas, crossing the same `toLogical` every real press crosses
+       *  (the same discipline as `__repairStage`'s wedge point). */
+      physicalPoint(lx: number, ly: number): Vec2 {
+        return logicalToPhysical(lx, ly, transform);
       },
       /**
        * Stage a radar satellite on the local station (feature f1) and park a

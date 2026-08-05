@@ -28,8 +28,11 @@
  *     *really* small: a glance object, sized to stay clear of the thumb zones and
  *     kept inside the `bottom-right` layout region.
  *   - EXPANDED — a centred overlay at readable scale; the match plays on behind
- *     it. A tap/click anywhere on the overlay (or its close affordance) collapses
- *     it again.
+ *     it. While it is open it is **MODAL: a press anywhere collapses it, on the
+ *     overlay or off it, and the press is consumed** rather than falling through
+ *     to fly the ship (developer report u6-01). The asymmetry with COLLAPSED —
+ *     where a press that misses the corner square still falls through, because the
+ *     player is flying — is deliberate and is the point; see {@link Minimap.tap}.
  * The toggle is the SAME interaction on both platforms — a click on PC, a tap on
  * mobile, both routed through {@link Minimap.tap} — plus an `M` keyboard shortcut
  * on PC ({@link MINIMAP_TOGGLE_KEY}). "Same code path, both platforms" is the
@@ -743,10 +746,29 @@ export class Minimap {
   }
 
   /**
-   * Apply a click/tap at a screen point: if it lands on the active surface, toggle
-   * and return `true` (the caller consumes the event so it never also flies the
-   * ship or engages a stick under it); otherwise return `false` and leave the
-   * event to fall through. The one entry point both PC clicks and mobile taps use.
+   * Apply a click/tap at a screen point. The one entry point both PC clicks and
+   * mobile taps use — and it is **deliberately asymmetric between the two states**
+   * (developer report u6-01, *"when you have radar opened clicking anywhere off
+   * the map should close it"*). A future reader will want to "simplify" the two
+   * branches back into one hit test; that is the bug, so here is why they differ:
+   *
+   * - **EXPANDED — the overlay is MODAL: every press is consumed.** A press on it
+   *   collapses it (as before) and so does a press *outside* it, and either way
+   *   this returns `true` so the caller consumes the event. That `true` is the
+   *   whole fix: while the radar is open, a press off the map used to return
+   *   `false`, fall through, and *fly the ship / engage a stick under the overlay*
+   *   while the overlay stayed open — an input-capture defect, not a missing
+   *   convenience. The player's instinctive "tap away to dismiss" is now the
+   *   dismissal, and nothing else.
+   * - **COLLAPSED — nothing is modal; a miss still falls through.** The corner
+   *   square consumes only a press that actually lands on it (`false` otherwise),
+   *   because the player is *flying*: a 148 px glance widget that ate every press
+   *   on the screen would be a far worse bug than the one above.
+   *
+   * (Priority is `main.ts`'s, not ours: the minimap is checked LAST among the
+   * interactive surfaces, so a control drawn over the overlay still wins its own
+   * press. "Modal" here means modal against *gameplay*, which is what fell
+   * through.)
    */
   tap(
     x: number,
@@ -755,8 +777,13 @@ export class Minimap {
     isTouch: boolean,
     insets: MinimapInsets = {},
   ): boolean {
+    if (this._expanded) {
+      // Modal: dismiss on ANY press, hit or miss, and report it consumed.
+      this._expanded = false;
+      return true;
+    }
     if (!this.hitTest(x, y, viewport, isTouch, insets)) return false;
-    this.toggle();
+    this._expanded = true;
     return true;
   }
 }
