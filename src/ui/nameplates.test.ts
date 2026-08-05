@@ -22,12 +22,17 @@ import {
   resolveName,
   resolveDifficultySuffix,
   resolveTeamLabel,
+  resolveTeamRelation,
   fallbackName,
   NAMEPLATE_FULL_ALPHA,
   NAMEPLATE_FADE_ALPHA,
   NAMEPLATE_MAX_CHARS,
 } from './nameplates';
 import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
+// The side vocabulary and its motif colours live with the lobby's `teamName`, so
+// the roster and the battlefield cannot drift (u3).
+import { SIDE_COLORS } from './lobby';
+import { playerColor } from './station-hp';
 
 /** A live enemy SHIP at owner 3 — the labelled baseline each test perturbs. */
 function ship(over: Partial<Nameable> = {}): Nameable {
@@ -49,8 +54,13 @@ const DIFFS: DifficultyTable = [undefined, 'easy', 'medium', 'hard'];
  *  `main.ts` builds from the live world's `ship.team` (m10 teams). */
 const TEAMS: TeamTable = [0, 1, 0, 1];
 
-/** TEAMS mode — the gate every side label is behind. */
-const IN_TEAMS = { showTeamLabels: true } as const;
+/** TEAMS mode, seen by a player on side A (slot 0's side) — the gate every side
+ *  label is behind, plus the viewer the WORD is relative to (u3). */
+const IN_TEAMS = { showTeamLabels: true, viewerTeam: 0 } as const;
+
+/** The same match with nobody in it: a spectator / replay HUD. Documented to read
+ *  the neutral `TEAM <letter>` — never to call every hull an enemy. */
+const SPECTATING = { showTeamLabels: true } as const;
 
 describe('who gets a label', () => {
   it('labels a live enemy ship', () => {
@@ -218,17 +228,66 @@ describe('the whole frame', () => {
 
 
 // ---------------------------------------------------------------------------
-// The side label (m10 teams — ratified: colour alone is insufficient)
+// The side label (m10 teams — ratified: colour alone is insufficient;
+// u3 — FRIENDLY/ENEMY + letter, the word relative to the viewer)
 // ---------------------------------------------------------------------------
 
 describe('the side label', () => {
   it('names the side in words, not as a letter or a hue', () => {
     // The developer could not tell who was on their team. `A` is a legend nobody
-    // was given; `TEAM A` is the answer, and it is the same string the lobby chip
-    // carries (`./lobby` teamName).
-    expect(resolveTeamLabel(TEAMS, 0, IN_TEAMS)).toBe('TEAM A');
-    expect(resolveTeamLabel(TEAMS, 1, IN_TEAMS)).toBe('TEAM B');
-    expect(resolveTeamLabel(TEAMS, 2, IN_TEAMS)).toBe('TEAM A');
+    // was given, and `TEAM A` only helped a player who remembered which team they
+    // were; `FRIENDLY A` answers the question that was actually asked. Same string
+    // the lobby chip carries (`./lobby` teamName).
+    expect(resolveTeamLabel(TEAMS, 0, IN_TEAMS)).toBe('FRIENDLY A');
+    expect(resolveTeamLabel(TEAMS, 1, IN_TEAMS)).toBe('ENEMY B');
+    expect(resolveTeamLabel(TEAMS, 2, IN_TEAMS)).toBe('FRIENDLY A');
+  });
+
+  it('flips the WORD with the viewer and never the LETTER', () => {
+    // The same table, read by a player on the other side. Slot 1 is `B` on both
+    // screens; it is FRIENDLY on one and ENEMY on the other.
+    const asB = { showTeamLabels: true, viewerTeam: 1 } as const;
+    expect(resolveTeamLabel(TEAMS, 1, asB)).toBe('FRIENDLY B');
+    expect(resolveTeamLabel(TEAMS, 0, asB)).toBe('ENEMY A');
+    expect(resolveTeamRelation(TEAMS, 1, asB)).toBe('friendly');
+    expect(resolveTeamRelation(TEAMS, 1, IN_TEAMS)).toBe('enemy');
+  });
+
+  it('colours the tag blue for an ally and red for a rival, never the name', () => {
+    const [ally, rival] = nameplateModel(
+      [ship({ owner: 2 }), ship({ owner: 1 })],
+      NAMES,
+      IN_TEAMS,
+      DIFFS,
+      TEAMS,
+    );
+    expect(ally!.teamColor).toBe(SIDE_COLORS.friendly);
+    expect(rival!.teamColor).toBe(SIDE_COLORS.enemy);
+    // The NAME keeps the owner's identity colour — per-SLOT, style-guide §3.1 —
+    // because that is how a player tells two enemies apart. Side colour lives on
+    // the side tag alone, as reinforcement for a word that already says it.
+    expect(ally!.color).toBe(playerColor(2));
+    expect(rival!.color).toBe(playerColor(1));
+    expect(rival!.teamLabel).toBe('ENEMY B');
+  });
+
+  it('reads the neutral TEAM <letter> with no viewer — a spectator has no enemies', () => {
+    expect(resolveTeamLabel(TEAMS, 0, SPECTATING)).toBe('TEAM A');
+    expect(resolveTeamLabel(TEAMS, 1, SPECTATING)).toBe('TEAM B');
+    const plates = nameplateModel([ship({ owner: 1 })], NAMES, SPECTATING, DIFFS, TEAMS);
+    expect(plates[0]!.teamLabel).toBe('TEAM B');
+    expect(plates[0]!.teamColor).toBe(SIDE_COLORS.neutral);
+  });
+
+  it('names three and four sides with one FRIENDLY and distinct ENEMYs', () => {
+    for (const sides of [3, 4]) {
+      const table: TeamTable = Array.from({ length: sides }, (_, i) => i);
+      const named = table.map((_, owner) => resolveTeamLabel(table, owner, IN_TEAMS));
+      expect(named.filter((n) => n.startsWith('FRIENDLY'))).toEqual(['FRIENDLY A']);
+      const enemies = named.filter((n) => n.startsWith('ENEMY'));
+      expect(enemies).toHaveLength(sides - 1);
+      expect(new Set(enemies).size).toBe(enemies.length);
+    }
   });
 
   it('says nothing at all in FFA', () => {
@@ -248,8 +307,8 @@ describe('the side label', () => {
   it('folds a side number past the roster back into a readable letter', () => {
     // Four sides is the lobby's ceiling; a stray value must still READ, because a
     // blank where a side belongs is the exact failure this label exists to fix.
-    expect(resolveTeamLabel([4], 0, IN_TEAMS)).toBe('TEAM A');
-    expect(resolveTeamLabel([5], 0, IN_TEAMS)).toBe('TEAM B');
+    expect(resolveTeamLabel([4], 0, IN_TEAMS)).toBe('ENEMY A');
+    expect(resolveTeamLabel([5], 0, IN_TEAMS)).toBe('ENEMY B');
   });
 
   it('puts the side on every plate in a teams match — ships and homes alike', () => {
@@ -261,9 +320,9 @@ describe('the side label', () => {
       TEAMS,
     );
     expect(plates.map((p) => [p.owner, p.kind, p.teamLabel])).toEqual([
-      [0, 'ship', 'TEAM A'],
-      [1, 'station', 'TEAM B'],
-      [3, 'ship', 'TEAM B'],
+      [0, 'ship', 'FRIENDLY A'],
+      [1, 'station', 'ENEMY B'],
+      [3, 'ship', 'ENEMY B'],
     ]);
   });
 
@@ -273,12 +332,12 @@ describe('the side label', () => {
     const [plate] = nameplateModel([ship({ owner: 3 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
     expect(plate!.text).toBe('Warden');
     expect(plate!.suffix).toBe('(HARD)');
-    expect(plate!.teamLabel).toBe('TEAM B');
+    expect(plate!.teamLabel).toBe('ENEMY B');
   });
 
   it('leaves a human seat its side and no difficulty tag', () => {
     const [plate] = nameplateModel([ship({ owner: 0 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
     expect(plate!.suffix).toBe(''); // humans never carry a tier
-    expect(plate!.teamLabel).toBe('TEAM A'); // but they do carry a side
+    expect(plate!.teamLabel).toBe('FRIENDLY A'); // but they do carry a side
   });
 });

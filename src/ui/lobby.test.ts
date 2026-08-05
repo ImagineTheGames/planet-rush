@@ -40,6 +40,8 @@ import {
   RUSH_COUNTDOWN_SECONDS,
   RUSH_LABEL,
   SEAT_STATE_CYCLE,
+  SIDE_COLORS,
+  SIDE_WORDS,
   TEAM_LABELS,
   activeTeams,
   applyLobbySlots,
@@ -71,15 +73,23 @@ import {
   selectMap,
   selectShipClass,
   setPlayerName,
+  sideRelation,
   startLobbyMatch,
   teamLabel,
+  teamName,
   tickLobby,
   toggleMode,
+  viewerTeamOf,
   typeRoomCode,
   DEFAULT_PLAYER_NAME,
   PLAYER_NAME_MAX_CHARS,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import { nameplateModel, resolveTeamLabel } from './nameplates';
+// The art direction itself, so the two side hues are pinned to the frozen palette
+// and its declared ramp rather than to a hex typed twice (the same cross-check
+// `./chrome.test` runs on the panel chrome).
+import { PALETTE as ART_PALETTE, DERIVED, tint } from '../art/palette';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
 import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import {
@@ -91,6 +101,27 @@ import {
 } from '../sim/match-config';
 
 const ROOM = 'K7QM';
+
+/**
+ * WCAG relative-contrast of a UI colour against the Vacuum backdrop `#0D1015` —
+ * the one thing style-guide §1's "every entity must read against Vacuum on its
+ * own" can actually be measured as. Used to keep the side hues legible at 11–12px
+ * on a phone, where a dim tone that looked fine in a desktop mock disappears.
+ */
+function contrastOnVacuum(color: number): number {
+  const lum = (c: number): number => {
+    const ch = (v: number): number => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((c >> 16) & 0xff) + 0.7152 * ch((c >> 8) & 0xff) + 0.0722 * ch(c & 0xff)
+    );
+  };
+  const a = lum(color) + 0.05;
+  const b = lum(ART_PALETTE.vacuum) + 0.05;
+  return a > b ? a / b : b / a;
+}
 
 function lobby(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): LobbyState {
   return createLobby({ room: ROOM, you: 0, ...overrides });
@@ -704,6 +735,177 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
     expect(byLabel[teamLabel(1)]).toBe(1);
     expect(counts.reduce((n, c) => n + c.count, 0)).toBe(4);
     expect(canStart(state)).toBe(true); // shown, not blocked
+  });
+});
+
+describe('a side says FRIENDLY or ENEMY, and says it to the right player (u3)', () => {
+  // Ratified 2026-08-05, refining m10's `TEAM A`: "Friendly/Enemy plus Letters —
+  // Friendly A, Enemy B, Enemy C, Enemy D etc...". The grammar is WORD + LETTER,
+  // and the two halves behave differently — which is what these tests pin down.
+
+  it('reads FRIENDLY to its own members and ENEMY to everyone else', () => {
+    // The same side, from two different viewers. Nothing about the side changed
+    // between these two lines; only who is looking.
+    expect(teamName(0, 0)).toBe('FRIENDLY A');
+    expect(teamName(0, 1)).toBe('ENEMY A');
+    expect(teamName(1, 1)).toBe('FRIENDLY B');
+    expect(teamName(1, 0)).toBe('ENEMY B');
+
+    expect(sideRelation(0, 0)).toBe('friendly');
+    expect(sideRelation(0, 1)).toBe('enemy');
+    expect(SIDE_WORDS).toEqual({ friendly: 'FRIENDLY', enemy: 'ENEMY', neutral: 'TEAM' });
+  });
+
+  it('keeps the LETTER absolute — team 1 is B no matter who looks', () => {
+    for (let viewer = 0; viewer < MAX_TEAMS; viewer++) {
+      for (let team = 0; team < MAX_TEAMS; team++) {
+        const [, letter] = teamName(team, viewer).split(' ');
+        expect(letter, `team ${team} seen by ${viewer}`).toBe(TEAM_LABELS[team]);
+      }
+    }
+    // Absolute is the whole point: two players on opposite sides name the same
+    // third side by the same letter, and differ only in the word.
+    expect(teamName(2, 0)).toBe('ENEMY C');
+    expect(teamName(2, 1)).toBe('ENEMY C');
+  });
+
+  it('names a 3-team and a 4-team match as one FRIENDLY and distinct ENEMYs', () => {
+    for (const sides of [3, 4]) {
+      const viewer = 0;
+      const named = Array.from({ length: sides }, (_, team) => teamName(team, viewer));
+      expect(named.filter((n) => n.startsWith('FRIENDLY'))).toEqual(['FRIENDLY A']);
+      const enemies = named.filter((n) => n.startsWith('ENEMY'));
+      expect(enemies).toHaveLength(sides - 1);
+      // No two enemies share a letter — the letter is what tells them apart.
+      expect(new Set(enemies).size).toBe(enemies.length);
+    }
+    expect(Array.from({ length: 4 }, (_, t) => teamName(t, 0))).toEqual([
+      'FRIENDLY A',
+      'ENEMY B',
+      'ENEMY C',
+      'ENEMY D',
+    ]);
+  });
+
+  it('falls back to the bare TEAM <letter> when there is no viewer, never to ENEMY', () => {
+    // A replay, a spectator, any view with no local player. It has no "friendly",
+    // and it must not answer that by declaring everyone hostile.
+    for (const viewer of [undefined, -1, Number.NaN]) {
+      expect(teamName(0, viewer)).toBe('TEAM A');
+      expect(teamName(1, viewer)).toBe('TEAM B');
+      expect(sideRelation(1, viewer)).toBe('neutral');
+    }
+    // The lobby's own viewer-less case: a roster nobody in it is you.
+    const spectating = { ...toggleMode(lobby()), you: 99 };
+    expect(viewerTeamOf(spectating)).toBeUndefined();
+    expect(lobbyModel(spectating).seats.map((s) => s.teamName.split(' ')[0])).toEqual(
+      new Array(LOBBY_SLOTS).fill('TEAM'),
+    );
+    expect(lobbyModel(spectating).seats.every((s) => s.side === 'neutral')).toBe(true);
+  });
+
+  it('re-words the whole roster when the viewer changes sides', () => {
+    const teams = toggleMode(lobby()); // you are slot 0 ⇒ side A by default
+    const before = lobbyModel(teams);
+    expect(viewerTeamOf(teams)).toBe(0);
+    expect(before.viewerTeam).toBe(0);
+    expect(before.seats[0]!.teamName).toBe('FRIENDLY A');
+    expect(before.seats[1]!.teamName).toBe('ENEMY B');
+
+    // Walk YOUR OWN seat onto side B. The letters do not move; the words swap.
+    let state = teams;
+    while (state.seats[0]!.team !== 1) state = cycleSeatTeam(state, 0);
+    const after = lobbyModel(state);
+    expect(after.seats[0]!.teamName).toBe('FRIENDLY B');
+    expect(after.seats[1]!.teamName).toBe('FRIENDLY B'); // slot 1 was already B
+    expect(after.seats[2]!.teamName).toBe('ENEMY A'); // and A is now the far side
+    // Every OTHER seat's letter is untouched — the letter is the side's identity,
+    // not the viewer's opinion of it. (Slot 0's own letter moved because slot 0
+    // genuinely changed sides.)
+    expect(after.seats.slice(1).map((s) => s.teamLabel)).toEqual(
+      before.seats.slice(1).map((s) => s.teamLabel),
+    );
+  });
+
+  it('colours the motif blue for friendly and red for enemy — as reinforcement', () => {
+    const teams = toggleMode(lobby());
+    const model = lobbyModel(teams);
+    expect(SIDE_COLORS[model.seats[0]!.side]).toBe(SIDE_COLORS.friendly);
+    expect(SIDE_COLORS[model.seats[1]!.side]).toBe(SIDE_COLORS.enemy);
+
+    // The words carry the meaning on their own: strip every colour and the roster
+    // still says which side each row is on. This is the m10 ratification (colour
+    // alone is insufficient) surviving u3's addition of colour.
+    const worded = model.seats.map((s) => s.teamName);
+    expect(new Set(worded)).toEqual(new Set(['FRIENDLY A', 'ENEMY B']));
+
+    // …and the identity colours do NOT move: they are per-SLOT (style-guide
+    // §3.1) and are how a player tells two ENEMIES apart.
+    expect(model.seats.map((s) => s.color)).toEqual(PLAYER_COLORS.slice(0, LOBBY_SLOTS));
+  });
+
+  it('paints the two side hues from the frozen palette, legible on Vacuum', () => {
+    // Blue is plasma; red is threat red lifted one declared rung toward white
+    // (`shotEnemy2` of the enemy-fire ramp) — no seventh hue enters the palette.
+    expect(SIDE_COLORS.friendly).toBe(PALETTE.plasma);
+    expect(SIDE_COLORS.enemy).toBe(tint(ART_PALETTE.threatRed, 0.32));
+    expect(SIDE_COLORS.enemy).toBe(DERIVED.shotEnemy2);
+    expect(SIDE_COLORS.neutral).toBe(PALETTE.patina);
+
+    // And both hold against the backdrop at both form factors: raw threat red is
+    // 3.2:1 on Vacuum — fine for a filling damage ring, too dim for an 11px word
+    // on a phone — so the lifted rung is the one that ships.
+    for (const key of ['friendly', 'enemy'] as const) {
+      expect(contrastOnVacuum(SIDE_COLORS[key]), `${key} contrast`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrastOnVacuum(ART_PALETTE.threatRed)).toBeLessThan(4.5);
+  });
+
+  it('shows no side label in FFA — a side there is the player again', () => {
+    const ffa = lobbyModel(lobby());
+    // FFA is teams-of-one (GDD §2.1 / sim/constants), so a side label there would
+    // repeat the nameplate. The mode flag is what the view gates the chip on…
+    expect(ffa.mode).toBe('ffa');
+    expect(lobbyMatchConfig(lobby()).mode).toBe('ffa');
+    // …and the nameplate gate is the same fact on the battlefield: no label, on
+    // any slot, whatever the team table happens to hold.
+    const plates = nameplateModel(
+      Array.from({ length: 4 }, (_, owner) => ({
+        owner,
+        kind: 'ship' as const,
+        alive: true,
+        pos: { x: 0, y: 0 },
+        radius: 8,
+      })),
+      [],
+      { showTeamLabels: false, viewerTeam: 0 },
+      [],
+      [0, 1, 2, 3],
+    );
+    expect(plates.map((p) => p.teamLabel)).toEqual(['', '', '', '']);
+    expect(plates.every((p) => p.teamColor === SIDE_COLORS.neutral)).toBe(true);
+  });
+
+  it('says the SAME string on the roster row and over that seat\'s hull', () => {
+    // One vocabulary, asserted rather than assumed: whatever the lobby row says
+    // about a seat is exactly what the nameplate says about it, for the same
+    // viewer — including when the viewer is nobody.
+    for (const viewerSlot of [0, 1]) {
+      let state = toggleMode(lobby({ you: viewerSlot }));
+      // A three-side split, so the assertion covers more than "us and them".
+      while (state.seats[2]!.team !== 2) state = cycleSeatTeam(state, 2);
+      const model = lobbyModel(state);
+      const teams = model.seats.map((s) => s.team);
+      for (const seat of model.seats) {
+        expect(
+          resolveTeamLabel(teams, seat.player, {
+            showTeamLabels: true,
+            ...(model.viewerTeam !== undefined ? { viewerTeam: model.viewerTeam } : {}),
+          }),
+          `seat ${seat.player} seen by ${viewerSlot}`,
+        ).toBe(seat.teamName);
+      }
+    }
   });
 });
 

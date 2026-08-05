@@ -95,7 +95,12 @@ import {
   resolveAnchor,
   rectContains,
 } from '@platform/layout-registry';
-import type { AnchorSpec, Rect, Viewport as LayoutViewport } from '@platform/layout-registry';
+import type {
+  AnchorSpec,
+  DebugFlags,
+  Rect,
+  Viewport as LayoutViewport,
+} from '@platform/layout-registry';
 import { advanceToFreezeTick, hashWorld, stampDefenseShowcase, FREEZE_TICK } from '@platform/freeze';
 import { installDebugHook, installDebugStage, installInputProbe } from '@platform/debug-hook';
 import { installCombatDebug } from '@platform/combat-debug';
@@ -203,6 +208,10 @@ import {
   cycleBotDifficulty,
   cycleSeatState,
   cycleSeatTeam,
+  // The lobby's own side ceiling and seat count — read by the debug `?sides=N`
+  // switch so the harness can never author a split the lobby itself could not.
+  MAX_TEAMS,
+  LOBBY_SLOTS,
   toggleMode,
   cycleAbundance,
   matchSizeOf,
@@ -781,15 +790,24 @@ async function boot(): Promise<void> {
   // Under ?debug=1 there is no lobby, so both fall back to the persisted-or-default
   // values.
   const debugSize = readMatchSize(platform);
+  // `?debug=1&sides=N` — the debug boot's TEAMS switch (u3). There is no lobby
+  // under ?debug=1, so a harness that needs a SIDED world (the teams goldens, and
+  // any future teams live-stage run) has no other way to ask for one; without it
+  // the frozen scene is always free-for-all and a side label can never appear in a
+  // screenshot. It only fills in the same `teams` table the lobby would have
+  // authored, so the world is built by the ordinary path — real allegiance, real
+  // spawn placement, not a poked label.
+  const debugTeams = readDebugSides(flags, debugSize ?? LOBBY_SLOTS);
   const chosen: LobbyChoice = lobby
     ? await lobby.untilRush()
     : {
         shipClass: readShipClass(platform),
         mapId: readMapId(platform),
         name: readPlayerName(platform),
-        mode: readMatchMode(platform),
+        mode: debugTeams ? 'teams' : readMatchMode(platform),
         abundance: readAbundance(platform),
         ...(debugSize !== undefined ? { size: debugSize } : {}),
+        ...(debugTeams ? { teams: debugTeams } : {}),
       };
   const chosenShipClass = chosen.shipClass;
   // The name shown over the local ship and station (field request v0.2.1) — the
@@ -1572,6 +1590,13 @@ async function boot(): Promise<void> {
    *  rematch — so a rematch that changed the split relabels with it. */
   let playerTeams: TeamTable = [];
   let teamsMode = false;
+  /** The VIEWING player's own side — what makes a nameplate read `FRIENDLY A`
+   *  rather than `ENEMY B` (u3). Read off the local ship's own `team`, the exact
+   *  number `areEnemies` acts on, so the word over a hull and the friend/foe rule
+   *  are the same fact. `undefined` when this client has no ship in the world (a
+   *  spectator / replay), which the HUD renders as the neutral `TEAM <letter>`
+   *  rather than declaring every hull hostile. */
+  let viewerTeam: number | undefined;
 
   // --- Minimap feed (field request v0.2.2): the sim-driven dots in MAP space —
   //     stations, ships, ore-field hints, the collapse ring — pooled and reused so
@@ -1666,6 +1691,8 @@ async function boot(): Promise<void> {
     }
     playerTeams = sides;
     teamsMode = distinct.size > 0 && distinct.size < world.ships.length;
+    const local = world.ships.find(isLocalShip);
+    viewerTeam = local ? (local.team ?? local.id) : undefined;
   }
   rebuildNameTable();
 
@@ -2718,6 +2745,9 @@ async function boot(): Promise<void> {
     // exactly what `areEnemies` will act on.
     hudFrame.playerTeams = playerTeams;
     hudFrame.teamsMode = teamsMode;
+    // …and whose side is FRIENDLY (u3). Same source, same rebuild, so a rematch
+    // that moves this player to the other side re-words every plate with them.
+    hudFrame.viewerTeam = viewerTeam;
   }
 
   /** Pooled nameable record `i`, grown to fit and reused across frames (GDD §4.3). */
@@ -4914,6 +4944,27 @@ function readPlayerName(platform: ReturnType<typeof createBrowserPlatform>): str
  *  the default (`octagon`), so a bad key can never reach the sim. */
 function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
   return normalizeMapId(platform.storage.get(MAP_STORAGE_KEY));
+}
+
+/**
+ * `?sides=N` (debug only) — the side table a `?debug=1` boot builds its world
+ * with, or `null` for the ordinary free-for-all.
+ *
+ * The debug boot skips the lobby by contract, which also skipped the one control
+ * that authors sides; this is the missing half, and nothing more than it. `N` is
+ * folded into 2..{@link MAX_TEAMS} and the split is the lobby's own default —
+ * alternating by slot (`ui/lobby` `defaultTeamForSlot` generalised to N), so
+ * `?sides=2` is the 4v4 a host gets by tapping TEAMS and nothing else. Ignored
+ * without `?debug=1`, exactly like `?freeze=1`.
+ */
+function readDebugSides(flags: DebugFlags, slots: number): number[] | null {
+  if (!flags.debug) return null;
+  const search = typeof window !== 'undefined' ? window.location.search : '';
+  const raw = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('sides');
+  const sides = Math.floor(Number(raw));
+  if (!Number.isFinite(sides) || sides < 2) return null;
+  const n = Math.min(sides, MAX_TEAMS);
+  return Array.from({ length: Math.max(2, Math.floor(slots)) }, (_, i) => i % n);
 }
 
 /** The match MODE the lobby opens on (variable-slots Milestone E): the last one

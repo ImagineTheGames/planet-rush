@@ -307,8 +307,9 @@ export interface HudFrame {
   readonly difficulties?: DifficultyTable;
   /**
    * Per-slot **side** table, the third mirror of {@link names} (m10 teams): the
-   * raw `team` the sim carries on that slot's ship, turned into a `TEAM A` /
-   * `TEAM B` label beside the name when {@link teamsMode} is on.
+   * raw `team` the sim carries on that slot's ship, turned into a `FRIENDLY A` /
+   * `ENEMY B` label beside the name when {@link teamsMode} is on (u3 — the word is
+   * relative to {@link viewerTeam}, the letter is absolute).
    *
    * Default: none ⇒ no side labels, which is also FFA's answer. Fed from the
    * booted world's own roster, so the HUD names a side from the same number
@@ -318,6 +319,20 @@ export interface HudFrame {
   /** TEAMS mode — the gate on the side labels above. FFA is teams-of-one, where a
    *  side label would repeat the player and inform nobody. Default false. */
   readonly teamsMode?: boolean;
+  /**
+   * The **viewing player's own side** (u3): the local ship's `team`, which is what
+   * turns each label's word into `FRIENDLY` or `ENEMY`. The letter beside it never
+   * depends on this — team 1 is `B` on every screen.
+   *
+   * Default: none ⇒ every plate reads the neutral `TEAM <letter>`. That is the
+   * documented spectator/replay answer, and it is deliberately not "everyone is an
+   * enemy" (`./nameplates` `NameplateOptions.viewerTeam`).
+   *
+   * Explicitly `| undefined` so the per-frame feed can write "no viewer" into its
+   * REUSED frame object rather than deleting a key every frame (GDD §4.3 — the
+   * render loop allocates nothing).
+   */
+  readonly viewerTeam?: number | undefined;
   /** Show the local player's OWN ship label. Default false — see
    *  {@link ./nameplates} `NameplateOptions.showOwnShipLabel}. */
   readonly showOwnShipLabel?: boolean;
@@ -1037,6 +1052,11 @@ export class Hud extends Container {
         // a different side and tell a player nothing they did not already read
         // from the name.
         showTeamLabels: frame.teamsMode ?? false,
+        // Whose side is "FRIENDLY". Passed through rather than derived here, so
+        // the HUD reads the viewer from the same world the labels came from — and
+        // an absent viewer (a spectator / replay) falls back to the neutral
+        // `TEAM <letter>` instead of calling every hull an enemy (u3).
+        ...(frame.viewerTeam !== undefined ? { viewerTeam: frame.viewerTeam } : {}),
       },
       frame.difficulties ?? NO_DIFFICULTIES,
       frame.playerTeams ?? NO_TEAMS,

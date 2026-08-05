@@ -194,17 +194,34 @@ export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /** Inset of the chip from the row's edges. */
 export const SEAT_CHIP_PAD = 3;
 
-/** Width of a roster row's TEAM chip (TEAMS only) — wide enough for the WORD,
- *  `TEAM A`, which is what the chip carries since the developer reported a teams
- *  match they could not read sides in (m10; a bare letter is a legend nobody was
- *  given, and the in-match nameplates say it in full too).
+/** Width of a roster row's TEAM chip (TEAMS only) — wide enough for the WORD the
+ *  chip carries since the developer reported a teams match they could not read
+ *  sides in (m10; a bare letter is a legend nobody was given, and the in-match
+ *  nameplates say it in full too). **88, not 64, since u3 (2026-08-05):** the word
+ *  is now the viewer-relative `FRIENDLY A` / `ENEMY B` (`./lobby` `teamName`), and
+ *  the longest of those measures 64px in 11px Audiowide against `TEAM A`'s 41 —
+ *  the old constant would have overflowed its own chip.
  *  It COMPOSES with the difficulty chip rather than replacing it
- *  (n2): laid out immediately left of the difficulty chip and always kept strictly
- *  right of the row's centre, so the row body stays tappable and the shared
- *  difficulty control keeps its place. In FFA a seat's side is its slot
+ *  (n2): laid out immediately left of the difficulty chip, and kept clear of the
+ *  row's left {@link SEAT_TEAM_CHIP_MIN_BODY} so the row body stays tappable and the
+ *  shared difficulty control keeps its place. In FFA a seat's side is its slot
  *  (teams-of-one), so the team chip is laid out but drawn away and a tap on it is a
  *  no-op in the model — the geometry stays mode-blind, the flow routes by mode. */
-export const SEAT_TEAM_CHIP_WIDTH = 64;
+export const SEAT_TEAM_CHIP_WIDTH = 88;
+
+/**
+ * The share of a roster row the TEAM chip may never cross into — the row's own
+ * body, which is the seat-state cycle's tap target.
+ *
+ * It used to be "strictly right of centre" (0.5), and that was affordable while
+ * the chip said `TEAM A`. `FRIENDLY A` needs ~76px including its padding, and the
+ * landscape phone's 221px row has only 48 to the right of centre: the word would
+ * have spilled out of the chip drawn around it. 0.38 leaves the phone chip 78px —
+ * the word fits, with the left 84px of the row (a 84×19 target, and the whole row
+ * height) still body. Every wider form factor is bound by
+ * {@link SEAT_TEAM_CHIP_WIDTH} instead and never reaches this clamp at all.
+ */
+export const SEAT_TEAM_CHIP_MIN_BODY = 0.38;
 
 /** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
 export const RUSH_HEIGHT = 56;
@@ -519,19 +536,19 @@ function chipRect(seat: Rect): Rect {
 /**
  * A roster row's TEAM chip (TEAMS) — the side cycle that COMPOSES with the
  * difficulty chip rather than replacing it (n2). It sits immediately left of the
- * difficulty chip and its left edge is clamped strictly right of the row's centre,
- * so a tap on the row body's centre still lands on the body ({@link lobbyHitTest}
- * checks the chips first, so a tap *on* a chip wins). A very narrow row that cannot
- * spare the width right of its centre yields a zero-extent chip — the difficulty
- * control, the shared one, always keeps its place.
+ * difficulty chip and its left edge is clamped out of the row's leading
+ * {@link SEAT_TEAM_CHIP_MIN_BODY}, so a tap on the row body still lands on the body
+ * ({@link lobbyHitTest} checks the chips first, so a tap *on* a chip wins). A very
+ * narrow row that cannot spare that width yields a zero-extent chip — the
+ * difficulty control, the shared one, always keeps its place.
  */
 function teamChipRect(seat: Rect, diffChip: Rect): Rect {
   if (seat.width <= 0 || seat.height <= 0 || diffChip.width <= 0) {
     return { x: seat.x, y: seat.y, width: 0, height: 0 };
   }
   const right = diffChip.x - SEAT_CHIP_PAD;
-  const centre = seat.x + seat.width / 2;
-  const left = Math.max(centre + SEAT_CHIP_PAD, right - SEAT_TEAM_CHIP_WIDTH);
+  const bodyKeep = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
+  const left = Math.max(bodyKeep + SEAT_CHIP_PAD, right - SEAT_TEAM_CHIP_WIDTH);
   const width = Math.max(0, right - left);
   return { x: left, y: diffChip.y, width, height: diffChip.height };
 }

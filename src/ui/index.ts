@@ -289,9 +289,11 @@ export {
   nameplateGetsLabel,
   resolveName,
   resolveDifficultySuffix,
-  // The `TEAM A` / `TEAM B` side label every nameplate carries in TEAMS (m10 —
-  // ratified: colour alone is insufficient, because identity colour is per-SLOT).
+  // The `FRIENDLY A` / `ENEMY B` side label every nameplate carries in TEAMS (m10
+  // — ratified: colour alone is insufficient, because identity colour is per-SLOT
+  // — worded relative to the viewer since u3), and its blue/red motif colour.
   resolveTeamLabel,
+  resolveTeamRelation,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
   NAMEPLATE_FULL_ALPHA,
@@ -351,6 +353,7 @@ export {
   DIFFICULTY_CYCLE,
   DIFFICULTY_LABELS,
   LOBBY_SLOTS,
+  MAX_TEAMS,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   RUSH_COUNTDOWN_SECONDS,
@@ -389,10 +392,16 @@ export {
   selectShipClass,
   setPlayerName,
   startLobbyMatch,
-  // The one place a side's player-facing name lives — `TEAM A` / `TEAM B` — shared
-  // by the lobby roster and the in-match nameplates so they can never disagree.
+  // The one place a side's player-facing name lives — `FRIENDLY A` / `ENEMY B`,
+  // the WORD relative to the viewer and the LETTER absolute — shared by the lobby
+  // roster and the in-match nameplates so they can never disagree. `SIDE_COLORS`
+  // is the motif's blue/red reinforcement (u3, ratified 2026-08-05).
+  SIDE_COLORS,
+  SIDE_WORDS,
+  sideRelation,
   teamLabel,
   teamName,
+  viewerTeamOf,
   tickLobby,
   toggleMode,
   typeRoomCode,
@@ -400,6 +409,7 @@ export {
 export type {
   LobbyModel,
   LobbyOptions,
+  SideRelation,
   LobbyPhase,
   LobbySeat,
   LobbySeatView,

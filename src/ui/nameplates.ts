@@ -37,14 +37,20 @@
  *    read through the SAME roster resolver [[station-hp]] and [[healthbar]] use, so
  *    a ship's trim, its bar and its name can never disagree. Never signal yellow
  *    or threat red — those are RESERVED (style-guide §2).
- *  - **Which side, in words.** In TEAMS every label carries `TEAM A` / `TEAM B`
- *    beside the name ({@link resolveTeamLabel}) — ratified by the developer after
- *    a match they described as *"impossible to know who is on your team."* Colour
- *    was never able to answer it: identity colour is per-SLOT (style-guide §3.1),
- *    so a side owns no hue, and **colour alone is insufficient** is the
- *    ratification. In FFA the label is empty on every plate — teams-of-one has no
- *    side worth naming — so the free-for-all HUD is unchanged, character for
- *    character.
+ *  - **Which side, in words — and whose side.** In TEAMS every label carries the
+ *    viewer-relative side beside the name ({@link resolveTeamLabel}): `FRIENDLY A`
+ *    over an ally, `ENEMY B` / `ENEMY C` over everyone else. Ratified by the
+ *    developer after a match they described as *"impossible to know who is on your
+ *    team"* (m10 — colour was never able to answer it: identity colour is per-SLOT,
+ *    style-guide §3.1, so a side owns no hue, and **colour alone is insufficient**
+ *    is the ratification), and refined by them at u3 into `Friendly/Enemy plus
+ *    Letters`, because `TEAM A` only helps a player who remembers which team *they*
+ *    are. The WORD is relative to the viewer ({@link NameplateOptions.viewerTeam});
+ *    the LETTER is absolute — team 1 is `B` on everyone's screen. Both come from
+ *    the lobby's one formatter (`./lobby` {@link teamName}), and the side's colour
+ *    ({@link Nameplate.teamColor}) reinforces the word without ever replacing it.
+ *    In FFA the label is empty on every plate — teams-of-one has no side worth
+ *    naming — so the free-for-all HUD is unchanged, character for character.
  *  - **Fade under combat clutter.** A label over an entity that is damaged or
  *    fighting drops to {@link NAMEPLATE_FADE_ALPHA} so it never fights the health
  *    bar for the eye during a brawl (field request rule 3). It is *also* stacked
@@ -57,7 +63,8 @@
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import { playerColor } from './station-hp';
-import { teamName } from './lobby';
+import { SIDE_COLORS, sideRelation, teamName } from './lobby';
+import type { SideRelation } from './lobby';
 
 // ---------------------------------------------------------------------------
 // Text policy
@@ -135,14 +142,28 @@ export interface Nameplate {
    *  it flows through the SAME per-slot seam the name does ({@link resolveDifficultySuffix}). */
   readonly suffix: string;
   /**
-   * The owner's **side, in words** — `TEAM A` / `TEAM B` (ratified developer, m10
-   * teams) — or `''` in FFA and for any slot with no side on record.
+   * The owner's **side, in the viewer's words** — `FRIENDLY A` over an ally,
+   * `ENEMY B` over a rival (ratified developer m10, refined u3) — or `''` in FFA
+   * and for any slot with no side on record. A viewer-less HUD (no local player)
+   * reads the neutral `TEAM A` instead: see {@link NameplateOptions.viewerTeam}.
    *
    * Kept separate from {@link text} and {@link suffix} for the same reason those
    * two are separate from each other: the view weights them differently, and a
    * test can assert *which* string is the team without parsing a run-on label.
    */
   readonly teamLabel: string;
+  /**
+   * The colour that side's tag is drawn in — blue for friendly, red for enemy
+   * (`./lobby` {@link SIDE_COLORS}, ratified u3). Reinforcement for the word, never
+   * a replacement: the plate is fully readable with the hue removed, which is what
+   * the m10 ratification (colour alone is insufficient) bought and this keeps.
+   *
+   * It is deliberately NOT {@link color}: the identity colour stays per-SLOT
+   * (style-guide §3.1) on the name itself, because that is how a player tells two
+   * enemies apart. Neutral ({@link SIDE_COLORS}.neutral) whenever there is no side
+   * label to paint.
+   */
+  readonly teamColor: number;
   /** The owner's identity colour (style-guide §3), from the ratified roster. */
   readonly color: number;
   /** Entity centre, screen px — the view centres the label here and offsets it up. */
@@ -195,11 +216,22 @@ export type TeamTable = readonly (number | undefined)[];
  *  field-request calls (own-ship label off, the two alpha levels above). */
 export interface NameplateOptions {
   /**
-   * Show the `TEAM A` / `TEAM B` side label on every plate. **TEAMS only** — pass
-   * `mode === 'teams'`. Default false, so FFA (teams-of-one, where a "side" is
-   * just the player again) draws exactly the labels it always has.
+   * Show the side label on every plate. **TEAMS only** — pass `mode === 'teams'`.
+   * Default false, so FFA (teams-of-one, where a "side" is just the player again)
+   * draws exactly the labels it always has.
    */
   readonly showTeamLabels?: boolean;
+  /**
+   * The **viewing player's own side** — what makes a label read `FRIENDLY` or
+   * `ENEMY` (u3). It is the local player's `ship.team`, the same number
+   * `areEnemies` acts on, so the word over a hull and the friend/foe rule can
+   * never disagree.
+   *
+   * Omitted is the documented **viewer-less** case — a spectator, a replay, any
+   * HUD with no local player — and it degrades to the neutral `TEAM <letter>` on
+   * every plate. Never to `ENEMY`: a view with nobody in it has no enemies.
+   */
+  readonly viewerTeam?: number;
   /** Show the local player's OWN ship label. Default **false** — a name pinned to
    *  screen-centre reads as noise (field request rule 3; the own station is still
    *  labelled either way). Wire this to a settings toggle if a player disagrees. */
@@ -255,9 +287,11 @@ export function resolveDifficultySuffix(difficulties: DifficultyTable, owner: Pl
 }
 
 /**
- * Resolve a slot's **side label** from the team table (m10 teams): `TEAM A` /
- * `TEAM B`, the ratified wording, shared with the lobby roster (`./lobby`
- * {@link teamName}) so the two screens name a side identically.
+ * Resolve a slot's **side label** from the team table (m10 teams, u3 wording):
+ * `FRIENDLY A` to the viewer's own side, `ENEMY B` to any other — the ratified
+ * wording, produced by the lobby roster's own formatter (`./lobby`
+ * {@link teamName}) so the two screens name a side identically for the same seat
+ * and the same viewer.
  *
  * Empty unless team labels are on — that is FFA's answer, and it is the whole of
  * it: in teams-of-one every plate would read a different side, which is noise
@@ -269,11 +303,33 @@ export function resolveTeamLabel(
   owner: PlayerId,
   opts: NameplateOptions = {},
 ): string {
-  if (!(opts.showTeamLabels ?? false)) return '';
-  if (!isOwnedSlot(owner)) return '';
+  const side = resolveSide(teams, owner, opts);
+  return side === null ? '' : teamName(side, opts.viewerTeam);
+}
+
+/**
+ * The same slot's side as a RELATION — friendly / enemy / neutral — which is what
+ * the tag's colour is chosen from ({@link SIDE_COLORS}). `neutral` also covers the
+ * viewer-less HUD, so a spectator's plates are neither blue nor red.
+ */
+export function resolveTeamRelation(
+  teams: TeamTable,
+  owner: PlayerId,
+  opts: NameplateOptions = {},
+): SideRelation {
+  const side = resolveSide(teams, owner, opts);
+  return side === null ? 'neutral' : sideRelation(side, opts.viewerTeam);
+}
+
+/** The raw side this slot fights for when it is worth naming at all, else null —
+ *  the one gate both resolvers above read, so a label and its colour can never
+ *  disagree about whether there IS a side. */
+function resolveSide(teams: TeamTable, owner: PlayerId, opts: NameplateOptions): number | null {
+  if (!(opts.showTeamLabels ?? false)) return null;
+  if (!isOwnedSlot(owner)) return null;
   const side = teams[Math.floor(owner)];
-  if (typeof side !== 'number' || !Number.isFinite(side) || side < 0) return '';
-  return teamName(side);
+  if (typeof side !== 'number' || !Number.isFinite(side) || side < 0) return null;
+  return side;
 }
 
 /**
@@ -313,6 +369,7 @@ export function nameplateModel(
       text: resolveName(names, e.owner),
       suffix: resolveDifficultySuffix(difficulties, e.owner),
       teamLabel: resolveTeamLabel(teams, e.owner, opts),
+      teamColor: SIDE_COLORS[resolveTeamRelation(teams, e.owner, opts)],
       color: playerColor(e.owner),
       x: e.pos.x,
       y: e.pos.y,

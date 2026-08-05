@@ -99,10 +99,14 @@ export interface DrawnNameplate {
   /** The recessive difficulty suffix drawn beside the name — `(HARD)` etc., or
    *  `''` for a human seat (field request v0.2.2). */
   suffix: string;
-  /** The side label drawn beside the name — `TEAM A` / `TEAM B` in TEAMS, `''` in
-   *  FFA (m10 teams). This is the readback a live-stage teams match asserts on:
-   *  proof the label a player is supposed to be able to read actually DREW. */
+  /** The side label drawn beside the name — `FRIENDLY A` / `ENEMY B` in TEAMS,
+   *  `''` in FFA (m10 teams, u3 wording). This is the readback a live-stage teams
+   *  match asserts on: proof the label a player is supposed to be able to read
+   *  actually DREW. */
   teamLabel: string;
+  /** …and the tint it drew in — blue for the viewer's own side, red for a rival
+   *  (`./lobby` SIDE_COLORS), so a screenshot's colour claim is checkable too. */
+  teamColor: number;
   /** The tint (owner identity colour) applied. */
   color: number;
   /** Label centre-x in screen space, CSS px (the entity it tracks). */
@@ -149,10 +153,12 @@ export class NameplateView extends Container {
       t.tint = plate.color;
       t.alpha = plate.alpha;
 
-      // The side label (m10 teams) — `TEAM A`, in words, immediately after the
-      // name, because colour cannot say it: identity colour is per-SLOT, so a side
-      // has no hue of its own (style-guide §3.1; "colour alone insufficient",
-      // ratified). Empty in FFA, where every plate would otherwise read a different
+      // The side label (m10 teams, u3 wording) — `FRIENDLY A` / `ENEMY B`, in
+      // words, immediately after the name, because colour cannot say it on its own:
+      // identity colour is per-SLOT, so a side has no hue (style-guide §3.1;
+      // "colour alone insufficient", ratified). Its own tint IS the side colour —
+      // blue ally / red rival — but only as reinforcement over a word that already
+      // says it. Empty in FFA, where every plate would otherwise read a different
       // side and say nothing.
       const tm = this.teamSlot(drawn);
       if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
@@ -189,7 +195,7 @@ export class NameplateView extends Container {
       t.position.set(plate.x, bottom);
       if (hasTeam) {
         tm.visible = true;
-        tm.tint = plate.color;
+        tm.tint = plate.teamColor;
         tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
         tm.position.set(left + width + NAMEPLATE_TEAM_GAP, bottom);
       } else {
@@ -250,7 +256,7 @@ export class NameplateView extends Container {
   private recordDebug(i: number, plate: Nameplate, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, color: plate.color, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, x: plate.x, y: top, local: plate.local };
       this.debugDrawn[i] = d;
       return;
     }
@@ -259,6 +265,7 @@ export class NameplateView extends Container {
     d.text = plate.text;
     d.suffix = plate.suffix;
     d.teamLabel = plate.teamLabel;
+    d.teamColor = plate.teamColor;
     d.color = plate.color;
     d.x = plate.x;
     d.y = top;
