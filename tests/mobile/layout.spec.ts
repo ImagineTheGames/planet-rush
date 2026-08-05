@@ -272,7 +272,7 @@ test('layout contract: desktop elements within anchors, no touch affordances lea
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
   budgetTest({
     work: 'desktop boot of the frozen build → one registry probe → contract check + touch-affordance leak guard',
-    measuredSeconds: 2,
+    measuredSeconds: 3,
   });
 
   const probe = await probeLayout(page);

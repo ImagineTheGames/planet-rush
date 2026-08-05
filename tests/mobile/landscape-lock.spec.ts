@@ -246,7 +246,7 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
   test.skip(!isTouchProject(testInfo.project.name), 'the landscape lock is a mobile concern');
   budgetTest({
     work: 'portrait boot → rotate to landscape (re-layout) → rotate back to portrait (re-layout), asserting anchors at each stop',
-    measuredSeconds: 7,
+    measuredSeconds: 8,
   });
 
   // Boot portrait (the developer's mistaken opening orientation).
@@ -312,7 +312,7 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
   // from the same measured model as every other test in the suite — q7-01.)
   budgetTest({
     work: 'portrait boot → tap PLAY → doors → tap PLAY SOLO → lobby → pick a hull → tap RUSH! → full match-world assembly',
-    measuredSeconds: 28,
+    measuredSeconds: 27,
   });
 
   const vp = page.viewportSize()!;

@@ -45,6 +45,12 @@
  * of SIMULATION everywhere; the wall-clock price of that on a slow host is what
  * ./budgets.ts is for. This test is what took `main` red for two days on a flat
  * 60 s budget it could not finish inside (q7-01).
+ *
+ * It also got CHEAPER, which was not the goal but is worth recording: the old
+ * hold re-dispatched a `touchMove` every 50 ms purely to pace itself, and paid a
+ * CDP round-trip for each. The stick holds its own deflection until `touchEnd`
+ * (touch.ts), so none of those events were input — 27.3 s → 15.4 s in-container
+ * for a hold that now delivers strictly more simulation in CI.
  */
 import { test, expect, type Page, type CDPSession, type TestInfo } from '@playwright/test';
 import { budgetTest } from './budgets';
@@ -208,7 +214,7 @@ for (const mode of ['landscape', 'portrait'] as const) {
   test(`camera keeps the ship centred at boot and after 2s thrust (${mode})`, async ({ page }, testInfo) => {
     budgetTest({
       work: 'orient → boot the debug build → assert centred → hold thrust for 2 s of SIM → settle → assert centred',
-      measuredSeconds: 27,
+      measuredSeconds: 16,
     });
 
     // Landscape is the gameplay orientation on every profile. Portrait is asserted
@@ -240,7 +246,7 @@ test('debug hook is ABSENT without ?debug=1', async ({ page }) => {
     work: 'one clean boot → assert the instrument never installed',
     // Two assertions on a single boot: this one keeps the flat floor, which is the
     // point of budgeting per test rather than raising the global cap.
-    measuredSeconds: 3,
+    measuredSeconds: 5,
   });
 
   await page.goto('/');

@@ -284,7 +284,7 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
   budgetTest({
     work: 'landscape boot → 1 s of sim settle → one full-viewport screenshot → three region pixel counts',
-    measuredSeconds: 6,
+    measuredSeconds: 9,
   });
 
   // Play-mode affordance assertion → landscape (portrait is the blocked state).
@@ -315,7 +315,7 @@ test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', asy
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
   budgetTest({
     work: 'portrait boot → settle → screenshot → rotate to landscape → re-layout settle → second screenshot',
-    measuredSeconds: 12,
+    measuredSeconds: 14,
   });
 
   // Boot on the device default viewport, which is PORTRAIT (h > w). The ratified
@@ -443,7 +443,7 @@ test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, t
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
   budgetTest({
     work: 'desktop boot → 1 s of sim settle → one screenshot → minimap-region read → two region pixel counts',
-    measuredSeconds: 4,
+    measuredSeconds: 5,
   });
 
   await boot(page);

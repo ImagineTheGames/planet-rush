@@ -54,7 +54,7 @@ test('golden: desktop frozen scene', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
   budgetTest({
     work: 'desktop boot of the frozen scene → font settle → one full-frame golden comparison',
-    measuredSeconds: 3,
+    measuredSeconds: 5,
   });
 
   await bootFrozen(page);
@@ -66,7 +66,7 @@ test('golden: landscape phone frozen scene', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
   budgetTest({
     work: 'rotate to landscape → boot the frozen scene → font settle → one full-frame golden comparison at dpr 3',
-    measuredSeconds: 5,
+    measuredSeconds: 8,
   });
 
   const vp = page.viewportSize();

@@ -177,7 +177,7 @@ test.describe('build button persists through the whole build cycle', () => {
     // (q7-01, ./budgets.ts).
     budgetTest({
       work: 'landscape boot → tap BUILD → order a turret → 650 sim ticks of construction → 3 more taps',
-      measuredSeconds: 28,
+      measuredSeconds: 29,
     });
 
     await useLandscape(page);
@@ -266,7 +266,7 @@ test.describe('the wheel BACK cycle — drill in, hub-tap back out (field report
     test.skip(!isTouchProject(testInfo.project.name), 'the wheel is tap-operated on touch (GDD §2.4)');
     budgetTest({
       work: 'landscape boot → 6 wheel taps (drill BUILD → UPGRADE → WEAPON, then BACK ×3), each with a 2-tick settle',
-      measuredSeconds: 24,
+      measuredSeconds: 23,
     });
 
     await useLandscape(page);

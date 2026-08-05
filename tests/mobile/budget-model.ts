@@ -22,11 +22,13 @@ export const FLAT_DEFAULT_MS = 60_000;
  *
  * Observed at 11659df: 8.9 min vs 1.5 min = **5.9×**. LESSONS §5 bands
  * software-GL runners at 3–10×. We size at the TOP of that band, not at the
- * observation, because the observation is one sample of a shared, noisy-neighbour
- * runner — and because the cost of being generous is bounded (a budget is only
- * ever spent on work that is genuinely running; hangs are caught by the tighter,
- * separate bounds documented in ./budgets.ts) while the cost of being tight is a
- * red `main`.
+ * observation, for three reasons: the observation is one sample of a shared,
+ * noisy-neighbour runner; a whole-suite ratio hides that the costs inside any one
+ * test scale unevenly (a page boot and a CDP round-trip stretch much further than
+ * a tick-denominated wait, which stretches by ~4× — 60 ticks/s to ~15); and the
+ * cost of being generous is bounded — a budget is only ever spent on work that is
+ * genuinely running, since hangs are caught by the tighter, separate bounds
+ * documented in ./budgets.ts — while the cost of being tight is a red `main`.
  */
 export const CI_SLOW_FACTOR = 10;
 
