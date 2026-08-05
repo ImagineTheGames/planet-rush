@@ -497,11 +497,14 @@ describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
     await until('the guest roster to show the split', () =>
       lobbyModel(guest.lobby()).seats.slice(0, 4).map((s) => s.team).join() === wanted.join(),
     );
+    // …and both name the sides in the WORDS that roster's own viewer reads (u3).
+    // The GUEST is on side A, so A is `FRIENDLY` and B is `ENEMY` on their screen;
+    // the letter is absolute, so both screens agree on which side is which.
     expect(lobbyModel(guest.lobby()).seats.slice(0, 4).map((s) => s.teamName)).toEqual([
-      'TEAM A',
-      'TEAM A',
-      'TEAM B',
-      'TEAM B',
+      'FRIENDLY A',
+      'FRIENDLY A',
+      'ENEMY B',
+      'ENEMY B',
     ]);
 
     runCountdown(host);

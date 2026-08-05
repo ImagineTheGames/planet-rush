@@ -56,7 +56,7 @@
 
 import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { PLAYER_COLORS } from '@render/index';
+import { PALETTE, PLAYER_COLORS } from '@render/index';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
@@ -133,7 +133,10 @@ export const MAX_TEAMS = 4;
 
 /** A team's label — a letter, not a colour: the eight identity colours stay
  *  per-SLOT (style-guide §3.1, ratified), and the team is the *motif* over them
- *  (nameplate underline), so it needs a hue-independent name of its own. */
+ *  (nameplate underline), so it needs a hue-independent name of its own.
+ *
+ *  The letter is the **ABSOLUTE** half of the side grammar ({@link teamName}):
+ *  team 1 is `B` to everyone, always, whoever is looking. */
 export const TEAM_LABELS: readonly string[] = ['A', 'B', 'C', 'D'];
 
 /** A team number's label, folded into range so a stray value still reads. */
@@ -142,25 +145,123 @@ export function teamLabel(team: number): string {
   return TEAM_LABELS[Math.floor(team) % TEAM_LABELS.length]!;
 }
 
-/** The word the roster chip carries, so a lone letter never has to be decoded. */
-export const TEAM_WORD = 'TEAM';
+/**
+ * How a side reads **to the viewer looking at it** — the RELATIVE half of the
+ * side grammar ({@link teamName}). The same side is `friendly` to its own members
+ * and `enemy` to everyone else; `neutral` is the viewer-less case (a spectator, a
+ * replay, any view with no local player), where nobody is an ally and — the point
+ * — nobody may be called an enemy either.
+ */
+export type SideRelation = 'friendly' | 'enemy' | 'neutral';
 
 /**
- * A side's **player-facing name** — `TEAM A`, `TEAM B` — the one string both the
- * lobby roster and the in-match nameplates show (`./nameplates`).
- *
- * Ratified by the developer after playing a TEAMS match: *"impossible to know who
- * is on your team."* Colour could not answer that and was never going to — the
- * eight identity colours are per-SLOT (style-guide §3.1), so a side has no hue of
- * its own to read, and the bare letter on the lobby chip did not survive the trip
- * into a fight. The label is words, over every nameplate, in both form factors:
- * **colour alone is insufficient** is the ratification, and this function is the
- * single place the wording lives so the lobby and the battlefield can never
- * disagree about what a side is called.
+ * The word each relation carries. `WORD + LETTER` is the whole grammar:
+ * `FRIENDLY A`, `ENEMY B`, `ENEMY C` — and `TEAM B` when there is no viewer to be
+ * friendly to. One table, so nothing else in the UI ever spells a side by hand.
  */
-export function teamName(team: number): string {
-  return `${TEAM_WORD} ${teamLabel(team)}`;
+export const SIDE_WORDS: Readonly<Record<SideRelation, string>> = {
+  friendly: 'FRIENDLY',
+  enemy: 'ENEMY',
+  neutral: 'TEAM',
+};
+
+/**
+ * Which relation `team` bears to the player viewing it.
+ *
+ * `viewerTeam` is the VIEWING player's own side. Absent (or not a real side) means
+ * there is no local player — a spectator, a replay, a lobby nobody is seated in —
+ * and that resolves to `neutral`, never to `enemy`: a view with no "friendly" must
+ * not answer by declaring everyone hostile. A `team` that is not a real side is
+ * neutral for the same reason: an unknown side is not an enemy side.
+ */
+export function sideRelation(team: number, viewerTeam?: number): SideRelation {
+  if (viewerTeam === undefined || !Number.isFinite(viewerTeam) || viewerTeam < 0) return 'neutral';
+  if (!Number.isFinite(team) || team < 0) return 'neutral';
+  return Math.floor(team) === Math.floor(viewerTeam) ? 'friendly' : 'enemy';
 }
+
+/**
+ * A side's **player-facing name** — `FRIENDLY A`, `ENEMY B`, `ENEMY C` — the one
+ * string both the lobby roster and the in-match nameplates show (`./nameplates`).
+ *
+ * ---------------------------------------------------------------------------
+ * THE RATIFICATION CHAIN (read this before changing the wording)
+ * ---------------------------------------------------------------------------
+ *
+ * **m10, ratified after a TEAMS match:** *"impossible to know who is on your
+ * team."* Colour could not answer that and was never going to — the eight
+ * identity colours are per-SLOT (style-guide §3.1), so a side has no hue of its
+ * own to read, and the bare letter on the lobby chip did not survive the trip
+ * into a fight. The conclusion: **colour alone is insufficient**; the label is
+ * words, over every nameplate, in both form factors. That produced `TEAM A`.
+ *
+ * **u3, ratified 2026-08-05 — a REFINEMENT of that, not a reversal:** *"I don't
+ * think we should show teams like Team A Team B in the match (perhaps just
+ * Friendly, and Enemy, with colors like Blue for Friendly, Red for Enemy)"* and,
+ * on more than two sides, *"Friendly/Enemy plus Letters — Friendly A, Enemy B,
+ * Enemy C, Enemy D etc..."*. `TEAM A` only ever helped a player who remembered
+ * which team *they* were; `FRIENDLY A` answers the original complaint directly.
+ * The words still carry the whole meaning — colour came back as **reinforcement,
+ * never as the sole signal** ({@link SIDE_COLORS}, on the team motif only), which
+ * is what keeps the readout usable with the hue removed.
+ *
+ * ---------------------------------------------------------------------------
+ * THE GRAMMAR: `WORD + LETTER`, and the two halves behave differently
+ * ---------------------------------------------------------------------------
+ *
+ *  - **The letter is ABSOLUTE** ({@link teamLabel}) — team 1 is `B` to everyone,
+ *    always. It is the side's identity and does not depend on who is looking, so
+ *    two players on opposite sides still name the same third side identically.
+ *  - **The word is RELATIVE to the viewer** ({@link sideRelation}) — the same side
+ *    reads `FRIENDLY` to its own members and `ENEMY` to everyone else.
+ *
+ * `viewerTeam` is therefore required for the word to mean anything; omitting it is
+ * the documented **viewer-less** case (spectator / replay / no local player) and
+ * degrades to the bare `TEAM <letter>` rather than calling everybody an enemy.
+ *
+ * This function stays the SINGLE place the wording lives, so the lobby roster and
+ * the in-match nameplates can never disagree about what a side is called — every
+ * call site passes the viewer's team rather than inventing its own wording.
+ */
+export function teamName(team: number, viewerTeam?: number): string {
+  return `${SIDE_WORDS[sideRelation(team, viewerTeam)]} ${teamLabel(team)}`;
+}
+
+/**
+ * The **team motif's** colour, by relation — blue for friendly, red for enemy
+ * (ratified u3, 2026-08-05: *"with colors like Blue for Friendly, Red for
+ * Enemy"*).
+ *
+ * Where it is allowed to land: the **motif only** — the roster row's team
+ * underline and its side chip, and the side tag on a nameplate. Never a hull,
+ * never a ship's trim, never an HP bar. The eight identity colours are per-SLOT
+ * and ratified (style-guide §3.1): they are how a player tells two *enemies*
+ * apart, and at three and four sides they are doing real work alongside the
+ * letter. The motif is exactly the hue-independent layer this file already
+ * described, so blue/red belongs there and nowhere else.
+ *
+ * Why these two hues, from the frozen palette rather than invented
+ * (`src/art/tokens.ts`; pinned in `./lobby.test`):
+ *
+ *  - **friendly = plasma `#4DC3FF`** — the cold energy blue this UI already
+ *    accents with (selection strokes, the lobby's own chips). 9.5:1 against
+ *    Vacuum `#0D1015`, so it holds at 11px on a phone.
+ *  - **enemy = threat red, lifted toward white** (`tint(threatRed, 0.32)` =
+ *    `#CB7979`, the declared `shotEnemy2` rung of the enemy-fire ramp). Raw
+ *    threat red `#B23A3A` is only 3.2:1 on Vacuum — right for a filling damage
+ *    ring, too dim for a 12px word on a phone — and the ramp already owns the
+ *    brighter rung, so no seventh hue enters the palette. It stays inside the
+ *    RESERVED rule (style-guide §2: red is "damage, alarm, enemy fire") because
+ *    an ENEMY tag is precisely the danger channel; it is never worn by a
+ *    friendly or neutral side.
+ *  - **neutral = patina** — what the roster underline already drew, and the right
+ *    answer for a viewer-less view, which has no friend or foe to colour.
+ */
+export const SIDE_COLORS: Readonly<Record<SideRelation, number>> = {
+  friendly: PALETTE.plasma,
+  enemy: 0xcb7979,
+  neutral: PALETTE.patina,
+};
 
 /** The default side a slot starts on when TEAMS is picked: alternating by slot,
  *  so any active count of two or more already has both sides manned (an even
@@ -1062,13 +1163,18 @@ export interface LobbySeatView {
   /** The side this slot fights for (raw team number, TEAMS). */
   readonly team: number;
   /** …and its label (`A`…`D`), so the row reads the team with the hue removed —
-   *  colour is identity, the letter is the team (style-guide §3 rule 3). */
+   *  colour is identity, the letter is the team (style-guide §3 rule 3). The
+   *  letter is ABSOLUTE: this row is `B` on every player's screen. */
   readonly teamLabel: string;
-  /** …and the same side as the WORD a player reads — `TEAM A` (ratified developer,
-   *  m10: *"impossible to know who is on your team"*). The chip carries this rather
-   *  than the bare letter, and the in-match nameplates carry the identical string
+  /** …and the same side as the WORD *you* read — `FRIENDLY A` on your own side,
+   *  `ENEMY B` on any other (ratified u3, 2026-08-05, refining m10's `TEAM A`).
+   *  The chip carries this rather than the bare letter, and the in-match
+   *  nameplates carry the identical string for the same seat and viewer
    *  ({@link teamName}), so the roster and the battlefield teach one vocabulary. */
   readonly teamName: string;
+  /** …and that same relation as a token, so the view can colour the team motif
+   *  (blue friendly / red enemy, {@link SIDE_COLORS}) without re-deciding it. */
+  readonly side: SideRelation;
   /** The tier, on a bot row only. */
   readonly botDifficulty?: BotDifficulty;
   /**
@@ -1109,8 +1215,13 @@ export interface LobbyModel {
   /** `N` — active (non-closed) seats, 2..8. The size the world will build at. */
   readonly size: number;
   /** Per-side active headcounts, always present so TEAMS shows them and never
-   *  blocks a split (ratified). Sorted by team; empty of nothing active. */
+   *  blocks a split (ratified). Sorted by team; empty of nothing active. The
+   *  tally is by the ABSOLUTE letter (`A 4 · B 4`) — it counts sides, and a
+   *  headcount is the one place on this screen that is nobody's point of view. */
   readonly teamCounts: readonly LobbyTeamCount[];
+  /** The viewing player's own side ({@link viewerTeamOf}) — what makes every
+   *  row's word `FRIENDLY` or `ENEMY`. `undefined` in a viewer-less roster. */
+  readonly viewerTeam: number | undefined;
   readonly classLocked: boolean;
   readonly countdown: { readonly active: boolean; readonly label: string; readonly seconds: number };
   readonly canStart: boolean;
@@ -1125,7 +1236,8 @@ export interface LobbyModel {
 
 /** Build the frame model. Pure: the view draws exactly this and decides nothing. */
 export function lobbyModel(state: LobbyState): LobbyModel {
-  const seats = state.seats.map((seat) => seatView(state, seat));
+  const viewer = viewerTeamOf(state);
+  const seats = state.seats.map((seat) => seatView(state, seat, viewer));
   // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
   // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
   const active = seats.filter((s) => !s.isClosed);
@@ -1143,6 +1255,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     abundance: state.abundance,
     size: active.length,
     teamCounts: teamCountsOf(active),
+    viewerTeam: viewer,
     classLocked: classLocked(state),
     countdown: {
       active: state.phase === 'counting',
@@ -1167,7 +1280,26 @@ function teamCountsOf(active: readonly LobbySeatView[]): LobbyTeamCount[] {
     .map(([team, count]) => ({ team, label: teamLabel(team), count }));
 }
 
-function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
+/**
+ * The VIEWING player's own side — the relative half of every side label on this
+ * screen ({@link teamName}).
+ *
+ * Read off the seat the local player is actually sitting in, so a host who
+ * re-assigns their own side sees the whole roster re-word itself in the same
+ * frame. `undefined` when no seat is the viewer's — the documented viewer-less
+ * case (a spectator, or a roster rendered with no local player), where every row
+ * reads the neutral `TEAM <letter>` rather than being declared hostile.
+ */
+export function viewerTeamOf(state: LobbyState): number | undefined {
+  const seat = state.seats.find((s) => s.player === state.you);
+  return seat ? seat.team : undefined;
+}
+
+function seatView(
+  state: LobbyState,
+  seat: LobbySeat,
+  viewerTeam: number | undefined,
+): LobbySeatView {
   const isBot = isBotSeat(seat.occupant);
   const isClosed = seat.occupant === 'closed';
   const character = seat.personality ? PERSONALITIES[seat.personality] : null;
@@ -1192,7 +1324,10 @@ function seatView(state: LobbyState, seat: LobbySeat): LobbySeatView {
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
-    teamName: teamName(seat.team),
+    // The WORD is the viewer's ("FRIENDLY A" on your own side), the LETTER is
+    // everyone's — one formatter, so this row and that row's nameplate cannot drift.
+    teamName: teamName(seat.team, viewerTeam),
+    side: sideRelation(seat.team, viewerTeam),
     // An open seat stops being claimable the moment the match starts; a seat the
     // server has already seated a bot in was never claimable to begin with; a
     // closed seat is a shut door; and offline there is no wire for a second player

@@ -8,6 +8,94 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Sides read FRIENDLY / ENEMY, not TEAM A / TEAM B
+
+**Date:** 2026-08-05 · branch `agent/ui/u3-friendly-enemy-sides`
+**Ratified by:** Developer (Reinaldo)
+**Amends by reference:** GDD §2.1 (the Teams side indicator), §2.2 (what the HUD
+shows), §5.2 (player colour and identity) and §5.7 — all four now carry the
+folded text with a dated *(amended)* marker, so this entry is the *why*, not the
+spec. **Refines, does not reverse, the m10 ratification** below it in spirit
+(`docs/netcode-teams-wire.md` §3, "colour alone is insufficient").
+
+### The ratification, verbatim
+
+> "I don't think we should show teams like Team A Team B in the match (perhaps
+> just Friendly, and Enemy, with colors like Blue for Friendly, Red for Enemy)"
+
+and, asked what should happen when a host makes more than two sides:
+
+> "Friendly/Enemy plus Letters — Friendly A, Enemy B, Enemy C, Enemy D etc..."
+
+### Why this is a refinement and not a reversal
+
+m10's ratification came out of a Teams match the developer could not read:
+*"impossible to know who is on your team."* Its conclusion was that **colour
+alone is insufficient** — a side owns no hue, because the eight identity colours
+are per-*slot* (style-guide §3.1) — so the side had to be said in **words**, over
+every nameplate, in both form factors. That produced `TEAM A`.
+
+`TEAM A` obeys the letter of that and misses its point: it only ever helps a
+player who remembers which team *they* are. `FRIENDLY A` answers the question
+that was actually asked. The word still carries the whole meaning; colour comes
+back only as reinforcement, which is what keeps the readout usable with the hue
+removed (and therefore colour-blind-safe, the same path the hull decal takes).
+
+### What changed
+
+- **`teamName(team, viewerTeam)` is viewer-aware** (`src/ui/lobby.ts`) and stays
+  the SINGLE place the wording lives. Every call site passes the viewer's side
+  rather than inventing its own wording, which is what makes the lobby roster
+  string and the in-match nameplate string identical for the same seat and the
+  same viewer — asserted in `src/ui/lobby.test.ts`, not assumed.
+- **The grammar is `WORD + LETTER`, and the halves differ.** The **letter is
+  absolute** (team 1 is `B` to everyone, on every screen, so two enemies are never
+  both just "the enemy"); the **word is relative** to who is looking.
+- **The viewer-less case is decided and documented:** a spectator, a replay, or
+  any view with no local player has no "friendly," so it reads the bare
+  `TEAM <letter>`. It must never answer by declaring everyone an enemy.
+- **Colour lands on the team motif only** — the nameplate's side tag, the roster
+  row's underline and side chip. Blue is plasma `#4DC3FF`; red is threat red
+  lifted one *declared* rung toward white (`shotEnemy2`, `src/art/palette.ts`),
+  because raw threat red is 3.2:1 against Vacuum — right for a filling damage
+  ring, too dim for an 11px word on a phone. Both are pinned to the art tokens and
+  to a 4.5:1 contrast floor by test. **The eight identity colours do not move.**
+- **FFA is untouched.** Teams-of-one has no side worth naming; no label is drawn,
+  and the free-for-all HUD is unchanged character for character.
+- **The lobby's side chip grew 64 → 88px** and its clamp moved from "strictly
+  right of the row's centre" to the row's leading 36%: a 221px landscape-phone row
+  has only 48px right of centre, and a word drawn wider than the chip around it
+  reads as a bug. The row body keeps a full-height 80px target there; every wider
+  form factor is bound by the chip width and never reaches the clamp.
+- **Evidence.** Three new golden baselines (desktop, landscape phone, and
+  **portrait-held** phone through the landscape lock) of a frozen TEAMS scene
+  carrying `YOU FRIENDLY A` and `Rusty ENEMY B` at once — the FFA baselines cannot
+  show a side label by design, which is why the teams scene had to exist. The
+  debug boot gained `?sides=N` (debug-only, like `?freeze=1`) because `?debug=1`
+  skips the lobby and there was otherwise no way to boot a sided world.
+
+### Known-open
+
+- **A nameplate crossing the station's own ring strokes loses contrast — the side
+  tag inherits this, it does not introduce it.** Both hues clear the 4.5:1 floor
+  against Vacuum, which is the backdrop this amendment declares and pins by test
+  (measured 9.4:1 for friendly in dark space). But the nameplate layer draws no
+  backing plate, so where a plate happens to cross the bright blue shield/beacon
+  rings, the *whole* plate — the name as much as the side tag — drops to ~2.1:1
+  (p90 of the backdrop under the glyphs) and ~1.6:1 at the brightest stroke. This
+  is visible in all three new baselines on `YOU FRIENDLY A`, because a ship spawns
+  orbiting its own station and the frozen scene is t≈0. It is **pre-existing, not
+  a regression**: `desktop-frozen` on `main` shows the bare name `YOU` washing out
+  identically in the same place, in a different colour, before this change. The
+  fix is a backing plate or outline on the nameplate layer, which would move the
+  FFA baselines too and is deliberately out of this brief's scope.
+- `docs/netcode-teams-wire.md` §3/§5 still quotes the superseded `TEAM A` wording
+  and the 64px chip; it is the Netcode lane's record of the m10 round and was left
+  for its owner rather than rewritten from this lane. The GDD (§2.1, §2.2, §5.2)
+  and `teamName`'s own doc comment are the current truth.
+
+---
+
 ## REPAIR has a 15-second COOLDOWN (per station)
 
 **Date:** 2026-07-28 · branch `agent/gameplay/p12-repair-cooldown`

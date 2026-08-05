@@ -35,6 +35,7 @@ import {
   RUSH_HEIGHT,
   SEAT_ROW_MAX,
   SEAT_ROW_MAX_TOUCH,
+  SEAT_TEAM_CHIP_MIN_BODY,
   TWO_COLUMN_MIN_WIDTH,
   lobbyHitTest,
   lobbyLayout,
@@ -105,6 +106,25 @@ const center = (r: Rect): { x: number; y: number } => ({
   x: r.x + r.width / 2,
   y: r.y + r.height / 2,
 });
+
+/** A point in a roster row's guaranteed BODY zone — its leading
+ *  {@link SEAT_TEAM_CHIP_MIN_BODY} share, which no trailing chip may enter. This
+ *  is what "the row is still tappable" means since the side chip grew to hold
+ *  `FRIENDLY A` (u3); on every profile but the landscape phone the zone reaches
+ *  past the row's centre anyway. */
+const bodyPoint = (r: Rect): { x: number; y: number } => ({
+  x: r.x + (r.width * SEAT_TEAM_CHIP_MIN_BODY) / 2,
+  y: r.y + r.height / 2,
+});
+
+/** The widest side label the chip ever carries — `FRIENDLY A` — in CSS px at the
+ *  chip's 11px Audiowide, measured in the studio container (`ENEMY B` is 50,
+ *  `TEAM A` was 41). Geometry runs in node with no font to measure, so the number
+ *  is stated here and the constant it justifies lives next door
+ *  (`SEAT_TEAM_CHIP_WIDTH` = 88 = this + its padding, rounded up). */
+const LONGEST_SIDE_LABEL_PX = 64;
+/** Mirrors `lobby-view`'s own `TEAM_CHIP_LABEL_PAD` — the inset the word keeps. */
+const TEAM_CHIP_LABEL_PAD = 6;
 
 // ---------------------------------------------------------------------------
 // 1. Containment
@@ -335,7 +355,11 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
     it(`maps a tap back to the rect it was drawn in — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: touch });
       for (let i = 0; i < layout.seats.length; i++) {
-        const p = center(layout.seats[i]!);
+        // The row BODY is its leading share — the part the chips are clamped out
+        // of (SEAT_TEAM_CHIP_MIN_BODY). It stopped being "everything left of the
+        // trailing chips, centre included" at u3: the side chip now carries
+        // `FRIENDLY A`, which a 221px phone row cannot hold right of its centre.
+        const p = bodyPoint(layout.seats[i]!);
         expect(lobbyHitTest(layout, p.x, p.y), `seat[${i}] on ${name}`).toEqual({
           kind: 'seat',
           index: i,
@@ -412,13 +436,18 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
         const teamChip = layout.seatTeamChips[i]!;
         const seat = layout.seats[i]!;
         const mid = center(seat).x;
+        const body = bodyPoint(seat);
 
-        // Both chips nest inside the row and never cover its centre — the row body
-        // stays tappable and both chips sit strictly right of centre (n2).
+        // Both chips nest inside the row and leave its LEADING share clear — the
+        // row body stays tappable (n2). The guaranteed body is the row's first
+        // SEAT_TEAM_CHIP_MIN_BODY, not "everything up to the centre": u3 widened
+        // the side chip to hold `FRIENDLY A`, which the landscape phone's 221px
+        // row cannot fit right of centre. Every wider profile still keeps its
+        // centre body — asserted below where the row can afford it.
         expect(rectContains(seat, chip), `difficulty chip ${i} escapes its row on ${name}`).toBe(true);
         expect(rectContains(seat, teamChip), `team chip ${i} escapes its row on ${name}`).toBe(true);
         expect(
-          lobbyHitTest(layout, mid, center(seat).y),
+          lobbyHitTest(layout, body.x, body.y),
           `row body ${i} on ${name}`,
         ).toEqual({ kind: 'seat', index: i });
 
@@ -433,11 +462,26 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
           });
         }
 
+        // …and it is wide enough to actually SAY the side (u3). The word is the
+        // whole feature — `FRIENDLY A` measures 64px in the chip's 11px Audiowide
+        // (measured in-container, the same way the 88px constant was chosen) — so
+        // a chip that cannot hold it is a chip that would draw the word over the
+        // name beside it. Every profile that draws a chip at all must fit it.
+        if (teamChip.width > 0 && teamChip.height > 0) {
+          expect(
+            teamChip.width,
+            `team chip ${i} cannot hold "FRIENDLY A" on ${name}`,
+          ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
+        }
+
         // The team chip — composed to the LEFT of the difficulty chip (TEAMS) —
         // cycles the side. It, too, stays right of centre and never overlaps the
         // difficulty chip, so editing one control never costs the other.
         if (teamChip.width > 0 && teamChip.height > 0) {
-          expect(teamChip.x, `team chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
+          expect(
+            teamChip.x,
+            `team chip ${i} eats into the row's body zone on ${name}`,
+          ).toBeGreaterThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY);
           expect(
             overlaps(teamChip, chip),
             `team chip ${i} overlaps difficulty chip on ${name}`,

@@ -53,17 +53,26 @@ The game ships milestone by milestone, each one playable, built by a team of spe
 
 ## 2. Game Mechanics
 
-### 2.1 Match setup *(amended 2026-07-27 — modes, slot model, variable size, four maps; see `docs/design-amendments.md` and `docs/variable-slots-plan.md`)*
+### 2.1 Match setup *(amended 2026-07-27 — modes, slot model, variable size, four maps; amended 2026-08-05 — sides read FRIENDLY / ENEMY + letter; see `docs/design-amendments.md` and `docs/variable-slots-plan.md`)*
 
 **Two modes and a slot model (amended).** A match runs in one of two modes, chosen in the lobby: **Free-for-All** (every station is its own side) or **Teams** (facilities grouped by side, alliances made explicit). Under the hood these are one model — FFA is simply "teams-of-one," so the whole simulation asks "are these two enemies?" through a single predicate and Teams changes a table, not a code path. The lobby shows **8 physical slots**, each set to **open** (a competitive human seat), **bot** (AI-filled), or **closed** (excluded from the match entirely — no ship, no station, no color). The match size **N is the count of non-closed slots, 2–8**: closing slots is how a host runs a 3-station duel or a 2v2. In Teams the host assigns each slot a side; team sizes may be uneven (a 3v1 handicap or co-op-vs-bots is allowed — the lobby shows the split, never blocks it), and **friendly fire is off** (allies' shots pass through each other, and turrets and auto-aim ignore allies).
 
 **N facilities are placed around a central asteroid field**, sized to the non-closed slot count. Each player spawns in a ship orbiting their home station with a small stock of **starting ore** (enough to make one meaningful opening choice: an early turret, a head start on upgrades, or banked safety) and **10 seconds of spawn protection** on ship and reactor, so no rush can end a match before anyone has flown. A match countdown ("RUSH!") starts the game. Open slots that no human takes are filled by AI bots; before the match, the host picks each bot's difficulty (and, in Teams, its side). In the lobby, every player also picks a **ship class** (section 2.11) and gets a unique **player color** from the 8-color roster — the color marks their ship trim, weapon fire, shield tint, station beacon ring, and HP bar. In Teams, per-player identity colors are kept and the side is shown as an added indicator (nameplate underline / shared beacon-ring motif), so a single ship stays individually legible on a chaotic screen.
 
+**How a side is named: `WORD + LETTER`, the word relative to you (amended 2026-08-05).** A side is never called "Team A" to a player's face. It reads **`FRIENDLY A`**, **`ENEMY B`**, **`ENEMY C`**, **`ENEMY D`** — the same vocabulary on the lobby roster and over every hull in the match, from one formatter, so the two screens can never disagree. The two halves behave differently, and the difference is the design:
+
+- **The letter is absolute.** Team 1 is `B` to everyone, always. It is the side's identity, it does not depend on who is looking, and it is what keeps three and four sides apart — two enemies are never both just "the enemy."
+- **The word is relative to the viewer.** The same side reads `FRIENDLY` to its own members and `ENEMY` to everyone else, which is what answers the question a player actually asks ("is that one mine?"). A view with **no local player** — a spectator, a replay — has no "friendly," so it falls back to the neutral `TEAM <letter>` and never declares everyone hostile.
+
+**Color reinforces the word; it never replaces it (amended 2026-08-05).** Blue for friendly, red for enemy, on the **team motif only** (the nameplate's side tag and the roster row's underline / side chip). The eight identity colors are untouched and stay per-slot (§5.2): they are how a player tells two *enemies* apart, which matters more at three and four sides, not less. Hulls take no side color at all. Because the words carry the whole meaning on their own, the readout survives with the hue removed — the color-blind-safe path this document already takes with the hull decal. In Free-for-All (teams-of-one) there is no side worth naming, so no side label is drawn anywhere.
+
 **Four maps, fair at every N (amended).** Four hand-authored arena layouts ship in core scope — **octagon, compass, oval, diamond** — chosen in the lobby. Every layout is a **resource-fairness invariant**: the asteroid field is rotationally symmetric about the arena center by 2π/N, so per-player ore is exactly equal at any size. Small-N handling is a **hybrid** (developer-ratified): **octagon and oval regenerate** as true N-station arenas (equal gaps at any N); **compass and diamond always place 8 homes** and leave the `8−N` unused ones as **lootable derelicts** — abandoned rigs, unowned wrecks that carry a home ore field anyone can scavenge (§2.7), preserving each layout's signature geometry at any size. **Per-player ore density rises as N falls** (the finite field is split across fewer facilities), so a small match is a richer, more abundant board even though its wall-clock length lands in the same 10–15-minute target — an economy-feel difference QA re-baselines per size, not a clock change.
 
-### 2.2 What the player sees *(amended 2026-07-27 — damage-ring grammar; boost/ping cut; see `docs/design-amendments.md`)*
+### 2.2 What the player sees *(amended 2026-07-27 — damage-ring grammar; boost/ping cut; amended 2026-08-05 — the side label over every hull; see `docs/design-amendments.md`)*
 
 The camera follows the player's ship from above. The HUD shows only what the player acts on. On screen at all times: the ship at center; **ore at a glance** (top left) — filled squares for what's in your hold, one square per cargo slot so upgrades visibly widen it, flashing when full, above your banked **ORE** total; **your own station's HP** (top right, in your player color, mirrored as a bar over the station itself); a narrow **hull bar in the owner's color floating over every ship**, yours included; the **ASTEROID WAVE clock** (top center) naming the wave number, the countdown to the next one, and match time; the Build & Upgrade wheel when near your own station; a minimap (bottom right); and a **controls strip** along the bottom edge listing the active device's bindings. The controls strip is desktop-only — on touch, the visible controls (2.4) replace it entirely.
+
+**In Teams, every name label carries its side, in words (amended 2026-08-05).** Beside each ship's and each owned station's name sits `FRIENDLY A` / `ENEMY B` — the viewer-relative wording of §2.1, tinted blue or red as reinforcement, one step dimmer than the name so it reads as the side rather than as the player. This is a HUD *mechanic*, not decoration: it exists because a Teams match was played in which it was "impossible to know who is on your team," and colour alone could not answer that. Free-for-All draws no side label, character for character as before.
 
 Ship stats — weapon, engine, cargo, hull tiers — are deliberately **not** on the HUD. They appear only in the upgrade panel (2.5), where they are a spending decision rather than clutter.
 
@@ -386,9 +395,11 @@ The palette is small on purpose, because every colour has a job:
 
 The rule that carries the most weight: **signal yellow means ore or danger, and nothing else.** Nothing decorative is ever yellow, so a player scanning a chaotic screen can trust it.
 
-### 5.2 Player colour and identity
+### 5.2 Player colour and identity *(amended 2026-08-05 — the side motif's blue/red)*
 
 Eight players, eight colours — humans and bots alike. The rule is that **hulls stay steel**; player colour lives only on wing tips, cockpit, engine flame, weapon-fire tint, station beacon ring and HP bar. This keeps every ship reading as the same industrial fleet while remaining instantly identifiable, and it means a livery is a palette swap rather than a new sprite. Every ship also carries its player number as a hull decal, so identity never depends on colour alone — which is the colourblind-safe path and costs nothing.
+
+**The team motif is the one place a second colour layer is allowed (amended 2026-08-05).** In Teams the side tag beside a name, and the roster row's underline and side chip, are drawn **blue for friendly and red for enemy** — plasma `#4DC3FF` and a declared lift of threat red toward white (the enemy-fire ramp's own rung, so no seventh hue enters the palette; raw threat red is too dim to read at 11px against Vacuum). It is reinforcement over a **word** that already says the side (§2.1), so nothing is lost with the hue removed, and it never reaches a hull, a trim, a beacon ring or an HP bar — those stay the player's identity colour, because at three and four sides that colour is what tells two enemies apart.
 
 ### 5.3 Ship classes
 
@@ -408,7 +419,7 @@ Turrets must read as cannons at a glance and telegraph their threat while spinni
 
 ### 5.7 The interface
 
-The HUD shows only what the player acts on: ore squares and banked total, the asteroid wave clock, your own station's health, hull bars over ships, and a controls strip that names the active device's bindings. Ship stats live in the upgrade panel and nowhere else. Enemy station health is scouted, never broadcast.
+The HUD shows only what the player acts on: ore squares and banked total, the asteroid wave clock, your own station's health, hull bars over ships, in Teams the side each name is on (`FRIENDLY A` / `ENEMY B`, §2.2), and a controls strip that names the active device's bindings. Ship stats live in the upgrade panel and nowhere else. Enemy station health is scouted, never broadcast.
 
 ### 5.8 The game in play
 

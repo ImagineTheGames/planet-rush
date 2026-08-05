@@ -32,7 +32,7 @@ import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { buttonStyle } from './button-theme';
-import { ABUNDANCE_LABELS, DIFFICULTY_LABELS, MODE_LABELS, RUSH_LABEL } from './lobby';
+import { ABUNDANCE_LABELS, DIFFICULTY_LABELS, MODE_LABELS, RUSH_LABEL, SIDE_COLORS } from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
 import { BLOCK_GAP, lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
@@ -59,6 +59,10 @@ const TEXT_DIM = PALETTE.hullSteel;
 /** Air between a player's name and their ping — `reivi · 245ms`. */
 const PING_GAP = 8;
 
+/** Inset the TEAM chip's word keeps from its chip's edges, CSS px — the room the
+ *  auto-fit measures against ({@link LobbyView.drawTeamChip}). */
+const TEAM_CHIP_LABEL_PAD = 6;
+
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
 export const LOBBY_ANCHOR: AnchorSpec = { region: 'full' };
@@ -83,10 +87,12 @@ interface SeatNodes {
   /** The TEAM chip's background (TEAMS only) — the side cycle, composed left of the
    *  difficulty chip (n2), so a bot seat carries BOTH controls at once. */
   readonly teamChip: Graphics;
-  /** The side letter (A…D), centred on the team chip. */
+  /** The side, in the viewer's words — `FRIENDLY A` / `ENEMY B` — centred on the
+   *  team chip and auto-fitted to it (u3). */
   readonly teamChipLabel: Text;
   /** The team underline under the name — the TEAMS grouping motif over the eight
-   *  identity colours (ratified: keep the colours, add a team indicator). */
+   *  identity colours (ratified: keep the colours, add a team indicator), drawn in
+   *  the side colour since u3 (blue friendly / red enemy, `./lobby` SIDE_COLORS). */
   readonly underline: Graphics;
   /** "OPEN" while a bot seat is still claimable by room code. */
   readonly open: Text;
@@ -365,14 +371,17 @@ export class LobbyView extends Container {
     nodes.detail.visible = rect.height > 30;
 
     // The TEAMS grouping underline under the name (ratified: keep the identity
-    // colours, add a team indicator). Neutral accent — the LETTER on the chip is
-    // the team's identity, not a hue (team colours would be a style-guide change).
+    // colours, add a team indicator) — the team MOTIF, and since u3 the one place
+    // on this row that carries side colour: blue for your side, red for any other
+    // (`./lobby` SIDE_COLORS). The identity colours above it do not move — they are
+    // per-SLOT (style-guide §3.1) and are how a player tells two enemies apart —
+    // and the colour is reinforcement only: the chip beside it says the word.
     const teams = model.mode === 'teams';
     nodes.underline.clear();
     if (teams && !closed) {
       nodes.underline
         .rect(textX, nodes.name.y + 12, 22, 2)
-        .fill({ color: PALETTE.patina, alpha: 0.85 });
+        .fill({ color: SIDE_COLORS[seat.side], alpha: 0.85 });
     }
 
     // The two trailing controls (n2): the DIFFICULTY chip (bot tier, both modes)
@@ -452,11 +461,19 @@ export class LobbyView extends Container {
    * rather than replacing it. FFA is teams-of-one, so it is hidden there. Returns
    * whether it was drawn.
    *
-   * It carries the WORD — `TEAM A`, {@link LobbySeatView.teamName} — not the bare
-   * letter it used to. The developer played a teams match and could not tell who
-   * was on their side; a lone `A` on a roster chip is a legend nobody was given,
-   * and the in-match nameplates now say `TEAM A` in full (`./nameplates`), so the
-   * lobby says it the same way and a player learns the vocabulary before RUSH!.
+   * It carries the WORD — `FRIENDLY A` / `ENEMY B`, {@link LobbySeatView.teamName}
+   * — not the bare letter it used to. The developer played a teams match and could
+   * not tell who was on their side; a lone `A` on a roster chip is a legend nobody
+   * was given, and `TEAM A` only helped a player who remembered which team they
+   * were (u3). The in-match nameplates say the identical string for this seat and
+   * this viewer (`./nameplates`), so the lobby teaches the battlefield's vocabulary
+   * before RUSH!.
+   *
+   * The chip's stroke and its word take the side colour ({@link SIDE_COLORS}) —
+   * reinforcement for the word, never a replacement for it, so the row still reads
+   * with the hue removed. The label auto-fits: on a landscape phone the row can
+   * only spare ~78px, and a word that would overrun its chip is scaled down rather
+   * than allowed to spill over the name beside it.
    */
   private drawTeamChip(
     nodes: SeatNodes,
@@ -471,13 +488,22 @@ export class LobbyView extends Container {
     nodes.teamChip.clear();
     if (!visible) return false;
 
+    const accent = SIDE_COLORS[seat.side];
     nodes.teamChip
       .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
       .fill({ color: PALETTE.hullSteel, alpha: 0.16 })
       .roundRect(chip.x, chip.y, chip.width, chip.height, 4)
-      .stroke({ width: 1, color: PALETTE.plasma, alpha: 0.85 });
+      .stroke({ width: 1, color: accent, alpha: 0.85 });
     nodes.teamChipLabel.text = seat.teamName;
-    nodes.teamChipLabel.style.fill = TEXT_PRIMARY;
+    nodes.teamChipLabel.style.fill = accent;
+    // Fit the word to the chip it is drawn in. The chip is sized for the longest
+    // side word, but a very narrow row clamps it (lobby-geometry
+    // SEAT_TEAM_CHIP_MIN_BODY), and a word drawn wider than its own chip reads as a
+    // bug — so scale down instead, never up.
+    nodes.teamChipLabel.scale.set(1);
+    const room = chip.width - 2 * TEAM_CHIP_LABEL_PAD;
+    const drawn = nodes.teamChipLabel.width;
+    if (drawn > room && room > 0) nodes.teamChipLabel.scale.set(room / drawn);
     nodes.teamChipLabel.x = chip.x + chip.width / 2;
     nodes.teamChipLabel.y = chip.y + chip.height / 2;
     return true;
