@@ -126,9 +126,11 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // sound that is the `TELL.mineHit` voice (`./bank`) and fires all match.
   //
   // Why it does not go boomy at rate: the low-pass moved, the *envelope* did not —
-  // the decays are as short as they were, so a 28 Hz retrigger stacks no more
-  // energy than the denied set did (measured, overlap-added: same or less), and the
-  // high-pass corner stays well above the sub band on every one of the three.
+  // the decays are as short as they were, so a 28 Hz retrigger stacks no more energy
+  // than the denied set did. Measured, overlap-added at that rate: a 0.112 (was
+  // 0.120), c 0.113 (was 0.136), and the long rasp b 0.168 against its own 0.166 —
+  // level with what was already judged "almost there", not above it. The high-pass
+  // corner stays clear of the sub band on all three (38 / 50 / 90 Hz).
   rockChip: {
     label: "Rock Chip",
     context: "Per-tick mining laser hit while chipping a rock — fires rapidly, must read as a stream",
