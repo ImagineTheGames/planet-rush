@@ -35,8 +35,26 @@
  * holds the camera to. The DoD gate for this branch is `tsc`, unit tests, and
  * `playwright test --list`; the live run belongs in the qa container against a
  * build that carries the hook.
+ *
+ * TIME BASE (q7-01): the thrust hold is counted in the sim's OWN fixed steps, not
+ * in wall-clock milliseconds. It used to be `waitForTimeout(THRUST_MS = 2000)`,
+ * which is 120 ticks of travel on a 60 fps laptop but only ~30 on the CI runner's
+ * software-GL rasterizer (the loop clamps each slow frame's catch-up — see
+ * ./sim-clock.ts): the follow-camera was being asked to track a quarter of the
+ * journey on the machine that gates merges. Counting ticks buys the same 2 seconds
+ * of SIMULATION everywhere; the wall-clock price of that on a slow host is what
+ * ./budgets.ts is for. This test is what took `main` red for two days on a flat
+ * 60 s budget it could not finish inside (q7-01).
+ *
+ * It also got CHEAPER, which was not the goal but is worth recording: the old
+ * hold re-dispatched a `touchMove` every 50 ms purely to pace itself, and paid a
+ * CDP round-trip for each. The stick holds its own deflection until `touchEnd`
+ * (touch.ts), so none of those events were input — 27.3 s → 15.4 s in-container
+ * for a hold that now delivers strictly more simulation in CI.
  */
 import { test, expect, type Page, type CDPSession, type TestInfo } from '@playwright/test';
+import { budgetTest } from './budgets';
+import { simSeconds, waitForSimTicks } from './sim-clock';
 
 // --- Contract shape (mirrors src/platform/debug-hook.ts `DebugState`). Declared
 //     locally on purpose: the QA suite asserts the *runtime* contract and must not
@@ -55,8 +73,16 @@ const DEBUG_GLOBAL_KEY = '__planetRush';
 const CENTER_TOL = 0.05;
 
 /** How long to hold thrust before re-asserting centring (brief: "after 2 seconds
- *  of thrust") — long enough that the follow-camera has tracked real ship travel. */
-const THRUST_MS = 2000;
+ *  of thrust") — long enough that the follow-camera has tracked real ship travel.
+ *  Counted in SIM ticks, so "2 seconds" is 2 seconds of simulation on every host
+ *  rather than 2 seconds of stopwatch that buys a quarter of the travel in CI. */
+const THRUST_TICKS = simSeconds(2);
+
+/** A few post-input steps so the camera has rendered the released-thrust frames
+ *  before the second sample. Ticks only advance on rendered frames, so waiting on
+ *  ticks here also guarantees the frames happened — which `waitForTimeout(200)`
+ *  did not on a ~1 fps host. */
+const SETTLE_TICKS = 12;
 
 const TOUCH_PROJECTS = ['iphone', 'pixel'];
 const isTouchProject = (name: string): boolean => TOUCH_PROJECTS.includes(name);
@@ -127,27 +153,35 @@ async function orient(page: Page, mode: 'landscape' | 'portrait'): Promise<void>
 }
 
 /**
- * Hold thrust for `ms`. Touch profiles drive the left virtual stick via a real
- * CDP `touchstart`+held `touchmove` (surfaced as `pointerType:'touch'`, the exact
- * events `main.ts` binds the stick to — `page.mouse` would report `'mouse'` and be
- * ignored). Desktop holds `W` (WASD → thrust, actions.ts). Direction is irrelevant
- * to centring: whichever way the ship travels, the follow-camera must keep it dead
- * centre — that is the property under test.
+ * Hold thrust for `ticks` fixed sim steps. Touch profiles drive the left virtual
+ * stick via a real CDP `touchstart`+held `touchmove` (surfaced as
+ * `pointerType:'touch'`, the exact events `main.ts` binds the stick to —
+ * `page.mouse` would report `'mouse'` and be ignored). Desktop holds `W` (WASD →
+ * thrust, actions.ts). Direction is irrelevant to centring: whichever way the ship
+ * travels, the follow-camera must keep it dead centre — that is the property under
+ * test.
  */
-async function holdThrust(page: Page, testInfo: TestInfo, ms: number): Promise<void> {
+async function holdThrust(page: Page, testInfo: TestInfo, ticks: number): Promise<void> {
   if (isTouchProject(testInfo.project.name)) {
-    await touchThrust(page, ms);
+    await touchThrust(page, ticks);
   } else {
     await page.keyboard.down('KeyW');
-    await page.waitForTimeout(ms);
+    await waitForSimTicks(page, ticks, { what: 'desktop W-key thrust hold' });
     await page.keyboard.up('KeyW');
   }
 }
 
-/** Engage the left thrust-stick under the thumb and hold it deflected for `holdMs`.
- *  Both points stay in the LEFT half (x < width/2) so the thrust stick — not the
- *  right-half aim/FIRE control — is the one engaged (GDD §2.4 twin sticks). */
-async function touchThrust(page: Page, holdMs: number): Promise<void> {
+/** Engage the left thrust-stick under the thumb and hold it deflected for `ticks`
+ *  fixed sim steps. Both points stay in the LEFT half (x < width/2) so the thrust
+ *  stick — not the right-half aim/FIRE control — is the one engaged (GDD §2.4 twin
+ *  sticks).
+ *
+ *  After the ramp-in nothing more is dispatched: a virtual stick holds its last
+ *  position until `touchEnd` (touch.ts — `current` is only rewritten by a move),
+ *  so thrust stays at full deflection for free. The old version re-dispatched a
+ *  `touchMove` every 50 wall-clock ms purely to pace the hold, which made the
+ *  amount of thrust the ship received a function of the host's frame rate. */
+async function touchThrust(page: Page, ticks: number): Promise<void> {
   const vp = page.viewportSize() ?? { width: 390, height: 844 };
   const origin = { x: Math.round(vp.width * 0.25), y: Math.round(vp.height * 0.5) };
   const to = { x: Math.round(vp.width * 0.12), y: Math.round(vp.height * 0.34) };
@@ -157,20 +191,15 @@ async function touchThrust(page: Page, holdMs: number): Promise<void> {
       type: 'touchStart',
       touchPoints: [{ x: origin.x, y: origin.y }],
     });
-    // Deflect the stick off its origin to build a thrust vector.
+    // Deflect the stick off its origin to build a thrust vector, as a thumb would.
     const steps = 6;
     for (let i = 1; i <= steps; i++) {
       const x = origin.x + ((to.x - origin.x) * i) / steps;
       const y = origin.y + ((to.y - origin.y) * i) / steps;
       await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
-      await page.waitForTimeout(16);
     }
-    // Hold it deflected so the loop integrates a full THRUST_MS of ship travel.
-    const holdSteps = Math.max(1, Math.ceil(holdMs / 50));
-    for (let i = 0; i < holdSteps; i++) {
-      await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: to.x, y: to.y }] });
-      await page.waitForTimeout(50);
-    }
+    // Hold: the stick stays deflected on its own, so just let the sim run.
+    await waitForSimTicks(page, ticks, { what: 'touch thrust-stick hold at full deflection' });
     await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } finally {
     await client.detach();
@@ -183,6 +212,11 @@ async function touchThrust(page: Page, holdMs: number): Promise<void> {
 
 for (const mode of ['landscape', 'portrait'] as const) {
   test(`camera keeps the ship centred at boot and after 2s thrust (${mode})`, async ({ page }, testInfo) => {
+    budgetTest({
+      work: 'orient → boot the debug build → assert centred → hold thrust for 2 s of SIM → settle → assert centred',
+      measuredSeconds: 16,
+    });
+
     // Landscape is the gameplay orientation on every profile. Portrait is asserted
     // too: on desktop it is just a tall aspect (no overlay); on touch the default
     // Android path renders gameplay in portrait (the ROTATE overlay only appears on
@@ -197,9 +231,9 @@ for (const mode of ['landscape', 'portrait'] as const) {
 
     // After sustained thrust: the ship has travelled; the follow-camera must have
     // tracked it and still hold it dead centre.
-    await holdThrust(page, testInfo, THRUST_MS);
-    await page.waitForTimeout(200); // let a few post-input frames settle
-    assertCentered(await readDebug(page), `${mode} @ +${THRUST_MS}ms thrust`);
+    await holdThrust(page, testInfo, THRUST_TICKS);
+    await waitForSimTicks(page, SETTLE_TICKS, { what: 'post-input camera settle' });
+    assertCentered(await readDebug(page), `${mode} @ +${THRUST_TICKS} sim ticks of thrust`);
   });
 }
 
@@ -208,10 +242,19 @@ for (const mode of ['landscape', 'portrait'] as const) {
 // ===========================================================================
 
 test('debug hook is ABSENT without ?debug=1', async ({ page }) => {
+  budgetTest({
+    work: 'one clean boot → assert the instrument never installed',
+    // Two assertions on a single boot: this one keeps the flat floor, which is the
+    // point of budgeting per test rather than raising the global cap.
+    measuredSeconds: 5,
+  });
+
   await page.goto('/');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   // Let the app fully boot and run frames — if the hook were going to install, it
   // would have by now, so a clean absence here is meaningful, not merely early.
+  // Wall-clock on purpose, and the one place it is right: the thing under test is
+  // that `__planetRush` does NOT exist, so there is no sim clock to wait on.
   await page.waitForTimeout(900);
 
   const present = await page.evaluate((key) => key in window, DEBUG_GLOBAL_KEY);

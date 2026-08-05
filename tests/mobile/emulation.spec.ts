@@ -48,6 +48,8 @@ import {
   type Img,
   type Region,
 } from './pixels';
+import { budgetTest } from './budgets';
+import { simSeconds, waitForSimClock, waitForSimTicks } from './sim-clock';
 
 // --- Which projects are touch phones vs the desktop control -----------------
 
@@ -100,6 +102,10 @@ const DRAG_SIM_TICKS = 90;
  *  exactly 0.000 because a ship with no input does not move at all. */
 const DRAG_MIN_UNITS_PER_TICK = 1.0;
 
+/** One second of simulation — enough for the HUD and the affordances to be drawn
+ *  before a screenshot samples them. Ticks, not milliseconds: see {@link boot}. */
+const SETTLE_TICKS = simSeconds(1);
+
 // --- Fixtures / helpers -----------------------------------------------------
 
 /** Load the game and let the Pixi app boot + render a few frames.
@@ -113,9 +119,14 @@ const DRAG_MIN_UNITS_PER_TICK = 1.0;
 async function boot(page: Page): Promise<void> {
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
-  // Let the fixed-timestep loop run out a few frames and fonts settle so the
-  // HUD/affordances are on-screen before we sample.
-  await page.waitForTimeout(900);
+  // Let the fixed-timestep loop run out a second of SIMULATION so the HUD and the
+  // affordances are on-screen before we sample. In ticks, not the old
+  // `waitForTimeout(900)`: on the CI runner's ~1 fps software GL that bought ~13
+  // ticks instead of ~54, so the screenshot assertions were sampling a frame that
+  // had barely booted — a less-settled frame on exactly the host that gates merges
+  // (q7-01; see ./sim-clock.ts).
+  await waitForSimClock(page);
+  await waitForSimTicks(page, SETTLE_TICKS, { what: 'boot settle before sampling pixels' });
 }
 
 /** Decode the current viewport screenshot into an {@link Img}. */
@@ -271,6 +282,10 @@ async function useLandscape(page: Page): Promise<void> {
 
 test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
+  budgetTest({
+    work: 'landscape boot → 1 s of sim settle → one full-viewport screenshot → three region pixel counts',
+    measuredSeconds: 9,
+  });
 
   // Play-mode affordance assertion → landscape (portrait is the blocked state).
   await useLandscape(page);
@@ -298,6 +313,10 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
 
 test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
+  budgetTest({
+    work: 'portrait boot → settle → screenshot → rotate to landscape → re-layout settle → second screenshot',
+    measuredSeconds: 14,
+  });
 
   // Boot on the device default viewport, which is PORTRAIT (h > w). The ratified
   // landscape lock rotates the whole game to landscape rather than blacking out the
@@ -325,7 +344,9 @@ test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', asy
   // overlay to dismiss). Still showing the HUD's yellow, still drawing the field.
   const { width, height } = page.viewportSize() ?? { width: 390, height: 844 };
   await page.setViewportSize({ width: height, height: width });
-  await page.waitForTimeout(900);
+  // A second of SIM, not of stopwatch, for the re-layout to land and draw — same
+  // reason as {@link boot}.
+  await waitForSimTicks(page, SETTLE_TICKS, { what: 'rotation re-layout settle' });
 
   const landscape = await shoot(page);
   const oreLandscapePx = count(landscape, REGION_FULL, isYellow).matched;
@@ -341,16 +362,17 @@ test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', asy
 test('touch drag on the left half moves the ship (world units per sim tick)', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
 
-  // The one test in this suite that buys a fixed amount of SIM time, so it is the
-  // one whose WALL-CLOCK cost scales with how slowly the host renders — that is
-  // the trade the tick-based window makes, not a flaw in it. Measured end-to-end:
-  // 3.8 s at full speed, 33.4 s with the CPU throttled 200x (~1 fps, the CI
-  // software-WebGL profile). The suite default of 60 s leaves under 2x headroom
-  // there, which is too thin for a job that gates merges, so this test — and only
-  // this test — gets a longer bound. It does not weaken the assertion: a host too
-  // slow to run 90 ticks still fails, it just fails on the tick target rather than
-  // on an arbitrary stopwatch.
-  test.setTimeout(120_000);
+  // This test buys a fixed amount of SIM time, so its WALL-CLOCK cost scales with
+  // how slowly the host renders — that is the trade the tick-based window makes,
+  // not a flaw in it. Measured end-to-end: 3.8 s at full speed, 33.4 s with the
+  // CPU throttled 200x (~1 fps, the CI software-WebGL profile). It does not weaken
+  // the assertion: a host too slow to run 90 ticks still fails, it just fails on
+  // the tick target rather than on an arbitrary stopwatch. (Was a hand-written
+  // 120_000; the number now comes from the suite's measured model — q7-01.)
+  budgetTest({
+    work: 'landscape boot → ramped touch drag → 90 sim ticks of sustained thrust → world-distance-per-tick assertion',
+    measuredSeconds: 15,
+  });
 
   // Gameplay assertion → landscape. In portrait the field is the blocked,
   // squashed non-play state (the ROTATE-overlay guard), and the first-gesture
@@ -419,6 +441,10 @@ test('touch drag on the left half moves the ship (world units per sim tick)', as
 
 test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, testInfo) => {
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
+  budgetTest({
+    work: 'desktop boot → 1 s of sim settle → one screenshot → minimap-region read → two region pixel counts',
+    measuredSeconds: 5,
+  });
 
   await boot(page);
   const img = await shoot(page);

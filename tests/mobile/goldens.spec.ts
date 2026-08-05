@@ -18,6 +18,7 @@
  *   npx playwright test tests/mobile/goldens.spec.ts --update-snapshots
  */
 import { test, expect, type Page } from '@playwright/test';
+import { budgetTest } from './budgets';
 
 /** Small but tolerant of font/GPU antialiasing — the frozen frame is otherwise
  *  byte-stable. */
@@ -42,11 +43,19 @@ async function bootFrozen(page: Page): Promise<void> {
   );
   await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
   // A couple of render frames after freeze so the final composited frame is up.
+  // Wall-clock here, deliberately: `?freeze=1` pins the sim, so there is no tick
+  // clock to wait on (the whole suite otherwise waits on ticks — ./sim-clock.ts).
+  // It is also harmless: the frozen frame is time-invariant, so a slow host that
+  // takes this wait "early" simply screenshots the same deterministic frame.
   await page.waitForTimeout(500);
 }
 
 test('golden: desktop frozen scene', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → font settle → one full-frame golden comparison',
+    measuredSeconds: 5,
+  });
 
   await bootFrozen(page);
   await expect(page).toHaveScreenshot('desktop-frozen.png', GOLDEN);
@@ -55,6 +64,10 @@ test('golden: desktop frozen scene', async ({ page }, testInfo) => {
 test('golden: landscape phone frozen scene', async ({ page }, testInfo) => {
   // One landscape phone baseline (brief). The iPhone-ish profile is the pick.
   test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 8,
+  });
 
   const vp = page.viewportSize();
   if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
