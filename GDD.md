@@ -331,15 +331,114 @@ The seven milestones above (M1–M7) are the playable milestones; M0 is pre-prod
 
 **On-demand deploys.** Saying "deploy now" to the Director pushes the current `main` to the `/dev` URL and fires the same ping, with no tag required — so a milestone can be phone-verified mid-cycle, not just at its scheduled end.
 
-### 4.7 Pre-production: concept iteration and tone
+### 4.7 Tone and voice: what the game feels like, and what it says *(amended 2026-08-05 — the section now names **two registers**: the emotional tone, unchanged, and the **interface voice**, ratified today. The execution inventory is `docs/copy-sweep-industrial-voice.md`.)*
 
 Before production, the Art & Audio Agent runs the M0 concept mode, delivering instantly viewable HTML/SVG artifacts: two to three **theme boards** showing the *same* scene (ship, defended station, asteroid field, HUD, open build menu); **level layout variants** (one SVG, three station-ring/field arrangements — spacing tunes the triangle, since travel time home is the defense tax); and **UI mockups** in the two leading themes.
+
+**Two registers, one game (amended).** This section used to hold one paragraph doing two jobs. It now names both explicitly, because they are judged by different agents against different artifacts and one of them changed:
+
+- **Register 1 — the emotional tone.** What the game *feels* like: art, VFX, audio, pacing, the shape of a moment. Judged against the tone paragraph below. **Unchanged.**
+- **Register 2 — the interface voice.** What the game *says*: every word a player reads on a button, a label, a prompt, a refusal, or an end screen. **New, ratified 2026-08-05.**
+
+They are not in tension, and the reconciliation is the point: the game *looks* like a toy and *talks* like paperwork. A claim office filing a status update while a rig burns is funnier and colder than a game shouting "AWESOME!", and the ache in register 1 lands harder when the interface refuses to comment on it. Where the two ever genuinely compete, register 1 wins on **moments** (a death, a wave, an explosion) and register 2 wins on **words**.
+
+#### Register 1 — the emotional tone (unchanged)
 
 The boards are judged against a **tone paragraph**, written into this GDD so the choice has criteria instead of vibes:
 
 > *Planet Rush is a Saturday-morning space brawl: fast, bright, and a little cheeky. Ships are toys, explosions are fireworks, bots are cartoon rivals with names. But homes are the one serious thing in it — when a station dies, the game goes briefly quiet, the wreck stays on the map all match, and nobody jokes for three seconds. Arcade on the surface, a small ache underneath.*
 
 The developer picks a winner (one revision round max), frozen into `style-guide.md` — a contract like the interfaces, changeable only through the Director. Concept iteration is deliberately not a standing loop: after M2 the game is playable, and iterating on the real build beats iterating on pictures. Budget: ~1.0 M tokens inside the Art & Audio line.
+
+#### Register 2 — the interface voice *(new, amended 2026-08-05)*
+
+**The ratification.** The UI design handoff proposed that the interface speak as a mining authority — contracts, rigs, operators, seals — rather than as a game menu, and flagged it as a lore call. Asked to decide, the developer's answer was: *"doesn't sound like a question to me."* Read as: it is a given. It is also a natural continuation of the ratified lore pivot (§0) — the eight homes are already mining facilities on a contested claim, so this catches the words up with a decision already made.
+
+**This block is the pinned prompt.** Everything from *"Who speaks"* to *"The clarity rule"* below is injected **verbatim** into every player-facing-copy task, the same way `content/codex/pipeline/tone.md` pins register 1. It is written to be pinnable: concrete enough that two agents writing two different screens produce copy that sounds like one game. Copy work quotes it; it does not interpret it.
+
+**Who speaks, and to whom.** The interface is **the claim's operating authority** addressing a **contracted operator**. Not a narrator, not a coach, not the game. The player holds a licence to work a plot; the interface is the office that issued it. It logs, prices, permits, and refuses. It has no stake in whether the operator wins.
+
+**What the voice IS:**
+
+1. **Procedural.** It states status, cost, condition, and — when it refuses — the reason. Nothing else.
+2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `CLAIM HELD`, not `GLORIOUS VICTORY`.
+3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (room, level, score), the authority reaches for the nouns of work and paperwork (claim, sector, yield, contract, seal, log).
+4. **Terse and present-tense.** Second person, imperative for instructions. The interface has a word budget and spends it on the reason, not the fiction.
+5. **Indifferent.** It is not on the operator's side. This — not jokes — is where the game's cheek lives in register 2.
+
+**What the voice is NOT:**
+
+1. **Not congratulatory.** It does not cheer, praise, or exclaim. It never says "Nice", "Great", "Awesome", or "!" — with exactly one sanctioned exception, `RUSH!` (§2.1, GDD-verbatim).
+2. **Not menacing.** Indifferent, not hostile. No grimdark, no threats, no "DOOM". The authority does not care enough to menace.
+3. **Not chatty and never winking.** No jokes in a string. The humour is structural — the flat voice over a toy-bright brawl — not lexical.
+4. **Not a naval or space-opera register.** The operator is not "Commander", "Captain", or "Pilot". This is a mining company, not a fleet.
+5. **Not worldbuilding.** A button never explains the fiction. If a string is teaching lore instead of naming an action, it is the wrong string.
+6. **Not decorative punctuation.** No ellipses for mood, no em-dash flourishes where a full stop works. (`—` is fine where it separates a fact from its reason, which is most of the existing copy.)
+
+**The clarity rule — the one that outranks everything above.** **Clarity always wins over flavour.** A player under fire reading a refusal needs the reason, not the fiction. Concretely:
+
+- A refusal names its reason in the **first three words**. `NEED 1 ORE`, `REACTOR FULL`, `REPAIR IN 12s`.
+- If the flavour word and the plain word compete on comprehension, **the plain word ships** — and the copy sweep records that it was considered and rejected, so nobody re-litigates it.
+- A word a first-time player has to learn before they can act is a bug. The voice may rename the *world*; it may not rename the *verb*.
+- **Length is part of clarity.** The HUD runs at 11–15px and nameplates truncate at 12 characters (`NAMEPLATE_MAX_CHARS`). A longer in-register word that ellipsizes has traded information for flavour, which this rule forbids. Measure before you ship it.
+
+**Vocabulary — in and out.** The register's lexicon. Where a word already has a fixed meaning in the §0 fiction glossary, **the glossary wins** (notably: a home is a **station**; a **rig** is hardware or an abandoned derelict, never the player's home).
+
+| Reach for | Instead of | Note |
+|---|---|---|
+| **claim** (the match's arena and its lobby) | room, arena, level, system | The room-code *noun* stays "code" — see the clarity rule. |
+| **operator** (the player) | player, pilot, commander, captain | Bots are operators too; where the interface must distinguish humans from bots, it says so plainly. |
+| **contract** (a match you take) | game, session, match-type | "Match" stays where it names the live thing being timed (`MATCH 8:42`). |
+| **sector** (a map / arena layout) | map, level | The four map display names are unchanged (§2.1). |
+| **yield** (ore abundance) | ore density, richness | `YIELD · RICH`. |
+| **seal / signed** (an authorisation stamp) | — | Bound to the allocator's existing ticket stamp (`TICKET SIGNED`). It does **not** replace "code". |
+| **station · reactor · collection field · abandoned rig · the claim · the Crush** | planet, core, atmosphere, derelict | Already ratified in §0; listed here so the voice does not reinvent them. |
+| **held / lost / offline / refused** | victory, defeat, error, oops | Outcome words are stated, not celebrated. |
+
+**Worked examples — the same string in both registers.** Copy work should be able to tell which column it is writing without asking.
+
+| Game-menu register (wrong) | Interface voice (right) | Why |
+|---|---|---|
+| `VICTORY` | `CLAIM HELD` | States the outcome; does not congratulate. |
+| `DEFEAT` | `CLAIM LOST` | Same sentence shape as the win. The authority files both identically. |
+| `You win! Great flying!` | `You took the claim.` | Already shipped and already correct — the flat report *is* the voice. |
+| `PLAY SOLO` | `SOLO CONTRACT` | A thing you take, not a thing you do. |
+| `CREATE ROOM` / `JOIN ROOM` | `OPEN A CLAIM` / `JOIN A CLAIM` | The claim is the shared object; "room" is a lobby-software word. |
+| `WAITING FOR THE HOST` | `WAITING FOR THE CLAIM HOLDER` | "Host" is the network word; the holder is the fiction's word. |
+| `Oops! Couldn't find that room 😕` | `No room with that code. Check it and try again.` | Shipped and correct: fact, then instruction, no apology, no emoji. |
+| `Nice repair!` (never) | `+15 HP` | The authority prices the work. It does not compliment it. |
+| `LEVEL: The Compass` | `SECTOR · THE COMPASS` | The layout is surveyed ground, not a level. |
+| `ORE · RICH` | `YIELD · RICH` | "Yield" is the word a survey uses (§2.8, "Field yield"). |
+
+**Where the voice applies.** Main menu; the doors and room-code entry; the lobby (roster, mode/yield toggles, sector picker, hints); settings row *titles*; the Build & Upgrade wheel's non-fixed copy and every refusal line; HUD labels; onboarding prompts; the pause menu; end-of-match headlines and cause lines.
+
+**Where it does NOT apply — the match/machine line.** *The authority speaks about the claim. It does not speak about the machine.* Anything describing hardware, the network, the build, or a developer seam stays **plain and diagnostic**, because when the machine has failed there is no claim to have an authority:
+
+- the wordmark **`PLANET RUSH`** — brand, kept per §0;
+- the **build badge / build stamp** (`src/platform/build-info.ts`);
+- **boot and WebGL failure copy** (`src/platform/boot-error.ts`) — troubleshooting steps, not fiction;
+- **connection and server copy** (`src/ui/connection-status.ts`, `src/ui/online-copy.ts`, region-latency hints) — a dropped socket is a machine fact; only door labels quoted inside these strings move with their doors;
+- the **playtest log / COPY LOG** and every debug seam, test id, layout id, and telemetry field;
+- **numbers, units, and clocks** — never re-fictioned.
+
+**Fixed strings the voice does not get to revisit.** Each is already ratified elsewhere; re-wording one is a new decision, not a copy pass:
+
+- **`teamName()` — `FRIENDLY A` / `ENEMY B`** (ratified 2026-08-05, §2.1; being implemented as u3-01). Settled.
+- Every **Build & Upgrade wheel segment label** — `TURRET`, `SHIELD`, `RADAR`, `REPAIR REACTOR`, `UPGRADE SHIP`, `BANK` — and every upgrade track name, quoted verbatim in §2.5.
+- Every **settings row**: `FIRE MODE` / `MANUAL` / `AUTO-AIM`, `CONTROLS` / `STICKS` / `TAP COMMANDER`, `REDUCE VFX` (§2.4, §4.3).
+- **Pause and end-screen actions** named in §4.2 / §2.7: `RESUME`, `SETTINGS`, `EXIT TO MENU`, `REMATCH`, `SPECTATE`.
+- **`RUSH!`** (§2.1) and the slot-state words `OPEN` / `BOT` / `CLOSED` (§2.1).
+- **Bot character names, ship class names, player colour names, and the four map display names.**
+- **`HOME`** on the HUD, and `HOME LOST`. This is the one deliberately warm word in the interface, and it is load-bearing on register 1 — "the pitch is a clock, and a home" (§1). The authority is allowed exactly one word it does not own.
+
+**Accessibility — the voice must never make a state ambiguous.** Non-negotiable, and it is the failure mode of every voice pass:
+
+- An **error or refusal must be readable as a plain sentence** with the fiction stripped out. If deleting the flavour word removes the meaning, the string is wrong.
+- **State is never carried by flavour alone.** A player must not have to know what a "seal" is to learn that a seat is unavailable.
+- An in-register **headline may only replace a plain one when the line beneath it states the outcome plainly** — `CLAIM HELD` is permitted because `You took the claim.` sits under it, and because colour and layout already carry the result. A headline change that leaves the outcome to inference is rejected.
+- Screen-reader and colourblind paths are unchanged: the voice adds no new information channel and removes none. Nothing that was legible without colour becomes dependent on it.
+
+**Propagation.** The tone paragraph is mirrored in two places outside this document — `style-guide.md` §8 and `content/codex/pipeline/tone.md` — because lexical retrieval provably never surfaces a tone section on its own (0/4 query types in the Assignment-4 codex pipeline), so it is pinned by hand. **Both mirrors must gain register 2**, and `style-guide.md` §8 still quotes the pre-pivot "when a *planet* dies" wording. Recorded as a task and a developer question in `docs/copy-sweep-industrial-voice.md`; the mirrors are the Director's and Art's files, not the architect's.
 
 ### 4.8 Source control, CI, and classroom distribution
 
@@ -430,5 +529,7 @@ The ruleset's distinct moments, drawn before M1. Each one is a legibility test: 
 *Changes in v0.6 (consolidation): every ratified build-time amendment is folded back into the sections above, in the GDD's own voice, each marked "(amended)"; the ratification history and the "why" stay in `docs/design-amendments.md`, `docs/variable-slots-plan.md`, and `docs/input-parity.md`. The mechanical changes folded: **combat and mining are one dodgeable projectile** — the hitscan beam is retired, shots have travel time, and auto-aim, bots, and turrets all lead a moving target (§1, §2.3, §2.4, §2.6, §2.9, §4.1); **weapon upgrades split into DAMAGE and SPEED** (§2.5); **repair is a discrete purchase** — 1 ore restores 15 core HP, no channel, no interrupt (§2.5, §2.6, §2.8); **turrets are upgradeable Mk I→III** with tier-scaled lead/accuracy, every mark kept under the ship's weapon reach (§2.5, §2.6, §2.8); **banking is by atmosphere** — the hold auto-drains inside your own planet's atmosphere, no dock-and-park (§2.3, §2.5, §2.8, §2.10); **two modes (FFA / Teams) over a slot model** (open / bot / closed), variable 2–8 size, friendly fire off, rooms advertise their config (§1, §2.1, §2.9, §4.2); **four maps, fair at every N**, with lootable derelicts filling the unused slots on compass/diamond at small N (§2.1, §2.7, §4.3); **the damage-ring grammar** — owner-colour ring, threat-red fills as HP is lost, shields before core (§2.2, §5.4); **boost and minimap ping are cut** from the game entirely (§2.2, §2.4, §4.9); **the input-parity principle** — every action reachable from every input source — plus the optional Tap Commander scheme and the minimap toggle (§2.4); **no pause online** — the sim freezes only in an offline match (§2.4, §4.2); and **ore is conserved exactly**, asserted in CI every tick, closing the loot-black-hole class of bug (§2.7, §4.8). No new mechanics were invented in this pass — it only makes the document say what the developer already ratified.*
 
 *Changes in v0.7 (the lore pivot): the fiction is lifted and shifted from "planets" to **mining facilities** on a contested **mining claim** — a fiction-only change with **no mechanical, numeric, or rule change anywhere in the document**. A new §0 fiction glossary fixes the term contract: planet→**station** (a working placeholder; the developer ratifies FACILITY / RIG / STATION / OUTPOST from the PR body), core→**reactor**, atmosphere→the **collection field**, ore-repair→an industrial **reactor patch**, derelict→**abandoned rig**, and the collapse/waves are re-fictioned as the belt's inward **ore surges** and the claim closing in — **"the Crush,"** the one named antagonist the waves and the collapse share. Every GDD section was swept for fiction language; mechanics text, the baseline constants (values and row names), and all code identifiers were left untouched (code keeps `planet` and `core`). The player-facing string swaps are enumerated for the UI agent in `docs/lore-copy-sweep.md`. Open lore follow-ups, each a developer/Art call, not this pass's job: the game **title** "Planet Rush" is kept as the brand (§0); whether facilities gain industrial art dressing beyond the claimed-planetoid body is an Art follow-up (§5.4); and `style-guide.md` + `docs/mobile-cross-platform-amendment.md` still speak the old planet fiction and need the same sweep next pass.*
+
+*Amended 2026-08-05 (the interface voice): §4.7 is split into **two named registers** — the **emotional tone** (the tone paragraph, unchanged, judging art/VFX/audio and the shape of a moment) and the **interface voice** (new, developer-ratified: the interface speaks as the claim's operating authority addressing a contracted operator — procedural, unglamorous, faintly bureaucratic, and never congratulatory). The voice block is written to be **pinned verbatim** into every player-facing-copy task, the same way the tone paragraph already is, and it carries a hard subordinate rule — **clarity always wins over flavour** — plus an explicit match/machine scope line (the authority speaks about the claim, never about the network, the build, or a boot failure) and a list of fixed strings the voice does not get to revisit (`teamName()`'s ratified `FRIENDLY A` / `ENEMY B`, every §2.5 wheel label, every settings row, `RUSH!`, and `HOME`). **No mechanic, number, or rule changes.** The string-by-string execution list is `docs/copy-sweep-industrial-voice.md`; the two out-of-document mirrors of the tone paragraph (`style-guide.md` §8 and `content/codex/pipeline/tone.md`) still carry register 1 only, and are flagged there.*
 
 *Open questions for the build: exact wave pacing curve, whether spectators get a ghost-ping ability, and cross-team alliance signalling in large matches. (Two docs outside the GDD still carry stale references the consolidation could not touch under this brief's write-scope: `style-guide.md` says "repair channel" and underspecifies the damage-ring fill grammar, and `docs/mobile-cross-platform-amendment.md` still lists boost and minimap-ping as live — both should be reconciled by the Director/Art next pass.)*
