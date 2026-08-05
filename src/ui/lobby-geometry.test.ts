@@ -37,8 +37,11 @@ import {
   LOBBY_MAP_COUNT,
   LOBBY_PAD,
   RUSH_HEIGHT,
+  SEAT_ROW_BODY_MIN,
   SEAT_ROW_MAX,
   SEAT_ROW_MAX_TOUCH,
+  SEAT_STATE_MIN,
+  SEAT_STRIPE,
   SEAT_TEAM_CHIP_MIN_BODY,
   STAT_CELL_FLOOR,
   STAT_CELL_GAP,
@@ -117,15 +120,25 @@ const center = (r: Rect): { x: number; y: number } => ({
   y: r.y + r.height / 2,
 });
 
-/** A point in a roster row's guaranteed BODY zone — its leading
- *  {@link SEAT_TEAM_CHIP_MIN_BODY} share, which no trailing chip may enter. This
- *  is what "the row is still tappable" means since the side chip grew to hold
- *  `FRIENDLY A` (u3); on every profile but the landscape phone the zone reaches
- *  past the row's centre anyway. */
-const bodyPoint = (r: Rect): { x: number; y: number } => ({
-  x: r.x + (r.width * SEAT_TEAM_CHIP_MIN_BODY) / 2,
-  y: r.y + r.height / 2,
-});
+/**
+ * A point in a roster row's BODY zone — the strip between the row's LEADING state
+ * control (u5) and the leading edge of the trailing chips' guaranteed zone
+ * ({@link SEAT_TEAM_CHIP_MIN_BODY}, which no trailing chip may enter).
+ *
+ * It is DERIVED from the drawn rects rather than stated as a fraction, and that is
+ * the point: the body used to be "the row's leading 36%" because nothing else was
+ * ever laid out at the front of a row. u5 puts a control there, so a fixed
+ * fraction would now name a point on the control and call it the body. Measuring
+ * from what was actually laid out is the same discipline the hit test keeps — one
+ * geometry, never a second copy of the arithmetic.
+ */
+const bodyPoint = (layout: LobbyLayout, i: number): { x: number; y: number } => {
+  const seat = layout.seats[i]!;
+  const state = layout.seatStates[i]!;
+  const left = state.width > 0 ? state.x + state.width : seat.x;
+  const right = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
+  return { x: (left + right) / 2, y: seat.y + seat.height / 2 };
+};
 
 /** The widest side label the chip ever carries — `FRIENDLY A` — in CSS px at the
  *  chip's 11px Audiowide, measured in the studio container (`ENEMY B` is 50,
@@ -503,11 +516,12 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
     it(`maps a tap back to the rect it was drawn in — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: touch });
       for (let i = 0; i < layout.seats.length; i++) {
-        // The row BODY is its leading share — the part the chips are clamped out
-        // of (SEAT_TEAM_CHIP_MIN_BODY). It stopped being "everything left of the
-        // trailing chips, centre included" at u3: the side chip now carries
-        // `FRIENDLY A`, which a 221px phone row cannot hold right of its centre.
-        const p = bodyPoint(layout.seats[i]!);
+        // The row BODY is what is left between the leading state control (u5) and
+        // the trailing chips' zone. It stopped being "everything left of the
+        // trailing chips, centre included" at u3 (the side chip carries
+        // `FRIENDLY A`, which a 221px phone row cannot hold right of its centre)
+        // and stopped starting at the row's edge at u5.
+        const p = bodyPoint(layout, i);
         expect(lobbyHitTest(layout, p.x, p.y), `seat[${i}] on ${name}`).toEqual({
           kind: 'seat',
           index: i,
@@ -584,7 +598,7 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
         const teamChip = layout.seatTeamChips[i]!;
         const seat = layout.seats[i]!;
         const mid = center(seat).x;
-        const body = bodyPoint(seat);
+        const body = bodyPoint(layout, i);
 
         // Both chips nest inside the row and leave its LEADING share clear — the
         // row body stays tappable (n2). The guaranteed body is the row's first
@@ -643,4 +657,186 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
       }
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// 6. The LEADING state control (u5) — the affordance, not the behaviour
+// ---------------------------------------------------------------------------
+
+/**
+ * The developer's report was that **nothing showed**: *"theres no way visible way
+ * to know that you can close slots right now."* The cycle itself worked, and had
+ * worked every day the bug existed — so a test that cycles a seat and checks the
+ * occupant would have passed throughout and caught none of it.
+ *
+ * These assertions are therefore about the CONTROL: that one is laid out per row,
+ * where it is, that it is big enough to be a control rather than a smudge, and
+ * that it took nothing from the two chips that were already there. What the
+ * control SAYS, and when it goes dead, is the model's half (`./lobby.test.ts`);
+ * that it is drawn as pixels a thumb can find is the mobile suite's
+ * (`tests/mobile/slot-state.spec.ts`).
+ */
+describe('the seat-state control is DRAWN on every row (u5 — the affordance)', () => {
+  for (const { name, vp, touch } of PROFILES) {
+    it(`lays one out per row, leading, hittable, without moving a chip — ${name}`, () => {
+      const layout = lobbyLayout(vp, { isTouch: touch });
+      expect(layout.seatStates, `one control per row on ${name}`).toHaveLength(layout.seats.length);
+
+      for (let i = 0; i < layout.seats.length; i++) {
+        const seat = layout.seats[i]!;
+        const control = layout.seatStates[i]!;
+        const chip = layout.seatChips[i]!;
+        const teamChip = layout.seatTeamChips[i]!;
+
+        // 1. It EXISTS wherever the row can carry a control at ALL — stated as an
+        //    equivalence with the difficulty chip rather than as an absolute,
+        //    because the smallest PORTRAIT phones compress the roster until no row
+        //    can carry any chip (the file header's rule: the roster is a list and
+        //    it is what gives). Where they carry one, they carry this one: the
+        //    state control is never the affordance a screen drops FIRST, which is
+        //    what "the screen advertised its lesser controls and hid its main one"
+        //    would look like as geometry.
+        const carriesControls = chip.width > 0 && chip.height > 0;
+        expect(
+          control.width > 0 && control.height > 0,
+          `row ${i} on ${name} carries a difficulty chip but no state control`,
+        ).toBe(carriesControls);
+
+        // Everything below is about the control the row actually has.
+        if (!carriesControls) continue;
+
+        // 2. It sits inside its ANCHOR — its own roster row — and at the row's
+        //    LEADING edge, right of the identity stripe and left of everything
+        //    else. "Leading" is the half of the shape that has to survive if the
+        //    ratified design handoff lands later: this should be a re-skin.
+        expect(
+          rectContains(seat, control),
+          `state control ${i} escapes its row on ${name}: ${fmt(control)} vs ${fmt(seat)}`,
+        ).toBe(true);
+        expect(control.x, `state control ${i} covers the identity stripe on ${name}`).toBeGreaterThanOrEqual(
+          seat.x + SEAT_STRIPE,
+        );
+        expect(control.x, `state control ${i} is not leading on ${name}`).toBeLessThan(center(seat).x);
+
+        // 3. It is a CONTROL, not a smudge: wide enough to carry `CLOSED` (the
+        //    longest word it shows) and as tall as the row can spare, so it is a
+        //    plain tap on every device (GDD §2.4).
+        expect(
+          control.width,
+          `state control ${i} too narrow to name a state on ${name}`,
+        ).toBeGreaterThanOrEqual(SEAT_STATE_MIN);
+        expect(control.height, `state control ${i} thinner than its row on ${name}`).toBeGreaterThanOrEqual(
+          seat.height - 8,
+        );
+
+        // 4. A tap on it resolves to it, through the SAME hit test the view drives
+        //    — its drawn rect, never a second copy (GDD §2.4, the hit-test
+        //    contract). It wins over the row body it nests in.
+        const p = center(control);
+        expect(lobbyHitTest(layout, p.x, p.y), `state control ${i} on ${name}`).toEqual({
+          kind: 'seatState',
+          index: i,
+        });
+
+        // 5. …and it cost the row's existing furniture NOTHING. This brief moves
+        //    layout, so it has to prove it moved only what it meant to: neither
+        //    trailing chip is touched, and the body between them survives.
+        expect(overlaps(control, chip), `state control ${i} overlaps difficulty chip on ${name}`).toBe(false);
+        expect(overlaps(control, teamChip), `state control ${i} overlaps team chip on ${name}`).toBe(false);
+        expect(
+          control.x + control.width,
+          `state control ${i} eats the trailing chips' zone on ${name}`,
+        ).toBeLessThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY - SEAT_ROW_BODY_MIN + 1e-9);
+
+        const body = bodyPoint(layout, i);
+        expect(lobbyHitTest(layout, body.x, body.y), `row body ${i} on ${name}`).toEqual({
+          kind: 'seat',
+          index: i,
+        });
+      }
+    });
+
+    it(`keeps the control AND both chips on the notched, safe-area-inset screen — ${name}`, () => {
+      // The narrowest roster row the game ever produces is a landscape phone's
+      // WITH its notch insets applied (718→396px of roster, halved into two
+      // columns of 195). That row is the one this brief could plausibly have
+      // broken, so it is asserted rather than assumed.
+      const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      for (let i = 0; i < layout.seats.length; i++) {
+        const seat = layout.seats[i]!;
+        const control = layout.seatStates[i]!;
+        const chip = layout.seatChips[i]!;
+        const teamChip = layout.seatTeamChips[i]!;
+        if (chip.width <= 0 || chip.height <= 0) continue; // a row too short for any control
+        expect(control.width, `no state control on inset row ${i} on ${name}`).toBeGreaterThan(0);
+        expect(rectContains(seat, control), `inset state control ${i} escapes its row on ${name}`).toBe(true);
+        expect(overlaps(control, chip), `inset state control ${i} hits difficulty chip on ${name}`).toBe(false);
+        expect(overlaps(control, teamChip), `inset state control ${i} hits team chip on ${name}`).toBe(false);
+        if (chip.width > 0) {
+          expect(chip.x, `inset difficulty chip ${i} left of centre on ${name}`).toBeGreaterThan(center(seat).x);
+        }
+        if (teamChip.width > 0) {
+          expect(
+            teamChip.x,
+            `inset team chip ${i} eats the row's body zone on ${name}`,
+          ).toBeGreaterThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY);
+        }
+        const body = bodyPoint(layout, i);
+        expect(lobbyHitTest(layout, body.x, body.y), `inset row body ${i} on ${name}`).toEqual({
+          kind: 'seat',
+          index: i,
+        });
+      }
+    });
+  }
+
+  // …and the equivalence above is only worth having because the orientation the
+  // game is actually PLAYED in never reaches the compressed case. Planet Rush is
+  // landscape (`src/platform/orientation.ts` rotates a portrait phone rather than
+  // blocking it), so a landscape phone is the primary mobile layout of this
+  // screen — and there, all eight rows carry a control, notch or no notch.
+  for (const { name, vp, touch } of PROFILES.filter((p) => p.vp.width > p.vp.height)) {
+    it(`gives all eight rows a control in LANDSCAPE, the orientation this screen is used in — ${name}`, () => {
+      for (const insets of [undefined, insetsFor(vp)]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: touch, insets } : { isTouch: touch });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        for (let i = 0; i < layout.seats.length; i++) {
+          const control = layout.seatStates[i]!;
+          expect(control.width, `row ${i} has no state control on ${name} (${tag})`).toBeGreaterThanOrEqual(
+            SEAT_STATE_MIN,
+          );
+          expect(control.height, `row ${i} state control is flat on ${name} (${tag})`).toBeGreaterThan(0);
+          const p = center(control);
+          expect(lobbyHitTest(layout, p.x, p.y), `row ${i} control on ${name} (${tag})`).toEqual({
+            kind: 'seatState',
+            index: i,
+          });
+        }
+      }
+    });
+  }
+
+  it('drops the control whole rather than drawing a stub on a row that cannot hold one', () => {
+    // The documented fallback, and the reason the matrix above can assert
+    // "always present": a row too narrow for a legible control yields zero extent
+    // and the pre-u5 behaviour (the body is still the cycle), never a 12px button
+    // with a clipped word in it. No profile in QA's matrix reaches this.
+    const layout = lobbyLayout({ width: 210, height: 700 }, { isTouch: true });
+    for (let i = 0; i < layout.seats.length; i++) {
+      const control = layout.seatStates[i]!;
+      expect(control.width === 0 || control.width >= SEAT_STATE_MIN, `row ${i}`).toBe(true);
+      if (control.width === 0) {
+        const p = center(layout.seats[i]!);
+        expect(lobbyHitTest(layout, p.x, p.y)).toEqual({ kind: 'seat', index: i });
+      }
+    }
+  });
+
+  it('never hits a control on a zero-extent row', () => {
+    const layout = lobbyLayout({ width: 10, height: 10 });
+    for (const control of layout.seatStates) {
+      expect(control.width).toBe(0);
+      expect(control.height).toBe(0);
+    }
+  });
 });

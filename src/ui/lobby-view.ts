@@ -50,6 +50,8 @@ import {
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
 import {
   BLOCK_GAP,
+  SEAT_CONTROL_MIN_HEIGHT,
+  SEAT_STRIPE,
   STAT_COUNT,
   STAT_PIP_BAR,
   STAT_ROW_TEXT,
@@ -86,6 +88,11 @@ const PING_GAP = 8;
  *  auto-fit measures against ({@link LobbyView.drawTeamChip}). */
 const TEAM_CHIP_LABEL_PAD = 6;
 
+/** …and the same for the leading STATE control's word (u5). Tighter than the team
+ *  chip's, because `CLOSED` is the longest word on the narrowest control on this
+ *  screen and it should reach full size on every row the layout really produces. */
+const STATE_LABEL_PAD = 4;
+
 /** Air between two pips of a stat bar (u4). */
 const STAT_PIP_GAP = 1;
 /** A pip bar never spans more than this, so a stat on a 543px-wide desktop tile
@@ -104,6 +111,13 @@ export const LOBBY_ANCHOR: AnchorSpec = { region: 'full' };
 
 interface SeatNodes {
   readonly body: Graphics;
+  /** The LEADING STATE control's background — the OPEN/BOT/CLOSED cycle, drawn at
+   *  last (u5). The one control on this row that decides whether the slot is a
+   *  human, a bot, or shut, and until u5 the only one with nothing drawn for it. */
+  readonly stateBody: Graphics;
+  /** `OPEN` / `BOT` / `CLOSED` / `TAKEN`, centred on it — the CURRENT state, in
+   *  words (`./lobby` SEAT_STATE_LABELS). */
+  readonly stateLabel: Text;
   /** The identity chip: the colour, with the decal written on it (§3 rule 3). */
   readonly chip: Graphics;
   readonly decal: Text;
@@ -125,8 +139,6 @@ interface SeatNodes {
    *  identity colours (ratified: keep the colours, add a team indicator), drawn in
    *  the side colour since u3 (blue friendly / red enemy, `./lobby` SIDE_COLORS). */
   readonly underline: Graphics;
-  /** "OPEN" while a bot seat is still claimable by room code. */
-  readonly open: Text;
   /** `· 245ms` — this player's round trip, beside their name, colour-graded
    *  (ratified developer). Human rows only; a bot has no ping (`src/net/ping`). */
   readonly ping: Text;
@@ -249,10 +261,11 @@ export class LobbyView extends Container {
     for (let i = 0; i < this.layout.seats.length; i++) {
       const seat = model.seats[i];
       const rect = this.layout.seats[i];
+      const stateControl = this.layout.seatStates[i];
       const chip = this.layout.seatChips[i];
       const teamChip = this.layout.seatTeamChips[i];
-      if (!seat || !rect || !chip || !teamChip) continue;
-      this.drawSeat(this.seatSlot(i), seat, rect, chip, teamChip, model);
+      if (!seat || !rect || !stateControl || !chip || !teamChip) continue;
+      this.drawSeat(this.seatSlot(i), seat, rect, stateControl, chip, teamChip, model);
     }
     for (let i = 0; i < this.layout.classOptions.length; i++) {
       const option = model.classOptions[i];
@@ -345,18 +358,23 @@ export class LobbyView extends Container {
    * lives on trim, never on the body). Your own row is marked by a plasma
    * outline rather than by a brighter identity colour, so "which one is me" and
    * "which colour am I" stay two separate reads.
+   *
+   * Left to right since u5: `stripe | STATE control | identity chip | name and
+   * detail | team chip | difficulty chip`. The state control leads, because it is
+   * the control that decides what the slot *is* — and because it was the only one
+   * on this row that had nothing drawn for it at all.
    */
   private drawSeat(
     nodes: SeatNodes,
     seat: LobbySeatView,
     rect: Rect,
+    stateRect: Rect,
     chipRect: Rect,
     teamChipRect: Rect,
     model: LobbyModel,
   ): void {
     const pad = 8;
-    const stripe = 4;
-    const phase = model.phase;
+    const stripe = SEAT_STRIPE;
     // A closed seat is a shut door: drawn faint, no identity, no chip, no team —
     // it holds no player and takes no field (variable-slots Milestone E).
     const closed = seat.isClosed;
@@ -374,11 +392,18 @@ export class LobbyView extends Container {
         .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.8 });
     }
 
+    // The seat-state control — leading, labelled, and the reason this row was
+    // re-composed (u5). Drawn FIRST because everything after it measures from
+    // where it ended; a row too narrow to carry one falls back to the old
+    // composition, where the identity chip sits against the stripe.
+    const stateShown = this.drawSeatState(nodes, seat, stateRect);
+    const leadX = stateShown ? stateRect.x + stateRect.width : rect.x + stripe;
+
     // The identity chip and its decal. The decal is the source of truth and the
     // colour is the fast read, so they are drawn as one object (§3 rule 3). A
     // closed seat keeps its decal faint (identity is per-slot) but drops the fill.
     const chipSize = Math.min(26, rect.height - 2 * pad);
-    const chipX = rect.x + stripe + pad;
+    const chipX = leadX + pad;
     const chipY = rect.y + (rect.height - chipSize) / 2;
     nodes.chip.clear();
     nodes.chip
@@ -427,18 +452,16 @@ export class LobbyView extends Container {
     const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed);
 
     // Where the row's trailing furniture actually begins — the leftmost chip that
-    // was really drawn, or the right edge when the row carries none. Both the OPEN
-    // marker and the ping measure from it, so neither reserves space for a control
-    // that isn't there.
+    // was really drawn, or the right edge when the row carries none. The ping
+    // measures from it, so it never reserves space for a control that isn't there.
     const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
 
-    // A bot seat before RUSH is a seat somebody can still take by room code —
-    // marked just left of the leftmost visible chip so it never fights a label.
-    nodes.open.visible = seat.openToJoin && phase === 'gathering' && rect.height > 30 && !closed;
-    if (nodes.open.visible) {
-      nodes.open.x = chipsLeft - 4;
-      nodes.open.y = rect.y + rect.height / 2 + 2;
-    }
+    // A trailing `OPEN` marker used to sit here, saying that a bot seat was still
+    // claimable by room code. It is gone with u5, because the LEADING control now
+    // says `OPEN` on exactly those seats and a row with the same word at both ends
+    // reads as two different facts when it is one. The model's `openToJoin` is
+    // unchanged — the state control's word is the same truth, drawn once, at the
+    // end of the row a player reads first.
 
     // The ping, beside the name (ratified developer): `reivi · 245ms`, graded
     // green/amber/red by `src/net/ping`. Drawn on the name's own line because it
@@ -466,13 +489,73 @@ export class LobbyView extends Container {
   }
 
   /**
+   * The LEADING STATE control — the OPEN → BOT → CLOSED cycle, drawn and named
+   * (u5, 2026-08-05; developer report: *"theres no way visible way to know that
+   * you can close slots right now"*). Returns whether it was drawn.
+   *
+   * Three things about it are the whole fix, and each is a rule rather than a
+   * style choice:
+   *
+   *  1. **It says the state it is on.** `OPEN` / `BOT` / `CLOSED` — the model's
+   *     own words (`./lobby` SEAT_STATE_LABELS) for the model's own cycle, so a
+   *     player can answer *"can I close this slot?"* by reading rather than by
+   *     experimenting. `TAKEN` on a seat with a person in it, which is the one
+   *     state the ring does not contain.
+   *  2. **It reads as pressable** — a steel body with a plasma edge, the exact
+   *     visual language the MODE and ABUNDANCE pills already use
+   *     ({@link drawToggle}) and the difficulty and team chips echo. The screen
+   *     had been advertising its two lesser controls and hiding its main one;
+   *     this makes the main one look like the others.
+   *  3. **…and it reads DEAD when it is dead.** A guest, a lobby past RUSH!, and
+   *     a human seat are all no-ops in `cycleSeatState`, and all three arrive
+   *     here as `canCycleState === false` — one flag, from the mutation's own
+   *     refusals — so the control goes steel-edged and dim instead of looking
+   *     live and then refusing. A dead-looking button beats a lying one.
+   *
+   * No new hue enters for any of it (style-guide §2): a closed slot is not
+   * danger, so there is no threat red on it, and there is no ore on this screen,
+   * so there is no signal yellow either.
+   */
+  private drawSeatState(nodes: SeatNodes, seat: LobbySeatView, rect: Rect): boolean {
+    const visible = rect.width > 0 && rect.height > SEAT_CONTROL_MIN_HEIGHT;
+    nodes.stateBody.visible = visible;
+    nodes.stateLabel.visible = visible;
+    nodes.stateBody.clear();
+    if (!visible) return false;
+
+    const live = seat.canCycleState;
+    nodes.stateBody
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 4)
+      .fill({ color: PALETTE.hullSteel, alpha: live ? 0.16 : 0.08 })
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 4)
+      .stroke({
+        width: 1,
+        color: live ? PALETTE.plasma : PALETTE.hullSteel,
+        alpha: live ? 0.85 : 0.4,
+      });
+    nodes.stateLabel.text = seat.stateLabel;
+    nodes.stateLabel.style.fill = live ? TEXT_PRIMARY : TEXT_DIM;
+    nodes.stateLabel.alpha = live ? 1 : 0.7;
+    // Fit the word to the control it is drawn in — down, never up — exactly as the
+    // team chip does: the narrowest row the layout produces is a landscape phone's,
+    // and `CLOSED` drawn wider than its own button reads as a bug.
+    nodes.stateLabel.scale.set(1);
+    const room = rect.width - 2 * STATE_LABEL_PAD;
+    const drawn = nodes.stateLabel.width;
+    if (drawn > room && room > 0) nodes.stateLabel.scale.set(room / drawn);
+    nodes.stateLabel.x = rect.x + rect.width / 2;
+    nodes.stateLabel.y = rect.y + rect.height / 2;
+    return true;
+  }
+
+  /**
    * The trailing DIFFICULTY chip — the bot-tier cycle (EASY/MEDIUM/HARD), drawn on
    * every BOT seat in BOTH modes (n2): the one slot-editor control every mode
    * shares, so a bot's tier is editable in TEAMS exactly as in FFA. A human or
    * closed seat has no tier, so the chip is hidden. Returns whether it was drawn.
    */
   private drawDifficultyChip(nodes: SeatNodes, seat: LobbySeatView, chip: Rect): boolean {
-    const visible = seat.isBot && chip.width > 0 && chip.height > 8;
+    const visible = seat.isBot && chip.width > 0 && chip.height > SEAT_CONTROL_MIN_HEIGHT;
     nodes.rightChip.visible = visible;
     nodes.chipLabel.visible = visible;
     nodes.rightChip.clear();
@@ -518,7 +601,7 @@ export class LobbyView extends Container {
     teams: boolean,
     closed: boolean,
   ): boolean {
-    const visible = teams && !closed && chip.width > 0 && chip.height > 8;
+    const visible = teams && !closed && chip.width > 0 && chip.height > SEAT_CONTROL_MIN_HEIGHT;
     nodes.teamChip.visible = visible;
     nodes.teamChipLabel.visible = visible;
     nodes.teamChip.clear();
@@ -550,6 +633,12 @@ export class LobbyView extends Container {
     if (existing) return existing;
 
     const body = new Graphics();
+    const stateBody = new Graphics();
+    // The heading face, like every other control label on this screen (§7); 10 pt
+    // rather than the chips' 11, because `CLOSED` is the longest word any of them
+    // carries and it rides the narrowest button.
+    const stateLabel = makeText('', FONT_HEADING, 10, TEXT_PRIMARY);
+    stateLabel.anchor.set(0.5, 0.5);
     const chip = new Graphics();
     const decal = makeText('', FONT_BODY, 11, TEXT_PRIMARY, 'bold');
     decal.anchor.set(0.5, 0.5);
@@ -562,15 +651,29 @@ export class LobbyView extends Container {
     const teamChipLabel = makeText('', FONT_HEADING, 11, TEXT_PRIMARY);
     teamChipLabel.anchor.set(0.5, 0.5);
     const underline = new Graphics();
-    const open = makeText('OPEN', FONT_BODY, 10, TEXT_DIM);
-    open.anchor.set(1, 0.5);
     // Numerals face, like every other number on this screen; the colour is set
     // per-frame from the grade.
     const ping = makeText('', FONT_BODY, 11, PING_GRADE_COLORS.good);
 
-    this.addChild(body, chip, decal, name, detail, underline, rightChip, chipLabel, teamChip, teamChipLabel, open, ping);
+    this.addChild(
+      body,
+      stateBody,
+      stateLabel,
+      chip,
+      decal,
+      name,
+      detail,
+      underline,
+      rightChip,
+      chipLabel,
+      teamChip,
+      teamChipLabel,
+      ping,
+    );
     const nodes: SeatNodes = {
       body,
+      stateBody,
+      stateLabel,
       chip,
       decal,
       name,
@@ -580,7 +683,6 @@ export class LobbyView extends Container {
       teamChip,
       teamChipLabel,
       underline,
-      open,
       ping,
     };
     this.seatNodes[index] = nodes;

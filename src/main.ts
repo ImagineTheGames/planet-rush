@@ -6433,6 +6433,29 @@ interface LobbySeam {
   content: Rect;
   /** One roster row's height — a thumb-size assertion target. */
   seatHeight: number;
+  /** The eight roster rows' logical rects — the anchor each per-row control has to
+   *  sit inside (u5). */
+  seatRows: readonly Rect[];
+  /**
+   * Each roster row's LEADING STATE control, as it was actually DRAWN (u5) — the
+   * word on it, whether it reads live or dead, its logical rect, and the physical
+   * point a real press must land on (through the landscape-lock rotation, like
+   * {@link rushControl}).
+   *
+   * Read-back only. The mobile suite presses the physical point for real and reads
+   * the label back from here — "test the door as a door": a seam is for observing
+   * what happened, never for opening the thing under test.
+   */
+  seatStates: readonly {
+    index: number;
+    /** `OPEN` / `BOT` / `CLOSED` / `TAKEN` — the current state, in words. */
+    label: string;
+    /** Whether this client may cycle this seat right now: the host, before RUSH!,
+     *  and never a human seat. What decides whether the control draws pressable. */
+    live: boolean;
+    logical: Rect;
+    physicalCenter: { x: number; y: number };
+  }[];
   /** RUSH!'s height — likewise. */
   rushHeight: number;
   /** The RUSH! control's logical rect + the physical point a tap must land on to
@@ -6587,6 +6610,8 @@ function openLobby(
     logicalViewport: { width: size0.w, height: size0.h },
     content: { x: 0, y: 0, width: 0, height: 0 },
     seatHeight: 0,
+    seatRows: [],
+    seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
@@ -6638,6 +6663,18 @@ function openLobby(
     seam.logicalViewport = { width: w, height: h };
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
+    seam.seatRows = layout.seats.map((r) => ({ ...r }));
+    // The per-row STATE controls, exactly as drawn (u5): the word, the live/dead
+    // look, the rect and the physical press point. Built from the SAME layout the
+    // view drew from and the SAME model row it drew the word from, so the seam
+    // cannot report a control the screen does not have.
+    seam.seatStates = layout.seatStates.map((r, i) => ({
+      index: i,
+      label: model.seats[i]?.stateLabel ?? '',
+      live: model.seats[i]?.canCycleState ?? false,
+      logical: { ...r },
+      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+    }));
     seam.rushHeight = layout.rushButton.height;
     // The RUSH! rect in logical (landscape) space and the physical tap point it
     // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
@@ -6852,8 +6889,12 @@ function openLobby(
         selectMapAt(hit.index);
         break;
       case 'seat':
-        // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
-        // Milestone E) — the host shrinks or shapes the match here. Persist the
+      case 'seatState':
+        // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E) — the
+        // host shrinks or shapes the match here. Reached from the row BODY, where
+        // it has always lived, and from the row's LEADING STATE control, the drawn
+        // and labelled button u5 added because nothing on this screen said a slot
+        // could be closed at all. One case, so the two can never diverge. Persist the
         // resulting size so a returning host reopens on the same count, and tell the
         // room: closing a seat changes which bots it will cast, and the cast list
         // rides the host's own `lobbyChoice`.

@@ -256,8 +256,9 @@ export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 // toggles carved off the TOP of the roster box, never a band of their own: the
 // roster is a list to read and it is what compresses (the file header's rule), so
 // the hull tiles and the arena cards keep their thumb floors on the tightest
-// phone. The per-seat OPEN/BOT/CLOSED cycle is the row itself; the per-row TEAM /
-// difficulty control is a chip at the row's right edge (below).
+// phone. The per-seat OPEN/BOT/CLOSED cycle is a LABELLED control at the row's
+// LEADING edge since u5 (below); the per-row TEAM / difficulty control is a chip
+// at the row's right edge (below).
 // ---------------------------------------------------------------------------
 
 /** Height of the MODE/ABUNDANCE strip at the top of the roster. A plain tap
@@ -267,6 +268,74 @@ export const CONTROLS_HEIGHT_TOUCH = 38;
 /** Widest a single toggle grows — the two split the roster width, capped so they
  *  read as controls, not banners, on a wide desktop roster column. */
 export const CONTROL_MAX_WIDTH = 200;
+
+/**
+ * Width of the identity STRIPE down a roster row's leading edge — the trim that
+ * carries the slot's player colour (style-guide §3 rule 2).
+ *
+ * It lives here rather than in the view since u5, because the row's leading edge
+ * stopped being decoration the drawing code could place on its own: the STATE
+ * control is laid out immediately right of the stripe, so the two are one piece
+ * of geometry and the view reads both from this file.
+ */
+export const SEAT_STRIPE = 4;
+
+/**
+ * Width of a roster row's LEADING STATE control — the OPEN / BOT / CLOSED cycle,
+ * finally drawn and finally named (u5, 2026-08-05).
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS
+ * ---------------------------------------------------------------------------
+ * The cycle itself is old ({@link LobbyTarget} `seat`, `./lobby` `cycleSeatState`)
+ * and it worked from the day it shipped — on a plain tap of the row BODY, with
+ * nothing drawn to say the row was tappable and nothing naming the three states
+ * it walks. The developer's report is the whole case: *"theres no way visible way
+ * to know that you can close slots right now."* The screen advertised its two
+ * lesser controls — the DIFFICULTY chip and the TEAM chip, both drawn chips with
+ * backgrounds — and hid the one that decides whether a slot is a human, a bot, or
+ * shut. A control that works but cannot be discovered is not shipped (the same
+ * class as the M1 miss that created the mobile suite: `playwright.config.ts`,
+ * "caught invisible touch UI").
+ *
+ * So the state is an **explicit, labelled, leading** control that states the
+ * CURRENT state and reads as pressable — deliberately the shape the UI design
+ * handoff independently proposed (slot state as `OPEN` / `CLOSED` buttons on the
+ * far left of each row). That direction is not ratified as a whole and this is
+ * NOT that lobby; it is built leading-and-labelled so that if the design lands it
+ * is a re-skin rather than a rewrite.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IT MAY NOT COST
+ * ---------------------------------------------------------------------------
+ * A leading control is the first thing on this screen to take width off the
+ * *front* of a row, and the row already had two guarantees carved off its back
+ * ({@link SEAT_CHIP_WIDTH}, {@link SEAT_TEAM_CHIP_WIDTH}) plus the body zone
+ * between them ({@link SEAT_TEAM_CHIP_MIN_BODY}). Neither may move, so the state
+ * control is bounded three ways and takes whichever is smallest — its own width,
+ * a share of a narrow row, and whatever is left once the body keeps
+ * {@link SEAT_ROW_BODY_MIN}. The order across a row is therefore fixed at every
+ * width: `stripe | STATE | body | team chip | difficulty chip`.
+ */
+export const SEAT_STATE_WIDTH = 58;
+/** …never more than this share of a narrow row. */
+export const SEAT_STATE_MAX_FRACTION = 0.28;
+/**
+ * …and below this the control is dropped whole rather than drawn as a stub too
+ * small to carry a word (the ladder `classTileContent` keeps for a hull tile: a
+ * clipped affordance reads worse than none). No row the layout produces on any
+ * profile in QA's matrix lands here — asserted in `./lobby-geometry.test.ts` —
+ * and a row that did would fall back to the pre-u5 behaviour, where the row body
+ * is still the cycle.
+ */
+export const SEAT_STATE_MIN = 34;
+/**
+ * The row BODY the state control must leave between itself and the trailing
+ * chips. The body is still the seat-state cycle's tap target (u5 adds a control,
+ * it does not take one away — a wide desktop row is a generous target and stays
+ * one), so it may be squeezed by the new control but never closed by it.
+ */
+export const SEAT_ROW_BODY_MIN = 16;
 
 /** Width of a roster row's trailing DIFFICULTY chip — the bot-tier cycle
  *  (EASY/MEDIUM/HARD). Carved off the RIGHT of the row in BOTH modes: it is the
@@ -279,6 +348,25 @@ export const SEAT_CHIP_WIDTH = 54;
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /** Inset of the chip from the row's edges. */
 export const SEAT_CHIP_PAD = 3;
+
+/**
+ * The height below which a roster row draws NONE of its per-row controls — the
+ * state control, the difficulty chip and the team chip alike.
+ *
+ * It was three separate `> 8` literals in the view before u5, which is one guess
+ * per control and no statement about their relationship. Stated once, here, it
+ * says the thing that matters: **a row either carries its controls or carries
+ * none of them.** The state control can never be the one a shrinking row drops
+ * first — dropping it first is precisely the shape of the bug u5 exists to fix
+ * (a screen that keeps its lesser controls and loses its main one).
+ *
+ * Rows this short only happen where the roster has been compressed hard (the file
+ * header's rule: the roster is a list and it is what gives, so the hull tiles and
+ * the arena cards keep their thumb floors). `./lobby-geometry.test.ts` asserts
+ * every LANDSCAPE profile — the orientation this screen is used in — stays above
+ * it.
+ */
+export const SEAT_CONTROL_MIN_HEIGHT = 8;
 
 /** Width of a roster row's TEAM chip (TEAMS only) — wide enough for the WORD the
  *  chip carries since the developer reported a teams match they could not read
@@ -395,6 +483,11 @@ export interface LobbyLayout {
   readonly roomCode: Rect;
   /** The eight roster rows, in slot order, top to bottom. */
   readonly seats: readonly Rect[];
+  /** Each roster row's LEADING STATE control — the OPEN/BOT/CLOSED cycle, named
+   *  (u5). Nested inside its {@link seats} row at the leading edge, right of the
+   *  identity stripe, so the hit-test finds it *before* the row body. Aligned to
+   *  `seats`; zero-extent on a row too narrow to carry a legible one. */
+  readonly seatStates: readonly Rect[];
   /** Each roster row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH
    *  modes (n2). Nested inside its {@link seats} row on the right, so the hit-test
    *  checks it *before* the row body. Aligned to `seats`. */
@@ -438,8 +531,16 @@ export type LobbyTarget =
   /** BACK — leaves the lobby for the main menu (u2 menu-back), the exit every
    *  screen carries. Top-left of the title band. */
   | { readonly kind: 'leave' }
-  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E). */
+  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E).
+   *  Since u5 the same cycle also has a control that SAYS so ({@link seatState});
+   *  the body is kept because a wide row is a generous target and taking it away
+   *  would be a second change nobody asked for. */
   | { readonly kind: 'seat'; readonly index: number }
+  /** The row's LEADING STATE control — the same OPEN/BOT/CLOSED cycle as the row
+   *  body, drawn and named (u5). A distinct target rather than a second `seat`
+   *  rect so the flow, the seam and the tests can talk about the *control* rather
+   *  than about the row that happens to contain it. */
+  | { readonly kind: 'seatState'; readonly index: number }
   /** The row's trailing DIFFICULTY chip — the bot-tier cycle, present in BOTH
    *  modes (n2). The flow routes it to the difficulty cycle in either mode. */
   | { readonly kind: 'seatChip'; readonly index: number }
@@ -567,6 +668,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: Math.max(0, rosterBox.height - controls.height - (controls.height > 0 ? ROW_GAP : 0)),
   };
   const seatColumns = placeSeats(seats, seatsBox, seatRowMax(isTouch));
+  const seatStates = seats.map((rect) => stateRect(rect));
   const seatChips = seats.map((rect) => chipRect(rect));
   const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!));
   const mapColumns = placeMaps(maps, mapBand);
@@ -577,6 +679,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     leave,
     roomCode,
     seats,
+    seatStates,
     seatChips,
     seatTeamChips,
     modeToggle: controls.modeToggle,
@@ -605,6 +708,41 @@ function placeControls(roster: Rect, isTouch: boolean): { modeToggle: Rect; abun
   const modeToggle: Rect = { x: roster.x, y: roster.y, width, height };
   const abundance: Rect = { x: roster.x + roster.width - width, y: roster.y, width, height };
   return { modeToggle, abundance, height };
+}
+
+/**
+ * A roster row's LEADING STATE control — the OPEN / BOT / CLOSED cycle, named
+ * (u5; see {@link SEAT_STATE_WIDTH} for why it exists).
+ *
+ * Placed immediately right of the identity stripe and bounded three ways, taking
+ * whichever is smallest: its own width, a share of a narrow row, and whatever is
+ * left once the row body keeps {@link SEAT_ROW_BODY_MIN} clear of the trailing
+ * chips' guaranteed zone ({@link SEAT_TEAM_CHIP_MIN_BODY}). That last bound is
+ * the one that matters: it is what makes "u5 moved layout and moved nothing else"
+ * true by construction rather than by care — no width of row can let this control
+ * reach the space the team chip was already promised, so the difficulty chip, the
+ * team chip and the body between them keep every guarantee they had.
+ *
+ * Below {@link SEAT_STATE_MIN} the control is dropped whole rather than drawn as
+ * a stub with a clipped word in it.
+ */
+function stateRect(seat: Rect): Rect {
+  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
+  const x = seat.x + SEAT_STRIPE + SEAT_CHIP_PAD;
+  // Where the trailing chips' zone begins — the body has to fit before it.
+  const bodyStart = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
+  const room = Math.min(
+    SEAT_STATE_WIDTH,
+    seat.width * SEAT_STATE_MAX_FRACTION,
+    bodyStart - SEAT_ROW_BODY_MIN - x,
+  );
+  const width = room >= SEAT_STATE_MIN ? room : 0;
+  return {
+    x,
+    y: seat.y + SEAT_CHIP_PAD,
+    width,
+    height: width > 0 ? Math.max(0, seat.height - 2 * SEAT_CHIP_PAD) : 0,
+  };
 }
 
 /**
@@ -666,11 +804,14 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
   for (let i = 0; i < layout.seats.length; i++) {
-    // A row's trailing chips win over its body: the difficulty chip cycles the
-    // bot's tier (both modes), the team chip to its left cycles the side (TEAMS);
-    // a tap anywhere else on the row cycles the seat state. Both chips sit strictly
-    // right of the row centre, so the centre — what the hit-test contract taps —
-    // is always the body.
+    // A row's own controls win over its body: the LEADING state control names and
+    // cycles OPEN/BOT/CLOSED (u5), the trailing difficulty chip cycles the bot's
+    // tier (both modes), and the team chip to its left cycles the side (TEAMS); a
+    // tap anywhere else on the row cycles the seat state too. The three sit at the
+    // row's leading edge and strictly right of its centre respectively, so the
+    // BODY between them — what the hit-test contract taps — is never one of them.
+    const stateControl = layout.seatStates[i];
+    if (stateControl && hit(stateControl, x, y)) return { kind: 'seatState', index: i };
     const teamChip = layout.seatTeamChips[i];
     if (teamChip && hit(teamChip, x, y)) return { kind: 'seatTeamChip', index: i };
     const chip = layout.seatChips[i];

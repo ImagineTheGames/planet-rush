@@ -40,6 +40,7 @@ import {
   RUSH_COUNTDOWN_SECONDS,
   RUSH_LABEL,
   SEAT_STATE_CYCLE,
+  SEAT_STATE_LABELS,
   SIDE_COLORS,
   SIDE_WORDS,
   STAT_PIPS,
@@ -822,6 +823,97 @@ describe('the seat-state cycle (variable-slots E — OPEN → BOT → CLOSED →
     expect(matchSizeOf(lobby({ size: 1 }))).toBe(MIN_MATCH_SIZE);
     expect(matchSizeOf(lobby({ size: 99 }))).toBe(MAX_MATCH_SIZE);
     expect(matchSizeOf(lobby())).toBe(LOBBY_SLOTS); // absent size = the eight-player game
+  });
+});
+
+describe('the seat-state control SAYS what it is (u5 — the affordance, not the cycle)', () => {
+  // The developer's report — "theres no way visible way to know that you can close
+  // slots right now" — is a defect the tests above could never have caught: they
+  // assert the cycle WORKS, and it always did. What was missing is that nothing
+  // said so. These assert the words and the live/dead look the row's leading
+  // control is drawn from (`./lobby-view` drawSeatState), which is the half of the
+  // fix that lives in a model rather than in pixels.
+
+  it('names every state there is — including the one the ring does not contain', () => {
+    // A control that states the current state needs a word for every state; the
+    // one it forgets is the one drawn blank. `human` is not on the ring (you
+    // cannot cycle a seat somebody is sitting in), and still needs a word.
+    for (const occupant of SEAT_STATE_CYCLE) {
+      expect(SEAT_STATE_LABELS[occupant], `no word for ${occupant}`).toBeTruthy();
+    }
+    expect(SEAT_STATE_LABELS.human).toBeTruthy();
+    expect(SEAT_STATE_LABELS).toEqual({
+      open: 'OPEN',
+      bot: 'BOT',
+      closed: 'CLOSED',
+      human: 'TAKEN',
+    });
+  });
+
+  it('reads the CURRENT state on every row, and changes as the state changes', () => {
+    let state = lobby();
+    // Row 0 is you — a seat nobody can cycle, and it says so rather than lying
+    // about being one tap from OPEN.
+    expect(lobbyModel(state).seats[0]!.stateLabel).toBe('TAKEN');
+
+    // …and row 1 walks the ring, in words, one label per state.
+    const walked: string[] = [lobbyModel(state).seats[1]!.stateLabel];
+    for (let i = 0; i < 3; i++) {
+      state = cycleSeatState(state, 1);
+      walked.push(lobbyModel(state).seats[1]!.stateLabel);
+    }
+    expect(walked).toEqual(['OPEN', 'BOT', 'CLOSED', 'OPEN']);
+
+    // The word is the seat's own state, never a neighbour's: closing row 1 does
+    // not relabel row 2.
+    const closed = cycleSeatState(cycleSeatState(lobby(), 1), 1);
+    expect(lobbyModel(closed).seats[1]!.stateLabel).toBe('CLOSED');
+    expect(lobbyModel(closed).seats[2]!.stateLabel).toBe('OPEN');
+  });
+
+  it('reads DEAD in exactly the three cases the cycle refuses — never live-then-refusing', () => {
+    // One flag, from the mutation's own refusals, because a control that looks
+    // live and then does nothing is worse than one that looks unavailable.
+    const host = lobby();
+    const hostModel = lobbyModel(host);
+    expect(hostModel.seats[1]!.canCycleState, 'a host may cycle an empty seat').toBe(true);
+    expect(hostModel.seats[0]!.canCycleState, 'nobody may cycle an occupied seat').toBe(false);
+
+    // 1. A GUEST holds no slot editor at all — every row, not just the bot rows.
+    const guest = lobbyModel(lobby({ you: 2, host: 0 }));
+    expect(guest.seats.every((s) => !s.canCycleState), 'a guest sees a live control').toBe(true);
+
+    // 2. After RUSH! the match shape is locked, so the whole roster goes dead.
+    const counting = lobbyModel(pressRush(lobby()));
+    expect(counting.seats.every((s) => !s.canCycleState), 'a control is live past RUSH!').toBe(true);
+
+    // 3. …and a CLOSED seat stays live for the host, which is the one that would
+    //    strand a player if it were wrong: the control is the only way back out
+    //    of CLOSED, so a closed row must never read as dead.
+    const shut = cycleSeatState(cycleSeatState(lobby(), 5), 5);
+    expect(lobbyModel(shut).seats[5]!.stateLabel).toBe('CLOSED');
+    expect(lobbyModel(shut).seats[5]!.canCycleState, 'a closed seat cannot be reopened').toBe(true);
+  });
+
+  it('agrees with the mutation on every seat, in every state (the flag cannot drift)', () => {
+    // The property behind the three cases: `canCycleState` is true exactly when
+    // `cycleSeatState` actually moves. Exhaustive over the roster in four lobbies,
+    // so a fourth refusal added to the mutation and not to the flag fails here.
+    const LOBBIES: readonly { readonly name: string; readonly state: LobbyState }[] = [
+      { name: 'host, gathering', state: lobby() },
+      { name: 'guest', state: lobby({ you: 2, host: 0 }) },
+      { name: 'counting (post-RUSH!)', state: pressRush(lobby()) },
+      { name: 'host with a closed seat', state: cycleSeatState(cycleSeatState(lobby(), 5), 5) },
+    ];
+    for (const { name, state } of LOBBIES) {
+      const model = lobbyModel(state);
+      for (const row of model.seats) {
+        const moved = cycleSeatState(state, row.player) !== state;
+        expect(row.canCycleState, `${name}: row ${row.player} draws ${row.canCycleState} but moves ${moved}`).toBe(
+          moved,
+        );
+      }
+    }
   });
 });
 

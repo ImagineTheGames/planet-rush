@@ -142,6 +142,25 @@ export const MODE_LABELS: Readonly<Record<MatchMode, string>> = {
 export const SEAT_STATE_CYCLE: readonly SeatOccupant[] = ['open', 'bot', 'closed'];
 
 /**
+ * The word a seat's state is shown as, on the row's leading STATE control (u5,
+ * 2026-08-05 — the developer's report: *"theres no way visible way to know that
+ * you can close slots right now"*).
+ *
+ * The cycle above walks three of these; the fourth — `human` — is the state you
+ * cannot cycle *to* or *from*, because you cannot cycle a seat somebody is
+ * sitting in ({@link cycleSeatState}), so its word says the seat is spoken for
+ * rather than naming a rung of a ring the row is not on. Every occupant has a
+ * word: a control that states the current state must have one for every state
+ * there is, or the one it forgets is the one drawn blank.
+ */
+export const SEAT_STATE_LABELS: Readonly<Record<SeatOccupant, string>> = {
+  open: 'OPEN',
+  bot: 'BOT',
+  closed: 'CLOSED',
+  human: 'TAKEN',
+};
+
+/**
  * How many sides TEAMS can split into. Two is the common game (1v1..4v4, and any
  * uneven split — the developer ratified "any team split allowed, show counts,
  * never block"); the ring runs to four so 2v2v2v2 and three-corner games are
@@ -1339,6 +1358,22 @@ export interface LobbySeatView {
   /** The seat's occupancy (variable-slots Milestone E) — the view dims a `closed`
    *  row and shows the OPEN/BOT/CLOSED cycle state. */
   readonly state: SeatOccupant;
+  /** …and that state IN WORDS, for the row's leading state control (u5):
+   *  `OPEN` / `BOT` / `CLOSED`, or `TAKEN` on a seat with a person in it
+   *  ({@link SEAT_STATE_LABELS}). The control states the state it is on, so a
+   *  player can answer "can I close this slot?" without experimenting. */
+  readonly stateLabel: string;
+  /**
+   * Whether *this client, right now* may cycle this seat's state — exactly the
+   * three refusals {@link cycleSeatState} already keeps: the host only, before
+   * RUSH!, and never on a human seat.
+   *
+   * It is on the seat view because the control has to LOOK unavailable in each of
+   * those cases rather than look live and then refuse (u5): a dead-looking button
+   * beats a lying one. Deriving it here — from the same predicate the mutation
+   * uses — is what keeps the drawn state and the real refusal from drifting.
+   */
+  readonly canCycleState: boolean;
   /** Out of the match: no station, no player. The view draws it as a shut seat. */
   readonly isClosed: boolean;
   /** The side this slot fights for (raw team number, TEAMS). */
@@ -1418,7 +1453,11 @@ export interface LobbyModel {
 /** Build the frame model. Pure: the view draws exactly this and decides nothing. */
 export function lobbyModel(state: LobbyState): LobbyModel {
   const viewer = viewerTeamOf(state);
-  const seats = state.seats.map((seat) => seatView(state, seat, viewer));
+  // Read ONCE, from the same predicate the mutations use, and handed to every row:
+  // whether this client may edit the slots at all (the host, before RUSH!). It is
+  // what makes each row's state control draw live or dead — honestly, per seat.
+  const canEdit = hostControls(state);
+  const seats = state.seats.map((seat) => seatView(state, seat, viewer, canEdit));
   // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
   // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
   const active = seats.filter((s) => !s.isClosed);
@@ -1480,6 +1519,7 @@ function seatView(
   state: LobbyState,
   seat: LobbySeat,
   viewerTeam: number | undefined,
+  canEdit: boolean,
 ): LobbySeatView {
   const isBot = isBotSeat(seat.occupant);
   const isClosed = seat.occupant === 'closed';
@@ -1502,6 +1542,10 @@ function seatView(
     isYou: seat.player === state.you,
     isHost: seat.player === state.host && seat.occupant === 'human',
     state: seat.occupant,
+    stateLabel: SEAT_STATE_LABELS[seat.occupant],
+    // The control's live/dead look, from the mutation's own three refusals: the
+    // host, before RUSH! (both folded into `canEdit`), and never a human seat.
+    canCycleState: canEdit && seat.occupant !== 'human',
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
