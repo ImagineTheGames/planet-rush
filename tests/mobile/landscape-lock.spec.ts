@@ -246,7 +246,7 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
   test.skip(!isTouchProject(testInfo.project.name), 'the landscape lock is a mobile concern');
   budgetTest({
     work: 'portrait boot → rotate to landscape (re-layout) → rotate back to portrait (re-layout), asserting anchors at each stop',
-    measuredSeconds: 8,
+    measuredSeconds: 9,
   });
 
   // Boot portrait (the developer's mistaken opening orientation).

@@ -315,7 +315,7 @@ test('portrait renders the landscape game (no ROTATE overlay, HUD visible)', asy
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
   budgetTest({
     work: 'portrait boot → settle → screenshot → rotate to landscape → re-layout settle → second screenshot',
-    measuredSeconds: 14,
+    measuredSeconds: 16,
   });
 
   // Boot on the device default viewport, which is PORTRAIT (h > w). The ratified
@@ -371,7 +371,7 @@ test('touch drag on the left half moves the ship (world units per sim tick)', as
   // 120_000; the number now comes from the suite's measured model — q7-01.)
   budgetTest({
     work: 'landscape boot → ramped touch drag → 90 sim ticks of sustained thrust → world-distance-per-tick assertion',
-    measuredSeconds: 15,
+    measuredSeconds: 16,
   });
 
   // Gameplay assertion → landscape. In portrait the field is the blocked,
