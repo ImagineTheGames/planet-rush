@@ -31,6 +31,7 @@ import type { World } from '../../src/sim';
 import { PredictedMatch } from '../../src/net/prediction';
 import { runLatencyMatch } from './latency-harness';
 import type { HarnessClient, LatencyMatchResult } from './latency-harness';
+import { netBudget } from './budgets';
 
 /** A clean 100 ms wire — the developer's condition with nothing else in it, so a
  *  measurement that disagrees with 100 ms is disagreeing about something real. */
@@ -92,7 +93,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
         expect(live.networkFloorMs!).toBeLessThan(profile.rttMs + slack);
       }
     }
-  });
+  }, netBudget({
+    work: 'two scripted 20 s matches (clean 100 ms, rough 250 ms) → assert the ping floor is the wire on every client',
+    measuredSeconds: 4.3,
+  }));
 
   it('shows the composite reading high — and says where the difference went', () => {
     // At 250 ms with jitter and loss the client holds a real lead, which is where the
@@ -118,7 +122,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
       const budgetMs = client.session.prediction!.leadBudget * FRAME_MS;
       expect(live.serverQueueMs!).toBeLessThanOrEqual(budgetMs + FRAME_MS);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 20 s match at 250 ms → take the composite RTT apart into network, tick queue and client lag',
+    measuredSeconds: 1.4,
+  }));
 
   it('adds up: network + tick queue accounts for what the client measures', () => {
     // On a clean wire, where a single reading is a reading and not a retransmit: the
@@ -132,7 +139,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
       const explained = live.networkRttMs! + live.serverQueueMs!;
       expect(Math.abs(live.rttMs! - explained)).toBeLessThanOrEqual(4 * FRAME_MS);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 20 s match → assert the three stages account for the composite the client measures',
+    measuredSeconds: 1.0,
+  }));
 
   it('reports the server loop honestly — a harness server is not starving', () => {
     const result = run();
@@ -146,7 +156,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
       // Director/developer call and not a code fix (docs/netcode-spike.md).
       expect(live.serverLoopLagMs!).toBeLessThan(1);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 20 s match → assert the harness server states a healthy loop lag',
+    measuredSeconds: 1.1,
+  }));
 
   it('keeps all three on every finalized second, for the pasted log', () => {
     const result = run();
@@ -165,7 +178,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
         expect(s.clientLagMaxMs).toBeLessThan(1);
       }
     }
-  });
+  }, netBudget({
+    work: 'one scripted 20 s match → assert every finalized second carries all three stages for the pasted log',
+    measuredSeconds: 1.0,
+  }));
 
   it('shows the player the network figure, never the composite', () => {
     const result = run(ROUGH_250);
@@ -180,7 +196,10 @@ describe('the round trip is measured in three parts (M10 item 6)', () => {
       expect(client.session.networkPingMs).toBe(client.telemetry.live.networkFloorMs);
       expect(client.session.networkPingMs!).toBeLessThan(client.telemetry.live.rttFloorMs!);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 20 s match → assert the HUD reads the wire, never the composite',
+    measuredSeconds: 1.4,
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -247,7 +266,10 @@ describe('the input lead comes back down after a hiccup (M10 item 7)', () => {
       // merely below the peak but at the baseline it held before the hiccup.
       expect(recovered).toBeLessThanOrEqual(baseline + 1);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 30 s match with a 500 ms stall at t=20 s → assert the lead is back at baseline ten seconds later',
+    measuredSeconds: 1.1,
+  }));
 
   it('never widens the budget on a hiccup the wire has already recovered from', () => {
     const result = runLatencyMatch({
@@ -264,7 +286,10 @@ describe('the input lead comes back down after a hiccup (M10 item 7)', () => {
       // there is the ratchet itself.
       expect(budget).toBeLessThanOrEqual(Math.ceil((CLEAN_100.rttMs + 2 * FRAME_MS) / FRAME_MS) + 4);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 30 s match with a 500 ms stall → assert the lead budget never ratchets on it',
+    measuredSeconds: 1.0,
+  }));
 
   /**
    * The ratchet's arithmetic, from the developer's own capture (room RXS3).
@@ -309,5 +334,8 @@ describe('the input lead comes back down after a hiccup (M10 item 7)', () => {
     // And it is not merely smaller — it is the wire plus its jitter allowance, which is
     // what "the measured need" means: a 24 ms round trip needs three ticks in flight.
     expect(honest).toBeLessThanOrEqual(Math.ceil((NETWORK_MS + 2 * JITTER_MS) / FRAME_MS) + 2);
-  });
+  }, netBudget({
+    work: 'arithmetic on a hand-built telemetry ring — no match',
+    measuredSeconds: 0.05,
+  }));
 });

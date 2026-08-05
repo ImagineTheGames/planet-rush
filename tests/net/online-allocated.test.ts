@@ -154,7 +154,7 @@ describe('the allocator door: a registered Machine, an allocated room, two clien
     await until('the server to simulate past its first second', () => authority.tick > 60);
   }, netBudget({
     work: 'boot a Machine and an allocator → register the Machine → allocate a room → seat two ticketed clients → RUSH! → simulate past the first sim second',
-    measuredSeconds: 1.3,
+    measuredSeconds: 1.4,
   }));
 
   it('refuses a join the allocator never signed — the Machine fails closed', async () => {

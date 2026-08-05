@@ -216,6 +216,6 @@ describe('buying things in an online match', () => {
     expect(bobSat.owner).toBe(0);
   }, netBudget({
     work: 'boot a server → seat two clients → RUSH! → stake a wallet and wait for it on the client → buy a DAMAGE tier over the wire and wait for it home → order a satellite, wind the job down, wait for it on both clients',
-    measuredSeconds: 1.6,
+    measuredSeconds: 0.5,
   }));
 });

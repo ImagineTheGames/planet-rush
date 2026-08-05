@@ -34,6 +34,7 @@ import type { OnlineSession } from '../../src/net/session';
 import { SILENCE_FLOOR_MS, linkNotice } from '../../src/net/link-loss';
 import type { WebSocketLike } from '../../src/net/websocket-transport';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
+import { netBudget } from './budgets';
 
 let cleanup: (() => Promise<void>) | null = null;
 afterEach(async () => {
@@ -199,7 +200,10 @@ describe('a silently-killed socket (the backgrounded tab)', () => {
       alice.sendInput(thrust);
     }
     expect(alice.world!.tick).toBeGreaterThan(tickAfterReclaim);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → gag alice\'s socket → cross the silence limit → assert the freeze, the overlay, the reclaim and the world moving again',
+    measuredSeconds: 0.3,
+  }));
 });
 
 describe('ABANDON MATCH', () => {
@@ -256,7 +260,10 @@ describe('ABANDON MATCH', () => {
     expect(room.hasPendingReclaim).toBe(false);
     expect(room.lobbyState()[seat]!.isBot).toBe(true);
     expect(alice.link.ending).toBe('left');
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → ABANDON MATCH → assert the peer is told and the seat is freed with no grace window',
+    measuredSeconds: 0.15,
+  }));
 
   it('a plain drop still holds the seat — the grace rule is untouched', async () => {
     const harness = await startMatchServer({ seed: 78, slots: 2, asteroidCount: 12, graceMs: 30_000 });
@@ -299,5 +306,8 @@ describe('ABANDON MATCH', () => {
     (aliceSocket as unknown as WebSocketLike).close();
     await until('the seat to be held', () => room.hasPendingReclaim);
     expect(room.graceRemaining(seat, Date.now())).toBeGreaterThan(0);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → sever alice\'s socket → assert the seat is held behind a live grace window',
+    measuredSeconds: 0.15,
+  }));
 });

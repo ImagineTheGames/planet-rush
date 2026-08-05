@@ -40,7 +40,10 @@ import { nodeWebSocket, startMatchServer, until } from './node-websocket';
  * fragment of a wall-clock second — however much of it was left when the match
  * started — and a fragment can easily contain one reconcile whose `ackSeq` matched
  * no outstanding send, which finalizes as `rtt: null`. Reproduced on this hardware
- * at 1 run in 20; on CI's ~6× slower runners, often enough to redden `main`.
+ * at 1 run in 20, and at 20 runs in 20 once the phase is forced by starting the
+ * flight 15 ms before a second boundary; on CI's ~6× slower runners, often enough
+ * to redden `main`. The mechanism is pinned as a unit, on an injected clock, in
+ * `src/net/telemetry.test.ts` ("finalizes an opening FRAGMENT of a second").
  *
  * `rtt` is the one field here that can be absent from a real sample, and it is the
  * one to wait on: `matchRtt` is only ever reached from `recordReconcile`, which has
@@ -226,7 +229,12 @@ describe('the playtest log over a real socket', () => {
     expect(log.dropped).toBe(0);
     expect(log.events.length).toBeLessThan(log.capacity);
   }, netBudget({
-    work: 'boot a server → seat and welcome a client → RUSH! → fly under 60 Hz input until a COMPLETE telemetry second lands → assert the sample and the lifecycle',
-    measuredSeconds: 1.6,
+    // Observed at 0.5–0.8 s over four runs, declared at 2.0: the wait is on a
+    // telemetry second finalizing, and those are keyed on the WALL clock, so the
+    // work can legitimately be a fragment of a second plus a whole one — a bound
+    // set by the instrument's shape, not by the host, which a stopwatch reading
+    // taken on a lucky phase would understate.
+    work: 'boot a server → seat and welcome a client → RUSH! → fly under 60 Hz input until a COMPLETE telemetry second lands (up to ~2 s of wall clock by construction) → assert the sample and the lifecycle',
+    measuredSeconds: 2,
   }));
 });

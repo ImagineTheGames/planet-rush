@@ -21,9 +21,13 @@
  *    For Playwright that is `playwright.config.ts`'s 60 s; for vitest it is the
  *    5 s built-in default, because `vite.config.ts` sets no `testTimeout`.
  *  - {@link ROUND_TO_MS} is the human step budgets are quoted in. The mobile
- *    journeys land at 60–330 s, so they round to 30 s. These land at 5–50 s, so
- *    they round to 10 s — round *those* to 30 s and every test in the suite
- *    lands on the same number and the table stops saying anything.
+ *    journeys land at 60–330 s, so they round to 30 s. These land at 5–45 s, so
+ *    they round to 5 s — round *those* to 30 s and every test in the suite lands
+ *    on the same number and the table stops saying anything. The step is set to
+ *    the floor exactly, so the cheapest budget the model can produce IS the
+ *    suite default: without that, rounding swallows the floor and no test can
+ *    ever land on it, which is the property that keeps this from being a blanket
+ *    bump in disguise.
  *
  * ── WHY THE NET SUITE NEEDS THIS AT ALL ────────────────────────────────────
  * Nothing here rasterizes WebGL, so it is worth saying where the slowdown
@@ -80,8 +84,9 @@ export { CI_SLOW_FACTOR };
 export const FLAT_DEFAULT_MS = 5_000;
 
 /** Budgets round up to this, so the table reads in human steps rather than in
- *  false precision inherited from one stopwatch reading. */
-export const ROUND_TO_MS = 10_000;
+ *  false precision inherited from one stopwatch reading. Equal to
+ *  {@link FLAT_DEFAULT_MS} on purpose — see the header. */
+export const ROUND_TO_MS = 5_000;
 
 /** The budget, in ms, implied by a test's measured in-container cost. */
 export function budgetMsFor(measuredSeconds: number): number {

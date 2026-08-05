@@ -134,6 +134,6 @@ describe('a radar satellite in an online match', () => {
     expect(satelliteCount(bob.world, 0)).toBe(0);
   }, netBudget({
     work: 'boot a server → seat two clients → RUSH! → complete a satellite through the sim’s own build path → wait for it on both clients → kill it → wait for the ghost to clear on both',
-    measuredSeconds: 1.5,
+    measuredSeconds: 0.5,
   }));
 });
