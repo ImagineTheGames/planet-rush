@@ -49,7 +49,7 @@ import {
 } from './steering';
 import { commit, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
-import { homeIntruder, isEngageable, isWounded, retreatThreshold } from './targeting';
+import { homeIntruder, isTargetable, isWounded, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -778,13 +778,19 @@ function tabuMineSite(ctx: BotCtx): void {
  *  cheap (GDD §1, §2.7). TUNABLE */
 export const CORE_FINAL_ASSAULT = 0.3;
 
-/** The nearest engageable ship within `range` — the thing that could be shooting
- *  at this bot. The break-off band reads it at two ranges (enter/exit), so the
- *  range is a parameter rather than a constant. */
+/** The nearest engageable **enemy** ship within `range` — the thing that could be
+ *  shooting at this bot. The break-off band reads it at two ranges (enter/exit),
+ *  so the range is a parameter rather than a constant.
+ *
+ *  Hostility comes from the one predicate ({@link isTargetable} → `hostile` →
+ *  `sim/allegiance.ts`): a teammate cannot shoot this bot (`canDamage`), so it is
+ *  not something to flee from and not something to be cornered by. Before
+ *  p16-01 a wounded TEAMS bot fled its own escort, and — worse — the cornered
+ *  branch could commit to *fighting* the teammate parked between it and home. */
 export function nearestThreat(ctx: BotCtx, range: number): PerceivedShip | null {
   let best: PerceivedShip | null = null;
   for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
+    if (!isTargetable(ship)) continue;
     if (ship.distance > range) continue;
     if (best === null || ship.distance < best.distance) best = ship;
   }
@@ -937,11 +943,13 @@ export const CORNERED_COMMIT_SECONDS = 4;
 
 /** The ship in view with this slot, if it is still worth fighting and still
  *  here. `null` covers all three ways a commitment ends on its own — it died,
- *  it was eliminated, or it broke off past the retreat band. */
+ *  it was eliminated, or it broke off past the retreat band. A teammate is never
+ *  a blockader ({@link isTargetable}): it is in the way, which is what
+ *  `go`'s obstacle avoidance is for, not something to commit to fighting. */
 function blockaderInView(ctx: BotCtx, id: PlayerId): PerceivedShip | null {
   for (const ship of ctx.view.ships) {
     if (ship.id !== id) continue;
-    if (!isEngageable(ship) || ship.distance > RETREAT_CLEAR_RANGE) return null;
+    if (!isTargetable(ship) || ship.distance > RETREAT_CLEAR_RANGE) return null;
     return ship;
   }
   return null;
