@@ -241,8 +241,18 @@ export const ROOM = {
  */
 export const UI_CUE_LEVEL = 1;
 
-/** Minimum seconds between any two cues — rule 1, "one sound per state change". */
-export const STACK_GAP_S = 0.02;
+/**
+ * Minimum seconds between any two cues — rule 1, *"one sound per state change"*.
+ *
+ * The number is chosen to mean **"the same frame"**: shorter than one 60 Hz frame
+ * (16.7 ms), so two cues raised by one handler — a press tick under a purchase,
+ * a wedge that sounds itself and a caller that sounds it again — collapse to one,
+ * while a genuinely *later* state change still gets its own voice. That matters
+ * concretely: a wheel press and the spend the sim lands a frame or two afterwards
+ * are two beats, and swallowing the second would cost the player the one cue that
+ * carries the outcome (rule 2).
+ */
+export const STACK_GAP_S = 0.012;
 
 /** Minimum seconds between two plays of the *same* cue. A hover is not a trill. */
 export const REPEAT_GAP_S = 0.05;

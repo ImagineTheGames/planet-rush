@@ -403,6 +403,20 @@ describe('rule 1 — one sound per state change, no cue stacking', () => {
     expect(cues.stackedCount).toBe(1);
   });
 
+  it('does NOT swallow the spend that lands a frame after the press', () => {
+    // The real sequence in the game: a wheel wedge sounds `press` (a pick), and
+    // the HUD raises `confirm` once the SIM has landed the spend — one or two
+    // frames later. Both are real state changes, and the second is the one that
+    // carries the outcome (rule 2), so the stacking window must be shorter than a
+    // frame. This is the test that keeps someone widening it "for safety".
+    const ctx = new FakeContext();
+    const cues = new UiCuePlayer(ctx, ctx.destination);
+    expect(cues.play('pick')).toBe(true);
+    ctx.currentTime = 1 / 60;
+    expect(cues.play('purchase')).toBe(true);
+    expect(cues.playCount).toBe(2);
+  });
+
   it('lets the next real state change through once the window has passed', () => {
     const ctx = new FakeContext();
     const cues = player(ctx);
