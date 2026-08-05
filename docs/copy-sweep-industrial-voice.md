@@ -327,6 +327,73 @@ The codex is also *prose*, not chrome. §4.7's voice governs buttons, labels, an
 refusals — the authority's own utterances. A codex entry is a document *about* the
 claim, which can reasonably keep the narrator's register. Making that explicit is Q4.
 
+### 3.9 Navigation chrome and the codex screen — the copy that lives in the *view* files
+
+The sweep above works from the model files, which is where this codebase keeps most
+of its copy. But a handful of strings are constructed directly in the `-view.ts`
+renderers and in `wheel-nav.ts` / `codex.ts`, and a model-first grep walks straight
+past them. Inventoried here so the "every player-facing string" claim is true.
+
+**Navigation chrome — every one `[HOLD]`, and the reason is one reason.**
+
+| File · line | Current | |
+|---|---|---|
+| `codex.ts:65` (`CODEX_BACK_LABEL`), `codex-view.ts:112` | `'BACK'` | `[HOLD]` |
+| `lobby-view.ts:146`, `lobby-entry-view.ts:126` | `'BACK'` | `[HOLD]` |
+| `wheel-nav.ts:82` (`HUB_BACK_LABEL`) | `'BACK'` | `[HOLD]` |
+| `wheel-nav.ts:80` (`HUB_CLOSE_LABEL`) | `'CLOSE'` | `[HOLD]` |
+| `settings-view.ts:61` | `'DONE'` | `[HOLD]` — §3.1 |
+| `settings-view.ts:59`, `lobby-entry-view.ts:129` | `'SETTINGS'` | `[HOLD]` — §3.1 |
+| `lobby-entry-view.ts:128` | `'JOIN'` (keypad submit) | `[HOLD]` |
+| `lobby-entry-view.ts:127` | `'⌫ ERASE'` | `[HOLD]` |
+| `main-menu-view.ts:50`, `lobby-entry-view.ts:112`, `lobby-view.ts:149` | `'PLANET RUSH'` | `[FIXED]` — brand, §0 |
+
+**`BACK` / `CLOSE` / `DONE` / `JOIN` / `ERASE` are verbs of navigation, not of the
+fiction.** They are the clarity rule at its least interesting and most absolute: they
+appear on every screen, a player uses them before they have read anything else, and
+there is no in-register synonym that is not worse. `RETURN`, `DISMISS`, `FILE`,
+`SUBMIT`, `RELEASE` were each considered and each loses on comprehension. The
+authority may rename the world; it does not rename the way out of a screen.
+
+Note that `JOIN` (the keypad's submit button) is distinct from `JOIN ROOM` (the door,
+§3.2, moving to `JOIN A CLAIM`). The door moves; the submit button does not. They
+are different strings in different files and it is easy to conflate them — the
+keypad button is the confirm action for a code you have already typed, and `JOIN` is
+the shortest true word for it.
+
+**The codex screen — three uninventoried strings, one of them interesting.**
+
+| File · line | Current | Proposed | |
+|---|---|---|---|
+| `codex.ts:56–59` | tabs `BOTS` / `SHIPS` / `SYSTEMS` / `STRATEGY` | *(unchanged)* | `[FIXED]` — one-to-one with `content/codex/codex-*.json` |
+| `codex-view.ts:282` | `'No entries.'` | *(unchanged)* | `[HOLD]` — already the register: flat, factual, no apology |
+| `codex-view.ts:316` | `'BY THE NUMBERS'` | `'FIGURES'` | `[OPT]` — see below, and Q9 |
+
+**`BY THE NUMBERS` is the one string in the interface that winks.** It is a magazine
+sub-head — a listicle's phrase, borrowed register, faintly pleased with itself. It
+is exactly what §4.7's "not chatty and never winking" rule describes, and it is the
+only clear instance of it I found in `src/ui/`. `FIGURES` is the plain word for a
+block of numbers and is one word shorter.
+
+It is `[OPT]` and not `[REC]` for one reason: **the codex is out of scope** (§3.8,
+Q4), and this string is codex *chrome* rather than codex *prose*, which puts it on
+the boundary the sweep drew rather than cleanly inside it. If the developer answers
+Q4 with "the voice does not retro-apply to the codex," the consistent reading is
+that its chrome still does — chrome is chrome. Recorded as **Q9** rather than
+decided, because it is the only place the two scope lines disagree.
+
+**One drift risk, same shape as §5.5.** The wordmark `'PLANET RUSH'` is written out
+three times in three view files and never reads `MAIN_MENU_TITLE`. Nothing in this
+sweep touches it — it is `[FIXED]` brand — but it is the second duplicated literal
+found in `src/ui/`, and it is worth a constant the next time somebody is in these
+files for another reason. Not this PR.
+
+**A test pattern worth copying, again.** `codex.test.ts:179` asserts
+`expect(model.backLabel).toBe(CODEX_BACK_LABEL)` — against the *constant*, not the
+literal. Like `lobby-entry.test.ts:213`'s `toContain('SOLO')` (§5.2), it pins the
+wiring without pinning the prose, and it survives any rename for free. This is the
+shape the guard tests in §6 steps 1 and 2 should take.
+
 ---
 
 ## 4. Where the voice stops — the match/machine line
@@ -514,8 +581,10 @@ recommendation alone** — it is the game's most-read string.
 
 ### Step 5 — the optionals, or not at all
 `TOTAL` → `BANKED`; `REPAIR in` → `REPAIR IN`; `DRAW` → `NO CLAIMANT`; the
-`VETERAN` tag. Each is a one-line change with a two-to-four-file test tail. Ship
-them together or skip them together; do not dribble them into unrelated PRs.
+`VETERAN` tag; and `BY THE NUMBERS` → `FIGURES` (§3.9) **if Q9 says yes** — that one
+is a single line in `codex-view.ts:316` with no test asserting on it. Each is a
+one-line change with a zero-to-four-file test tail. Ship them together or skip them
+together; do not dribble them into unrelated PRs.
 
 ### Definition of done for l2-02
 - `npx tsc --noEmit` clean; `npm test -- --run` green; the `tests/live-stage*`
@@ -562,6 +631,20 @@ them together or skip them together; do not dribble them into unrelated PRs.
 10. **`style-guide.md` is frozen and says so.** Its §8 is now stale in two ways
     (register 2 missing, "when a *planet* dies" pre-pivot), and it is still the
     Director's file. Flag, don't edit. (Q3.)
+
+11. **Copy lives in two layers, and the model layer is the one you'll think of.**
+    Most player-facing text is a constant in a model file (`lobby-entry.ts`,
+    `main-menu.ts`, `end-of-match.ts`) — but twelve strings are built inline in the
+    `-view.ts` renderers and in `wheel-nav.ts` (§3.9), where no `ENTRY_DOORS`-shaped
+    constant exists to grep for. This document's first pass missed all twelve. If
+    l2-02 renames anything, run the `makeText`/`makeButton` grep in §9 as well as the
+    model-file one, or the same blind spot recurs.
+
+12. **Don't "fix" the navigation verbs.** `BACK`, `CLOSE`, `DONE`, `JOIN`, `ERASE`
+    look like the most obviously un-industrial words in the game and they are the
+    most obviously correct ones (§3.9). They are the clarity rule's floor. An agent
+    applying the voice mechanically will reach for them first, which is why they were
+    added to §4.7's fixed-strings list once this sweep surfaced them.
 
 ---
 
@@ -622,6 +705,15 @@ them together or skip them together; do not dribble them into unrelated PRs.
    rather the trace moved too; it's a diagnostic surface, so it would be a small
    change with no clarity cost either way.*
 
+9. **Does "out of scope for the codex" cover the codex's own chrome?** The codex
+   *prose* is out of scope (Q4). But `codex-view.ts:316` renders `BY THE NUMBERS`
+   above each entry's fact block — the only clearly winking string the sweep found
+   anywhere in `src/ui/` (§3.9), and precisely what §4.7's "never winking" rule
+   names. It is chrome, not prose. *Recommendation: **yes, chrome is chrome** —
+   `BY THE NUMBERS` → `FIGURES`, shipped with step 5's optionals. It is a one-line
+   change in a view file with no test assertion on it. This is the only place the
+   sweep's two scope lines disagree, which is why it is a question and not a `[REC]`.*
+
 ---
 
 ## 9. Reproducing this inventory
@@ -643,11 +735,26 @@ grep -rn "PLAY SOLO" src/ --include=*.ts | grep -v '\.test\.ts'
 
 # How the e2e specs actually select a door (the §5.3 finding).
 grep -rn "doorPoint\|soloDoor" tests/live-stage/ tests/live-stage-online/
+
+# Copy built directly in the RENDERERS, which a model-first grep walks past (§3.9).
+grep -rnE "makeText\('|makeButton\('|Label = '|LABEL = '" src/ui/*.ts | grep -v '\.test\.ts'
+
+# Coverage check: which non-test UI modules this document never names.
+for f in $(ls src/ui/*.ts | grep -v '\.test\.ts'); do
+  grep -q "$(basename "$f")" docs/copy-sweep-industrial-voice.md || echo "UNMENTIONED: $(basename "$f")"
+done
 ```
 
 The first pattern over-matches type-union literals (`'ffa'`, `'closed'`) and
 under-matches template strings; both were reconciled by hand against the files.
 Treat it as a net, not an oracle.
+
+The last two are the ones that closed the gap. The first pass of this document was
+built model-file-first — which is where this codebase keeps most of its copy, and
+which is why it was wrong: the `makeText` grep surfaced nine navigation-chrome
+strings and the codex screen's three (§3.9), none of which appear in any model file.
+The coverage loop still reports the geometry, theme, and pure-renderer modules as
+unmentioned, which is correct — they carry no copy. Anything else it names is a hole.
 
 ---
 
@@ -655,12 +762,20 @@ Treat it as a net, not an oracle.
 
 Roughly **19 strings move.** Two headlines, three door labels, two door hints, four
 error lines, three lobby labels, four machine-copy door references, and one prompt
-line — plus five test assertions and four `menu-nav` graph edges. Perhaps 12 more sit
+line — plus five test assertions and four `menu-nav` graph edges. Perhaps 13 more sit
 in `[OPT]`.
 
-The other ~90 player-facing strings do not move, and the reason is the interesting
+The other ~100 player-facing strings do not move, and the reason is the interesting
 part: the GDD specifies most of its own UI words, the lore pivot already moved the
 nouns, and the copy that was written free-hand — the onboarding prompts, the wheel
 refusals, the ship blurbs, `'Your station falls the moment you go.'` — was written
 in this voice before anybody named it. The ratification is less a change of
 direction than a decision to stop making the exception for menus.
+
+The nine navigation-chrome strings of §3.9 are the sharpest version of that finding.
+`BACK`, `CLOSE`, `DONE`, `JOIN`, `ERASE` are the words a player uses before they have
+read a single line of fiction, and not one of them has an in-register replacement
+that is not worse. A voice pass that changes them has misunderstood which register it
+is in. That the sweep found exactly **one** winking string in the whole interface —
+`BY THE NUMBERS`, on the codex screen, out of scope — is the measurement that best
+supports the conclusion above.

@@ -63,8 +63,10 @@ amend it first, and the sweep that follows has something exact to obey.
 - **A fixed-strings list** the voice does not get to revisit: `teamName()`'s
   `FRIENDLY A` / `ENEMY B` (ratified the same day, u3-01), every §2.5 wheel label and
   upgrade track, every settings row, `RUSH!`, the §2.1 slot states, bot and ship-class
-  names, and **`HOME`** — the one deliberately warm word in the interface, load-bearing
-  on register 1 ("the pitch is a clock, and a home", §1).
+  names, **the navigation verbs** (`BACK`, `CLOSE`, `DONE`, `JOIN`, `ERASE` — the
+  clarity rule's floor, added once the sweep surfaced them), and **`HOME`** — the one
+  deliberately warm word in the interface, load-bearing on register 1 ("the pitch is
+  a clock, and a home", §1).
 
 ### Execution
 
@@ -82,6 +84,12 @@ the ship-class blurbs, and the pause-menu confirm line were written this way bef
 anybody named it. The GDD specifies most of its own UI words, and the lore pivot
 (v0.7) already moved the nouns. The ratification is less a change of direction than
 a decision to stop making the exception for menus.
+
+The strongest evidence for that: sweeping the renderer layer as well as the model
+layer turned up exactly **one** winking string in the entire interface — `BY THE
+NUMBERS`, a magazine sub-head on the codex screen, and it sits on the boundary of
+the codex scope-out rather than cleanly inside it (Q9). Everything else the renderers
+hold is navigation chrome that must not move.
 
 ### Still open (flagged, not fixed)
 
