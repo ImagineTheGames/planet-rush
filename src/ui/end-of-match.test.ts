@@ -60,7 +60,9 @@ describe('reading an outcome', () => {
 describe('the frame model', () => {
   it('headlines each end and marks Rematch primary', () => {
     const victory = endOfMatchModel(over(1, 1));
-    expect(victory.headline).toBe('VICTORY');
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(endOfMatchModel(over(2, 5)).headline).toBe('CLAIM LOST');
+    expect(endOfMatchModel(over(2, null)).headline).toBe('NO CLAIMANT');
     expect(victory.buttons[0]).toMatchObject({ id: 'rematch', primary: true });
 
     const elim = endOfMatchModel(eliminated(1));
@@ -79,6 +81,32 @@ describe('the frame model', () => {
 
   it('names the victor in a defeat’s subhead, one-based', () => {
     expect(endOfMatchModel(over(0, 4)).subhead).toContain('Player 5');
+  });
+
+  /**
+   * The condition on the in-register headlines, not a nicety. GDD §4.7's
+   * accessibility clause permits `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
+   * **only** while the line underneath states the outcome plainly — the headline
+   * may never be the sole statement of who won. If a refactor empties
+   * `subheadFor()`, this fails and the headlines must revert to plain words
+   * rather than the screen shipping an outcome the player has to infer.
+   */
+  it('never lets an in-register headline be the only statement of the outcome', () => {
+    const victory = endOfMatchModel(over(1, 1));
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(victory.subhead).toBe('You took the claim.');
+
+    const defeat = endOfMatchModel(over(1, 4));
+    expect(defeat.headline).toBe('CLAIM LOST');
+    // Says who took it — the loss is stated, not left to the headline's colour.
+    expect(defeat.subhead).toContain('took the claim');
+    expect(defeat.subhead).toContain('Player 5');
+
+    // The draw's plain line names the outcome without the fiction word, which is
+    // the clause working as written: strip "NO CLAIMANT" and the meaning survives.
+    const draw = endOfMatchModel(over(1, null));
+    expect(draw.headline).toBe('NO CLAIMANT');
+    expect(draw.subhead).toBe('No reactor survived the collapse.');
   });
 
   it('offers REMATCH + BACK TO MENU on a whole-match-over screen', () => {

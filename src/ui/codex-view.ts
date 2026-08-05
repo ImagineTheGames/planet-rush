@@ -313,7 +313,7 @@ export class CodexView extends Container {
 
     if (detail.facts.length > 0) {
       y += BLOCK_GAP;
-      y = this.placeBlock(this.detailFactsHead, 'BY THE NUMBERS', left, y, wrap, false);
+      y = this.placeBlock(this.detailFactsHead, 'FIGURES', left, y, wrap, false);
       y += 4;
       for (let i = 0; i < detail.facts.length; i++) {
         const fact = detail.facts[i];

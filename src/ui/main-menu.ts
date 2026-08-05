@@ -6,7 +6,7 @@
  * dropped the player "right in the match", so the menu was never reached.
  *
  * **PLAY opens the doors, and it is the only way in** (ratified: one play flow).
- * PLAY leads to {@link ./lobby-entry} — PLAY SOLO / CREATE ROOM / JOIN ROOM — and
+ * PLAY leads to {@link ./lobby-entry} — SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM — and
  * all three of those lead to the *same* lobby ({@link ./lobby}), offline or
  * online. Nothing on this screen builds a match world; SETTINGS opens the Day-7
  * settings screen ({@link ./settings}). The wiring lives in `src/main.ts`; this
@@ -37,7 +37,7 @@ import type { Insets } from './menu-geometry';
 /**
  * What a tap on the main menu resolves to.
  *
- * `play` opens **the doors** — PLAY SOLO / CREATE ROOM / JOIN ROOM
+ * `play` opens **the doors** — SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM
  * ({@link ./lobby-entry}) — and nothing else. It does not build a match and it no
  * longer has an offline lobby of its own: the developer ratified ONE way in
  * ("PLAY → goes to the same online menu, which already has offline play … right
@@ -65,7 +65,7 @@ export interface MainMenuItem {
  * The buttons, top to bottom. **PLAY is the only door into a match** (plasma, the
  * one primary action) and it opens the three ways in rather than one of them: the
  * ratified single play flow. There used to be a second button here — ONLINE —
- * whose screen already carried PLAY SOLO, which made PLAY a redundant shortcut to
+ * whose screen already carried the solo door, which made PLAY a redundant shortcut to
  * an offline lobby the doors screen could reach anyway; two front doors is one
  * more than a player can be told about, so the redundant one was removed rather
  * than relabelled.

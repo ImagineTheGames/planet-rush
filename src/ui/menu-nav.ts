@@ -34,22 +34,22 @@
 export type NavScreen =
   /** The front door and the one true destination — a clean boot opens here. */
   | 'main-menu'
-  /** **The doors** — the one screen PLAY opens (ratified: one play flow): PLAY SOLO
-   *  / CREATE ROOM / JOIN ROOM, and BACK (u2 menu-back). `src/ui/lobby-entry`,
+  /** **The doors** — the one screen PLAY opens (ratified: one play flow): SOLO CONTRACT
+   *  / OPEN A CLAIM / JOIN A CLAIM, and BACK (u2 menu-back). `src/ui/lobby-entry`,
    *  `screen: 'home'`. Kept named `online` because that is the screen id `main.ts`
    *  and the `__mainMenu` seam already use. */
   | 'online'
-  /** The room-code keypad reached by JOIN ROOM. `lobby-entry`, `screen: 'join'`. */
+  /** The room-code keypad reached by JOIN A CLAIM. `lobby-entry`, `screen: 'join'`. */
   | 'online-keypad'
   /** The pre-match settings screen (fire mode / controls / VFX / volume). */
   | 'settings'
   /** The CODEX reference (GDD §2.10). */
   | 'codex'
-  /** The lobby in its OFFLINE flavour (PLAY SOLO): roster, ship-class select, MAP
+  /** The lobby in its OFFLINE flavour (SOLO CONTRACT): roster, ship-class select, MAP
    *  SELECT, mode/abundance, RUSH — and BACK (u2 menu-back). `src/ui/lobby`, drawn
    *  by `openLobby` with no session. */
   | 'lobby'
-  /** The SAME lobby component, online (CREATE ROOM / JOIN ROOM): one screen, one
+  /** The SAME lobby component, online (OPEN A CLAIM / JOIN A CLAIM): one screen, one
    *  model, one view — plus the room code up top and live seats. It is a distinct
    *  *node* here for one reason only: its BACK has a room to give back, so the exit
    *  it owes is stronger than the offline one (close the socket, free the seat, let
@@ -123,7 +123,7 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // PLAY is now the ONE door into a match, and what it opens is the doors screen
   // (ratified: one play flow). It builds no world and no lobby of its own — the
   // second front door that used to live here (ONLINE) is gone, and with it the
-  // offline-lobby shortcut that made PLAY redundant with PLAY SOLO.
+  // offline-lobby shortcut that made PLAY redundant with the SOLO CONTRACT door.
   { from: 'main-menu', to: 'online', via: 'PLAY' },
   { from: 'main-menu', to: 'settings', via: 'SETTINGS' },
   { from: 'main-menu', to: 'codex', via: 'CODEX' },
@@ -131,18 +131,18 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // --- The doors (openMainMenu.applyEntryTarget / chooseEntryDoor) -------------
   // BACK leaves for the menu (closeOnline); Escape does the same on a pointer.
   { from: 'online', to: 'main-menu', via: 'BACK', escape: true },
-  { from: 'online', to: 'online-keypad', via: 'JOIN ROOM' },
-  // PLAY SOLO opens the lobby offline (chooseEntryDoor('solo') → play()).
-  { from: 'online', to: 'lobby', via: 'PLAY SOLO' },
-  // CREATE ROOM opens the SAME lobby online, host flavour: the allocator mints the
+  { from: 'online', to: 'online-keypad', via: 'JOIN A CLAIM' },
+  // SOLO CONTRACT opens the lobby offline (chooseEntryDoor('solo') → play()).
+  { from: 'online', to: 'lobby', via: 'SOLO CONTRACT' },
+  // OPEN A CLAIM opens the SAME lobby online, host flavour: the allocator mints the
   // code, the socket opens, and the room's `welcome` hands the lobby the seat.
-  { from: 'online', to: 'lobby-online', via: 'CREATE ROOM' },
+  { from: 'online', to: 'lobby-online', via: 'OPEN A CLAIM' },
 
   // --- Room-code keypad (backToDoors / Escape) --------------------------------
   { from: 'online-keypad', to: 'online', via: 'BACK', escape: true },
   // A submitted code joins the host's room and lands in the same lobby, guest
   // flavour — the seats fill live, the map and mode read-only.
-  { from: 'online-keypad', to: 'lobby-online', via: 'JOIN ROOM (code)' },
+  { from: 'online-keypad', to: 'lobby-online', via: 'JOIN A CLAIM (code)' },
 
   // --- Settings (closeSettings / Escape) --------------------------------------
   { from: 'settings', to: 'main-menu', via: 'DONE', escape: true },

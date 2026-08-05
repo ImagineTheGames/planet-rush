@@ -276,7 +276,7 @@ export interface HudFrame {
   /** Seconds left on the own station's repair COOLDOWN — the sim's
    *  `station.repairGate`, read each frame. While `> 0` the sim refuses every
    *  repair order `'cooling-down'`, so REPAIR REACTOR draws disabled-gray with a
-   *  live "REPAIR in Ns" countdown rather than a pressable "+15 HP" deal. Default
+   *  live "REPAIR IN Ns" countdown rather than a pressable "+15 HP" deal. Default
    *  0 ⇒ not cooling (the pre-cooldown behaviour). */
   readonly repairGate?: number;
 
@@ -588,7 +588,10 @@ export class Hud extends Container {
     // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
     // yellow. The heading names it as the safe bank total, distinct in both form
     // and place from the pips carried under the ship (field rule).
-    this.totalLabel = this.makeText('TOTAL', FONT_HEADING, 11, TEXT_MUTED);
+    // BANKED, not TOTAL: the squares beside it are the ore in the HOLD, so a
+    // label reading "TOTAL" invites the reading "hold + bank". GDD §2.3's own
+    // words are "banked total" (l2-02, GDD §4.7 register 2).
+    this.totalLabel = this.makeText('BANKED', FONT_HEADING, 11, TEXT_MUTED);
     this.totalLabel.y = 0;
     this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
     this.bankedText.y = TOTAL_LABEL_H;

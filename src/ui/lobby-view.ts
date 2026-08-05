@@ -153,10 +153,12 @@ export class LobbyView extends Container {
     this.backText.anchor.set(0.5, 0.5);
 
     this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 22, TEXT_PRIMARY);
-    // The room code is the thing that gets read across a classroom, so it is the
+    // The claim code is the thing that gets read across a classroom, so it is the
     // largest text on the screen after the wordmark — and it is set in the body
-    // face, because it is a code to be read character by character (§7).
-    this.roomLabel = makeText('ROOM', FONT_HEADING, 10, TEXT_DIM);
+    // face, because it is a *code* to be read character by character (§7). The
+    // noun above it moved to CLAIM with the doors (GDD §4.7); the word "code"
+    // deliberately did not — see `lobby-entry.ts` ENTRY_ERRORS.
+    this.roomLabel = makeText('CLAIM', FONT_HEADING, 10, TEXT_DIM);
     this.roomLabel.anchor.set(1, 0);
     this.roomCode = makeText('', FONT_BODY, 26, PALETTE.plasma, 'bold');
     this.roomCode.anchor.set(1, 0);
@@ -566,7 +568,7 @@ export class LobbyView extends Container {
       this.abundanceBody,
       this.abundanceText,
       this.layout.abundance,
-      `ORE · ${ABUNDANCE_LABELS[model.abundance]}`,
+      `YIELD · ${ABUNDANCE_LABELS[model.abundance]}`,
       enabled,
     );
   }
@@ -694,7 +696,15 @@ export class LobbyView extends Container {
     // The host sees the shape of the match they are about to start — the head count
     // in FFA, and the always-visible per-side tally in TEAMS (ratified: counts
     // shown, never blocking a split).
-    this.rushHint.text = counting ? '' : model.hostControls ? this.hintText(model) : 'WAITING FOR THE HOST';
+    // "Claim holder", not "host": the guest came through JOIN A CLAIM, so the
+    // claim is the noun already on screen, and "host" is the network's word for
+    // it (GDD §4.7 worked examples). Measured at 11px against the 390-wide
+    // content box before it shipped — see tests/mobile/voice-copy-fit.spec.ts.
+    this.rushHint.text = counting
+      ? ''
+      : model.hostControls
+        ? this.hintText(model)
+        : 'WAITING FOR THE CLAIM HOLDER';
     this.rushHint.visible = this.rushHint.text !== '';
     this.rushHint.x = rect.x + rect.width / 2;
     this.rushHint.y = rect.y + rect.height + 2;

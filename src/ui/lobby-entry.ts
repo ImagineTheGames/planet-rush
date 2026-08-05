@@ -4,9 +4,9 @@
  * The screen *before* {@link ./lobby}: the three ways a match is entered
  * (GDD §2.1, §4.2), and the on-screen pad a room code is typed on.
  *
- *   PLAY SOLO     no server, no code to read out — bots fill all eight seats.
- *   CREATE ROOM   a fresh code, generated here and shown for the room to read.
- *   JOIN ROOM     type the code somebody else is holding up.
+ *   SOLO CONTRACT  no server, no code to read out — bots fill all eight seats.
+ *   OPEN A CLAIM   a fresh code, generated here and shown for the room to read.
+ *   JOIN A CLAIM   type the code somebody else is holding up.
  *
  * **This is the one and only front door** (ratified: one play flow). The main
  * menu's PLAY opens *this* screen — there is no second entry point that skips it —
@@ -95,19 +95,19 @@ export interface EntryDoorOption {
 export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
   {
     door: 'solo',
-    label: 'PLAY SOLO',
-    hint: 'Set up the match. Bots fill the seats, no connection needed.',
+    label: 'SOLO CONTRACT',
+    hint: 'Work the claim alone. Bots hold the other seats. No connection needed.',
     needsNetwork: false,
   },
   {
     door: 'create',
-    label: 'CREATE ROOM',
-    hint: 'Set up the match and read the code out. They join you.',
+    label: 'OPEN A CLAIM',
+    hint: 'Open the claim and read the code out. They join you.',
     needsNetwork: true,
   },
   {
     door: 'join',
-    label: 'JOIN ROOM',
+    label: 'JOIN A CLAIM',
     hint: 'Type the code somebody is holding up.',
     needsNetwork: true,
   },
@@ -192,14 +192,18 @@ export interface EntryResult {
  *  never as an error code — a player who cannot read the message cannot act. */
 export const ENTRY_ERRORS = {
   /** A submit with fewer than {@link ROOM_CODE_LENGTH} characters. */
-  short: `A room code is ${ROOM_CODE_LENGTH} characters.`,
-  /** The server has no such room (it creates unknown codes, so this is a typo
-   *  the server declined rather than a room that vanished). */
-  unknown: 'No room with that code. Check it and try again.',
+  short: `A claim code is ${ROOM_CODE_LENGTH} characters.`,
+  /** The server has no such claim (it creates unknown codes, so this is a typo
+   *  the server declined rather than a claim that vanished).
+   *
+   *  Duplicated verbatim in `./online-copy` `ONLINE_COPY.notFound` — the two must
+   *  agree, and `lobby-entry.test.ts` pins that they do. */
+  unknown: 'No claim with that code. Check it and try again.',
   /** Eight seats, all taken (`./lobby` LOBBY_SLOTS). */
-  full: 'That room is full. Ask for a rematch, or play solo.',
-  /** No server, or no internet. Names the door that still works. */
-  offline: 'Cannot reach the server. PLAY SOLO still works.',
+  full: 'That claim is full. Ask for a rematch, or take a solo contract.',
+  /** No server, or no internet. Names the door that still works — so it moves
+   *  whenever {@link DOOR_OPTIONS} does (`voice-door-labels.test.ts`). */
+  offline: 'Cannot reach the server. SOLO CONTRACT still works.',
 } as const;
 
 /** A fresh entry screen: the home doors, nothing typed, nothing wrong. */
@@ -322,7 +326,7 @@ export function entryConnected(): EntryState {
  * The three failures the M3 brief keeps apart get three different sentences
  * calling for three different actions (never one "connection failed"): the fleet
  * is full (retry later), no room has that code (fix the code), or the servers
- * cannot be reached (retry, and PLAY SOLO still works). The mapping itself lives
+ * cannot be reached (retry, and SOLO CONTRACT still works). The mapping itself lives
  * in {@link ./online-copy} so this door and the in-match connection overlay say
  * the same words for the same reason.
  */
@@ -396,7 +400,7 @@ export interface EntryModel {
  * last step *is* the failure, said exactly (`REFUSED: bad-ticket — machine
  * mismatch`), and two sentences about one refusal is the duplicate surface this
  * whole change exists to delete. With no narration the screen behaves exactly as it
- * always has, which is what PLAY SOLO and a mistyped room code still want.
+ * always has, which is what SOLO CONTRACT and a mistyped room code still want.
  */
 export function entryModel(state: EntryState, narration: EntryNarration | null = null): EntryModel {
   const live = entryLive(state);
@@ -442,5 +446,5 @@ export const ENTRY_TAGLINE = 'MINE · DEFEND · ATTACK';
  */
 function entryPrompt(state: EntryState): string {
   if (state.status === 'connecting') return 'CONNECTING…';
-  return state.screen === 'join' ? 'ENTER THE ROOM CODE' : ENTRY_TAGLINE;
+  return state.screen === 'join' ? 'ENTER THE CLAIM CODE' : ENTRY_TAGLINE;
 }

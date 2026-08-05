@@ -369,16 +369,16 @@ describe('the repair COOLDOWN wedge — no ready-looking press that does nothing
     expect(segmentState('repair', cooling(REPAIR_COOLDOWN_SECONDS))).toBe('inactive');
   });
 
-  it('counts the cooldown down live in the wedge copy — "REPAIR in Ns", read off sim state', () => {
+  it('counts the cooldown down live in the wedge copy — "REPAIR IN Ns", read off sim state', () => {
     // The copy is the CEILING of the sim's remaining seconds (no UI timer, p4-17),
     // so it never reads 0 while the press is still locked. QA's attested frame: 1.63 s
-    // into the cooldown reads "REPAIR in 2s", not a "+15 HP" deal.
-    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS)).line).toBe(`REPAIR in ${REPAIR_COOLDOWN_SECONDS}s`);
-    expect(repairWedgeInfo(cooling(13.37)).line).toBe('REPAIR in 14s');
-    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS - 1.63)).line).toBe('REPAIR in 14s');
-    expect(repairWedgeInfo(cooling(1.63)).line).toBe('REPAIR in 2s');
+    // into the cooldown reads "REPAIR IN 2s", not a "+15 HP" deal.
+    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS)).line).toBe(`REPAIR IN ${REPAIR_COOLDOWN_SECONDS}s`);
+    expect(repairWedgeInfo(cooling(13.37)).line).toBe('REPAIR IN 14s');
+    expect(repairWedgeInfo(cooling(REPAIR_COOLDOWN_SECONDS - 1.63)).line).toBe('REPAIR IN 14s');
+    expect(repairWedgeInfo(cooling(1.63)).line).toBe('REPAIR IN 2s');
     // A sub-second sliver still reads "1s" — never a bare "0s" that looks ready.
-    expect(repairWedgeInfo(cooling(0.0001)).line).toBe('REPAIR in 1s');
+    expect(repairWedgeInfo(cooling(0.0001)).line).toBe('REPAIR IN 1s');
     expect(repairCooldownSeconds(cooling(0.0001))).toBe(1);
   });
 
@@ -416,7 +416,7 @@ describe('the repair COOLDOWN wedge — no ready-looking press that does nothing
     expect(repairWedgeInfo(cooling(9, { collapsed: true })).line).toBe('NO REPAIR');
     // But cooldown DOES outrank affordability: a broke, cooling core reads the
     // countdown (the sim refuses `cooling-down` before it ever checks the bank).
-    expect(repairWedgeInfo(cooling(9, { banked: 0, cargo: 0 })).line).toBe('REPAIR in 9s');
+    expect(repairWedgeInfo(cooling(9, { banked: 0, cargo: 0 })).line).toBe('REPAIR IN 9s');
     expect(stateOf('repair', { banked: 0, cargo: 0, coreHp: 50, maxCoreHp: 100, repairGate: 9 })).toBe('inactive');
   });
 });

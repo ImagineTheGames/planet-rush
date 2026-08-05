@@ -14,6 +14,11 @@ import {
   screenExits,
   type NavScreen,
 } from './menu-nav';
+import { DOOR_OPTIONS } from './lobby-entry';
+
+/** A door's label, read from the one file that authors it. */
+const doorLabel = (door: 'solo' | 'create' | 'join'): string =>
+  DOOR_OPTIONS.find((d) => d.door === door)!.label;
 
 describe('the navigation graph is well-formed', () => {
   it('lists each screen exactly once', () => {
@@ -94,10 +99,16 @@ describe('ONE play flow: PLAY opens the doors, and every door lands in the lobby
     expect(NAV_EDGES.some((e) => e.from === 'main-menu' && e.to === 'lobby-online')).toBe(false);
   });
 
-  it('reaches the offline lobby from PLAY SOLO and the online one from CREATE / JOIN', () => {
+  it('reaches the offline lobby from the solo door and the online one from open / join', () => {
+    // Asserted against DOOR_OPTIONS, not against the words: this graph is
+    // hand-authored and its `via` labels are a second, untested copy of the door
+    // names (copy-sweep trap 3). Reading the constant means a door rename either
+    // updates both or fails here — it can no longer half-land and leave the map
+    // describing buttons that do not exist.
     const doors = NAV_EDGES.filter((e) => e.from === 'online' || e.from === 'online-keypad');
-    expect(doors.some((e) => e.via === 'PLAY SOLO' && e.to === 'lobby')).toBe(true);
-    expect(doors.some((e) => e.via === 'CREATE ROOM' && e.to === 'lobby-online')).toBe(true);
+    expect(doors.some((e) => e.via === doorLabel('solo') && e.to === 'lobby')).toBe(true);
+    expect(doors.some((e) => e.via === doorLabel('create') && e.to === 'lobby-online')).toBe(true);
+    expect(doors.some((e) => e.via === doorLabel('join') && e.to === 'online-keypad')).toBe(true);
     expect(doors.some((e) => e.from === 'online-keypad' && e.to === 'lobby-online')).toBe(true);
   });
 

@@ -122,10 +122,24 @@ export interface EndOfMatchModel {
   readonly buttons: readonly EndButtonView[];
 }
 
+/**
+ * The four end-screen headlines, in the interface voice (GDD §4.7 register 2):
+ * the authority files a win and a loss in the same sentence shape and does not
+ * congratulate either. `VICTORY` / `DEFEAT` were the scoreboard words the
+ * ratification was aimed at.
+ *
+ * The swap is legal **only** because {@link subheadFor} states the outcome
+ * plainly underneath — §4.7's accessibility clause permits an in-register
+ * headline only above a plain one. `end-of-match.test.ts` encodes that as a
+ * guard: if a future edit empties the subhead, the headline must revert.
+ *
+ * `ELIMINATED` stays: it is plain, it does not celebrate, and the in-register
+ * alternative (`CONTRACT TERMINATED`) is the corporate joke §4.7 forbids.
+ */
 const HEADLINES: Record<EndKind, string> = {
-  victory: 'VICTORY',
-  defeat: 'DEFEAT',
-  draw: 'DRAW',
+  victory: 'CLAIM HELD',
+  defeat: 'CLAIM LOST',
+  draw: 'NO CLAIMANT',
   eliminated: 'ELIMINATED',
 };
 

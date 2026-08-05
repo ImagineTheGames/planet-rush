@@ -206,7 +206,7 @@ export class LobbyEntryView extends Container {
     }
 
     // SETTINGS lives in the same band, but only on the home screen. Steel, never
-    // plasma: PLAY SOLO is the screen's affirmative action, not this.
+    // plasma: SOLO CONTRACT is the screen's affirmative action, not this.
     setVisible(home, this.settings.body, this.settings.label);
     if (home) this.drawButton(this.settings, this.layout.settings, !model.connecting, false);
   }
