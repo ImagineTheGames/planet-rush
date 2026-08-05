@@ -12,19 +12,19 @@
         {
           "id": "a",
           "wav": "previews/rockChip/a.wav",
-          "character": "dry brittle tick",
+          "character": "blunt dry tick, low",
           "params": "src/art/audio/candidates.ts#rockChip.a"
         },
         {
           "id": "b",
           "wav": "previews/rockChip/b.wav",
-          "character": "grinding rasp scrape",
+          "character": "deep slow grinding rasp",
           "params": "src/art/audio/candidates.ts#rockChip.b"
         },
         {
           "id": "c",
           "wav": "previews/rockChip/c.wav",
-          "character": "sharp crisp crack",
+          "character": "heavy low crack, punchy",
           "params": "src/art/audio/candidates.ts#rockChip.c"
         }
       ]
@@ -603,7 +603,7 @@
     },
     {
       "id": "stationDeath",
-      "label": "Station Death",
+      "label": "MiningStation Death",
       "context": "A station dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
       "current": "previews/stationDeath/current.wav",
       "candidates": [

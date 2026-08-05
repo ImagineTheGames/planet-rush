@@ -84,6 +84,34 @@ describe('sound-review candidates', () => {
     }
   });
 
+  it('keeps every rockChip candidate below the tone that was denied (s4-01)', () => {
+    // The developer denied all three rockChip candidates with one note — "almost
+    // there, but they should be lower in tone" — so the re-offer's whole point is
+    // a number: each candidate's spectral centre. Zero crossings stand in for it,
+    // the same cheap proxy `./audio.test.ts` uses for rock-vs-hull, measured over a
+    // fixed window so a long rasp and a short tick are compared on equal terms.
+    // The denied trio measured 0.049 / 0.036 / 0.070 in this window; the re-offer
+    // measures 0.017 / 0.012 / 0.031. The ceiling sits under the *darkest* thing
+    // that was denied, so no future edit can drift a candidate back up into the
+    // range the note rejected.
+    const CEILING = 0.034;
+    const rate = (spec: SoundSpec): number => {
+      const buf = render(spec);
+      const from = Math.round(0.003 * 44100); // past the attack transient
+      const to = Math.min(buf.length, from + 2048);
+      let n = 0;
+      for (let i = from + 1; i < to; i++) if ((buf[i]! >= 0) !== (buf[i - 1]! >= 0)) n++;
+      return n / Math.max(1, to - from);
+    };
+    for (const c of CANDIDATE_SLOTS.rockChip!.candidates) {
+      expect(rate(c.spec), `rockChip/${c.id} is not lower in tone`).toBeLessThan(CEILING);
+    }
+    // And still a real choice rather than three takes on one idea: the brightest of
+    // the three sits at least half again above the darkest.
+    const rates = CANDIDATE_SLOTS.rockChip!.candidates.map((c) => rate(c.spec));
+    expect(Math.max(...rates)).toBeGreaterThan(Math.min(...rates) * 1.5);
+  });
+
   it('the committed manifest matches the source', () => {
     const manifest = JSON.parse(readFileSync('sound-review/manifest.json', 'utf8')) as {
       slots: { id: string; candidates: { id: string; params: string }[] }[];
