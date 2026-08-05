@@ -107,9 +107,41 @@ export interface OwnStationView {
   readonly shieldHp: number;
   readonly shields: number;
   readonly turrets: number;
-  /** Jobs still under construction (GDD §2.5). */
+  /** Live radar satellites orbiting this station (feature f1, cap 1). Own-station
+   *  knowledge: it is a body orbiting your own home, in plain sight. */
+  readonly satellites: number;
+  /** Jobs still under construction, all kinds (GDD §2.5). */
   readonly builds: number;
+  /**
+   * Queued construction **by kind** — turrets, shields, satellites.
+   *
+   * A tree plans against `standing + queued < target`, and the *kind* matters:
+   * with only the total, a shield 15 seconds from completion reads as a turret
+   * already on order, so a bot with a hole in its turret ring sits on the ore and
+   * waits for a job that will never fill the hole (`./behaviors` `structureGap`).
+   * The sim counts its caps this way too (`turretCount`/`shieldCount`/
+   * `satelliteCount` in `sim/buildings.ts`) — this is the same arithmetic, on the
+   * bot's side of the fog.
+   */
+  readonly turretsBuilding: number;
+  readonly shieldsBuilding: number;
+  readonly satellitesBuilding: number;
+  /** The repair TELL (GDD §2.5): a patch was bought recently and the glow is
+   *  still lit. Signalling only — it is {@link repairReadyIn} that decides
+   *  whether the next press is accepted. */
   readonly repairing: boolean;
+  /**
+   * Seconds until this station's REPAIR wedge re-arms, `0` when it is ready
+   * (RATIFIED developer, 2026-07-28: a 15-second per-station repair cooldown).
+   *
+   * Public information by construction — the wheel counts it down in words on
+   * the owner's own screen ("REPAIR in 12s"), so a bot reading it is reading its
+   * own HUD, not the world. It is the gate that actually refuses a press
+   * (`sim/buildings.ts` `placeOrder` → `'cooling-down'`); the `repairing` tell
+   * above releases at half that, so a tree that paced off the tell alone spent
+   * the back half of every cooldown filing orders the sim threw away.
+   */
+  readonly repairReadyIn: number;
   readonly sinceDamage: number;
   /** The alarm (GDD §2.2): something has been hitting home recently. */
   readonly underAttack: boolean;
@@ -275,6 +307,14 @@ function stationIn(world: World, id: PlayerId): MiningStation | null {
  * permanently (GDD §2.2).
  */
 function ownStationView(station: MiningStation, from: Vec2, env: Perception): OwnStationView {
+  let turretsBuilding = 0;
+  let shieldsBuilding = 0;
+  let satellitesBuilding = 0;
+  for (const job of station.builds) {
+    if (job.kind === 'turret') turretsBuilding++;
+    else if (job.kind === 'shield') shieldsBuilding++;
+    else if (job.kind === 'satellite') satellitesBuilding++;
+  }
   return {
     pos: { x: station.pos.x, y: station.pos.y },
     radius: station.radius,
@@ -284,8 +324,13 @@ function ownStationView(station: MiningStation, from: Vec2, env: Perception): Ow
     shieldHp: shieldPool(station),
     shields: station.shields.length,
     turrets: station.turrets.length,
+    satellites: station.satellites?.length ?? 0,
     builds: station.builds.length,
+    turretsBuilding,
+    shieldsBuilding,
+    satellitesBuilding,
     repairing: station.repairing,
+    repairReadyIn: Math.max(0, station.repairGate ?? 0),
     sinceDamage: station.sinceDamage,
     underAttack: station.alive && station.sinceDamage < env.alarmWindow,
     distance: distance(from, station.pos),
