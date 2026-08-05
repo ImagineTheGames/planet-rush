@@ -31,8 +31,8 @@
  */
 
 import { UpgradeTrack } from '@shared/types';
-import { SHIELD, TURRET, nextUpgradeCost } from '../sim';
-import type { Purchase } from './behaviors';
+import { TURRET, nextUpgradeCost } from '../sim';
+import type { DefencePlan, Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
   attack,
@@ -40,20 +40,24 @@ import {
   coreUnderFinalAssault,
   defendHome,
   haulHome,
+  homeErrand,
   hunt,
   fightBlockade,
   lastStandDefend,
   mine,
   nearestThreat,
   order,
-  repairTargetFraction,
+  rebuildOrder,
   retreat,
   roam,
+  satelliteTarget,
   scavenge,
   spendAtHome,
   suppressTurrets,
   upgrade,
+  wantsCorePatch,
   wantsCorneredFight,
+  wantsHomeErrand,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -74,6 +78,24 @@ export const HARD_TURRET_TARGET = 2;
 export const HARD_SHIELD_TARGET = 1;
 /** Core fraction below which it spends a trip home on repairs. TUNABLE */
 export const HARD_REPAIR_AT = 0.75;
+
+/**
+ * What a Hard bot keeps standing at home: a working minimum of guns and one
+ * bubble, plus — for the territorial half of the tier — a **radar satellite**.
+ *
+ * Hard is the tier that thinks about the whole board (see the file header), so it
+ * is the tier that buys the board-scale sensor; `satelliteTarget` then leaves it
+ * to the character, which among the Hard three means Warden and only Warden
+ * (`homebody` 0.55, against Vulture's 0.4 and Sable's 0.2). Easy and Medium buy
+ * guns and hulls instead, and say so in their own `*Defence`.
+ */
+export function hardDefence(ctx: BotCtx): DefencePlan {
+  return {
+    turrets: HARD_TURRET_TARGET,
+    shields: HARD_SHIELD_TARGET,
+    satellites: satelliteTarget(ctx),
+  };
+}
 
 /**
  * The ladder a Hard bot climbs, in order (GDD §2.5). DAMAGE (`Power`) leads
@@ -106,32 +128,28 @@ export function hardSpendPlan(ctx: BotCtx): Purchase | null {
   const spendable = ctx.self.spendable;
 
   // Under siege right now: a turret is the only purchase that helps, and only
-  // if there is a slot for it. Everything else waits.
+  // if there is a slot for it. Everything else waits. Queued turrets counted BY
+  // KIND (p15-02): a shield half-built used to read as a gun already on order, at
+  // the exact moment the guns are the only thing that helps.
   if (station.underAttack) {
-    if (station.turrets + station.builds < TURRET.capPerStation && spendable >= TURRET.cost) {
+    if (station.turrets + station.turretsBuilding < TURRET.capPerStation && spendable >= TURRET.cost) {
       return order('turret');
     }
     return null;
   }
 
-  if (station.turrets + station.builds < HARD_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
+  // Guns first, then the patch, then the bubble and (for a homesteader) the
+  // sensor — a Hard bot plugs a hole in its ring before it heals, because the
+  // ring is what stops the next hole (GDD §2.6). `rebuildOrder` is asked twice
+  // for exactly that: once for the turrets it puts at the head of the list, once
+  // for everything behind the repair.
+  const guns = rebuildOrder(ctx, { turrets: HARD_TURRET_TARGET, shields: 0, satellites: 0 });
+  if (guns) return guns;
 
-  if (
-    !ctx.view.collapsed &&
-    !station.repairing &&
-    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, HARD_REPAIR_AT) &&
-    spendable >= 2
-  ) {
-    return order('repair');
-  }
+  if (wantsCorePatch(ctx, HARD_REPAIR_AT)) return order('repair');
 
-  if (
-    station.turrets >= 1 &&
-    station.shields + station.builds < HARD_SHIELD_TARGET &&
-    spendable >= SHIELD.cost
-  ) {
-    return order('shield');
-  }
+  const rebuild = rebuildOrder(ctx, hardDefence(ctx));
+  if (rebuild) return rebuild;
 
   for (const track of HARD_UPGRADE_ORDER) {
     const cost = nextUpgradeCost(ctx.self, track);
@@ -249,6 +267,25 @@ export const hardTree: Node = selector('hard', [
       }
       return attack(ctx, target);
     },
+  ),
+
+  // Go home ON PURPOSE to patch the core (p15-02) — the errand a bot that only
+  // ever spent while docked-for-something-else did not have. Two deliberate
+  // narrowings, and both are the same sentence of GDD §2.9: *a Hard bot plays
+  // like a good human.*
+  //
+  //  - **The core only** (`null` plan — see `wantsHomeErrand`). A good human
+  //    swings home to patch the thing that ends the match, and replaces a shot-off
+  //    turret on the next trip home rather than flying one for it; the spend plan
+  //    already rebuilds the ring every time this bot docks for any reason.
+  //  - **Below the attack.** A target that has already cleared `hardAttackFloor`
+  //    is by construction worth more than an errand. Both narrowings are also
+  //    measured: with either one dropped, an all-Hard cast turns *inward* enough
+  //    to move the standing appetite A/B in `tests/harness/player-aggression.test.ts`.
+  when(
+    'fix-base',
+    (ctx) => wantsHomeErrand(ctx, HARD_REPAIR_AT, null),
+    (ctx) => homeErrand(ctx),
   ),
 
   // Collapse, and nothing in sight: go and find the last rival (`./behaviors`).

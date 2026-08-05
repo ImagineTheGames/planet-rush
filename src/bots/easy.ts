@@ -24,8 +24,7 @@
  */
 
 import { UpgradeTrack } from '@shared/types';
-import { SHIELD, TURRET } from '../sim';
-import type { Purchase } from './behaviors';
+import type { DefencePlan, Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
   corneredBlockader,
@@ -34,17 +33,20 @@ import {
   engage,
   haulHome,
   fightBlockade,
+  homeErrand,
   lastStandDefend,
   mine,
   nearestThreat,
   order,
-  repairTargetFraction,
+  rebuildOrder,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   upgrade,
+  wantsCorePatch,
   wantsCorneredFight,
+  wantsHomeErrand,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -69,20 +71,15 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   // not topped to full: even timid Rusty stops short of the ceiling so a field
   // of turtles does not reach collapse at one identical HP (`repairTargetFraction`,
   // p5-repair-discrete). Rusty (caution 1.3) patches early; Bolt (0.5) rarely.
-  if (
-    !ctx.view.collapsed &&
-    !station.repairing &&
-    !station.underAttack &&
-    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, EASY_REPAIR_AT) &&
-    spendable >= 1
-  ) {
-    return order('repair');
-  }
+  // The whole gate now lives in `wantsCorePatch`, which also refuses a press the
+  // sim's 15-second cooldown would throw away (p15-02).
+  if (wantsCorePatch(ctx, EASY_REPAIR_AT)) return order('repair');
 
-  // Guns, then the bubble. Jobs in progress count against the target so a bot
-  // does not queue four turrets in four consecutive decisions.
-  if (station.turrets + station.builds < EASY_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
-  if (station.shields + station.builds < EASY_SHIELD_TARGET && spendable >= SHIELD.cost) return order('shield');
+  // Guns, then the bubble. Queued jobs count against the target BY KIND, so a
+  // shield fifteen seconds from done can no longer read as a turret already on
+  // order and stall a rebuild (`rebuildOrder`, p15-02).
+  const rebuild = rebuildOrder(ctx, easyDefence(ctx));
+  if (rebuild) return rebuild;
 
   // Held ore is not safe ore (GDD §2.3). Bank before flying out again.
   if (ctx.self.cargo > 1e-9) return order('bank');
@@ -90,6 +87,17 @@ export function easySpendPlan(ctx: BotCtx): Purchase | null {
   // Fully turtled and still rich: widen the hold, so the next trip is worth more.
   if (spendable >= EASY_UPGRADE_FLOOR) return upgrade(UpgradeTrack.Cargo);
   return null;
+}
+
+/**
+ * What an Easy bot keeps standing at home: three guns and a bubble, and **no
+ * radar satellite**. Easy is "safe and poor" — its documented ladder is guns,
+ * bubble, hold (`./easy.test.ts`), and a 6-ore strategic sensor is two turrets it
+ * would rather have. The dish belongs to the tier that plays the whole board
+ * (`./hard` `hardDefence`).
+ */
+export function easyDefence(_ctx: BotCtx): DefencePlan {
+  return { turrets: EASY_TURRET_TARGET, shields: EASY_SHIELD_TARGET, satellites: 0 };
 }
 
 /** Base core fraction below which an Easy bot patches its core, before the
@@ -158,6 +166,17 @@ export const easyTree: Node = selector('easy', [
 
   // Hold full enough: take it home. Easy characters run shallow holds.
   when('haul', (ctx) => wantsToHaul(ctx), (ctx) => haulHome(ctx)),
+
+  // Go home ON PURPOSE to patch the core or plug a hole in the ring (p15-02).
+  // An over-defender that only ever spent when it happened to be docked was an
+  // over-defender in name only: it carried the ore for the turret it needed
+  // around the field instead (`wantsHomeErrand`). Below `haul`, because a full
+  // hold is already flying the same way.
+  when(
+    'fix-base',
+    (ctx) => wantsHomeErrand(ctx, EASY_REPAIR_AT, easyDefence(ctx)),
+    (ctx) => homeErrand(ctx),
+  ),
 
   // "attacks rarely": only a character with a real attack weight, and only at
   // something already in front of it.
