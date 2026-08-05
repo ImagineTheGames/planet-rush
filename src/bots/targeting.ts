@@ -20,6 +20,22 @@
  * `PerceivedShip`/`PerceivedStation` field or a memo taken from one. An unscouted
  * core reads as `null` and the score falls back to an *assumption* — which is
  * exactly what a player does, and exactly why scouting is worth the trip.
+ *
+ * **And nothing in this file decides who the enemy is.** Every friend/foe
+ * question here — the intruder in the alarm ring, the nearest engageable ship,
+ * the hostile on a mining corridor, the home worth besieging, the "leader" to
+ * gang up on — is {@link isFoe}, which reads the `hostile` stamp `./perception`
+ * takes from `sim/allegiance.ts`'s `areEnemies`. That module is by its own header
+ * *"the ONE friend/foe predicate"*, so this layer owns no second notion of
+ * hostility and must never grow one: FFA vs TEAMS is a difference in the `team`
+ * table, not a difference in any code path here.
+ *
+ * Before p16-01 these functions were merely *named* for hostility and asked only
+ * "is that another ship?". In FFA that is the same set — teams-of-one makes
+ * `areEnemies` reduce to `a !== b` — which is why every gate stayed green while a
+ * TEAMS bot chased its own teammates (developer report, "team B bots was
+ * attacking each other"). Self-immunity comes free from the `a === b`
+ * short-circuit inside `areEnemies`; it is not re-implemented here.
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
@@ -107,11 +123,36 @@ export function isWounded(ctx: BotCtx): boolean {
 // Reading the field
 // ---------------------------------------------------------------------------
 
+/**
+ * **Is that a foe?** The single question, asked the single way: the `hostile`
+ * stamp `./perception` takes from `sim/allegiance.ts`'s `areEnemies`. Ships and
+ * homes both carry it, so one predicate covers both kinds of target and the two
+ * can never disagree about a slot.
+ *
+ * A bare field read, deliberately a *named function* anyway: it is the seam where
+ * this layer's hostility question meets the sim's answer, and a named seam is
+ * what makes "did we route this through allegiance?" a grep rather than an audit.
+ */
+export function isFoe(seen: { readonly hostile: boolean }): boolean {
+  return seen.hostile;
+}
+
 /** Can this ship be hurt at all right now? Spawn protection is a visible glow
  *  (style-guide §8), so reading it is fair; out of range it is `null` and the
- *  bot assumes the worst about its own information, not the best. */
+ *  bot assumes the worst about its own information, not the best.
+ *
+ *  **Allegiance is a separate question** ({@link isFoe}) and every caller asks
+ *  both: this one is about the target's *state*, not its *side*, and folding the
+ *  two together here would hide a friendly-fire gate inside a spawn-protection
+ *  check. */
 export function isEngageable(ship: PerceivedShip): boolean {
   return ship.alive && !ship.eliminated && ship.spawnProtected !== true;
+}
+
+/** Engageable **and** an enemy — the full "may I shoot this?" test, and what
+ *  every ship-picking function below filters on. */
+export function isTargetable(ship: PerceivedShip): boolean {
+  return isFoe(ship) && isEngageable(ship);
 }
 
 /** How threatening a hull looks on sight (GDD §2.11 roles). The Interceptor
@@ -142,14 +183,18 @@ export function homeProximity(ctx: BotCtx, pos: Vec2): number {
 }
 
 /** The nearest enemy ship inside the home alarm ring — the intruder a defender
- *  turns to meet (GDD §2.6: "turrets deter; the ship defends"). */
+ *  turns to meet (GDD §2.6: "turrets deter; the ship defends").
+ *
+ *  An **intruder is a foe**: a teammate flying home to dock is the most ordinary
+ *  sight in a TEAMS match, and before p16-01 it was what a defending bot turned
+ *  and opened fire on (repro, slot 5 vs slot 4). */
 export function homeIntruder(ctx: BotCtx): PerceivedShip | null {
   const station = ctx.self.station;
   if (!station) return null;
   let best: PerceivedShip | null = null;
   let bestD = HOME_ALARM_RANGE;
   for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
+    if (!isTargetable(ship)) continue;
     const d = dist(station.pos, ship.pos);
     if (d < bestD) {
       bestD = d;
@@ -159,11 +204,12 @@ export function homeIntruder(ctx: BotCtx): PerceivedShip | null {
   return best;
 }
 
-/** The nearest engageable enemy ship, at any range in view. */
+/** The nearest engageable **enemy** ship, at any range in view — an ally is not
+ *  a candidate however close it is ({@link isTargetable}). */
 export function nearestEnemy(ctx: BotCtx): PerceivedShip | null {
   let best: PerceivedShip | null = null;
   for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
+    if (!isTargetable(ship)) continue;
     if (best === null || ship.distance < best.distance) best = ship;
   }
   return best;
@@ -205,12 +251,18 @@ function segmentDist(a: Vec2, b: Vec2, p: Vec2): number {
  * shrinking toward `1 / (1 + PATH_THREAT_PENALTY)` as a ship closes on the line
  * the miner would fly. The worst single hostile sets it — a corridor with two
  * threats is not twice as bad as one, it is just blocked (p11).
+ *
+ * **Only a foe spoils a corridor** ({@link isTargetable}). A teammate on its own
+ * mining run cannot open fire on this bot, so counting it as a threat divided a
+ * perfectly good field's score by up to four and sent the bot somewhere worse —
+ * in TEAMS, where allies spawn adjacent and therefore mine the same fields, that
+ * was most of them (p16-01).
  */
 function pathClearance(ctx: BotCtx, to: Vec2): number {
   const from = ctx.self.pos;
   let worst = 0;
   for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
+    if (!isTargetable(ship)) continue;
     const d = segmentDist(from, to, ship.pos);
     if (d >= PATH_THREAT_RADIUS) continue;
     const near = 1 - d / PATH_THREAT_RADIUS;
@@ -339,7 +391,10 @@ function total(
  *    term is "the miner far from home", spelled arithmetically.
  *
  * A spawn-protected ship scores zero opportunity: it cannot be hurt, so hitting
- * it is not an opportunity, it is a waste of a shot (GDD §2.1).
+ * it is not an opportunity, it is a waste of a shot (GDD §2.1). **An ally scores
+ * zero outright** ({@link isTargetable}) — gated here, and not only in
+ * {@link bestTarget}, so a tier that scores one candidate by hand (Medium's
+ * `mediumTarget`) gets the same answer as one that scores the whole board.
  */
 export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
   const threat = clamp01(
@@ -352,8 +407,8 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
   const wounded = ship.hull !== null ? 1 - clamp01(ship.hull / Math.max(1e-9, ship.maxHull)) : 0.25;
   const home = ctx.memory.station(ship.id);
   const exposed = home ? clamp01(dist(home.pos, ship.pos) / EXPOSED_RANGE) : 0.5;
-  const engageable = isEngageable(ship);
-  const opportunity = engageable ? clamp01(0.55 * wounded + 0.45 * exposed) : 0;
+  const targetable = isTargetable(ship);
+  const opportunity = targetable ? clamp01(0.55 * wounded + 0.45 * exposed) : 0;
   const worth = ctx.view.collapsed ? COLLAPSE_SHIP_DISCOUNT : 1;
 
   return {
@@ -365,7 +420,7 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
     threat,
     proximity,
     opportunity,
-    score: engageable ? worth * total(ctx.weights, threat, proximity, opportunity) : 0,
+    score: targetable ? worth * total(ctx.weights, threat, proximity, opportunity) : 0,
   };
 }
 
@@ -383,7 +438,10 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
  *    memory is worth something and a ten-second-old read is worth less.
  *
  * A wreck scores zero — it has no core left to kill (GDD §2.7). Its *debris* is
- * a separate, scavenger-shaped errand (`./behaviors`).
+ * a separate, scavenger-shaped errand (`./behaviors`). **An ally's home scores
+ * zero** for the same reason a wreck does: there is no win in it. Killing a
+ * teammate's core would hand the match to the other side, and the sim would not
+ * let the shots land anyway (`canDamage`).
  */
 export function scoreStation(ctx: BotCtx, station: PerceivedStation): TargetScore {
   const memo = ctx.memory.station(station.owner);
@@ -410,7 +468,7 @@ export function scoreStation(ctx: BotCtx, station: PerceivedStation): TargetScor
   // Spawn protection is match-start-wide and the match clock is public (GDD §2.2
   // — the wave clock), so a bot knows without peeking that nothing is crackable
   // in the opening seconds.
-  const crackable = station.alive && ctx.view.time >= SPAWN_PROTECTION_S;
+  const crackable = isFoe(station) && station.alive && ctx.view.time >= SPAWN_PROTECTION_S;
   const opportunity = crackable
     ? clamp01(0.4 * wounded * freshness + 0.3 * alarmUnanswered + 0.15 * (1 - defended) + 0.15 * thinCover)
     : 0;
@@ -448,9 +506,15 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
     if (candidate.score === best.score && breaksTie(ctx.self.id, candidate.id, best.id)) best = candidate;
   };
 
-  for (const ship of ctx.view.ships) consider(scoreShip(ctx, ship));
+  // Allies are skipped before they are scored rather than after: the score gate
+  // in `scoreShip`/`scoreStation` would already zero them, but a teammate is not
+  // a candidate the bot rejected — it is not a candidate at all.
+  for (const ship of ctx.view.ships) {
+    if (!isFoe(ship)) continue;
+    consider(scoreShip(ctx, ship));
+  }
   for (const station of ctx.view.stations) {
-    if (!station.alive) continue;
+    if (!isFoe(station) || !station.alive) continue;
     // Homes are only candidates once they are on screen: a bot does not lay
     // siege to a rumour.
     if (station.distance - station.radius > ctx.view.perception.visualRange) continue;
@@ -464,10 +528,15 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
 // ---------------------------------------------------------------------------
 
 /**
- * The nearest home still standing that is not this bot's own. Position and
- * wreck state are public at any range — "a burning station is visible from
- * further away than its numbers are" (GDD §2.2) — so this is a legal read
- * without scouting, and it is the only map-wide fact any tree uses.
+ * The nearest **hostile** home still standing. Position and wreck state are
+ * public at any range — "a burning station is visible from further away than its
+ * numbers are" (GDD §2.2) — so this is a legal read without scouting, and it is
+ * the only map-wide fact any tree uses.
+ *
+ * "Not this bot's own" was enough when FFA was the only mode (`./perception`
+ * leaves self out of the view). In TEAMS it sent the endgame hunt at a
+ * teammate's doorstep — so the filter is the allegiance stamp, and in FFA it
+ * still means every home but this bot's.
  *
  * It exists for the endgame. Once the field is spent there is nothing left to
  * mine and nothing left to repair (GDD §2.3), so a bot with no target in view
@@ -478,7 +547,7 @@ export function bestTarget(ctx: BotCtx, minScore = 0): TargetScore | null {
 export function nearestLivingRival(ctx: BotCtx): PerceivedStation | null {
   let best: PerceivedStation | null = null;
   for (const station of ctx.view.stations) {
-    if (!station.alive) continue;
+    if (!isFoe(station) || !station.alive) continue;
     if (best === null || station.distance < best.distance) best = station;
   }
   return best;
@@ -498,12 +567,18 @@ export function nearestLivingRival(ctx: BotCtx): PerceivedStation | null {
  * every unscouted home reads at one standing — the dead heat is broken
  * index-blind ({@link breaksTie}), not toward slot 0: without that, "gang the
  * leader" quietly means "gang the lowest slot" (p8 aggression-bias fix).
+ *
+ * **The leader is a rival**, so allies are not in the running ({@link isFoe}).
+ * They would otherwise win it routinely: a teammate's home is the one a bot has
+ * been parked next to all match, so it is the best-scouted, healthiest-looking
+ * standing on the board — "gang up on the leader" meant "besiege your own side"
+ * (p16-01).
  */
 export function leaderStation(ctx: BotCtx): PerceivedStation | null {
   let best: PerceivedStation | null = null;
   let bestStanding = -1;
   for (const station of ctx.view.stations) {
-    if (!station.alive) continue;
+    if (!isFoe(station) || !station.alive) continue;
     const memo = ctx.memory.station(station.owner);
     const core = memo?.coreFraction ?? 1;
     const turrets = memo?.turrets ?? 0;

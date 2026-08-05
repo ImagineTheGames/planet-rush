@@ -17,7 +17,9 @@ import type { Action, BuildItem, PlayerId, ThrustAction, UpgradeTrack, Vec2 } fr
 import {
   CORE_HP,
   REPAIR_HP_PER_ORE,
+  REPAIR_ORE_COST,
   WEAPON_RANGE,
+  SATELLITE,
   STATION,
   SHIELD,
   SHIP_RADIUS,
@@ -47,7 +49,7 @@ import {
 } from './steering';
 import { commit, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
-import { homeIntruder, isEngageable, isWounded, retreatThreshold } from './targeting';
+import { homeIntruder, isTargetable, isWounded, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -115,6 +117,213 @@ export function repairTargetFraction(ctx: BotCtx, baseAt: number): number {
   // reach — let alone clamp onto — the ceiling. (100/15 ⇒ cap ≈ 0.80.)
   const ceiling = Math.max(0, (maxHp - REPAIR_HP_PER_ORE) / maxHp - 0.05);
   return Math.min(baseAt * ctx.weights.caution, ceiling);
+}
+
+/**
+ * Does this bot want to buy a core patch *right now* — the one question the spend
+ * plans and the {@link wantsHomeErrand} both ask, so the errand can never fly a
+ * bot home for a purchase the plan will then refuse (p15-02).
+ *
+ * Five gates, and each one is somebody's rule rather than this file's taste:
+ *
+ *  - **Collapse** shuts repair off for good (GDD §2.3).
+ *  - **Under attack** — "a defender cannot out-repair an attacker who keeps
+ *    shooting" (GDD §2.6), so ore spent under fire is ore thrown away.
+ *  - **The tell** (`repairing`) is the sim's pacing signal: it releases only once
+ *    the core has been quiet for `REPAIR_TELL_HOLD`, which is what keeps a bot
+ *    from resuming its patching on the firing line (`sim/buildings.ts`).
+ *  - **The cooldown** (`repairReadyIn`) is the gate that actually *refuses* a
+ *    press — 15 seconds per station, ratified 2026-07-28. Until p15-02 no tree
+ *    read it: they paced off the tell alone, which releases at half the cooldown,
+ *    so the back half of every cooldown was spent filing orders the sim answered
+ *    `'cooling-down'` and threw away — and, because repair sits at the head of the
+ *    spend plan, those dropped presses starved the turret and shield buys behind
+ *    them for as long as they lasted.
+ *  - **The ration** ({@link repairTargetFraction}) — deliberately untouched here.
+ */
+export function wantsCorePatch(ctx: BotCtx, baseAt: number): boolean {
+  const station = ctx.self.station;
+  if (!station || !station.alive || ctx.view.collapsed) return false;
+  if (station.underAttack || station.repairing || station.repairReadyIn > 1e-9) return false;
+  if (station.coreHp >= station.maxCoreHp * repairTargetFraction(ctx, baseAt)) return false;
+  return ctx.self.spendable >= REPAIR_ORE_COST;
+}
+
+// ---------------------------------------------------------------------------
+// The standing defence — build, and REBUILD (GDD §2.5 caps; p15-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * What a tier keeps standing at home. Written as one record rather than three
+ * loose constants because the *arithmetic* over it — standing plus queued,
+ * clamped to the sim's caps — is the part that was wrong, and it should be wrong
+ * in only one place if it is ever wrong again.
+ */
+export interface DefencePlan {
+  readonly turrets: number;
+  readonly shields: number;
+  readonly satellites: number;
+}
+
+/**
+ * `homebody` at or above which a character wires its claim for radar — the
+ * satellite dial (feature f1). Rusty (0.8), Patch (0.9) and Warden (0.55) are the
+ * homesteaders; Bolt, Sable, Foreman and Vulture are out in the field and buy
+ * guns instead.
+ *
+ * **Stated plainly, because it is a real cost:** a live satellite lifts the
+ * *minimap* fog for its owner (`sim/sensing.ts`), and a bot's `BotView` does not
+ * read the sensed set — so today this purchase buys a bot no vision it did not
+ * already have. It is bought anyway, and only by the two characters whose whole
+ * read is homesteading, for two reasons that are not vision: the structure exists
+ * on the board for a human to hunt (which `constants.ts` calls "a legitimate
+ * strategy"), and a capped structure a bot never builds is a capped structure the
+ * rebuild path can never be exercised on. Feeding a satellite's coverage into
+ * `BotView` is the honest follow-up — a human in that cockpit genuinely sees more
+ * — and it is flagged to the Director rather than smuggled in here. TUNABLE
+ */
+export const SATELLITE_HOMESTEAD = 0.5;
+
+/** Ore a bot keeps back beyond the sticker price before it will buy a sensor:
+ *  the satellite is the last thing on the list, never the purchase that empties
+ *  a wallet the turret ring wanted. TUNABLE */
+export const SATELLITE_RESERVE = 3;
+
+/** This character's satellite target — {@link SATELLITE_HOMESTEAD}, in one place. */
+export function satelliteTarget(ctx: BotCtx): number {
+  return ctx.weights.homebody >= SATELLITE_HOMESTEAD ? SATELLITE.capPerStation : 0;
+}
+
+/** Ore price of one capped structure. Local rather than the sim's `orderCost` so
+ *  this module keeps one import surface; the three numbers are the same table. */
+function structureCost(item: 'turret' | 'shield' | 'satellite'): number {
+  return item === 'turret' ? TURRET.cost : item === 'shield' ? SHIELD.cost : SATELLITE.cost;
+}
+
+/**
+ * The one purchase that closes this station's most urgent hole in its standing
+ * defence, or `null` when there is nothing to close (or nothing to close it
+ * with). Guns, then the bubble, then the sensor.
+ *
+ * **Build and rebuild are the same question**, deliberately: "I want two turrets
+ * and I have one" reads identically whether the second was never built or was
+ * shot off ten seconds ago, so a bot that tops up to its target *is* a bot that
+ * rebuilds, and there is no second code path to keep in step. What was actually
+ * broken is the counting (p15-02):
+ *
+ *  - **Queued jobs are counted by KIND.** The trees used to add
+ *    `station.builds` — every job on the station, of every kind — to the standing
+ *    count of one kind. So a shield under construction read as a turret already on
+ *    order, and a bot with a hole in its ring sat on the ore for the fifteen
+ *    seconds the shield took, waiting for a job that could never fill it. With the
+ *    satellite in the mix (12 s) the same collision widens.
+ *  - **The sim's caps clamp the target**, so a tier target can never ask for a
+ *    fifth turret or a second satellite and spend the match filing orders the sim
+ *    refuses `'cap-reached'`.
+ *
+ * The shield still waits on a standing turret: a bubble over an unguarded core
+ * only buys time, and the guns are what make an attacker regret the trip
+ * (GDD §2.6).
+ */
+export function rebuildOrder(ctx: BotCtx, plan: DefencePlan): Purchase | null {
+  const station = ctx.self.station;
+  if (!station || !station.alive) return null;
+  const spendable = ctx.self.spendable;
+
+  const wantTurrets = Math.min(plan.turrets, TURRET.capPerStation);
+  if (station.turrets + station.turretsBuilding < wantTurrets && spendable >= structureCost('turret')) {
+    return order('turret');
+  }
+
+  const wantShields = Math.min(plan.shields, SHIELD.capPerStation);
+  if (
+    station.turrets >= 1 &&
+    station.shields + station.shieldsBuilding < wantShields &&
+    spendable >= structureCost('shield')
+  ) {
+    return order('shield');
+  }
+
+  const wantSatellites = Math.min(plan.satellites, SATELLITE.capPerStation);
+  if (
+    station.satellites + station.satellitesBuilding < wantSatellites &&
+    spendable >= structureCost('satellite') + SATELLITE_RESERVE
+  ) {
+    return order('satellite');
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// The home errand — going home ON PURPOSE (p15-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * How far from home a character will break off what it is doing to go and fix
+ * its base, as a multiple of its own visual range, leaned by `homebody`.
+ *
+ * Bolt (0.1) barely turns around; Patch (0.9) crosses the map for it. The dial is
+ * the same one that decides how territorial a character is (GDD §2.9), which is
+ * exactly the question "is my base worth the trip?" asks. TUNABLE
+ */
+export function errandRange(ctx: BotCtx): number {
+  return ctx.view.perception.visualRange * (0.5 + 1.5 * ctx.weights.homebody);
+}
+
+/** How much further a bot will fly for a *core patch* than for a structure — the
+ *  core is the win condition (GDD §1) and a turret slot is not, so the trip home
+ *  is worth twice as much for one as for the other. TUNABLE */
+export const CORE_ERRAND_REACH = 2;
+
+/**
+ * Does this bot want to fly home and spend, right now?
+ *
+ * **The defect this exists for (p15-02).** A bot only ever spent when it happened
+ * to be docked for some *other* reason — a full hold, an answered alarm. There
+ * was no errand that said "go home and fix your base", so a bot that wanted a
+ * repair while it was out mining simply… kept mining. Measured over one unstaged
+ * eight-bot match at seed 1: nine repair orders in 791 seconds; 21.8% of every
+ * decision taken with a core under its own ration was taken away from home, and
+ * Warden alone spent ~286 seconds of that match carrying the ore for a turret it
+ * never went home to build. Six of the eight cores died with damage on them that
+ * was never patched.
+ *
+ * So this is the missing verb, and it is deliberately narrow:
+ *
+ *  - **Not docked**, or there is nothing to fly to — {@link spendAtHome} owns the
+ *    purchase, this only owns the trip.
+ *  - **A patch calls you home from twice as far** as a structure does
+ *    ({@link CORE_ERRAND_REACH}): a core is the win condition, a turret slot is a
+ *    convenience.
+ *  - **`plan === null` means this tier runs no structural errand at all** — it
+ *    replaces what it lost on its next trip home instead. That is `./hard`'s
+ *    setting, and the reason is in that file: a Hard bot plays like a good human,
+ *    and a good human does not fly home mid-raid to plug one turret.
+ *  - **Never in collapse** — no repair, no regeneration, and the endgame is a
+ *    damage race a defender cannot win by spending (GDD §2.3, `./hard`).
+ *  - **A stand-in never spends the dropped pilot's endowment** (GDD §4.2) — the
+ *    same line {@link spendAtHome} draws, drawn before the trip rather than after
+ *    it, so a stand-in does not fly home for a purchase it will be refused.
+ */
+export function wantsHomeErrand(ctx: BotCtx, baseAt: number, plan: DefencePlan | null): boolean {
+  const station = ctx.self.station;
+  if (!ctx.self.alive || ctx.self.docked || ctx.view.collapsed) return false;
+  if (!station || !station.alive) return false;
+  if (ctx.self.spendable <= ctx.brain.endowment + 1e-9) return false;
+  const reach = errandRange(ctx);
+  if (wantsCorePatch(ctx, baseAt)) return ctx.self.homeDistance <= reach * CORE_ERRAND_REACH;
+  return plan !== null && rebuildOrder(ctx, plan) !== null && ctx.self.homeDistance <= reach;
+}
+
+/**
+ * Fly home to spend. The same flight {@link haulHome} makes and for the same
+ * reason — home is home — named separately because the *reason* is what a reader
+ * of the tree needs: this bot is not carrying anything, it is going to fix
+ * something.
+ */
+export function homeErrand(ctx: BotCtx): readonly Action[] | null {
+  return haulHome(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -569,13 +778,19 @@ function tabuMineSite(ctx: BotCtx): void {
  *  cheap (GDD §1, §2.7). TUNABLE */
 export const CORE_FINAL_ASSAULT = 0.3;
 
-/** The nearest engageable ship within `range` — the thing that could be shooting
- *  at this bot. The break-off band reads it at two ranges (enter/exit), so the
- *  range is a parameter rather than a constant. */
+/** The nearest engageable **enemy** ship within `range` — the thing that could be
+ *  shooting at this bot. The break-off band reads it at two ranges (enter/exit),
+ *  so the range is a parameter rather than a constant.
+ *
+ *  Hostility comes from the one predicate ({@link isTargetable} → `hostile` →
+ *  `sim/allegiance.ts`): a teammate cannot shoot this bot (`canDamage`), so it is
+ *  not something to flee from and not something to be cornered by. Before
+ *  p16-01 a wounded TEAMS bot fled its own escort, and — worse — the cornered
+ *  branch could commit to *fighting* the teammate parked between it and home. */
 export function nearestThreat(ctx: BotCtx, range: number): PerceivedShip | null {
   let best: PerceivedShip | null = null;
   for (const ship of ctx.view.ships) {
-    if (!isEngageable(ship)) continue;
+    if (!isTargetable(ship)) continue;
     if (ship.distance > range) continue;
     if (best === null || ship.distance < best.distance) best = ship;
   }
@@ -728,11 +943,13 @@ export const CORNERED_COMMIT_SECONDS = 4;
 
 /** The ship in view with this slot, if it is still worth fighting and still
  *  here. `null` covers all three ways a commitment ends on its own — it died,
- *  it was eliminated, or it broke off past the retreat band. */
+ *  it was eliminated, or it broke off past the retreat band. A teammate is never
+ *  a blockader ({@link isTargetable}): it is in the way, which is what
+ *  `go`'s obstacle avoidance is for, not something to commit to fighting. */
 function blockaderInView(ctx: BotCtx, id: PlayerId): PerceivedShip | null {
   for (const ship of ctx.view.ships) {
     if (ship.id !== id) continue;
-    if (!isEngageable(ship) || ship.distance > RETREAT_CLEAR_RANGE) return null;
+    if (!isTargetable(ship) || ship.distance > RETREAT_CLEAR_RANGE) return null;
     return ship;
   }
   return null;

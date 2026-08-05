@@ -23,6 +23,25 @@
  * **wreck** (GDD §2.2 — "a burning station is visible from further away than its
  * numbers are"), and the **asteroid-wave clock** (GDD §2.2, top centre).
  *
+ * **Whose side everything is on is public too, and it is asked here — once.**
+ * Every perceived ship and station carries a `hostile` stamp taken from
+ * `sim/allegiance.ts`'s `areEnemies`, the ONE friend/foe predicate the whole game
+ * routes through (auto-aim, turrets, siege collision, projectile damage). The bot
+ * layer does not own a second notion of hostility and must never grow one: a tree
+ * asks "is that a foe?" by reading the stamp, and the answer is the same answer
+ * the sim's own targeting ladder gets. Reading it is fair — a hull's beacon ring
+ * *is* its side, drawn at any range (style-guide §5, and `main.ts`'s `TEAM A`
+ * label over the hull) — and it is static match config fixed at match start, so a
+ * boolean captured per view is exactly as fresh as the world (allegiance spike,
+ * Trap 7). **FFA is teams-of-one**, so `hostile` there is `other !== self`, i.e.
+ * true for every entity in the view — byte-for-byte what the bots assumed before
+ * they were ever told to ask.
+ *
+ * Hostility gates *targeting*, not *knowledge*: an ally's core and shields are
+ * still read through the same sensor-range gate an enemy's are, because sharing a
+ * side is not a scouting report and widening what a teammate knows is a design
+ * question, not a bug fix (see docs/bot-teams-allegiance-p16.md).
+ *
  * Determinism note (GDD §4.8): distances use `Math.sqrt(dx*dx + dy*dy)` rather
  * than `Math.hypot`, because the former is IEEE-exact on every engine and the
  * latter is not specified to be. Bot state lives outside the world tree, so it
@@ -37,6 +56,7 @@ import {
   STATION,
   SENSOR_RANGE,
   WAVE_COUNT,
+  areEnemies,
   isCollapsed,
   isDocked,
   shieldPool,
@@ -107,9 +127,41 @@ export interface OwnStationView {
   readonly shieldHp: number;
   readonly shields: number;
   readonly turrets: number;
-  /** Jobs still under construction (GDD §2.5). */
+  /** Live radar satellites orbiting this station (feature f1, cap 1). Own-station
+   *  knowledge: it is a body orbiting your own home, in plain sight. */
+  readonly satellites: number;
+  /** Jobs still under construction, all kinds (GDD §2.5). */
   readonly builds: number;
+  /**
+   * Queued construction **by kind** — turrets, shields, satellites.
+   *
+   * A tree plans against `standing + queued < target`, and the *kind* matters:
+   * with only the total, a shield 15 seconds from completion reads as a turret
+   * already on order, so a bot with a hole in its turret ring sits on the ore and
+   * waits for a job that will never fill the hole (`./behaviors` `structureGap`).
+   * The sim counts its caps this way too (`turretCount`/`shieldCount`/
+   * `satelliteCount` in `sim/buildings.ts`) — this is the same arithmetic, on the
+   * bot's side of the fog.
+   */
+  readonly turretsBuilding: number;
+  readonly shieldsBuilding: number;
+  readonly satellitesBuilding: number;
+  /** The repair TELL (GDD §2.5): a patch was bought recently and the glow is
+   *  still lit. Signalling only — it is {@link repairReadyIn} that decides
+   *  whether the next press is accepted. */
   readonly repairing: boolean;
+  /**
+   * Seconds until this station's REPAIR wedge re-arms, `0` when it is ready
+   * (RATIFIED developer, 2026-07-28: a 15-second per-station repair cooldown).
+   *
+   * Public information by construction — the wheel counts it down in words on
+   * the owner's own screen ("REPAIR in 12s"), so a bot reading it is reading its
+   * own HUD, not the world. It is the gate that actually refuses a press
+   * (`sim/buildings.ts` `placeOrder` → `'cooling-down'`); the `repairing` tell
+   * above releases at half that, so a tree that paced off the tell alone spent
+   * the back half of every cooldown filing orders the sim threw away.
+   */
+  readonly repairReadyIn: number;
   readonly sinceDamage: number;
   /** The alarm (GDD §2.2): something has been hitting home recently. */
   readonly underAttack: boolean;
@@ -119,6 +171,14 @@ export interface OwnStationView {
 /** Another player's ship, as seen. */
 export interface PerceivedShip {
   readonly id: PlayerId;
+  /**
+   * **Is this a foe?** `areEnemies(world, self, this.id)` — the sim's ONE
+   * allegiance predicate (`sim/allegiance.ts`), stamped here so no bot branch
+   * re-derives it. In FFA (teams-of-one) it is true for everything in the view;
+   * in TEAMS it is false for a teammate, and a teammate is not a target at any
+   * range, in any behavior, at any tier.
+   */
+  readonly hostile: boolean;
   readonly shipClass: ShipClass;
   readonly pos: Vec2;
   readonly vel: Vec2;
@@ -142,6 +202,14 @@ export interface PerceivedShip {
  *  the numbers are scouted. */
 export interface PerceivedStation {
   readonly owner: PlayerId;
+  /**
+   * **Is this home a foe's?** The same `areEnemies` stamp {@link PerceivedShip}
+   * carries, asked of the station's owner — which is exactly the question the
+   * sim's own siege ladder asks (`sim/step.ts`: `areEnemies(world, ship.id,
+   * station.owner)`). A bot lays siege only to a hostile home; an ally's station
+   * is a landmark and an obstacle, never a target.
+   */
+  readonly hostile: boolean;
   readonly pos: Vec2;
   readonly radius: number;
   /** False for a wreck. Public at any range — smoke carries (GDD §2.2). */
@@ -275,6 +343,14 @@ function stationIn(world: World, id: PlayerId): MiningStation | null {
  * permanently (GDD §2.2).
  */
 function ownStationView(station: MiningStation, from: Vec2, env: Perception): OwnStationView {
+  let turretsBuilding = 0;
+  let shieldsBuilding = 0;
+  let satellitesBuilding = 0;
+  for (const job of station.builds) {
+    if (job.kind === 'turret') turretsBuilding++;
+    else if (job.kind === 'shield') shieldsBuilding++;
+    else if (job.kind === 'satellite') satellitesBuilding++;
+  }
   return {
     pos: { x: station.pos.x, y: station.pos.y },
     radius: station.radius,
@@ -284,20 +360,28 @@ function ownStationView(station: MiningStation, from: Vec2, env: Perception): Ow
     shieldHp: shieldPool(station),
     shields: station.shields.length,
     turrets: station.turrets.length,
+    satellites: station.satellites?.length ?? 0,
     builds: station.builds.length,
+    turretsBuilding,
+    shieldsBuilding,
+    satellitesBuilding,
     repairing: station.repairing,
+    repairReadyIn: Math.max(0, station.repairGate ?? 0),
     sinceDamage: station.sinceDamage,
     underAttack: station.alive && station.sinceDamage < env.alarmWindow,
     distance: distance(from, station.pos),
   };
 }
 
-/** Another player's ship, filtered to what is drawn on screen. */
-function perceiveShip(ship: Ship, from: Vec2, env: Perception): PerceivedShip {
+/** Another player's ship, filtered to what is drawn on screen. `hostile` is the
+ *  caller's `areEnemies` read (see the module note): this function never decides
+ *  allegiance, it only carries the one answer through. */
+function perceiveShip(ship: Ship, from: Vec2, env: Perception, hostile: boolean): PerceivedShip {
   const d = distance(from, ship.pos);
   const seen = d <= env.visualRange;
   return {
     id: ship.id,
+    hostile,
     shipClass: ship.shipClass,
     pos: { x: ship.pos.x, y: ship.pos.y },
     vel: { x: ship.vel.x, y: ship.vel.y },
@@ -317,7 +401,12 @@ function perceiveShip(ship: Ship, from: Vec2, env: Perception): PerceivedShip {
  * core and shield numbers require sensor range, and the turret count requires
  * being close enough to see the barrels.
  */
-function perceiveStation(station: MiningStation, from: Vec2, env: Perception): PerceivedStation {
+function perceiveStation(
+  station: MiningStation,
+  from: Vec2,
+  env: Perception,
+  hostile: boolean,
+): PerceivedStation {
   const d = distance(from, station.pos);
   // Measured to the station's surface, not its centre: a 64-unit rock you are
   // standing on must not read as out of sensor range.
@@ -326,6 +415,7 @@ function perceiveStation(station: MiningStation, from: Vec2, env: Perception): P
   const seen = surface <= env.visualRange;
   return {
     owner: station.owner,
+    hostile,
     pos: { x: station.pos.x, y: station.pos.y },
     radius: station.radius,
     alive: station.alive,
@@ -364,14 +454,17 @@ export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_P
   if (looking) {
     for (const other of world.ships) {
       if (other.id === id) continue;
-      const p = perceiveShip(other, eye, env);
+      // Whose side it is on, asked ONCE, of the sim's one predicate. Self is
+      // already skipped above, and `areEnemies` short-circuits `a === b` anyway,
+      // so self-immunity never depends on this loop's shape.
+      const p = perceiveShip(other, eye, env, areEnemies(world, id, other.id));
       // Out of visual range: the ship is not on screen, so it is not in the
       // view at all. (Its station still is — stations are landmarks.)
       if (p.distance <= env.visualRange) ships.push(p);
     }
     for (const station of world.stations) {
       if (station.owner === id) continue;
-      stations.push(perceiveStation(station, eye, env));
+      stations.push(perceiveStation(station, eye, env, areEnemies(world, id, station.owner)));
     }
     for (const a of world.asteroids) {
       const d = distance(eye, a.pos);

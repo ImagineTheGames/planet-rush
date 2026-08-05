@@ -24,8 +24,8 @@
  */
 
 import { UpgradeTrack } from '@shared/types';
-import { SHIELD, TURRET, nextUpgradeCost } from '../sim';
-import type { Purchase } from './behaviors';
+import { nextUpgradeCost } from '../sim';
+import type { DefencePlan, Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
   attack,
@@ -33,19 +33,22 @@ import {
   coreUnderFinalAssault,
   defendHome,
   haulHome,
+  homeErrand,
   hunt,
   fightBlockade,
   lastStandDefend,
   mine,
   nearestThreat,
   order,
-  repairTargetFraction,
+  rebuildOrder,
   retreat,
   roam,
   scavenge,
   spendAtHome,
   upgrade,
+  wantsCorePatch,
   wantsCorneredFight,
+  wantsHomeErrand,
   wantsRetreat,
   wantsToHaul,
 } from './behaviors';
@@ -86,24 +89,14 @@ export function mediumSpendPlan(ctx: BotCtx): Purchase | null {
   if (!station) return null;
   const spendable = ctx.self.spendable;
 
-  if (
-    !ctx.view.collapsed &&
-    !station.repairing &&
-    !station.underAttack &&
-    station.coreHp < station.maxCoreHp * repairTargetFraction(ctx, MEDIUM_REPAIR_AT) &&
-    spendable >= 2
-  ) {
-    return order('repair');
-  }
+  // Repair, gated on the sim's real 15-second cooldown rather than the tell that
+  // releases at half of it (p15-02, `wantsCorePatch`).
+  if (wantsCorePatch(ctx, MEDIUM_REPAIR_AT)) return order('repair');
 
-  if (station.turrets + station.builds < MEDIUM_TURRET_TARGET && spendable >= TURRET.cost) return order('turret');
-  if (
-    station.turrets >= 1 &&
-    station.shields + station.builds < MEDIUM_SHIELD_TARGET &&
-    spendable >= SHIELD.cost
-  ) {
-    return order('shield');
-  }
+  // Guns, then the bubble — queued jobs counted BY KIND, so a shield in progress
+  // no longer stalls a turret rebuild (`rebuildOrder`, p15-02).
+  const rebuild = rebuildOrder(ctx, mediumDefence(ctx));
+  if (rebuild) return rebuild;
 
   // The ship half of the economy. Cargo first — the cheapest tier in the ladder
   // and the one a miner feels immediately (GDD §2.5) — then power, which is both
@@ -119,6 +112,17 @@ export function mediumSpendPlan(ctx: BotCtx): Purchase | null {
 
 /** Core fraction below which a Medium bot spends its trip home on repairs. TUNABLE */
 export const MEDIUM_REPAIR_AT = 0.7;
+
+/**
+ * What a Medium bot keeps standing at home (GDD §2.6 — bounded defence, then the
+ * ship). **No radar satellite:** Medium's whole read is that it stops turtling at
+ * two turrets and buys the *ship* instead, and a 6-ore sensor is the cargo tier
+ * and the power tier it would rather have. The dish belongs to Hard, the tier
+ * that thinks about the whole board (`./hard` `hardDefence`).
+ */
+export function mediumDefence(_ctx: BotCtx): DefencePlan {
+  return { turrets: MEDIUM_TURRET_TARGET, shields: MEDIUM_SHIELD_TARGET, satellites: 0 };
+}
 
 /** The ladder a Medium bot climbs, in order (GDD §2.5). TUNABLE */
 export const MEDIUM_UPGRADE_ORDER: readonly UpgradeTrack[] = [
@@ -198,6 +202,17 @@ export const mediumTree: Node = selector('medium', [
   when('spend', () => true, (ctx) => spendAtHome(ctx, mediumSpendPlan)),
 
   when('haul', (ctx) => wantsToHaul(ctx), (ctx) => haulHome(ctx)),
+
+  // Go home ON PURPOSE to patch the core or replace a lost structure (p15-02) —
+  // the errand a bot that only ever spent while docked-for-something-else did not
+  // have. Ranged by `homebody`, so Patch crosses the map for it and Foreman does
+  // not (`wantsHomeErrand`); a core under its ration calls either one home from
+  // anywhere, because a core is the win condition (GDD §1).
+  when(
+    'fix-base',
+    (ctx) => wantsHomeErrand(ctx, MEDIUM_REPAIR_AT, mediumDefence(ctx)),
+    (ctx) => homeErrand(ctx),
+  ),
 
   // "contests ore waves": be at the centre when the rocks arrive, not after.
   when(

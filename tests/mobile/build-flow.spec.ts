@@ -177,7 +177,10 @@ test.describe('build button persists through the whole build cycle', () => {
     // (q7-01, ./budgets.ts).
     budgetTest({
       work: 'landscape boot → tap BUILD → order a turret → 650 sim ticks of construction → 3 more taps',
-      measuredSeconds: 30,
+      // Highest of three green in-container runs (28.4 / 30.3 / 32.0). This is the
+      // suite's most expensive test and the one that drifts most with machine load,
+      // so it takes the worst reading rather than the latest one.
+      measuredSeconds: 32,
     });
 
     await useLandscape(page);
