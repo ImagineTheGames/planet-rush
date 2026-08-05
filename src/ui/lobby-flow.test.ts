@@ -39,7 +39,14 @@ import {
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
 import { DOOR_ORDER, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
-import { CLASS_ORDER, DEFAULT_SHIP_CLASS, MODE_LABELS, RUSH_COUNTDOWN_SECONDS, lobbyModel } from './lobby';
+import {
+  CLASS_ORDER,
+  DEFAULT_SHIP_CLASS,
+  MODE_LABELS,
+  RUSH_COUNTDOWN_SECONDS,
+  SEAT_STATE_CYCLE,
+  lobbyModel,
+} from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
@@ -273,6 +280,22 @@ describe('the room tells the server what it chose', () => {
     const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
     expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
 
+    // …and so does the LEADING state control (u5) — the drawn, labelled button
+    // that finally says a slot can be closed. Two rects, ONE action: they walk the
+    // same ring in the same order, so the control can never become a second,
+    // subtly-different cycle bolted beside the first.
+    let viaBody = inLobby(0, 0);
+    let viaControl = inLobby(0, 0);
+    for (let i = 0; i < SEAT_STATE_CYCLE.length + 1; i++) {
+      viaBody = flowTapLobby(viaBody, { kind: 'seat', index: 5 }).state;
+      viaControl = flowTapLobby(viaControl, { kind: 'seatState', index: 5 }).state;
+      expect(
+        viaControl.lobby?.seats[5]?.occupant,
+        `tap ${i + 1}: the control and the body disagree`,
+      ).toBe(viaBody.lobby?.seats[5]?.occupant);
+    }
+    expect(viaControl.lobby?.seats[5]?.occupant).toBe('bot'); // four taps = once round + one
+
     // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
     // the TEAMS lobby had lost when the side control took the only chip.
     const tiered = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
@@ -293,6 +316,7 @@ describe('the room tells the server what it chose', () => {
       { kind: 'mode' } as const,
       { kind: 'abundance' } as const,
       { kind: 'seat', index: 2 } as const,
+      { kind: 'seatState', index: 2 } as const,
       { kind: 'seatChip', index: 2 } as const,
       { kind: 'seatTeamChip', index: 2 } as const,
     ]) {
@@ -455,6 +479,21 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
           state.lobby?.seats[SEAT]?.occupant,
         );
+
+        // …and so does the LEADING STATE control (u5) — the one that SAYS so. It
+        // belongs in this guard for the reason the guard exists: an affordance
+        // that is laid out in one mode and not another, or in one lobby and not
+        // the other, is the class of miss this describe block was written for.
+        const stateControl = tapCentre(layout, layout.seatStates[SEAT]!);
+        expect(stateControl, `state control reachable in ${mode}`).toEqual({
+          kind: 'seatState',
+          index: SEAT,
+        });
+        const viaControl = flowTapLobby(state, stateControl!);
+        expect(
+          viaControl.state.lobby?.seats[SEAT]?.occupant,
+          `state control cycles the seat in ${mode}`,
+        ).toBe(cycled.state.lobby?.seats[SEAT]?.occupant);
 
         // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
         // This is the exact control the TEAMS lobby had lost.
