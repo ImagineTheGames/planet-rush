@@ -177,7 +177,7 @@ test.describe('build button persists through the whole build cycle', () => {
     // (q7-01, ./budgets.ts).
     budgetTest({
       work: 'landscape boot → tap BUILD → order a turret → 650 sim ticks of construction → 3 more taps',
-      measuredSeconds: 29,
+      measuredSeconds: 30,
     });
 
     await useLandscape(page);

@@ -135,6 +135,11 @@ for that profile.
 | `goldens` › phone frozen | (not captured) | 8.0 / — / — | 90 s |
 | **suite** | **2.5 min** | **2.6 min** | — |
 
+Each column is a single run. Repeat runs of the same tree move a test by a
+couple of seconds either way (`build-flow` read 28.4 s and 30.3 s on two
+consecutive green runs), which is one more reason the allowance is ×10 rather
+than the ×5.9 that was observed.
+
 **Seven of the eighteen tests are back on the flat floor.** That is the check
 that this is a sweep and not a blanket bump.
 
