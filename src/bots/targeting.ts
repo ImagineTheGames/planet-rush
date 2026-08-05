@@ -407,8 +407,8 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
   const wounded = ship.hull !== null ? 1 - clamp01(ship.hull / Math.max(1e-9, ship.maxHull)) : 0.25;
   const home = ctx.memory.station(ship.id);
   const exposed = home ? clamp01(dist(home.pos, ship.pos) / EXPOSED_RANGE) : 0.5;
-  const engageable = isTargetable(ship);
-  const opportunity = engageable ? clamp01(0.55 * wounded + 0.45 * exposed) : 0;
+  const targetable = isTargetable(ship);
+  const opportunity = targetable ? clamp01(0.55 * wounded + 0.45 * exposed) : 0;
   const worth = ctx.view.collapsed ? COLLAPSE_SHIP_DISCOUNT : 1;
 
   return {
@@ -420,7 +420,7 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
     threat,
     proximity,
     opportunity,
-    score: engageable ? worth * total(ctx.weights, threat, proximity, opportunity) : 0,
+    score: targetable ? worth * total(ctx.weights, threat, proximity, opportunity) : 0,
   };
 }
 
