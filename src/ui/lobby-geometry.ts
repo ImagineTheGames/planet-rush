@@ -176,11 +176,13 @@ export const CLASS_TILE_MIN_WIDTH = 150;
 /** Inset from a tile's edge to its content. Tight, because six stat cells and
  *  four words share a 152×56 tile on a phone in landscape — the primary mobile
  *  layout of this screen. */
-export const CLASS_TILE_PAD = 4;
-/** The class-name line (Audiowide 12). */
+export const CLASS_TILE_PAD = 3;
+/** The class-name line. Audiowide 12's MEASURED box (ascent + descent) on the
+ *  self-hosted face, not a guess — the first cut of this block guessed the line
+ *  heights and every tile drew its stats through its hull nickname. */
 export const CLASS_NAME_LINE = 14;
-/** The hull-nickname line (Oxanium 9). */
-export const CLASS_HULL_LINE = 11;
+/** The hull-nickname line (Oxanium 9, measured box 12). */
+export const CLASS_HULL_LINE = 12;
 /** The role blurb — two wrapped Oxanium-10 lines. */
 export const CLASS_BLURB_LINE = 22;
 
@@ -188,14 +190,20 @@ export const CLASS_BLURB_LINE = 22;
  *  asserted equal in the tests). Mirrored rather than imported so the geometry
  *  stays free of the model, exactly like {@link LOBBY_SLOT_ROWS}. */
 export const STAT_COUNT = 6;
-/** One stat cell: its figure on a text line, its pip bar directly beneath. */
-export const STAT_ROW_TEXT = 9;
+/** One stat cell: its figure on a text line (Oxanium 8, measured box 10), its
+ *  pip bar directly beneath. */
+export const STAT_ROW_TEXT = 10;
 export const STAT_PIP_BAR = 3;
 export const STAT_ROW_HEIGHT = STAT_ROW_TEXT + STAT_PIP_BAR;
 /** Air between two rows of the stat grid. */
 export const STAT_ROW_GAP = 2;
 /** Air between two columns of it. */
 export const STAT_CELL_GAP = 4;
+/** Air above and below the whole stat block, when the tile has height to spare.
+ *  **Elastic**: a roomy desktop tile takes all of it so the block reads as its
+ *  own thing rather than a third line of prose, and the tightest phone tile takes
+ *  none — the stats themselves never pay for the spacing. */
+export const STAT_BLOCK_AIR = 5;
 /** A cell wide enough to lay all six across in ONE row — `SPD 130%` over five
  *  pips with room to spare. The wide-tile (desktop `stack`) shape, which reads
  *  like GDD §2.11's own table row. */
@@ -1102,13 +1110,24 @@ export function classTileContent(tile: Rect): ClassTileContent {
   const showBlurb =
     showHull && height >= CLASS_NAME_LINE + CLASS_HULL_LINE + reserved + CLASS_BLURB_LINE;
 
+  // Leftover height buys AIR around the stat block, up to STAT_BLOCK_AIR each
+  // side — so the block reads as its own thing on a roomy tile instead of a
+  // third line of prose, while a phone tile that has nothing to spare spends
+  // nothing. Elastic rather than fixed because a fixed gap would have to come
+  // out of the stats' own budget on exactly the device that can least afford it.
+  const used =
+    CLASS_NAME_LINE + hullHeight + statsHeight + (showBlurb ? CLASS_BLURB_LINE : 0);
+  const slack = Math.max(0, height - used);
+  const airAbove = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack / 2)) : 0;
+  const airBelow = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack) - airAbove) : 0;
+
   let y = tile.y + pad;
   const name: Rect = { x, y, width, height: Math.min(CLASS_NAME_LINE, height) };
   y += name.height;
   const hull: Rect = { x, y, width, height: hullHeight };
-  y += hullHeight;
+  y += hullHeight + airAbove;
   const stats: Rect = { x, y, width, height: statsHeight };
-  y += statsHeight;
+  y += statsHeight + airBelow;
   // The blurb takes whatever is left below it — it wraps, so extra height is
   // extra lines rather than dead space. Never past the tile's own bottom.
   const blurbHeight = showBlurb ? Math.max(0, tile.y + tile.height - pad - y) : 0;

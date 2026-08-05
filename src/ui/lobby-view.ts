@@ -89,8 +89,10 @@ const TEAM_CHIP_LABEL_PAD = 6;
 /** Air between two pips of a stat bar (u4). */
 const STAT_PIP_GAP = 1;
 /** A pip bar never spans more than this, so a stat on a 543px-wide desktop tile
- *  reads as a bar to compare rather than a rule across the tile. */
-const STAT_PIP_BAR_MAX_WIDTH = 44;
+ *  reads as a bar under its own figure rather than a rule across the tile. Set
+ *  to the widest figure the six cells produce (`SPD 130%` measures 32px at
+ *  Oxanium 8), so the bar tracks the text it belongs to. */
+const STAT_PIP_BAR_MAX_WIDTH = 34;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
@@ -745,7 +747,7 @@ export class LobbyView extends Container {
                 ? STAT_PIP_COLORS.selected
                 : STAT_PIP_COLORS.filled
               : STAT_PIP_COLORS.empty,
-            alpha: filled ? (selected ? 0.95 : 0.7) : 0.22,
+            alpha: filled ? (selected ? 1 : 0.85) : 0.3,
           });
       }
     }
