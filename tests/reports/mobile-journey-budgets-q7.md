@@ -118,15 +118,15 @@ for that profile.
 | `centering` › centred, landscape | 26.3 / 22.6 / 5.3 | **12.4 / 10.7 / 6.3** | 180 s |
 | `centering` › centred, portrait | 27.3 / 23.9 / 4.6 | **14.9 / 15.4 / 5.7** | 180 s |
 | `centering` › hook ABSENT | 2.2 / 2.1 / 1.7 | 3.8 / 4.1 / 1.8 | 60 s (floor) |
-| `build-flow` › full build cycle | 28.0 / 24.0 / — | 28.4 / 25.6 / — | 300 s |
+| `build-flow` › full build cycle | 28.0 / 24.0 / — | 28.4 / 25.6 / — | 330 s |
 | `build-flow` › wheel BACK cycle | 23.4 / 21.0 / — | 20.6 / 22.5 / — | 240 s |
 | `landscape-lock` › portrait boot | 3.0 / 3.3 / 1.1 | 3.6 / 3.1 / 1.3 | 60 s (floor) |
 | `landscape-lock` › rotate ×2 | 6.6 / 5.9 / — | 7.5 / 6.5 / — | 90 s |
 | `landscape-lock` › three taps → match | 27.2 / 22.5 / — | 23.4 / 26.8 / — | 270 s |
 | `landscape-lock` › in-match centred | 3.8 / 2.2 / 1.5 | 3.8 / 2.2 / 1.9 | 60 s (floor) |
 | `emulation` › FIRE + ghost stick | — / 5.6 / — | 7.0 / 8.2 / — | 90 s |
-| `emulation` › portrait renders | 11.4 / 10.2 / — | 13.4 / 13.8 / — | 150 s |
-| `emulation` › drag moves the ship | 14.4 / 11.7 / — | 13.8 / 13.8 / — | 150 s |
+| `emulation` › portrait renders | 11.4 / 10.2 / — | 13.4 / 13.8 / — | 180 s |
+| `emulation` › drag moves the ship | 14.4 / 11.7 / — | 13.8 / 13.8 / — | 180 s |
 | `emulation` › desktop control | — / — / 3.1 | — / — / 4.8 | 60 s (floor) |
 | `layout` › portrait-locked | 5.7 / 5.5 / — | 5.0 / 5.6 / — | 60 s (floor) |
 | `layout` › landscape | 5.3 / 5.6 / — | 5.1 / 5.0 / — | 60 s (floor) |
@@ -136,9 +136,38 @@ for that profile.
 | **suite** | **2.5 min** | **2.6 min** | — |
 
 Each column is a single run. Repeat runs of the same tree move a test by a
-couple of seconds either way (`build-flow` read 28.4 s and 30.3 s on two
-consecutive green runs), which is one more reason the allowance is ×10 rather
-than the ×5.9 that was observed.
+couple of seconds either way, which is one more reason the allowance is ×10
+rather than the ×5.9 that was observed.
+
+**Three runs, and `measuredSeconds` takes the worst of them.** A third green
+verification run of this branch (37 passed, 17 skipped, 2.6 min — the run in §E)
+came in on a busier machine and put four tests above the figure they had been
+recorded at: `build-flow` full cycle 32.0 s (28.4 / 30.3 / **32.0** across the
+three), `emulation` portrait renders 15.3 s, `emulation` drag 15.2 s,
+`landscape-lock` rotate ×2 8.3 s. Those four records were raised to the highest
+reading, moving three budgets (300 → **330 s**, and both `emulation` journeys
+150 → **180 s**; rotate ×2 stays at 90 s after rounding). The budget column above
+is the current one; the "after" column is still the single run it documents.
+
+This is the invariant worth keeping, and it is why the numbers were re-taken
+rather than left alone: `measuredSeconds` is defined as the test's cost on its
+slowest project, so an observed reading above it makes the record understate the
+work — and an understated base quietly spends part of the ×10 allowance before
+the runner ever gets it. Raising it to the worst observation is not the same as
+nudging a budget to silence a flake; nothing flaked in any of the three runs, and
+a record that has to grow while the *work* holds still is a performance
+regression, to be read as one rather than absorbed.
+
+**Only measure on a quiet container.** The studio box is shared between lanes. A
+run taken while a neighbouring lane was saturating the CPU with its own suite
+came in at 3.0 min with every reading roughly doubled — `build-flow` full cycle
+54.2 s, `landscape-lock` three-taps 38.0 s, `emulation` portrait renders 24.1 s.
+Those are *not* measurements and were deliberately not recorded: taking them
+would encode another lane's load into this branch's budgets, which is the
+treadmill this file exists to stop. They are worth one thing, though — **every
+test still passed, comfortably, with the worst of them at 54.2 s against a 330 s
+budget.** That is measured headroom rather than asserted headroom, at roughly 2×
+contention on top of the ×10 the runner is sized for.
 
 **Seven of the eighteen tests are back on the flat floor.** That is the check
 that this is a sweep and not a blanket bump.
@@ -149,10 +178,11 @@ virtual stick holds its deflection until `touchEnd` (`touch.ts`), so those event
 were pacing, not input. The hold now delivers a full 120 ticks on any host.
 
 **Estimated runner cost.** At the observed 5.9×, the worst journey
-(`build-flow`, 28.4 s in-container, with ~650 of its ticks re-priced at the
-runner's ~15 ticks/s) lands near ~150 s against a 300 s budget. The formerly
-red `centering` portrait journey lands near ~70 s against 180 s. Both have room
-for a runner having a bad day, which is what the ×10 rather than ×5.9 buys.
+(`build-flow`, 32.0 s in-container at its worst reading, with ~650 of its ticks
+re-priced at the runner's ~15 ticks/s) lands near ~170 s against a 330 s budget.
+The formerly red `centering` portrait journey lands near ~70 s against 180 s.
+Both have room for a runner having a bad day, which is what the ×10 rather than
+×5.9 buys.
 
 ---
 
@@ -178,3 +208,15 @@ npx tsc --noEmit
 npm test -- --run           # includes tests/mobile-budget-contract.test.ts
 npm run test:mobile         # 37 passed, 17 skipped, 2.6 min
 ```
+
+All three were run green on this branch. One studio-only caveat for whoever
+repeats this: `playwright.config.ts` serves the preview on a fixed port 4173 with
+`reuseExistingServer: !process.env.CI`, and the studio box is shared between
+lanes. One run here died in a burst of `ERR_CONNECTION_REFUSED` at ~500 ms per
+test when the preview server went out from under it mid-run; the next run of the
+same tree was green. **This does not affect CI** — `CI` is set there, so
+`reuseExistingServer` is false and each runner is isolated — and it is unrelated
+to budgets, so nothing in this change addresses it. Flagged rather than fixed:
+port allocation across lanes is not this branch's business, and a connection
+refusal fails in half a second and names itself, which is the failure mode you
+want.
