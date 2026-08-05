@@ -22,6 +22,7 @@ import { INTERP_DELAY_MS, MAX_DELAY_MS, MIN_DELAY_MS } from '../../src/net/inter
 import { MAX_LEAD_TICKS, SNAP_THRESHOLD } from '../../src/net/prediction';
 import { runLatencyMatch } from './latency-harness';
 import type { HarnessClient, LatencyMatchResult, WireProfile } from './latency-harness';
+import { netBudget } from './budgets';
 
 // ---------------------------------------------------------------------------
 // The named thresholds (docs/netcode-audit.md §5)
@@ -256,13 +257,19 @@ describe('the full two-client match, at real-world latency', () => {
     // The wire the test claims to have tested: loss must actually have bitten.
     expect(result.stalls).toBeGreaterThan(0);
     assertFeel(report('150 ms ±30 ms, 2 % loss', result));
-  });
+  }, netBudget({
+    work: 'one scripted two-client match at 150 ms, ±30 ms jitter, 2 % loss → assert every feel threshold',
+    measuredSeconds: 2.8,
+  }));
 
   it('holds them on a slower connection: 250 ms RTT, ±30 ms jitter, 2 % loss', () => {
     const result = runLatencyMatch({ profile: AT_250, frames: FRAMES });
     expect(result.stalls).toBeGreaterThan(0);
     assertFeel(report('250 ms ±30 ms, 2 % loss', result));
-  });
+  }, netBudget({
+    work: 'one scripted two-client match at 250 ms, ±30 ms jitter, 2 % loss → assert every feel threshold',
+    measuredSeconds: 2.0,
+  }));
 
   it('is quiet on a clean wire — 0 ms, no jitter, no loss', () => {
     const result = runLatencyMatch({ profile: AT_0, frames: FRAMES });
@@ -275,7 +282,10 @@ describe('the full two-client match, at real-world latency', () => {
       expect(feel.meanCorrection).toBeLessThan(1);
       expect(feel.meanLead).toBeLessThanOrEqual(6);
     }
-  });
+  }, netBudget({
+    work: 'one scripted two-client match on a 0 ms wire → assert the feel thresholds and that nothing stalled',
+    measuredSeconds: 0.6,
+  }));
 });
 
 describe('the constant correction', () => {
@@ -366,7 +376,10 @@ describe('the constant correction', () => {
       const ship = client.world!.ships.find((s) => s.id === client.you)!;
       expect(Math.hypot(ship.vel.x, ship.vel.y)).toBeGreaterThan(FLYING_SPEED);
     }
-  });
+  }, netBudget({
+    work: 'one scripted 250 ms match of straight-line flight on an empty board → assert the constant correction is at the wire\'s precision floor',
+    measuredSeconds: 0.5,
+  }));
 });
 
 describe('the jitter buffer sizes itself from what it measured', () => {
@@ -387,7 +400,10 @@ describe('the jitter buffer sizes itself from what it measured', () => {
       expect(ms).toBeGreaterThanOrEqual(MIN_DELAY_MS);
       expect(ms).toBeLessThanOrEqual(MAX_DELAY_MS);
     }
-  });
+  }, netBudget({
+    work: 'two scripted matches, clean and jittery → assert the jitter buffer sized itself from what it measured',
+    measuredSeconds: 1.8,
+  }));
 });
 
 describe('the lead does not ratchet', () => {
@@ -408,5 +424,8 @@ describe('the lead does not ratchet', () => {
       console.log(`    20 % loss: mean lead ${mean.toFixed(1)}t, budget ${client.session.prediction!.leadBudget}t`);
       expect(mean).toBeLessThanOrEqual(MAX_MEAN_LEAD_TICKS_LOSSY);
     }
-  });
+  }, netBudget({
+    work: 'one scripted match at 250 ms with 20 % loss → assert the lead comes back down instead of ratcheting',
+    measuredSeconds: 1.4,
+  }));
 });

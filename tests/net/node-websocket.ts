@@ -200,12 +200,37 @@ export async function startMatchServer(
   };
 }
 
-/** Poll until a condition holds, or fail loudly rather than hang the suite —
- *  the same rule the QA harness applies to matches (GDD §3.8). */
-export async function until(what: string, ok: () => boolean, timeoutMs = 8_000): Promise<void> {
+/**
+ * Poll until a condition holds, or fail loudly rather than hang the suite — the
+ * same rule the QA harness applies to matches (GDD §3.8).
+ *
+ * **Wait for the condition you actually need**, not for a proxy that usually
+ * precedes it. n4-01 held `main` red on exactly that mistake: a test waited for a
+ * telemetry event to *exist* and then asserted a field that event fills in later,
+ * so on a slow host the assertion raced the sample's own population. If an
+ * assertion needs a value, the wait is for that value being there.
+ *
+ * This bound is a **liveness** bound: it names what never arrived and it is
+ * deliberately much tighter than the journey budget the test declares
+ * (`./budgets.ts`). Budgets bound the slow; this bounds the stuck.
+ *
+ * `detail` is read only on failure, and only when the wait is for something whose
+ * near-miss is worth seeing — "a net sample exists, but rtt is still null" is a
+ * different bug report from "no net sample at all", and a bare timeout cannot
+ * tell them apart.
+ */
+export async function until(
+  what: string,
+  ok: () => boolean,
+  timeoutMs = 8_000,
+  detail?: () => string,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!ok()) {
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    if (Date.now() > deadline) {
+      const saw = detail === undefined ? '' : ` — saw: ${detail()}`;
+      throw new Error(`timed out after ${timeoutMs}ms waiting for ${what}${saw}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }

@@ -20,9 +20,8 @@ import { SATELLITE } from '../../src/sim';
 import type { World } from '../../src/sim';
 import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Satellites standing at player `seat`'s station in `world`, or -1 when that
  *  world has no such station (which would be a different failure entirely). */
@@ -94,8 +93,16 @@ describe('a radar satellite in an online match', () => {
     });
     await until('the server to finish building it', () => satelliteCount(authority, 0) === 1);
 
-    // Give the entity-event stream several of its 10 Hz intervals to say so.
-    await sleep(600);
+    // Wait for the entity-event stream to say so — the exact claim this file makes —
+    // instead of for several of its 10 Hz intervals. "600 ms" is how long that takes
+    // on this hardware; the question the test asks is whether it happens at all, and
+    // phrasing it as a duration turns a gap in the stream into a slow machine.
+    await until(
+      'the satellite to reach both clients on the entity-event stream',
+      () => satelliteCount(alice.world, 0) === 1 && satelliteCount(bob.world, 0) === 1,
+      5_000,
+      () => `alice ${satelliteCount(alice.world, 0)}, bob ${satelliteCount(bob.world, 0)}`,
+    );
 
     // The owner sees their own satellite…
     expect(satelliteCount(alice.world, 0)).toBe(1);
@@ -117,8 +124,16 @@ describe('a radar satellite in an online match', () => {
     // a client sensor coverage authority stopped granting it (GDD §2.2).
     serverSat.hp = 0;
     await until('the server to drop the dead satellite', () => satelliteCount(authority, 0) === 0);
-    await sleep(600);
+    await until(
+      'the death to reach both clients, so neither is left with a ghost',
+      () => satelliteCount(alice.world, 0) === 0 && satelliteCount(bob.world, 0) === 0,
+      5_000,
+      () => `alice ${satelliteCount(alice.world, 0)}, bob ${satelliteCount(bob.world, 0)}`,
+    );
     expect(satelliteCount(alice.world, 0)).toBe(0);
     expect(satelliteCount(bob.world, 0)).toBe(0);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → complete a satellite through the sim’s own build path → wait for it on both clients → kill it → wait for the ghost to clear on both',
+    measuredSeconds: 0.5,
+  }));
 });

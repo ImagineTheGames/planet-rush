@@ -31,6 +31,7 @@ import type { OnlineSession } from '../../src/net/session';
 import type { WelcomeMessage } from '../../src/net/transport';
 import type { WebSocketLike } from '../../src/net/websocket-transport';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
+import { netBudget } from './budgets';
 
 let cleanup: (() => Promise<void>) | null = null;
 afterEach(async () => {
@@ -213,5 +214,8 @@ describe('reconnect-resume', () => {
     // *earned* by a real substitute bot, with the residual sampled every tick of
     // the cycle, is `./economy-conservation.test.ts`.)
     expect(oreResidual(room.world!)).toBeCloseTo(residualBaseline + 13, 6);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients → RUSH! → forge a wallet on authority → sever the socket → wait out substitution and reclaim → assert the ship, cargo, upgrades and the ore ledger',
+    measuredSeconds: 0.6,
+  }));
 });

@@ -31,13 +31,19 @@ import type { Action } from '@shared/types';
 import { createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
 import type { World } from '../../src/sim';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
+import { simSeconds, waitForTicks } from './sim-clock';
 
 // ---------------------------------------------------------------------------
 // Harness
 // ---------------------------------------------------------------------------
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/** How much match this test needs under thrust before a ship has measurably
+ *  travelled. Counted in the sim's own fixed steps, not in wall seconds, so the
+ *  runner's CPU cannot decide how much flight the assertions below get
+ *  (`./sim-clock.ts`). */
+const FLIGHT_TICKS = simSeconds(1.5);
 
 const THRUST = (x: number, y: number): readonly Action[] => [{ type: 'thrust', dir: { x, y } }];
 
@@ -125,10 +131,24 @@ describe('a two-player online match', () => {
       leadWhileFlying = Math.max(leadWhileFlying, alice.prediction?.lead ?? 0);
       pendingWhileFlying = Math.max(pendingWhileFlying, alice.prediction?.pendingCount ?? 0);
     }, 1000 / 60);
-    await sleep(1_500);
+    // Ninety fixed steps of flight, counted on the server's OWN clock rather than on
+    // a stopwatch. `await sleep(1_500)` bought 90 ticks here and fewer on the runner,
+    // where the server's 60 Hz `setInterval` competes with two client sessions on two
+    // shared cores — so every assertion below it (`tick > 60`, travelled > 20 units)
+    // was partly an assertion about CI's CPU. This buys the same simulation anywhere.
+    await waitForTicks(() => authority.tick, FLIGHT_TICKS, { what: 'two ships under thrust' });
     clearInterval(flying);
-    // Let the last inputs land and the last snapshots come back.
-    await sleep(200);
+
+    // Let the last inputs land and the last snapshots come back — which is a
+    // *condition*, not a duration: the client is caught up exactly when it has no
+    // unacknowledged input left, and that is the same fact `lead === 0` asserts
+    // below. Waiting 200 ms instead was waiting for the usual case.
+    await until(
+      'the last inputs to be acknowledged, so neither client is still ahead',
+      () => (alice.prediction?.pendingCount ?? 1) === 0 && (bob.prediction?.pendingCount ?? 1) === 0,
+      5_000,
+      () => `alice pending ${alice.prediction?.pendingCount}, bob pending ${bob.prediction?.pendingCount}`,
+    );
 
     const aliceWorld = alice.world;
     const bobWorld = bob.world;
@@ -165,5 +185,8 @@ describe('a two-player online match', () => {
     expect(shipDistance(bobWorld, authority, 0)).toBeLessThan(40);
     // …and they are not merely *drawing* it at the spawn point.
     expect(shipOf(aliceWorld, 1).pos.y).toBeLessThan(start[1]!.y - 10);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a server → seat two clients by room code → RUSH! → 90 SIM ticks of two-way thrust at 60 Hz → drain the input queues → assert travel, prediction error, lead and the remote view',
+    measuredSeconds: 1.9,
+  }));
 });

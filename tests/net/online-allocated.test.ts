@@ -31,6 +31,7 @@ import { allocateRoom, joinRoom } from '../../src/net/allocator-client';
 import type { AllocatorClientConfig, ResolvedConnection } from '../../src/net/allocator-client';
 import { allocatorTransport, createOnlineSession } from '../../src/net/session';
 import type { OnlineSession } from '../../src/net/session';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 import type { MatchServerHarness } from './node-websocket';
 
@@ -151,7 +152,10 @@ describe('the allocator door: a registered Machine, an allocated room, two clien
     const authority = room.world;
     if (!authority) throw new Error('the room never started its match');
     await until('the server to simulate past its first second', () => authority.tick > 60);
-  }, 30_000);
+  }, netBudget({
+    work: 'boot a Machine and an allocator → register the Machine → allocate a room → seat two ticketed clients → RUSH! → simulate past the first sim second',
+    measuredSeconds: 1.4,
+  }));
 
   it('refuses a join the allocator never signed — the Machine fails closed', async () => {
     const harness = await startMatchServer({
@@ -178,8 +182,22 @@ describe('the allocator door: a registered Machine, an allocated room, two clien
       transport: { connect: nodeWebSocket }, // no ticket
     });
     sessions.push(rogue);
-    // Give the refusal time to land, then confirm the room was never opened.
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Wait for the refusal itself, not for 300 ms in which it usually arrives. The
+    // claim is "no room was opened", and asserting it before the Machine has even
+    // answered would pass for the wrong reason on a fast host and fail for the wrong
+    // reason on a slow one. The Machine states its refusal and hangs up
+    // (`./websocket-transport` treats a rejected join as terminal), so the terminal
+    // close IS the moment the question can be asked.
+    await until(
+      'the Machine to refuse the unsigned join and hang up',
+      () => rogue.state === 'closed',
+      5_000,
+      () => `state ${rogue.state}, rejectReason ${rogue.rejectReason}`,
+    );
+    expect(rogue.rejectReason).toBe('bad-ticket');
     expect(harness.matches.room('RUSH')).toBeUndefined();
-  }, 20_000);
+  }, netBudget({
+    work: 'boot an enforcing Machine and an allocator → register → dial the Machine with no ticket → wait out the refusal and the terminal close → assert no room was opened',
+    measuredSeconds: 0.35,
+  }));
 });

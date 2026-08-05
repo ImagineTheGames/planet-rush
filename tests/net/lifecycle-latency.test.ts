@@ -28,6 +28,7 @@ import { SNAP_THRESHOLD } from '../../src/net/prediction';
 import { MISPREDICTION_UNITS } from '../../src/net/telemetry';
 import { runLatencyMatch } from './latency-harness';
 import type { HarnessClient, LatencyMatchResult } from './latency-harness';
+import { netBudget } from './budgets';
 
 /** The two wires the M10 acceptance gate names. Clean, because a death is what is
  *  under test here and retransmit stalls are gated in `./latency-feel.test.ts`. */
@@ -150,7 +151,10 @@ describe('a death at latency (M10 item 1: the t=63 s signature)', () => {
         // And the sustained-misprediction run is gone. One second of raised
         // correction as the news crosses the wire is honest; the fault was five.
         expect(signatureSeconds(client, killedAtMs!)).toBeLessThan(2);
-      });
+      }, netBudget({
+        work: 'one scripted match with a death at t=63 s → assert the client stops predicting the corpse and never snaps',
+        measuredSeconds: 2.2,
+      }));
 
       it('settles back to a quiet wire once the news has crossed it', () => {
         const { result } = run();
@@ -168,7 +172,10 @@ describe('a death at latency (M10 item 1: the t=63 s signature)', () => {
           // under (`src/net/telemetry` MISPREDICTION_UNITS); allow a couple of those.
           expect(s.correctionMaxUnits).toBeLessThan(8 * MISPREDICTION_UNITS);
         }
-      });
+      }, netBudget({
+        work: 'one scripted match with a death → assert the correction settles once the news has crossed the wire',
+        measuredSeconds: 1.2,
+      }));
 
       it('runs the respawn countdown the offline flow runs', () => {
         const { countdownFrames, countdownOpenedAt, countdownMonotonic } = run();
@@ -184,7 +191,10 @@ describe('a death at latency (M10 item 1: the t=63 s signature)', () => {
         const roundTripFrames = Math.ceil(wire.profile.rttMs / (TICK_DT * 1000)) + 2;
         expect(countdownOpenedAt!).toBeLessThanOrEqual(KILL_AT_S * 60 + roundTripFrames);
         expect(countdownMonotonic).toBe(true);
-      });
+      }, netBudget({
+        work: 'one scripted match with a death → assert the online countdown is the offline one',
+        measuredSeconds: 1.0,
+      }));
 
       it('shows the other client a corpse, not a ship flying itself home', () => {
         const observer = 1 - VICTIM;
@@ -216,7 +226,10 @@ describe('a death at latency (M10 item 1: the t=63 s signature)', () => {
         // corpse the client had quietly revived and went on drawing for five seconds.
         expect(drawnDead).toBeGreaterThan(0);
         expect(drawnAlive).toBe(0);
-      });
+      }, netBudget({
+        work: 'one scripted match with a death → assert the rival\'s screen shows a corpse, not a ship flying itself home',
+        measuredSeconds: 1.4,
+      }));
     });
   }
 });
