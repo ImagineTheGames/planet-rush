@@ -26,6 +26,15 @@
  * be an unmistakable klaxon, GDD §2.2/§4.7), all three candidates honour it.
  *
  * Generated in bank order; see `sound-review/render.ts` for how previews are rendered.
+ *
+ * ## Review rounds
+ *
+ * A denied slot is regenerated *here*, in place — the file is the current offer, and
+ * git carries the takes that were turned down. Round two so far:
+ *
+ *  - **rockChip (s4-01).** All three denied, with one note: *"almost there, but they
+ *    should be lower in tone."* Re-offered a transposition down — same three
+ *    characters, same envelopes, pitch and filter corners moved (see the slot).
  */
 
 import type { SoundName, SoundSpec } from './bank';
@@ -98,14 +107,38 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
 
 /** Every reviewable slot, keyed by id (each id is also its shipped {@link SoundName}). */
 export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
+  // s4-01 — regenerated LOWER, on the developer's review note: *"The sounds are
+  // almost there, but they should be lower in tone."* Read as written: the three
+  // characters were right, so this is a transposition, not a redesign. In each
+  // candidate exactly five numbers moved — `freq`, `freqEnd`, the two filter
+  // corners, and a compensating `gain` — and everything that carries character
+  // (wave, attack, hold, decay, punch, vibrato, seed) is byte-identical to the
+  // take that was denied, so what the developer hears change is the tone alone.
+  //
+  //   the move, per candidate:  pitch ÷1.9–2.9 (11–18 semitones)
+  //                             low-pass corner ÷4 (two octaves)
+  //                             measured spectral centre −52% to −59%
+  //
+  // All three now sit *below the darkest thing that was denied* (the old rasp), and
+  // they spread an octave apart in pitch — 38 / 76 / 130 Hz of grain — so the next
+  // pass is a choice of three, not three takes on one. The `gain` rise gives back
+  // roughly what the lower corner took: "lower" must not arrive as "quieter" on a
+  // sound that is the `TELL.mineHit` voice (`./bank`) and fires all match.
+  //
+  // Why it does not go boomy at rate: the low-pass moved, the *envelope* did not —
+  // the decays are as short as they were, so a 28 Hz retrigger stacks no more energy
+  // than the denied set did. Measured, overlap-added at that rate: a 0.112 (was
+  // 0.120), c 0.113 (was 0.136), and the long rasp b 0.168 against its own 0.166 —
+  // level with what was already judged "almost there", not above it. The high-pass
+  // corner stays clear of the sub band on all three (38 / 50 / 90 Hz).
   rockChip: {
     label: "Rock Chip",
     context: "Per-tick mining laser hit while chipping a rock — fires rapidly, must read as a stream",
     current: 'rockChip',
     candidates: [
-      { id: 'a', character: "dry brittle tick", spec: {"name":"rockChip_dryTick","wave":"noise","attack":0.001,"hold":0.008,"decay":0.05,"punch":0.5,"freq":180,"freqEnd":130,"lowPass":900,"highPass":80,"gain":0.38,"seed":20480} },
-      { id: 'b', character: "grinding rasp scrape", spec: {"name":"rockChip_grindRasp","wave":"noise","attack":0.001,"hold":0.02,"decay":0.14,"punch":0.25,"freq":110,"freqEnd":90,"vibratoDepth":0.15,"vibratoRate":14,"lowPass":700,"highPass":50,"gain":0.36,"seed":20481} },
-      { id: 'c', character: "sharp crisp crack", spec: {"name":"rockChip_sharpCrack","wave":"noise","attack":0.001,"hold":0.01,"decay":0.07,"punch":0.6,"freq":240,"freqEnd":160,"lowPass":1800,"highPass":140,"gain":0.34,"seed":20482} },
+      { id: 'a', character: "blunt dry tick, low", spec: {"name":"rockChip_dryTick","wave":"noise","attack":0.001,"hold":0.008,"decay":0.05,"punch":0.5,"freq":76,"freqEnd":54,"lowPass":220,"highPass":50,"gain":0.44,"seed":20480} },
+      { id: 'b', character: "deep slow grinding rasp", spec: {"name":"rockChip_grindRasp","wave":"noise","attack":0.001,"hold":0.02,"decay":0.14,"punch":0.25,"freq":38,"freqEnd":28,"vibratoDepth":0.15,"vibratoRate":14,"lowPass":175,"highPass":38,"gain":0.42,"seed":20481} },
+      { id: 'c', character: "heavy low crack, punchy", spec: {"name":"rockChip_sharpCrack","wave":"noise","attack":0.001,"hold":0.01,"decay":0.07,"punch":0.6,"freq":130,"freqEnd":86,"lowPass":420,"highPass":90,"gain":0.40,"seed":20482} },
     ],
   },
   hullHit: {
