@@ -25,7 +25,10 @@ export interface Mask {
 /** Samples per axis inside each pixel. 2 ⇒ 4 samples, enough to stabilise thin fins. */
 const SUBSAMPLES = 2;
 
-function pointInPoly(points: readonly number[], x: number, y: number): boolean {
+/** Crossing-number test: is `(x, y)` inside the closed polygon `points`?
+ *  Shared with the ring scanner (./ring-scan), which measures the same sprite IR
+ *  along a radius rather than over a pixel grid. */
+export function pointInPoly(points: readonly number[], x: number, y: number): boolean {
   let inside = false;
   const n = points.length / 2;
   for (let i = 0, j = n - 1; i < n; j = i++) {
