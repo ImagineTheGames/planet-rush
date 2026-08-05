@@ -59,6 +59,7 @@
 
 import { TELL, type TellKind } from '../tells';
 import type { VoiceSpec } from './synth';
+import type { UiCueName } from './ui-cues';
 
 // ---------------------------------------------------------------------------
 // Spec shapes
@@ -1618,13 +1619,46 @@ export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.thrust];
  *  - `respawnBeep` / `respawnGo` — the respawn countdown, and the launch (GDD §2.7).
  *  - `ping`    — a minimap ping (GDD §2.4).
  *
+ * Six more name the interactions the **Gantry/Bone cue set** (`./ui-cues`, s6-01)
+ * distinguishes and the original three could not. They are additive: `press`,
+ * `confirm` and `reject` still mean what `src/ui/sfx.ts` says they mean, and the
+ * UI seam's three-word vocabulary is unchanged.
+ *
+ *  - `hover`  — a fingertip crossed a live control.
+ *  - `detent` — a selection stepped one notch (a wheel, a roster row, a hull tile).
+ *  - `back`   — BACK or CANCEL. **Never a forward cue**: falling interval = backwards.
+ *  - `accept` — a forward confirm that is *not* a spend (a screen entered, REMATCH).
+ *  - `join`   — a seat filled, stepping up by slot index.
+ *  - `rush`   — RUSH!, the countdown starting.
+ *
  * Played through {@link AudioEngine.cue}: full level, no earshot falloff (they are
  * non-diegetic UI, not a thing at a place in the world), but still under the
  * three-second hush like everything else (GDD §4.7).
  */
-export type AudioCue = 'press' | 'confirm' | 'reject' | 'deposit' | 'respawnBeep' | 'respawnGo' | 'ping';
+export type AudioCue =
+  | 'press'
+  | 'confirm'
+  | 'reject'
+  | 'deposit'
+  | 'respawnBeep'
+  | 'respawnGo'
+  | 'ping'
+  | 'hover'
+  | 'detent'
+  | 'back'
+  | 'accept'
+  | 'join'
+  | 'rush';
 
-/** The sound each device cue plays. */
+/**
+ * The bank sound each device cue falls back to.
+ *
+ * *"Falls back"*, because since s6-01 every cue the Gantry/Bone set covers is
+ * played by `./ui-cues` instead — the ratified struck-glass voices the developer
+ * chose by ear ({@link CUE_UI}). This map is what sounds when there is no cue
+ * player at all, and it is what keeps the vocabulary total: no cue is ever silent
+ * for want of a mapping.
+ */
 export const CUE_SOUND: Readonly<Record<AudioCue, SoundName>> = {
   press: SOUND.pressTick,
   confirm: SOUND.purchaseConfirm,
@@ -1633,4 +1667,39 @@ export const CUE_SOUND: Readonly<Record<AudioCue, SoundName>> = {
   respawnBeep: SOUND.respawnBeep,
   respawnGo: SOUND.respawnGo,
   ping: SOUND.minimapPing,
+  hover: SOUND.pressTick,
+  detent: SOUND.pressTick,
+  back: SOUND.pressTick,
+  accept: SOUND.purchaseConfirm,
+  join: SOUND.pressTick,
+  rush: SOUND.purchaseConfirm,
+};
+
+/**
+ * Device cue → the Gantry/Bone cue that answers it (`./ui-cues` s6-01).
+ *
+ * The interesting rows are the three that already existed, because they are what
+ * makes the ratified set audible everywhere the UI already speaks without the UI
+ * seam learning a single new word:
+ *
+ *  - `press`   → **pick**     — one note, A♭6. The plainest forward thing there is.
+ *  - `confirm` → **purchase** — a spend landed: three notes rising. The UI raises
+ *    `confirm` only when the SIM confirmed the spend (`src/ui/sfx.ts`), which is
+ *    exactly what the handoff calls a purchase.
+ *  - `reject`  → **refused**  — two notes a minor second apart, resolving nowhere.
+ *
+ * `deposit`, `respawnBeep`, `respawnGo` and `ping` are absent on purpose: they are
+ * world/clock tells wearing a cue's clothes, not the UI's struck glass, and the
+ * handoff's set does not cover them.
+ */
+export const CUE_UI: Readonly<Partial<Record<AudioCue, UiCueName>>> = {
+  press: 'pick',
+  confirm: 'purchase',
+  reject: 'refused',
+  hover: 'hover',
+  detent: 'detent',
+  back: 'back',
+  accept: 'confirm',
+  join: 'join',
+  rush: 'rush',
 };
