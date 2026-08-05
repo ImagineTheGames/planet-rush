@@ -20,8 +20,15 @@
  *  3. **Signal yellow is RESERVED** (§2). There is no ore and no hazard on this
  *     screen, so there is no yellow on it either — not on the selected hull tile,
  *     not on RUSH!, not on the room code. Selection reads as plasma.
- *  4. **No ship stats** (GDD §2.2, §2.5). A hull tile draws a name, a hull and a
- *     blurb; the model gives it nothing else it *could* draw.
+ *  4. **Ship stats ARE drawn here — pips AND numbers** (u4, ratified 2026-08-05:
+ *     *"both pips and numbers"*; GDD §2.5 / §2.11 amended). A hull tile draws a
+ *     name, a hull, a blurb **and** six stat cells, each a figure over a coarse
+ *     five-pip bar. This file does no arithmetic for any of it: the numbers and
+ *     the pips both arrive on the model's {@link ShipStatLine} (derived from one
+ *     value, off the sim's own table), and every rect arrives from
+ *     `classTileContent` / `classStatCell`. The **pips are chrome** — plasma on
+ *     the selected tile, chalk otherwise, hull-steel unfilled — so rule 3 above
+ *     is untouched: nothing on this screen is signal yellow or threat red.
  *
  * Typography follows style-guide §7: Audiowide for headings and the wordmark,
  * Oxanium for numerals and body — never the other way round.
@@ -32,10 +39,26 @@ import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { buttonStyle } from './button-theme';
-import { ABUNDANCE_LABELS, DIFFICULTY_LABELS, MODE_LABELS, RUSH_LABEL, SIDE_COLORS } from './lobby';
+import {
+  ABUNDANCE_LABELS,
+  DIFFICULTY_LABELS,
+  MODE_LABELS,
+  RUSH_LABEL,
+  SIDE_COLORS,
+  STAT_PIP_COLORS,
+} from './lobby';
 import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
-import { BLOCK_GAP, lobbyHitTest, lobbyLayout } from './lobby-geometry';
-import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
+import {
+  BLOCK_GAP,
+  STAT_COUNT,
+  STAT_PIP_BAR,
+  STAT_ROW_TEXT,
+  classStatCell,
+  classTileContent,
+  lobbyHitTest,
+  lobbyLayout,
+} from './lobby-geometry';
+import type { ClassTileContent, Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
 import { MapPickerView } from './map-picker-view';
 import { mapPickerModel } from './map-picker';
 import type { MapPickerLayout } from './map-picker';
@@ -62,6 +85,12 @@ const PING_GAP = 8;
 /** Inset the TEAM chip's word keeps from its chip's edges, CSS px — the room the
  *  auto-fit measures against ({@link LobbyView.drawTeamChip}). */
 const TEAM_CHIP_LABEL_PAD = 6;
+
+/** Air between two pips of a stat bar (u4). */
+const STAT_PIP_GAP = 1;
+/** A pip bar never spans more than this, so a stat on a 543px-wide desktop tile
+ *  reads as a bar to compare rather than a rule across the tile. */
+const STAT_PIP_BAR_MAX_WIDTH = 44;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
@@ -106,6 +135,11 @@ interface ClassNodes {
   readonly name: Text;
   readonly hull: Text;
   readonly blurb: Text;
+  /** Every pip of every stat on this tile, in one Graphics — 30 tiny rects
+   *  redrawn together, so a tile costs one extra draw call rather than six. */
+  readonly pips: Graphics;
+  /** `SPD 130%` — one per stat, in the model's own stat order (u4). */
+  readonly stats: Text[];
 }
 
 // ---------------------------------------------------------------------------
@@ -594,12 +628,19 @@ export class LobbyView extends Container {
   // --- Hull tiles ----------------------------------------------------------
 
   /**
-   * One hull tile: a name, a hull, and a role blurb. **Words only** — the model
-   * carries no stat for this to print, which is how GDD §2.5's "ship stats live
-   * in the upgrade panel" is kept true by construction rather than by care.
+   * One hull tile: a name, a hull, **six stats as pips and numbers**, and a role
+   * blurb — in that priority order, laid out by `classTileContent` so a short
+   * tile drops a whole block rather than clipping one (u4, ratified 2026-08-05:
+   * *"both pips and numbers"*).
+   *
+   * Every figure here is `line.text` and every bar is `line.pips`, both derived
+   * from the one `line.value` the model read off the sim's `SHIP_STATS`. This
+   * method computes neither, which is how "four pips beside a number that means
+   * three" is made unreachable rather than merely unlikely.
    *
    * Selection is **plasma**, never signal yellow: there is no ore and no hazard
-   * on this screen, so there is no yellow on it (style-guide §2).
+   * on this screen, so there is no yellow on it (style-guide §2) — and the pips
+   * are chrome, so they are neither yellow nor threat red either.
    */
   private drawClassTile(
     nodes: ClassNodes,
@@ -609,6 +650,7 @@ export class LobbyView extends Container {
   ): void {
     const selected = option.shipClass === model.shipClass;
     const dim = model.classLocked && !selected;
+    const content = classTileContent(rect);
 
     nodes.body.clear();
     nodes.body
@@ -621,27 +663,92 @@ export class LobbyView extends Container {
         alpha: dim ? 0.3 : selected ? 0.9 : 0.45,
       });
 
-    const pad = 8;
     const alpha = dim ? 0.45 : 1;
     nodes.name.text = option.name;
     nodes.name.style.fill = selected ? TEXT_PRIMARY : TEXT_DIM;
     nodes.name.alpha = alpha;
-    nodes.name.x = rect.x + pad;
-    nodes.name.y = rect.y + pad;
+    nodes.name.x = content.name.x;
+    nodes.name.y = content.name.y;
 
+    // The hull nickname (Quadfin…). Flavour the codex also carries, so it is the
+    // block that gives way *before* the stats on the tightest tile.
     nodes.hull.text = option.hull;
     nodes.hull.alpha = alpha;
-    nodes.hull.x = rect.x + pad;
-    nodes.hull.y = nodes.name.y + 16;
+    nodes.hull.x = content.hull.x;
+    nodes.hull.y = content.hull.y;
+    nodes.hull.visible = content.showHull;
+
+    this.drawClassStats(nodes, option, content, selected, alpha);
 
     // The role blurb (GDD §2.11). Hidden on a tile too short to hold it rather
     // than clipped — a half-sentence reads worse than none.
     nodes.blurb.text = option.blurb;
     nodes.blurb.alpha = alpha;
-    nodes.blurb.style.wordWrapWidth = Math.max(20, rect.width - 2 * pad);
-    nodes.blurb.x = rect.x + pad;
-    nodes.blurb.y = nodes.hull.y + 16;
-    nodes.blurb.visible = rect.height >= 64;
+    nodes.blurb.style.wordWrapWidth = Math.max(20, content.blurb.width);
+    nodes.blurb.x = content.blurb.x;
+    nodes.blurb.y = content.blurb.y;
+    nodes.blurb.visible = content.showBlurb;
+  }
+
+  /**
+   * The stat grid on one tile: per stat, its figure on a text line with its pip
+   * bar directly beneath, in the model's own stat order (GDD §2.11's table).
+   *
+   * The two channels are deliberately redundant — the bar answers *"which of
+   * these four is the fast one?"* across the four tiles at a glance, the figure
+   * answers *"by how much"* — and both are read off the same `ShipStatLine`, so
+   * they cannot drift apart here.
+   */
+  private drawClassStats(
+    nodes: ClassNodes,
+    option: ShipClassOption,
+    content: ClassTileContent,
+    selected: boolean,
+    alpha: number,
+  ): void {
+    nodes.pips.clear();
+    nodes.pips.alpha = alpha;
+    nodes.pips.visible = content.showStats;
+
+    for (let i = 0; i < nodes.stats.length; i++) {
+      const cell = nodes.stats[i]!;
+      const line = option.stats[i];
+      if (!line || !content.showStats) {
+        cell.visible = false;
+        continue;
+      }
+      const box = classStatCell(content, i);
+      cell.visible = true;
+      cell.text = `${line.label} ${line.text}`;
+      cell.style.fill = selected ? TEXT_PRIMARY : TEXT_DIM;
+      cell.alpha = alpha;
+      cell.x = box.x;
+      cell.y = box.y;
+
+      // The bar under the figure. Filled pips take the tile's own accent —
+      // plasma when this hull is the pick, chalk otherwise — and the unfilled
+      // remainder is hull-steel at a glance-level alpha: chrome, never a
+      // reserved hue (style-guide §2).
+      const barWidth = Math.min(box.width, STAT_PIP_BAR_MAX_WIDTH);
+      const pipWidth = Math.max(
+        1,
+        (barWidth - (line.pipMax - 1) * STAT_PIP_GAP) / Math.max(1, line.pipMax),
+      );
+      const barY = box.y + STAT_ROW_TEXT;
+      for (let p = 0; p < line.pipMax; p++) {
+        const filled = p < line.pips;
+        nodes.pips
+          .rect(box.x + p * (pipWidth + STAT_PIP_GAP), barY, pipWidth, STAT_PIP_BAR)
+          .fill({
+            color: filled
+              ? selected
+                ? STAT_PIP_COLORS.selected
+                : STAT_PIP_COLORS.filled
+              : STAT_PIP_COLORS.empty,
+            alpha: filled ? (selected ? 0.95 : 0.7) : 0.22,
+          });
+      }
+    }
   }
 
   private classSlot(index: number): ClassNodes {
@@ -650,12 +757,21 @@ export class LobbyView extends Container {
 
     const body = new Graphics();
     const name = makeText('', FONT_HEADING, 12, TEXT_PRIMARY);
-    const hull = makeText('', FONT_BODY, 11, PALETTE.patina);
+    const hull = makeText('', FONT_BODY, 9, PALETTE.patina);
     const blurb = makeText('', FONT_BODY, 10, TEXT_DIM);
     blurb.style.wordWrap = true;
+    const pips = new Graphics();
+    // One label+figure per stat. `letterSpacing: 0` (rather than the screen's
+    // usual 0.5) is what buys `SPD 130%` its room in a 42px cell on a phone.
+    const stats: Text[] = [];
+    for (let i = 0; i < STAT_COUNT; i++) {
+      const cell = makeText('', FONT_BODY, 8, TEXT_DIM);
+      cell.style.letterSpacing = 0;
+      stats.push(cell);
+    }
 
-    this.addChild(body, name, hull, blurb);
-    const nodes: ClassNodes = { body, name, hull, blurb };
+    this.addChild(body, name, hull, blurb, pips, ...stats);
+    const nodes: ClassNodes = { body, name, hull, blurb, pips, stats };
     this.classNodes[index] = nodes;
     return nodes;
   }

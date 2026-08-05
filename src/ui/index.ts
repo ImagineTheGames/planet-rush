@@ -358,6 +358,13 @@ export {
   ROOM_CODE_LENGTH,
   RUSH_COUNTDOWN_SECONDS,
   RUSH_LABEL,
+  // The hull tiles' stats — pips AND numbers (u4, ratified 2026-08-05; GDD §2.5
+  // / §2.11 amended). `shipStatLines` derives both channels from ONE value off
+  // the sim's `SHIP_STATS`, so nothing downstream can print a figure that
+  // disagrees with its bar. `STAT_PIP_COLORS` pins the pips as chrome.
+  STAT_PIPS,
+  STAT_PIP_COLORS,
+  shipStatLines,
   applyLobbySlots,
   botDifficulties,
   canStart,
@@ -417,11 +424,19 @@ export type {
   LobbyTeamCount,
   SeatOccupant,
   ShipClassOption,
+  ShipStatKey,
+  ShipStatLine,
 } from './lobby';
 
 export {
   CLASS_TILE_MAX,
   CLASS_TILE_MIN,
+  // Inside one hull tile: which of its four blocks fit at this size, and where
+  // each stat cell goes (u4). The view draws what these return and decides
+  // nothing, so "six stats legible at phone scale" is a headless assertion.
+  STAT_COUNT,
+  classStatCell,
+  classTileContent,
   LOBBY_PAD,
   RUSH_HEIGHT,
   RUSH_HEIGHT_TOUCH,
@@ -431,7 +446,14 @@ export {
   lobbyHitTest,
   lobbyLayout,
 } from './lobby-geometry';
-export type { Insets, LobbyLayout, LobbyLayoutOptions, LobbyTarget, TileShape } from './lobby-geometry';
+export type {
+  ClassTileContent,
+  Insets,
+  LobbyLayout,
+  LobbyLayoutOptions,
+  LobbyTarget,
+  TileShape,
+} from './lobby-geometry';
 
 export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
