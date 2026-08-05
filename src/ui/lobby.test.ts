@@ -42,6 +42,8 @@ import {
   SEAT_STATE_CYCLE,
   SIDE_COLORS,
   SIDE_WORDS,
+  STAT_PIPS,
+  STAT_PIP_COLORS,
   TEAM_LABELS,
   activeTeams,
   applyLobbySlots,
@@ -73,6 +75,7 @@ import {
   selectMap,
   selectShipClass,
   setPlayerName,
+  shipStatLines,
   sideRelation,
   startLobbyMatch,
   teamLabel,
@@ -91,7 +94,9 @@ import { nameplateModel, resolveTeamLabel } from './nameplates';
 // `./chrome.test` runs on the panel chrome).
 import { PALETTE as ART_PALETTE, DERIVED, tint } from '../art/palette';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
-import { DEFAULT_ABUNDANCE } from '../sim/constants';
+// The sim's own class table — the source the hull tiles' figures must match
+// exactly (u4: never a hand-copied table).
+import { DEFAULT_ABUNDANCE, SHIP_STATS } from '../sim/constants';
 import {
   MAX_MATCH_SIZE,
   MIN_MATCH_SIZE,
@@ -255,14 +260,30 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
     expect(new Set(Object.values(ShipClass))).toEqual(new Set(CLASS_ORDER));
   });
 
-  it('gives each hull a name, a hull and a role blurb — and no number', () => {
-    // GDD §2.2/§2.5: ship stats appear in the upgrade panel and nowhere else.
-    // The tile carries words only, which is why the type has no numeric field.
+  it('gives each hull a name, a hull, a role blurb — AND its stats (u4)', () => {
+    // This assertion is the INVERSION of the one that stood here until
+    // 2026-08-05, which required `${name} ${hull} ${blurb}` to contain no digit
+    // at all — the enforcement of "ship stats appear only in the upgrade panel".
+    // The developer ratified the opposite ("both pips and numbers") and GDD §2.5
+    // / §2.11 were amended, so the gate is rewritten to describe the design that
+    // exists rather than left skipped as furniture.
     for (const option of CLASS_OPTIONS) {
       expect(option.name.length).toBeGreaterThan(0);
       expect(option.hull.length).toBeGreaterThan(0);
       expect(option.blurb.length).toBeGreaterThan(0);
+      // The prose is still prose — a stat belongs in the stat block, not smuggled
+      // into a sentence where nothing lines it up against the other three hulls.
       expect(`${option.name} ${option.hull} ${option.blurb}`).not.toMatch(/\d/);
+      // …and the stats are there, in GDD §2.11's table order, every one of them
+      // carrying BOTH channels: a figure and a pip count.
+      expect(option.stats.map((s) => s.key)).toEqual(STAT_KEYS);
+      for (const stat of option.stats) {
+        expect(stat.label.length, `${option.name} ${stat.key} label`).toBeGreaterThan(0);
+        expect(stat.text, `${option.name} ${stat.key} figure`).toMatch(/\d/);
+        expect(stat.pips).toBeGreaterThanOrEqual(1);
+        expect(stat.pips).toBeLessThanOrEqual(STAT_PIPS);
+        expect(stat.pipMax).toBe(STAT_PIPS);
+      }
     }
     expect(CLASS_OPTIONS.map((o) => o.hull)).toEqual(['Quadfin', 'Anvil', 'Pincer', 'Hammerhead']);
   });
@@ -299,6 +320,152 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
     const picked = selectShipClass(lobby(), ShipClass.Hauler);
     const echoed = applyLobbySlots(picked, wireSlots(['human', 'open', 'open', 'open', 'open', 'open', 'open', 'open']));
     expect(echoed.seats[0]?.shipClass).toBe(ShipClass.Hauler);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2a. Ship stats on ship-select — pips AND numbers (u4, ratified 2026-08-05)
+// ---------------------------------------------------------------------------
+//
+// The developer, asked whether ship stats could appear on ship-select having been
+// shown coarse pips: **"both pips and numbers."** GDD §2.5 and §2.11 carry the
+// matching *(amended 2026-08-05)* marker. These are the two guarantees that make
+// the reversal safe rather than merely permitted:
+//
+//   1. the figures come from the SIM's own class table, so the screen cannot
+//      advertise a game the simulation is not running; and
+//   2. the pips and the figure are two renderings of ONE value, so a tile cannot
+//      show four pips beside a number that means three.
+//
+// The build wheel is deliberately untouched by all of this: a segment's numeric
+// keys are still exactly `['angle', 'cost']` and UPGRADE SHIP still carries an
+// arrow rather than a number — pinned in `./build-wheel.test.ts`, which this
+// brief did not go near.
+
+/** GDD §2.11's table columns, in order — the stats a tile shows. */
+const STAT_KEYS = ['speed', 'accel', 'turn', 'hull', 'power', 'cargo'] as const;
+
+/** The `SHIP_STATS` field each key is read from — the mapping this screen claims
+ *  to make, restated independently here so the test would catch it silently
+ *  reading `accelMul` under the SPD label. */
+const STAT_SOURCE: Readonly<Record<(typeof STAT_KEYS)[number], keyof (typeof SHIP_STATS)[ShipClass.Vanguard]>> = {
+  speed: 'speedMul',
+  accel: 'accelMul',
+  turn: 'turnMul',
+  hull: 'hull',
+  power: 'power',
+  cargo: 'cargo',
+};
+
+/** The figure as a NUMBER again — `130%` → 1.3, `35` → 35. Reading the printed
+ *  string back is the only way to assert the *player's* number is the sim's; an
+ *  assertion against `stat.value` alone would pass on a broken formatter. */
+function parseFigure(text: string): number {
+  const n = Number.parseFloat(text);
+  return text.trim().endsWith('%') ? n / 100 : n;
+}
+
+describe('ship stats on ship-select (u4 — "both pips and numbers")', () => {
+  it('reads every figure off the SIM class table, never a hand-copied one', () => {
+    for (const option of CLASS_OPTIONS) {
+      const source = SHIP_STATS[option.shipClass];
+      for (const stat of option.stats) {
+        expect(stat.value, `${option.name} ${stat.key}`).toBe(source[STAT_SOURCE[stat.key]]);
+      }
+    }
+    // …and the accessor is the same one the tiles were built from, so a caller
+    // that asks for a class's stats gets exactly what its tile shows.
+    for (const cls of CLASS_ORDER) {
+      const tile = CLASS_OPTIONS.find((o) => o.shipClass === cls)!;
+      expect(shipStatLines(cls)).toEqual(tile.stats);
+    }
+  });
+
+  it('prints the number the sim honours — the figure IS the value', () => {
+    for (const option of CLASS_OPTIONS) {
+      for (const stat of option.stats) {
+        expect(parseFigure(stat.text), `${option.name} ${stat.key} = ${stat.text}`).toBeCloseTo(
+          stat.value,
+          6,
+        );
+      }
+    }
+    // Spot-checked against GDD §2.11's own table, so a silent unit change (a
+    // multiplier printed raw as `1.3`) fails here rather than on a phone.
+    const interceptor = CLASS_OPTIONS.find((o) => o.shipClass === ShipClass.Interceptor)!;
+    expect(interceptor.stats.map((s) => s.text)).toEqual(['130%', '120%', '140%', '35', '8', '2']);
+    const hauler = CLASS_OPTIONS.find((o) => o.shipClass === ShipClass.Hauler)!;
+    expect(hauler.stats.map((s) => s.text)).toEqual(['85%', '80%', '85%', '70', '9', '3']);
+  });
+
+  it('never shows pips that disagree with the number beside them', () => {
+    // The load-bearing assertion of this brief. Both channels hang off one
+    // `value`, so across the four hulls the pip order can never contradict the
+    // figure order: a hull that shows MORE pips than another must also show a
+    // BIGGER number for that stat, on every stat, for every pair of hulls.
+    for (const key of STAT_KEYS) {
+      const rows = CLASS_OPTIONS.map((o) => ({
+        name: o.name,
+        stat: o.stats.find((s) => s.key === key)!,
+      }));
+      for (const a of rows) {
+        for (const b of rows) {
+          if (a.stat.pips === b.stat.pips) continue;
+          const claim = `${key}: ${a.name} ${a.stat.text}/${a.stat.pips}pip vs ${b.name} ${b.stat.text}/${b.stat.pips}pip`;
+          expect(a.stat.pips > b.stat.pips, claim).toBe(
+            parseFigure(a.stat.text) > parseFigure(b.stat.text),
+          );
+        }
+      }
+    }
+  });
+
+  it('spends the whole bar on the four hulls, so the pips actually compare', () => {
+    // A pip bar that reads 4/5 on every hull compares nothing. Each stat's scale
+    // is the spread across the roster, so the roster's worst hull reads one pip
+    // and its best reads five — and the FIGURE beside it is what keeps the
+    // absolute truth on screen.
+    for (const key of STAT_KEYS) {
+      const stats = CLASS_OPTIONS.map((o) => o.stats.find((s) => s.key === key)!);
+      const values = stats.map((s) => s.value);
+      const pips = stats.map((s) => s.pips);
+      if (Math.min(...values) === Math.max(...values)) {
+        // No spread to show (every hull equal) — every tile reads full rather
+        // than parking the roster on some arbitrary middle rung.
+        expect(new Set(pips)).toEqual(new Set([STAT_PIPS]));
+        continue;
+      }
+      expect(Math.min(...pips), `${key} floor`).toBe(1);
+      expect(Math.max(...pips), `${key} ceiling`).toBe(STAT_PIPS);
+    }
+    // The Interceptor is the roster's fast, nimble, papery knife and the Hauler
+    // its hold-carrying tank (GDD §2.11) — the pips say so at a glance.
+    const stat = (cls: ShipClass, key: (typeof STAT_KEYS)[number]) =>
+      CLASS_OPTIONS.find((o) => o.shipClass === cls)!.stats.find((s) => s.key === key)!.pips;
+    expect(stat(ShipClass.Interceptor, 'speed')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Interceptor, 'hull')).toBe(1);
+    expect(stat(ShipClass.Hauler, 'hull')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Hauler, 'cargo')).toBe(STAT_PIPS);
+    expect(stat(ShipClass.Excavator, 'power')).toBe(STAT_PIPS);
+  });
+
+  it('draws the pips in CHROME — never signal yellow, never threat red', () => {
+    // Cold Vacuum's load-bearing rule (style-guide §2): signal yellow means ore
+    // or danger and nothing else, and threat red is damage. A pip is neither, so
+    // it takes a hue the screen already uses — plasma (the selection accent),
+    // chalk (its body text), hull steel (its chrome) — and adds none.
+    const pips = Object.values(STAT_PIP_COLORS);
+    for (const color of pips) {
+      expect(color).not.toBe(PALETTE.signalYellow);
+      expect(color).not.toBe(ART_PALETTE.signalYellow);
+      expect(color).not.toBe(PALETTE.threatRed);
+      expect(color).not.toBe(SIDE_COLORS.enemy);
+    }
+    expect(STAT_PIP_COLORS.selected).toBe(PALETTE.plasma);
+    expect(STAT_PIP_COLORS.empty).toBe(PALETTE.hullSteel);
+    // The filled-but-unselected pip is the lobby's own chalk, and it has to read
+    // at 3px against Vacuum — the same bar every other tone on this screen clears.
+    expect(contrastOnVacuum(STAT_PIP_COLORS.filled)).toBeGreaterThan(4.5);
   });
 });
 

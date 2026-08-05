@@ -25,20 +25,30 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { CLASS_ORDER, LOBBY_SLOTS } from './lobby';
+import { CLASS_OPTIONS, CLASS_ORDER, LOBBY_SLOTS } from './lobby';
 import { MAP_ORDER } from './map-picker';
 import {
+  CLASS_HULL_LINE,
+  CLASS_NAME_LINE,
   CLASS_TILE_COMPACT,
   CLASS_TILE_MIN,
+  CLASS_TILE_MIN_WIDTH,
+  CLASS_TILE_PAD,
   LOBBY_MAP_COUNT,
   LOBBY_PAD,
   RUSH_HEIGHT,
   SEAT_ROW_MAX,
   SEAT_ROW_MAX_TOUCH,
   SEAT_TEAM_CHIP_MIN_BODY,
+  STAT_CELL_FLOOR,
+  STAT_CELL_GAP,
+  STAT_COUNT,
   TWO_COLUMN_MIN_WIDTH,
+  classStatCell,
+  classTileContent,
   lobbyHitTest,
   lobbyLayout,
+  statGridHeight,
 } from './lobby-geometry';
 import type { LobbyLayout } from './lobby-geometry';
 
@@ -343,6 +353,144 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     const layout = lobbyLayout({ width: 320, height: 568 }, { isTouch: true });
     expect(layout.seats[0]!.height).toBeLessThan(SEAT_ROW_MAX_TOUCH);
     expect(layout.classOptions[0]!.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Inside a hull tile — six stats, as pips AND numbers, at phone scale
+// ---------------------------------------------------------------------------
+//
+// u4 (ratified 2026-08-05, "both pips and numbers") put six stat cells on a tile
+// that used to hold a name over a sentence. Four hulls' worth of that on a
+// 390-wide handset is the hard case the brief named, and a layout verified only
+// on desktop has shipped broken on this project before — so the ladder is
+// asserted against the WHOLE device matrix here, portrait and landscape, rather
+// than eyeballed once.
+
+describe('the hull tile’s contents (u4 — pips and numbers, at every size)', () => {
+  it('sizes CLASS_TILE_MIN so a minimum tile still carries name + hull + stats', () => {
+    // The arrangement chooser (placeTiles) defends CLASS_TILE_MIN before it
+    // defends anything else, so that number has to be the height of the tile's
+    // whole IDENTITY block — otherwise "the tiles keep their floor" would be a
+    // promise about a tile with nothing on it.
+    const identity =
+      2 * CLASS_TILE_PAD + CLASS_NAME_LINE + CLASS_HULL_LINE + statGridHeight(2);
+    expect(identity).toBeLessThanOrEqual(CLASS_TILE_MIN);
+    // …and three columns fit inside ANY tile the layout is willing to produce,
+    // which is why 3 is the floor arrangement and there is no 2-column shape.
+    const innerWidth = CLASS_TILE_MIN_WIDTH - 2 * CLASS_TILE_PAD;
+    expect((innerWidth - 2 * STAT_CELL_GAP) / 3).toBeGreaterThanOrEqual(STAT_CELL_FLOOR);
+    // The geometry mirrors the model's stat count rather than importing it (the
+    // LOBBY_SLOT_ROWS discipline); this is the assertion that keeps them equal.
+    for (const option of CLASS_OPTIONS) expect(option.stats).toHaveLength(STAT_COUNT);
+  });
+
+  for (const { name, vp, touch } of PROFILES) {
+    it(`shows all six stats, inside the tile and never overlapping — ${name}`, () => {
+      const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      for (let t = 0; t < layout.classOptions.length; t++) {
+        const tile = layout.classOptions[t]!;
+        const content = classTileContent(tile);
+        expect(content.showStats, `stats dropped on ${name} tile ${t} ${fmt(tile)}`).toBe(true);
+        expect(content.statColumns * content.statRows).toBeGreaterThanOrEqual(STAT_COUNT);
+
+        const cells: Rect[] = [];
+        for (let i = 0; i < STAT_COUNT; i++) {
+          const cell = classStatCell(content, i);
+          expect(
+            rectContains(tile, cell),
+            `stat cell ${i} escapes ${name} tile ${t}: ${fmt(cell)} ⊄ ${fmt(tile)}`,
+          ).toBe(true);
+          for (let j = 0; j < cells.length; j++) {
+            expect(overlaps(cells[j]!, cell), `stat cells ${j}/${i} overlap on ${name}`).toBe(false);
+          }
+          cells.push(cell);
+        }
+        // Every block the tile decided to draw stays inside it too — a name that
+        // runs off a 44px tile is the same bug as a stat cell that does.
+        for (const [label, rect] of [
+          ['name', content.name],
+          ['hull', content.hull],
+          ['stats', content.stats],
+          ['blurb', content.blurb],
+        ] as const) {
+          expect(
+            rectContains(tile, rect),
+            `${label} escapes ${name} tile ${t}: ${fmt(rect)} ⊄ ${fmt(tile)}`,
+          ).toBe(true);
+        }
+      }
+    });
+  }
+
+  it('lays the six across in ONE row when the tile is wide, 3×2 on a phone', () => {
+    // A desktop `stack` tile is wide and reads like GDD §2.11's own table row…
+    const desktop = lobbyLayout({ width: 1280, height: 800 });
+    const wide = classTileContent(desktop.classOptions[0]!);
+    expect(desktop.tileShape).toBe('stack');
+    expect(wide.statColumns).toBe(STAT_COUNT);
+    expect(wide.statRows).toBe(1);
+    expect(wide.showBlurb).toBe(true);
+
+    // …and a phone tile folds to 3×2, which is what fits beside four of them.
+    const phone = lobbyLayout({ width: 390, height: 844 }, { isTouch: true, insets: PORTRAIT_INSETS });
+    const narrow = classTileContent(phone.classOptions[0]!);
+    expect(narrow.statColumns).toBe(3);
+    expect(narrow.statRows).toBe(2);
+    expect(narrow.showStats).toBe(true);
+  });
+
+  it('gives up the blurb, then the hull nickname — keeping the stats', () => {
+    // The stated ladder (see the geometry header): name, stats, hull, blurb. A
+    // tile shrinking through the sizes loses them from the bottom, so each block
+    // is monotone in height — nothing may reappear as the tile gets smaller —
+    // and the blurb is never drawn without the two blocks above it.
+    const width = 200;
+    let sawFull = false;
+    let sawStatsNoHull = false;
+    let sawFallback = false;
+    let previous: { stats: boolean; hull: boolean; blurb: boolean } | null = null;
+    for (let height = 44; height <= 120; height += 1) {
+      const box = { x: 0, y: 0, width, height };
+      const content = classTileContent(box);
+
+      expect(!content.showBlurb || (content.showHull && content.showStats), `blurb alone at ${height}px`).toBe(true);
+      if (previous) {
+        expect(content.showStats || !previous.stats, `stats un-shown at ${height}px`).toBe(true);
+        expect(content.showHull || !previous.hull, `hull un-shown at ${height}px`).toBe(true);
+        expect(content.showBlurb || !previous.blurb, `blurb un-shown at ${height}px`).toBe(true);
+      }
+      previous = { stats: content.showStats, hull: content.showHull, blurb: content.showBlurb };
+
+      if (content.showBlurb) sawFull = true;
+      else if (content.showStats && !content.showHull) sawStatsNoHull = true;
+      else if (!content.showStats && !content.showHull) sawFallback = true;
+
+      // Whatever it decided, the blocks it drew fit in the tile it was given.
+      expect(rectContains(box, content.stats)).toBe(true);
+      expect(rectContains(box, content.blurb)).toBe(true);
+      expect(rectContains(box, content.hull)).toBe(true);
+    }
+    // All three regimes are reachable — the full tile, the phone tile that keeps
+    // its stats and gives up its nickname, and the sub-floor tile that is too
+    // short for either. Otherwise this test proves nothing.
+    expect({ sawFull, sawStatsNoHull, sawFallback }).toEqual({
+      sawFull: true,
+      sawStatsNoHull: true,
+      sawFallback: true,
+    });
+  });
+
+  it('falls back to the pre-u4 card on a tile too NARROW for a legible grid', () => {
+    // The one documented exception to "stats before the nickname". Height cannot
+    // buy a narrow tile a grid, so it keeps its words instead of standing empty —
+    // and it does so at every height, never blinking between the two readings.
+    for (let height = 44; height <= 160; height += 4) {
+      const content = classTileContent({ x: 0, y: 0, width: 100, height });
+      expect(content.cellWidth, `cell at ${height}px`).toBeLessThan(STAT_CELL_FLOOR);
+      expect(content.showStats, `grid drawn illegibly at ${height}px`).toBe(false);
+      expect(content.showHull, `words given up for nothing at ${height}px`).toBe(true);
+    }
   });
 });
 

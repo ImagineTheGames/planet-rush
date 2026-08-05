@@ -25,8 +25,10 @@
  *    be legible and the column can be halved, the roster becomes two columns of
  *    four — P1–P4 down the left, P5–P8 down the right.
  *  - **Tile arrangement** ({@link TileShape}): four stacked, a 2×2, or one row
- *    of four — whichever keeps a tile tall *and* wide enough to carry its role
- *    blurb, which is the only reason the tile exists (GDD §2.11).
+ *    of four — whichever keeps a tile tall *and* wide enough to carry its name,
+ *    its hull and its **stat grid** (u4, 2026-08-05 — pips AND numbers; GDD
+ *    §2.5 / §2.11 amended). What a tile can hold at a given size, and in what
+ *    order it gives things up, is {@link classTileContent}.
  *
  * All three are decided by the **content box's dimensions**, never by
  * `isTouch`: a tablet in landscape gets the same reading as a desktop of the
@@ -49,8 +51,10 @@
  * behind the ROTATE overlay anyway — the roster compresses and the tiles do
  * not: the roster is a list to *read* (its only tap is the host's difficulty
  * cycle), while the tiles and RUSH! are the two choices every player makes with
- * a thumb. The view then drops a row's detail line below 30px and a tile's
- * blurb below 64px rather than clipping either.
+ * a thumb. The view then drops a row's detail line below 30px, and a tile gives
+ * up its blurb (and, below that, its hull nickname) by the ladder in
+ * {@link classTileContent} — **never its stats** at any size the layout will
+ * actually produce — rather than clipping anything.
  *
  * Nothing is ever laid out outside {@link LobbyLayout.content}, which is itself
  * the viewport inset by the safe area — so a notch, a home indicator or a
@@ -116,9 +120,11 @@ export const SEAT_ROW_LEGIBLE = 26;
  *  splits into two 177 px rows, which still hold a chip, a name and a tier. */
 export const TWO_ROSTER_MIN_WIDTH = 360;
 
-/** Hull tile heights. 64 is the height the view needs to draw the role blurb —
- *  the blurb is the whole point of the tile (GDD §2.11), so it is defended by
- *  changing the tiles' *arrangement* before their height (see {@link TileShape}). */
+/** Hull tile heights. 64 is the height that carries a tile's whole IDENTITY
+ *  block — its name, its hull, and the 3×2 grid of stat pips-and-numbers (u4,
+ *  {@link classTileContent}; the constants below are asserted to add up to it).
+ *  It is defended by changing the tiles' *arrangement* before their height (see
+ *  {@link TileShape}). Above it the tile also carries its role blurb. */
 export const CLASS_TILE_MIN = 64;
 export const CLASS_TILE_MAX = 108;
 /** The floor a tile keeps even when the band cannot spare the full blurb height:
@@ -133,6 +139,86 @@ export const CLASS_TILE_COMPACT = 44;
 /** Narrower than this a tile cannot carry a name over a wrapped blurb, so an
  *  arrangement that would produce one is rejected in favour of a taller shape. */
 export const CLASS_TILE_MIN_WIDTH = 150;
+
+// ---------------------------------------------------------------------------
+// Inside a hull tile — the identity block, and the stat grid (u4, 2026-08-05:
+// "both pips and numbers"). The tile is no longer a name over a blurb: it now
+// carries six stats, each as a coarse pip bar over its actual figure, read off
+// the sim's own class table (`./lobby` shipStatLines).
+//
+// Six of those on a 390-wide phone is the hard case this block is dimensioned
+// for, so the tile has a stated PRIORITY LADDER and {@link classTileContent} is
+// the one place it lives — the view draws whatever the ladder returns and
+// decides nothing:
+//
+//   1. the class NAME       — a tile with no name is not a choice
+//   2. the STAT GRID        — the reason this brief exists; the thing a player
+//                             is comparing four tiles for
+//   3. the HULL nickname    — the silhouette's name (Quadfin…), flavour the
+//                             codex also carries
+//   4. the role BLURB       — the sentence, which already dropped below 64px
+//                             before this brief and still does
+//
+// One deliberate exception to rung 2, and it is a fallback rather than a hole:
+// where a tile is below the stat grid's OWN floor — too short for two rows, or
+// too narrow for three legible cells — the tile degrades to the pre-u4 card
+// (name over hull) rather than to a bare name. Nothing the layout actually
+// produces on any profile in QA's matrix lands there (asserted), and a tile that
+// small would have shown a clipped grid, which is the thing this ladder exists
+// to prevent.
+//
+// Each rung is dropped whole rather than clipped — a half-sentence and a
+// half-visible stat row both read worse than none — and the ladder is asserted
+// against the real QA device matrix in `./lobby-geometry.test.ts`, portrait and
+// landscape, so "legible at phone scale" is a test rather than a hope.
+// ---------------------------------------------------------------------------
+
+/** Inset from a tile's edge to its content. Tight, because six stat cells and
+ *  four words share a 152×56 tile on a phone in landscape — the primary mobile
+ *  layout of this screen. */
+export const CLASS_TILE_PAD = 3;
+/** The class-name line. Audiowide 12's MEASURED box (ascent + descent) on the
+ *  self-hosted face, not a guess — the first cut of this block guessed the line
+ *  heights and every tile drew its stats through its hull nickname. */
+export const CLASS_NAME_LINE = 14;
+/** The hull-nickname line (Oxanium 9, measured box 12). */
+export const CLASS_HULL_LINE = 12;
+/** The role blurb — two wrapped Oxanium-10 lines. */
+export const CLASS_BLURB_LINE = 22;
+
+/** Stats on a tile — GDD §2.11's six table columns (`./lobby` STAT_SPECS,
+ *  asserted equal in the tests). Mirrored rather than imported so the geometry
+ *  stays free of the model, exactly like {@link LOBBY_SLOT_ROWS}. */
+export const STAT_COUNT = 6;
+/** One stat cell: its figure on a text line (Oxanium 8, measured box 10), its
+ *  pip bar directly beneath. */
+export const STAT_ROW_TEXT = 10;
+export const STAT_PIP_BAR = 3;
+export const STAT_ROW_HEIGHT = STAT_ROW_TEXT + STAT_PIP_BAR;
+/** Air between two rows of the stat grid. */
+export const STAT_ROW_GAP = 2;
+/** Air between two columns of it. */
+export const STAT_CELL_GAP = 4;
+/** Air above and below the whole stat block, when the tile has height to spare.
+ *  **Elastic**: a roomy desktop tile takes all of it so the block reads as its
+ *  own thing rather than a third line of prose, and the tightest phone tile takes
+ *  none — the stats themselves never pay for the spacing. */
+export const STAT_BLOCK_AIR = 5;
+/** A cell wide enough to lay all six across in ONE row — `SPD 130%` over five
+ *  pips with room to spare. The wide-tile (desktop `stack`) shape, which reads
+ *  like GDD §2.11's own table row. */
+export const STAT_CELL_WIDE = 42;
+/** The narrowest a cell may get before the grid is dropped rather than drawn
+ *  with figures running into each other. Three columns of this fit inside every
+ *  tile the layout is willing to produce, which is why 3 is the floor
+ *  arrangement and there is no 2-column shape. */
+export const STAT_CELL_FLOOR = 36;
+
+/** Height of a stat grid of `rows` rows. */
+export function statGridHeight(rows: number): number {
+  const n = Math.max(0, Math.floor(rows));
+  return n === 0 ? 0 : n * STAT_ROW_HEIGHT + (n - 1) * STAT_ROW_GAP;
+}
 
 // ---------------------------------------------------------------------------
 // The arena (map) row — the four map cards, moved off the PLAY flow into the
@@ -954,6 +1040,131 @@ function placeTiles(
     });
   }
   return shape;
+}
+
+// ---------------------------------------------------------------------------
+// Inside one hull tile
+// ---------------------------------------------------------------------------
+
+/** Where a hull tile's four content blocks go, and which of them fit. Every rect
+ *  is absolute screen space and inside the tile; a block that does not fit is
+ *  reported `false` **and** zero-height, so a view that ignores the flag still
+ *  cannot draw a clipped one. */
+export interface ClassTileContent {
+  /** The class name — always drawn (rung 1 of the ladder). */
+  readonly name: Rect;
+  /** The hull nickname (Quadfin…) — rung 3. */
+  readonly hull: Rect;
+  /** The whole stat grid — rung 2, the pips-and-numbers block (u4). */
+  readonly stats: Rect;
+  /** The role blurb — rung 4, the first to go. */
+  readonly blurb: Rect;
+  readonly showHull: boolean;
+  readonly showStats: boolean;
+  readonly showBlurb: boolean;
+  /** Columns the six stats fall into: 6 (one table-like row, wide tiles) or 3. */
+  readonly statColumns: number;
+  /** …and the rows that follow from it: 1 or 2. */
+  readonly statRows: number;
+  /** One cell's width — the room a `SPD 130%` and its pip bar have. */
+  readonly cellWidth: number;
+}
+
+/**
+ * Divide one hull tile between its name, its hull, its stat grid and its blurb,
+ * by the priority ladder in the constants header above.
+ *
+ * Pure and rect-in/rect-out, for the same reason the rest of this file is: the
+ * hard case is six stats on a 172×66 tile — a phone on its side, which is the
+ * primary mobile layout of this screen — and that is a case worth asserting
+ * headless on every device profile rather than eyeballing once.
+ */
+export function classTileContent(tile: Rect): ClassTileContent {
+  const pad = CLASS_TILE_PAD;
+  const x = tile.x + pad;
+  const width = Math.max(0, tile.width - 2 * pad);
+  const height = Math.max(0, tile.height - 2 * pad);
+
+  // Six across whenever a cell can carry its figure over five pips comfortably
+  // (the desktop tile, which then reads like GDD §2.11's own table row); 3×2
+  // otherwise, which is the shape every phone gets. There is no 2-column shape:
+  // three columns fit inside any tile {@link placeTiles} is willing to produce.
+  const wideCell = (width - (STAT_COUNT - 1) * STAT_CELL_GAP) / STAT_COUNT;
+  const statColumns = wideCell >= STAT_CELL_WIDE ? STAT_COUNT : 3;
+  const statRows = Math.ceil(STAT_COUNT / statColumns);
+  const cellWidth = (width - (statColumns - 1) * STAT_CELL_GAP) / statColumns;
+  const gridHeight = statGridHeight(statRows);
+
+  // A tile wide enough for a grid RESERVES the grid's height whether or not it
+  // is tall enough to draw one. Without that, a short tile would "win back" its
+  // hull line by failing to fit its stats — the ladder running backwards, and a
+  // nickname blinking off as a tile grew. A tile too NARROW for a legible grid
+  // is the documented fallback: it reserves nothing and degrades to the pre-u4
+  // card, because no amount of height will earn it a grid.
+  const fitsWidth = cellWidth >= STAT_CELL_FLOOR;
+  const reserved = fitsWidth ? gridHeight : 0;
+  const showStats = fitsWidth && height >= CLASS_NAME_LINE + gridHeight;
+  const statsHeight = showStats ? gridHeight : 0;
+  const showHull = height >= CLASS_NAME_LINE + CLASS_HULL_LINE + reserved;
+  const hullHeight = showHull ? CLASS_HULL_LINE : 0;
+  const showBlurb =
+    showHull && height >= CLASS_NAME_LINE + CLASS_HULL_LINE + reserved + CLASS_BLURB_LINE;
+
+  // Leftover height buys AIR around the stat block, up to STAT_BLOCK_AIR each
+  // side — so the block reads as its own thing on a roomy tile instead of a
+  // third line of prose, while a phone tile that has nothing to spare spends
+  // nothing. Elastic rather than fixed because a fixed gap would have to come
+  // out of the stats' own budget on exactly the device that can least afford it.
+  const used =
+    CLASS_NAME_LINE + hullHeight + statsHeight + (showBlurb ? CLASS_BLURB_LINE : 0);
+  const slack = Math.max(0, height - used);
+  const airAbove = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack / 2)) : 0;
+  const airBelow = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack) - airAbove) : 0;
+
+  let y = tile.y + pad;
+  const name: Rect = { x, y, width, height: Math.min(CLASS_NAME_LINE, height) };
+  y += name.height;
+  const hull: Rect = { x, y, width, height: hullHeight };
+  y += hullHeight + airAbove;
+  const stats: Rect = { x, y, width, height: statsHeight };
+  y += statsHeight + airBelow;
+  // The blurb takes whatever is left below it — it wraps, so extra height is
+  // extra lines rather than dead space. Never past the tile's own bottom.
+  const blurbHeight = showBlurb ? Math.max(0, tile.y + tile.height - pad - y) : 0;
+  const blurb: Rect = { x, y, width, height: blurbHeight };
+
+  return {
+    name,
+    hull,
+    stats,
+    blurb,
+    showHull,
+    showStats,
+    showBlurb,
+    statColumns,
+    statRows,
+    cellWidth,
+  };
+}
+
+/**
+ * The rect of the `index`th stat cell inside a tile's grid — reading order is
+ * `./lobby`'s own stat order, across a row then down, the same discipline
+ * {@link placeTiles} uses for the tiles themselves.
+ *
+ * The view calls this rather than doing the arithmetic itself, so "no cell ever
+ * escapes its tile" is asserted once, here, instead of per drawing site.
+ */
+export function classStatCell(content: ClassTileContent, index: number): Rect {
+  const i = Math.max(0, Math.floor(index));
+  const column = i % content.statColumns;
+  const row = Math.floor(i / content.statColumns);
+  return {
+    x: content.stats.x + column * (content.cellWidth + STAT_CELL_GAP),
+    y: content.stats.y + row * (STAT_ROW_HEIGHT + STAT_ROW_GAP),
+    width: content.cellWidth,
+    height: STAT_ROW_HEIGHT,
+  };
 }
 
 /**

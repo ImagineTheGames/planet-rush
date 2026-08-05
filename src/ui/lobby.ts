@@ -30,10 +30,26 @@
  *     match"). {@link selectShipClass} refuses once the countdown has started,
  *     which is the same instant the server stops honouring `lobbyChoice`
  *     (`server/room.ts`: "a hull is locked for the match").
- *  4. **No ship stats on this screen.** A {@link ShipClassOption} carries a
- *     name, a hull and a role blurb — and no number. Stats live in the upgrade
- *     panel and nowhere else (GDD §2.2, §2.5), so the type simply gives the view
- *     nothing it *could* print.
+ *  4. **Ship stats DO appear here — as pips AND numbers** *(u4, ratified by the
+ *     developer 2026-08-05: "both pips and numbers"; GDD §2.5 and §2.11 amended
+ *     the same day)*. This reverses the rule this file used to keep ("no ship
+ *     stats on this screen"): a {@link ShipClassOption} now carries a name, a
+ *     hull, a role blurb **and** its {@link ShipStatLine} row — a coarse pip bar
+ *     to compare four hulls at a glance, beside the actual figure for the player
+ *     who wants it. Never one or the other: both, together, on every hull.
+ *
+ *     Two guarantees hold the reversal up, and they are what the tests pin:
+ *     the numbers are read from the **sim's own** `SHIP_STATS`
+ *     (`../sim/constants`), never a table hand-copied into the UI — a screen
+ *     that prints a stat the sim does not honour is worse than one with no
+ *     stats; and the pips and the number are derived from the **same** `value`
+ *     in {@link statLine}, so a hull can never show four pips beside a figure
+ *     that means three.
+ *
+ *     The upgrade panel ({@link ./upgrade-wheel}) is unaffected and keeps
+ *     showing what it shows; the **build wheel** is untouched — a segment's only
+ *     number is still its cost (GDD §2.5), and "stats are allowed on
+ *     ship-select" does not leak into it.
  *
  * ---------------------------------------------------------------------------
  * WHAT THE EMPTY SEATS SHOW
@@ -64,8 +80,11 @@ import { seatPing } from '../net/ping';
 import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
 import { MAX_MATCH_SIZE, MIN_MATCH_SIZE, configToPlayers } from '../sim/match-config';
-import type { Abundance } from '../sim/constants';
-import { DEFAULT_ABUNDANCE } from '../sim/constants';
+import type { Abundance, ShipStats } from '../sim/constants';
+// The hull tiles' numbers come from the SIM's own class table (u4) — never a
+// table hand-copied into the UI, so a retune in `../sim/constants` moves the
+// lobby with it and the screen cannot advertise a game the sim is not running.
+import { DEFAULT_ABUNDANCE, SHIP_STATS } from '../sim/constants';
 import { playerColor } from './station-hp';
 import { CLASS_NAMES } from './upgrade-wheel';
 import { normalizeMapId } from './map-picker';
@@ -300,7 +319,14 @@ export const COLOR_NAMES: readonly string[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// The four hulls (GDD §2.11) — words only, never a stat
+// The four hulls (GDD §2.11) — words, AND pips, AND numbers
+//
+// Ratified by the developer 2026-08-05 (u4), asked whether ship stats could
+// appear on ship-select having been shown coarse pips: **"both pips and
+// numbers."** So both, together — pips to compare four hulls at a glance,
+// numbers for the player who wants the actual figure. GDD §2.5 and §2.11 carry
+// the matching *(amended 2026-08-05)* marker; the superseded rule this file used
+// to enforce ("no ship stats on this screen") is gone, not routed around.
 // ---------------------------------------------------------------------------
 
 /** Tile order, left to right / top to bottom. The order GDD §2.11 tables them
@@ -343,10 +369,159 @@ export function normalizePlayerName(raw: string | undefined): string {
   return trimmed.length > PLAYER_NAME_MAX_CHARS ? trimmed.slice(0, PLAYER_NAME_MAX_CHARS) : trimmed;
 }
 
+/** Pips in one stat's bar. Five is coarse on purpose — a pip bar answers
+ *  "which of these four is the fast one?", and the **number beside it** answers
+ *  "by how much". Neither is asked to do the other's job. */
+export const STAT_PIPS = 5;
+
 /**
- * One hull tile. A name, a hull, a role — **and no number**. This type is the
- * enforcement of GDD §2.5's "ship stats … appear only in the upgrade panel":
- * the view cannot print a stat here because the model never carries one.
+ * What a stat pip is drawn in (u4). Lives here, beside {@link SIDE_COLORS} and
+ * for the same reason: the frozen palette's reserved rules are a contract, so
+ * the colours are pinned by a unit test rather than trusted to a view.
+ *
+ * **Pips are CHROME.** They are not ore and they are not danger, so signal
+ * yellow `#F2D24B` and threat red `#B23A3A` are both out (style-guide §2 — "signal
+ * yellow means ore or danger, and nothing else"), and no seventh hue enters the
+ * palette either: a filled pip is the plasma this screen already selects with,
+ * or the chalk it already writes in, and the unfilled remainder is hull steel at
+ * a glance-level alpha.
+ */
+export const STAT_PIP_COLORS = {
+  /** Filled, on the hull you have picked — the lobby's own selection accent. */
+  selected: PALETTE.plasma,
+  /** Filled, on any other tile — neutral chalk, the lobby's primary text tone. */
+  filled: 0xdce3ec,
+  /** The unfilled remainder of a bar. */
+  empty: PALETTE.hullSteel,
+} as const;
+
+/** The stats a hull tile shows, in GDD §2.11's own table order. Exactly the six
+ *  columns of that table — the five core attributes the hull choice "sets"
+ *  (speed, acceleration, turn rate, armor, weapon power) plus the cargo hold,
+ *  which is the sixth column and the Hauler's whole argument. */
+export type ShipStatKey = 'speed' | 'accel' | 'turn' | 'hull' | 'power' | 'cargo';
+
+/**
+ * One stat on one hull tile: a short label, the sim's own value, that value
+ * **printed**, and that same value **as pips**.
+ *
+ * `text` and `pips` are two renderings of the one `value` ({@link statLine}),
+ * which is the whole reason this type carries all three: a tile can never show
+ * four pips beside a figure that means three, because there is only ever one
+ * number in play and the view does no arithmetic of its own.
+ */
+export interface ShipStatLine {
+  readonly key: ShipStatKey;
+  /** The label on the cell — short, because six of these share a phone tile. */
+  readonly label: string;
+  /** The sim's value, verbatim from `SHIP_STATS` (a multiplier, HP, or slots). */
+  readonly value: number;
+  /** …the same value as the player reads it: `130%`, `35`, `8`, `3`. */
+  readonly text: string;
+  /** …and the same value as a coarse bar, 1..{@link STAT_PIPS} filled. */
+  readonly pips: number;
+  /** Pips in the bar — {@link STAT_PIPS}, carried so the view never hard-codes it. */
+  readonly pipMax: number;
+}
+
+/**
+ * How each stat is read off the sim's table and shown. The `read` functions are
+ * the ONLY coupling to `SHIP_STATS`, and there is deliberately no per-class
+ * literal anywhere in this file: retune a hull in `../sim/constants` and this
+ * screen retunes with it, which is what keeps the tile from advertising a game
+ * the sim is not running.
+ */
+const STAT_SPECS: readonly {
+  readonly key: ShipStatKey;
+  readonly label: string;
+  readonly read: (stats: ShipStats) => number;
+  readonly format: (value: number) => string;
+}[] = [
+  { key: 'speed', label: 'SPD', read: (s) => s.speedMul, format: percent },
+  { key: 'accel', label: 'ACC', read: (s) => s.accelMul, format: percent },
+  { key: 'turn', label: 'TRN', read: (s) => s.turnMul, format: percent },
+  { key: 'hull', label: 'HULL', read: (s) => s.hull, format: whole },
+  { key: 'power', label: 'PWR', read: (s) => s.power, format: whole },
+  { key: 'cargo', label: 'HOLD', read: (s) => s.cargo, format: whole },
+];
+
+/** Speed, acceleration and turn are multipliers over the Vanguard (GDD §2.11
+ *  tables them as percentages), so they read as percentages here too. */
+function percent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+/** Hull HP, power and hold are absolute counts — printed as they are. */
+function whole(value: number): string {
+  return String(Math.round(value));
+}
+
+/**
+ * A stat's pip scale: the **spread across the four hulls**, so the pips answer
+ * the question the screen is actually for — *which of these four is the fast
+ * one?* The roster's slowest hull gets one pip and its fastest gets five, and
+ * every other tile is placed between them.
+ *
+ * A scale anchored at zero instead would flatten the roster into four
+ * near-identical bars (every hull's speed sits between 85% and 130%), which is a
+ * pip bar that compares nothing. The **number** beside it is what keeps the
+ * absolute truth on screen, so the coarse scale costs the player nothing.
+ *
+ * A stat every hull shares — cargo, the day a retune levels it — has no spread
+ * to show, so every tile reads full rather than an arbitrary rung.
+ */
+function pipScale(read: (stats: ShipStats) => number): { min: number; max: number } {
+  const values = CLASS_ORDER.map((cls) => read(SHIP_STATS[cls]));
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function pipsFor(value: number, scale: { min: number; max: number }): number {
+  if (!(scale.max > scale.min)) return STAT_PIPS;
+  const t = (value - scale.min) / (scale.max - scale.min);
+  return Math.min(STAT_PIPS, Math.max(1, Math.round(1 + t * (STAT_PIPS - 1))));
+}
+
+/**
+ * One stat line — and the **one place** the number and the pips are decided.
+ *
+ * `value` is read once, and both renderings hang off that single read. There is
+ * no second path by which a tile could print one hull's figure beside another
+ * hull's bar, which is the guarantee the brief asked for stated as code rather
+ * than as care.
+ */
+function statLine(
+  spec: (typeof STAT_SPECS)[number],
+  stats: ShipStats,
+  scale: { min: number; max: number },
+): ShipStatLine {
+  const value = spec.read(stats);
+  return {
+    key: spec.key,
+    label: spec.label,
+    value,
+    text: spec.format(value),
+    pips: pipsFor(value, scale),
+    pipMax: STAT_PIPS,
+  };
+}
+
+/** The six stat lines for one hull, in {@link STAT_SPECS} order — read straight
+ *  off the sim's `SHIP_STATS[cls]`, so what the lobby shows is what the match
+ *  honours. */
+export function shipStatLines(shipClass: ShipClass): readonly ShipStatLine[] {
+  const stats = SHIP_STATS[shipClass];
+  return STAT_SPECS.map((spec) => statLine(spec, stats, pipScale(spec.read)));
+}
+
+/**
+ * One hull tile: a name, a hull, a role — **and its stats, as pips and numbers**
+ * (u4, ratified 2026-08-05; GDD §2.5 / §2.11 amended).
+ *
+ * The type used to be the enforcement of "ship stats appear only in the upgrade
+ * panel" by carrying no numeric field at all. That rule is superseded: the tile
+ * carries {@link stats} now, sourced from the sim and rendered as both a bar and
+ * a figure. What has *not* changed is where the numbers come from — never a
+ * literal typed into this file.
  */
 export interface ShipClassOption {
   readonly shipClass: ShipClass;
@@ -355,8 +530,10 @@ export interface ShipClassOption {
   /** The hull's name (GDD §2.11's parenthetical: Quadfin, Anvil, Pincer,
    *  Hammerhead) — the silhouette a player learns to read at 24px (§5.3). */
   readonly hull: string;
-  /** The role, in the design's own words. Words only: no speeds, no HP. */
+  /** The role, in the design's own words. */
   readonly blurb: string;
+  /** The six stats of GDD §2.11's table, each as a pip bar **and** a figure. */
+  readonly stats: readonly ShipStatLine[];
 }
 
 /** The four tiles (GDD §2.11), in {@link CLASS_ORDER}. */
@@ -366,24 +543,28 @@ export const CLASS_OPTIONS: readonly ShipClassOption[] = [
     name: CLASS_NAMES[ShipClass.Interceptor],
     hull: 'Quadfin',
     blurb: 'Scout and miner-hunter. Catches miners in the open; melts against turrets.',
+    stats: shipStatLines(ShipClass.Interceptor),
   },
   {
     shipClass: ShipClass.Vanguard,
     name: CLASS_NAMES[ShipClass.Vanguard],
     hull: 'Anvil',
     blurb: 'All-rounder. Does everything second-best — the one to learn the game in.',
+    stats: shipStatLines(ShipClass.Vanguard),
   },
   {
     shipClass: ShipClass.Excavator,
     name: CLASS_NAMES[ShipClass.Excavator],
     hull: 'Pincer',
     blurb: 'Mining engine and close bruiser. Out-earns everyone, and cannot run.',
+    stats: shipStatLines(ShipClass.Excavator),
   },
   {
     shipClass: ShipClass.Hauler,
     name: CLASS_NAMES[ShipClass.Hauler],
     hull: 'Hammerhead',
     blurb: 'Logistics and siege tank. Hauls the biggest hold and tanks a siege; arrives late.',
+    stats: shipStatLines(ShipClass.Hauler),
   },
 ];
 
