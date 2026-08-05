@@ -16,6 +16,10 @@
  *
  *   visible  ⇔  the ship is docked at its own station  (and this is a touch build).
  *
+ * {@link buildButtonHighlighted} — the *lit* state a second field report asked
+ * for (2026-08-05, "make it stand out") — is that same predicate, by the same
+ * call, for the reason spelled out there.
+ *
  * {@link buildButtonVisible} takes **neither** the wheel's open/closed state
  * **nor** any onboarding flag — not as a matter of style, but so that "the button
  * hid because the wheel opened" or "…because the first-build prompt fired once"
@@ -83,4 +87,28 @@ export interface BuildButtonSignals {
  */
 export function buildButtonVisible(signals: BuildButtonSignals): boolean {
   return signals.isTouch && signals.docked;
+}
+
+/**
+ * Whether the button is drawn **lit** — the loud, plasma-glowing state that says
+ * *building just became possible*.
+ *
+ * Field report, 2026-08-05: *"once you are in build distance it should highlight
+ * the build button (make it stand out)"*. The button used to arrive wearing the
+ * same weight as the always-present FIRE button next to it, so crossing
+ * `STATION.dockRange` — the moment the whole Build & Upgrade loop opens up — went
+ * by without announcing itself. Now it arrives lit, and the world says the same
+ * thing at the same instant: the dashed plasma build ring you just flew across
+ * (`@art/stations` `BUILD_RING_RADIUS`) is drawn at that exact radius, in that
+ * exact colour.
+ *
+ * **Deliberately the same call as {@link buildButtonVisible}, not the same
+ * expression written twice.** Both are the sim's `isDocked` answer — the one the
+ * wheel's own availability gate uses (`src/main.ts` `updateBuildWheel`) — so a
+ * highlight that promises building is possible while the wheel refuses to open is
+ * unrepresentable rather than merely unlikely. A highlight that can disagree with
+ * the wheel is worse than no highlight, so the two states are one predicate.
+ */
+export function buildButtonHighlighted(signals: BuildButtonSignals): boolean {
+  return buildButtonVisible(signals);
 }
