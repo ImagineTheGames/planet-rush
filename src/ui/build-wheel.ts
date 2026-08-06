@@ -37,7 +37,26 @@
  * honestly dark.
  *
  * Style: cost numerals are signal yellow — "cost numerals on the build wheel"
- * are an explicitly allowed use of the RESERVED colour (style-guide §2).
+ * are an explicitly allowed use of the RESERVED colour (style-guide §2), and
+ * since the Gantry/Bone pass (u7-02) the SAME numerals are threat red when the
+ * cost cannot be paid. That is one carve-out stated in two colours, written into
+ * style-guide §2 with a dated marker; nothing else on the wheel may go red.
+ *
+ * ── WHAT A WEDGE SAYS, SINCE THE GANTRY/BONE PASS (u7-02) ───────────────────
+ * The ratified design (`docs/design/gantry-bone-handoff.html`, screen 5a) draws
+ * four lines on a wedge, and this module produces three of them:
+ *
+ *   TURRET            ← the words        (label)
+ *   YOUR STATION      ← what it spends on (target)
+ *   3/4               ← cost over spendable ore  ({@link WheelSegment.costLabel})
+ *   2 / 4 BUILT       ← the count and its cap    ({@link WheelSegment.capLabel})
+ *
+ * Both of the new lines are **strings**, never numbers, and that is deliberate
+ * rather than incidental: the guarantee this file exists to keep is that a
+ * segment's only *numeric* field is `cost` (build-wheel.test.ts asserts the
+ * numeric keys are exactly `['angle', 'cost']`), which is what stops a rate or a
+ * stat leaking onto the wheel. `cost/held` and `2 / 4 BUILT` ship the design's
+ * pixels through the same door the RADAR count already used.
  */
 
 import type { BuildItem } from '@shared/types';
@@ -99,7 +118,9 @@ export type SegmentTarget = 'station' | 'ship';
  * - `capped`       — the per-station cap is reached: 4 turrets, 2 shields, 1
  *                    radar satellite (GDD §2.5 — "design rules, not renderer
  *                    limits"). Queued construction counts, so a player cannot buy
- *                    past the cap; the RADAR wedge also shows its "1/1" count.
+ *                    past the cap, and every capped wedge shows its count over
+ *                    that cap — "4 / 4 BUILT" (u7-02) — with `FULL` where the
+ *                    price would otherwise be.
  * - `inactive`     — the press would be a no-op: REPAIR CORE on a core that is
  *                    already full, after the collapse phase has shut repair off
  *                    for good (GDD §2.3), *or* while the station is still cooling
@@ -306,17 +327,57 @@ export interface WheelSegment {
    *  Not a numeric field — the "only `cost` is a number" guarantee is kept. */
   readonly repair: RepairWedgeInfo | null;
   /**
-   * The u2-02 count/cap grammar — a string like `"0/1"` — for a single-build,
-   * capped segment whose count the player must be able to *see* (the RADAR
-   * satellite: one per station, and it re-arms after it is shot down, so hiding
-   * the count would hide the rebuild). `null` on every other segment — turret and
-   * shield cap silently, and their wedges name their target instead.
+   * The count/cap line — `"2 / 4 BUILT"` — on **every capped segment**: TURRET,
+   * SHIELD and RADAR (u7-02, closing u2-02). `null` on REPAIR REACTOR, which is
+   * rationed by a cooldown rather than a cap and carries {@link repair} instead,
+   * and on UPGRADE SHIP, which spends nothing here.
+   *
+   * This used to be RADAR-only, and this file used to say that turret and shield
+   * *"cap silently … their wedges name their target instead."* They do not any
+   * more: the developer ratified the Gantry/Bone build wheel (2026-08-05), which
+   * draws `2 / 4 BUILT` and `0 / 2 BUILT` on exactly those two wedges, and GDD
+   * §2.5 is amended to match. A cap you cannot see is a refusal you cannot
+   * predict — the wedge greys out and the player is left guessing whether the
+   * ring is full or the bank is empty.
+   *
+   * The count is the sim's own (`turretCount` / `shieldCount` / `satelliteCount`,
+   * which count **standing plus under construction**), so it counts queued
+   * construction and a player cannot buy past a cap by ordering several on one
+   * tick (GDD §2.5). It is also the "it re-arms" tell: when a turret is shot down
+   * the count drops and the wedge lights again.
    *
    * A string, never a number, so the "the only numeric field is `cost`" guarantee
    * ({@link WheelSegment}, build-wheel.test.ts) still holds — no rate or count can
    * leak into a numeric field.
    */
   readonly capLabel: string | null;
+  /**
+   * The same count/cap line with the padding gone — `"2/4 BUILT"` — for the phone
+   * profile, where a wedge's words sit on a 72° arc only ~115 px wide
+   * (`WHEEL_PROFILES.phone`, `src/art/materials.ts`). Nothing is dropped: the
+   * count is still there, said in fewer characters. `null` wherever
+   * {@link capLabel} is.
+   */
+  readonly capLabelCompact: string | null;
+  /**
+   * The cost line as the design draws it: **`cost/held`** — what the thing costs
+   * over what the player can actually spend (`"3/4"`, `"5/4"`), or `"FULL"` on a
+   * capped segment, where there is no price to quote because there is nothing to
+   * buy. `null` on UPGRADE SHIP, which opens a screen instead of spending.
+   *
+   * A **string**, and that is the load-bearing part. The design shows two numbers
+   * here; a second numeric field on a segment would break the guarantee that a
+   * segment's only number is its cost — the guarantee that keeps rates and stats
+   * off the wheel. So the pair ships as one label, the same trick
+   * {@link capLabel} uses, and {@link cost} stays the single numeric truth
+   * underneath it.
+   *
+   * The second half is not new information: it is the same spendable total the
+   * hub already prints, restated at the point of decision so a player reading
+   * `5/4` knows they are one ore short without the wheel having to say so in
+   * words ("no 'need 2 more' copy, because the numbers already say it").
+   */
+  readonly costLabel: string | null;
 }
 
 /** The wheel for one frame. */
@@ -343,8 +404,9 @@ const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: Seg
   turret: { label: 'TURRET', target: 'station' },
   shield: { label: 'SHIELD', target: 'station' },
   // The radar satellite (feature f1): a station-built body that orbits and lifts
-  // the minimap fog. One word, its own thing — the wedge's second line carries the
-  // "0/1" count so the one-per-station cap and its re-arm are legible.
+  // the minimap fog. One word, its own thing — and, like turret and shield since
+  // u7-02, its wedge carries a "0 / 1 BUILT" count so the one-per-station cap and
+  // its re-arm are legible.
   satellite: { label: 'RADAR', target: 'station' },
   // Named in full: "REPAIR REACTOR", never "REPAIR" — it repairs the station's
   // reactor and never the ship, and the label is the only place that is ever said.
@@ -354,14 +416,83 @@ const SEGMENT_COPY: Readonly<Record<WheelSegmentId, { label: string; target: Seg
 };
 
 /**
- * The RADAR wedge's "0/1" count/cap line (u2-02 grammar): satellites built (or
- * building) over the per-station cap. Reads `"0/1"` before the first is built,
- * `"1/1"` at the cap (paired with the `capped` state that greys the wedge), and
- * back to `"0/1"` the frame the sim's `satelliteCount` drops after the satellite
- * is shot down — so the wedge's count *is* the "it will re-arm" tell.
+ * Per-station caps, by segment — the sim's own numbers (`../sim/constants`), so
+ * the wheel counts against exactly what `placeOrder` refuses on. `null` for the
+ * two segments that have no cap: REPAIR REACTOR (rationed by a cooldown) and
+ * UPGRADE SHIP (spends nothing here).
  */
-export function radarCapLabel(signals: BuildWheelSignals): string {
-  return `${Math.max(0, signals.satellites ?? 0)}/${SATELLITE.capPerStation}`;
+export function segmentCap(id: WheelSegmentId): number | null {
+  switch (id) {
+    case 'turret':
+      return TURRET.capPerStation;
+    case 'shield':
+      return SHIELD.capPerStation;
+    case 'satellite':
+      return SATELLITE.capPerStation;
+    case 'repair':
+    case 'upgrade':
+      return null;
+  }
+}
+
+/** How many of `id` this station has **standing or under construction** — the
+ *  sim's own count, so queued construction counts against the cap (GDD §2.5). */
+export function segmentBuilt(id: WheelSegmentId, signals: BuildWheelSignals): number {
+  switch (id) {
+    case 'turret':
+      return Math.max(0, signals.turrets);
+    case 'shield':
+      return Math.max(0, signals.shields);
+    case 'satellite':
+      return Math.max(0, signals.satellites ?? 0);
+    case 'repair':
+    case 'upgrade':
+      return 0;
+  }
+}
+
+/**
+ * The count/cap line for a capped segment: `"2 / 4 BUILT"`, the copy the ratified
+ * design draws (u7-02, closing u2-02). `null` on an uncapped one.
+ *
+ * Reads `"0 / 4 BUILT"` before the first is built, `"4 / 4 BUILT"` at the cap
+ * (paired with the `capped` state that greys the wedge), and back down the frame
+ * the sim's count drops after one is shot down — so the count *is* the "it will
+ * re-arm" tell. The count includes queued construction, so the line can never
+ * promise a build the sim would refuse `cap-reached`.
+ */
+export function capBuiltLabel(id: WheelSegmentId, signals: BuildWheelSignals): string | null {
+  const cap = segmentCap(id);
+  if (cap === null) return null;
+  return `${segmentBuilt(id, signals)} / ${cap} BUILT`;
+}
+
+/** {@link capBuiltLabel} with the padding gone — `"2/4 BUILT"` — for the phone
+ *  profile's narrower arc. Same count, fewer characters. */
+export function capBuiltLabelCompact(id: WheelSegmentId, signals: BuildWheelSignals): string | null {
+  const cap = segmentCap(id);
+  if (cap === null) return null;
+  return `${segmentBuilt(id, signals)}/${cap} BUILT`;
+}
+
+/**
+ * The cost line: `cost/held` — `"3/4"` — or `"FULL"` at the cap, where there is
+ * nothing left to buy and so no price worth quoting (the design's own copy).
+ * `null` where a segment has no price at all (UPGRADE SHIP).
+ *
+ * `held` is the same spendable total the hub prints ({@link spendableOre},
+ * floored to whole ore because costs are whole ore), so the two can never
+ * disagree — one is the other, restated where the decision is made.
+ */
+export function segmentCostLabel(
+  id: WheelSegmentId,
+  signals: BuildWheelSignals,
+  state: SegmentState = segmentState(id, signals),
+): string | null {
+  const cost = segmentCost(id);
+  if (cost === null) return null;
+  if (state === 'capped') return 'FULL';
+  return `${cost}/${Math.floor(spendableOre(signals))}`;
 }
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's
@@ -384,16 +515,19 @@ export function buildWheelModel(signals: BuildWheelSignals): BuildWheelModel {
   const ore = spendableOre(signals);
   const segments = WHEEL_ORDER.map((id, index) => {
     const copy = SEGMENT_COPY[id];
+    const state = segmentState(id, signals, ore);
     return {
       id,
       label: copy.label,
       target: copy.target,
       cost: segmentCost(id),
-      state: segmentState(id, signals, ore),
+      state,
       opensPanel: id === 'upgrade',
       angle: segmentAngle(index),
       repair: id === 'repair' ? repairWedgeInfo(signals, ore) : null,
-      capLabel: id === 'satellite' ? radarCapLabel(signals) : null,
+      capLabel: capBuiltLabel(id, signals),
+      capLabelCompact: capBuiltLabelCompact(id, signals),
+      costLabel: segmentCostLabel(id, signals, state),
     };
   });
   const open = canOpenWheel(signals);
