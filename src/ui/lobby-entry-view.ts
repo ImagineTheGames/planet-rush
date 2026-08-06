@@ -236,12 +236,16 @@ export class LobbyEntryView extends Container {
     this.wordmark.alpha = model.screen === 'home' && !model.narrating ? 1 : 0.45;
 
     // Threat red is reserved for danger (style-guide §2) — and a join that came
-    // back refused is the only genuinely wrong thing this screen can show.
+    // back refused is the only genuinely wrong thing this screen can show. A
+    // NOTICE (`Coming Soon…`, from the CAMPAIGN teaser — u9-01) takes the same
+    // slot when nothing is wrong, and takes plasma rather than red: the door is
+    // not built yet, which is not a failure and must not be dressed as one.
     const failed = model.error !== '';
-    this.message.text = failed ? model.error : model.prompt;
+    const noticed = !failed && model.notice !== '';
+    this.message.text = failed ? model.error : noticed ? model.notice : model.prompt;
     this.message.style.fill = failed
       ? PALETTE.threatRed
-      : model.narrating
+      : model.narrating || noticed
         ? PALETTE.plasma
         : TEXT_DIM;
     this.message.style.fontSize = model.narrating ? NARRATION_SIZE : MESSAGE_SIZE;
@@ -265,7 +269,13 @@ export class LobbyEntryView extends Container {
     // The offline door is PRIMARY (it always works — risk 6); the online door is
     // STANDARD, equally active. A door the player can't take yet is DISABLED and
     // its `hint` is the reason (p4-03). One contract, no ad-hoc gray.
-    const style = buttonStyle(door.needsNetwork ? 'standard' : 'primary', !door.enabled);
+    //
+    // A COMING-SOON door (CAMPAIGN, u9-01) is STANDARD, never PRIMARY and never
+    // disabled: it is fully lit and fully pressable — pressing it is how the
+    // screen answers — but PLAY SOLO stays the one affirmative action, so the
+    // teaser does not take the plasma off the door that actually works.
+    const primary = !door.needsNetwork && !door.comingSoon;
+    const style = buttonStyle(primary ? 'primary' : 'standard', !door.enabled);
     nodes.body.clear();
     nodes.body
       .roundRect(rect.x, rect.y, rect.width, rect.height, 6)

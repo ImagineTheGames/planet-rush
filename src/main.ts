@@ -5312,6 +5312,11 @@ interface OnlineSeam {
   status: EntryState['status'];
   /** The refusal line, in the player's words, or `''`. */
   error: string;
+  /** The ANSWER line, or `''` — `Coming Soon…` while the CAMPAIGN teaser's press
+   *  is standing (u9-01). Separate from {@link error} exactly as it is in the
+   *  model: a door that is not built yet is not a failure, and a live-stage run
+   *  that read it off `error` would be asserting the wrong thing. */
+  notice: string;
   /**
    * The screen's TITLE, exactly as drawn: the standing line (`MINE · DEFEND ·
    * ATTACK`, `ENTER THE ROOM CODE`) when nothing is connecting, and the live
@@ -5335,6 +5340,9 @@ interface OnlineSeam {
    *  than by calling the seam methods below. */
   doorControls: readonly { kind: string; physicalCenter: { x: number; y: number } }[];
   open(): void;
+  /** CAMPAIGN — the teaser above SOLO (u9-01). Says `Coming Soon…` and goes
+   *  nowhere: no transport, no lobby, no screen change. */
+  campaign(): void;
   /** PLAY SOLO — the offline door. Needs no server, and lands in the same lobby the
    *  online doors do (ratified: one lobby, both modes). */
   solo(): void;
@@ -5474,12 +5482,14 @@ function openMainMenu(
     screen: 'home',
     status: 'idle',
     error: '',
+    notice: '',
     title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
     resolvedCode: null,
     doorControls: [],
     open: (): void => openDoors(),
+    campaign: (): void => chooseEntryDoor('campaign'),
     solo: (): void => chooseEntryDoor('solo'),
     create: (): void => chooseEntryDoor('create'),
     join: (): void => chooseEntryDoor('join'),
@@ -5739,7 +5749,9 @@ function openMainMenu(
     onlineSeam.error = entry.error;
     // Read off the same model the view draws, never re-derived — a seam that
     // computes its own answer can agree with a screen that says something else.
-    onlineSeam.title = entryModel(entry, connectNarration()).prompt;
+    const model = entryModel(entry, connectNarration());
+    onlineSeam.title = model.prompt;
+    onlineSeam.notice = model.notice;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
     const { w, h } = ctx.logicalSize();
@@ -5790,6 +5802,15 @@ function openMainMenu(
    *  away and `boot()` opens the lobby offline; CREATE / JOIN go through the
    *  allocator and open the same lobby online once the room welcomes us. */
   function chooseEntryDoor(door: EntryDoor): void {
+    if (door === 'campaign') {
+      // The teaser (u9-01). It answers in place: `chooseDoor` puts `Coming Soon…`
+      // in the entry state's notice and returns no intent, so there is nothing to
+      // resolve, no socket to open and no screen to leave. Rendering is the whole
+      // of the effect.
+      entry = chooseDoor(entry, door, onlineRng).state;
+      render();
+      return;
+    }
     if (door === 'solo') {
       endConnectTrace();
       beginSolo();
