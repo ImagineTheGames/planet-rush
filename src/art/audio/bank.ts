@@ -59,7 +59,14 @@
 
 import { TELL, type TellKind } from '../tells';
 import type { VoiceSpec } from './synth';
-import type { UiCueName } from './ui-cues';
+import {
+  GLASS_PAIR,
+  GLASS_PARTIALS,
+  PARTIAL_DECAY,
+  PARTIAL_ROLLOFF,
+  STRIKE_S,
+  type UiCueName,
+} from './ui-cues';
 
 // ---------------------------------------------------------------------------
 // Spec shapes
@@ -197,6 +204,58 @@ export type SoundName = (typeof SOUND)[keyof typeof SOUND];
 
 /** Loop bodies are rendered flat and joined tail-to-head (`./synth` seamless). */
 const LOOP_CROSSFADE = 0.04;
+
+/**
+ * **One struck note, in the ratified material** — the world bank's half of the
+ * Gantry/Bone instrument (`./ui-cues`, s6-01).
+ *
+ * The amended tone contract (GDD §4.7, 2026-08-06) asks for one game, not a menu
+ * game and a match game: the cue set the developer chose by ear is *sine
+ * partials at the inharmonic ratios 1 / 2.76 / 5.4, struck in about 2 ms, with
+ * a steep rolloff and the upper partials decaying first*. Where a world tell
+ * wants that exact material — a pick-up, a confirmation, an acknowledgement —
+ * it says so by calling this and reusing {@link GLASS_PARTIALS}, rather than
+ * re-inventing a spacing that would drift away from the ratified one.
+ *
+ * The constants are imported, never copied. If the handoff's ratios are ever
+ * re-tuned, the world moves with the UI by construction.
+ *
+ * This is also what replaces `square` almost everywhere it did a *confirmation's*
+ * job: a square with a low duty was a tone generator standing in for a struck
+ * body, and a struck body is what the register actually wants.
+ *
+ * @param partials {@link GLASS_PARTIALS} (three, full) or {@link GLASS_PAIR}
+ *   (two, thinner — the handoff's own choice for an answering note).
+ */
+function struck(
+  name: string,
+  freq: number,
+  opts: {
+    /** Peak of the fundamental; upper partials roll off from it. */
+    readonly gain: number;
+    /** The fundamental's decay. Each partial above it decays faster. */
+    readonly decay: number;
+    readonly hold?: number;
+    /** Seconds from the start of the sound. */
+    readonly at?: number;
+    readonly partials?: readonly number[];
+    readonly seed: number;
+  },
+): SoundLayer[] {
+  return (opts.partials ?? GLASS_PARTIALS).map((ratio, i) => ({
+    spec: {
+      name: `${name}.p${i}`,
+      wave: 'sine',
+      attack: STRIKE_S,
+      hold: opts.hold ?? 0.006,
+      decay: opts.decay * Math.pow(PARTIAL_DECAY, i),
+      freq: freq * ratio,
+      gain: opts.gain / Math.pow(i + 1, PARTIAL_ROLLOFF),
+      seed: opts.seed + i,
+    },
+    at: opts.at,
+  }));
+}
 
 const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- Mine ---------------------------------------------------------------
@@ -840,40 +899,32 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // The half of the economy a player can most easily miss (GDD §2.10) — so when
-  // they do find it, it is the brightest confirmation in the bank.
+  /**
+   * The half of the economy a player can most easily miss (GDD §2.10) — so when
+   * they do find it, it is the brightest confirmation in the bank.
+   *
+   * It used to be that by being a jsfxr arpeggio: a square with `arpMul` 1.5
+   * (the synth's own comment calls it *"the arcade 'blip up'"*) restarted every
+   * 140 ms as a trill. Both idioms are retired outright by the amended contract,
+   * and neither has a non-arcade use.
+   *
+   * Now it is **three struck notes rising** — an A-minor triad, the key the
+   * soundtrack and the ambient bed already sit in, so a purchase harmonises with
+   * the room it lands in instead of cutting across it. Minor rather than major
+   * on purpose: this is a machine acknowledging a spend, not a game cheering.
+   *
+   * It deliberately borrows the *shape* of the ratified `purchase` UI cue
+   * without becoming it — that one is three notes at A♭6/E♭7/A♭7 rising a fifth
+   * then a fourth. This is a world tell, an octave lower and on different
+   * intervals, so a player who buys from the wheel hears the UI answer their
+   * finger and the world answer the spend, and can still tell the two apart.
+   */
   [SOUND.upgradeBought]: {
     name: 'upgradeBought',
     layers: [
-      {
-        spec: {
-          name: 'upgradeBought.arp',
-          wave: 'square',
-          attack: 0.003,
-          hold: 0.12,
-          decay: 0.1,
-          freq: 523,
-          arpMul: 1.5,
-          arpTime: 0.07,
-          repeat: 0.14,
-          duty: 0.3,
-          gain: 0.26,
-          seed: 0x9b5d,
-        },
-      },
-      {
-        spec: {
-          name: 'upgradeBought.top',
-          wave: 'triangle',
-          attack: 0.004,
-          hold: 0.05,
-          decay: 0.2,
-          freq: 1046,
-          gain: 0.2,
-          seed: 0x9b5e,
-        },
-        at: 0.16,
-      },
+      ...struck('upgradeBought.a', 880, { gain: 0.24, decay: 0.14, hold: 0.02, partials: GLASS_PAIR, seed: 0x9b5d }),
+      ...struck('upgradeBought.b', 1046.5, { gain: 0.24, decay: 0.14, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0x9b60 }),
+      ...struck('upgradeBought.c', 1318.51, { gain: 0.26, decay: 0.24, hold: 0.02, at: 0.16, seed: 0x9b63 }),
     ],
   },
 
