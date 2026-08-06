@@ -7,17 +7,39 @@
  * the mapping stated as data ({@link TELL_SOUND}) so `audio.test.ts` can assert
  * that no mechanic is visible but silent.
  *
- * ## Judged against the tone paragraph
+ * ## Judged against the tone paragraph (GDD §4.7, amended 2026-08-06)
  *
- * > *Saturday-morning space brawl: fast, bright, and a little cheeky. Ships are
- * > toys, explosions are fireworks … But homes are the one serious thing in it.*
+ * > *Planet Rush is a clean, modern science-fiction brawl: fast, precise, and
+ * > cold. Ships are machines, explosions are pressure failures, bots are
+ * > operators with names and habits. But homes are the one serious thing in it —
+ * > when a station dies, the game goes briefly quiet, the wreck stays on the map
+ * > all match, and nobody jokes for three seconds. Engineered on the surface, a
+ * > small ache underneath.*
  *
- * So the arcade half is deliberately synthetic and unembarrassed — square waves,
- * blips that arpeggio upward, a firework rather than a war film — while the two
- * sounds attached to homes ({@link SOUND.coreHit}, {@link SOUND.stationDeath})
- * drop an octave, lose their brightness and take their time. The death sound is
- * the only one in the bank with a tail longer than a second, and the only one
- * that is followed by nothing at all (`../vfx/death-moment`).
+ * So the bank is deliberately **machined**: struck bodies rather than tone
+ * generators, filtered noise where the thing making the sound is genuinely
+ * broadband, and nothing that bends, wobbles or arpeggios its way to a feeling.
+ * `square` and `saw` do not appear in it — with one sanctioned exception,
+ * {@link SOUND.alarm}, because §2.2 calls for *"an unmistakable alarm"* and a
+ * saw's dense harmonic stack is what stops a klaxon sounding like music.
+ * Legibility outranks register, always.
+ *
+ * Struck confirmations are built on the ratified Gantry/Bone instrument, whose
+ * constants are **imported** from `./ui-cues` rather than copied ({@link struck}),
+ * so the menu and the match are audibly one game.
+ *
+ * The two sounds attached to homes ({@link SOUND.coreHit},
+ * {@link SOUND.stationDeath}) are untouched by that amendment and always were
+ * the serious end of the set: they drop an octave, lose their brightness and
+ * take their time. The death sound is the only one in the bank with a tail
+ * longer than a second, and the only one followed by nothing at all
+ * (`../vfx/death-moment`). A clean palette makes that silence land harder, not
+ * softer — which is the one thing this re-voice was not allowed to cost.
+ *
+ * *The pre-amendment paragraph read "a Saturday-morning space brawl … ships are
+ * toys, explosions are fireworks … Arcade on the surface", and this bank
+ * implemented it faithfully. The re-voice is `docs/audio-revoice-spec.md` (s7-01),
+ * executed under s7-02.*
  *
  * ## The rock-vs-hull firing voices, after the laser's retirement
  *
@@ -115,15 +137,15 @@ export function loops(spec: SoundSpec): boolean {
  */
 export const SOUND = {
   // --- Mine ---------------------------------------------------------------
-  /** A mining shot biting rock — one discrete chip. Low, grainy: stone giving way. */
+  /** A cutting tool taking a bite out of stone — one discrete chip. Low, flat, grainy. */
   rockChip: 'rockChip',
-  /** A weapon shot biting hull/turret/shield/core — one discrete hit. Bright, rude. */
+  /** A round on plate — one discrete hit on hull/turret/shield/core. Bright, with cut. */
   hullHit: 'hullHit',
   /** A crack stage advancing — rock giving way, one step of three. */
   rockCrack: 'rockCrack',
   /** The rock coming apart and paying out. */
   rockBurst: 'rockBurst',
-  /** A chunk tractored in. Small, and up: the sound of getting something. */
+  /** A chunk tractored in. One struck note: a machine registering that you have it. */
   oreCollect: 'oreCollect',
   /** Hold full — "fly home" (GDD §2.3). Two notes, insistent. */
   holdFull: 'holdFull',
@@ -136,7 +158,7 @@ export const SOUND = {
   /** The core taking damage. Low, and one of the two sounds homes get. */
   coreHit: 'coreHit',
   turretDown: 'turretDown',
-  /** Explosions are fireworks (GDD §4.7). */
+  /** Explosions are pressure failures (GDD §4.7, amended 2026-08-06). */
   shipExplode: 'shipExplode',
   shipSpawn: 'shipSpawn',
   spawnPulse: 'spawnPulse',
@@ -173,7 +195,7 @@ export const SOUND = {
   musicTheme: 'musicTheme',
   /** The bleak drone that replaces the bed through the collapse. */
   musicDread: 'musicDread',
-  /** The sting on a win — brief, bright, and after the three-second quiet. */
+  /** The sting on a win — brief, and after the three-second quiet. */
   musicWin: 'musicWin',
   /** The sting on a loss — the ache, falling. */
   musicLoss: 'musicLoss',
@@ -183,7 +205,8 @@ export const SOUND = {
   pressTick: 'pressTick',
   /** A purchase or repair committed — a rising two-beat "done", matched to `confirm`. */
   purchaseConfirm: 'purchaseConfirm',
-  /** A buy the player can't afford — a low, flat nope. No haptic twin; the buzzer. */
+  /** A buy the player can't afford — two notes a minor second apart, resolving
+   * nowhere. No haptic twin. (The name is pre-amendment; see the spec below.) */
   rejectBuzz: 'rejectBuzz',
   /** One ore chunk settling into the bank on a deposit flight — soft, conserved 1:1. */
   depositTick: 'depositTick',
@@ -191,7 +214,8 @@ export const SOUND = {
   respawnBeep: 'respawnBeep',
   /** Respawn — free and fast (GDD §2.7): the ship arriving, brighter than the beeps. */
   respawnGo: 'respawnGo',
-  /** A minimap ping (GDD §2.4). A rising sonar blip — locate, not alarm. */
+  /** The minimap toggle. A rising sonar blip — locate, not alarm. The *ping*
+   * mechanic was cut (§2.4); the name is a fossil (s7-01 §11 Q7). */
   minimapPing: 'minimapPing',
 } as const;
 
@@ -242,8 +266,8 @@ function struck(
     readonly seed: number;
   },
 ): SoundLayer[] {
-  return (opts.partials ?? GLASS_PARTIALS).map((ratio, i) => ({
-    spec: {
+  return (opts.partials ?? GLASS_PARTIALS).map((ratio, i) => {
+    const spec: VoiceSpec = {
       name: `${name}.p${i}`,
       wave: 'sine',
       attack: STRIKE_S,
@@ -252,9 +276,10 @@ function struck(
       freq: freq * ratio,
       gain: opts.gain / Math.pow(i + 1, PARTIAL_ROLLOFF),
       seed: opts.seed + i,
-    },
-    at: opts.at,
-  }));
+    };
+    // `exactOptionalPropertyTypes`: an absent `at` is not `at: undefined`.
+    return opts.at === undefined ? { spec } : { spec, at: opts.at };
+  });
 }
 
 const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
@@ -1027,11 +1052,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- The one serious thing ----------------------------------------------
 
   /**
-   * The station-death sound (GDD §4.7). Everything the arcade half of the bank
-   * does, this one refuses to do: it does not blip, it does not sparkle, and it
-   * does not resolve. A long fall and a low tail — and then the mix goes to
-   * zero underneath it for three seconds (`../vfx/death-moment`), so the sound
-   * a player actually remembers is the silence after it.
+   * The station-death sound (GDD §4.7). **Untouched by the re-voice, and that is
+   * a decision rather than an omission.** The amendment carries this beat over
+   * character for character — *"when a station dies, the game goes briefly quiet,
+   * the wreck stays on the map all match, and nobody jokes for three seconds"* —
+   * and names it a mechanic of tone rather than polish.
+   *
+   * It does not blip, it does not sparkle, and it does not resolve. A long fall
+   * and a low tail — and then the mix goes to zero underneath it for three
+   * seconds (`../vfx/death-moment`), so the sound a player actually remembers is
+   * the silence after it. A quiet that follows a precise, cold soundscape is a
+   * bigger drop than one that follows a firework, so the pass around it makes
+   * this land harder, not softer.
    */
   [SOUND.stationDeath]: {
     name: 'stationDeath',
@@ -1366,9 +1398,11 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   /**
    * The full theme: a short A-minor riff over a sustained pad, in during a siege
-   * (GDD §2.6). Arcade but restrained — square notes for the tune, a triangle pad
-   * to sit them on — because the theme has to lift a fight without becoming a
-   * cartoon over a station that is dying.
+   * (GDD §2.6). **Cold but driving** — triangle notes for the tune over a
+   * triangle pad — because the theme has to lift a fight without commenting on a
+   * station that is dying. It read *"arcade but restrained"* until the 2026-08-06
+   * amendment retired the first half of that as a target; the riff, the key and
+   * the timing are unchanged, and only the five square melody notes moved.
    */
   [SOUND.musicTheme]: {
     name: 'musicTheme',
@@ -1469,8 +1503,9 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   },
 
   /**
-   * The win sting: a rising major arpeggio, bright and quickly over — a firework
-   * for the surface (GDD §4.7), not a fanfare. Held back until the three-second
+   * The win sting: a rising major arpeggio, quickly over — an acknowledgement,
+   * not a fanfare and no longer *"a firework for the surface"*, which quoted the
+   * paragraph the 2026-08-06 amendment retired. Held back until the three-second
    * quiet has lifted (`./music`), so it lands *after* the silence.
    */
   [SOUND.musicWin]: {
@@ -1486,8 +1521,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   /**
    * The loss sting: a falling minor phrase that settles low and stops. The ache,
-   * with no arcade left on top of it — the one thing in the soundtrack that is
-   * allowed to be sad.
+   * with nothing on top of it — the one thing in the soundtrack that is allowed
+   * to be sad. Untouched by the re-voice: it had no arcade in it to remove.
    */
   [SOUND.musicLoss]: {
     name: 'musicLoss',
