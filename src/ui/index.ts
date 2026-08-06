@@ -629,6 +629,7 @@ export {
 
 export {
   DEFAULT_VOLUMES,
+  SETTINGS_EYEBROW,
   SETTINGS_ID,
   SETTINGS_ROWS,
   VOLUME_CHANNELS,
@@ -636,6 +637,7 @@ export {
   VOLUME_STEPS,
   adjustVolume,
   createSettings,
+  sameTarget,
   setReduceVfx,
   setVolume,
   settingsHitTest,
@@ -647,8 +649,10 @@ export {
 } from './settings';
 export type {
   ControlScheme,
+  SettingsControlState,
   SettingsLayout,
   SettingsModel,
+  SettingsPointer,
   SettingsRowSpec,
   SettingsRowView,
   SettingsState,
@@ -772,21 +776,32 @@ export {
   MAIN_MENU_ID,
   MAIN_MENU_ITEMS,
   MAIN_MENU_TITLE,
-  MAIN_MENU_TITLE_HEIGHT,
-  MAIN_MENU_BUTTON_HEIGHT,
-  MAIN_MENU_BUTTON_HEIGHT_TOUCH,
+  MAIN_MENU_EYEBROW,
+  MAIN_MENU_STATUS,
+  codexSubLine,
+  itemPlate,
   mainMenuHitTest,
   mainMenuLayout,
   mainMenuModel,
 } from './main-menu';
 export type {
+  MainMenuButtonState,
   MainMenuButtonView,
   MainMenuItem,
   MainMenuLayout,
   MainMenuLayoutOptions,
   MainMenuModel,
   MainMenuOption,
+  MainMenuPointer,
 } from './main-menu';
+
+// --- The Gantry/Bone screen frame (u7-01) ----------------------------------
+//
+// Where the header/footer beams sit, what is left for content, and the rule that
+// travels with the Bone accent: at most ONE bright plate per screen.
+
+export { beamContent, countPrimaries, gantryFrame, singlePrimary, stackPlates } from './gantry';
+export type { GantryFrame } from './gantry';
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
 
