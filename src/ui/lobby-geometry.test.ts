@@ -17,14 +17,24 @@
  *     targets; two rects that overlap are two taps that disagree.
  *  3. **A tap hits what it looks like it hits.** `lobbyHitTest` is tested
  *     against the same layout object the view draws from, never a second copy.
- *  4. **The thumb-scale promise.** On touch the hull tiles keep their blurb
- *     height and RUSH! keeps its thumb size on every phone in the matrix, and a
- *     phone in landscape — the orientation the game is actually played in —
- *     keeps its roster legible too (see the module header).
+ *  4. **The thumb-scale promise, which u7-03 made much stronger.** RUSH! and
+ *     BACK clear 48px on every viewport in the matrix, notch or none — including
+ *     the ones whose footer beam is itself under the floor. And on a phone in
+ *     LANDSCAPE, the orientation this screen is actually used in, **every control
+ *     on every roster row** clears it: the row, its state control, its side chip
+ *     and its difficulty chip. That last promise is what the layout was
+ *     restructured for, so it is asserted per row and per control rather than
+ *     sampled.
+ *  5. **The row-composition guarantees survived the move.** The difficulty chip's
+ *     max-fraction, the row body staying tappable, and the side chip's word — all
+ *     re-derived at the narrowest row the layout now produces, and derived from
+ *     the constants rather than restated as numbers, so widening a chip moves the
+ *     assertion with it.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { Rect, Viewport } from '@platform/layout-registry';
+import { TOUCH_MIN, rosterRowHeight, frameMetrics } from '../art/materials';
 import { CLASS_OPTIONS, CLASS_ORDER, LOBBY_SLOTS } from './lobby';
 import { MAP_ORDER } from './map-picker';
 import {
@@ -35,22 +45,25 @@ import {
   CLASS_TILE_MIN_WIDTH,
   CLASS_TILE_PAD,
   LOBBY_MAP_COUNT,
-  LOBBY_PAD,
-  RUSH_HEIGHT,
+  SEAT_CHIP_MAX_FRACTION,
+  SEAT_CHIP_PAD,
+  SEAT_CHIP_WIDTH,
   SEAT_ROW_BODY_MIN,
-  SEAT_ROW_MAX,
-  SEAT_ROW_MAX_TOUCH,
+  SEAT_ROW_MIN_WIDTH,
+  SEAT_STATE_MAX_FRACTION,
   SEAT_STATE_MIN,
   SEAT_STRIPE,
-  SEAT_TEAM_CHIP_MIN_BODY,
+  SEAT_TEAM_CHIP_WIDTH,
   STAT_CELL_FLOOR,
   STAT_CELL_GAP,
   STAT_COUNT,
   TWO_COLUMN_MIN_WIDTH,
+  TWO_ROSTER_MIN_WIDTH,
   classStatCell,
   classTileContent,
   lobbyHitTest,
   lobbyLayout,
+  seatBodyEnd,
   statGridHeight,
 } from './lobby-geometry';
 import type { LobbyLayout } from './lobby-geometry';
@@ -93,6 +106,8 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
   return [
     { label: 'title', rect: layout.title },
     { label: 'roomCode', rect: layout.roomCode },
+    { label: 'leave', rect: layout.leave },
+    { label: 'rushHint', rect: layout.rushHint },
     { label: 'modeToggle', rect: layout.modeToggle },
     { label: 'abundance', rect: layout.abundance },
     ...layout.seats.map((rect, i) => ({ label: `seat[${i}]`, rect })),
@@ -103,7 +118,9 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
   // NB: seatChips AND seatTeamChips are DELIBERATELY absent — they nest inside
   // their roster row (the row body cycles state, the difficulty chip cycles the
   // tier, the team chip cycles the side), so they overlap a seat by design and are
-  // contained-checked separately (see the chip test).
+  // contained-checked separately (see the chip test). So are `header` / `footer`,
+  // which are the BEAMS: a beam is structure and runs to the safe-area edge,
+  // outside the page margin `content` is inset by (`./gantry`).
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -122,21 +139,20 @@ const center = (r: Rect): { x: number; y: number } => ({
 
 /**
  * A point in a roster row's BODY zone — the strip between the row's LEADING state
- * control (u5) and the leading edge of the trailing chips' guaranteed zone
- * ({@link SEAT_TEAM_CHIP_MIN_BODY}, which no trailing chip may enter).
+ * control (u5) and the first pixel a trailing chip may occupy.
  *
- * It is DERIVED from the drawn rects rather than stated as a fraction, and that is
- * the point: the body used to be "the row's leading 36%" because nothing else was
- * ever laid out at the front of a row. u5 puts a control there, so a fixed
- * fraction would now name a point on the control and call it the body. Measuring
- * from what was actually laid out is the same discipline the hit test keeps — one
- * geometry, never a second copy of the arithmetic.
+ * It is DERIVED from the drawn rects, through the layout's own
+ * {@link seatBodyEnd}, rather than restated here: the body used to be "the row's
+ * leading 36%" because nothing else was ever laid out at the front of a row; u5
+ * put a control there and u7-03 made the rule absolute, so a fraction would now
+ * name a point on the control and call it the body. One geometry, never a second
+ * copy of the arithmetic — the same discipline the hit test keeps.
  */
 const bodyPoint = (layout: LobbyLayout, i: number): { x: number; y: number } => {
   const seat = layout.seats[i]!;
   const state = layout.seatStates[i]!;
   const left = state.width > 0 ? state.x + state.width : seat.x;
-  const right = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
+  const right = seatBodyEnd(seat, state);
   return { x: (left + right) / 2, y: seat.y + seat.height / 2 };
 };
 
@@ -148,6 +164,19 @@ const bodyPoint = (layout: LobbyLayout, i: number): { x: number; y: number } => 
 const LONGEST_SIDE_LABEL_PX = 64;
 /** Mirrors `lobby-view`'s own `TEAM_CHIP_LABEL_PAD` — the inset the word keeps. */
 const TEAM_CHIP_LABEL_PAD = 6;
+/** …and the row width at which the side chip can therefore hold that word at full
+ *  size. DERIVED rather than stated: on a row of `W`, the chip's right edge is
+ *  `W − SEAT_CHIP_WIDTH − SEAT_CHIP_PAD` and its left edge is
+ *  {@link seatBodyEnd}, so `W` has to satisfy
+ *  `W − chip − pad − (bar + stateFraction·W + body) ≥ word + 2·pad`. */
+const SIDE_WORD_ROW_WIDTH =
+  (SEAT_CHIP_WIDTH +
+    SEAT_CHIP_PAD +
+    SEAT_STRIPE +
+    SEAT_ROW_BODY_MIN +
+    LONGEST_SIDE_LABEL_PX +
+    2 * TEAM_CHIP_LABEL_PAD) /
+  (1 - SEAT_STATE_MAX_FRACTION);
 
 // ---------------------------------------------------------------------------
 // 1. Containment
@@ -253,7 +282,7 @@ describe('the roster and the hull tiles', () => {
   }
 
   it('splits into two columns only once there is width for them', () => {
-    const wide = lobbyLayout({ width: TWO_COLUMN_MIN_WIDTH + 2 * LOBBY_PAD, height: 800 });
+    const wide = lobbyLayout({ width: 1280, height: 800 });
     const narrow = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });
 
     expect(wide.twoColumn).toBe(true);
@@ -269,9 +298,46 @@ describe('the roster and the hull tiles', () => {
     expect(narrow.classOptions[1]!.x).toBeGreaterThan(narrow.classOptions[0]!.x);
   });
 
-  it('is decided by width, not by device — a narrow desktop window is a phone layout', () => {
-    expect(lobbyLayout({ width: 600, height: 900 }).twoColumn).toBe(false);
+  it('is decided by BAND width, not by device — a narrow desktop window is a phone layout', () => {
+    // The threshold is read against the band the frame resolved, not the raw
+    // viewport: the Gantry margin is the handoff's 44 scaled, so a 600px window
+    // has a 558px band and stays one column.
+    const window600 = lobbyLayout({ width: 600, height: 900 });
+    expect(window600.band.width).toBeLessThan(TWO_COLUMN_MIN_WIDTH);
+    expect(window600.twoColumn).toBe(false);
     expect(lobbyLayout({ width: 1024, height: 700 }, { isTouch: true }).twoColumn).toBe(true);
+  });
+
+  it('bounds the ship-select column by the BAND, so nothing crowds the separator', () => {
+    // The handoff's own rule for this screen, and the reason the arena row moved
+    // out of the full width of the band into the right column: the roster gets
+    // the whole band, the right column gets the whole band, and the 1px rule
+    // between them has clear air on both sides at every width.
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      if (!layout.twoColumn) {
+        expect(layout.separator.width, `separator drawn in one column on ${name}`).toBe(0);
+        continue;
+      }
+      expect(layout.separator.width, `no separator on ${name}`).toBeGreaterThan(0);
+      expect(layout.separator.y).toBeCloseTo(layout.band.y, 6);
+      expect(layout.separator.height).toBeCloseTo(layout.band.height, 6);
+      expect(layout.shipColumn.y).toBeCloseTo(layout.band.y, 6);
+      expect(layout.shipColumn.height).toBeCloseTo(layout.band.height, 6);
+      expect(rectContains(layout.band, layout.shipColumn), `ship column escapes band on ${name}`).toBe(true);
+      // Nothing in the right column touches the rule…
+      for (const rect of [...layout.classOptions, ...layout.maps]) {
+        expect(rect.x, `right column crowds the separator on ${name}`).toBeGreaterThanOrEqual(
+          layout.separator.x + layout.separator.width - 1e-9,
+        );
+      }
+      // …and nothing in the left one does either.
+      for (const rect of layout.seats) {
+        expect(rect.x + rect.width, `roster crowds the separator on ${name}`).toBeLessThanOrEqual(
+          layout.separator.x + 1e-9,
+        );
+      }
+    }
   });
 });
 
@@ -296,10 +362,27 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
         expect(layout.maps[i]!.width, `arena card ${i} untappable wide on ${name}`).toBeGreaterThanOrEqual(44);
         expect(layout.maps[i]!.height, `arena card ${i} untappable tall on ${name}`).toBeGreaterThanOrEqual(44);
       }
-      expect(layout.rushButton.height).toBeGreaterThanOrEqual(RUSH_HEIGHT);
-      expect(layout.rushButton.width).toBeGreaterThanOrEqual(200);
+      // RUSH! keeps the thumb floor on EVERY viewport, including the ones whose
+      // footer beam is itself under it — a 390-wide phone in portrait resolves a
+      // 28px beam, and the plate grows up into the gutter rather than shrinking.
+      expect(layout.rushButton.height, `RUSH! untappable on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(layout.leave.height, `BACK untappable on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(layout.rushButton.width).toBeGreaterThanOrEqual(150);
     });
   }
+
+  it('keeps RUSH! and BACK at the thumb floor on every profile, notch or none', () => {
+    for (const { name, vp, touch } of PROFILES) {
+      for (const insets of [undefined, insetsFor(vp)]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: touch, insets } : { isTouch: touch });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        expect(layout.rushButton.height, `RUSH! on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        expect(layout.leave.height, `BACK on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        // …and the two never overlap, however little footer there is to share.
+        expect(overlaps(layout.leave, layout.rushButton), `BACK hits RUSH! on ${name}`).toBe(false);
+      }
+    }
+  });
 
   it('keeps the hull tiles at blurb height on a roomy screen (GDD §2.11)', () => {
     // The blurb is the point of the tile; on any device with real room — a desktop
@@ -315,21 +398,74 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     }
   });
 
-  it('keeps the roster in two columns and everything tappable on a phone in LANDSCAPE', () => {
-    // Planet Rush is a landscape game (src/platform/orientation.ts), so this is
-    // the layout a phone player actually meets. With the arena row now sharing the
-    // band, the roster — a list — compresses (its rows can dip below the legible
-    // ceiling, the view drops the detail line), while the tiles and the map cards,
-    // both thumb choices, stay tappable. The roster still splits into two columns
-    // of four, so slot order reads down each column.
-    for (const { name, vp } of PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height)) {
-      const layout = lobbyLayout(vp, { isTouch: true, insets: LANDSCAPE_INSETS });
-      expect(layout.seatColumns, `roster columns on ${name}`).toBe(2);
-      expect(layout.seats[0]!.height, `roster row on ${name}`).toBeGreaterThan(0);
-      expect(layout.classOptions[0]!.height, `hull tile on ${name}`).toBeGreaterThanOrEqual(
-        CLASS_TILE_COMPACT,
+  /**
+   * THE BAR THIS BRIEF SET, and the one it is easiest to lose silently.
+   *
+   * Planet Rush is a landscape game (`src/platform/orientation.ts`), so a phone on
+   * its side is the layout a phone player actually meets — and this screen carries
+   * more per row than anything else in the game. Every control on a roster row has
+   * to clear the 48px thumb floor there, notch or no notch, or the screen only
+   * works with a mouse.
+   *
+   * Three changes buy it and all three are asserted through their effect rather
+   * than by name: the arena row moved into the right column (so the roster gets
+   * the whole band), the rows abut (`ROSTER.gap` = 0), and a row's segments span
+   * its full height instead of sitting inset in it.
+   */
+  it('gives every roster-row control the 48px thumb floor on a phone in LANDSCAPE', () => {
+    const landscape = PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height);
+    expect(landscape.length, 'there are landscape phone profiles to assert').toBeGreaterThan(0);
+    for (const { name, vp } of landscape) {
+      for (const insets of [undefined, LANDSCAPE_INSETS]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: true, insets } : { isTouch: true });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        expect(layout.seatColumns, `roster columns on ${name} (${tag})`).toBe(2);
+        for (let i = 0; i < layout.seats.length; i++) {
+          const seat = layout.seats[i]!;
+          expect(seat.height, `row ${i} under the thumb on ${name} (${tag})`).toBeGreaterThanOrEqual(
+            TOUCH_MIN,
+          );
+          // …and its controls are the row's height, not the row's height minus a pad.
+          for (const [label, rect] of [
+            ['state', layout.seatStates[i]!],
+            ['team chip', layout.seatTeamChips[i]!],
+            ['difficulty chip', layout.seatChips[i]!],
+          ] as const) {
+            expect(rect.width, `${label} ${i} missing on ${name} (${tag})`).toBeGreaterThan(0);
+            expect(
+              rect.height,
+              `${label} ${i} under the thumb on ${name} (${tag})`,
+            ).toBeGreaterThanOrEqual(TOUCH_MIN);
+          }
+        }
+        // The MODE / ORE chips above them are controls too.
+        expect(layout.modeToggle.height, `MODE on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        expect(layout.abundance.height, `ORE on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        // …and the two thumb CHOICES beside the roster keep their floors.
+        expect(layout.classOptions[0]!.height, `hull tile on ${name} (${tag})`).toBeGreaterThanOrEqual(
+          CLASS_TILE_COMPACT,
+        );
+        expect(layout.maps[0]!.height, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
+        expect(layout.maps[0]!.width, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
+  it('holds the same floor on the SMALLEST phone in landscape — the iPhone SE', () => {
+    // 375×667 is in QA's matrix, and under the landscape lock it hands the lobby
+    // a 667×375 logical viewport whose band is 621px. Under the old 700px
+    // two-column threshold that fell to the stacked shape, where a 249px band
+    // split three ways left the roster 74px for eight rows. It is the device that
+    // moved TWO_COLUMN_MIN_WIDTH, so it is asserted by name.
+    const layout = lobbyLayout({ width: 667, height: 375 }, { isTouch: true });
+    expect(layout.twoColumn).toBe(true);
+    expect(layout.seatColumns).toBe(2);
+    for (let i = 0; i < layout.seats.length; i++) {
+      expect(layout.seats[i]!.height, `SE row ${i}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(layout.seatStates[i]!.width, `SE state control ${i}`).toBeGreaterThanOrEqual(
+        SEAT_STATE_MIN,
       );
-      expect(layout.maps[0]!.height, `arena card on ${name}`).toBeGreaterThanOrEqual(44);
+      expect(layout.seatChips[i]!.width, `SE difficulty chip ${i}`).toBe(SEAT_CHIP_WIDTH);
     }
   });
 
@@ -338,33 +474,47 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     expect(lobbyLayout({ width: 1280, height: 800 }).tileShape).toBe('stack');
     // Tall and narrow: a 2×2 under the roster.
     expect(lobbyLayout({ width: 390, height: 844 }, { isTouch: true }).tileShape).toBe('grid');
-    // Short and wide, one column: a single row of four — height is the scarce
-    // axis, so the tiles spend width instead and keep their blurb.
-    const short = lobbyLayout({ width: 690, height: 400 });
-    expect(short.twoColumn).toBe(false);
+    // Wide and very short: a single row of four — height is the scarce axis, so
+    // the tiles spend width instead and keep their blurb.
+    //
+    // The viewport that reaches this shape MOVED with u7-03, and the move is the
+    // restructure rather than a tuning slip: the tiles used to divide a band that
+    // ran the full width of the screen, so a 690×400 phone-ish window reached it;
+    // they now live in the ship-select column, which is 40% of the band, so the
+    // `row` shape is what a wide-and-short DESKTOP window falls into instead. The
+    // chooser is unchanged — stack, then grid, then row — and this is the window
+    // where the first two genuinely do not fit.
+    const short = lobbyLayout({ width: 1620, height: 255 });
     expect(short.tileShape).toBe('row');
     expect(short.classOptions[0]!.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
     expect(short.classOptions.map((r) => r.y)).toEqual(Array(4).fill(short.classOptions[0]!.y));
   });
 
-  it('grows the roster rows on touch, up to the touch cap', () => {
-    // A tall portrait window, so the roster band has room for the rows to reach
-    // their cap even with the arena row now sharing the middle — otherwise the
-    // rows compress below both caps and the cap, not the device, stops binding.
+  it('sizes every control by the VIEWPORT, never by isTouch (u7-03)', () => {
+    // `isTouch` used to choose between a desktop row height and a taller "touch"
+    // one. It does not any more: the thumb floor is a property of the viewport,
+    // not of the input device, so both readings of the same window are identical
+    // and every control clears the floor on both. That is strictly stronger than
+    // the old promise, which left a mouse-driven window on 44px rows.
     const vp: Viewport = { width: 412, height: 1400 };
-    const desktop = lobbyLayout(vp);
+    const pointer = lobbyLayout(vp);
     const thumb = lobbyLayout(vp, { isTouch: true });
-    expect(desktop.seats[0]!.height).toBeLessThanOrEqual(SEAT_ROW_MAX);
-    expect(thumb.seats[0]!.height).toBeLessThanOrEqual(SEAT_ROW_MAX_TOUCH);
-    expect(thumb.seats[0]!.height).toBeGreaterThan(desktop.seats[0]!.height);
-    expect(thumb.rushButton.height).toBeGreaterThan(desktop.rushButton.height);
+    expect(thumb.seats[0]!.height).toBeCloseTo(pointer.seats[0]!.height, 6);
+    expect(thumb.rushButton.height).toBeCloseTo(pointer.rushButton.height, 6);
+    expect(pointer.seats[0]!.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+    // …and the cap is the frame's own row, the handoff's 64px surface floored at
+    // the thumb, rather than a lobby literal.
+    const cap = rosterRowHeight(frameMetrics(vp.width, vp.height));
+    expect(pointer.seats[0]!.height).toBeLessThanOrEqual(cap + 1e-9);
   });
 
   it('compresses the roster — never the tiles — when the screen runs out', () => {
     // 320×568 (GDD §4.3) cannot hold eight thumb-scale rows *and* four tiles.
     // The stated priority: the roster is a list to read, the tiles are a choice.
+    // This is a PORTRAIT window, behind the ROTATE overlay — the one place the
+    // 48px promise above is deliberately not made.
     const layout = lobbyLayout({ width: 320, height: 568 }, { isTouch: true });
-    expect(layout.seats[0]!.height).toBeLessThan(SEAT_ROW_MAX_TOUCH);
+    expect(layout.seats[0]!.height).toBeLessThan(TOUCH_MIN);
     expect(layout.classOptions[0]!.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
   });
 });
@@ -551,12 +701,23 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
     });
   }
 
-  it('keeps the lobby BACK exit inside the title band, clear of the room code (u2)', () => {
+  it('keeps the lobby BACK exit in the FOOTER beam, clear of RUSH! and the hint (u2)', () => {
+    // BACK moved out of the title band and into the footer beam with u7-03 —
+    // where this set puts a screen's secondary action (settings' DONE is its
+    // twin). What has to hold is unchanged: it is inside the safe content box, it
+    // is the left-anchored exit, and it never collides with the screen's start
+    // button or with the hint that explains a dim one.
     for (const { name, vp, touch } of PROFILES) {
       const layout = lobbyLayout(vp, { isTouch: touch });
       expect(rectContains(layout.content, layout.leave), `leave escapes content on ${name}`).toBe(true);
-      expect(rectContains(layout.title, layout.leave), `leave escapes title band on ${name}`).toBe(true);
+      expect(layout.leave.x, `leave is not left-anchored on ${name}`).toBeLessThan(
+        layout.rushButton.x,
+      );
+      expect(overlaps(layout.leave, layout.rushButton), `leave overlaps RUSH! on ${name}`).toBe(false);
+      expect(overlaps(layout.leave, layout.rushHint), `leave overlaps the hint on ${name}`).toBe(false);
       expect(overlaps(layout.leave, layout.roomCode), `leave overlaps room code on ${name}`).toBe(false);
+      // …and the header beam still carries the heading and the code, side by side.
+      expect(overlaps(layout.title, layout.roomCode), `heading overlaps code on ${name}`).toBe(false);
     }
   });
 
@@ -600,12 +761,11 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
         const mid = center(seat).x;
         const body = bodyPoint(layout, i);
 
-        // Both chips nest inside the row and leave its LEADING share clear — the
-        // row body stays tappable (n2). The guaranteed body is the row's first
-        // SEAT_TEAM_CHIP_MIN_BODY, not "everything up to the centre": u3 widened
-        // the side chip to hold `FRIENDLY A`, which the landscape phone's 221px
-        // row cannot fit right of centre. Every wider profile still keeps its
-        // centre body — asserted below where the row can afford it.
+        // Both chips nest inside the row and leave its LEADING zone clear — the
+        // identity bar, whatever the state control took, and SEAT_ROW_BODY_MIN of
+        // body (`seatBodyEnd`). That rule is ABSOLUTE since u7-03; it used to be
+        // 36% of the row, which over-reserved on a narrow row and under-reserved
+        // on a wide one.
         expect(rectContains(seat, chip), `difficulty chip ${i} escapes its row on ${name}`).toBe(true);
         expect(rectContains(seat, teamChip), `team chip ${i} escapes its row on ${name}`).toBe(true);
         expect(
@@ -617,6 +777,13 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
         // the bot's tier. Right-anchored, so a tap on it wins over the body.
         if (chip.width > 0 && chip.height > 0) {
           expect(chip.x, `difficulty chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
+          expect(
+            chip.width,
+            `difficulty chip ${i} lost its max-fraction guarantee on ${name}`,
+          ).toBeCloseTo(
+            Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD),
+            6,
+          );
           const c = center(chip);
           expect(lobbyHitTest(layout, c.x, c.y), `difficulty chip ${i} on ${name}`).toEqual({
             kind: 'seatChip',
@@ -624,12 +791,14 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
           });
         }
 
-        // …and it is wide enough to actually SAY the side (u3). The word is the
-        // whole feature — `FRIENDLY A` measures 64px in the chip's 11px Audiowide
-        // (measured in-container, the same way the 88px constant was chosen) — so
-        // a chip that cannot hold it is a chip that would draw the word over the
-        // name beside it. Every profile that draws a chip at all must fit it.
-        if (teamChip.width > 0 && teamChip.height > 0) {
+        // …and where the row is wide enough for it, the side chip SAYS the side at
+        // full size (u3). The word is the whole feature — `FRIENDLY A` measures
+        // 64px in the chip's 11px Audiowide — and `SIDE_WORD_ROW_WIDTH` is the row
+        // width the composition needs for it, derived from the constants above
+        // rather than restated. Every landscape profile clears it; a narrower row
+        // scales the word down (`lobby-view` `fitLabel`) rather than dropping the
+        // control, because a control the player cannot find is the worse failure.
+        if (teamChip.width > 0 && teamChip.height > 0 && seat.width >= SIDE_WORD_ROW_WIDTH) {
           expect(
             teamChip.width,
             `team chip ${i} cannot hold "FRIENDLY A" on ${name}`,
@@ -637,13 +806,13 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
         }
 
         // The team chip — composed to the LEFT of the difficulty chip (TEAMS) —
-        // cycles the side. It, too, stays right of centre and never overlaps the
-        // difficulty chip, so editing one control never costs the other.
+        // cycles the side. It never enters the row's body zone and never overlaps
+        // the difficulty chip, so editing one control never costs the other.
         if (teamChip.width > 0 && teamChip.height > 0) {
           expect(
             teamChip.x,
             `team chip ${i} eats into the row's body zone on ${name}`,
-          ).toBeGreaterThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY);
+          ).toBeGreaterThanOrEqual(seatBodyEnd(seat, layout.seatStates[i]!) - 1e-9);
           expect(
             overlaps(teamChip, chip),
             `team chip ${i} overlaps difficulty chip on ${name}`,
@@ -657,6 +826,46 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
       }
     });
   }
+
+  it('holds the side chip at full word width on every LANDSCAPE profile', () => {
+    // The guarantee restated as a claim about devices rather than about rows:
+    // every phone-on-its-side in QA's matrix — the orientation this screen is
+    // used in — carries `FRIENDLY A` at full size, notch or none. (The iPhone SE
+    // is the one landscape device below the threshold; its 180px halved row
+    // scales the word instead, and it is asserted by name above for the floor it
+    // does keep.)
+    for (const { name, vp } of PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height)) {
+      for (const insets of [undefined, LANDSCAPE_INSETS]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: true, insets } : { isTouch: true });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        for (let i = 0; i < layout.seats.length; i++) {
+          expect(
+            layout.seatTeamChips[i]!.width,
+            `side word clipped on ${name} row ${i} (${tag})`,
+          ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
+        }
+      }
+    }
+  });
+
+  it('derives the two-column roster threshold from the row it has to leave', () => {
+    // TWO_ROSTER_MIN_WIDTH is not a taste: a halved column has to leave a row
+    // that still carries its difficulty chip at full width and its state control
+    // above SEAT_STATE_MIN. Both bounds are fractions of the row, so both give a
+    // minimum row width — and the constant is two of those plus a gap.
+    const chipNeeds = (SEAT_CHIP_WIDTH + SEAT_CHIP_PAD) / SEAT_CHIP_MAX_FRACTION;
+    const stateNeeds = SEAT_STATE_MIN / SEAT_STATE_MAX_FRACTION;
+    expect(SEAT_ROW_MIN_WIDTH).toBeGreaterThanOrEqual(Math.max(chipNeeds, stateNeeds));
+    expect(TWO_ROSTER_MIN_WIDTH).toBeGreaterThanOrEqual(2 * SEAT_ROW_MIN_WIDTH);
+
+    // …and a row at exactly that width really does keep both.
+    const row: Rect = { x: 0, y: 0, width: SEAT_ROW_MIN_WIDTH, height: TOUCH_MIN };
+    const chipWidth = Math.min(SEAT_CHIP_WIDTH, row.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD);
+    expect(chipWidth).toBeCloseTo(SEAT_CHIP_WIDTH, 6);
+    expect(
+      Math.min(SEAT_TEAM_CHIP_WIDTH, row.width * SEAT_STATE_MAX_FRACTION),
+    ).toBeGreaterThanOrEqual(SEAT_STATE_MIN);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -746,7 +955,7 @@ describe('the seat-state control is DRAWN on every row (u5 — the affordance)',
         expect(
           control.x + control.width,
           `state control ${i} eats the trailing chips' zone on ${name}`,
-        ).toBeLessThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY - SEAT_ROW_BODY_MIN + 1e-9);
+        ).toBeLessThanOrEqual(seatBodyEnd(seat, control) - SEAT_ROW_BODY_MIN + 1e-9);
 
         const body = bodyPoint(layout, i);
         expect(lobbyHitTest(layout, body.x, body.y), `row body ${i} on ${name}`).toEqual({
@@ -779,7 +988,7 @@ describe('the seat-state control is DRAWN on every row (u5 — the affordance)',
           expect(
             teamChip.x,
             `inset team chip ${i} eats the row's body zone on ${name}`,
-          ).toBeGreaterThanOrEqual(seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY);
+          ).toBeGreaterThanOrEqual(seatBodyEnd(seat, control) - 1e-9);
         }
         const body = bodyPoint(layout, i);
         expect(lobbyHitTest(layout, body.x, body.y), `inset row body ${i} on ${name}`).toEqual({

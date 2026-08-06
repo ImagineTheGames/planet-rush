@@ -13,46 +13,82 @@
  * convention the layout registry, the touch layer and the camera all speak.
  *
  * ---------------------------------------------------------------------------
+ * GANTRY / BONE (u7-03, ratified 2026-08-05; spec `docs/design/gantry-bone-handoff.html`)
+ * ---------------------------------------------------------------------------
+ * The lobby is framed like every other screen in the set: a **header beam**
+ * carrying the screen's name and the room code, a **footer beam** carrying
+ * BACK, the RUSH! hint and RUSH! itself, and one **content band** between them.
+ * That frame is {@link ./gantry} `gantryFrame` — the same call the title and
+ * settings screens make — so the beams, the margins and the gutters are the
+ * handoff's own numbers on a desktop and their derived counterparts on a phone
+ * (`../art/materials` §3b/§3c), never a second hand-picked set.
+ *
+ * ---------------------------------------------------------------------------
  * THE SHAPE, AND WHAT DECIDES IT
  * ---------------------------------------------------------------------------
- * Title across the top (wordmark left, room code right), RUSH! hung off the
- * bottom with room for its one-line hint, and the band between them divided
- * between the eight-seat roster and the four hull tiles. Three things flex:
+ * Inside the band, two things flex:
  *
  *  - **Columns** ({@link TWO_COLUMN_MIN_WIDTH}): wide enough, and the roster
- *    goes left with the tiles beside it; narrow, and the tiles drop below.
- *  - **Roster columns** ({@link SEAT_ROW_LEGIBLE}): when eight rows would not
- *    be legible and the column can be halved, the roster becomes two columns of
- *    four — P1–P4 down the left, P5–P8 down the right.
+ *    takes the left column and **ship select takes the right one, bounded by the
+ *    band itself** — the handoff's rule, so nothing crowds the separator between
+ *    them. The four arena cards ride the bottom of the *right* column rather
+ *    than cutting across both, which is what leaves the roster the full height of
+ *    the band and is what makes the thumb floor below reachable at all.
+ *    Narrow, and the three blocks stack: roster, tiles, arena row.
  *  - **Tile arrangement** ({@link TileShape}): four stacked, a 2×2, or one row
  *    of four — whichever keeps a tile tall *and* wide enough to carry its name,
  *    its hull and its **stat grid** (u4, 2026-08-05 — pips AND numbers; GDD
  *    §2.5 / §2.11 amended). What a tile can hold at a given size, and in what
  *    order it gives things up, is {@link classTileContent}.
  *
- * All three are decided by the **content box's dimensions**, never by
- * `isTouch`: a tablet in landscape gets the same reading as a desktop of the
- * same width, and a desktop window dragged narrow gets the phone one. `isTouch`
- * is a *scale* input, not a layout input — it grows the tap targets (GDD §2.4
- * makes every menu a plain tap).
+ * Both are decided by the **band's dimensions**, never by `isTouch`: a tablet in
+ * landscape gets the same reading as a desktop of the same width, and a desktop
+ * window dragged narrow gets the phone one.
  *
  * ---------------------------------------------------------------------------
- * LANDSCAPE IS THE CASE THAT MATTERS
+ * `isTouch` NO LONGER PICKS A SIZE (u7-03)
+ * ---------------------------------------------------------------------------
+ * It used to choose between a desktop row height and a taller "touch" one, on
+ * every block. It does not any more, for the reason `./main-menu` states: **the
+ * thumb floor is a property of the viewport, not of the input device** — a
+ * viewport cannot tell you whether the screen in front of it is a touchscreen,
+ * and a 44px row that a mouse can hit is still a 44px row under a thumb. So
+ * every control on this screen is sized by `../art/materials` and floored at
+ * `TOUCH_MIN` on *every* platform. The flag is kept because the caller and the
+ * seam both still carry it, and because a screen may yet want it.
+ *
+ * ---------------------------------------------------------------------------
+ * LANDSCAPE IS THE CASE THAT MATTERS, AND 48px IS THE BAR
  * ---------------------------------------------------------------------------
  * Planet Rush is a landscape game — a phone held in portrait gets the ROTATE
  * overlay (`src/platform/orientation.ts`) — so **a phone on its side is the
  * primary mobile layout of this screen**, not a degenerate one. That handset is
- * short and wide (a 844×390 device with its notch insets leaves 718×337), which
- * is why the flex above is on the *arrangement* rather than on the sizes: two
- * roster columns of four and a 2×2 of tiles fit that band at full height, where
- * eight stacked rows and four stacked tiles would each be a quarter of one.
+ * short and wide (a 844×390 device with its notch insets leaves a 704×247 band),
+ * and this screen carries more per row than anything else in the game: an
+ * identity bar, a P-number, a name, a slot-state control, a side chip, a
+ * difficulty chip and a ping.
  *
- * Where something still has to give — the smallest portrait phones, which are
- * behind the ROTATE overlay anyway — the roster compresses and the tiles do
- * not: the roster is a list to *read* (its only tap is the host's difficulty
- * cycle), while the tiles and RUSH! are the two choices every player makes with
- * a thumb. The view then drops a row's detail line below 30px, and a tile gives
- * up its blurb (and, below that, its hull nickname) by the ladder in
+ * The bar this brief sets is that **every control on a roster row clears the
+ * 48px thumb floor** on the orientation the screen is used in. Three decisions
+ * are what buy it, and each is a number this file changed on purpose:
+ *
+ *  1. the arena row moved into the right column, so the roster gets the WHOLE
+ *     band rather than the band minus a full-width card row;
+ *  2. roster rows **abut** ({@link ../art/materials} `ROSTER.gap` = 0) — a roster
+ *     is a list, and the handoff draws lists as adjacent surfaces with a rule
+ *     between, not as floating cards;
+ *  3. a row's segments — the state control, the side chip, the difficulty chip —
+ *     span the row's **full height** instead of sitting inset inside it, so a
+ *     48px row is made of 48px controls rather than 42px ones.
+ *
+ * On the two landscape phone profiles, notched and not, that lands every row at
+ * 48–52px. `./lobby-geometry.test.ts` asserts it rather than hoping.
+ *
+ * Where something still has to give — the smallest PORTRAIT phones, which are
+ * behind the ROTATE overlay anyway — the roster compresses and the tiles do not:
+ * the roster is a list to *read*, while the tiles and RUSH! are the two choices
+ * every player makes with a thumb. The view then drops a row's detail line, and
+ * a tile gives up its blurb (and, below that, its hull nickname) by the ladder in
  * {@link classTileContent} — **never its stats** at any size the layout will
  * actually produce — rather than clipping anything.
  *
@@ -62,6 +98,9 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
+import { ROSTER, TOUCH_MIN, plateHeight, rosterRowHeight, valueChipHeight } from '../art/materials';
+import type { FrameMetrics } from '../art/materials';
+import { beamContent, gantryFrame } from './gantry';
 
 // ---------------------------------------------------------------------------
 // Safe area
@@ -93,32 +132,61 @@ export interface LobbyLayoutOptions {
  *  free of the model and its dependencies. */
 export const LOBBY_SLOT_ROWS = 8;
 
-/** Margin from the (safe) screen edge to the content box. */
+/** Margin from the (safe) screen edge to the ENTRY screen's content box. The
+ *  lobby itself no longer uses it — it is framed by `./gantry` `gantryFrame`,
+ *  whose margin is the handoff's 44 scaled — but the doors and the keypad
+ *  ({@link entryLayout}) are a different screen and still do. */
 export const LOBBY_PAD = 16;
-/** Gap between the lobby's blocks (title / roster / tiles / button). */
+/** Gap between the lobby's stacked blocks in the one-column shape, and between
+ *  the entry screen's. */
 export const BLOCK_GAP = 12;
-/** Gap between two roster rows, and between two hull tiles. */
+/** Gap between two hull tiles, and between two arena cards. Roster rows use
+ *  `../art/materials` `ROSTER.gap` instead, which is zero (see the header). */
 export const ROW_GAP = 6;
 
-/** Title band: BACK on the far left, wordmark beside it, room code on the right. */
+/** Entry-screen title band. The lobby's own heading lives in the header beam. */
 export const TITLE_HEIGHT = 52;
-/** Room-code block width — `ROOM` over a 26px code, right-aligned. */
+/** Room-code cluster width at the handoff's reference — `ROOM` over the code,
+ *  right-aligned in the header beam. Scaled by the frame like every other
+ *  reference metric in this file. */
 export const ROOM_CODE_WIDTH = 132;
-/** BACK button width — the lobby's exit to the main menu (u2 menu-back), carved
- *  off the far left of the title band. Compact, so the wordmark and the room code
- *  keep their room; the same left-anchored corner every screen puts its exit in. */
-export const LOBBY_BACK_WIDTH = 64;
+/** BACK plate width at the reference — the lobby's exit to the main menu (u2
+ *  menu-back), now the left-hand plate in the FOOTER beam, which is where this
+ *  set puts a screen's secondary action (settings' DONE is its twin). */
+export const LOBBY_BACK_WIDTH = 120;
 
-/** Roster row height ceiling — rows are capped here and compress below it on a
- *  short screen; there is deliberately no floor (see the file header). */
-export const SEAT_ROW_MAX = 44;
-export const SEAT_ROW_MAX_TOUCH = 54;
-/** Below this row height the roster splits into two columns of four rather than
- *  compressing eight rows into an unreadable stack. */
-export const SEAT_ROW_LEGIBLE = 26;
-/** …but only if the roster column is wide enough to halve. A 360 px column
- *  splits into two 177 px rows, which still hold a chip, a name and a tier. */
-export const TWO_ROSTER_MIN_WIDTH = 360;
+/**
+ * The narrowest roster ROW that still carries every control a row must carry.
+ *
+ * Derived, not chosen, from the two guarantees below it — and
+ * `./lobby-geometry.test.ts` re-derives it rather than restating it, so widening
+ * a chip moves this number instead of quietly breaking a row:
+ *
+ *  - the **difficulty chip** keeps its full width, which
+ *    {@link SEAT_CHIP_MAX_FRACTION} grants at `W ≥ (54 + 2) / 0.4` = 140;
+ *  - the **state control** stays above {@link SEAT_STATE_MIN}, which
+ *    {@link SEAT_TEAM_CHIP_MIN_BODY} grants at
+ *    `W ≥ (34 + 16 + 4) / 0.36` = 150.
+ *
+ * The side chip is deliberately NOT in that list: it auto-fits its word down
+ * (`./lobby-view`), so a narrow row shows `FRIENDLY A` smaller rather than not at
+ * all, while a *missing* state control is a control the player cannot find.
+ */
+export const SEAT_ROW_MIN_WIDTH = 150;
+
+/**
+ * The narrowest roster column that may be halved into two columns of four —
+ * two minimum rows and the gap between them.
+ *
+ * The old 360 encoded a different question: "is a halved row still legible?"
+ * Since u7-03 the split exists to keep every row above the **thumb floor**
+ * ({@link placeSeats}), so the question is "does a halved row still carry its
+ * controls?", and the answer is {@link SEAT_ROW_MIN_WIDTH} twice. That is what
+ * lets the iPhone SE in landscape — 621px of band, and the tightest real device
+ * this screen runs on — take two columns of 48px rows instead of one column of
+ * 25px ones.
+ */
+export const TWO_ROSTER_MIN_WIDTH = 2 * SEAT_ROW_MIN_WIDTH + 20;
 
 /** Hull tile heights. 64 is the height that carries a tile's whole IDENTITY
  *  block — its name, its hull, and the 3×2 grid of stat pips-and-numbers (u4,
@@ -244,10 +312,17 @@ export const LOBBY_MAP_ROW_MIN = 52;
 /** Share of the middle band the arena row takes off the bottom before the roster
  *  and the hull tiles divide the rest. */
 export const LOBBY_MAP_BAND_FRACTION = 0.26;
-/** Below this per-card width a row of four would be too pinched, so the arena row
- *  drops to a 2×2 (only the narrowest portrait windows, all behind the ROTATE
- *  overlay). Low, because a preview + a name reads fine on a slim card. */
-export const LOBBY_MAP_MIN_WIDTH = 60;
+/**
+ * Below this per-card width a row of four folds to a 2×2.
+ *
+ * **48 since u7-03, down from 60: the thumb floor, not a taste.** The arena row
+ * now rides the bottom of the ship-select column rather than the full width of
+ * the band, so a 2×2 there is *half as tall* as the row it replaces — on the
+ * iPhone SE in landscape the fold turned four 57×65 cards into eight… four 119×29
+ * ones, which is a card no thumb can hit. A slim card reads fine (a preview over a
+ * name); a short one does not, so the row of four is what is defended.
+ */
+export const LOBBY_MAP_MIN_WIDTH = 48;
 /** Cards don't sprawl on a wide desktop. */
 export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 
@@ -261,24 +336,27 @@ export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 // at the row's right edge (below).
 // ---------------------------------------------------------------------------
 
-/** Height of the MODE/ABUNDANCE strip at the top of the roster. A plain tap
- *  (GDD §2.4), thumb-scaled like every other control. */
-export const CONTROLS_HEIGHT = 30;
-export const CONTROLS_HEIGHT_TOUCH = 38;
 /** Widest a single toggle grows — the two split the roster width, capped so they
  *  read as controls, not banners, on a wide desktop roster column. */
 export const CONTROL_MAX_WIDTH = 200;
 
 /**
- * Width of the identity STRIPE down a roster row's leading edge — the trim that
- * carries the slot's player colour (style-guide §3 rule 2).
+ * Width of the identity BAR down a roster row's leading edge.
+ *
+ * This is the handoff's own row bar (`../art/materials` `ROW_BAR_WIDTH`), and
+ * since u7-03 it is one of exactly **two** places a slot's identity colour is
+ * allowed to land on this screen — the bar and the P-number — because *"identity
+ * colours live on the row bar and P-number only, never as a background wash; that
+ * was making identity read as chrome"*. The filled identity chip the row used to
+ * carry behind its decal is gone with that rule; the decal itself is unchanged
+ * and is still the colour-blind-safe source of truth (style-guide §3 rule 3).
  *
  * It lives here rather than in the view since u5, because the row's leading edge
  * stopped being decoration the drawing code could place on its own: the STATE
- * control is laid out immediately right of the stripe, so the two are one piece
- * of geometry and the view reads both from this file.
+ * control is laid out immediately right of the bar, so the two are one piece of
+ * geometry and the view reads both from this file.
  */
-export const SEAT_STRIPE = 4;
+export const SEAT_STRIPE = ROSTER.bar;
 
 /**
  * Width of a roster row's LEADING STATE control — the OPEN / BOT / CLOSED cycle,
@@ -315,11 +393,33 @@ export const SEAT_STRIPE = 4;
  * control is bounded three ways and takes whichever is smallest — its own width,
  * a share of a narrow row, and whatever is left once the body keeps
  * {@link SEAT_ROW_BODY_MIN}. The order across a row is therefore fixed at every
- * width: `stripe | STATE | body | team chip | difficulty chip`.
+ * width: `bar | STATE | body | team chip | difficulty chip`.
+ *
+ * ---------------------------------------------------------------------------
+ * u7-03 — THE RE-SKIN, AND WHAT IT DID NOT MOVE
+ * ---------------------------------------------------------------------------
+ * The ratified handoff landed, and it puts exactly this control in exactly this
+ * place (*"slots are `OPEN` / `CLOSED` buttons on the far left of each row"*), so
+ * it is the re-skin u5 was built to be rather than a rewrite: the cycle, the
+ * host-only refusals and the hit-test registration are untouched, and only the
+ * material and the sizes changed. The width is the handoff's own button
+ * (`../art/materials` `ROSTER.stateWidth`, 72 at the reference) scaled by the
+ * frame, and the control now spans the row's FULL height rather than sitting
+ * inset in it — which is what puts a 48px row's leading control at 48px instead
+ * of at 42.
  */
-export const SEAT_STATE_WIDTH = 58;
-/** …never more than this share of a narrow row. */
-export const SEAT_STATE_MAX_FRACTION = 0.28;
+export const SEAT_STATE_WIDTH = ROSTER.stateWidth;
+/**
+ * …never more than this share of a narrow row.
+ *
+ * **0.24 since u7-03, down from 0.28.** The control used to be bounded by
+ * {@link SEAT_TEAM_CHIP_MIN_BODY}'s fraction as well, which over-reserved on a
+ * narrow row; it is bounded by an absolute body rule now ({@link seatBodyEnd}),
+ * so every pixel this fraction grants comes straight off the side chip's word.
+ * At 0.24 the notched landscape phone's 205px row holds `FRIENDLY A` at full
+ * size; at 0.28 it did not.
+ */
+export const SEAT_STATE_MAX_FRACTION = 0.24;
 /**
  * …and below this the control is dropped whole rather than drawn as a stub too
  * small to carry a word (the ladder `classTileContent` keeps for a hull tile: a
@@ -342,12 +442,21 @@ export const SEAT_ROW_BODY_MIN = 16;
  *  one slot-editor control every mode shares, so a bot's tier is reachable in FFA
  *  and TEAMS alike (n2 — the TEAMS lobby had lost it). A tap on the row's body
  *  still cycles the seat state; only the chip cycles the tier. */
-export const SEAT_CHIP_WIDTH = 54;
+export const SEAT_CHIP_WIDTH = ROSTER.trailingWidth;
 /** The chip never eats more than this share of a (narrow) row, so the state-cycle
  *  body — and the row's centre, which the hit-test contract taps — stays clear. */
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
-/** Inset of the chip from the row's edges. */
-export const SEAT_CHIP_PAD = 3;
+/**
+ * Inset of a row's segments from the row's LEFT/RIGHT edges.
+ *
+ * **Zero on the vertical axis since u7-03**, which is why this is now only a
+ * horizontal number: the state control, the side chip and the difficulty chip
+ * span the row's full height. A 48px row inset by 3 top and bottom is a 42px
+ * control, and 42px is under the thumb floor on the one screen in the game that
+ * cannot afford to be — so the segments became segments of the row rather than
+ * chips floating in it, which is also the handoff's own read of a machined strip.
+ */
+export const SEAT_CHIP_PAD = 2;
 
 /**
  * The height below which a roster row draws NONE of its per-row controls — the
@@ -381,45 +490,73 @@ export const SEAT_CONTROL_MIN_HEIGHT = 8;
  *  shared difficulty control keeps its place. In FFA a seat's side is its slot
  *  (teams-of-one), so the team chip is laid out but drawn away and a tap on it is a
  *  no-op in the model — the geometry stays mode-blind, the flow routes by mode. */
-export const SEAT_TEAM_CHIP_WIDTH = 88;
+export const SEAT_TEAM_CHIP_WIDTH = ROSTER.sideWidth;
 
 /**
- * The share of a roster row the TEAM chip may never cross into — the row's own
- * body, which is the seat-state cycle's tap target.
+ * Where a row's trailing chips may begin — the first pixel after the identity
+ * bar, the leading STATE control, and the row BODY's own minimum.
  *
- * It used to be "strictly right of centre" (0.5), and that was affordable while
- * the chip said `TEAM A`. `FRIENDLY A` needs 76px including its padding (64px of
- * word at 11px Audiowide, measured), and the landscape phone's 221px row has only
- * 48 to the right of centre: the word would have spilled out of the chip drawn
- * around it. 0.36 leaves that row's chip 79px — the word fits at full size, with
- * the leading 80px of the row (80×19, the whole row height) still body. Every
- * wider form factor is bound by {@link SEAT_TEAM_CHIP_WIDTH} instead and never
- * reaches this clamp at all. `./lobby-geometry.test` asserts both halves.
+ * ---------------------------------------------------------------------------
+ * ABSOLUTE SINCE u7-03, AND THAT IS THE RE-DERIVATION
+ * ---------------------------------------------------------------------------
+ * This used to be a *fraction* of the row (`SEAT_TEAM_CHIP_MIN_BODY`, 0.36),
+ * chosen when a 221px row was the narrowest the screen produced. A fraction is
+ * the wrong shape for the thing it protects: what has to survive is the identity
+ * bar, the control that is actually there, and 16px of body — three absolute
+ * numbers — and expressing them as 36% of the row **over-reserves on a narrow
+ * row and under-reserves on a wide one**. On the notched landscape phone the
+ * fraction was reserving 74px to protect 20px of need, and the 54px difference
+ * came straight off the side chip's word.
+ *
+ * Stated absolutely, the same row keeps `FRIENDLY A` at full size. The guarantee
+ * it replaces is strictly stronger — the body between the state control and the
+ * chips is now *exactly* {@link SEAT_ROW_BODY_MIN} at its worst instead of
+ * "whatever 36% happened to leave" — and it is one function, so the layout, the
+ * hit test and the tests cannot each hold a different opinion about where a row's
+ * body ends.
  */
-export const SEAT_TEAM_CHIP_MIN_BODY = 0.36;
+export function seatBodyEnd(seat: Rect, state: Rect): number {
+  const lead = state.width > 0 ? state.x + state.width : seat.x + SEAT_STRIPE;
+  return lead + SEAT_ROW_BODY_MIN;
+}
 
-/** RUSH! button: ≥56 px so it is a thumb target on every device (GDD §2.4). */
-export const RUSH_HEIGHT = 56;
-export const RUSH_HEIGHT_TOUCH = 64;
-export const RUSH_WIDTH_MAX = 280;
-/** Room left under the button for its one-line hint (`3 PLAYING · 5 BOTS`). */
-export const RUSH_HINT_HEIGHT = 16;
+/** RUSH!'s width at the reference — the one PRIMARY plate on this screen, in
+ *  the footer beam. Its HEIGHT is the frame's own compact plate, which is 56 on
+ *  a desktop and the thumb floor on a phone, so there is no lobby literal for it
+ *  any more (`../art/materials` `plateHeight`). */
+export const RUSH_WIDTH_MAX = 220;
 
 /**
- * At or above this content width the lobby lays out in two columns.
+ * At or above this BAND width the lobby lays out in two columns.
  *
- * 700 rather than a round 720 for one specific device: **Planet Rush is a
- * landscape game** (`src/platform/orientation.ts` — a phone held in portrait
- * gets a ROTATE overlay), so the phone-in-landscape case is the *primary*
- * mobile layout, not an afterthought. A 844×390 handset with its notch insets
- * leaves 718 px of content width, and it is exactly the screen that needs the
- * two-column shape most: height is the scarce axis there, width is not.
+ * **600 since u7-03, down from 700, and the change is a device rather than a
+ * preference.** Planet Rush is a landscape game (`src/platform/orientation.ts` —
+ * a phone held in portrait gets a ROTATE overlay), so a handset on its side is
+ * the primary mobile layout of this screen. Under the lock, the iPhone SE
+ * profile in QA's matrix (375×667) hands the lobby a 667×375 logical viewport,
+ * whose band is **621px** — under the old 700, so it fell to the one-column
+ * shape, where a 249px band split three ways left the roster 74px for eight rows.
+ * Two columns give that same device a full-height roster and 48px rows.
+ *
+ * The number the constant still has to clear is the notched landscape iPhone's
+ * 704px band, which it does with room to spare; and the two profiles that must
+ * NOT reach it — a 390-wide phone in portrait (364) and a desktop window dragged
+ * to 600 (558) — stay clear of it too. All three are asserted.
  */
-export const TWO_COLUMN_MIN_WIDTH = 700;
-/** Share of the content width the roster column takes when there are two. */
-export const ROSTER_COLUMN_FRACTION = 0.56;
-/** Share of the middle band the hull tiles take in the one-column shape. */
-export const CLASS_BLOCK_FRACTION = 0.42;
+export const TWO_COLUMN_MIN_WIDTH = 600;
+/**
+ * Share of the band the roster column takes when there are two.
+ *
+ * **0.60 since u7-03, up from 0.56.** The Gantry frame's page margin is the
+ * handoff's (44 scaled) rather than the lobby's old 16, so the band is narrower
+ * than the content box it replaced — and a roster column that merely kept its
+ * old *fraction* would have handed the landscape phone a 191px halved row, below
+ * the 190px a row needs to carry its side chip at full word width. At 0.60 that
+ * row is 233px, which is wider than the 221px the screen shipped with.
+ */
+export const ROSTER_COLUMN_FRACTION = 0.6;
+/** The rule between the two columns. One pixel: it is a separator, not a wall. */
+export const SEPARATOR_WIDTH = 1;
 
 // ---------------------------------------------------------------------------
 // The entry screen (./lobby-entry) — the door, and the keypad behind JOIN
@@ -472,15 +609,33 @@ export type TileShape = 'stack' | 'grid' | 'row';
 
 /** Every rect the lobby draws in, for one viewport. */
 export interface LobbyLayout {
-  /** The safe, padded box everything else lives inside. */
+  /** The safe area inset by the page margin — the box everything lives inside. */
   readonly content: Rect;
-  /** Wordmark band (left of the room code). */
+  /** The header beam, full width inside the safe area (`./gantry`). */
+  readonly header: Rect;
+  /** The footer beam — BACK, the RUSH! hint and RUSH!. */
+  readonly footer: Rect;
+  /** The band between the two beams: the roster, ship select and the arena row. */
+  readonly band: Rect;
+  /** The heading's strip inside the header beam (left of the room code). */
   readonly title: Rect;
-  /** BACK — the lobby's exit to the main menu (u2 menu-back), carved off the far
-   *  left of the title band; the wordmark sits to its right. */
+  /** BACK — the lobby's exit to the main menu (u2 menu-back), the left-hand
+   *  plate in the FOOTER beam since u7-03 (it was the title band's far left). */
   readonly leave: Rect;
-  /** `ROOM` + the code, right-aligned inside the title band. */
+  /** `ROOM` + the code, right-aligned inside the header beam. */
   readonly roomCode: Rect;
+  /** The RUSH! hint's strip — between BACK and RUSH! in the footer beam. */
+  readonly rushHint: Rect;
+  /** The 1px rule between the roster column and the ship-select column.
+   *  Zero-extent in the one-column shape, where there is nothing to separate. */
+  readonly separator: Rect;
+  /** The ship-select column — the hull tiles and the arena row, bounded by the
+   *  band (the handoff's rule) so nothing crowds the separator. In the
+   *  one-column shape it is the band's lower two blocks. */
+  readonly shipColumn: Rect;
+  /** The resolved frame — beams, margins, gutters, plate scale. The view reads
+   *  its type sizes and paddings off this rather than re-deriving them. */
+  readonly metrics: FrameMetrics;
   /** The eight roster rows, in slot order, top to bottom. */
   readonly seats: readonly Rect[];
   /** Each roster row's LEADING STATE control — the OPEN/BOT/CLOSED cycle, named
@@ -567,117 +722,192 @@ export type LobbyTarget =
  */
 export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}): LobbyLayout {
   const isTouch = options.isTouch ?? false;
-  const content = contentBox(viewport, options.insets);
-  const twoColumn = content.width >= TWO_COLUMN_MIN_WIDTH;
+  const frame = gantryFrame(viewport, options.insets);
+  const metrics = frame.metrics;
+  const content = frame.content;
+  const gap = metrics.gap;
 
-  // --- Title band -----------------------------------------------------------
-  const titleHeight = Math.min(TITLE_HEIGHT, content.height);
-  const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
-  // BACK — the lobby's exit, top-left of the title band (u2 menu-back). Capped to
-  // the content width so a comically narrow box yields a shrunk-not-escaped rect.
-  const leaveWidth = Math.max(0, Math.min(LOBBY_BACK_WIDTH, content.width));
-  const leave: Rect = { x: content.x, y: content.y, width: leaveWidth, height: titleHeight };
-  const codeWidth = Math.min(ROOM_CODE_WIDTH, content.width);
-  const roomCode: Rect = {
-    x: content.x + content.width - codeWidth,
-    y: content.y,
-    width: codeWidth,
-    height: titleHeight,
-  };
-
-  // --- RUSH!, hung off the bottom edge with room for its hint ---------------
-  const rushHeight = Math.min(
-    isTouch ? RUSH_HEIGHT_TOUCH : RUSH_HEIGHT,
-    Math.max(0, content.height - titleHeight),
+  // The footer's plates are sized before the band is, because on a short viewport
+  // they are what the band gives way to. RUSH! is the one control on this screen
+  // a player has to be able to press, so it takes the thumb floor even where the
+  // beam and its gutter cannot hold one (a 390-wide phone in PORTRAIT resolves a
+  // 28px beam), and the band loses that overflow off its bottom — which is air
+  // between the band and the beam by construction, plus whatever the band lends.
+  const actionHeight = Math.max(
+    0,
+    Math.min(
+      Math.max(TOUCH_MIN, plateHeight('compact', metrics)),
+      frame.footer.height + metrics.gutter + frame.band.height,
+    ),
   );
-  const rushWidth = Math.min(RUSH_WIDTH_MAX, content.width);
-  const hint = Math.min(RUSH_HINT_HEIGHT, Math.max(0, content.height - titleHeight - rushHeight));
+  const actionOverflow = Math.max(0, actionHeight - (frame.footer.height + metrics.gutter));
+  const band: Rect = {
+    ...frame.band,
+    height: Math.max(0, frame.band.height - actionOverflow),
+  };
+
+  // --- The header beam: the heading left, the room-code cluster right --------
+  const headerStrip = beamContent(frame.header, metrics, 'header');
+  const codeWidth = Math.min(scaled(ROOM_CODE_WIDTH, metrics), headerStrip.width);
+  const roomCode: Rect = {
+    x: headerStrip.x + headerStrip.width - codeWidth,
+    y: headerStrip.y,
+    width: codeWidth,
+    height: headerStrip.height,
+  };
+  const title: Rect = {
+    x: headerStrip.x,
+    y: headerStrip.y,
+    width: Math.max(0, headerStrip.width - codeWidth - gap),
+    height: headerStrip.height,
+  };
+
+  // --- The footer beam: BACK, the hint, RUSH! --------------------------------
+  //
+  // The two plates are sized by the frame like every other plate in the set, so
+  // they are 56px on a desktop and the thumb floor on a phone. A phone's beam is
+  // itself under the floor (47px with notch insets), so a plate that cannot be
+  // centred in it is bottom-aligned instead and grows upward — never past the
+  // safe-area edge below it, and never into the band, which gave up exactly that
+  // many pixels above.
+  const footerStrip = beamContent(frame.footer, metrics, 'footer');
+  const footerBottom = frame.footer.y + frame.footer.height;
+  const actionY = Math.min(
+    footerStrip.y + (footerStrip.height - actionHeight) / 2,
+    footerBottom - actionHeight,
+  );
+  const backWidth = Math.max(0, Math.min(scaled(LOBBY_BACK_WIDTH, metrics), footerStrip.width));
+  const leave: Rect = { x: footerStrip.x, y: actionY, width: backWidth, height: actionHeight };
+  const rushWidth = Math.max(
+    0,
+    Math.min(scaled(RUSH_WIDTH_MAX, metrics), footerStrip.width - backWidth - gap),
+  );
   const rushButton: Rect = {
-    x: content.x + (content.width - rushWidth) / 2,
-    y: content.y + content.height - hint - rushHeight,
+    x: footerStrip.x + footerStrip.width - rushWidth,
+    y: actionY,
     width: rushWidth,
-    height: rushHeight,
+    height: actionHeight,
+  };
+  // The hint is what a guest reads instead of a dead button ("WAITING FOR THE
+  // HOST"), so it keeps a strip of its own between the two plates rather than
+  // being hung under RUSH! where a short footer would clip it.
+  const hintX = leave.x + backWidth + (backWidth > 0 ? gap : 0);
+  const rushHint: Rect = {
+    x: hintX,
+    y: actionY,
+    width: Math.max(0, rushButton.x - (rushWidth > 0 ? gap : 0) - hintX),
+    height: actionHeight,
   };
 
-  // --- The middle band ------------------------------------------------------
-  const middle: Rect = {
-    x: content.x,
-    y: title.y + titleHeight + BLOCK_GAP,
-    width: content.width,
-    height: Math.max(0, rushButton.y - BLOCK_GAP - (title.y + titleHeight + BLOCK_GAP)),
-  };
-
-  // The arena row, hung off the BOTTOM of the middle band (above RUSH!). It is a
-  // thumb *choice* (like the hull tiles), so it keeps a floor height and the
-  // roster — a list — gives back the space; on a wide/tall screen it is capped so
-  // it never balloons. The roster and the tiles then divide what is left (`upper`).
-  const mapWanted = Math.max(middle.height * LOBBY_MAP_BAND_FRACTION, Math.min(LOBBY_MAP_ROW_MIN, middle.height / 2));
-  const mapHeight = Math.max(0, Math.min(mapWanted, LOBBY_MAP_ROW_MAX, middle.height));
-  const upperHeight = Math.max(0, middle.height - mapHeight - (mapHeight > 0 ? BLOCK_GAP : 0));
-  const upper: Rect = { x: middle.x, y: middle.y, width: middle.width, height: upperHeight };
-  const mapBand: Rect = {
-    x: middle.x,
-    y: middle.y + upperHeight + (mapHeight > 0 ? BLOCK_GAP : 0),
-    width: middle.width,
-    height: mapHeight,
-  };
+  // --- The band -------------------------------------------------------------
+  const twoColumn = band.width >= TWO_COLUMN_MIN_WIDTH;
 
   const seats: Rect[] = [];
   const classOptions: Rect[] = [];
   const maps: Rect[] = [];
   let tileShape: TileShape;
   let rosterBox: Rect;
+  let shipColumn: Rect;
+  let separator: Rect;
+  let mapBand: Rect;
 
   if (twoColumn) {
-    // Roster left, tiles right, both spanning the upper band.
-    const rosterWidth = Math.max(0, upper.width * ROSTER_COLUMN_FRACTION - BLOCK_GAP / 2);
-    const tilesX = upper.x + rosterWidth + BLOCK_GAP;
-    const tilesWidth = Math.max(0, upper.x + upper.width - tilesX);
-    rosterBox = { x: upper.x, y: upper.y, width: rosterWidth, height: upper.height };
-    tileShape = placeTiles(classOptions, tilesX, upper.y, tilesWidth, upper.height, 'stack');
-  } else {
-    // One column: the tiles take a band off the bottom of the upper band, the
-    // roster the rest. The tiles' band is at least tall enough for a 2×2 of
-    // blurb-height tiles whenever half the band can spare it — below that
-    // {@link placeTiles} switches to a single row rather than four strips.
-    const wanted = Math.max(
-      upper.height * CLASS_BLOCK_FRACTION,
-      Math.min(2 * CLASS_TILE_MIN + ROW_GAP, upper.height / 2),
-    );
-    const tilesHeight = Math.max(0, Math.min(wanted, 2 * CLASS_TILE_MAX + ROW_GAP, upper.height));
-    const rosterHeight = Math.max(0, upper.height - tilesHeight - BLOCK_GAP);
-    rosterBox = { x: upper.x, y: upper.y, width: upper.width, height: rosterHeight };
+    // Roster left, ship select right, **both spanning the whole band** — the
+    // handoff's rule, and the reason the roster can hand every row a thumb.
+    const rosterWidth = Math.max(0, band.width * ROSTER_COLUMN_FRACTION - gap / 2);
+    const shipX = band.x + rosterWidth + gap;
+    rosterBox = { x: band.x, y: band.y, width: rosterWidth, height: band.height };
+    shipColumn = {
+      x: shipX,
+      y: band.y,
+      width: Math.max(0, band.x + band.width - shipX),
+      height: band.height,
+    };
+    separator = {
+      x: band.x + rosterWidth + gap / 2,
+      y: band.y,
+      width: band.width > 0 && rosterWidth > 0 ? SEPARATOR_WIDTH : 0,
+      height: band.height,
+    };
+    // Inside the right column: the four hull tiles, then the arena row along its
+    // bottom. The cards are a thumb choice, so they keep a floor and the tiles —
+    // which have a floor of their own — take what is left.
+    const mapHeight = mapRowHeight(shipColumn.height);
+    const tilesHeight = Math.max(0, shipColumn.height - mapHeight - (mapHeight > 0 ? gap : 0));
     tileShape = placeTiles(
       classOptions,
-      upper.x,
-      upper.y + rosterHeight + BLOCK_GAP,
-      upper.width,
+      shipColumn.x,
+      shipColumn.y,
+      shipColumn.width,
       tilesHeight,
-      'grid',
+      'stack',
     );
+    mapBand = {
+      x: shipColumn.x,
+      y: shipColumn.y + tilesHeight + (mapHeight > 0 ? gap : 0),
+      width: shipColumn.width,
+      height: mapHeight,
+    };
+  } else {
+    // One column: roster, then the tiles, then the arena row off the bottom.
+    const mapHeight = mapRowHeight(band.height);
+    const upperHeight = Math.max(0, band.height - mapHeight - (mapHeight > 0 ? BLOCK_GAP : 0));
+    // The roster asks for what eight thumb-sized rows and the strip above them
+    // actually need, and is refused only by the tiles' own floor. It used to take
+    // whatever was left after the tiles claimed a *fraction* of the band, which
+    // is how a 390px phone ended up with 45px rows on a band that could afford 55.
+    const tilesFloor = Math.min(2 * CLASS_TILE_MIN + ROW_GAP + BLOCK_GAP, upperHeight);
+    const rosterHeight = Math.max(
+      0,
+      Math.min(rosterWantedHeight(metrics), upperHeight - tilesFloor),
+    );
+    const tilesHeight = Math.max(0, upperHeight - rosterHeight - (rosterHeight > 0 ? BLOCK_GAP : 0));
+    rosterBox = { x: band.x, y: band.y, width: band.width, height: rosterHeight };
+    const tilesY = band.y + rosterHeight + (rosterHeight > 0 ? BLOCK_GAP : 0);
+    shipColumn = {
+      x: band.x,
+      y: tilesY,
+      width: band.width,
+      height: Math.max(0, band.y + band.height - tilesY),
+    };
+    separator = { x: band.x, y: band.y, width: 0, height: 0 };
+    tileShape = placeTiles(classOptions, band.x, tilesY, band.width, tilesHeight, 'grid');
+    mapBand = {
+      x: band.x,
+      y: band.y + upperHeight + (mapHeight > 0 ? BLOCK_GAP : 0),
+      width: band.width,
+      height: mapHeight,
+    };
   }
 
   // The MODE / ABUNDANCE strip is carved off the TOP of the roster box (never a
   // band of its own — see the constants header): the roster gives back the space,
   // the tiles and the arena cards keep their floors. The seats take what is left.
-  const controls = placeControls(rosterBox, isTouch);
+  const controls = placeControls(rosterBox, metrics);
   const seatsBox: Rect = {
     x: rosterBox.x,
-    y: rosterBox.y + controls.height + (controls.height > 0 ? ROW_GAP : 0),
+    y: rosterBox.y + controls.height + (controls.height > 0 ? metrics.rowGap : 0),
     width: rosterBox.width,
-    height: Math.max(0, rosterBox.height - controls.height - (controls.height > 0 ? ROW_GAP : 0)),
+    height: Math.max(0, rosterBox.height - controls.height - (controls.height > 0 ? metrics.rowGap : 0)),
   };
-  const seatColumns = placeSeats(seats, seatsBox, seatRowMax(isTouch));
+  const seatColumns = placeSeats(seats, seatsBox, rosterRowHeight(metrics), gap);
   const seatStates = seats.map((rect) => stateRect(rect));
   const seatChips = seats.map((rect) => chipRect(rect));
-  const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!));
+  const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!, seatStates[i]!));
   const mapColumns = placeMaps(maps, mapBand);
 
   return {
     content,
+    header: frame.header,
+    footer: frame.footer,
+    band,
     title,
     leave,
     roomCode,
+    rushHint,
+    separator,
+    shipColumn,
+    metrics,
     seats,
     seatStates,
     seatChips,
@@ -696,15 +926,49 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   };
 }
 
+/** One of this file's reference metrics at the frame's plate scale — the widths
+ *  that hold display type and therefore shrink with it. The roster's own segment
+ *  widths deliberately do NOT (`../art/materials` `ROSTER`). */
+function scaled(referencePx: number, m: FrameMetrics): number {
+  return Math.max(0, Math.round(referencePx * m.plateScale));
+}
+
+/** The arena row's height inside the column it hangs off the bottom of: a share
+ *  of that column, floored so a card can still show its preview over its name and
+ *  capped so it never balloons on a tall desktop. */
+function mapRowHeight(columnHeight: number): number {
+  const wanted = Math.max(
+    columnHeight * LOBBY_MAP_BAND_FRACTION,
+    Math.min(LOBBY_MAP_ROW_MIN, columnHeight / 2),
+  );
+  return Math.max(0, Math.min(wanted, LOBBY_MAP_ROW_MAX, columnHeight));
+}
+
+/** What the roster column would like: the MODE/ORE strip, then eight rows at the
+ *  frame's own row height — which is floored at the thumb (`rosterRowHeight`). */
+function rosterWantedHeight(m: FrameMetrics): number {
+  return (
+    valueChipHeight(m) +
+    m.rowGap +
+    LOBBY_SLOT_ROWS * rosterRowHeight(m) +
+    (LOBBY_SLOT_ROWS - 1) * ROSTER.gap
+  );
+}
+
 /**
  * The MODE toggle (top-left of the roster) and the ABUNDANCE toggle (top-right),
  * splitting the roster width with a gap between. Capped in width so they read as
  * controls on a wide desktop column, and clamped to the roster's own height so a
  * comically short box yields zero-extent rather than a strip taller than its band.
+ *
+ * Its height is the frame's own value chip ({@link ../art/materials}
+ * `valueChipHeight`) rather than a lobby literal — the same 40px-at-reference,
+ * thumb-floored control the settings screen's toggles are, because that is what
+ * they are.
  */
-function placeControls(roster: Rect, isTouch: boolean): { modeToggle: Rect; abundance: Rect; height: number } {
-  const height = Math.max(0, Math.min(isTouch ? CONTROLS_HEIGHT_TOUCH : CONTROLS_HEIGHT, roster.height));
-  const width = Math.max(0, Math.min(CONTROL_MAX_WIDTH, (roster.width - BLOCK_GAP) / 2));
+function placeControls(roster: Rect, m: FrameMetrics): { modeToggle: Rect; abundance: Rect; height: number } {
+  const height = Math.max(0, Math.min(valueChipHeight(m), roster.height));
+  const width = Math.max(0, Math.min(CONTROL_MAX_WIDTH, (roster.width - m.gap) / 2));
   const modeToggle: Rect = { x: roster.x, y: roster.y, width, height };
   const abundance: Rect = { x: roster.x + roster.width - width, y: roster.y, width, height };
   return { modeToggle, abundance, height };
@@ -728,21 +992,12 @@ function placeControls(roster: Rect, isTouch: boolean): { modeToggle: Rect; abun
  */
 function stateRect(seat: Rect): Rect {
   if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
-  const x = seat.x + SEAT_STRIPE + SEAT_CHIP_PAD;
-  // Where the trailing chips' zone begins — the body has to fit before it.
-  const bodyStart = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
-  const room = Math.min(
-    SEAT_STATE_WIDTH,
-    seat.width * SEAT_STATE_MAX_FRACTION,
-    bodyStart - SEAT_ROW_BODY_MIN - x,
-  );
+  const x = seat.x + SEAT_STRIPE;
+  const room = Math.min(SEAT_STATE_WIDTH, seat.width * SEAT_STATE_MAX_FRACTION);
   const width = room >= SEAT_STATE_MIN ? room : 0;
-  return {
-    x,
-    y: seat.y + SEAT_CHIP_PAD,
-    width,
-    height: width > 0 ? Math.max(0, seat.height - 2 * SEAT_CHIP_PAD) : 0,
-  };
+  // Full row height, not inset (u7-03): a 48px row inset by a pad is a 42px
+  // control, and this is the screen that cannot afford one.
+  return { x, y: seat.y, width, height: width > 0 ? seat.height : 0 };
 }
 
 /**
@@ -754,8 +1009,7 @@ function stateRect(seat: Rect): Rect {
 function chipRect(seat: Rect): Rect {
   if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
   const width = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
-  const height = Math.max(0, seat.height - 2 * SEAT_CHIP_PAD);
-  return { x: seat.x + seat.width - width - SEAT_CHIP_PAD, y: seat.y + SEAT_CHIP_PAD, width, height };
+  return { x: seat.x + seat.width - width, y: seat.y, width, height: seat.height };
 }
 
 /**
@@ -767,15 +1021,14 @@ function chipRect(seat: Rect): Rect {
  * narrow row that cannot spare that width yields a zero-extent chip — the
  * difficulty control, the shared one, always keeps its place.
  */
-function teamChipRect(seat: Rect, diffChip: Rect): Rect {
+function teamChipRect(seat: Rect, diffChip: Rect, state: Rect): Rect {
   if (seat.width <= 0 || seat.height <= 0 || diffChip.width <= 0) {
     return { x: seat.x, y: seat.y, width: 0, height: 0 };
   }
   const right = diffChip.x - SEAT_CHIP_PAD;
-  const bodyKeep = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
-  const left = Math.max(bodyKeep + SEAT_CHIP_PAD, right - SEAT_TEAM_CHIP_WIDTH);
+  const left = Math.max(seatBodyEnd(seat, state), right - SEAT_TEAM_CHIP_WIDTH);
   const width = Math.max(0, right - left);
-  return { x: left, y: diffChip.y, width, height: diffChip.height };
+  return { x: left, y: seat.y, width, height: seat.height };
 }
 
 /**
@@ -1091,31 +1344,35 @@ function contentBox(viewport: Viewport, insets?: Insets): Rect {
   return { x: left, y: top, width, height };
 }
 
-function seatRowMax(isTouch: boolean): number {
-  return isTouch ? SEAT_ROW_MAX_TOUCH : SEAT_ROW_MAX;
-}
-
 /**
  * Lay the eight roster rows out inside `box`, in one column or — when eight
- * rows would not be legible and the box is wide enough to halve — two columns
- * of four. Seats fill **column-major**, so slot order still reads top to
- * bottom: P1–P4 down the left, P5–P8 down the right.
+ * rows in one column would land **under the thumb floor** and the box is wide
+ * enough to halve ({@link TWO_ROSTER_MIN_WIDTH}) — two columns of four. Seats
+ * fill **column-major**, so slot order still reads top to bottom: P1–P4 down the
+ * left, P5–P8 down the right.
+ *
+ * The split test is the thumb rather than legibility since u7-03: a roster row
+ * stopped being a line of text to read when u5 put a control on it, so "can a
+ * finger hit it" is the question, and it is the landscape phone's answer. The
+ * width guard is what keeps a portrait phone — whose single column already
+ * clears 48 — from being halved into two rows too narrow to carry a side chip.
  *
  * Returns the column count it settled on.
  */
-function placeSeats(out: Rect[], box: Rect, max: number): number {
-  const single = rowHeight(box.height, LOBBY_SLOT_ROWS, ROW_GAP, max);
-  const twoColumns = single < SEAT_ROW_LEGIBLE && box.width >= TWO_ROSTER_MIN_WIDTH;
+function placeSeats(out: Rect[], box: Rect, max: number, gapX: number): number {
+  const gap = ROSTER.gap;
+  const single = rowHeight(box.height, LOBBY_SLOT_ROWS, gap, max);
+  const twoColumns = single < TOUCH_MIN && box.width >= TWO_ROSTER_MIN_WIDTH;
   const columns = twoColumns ? 2 : 1;
   const perColumn = LOBBY_SLOT_ROWS / columns;
-  const width = Math.max(0, (box.width - (columns - 1) * ROW_GAP) / columns);
-  const height = rowHeight(box.height, perColumn, ROW_GAP, max);
+  const width = Math.max(0, (box.width - (columns - 1) * gapX) / columns);
+  const height = rowHeight(box.height, perColumn, gap, max);
   for (let i = 0; i < LOBBY_SLOT_ROWS; i++) {
     const column = Math.floor(i / perColumn);
     const row = i % perColumn;
     out.push({
-      x: box.x + column * (width + ROW_GAP),
-      y: box.y + row * (height + ROW_GAP),
+      x: box.x + column * (width + gapX),
+      y: box.y + row * (height + gap),
       width,
       height,
     });

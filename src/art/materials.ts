@@ -533,6 +533,13 @@ export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): nu
  * `sideWidth` is **ours, and deliberately wider than the design's**: the handoff
  * draws a `T1` chip, and our ratified side chip carries the WORD (`FRIENDLY A`,
  * GDD §2.1 amended 2026-08-05), which needs the room a letter does not.
+ *
+ * **The three widths do NOT scale, and that is the derivation rather than an
+ * omission.** What has to fit inside them is a word, and type on this screen
+ * bottoms out at {@link TYPE_MIN} — an 11px `CLOSED` is 11px wide per glyph on a
+ * phone exactly as on a desktop, so a button sized to hold it cannot shrink with
+ * the frame. The row's *height* and its *padding* do scale ({@link rowHeight},
+ * {@link rosterMetric}), because those hold air rather than letters.
  */
 export const ROSTER = {
   /** Row height — the handoff's row surface ({@link ROW}), restated here so the
@@ -540,12 +547,17 @@ export const ROSTER = {
   height: ROW.height,
   /** The identity bar down a row's leading edge ({@link ROW_BAR_WIDTH}). */
   bar: ROW_BAR_WIDTH,
-  /** The leading slot-state button (`OPEN` / `BOT` / `CLOSED` / `TAKEN`). */
+  /** The leading slot-state button — the handoff's own `OPEN` / `CLOSED` button
+   *  on the far left of the row, holding our four words. */
   stateWidth: 72,
-  /** The trailing slot — the handoff collapses difficulty and OPEN into one. */
-  trailingWidth: 62,
-  /** The side chip, holding `FRIENDLY A` rather than the handoff's `T1`. */
-  sideWidth: 96,
+  /** The trailing slot — the handoff collapses difficulty and OPEN into one.
+   *  54, the width `MEDIUM` measures at 11px Audiowide plus its padding, rather
+   *  than the handoff's own 62: the word decides, and ours is shorter. */
+  trailingWidth: 54,
+  /** The side chip, holding `FRIENDLY A` rather than the handoff's `T1` — 88,
+   *  the measured 64px of word plus padding (u3). The design's chip holds two
+   *  characters and is a third of this; the ratified WORD is why it cannot be. */
+  sideWidth: 88,
   /**
    * Air between two roster rows. **Zero, and that is the design.** The handoff
    * draws a roster as a LIST — abutting surfaces with a rule between them — not
@@ -1406,7 +1418,7 @@ export function drawBeam(
   width: number,
   kind: BeamKind,
   rivets = true,
-  height = BEAM.height,
+  height: number = BEAM.height,
 ): void {
   if (width <= 0) return;
   const h = Math.max(0, height);

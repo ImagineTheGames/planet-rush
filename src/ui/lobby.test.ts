@@ -90,10 +90,13 @@ import {
 } from './lobby';
 import type { LobbyState } from './lobby';
 import { nameplateModel, resolveTeamLabel } from './nameplates';
+import { countPrimaries, singlePrimary } from './gantry';
+import { lobbyPlateRoles } from './lobby-view';
 // The art direction itself, so the two side hues are pinned to the frozen palette
 // and its declared ramp rather than to a hex typed twice (the same cross-check
 // `./chrome.test` runs on the panel chrome).
 import { PALETTE as ART_PALETTE, DERIVED, tint } from '../art/palette';
+import { BONE, MATERIAL_SHADES } from '../art/materials';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
 // The sim's own class table — the source the hull tiles' figures must match
 // exactly (u4: never a hand-copied table).
@@ -114,6 +117,16 @@ const ROOM = 'K7QM';
  * own" can actually be measured as. Used to keep the side hues legible at 11–12px
  * on a phone, where a dim tone that looked fine in a desktop mock disappears.
  */
+/** A cool neutral: no channel warmer than the blue one. Bone is a value ramp on
+ *  hull steel, so every tone it produces has to pass this — the same oracle
+ *  `src/art/materials.test.ts` runs over the whole plate vocabulary. */
+function isCoolNeutral(color: number): boolean {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  return b >= g && g >= r;
+}
+
 function contrastOnVacuum(color: number): number {
   const lum = (c: number): number => {
     const ch = (v: number): number => {
@@ -450,11 +463,9 @@ describe('ship stats on ship-select (u4 — "both pips and numbers")', () => {
     expect(stat(ShipClass.Excavator, 'power')).toBe(STAT_PIPS);
   });
 
-  it('draws the pips in CHROME — never signal yellow, never threat red', () => {
+  it('draws the pips in CHROME — never signal yellow, never threat red, and under Bone no hue at all', () => {
     // Cold Vacuum's load-bearing rule (style-guide §2): signal yellow means ore
-    // or danger and nothing else, and threat red is damage. A pip is neither, so
-    // it takes a hue the screen already uses — plasma (the selection accent),
-    // chalk (its body text), hull steel (its chrome) — and adds none.
+    // or danger and nothing else, and threat red is damage. A pip is neither.
     const pips = Object.values(STAT_PIP_COLORS);
     for (const color of pips) {
       expect(color).not.toBe(PALETTE.signalYellow);
@@ -462,17 +473,71 @@ describe('ship stats on ship-select (u4 — "both pips and numbers")', () => {
       expect(color).not.toBe(PALETTE.threatRed);
       expect(color).not.toBe(SIDE_COLORS.enemy);
     }
-    expect(STAT_PIP_COLORS.selected).toBe(PALETTE.plasma);
-    expect(STAT_PIP_COLORS.empty).toBe(PALETTE.hullSteel);
-    // The filled-but-unselected pip is the lobby's own chalk, and it has to read
-    // at 3px against Vacuum — the same bar every other tone on this screen clears.
+
+    // …and since u7-03 the pips spend no hue at all: the ratified Gantry/Bone
+    // direction makes selection a BRIGHTER PLATE rather than a colour, so the
+    // pips moved onto the Bone value ramp (the same treatment the settings
+    // screen's volume pips take). Each is a declared step on hull steel, which
+    // `src/art/materials.test.ts` recomputes from its recipe — so a hand-edited
+    // hex cannot smuggle a seventh hue in here any more than into a ship.
+    expect(STAT_PIP_COLORS.selected).toBe(BONE.hi);
+    expect(STAT_PIP_COLORS.filled).toBe(MATERIAL_SHADES.bone);
+    expect(STAT_PIP_COLORS.empty).toBe(MATERIAL_SHADES.chipFaceLit);
+    for (const color of pips) expect(isCoolNeutral(color)).toBe(true);
+    // The filled-but-unselected pip has to read at 3px against Vacuum — the same
+    // bar every other tone on this screen clears.
     expect(contrastOnVacuum(STAT_PIP_COLORS.filled)).toBeGreaterThan(4.5);
+    // …and the unfilled remainder must be visibly DARKER than a filled one, which
+    // is the whole read of a pip bar once the hue is gone.
+    expect(contrastOnVacuum(STAT_PIP_COLORS.filled)).toBeGreaterThan(
+      contrastOnVacuum(STAT_PIP_COLORS.empty) * 2,
+    );
   });
 });
 
 // ---------------------------------------------------------------------------
 // 2b. Arena select and the lock at start (p2 field rule — the picker moved here)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// 2c. Gantry/Bone — the one-primary rule, on the screen with the most controls
+// ---------------------------------------------------------------------------
+
+describe('Gantry/Bone: RUSH! is the lobby’s ONE bright plate (u7-03)', () => {
+  it('draws exactly one primary plate, whatever the roster is doing', () => {
+    // Bone spends no hue on a menu, so the primary action is simply the
+    // brightest plate on the screen — which only works while there is exactly
+    // one of them (`./gantry` `singlePrimary`, and the handoff's own constraint:
+    // *"the primary relies on brightness and size rather than hue, so it must
+    // never share a screen with a second bright plate"*).
+    //
+    // This is the screen where that is easiest to lose: eight roster rows, four
+    // hull tiles, four arena cards, two toggles and three per-row controls, any
+    // of which could reach for "make the selected one bright". The selected hull
+    // is `secondary` for exactly that reason.
+    for (const state of [
+      lobby(),
+      selectShipClass(lobby(), ShipClass.Hauler),
+      pressRush(lobby()),
+      toggleMode(lobby()),
+      cycleSeatState(lobby(), 3),
+    ]) {
+      const roles = lobbyPlateRoles(lobbyModel(state));
+      expect(countPrimaries(roles), 'more than one bright plate on the lobby').toBe(1);
+      expect(singlePrimary(roles)).toBe(true);
+    }
+  });
+
+  it('marks the picked hull as a RAISED plate, not as a second primary', () => {
+    const model = lobbyModel(selectShipClass(lobby(), ShipClass.Hauler));
+    const roles = lobbyPlateRoles(model);
+    // One `secondary` for BACK plus one for the picked hull; the other three
+    // hulls are surfaces, which is the handoff's own example of `inert`
+    // ("a settings row, an unselected ship").
+    expect(roles.filter((r) => r === 'secondary')).toHaveLength(2);
+    expect(roles.filter((r) => r === 'inert')).toHaveLength(3 + LOBBY_SLOTS);
+  });
+});
 
 describe('arena select and the lock at start (p2 — the map picker moved into the lobby)', () => {
   it('pre-selects the registry default (octagon) the first time out', () => {
