@@ -8,6 +8,68 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## The CONTROLS row names the DEVICE, not the scheme's internal name
+
+**Date:** 2026-08-06 · branch `agent/ui/u8-controls-label-per-device`
+**Ratified by:** Developer (Reinaldo), field report with a screenshot
+**Amends:** GDD §2.4 (folded in directly) and §5.7's fixed-string list, superseding
+the p6-01 wording *"CONTROLS: STICKS / TAP COMMANDER"*. **No mechanic, number,
+rule, type, or persisted value changes** — this is a player-facing string change.
+
+### The ratification, verbatim
+
+A screenshot of the settings row reading `CONTROLS · STICKS`, on a PC:
+
+> "this is wrong for pc, it should be KEYBOARD + MOUSE or MOUSE ONLY and not
+> sticks (there are no sticks, unless someone is playing with gamepad... then wen
+> can call it TWIN STICKS (but only if gamepad detected)"
+
+### What changed
+
+The row printed `'sticks'` — the **internal** name of the scheme
+(`ControlScheme = 'sticks' | 'tap'`) — verbatim on every device. It now says what
+is true of the hardware in front of the player:
+
+| Situation | Label |
+|---|---|
+| touch | `STICKS` (unchanged — the virtual sticks are real, and on screen) |
+| gamepad connected | `TWIN STICKS` |
+| desktop, no gamepad | `KEYBOARD + MOUSE` |
+| scheme is `tap` | `TAP COMMANDER` (unchanged, any device) |
+
+**`KEYBOARD + MOUSE`, not `MOUSE ONLY`.** The developer offered either; the
+bindings settle it. On `keyboard`, `describeBindings()` gives thrust `WASD`, aim
+`Mouse`, fire `Left mouse` — a player cannot move without the keyboard, so "mouse
+only" would replace one false label with another. A test reads those two bindings
+out of the action map so a future re-binding cannot leave the label quietly wrong.
+
+**A pad beats the keyboard on CONNECTION, not on use.** The row is a standing
+description of the hardware, not a readout of whatever was touched last — so it
+does not ride `activeDevice`. `gamepaddisconnected` reverts it (re-scanning, since
+a second pad may still be plugged in): a stale `TWIN STICKS` after a pad's battery
+dies is the same class of lie this amendment removes. **Touch beats everything**,
+because on a phone the sticks are drawn on the glass whatever else is attached.
+
+### What deliberately did NOT change
+
+The **internal name stays `'sticks'`** — the `ControlScheme` type, every
+identifier, and above all the persisted `planet-rush:controlScheme` value. A
+lift-and-shift exactly like the lore pivot, where the fiction moved and the code
+kept saying `planet`: renaming the stored value would seat an unknown scheme for
+every player who has already saved a preference. `settings.test.ts` asserts the
+storage strings literally, in both directions, so a future rename of the union
+cannot break saved preferences silently.
+
+### Where it lives
+
+The words and the precedence rule are pure and headless-testable in
+`src/ui/settings.ts` (`STICKS_LABELS`, `controlsValue`, `controlsDevice`); the one
+`navigator.getGamepads()` read and the two window listeners are in the wiring
+layer (`src/main.ts`), which passes the device kind in the same way it already
+passes the fire mode and the control scheme. `src/ui/` sniffs nothing.
+
+---
+
 ## The INTERFACE VOICE — the game talks like paperwork
 
 **Date:** 2026-08-05 · branch `agent/architect/l2-industrial-voice`

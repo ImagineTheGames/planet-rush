@@ -26,6 +26,7 @@
  */
 
 import { FireMode } from '@platform/actions';
+import type { DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
@@ -52,6 +53,100 @@ import type { Insets } from './menu-geometry';
  * lane's private `ControlScheme` so main.ts's live value passes straight in.
  */
 export type ControlScheme = 'sticks' | 'tap';
+
+/**
+ * The exact string each scheme persists as, under `planet-rush:controlScheme`.
+ *
+ * Stated as data, and read by both halves of the round trip below, because the
+ * player-facing wording moved away from the internal name in u8-01 and the
+ * stored value did **not**: a save written by any earlier build still says
+ * `sticks`, and it has to keep meaning the default scheme. A future rename of
+ * the {@link ControlScheme} union must therefore leave these two strings alone
+ * — `settings.test.ts` asserts them literally, so it cannot happen quietly.
+ */
+export const CONTROL_SCHEME_STORAGE: Record<ControlScheme, string> = {
+  sticks: 'sticks',
+  tap: 'tap',
+};
+
+/** The string to persist for a scheme. */
+export function storedControlScheme(scheme: ControlScheme): string {
+  return CONTROL_SCHEME_STORAGE[scheme];
+}
+
+/** The scheme a stored value seats. Anything unrecognised — a stale key, a
+ *  hand-edited save, a value from a build that shipped a scheme we since cut —
+ *  folds to the default, so nothing a player ever saved can seat an unknown
+ *  scheme. */
+export function parseControlScheme(stored: string | null | undefined): ControlScheme {
+  return stored === CONTROL_SCHEME_STORAGE.tap ? 'tap' : 'sticks';
+}
+
+// ---------------------------------------------------------------------------
+// What the CONTROLS row is allowed to say (u8-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * The word for the default scheme, per device — the fix for u8-01.
+ *
+ * `'sticks'` is the scheme's INTERNAL name, and the row used to print it
+ * verbatim on every device: a PC with no sticks on screen and none in the
+ * player's hands read `CONTROLS · STICKS`, which is simply false (developer
+ * field report, 2026-08-06, with the screenshot). The internal name did not
+ * move — see {@link CONTROL_SCHEME_STORAGE} — only the word the player reads:
+ *
+ *   `touch`     the virtual sticks are real and on the glass, so STICKS stands.
+ *   `gamepad`   TWIN STICKS — the pad genuinely has two, and it is named only
+ *               when one is actually detected (the report's condition).
+ *   `keyboard`  KEYBOARD + MOUSE, not "MOUSE ONLY": the bindings settle it —
+ *               thrust is `WASD`, aim is `Mouse`, fire is `Left mouse`
+ *               (`describeBindings`), so a player cannot move without the
+ *               keyboard and "mouse only" would swap one false label for
+ *               another.
+ */
+export const STICKS_LABELS: Record<DeviceKind, string> = {
+  touch: 'STICKS',
+  gamepad: 'TWIN STICKS',
+  keyboard: 'KEYBOARD + MOUSE',
+};
+
+/** Tap Commander reads the same on every device: it is a scheme, not a device,
+ *  and a tap is a tap whether it lands from a finger or a mouse. */
+export const TAP_COMMANDER_LABEL = 'TAP COMMANDER';
+
+/** The word the CONTROLS row shows: the scheme decides first, and only the
+ *  default scheme has anything device-dependent to say. */
+export function controlsValue(scheme: ControlScheme, device: DeviceKind): string {
+  return scheme === 'tap' ? TAP_COMMANDER_LABEL : STICKS_LABELS[device];
+}
+
+/** What the wiring layer knows about the hardware, and all this screen needs of
+ *  it. Deliberately two booleans rather than a `navigator`: the model stays pure
+ *  and headless-testable, and sniffing the browser stays the platform's job. */
+export interface ControlsDeviceInputs {
+  /** A touch device — the same test the rest of the wiring layer already makes. */
+  readonly isTouch: boolean;
+  /** A pad is connected RIGHT NOW (`gamepadconnected` / `gamepaddisconnected`),
+   *  not "a pad was used at some point": a stale TWIN STICKS after the pad's
+   *  battery dies is the same class of lie u8-01 exists to remove. */
+  readonly gamepadConnected: boolean;
+}
+
+/**
+ * Which device the CONTROLS row describes.
+ *
+ * Two precedence calls, both deliberate. **A pad beats the keyboard** when one
+ * is connected, per the report ("unless someone is playing with gamepad… then we
+ * can call it TWIN STICKS"), and it beats it on connection rather than on use,
+ * because the row is a standing description of the hardware and not a readout of
+ * whatever was touched last. **Touch beats everything**, because on a phone the
+ * virtual sticks are drawn on the glass in front of the player — STICKS is
+ * literally true there no matter what else is plugged in.
+ */
+export function controlsDevice({ isTouch, gamepadConnected }: ControlsDeviceInputs): DeviceKind {
+  if (isTouch) return 'touch';
+  return gamepadConnected ? 'gamepad' : 'keyboard';
+}
 
 /** The three mixer channels the player can set independently. */
 export type VolumeChannel = 'master' | 'sfx' | 'music';
@@ -234,15 +329,21 @@ export const SETTINGS_EYEBROW = 'CHANGES SAVE IMMEDIATELY';
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
- * Takes the fire mode AND the control scheme by argument because the wiring layer
- * owns each (see {@link SettingsState}, {@link ControlScheme}), so the one screen
- * that shows every control value still reads them from their single sources of
- * truth rather than keeping a second, driftable copy.
+ * Takes the fire mode, the control scheme AND the device by argument because the
+ * wiring layer owns each (see {@link SettingsState}, {@link ControlScheme},
+ * {@link controlsDevice}), so the one screen that shows every control value still
+ * reads them from their single sources of truth rather than keeping a second,
+ * driftable copy — and so this model never touches `navigator`.
+ *
+ * `device` is required rather than defaulted: a caller that forgets it would
+ * print a confident sentence about hardware the player does not have, which is
+ * the whole of u8-01.
  */
 export function settingsModel(
   state: SettingsState,
   fireMode: FireMode,
   controlScheme: ControlScheme,
+  device: DeviceKind,
   pointer: SettingsPointer = {},
 ): SettingsModel {
   /** The state of one target: pressed beats hovered, and neither is at rest. */
@@ -260,13 +361,17 @@ export function settingsModel(
           state: stateOf({ kind: 'fireMode' }),
         };
       case 'controls':
-        // The ratified wording (p6-01): "CONTROLS: STICKS / TAP COMMANDER". The
-        // label names the setting; the pill shows the seated scheme. Tap Commander
-        // is the engaged (plasma) state — the opt-in layer over the default sticks.
+        // The ratified wording (u8-01, 2026-08-06, superseding p6-01's flat
+        // "CONTROLS: STICKS / TAP COMMANDER"): the label still names the setting
+        // and the pill still shows the seated scheme, but the default scheme's
+        // word is now the one that is TRUE on the device in front of the player —
+        // STICKS on touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a PC
+        // ({@link STICKS_LABELS}). Tap Commander is unchanged on every device, and
+        // is still the engaged (plasma) state — the opt-in layer over the default.
         return {
           kind: 'controls',
           label: 'CONTROLS',
-          value: controlScheme === 'tap' ? 'TAP COMMANDER' : 'STICKS',
+          value: controlsValue(controlScheme, device),
           on: controlScheme === 'tap',
           state: stateOf({ kind: 'controls' }),
         };
