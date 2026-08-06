@@ -61,6 +61,7 @@ import {
   isDocked,
   shieldPool,
   stockTiers,
+  teamOf,
   waveTime,
 } from '../sim';
 import type { Asteroid, Bounds, MatchPhase, MiningStation, Ship, UpgradeTiers, World } from '../sim';
@@ -227,6 +228,54 @@ export interface PerceivedStation {
   readonly underAttack: boolean | null;
 }
 
+/**
+ * A slot on this bot's own side — its **roster** entry, not a sighting.
+ *
+ * Stage 1 of `docs/team-bots-plan.md` exists because a bot's model of *winning*
+ * was wrong in TEAMS rather than merely unsophisticated: the sim ends a match
+ * when the last **team** holding a core is alone (`sim/match.ts` `resolveWinner`,
+ * GDD §1), and every read in the bot layer was *me*-shaped. This is the roster a
+ * tree needs to ask the right question — "does my side still hold a core?"
+ * instead of "do I?".
+ *
+ * **Every field here is public at any range, and that is the whole test it had
+ * to pass.** A station's position and its owner's beacon ring are drawn map-wide
+ * (style-guide §5, "ownership … always visible"), and a wreck is visible from
+ * further away than its numbers are (GDD §2.2) — the same licence
+ * {@link PerceivedStation} already ships `pos` and `alive` under. Who is on your
+ * side is the `FRIENDLY A` label over the hull (`src/ui/hud.ts`), which is the
+ * lobby's, not a scouting report.
+ *
+ * **Three things are deliberately NOT here**, and the next person to add one
+ * should read this first:
+ *
+ *  - **The ally's core and shield HP.** Scouted for everyone, ally included
+ *    (`perceiveStation` below, and `docs/bot-teams-allegiance-p16.md` §4). A
+ *    human does not get a teammate's HP on their HUD either.
+ *  - **Whether the ally's *ship* is alive.** A teammate dying in a far corner is
+ *    not drawn on anyone's screen. Its ship is in {@link BotView.ships} when it
+ *    is close enough to see, with a hull bar and everything else, and it is
+ *    absent when it is not — which is exactly right. (The plan's sketch of this
+ *    record listed a bare `alive`; it is left out because nothing in Stage 1
+ *    needs it and fog honesty is structural, not a preference.)
+ *  - **Whether the ally's home is under attack.** That one is Stage 2's, and it
+ *    is licensed by the shipped human klaxon being team-scoped and range-free
+ *    (`src/art/presenter.ts`, `src/art/audio/engine.ts`) — a separate argument
+ *    from this one, to be made when it ships and not smuggled in early.
+ */
+export interface AllyView {
+  readonly id: PlayerId;
+  /** This ally's home, or `null` if it somehow has none. Position is public. */
+  readonly stationPos: Vec2 | null;
+  /**
+   * Does this ally still hold a core? **This is the win condition**, one slot at
+   * a time: the match runs while any member of a side holds one, so a bot's side
+   * is alive iff its own station is alive or any of these is. Public — a burning
+   * home carries (GDD §2.2).
+   */
+  readonly stationAlive: boolean;
+}
+
 /** A rock, as seen: its size and its crack stage — enough to judge a payout
  *  before committing weapon time (GDD §5.5), never the exact ore inside. */
 export interface PerceivedAsteroid {
@@ -248,6 +297,19 @@ export interface PerceivedChunk {
 /** The bot's own ship — full knowledge, because it is its own cockpit. */
 export interface SelfView {
   readonly id: PlayerId;
+  /**
+   * The side this bot fights for (`sim/allegiance.ts` `teamOf`). Public: it is
+   * the beacon ring on the hull and the `FRIENDLY A` / `ENEMY B` label the HUD
+   * prints beside every name plate in TEAMS (`src/ui/hud.ts`), and it is static
+   * match config fixed at match start, so a number captured per view is exactly
+   * as fresh as the world.
+   *
+   * **FFA is teams-of-one**, so this is the bot's own id there and
+   * {@link BotView.allies} is empty — which is the structural reason every
+   * team-aware branch degrades to today's behaviour rather than being switched
+   * off by a mode flag (`docs/team-bots-plan.md` §2.5).
+   */
+  readonly team: number;
   readonly shipClass: ShipClass;
   /**
    * Tiers bought on the four upgrade tracks (GDD §2.5). Own-ship knowledge: the
@@ -300,6 +362,17 @@ export interface BotView {
   /** Seconds until the next wave lands, or `null` after the last one. */
   readonly nextWaveIn: number | null;
   readonly self: SelfView;
+  /**
+   * The other slots on this bot's own side, **ascending by id, self excluded**
+   * ({@link AllyView}). Empty in FFA — teams-of-one has no allies — which is how
+   * every team-aware branch degrades to exactly today's behaviour without a mode
+   * flag anywhere in the tree (`docs/team-bots-plan.md` §2.5).
+   *
+   * The order is ascending rather than "whatever `world.ships` happened to be
+   * in": a roster read in an incidental order is a determinism bug that only
+   * surfaces on the engine whose array shape differs (GDD §4.8).
+   */
+  readonly allies: readonly AllyView[];
   readonly ships: readonly PerceivedShip[];
   readonly stations: readonly PerceivedStation[];
   readonly asteroids: readonly PerceivedAsteroid[];
@@ -430,6 +503,45 @@ function perceiveStation(
 }
 
 /**
+ * The roster of slots on `id`'s own side, ascending by id and never including
+ * `id` itself ({@link AllyView}).
+ *
+ * Walks `world.ships` — a slot with a ship is a slot in the match — and asks the
+ * sim's one allegiance predicate per candidate, exactly as the ship and station
+ * loops below do. It never re-derives a side from a `team` number of its own.
+ *
+ * Derelict homes cannot appear here: a derelict has no ship, and it reads as its
+ * own team anyway (`teamOf` falls back to the owner id), so it is nobody's ally.
+ *
+ * The insertion below keeps the list sorted without `Array.sort` — at most seven
+ * entries, so it is cheaper than a comparator and, more to the point, it makes
+ * the ordering a property of *this* function rather than of the engine's sort
+ * (GDD §4.8). **FFA returns the same frozen empty array every time**, so a
+ * teams-of-one match allocates nothing here per view (GDD §4.3).
+ */
+const NO_ALLIES: readonly AllyView[] = Object.freeze([]);
+
+function allyRoster(world: World, id: PlayerId): readonly AllyView[] {
+  let allies: AllyView[] | null = null;
+  for (const other of world.ships) {
+    if (other.id === id || areEnemies(world, id, other.id)) continue;
+    const station = stationIn(world, other.id);
+    const ally: AllyView = {
+      id: other.id,
+      stationPos: station ? { x: station.pos.x, y: station.pos.y } : null,
+      stationAlive: station !== null && station.alive,
+    };
+    allies ??= [];
+    // Insertion sort by id: ids are unique, so the order is total and there is
+    // no tie to break.
+    let at = allies.length;
+    while (at > 0 && allies[at - 1]!.id > ally.id) at--;
+    allies.splice(at, 0, ally);
+  }
+  return allies ?? NO_ALLIES;
+}
+
+/**
  * Build one bot's view of the world (GDD §2.2, §2.9). Allocates a fresh flat
  * snapshot: nothing here aliases the world tree, so a tree cannot mutate the
  * simulation even by accident.
@@ -487,7 +599,11 @@ export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_P
     collapsed: isCollapsed(world),
     wavesSpawned: world.match.wavesSpawned,
     nextWaveIn: nextWaveIn(world),
-    self: selfView(self, ownStation, env),
+    self: selfView(self, ownStation, env, teamOf(world, id)),
+    // The roster is filled even for a bot whose cockpit is wreckage: it is the
+    // lobby plus map-wide public state, not a sighting, and a dead player's
+    // screen still shows the board they are about to respawn into.
+    allies: allyRoster(world, id),
     ships,
     stations,
     asteroids,
@@ -507,11 +623,17 @@ function perceivedAsteroid(a: Asteroid, d: number): PerceivedAsteroid {
 }
 
 /** The cockpit half of the view. */
-function selfView(ship: Ship | null, station: MiningStation | null, env: Perception): SelfView {
+function selfView(
+  ship: Ship | null,
+  station: MiningStation | null,
+  env: Perception,
+  team: number,
+): SelfView {
   if (!ship) {
     const pos: Vec2 = station ? { x: station.pos.x, y: station.pos.y } : { x: 0, y: 0 };
     return {
       id: -1,
+      team,
       shipClass: ShipClass.Vanguard,
       tiers: stockTiers(),
       pos,
@@ -537,6 +659,7 @@ function selfView(ship: Ship | null, station: MiningStation | null, env: Percept
   }
   return {
     id: ship.id,
+    team,
     shipClass: ship.shipClass,
     tiers: { ...ship.tiers },
     pos: { x: ship.pos.x, y: ship.pos.y },

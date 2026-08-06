@@ -49,14 +49,26 @@ export const MATCH_SLOTS = 8;
  * that a widened `slots` (a QA harness running sixteen) degrades to a repeated
  * character rather than an undefined one.
  *
+ * **Teams are a table indexed by slot, and FFA supplies none.** `teams[id]` is
+ * the side slot `id` fights for — the same shape `sim/match-config.ts` resolves
+ * a lobby into, and the same shape the offline boot stamps onto its roster. An
+ * absent entry (or an absent table, which is every FFA lobby) leaves the seat
+ * with **no `team` key at all**, so `createWorld` applies its teams-of-one
+ * default and an FFA match is byte-identical to the one this function built
+ * before teams existed. That absence is load-bearing: assigning `team:
+ * undefined` would not compile under `exactOptionalPropertyTypes`, and if it did
+ * it would still be the wrong thing to ship (`docs/team-bots-plan.md`, Trap 10).
+ *
  * @param humans slots already taken by people.
  * @param slots  total slots in the match.
  * @param roster the cast to draw from, in order.
+ * @param teams  per-slot side table, indexed by slot id. Omit for FFA.
  */
 export function fillEmptySlots(
   humans: readonly PlayerId[] = [],
   slots: number = MATCH_SLOTS,
   roster: readonly PersonalityId[] = ROSTER,
+  teams?: readonly number[],
 ): BotSeat[] {
   const taken = new Set(humans);
   const seats: BotSeat[] = [];
@@ -64,7 +76,8 @@ export function fillEmptySlots(
     if (taken.has(id)) continue;
     const character = roster[seats.length % roster.length];
     if (character === undefined) break; // empty roster: no bots, not a crash
-    seats.push({ id, personality: character });
+    const team = teams?.[id];
+    seats.push(team === undefined ? { id, personality: character } : { id, personality: character, team });
   }
   return seats;
 }
@@ -74,9 +87,20 @@ export function fillEmptySlots(
  * its character's hull (style-guide §4: the livery is a palette swap over one of
  * the four silhouettes). Humans' rows are the caller's to add; concatenate and
  * sort by id if the world config wants them in slot order.
+ *
+ * **A seat's side travels with it** (`BotSeat.team`). This line used to drop
+ * everything but the id and the hull, which meant a caller could seat a team
+ * lineup and get an FFA world — bots on "teams" that the simulation had never
+ * heard of, which is the worst of both and reads as a bot bug for a day
+ * (`docs/team-bots-plan.md`, Trap 1). The spread is conditional so an FFA seat
+ * produces a spec with **no `team` key**, not a `team: undefined`: `createWorld`
+ * distinguishes the two, and only the first is teams-of-one (Trap 10).
  */
 export function botLobby(seats: readonly BotSeat[]): PlayerSpec[] {
-  return seats.map((seat) => ({ id: seat.id, shipClass: PERSONALITIES[seat.personality].shipClass }));
+  return seats.map((seat) => {
+    const spec: PlayerSpec = { id: seat.id, shipClass: PERSONALITIES[seat.personality].shipClass };
+    return seat.team === undefined ? spec : { ...spec, team: seat.team };
+  });
 }
 
 /** Construct the bots for a seated cast (`./bot`). */
