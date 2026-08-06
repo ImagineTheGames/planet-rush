@@ -65,7 +65,8 @@ class Recorder implements PlateCanvas {
   readonly ops: RecordedOp[] = [];
   /** Every distinct fill-style object seen. Should stay at exactly one. */
   readonly styleObjects = new Set<object>();
-  /** Every distinct points array seen. Should stay tiny — the scratch buffers. */
+  /** Every distinct points array seen. Should equal the polygon count: PixiJS
+   *  keeps the array it is handed, so each shape must get its own. */
   readonly pointArrays = new Set<object>();
 
   private pending: { kind: 'poly' | 'circle'; points: number[] } | null = null;
@@ -476,13 +477,23 @@ describe('zero per-frame allocation', () => {
     expect(plateMaterial('primary')).toBe(plateMaterial('primary', 'rest', 'plate'));
   });
 
-  it('reuses one fill style and two scratch polygons for every mark', () => {
+  it('reuses one fill style, and hands every mark its OWN points array', () => {
     const rec = new Recorder();
     for (let i = 0; i < 20; i++) drawPlate(rec, 0, 0, 400, 80, 'primary', 'hero', 'hover');
     drawBeam(rec, 0, 0, 1280, 'header');
     expect(rec.ops.length).toBeGreaterThan(400);
+    // The fill style is shared: `GraphicsContext.fill` converts its input into a
+    // fresh style synchronously, so one mutable object is safe and free.
     expect(rec.styleObjects.size).toBe(1);
-    expect(rec.pointArrays.size).toBeLessThanOrEqual(2);
+    // The POINTS are not. PixiJS 8's `Polygon` keeps the array it is handed by
+    // reference (`this.points = flat`) and `fill()` clones the path only
+    // shallowly, so a shared scratch buffer does not draw a plate — it draws the
+    // last shape marked, N times, on top of itself. u7-01's first golden run
+    // rendered an entire Gantry/Bone menu as one 3px accent tick because of
+    // exactly this. Every polygon therefore gets its own array.
+    const polys = rec.ops.filter((op) => op.kind === 'poly').length;
+    expect(polys).toBeGreaterThan(400);
+    expect(rec.pointArrays.size).toBe(polys);
   });
 
   it('emits an identical mark list on every redraw', () => {

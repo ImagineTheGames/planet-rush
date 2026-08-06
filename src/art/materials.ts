@@ -481,6 +481,29 @@ export function platePadX(scale: PlateScale, m: FrameMetrics): number {
   return Math.max(8, Math.round(PLATE_SCALES[scale].padX * m.plateScale));
 }
 
+/** Air between a beam's rivet cluster and the first content beside it. */
+const RIVET_CLEARANCE = 3;
+
+/**
+ * How far a beam's own content must start from that beam's end.
+ *
+ * A header beam is **bolted**: {@link RIVET} puts a two-head cluster 20px in from
+ * each end, and the rivets are hardware — a 6px bolt is a 6px bolt whatever size
+ * the screen is, so unlike the margins they do not scale. At the handoff's 44px
+ * margin they clear the eyebrow cluster by exactly 3px and the question never
+ * comes up; at a phone's derived 24px margin they sit *underneath the first two
+ * letters of it* (found in u7-01's first phone golden). So the beam's content
+ * starts clear of its fasteners rather than through them — a rule that reproduces
+ * the handoff's 44 on a desktop and holds at any size.
+ *
+ * A footer carries no rivets, so its content starts at the plain page margin.
+ */
+export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): number {
+  if (kind !== 'header') return m.margin;
+  const cluster = RIVET.perCluster * RIVET.pitch - RIVET.gap;
+  return Math.max(m.margin, RIVET.inset + cluster + RIVET_CLEARANCE);
+}
+
 /**
  * Chrome type — a beam's eyebrow, the wordmark, a heading. Scales with the
  * FRAME, because that is the thing it sits inside, and never below
@@ -993,20 +1016,41 @@ export function plateMaterial(
  * imports PixiJS — which is what keeps `src/art/` testable without a canvas.
  */
 export interface PlateCanvas {
+  /**
+   * **The callee OWNS `points`.** PixiJS 8's `Polygon` constructor stores the
+   * array it is handed by reference (`this.points = flat`), so a caller that
+   * reuses one scratch buffer hands every polygon in the drawing the same array
+   * and the whole plate collapses onto the last shape marked. These primitives
+   * therefore pass a fresh array per shape — see {@link fillChamfered}.
+   */
   poly(points: number[], close?: boolean): void;
   circle(x: number, y: number, radius: number): void;
   /**
    * **Must consume `style` synchronously.** These primitives hand the same
-   * mutable object to every fill so a draw allocates nothing; `Graphics.fill`
-   * copies its input into the geometry immediately, which is what makes that
-   * safe. A test recorder must copy the object rather than retain it.
+   * mutable object to every fill so a draw allocates no styles;
+   * `GraphicsContext.fill` converts its input into a fresh fill style
+   * immediately, which is what makes that safe. A test recorder must copy the
+   * object rather than retain it.
    */
   fill(style: { color: number; alpha: number }): void;
 }
 
 // Two scratch polygons, ping-ponged through the two chamfer clips, and one
-// scratch fill style. Reused for every shape of every plate — this is why a draw
-// allocates nothing.
+// scratch fill style. The clipping work reuses these; only the finished outline
+// is copied out (see below), so a draw allocates one small array per marked
+// shape and nothing else.
+//
+// **Why the copy is not optional.** PixiJS 8's `Polygon` stores the points array
+// it is handed *by reference* — `this.points = flat`, no slice — and
+// `GraphicsContext.fill` clones the path only shallowly. Handing every shape the
+// same scratch buffer therefore does not draw a plate: it draws the LAST shape
+// marked, N times, on top of itself, which renders a whole screen of Gantry/Bone
+// plates as a single 3px accent tick (found in u7-01's first golden run). The
+// fill STYLE really is converted synchronously, so that one stays shared.
+//
+// This is not a per-frame cost. A plate's look changes only when its state does
+// — a hover, a press, a resize — which is a user event, not a frame; the
+// per-frame path writes no geometry at all.
 const PA: number[] = [];
 const PB: number[] = [];
 const FILL = { color: 0, alpha: 1 };
@@ -1079,7 +1123,8 @@ function fillChamfered(
   clipHalf(PA, PB, 1, d1);
   clipHalf(PB, PA, -1, d2);
   if (PA.length < 6) return;
-  canvas.poly(PA, true);
+  // `slice()`, not `PA`: the canvas keeps what it is handed (see PlateCanvas).
+  canvas.poly(PA.slice(), true);
   fillWith(canvas, color, alpha);
 }
 
@@ -1094,9 +1139,7 @@ function fillBox(
   alpha: number,
 ): void {
   if (bw <= 0 || bh <= 0 || alpha <= 0) return;
-  PA.length = 0;
-  PA.push(bx, by, bx + bw, by, bx + bw, by + bh, bx, by + bh);
-  canvas.poly(PA, true);
+  canvas.poly([bx, by, bx + bw, by, bx + bw, by + bh, bx, by + bh], true);
   fillWith(canvas, color, alpha);
 }
 
