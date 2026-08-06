@@ -132,6 +132,10 @@ export class MainMenuView extends Container {
 
   update(model: MainMenuModel): void {
     if (!this.visible) return;
+    // Redrawing an unchanged screen is ~170 translucent polygons and a
+    // render-to-texture for no pixels gained — see ./screen-cache.
+    const signature = JSON.stringify(model);
+    if (this.cache.unchanged(signature)) return;
     const { header, footer, title, eyebrow, buttons, metrics } = this.layout;
 
     // Opaque backdrop over the whole viewport — the menu owns the screen; no
@@ -158,7 +162,7 @@ export class MainMenuView extends Container {
     // Everything above is now on the display list; rasterise it once so the
     // frames between state changes cost one blit rather than ~170 translucent
     // polygons (./screen-cache).
-    this.cache.refresh();
+    this.cache.refresh(signature);
   }
 
   /**

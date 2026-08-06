@@ -74,8 +74,30 @@ import type { Container } from 'pixi.js';
  */
 export class ScreenCache {
   private enabled = false;
+  private signature: string | null = null;
 
   constructor(private readonly target: Container) {}
+
+  /**
+   * Whether the screen may skip its redraw entirely: caching is live and the
+   * content is identical to what was last rasterised.
+   *
+   * This is not an optimisation of an optimisation — it is what makes the cache
+   * safe on a screen whose `update()` is called per FRAME rather than per state
+   * change. The in-match settings screen is exactly that: `syncPause()` runs
+   * every rendered frame and rebuilds the whole screen from a freshly-built
+   * model, so without this check a cached screen would re-render to its texture
+   * 60 times a second — strictly worse than not caching at all. With it, an
+   * unchanged frame costs one string compare.
+   *
+   * The signature is the model itself, serialised. These models are small, flat
+   * view-models (a title, a handful of rows, a hover/press target) and the
+   * compare runs once per frame against ~170 polygons of drawing, so the
+   * serialisation is not the expensive end of this trade by any margin.
+   */
+  unchanged(signature: string): boolean {
+    return this.enabled && this.signature === signature;
+  }
 
   /**
    * Re-rasterise, having just redrawn the container's children.
@@ -84,7 +106,8 @@ export class ScreenCache {
    * every later one refreshes the existing texture in place, so a hover does not
    * churn a new render target per pointer event.
    */
-  refresh(): void {
+  refresh(signature: string): void {
+    this.signature = signature;
     if (!this.enabled) {
       // `antialias` is carried through deliberately: without it the cache would
       // rasterise the chamfered plate edges harder than the direct path does,
@@ -105,6 +128,7 @@ export class ScreenCache {
    * for any other change, which is what makes this the safe call to reach for.
    */
   invalidate(): void {
+    this.signature = null;
     if (!this.enabled) return;
     this.target.cacheAsTexture(false);
     this.enabled = false;

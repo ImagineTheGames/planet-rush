@@ -129,6 +129,12 @@ export class SettingsView extends Container {
 
   update(model: SettingsModel): void {
     if (!this.visible) return;
+    // This screen's `update` is called per FRAME in-match (`syncPause()` draws
+    // the pause overlay every rendered frame), not only on a state change. An
+    // unchanged frame must therefore cost a string compare rather than ~170
+    // polygons and a render-to-texture — see ./screen-cache.
+    const signature = JSON.stringify(model);
+    if (this.cache.unchanged(signature)) return;
     const { header, footer, title, rows, back, metrics } = this.layout;
 
     // Near-opaque over the whole viewport: the settings screen can be opened from
@@ -156,7 +162,7 @@ export class SettingsView extends Container {
     // Everything above is now on the display list; rasterise it once so the
     // frames between state changes cost one blit rather than ~170 translucent
     // polygons (./screen-cache).
-    this.cache.refresh();
+    this.cache.refresh(signature);
   }
 
   /** The header beam: the heading hard left, the standing instruction hard right. */
