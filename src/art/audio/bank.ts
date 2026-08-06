@@ -384,20 +384,54 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   // --- Fight --------------------------------------------------------------
 
+  /**
+   * **A coil discharging.** The single most arcade voice in the bank before the
+   * re-voice, and the clearest illustration of what the amended §4.7 is asking
+   * for: a duty-swept square falling four-to-one in 86 ms is a 1980s cabinet
+   * laser, and every part of that sentence is an idiom rather than a sound a
+   * machine makes. The sweep is gone, the slide is gone, the square is gone.
+   *
+   * What replaces them is the event itself, in two layers: a low tonal **body**
+   * that is the coil dumping its charge, and a short band-limited **arc** over
+   * the top of it that is the discharge crossing the gap. Neither one moves in
+   * pitch. It stays low on purpose — the pair it must never be confused with is
+   * `shotImpact` (*a turret fired at me* vs *something landed on me*), and low
+   * is the dimension that separates them.
+   */
   [SOUND.turretFire]: {
     name: 'turretFire',
-    wave: 'square',
-    attack: 0.001,
-    hold: 0.01,
-    decay: 0.075,
-    punch: 0.6,
-    freq: 520,
-    freqEnd: 130,
-    duty: 0.22,
-    dutySweep: 1.6,
-    noiseMix: 0.25,
-    gain: 0.3,
-    seed: 0x7e88,
+    layers: [
+      {
+        spec: {
+          name: 'turretFire.body',
+          wave: 'triangle',
+          attack: 0.001,
+          hold: 0.012,
+          decay: 0.072,
+          punch: 0.6,
+          freq: 174.61,
+          noiseMix: 0.2, // grit on the body, not a second oscillator
+          lowPass: 1300,
+          gain: 0.32,
+          seed: 0x7e88,
+        },
+      },
+      {
+        spec: {
+          name: 'turretFire.arc',
+          wave: 'noise',
+          attack: 0.0006,
+          hold: 0.006,
+          decay: 0.05,
+          punch: 0.5,
+          freq: 780,
+          lowPass: 2600, // banded, not a hiss: an arc, not a spray
+          highPass: 420,
+          gain: 0.18,
+          seed: 0x7e8b,
+        },
+      },
+    ],
   },
 
   [SOUND.shotImpact]: {
