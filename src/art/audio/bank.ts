@@ -346,16 +346,20 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
+  // One crack stage advancing — **a step, not a slide.** The ×2.17 fall inside
+  // 114 ms was the same downward chirp `rockChip` carried, on the sound that
+  // answers it; stone gives way in stages, and a stage is a step.
   [SOUND.rockCrack]: {
     name: 'rockCrack',
     wave: 'noise',
     attack: 0.002,
     hold: 0.012,
     decay: 0.1,
-    punch: 0.4,
+    punch: 0.45,
     freq: 260,
-    freqEnd: 120,
-    lowPass: 2400,
+    freqEnd: 220,
+    lowPass: 1900, // was 2400: flattening the fall held the grain up, so trim here
+
     gain: 0.4,
     seed: 0x1a2b,
   },
@@ -476,6 +480,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
+  // A shot in flight landing. **A tick, not a "pew"** — the ×3.00 fall inside
+  // 57 ms was the arcade half of a projectile, and the arrival is the transient.
   [SOUND.shotImpact]: {
     name: 'shotImpact',
     wave: 'noise',
@@ -483,9 +489,11 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     hold: 0.006,
     decay: 0.05,
     freq: 900,
-    freqEnd: 300,
+    freqEnd: 780,
+    lowPass: 6000, // a tick, not a hiss — same reason as rockCrack's trim
     highPass: 400,
-    gain: 0.22,
+    gain: 0.27, // the low-pass cost it level; a landing shot still has to land
+
     seed: 0xb23a,
   },
 
@@ -624,13 +632,16 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       },
       {
         spec: {
+          // Flattened from ×2.00: a metallic clang falling an octave inside
+          // 242 ms is a boing, which is the one thing §7.2 asked to be listened
+          // for here. The crumple under it carries the collapse.
           name: 'turretDown.clang',
           wave: 'triangle',
           attack: 0.002,
           hold: 0.02,
           decay: 0.22,
           freq: 380,
-          freqEnd: 190,
+          freqEnd: 320,
           gain: 0.18,
           seed: 0x7e8a,
         },
@@ -750,8 +761,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     attack: 0.006,
     hold: 0.02,
     decay: 0.12,
-    freq: 1046,
-    freqEnd: 1320,
+    freq: 784,
+    freqEnd: 850,
     gain: 0.1,
     seed: 0x22d3,
   },
@@ -870,8 +881,14 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // Patina is the repair colour (style-guide §1) and this is its sound: a soft
-  // tick you notice mostly when it *stops*, because a hit interrupted it.
+  // Patina is the repair colour (style-guide §1) and this is its sound: a soft,
+  // low acknowledgement that a repair was bought and applied.
+  //
+  // The comment here used to read *"a soft tick you notice mostly when it stops,
+  // because a hit interrupted it"* — which describes the **retired repair
+  // channel**. Repair has been a discrete purchase with no channel and nothing
+  // to interrupt since the v0.3 amendment (§2.5), so that sentence had been
+  // describing a mechanic the game does not have. Its ×1.33 rise goes with it.
   [SOUND.repairTick]: {
     name: 'repairTick',
     wave: 'sine',
@@ -879,7 +896,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     hold: 0.02,
     decay: 0.13,
     freq: 392,
-    freqEnd: 523,
+    freqEnd: 440,
     gain: 0.14,
     seed: 0x4fa4,
   },
@@ -1636,9 +1653,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // A minimap ping (GDD §2.4): a rising sonar blip that rings a moment and fades.
-  // Plasma-blue in character (style-guide §1) — this locates, it does not warn, so
-  // it must never be mistaken for the alarm.
+  // A rising sonar blip that rings a moment and fades. Plasma-blue in character
+  // (style-guide §1) — this locates, it does not warn, so it must never be
+  // mistaken for the alarm. The rise stays: locating is the one thing in the
+  // bank a rise still legitimately means, and at 293 ms it reads as a sweep
+  // rather than as a chirp. The 12 Hz wobble on top of it does not stay.
+  //
+  // **The name is a fossil.** The minimap *ping mechanic was cut* (§2.4, §4.9);
+  // this cue is live and correctly wired, but `src/main.ts` raises it for the
+  // minimap **toggle**. Renaming it (and the `'ping'` cue in {@link AudioCue})
+  // touches five files and is deliberately not folded into a re-voice, where it
+  // would make it impossible to review which sound actually changed — it is
+  // s7-01 §11 Q7, open for the developer.
   [SOUND.minimapPing]: {
     name: 'minimapPing',
     layers: [
@@ -1651,8 +1677,6 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           decay: 0.26,
           freq: 880,
           freqEnd: 1320,
-          vibratoDepth: 0.02,
-          vibratoRate: 12,
           gain: 0.22,
           seed: 0x4dc9,
         },
