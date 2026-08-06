@@ -20,11 +20,21 @@
  * `isMobile`/`hasTouch` are Chromium-only Playwright features — fine here.
  */
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
+import { DEVICE_MATRIX } from './tests/mobile/shot-budget';
 
 const PREVIEW_PORT = 4173;
 const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
 
 const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chromium';
+
+/**
+ * The matrix's three profiles, stated ONCE in tests/mobile/shot-budget.ts and
+ * read twice: here, as what Chromium emulates, and there, as the pixel count a
+ * full-frame golden capture of that emulation has to pay for. Stating them once
+ * is what stops a device's screenshot budget from drifting away from the frame
+ * it was derived from (q8-01).
+ */
+const { iphone: IPHONE, pixel: PIXEL, desktop: DESKTOP } = DEVICE_MATRIX;
 
 export default defineConfig({
   testDir: './tests/mobile',
@@ -44,11 +54,43 @@ export default defineConfig({
   // follows, via `budgetTest()` in tests/mobile/budgets.ts — and
   // tests/mobile-budget-contract.test.ts fails the build if one forgets to.
   timeout: 60_000,
+  // The floor for an ORDINARY assertion — a locator check, a `waitFor`.
+  //
+  // Golden comparisons do NOT ride this, and never did: `toHaveScreenshot`
+  // carries its own default (5 s in Playwright 1.49.1, lower than this line
+  // suggests), and it is nowhere near a dpr-3 phone frame's stabilisation pair.
+  // They take a budget derived from the frame they rasterise instead —
+  // tests/mobile/shot-budget.ts `GOLDEN_SHOT_TIMEOUT_MS`, passed on the options
+  // object in goldens.spec.ts. Do not raise the number on this line to fix a
+  // golden: it would bump every ordinary assertion in the suite and still be
+  // sized by nothing in particular.
   expect: { timeout: 10_000 },
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
+
+  // ── Reporters, and the one that made a golden failure inspectable (q8-01) ──
+  //
+  // `github` writes the inline annotations that surface a failure in the PR's
+  // checks — it is what a reviewer sees first, and it stays.
+  //
+  // What it cannot do is carry a PICTURE. A failed `toHaveScreenshot` produces
+  // three PNGs (actual / expected / diff) and, under `trace: 'retain-on-failure'`
+  // below, a trace — as test ATTACHMENTS, which only a file-producing reporter
+  // ever writes out. With `github` + `list` alone nothing was written, so
+  // ci.yml's `upload-artifact` step warned "No files were found with the provided
+  // path: playwright-report/" on every single run and every visual failure had to
+  // be debugged by reproduction and guesswork (PR #291 — the brief for q8-01).
+  //
+  // `html` with `open: 'never'` closes that: it writes `playwright-report/`
+  // (the path ci.yml already uploads) with the attachments copied into
+  // `playwright-report/data/`, and inlines the report itself into `index.html`
+  // so the downloaded artifact opens by double-clicking it — no server, no
+  // `npx playwright show-report`. `open: 'never'` because a CI runner has no
+  // browser to open it in and would hang trying.
+  reporter: process.env.CI
+    ? [['github'], ['list'], ['html', { open: 'never' }]]
+    : [['list']],
 
   use: {
     baseURL: PREVIEW_URL,
@@ -59,10 +101,13 @@ export default defineConfig({
   projects: [
     {
       name: 'iphone',
+      // 2.96 MP a capture — ~9× the desktop control's, and the reason PR #291's
+      // two `iphone` goldens ran out of clock on a loaded runner while passing
+      // everywhere else (tests/mobile/shot-budget.ts).
       use: {
         browserName: chromium,
-        viewport: { width: 390, height: 844 },
-        deviceScaleFactor: 3,
+        viewport: { width: IPHONE.width, height: IPHONE.height },
+        deviceScaleFactor: IPHONE.deviceScaleFactor,
         isMobile: true,
         hasTouch: true,
       },
@@ -71,8 +116,8 @@ export default defineConfig({
       name: 'pixel',
       use: {
         browserName: chromium,
-        viewport: { width: 412, height: 915 },
-        deviceScaleFactor: 2.6,
+        viewport: { width: PIXEL.width, height: PIXEL.height },
+        deviceScaleFactor: PIXEL.deviceScaleFactor,
         isMobile: true,
         hasTouch: true,
       },
@@ -81,8 +126,8 @@ export default defineConfig({
       name: 'desktop',
       use: {
         browserName: chromium,
-        viewport: { width: 1280, height: 800 },
-        deviceScaleFactor: 1,
+        viewport: { width: DESKTOP.width, height: DESKTOP.height },
+        deviceScaleFactor: DESKTOP.deviceScaleFactor,
         isMobile: false,
         hasTouch: false,
       },

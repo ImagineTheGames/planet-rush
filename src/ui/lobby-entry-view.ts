@@ -1,5 +1,5 @@
 /**
- * src/ui/lobby-entry-view.ts — the Pixi view for the entry screen.
+ * src/ui/lobby-entry-view.ts — the Pixi view for the entry screen (THE DOORS).
  * OWNER: UI Engineer.
  *
  * The drawing half of {@link ./lobby-entry}. Every decision lives in the pure
@@ -7,48 +7,100 @@
  * turns them into Graphics and Text, and owns the one thing neither has an
  * opinion about — which Pixi child is which.
  *
- * The rules from the frozen contract that could only be broken *here*:
+ * ---------------------------------------------------------------------------
+ * GANTRY / BONE (u7-04; the direction ratified 2026-08-05, spec
+ * `docs/design/gantry-bone-handoff.html`)
+ * ---------------------------------------------------------------------------
+ * The handoff named five screens — title, build wheel, lobby, ship select,
+ * settings — and this one is not among them, which is how the first screen a
+ * player touches after PLAY was still *"1px hairlines on black, which reads as a
+ * wireframe rather than a product"* while the screen in front of it had been
+ * re-skinned. It is now the same material as the title screen: a header beam
+ * carrying the eyebrow cluster and the wordmark, a footer beam carrying BACK and
+ * SETTINGS, and four door PLATES in the band between them. **None of that is drawn
+ * here.** Every bevel, rivet, band and tone comes from {@link ../art/materials},
+ * so this screen and the four already in the set speak one dialect.
  *
- *  1. **Signal yellow is RESERVED for ore** (style-guide §2). There is no ore on
- *     this screen, so there is no yellow on it. Emphasis is plasma.
- *  2. **Threat red is RESERVED for damage and danger** (§2) — and a failed join
- *     is the one thing on this screen that is genuinely wrong, so the error line
- *     is the single red element and nothing else competes with it.
- *  3. **Typography** (§7): Audiowide for the wordmark and the buttons, Oxanium
- *     for the code and the keys — the code is a string of characters to be read
- *     one at a time, which is exactly what the body face is for.
- *  4. **Every control is a plain tap** (GDD §2.4). Nothing here is a drag, a
- *     long-press or a gesture, and the disabled states are drawn rather than
- *     merely inert, so a dead button never looks pressable.
+ * Three rules this file has to keep on its own:
+ *
+ *  1. **One primary, and it is PLAY SOLO.** Bone spends no colour, so the primary
+ *     action is simply the biggest and brightest plate — which only works while
+ *     there is exactly one ({@link ./gantry} `singlePrimary`, held by
+ *     `lobby-entry.test.ts`). CAMPAIGN is a full-contrast `secondary` plate, never
+ *     `inert`: `inert` is Gantry's word for a *surface*, and a teaser drawn as a
+ *     surface is the greyed-out door u9-01 exists to prevent, wearing a bevel.
+ *  2. **Bone spends no hue, so neither does this screen.** The plasma that used to
+ *     fill PLAY SOLO, tint the caret and letter the `Coming Soon…` answer is gone;
+ *     emphasis is brightness now. The ONE exception is unchanged and deliberate:
+ *     a join that came back refused is the only genuinely wrong thing this screen
+ *     can show, and it stays threat red (style-guide §2).
+ *  3. **Signal yellow is RESERVED for ore** (§2). There is no ore on this screen,
+ *     so there is no yellow on it — and under Bone, no hue at all.
+ *
+ * Typography (§7): Audiowide for the wordmark and every plate label; Oxanium for
+ * the eyebrow cluster, the sub-lines, the message slot, the code and the keys —
+ * the code is a string of characters to be read one at a time, which is exactly
+ * what the body face is for. Every control is a plain tap (GDD §2.4): nothing here
+ * is a drag, a long-press or a gesture.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
-import type { TextStyleFontWeight } from 'pixi.js';
+import {
+  BONE,
+  DISPLAY_TRACKING,
+  MATERIAL_SHADES,
+  PLATE_SCALES,
+  TRACKING,
+  drawBeam,
+  drawPlate,
+  plateFamily,
+  plateMaterial,
+  platePadX,
+  plateTypeSize,
+  trackingPx,
+  typeSize,
+} from '../art/materials';
+import type { FrameMetrics, PlateState } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { buttonStyle } from './button-theme';
+import { entryPlateState } from './lobby-entry';
 import type { EntryCodeCell, EntryDoorView, EntryModel } from './lobby-entry';
 import { entryHitTest, entryLayout } from './lobby-geometry';
 import type { EntryLayout, EntryTarget, Insets } from './lobby-geometry';
+import { FONT_BODY, FONT_HEADING } from './typography';
 
 // ---------------------------------------------------------------------------
-// Typography & neutrals — shared with ./lobby-view (style-guide §7)
+// Reference type sizes — the handoff's own, at its 1280×720 reference
 // ---------------------------------------------------------------------------
 
-const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
-const FONT_BODY = 'Oxanium, "DejaVu Sans Mono", monospace';
+/** The wordmark, in the header beam. The title screen's 46px. */
+const WORDMARK_PX = 46;
+/** The beam's two eyebrow lines. */
+const EYEBROW_PX = 12;
+/** A primary door's label (27px) and a secondary's (21px), per the handoff. */
+const LABEL_PX = { primary: 27, secondary: 21 } as const;
+/** The sub-line under a door's label — its hint, now inside the plate. */
+const SUB_PX = 13;
+/** The footer plates' labels: BACK, SETTINGS, ERASE, JOIN. */
+const FOOTER_PX = 18;
 
-const TEXT_PRIMARY = 0xdce3ec;
-const TEXT_DIM = PALETTE.hullSteel;
-
-/** The standing line under the wordmark: a tagline, a prompt, an error. */
-const MESSAGE_SIZE = 12;
-/** The same slot carrying a live connect narration — the connecting screen's real
- *  title now, so it is read at a glance from across a classroom rather than
- *  squinted at. Kept in the body face: it spells out machine ids and room codes,
- *  which is exactly what a body face is for, and it fits a phone's width where
- *  Audiowide at this size would not. */
+/** The standing line under the beam: a tagline, a prompt, an error. */
+const MESSAGE_SIZE = 13;
+/**
+ * The same slot carrying a live connect narration or a NOTICE — the connecting
+ * screen's real title, so it is read at a glance from across a classroom rather
+ * than squinted at. Kept in the body face: it spells out machine ids and room
+ * codes, which is exactly what a body face is for, and it fits a phone's width
+ * where Audiowide at this size would not.
+ */
 const NARRATION_SIZE = 17;
+
+/** Gap between the accent tick and the label block inside a plate (handoff 24). */
+const TICK_GAP = 24;
+/** Vertical gap between a plate's label and its sub-line (handoff 3). */
+const LABEL_GAP = 3;
+/** Vertical gap between the beam's two eyebrow lines (handoff 4). */
+const EYEBROW_GAP = 4;
 
 /** The entry screen's layout-registry id and anchor: it owns the screen. */
 export const ENTRY_ID = 'lobby-entry';
@@ -57,7 +109,7 @@ export const ENTRY_ANCHOR: AnchorSpec = { region: 'full' };
 interface DoorNodes {
   readonly body: Graphics;
   readonly label: Text;
-  readonly hint: Text;
+  readonly sub: Text;
 }
 
 interface CellNodes {
@@ -91,7 +143,10 @@ interface ButtonNodes {
  */
 export class LobbyEntryView extends Container {
   private readonly backdrop = new Graphics();
+  private readonly beams = new Graphics();
   private readonly wordmark: Text;
+  private readonly eyebrow: Text;
+  private readonly status: Text;
   private readonly message: Text;
   private readonly doorNodes: DoorNodes[] = [];
   private readonly cellNodes: CellNodes[] = [];
@@ -99,7 +154,7 @@ export class LobbyEntryView extends Container {
   private readonly back: ButtonNodes;
   private readonly erase: ButtonNodes;
   private readonly submit: ButtonNodes;
-  /** The home screen's own bottom control — the fourth main-menu option. */
+  /** The home screen's own trailing footer control. */
   private readonly settings: ButtonNodes;
 
   private layout: EntryLayout;
@@ -109,9 +164,13 @@ export class LobbyEntryView extends Container {
     super();
     this.layout = entryLayout({ width: screenWidth, height: screenHeight }, opts(isTouch, insets));
 
-    this.wordmark = makeText('PLANET RUSH', FONT_HEADING, 26, TEXT_PRIMARY);
+    this.wordmark = makeText('PLANET RUSH', FONT_HEADING, WORDMARK_PX, MATERIAL_SHADES.bone);
     this.wordmark.anchor.set(0.5, 0.5);
-    this.message = makeText('', FONT_BODY, MESSAGE_SIZE, TEXT_DIM);
+    this.eyebrow = makeText('', FONT_BODY, EYEBROW_PX, BONE.lo);
+    this.eyebrow.anchor.set(0, 1);
+    this.status = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
+    this.status.anchor.set(0, 0);
+    this.message = makeText('', FONT_BODY, MESSAGE_SIZE, MATERIAL_SHADES.boneLo);
     this.message.anchor.set(0.5, 0);
     // A safety net, not a layout: every line this slot carries fits one row on the
     // narrowest supported phone. It exists so a refusal token nobody anticipated
@@ -119,14 +178,14 @@ export class LobbyEntryView extends Container {
     this.message.style.wordWrap = true;
     this.message.style.align = 'center';
 
-    this.addChild(this.backdrop, this.wordmark, this.message);
+    this.addChild(this.backdrop, this.beams, this.wordmark, this.eyebrow, this.status, this.message);
 
-    // Built in the order they are drawn, so the action row sits over the pad
+    // Built in the order they are drawn, so the footer plates sit over the pad
     // rather than under it if a very short screen ever brings them together.
-    this.back = this.makeButton('BACK', FONT_HEADING, 13);
-    this.erase = this.makeButton('⌫ ERASE', FONT_BODY, 13);
-    this.submit = this.makeButton('JOIN', FONT_HEADING, 15);
-    this.settings = this.makeButton('SETTINGS', FONT_HEADING, 14);
+    this.back = this.makeButton('BACK');
+    this.erase = this.makeButton('⌫ ERASE');
+    this.submit = this.makeButton('JOIN');
+    this.settings = this.makeButton('SETTINGS');
   }
 
   /** Re-lay-out for a new viewport, device or safe area. */
@@ -153,13 +212,25 @@ export class LobbyEntryView extends Container {
     this.screen = model.screen;
     if (!this.visible) return;
 
-    const { content } = this.layout;
+    const { header, footer, metrics } = this.layout;
+
+    // Opaque backdrop over the whole viewport — the doors own the screen. Drawn
+    // from the beams outward so the beams' own translucent fill has the void to
+    // sit on, exactly as the handoff composites them.
     this.backdrop.clear();
     this.backdrop
-      .rect(content.x - 8, content.y - 8, content.width + 16, content.height + 16)
-      .fill({ color: PALETTE.vacuum, alpha: 0.96 });
+      .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
+      .fill({ color: PALETTE.vacuum, alpha: 1 });
 
-    this.drawTitle(model);
+    // The beams paint the height the FRAME reserved, not a flat 92 (see
+    // `../art/materials` drawBeam) — this screen's band is the tightest of the set
+    // on a phone and cannot afford a beam that overshoots it.
+    this.beams.clear();
+    if (header.height > 0) drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
+    if (footer.height > 0) drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
+
+    this.drawHeader(model, metrics);
+    this.drawMessage(model, metrics);
 
     const home = model.screen === 'home';
     for (let i = 0; i < this.layout.doors.length; i++) {
@@ -167,8 +238,8 @@ export class LobbyEntryView extends Container {
       const rect = this.layout.doors[i];
       if (!door || !rect) continue;
       const nodes = this.doorSlot(i);
-      setVisible(home, nodes.body, nodes.label, nodes.hint);
-      if (home) this.drawDoor(nodes, door, rect);
+      setVisible(home, nodes.body, nodes.label, nodes.sub);
+      if (home) this.drawDoor(nodes, door, rect, metrics);
     }
 
     for (let i = 0; i < this.layout.cells.length; i++) {
@@ -186,143 +257,235 @@ export class LobbyEntryView extends Container {
       if (key === undefined || !rect) continue;
       const nodes = this.keySlot(i);
       setVisible(!home, nodes.body, nodes.label);
-      if (!home) this.drawKey(nodes, key, rect, !model.connecting);
+      if (!home) {
+        this.drawKey(nodes, key, rect, model.connecting ? 'rest' : entryPlateState(model, `key:${i}`));
+      }
     }
 
     // BACK is on BOTH screens — the exit every screen must carry (u2 menu-back):
     // on the keypad it steps back to the doors, on the home screen it leaves to
-    // the main menu. Steel chrome, never plasma. ERASE / JOIN are join-only.
+    // the main menu. A `secondary` plate, bolted to the leading end of the footer
+    // beam so it never moves as the screen changes under it.
     setVisible(true, this.back.body, this.back.label);
-    this.drawButton(this.back, this.layout.back, !model.connecting, false);
+    this.drawFooterPlate(this.back, this.layout.back, model, 'back', false, !model.connecting, metrics);
 
-    for (const [nodes, rect, enabled] of [
-      [this.erase, this.layout.erase, model.canErase],
-      [this.submit, this.layout.submit, model.canSubmit],
+    for (const [nodes, rect, key, primary, enabled] of [
+      [this.erase, this.layout.erase, 'erase', false, model.canErase],
+      // JOIN is the keypad screen's one affirmative action — its single bright
+      // plate, exactly as PLAY SOLO is the doors screen's. The two never share a
+      // screen, so the one-primary rule holds in both states.
+      [this.submit, this.layout.submit, 'submit', true, model.canSubmit],
     ] as const) {
       setVisible(!home, nodes.body, nodes.label);
-      // JOIN is the screen's one affirmative action, so it is the only button
-      // that reads as plasma; ERASE is steel chrome.
-      if (!home) this.drawButton(nodes, rect, enabled, nodes === this.submit);
+      if (!home) this.drawFooterPlate(nodes, rect, model, key, primary, enabled, metrics);
     }
 
-    // SETTINGS lives in the same band, but only on the home screen. Steel, never
-    // plasma: PLAY SOLO is the screen's affirmative action, not this.
+    // SETTINGS shares the beam's trailing end with JOIN, on the home screen only.
+    // `secondary`, never primary: PLAY SOLO is this screen's affirmative action.
     setVisible(home, this.settings.body, this.settings.label);
-    if (home) this.drawButton(this.settings, this.layout.settings, !model.connecting, false);
+    if (home) {
+      this.drawFooterPlate(this.settings, this.layout.settings, model, 'settings', false, !model.connecting, metrics);
+    }
   }
 
-  // --- Title and the one line under it --------------------------------------
+  // --- The header beam ------------------------------------------------------
 
   /**
-   * The wordmark, and **the title slot under it** — the line that used to read
-   * `CONNECTING…` from the first tap to the last, and now reads whatever the
-   * connection is actually doing: ALLOCATING ROOM… → ROOM Q5RN · TICKET SIGNED →
-   * DIALING MACHINE 0800d5b6… → JOINED · SEAT 2, or the exact refusal
-   * (`EntryModel.narrating`, fed from `src/net/connect-trace`).
+   * The header beam's contents: the eyebrow cluster on the left, the wordmark
+   * centred across the beam — the title screen's own construction, because this
+   * screen is that screen's other half. The wordmark shrinks — never the cluster —
+   * when the two would collide, because "which game is this" survives a smaller
+   * wordmark and the cluster is already at the type floor.
    *
-   * A narration is drawn as a *title*, not as the standing sub-line: bigger, in
-   * plasma while there is still hope and threat red once there is not, with the
-   * wordmark stepping back behind it — the same deference it already shows the
-   * keypad prompt. One text element at the top of the screen, which was the ask.
+   * The wordmark still steps back while the keypad is up or a connect is
+   * narrating: what the player needs then is the prompt, not the game's name
+   * shouted at somebody mid-way through typing a code.
    */
-  private drawTitle(model: EntryModel): void {
-    const { title, message } = this.layout;
+  private drawHeader(model: EntryModel, m: FrameMetrics): void {
+    const { title, eyebrow: eyebrowRect } = this.layout;
+    const visible = this.layout.header.height > 0;
+    this.wordmark.visible = visible;
+    this.eyebrow.visible = visible;
+    this.status.visible = visible;
+    if (!visible) return;
+
+    const eyebrowPx = typeSize(EYEBROW_PX, m);
+    const gap = Math.max(2, Math.round(EYEBROW_GAP * m.scale));
+    this.eyebrow.text = model.eyebrow;
+    this.eyebrow.style.fontSize = eyebrowPx;
+    this.eyebrow.style.letterSpacing = trackingPx(TRACKING.eyebrow, eyebrowPx);
+    this.status.text = model.status;
+    this.status.style.fontSize = eyebrowPx;
+    this.status.style.letterSpacing = trackingPx(TRACKING.label, eyebrowPx);
+
+    const midY = eyebrowRect.y + eyebrowRect.height / 2;
+    this.eyebrow.x = eyebrowRect.x;
+    this.eyebrow.y = midY - gap / 2;
+    this.status.x = eyebrowRect.x;
+    this.status.y = midY + gap / 2;
+
+    const wordPx = typeSize(WORDMARK_PX, m);
+    this.wordmark.style.fontSize = wordPx;
+    this.wordmark.style.letterSpacing = trackingPx(DISPLAY_TRACKING.wordmark, wordPx);
+    this.wordmark.scale.set(1);
     this.wordmark.x = title.x + title.width / 2;
-    this.wordmark.y = title.y + title.height / 2;
-    // The wordmark is the title on the home screen; on the keypad the *prompt* is
-    // what the player needs, and while a connect narrates, the narration is — so
-    // the wordmark steps back rather than shouting the game's name at somebody who
-    // is mid-way through typing a code or watching a socket refuse them.
+    this.wordmark.y = midY;
     this.wordmark.alpha = model.screen === 'home' && !model.narrating ? 1 : 0.45;
 
-    // Threat red is reserved for danger (style-guide §2) — and a join that came
-    // back refused is the only genuinely wrong thing this screen can show.
+    // Two ceilings, and the tighter wins: the beam's own strip, and whatever is
+    // left after the eyebrow cluster claims its left-hand share on both sides of
+    // centre (the wordmark is centred, so a collision on the left is a collision).
+    const clusterW = Math.max(this.eyebrow.width, this.status.width);
+    const centreRoom = Math.max(0, title.width - 2 * (clusterW + m.gutter));
+    const maxWidth = Math.max(0, Math.min(title.width, centreRoom));
+    if (this.wordmark.width > maxWidth && this.wordmark.width > 0) {
+      this.wordmark.scale.set(maxWidth / this.wordmark.width);
+    }
+  }
+
+  // --- The one line under the beam ------------------------------------------
+
+  /**
+   * The message slot: the tagline `MINE · DEFEND · ATTACK`, the keypad's prompt,
+   * the CAMPAIGN teaser's `Coming Soon…`, a refusal, or whatever the connection is
+   * actually doing — `ALLOCATING ROOM…` → `ROOM Q5RN · TICKET SIGNED` → `DIALING
+   * MACHINE 0800d5b6…` → `JOINED · SEAT 2` (`EntryModel.narrating`, fed from
+   * `src/net/connect-trace`).
+   *
+   * Under Bone the emphasis is BRIGHTNESS, not hue: the standing tagline is low
+   * Bone, and a narration or a NOTICE is chalk-bright and a size larger. The one
+   * survivor of the old palette is threat red for a genuine refusal — the only
+   * thing on this screen that is actually wrong (style-guide §2). A notice takes
+   * the narration's size as well as its brightness: it is an ANSWER to a press the
+   * player just made a band lower down the screen, and a reply whispered at hint
+   * size half a screen from the finger that asked is a reply nobody reads.
+   */
+  private drawMessage(model: EntryModel, m: FrameMetrics): void {
+    const { message } = this.layout;
     const failed = model.error !== '';
-    this.message.text = failed ? model.error : model.prompt;
-    this.message.style.fill = failed
-      ? PALETTE.threatRed
-      : model.narrating
-        ? PALETTE.plasma
-        : TEXT_DIM;
-    this.message.style.fontSize = model.narrating ? NARRATION_SIZE : MESSAGE_SIZE;
+    const noticed = !failed && model.notice !== '';
+    const loud = model.narrating || noticed;
+
+    this.message.text = failed ? model.error : noticed ? model.notice : model.prompt;
+    this.message.style.fill = failed ? PALETTE.threatRed : loud ? BONE.hi : MATERIAL_SHADES.boneLo;
+    const px = typeSize(loud ? NARRATION_SIZE : MESSAGE_SIZE, m);
+    this.message.style.fontSize = px;
+    this.message.style.letterSpacing = trackingPx(loud ? TRACKING.label : TRACKING.eyebrow, px);
     // A refusal names a token the server chose the length of, so the title wraps
     // inside the content box rather than running off both edges of a phone.
     this.message.style.wordWrapWidth = Math.max(1, message.width);
     this.message.x = message.x + message.width / 2;
-    this.message.y = message.y;
+    this.message.y = message.y + Math.max(0, (message.height - this.message.height) / 2);
     this.message.visible = this.message.text !== '' && message.height > 0;
   }
 
   // --- Doors ---------------------------------------------------------------
 
   /**
-   * One door: a word, and one line saying what it costs you. The offline door is
-   * drawn as the primary action (plasma fill) because it is the one that always
-   * works — a player who cannot reach the server should still see a lit button
-   * (GDD §4.8 risk 6).
+   * One door: the plate material from {@link ../art/materials} `drawPlate`, then
+   * its word and the one line saying what it costs you, both hung off the plate's
+   * accent tick — the handoff's own plate anatomy, identical to the title screen's.
+   *
+   * The offline door is the PRIMARY (it always works — GDD §4.8 risk 6) and is the
+   * only bright plate on the screen. A COMING-SOON door (CAMPAIGN, u9-01) is
+   * `secondary`, never primary and never `inert`: fully lit and fully pressable,
+   * because pressing it is how the screen answers — while PLAY SOLO keeps the
+   * brightness, so the teaser does not take the emphasis off the door that works.
    */
-  private drawDoor(nodes: DoorNodes, door: EntryDoorView, rect: Rect): void {
-    // The offline door is PRIMARY (it always works — risk 6); the online door is
-    // STANDARD, equally active. A door the player can't take yet is DISABLED and
-    // its `hint` is the reason (p4-03). One contract, no ad-hoc gray.
-    const style = buttonStyle(door.needsNetwork ? 'standard' : 'primary', !door.enabled);
+  private drawDoor(nodes: DoorNodes, door: EntryDoorView, rect: Rect, m: FrameMetrics): void {
     nodes.body.clear();
-    nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: style.fill, alpha: style.fillAlpha })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
+    if (rect.width <= 0 || rect.height <= 0) {
+      nodes.label.visible = false;
+      nodes.sub.visible = false;
+      return;
+    }
+    nodes.label.visible = true;
+    nodes.sub.visible = true;
+
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, door.role, door.scale, door.state);
+
+    const padX = platePadX(door.scale, m);
+    const tickW = PLATE_SCALES[door.scale].tickWidth;
+    const textX = rect.x + padX + tickW + Math.max(8, Math.round(TICK_GAP * m.plateScale));
+    // `drawPlate` sinks a pressed plate by its role's own offset; the text rides
+    // the same number rather than a second copy of it.
+    const sink = plateMaterial(door.role, door.state, plateFamily(door.scale)).offsetY;
+    const midY = rect.y + rect.height / 2 + sink;
+
+    const labelPx = plateTypeSize(door.primary ? LABEL_PX.primary : LABEL_PX.secondary, m);
+    const subPx = plateTypeSize(SUB_PX, m);
+    const gap = Math.max(2, Math.round(LABEL_GAP * m.plateScale));
 
     nodes.label.text = door.label;
-    nodes.label.style.fill = style.label;
-    nodes.label.alpha = style.labelAlpha;
-    nodes.label.x = rect.x + rect.width / 2;
-    nodes.label.y = rect.y + rect.height / 2;
-    nodes.label.visible = rect.height > 0;
+    nodes.label.style.fontSize = labelPx;
+    nodes.label.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, labelPx);
+    nodes.label.style.fill = door.primary ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.label.alpha = door.enabled ? 1 : 0.45;
+    nodes.label.x = textX;
 
-    nodes.hint.text = door.hint;
-    nodes.hint.alpha = 0.9;
-    nodes.hint.x = rect.x + rect.width / 2;
-    nodes.hint.y = rect.y + rect.height + 3;
+    nodes.sub.text = door.hint;
+    nodes.sub.style.fontSize = subPx;
+    nodes.sub.style.letterSpacing = trackingPx(TRACKING.label, subPx);
+    nodes.sub.style.fill = door.primary ? MATERIAL_SHADES.bone : MATERIAL_SHADES.boneLo;
+    nodes.sub.alpha = door.enabled ? 1 : 0.45;
+    nodes.sub.x = textX;
+    // The sub-line wraps inside the plate rather than running out past its bevel:
+    // a hint is a whole sentence and a phone's plate is not a desktop's.
+    nodes.sub.style.wordWrap = true;
+    nodes.sub.style.wordWrapWidth = Math.max(20, rect.x + rect.width - padX - textX);
+
+    // The two lines share the plate's vertical centre: the label sits above it,
+    // the sub-line below, so the block is centred however tall the plate is. A
+    // plate too short for two lines drops the sub-line rather than overflowing its
+    // own bevel — the label is the door's name and is never the thing cut.
+    const block = nodes.label.height + gap + nodes.sub.height;
+    const twoLines = block <= rect.height - 8;
+    nodes.sub.visible = twoLines;
+    if (twoLines) {
+      nodes.label.y = midY - block / 2;
+      nodes.sub.y = midY - block / 2 + nodes.label.height + gap;
+    } else {
+      nodes.label.y = midY - nodes.label.height / 2;
+    }
   }
 
   private doorSlot(index: number): DoorNodes {
     const existing = this.doorNodes[index];
     if (existing) return existing;
     const body = new Graphics();
-    const label = makeText('', FONT_HEADING, 16, TEXT_PRIMARY);
-    label.anchor.set(0.5, 0.5);
-    const hint = makeText('', FONT_BODY, 11, TEXT_DIM);
-    hint.anchor.set(0.5, 0);
-    this.addChild(body, label, hint);
-    const nodes: DoorNodes = { body, label, hint };
+    const label = makeText('', FONT_HEADING, LABEL_PX.secondary, MATERIAL_SHADES.bone);
+    label.anchor.set(0, 0);
+    const sub = makeText('', FONT_BODY, SUB_PX, MATERIAL_SHADES.boneLo);
+    sub.anchor.set(0, 0);
+    this.addChild(body, label, sub);
+    const nodes: DoorNodes = { body, label, sub };
     this.doorNodes[index] = nodes;
     return nodes;
   }
 
   // --- The code, and the pad it is typed on --------------------------------
 
-  /** One code cell. The caret is a plasma underline rather than a blinking bar:
-   *  nothing on this screen animates, so nothing has to be re-drawn per frame. */
+  /**
+   * One code cell, as a chip-scale plate.
+   *
+   * A cell is a *surface a character sits on*, so it takes the `inert` chip — the
+   * same material the settings screen's engaged value chip wears, and the
+   * brightest hairline in the set, which is what makes the ACTIVE cell (the one
+   * the next key lands in) read as the caret without spending a hue on it. A
+   * filled cell is a plain `secondary` chip and an empty one is drawn dimmer
+   * still, so the code reads as a row that is filling up left to right.
+   */
   private drawCell(nodes: CellNodes, cell: EntryCodeCell, rect: Rect): void {
     nodes.body.clear();
-    nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 4)
-      .fill({ color: PALETTE.hullSteel, alpha: cell.filled ? 0.16 : 0.07 })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 4)
-      .stroke({
-        width: cell.active ? 2 : 1,
-        color: cell.active || cell.filled ? PALETTE.plasma : PALETTE.hullSteel,
-        alpha: cell.active ? 0.95 : cell.filled ? 0.6 : 0.4,
-      });
-    if (cell.active) {
-      nodes.body
-        .moveTo(rect.x + 6, rect.y + rect.height - 5)
-        .lineTo(rect.x + rect.width - 6, rect.y + rect.height - 5)
-        .stroke({ width: 2, color: PALETTE.plasma, alpha: 0.95 });
+    if (rect.width <= 0 || rect.height <= 0) {
+      nodes.char.visible = false;
+      return;
     }
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, cell.active ? 'inert' : 'secondary', 'chip');
+    nodes.body.alpha = cell.active || cell.filled ? 1 : 0.6;
 
     nodes.char.text = cell.char;
+    nodes.char.style.fill = cell.filled ? BONE.hi : MATERIAL_SHADES.boneLo;
     nodes.char.style.fontSize = Math.max(10, Math.min(38, rect.height * 0.6));
     nodes.char.x = rect.x + rect.width / 2;
     nodes.char.y = rect.y + rect.height / 2;
@@ -333,7 +496,7 @@ export class LobbyEntryView extends Container {
     const existing = this.cellNodes[index];
     if (existing) return existing;
     const body = new Graphics();
-    const char = makeText('', FONT_BODY, 32, TEXT_PRIMARY, 'bold');
+    const char = makeText('', FONT_BODY, 32, BONE.hi);
     char.anchor.set(0.5, 0.5);
     this.addChild(body, char);
     const nodes: CellNodes = { body, char };
@@ -341,28 +504,28 @@ export class LobbyEntryView extends Container {
     return nodes;
   }
 
-  private drawKey(nodes: KeyNodes, key: string, rect: Rect, enabled: boolean): void {
-    const alpha = enabled ? 1 : 0.3;
+  /** One pad key: a `secondary` chip, the same metal every actionable chip in the
+   *  set is made of. It presses and it hovers, like any other plate. */
+  private drawKey(nodes: KeyNodes, key: string, rect: Rect, state: PlateState): void {
     nodes.body.clear();
-    nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 3)
-      .fill({ color: PALETTE.hullSteel, alpha: 0.1 })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 3)
-      .stroke({ width: 1, color: PALETTE.hullSteel, alpha: 0.45 * alpha });
-    nodes.body.alpha = alpha;
+    if (rect.width <= 0 || rect.height <= 0) {
+      nodes.label.visible = false;
+      return;
+    }
+    nodes.label.visible = true;
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, 'secondary', 'chip', state);
 
     nodes.label.text = key;
-    nodes.label.alpha = alpha;
     nodes.label.style.fontSize = Math.max(9, Math.min(18, rect.height * 0.45));
     nodes.label.x = rect.x + rect.width / 2;
-    nodes.label.y = rect.y + rect.height / 2;
+    nodes.label.y = rect.y + rect.height / 2 + plateMaterial('secondary', state, 'chip').offsetY;
   }
 
   private keySlot(index: number): KeyNodes {
     const existing = this.keyNodes[index];
     if (existing) return existing;
     const body = new Graphics();
-    const label = makeText('', FONT_BODY, 14, TEXT_PRIMARY);
+    const label = makeText('', FONT_BODY, 14, MATERIAL_SHADES.bone);
     label.anchor.set(0.5, 0.5);
     this.addChild(body, label);
     const nodes: KeyNodes = { body, label };
@@ -370,28 +533,49 @@ export class LobbyEntryView extends Container {
     return nodes;
   }
 
-  // --- BACK / ERASE / JOIN --------------------------------------------------
+  // --- The footer beam's plates: BACK / SETTINGS / ERASE / JOIN --------------
 
-  private drawButton(nodes: ButtonNodes, rect: Rect, enabled: boolean, primary: boolean): void {
-    // JOIN is PRIMARY, BACK/ERASE STANDARD. A disabled JOIN (code not yet full)
-    // gets the shared dim look — its reason is the incomplete code above it.
-    const style = buttonStyle(primary ? 'primary' : 'standard', !enabled);
+  /**
+   * One footer plate — a `compact` plate bolted into the beam, the shape the
+   * settings screen's DONE already is.
+   *
+   * A disabled control (a JOIN with an incomplete code above it) keeps the same
+   * material and loses its brightness rather than taking a colour: this screen has
+   * no gray costume any more, because gray is a hue budget it no longer spends.
+   * Its reason is the incomplete code sitting directly above it — the p4-03 rule
+   * that a dim control always carries its reason.
+   */
+  private drawFooterPlate(
+    nodes: ButtonNodes,
+    rect: Rect,
+    model: EntryModel,
+    key: string,
+    primary: boolean,
+    enabled: boolean,
+    m: FrameMetrics,
+  ): void {
     nodes.body.clear();
-    nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-      .fill({ color: style.fill, alpha: style.fillAlpha })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
+    const visible = rect.width > 0 && rect.height > 0;
+    nodes.label.visible = visible;
+    if (!visible) return;
 
-    nodes.label.style.fill = style.label;
-    nodes.label.alpha = style.labelAlpha;
+    const state = enabled ? entryPlateState(model, key) : 'rest';
+    const role = primary && enabled ? 'primary' : 'secondary';
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, role, 'compact', state);
+    nodes.body.alpha = enabled ? 1 : 0.5;
+
+    const px = plateTypeSize(FOOTER_PX, m);
+    nodes.label.style.fontSize = px;
+    nodes.label.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
+    nodes.label.style.fill = primary && enabled ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.label.alpha = enabled ? 1 : 0.5;
     nodes.label.x = rect.x + rect.width / 2;
-    nodes.label.y = rect.y + rect.height / 2;
+    nodes.label.y = rect.y + rect.height / 2 + plateMaterial(role, state, 'plate').offsetY;
   }
 
-  private makeButton(text: string, font: string, size: number): ButtonNodes {
+  private makeButton(text: string): ButtonNodes {
     const body = new Graphics();
-    const label = makeText(text, font, size, TEXT_PRIMARY);
+    const label = makeText(text, FONT_HEADING, FOOTER_PX, MATERIAL_SHADES.bone);
     label.anchor.set(0.5, 0.5);
     this.addChild(body, label);
     return { body, label };
@@ -410,12 +594,6 @@ function setVisible(visible: boolean, ...nodes: Array<Graphics | Text>): void {
   for (const node of nodes) node.visible = visible;
 }
 
-function makeText(
-  text: string,
-  fontFamily: string,
-  fontSize: number,
-  fill: number,
-  fontWeight: TextStyleFontWeight = 'normal',
-): Text {
-  return new Text({ text, style: { fontFamily, fontSize, fill, fontWeight, letterSpacing: 0.5 } });
+function makeText(text: string, fontFamily: string, fontSize: number, fill: number): Text {
+  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0 } });
 }

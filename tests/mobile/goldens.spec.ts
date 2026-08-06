@@ -19,10 +19,27 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { budgetTest } from './budgets';
+import { settleFrames } from './render-settle';
+import { GOLDEN_SHOT_TIMEOUT_MS } from './shot-budget';
 
-/** Small but tolerant of font/GPU antialiasing — the frozen frame is otherwise
- *  byte-stable. */
-const GOLDEN = { maxDiffPixelRatio: 0.01 } as const;
+/**
+ * The options every golden in this file passes, and the two things they say.
+ *
+ * `maxDiffPixelRatio` — small but tolerant of font/GPU antialiasing; the frozen
+ * frame is otherwise byte-stable. It is NOT the knob for a slow runner. It is
+ * here for antialiasing, and widening it to swallow a half-composited frame
+ * would blind the one gate that catches a real visual regression.
+ *
+ * `timeout` — the budget the COMPARISON gets, which is the thing that was
+ * actually short. `toHaveScreenshot` will not diff a frame it has not captured
+ * twice identically, and two dpr-3 phone captures cost ~3.6 s in the studio
+ * container before the compare even starts; against Playwright's own 5 s default
+ * that does not fit on a loaded software-GL runner, and the golden fails as a
+ * *timeout* with no pixels to look at. The number is derived from the largest
+ * frame in the device matrix rather than guessed — tests/mobile/shot-budget.ts,
+ * which also explains why it rides here rather than in playwright.config.ts.
+ */
+const GOLDEN = { maxDiffPixelRatio: 0.01, timeout: GOLDEN_SHOT_TIMEOUT_MS } as const;
 
 /**
  * The debug boot's TEAMS switch (`src/main.ts` `readDebugSides`) — `?sides=2`
@@ -50,12 +67,15 @@ async function bootFrozen(page: Page, url = '/?debug=1&freeze=1'): Promise<void>
     { timeout: 20_000 },
   );
   await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
-  // A couple of render frames after freeze so the final composited frame is up.
-  // Wall-clock here, deliberately: `?freeze=1` pins the sim, so there is no tick
-  // clock to wait on (the whole suite otherwise waits on ticks — ./sim-clock.ts).
-  // It is also harmless: the frozen frame is time-invariant, so a slow host that
-  // takes this wait "early" simply screenshots the same deterministic frame.
-  await page.waitForTimeout(500);
+  // A couple of render frames after freeze so the final composited frame is up —
+  // counted, not timed. This was `waitForTimeout(500)`, on the reasoning that the
+  // frozen frame is time-invariant so an early shot is the same deterministic
+  // frame. True of the WORLD, silent about the COMPOSITOR: 500 ms is ~30 frames
+  // here and can be none at all on a loaded software-GL runner, which shoots a
+  // frame the renderer has not drawn yet. `?freeze=1` pins the sim so there is no
+  // tick to wait on (./sim-clock.ts) — so wait on the frames themselves, with
+  // their own stall watchdog (./render-settle.ts).
+  await settleFrames(page);
 }
 
 test('golden: desktop frozen scene', async ({ page }, testInfo) => {
@@ -110,8 +130,9 @@ async function bootFrozenTeams(page: Page): Promise<void> {
     return stage ? stage.stageBot() : null;
   });
   expect(staged, 'the nameplate stage seated a rival to label').not.toBeNull();
-  // The labels are drawn from the render loop, not from the call above.
-  await page.waitForTimeout(500);
+  // The labels are drawn from the render loop, not from the call above — so wait
+  // for the loop to have run, in frames rather than in milliseconds.
+  await settleFrames(page);
   const plates = await page.evaluate(() => {
     const stage = (window as unknown as {
       __nameplateStage?: { plates(): { teamLabel: string }[] };
@@ -331,21 +352,34 @@ async function bootMenu(page: Page): Promise<void> {
   );
   await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
   await waitForStableViewport(page);
-  await page.waitForTimeout(1200);
+  // Then the frames themselves. `waitForStableViewport` proves the LAYOUT has
+  // stopped moving; this proves the screen was re-drawn at the size it settled
+  // on. It replaces a flat `waitForTimeout(1200)` that bought ~72 frames here and
+  // could buy one on a loaded runner (./render-settle.ts).
+  await settleFrames(page);
 }
 
 /**
- * The menu screens' screenshot options.
+ * The menu screens' screenshot options — now just {@link GOLDEN}.
  *
- * Same pixel tolerance as {@link GOLDEN}, but a longer assertion timeout: these
- * boot the REAL app rather than a frozen sim, and `toHaveScreenshot` will not
- * shoot until it has taken two identical frames in a row. On a software-GL runner
- * with three device projects in flight, the menu's first couple of frames land
- * slower than the 10 s default allows — which fails as a *timeout*, not as a
- * pixel diff, and reads like a broken screen when it is a slow one. Measured
- * settled and byte-identical across six consecutive frames once it is up.
+ * This used to carry `timeout: 30_000` of its own, for the right reason: these
+ * boot the REAL app rather than a frozen sim, `toHaveScreenshot` will not shoot
+ * until it has taken two identical frames in a row, and on a software-GL runner
+ * the menu's first frames land slower than the default allowed — which fails as
+ * a *timeout*, not as a pixel diff, and reads like a broken screen when it is a
+ * slow one.
+ *
+ * Every word of that turned out to be true of every golden in this file, not
+ * just these: PR #291's two `iphone` goldens failed exactly this way, and had no
+ * such override to save them. So the number moved from one spec's local guess to
+ * a model that derives it from the frame (tests/mobile/shot-budget.ts) and
+ * applies to all of them. 30 s was the right order of magnitude — the model
+ * gives a dpr-3 phone frame 45 s.
+ *
+ * Kept as a name because it still says something a reader wants: these tests
+ * shoot a MENU, not a frozen scene.
  */
-const MENU_GOLDEN = { ...GOLDEN, timeout: 30_000 } as const;
+const MENU_GOLDEN = GOLDEN;
 
 /** Poll the menu's own logical viewport until it stops moving. */
 async function waitForStableViewport(page: Page): Promise<void> {
@@ -358,7 +392,12 @@ async function waitForStableViewport(page: Page): Promise<void> {
     });
   let previous = await read();
   for (let i = 0; i < 20; i++) {
-    await page.waitForTimeout(200);
+    // Frames, not milliseconds: a viewport change is only observable after the
+    // screen has been laid out and drawn again, so a drawn frame is the honest
+    // poll interval — and one that means the same thing at 60 fps and at 1
+    // (./render-settle.ts). Returns on the first pair of readings that agree,
+    // which is the first iteration in every measured run.
+    await settleFrames(page, 2);
     const next = await read();
     if (next !== '' && next === previous) return;
     previous = next;
@@ -391,7 +430,57 @@ async function openSettings(page: Page): Promise<void> {
   // hover whatever settings row landed under it. Park it in a corner so the
   // baseline is the screen at rest rather than the screen mid-hover.
   await page.mouse.move(1, 1);
-  await page.waitForTimeout(300);
+  await settleFrames(page);
+}
+
+/**
+ * Open THE DOORS the way a player does — a real press on PLAY at the physical
+ * point the seam reports, through the landscape-lock remap.
+ */
+async function openDoors(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'play');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(point, 'the menu reports where PLAY is drawn').not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as { __onlineMenu?: { visible: boolean; doorControls: unknown[] } })
+        .__onlineMenu;
+      return !!d && d.visible && d.doorControls.length > 0;
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
+  // Park the pointer off every plate: a desktop mouse left sitting where PLAY was
+  // would hover whichever door landed under it, and a hovered plate is a brighter
+  // plate (u7-01's 90ms hover). The baseline is the screen at REST.
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** …and the CODEX, the same way: a real press on the menu's own CODEX plate. */
+async function openCodex(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'codex');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(point, 'the menu reports where CODEX is drawn').not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { screen: string } }).__mainMenu?.screen === 'codex',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
 }
 
 test('golden: desktop title screen — Gantry/Bone', async ({ page }, testInfo) => {
@@ -496,4 +585,103 @@ test('golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the 
 
   await bootFrozenTeams(page);
   await expect(page).toHaveScreenshot('phone-portrait-frozen-teams.png', GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// THE DOORS and THE CODEX, in Gantry/Bone (u7-04)
+// ---------------------------------------------------------------------------
+//
+// The two screens the Gantry chain forgot. The handoff named five — title, build
+// wheel, lobby, ship select, settings — and neither of these is among them, so
+// while the screen in FRONT of the doors had been re-skinned, the doors and the
+// codex were still the thing the handoff diagnosed: 1px hairlines on black.
+//
+// **They appeared in no golden either**, which is the other half of why they were
+// missed: a total re-skin of both would have left every baseline in this file
+// byte-identical. The doors screen in particular is the FIRST screen a player
+// touches after PLAY and had no visual gate at all. It has one now.
+//
+// Five baselines, chosen for what each one can fail that the others cannot:
+//  - the doors on a desktop (the stacked shape, four plates, one of them bright)
+//  - the doors on a landscape phone (the TWO-COLUMN shape — a different layout
+//    branch, not the same picture smaller)
+//  - the codex on a desktop and on a landscape phone (the tab row, the rail and
+//    the article at two very different widths)
+//  - the codex PORTRAIT-HELD, which goes through the landscape lock's 90°
+//    rotation — the densest screen in the game through the transform that has
+//    stranded a menu off-screen before (the M1 field report).
+//
+// Determinism is the same as the menu baselines above: a clean boot, no
+// animation, both screens pure functions of the viewport, and the build badge
+// deliberately unmasked.
+
+test('golden: desktop THE DOORS — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → press PLAY → one full-frame golden comparison',
+    measuredSeconds: 10,
+  });
+
+  await bootMenu(page);
+  await openDoors(page);
+  await expect(page).toHaveScreenshot('desktop-doors.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone THE DOORS — the two-column shape', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → press PLAY → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await openDoors(page);
+  await expect(page).toHaveScreenshot('phone-landscape-doors.png', MENU_GOLDEN);
+});
+
+test('golden: desktop CODEX — the densest text screen in the game', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → press CODEX → one full-frame golden comparison',
+    measuredSeconds: 10,
+  });
+
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('desktop-codex.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone CODEX — a tab row, a rail and an article at 844px', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → press CODEX → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('phone-landscape-codex.png', MENU_GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone CODEX — the dense screen through the lock', async ({
+  page,
+}, testInfo) => {
+  // The brief's hard case, and the one no desktop frame can speak to: a tab row
+  // plus a list plus an article, at 390px wide, through the 90° rotation the
+  // landscape lock puts the whole root through.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot to the main menu PORTRAIT-HELD (landscape lock rotation) → viewport + font settle → press CODEX → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('phone-portrait-codex.png', MENU_GOLDEN);
 });

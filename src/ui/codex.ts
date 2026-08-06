@@ -33,7 +33,10 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { MENU_ROW_GAP, hitRect, menuContent } from './menu-geometry';
+import { rowHeight, valueChipHeight } from '../art/materials';
+import type { FrameMetrics, PlateRole } from '../art/materials';
+import { beamContent, beamPlate, gantryFrame } from './gantry';
+import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -246,16 +249,79 @@ export function activeEntryIndex(state: CodexState): number {
 // The per-frame model
 // ---------------------------------------------------------------------------
 
-/** One tab as the strip draws it. */
+/**
+ * One tab as the strip draws it.
+ *
+ * ---------------------------------------------------------------------------
+ * TWO KINDS OF SELECTION, AND THEY MUST NOT LOOK THE SAME (u7-04)
+ * ---------------------------------------------------------------------------
+ * A tab and an entry are both "the selected one", and drawing them alike would
+ * leave the screen saying the same thing twice in two places about two different
+ * questions. They are marked differently on purpose:
+ *
+ *  - **The active TAB is a mode switch** — *which set of articles am I in?* — so
+ *    it is marked by BRIGHTNESS: the selected chip's brighter metal and its Bone
+ *    border, the same material the settings screen's engaged toggle wears.
+ *  - **The selected ENTRY is a pointer** — *which article is in the pane beside
+ *    me?* — so it is marked POSITIONALLY: a Bone bar down the row's leading edge,
+ *    aiming at the pane, and the row rising from a surface (`inert`) to a raised
+ *    plate (`secondary`). It is never the brightest thing on the screen.
+ *
+ * That also keeps the one-primary rule (`./gantry` `singlePrimary`) honest at the
+ * plate level: the CODEX has no headline action at all, which is legal — zero
+ * bright plates is a screen with nothing to press hardest, and a reference screen
+ * is exactly that.
+ */
 export interface CodexTabView {
   readonly label: string;
   readonly active: boolean;
+  /** Rest / hover / press, from the wiring layer's pointer routing. */
+  readonly state: CodexPlateState;
 }
 
 /** One entry title as the rail draws it. */
 export interface CodexEntryView {
   readonly title: string;
   readonly selected: boolean;
+  readonly state: CodexPlateState;
+}
+
+/** A plate's interaction state. Mirrors `../art/materials` `PlateState`, restated
+ *  here so the model does not make its consumers import the art module. */
+export type CodexPlateState = 'rest' | 'hover' | 'press';
+
+/**
+ * The material an active/inactive TAB is drawn in — BRIGHTNESS, at chip size.
+ *
+ * The active tab is the `primary` chip: the brightest metal in the chip family
+ * behind a Bone border, which is the set's existing word for *this is the current
+ * one* (it is what the settings screen's engaged toggle wears). A `primary` CHIP
+ * is not a second headline action — {@link ./gantry} `countPrimaries` takes the
+ * roles of a screen's PLATES, and a chip's "primary" is a selected state — so the
+ * CODEX still draws zero bright plates, which is what a reference screen should.
+ */
+export function codexTabPlate(tab: { readonly active: boolean }): PlateRole {
+  return tab.active ? 'primary' : 'secondary';
+}
+
+/**
+ * …and the material a rail ENTRY is drawn in — POSITION, at row size.
+ *
+ * An unselected row is an `inert` surface, held down on the panel exactly as a
+ * settings row is. The selected one rises to a `secondary` plate and takes a Bone
+ * bar down its leading edge (the view draws the bar). It is deliberately NOT the
+ * `primary` chip the tab uses: the two are different questions — *which set am I
+ * in* versus *which article is in the pane* — and answering both with the same
+ * brightness would leave the screen saying one thing twice.
+ */
+export function codexEntryPlate(entry: { readonly selected: boolean }): PlateRole {
+  return entry.selected ? 'secondary' : 'inert';
+}
+
+/** What the pointer is doing on the codex, each as a {@link codexTargetKey}. */
+export interface CodexPointer {
+  readonly hover?: string | null;
+  readonly press?: string | null;
 }
 
 /** A rendered fact line — the value and unit already formatted ("15 HP"). */
@@ -284,6 +350,8 @@ export interface CodexModel {
   readonly tabs: readonly CodexTabView[];
   readonly entries: readonly CodexEntryView[];
   readonly detail: CodexDetailView | null;
+  /** BACK's own plate state, from the same pointer routing as the tabs. */
+  readonly backState: CodexPlateState;
 }
 
 /** Format a fact's value and unit for display: "15 HP", "10 s", or a bare "8". */
@@ -323,43 +391,77 @@ function detailFor(entry: CodexEntry | null, data: CodexData): CodexDetailView |
   };
 }
 
-/** Build the frame model. Pure: the view draws exactly this and decides nothing. */
-export function codexModel(state: CodexState): CodexModel {
+/** Build the frame model. Pure: the view draws exactly this and decides nothing.
+ *  A press outranks a hover on the same plate — a finger that is down is not
+ *  hovering — the rule every screen in this directory keeps. */
+export function codexModel(state: CodexState, pointer: CodexPointer = {}): CodexModel {
   const selected = activeEntry(state);
+  const hover = pointer.hover ?? null;
+  const press = pointer.press ?? null;
+  const stateFor = (key: string): CodexPlateState =>
+    press === key ? 'press' : hover === key ? 'hover' : 'rest';
   return {
     title: CODEX_TITLE,
     backLabel: CODEX_BACK_LABEL,
     sectionTitle: state.data[state.activeTab].title,
-    tabs: CODEX_TABS.map((t) => ({ label: t.label, active: t.id === state.activeTab })),
-    entries: activeEntries(state).map((e) => ({ title: e.title, selected: e.id === selected?.id })),
+    tabs: CODEX_TABS.map((t, i) => ({
+      label: t.label,
+      active: t.id === state.activeTab,
+      state: stateFor(`tab:${i}`),
+    })),
+    entries: activeEntries(state).map((e, i) => ({
+      title: e.title,
+      selected: e.id === selected?.id,
+      state: stateFor(`entry:${i}`),
+    })),
     detail: detailFor(selected, state.data),
+    backState: stateFor('back'),
   };
 }
 
 // ---------------------------------------------------------------------------
 // Layout
+//
+// -- GANTRY / BONE (u7-04) --------------------------------------------------
+// The CODEX is framed like the rest of the set now — a header beam, a footer
+// beam, a page margin, one content band ({@link ./gantry} `gantryFrame`) — and it
+// is the densest screen in the game: a tab row, a scrolling entry list and a long
+// article, at 390px wide, in landscape and portrait-held.
+//
+// The rule that governs the density, and the reason this screen was not simply
+// handed the title screen's treatment: **material must not cost legibility.** The
+// reading pane is prose the player is actually reading, so the bevels, the rivets
+// and the plate faces go on the CHROME AROUND it — the beams, the tab chips, the
+// rail rows — and the article itself sits on bare Vacuum behind a hairline. A
+// bevelled panel behind a paragraph is a texture under text, which is the one
+// thing the frozen legibility rule (style-guide §9) will not buy at any price.
+//
+// The metrics that adapt, and what they were:
+//
+//  - `CODEX_TITLE_HEIGHT` (48) — the title band is the HEADER BEAM now.
+//  - `CODEX_TAB_HEIGHT` / `_TOUCH` (44 / 52) — a tab is a `chip` plate, sized by
+//    `valueChipHeight(metrics)`, which is floored at the 48px thumb minimum on
+//    EVERY device rather than only when someone remembered to pass `isTouch`.
+//    That is the brief's "its tabs must clear the 48px thumb floor", enforced by
+//    the shared floor instead of by a second per-screen constant.
+//  - `CODEX_ENTRY_HEIGHT` / `_TOUCH` (40 / 48) — a rail row is a settings-style
+//    ROW, so it takes `rowHeight(metrics)`: also never under the thumb floor.
+//  - `CODEX_ENTRY_GAP` (6) — the frame's own `rowGap`, so the rail breathes like
+//    the settings screen rather than at a number of its own.
+//  - `CODEX_BACK_WIDTH` (120 → 140) — BACK is a `compact` plate in the footer
+//    beam now, at the same reference width the doors screen's BACK uses.
 // ---------------------------------------------------------------------------
 
-/** Gap between rail entries. */
-export const CODEX_ENTRY_GAP = 6;
-
-/** The title/back band off the top of the content box. */
-export const CODEX_TITLE_HEIGHT = 48;
-/** The tab strip height (desktop pointer)… */
-export const CODEX_TAB_HEIGHT = 44;
-/** …and a fatter strip under a thumb. */
-export const CODEX_TAB_HEIGHT_TOUCH = 52;
-/** One entry row in the rail (desktop)… */
-export const CODEX_ENTRY_HEIGHT = 40;
-/** …and under a thumb. */
-export const CODEX_ENTRY_HEIGHT_TOUCH = 48;
-/** The back button's width, capped so it never eats the title. */
-export const CODEX_BACK_WIDTH = 120;
-/** The entry rail's width band. */
-export const CODEX_RAIL_MIN = 132;
-export const CODEX_RAIL_MAX = 260;
-/** Fraction of the content width the rail asks for before the min/max clamp. */
+/** The entry rail's width band, at the 1280×720 reference. Wider than the
+ *  pre-Gantry 132–260: a rail row is a PLATE now, with a selection bar down its
+ *  leading edge and plate padding either side of the title, so the text column
+ *  inside it is narrower than the row and the row has to grow to keep it. */
+export const CODEX_RAIL_MIN = 220;
+export const CODEX_RAIL_MAX = 360;
+/** Fraction of the band's width the rail asks for before the min/max clamp. */
 export const CODEX_RAIL_FRACTION = 0.34;
+/** BACK's plate width in the footer beam, at the reference. The doors screen's. */
+export const CODEX_BACK_WIDTH = 140;
 
 export interface CodexLayoutOptions {
   readonly isTouch?: boolean;
@@ -374,6 +476,11 @@ export interface CodexLayoutOptions {
  */
 export interface CodexLayout {
   readonly content: Rect;
+  /** The header beam — CODEX on the left, the section title on the right. */
+  readonly header: Rect;
+  /** The footer beam, which carries BACK and nothing else. */
+  readonly footer: Rect;
+  /** The heading's strip inside the header beam. */
   readonly title: Rect;
   readonly back: Rect;
   readonly tabs: readonly Rect[];
@@ -381,7 +488,10 @@ export interface CodexLayout {
   readonly railEntries: readonly Rect[];
   readonly detail: Rect;
   readonly entryHeight: number;
+  /** Gap between two rail rows. */
+  readonly entryGap: number;
   readonly isTouch: boolean;
+  readonly metrics: FrameMetrics;
 }
 
 /**
@@ -399,61 +509,86 @@ export function codexLayout(
   options: CodexLayoutOptions = {},
 ): CodexLayout {
   const isTouch = options.isTouch ?? false;
-  const content = menuContent(viewport, options.insets);
+  const frame = gantryFrame(viewport, options.insets);
+  const m = frame.metrics;
 
-  const titleHeight = Math.min(CODEX_TITLE_HEIGHT, content.height);
-  const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
-  const backWidth = Math.min(CODEX_BACK_WIDTH, content.width);
-  const back: Rect = {
-    x: content.x + content.width - backWidth,
-    y: title.y,
-    width: backWidth,
-    height: titleHeight,
-  };
+  // The header beam: the heading hard left, the section title hard right — the
+  // SETTINGS screen's construction rather than the title screen's, because this
+  // is a utility screen and its heading is what names it, not a wordmark.
+  const title = beamContent(frame.header, m);
+  const footerStrip = beamContent(frame.footer, m, 'footer');
+  const back = beamPlate(
+    footerStrip,
+    m,
+    'leading',
+    Math.max(0, Math.min(Math.round(CODEX_BACK_WIDTH * m.plateScale), footerStrip.width)),
+  );
 
-  const tabHeight = Math.min(isTouch ? CODEX_TAB_HEIGHT_TOUCH : CODEX_TAB_HEIGHT, Math.max(0, content.height - titleHeight));
-  const tabTop = title.y + titleHeight + MENU_ROW_GAP;
-  const tabs = tabStrip({ x: content.x, y: tabTop, width: content.width, height: tabHeight });
+  // The tab row, off the top of the band. A value chip's height, which is floored
+  // at the thumb minimum on every device — the brief's one hard number here.
+  const band = frame.band;
+  const tabHeight = Math.max(0, Math.min(valueChipHeight(m), band.height));
+  const tabs = tabStrip({ x: band.x, y: band.y, width: band.width, height: tabHeight }, m);
 
-  const bodyTop = tabTop + tabHeight + MENU_ROW_GAP;
-  const bodyHeight = Math.max(0, content.y + content.height - bodyTop);
+  const bodyTop = band.y + tabHeight + m.gutter;
+  const bodyHeight = Math.max(0, band.y + band.height - bodyTop);
 
-  const railWidth = clampRailWidth(content.width);
-  const rail: Rect = { x: content.x, y: bodyTop, width: railWidth, height: bodyHeight };
-  const detailX = rail.x + railWidth + MENU_ROW_GAP;
+  const railWidth = clampRailWidth(band.width, m);
+  const rail: Rect = { x: band.x, y: bodyTop, width: railWidth, height: bodyHeight };
+  const detailX = rail.x + railWidth + m.gutter;
   const detail: Rect = {
     x: detailX,
     y: bodyTop,
-    width: Math.max(0, content.x + content.width - detailX),
+    width: Math.max(0, band.x + band.width - detailX),
     height: bodyHeight,
   };
 
-  const entryHeight = isTouch ? CODEX_ENTRY_HEIGHT_TOUCH : CODEX_ENTRY_HEIGHT;
+  const entryHeight = Math.max(0, Math.min(rowHeight(m), bodyHeight));
+  const entryGap = m.rowGap;
   const railEntries: Rect[] = [];
   for (let i = 0; i < Math.max(0, entryCount); i++) {
     railEntries.push({
       x: rail.x,
-      y: rail.y + i * (entryHeight + CODEX_ENTRY_GAP),
+      y: rail.y + i * (entryHeight + entryGap),
       width: rail.width,
       height: entryHeight,
     });
   }
 
-  return { content, title, back, tabs, rail, railEntries, detail, entryHeight, isTouch };
+  return {
+    content: frame.content,
+    header: frame.header,
+    footer: frame.footer,
+    title,
+    back,
+    tabs,
+    rail,
+    railEntries,
+    detail,
+    entryHeight,
+    entryGap,
+    isTouch,
+    metrics: m,
+  };
 }
 
-function clampRailWidth(contentWidth: number): number {
-  const asked = contentWidth * CODEX_RAIL_FRACTION;
-  const capped = Math.min(CODEX_RAIL_MAX, Math.max(CODEX_RAIL_MIN, asked));
+function clampRailWidth(bandWidth: number, m: FrameMetrics): number {
+  const asked = bandWidth * CODEX_RAIL_FRACTION;
+  const capped = Math.min(
+    Math.round(CODEX_RAIL_MAX * m.scale),
+    Math.max(Math.round(CODEX_RAIL_MIN * m.scale), asked),
+  );
   // Never let the rail crowd out the detail on a genuinely tiny viewport: at most
-  // half the content, so both panes always have a share.
-  return Math.min(capped, contentWidth / 2);
+  // half the band, so both panes always have a share — and the ARTICLE stays the
+  // wider of the two at every size, because it is what the screen is for.
+  return Math.max(0, Math.min(capped, bandWidth / 2));
 }
 
-/** Four equal tabs across `band`, gap-separated, in {@link CODEX_TABS} order. */
-function tabStrip(band: Rect): Rect[] {
+/** Four equal tab CHIPS across `band`, gap-separated, in {@link CODEX_TABS}
+ *  order. Chips, not plates: a tab is a mode switch, not an action. */
+function tabStrip(band: Rect, m: FrameMetrics): Rect[] {
   const n = CODEX_TABS.length;
-  const gap = MENU_ROW_GAP;
+  const gap = m.rowGap;
   const width = Math.max(0, (band.width - (n - 1) * gap) / n);
   const rects: Rect[] = [];
   for (let i = 0; i < n; i++) {
@@ -467,7 +602,7 @@ function tabStrip(band: Rect): Rect[] {
 export function codexRailContentHeight(layout: CodexLayout): number {
   const n = layout.railEntries.length;
   if (n === 0) return 0;
-  return n * layout.entryHeight + (n - 1) * CODEX_ENTRY_GAP;
+  return n * layout.entryHeight + (n - 1) * layout.entryGap;
 }
 
 // ---------------------------------------------------------------------------
@@ -505,6 +640,21 @@ export function codexHitTest(layout: CodexLayout, x: number, y: number, railScro
     if (hitRect(shifted, x, y)) return { kind: 'entry', index: i };
   }
   return null;
+}
+
+/**
+ * A stable string naming one codex control — `tab:2`, `entry:7`, `back`.
+ *
+ * The pointer layer needs to say "the finger is on THIS control" without holding
+ * a rect, and both the hover cue (`src/main.ts`) and the plate's rest/hover/press
+ * state ({@link codexModel}) ask the same question. Stating the key format once,
+ * beside the target it names, is what keeps the two from drifting into two
+ * spellings of one control — the same discipline `./lobby-geometry`
+ * `entryTargetKey` keeps for the doors.
+ */
+export function codexTargetKey(target: CodexTarget | null): string | null {
+  if (!target) return null;
+  return target.kind === 'back' ? 'back' : `${target.kind}:${target.index}`;
 }
 
 /** The codex's layout-registry id and anchor: it owns the screen. */
