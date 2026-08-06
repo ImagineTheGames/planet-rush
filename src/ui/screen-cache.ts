@@ -67,10 +67,14 @@ import type { Container } from 'pixi.js';
  * Caches one container's rasterisation, refreshing it only when the owner says
  * its content changed.
  *
- * Usage is two calls, and getting them the wrong way round is the only way to
- * misuse this: {@link refresh} at the END of a redraw (the children must already
- * carry their new geometry), and {@link invalidate} on a resize (the cached
- * texture is the old size, so it must be dropped rather than updated).
+ * Three calls, and the order is the whole contract:
+ *
+ *  - {@link unchanged} FIRST, at the top of a redraw — if it says so, there is
+ *    nothing to do and the caller returns without drawing anything;
+ *  - {@link refresh} LAST, at the end of a redraw, once the children already
+ *    carry their new geometry (it rasterises what is on the display list *now*);
+ *  - {@link invalidate} on a resize — the cached texture is the old size, so it
+ *    must be dropped rather than updated in place.
  */
 export class ScreenCache {
   private enabled = false;
