@@ -214,6 +214,132 @@ const REAL_CONTEXT_FITS: RealSatisfiesSubset = true;
 
 const ALL_KINDS: TellKind[] = Object.values(TELL);
 
+// ---------------------------------------------------------------------------
+// Spectral measurement — the s7-02 re-voice's evidence
+// ---------------------------------------------------------------------------
+//
+// The re-voice (GDD §4.7 as amended 2026-08-06, `docs/audio-revoice-spec.md`) is
+// judged by ear but *asserted* by number, and the numbers are the audit's: the
+// working implementations below are copied from `spikes/tone-audit/`, not
+// imported from it. A test may not depend on a throwaway spike — but it also may
+// not measure a different thing than the document it is enforcing, so these are
+// deliberately the same arithmetic rather than a tidier equivalent.
+
+/** In-place iterative radix-2 FFT. Lengths are powers of two. */
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j]!, re[i]!];
+      [im[i], im[j]] = [im[j]!, im[i]!];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wRe = Math.cos(ang);
+    const wIm = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let curRe = 1;
+      let curIm = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const uRe = re[i + k]!;
+        const uIm = im[i + k]!;
+        const vRe = re[i + k + len / 2]! * curRe - im[i + k + len / 2]! * curIm;
+        const vIm = re[i + k + len / 2]! * curIm + im[i + k + len / 2]! * curRe;
+        re[i + k] = uRe + vRe;
+        im[i + k] = uIm + vIm;
+        re[i + k + len / 2] = uRe - vRe;
+        im[i + k + len / 2] = uIm - vIm;
+        const nextRe = curRe * wRe - curIm * wIm;
+        curIm = curRe * wIm + curIm * wRe;
+        curRe = nextRe;
+      }
+    }
+  }
+}
+
+/** The FFT_N-sample window with the most energy, zero-padded if the sound is shorter. */
+function loudestWindow(samples: Float32Array, n: number): Float32Array {
+  if (samples.length <= n) {
+    const out = new Float32Array(n);
+    out.set(samples);
+    return out;
+  }
+  const step = Math.max(1, Math.floor(n / 4));
+  let best = 0;
+  let bestEnergy = -1;
+  for (let start = 0; start + n <= samples.length; start += step) {
+    let e = 0;
+    for (let i = start; i < start + n; i++) {
+      const v = samples[i] ?? 0;
+      e += v * v;
+    }
+    if (e > bestEnergy) {
+      bestEnergy = e;
+      best = start;
+    }
+  }
+  return samples.slice(best, best + n);
+}
+
+/** Hann-windowed magnitude spectrum of the loudest window, and its bin width in Hz. */
+function spectrum(samples: Float32Array): { mag: Float64Array; binHz: number } {
+  const N = 8192;
+  const frame = loudestWindow(samples, N);
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    // Hann: without it the frame edges are a step and every bin smears.
+    re[i] = (frame[i] ?? 0) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  }
+  fft(re, im);
+  const mag = new Float64Array(N / 2);
+  for (let k = 0; k < N / 2; k++) mag[k] = Math.hypot(re[k] ?? 0, im[k] ?? 0);
+  return { mag, binHz: DEFAULT_SAMPLE_RATE / N };
+}
+
+/**
+ * Spectral centroid in Hz — the amplitude-weighted mean frequency, and the single
+ * closest number to *"how bright is this"*. Magnitude-weighted rather than
+ * power-weighted: magnitude tracks perceived brightness more evenly across the
+ * very different levels in this bank.
+ */
+function spectralCentroidHz(samples: Float32Array): number {
+  const { mag, binHz } = spectrum(samples);
+  let num = 0;
+  let den = 0;
+  for (let k = 1; k < mag.length; k++) {
+    num += (mag[k] ?? 0) * k * binHz;
+    den += mag[k] ?? 0;
+  }
+  return den > 0 ? num / den : 0;
+}
+
+/** Share of spectral energy in `[lo, hi)` Hz, 0..1. */
+function bandShare(samples: Float32Array, lo: number, hi: number): number {
+  const { mag, binHz } = spectrum(samples);
+  let band = 0;
+  let total = 0;
+  for (let k = 1; k < mag.length; k++) {
+    const e = (mag[k] ?? 0) ** 2;
+    total += e;
+    if (k * binHz >= lo && k * binHz < hi) band += e;
+  }
+  return total > 0 ? band / total : 0;
+}
+
+/** Zero crossings per sample over the whole buffer — the cheap brightness proxy. */
+function zeroCrossingRate(samples: Float32Array): number {
+  let n = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
+  }
+  return samples.length > 0 ? n / samples.length : 0;
+}
+
 /** Drive an engine for `seconds` at 60 Hz, advancing the fake clock with it. */
 function run(engine: AudioEngine, ctx: FakeAudioContext, seconds: number, each?: () => void): void {
   const dt = 1 / 60;
@@ -450,6 +576,43 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
   });
 
+  it('keeps the shipped mining voice under the tone the developer ratified (s4-01, s7-01)', () => {
+    // **The bug report, reproduced as a number.** The developer denied the
+    // rockChip trio in s4-01 with one note — *"almost there, but they should be
+    // lower in tone"* — and `candidates.test.ts` locked that ratification into a
+    // ceiling on `./candidates`. But candidates are a review artifact imported by
+    // nothing in the game, so the SHIPPED voice was never held to it: s7-01
+    // measured `bank.ts`'s rockChip byte-identical to its a3-02 form, at 0.0483
+    // against a ratified ceiling of 0.034, and nothing looked. That is why the
+    // second report — *"rockchip needs to be redone as well, it still has that
+    // toony sound"* (2026-08-05) — describes a sound that never changed.
+    //
+    // This test is the missing guard. Same window, same ceiling, same arithmetic
+    // as `candidates.test.ts`, pointed at the voice the player actually hears.
+    const CEILING = 0.034;
+    const windowedZcr = (samples: Float32Array): number => {
+      const from = Math.round(0.003 * DEFAULT_SAMPLE_RATE); // past the attack transient
+      const to = Math.min(samples.length, from + 2048);
+      let n = 0;
+      for (let i = from + 1; i < to; i++) if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
+      return n / Math.max(1, to - from);
+    };
+    const chip = renderSound(soundSpec(SOUND.rockChip));
+    expect(windowedZcr(chip), 'the shipped mining voice is not lower in tone').toBeLessThan(CEILING);
+
+    // **And a floor, because "lower" has one, and it is the phone.** A phone
+    // speaker rolls off hard below 500 Hz. s4-01's approved-but-never-shipped
+    // candidate "a" put 89% of its energy under that line — on `TELL.mineHit`, a
+    // voice that fires all match, on a device the mobile gate (GDD §4.3) makes a
+    // first-class target. It would have arrived as "the mining sound is gone".
+    // So the ceiling above and this floor bracket the voice together: lower than
+    // the ratification demands, and still a sound a phone can make.
+    expect(
+      bandShare(chip, 500, DEFAULT_SAMPLE_RATE / 2),
+      'the mining voice has fallen below what a phone speaker can emit',
+    ).toBeGreaterThan(0.4);
+  });
+
   it('keeps every pair of tells a player must not confuse apart (s7-01 §8)', () => {
     // **A regression net, not a goal** (s7-01 §9 T1). It went up GREEN on the
     // pre-re-voice bank and is asserted here so the s7-02 re-voice cannot do the
@@ -459,9 +622,9 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     // register — "an asset pass that makes two mechanics harder to tell apart has
     // failed this section, not satisfied it."
     //
-    // A pair's **separation** is the larger of its two measured ratios: spectral
-    // centroid (how bright) and zero-crossing rate (the cheap proxy the rock-vs-
-    // hull test already uses). Larger-of-two rather than both, because the pairs
+    // A pair's **separation** is the larger of its two measured ratios:
+    // {@link spectralCentroidHz} (how bright) and {@link zeroCrossingRate} (the
+    // cheap proxy the rock-vs-hull test already uses). Larger-of-two, because the pairs
     // do not all separate on the same axis — `shieldHit`/`coreHit` is carried
     // almost entirely by zcr (×9.02) and barely at all by centroid (×1.61), and
     // requiring both would fail a bank that is perfectly legible.
@@ -475,95 +638,12 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     // A net catches a collapse; it does not pin the bank to its own history.
     const CAP = 3;
 
-    const centroidHz = (samples: Float32Array): number => {
-      // Hann-windowed 8192-point FFT of the loudest window, bins weighted by
-      // magnitude — the working implementation from
-      // `spikes/tone-audit/measure-bank-tone.ts`, copied rather than imported so
-      // a test never depends on a throwaway spike.
-      const N = 8192;
-      let frame: Float32Array;
-      if (samples.length <= N) {
-        frame = new Float32Array(N);
-        frame.set(samples);
-      } else {
-        const step = Math.max(1, Math.floor(N / 4));
-        let best = 0;
-        let bestEnergy = -1;
-        for (let start = 0; start + N <= samples.length; start += step) {
-          let e = 0;
-          for (let i = start; i < start + N; i++) {
-            const v = samples[i] ?? 0;
-            e += v * v;
-          }
-          if (e > bestEnergy) {
-            bestEnergy = e;
-            best = start;
-          }
-        }
-        frame = samples.slice(best, best + N);
-      }
-      const re = new Float64Array(N);
-      const im = new Float64Array(N);
-      for (let i = 0; i < N; i++) {
-        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)); // Hann
-        re[i] = (frame[i] ?? 0) * w;
-      }
-      // In-place iterative radix-2 FFT.
-      for (let i = 1, j = 0; i < N; i++) {
-        let bit = N >> 1;
-        for (; j & bit; bit >>= 1) j ^= bit;
-        j ^= bit;
-        if (i < j) {
-          [re[i], re[j]] = [re[j]!, re[i]!];
-          [im[i], im[j]] = [im[j]!, im[i]!];
-        }
-      }
-      for (let len = 2; len <= N; len <<= 1) {
-        const ang = (-2 * Math.PI) / len;
-        const wRe = Math.cos(ang);
-        const wIm = Math.sin(ang);
-        for (let i = 0; i < N; i += len) {
-          let curRe = 1;
-          let curIm = 0;
-          for (let k = 0; k < len / 2; k++) {
-            const uRe = re[i + k]!;
-            const uIm = im[i + k]!;
-            const vRe = re[i + k + len / 2]! * curRe - im[i + k + len / 2]! * curIm;
-            const vIm = re[i + k + len / 2]! * curIm + im[i + k + len / 2]! * curRe;
-            re[i + k] = uRe + vRe;
-            im[i + k] = uIm + vIm;
-            re[i + k + len / 2] = uRe - vRe;
-            im[i + k + len / 2] = uIm - vIm;
-            const nextRe = curRe * wRe - curIm * wIm;
-            curIm = curRe * wIm + curIm * wRe;
-            curRe = nextRe;
-          }
-        }
-      }
-      let num = 0;
-      let den = 0;
-      for (let k = 1; k < N / 2; k++) {
-        const mag = Math.hypot(re[k] ?? 0, im[k] ?? 0);
-        num += mag * ((k * DEFAULT_SAMPLE_RATE) / N);
-        den += mag;
-      }
-      return den > 0 ? num / den : 0;
-    };
-
-    const zcr = (samples: Float32Array): number => {
-      let n = 0;
-      for (let i = 1; i < samples.length; i++) {
-        if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
-      }
-      return samples.length > 0 ? n / samples.length : 0;
-    };
-
     const measured = new Map<SoundName, { centroid: number; zcr: number }>();
     const measure = (name: SoundName) => {
       let m = measured.get(name);
       if (!m) {
         const samples = renderSound(soundSpec(name));
-        m = { centroid: centroidHz(samples), zcr: zcr(samples) };
+        m = { centroid: spectralCentroidHz(samples), zcr: zeroCrossingRate(samples) };
         measured.set(name, m);
       }
       return m;

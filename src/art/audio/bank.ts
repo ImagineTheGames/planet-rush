@@ -201,24 +201,47 @@ const LOOP_CROSSFADE = 0.04;
 const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- Mine ---------------------------------------------------------------
 
-  // Rock chip: one shot biting stone. Pitched noise low in the spectrum with the
-  // top rolled hard off, a short grind with a transient — material removed, not
-  // energy spent. Dark on purpose, so it sits far below the hull hit in spectral
-  // centre. A per-tick trigger reads as a stream once the mix thins it (`./graph`).
+  /**
+   * **A cutting tool taking a bite out of stone.** One flat percussive hit: no
+   * pitch movement in it, no wobble, and the whole character in the transient.
+   *
+   * This is the worked example of the re-voice (GDD §4.7 amended 2026-08-06,
+   * `docs/audio-revoice-spec.md` §6) and the sound the developer has judged
+   * twice, so it is worth saying what changed and what did not.
+   *
+   * The oscillator was never the problem — rock IS broadband, and it stays
+   * `noise`. What made it read as a cartoon were two parameters that made it
+   * *move* the way a cartoon moves: a 22 Hz vibrato inside a 12 ms hold (a
+   * wobble, not a texture) and a ×1.50 fall inside 103 ms (a chirp, not a body
+   * settling). Both are gone; the punch they were decorating went up to carry
+   * the hit on its own, which is where a machine keeps it.
+   *
+   * The pitch also comes down — the ratified s4-01 direction, *"lower in tone"*,
+   * which this bank never actually received (that brief moved `./candidates`,
+   * which the game does not import). Lower stops where a phone does: the audit
+   * measured s4-01's own candidate at 89% of its energy below 500 Hz, and this
+   * is `TELL.mineHit` firing all match on a device the mobile gate makes a
+   * first-class target. So `highPass` goes UP to 130 Hz, trimming sub a phone
+   * cannot emit and the mix would otherwise carry on every shot.
+   *
+   * Measured, shipped → here: centroid 2281 → 1815 Hz, windowed zcr 0.0483 →
+   * 0.0327 (under the ratified 0.034 ceiling), energy above 500 Hz 69% → 56%,
+   * RMS at the mix's 28.6 Hz retrigger ceiling 0.180 → 0.147 — a *quieter* held
+   * fire, which is the point on a voice that repeats all match. The seed is
+   * unchanged: same seed, same noise, so a replay hears the match (GDD §4.1).
+   */
   [SOUND.rockChip]: {
     name: 'rockChip',
     wave: 'noise',
-    attack: 0.001,
-    hold: 0.012,
-    decay: 0.09,
-    punch: 0.4,
-    freq: 150,
-    freqEnd: 100,
-    vibratoDepth: 0.06,
-    vibratoRate: 22,
-    lowPass: 1150,
-    highPass: 60,
-    gain: 0.4,
+    attack: 0.0008, // a tighter strike: the transient IS the character now
+    hold: 0.009,
+    decay: 0.062, // ~72 ms, from 103 — a bite, not a grind
+    punch: 0.55, // what the wobble and the chirp used to carry, moved here
+    freq: 92,
+    freqEnd: 82, // ×1.12 — a body settling, well under the chirp threshold
+    lowPass: 820, // was 1150
+    highPass: 130, // was 60 — sub a phone cannot emit anyway
+    gain: 0.42,
     seed: 0x9e37,
   },
 
