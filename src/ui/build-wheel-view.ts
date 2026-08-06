@@ -335,9 +335,14 @@ export class BuildWheelView extends Container {
   private readonly upgradeHubRule = new Graphics();
   private readonly upgradeHubHit = new Graphics();
 
-  /** Where the hub's caption ended this frame, so the divider and the BACK word
-   *  hang off the real measured text rather than off a guessed offset. */
-  private hubCaptionBottom = 0;
+  // The hub group is measured by {@link drawHub} and placed by {@link drawHubBack}
+  // once its full height is known, so the whole stack sits centred in the disc
+  // rather than hanging off a guessed offset. These carry the measurement across.
+  private hubOreNode: Text | null = null;
+  private hubCaptionNode: Text | null = null;
+  private hubOreCentre = 0;
+  private hubCaptionTop = 0;
+  private hubStackHeight = 0;
 
   /** Whether the last frame was a touch device — decides the hub BACK's key hint
    *  (`· ESC` on PC only, field report v0.2.4 "ESC mirrors it … legend shows it").
@@ -669,10 +674,32 @@ export class BuildWheelView extends Container {
     hit.clear();
     hit.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.001 });
 
-    // The handoff separates the hub's total from its BACK word with a short rule
-    // that fades out at both ends — the same "held in the middle" hairline the
-    // beams use, at hub scale.
-    const ruleY = this.hubCaptionBottom + Math.max(4, m.gapCost);
+    // CLOSE / BACK, plus the PC key that mirrors the hub tap (field report v0.2.4).
+    label.visible = true;
+    label.text = this.isTouch ? hb.label : `${hb.label} · ESC`;
+    restyle(label, m.hubBack, trackingPx(TRACKING.eyebrow, m.hubBack));
+
+    // The up-chevron — "go up a level" — sits BETWEEN the rule and the word,
+    // pointing back at the total above it, so the gesture and its label read as
+    // one thing rather than as a word with a mark stranded under it.
+    chevron.visible = true;
+    chevron.clear();
+    const c = Math.max(3, m.detent * 0.55);
+    chevron
+      .poly([-c, c * 0.6, 0, -c * 0.6, c, c * 0.6])
+      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
+
+    // Now that every piece has been measured, centre the whole hub group on the
+    // disc — the handoff's hub is a stack centred in its circle, and hanging it
+    // off a guessed offset is what left it sitting on the bottom rim.
+    const gap = Math.max(4, m.gapCost + 2);
+    const chevronH = c * 1.2;
+    const total = this.hubStackHeight + gap + chevronH + 2 + label.height;
+    const top = -total / 2;
+    if (this.hubOreNode) this.hubOreNode.y = top + this.hubOreCentre;
+    if (this.hubCaptionNode) this.hubCaptionNode.y = top + this.hubCaptionTop;
+
+    const ruleY = top + this.hubStackHeight + gap / 2;
     rule.visible = true;
     rule.clear();
     const steps = 6;
@@ -681,39 +708,32 @@ export class BuildWheelView extends Container {
       rule.moveTo(-w / 2, ruleY).lineTo(w / 2, ruleY).stroke({
         width: 1,
         color: MATERIAL_SHADES.hairline,
-        alpha: 0.22,
+        alpha: 0.3,
       });
     }
-
-    // CLOSE / BACK, plus the PC key that mirrors the hub tap (field report v0.2.4).
-    label.visible = true;
-    label.text = this.isTouch ? hb.label : `${hb.label} · ESC`;
-    restyle(label, m.hubBack, trackingPx(TRACKING.eyebrow, m.hubBack));
-    label.y = ruleY + Math.max(3, m.gapCost);
-
-    chevron.visible = true;
-    chevron.clear();
-    // A small up-chevron centred over the word — "go up a level".
-    const c = Math.max(3, m.detent * 0.55);
-    chevron
-      .poly([-c, c * 0.6, 0, -c * 0.6, c, c * 0.6])
-      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
-    chevron.y = label.y + label.height + c;
+    chevron.y = ruleY + gap / 2 + chevronH / 2;
+    label.y = chevron.y + chevronH / 2 + 2;
   }
 
   /** The hub's live ore total and its caption — the handoff's `40px` numeral over
    *  a tracked eyebrow. The Build wheel captions it `ORE`; the upgrade wheel names
-   *  the hull whose stats are being spent on. */
+   *  the hull whose stats are being spent on. Measured here and *placed* by
+   *  {@link drawHubBack}, which is the piece that knows how tall the whole group
+   *  ends up and so where the middle of it is. */
   private drawHub(ore: Text, caption: Text, value: string, word: string, m: WheelProfile): void {
     ore.text = value;
     restyle(ore, m.hubOre, trackingPx(TRACKING.name, m.hubOre));
     caption.text = word;
     restyle(caption, m.hubCaption, trackingPx(TRACKING.eyebrow, m.hubCaption));
-    // The numeral is anchored on its own centre; hang it a touch above the hub
-    // centre so the numeral + caption pair is optically centred in the disc.
-    ore.y = -m.hubOre * 0.42;
-    caption.y = ore.y + ore.height / 2 + 2;
-    this.hubCaptionBottom = caption.y + caption.height;
+    // The numeral is anchored on its own centre, the caption on its top edge —
+    // record both as offsets from the top of the pair so the group can be centred.
+    this.hubOreNode = ore;
+    this.hubCaptionNode = caption;
+    this.hubOreCentre = ore.height / 2;
+    this.hubCaptionTop = ore.height + 2;
+    this.hubStackHeight = ore.height + 2 + caption.height;
+    ore.y = this.hubOreCentre;
+    caption.y = this.hubCaptionTop;
   }
 
   /**
