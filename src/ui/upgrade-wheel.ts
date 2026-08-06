@@ -2,11 +2,21 @@
  * src/ui/upgrade-wheel.ts — the ship upgrade WHEEL. OWNER: UI Engineer.
  *
  * The second screen behind the Build wheel's UPGRADE SHIP arrow (GDD §2.5), and
- * **the only place ship stats are ever shown**:
+ * **the place ship stats are shown during a match**:
  *
  * > Ship stats — power, engine, cargo, hull tiers — are deliberately *not* on the
  * > HUD. They appear only in the upgrade screen, where they are a spending
  * > decision rather than clutter. (GDD §2.2, §2.5)
+ *
+ * This header used to say "the ONLY place ship stats are ever shown", quoting a
+ * sentence GDD §2.5 no longer contains. It was amended 2026-08-05: asked whether
+ * ship stats could appear on the lobby's ship-select screen, the developer
+ * answered ***"both pips and numbers"***, so there are **two** screens now, and
+ * they answer different questions — ship-select is a *comparison* made once,
+ * before the match; this wheel is a *spending decision* made repeatedly during
+ * it, against turrets and repair. Stats on ship-select (u4-01) are ratified and
+ * are not a violation of anything. What is unchanged is that stats are not on
+ * the **HUD**, and that this screen is the detailed one.
  *
  * ── WHY THIS IS A WHEEL AND NOT A PANEL (the field report) ──────────────────
  * A developer reported the upgrade screen *"is not immediately readable, and
