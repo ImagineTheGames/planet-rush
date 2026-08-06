@@ -395,17 +395,23 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
+  /**
+   * A chunk tractored in: **one clean struck note at a fixed pitch**.
+   *
+   * It was a square with duty 0.3 chirping up a fifth — a coin blip, and the
+   * single clearest example of the retired register doing an economy's job.
+   * *Getting something* now reads as a machine registering it.
+   *
+   * The pitch is fixed because the register has no pitch bends in it, and the
+   * *up* the chirp used to carry is expressed instead as **register**: this note
+   * sits a fifth and an octave above {@link SOUND.depositTick}, which is the
+   * same information (picked up vs put down) held in the one dimension a phone
+   * speaker still reproduces. That pair is the tightest in the bank and both
+   * halves of it are re-voiced here, so it is guarded by name in `audio.test.ts`.
+   */
   [SOUND.oreCollect]: {
     name: 'oreCollect',
-    wave: 'square',
-    attack: 0.002,
-    hold: 0.014,
-    decay: 0.07,
-    freq: 720,
-    freqEnd: 1080,
-    duty: 0.3,
-    gain: 0.22,
-    seed: 0xf2d2,
+    layers: [...struck('oreCollect', 1046.5, { gain: 0.2, decay: 0.07, hold: 0.014, seed: 0xf2d2 })],
   },
 
   [SOUND.holdFull]: {
@@ -1567,21 +1573,29 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     seed: 0xb23f,
   },
 
-  // Ore settling into the bank, one chunk at a time — the deposit twin of
-  // `oreCollect`, but softer and *falling* (it is coming to rest, not being won).
-  // One tick per chunk, conserved 1:1 like the sprites; a burst thins to a stream
-  // through the mix's repeat-gap (`./graph`), exactly as a wave of ore-collects does.
+  /**
+   * Ore settling into the bank, one chunk at a time — the deposit twin of
+   * {@link SOUND.oreCollect}, softer and lower, because it is coming to rest
+   * rather than being won. One tick per chunk, conserved 1:1 like the sprites; a
+   * burst thins to a stream through the mix's repeat-gap (`./graph`), exactly as
+   * a wave of ore-collects does.
+   *
+   * Both halves of this pair were `square` and both are re-voiced, which makes
+   * it the one place in the pass where a converging palette could genuinely cost
+   * the player information: at ×1.13 apart in spectral centre it was the tightest
+   * pair in the bank. The *falling* it used to carry as a chirp is now carried by
+   * **register** — the same struck material as its twin, a fifth and an octave
+   * below it — and the thinner two-partial form of the instrument, which is the
+   * handoff's own choice for a note that answers rather than announces.
+   *
+   * Measured after the re-voice the pair is ×2.0 apart, not ×1.13. `audio.test.ts`
+   * guards it by name.
+   */
   [SOUND.depositTick]: {
     name: 'depositTick',
-    wave: 'square',
-    attack: 0.002,
-    hold: 0.01,
-    decay: 0.055,
-    freq: 520,
-    freqEnd: 392,
-    duty: 0.35,
-    gain: 0.16,
-    seed: 0xf2d7,
+    layers: [
+      ...struck('depositTick', 587.33, { gain: 0.15, decay: 0.05, hold: 0.01, partials: GLASS_PAIR, seed: 0xf2d7 }),
+    ],
   },
 
   // The respawn countdown (GDD §2.7): one clean mid beep a second. Deliberately
