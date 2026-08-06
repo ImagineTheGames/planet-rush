@@ -73,6 +73,7 @@
  */
 
 import type { Rng } from '@shared/types';
+import type { PlateRole, PlateScale, PlateState } from '../art/materials';
 import type { RoomCode } from '../net/transport';
 import type { ResolveFailure } from '../net/allocator-client';
 import { resolveFailureMessage } from './online-copy';
@@ -426,6 +427,72 @@ export function entryErrorFor(reason: ResolveFailure): string {
 export interface EntryDoorView extends EntryDoorOption {
   /** Dead while an attempt is in flight. */
   readonly enabled: boolean;
+  /**
+   * Whether this is the screen's ONE headline action (u7-04). PLAY SOLO, and only
+   * PLAY SOLO: it is the door that always works with no server (GDD §4.8 risk 6).
+   * Under Gantry/Bone that is not a colour — the primary is simply the biggest and
+   * brightest plate, and it *must never share a screen with a second bright plate*
+   * ({@link ./gantry} `singlePrimary`).
+   */
+  readonly primary: boolean;
+  /** The plate material and size this door is drawn at ({@link doorPlate}). */
+  readonly role: PlateRole;
+  readonly scale: PlateScale;
+  /** Rest / hover / press — the handoff's three plate states, driven by the
+   *  wiring layer's pointer routing. Touch never hovers, so on a phone this is
+   *  only ever `rest` or `press`. */
+  readonly state: PlateState;
+}
+
+/**
+ * The plate role and size a door is drawn at.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY CAMPAIGN IS A `secondary` PLATE AND NEVER AN `inert` ONE (u7-04)
+ * ---------------------------------------------------------------------------
+ * The re-skin had one way to get the CAMPAIGN teaser wrong, and it is the same
+ * mistake u9-01 was written against in a new material: `inert` is Gantry's word
+ * for *a surface that holds content rather than inviting a press* — a settings
+ * row, an unselected ship. A teaser drawn as a surface would read as unpressable,
+ * which is the greyed-out door that brief exists to prevent, wearing a bevel.
+ *
+ * So CAMPAIGN takes exactly the same material as CREATE ROOM and JOIN ROOM:
+ * `secondary`, full contrast, raised off the screen with a bezel and a cast
+ * shadow, and pressable — because pressing it is how the screen answers.
+ */
+export function doorPlate(option: EntryDoorOption): {
+  primary: boolean;
+  role: PlateRole;
+  scale: PlateScale;
+} {
+  // The offline door is the primary (it always works — risk 6); every other door,
+  // teaser or not, is an equally-active secondary.
+  const primary = !option.needsNetwork && !option.comingSoon;
+  return primary
+    ? { primary: true, role: 'primary', scale: 'hero' }
+    : { primary: false, role: 'secondary', scale: 'standard' };
+}
+
+/**
+ * What the pointer is doing on the entry screen: which control it is over, and
+ * which (if any) it is holding down — each as a {@link ./lobby-geometry}
+ * `entryTargetKey`, so the model never has to know what a rect is.
+ */
+export interface EntryPointer {
+  readonly hover?: string | null;
+  readonly press?: string | null;
+}
+
+/**
+ * One control's plate state. A press outranks a hover on the same plate (a finger
+ * that is down is not hovering), and a plate that is neither is at rest — the same
+ * rule {@link ./main-menu} `mainMenuModel` keeps, stated once so the two front
+ * doors cannot disagree about what a press looks like.
+ */
+export function entryPlateState(model: EntryModel, key: string): PlateState {
+  if (model.press === key) return 'press';
+  if (model.hover === key) return 'hover';
+  return 'rest';
 }
 
 /**
@@ -478,7 +545,37 @@ export interface EntryModel {
    *  own standing line, so the view can draw it as the *title* it now is: bigger,
    *  lit, and with the wordmark stepping back behind it. */
   readonly narrating: boolean;
+  /**
+   * The header beam's eyebrow cluster (u7-04): the authority above, this screen's
+   * own standing status below — the title screen's construction, because this is
+   * the title screen's other half and the letterhead does not change between them.
+   */
+  readonly eyebrow: string;
+  readonly status: string;
+  /** The control the pointer is over / holding, as a `entryTargetKey` — read
+   *  through {@link entryPlateState} rather than compared by the view directly. */
+  readonly hover: string | null;
+  readonly press: string | null;
 }
+
+/**
+ * The header beam's first line: the authority, verbatim from the title screen
+ * ({@link ./main-menu} `MAIN_MENU_EYEBROW`). It is a letterhead — the same mining
+ * authority runs both screens — so repeating it is the point, not drift, and it
+ * invents no copy while `docs/copy-sweep-industrial-voice.md` Q1 is still open.
+ */
+export const ENTRY_EYEBROW = 'DEEP FIELD MINING AUTHORITY';
+
+/**
+ * …and its second line, which is this screen's own state. `ROOM CODE` is the
+ * handoff's own word for the keypad screen (it labels that panel exactly so); the
+ * doors carry the title screen's standing contract line unchanged, because the
+ * doors screen is where that contract is taken up.
+ */
+export const ENTRY_STATUS = {
+  home: 'CONTRACT OPEN · SECTOR 04',
+  join: 'ROOM CODE',
+} as const;
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
@@ -491,7 +588,11 @@ export interface EntryModel {
  * whole change exists to delete. With no narration the screen behaves exactly as it
  * always has, which is what PLAY SOLO and a mistyped room code still want.
  */
-export function entryModel(state: EntryState, narration: EntryNarration | null = null): EntryModel {
+export function entryModel(
+  state: EntryState,
+  narration: EntryNarration | null = null,
+  pointer: EntryPointer = {},
+): EntryModel {
   const live = entryLive(state);
   const cells: EntryCodeCell[] = [];
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
@@ -501,9 +602,21 @@ export function entryModel(state: EntryState, narration: EntryNarration | null =
   // An empty narration line is no narration at all — a trace that has not taken
   // its first step yet must not blank the title.
   const told = narration !== null && narration.line !== '' ? narration : null;
+  const hover = pointer.hover ?? null;
+  const press = pointer.press ?? null;
   return {
     screen: state.screen,
-    doors: DOOR_OPTIONS.map((option) => ({ ...option, enabled: live })),
+    doors: DOOR_OPTIONS.map((option, i) => {
+      const key = `door:${i}`;
+      return {
+        ...option,
+        ...doorPlate(option),
+        enabled: live,
+        // A dead screen (an attempt in flight) is at rest whatever the pointer is
+        // doing: a plate that lights up under a finger it will not answer is a lie.
+        state: !live ? 'rest' : press === key ? 'press' : hover === key ? 'hover' : 'rest',
+      };
+    }),
     cells,
     keys: KEYPAD_KEYS,
     canErase: live && state.code.length > 0,
@@ -515,6 +628,10 @@ export function entryModel(state: EntryState, narration: EntryNarration | null =
     notice: told ? '' : state.notice,
     prompt: told ? told.line : entryPrompt(state),
     narrating: told !== null,
+    eyebrow: ENTRY_EYEBROW,
+    status: ENTRY_STATUS[state.screen],
+    hover: live ? hover : null,
+    press: live ? press : null,
   };
 }
 

@@ -49,9 +49,10 @@ import {
   typeEntryCode,
 } from './lobby-entry';
 import type { EntryState } from './lobby-entry';
+import { TOUCH_MIN } from '../art/materials';
+import { singlePrimary } from './gantry';
 import {
   DOOR_COUNT,
-  DOOR_STACK_MIN,
   KEYPAD_COLUMNS as GEOMETRY_KEYPAD_COLUMNS,
   KEYPAD_KEY_COUNT,
   KEY_MIN,
@@ -553,13 +554,15 @@ describe('four doors are still four buttons (u9-01)', () => {
       expect(campaign.y, `campaign above solo on ${name}`).toBeLessThan(solo.y);
     });
 
-    it(`keeps every door a pressable size — ${name}`, () => {
-      // The trap the fourth door set: four stacked blocks of button-plus-hint do
+    it(`keeps every door a THUMB target — ${name}`, () => {
+      // The trap the fourth door set: four stacked blocks of button-plus-hint did
       // not fit a landscape phone's band, and a door compressed to a 20px stripe
-      // is not a control. The arrangement gives, never the button.
+      // is not a control. Under Gantry (u7-04) the hint moved INSIDE the plate, so
+      // a door is one plate tall and the bar is the real one — the shared thumb
+      // floor, not a bespoke "at least it's visible" number.
       const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
       for (const [i, door] of layout.doors.entries()) {
-        expect(door.height, `door[${i}] height on ${name}`).toBeGreaterThanOrEqual(DOOR_STACK_MIN);
+        expect(door.height, `door[${i}] height on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
         expect(door.width, `door[${i}] width on ${name}`).toBeGreaterThan(0);
       }
     });
@@ -571,19 +574,141 @@ describe('four doors are still four buttons (u9-01)', () => {
     expect(
       entryLayout({ width: 390, height: 844 }, { isTouch: true, insets: PORTRAIT_INSETS }).doorShape,
     ).toBe('stack');
-    // A phone in LANDSCAPE — the primary mobile layout of this screen — cannot
-    // stack four, so it takes two columns of two rather than four stripes.
+    // A phone in LANDSCAPE — the primary mobile layout of this screen — still
+    // cannot stack four, and the reason is now a *shared* one rather than this
+    // screen's own: two beams and their gutters take 122 of that handset's 369
+    // logical px, and four thumb-sized plates do not fit the 210 that are left.
+    // So it does what every short band in this file does — changes ARRANGEMENT
+    // rather than shrinking a control past usefulness.
     const phone = entryLayout({ width: 844, height: 390 }, { isTouch: true, insets: LANDSCAPE_INSETS });
     expect(phone.doorShape).toBe('columns');
-    expect(new Set(phone.doors.map((d) => d.x)).size).toBe(2);
-    expect(new Set(phone.doors.map((d) => d.y)).size).toBe(2);
+    expect(new Set(phone.doors.map((d) => Math.round(d.x))).size).toBe(2);
+    expect(new Set(phone.doors.map((d) => Math.round(d.y))).size).toBe(2);
+    // Both columns come back to FULL plate height there — that is the whole point
+    // of trading the stack away rather than compressing it.
+    for (const door of phone.doors) expect(door.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+  });
+
+  it('keeps the two columns’ rows in register, with the hero hanging lower', () => {
+    // The left column carries the hero and is therefore taller than the right.
+    // Centring each column in the band on its own would put the two rows visibly
+    // out of register; they are top-aligned instead, so the rows line up and the
+    // primary simply hangs lower — which is the size difference doing its job.
+    const phone = entryLayout({ width: 844, height: 390 }, { isTouch: true, insets: LANDSCAPE_INSETS });
+    const [campaign, solo, create, join] = phone.doors as [Rect, Rect, Rect, Rect];
+    expect(campaign.y).toBeCloseTo(create.y, 5);
+    expect(solo.y).toBeCloseTo(join.y, 5);
+    expect(solo.height).toBeGreaterThan(join.height);
   });
 
   it('never lets the columns shape produce doors too narrow to read', () => {
-    // A tall, extremely narrow window has no width to halve, so it keeps the
+    // A short, extremely narrow window has no width to halve, so it keeps the
     // stack — two unreadable columns are worse than one readable list.
-    const narrow = entryLayout({ width: 300, height: 420 }, { isTouch: true });
+    const narrow = entryLayout({ width: 300, height: 260 }, { isTouch: true });
     expect(narrow.doorShape).toBe('stack');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The Gantry re-skin (u7-04) — the material rules a screen can only break itself
+// ---------------------------------------------------------------------------
+
+describe('the doors in Gantry/Bone (u7-04)', () => {
+  it('draws exactly ONE bright plate, and it is PLAY SOLO', () => {
+    // Bone spends no colour: the primary action is simply the brightest and
+    // biggest plate, which is only a signal while there is exactly one of them.
+    const model = entryModel(createEntry());
+    const roles = model.doors.map((d) => d.role);
+    expect(singlePrimary(roles)).toBe(true);
+    const primaries = model.doors.filter((d) => d.primary);
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]?.door).toBe('solo');
+    expect(primaries[0]?.scale).toBe('hero');
+  });
+
+  it('draws CAMPAIGN as a full-contrast SECONDARY plate, never an inert surface', () => {
+    // The re-skin's one way to get u9-01 wrong: `inert` is Gantry's word for a
+    // surface that holds content rather than inviting a press, which is the
+    // greyed-out door that brief exists to prevent, wearing a bevel.
+    const campaign = entryModel(createEntry()).doors.find((d) => d.door === 'campaign');
+    expect(campaign?.role).toBe('secondary');
+    expect(campaign?.comingSoon).toBe(true);
+    expect(campaign?.enabled).toBe(true);
+    // …the same material as the two doors that are fully built, so it cannot be
+    // told apart from them by anything except its own words.
+    const create = entryModel(createEntry()).doors.find((d) => d.door === 'create');
+    expect(campaign?.role).toBe(create?.role);
+    expect(campaign?.scale).toBe(create?.scale);
+  });
+
+  it('gives PLAY SOLO the tallest plate on the screen at every profile', () => {
+    // Size is half of what marks the primary (brightness is the other half, and
+    // there is no third half, because Bone spends no hue). The stack compresses
+    // proportionally, so the ratio has to survive the phone as well as the desk.
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      const solo = layout.doors[DOOR_ORDER.indexOf('solo')] as Rect;
+      for (const [i, door] of layout.doors.entries()) {
+        if (i === DOOR_ORDER.indexOf('solo')) continue;
+        expect(solo.height, `solo taller than door[${i}] on ${name}`).toBeGreaterThan(door.height);
+      }
+    }
+  });
+
+  it('presses and hovers a plate, and a dead screen does neither', () => {
+    const rest = entryModel(createEntry());
+    expect(rest.doors.map((d) => d.state)).toEqual(['rest', 'rest', 'rest', 'rest']);
+
+    const hovered = entryModel(createEntry(), null, { hover: 'door:1' });
+    expect(hovered.doors[1]?.state).toBe('hover');
+    // A press outranks a hover on the same plate — a finger that is down is not
+    // hovering.
+    const pressed = entryModel(createEntry(), null, { hover: 'door:1', press: 'door:1' });
+    expect(pressed.doors[1]?.state).toBe('press');
+
+    // Mid-connect every control is dead, so no plate lights up under a finger it
+    // will not answer.
+    const connecting = chooseDoor(createEntry(), 'solo', rng()).state;
+    const busy = entryModel(connecting, null, { hover: 'door:1', press: 'door:1' });
+    expect(busy.doors[1]?.state).toBe('rest');
+    expect(busy.hover).toBeNull();
+    expect(busy.press).toBeNull();
+  });
+
+  it('carries the title screen’s letterhead, and names the screen you are on', () => {
+    // No new voice is invented for a screen the handoff never drew: the authority
+    // line is the title screen's, verbatim, and the keypad's status is the
+    // handoff's own word for that panel.
+    expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
+    expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
+    const join = chooseDoor(createEntry(), 'join', rng()).state;
+    expect(entryModel(join).status).toBe('ROOM CODE');
+  });
+
+  it('keeps the footer plates inside the footer BEAM, and BACK where it was', () => {
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      const { footer } = layout;
+      for (const [label, rect] of [
+        ['back', layout.back],
+        ['settings', layout.settings],
+        ['erase', layout.erase],
+        ['submit', layout.submit],
+      ] as const) {
+        expect(rect.y, `${label} below the footer beam top on ${name}`).toBeGreaterThanOrEqual(footer.y - 0.5);
+        expect(rect.y + rect.height, `${label} inside the footer beam on ${name}`).toBeLessThanOrEqual(
+          footer.y + footer.height + 0.5,
+        );
+      }
+      // BACK is the exit every screen carries, and it is the SAME rect on both —
+      // it must not move as the screen changes under it (u2 menu-back).
+      expect(layout.back.x, `back is leading on ${name}`).toBeLessThan(layout.settings.x);
+      expect(layout.back.x).toBeLessThan(layout.submit.x);
+      // ERASE sits inboard of JOIN, never across it.
+      expect(layout.erase.x + layout.erase.width, `erase clears submit on ${name}`).toBeLessThanOrEqual(
+        layout.submit.x + 0.5,
+      );
+    }
   });
 });
 

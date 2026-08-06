@@ -39,12 +39,16 @@
  * `evidence/images/u9-campaign-door/` — the doors screen and the answered state,
  * on a phone held each way and on the desktop — so the change is reviewable as a
  * picture rather than as a description of one. They are evidence, not baselines:
- * no golden covers this screen (the six in `goldens.spec.ts` are the title, the
- * settings screen and the frozen match scenes), so nothing here is a comparison
- * and nothing needed re-baselining.
+ * this file makes no comparison and re-baselines nothing.
+ *
+ * (When u9-01 wrote that, no golden covered this screen at all. Two now do —
+ * `goldens.spec.ts` gained a desktop and a landscape-phone baseline of the doors
+ * in u7-04 — which is a good thing for the CAMPAIGN door too: the golden catches
+ * a teaser that stops being drawn, and this file catches one that stops being
+ * *pressable*. Neither replaces the other.)
  */
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
-import { count, decode, isNonVacuum, isPlasma, type Img, type Region } from './pixels';
+import { count, decode, isBoneLit, isNonVacuum, type Img, type Region } from './pixels';
 import { settleFrames } from './render-settle';
 import { budgetTest } from './budgets';
 
@@ -105,16 +109,22 @@ interface LobbySeam {
 const DRAWN_MIN_PX = 200;
 
 /**
- * …and of PLASMA inside the message slot, which is what `Coming Soon…` is drawn
- * in (`src/ui/lobby-entry-view.ts` — plasma, never threat red, because a door
- * that is not built yet is not a failure). The standing tagline in that same
- * slot is dim steel and contributes none, so this count separates the answered
- * state from the resting one without reading a string off the seam.
+ * …and of CHALK-BRIGHT BONE inside the message slot, which is what `Coming Soon…`
+ * is drawn in.
  *
- * Low, because it is twelve characters of 12px text: at dpr 1 the lit glyph body
- * is a few hundred pixels, and the phones have 2.6–3× that.
+ * It was PLASMA until u7-04 re-skinned this screen, and the swap is the direction
+ * rather than a loosened assertion: Gantry/Bone *"spends no colour on the menu —
+ * the primary action is simply the brightest metal on screen"*, so the answer is
+ * now the brightest thing in the slot instead of the bluest. What the count means
+ * is unchanged — the standing tagline is the LOW Bone step (`#8C95A0`) and
+ * contributes zero, so this still separates the answered state from the resting
+ * one without reading a string off the seam. (Threat red is still not it: a door
+ * that is not built yet is not a failure.)
+ *
+ * Low, because it is twelve characters of 13–17px text: measured at dpr 1 the lit
+ * glyph body is ~190 px against a resting slot's 0, and the phones have 2.6–3× that.
  */
-const NOTICE_PLASMA_MIN_PX = 40;
+const NOTICE_LIT_MIN_PX = 40;
 
 // --- Input ------------------------------------------------------------------
 
@@ -313,7 +323,7 @@ test('a real press on CAMPAIGN says Coming Soon… and does not navigate', async
 
   // Resting: the standing tagline, drawn dim. Nothing in the slot is lit.
   expect(before.notice, 'nothing answered yet').toBe('');
-  const restingLit = count(await shoot(page), message, isPlasma).matched;
+  const restingLit = count(await shoot(page), message, isBoneLit).matched;
 
   const campaign = before.doorControls.find((c) => c.kind === 'campaign');
   expect(campaign, 'CAMPAIGN door reported').toBeTruthy();
@@ -334,8 +344,8 @@ test('a real press on CAMPAIGN says Coming Soon… and does not navigate', async
 
   // …and it is on the SCREEN, lit, where a moment ago the slot held dim text.
   const img = await shoot(page, `coming-soon-${testInfo.project.name}`);
-  const lit = count(img, message, isPlasma).matched;
-  expect(lit, 'Coming Soon… is drawn in the message slot').toBeGreaterThan(NOTICE_PLASMA_MIN_PX);
+  const lit = count(img, message, isBoneLit).matched;
+  expect(lit, 'Coming Soon… is drawn in the message slot').toBeGreaterThan(NOTICE_LIT_MIN_PX);
   expect(lit, 'and the slot was not already lit before the press').toBeGreaterThan(restingLit);
 
   // NOWHERE. Still the doors, not the keypad, no lobby, and the other three doors
@@ -472,7 +482,7 @@ test('held in LANDSCAPE, the four doors still fit and CAMPAIGN still answers', a
   expect(await lobbyVisible(page), 'no lobby opened').toBe(false);
   const answered = await shoot(page, `coming-soon-landscape-${testInfo.project.name}`);
   expect(
-    count(answered, regionOf(after.messageBounds, vp), isPlasma).matched,
+    count(answered, regionOf(after.messageBounds, vp), isBoneLit).matched,
     'Coming Soon… is drawn in the message slot',
-  ).toBeGreaterThan(NOTICE_PLASMA_MIN_PX);
+  ).toBeGreaterThan(NOTICE_LIT_MIN_PX);
 });

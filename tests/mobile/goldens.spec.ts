@@ -307,6 +307,56 @@ async function openSettings(page: Page): Promise<void> {
   await settleFrames(page);
 }
 
+/**
+ * Open THE DOORS the way a player does — a real press on PLAY at the physical
+ * point the seam reports, through the landscape-lock remap.
+ */
+async function openDoors(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'play');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(point, 'the menu reports where PLAY is drawn').not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as { __onlineMenu?: { visible: boolean; doorControls: unknown[] } })
+        .__onlineMenu;
+      return !!d && d.visible && d.doorControls.length > 0;
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
+  // Park the pointer off every plate: a desktop mouse left sitting where PLAY was
+  // would hover whichever door landed under it, and a hovered plate is a brighter
+  // plate (u7-01's 90ms hover). The baseline is the screen at REST.
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** …and the CODEX, the same way: a real press on the menu's own CODEX plate. */
+async function openCodex(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'codex');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(point, 'the menu reports where CODEX is drawn').not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { screen: string } }).__mainMenu?.screen === 'codex',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
 test('golden: desktop title screen — Gantry/Bone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
   budgetTest({
@@ -409,4 +459,103 @@ test('golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the 
 
   await bootFrozenTeams(page);
   await expect(page).toHaveScreenshot('phone-portrait-frozen-teams.png', GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// THE DOORS and THE CODEX, in Gantry/Bone (u7-04)
+// ---------------------------------------------------------------------------
+//
+// The two screens the Gantry chain forgot. The handoff named five — title, build
+// wheel, lobby, ship select, settings — and neither of these is among them, so
+// while the screen in FRONT of the doors had been re-skinned, the doors and the
+// codex were still the thing the handoff diagnosed: 1px hairlines on black.
+//
+// **They appeared in no golden either**, which is the other half of why they were
+// missed: a total re-skin of both would have left every baseline in this file
+// byte-identical. The doors screen in particular is the FIRST screen a player
+// touches after PLAY and had no visual gate at all. It has one now.
+//
+// Five baselines, chosen for what each one can fail that the others cannot:
+//  - the doors on a desktop (the stacked shape, four plates, one of them bright)
+//  - the doors on a landscape phone (the TWO-COLUMN shape — a different layout
+//    branch, not the same picture smaller)
+//  - the codex on a desktop and on a landscape phone (the tab row, the rail and
+//    the article at two very different widths)
+//  - the codex PORTRAIT-HELD, which goes through the landscape lock's 90°
+//    rotation — the densest screen in the game through the transform that has
+//    stranded a menu off-screen before (the M1 field report).
+//
+// Determinism is the same as the menu baselines above: a clean boot, no
+// animation, both screens pure functions of the viewport, and the build badge
+// deliberately unmasked.
+
+test('golden: desktop THE DOORS — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → press PLAY → one full-frame golden comparison',
+    measuredSeconds: 10,
+  });
+
+  await bootMenu(page);
+  await openDoors(page);
+  await expect(page).toHaveScreenshot('desktop-doors.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone THE DOORS — the two-column shape', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → press PLAY → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await openDoors(page);
+  await expect(page).toHaveScreenshot('phone-landscape-doors.png', MENU_GOLDEN);
+});
+
+test('golden: desktop CODEX — the densest text screen in the game', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → press CODEX → one full-frame golden comparison',
+    measuredSeconds: 10,
+  });
+
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('desktop-codex.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone CODEX — a tab row, a rail and an article at 844px', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → press CODEX → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('phone-landscape-codex.png', MENU_GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone CODEX — the dense screen through the lock', async ({
+  page,
+}, testInfo) => {
+  // The brief's hard case, and the one no desktop frame can speak to: a tab row
+  // plus a list plus an article, at 390px wide, through the 90° rotation the
+  // landscape lock puts the whole root through.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot to the main menu PORTRAIT-HELD (landscape lock rotation) → viewport + font settle → press CODEX → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  await bootMenu(page);
+  await openCodex(page);
+  await expect(page).toHaveScreenshot('phone-portrait-codex.png', MENU_GOLDEN);
 });

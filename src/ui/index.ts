@@ -535,9 +535,11 @@ export type {
 export {
   entryHitTest,
   entryLayout,
+  entryTargetKey,
   DOOR_COUNT,
-  DOOR_HEIGHT,
-  DOOR_HEIGHT_TOUCH,
+  // DOOR_HEIGHT / DOOR_HEIGHT_TOUCH are gone (u7-04): a door is a Gantry PLATE
+  // now, so its height comes from `frameMetrics` like every other plate in the
+  // set rather than from a per-screen constant. See `./lobby-geometry`.
   KEY_MAX,
   KEY_MIN,
 } from './lobby-geometry';
@@ -854,12 +856,13 @@ export {
   CODEX_TITLE,
   CODEX_BACK_LABEL,
   CODEX_ID,
-  CODEX_ENTRY_GAP,
-  CODEX_TITLE_HEIGHT,
-  CODEX_TAB_HEIGHT,
-  CODEX_TAB_HEIGHT_TOUCH,
-  CODEX_ENTRY_HEIGHT,
-  CODEX_ENTRY_HEIGHT_TOUCH,
+  // The five per-screen size constants (CODEX_ENTRY_GAP / _TITLE_HEIGHT /
+  // _TAB_HEIGHT / _TAB_HEIGHT_TOUCH / _ENTRY_HEIGHT / _ENTRY_HEIGHT_TOUCH) are
+  // gone in u7-04: the CODEX is on the shared Gantry frame, so its rows, its tab
+  // chips and its gaps come from `frameMetrics` like the rest of the set. See
+  // `./codex`'s layout header for what each one became.
+  CODEX_RAIL_MIN,
+  CODEX_RAIL_MAX,
   activeEntries,
   activeEntry,
   activeEntryIndex,
@@ -867,6 +870,9 @@ export {
   codexLayout,
   codexModel,
   codexRailContentHeight,
+  codexEntryPlate,
+  codexTabPlate,
+  codexTargetKey,
   createCodex,
   formatFactValue,
   normalizeCodex,
