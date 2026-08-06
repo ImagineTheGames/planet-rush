@@ -650,9 +650,10 @@ export const ENTRY_ACTION_HEIGHT_TOUCH = 56;
  * squashing four tiles into unreadable strips:
  *
  *  - `stack` — four down a column. The desktop/two-column shape.
- *  - `grid`  — 2×2. The portrait-phone shape.
- *  - `row`   — four across, one row. The landscape-phone shape, where height is
- *              the scarce axis and width is not.
+ *  - `grid`  — 2×2. The phone shape, in both orientations, since the tiles moved
+ *              into the ship-select column (u7-03).
+ *  - `row`   — four across, one row. What a wide-and-very-short window falls to,
+ *              where height is the scarce axis and width is not.
  */
 export type TileShape = 'stack' | 'grid' | 'row';
 
@@ -689,16 +690,18 @@ export interface LobbyLayout {
   readonly seats: readonly Rect[];
   /** Each roster row's LEADING STATE control — the OPEN/BOT/CLOSED cycle, named
    *  (u5). Nested inside its {@link seats} row at the leading edge, right of the
-   *  identity stripe, so the hit-test finds it *before* the row body. Aligned to
-   *  `seats`; zero-extent on a row too narrow to carry a legible one. */
+   *  identity bar and spanning the row's FULL height (u7-03), so the hit-test
+   *  finds it *before* the row body and a 48px row is made of 48px controls.
+   *  Aligned to `seats`; zero-extent on a row too narrow to carry a legible one. */
   readonly seatStates: readonly Rect[];
   /** Each roster row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH
    *  modes (n2). Nested inside its {@link seats} row on the right, so the hit-test
    *  checks it *before* the row body. Aligned to `seats`. */
   readonly seatChips: readonly Rect[];
   /** Each roster row's TEAM chip (TEAMS) — the side cycle, composed immediately
-   *  left of the difficulty chip and kept right of the row centre (n2). Aligned to
-   *  `seats`; zero-extent where a very narrow row cannot spare the width. */
+   *  left of the difficulty chip and kept clear of the row's body ({@link
+   *  seatBodyEnd}). Aligned to `seats`; zero-extent below
+   *  {@link SEAT_TEAM_CHIP_MIN}, which no row the roster splits into reaches. */
   readonly seatTeamChips: readonly Rect[];
   /** The MODE toggle (FFA / TEAMS), top-left of the roster (variable-slots E). */
   readonly modeToggle: Rect;
@@ -707,8 +710,9 @@ export interface LobbyLayout {
   /** The four hull tiles, in `CLASS_ORDER`. */
   readonly classOptions: readonly Rect[];
   /** The four arena cards, in `MAP_ORDER` (`./map-picker`). A row along the
-   *  bottom of the middle band; the view draws them through the shared
-   *  `MapPickerView`, so the registry-drawn previews come for free. */
+   *  bottom of the SHIP-SELECT column (u7-03 — it used to cut across the whole
+   *  band, which is the width the roster now has); the view draws them through
+   *  the shared `MapPickerView`, so the registry previews come for free. */
   readonly maps: readonly Rect[];
   /** The band the arena cards were laid out inside — handed to the map view as
    *  its `MapPickerLayout.band`. */
@@ -721,7 +725,8 @@ export interface LobbyLayout {
   readonly isTouch: boolean;
   /** Whether the roster and the tiles sit side by side. */
   readonly twoColumn: boolean;
-  /** Roster columns — 2 on a screen too short for eight legible rows. Seats
+  /** Roster columns — 2 where one column of eight would fall under the thumb
+   *  floor and the column is wide enough to halve ({@link placeSeats}). Seats
    *  fill column-major, so slot order still reads top-to-bottom. */
   readonly seatColumns: number;
   /** How the four hull tiles are arranged. */
@@ -733,7 +738,7 @@ export interface LobbyLayout {
  *  (`./lobby` CLASS_ORDER / seat slots), and the two can't drift. */
 export type LobbyTarget =
   /** BACK — leaves the lobby for the main menu (u2 menu-back), the exit every
-   *  screen carries. Top-left of the title band. */
+   *  screen carries. The footer beam's left-hand plate since u7-03. */
   | { readonly kind: 'leave' }
   /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E).
    *  Since u5 the same cycle also has a control that SAYS so ({@link seatState});
@@ -763,11 +768,16 @@ export type LobbyTarget =
 /**
  * Lay the lobby out for a viewport.
  *
- * Space is handed out top-down and never taken back: title, then the button and
- * its hint off the bottom, then whatever is left is the middle band the roster
- * and the tiles divide. Every block is *capped*, never stretched past its cap,
- * so a rect can only ever be smaller than the room it was given — which is what
- * makes "nothing escapes `content`" true by construction rather than by luck.
+ * The frame comes first ({@link ./gantry} `gantryFrame`): two beams, a page
+ * margin and one band between them. The beams' own contents — the heading and
+ * the room code above, BACK and RUSH! below — are placed inside their strips,
+ * and everything else divides the band.
+ *
+ * Every block is *capped*, never stretched past its cap, so a rect can only ever
+ * be smaller than the room it was given — which is what makes "nothing escapes
+ * `content`" true by construction rather than by luck. The one place that runs
+ * the other way is stated where it happens: RUSH! takes the thumb floor even
+ * where the beam cannot hold one, and the BAND gives up exactly those pixels.
  */
 export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}): LobbyLayout {
   const isTouch = options.isTouch ?? false;
