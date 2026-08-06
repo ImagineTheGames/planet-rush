@@ -248,7 +248,11 @@ export class LobbyEntryView extends Container {
       : model.narrating || noticed
         ? PALETTE.plasma
         : TEXT_DIM;
-    this.message.style.fontSize = model.narrating ? NARRATION_SIZE : MESSAGE_SIZE;
+    // A notice takes the narration's size as well as its colour. It is an ANSWER
+    // to a press the player just made, and the press happened a band lower down
+    // the screen — a reply whispered at hint size, half a screen from the finger
+    // that asked, is a reply nobody reads.
+    this.message.style.fontSize = model.narrating || noticed ? NARRATION_SIZE : MESSAGE_SIZE;
     // A refusal names a token the server chose the length of, so the title wraps
     // inside the content box rather than running off both edges of a phone.
     this.message.style.wordWrapWidth = Math.max(1, message.width);

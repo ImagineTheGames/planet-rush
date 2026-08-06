@@ -5334,11 +5334,26 @@ interface OnlineSeam {
   /** The globally-unique code the allocator minted on a successful CREATE, or
    *  `null`. Never client-guessed (M3 — use `assignment.code` verbatim). */
   resolvedCode: string | null;
-  /** The three doors and BACK, each with the physical point a real press must land
+  /** The four doors and BACK, each with the physical point a real press must land
    *  on (through the landscape-lock remap) — the front-door handles a live-stage run
    *  drives the ratified flow through with real input on both form factors, rather
-   *  than by calling the seam methods below. */
-  doorControls: readonly { kind: string; physicalCenter: { x: number; y: number } }[];
+   *  than by calling the seam methods below.
+   *
+   *  `physicalBounds` is the same rect as a box rather than a point, both corners
+   *  through the rotation and re-normalised. The mobile suite turns it into a
+   *  screenshot region and counts the pixels inside it, which is how this project
+   *  proves a control was DRAWN and not merely modelled (`playwright.config.ts`,
+   *  and the u5 seat-state control before it). */
+  doorControls: readonly {
+    kind: string;
+    physicalCenter: { x: number; y: number };
+    physicalBounds: { x: number; y: number; width: number; height: number };
+  }[];
+  /** The message slot under the wordmark, as drawn — the line that carries the
+   *  tagline, a refusal, or the CAMPAIGN teaser's `Coming Soon…` (u9-01). Reported
+   *  so the mobile suite can shoot the words themselves rather than trust the
+   *  string the model handed the view. */
+  messageBounds: { x: number; y: number; width: number; height: number };
   open(): void;
   /** CAMPAIGN — the teaser above SOLO (u9-01). Says `Coming Soon…` and goes
    *  nowhere: no transport, no lobby, no screen change. */
@@ -5488,6 +5503,7 @@ function openMainMenu(
     regionPickerVisible: regionPickerVisible(onlineRegions),
     resolvedCode: null,
     doorControls: [],
+    messageBounds: { x: 0, y: 0, width: 0, height: 0 },
     open: (): void => openDoors(),
     campaign: (): void => chooseEntryDoor('campaign'),
     solo: (): void => chooseEntryDoor('solo'),
@@ -5758,23 +5774,37 @@ function openMainMenu(
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
       ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
+    // Both corners through the rotation, then re-normalised — under the landscape
+    // lock the two corners swap sides, so a raw (x, y, w, h) built from one of them
+    // would be a backwards box on a phone.
+    const box = (r: Rect): { x: number; y: number; width: number; height: number } => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    };
+    const control = (kind: string, r: Rect): OnlineSeam['doorControls'][number] => ({
+      kind,
+      physicalCenter: point(r),
+      physicalBounds: box(r),
+    });
+    const nowhere: Rect = { x: 0, y: 0, width: 0, height: 0 };
     const front =
       entry.screen === 'join'
         ? [
             // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
             // room code by pressing the very keys a player's thumb finds.
-            ...KEYPAD_KEYS.map((ch, i) => ({
-              kind: `key:${ch}`,
-              physicalCenter: point(layout.keys[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-            })),
-            { kind: 'erase', physicalCenter: point(layout.erase) },
-            { kind: 'submit', physicalCenter: point(layout.submit) },
+            ...KEYPAD_KEYS.map((ch, i) => control(`key:${ch}`, layout.keys[i] ?? nowhere)),
+            control('erase', layout.erase),
+            control('submit', layout.submit),
           ]
-        : DOOR_OPTIONS.map((option, i) => ({
-            kind: option.door,
-            physicalCenter: point(layout.doors[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-          }));
-    onlineSeam.doorControls = [...front, { kind: 'back', physicalCenter: point(layout.back) }];
+        : DOOR_OPTIONS.map((option, i) => control(option.door, layout.doors[i] ?? nowhere));
+    onlineSeam.doorControls = [...front, control('back', layout.back)];
+    onlineSeam.messageBounds = box(layout.message);
   }
 
   /** Open THE DOORS — what PLAY does now (ratified: one play flow), and the only

@@ -52,12 +52,19 @@ interface MenuSeam {
 
 /**
  * The `window.__onlineMenu` doors seam (src/main.ts `OnlineSeam`) — the screen PLAY
- * opens since the ratified ONE play flow: PLAY SOLO / CREATE ROOM / JOIN ROOM, plus
- * BACK. Each door reports the physical point a tap must hit to reach it, exactly as
- * the main menu's controls do, so the rotation remap is provable on this screen too.
+ * opens since the ratified ONE play flow: CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN
+ * ROOM, plus BACK. Each door reports the physical point a tap must hit to reach it,
+ * exactly as the main menu's controls do, so the rotation remap is provable on this
+ * screen too.
+ *
+ * `screen` and `notice` are read for the CAMPAIGN teaser (u9-01): it is a door that
+ * must ANSWER without going anywhere, so the proof is that the message appears while
+ * the screen does not move.
  */
 interface DoorsSeam {
   readonly visible: boolean;
+  readonly screen: string;
+  readonly notice: string;
   readonly doorControls: ReadonlyArray<{
     readonly kind: string;
     readonly physicalCenter: { readonly x: number; readonly y: number };
@@ -280,16 +287,17 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
 });
 
 // ===========================================================================
-// 3. Three physical portrait taps, remapped through the rotation: PLAY opens the
-//    DOORS, PLAY SOLO opens the LOBBY, RUSH! boots the match with the hull
-//    picked there (GDD §2.1; the ratified ONE play flow).
+// 3. Four physical portrait taps, remapped through the rotation: PLAY opens the
+//    DOORS, CAMPAIGN answers without moving, PLAY SOLO opens the LOBBY, RUSH!
+//    boots the match with the hull picked there (GDD §2.1; the ratified ONE play
+//    flow, plus the u9-01 teaser).
 // ===========================================================================
 //
 // Since M4, PLAY no longer builds the match directly, and since the ratified ONE
 // play flow it no longer opens the lobby directly either: PLAY opens the DOORS
-// (PLAY SOLO / CREATE ROOM / JOIN ROOM), PLAY SOLO opens the lobby, and RUSH! is
-// the door that boots the world. The old separate offline-lobby entry point is
-// gone — one way in — so the journey this test walks gained a screen.
+// (CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN ROOM), PLAY SOLO opens the lobby, and
+// RUSH! is the door that boots the world. The old separate offline-lobby entry
+// point is gone — one way in — so the journey this test walks gained a screen.
 //
 // That makes the landscape-lock remap provable on THREE screens rather than two,
 // which is the point: a physical portrait tap has to land on the logical PLAY
@@ -299,8 +307,26 @@ test('rotate portrait→landscape→portrait keeps the menu on screen (re-layout
 // — `__mainMenu.controls`, `__onlineMenu.doorControls`, `__lobby.rushControl` — so
 // none of it is pixel-hunting, and a screen that drew its control in the wrong
 // place fails on its own report rather than on a screenshot.
+//
+// ---------------------------------------------------------------------------
+// WHY THIS TEST GAINED A TAP (u9-01, 2026-08-06)
+// ---------------------------------------------------------------------------
+// CAMPAIGN was inserted ABOVE PLAY SOLO, which moves the thing this test aims at.
+// The tap survived the move unchanged — the doors are looked up by `kind`, not by
+// index, and SOLO's new rect is still reported, still inside the physical canvas,
+// and still lands — so nothing here HAD to change.
+//
+// It changed anyway, because "nothing had to change" is exactly the problem: the
+// screen grew a first door that the honest click path now goes past, and a test
+// that walks the old path while claiming to walk the real one is worth less than
+// the failure it avoided. So the journey is the one a player actually takes on a
+// screen whose first button does nothing yet — press the new door, watch it
+// answer, then press SOLO — and the assertion that matters is the NEGATIVE one:
+// after a REAL press on CAMPAIGN, at real coordinates, the lobby has not opened
+// and the doors have not moved. A teaser that quietly navigated would be caught
+// here, on a phone, rather than by a unit test that cannot press anything.
 
-test('three physical taps remap through the rotation: PLAY → doors → PLAY SOLO → lobby, RUSH! → match with the chosen hull', async ({
+test('four physical taps remap through the rotation: PLAY → doors → CAMPAIGN answers → PLAY SOLO → lobby, RUSH! → match with the chosen hull', async ({
   page,
 }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'the touch remap only rotates on mobile');
@@ -310,9 +336,13 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
   // alone — it flaked #71 four times and then main itself. Budget the whole
   // journey, not just the waits. (Was a hand-written 180_000; the number now comes
   // from the same measured model as every other test in the suite — q7-01.)
+  // Re-measured for the fourth tap (u9-01), same box and same lane, this test
+  // alone on one worker: 12.9s before the CAMPAIGN press was added and 14.0s
+  // after. The budget is raised by that one second and by nothing else — a number
+  // that has to grow further without the work growing is a regression, not a nudge.
   budgetTest({
-    work: 'portrait boot → tap PLAY → doors → tap PLAY SOLO → lobby → pick a hull → tap RUSH! → full match-world assembly',
-    measuredSeconds: 27,
+    work: 'portrait boot → tap PLAY → doors → tap CAMPAIGN (answers, does not navigate) → tap PLAY SOLO → lobby → pick a hull → tap RUSH! → full match-world assembly',
+    measuredSeconds: 28,
   });
 
   const vp = page.viewportSize()!;
@@ -337,7 +367,7 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
   assertInsidePhysical(play!.physicalCenter, 'PLAY');
   await physicalTap(page, play!.physicalCenter.x, play!.physicalCenter.y);
 
-  // --- Tap 2: PLAY SOLO, on the doors PLAY opens (the ONE play flow). ---------
+  // --- The doors PLAY opens (the ONE play flow). ------------------------------
   // The doors seam appearing is proof the PLAY tap un-rotated onto the logical
   // control. PLAY builds no match and no lobby — it opens exactly this screen.
   await page.waitForFunction(
@@ -348,11 +378,52 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
     undefined,
     { timeout: 30_000 },
   );
-  const solo = await page.evaluate(() => {
+  const doors = await page.evaluate(() => {
     const d = (window as unknown as { __onlineMenu?: DoorsSeam }).__onlineMenu;
-    const c = (d?.doorControls ?? []).find((x) => x.kind === 'solo');
-    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+    return (d?.doorControls ?? []).map((c) => ({
+      kind: c.kind,
+      x: c.physicalCenter.x,
+      y: c.physicalCenter.y,
+    }));
   });
+  const doorKinds = doors.map((c) => c.kind);
+  // CAMPAIGN is the first door the screen reports, above PLAY SOLO (u9-01). The
+  // *geometric* above-ness is asserted per device profile in the headless layout
+  // test; what a real phone proves is that the order the screen draws in is the
+  // order the model declares, and that SOLO is still on it.
+  expect(doorKinds.indexOf('campaign'), 'CAMPAIGN is the first door').toBe(0);
+  expect(doorKinds.indexOf('solo'), 'PLAY SOLO is the second').toBe(1);
+
+  // --- Tap 2: CAMPAIGN. A real press, at real coordinates, on the door that ---
+  //     was inserted above SOLO. It must ANSWER and go nowhere.
+  const campaign = doors[0]!;
+  assertInsidePhysical(campaign, 'CAMPAIGN');
+  await physicalTap(page, campaign.x, campaign.y);
+  await page.waitForFunction(
+    () => (window as unknown as { __onlineMenu?: DoorsSeam }).__onlineMenu?.notice !== '',
+    undefined,
+    { timeout: 15_000 },
+  );
+  const answered = await page.evaluate(() => {
+    const d = (window as unknown as { __onlineMenu?: DoorsSeam }).__onlineMenu;
+    const l = (window as unknown as { __lobby?: LobbySeam }).__lobby;
+    const m = (window as unknown as { __mainMenu?: MenuSeam }).__mainMenu;
+    return {
+      notice: d?.notice ?? '',
+      visible: d?.visible ?? false,
+      screen: d?.screen ?? '',
+      lobbyVisible: l?.visible ?? false,
+      matchStarted: m?.matchStarted ?? false,
+    };
+  });
+  expect(answered.notice, 'the press is answered, in the developer’s words').toBe('Coming Soon…');
+  expect(answered.visible, 'still on the doors — CAMPAIGN navigates nowhere').toBe(true);
+  expect(answered.screen, 'and not into the keypad either').toBe('home');
+  expect(answered.lobbyVisible, 'no lobby was opened by the teaser').toBe(false);
+  expect(answered.matchStarted, 'and certainly no match').toBe(false);
+
+  // --- Tap 3: PLAY SOLO, unchanged by the door above it. ---------------------
+  const solo = doors.find((c) => c.kind === 'solo') ?? null;
   expect(solo, 'PLAY SOLO door present in the doors layout registry').toBeTruthy();
   assertInsidePhysical(solo!, 'PLAY SOLO');
   await physicalTap(page, solo!.x, solo!.y);
@@ -384,7 +455,7 @@ test('three physical taps remap through the rotation: PLAY → doors → PLAY SO
     { timeout: 15_000 },
   );
 
-  // --- Tap 2: RUSH!. Re-read the seam so the RUSH rect reflects the current
+  // --- Tap 4: RUSH!. Re-read the seam so the RUSH rect reflects the current
   //     layout, then tap the physical spot the logical RUSH! button occupies. ---
   const withPick = await readLobby(page);
   expect(withPick.selectedClass, 'the non-default hull is the selected one').toBe(chosen);
