@@ -35,8 +35,9 @@
  * player touches, so both phones and the desktop pointer control run it.
  *
  * ── EVIDENCE ───────────────────────────────────────────────────────────────
- * Each run also writes two full-frame PNGs to `evidence/images/u9-campaign-door/`
- * — the doors screen, and the answered state — so the change is reviewable as a
+ * Under `PR_EVIDENCE=1` the same frames are written to
+ * `evidence/images/u9-campaign-door/` — the doors screen and the answered state,
+ * on a phone held each way and on the desktop — so the change is reviewable as a
  * picture rather than as a description of one. They are evidence, not baselines:
  * no golden covers this screen (the six in `goldens.spec.ts` are the title, the
  * settings screen and the frozen match scenes), so nothing here is a comparison
@@ -228,10 +229,23 @@ function regionOf(bounds: Rect, vp: { width: number; height: number }): Region {
   };
 }
 
+/**
+ * Whether this run also WRITES its frames to `evidence/images/`.
+ *
+ * Off by default, and deliberately: every frame carries the build stamp in its
+ * corner, so a spec that wrote the images unconditionally would leave ten
+ * modified PNGs in the working tree after every `npm run test:mobile` — noise
+ * that trains a reviewer to ignore a dirty tree. `PR_EVIDENCE=1 npm run
+ * test:mobile` regenerates them when a PR wants the pictures; the assertions
+ * below run identically either way, because they read the buffer, not the file.
+ */
+const WRITE_EVIDENCE = process.env.PR_EVIDENCE === '1';
+
 async function shoot(page: Page, file?: string): Promise<Img> {
-  const buf = file
-    ? await page.screenshot({ path: `evidence/images/u9-campaign-door/${file}.png` })
-    : await page.screenshot();
+  const buf =
+    file && WRITE_EVIDENCE
+      ? await page.screenshot({ path: `evidence/images/u9-campaign-door/${file}.png` })
+      : await page.screenshot();
   return decode(buf);
 }
 
