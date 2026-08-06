@@ -375,23 +375,12 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           seed: 0x33aa,
         },
       },
-      {
-        // …and the payout glinting out of it: yellow means ore, and it is the
-        // one thing in this sound that goes *up* (style-guide §2).
-        spec: {
-          name: 'rockBurst.ore',
-          wave: 'square',
-          attack: 0.004,
-          hold: 0.02,
-          decay: 0.12,
-          freq: 640,
-          freqEnd: 1180,
-          duty: 0.35,
-          gain: 0.24,
-          seed: 0x33ab,
-        },
-        at: 0.05,
-      },
+      // …and the payout glinting out of it: yellow means ore, and it is still
+      // the one thing in this sound that goes *up* (style-guide §2). It was a
+      // square gliding up a minor seventh; the rise is now two struck notes
+      // instead of one bent one, which says the same thing without the chirp.
+      ...struck('rockBurst.ore', 784, { gain: 0.22, decay: 0.1, hold: 0.02, at: 0.05, partials: GLASS_PAIR, seed: 0x33ab }),
+      ...struck('rockBurst.glint', 1174.66, { gain: 0.18, decay: 0.12, hold: 0.02, at: 0.11, partials: GLASS_PAIR, seed: 0x33ae }),
     ],
   },
 
@@ -414,36 +403,20 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     layers: [...struck('oreCollect', 1046.5, { gain: 0.2, decay: 0.07, hold: 0.014, seed: 0xf2d2 })],
   },
 
+  /**
+   * Hold full — *"fly home"* (GDD §2.3). Two notes, insistent.
+   *
+   * The **interval and the insistence are the tell** and both are kept exactly:
+   * A5 then D6, a rising fourth, 110 ms apart. Only the oscillator changes —
+   * two struck notes where two squares were. A pair of squares a fourth apart is
+   * a game telling you something; the same pair struck is a machine telling you
+   * the same thing, which is the whole amendment in one sound.
+   */
   [SOUND.holdFull]: {
     name: 'holdFull',
     layers: [
-      {
-        spec: {
-          name: 'holdFull.a',
-          wave: 'square',
-          attack: 0.003,
-          hold: 0.05,
-          decay: 0.06,
-          freq: 880,
-          duty: 0.45,
-          gain: 0.3,
-          seed: 0xf2d3,
-        },
-      },
-      {
-        spec: {
-          name: 'holdFull.b',
-          wave: 'square',
-          attack: 0.003,
-          hold: 0.05,
-          decay: 0.1,
-          freq: 1174,
-          duty: 0.45,
-          gain: 0.3,
-          seed: 0xf2d4,
-        },
-        at: 0.11,
-      },
+      ...struck('holdFull.a', 880, { gain: 0.26, decay: 0.06, hold: 0.05, seed: 0xf2d3 }),
+      ...struck('holdFull.b', 1174.66, { gain: 0.26, decay: 0.1, hold: 0.05, at: 0.11, seed: 0xf2d4 }),
     ],
   },
 
@@ -724,7 +697,15 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // Free and fast (GDD §2.7): arriving, not being born. Rises and stops.
+  /**
+   * Free and fast (GDD §2.7): **arriving, not powering up.** The two-part shape
+   * is kept — something approaches, something lands — because that shape is the
+   * tell; what goes is the ×4.00 sweep over 340 ms, which is a power-up and not
+   * an arrival, and the square that terminated it.
+   *
+   * The approach is now a low filtered swell rather than a rocketing glide, and
+   * the landing is a struck note: a ship setting down on a pad.
+   */
   [SOUND.shipSpawn]: {
     name: 'shipSpawn',
     layers: [
@@ -732,29 +713,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'shipSpawn.rise',
           wave: 'triangle',
-          attack: 0.02,
-          hold: 0.05,
-          decay: 0.16,
-          freq: 220,
-          freqEnd: 880,
-          gain: 0.3,
+          attack: 0.03,
+          hold: 0.06,
+          decay: 0.17, // 260 ms — long enough that its glide is a move, not a chirp
+          freq: 175,
+          freqEnd: 350,
+          noiseMix: 0.12,
+          lowPass: 1200,
+          gain: 0.26,
           seed: 0x3d7b,
         },
       },
-      {
-        spec: {
-          name: 'shipSpawn.land',
-          wave: 'square',
-          attack: 0.002,
-          hold: 0.02,
-          decay: 0.12,
-          freq: 1046,
-          duty: 0.4,
-          gain: 0.2,
-          seed: 0x3d7c,
-        },
-        at: 0.2,
-      },
+      ...struck('shipSpawn.land', 1046.5, { gain: 0.2, decay: 0.14, hold: 0.02, at: 0.2, partials: GLASS_PAIR, seed: 0x3d7c }),
     ],
   },
 
@@ -809,25 +779,32 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   // --- Spend --------------------------------------------------------------
 
-  // Ore is gone and only time remains (GDD §2.5): a latch, not a fanfare.
+  // Ore is gone and only time remains (GDD §2.5): a latch, not a fanfare — which
+  // was already the right idea in the right register, so only the oscillator was
+  // wrong. The clunk was a plain square with duty 0.5 standing in for a body;
+  // it is a filtered triangle with grit in it now, which is the body itself.
   [SOUND.buildPlaced]: {
     name: 'buildPlaced',
     layers: [
       {
         spec: {
           name: 'buildPlaced.clunk',
-          wave: 'square',
+          wave: 'triangle',
           attack: 0.003,
           hold: 0.02,
           decay: 0.1,
           freq: 196,
-          freqEnd: 147,
-          duty: 0.5,
-          gain: 0.3,
+          freqEnd: 176, // ×1.11 — a body settling, not a fall
+          noiseMix: 0.18,
+          lowPass: 1500,
+          gain: 0.34,
           seed: 0x4fa0,
         },
       },
       {
+        // The latch itself. Untouched but for its glide: a ×2.58 fall inside
+        // 69 ms was a chirp, and the snap was never coming from it — it comes
+        // from the transient and the high-pass.
         spec: {
           name: 'buildPlaced.latch',
           wave: 'noise',
@@ -835,9 +812,10 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           hold: 0.008,
           decay: 0.06,
           freq: 620,
-          freqEnd: 240,
+          freqEnd: 530,
           highPass: 300,
-          gain: 0.16,
+          lowPass: 3400, // banded: the latch is a snap, not the whole sound
+          gain: 0.13,
           seed: 0x4fa1,
         },
         at: 0.03,
@@ -891,37 +869,16 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     seed: 0x4fa4,
   },
 
+  /**
+   * The hold emptying into the reactor: two struck notes, **falling** — ore
+   * coming to rest, which is the interval the two squares here always carried
+   * and the one thing about this sound that had to survive the re-voice.
+   */
   [SOUND.bankOre]: {
     name: 'bankOre',
     layers: [
-      {
-        spec: {
-          name: 'bankOre.drop',
-          wave: 'square',
-          attack: 0.002,
-          hold: 0.02,
-          decay: 0.09,
-          freq: 880,
-          freqEnd: 587,
-          duty: 0.35,
-          gain: 0.26,
-          seed: 0xf2d5,
-        },
-      },
-      {
-        spec: {
-          name: 'bankOre.settle',
-          wave: 'square',
-          attack: 0.002,
-          hold: 0.02,
-          decay: 0.16,
-          freq: 440,
-          duty: 0.4,
-          gain: 0.22,
-          seed: 0xf2d6,
-        },
-        at: 0.08,
-      },
+      ...struck('bankOre.drop', 880, { gain: 0.24, decay: 0.09, hold: 0.02, seed: 0xf2d5 }),
+      ...struck('bankOre.settle', 587.33, { gain: 0.2, decay: 0.16, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0xf2d8 }),
     ],
   },
 
@@ -1395,11 +1352,11 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           seed: 0xa320,
         },
       },
-      { spec: { name: 'musicTheme.n0', wave: 'square', attack: 0.004, hold: 0.08, decay: 0.22, freq: 220, duty: 0.32, gain: 0.13, seed: 0xa321 }, at: 0 },
-      { spec: { name: 'musicTheme.n1', wave: 'square', attack: 0.004, hold: 0.08, decay: 0.22, freq: 261.63, duty: 0.32, gain: 0.13, seed: 0xa322 }, at: 0.5 },
-      { spec: { name: 'musicTheme.n2', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.26, freq: 329.63, duty: 0.3, gain: 0.13, seed: 0xa323 }, at: 1 },
-      { spec: { name: 'musicTheme.n3', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.3, freq: 293.66, duty: 0.3, gain: 0.12, seed: 0xa324 }, at: 1.5 },
-      { spec: { name: 'musicTheme.n4', wave: 'square', attack: 0.004, hold: 0.1, decay: 0.3, freq: 261.63, duty: 0.3, gain: 0.12, seed: 0xa325 }, at: 2.1 },
+      { spec: { name: 'musicTheme.n0', wave: 'triangle', attack: 0.004, hold: 0.08, decay: 0.22, freq: 220, gain: 0.15, seed: 0xa321 }, at: 0 },
+      { spec: { name: 'musicTheme.n1', wave: 'triangle', attack: 0.004, hold: 0.08, decay: 0.22, freq: 261.63, gain: 0.15, seed: 0xa322 }, at: 0.5 },
+      { spec: { name: 'musicTheme.n2', wave: 'triangle', attack: 0.004, hold: 0.1, decay: 0.26, freq: 329.63, gain: 0.15, seed: 0xa323 }, at: 1 },
+      { spec: { name: 'musicTheme.n3', wave: 'triangle', attack: 0.004, hold: 0.1, decay: 0.3, freq: 293.66, gain: 0.14, seed: 0xa324 }, at: 1.5 },
+      { spec: { name: 'musicTheme.n4', wave: 'triangle', attack: 0.004, hold: 0.1, decay: 0.3, freq: 261.63, gain: 0.14, seed: 0xa325 }, at: 2.1 },
       { spec: { name: 'musicTheme.n5', wave: 'triangle', attack: 0.006, hold: 0.14, decay: 0.5, freq: 220, gain: 0.13, seed: 0xa326 }, at: 2.7 },
       { spec: { name: 'musicTheme.n6', wave: 'triangle', attack: 0.006, hold: 0.2, decay: 0.4, freq: 164.81, gain: 0.12, seed: 0xa327 }, at: 3.3 },
     ],
@@ -1482,7 +1439,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       { spec: { name: 'musicWin.n0', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.16, freq: 220, gain: 0.24, seed: 0xa340 }, at: 0 },
       { spec: { name: 'musicWin.n1', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.16, freq: 277.18, gain: 0.24, seed: 0xa341 }, at: 0.14 },
       { spec: { name: 'musicWin.n2', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.18, freq: 329.63, gain: 0.24, seed: 0xa342 }, at: 0.28 },
-      { spec: { name: 'musicWin.n3', wave: 'square', attack: 0.006, hold: 0.14, decay: 0.5, freq: 440, duty: 0.35, gain: 0.26, seed: 0xa343 }, at: 0.42 },
+      { spec: { name: 'musicWin.n3', wave: 'triangle', attack: 0.006, hold: 0.14, decay: 0.5, freq: 440, gain: 0.28, seed: 0xa343 }, at: 0.42 },
       { spec: { name: 'musicWin.shine', wave: 'triangle', attack: 0.01, hold: 0.1, decay: 0.4, freq: 880, gain: 0.12, seed: 0xa344 }, at: 0.42 },
     ],
   },
@@ -1509,17 +1466,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // together: `tap` is a whisper, `confirm` a two-beat, and so on. Kept quiet and
   // short — a control the player works dozens of times a match must never nag.
 
-  // `tap` (10 ms whisper): the lightest possible click that a press registered.
+  /**
+   * `tap` (10 ms whisper): the lightest possible click that a press registered.
+   *
+   * It is now **one struck note at the family root, A♭6** — deliberately the same
+   * pitch and the same material as the ratified `pick` cue (`./ui-cues`), so the
+   * fallback and the cue a player actually hears agree instead of diverging. A
+   * device with no cue player should sound like a quieter version of the game,
+   * not a different one.
+   */
   [SOUND.pressTick]: {
     name: 'pressTick',
-    wave: 'square',
-    attack: 0.001,
-    hold: 0.005,
-    decay: 0.022,
-    freq: 1240,
-    duty: 0.3,
-    gain: 0.14,
-    seed: 0x7a70,
+    layers: [...struck('pressTick', 1661, { gain: 0.14, decay: 0.022, hold: 0.005, seed: 0x7a70 })],
   },
 
   // `confirm` ([12, 40, 12]): a rising perfect fourth, the two beats spaced to the
@@ -1611,8 +1569,10 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     seed: 0x3d7d,
   },
 
-  // Free and fast (GDD §2.7): the ship back on the field. A rising blip with a
-  // square top over it — arriving, brighter and a step up from the countdown.
+  // Free and fast (GDD §2.7): the ship back on the field. The same two-part
+  // shape — a rise, then a top note a step above the countdown — with the square
+  // replaced by a struck note and the rise trimmed from ×1.50 to ×1.18, which is
+  // a lift rather than a chirp inside 200 ms.
   [SOUND.respawnGo]: {
     name: 'respawnGo',
     layers: [
@@ -1624,25 +1584,12 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           hold: 0.04,
           decay: 0.16,
           freq: 660,
-          freqEnd: 990,
+          freqEnd: 780,
           gain: 0.26,
           seed: 0x3d7e,
         },
       },
-      {
-        spec: {
-          name: 'respawnGo.top',
-          wave: 'square',
-          attack: 0.003,
-          hold: 0.02,
-          decay: 0.1,
-          freq: 1320,
-          duty: 0.4,
-          gain: 0.16,
-          seed: 0x3d7f,
-        },
-        at: 0.12,
-      },
+      ...struck('respawnGo.top', 1320, { gain: 0.16, decay: 0.1, hold: 0.02, at: 0.12, partials: GLASS_PAIR, seed: 0x3d7f }),
     ],
   },
 
