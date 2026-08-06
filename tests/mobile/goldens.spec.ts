@@ -218,8 +218,12 @@ async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
   }, ore);
   expect(staged, 'the ?debug=1 press stage is installed').not.toBeNull();
   expect(staged!.open, 'the Build wheel is up at the local station').toBe(true);
-  // The wedges are drawn from the render loop, not from the call above.
-  await page.waitForTimeout(500);
+  // The wedges are drawn from the render loop, not from the call above — so wait
+  // on the FRAMES, not on a stopwatch (q8-01, ./render-settle.ts). u7-02 wrote
+  // this as `waitForTimeout(500)` before q8-01 landed on main; the two met in
+  // this merge and the contract test (tests/mobile-shot-budget-contract.test.ts)
+  // caught it.
+  await settleFrames(page);
   const wedges = await page.evaluate(() => {
     const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
     return s ? s.wedges() : [];
