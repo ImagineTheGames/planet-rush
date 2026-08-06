@@ -112,6 +112,8 @@ export class MapPickerView extends Container {
       return;
     }
     // A card is a plate: raised where it is the pick, a surface where it is not.
+    // No accent tick: a card's content is a PREVIEW box starting at its own 8px
+    // padding, and the tick would land inside the picture.
     drawPlate(
       nodes.body,
       rect.x,
@@ -120,6 +122,8 @@ export class MapPickerView extends Container {
       rect.height,
       card.selected ? 'secondary' : 'inert',
       'compact',
+      'rest',
+      false,
     );
     nodes.name.style.fill = card.selected ? BONE.hi : MATERIAL_SHADES.bone;
 
@@ -166,7 +170,7 @@ export class MapPickerView extends Container {
       const tx = rect.x + rect.width - tw - CARD_PAD;
       const ty = rect.y + CARD_PAD;
       nodes.veteranBg.clear();
-      drawPlate(nodes.veteranBg, tx, ty, tw, th, 'secondary', 'chip');
+      drawPlate(nodes.veteranBg, tx, ty, tw, th, 'secondary', 'chip', 'rest', false);
       nodes.veteran.x = tx + padX;
       nodes.veteran.y = ty + padY;
     } else {

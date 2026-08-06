@@ -116,3 +116,79 @@ test('the static title screen costs no more per frame than the live match', asyn
       'see src/ui/screen-cache.ts.',
   ).toBeLessThan(MAX_RATIO);
 });
+
+/**
+ * The same guard, on the screen that would break it hardest.
+ *
+ * The lobby draws around **thirty** Gantry plates — eight roster rows, their
+ * leading state controls and trailing chips, four hull tiles, four arena cards
+ * and two toggles — where the title screen draws three. If the title's ~170
+ * translucent polygons cost 957 ms/frame uncached, this screen's are the reason
+ * `src/ui/screen-cache.ts` is a shared primitive rather than a title-screen
+ * detail (u7-03).
+ *
+ * It also guards a second thing the title cannot: the lobby's `update()` runs
+ * per frame against a model whose countdown carries a FLOAT, so a signature that
+ * serialised it would re-rasterise the whole screen sixty times a second while a
+ * player watches RUSH! count down — strictly worse than not caching at all. The
+ * signature carries the countdown's LABEL instead (`ui/lobby-view` `signatureOf`);
+ * this test samples the lobby at rest, where a leak of either kind shows up the
+ * same way.
+ */
+test('the static lobby costs no more per frame than the live match', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
+  budgetTest({
+    work: 'boot to the menu → press PLAY → press PLAY SOLO → sample 60 lobby frames → boot the frozen match → sample 60 frames → compare medians',
+    measuredSeconds: 20,
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { visible: boolean } }).__mainMenu?.visible === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  // Walk to the lobby with real presses, through the app's own reported points.
+  for (const step of ['play', 'solo'] as const) {
+    const point = await page.evaluate((kind) => {
+      const w = window as unknown as {
+        __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+        __onlineMenu?: { doorControls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+      };
+      const c =
+        kind === 'play'
+          ? w.__mainMenu?.controls.find((k) => k.kind === 'play')
+          : w.__onlineMenu?.doorControls.find((k) => k.kind === 'solo');
+      return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+    }, step);
+    expect(point, `the app reports where ${step} is drawn`).not.toBeNull();
+    await page.mouse.click(point!.x, point!.y);
+    await page.waitForTimeout(800);
+  }
+  await page.waitForFunction(
+    () => (window as unknown as { __lobby?: { visible: boolean } }).__lobby?.visible === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.mouse.move(1, 1);
+  await page.waitForTimeout(1000);
+  const lobbyMs = await medianFrameMs(page);
+
+  await page.goto('/?debug=1&freeze=1');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => (window as unknown as { __planetRush?: { frozen?: boolean } }).__planetRush?.frozen === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  const matchMs = await medianFrameMs(page);
+
+  expect(matchMs, 'the match sampled a sane frame time to compare against').toBeGreaterThan(0);
+  expect(
+    lobbyMs / matchMs,
+    `the static lobby costs ${lobbyMs.toFixed(1)}ms/frame against the live match's ${matchMs.toFixed(1)}ms/frame. ` +
+      'It draws ~30 Gantry plates and something has stopped caching them — see src/ui/screen-cache.ts.',
+  ).toBeLessThan(MAX_RATIO);
+});

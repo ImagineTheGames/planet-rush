@@ -24,12 +24,13 @@
  *     on every roster row** clears it: the row, its state control, its side chip
  *     and its difficulty chip. That last promise is what the layout was
  *     restructured for, so it is asserted per row and per control rather than
- *     sampled.
+ *     sampled. The iPhone SE is the one device where that promise is deliberately
+ *     NOT made, and it is asserted by name with the trade it takes instead.
  *  5. **The row-composition guarantees survived the move.** The difficulty chip's
- *     max-fraction, the row body staying tappable, and the side chip's word — all
- *     re-derived at the narrowest row the layout now produces, and derived from
- *     the constants rather than restated as numbers, so widening a chip moves the
- *     assertion with it.
+ *     max-fraction, the row body staying tappable, and the side chip never being
+ *     a stub — all re-derived at the narrowest row the layout now produces, and
+ *     derived from the constants rather than restated as numbers, so widening a
+ *     chip moves the assertion with it instead of quietly breaking a row.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
@@ -51,8 +52,10 @@ import {
   SEAT_ROW_BODY_MIN,
   SEAT_ROW_MIN_WIDTH,
   SEAT_STATE_MAX_FRACTION,
+  SEAT_ROW_FULL_WIDTH,
   SEAT_STATE_MIN,
   SEAT_STRIPE,
+  SEAT_TEAM_CHIP_MIN,
   SEAT_TEAM_CHIP_WIDTH,
   STAT_CELL_FLOOR,
   STAT_CELL_GAP,
@@ -451,21 +454,32 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     }
   });
 
-  it('holds the same floor on the SMALLEST phone in landscape — the iPhone SE', () => {
-    // 375×667 is in QA's matrix, and under the landscape lock it hands the lobby
-    // a 667×375 logical viewport whose band is 621px. Under the old 700px
-    // two-column threshold that fell to the stacked shape, where a 249px band
-    // split three ways left the roster 74px for eight rows. It is the device that
-    // moved TWO_COLUMN_MIN_WIDTH, so it is asserted by name.
+  it('takes the READABLE trade on the SMALLEST phone in landscape — the iPhone SE', () => {
+    // 375×667 is in QA's matrix, and under the landscape lock it hands the lobby a
+    // 667×375 logical viewport whose 621px band is the tightest this screen ever
+    // gets. It is the device that moved TWO_COLUMN_MIN_WIDTH (from 700 to 600 —
+    // under the old threshold this fell to the stacked shape, where a 249px band
+    // split three ways left the roster 74px for EIGHT rows), so it is asserted by
+    // name.
+    //
+    // And it is the one device where the 48px promise is deliberately not made.
+    // Halving its 369px roster would give 180px rows — under the width a row
+    // needs to carry a side chip at all — so it stays in ONE column of full-width
+    // rows: every control present and legible, at 25px rather than 48. A roster
+    // that loses a control to gain a thumb has traded the wrong way round.
     const layout = lobbyLayout({ width: 667, height: 375 }, { isTouch: true });
     expect(layout.twoColumn).toBe(true);
-    expect(layout.seatColumns).toBe(2);
+    expect(layout.seatColumns).toBe(1);
     for (let i = 0; i < layout.seats.length; i++) {
-      expect(layout.seats[i]!.height, `SE row ${i}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      const seat = layout.seats[i]!;
+      expect(seat.width, `SE row ${i} is a full-width row`).toBeGreaterThanOrEqual(
+        SEAT_ROW_FULL_WIDTH,
+      );
       expect(layout.seatStates[i]!.width, `SE state control ${i}`).toBeGreaterThanOrEqual(
         SEAT_STATE_MIN,
       );
       expect(layout.seatChips[i]!.width, `SE difficulty chip ${i}`).toBe(SEAT_CHIP_WIDTH);
+      expect(layout.seatTeamChips[i]!.width, `SE side chip ${i}`).toBe(SEAT_TEAM_CHIP_WIDTH);
     }
   });
 
@@ -827,25 +841,44 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
     });
   }
 
-  it('holds the side chip at full word width on every LANDSCAPE profile', () => {
-    // The guarantee restated as a claim about devices rather than about rows:
-    // every phone-on-its-side in QA's matrix — the orientation this screen is
-    // used in — carries `FRIENDLY A` at full size, notch or none. (The iPhone SE
-    // is the one landscape device below the threshold; its 180px halved row
-    // scales the word instead, and it is asserted by name above for the floor it
-    // does keep.)
-    for (const { name, vp } of PROFILES.filter((p) => p.touch && p.vp.width > p.vp.height)) {
-      for (const insets of [undefined, LANDSCAPE_INSETS]) {
-        const layout = lobbyLayout(vp, insets ? { isTouch: true, insets } : { isTouch: true });
+  it('never draws a side chip as a STUB, on any profile, notch or none', () => {
+    // The honest guarantee, and it is two claims rather than one.
+    //
+    // A row wide enough for the composition holds `FRIENDLY A` on ONE line at
+    // full size — every desktop, every tablet, and the roster's single-column
+    // shape. A narrower one (the split landscape phone) cannot, so the chip
+    // stacks the word over the letter instead (`lobby-view` `drawTeamChip`) and
+    // needs only SEAT_TEAM_CHIP_MIN for that — which is what
+    // SEAT_ROW_MIN_WIDTH is derived to keep, so no row the roster will ever split
+    // into can reach the stub floor. Both halves of the ratified `WORD + LETTER`
+    // grammar survive either way; only the line break moves.
+    for (const { name, vp, touch } of PROFILES) {
+      for (const insets of [undefined, insetsFor(vp)]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: touch, insets } : { isTouch: touch });
         const tag = insets ? 'with notch insets' : 'no insets';
         for (let i = 0; i < layout.seats.length; i++) {
-          expect(
-            layout.seatTeamChips[i]!.width,
-            `side word clipped on ${name} row ${i} (${tag})`,
-          ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
+          const seat = layout.seats[i]!;
+          const chip = layout.seatTeamChips[i]!;
+          if (layout.seatChips[i]!.width <= 0) continue; // a row too short for any control
+          expect(chip.width, `side chip is a stub on ${name} row ${i} (${tag})`).toBeGreaterThanOrEqual(
+            SEAT_TEAM_CHIP_MIN,
+          );
+          if (seat.width >= SEAT_ROW_FULL_WIDTH) {
+            expect(
+              chip.width,
+              `wide row still clips the side word on ${name} row ${i} (${tag})`,
+            ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
+          }
         }
       }
     }
+  });
+
+  it('keeps SEAT_ROW_FULL_WIDTH reachable — the desktop roster holds the word on one line', () => {
+    // …so the claim above is not vacuous.
+    const desktop = lobbyLayout({ width: 1280, height: 800 });
+    expect(desktop.seats[0]!.width).toBeGreaterThanOrEqual(SEAT_ROW_FULL_WIDTH);
+    expect(desktop.seatTeamChips[0]!.width).toBe(SEAT_TEAM_CHIP_WIDTH);
   });
 
   it('derives the two-column roster threshold from the row it has to leave', () => {

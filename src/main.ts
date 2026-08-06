@@ -6735,6 +6735,18 @@ interface LobbySeam {
    *  on RUSH remaps to the logical control, rather than only driving rush()
    *  programmatically (tests/mobile/landscape-lock.spec.ts). */
   rushControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /**
+   * The MODE toggle (FFA ⇄ TEAMS), as drawn: its logical rect and the physical
+   * point a real press has to land on, through the landscape-lock rotation — the
+   * same shape {@link rushControl} reports.
+   *
+   * Read-only, and it exists for one reason: FFA draws **no side label anywhere**
+   * (GDD §2.1 — teams-of-one has no side worth naming), so a baseline of an FFA
+   * lobby cannot show the `FRIENDLY A` / `ENEMY B` chips at all, and a change to
+   * them would leave every image byte-identical. A test presses this the way a
+   * player does and then shoots the roster (u7-03, tests/mobile/goldens.spec.ts).
+   */
+  modeControl: { logical: Rect; physicalCenter: { x: number; y: number } };
   /** True while the RUSH! countdown is running. */
   counting: boolean;
   /** The hull the built world gave the local ship, or null until the match boots
@@ -6885,6 +6897,7 @@ function openLobby(
     seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    modeControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
     hintTitle: null,
@@ -6967,6 +6980,11 @@ function openLobby(
     seam.rushControl = {
       logical: { ...rush },
       physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
+    };
+    const mode = layout.modeToggle;
+    seam.modeControl = {
+      logical: { ...mode },
+      physicalCenter: ctx.toPhysical(mode.x + mode.width / 2, mode.y + mode.height / 2),
     };
     seam.counting = model.countdown.active;
     // The hull tiles' physical centres — the codex hull-description hover targets.

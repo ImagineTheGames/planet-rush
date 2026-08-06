@@ -165,14 +165,15 @@ export const LOBBY_BACK_WIDTH = 120;
  *  - the **difficulty chip** keeps its full width, which
  *    {@link SEAT_CHIP_MAX_FRACTION} grants at `W ≥ (54 + 2) / 0.4` = 140;
  *  - the **state control** stays above {@link SEAT_STATE_MIN}, which
- *    {@link SEAT_TEAM_CHIP_MIN_BODY} grants at
- *    `W ≥ (34 + 16 + 4) / 0.36` = 150.
+ *    {@link SEAT_STATE_MAX_FRACTION} grants at `W ≥ 30 / 0.2` = 150;
+ *  - the **side chip** stays above {@link SEAT_TEAM_CHIP_MIN}, which — once the
+ *    bar, the state control, the guaranteed body and the difficulty chip have
+ *    taken theirs — needs `0.8·W − 116 ≥ 36`, so `W ≥ 190`.
  *
- * The side chip is deliberately NOT in that list: it auto-fits its word down
- * (`./lobby-view`), so a narrow row shows `FRIENDLY A` smaller rather than not at
- * all, while a *missing* state control is a control the player cannot find.
+ * The side chip binds, which is the point: a *missing* control is a control the
+ * player cannot find, and this screen exists because one of them was.
  */
-export const SEAT_ROW_MIN_WIDTH = 150;
+export const SEAT_ROW_MIN_WIDTH = 190;
 
 /**
  * The narrowest roster column that may be halved into two columns of four —
@@ -182,9 +183,11 @@ export const SEAT_ROW_MIN_WIDTH = 150;
  * Since u7-03 the split exists to keep every row above the **thumb floor**
  * ({@link placeSeats}), so the question is "does a halved row still carry its
  * controls?", and the answer is {@link SEAT_ROW_MIN_WIDTH} twice. That is what
- * lets the iPhone SE in landscape — 621px of band, and the tightest real device
- * this screen runs on — take two columns of 48px rows instead of one column of
- * 25px ones.
+ * keeps the iPhone SE in landscape — the tightest real device this screen runs
+ * on — in ONE column: its 369px roster halves into 180px rows, which is under
+ * the width a row needs to carry a side chip at all, and a roster that loses a
+ * control to gain a thumb has traded the wrong way round. It reads its eight
+ * rows at 25px instead, with every control on them present and legible.
  */
 export const TWO_ROSTER_MIN_WIDTH = 2 * SEAT_ROW_MIN_WIDTH + 20;
 
@@ -416,10 +419,14 @@ export const SEAT_STATE_WIDTH = ROSTER.stateWidth;
  * {@link SEAT_TEAM_CHIP_MIN_BODY}'s fraction as well, which over-reserved on a
  * narrow row; it is bounded by an absolute body rule now ({@link seatBodyEnd}),
  * so every pixel this fraction grants comes straight off the side chip's word.
- * At 0.24 the notched landscape phone's 205px row holds `FRIENDLY A` at full
- * size; at 0.28 it did not.
+ * At 0.20 the notched landscape phone's 205px row holds `FRIENDLY A` at full
+ * size; at 0.28 it did not, and at 0.24 the name beside it had nowhere to go.
+ *
+ * It also sets where the control is dropped whole: {@link SEAT_STATE_MIN} ÷ this
+ * is {@link SEAT_ROW_MIN_WIDTH}, so the narrowest row the roster will ever split
+ * into is exactly the narrowest row that still carries this control.
  */
-export const SEAT_STATE_MAX_FRACTION = 0.24;
+export const SEAT_STATE_MAX_FRACTION = 0.2;
 /**
  * …and below this the control is dropped whole rather than drawn as a stub too
  * small to carry a word (the ladder `classTileContent` keeps for a hull tile: a
@@ -428,14 +435,33 @@ export const SEAT_STATE_MAX_FRACTION = 0.24;
  * and a row that did would fall back to the pre-u5 behaviour, where the row body
  * is still the cycle.
  */
-export const SEAT_STATE_MIN = 34;
+export const SEAT_STATE_MIN = 30;
 /**
- * The row BODY the state control must leave between itself and the trailing
- * chips. The body is still the seat-state cycle's tap target (u5 adds a control,
- * it does not take one away — a wide desktop row is a generous target and stays
- * one), so it may be squeezed by the new control but never closed by it.
+ * The row BODY the trailing chips must leave clear — and since u7-03 it is what
+ * the row's **content** needs, not merely what a finger needs.
+ *
+ * ---------------------------------------------------------------------------
+ * 16 → 64, AND WHY THE NUMBER GREW BY FOUR TIMES
+ * ---------------------------------------------------------------------------
+ * 16 was a *tap* minimum: it existed so the state control could never close the
+ * strip of row that also cycles the seat state. That was the whole job while the
+ * body held nothing — and the body holds the P-number and the player's name.
+ *
+ * On a 233px landscape-phone row the old number let the side chip start 16px
+ * after the state control, which is 20px before the name even began: every name
+ * on the roster was drawn straight through `FRIENDLY A` (u7-03's first phone
+ * render). 56 is the P-number, its two paddings and a name — measured, not
+ * guessed — so the chips can never start before the row's own content ends.
+ *
+ * It does not come free, and this is the honest accounting: a 233px row has ~130
+ * px to divide between a name and a side chip that want ~54 and ~88. What the
+ * row gives up is the side chip's *single line* — the chip stacks `FRIENDLY`
+ * over `A` instead ({@link ../ui/lobby-view} `drawTeamChip`), which is the same
+ * `WORD + LETTER` grammar GDD §2.1 ratified, at full type size, in half the
+ * width. Every row at or above {@link SEAT_ROW_FULL_WIDTH} keeps it on one line.
  */
-export const SEAT_ROW_BODY_MIN = 16;
+export const SEAT_ROW_BODY_MIN = 56;
+
 
 /** Width of a roster row's trailing DIFFICULTY chip — the bot-tier cycle
  *  (EASY/MEDIUM/HARD). Carved off the RIGHT of the row in BOTH modes: it is the
@@ -491,6 +517,29 @@ export const SEAT_CONTROL_MIN_HEIGHT = 8;
  *  (teams-of-one), so the team chip is laid out but drawn away and a tap on it is a
  *  no-op in the model — the geometry stays mode-blind, the flow routes by mode. */
 export const SEAT_TEAM_CHIP_WIDTH = ROSTER.sideWidth;
+
+/**
+ * …and the narrowest one that is still a chip rather than a stub.
+ *
+ * 36 is `FRIENDLY` at the type floor with its padding, once the chip is allowed
+ * to stack the word over the letter (`./lobby-view` `drawTeamChip`) — the same
+ * "dropped whole rather than drawn clipped" rung {@link SEAT_STATE_MIN} is for
+ * the state control. {@link SEAT_ROW_MIN_WIDTH} is derived so no row the roster
+ * will actually split into can reach it.
+ */
+export const SEAT_TEAM_CHIP_MIN = 36;
+
+/**
+ * The row width at which the body and the side chip both stop competing: the
+ * leading bar and control, the guaranteed body, the side chip at its full
+ * {@link SEAT_TEAM_CHIP_WIDTH} and the difficulty chip, all at once.
+ *
+ * Recorded so the tests can say *which* rows are the compromised ones rather than
+ * asserting a blanket promise the narrow phone cannot keep.
+ */
+export const SEAT_ROW_FULL_WIDTH =
+  (SEAT_STRIPE + SEAT_ROW_BODY_MIN + SEAT_TEAM_CHIP_WIDTH + SEAT_CHIP_WIDTH + 2 * SEAT_CHIP_PAD) /
+  (1 - SEAT_STATE_MAX_FRACTION);
 
 /**
  * Where a row's trailing chips may begin — the first pixel after the identity
@@ -1027,8 +1076,11 @@ function teamChipRect(seat: Rect, diffChip: Rect, state: Rect): Rect {
   }
   const right = diffChip.x - SEAT_CHIP_PAD;
   const left = Math.max(seatBodyEnd(seat, state), right - SEAT_TEAM_CHIP_WIDTH);
-  const width = Math.max(0, right - left);
-  return { x: left, y: seat.y, width, height: seat.height };
+  const room = Math.max(0, right - left);
+  // Dropped whole below the stub floor, exactly as the state control is: a chip
+  // too narrow to name a side is worse than none, and the row body still cycles.
+  const width = room >= SEAT_TEAM_CHIP_MIN ? room : 0;
+  return { x: width > 0 ? left : seat.x, y: seat.y, width, height: width > 0 ? seat.height : 0 };
 }
 
 /**

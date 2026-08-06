@@ -566,8 +566,10 @@ export const ROSTER = {
    * row height on the notched landscape phone, where 4 × 48 has to fit in 195.
    */
   gap: 0,
-  /** Inset from a row segment's edge to the word inside it. */
-  padX: 12,
+  /** Inset from a row segment's edge to the word inside it. 8, not the settings
+   *  row's 20: a roster row is a strip of segments, and every pixel of padding on
+   *  it is a pixel off a player's name (see `lobby-geometry` SEAT_ROW_BODY_MIN). */
+  padX: 8,
 } as const;
 
 /** A roster row's height at these metrics: the handoff's 64px surface, never
@@ -1257,6 +1259,13 @@ function cutBottomLeft(bx: number, by: number, bh: number, c: number): number {
  * `x`/`y`/`width`/`height` are the plate's *outer* box; the press offset is
  * applied inside, so a caller never moves the rect itself. Allocates nothing.
  * Call it when the state changes, not every frame.
+ *
+ * **`tick`** is the 3px accent bar at the head of the plate's content, and it
+ * assumes the handoff's own composition: a label hung off it, starting after it.
+ * A plate whose content is a *grid* rather than a label — a lobby hull tile's six
+ * stat cells, an arena card's preview — starts at its own tighter padding and the
+ * tick lands in the middle of it, so those pass `false`. It is a parameter rather
+ * than a fourth role because nothing else about the material changes.
  */
 export function drawPlate(
   canvas: PlateCanvas,
@@ -1267,6 +1276,7 @@ export function drawPlate(
   role: PlateRole,
   scale: PlateScale,
   state: PlateState = 'rest',
+  tick = true,
 ): void {
   if (width <= 0 || height <= 0) return;
   const m = plateMaterial(role, state, plateFamily(scale));
@@ -1341,7 +1351,7 @@ export function drawPlate(
   }
 
   // 6. The accent tick — the 3px bar at the head of the plate's content.
-  if (m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
+  if (tick && m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
     const th = Math.min(g.tickHeight, fh);
     fillBox(canvas, fx + g.padX, fy + (fh - th) / 2, g.tickWidth, th, m.tick.color, m.tick.alpha);
   }

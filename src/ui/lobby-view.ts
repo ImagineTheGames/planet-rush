@@ -63,10 +63,12 @@ import {
   BONE,
   DISPLAY_TRACKING,
   MATERIAL_SHADES,
+  PLATE_SCALES,
   ROSTER,
   TRACKING,
   drawBeam,
   drawPlate,
+  platePadX,
   plateTypeSize,
   rosterMetric,
   trackingPx,
@@ -133,6 +135,9 @@ const TILE_NAME_PX = 14;
 const TILE_HULL_PX = 10;
 const TILE_BLURB_PX = 11;
 const STAT_PX = 9;
+/** …and the floor it keeps. Deliberately below {@link TYPE_MIN}: see the note in
+ *  {@link LobbyView.drawClassStats}. */
+const STAT_MIN_PX = 8;
 
 /** Air between a player's name and their ping — `reivi · 245ms`. */
 const PING_GAP = 8;
@@ -437,8 +442,9 @@ export class LobbyView extends Container {
       const px = plateTypeSize(ACTION_PX, m);
       this.backText.style.fontSize = px;
       this.backText.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
-      this.backText.x = leave.x + leave.width / 2;
+      this.backText.x = plateLabelCentreX(leave, m);
       this.backText.y = leave.y + leave.height / 2;
+      fitLabel(this.backText, leave.width - 2 * platePadX('compact', m));
     }
 
     const rushVisible = rushButton.width > 0 && rushButton.height > 0;
@@ -460,8 +466,9 @@ export class LobbyView extends Container {
       this.rushText.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
       this.rushText.style.fill = live ? BONE.hi : MATERIAL_SHADES.boneLo;
       this.rushText.alpha = live ? 1 : 0.75;
-      this.rushText.x = rushButton.x + rushButton.width / 2;
+      this.rushText.x = plateLabelCentreX(rushButton, m);
       this.rushText.y = rushButton.y + rushButton.height / 2;
+      fitLabel(this.rushText, rushButton.width - 2 * platePadX('compact', m));
     }
 
     // A guest is told who they are waiting for rather than shown a dead button.
@@ -581,41 +588,56 @@ export class LobbyView extends Container {
     nodes.decal.x = leadX + pad;
     nodes.decal.y = rect.y + rect.height / 2;
 
-    const textX = nodes.decal.x + nodes.decal.width + pad;
-    const namePx = plateTypeSize(NAME_PX, m);
-    const detailPx = plateTypeSize(DETAIL_PX, m);
-    // Two lines when the row is tall enough for them, one otherwise — dropped
-    // whole, never clipped, the ladder every block on this screen keeps.
-    const twoLines = rect.height >= namePx + detailPx + 8;
-    nodes.name.visible = true;
-    nodes.name.text = seat.isHost ? `${seat.name}  ★` : seat.name;
-    nodes.name.style.fontSize = namePx;
-    nodes.name.style.letterSpacing = trackingPx(TRACKING.name, namePx);
-    nodes.name.style.fill = closed || seat.isBot ? MATERIAL_SHADES.boneLo : MATERIAL_SHADES.bone;
-    nodes.name.alpha = closed ? 0.6 : 1;
-    nodes.name.x = textX;
-    nodes.name.y = rect.y + rect.height / 2 - (twoLines ? detailPx * 0.62 : 0);
-
-    // The hull, in words. The colour NAME that used to share this line is gone
-    // with the handoff's decluttered row.
-    nodes.detail.visible = twoLines;
-    nodes.detail.text = closed ? 'OUT OF THE MATCH' : seat.className;
-    nodes.detail.style.fontSize = detailPx;
-    nodes.detail.style.letterSpacing = trackingPx(TRACKING.label, detailPx);
-    nodes.detail.x = textX;
-    nodes.detail.y = nodes.name.y + namePx * 0.72;
-
-    // The two trailing controls (n2): the DIFFICULTY chip (bot tier, both modes)
-    // and — composed to its left in TEAMS — the TEAM chip (side). A bot seat in
-    // TEAMS therefore carries both at once; neither replaces the other.
+    // The two trailing controls (n2) are drawn BEFORE the name, because the name
+    // is what has to fit in whatever they leave: the DIFFICULTY chip (bot tier,
+    // both modes) and — composed to its left in TEAMS — the TEAM chip (side). A
+    // bot seat in TEAMS therefore carries both at once; neither replaces the
+    // other.
     const teams = model.mode === 'teams';
     const tierShown = this.drawDifficultyChip(nodes, seat, chipRect, m);
     const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed, m);
 
     // Where the row's trailing furniture actually begins — the leftmost chip that
-    // was really drawn, or the right edge when the row carries none. The ping
-    // measures from it, so it never reserves space for a control that isn't there.
+    // was really drawn, or the right edge when the row carries none. The name and
+    // the hull measure against it, so a 233px landscape row's name is fitted into
+    // its own body rather than drawn under the side chip.
     const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
+
+    const textX = nodes.decal.x + nodes.decal.width + pad;
+    const textRoom = Math.max(0, chipsLeft - pad - textX);
+    const namePx = plateTypeSize(NAME_PX, m);
+    const detailPx = plateTypeSize(DETAIL_PX, m);
+    nodes.name.visible = true;
+    nodes.name.text = seat.isHost ? `${seat.name}  \u2605` : seat.name;
+    nodes.name.style.fontSize = namePx;
+    nodes.name.style.letterSpacing = trackingPx(TRACKING.name, namePx);
+    nodes.name.style.fill = closed || seat.isBot ? MATERIAL_SHADES.boneLo : MATERIAL_SHADES.bone;
+    nodes.name.alpha = closed ? 0.6 : 1;
+
+    // The hull, in words. The colour NAME that used to share this line is gone
+    // with the handoff's decluttered row.
+    nodes.detail.text = closed ? 'OUT OF THE MATCH' : seat.className;
+    nodes.detail.style.fontSize = detailPx;
+    nodes.detail.style.letterSpacing = trackingPx(TRACKING.label, detailPx);
+
+    // Two lines when the row is tall enough for the two MEASURED boxes, one
+    // otherwise — dropped whole, never clipped, the ladder every block on this
+    // screen keeps. Measured rather than estimated from the point sizes: the
+    // first cut of this row guessed, and every name was drawn through its hull.
+    const twoLines =
+      nodes.name.height + nodes.detail.height <= rect.height - 6 &&
+      nodes.detail.width <= textRoom;
+    const block = nodes.name.height + (twoLines ? nodes.detail.height : 0);
+    const top = rect.y + (rect.height - block) / 2;
+    nodes.name.x = textX;
+    nodes.name.y = top + nodes.name.height / 2;
+    // The hull line is rung 3 of the row's ladder and it is DROPPED WHOLE rather
+    // than scaled: a landscape phone's 233px row leaves ~40px of body, and
+    // `EXCAVATOR` fitted into 40px is a 5px smudge, not a word. The tile beside
+    // the roster carries the same hull at full size, so nothing is lost.
+    nodes.detail.visible = twoLines;
+    nodes.detail.x = textX;
+    nodes.detail.y = top + block - nodes.detail.height / 2;
 
     // The ping, beside the name (ratified developer): `reivi · 245ms`, graded
     // green/amber/red by `src/net/ping`. Drawn on the name's own line because it
@@ -624,15 +646,22 @@ export class LobbyView extends Container {
     // refuses to produce (`seat.ping === null`).
     nodes.ping.visible = false;
     if (seat.ping) {
-      nodes.ping.text = `· ${seat.ping.label}`;
+      nodes.ping.text = `\u00b7 ${seat.ping.label}`;
       nodes.ping.style.fontSize = detailPx;
       const pingX = nodes.name.x + nodes.name.width + PING_GAP;
-      if (pingFits(pingX, nodes.ping.width, chipsLeft)) {
+      if (pingFits(pingX, nodes.ping.width, chipsLeft - pad)) {
         nodes.ping.visible = true;
         nodes.ping.style.fill = PING_GRADE_COLORS[seat.ping.grade];
         nodes.ping.x = pingX;
         nodes.ping.y = nodes.name.y;
+        // The name gives way to the ping, never the other way round: a truncated
+        // number is a lie about a measurement.
+        fitLabel(nodes.name, Math.max(0, textRoom - nodes.ping.width - PING_GAP));
+      } else {
+        fitLabel(nodes.name, textRoom);
       }
+    } else {
+      fitLabel(nodes.name, textRoom);
     }
   }
 
@@ -672,7 +701,7 @@ export class LobbyView extends Container {
     if (!visible) return false;
 
     const live = seat.canCycleState;
-    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, live ? 'secondary' : 'inert', 'chip');
+    drawDeadOrLive(nodes.body, rect, live);
     const px = plateTypeSize(ROW_LABEL_PX, m);
     nodes.stateLabel.text = seat.stateLabel;
     nodes.stateLabel.style.fontSize = px;
@@ -733,9 +762,18 @@ export class LobbyView extends Container {
    * The chip's word takes the side colour ({@link SIDE_COLORS}) — the one hue this
    * Bone screen spends, because it is a ratified mechanic rather than chrome —
    * as reinforcement for the word, never a replacement for it, so the row still
-   * reads with the hue removed. The label auto-fits: the tightest row the layout
-   * produces can only spare ~61px, and a word that would overrun its chip is
-   * scaled down rather than allowed to spill over the name beside it.
+   * reads with the hue removed.
+   *
+   * **On a narrow row the chip STACKS the word over the letter rather than
+   * shrinking it.** `WORD + LETTER` is the ratified grammar (GDD §2.1) and both
+   * halves do different jobs — the word is relative to the viewer, the letter is
+   * absolute — so both have to survive; what does not have to survive is their
+   * being on one line. A 233px landscape-phone row can spare ~70px for this chip,
+   * which holds `FRIENDLY A` at 8px on one line or `FRIENDLY` over `A` at full
+   * size on two, and the row is 48px tall with nothing else in it. The string is
+   * still `teamName`'s, character for character; only the line break is the
+   * view's. Below that the word is auto-fitted down, never up — a word drawn
+   * wider than its own chip reads as a bug.
    */
   private drawTeamChip(
     nodes: SeatNodes,
@@ -751,11 +789,24 @@ export class LobbyView extends Container {
 
     drawPlate(nodes.body, chip.x, chip.y, chip.width, chip.height, 'secondary', 'chip');
     const px = plateTypeSize(ROW_LABEL_PX, m);
+    const room = chip.width - 2 * TEAM_CHIP_LABEL_PAD;
     nodes.teamChipLabel.text = seat.teamName;
     nodes.teamChipLabel.style.fontSize = px;
     nodes.teamChipLabel.style.letterSpacing = trackingPx(TRACKING.label, px);
     nodes.teamChipLabel.style.fill = SIDE_COLORS[seat.side];
-    fitLabel(nodes.teamChipLabel, chip.width - 2 * TEAM_CHIP_LABEL_PAD);
+    nodes.teamChipLabel.style.align = 'center';
+    nodes.teamChipLabel.scale.set(1);
+    // The word over the letter, on EVERY row and every device — not "one line
+    // where it fits". A chip that wraps `FRIENDLY A` and does not wrap `ENEMY B`
+    // reads as two different controls down one roster, and the row that decides
+    // is the phone's, so the desktop would be the odd one out for no gain. The
+    // string is `teamName`'s, character for character; only the line break is the
+    // view's, and stacking is what lets both halves stay at full type size in the
+    // ~62px a landscape-phone row can spare (`lobby-geometry` SEAT_ROW_BODY_MIN).
+    // A row too short for two lines falls back to one.
+    nodes.teamChipLabel.text = seat.teamName.replace(' ', '\n');
+    if (nodes.teamChipLabel.height > chip.height - 4) nodes.teamChipLabel.text = seat.teamName;
+    fitLabel(nodes.teamChipLabel, room);
     nodes.teamChipLabel.x = chip.x + chip.width / 2;
     nodes.teamChipLabel.y = chip.y + chip.height / 2;
     return true;
@@ -823,7 +874,7 @@ export class LobbyView extends Container {
     const visible = rect.width > 0 && rect.height > 0;
     label.visible = visible;
     if (!visible) return;
-    drawPlate(this.toggles, rect.x, rect.y, rect.width, rect.height, enabled ? 'secondary' : 'inert', 'chip');
+    drawDeadOrLive(this.toggles, rect, enabled);
     const px = plateTypeSize(TOGGLE_PX, m);
     label.text = text;
     label.style.fontSize = px;
@@ -875,6 +926,8 @@ export class LobbyView extends Container {
       for (const cell of nodes.stats) cell.visible = false;
       return;
     }
+    // No accent tick: a tile's content is a GRID that starts at its own 3px
+    // padding, and the tick would land in the middle of the stat cells.
     drawPlate(
       nodes.body,
       rect.x,
@@ -883,6 +936,8 @@ export class LobbyView extends Container {
       rect.height,
       selected ? 'secondary' : 'inert',
       'compact',
+      'rest',
+      false,
     );
 
     const alpha = dim ? 0.45 : 1;
@@ -918,7 +973,11 @@ export class LobbyView extends Container {
     nodes.blurb.style.wordWrapWidth = Math.max(20, content.blurb.width);
     nodes.blurb.x = content.blurb.x;
     nodes.blurb.y = content.blurb.y;
-    nodes.blurb.visible = content.showBlurb;
+    // The layout reserves the blurb's band; how many WRAPPED lines the sentence
+    // actually takes at this width is a measurement only Pixi can make, so the
+    // final say is here — an overrunning blurb is dropped whole rather than run
+    // out of the bottom of its own tile.
+    nodes.blurb.visible = content.showBlurb && nodes.blurb.height <= content.blurb.height;
   }
 
   /**
@@ -941,7 +1000,12 @@ export class LobbyView extends Container {
     nodes.pips.clear();
     nodes.pips.alpha = alpha;
     nodes.pips.visible = content.showStats;
-    const px = plateTypeSize(STAT_PX, m);
+    // NOT `plateTypeSize`: that floors type at TYPE_MIN (11px), which is the right
+    // floor for a control's word and the wrong one for a six-cell grid — an 11px
+    // figure overflows the 10px text line `classStatCell` reserves and the pip bar
+    // is drawn straight through it. The grid has its own floor, and 8px is the
+    // size this block has been legible at since u4.
+    const px = Math.max(STAT_MIN_PX, Math.round(STAT_PX * m.plateScale));
 
     for (let i = 0; i < nodes.stats.length; i++) {
       const cell = nodes.stats[i]!;
@@ -1053,6 +1117,45 @@ function hintText(model: LobbyModel): string {
 function signatureOf(model: LobbyModel): string {
   const { countdown, ...rest } = model;
   return JSON.stringify({ ...rest, countdown: { active: countdown.active, label: countdown.label } });
+}
+
+/**
+ * A control that is either pressable or honestly dead.
+ *
+ * Live is the `secondary` CHIP — a bordered plate wearing the Bone hairline,
+ * which is what every pressable thing on this screen wears. Dead is an `inert`
+ * plate at `compact`, one full step DOWN the same ramp: `rulePlate` rather than
+ * `boneLo`, which is a third the brightness.
+ *
+ * The pairing matters more than either half. A guest, a lobby past RUSH! and a
+ * seat somebody is sitting in are all refusals the model already makes
+ * (`./lobby` `cycleSeatState`, `hostControls`), and the rule this screen keeps is
+ * that they must **look** unavailable rather than look live and then refuse — a
+ * dead-looking button beats a lying one. `tests/mobile/slot-state.spec.ts`
+ * measures exactly this, in pixels, on the two states in one frame.
+ *
+ * Note the deliberate divergence from the settings screen, which marks an
+ * ENGAGED toggle with the brightest hairline (`inert`'s chip is `ruleLit`). There
+ * a chip is always pressable and the hairline says which value is current; here a
+ * chip may be dead, so the hairline has to say *that* first.
+ */
+function drawDeadOrLive(canvas: Graphics, rect: Rect, live: boolean): void {
+  if (live) drawPlate(canvas, rect.x, rect.y, rect.width, rect.height, 'secondary', 'chip');
+  else drawPlate(canvas, rect.x, rect.y, rect.width, rect.height, 'inert', 'compact', 'rest', false);
+}
+
+/**
+ * Where a centred label sits on a plate that carries an accent tick.
+ *
+ * Not the plate's middle: the handoff hangs a label off the tick, and a small
+ * plate centred on its own box draws the word straight onto the 3px bar (found on
+ * u7-03's first BACK and RUSH! render). Centring in the space to the RIGHT of the
+ * tick keeps the handoff's composition on a wide plate and stops the collision on
+ * a narrow one.
+ */
+function plateLabelCentreX(rect: Rect, m: FrameMetrics): number {
+  const lead = platePadX('compact', m) + PLATE_SCALES.compact.tickWidth;
+  return rect.x + (rect.width + lead) / 2;
 }
 
 /** Scale a label DOWN to fit the control it is drawn in, never up — a word drawn
