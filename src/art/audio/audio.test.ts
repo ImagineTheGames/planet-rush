@@ -449,6 +449,161 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(isLayered(soundSpec(SOUND.shipExplode))).toBe(true);
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
   });
+
+  it('keeps every pair of tells a player must not confuse apart (s7-01 §8)', () => {
+    // **A regression net, not a goal** (s7-01 §9 T1). It went up GREEN on the
+    // pre-re-voice bank and is asserted here so the s7-02 re-voice cannot do the
+    // one thing a re-voice is uniquely able to do: converge nine voices onto one
+    // clean struck note and turn two obvious mechanics into a coin flip. GDD §4.7
+    // as amended is explicit that the audible-tell mandate (§3.6) OUTRANKS the
+    // register — "an asset pass that makes two mechanics harder to tell apart has
+    // failed this section, not satisfied it."
+    //
+    // A pair's **separation** is the larger of its two measured ratios: spectral
+    // centroid (how bright) and zero-crossing rate (the cheap proxy the rock-vs-
+    // hull test already uses). Larger-of-two rather than both, because the pairs
+    // do not all separate on the same axis — `shieldHit`/`coreHit` is carried
+    // almost entirely by zcr (×9.02) and barely at all by centroid (×1.61), and
+    // requiring both would fail a bank that is perfectly legible.
+    //
+    // The floor is **90% of today's separation, capped at ×3** — the cap is the
+    // deliberate part. 90% is the tolerance a legitimate re-voice needs; the cap
+    // exists because past a factor of three in brightness two tells are already
+    // unmistakable, and a bare 90%-of-today rule would have frozen
+    // `turretFire`/`shotImpact` at ×16.78 and forbidden exactly the re-voice
+    // s7-01 §7.2 orders for it ("the single most arcade voice in the bank").
+    // A net catches a collapse; it does not pin the bank to its own history.
+    const CAP = 3;
+
+    const centroidHz = (samples: Float32Array): number => {
+      // Hann-windowed 8192-point FFT of the loudest window, bins weighted by
+      // magnitude — the working implementation from
+      // `spikes/tone-audit/measure-bank-tone.ts`, copied rather than imported so
+      // a test never depends on a throwaway spike.
+      const N = 8192;
+      let frame: Float32Array;
+      if (samples.length <= N) {
+        frame = new Float32Array(N);
+        frame.set(samples);
+      } else {
+        const step = Math.max(1, Math.floor(N / 4));
+        let best = 0;
+        let bestEnergy = -1;
+        for (let start = 0; start + N <= samples.length; start += step) {
+          let e = 0;
+          for (let i = start; i < start + N; i++) {
+            const v = samples[i] ?? 0;
+            e += v * v;
+          }
+          if (e > bestEnergy) {
+            bestEnergy = e;
+            best = start;
+          }
+        }
+        frame = samples.slice(best, best + N);
+      }
+      const re = new Float64Array(N);
+      const im = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)); // Hann
+        re[i] = (frame[i] ?? 0) * w;
+      }
+      // In-place iterative radix-2 FFT.
+      for (let i = 1, j = 0; i < N; i++) {
+        let bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) {
+          [re[i], re[j]] = [re[j]!, re[i]!];
+          [im[i], im[j]] = [im[j]!, im[i]!];
+        }
+      }
+      for (let len = 2; len <= N; len <<= 1) {
+        const ang = (-2 * Math.PI) / len;
+        const wRe = Math.cos(ang);
+        const wIm = Math.sin(ang);
+        for (let i = 0; i < N; i += len) {
+          let curRe = 1;
+          let curIm = 0;
+          for (let k = 0; k < len / 2; k++) {
+            const uRe = re[i + k]!;
+            const uIm = im[i + k]!;
+            const vRe = re[i + k + len / 2]! * curRe - im[i + k + len / 2]! * curIm;
+            const vIm = re[i + k + len / 2]! * curIm + im[i + k + len / 2]! * curRe;
+            re[i + k] = uRe + vRe;
+            im[i + k] = uIm + vIm;
+            re[i + k + len / 2] = uRe - vRe;
+            im[i + k + len / 2] = uIm - vIm;
+            const nextRe = curRe * wRe - curIm * wIm;
+            curIm = curRe * wIm + curIm * wRe;
+            curRe = nextRe;
+          }
+        }
+      }
+      let num = 0;
+      let den = 0;
+      for (let k = 1; k < N / 2; k++) {
+        const mag = Math.hypot(re[k] ?? 0, im[k] ?? 0);
+        num += mag * ((k * DEFAULT_SAMPLE_RATE) / N);
+        den += mag;
+      }
+      return den > 0 ? num / den : 0;
+    };
+
+    const zcr = (samples: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < samples.length; i++) {
+        if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
+      }
+      return samples.length > 0 ? n / samples.length : 0;
+    };
+
+    const measured = new Map<SoundName, { centroid: number; zcr: number }>();
+    const measure = (name: SoundName) => {
+      let m = measured.get(name);
+      if (!m) {
+        const samples = renderSound(soundSpec(name));
+        m = { centroid: centroidHz(samples), zcr: zcr(samples) };
+        measured.set(name, m);
+      }
+      return m;
+    };
+    const ratio = (a: number, b: number) => (Math.min(a, b) > 0 ? Math.max(a, b) / Math.min(a, b) : Infinity);
+
+    // [a, b, separation measured on the pre-re-voice bank, the mechanic it protects]
+    const PAIRS: readonly (readonly [SoundName, SoundName, number, string])[] = [
+      // The tightest pair in the bank, and BOTH are re-voiced by s7-02: picked a
+      // chunk up vs banked a chunk — the whole held-ore-vs-banked-ore economy.
+      [SOUND.oreCollect, SOUND.depositTick, 2.0, 'picked a chunk up vs banked a chunk (§2.3)'],
+      // Your buy was refused vs your reactor is being eaten. Both low, both bad
+      // news, and the second is what the alarm is built on top of.
+      [SOUND.rejectBuzz, SOUND.coreHit, 1.26, 'a refused buy vs a reactor hit (§2.2)'],
+      // §2.2's grammar: shields redden and die before the reactor begins to fill.
+      // A besieged player must hear which layer is being eaten. Carried by zcr.
+      [SOUND.shieldHit, SOUND.coreHit, 9.02, 'their shield ate it vs the reactor did (§2.2)'],
+      // Seconds apart, off one wheel press.
+      [SOUND.buildComplete, SOUND.purchaseConfirm, 1.27, 'the defence arrived vs the buy registered'],
+      [SOUND.respawnBeep, SOUND.spawnPulse, 1.77, 'the respawn clock vs spawn protection (§2.1, §2.7)'],
+      // Both low, both two-note, both loud — and `waveArrive` is losing the saw
+      // that currently separates them most, while the alarm keeps its own (§5.1).
+      [SOUND.alarm, SOUND.waveArrive, 2.45, 'home is under attack vs a wave arrived (§2.2, §2.3)'],
+      // The game's central inversion. Also guarded on its own, below.
+      [SOUND.rockChip, SOUND.hullHit, 3.92, 'am I mining or shooting a ship (§2.3)'],
+      [SOUND.rockChip, SOUND.shotImpact, 4.68, 'my shot chipped rock vs my shot landed'],
+      [SOUND.turretFire, SOUND.shotImpact, 16.78, 'a turret fired at me vs something landed'],
+    ];
+
+    for (const [a, b, today, mechanic] of PAIRS) {
+      const ma = measure(a);
+      const mb = measure(b);
+      const separation = Math.max(ratio(ma.centroid, mb.centroid), ratio(ma.zcr, mb.zcr));
+      const floor = Math.min(0.9 * today, CAP);
+      expect(
+        separation,
+        `${a} / ${b} collapsed — ${mechanic}. was ×${today.toFixed(2)}, now ×${separation.toFixed(2)}, floor ×${floor.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(floor);
+    }
+  });
 });
 
 describe('the listener model (`./spatial`) — hear every thing on the map (a3-03)', () => {
