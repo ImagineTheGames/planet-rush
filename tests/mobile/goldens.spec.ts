@@ -498,9 +498,10 @@ async function openLobby(page: Page): Promise<void> {
   );
   // The pointer is left sitting where PLAY SOLO was, which on a desktop would
   // hover whatever roster row landed under it. Park it so the baseline is the
-  // screen at rest rather than the screen mid-hover.
+  // screen at rest rather than the screen mid-hover — then wait for the frames
+  // that redraw it, in frames rather than in milliseconds (./render-settle.ts).
   await page.mouse.move(1, 1);
-  await page.waitForTimeout(600);
+  await settleFrames(page);
 }
 
 /** Press MODE the way a player does, and wait for the roster to re-word itself
@@ -518,7 +519,7 @@ async function switchToTeams(page: Page): Promise<void> {
     { timeout: 10_000 },
   );
   await page.mouse.move(1, 1);
-  await page.waitForTimeout(400);
+  await settleFrames(page);
 }
 
 /** Portrait → landscape, for the profiles that declare portrait viewports. */
