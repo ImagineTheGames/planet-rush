@@ -143,6 +143,7 @@ import {
   // into the right words.
   LobbyEntryView,
   entryLayout,
+  entryTargetKey,
   DOOR_OPTIONS,
   createEntry,
   entryModel,
@@ -157,6 +158,7 @@ import {
   KEYPAD_KEYS,
   regionPickerVisible,
   CodexView,
+  codexTargetKey,
   codexModel,
   codexLayout,
   createCodex,
@@ -5495,6 +5497,14 @@ function openMainMenu(
   let menuPress: MainMenuOption | null = null;
   let settingsHover: SettingsTarget | null = null;
   let settingsPress: SettingsTarget | null = null;
+  // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
+  // same hover/press routing the title and settings screens have had since u7-01.
+  // Both are keyed by a plain string rather than a target object, because a pad of
+  // 32 keys and a rail of 14 entries want an index in the key, not a comparison.
+  let entryHover: string | null = null;
+  let entryPress: string | null = null;
+  let codexHover: string | null = null;
+  let codexPress: string | null = null;
   ctx.root.addChild(menuView, settingsView, codexView, entryView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
@@ -5782,8 +5792,10 @@ function openMainMenu(
         }),
       );
     }
-    if (codexView.visible) codexView.update(codexModel(codexState));
-    if (entryView.visible) entryView.update(entryModel(entry, connectNarration()));
+    if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
+    if (entryView.visible) {
+      entryView.update(entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }));
+    }
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -6420,7 +6432,12 @@ function openMainMenu(
       }
     } else if (screen === 'online') {
       const hit = entryView.hitTest(x, y);
+      // The plate goes down before it acts, so a press that navigates away has
+      // still been *seen* to be a press (u7-04, the same routing as the menu).
+      entryPress = entryTargetKey(hit);
+      entryHover = entryPress;
       if (hit) applyEntryTarget(hit);
+      else render();
       // A tap off the controls does nothing: the doors are three buttons and a
       // keypad, and RUSH! is the LOBBY's now — it used to be a bare tap-anywhere
       // here, which is exactly the shortcut the ratified flow replaced.
@@ -6436,6 +6453,11 @@ function openMainMenu(
       // scrolls it instead of selecting whatever entry it started on.
       const rail = codexLayoutNow().rail;
       codexDrag = { startX: x, startY: y, lastX: x, lastY: y, moved: false, overRail: withinRect(rail, x, y) };
+      // The plate goes down under the finger, and comes back up on pointer-up
+      // whether the gesture turned out to be a tap or a scroll (u7-04).
+      codexPress = codexTargetKey(codexView.hitTest(x, y));
+      codexHover = codexPress;
+      render();
     }
     e.preventDefault();
   }
@@ -6452,9 +6474,9 @@ function openMainMenu(
    */
   function hoverKey(x: number, y: number): string | null {
     if (screen === 'menu') return menuView.hitTest(x, y);
-    if (screen === 'online') return keyOf(entryView.hitTest(x, y));
+    if (screen === 'online') return entryTargetKey(entryView.hitTest(x, y));
     if (screen === 'settings') return keyOf(settingsView.hitTest(x, y));
-    return keyOf(codexView.hitTest(x, y));
+    return codexTargetKey(codexView.hitTest(x, y));
   }
 
   let hovered: string | null = null;
@@ -6489,6 +6511,18 @@ function openMainMenu(
           settingsHover = hit;
           render();
         }
+      } else if (screen === 'online') {
+        const hit = entryTargetKey(entryView.hitTest(p.x, p.y));
+        if (hit !== entryHover) {
+          entryHover = hit;
+          render();
+        }
+      } else if (screen === 'codex') {
+        const hit = codexTargetKey(codexView.hitTest(p.x, p.y));
+        if (hit !== codexHover) {
+          codexHover = hit;
+          render();
+        }
       }
     }
     if (screen !== 'codex' || !codexDrag) return;
@@ -6511,16 +6545,20 @@ function openMainMenu(
     // A finger lifting releases the plate it was holding, on whichever screen it
     // was held. `pointercancel` routes here too, so a gesture the browser steals
     // cannot strand a plate in its pressed state.
-    if (menuPress !== null || settingsPress !== null) {
+    if (menuPress !== null || settingsPress !== null || entryPress !== null || codexPress !== null) {
       menuPress = null;
       settingsPress = null;
+      entryPress = null;
+      codexPress = null;
       // Touch has no hover to fall back to: a lifted finger leaves nothing under
       // it, so the plate returns to rest rather than to a hover it never had.
       if (e.pointerType === 'touch') {
         menuHover = null;
         settingsHover = null;
+        entryHover = null;
+        codexHover = null;
       }
-      if (screen === 'menu' || screen === 'settings') render();
+      render();
     }
     if (screen !== 'codex' || !codexDrag) {
       codexDrag = null;

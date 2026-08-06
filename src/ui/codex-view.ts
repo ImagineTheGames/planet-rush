@@ -1,6 +1,7 @@
 /**
  * src/ui/codex-view.ts — the Pixi view for the CODEX screen.
- * OWNER: Gameplay Engineer (brief c1-codex-screen).
+ * OWNER: Gameplay Engineer (brief c1-codex-screen); the Gantry/Bone re-skin and
+ * the frame it now sits in are the UI Engineer's (u7-04).
  *
  * The drawing half of {@link ./codex}. Every value lives in the model and every
  * rect in {@link ./codex} `codexLayout`; this file turns them into Graphics and
@@ -11,34 +12,119 @@
  * shifted by their offset; the rail's offset is fed back into
  * {@link codexHitTest} so a tap on a scrolled title lands right.
  *
+ * ---------------------------------------------------------------------------
+ * GANTRY / BONE (u7-04) — AND THE LINE MATERIAL DOES NOT CROSS
+ * ---------------------------------------------------------------------------
+ * The handoff named five screens and this was not one of them, so the game's
+ * densest text screen was still *"1px hairlines on black"* while the menu in
+ * front of it had been re-skinned. It is now the same material as the rest of the
+ * set: a header beam, a footer beam, tab CHIPS and rail ROWS — all of it from
+ * {@link ../art/materials}, none of it invented here.
+ *
+ * And then it stops. **The reading pane gets no plate.** It is prose the player is
+ * actually reading, and a bevelled panel behind a paragraph is a texture under
+ * text; the frozen legibility rule (style-guide §9) outranks the register every
+ * time they compete. So the chrome carries the material and the article sits on
+ * bare Vacuum, separated from the rail by one hairline — the handoff's own
+ * `MATERIAL_SHADES.hairline`, the divider rule it uses between sections.
+ *
+ * **Two selections, two different marks** — the thing this screen could most
+ * easily have got wrong. The active TAB is a mode switch, so it is marked by
+ * BRIGHTNESS (the selected chip's brighter metal and its Bone border). The
+ * selected ENTRY is a pointer at the pane beside it, so it is marked
+ * POSITIONALLY: a Bone bar down the row's leading edge, and the row rising from a
+ * surface to a raised plate. Neither is the brightest plate on the screen, because
+ * this screen has no headline action at all — zero primaries, which
+ * {@link ./gantry} `singlePrimary` allows and a reference screen deserves.
+ *
  * The frozen contract, where it could only be broken here (style-guide §2, §7):
  *  - Audiowide for the heading, the tab labels and the entry titles (words);
- *    Oxanium for the body and the fact numerals.
- *  - Plasma marks the one active tab and the one selected entry; everything else
- *    is steel. No signal yellow (ore) and no threat red (danger) appear — the
- *    codex is neither.
+ *    Oxanium for the body, the fact numerals and the eyebrows.
+ *  - **No hue at all.** The plasma that used to mark the active tab, the selected
+ *    entry, the badges and the fact values is gone: Bone spends no colour on the
+ *    menu, which is what leaves the palette's hues free to mean things in a match.
+ *    Signal yellow (ore) and threat red (danger) never appear — the codex is
+ *    neither.
+ *  - **Prose takes no tracking.** The three tracking tiers are for uppercase tags,
+ *    control words and names; running body text set on a tracking tier is a
+ *    paragraph with gaps in it. Titles, eyebrows and labels track; the summary,
+ *    the body and the see-also line do not.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
+import {
+  BONE,
+  DISPLAY_TRACKING,
+  MATERIAL_SHADES,
+  PLATE_SCALES,
+  ROW,
+  TRACKING,
+  drawBeam,
+  drawPlate,
+  plateMaterial,
+  plateTypeSize,
+  trackingPx,
+  typeSize,
+} from '../art/materials';
+import type { FrameMetrics } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { FONT_BODY, FONT_HEADING, TEXT_DIM, TEXT_PRIMARY } from './typography';
-import { buttonStyle } from './button-theme';
+import { FONT_BODY, FONT_HEADING } from './typography';
 import {
   CODEX_ID,
+  codexEntryPlate,
   codexHitTest,
   codexLayout,
   codexRailContentHeight,
+  codexTabPlate,
 } from './codex';
-import type { CodexDetailView, CodexLayout, CodexModel, CodexTarget } from './codex';
+import type {
+  CodexDetailView,
+  CodexEntryView,
+  CodexLayout,
+  CodexModel,
+  CodexPlateState,
+  CodexTabView,
+  CodexTarget,
+} from './codex';
 import type { Insets } from './menu-geometry';
 
 export const CODEX_ANCHOR: AnchorSpec = { region: 'full' };
 
-/** Inner padding inside the detail pane. */
-const DETAIL_PAD = 14;
+// ---------------------------------------------------------------------------
+// Reference type sizes — at the handoff's 1280×720
+// ---------------------------------------------------------------------------
+
+/** The screen's heading, in the header beam. The settings screen's 22px. */
+const HEADING_PX = 22;
+/** The section title, hard right in the same beam. */
+const EYEBROW_PX = 12;
+/** A tab chip's word, and BACK's. */
+const TAB_PX = 15;
+const BACK_PX = 18;
+/** A rail row's entry title, and the plate scale the row itself is. `compact`
+ *  rather than `standard`: a row is a list item, and its 18px chamfer is the
+ *  gentler of the two cuts. */
+const ENTRY_PX = 14;
+const ENTRY_SCALE = 'compact' as const;
+/** Gap between a row's accent tick and its title (the plates' own 24, tightened —
+ *  a rail is 200–360px wide and a door is 800). */
+const ENTRY_TICK_GAP = 12;
+
+/** The article pane's own type. Body text is the biggest thing here for a reason:
+ *  it is the only thing on this screen a player reads for more than a second. */
+const DETAIL_TITLE_PX = 24;
+const DETAIL_BADGE_PX = 12;
+const DETAIL_SUMMARY_PX = 14;
+const DETAIL_BODY_PX = 15;
+const DETAIL_FACT_PX = 14;
+
+/** Inner padding inside the detail pane, at the reference. */
+const DETAIL_PAD = 20;
 /** Gap between stacked detail blocks. */
-const BLOCK_GAP = 10;
+const DETAIL_BLOCK_GAP = 12;
+/** The fact table's value column, at the reference. */
+const FACT_VALUE_COLUMN = 96;
 
 interface TabNodes {
   readonly body: Graphics;
@@ -61,6 +147,7 @@ interface FactNodes {
  */
 export class CodexView extends Container {
   private readonly backdrop = new Graphics();
+  private readonly beams = new Graphics();
   private readonly heading: Text;
   private readonly sectionLabel: Text;
   private readonly backBody = new Graphics();
@@ -70,7 +157,7 @@ export class CodexView extends Container {
   // The entry rail: a masked, scrollable list.
   private readonly railClip = new Container();
   private readonly railMask = new Graphics();
-  private readonly railBg = new Graphics();
+  private readonly railChrome = new Graphics();
   private readonly entryNodes: EntryNodes[] = [];
   private railScroll = 0;
 
@@ -105,22 +192,30 @@ export class CodexView extends Container {
     this.insets0 = insets;
     this.layout = codexLayout({ width: screenWidth, height: screenHeight }, 0, opts(isTouch, insets));
 
-    this.heading = makeText('CODEX', FONT_HEADING, 26, TEXT_PRIMARY);
+    this.heading = makeText('CODEX', FONT_HEADING, HEADING_PX, MATERIAL_SHADES.bone);
     this.heading.anchor.set(0, 0.5);
-    this.sectionLabel = makeText('', FONT_BODY, 12, TEXT_DIM);
-    this.sectionLabel.anchor.set(0, 0.5);
-    this.backLabel = makeText('BACK', FONT_HEADING, 15, TEXT_PRIMARY);
+    this.sectionLabel = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
+    this.sectionLabel.anchor.set(1, 0.5);
+    this.backLabel = makeText('BACK', FONT_HEADING, BACK_PX, MATERIAL_SHADES.bone);
     this.backLabel.anchor.set(0.5, 0.5);
 
     // Detail children live inside the masked, scrollable clip container.
-    this.detailTitle = makeText('', FONT_HEADING, 20, TEXT_PRIMARY);
-    this.detailBadges = makeText('', FONT_BODY, 12, PALETTE.plasma);
-    this.detailSummary = makeText('', FONT_BODY, 13, TEXT_PRIMARY);
-    this.detailBody = makeText('', FONT_BODY, 14, TEXT_PRIMARY);
-    this.detailFactsHead = makeText('', FONT_HEADING, 12, TEXT_DIM);
-    this.detailSeeAlso = makeText('', FONT_BODY, 12, TEXT_DIM);
-    this.detailEmpty = makeText('', FONT_BODY, 13, TEXT_DIM);
-    for (const t of [this.detailTitle, this.detailBadges, this.detailSummary, this.detailBody, this.detailFactsHead, this.detailSeeAlso, this.detailEmpty]) {
+    this.detailTitle = makeText('', FONT_HEADING, DETAIL_TITLE_PX, BONE.hi);
+    this.detailBadges = makeText('', FONT_BODY, DETAIL_BADGE_PX, MATERIAL_SHADES.bone);
+    this.detailSummary = makeText('', FONT_BODY, DETAIL_SUMMARY_PX, MATERIAL_SHADES.bone);
+    this.detailBody = makeText('', FONT_BODY, DETAIL_BODY_PX, MATERIAL_SHADES.bone);
+    this.detailFactsHead = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
+    this.detailSeeAlso = makeText('', FONT_BODY, DETAIL_BADGE_PX, MATERIAL_SHADES.boneLo);
+    this.detailEmpty = makeText('', FONT_BODY, DETAIL_SUMMARY_PX, MATERIAL_SHADES.boneLo);
+    for (const t of [
+      this.detailTitle,
+      this.detailBadges,
+      this.detailSummary,
+      this.detailBody,
+      this.detailFactsHead,
+      this.detailSeeAlso,
+      this.detailEmpty,
+    ]) {
       t.anchor.set(0, 0);
     }
     this.detailClip.addChild(
@@ -137,11 +232,12 @@ export class CodexView extends Container {
 
     this.addChild(
       this.backdrop,
+      this.beams,
       this.heading,
       this.sectionLabel,
       this.backBody,
       this.backLabel,
-      this.railBg,
+      this.railChrome,
       this.railMask,
       this.railClip,
       this.detailMask,
@@ -184,8 +280,12 @@ export class CodexView extends Container {
   update(model: CodexModel): void {
     if (!this.visible) return;
     // Recompute the layout with the live entry count so the rail sizes to the tab.
-    this.layout = codexLayout({ width: this.width0, height: this.height0 }, model.entries.length, opts(this.isTouch0, this.insets0));
-    const { content, title, back, tabs, rail, detail } = this.layout;
+    this.layout = codexLayout(
+      { width: this.width0, height: this.height0 },
+      model.entries.length,
+      opts(this.isTouch0, this.insets0),
+    );
+    const { header, footer, title, back, tabs, rail, detail, metrics } = this.layout;
 
     // A new tab (section) resets both scrolls; a new entry resets the detail.
     if (model.sectionTitle !== this.lastSection) {
@@ -198,39 +298,147 @@ export class CodexView extends Container {
       this.detailScroll = 0;
     }
 
+    // Opaque backdrop over the whole viewport, drawn from the beams outward so the
+    // beams' translucent fill has the void to sit on.
     this.backdrop.clear();
     this.backdrop
-      .rect(content.x - 8, content.y - 8, content.width + 16, content.height + 16)
-      .fill({ color: PALETTE.vacuum, alpha: 0.98 });
+      .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
+      .fill({ color: PALETTE.vacuum, alpha: 1 });
 
-    // Title band: heading on the left, the file title beneath it, BACK on the right.
-    this.heading.text = model.title;
-    this.heading.x = title.x + 2;
-    this.heading.y = title.y + title.height / 2 - 8;
-    this.sectionLabel.text = model.sectionTitle;
-    this.sectionLabel.x = title.x + 4;
-    this.sectionLabel.y = title.y + title.height / 2 + 12;
-    this.drawButton(this.backBody, this.backLabel, back, model.backLabel, false);
+    this.beams.clear();
+    if (header.height > 0) drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
+    if (footer.height > 0) drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
 
-    this.drawTabs(model, tabs);
-    this.drawRail(model, rail);
-    this.drawDetail(model.detail, detail);
+    this.drawHeader(model, title, metrics);
+    this.drawBack(model, back, metrics);
+    this.drawTabs(model, tabs, metrics);
+    this.drawRail(model, rail, metrics);
+    this.drawDetail(model.detail, detail, metrics);
   }
 
-  private drawTabs(model: CodexModel, tabs: readonly Rect[]): void {
+  /** The header beam: the heading hard left, the section title hard right — the
+   *  settings screen's construction, because this is a utility screen and its
+   *  heading is what names it. The section title gives way on a narrow beam: the
+   *  heading says which screen you are on, the section only describes it. */
+  private drawHeader(model: CodexModel, title: Rect, m: FrameMetrics): void {
+    const visible = title.height > 0;
+    this.heading.visible = visible;
+    this.sectionLabel.visible = visible;
+    if (!visible) return;
+
+    const headingPx = typeSize(HEADING_PX, m);
+    this.heading.text = model.title;
+    this.heading.style.fontSize = headingPx;
+    this.heading.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, headingPx);
+    this.heading.x = title.x;
+    this.heading.y = title.y + title.height / 2;
+
+    const eyebrowPx = typeSize(EYEBROW_PX, m);
+    this.sectionLabel.text = model.sectionTitle;
+    this.sectionLabel.style.fontSize = eyebrowPx;
+    this.sectionLabel.style.letterSpacing = trackingPx(TRACKING.name, eyebrowPx);
+    this.sectionLabel.x = title.x + title.width;
+    this.sectionLabel.y = title.y + title.height / 2;
+    this.sectionLabel.visible =
+      this.heading.width + this.sectionLabel.width + m.gutter <= title.width;
+  }
+
+  /** BACK — a `compact` plate bolted to the leading end of the footer beam, the
+   *  exit corner every screen in this directory puts its way out in. `secondary`,
+   *  never primary: leaving is not this screen's headline action, and the CODEX
+   *  deliberately has none. */
+  private drawBack(model: CodexModel, rect: Rect, m: FrameMetrics): void {
+    this.backBody.clear();
+    const visible = rect.width > 0 && rect.height > 0;
+    this.backLabel.visible = visible;
+    if (!visible) return;
+
+    drawPlate(this.backBody, rect.x, rect.y, rect.width, rect.height, 'secondary', 'compact', model.backState);
+    const px = plateTypeSize(BACK_PX, m);
+    this.backLabel.text = model.backLabel;
+    this.backLabel.style.fontSize = px;
+    this.backLabel.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
+    this.backLabel.x = rect.x + rect.width / 2;
+    this.backLabel.y =
+      rect.y + rect.height / 2 + plateMaterial('secondary', model.backState, 'plate').offsetY;
+  }
+
+  // --- The tab row ----------------------------------------------------------
+
+  /**
+   * The four tabs, as chips.
+   *
+   * The active one is the `primary` chip: the brightest metal in the chip family
+   * behind a Bone border — the same material the settings screen's engaged toggle
+   * wears, which is the set's existing word for *this is the current one*. The
+   * other three are plain `secondary` chips. Brightness, and nothing else: a tab
+   * is a mode switch, and marking it positionally would collide with the rail's
+   * selection mark one band below it.
+   */
+  private drawTabs(model: CodexModel, tabs: readonly Rect[], m: FrameMetrics): void {
     for (let i = 0; i < tabs.length; i++) {
       const rect = tabs[i];
       const tab = model.tabs[i];
       if (!rect || !tab) continue;
-      this.drawButton(this.tabSlot(i).body, this.tabSlot(i).label, rect, tab.label, tab.active);
+      const nodes = this.tabSlot(i);
+      this.drawTab(nodes, tab, rect, m);
+    }
+    for (let i = tabs.length; i < this.tabNodes.length; i++) {
+      const nodes = this.tabNodes[i];
+      if (nodes) {
+        nodes.body.visible = false;
+        nodes.label.visible = false;
+      }
     }
   }
 
-  private drawRail(model: CodexModel, rail: Rect): void {
-    // The rail background + the fixed clip mask (both in screen space; the clip
-    // container is what scrolls, not the mask).
-    this.railBg.clear();
-    this.railBg.rect(rail.x, rail.y, rail.width, rail.height).fill({ color: PALETTE.hullSteel, alpha: 0.05 });
+  private drawTab(nodes: TabNodes, tab: CodexTabView, rect: Rect, m: FrameMetrics): void {
+    nodes.body.clear();
+    const visible = rect.width > 0 && rect.height > 0;
+    nodes.body.visible = visible;
+    nodes.label.visible = visible;
+    if (!visible) return;
+
+    const role = codexTabPlate(tab);
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, role, 'chip', tab.state);
+
+    const px = plateTypeSize(TAB_PX, m);
+    nodes.label.text = tab.label;
+    nodes.label.style.fontSize = px;
+    nodes.label.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
+    nodes.label.style.fill = tab.active ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.label.x = rect.x + rect.width / 2;
+    nodes.label.y = rect.y + rect.height / 2 + plateMaterial(role, tab.state, 'chip').offsetY;
+    // A tab word that will not fit its chip shrinks rather than spilling over the
+    // border drawn round it: STRATEGY on a phone is the case.
+    nodes.label.scale.set(1);
+    const room = Math.max(0, rect.width - 2 * Math.max(6, Math.round(8 * m.plateScale)));
+    if (nodes.label.width > room && nodes.label.width > 0) {
+      nodes.label.scale.set(room / nodes.label.width);
+    }
+  }
+
+  // --- The entry rail -------------------------------------------------------
+
+  /**
+   * The scrolling list of entry titles.
+   *
+   * A row is a `inert` SURFACE by default — held down on the panel rather than
+   * standing off it, exactly as a settings row is. The selected one rises to a
+   * `secondary` plate and takes a **Bone bar down its leading edge**: the
+   * positional mark that points at the pane beside it, which is a different kind
+   * of statement from the tab row's brightness one band above.
+   */
+  private drawRail(model: CodexModel, rail: Rect, m: FrameMetrics): void {
+    // The rail's chrome: the fixed clip mask, and the hairline that separates the
+    // list from the article. The pane itself carries no plate — see the header.
+    this.railChrome.clear();
+    if (rail.width > 0 && rail.height > 0) {
+      const rule = Math.max(1, Math.round(m.scale));
+      this.railChrome
+        .rect(rail.x + rail.width + Math.round(m.gutter / 2) - rule, rail.y, rule, rail.height)
+        .fill({ color: MATERIAL_SHADES.hairline, alpha: 0.5 });
+    }
     this.railMask.clear();
     this.railMask.rect(rail.x, rail.y, rail.width, rail.height).fill({ color: 0xffffff });
 
@@ -238,26 +446,18 @@ export class CodexView extends Container {
     this.scrollRail(0);
     this.railClip.y = -this.railScroll;
 
+    // The title column: past the plate's padding and its accent tick, exactly the
+    // way a door's label hangs off its own tick on the doors screen.
+    const g = PLATE_SCALES[ENTRY_SCALE];
+    const padX = Math.max(8, Math.round(ROW.padX * m.plateScale));
+    const textX = rail.x + g.bezel + g.padX + g.tickWidth + Math.max(6, Math.round(ENTRY_TICK_GAP * m.plateScale));
+    const px = plateTypeSize(ENTRY_PX, m);
+
     for (let i = 0; i < model.entries.length; i++) {
       const rect = this.layout.railEntries[i];
       const entry = model.entries[i];
       if (!rect || !entry) continue;
-      const nodes = this.entrySlot(i);
-      nodes.body.visible = true;
-      nodes.label.visible = true;
-      const style = buttonStyle(entry.selected ? 'primary' : 'standard');
-      nodes.body.clear();
-      nodes.body
-        .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-        .fill({ color: style.fill, alpha: entry.selected ? style.fillAlpha : 0.06 })
-        .roundRect(rect.x, rect.y, rect.width, rect.height, 5)
-        .stroke({ width: entry.selected ? 2 : 1, color: style.stroke, alpha: entry.selected ? style.strokeAlpha : 0.3 });
-      nodes.label.text = entry.title;
-      nodes.label.style.fill = style.label;
-      nodes.label.style.wordWrap = true;
-      nodes.label.style.wordWrapWidth = Math.max(20, rect.width - 20);
-      nodes.label.x = rect.x + 10;
-      nodes.label.y = rect.y + rect.height / 2;
+      this.drawEntry(this.entrySlot(i), entry, rect, textX, padX, px);
     }
     // Hide pooled rows beyond the current tab's length.
     for (let i = model.entries.length; i < this.entryNodes.length; i++) {
@@ -269,52 +469,137 @@ export class CodexView extends Container {
     }
   }
 
-  private drawDetail(detail: CodexDetailView | null, pane: Rect): void {
+  private drawEntry(
+    nodes: EntryNodes,
+    entry: CodexEntryView,
+    rect: Rect,
+    textX: number,
+    wrapRight: number,
+    px: number,
+  ): void {
+    nodes.body.clear();
+    const visible = rect.width > 0 && rect.height > 0;
+    nodes.body.visible = visible;
+    nodes.label.visible = visible;
+    if (!visible) return;
+
+    const role = codexEntryPlate(entry);
+    const state: CodexPlateState = entry.state;
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, role, ENTRY_SCALE, state);
+    const sink = plateMaterial(role, state, 'plate').offsetY;
+
+    if (entry.selected) {
+      // THE SELECTION MARK. A raised (`secondary`) plate carries the vocabulary's
+      // own 3px accent tick "at the head of the plate's content" and a surface
+      // (`inert`) carries none, so the mark slides in beside the row that is
+      // selected and costs no new geometry — it is re-tinted to Bone here for the
+      // same reason a `primary` plate's tick is white: this one means something.
+      const g = PLATE_SCALES[ENTRY_SCALE];
+      const th = Math.min(g.tickHeight, rect.height - 2 * g.bezel);
+      nodes.body
+        .rect(rect.x + g.bezel + g.padX, rect.y + sink + (rect.height - th) / 2, g.tickWidth, th)
+        .fill({ color: BONE.mid, alpha: 1 });
+    }
+
+    nodes.label.text = entry.title;
+    nodes.label.style.fontSize = px;
+    nodes.label.style.letterSpacing = trackingPx(TRACKING.name, px);
+    nodes.label.style.fill = entry.selected ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.label.style.wordWrap = true;
+    // The title column is the SAME on a selected row and an unselected one, so a
+    // moving selection slides a mark in beside the list rather than shunting every
+    // title sideways.
+    nodes.label.style.wordWrapWidth = Math.max(20, rect.x + rect.width - wrapRight - textX);
+    nodes.label.x = textX;
+    nodes.label.y = rect.y + rect.height / 2 + sink;
+  }
+
+  // --- The article ----------------------------------------------------------
+
+  /**
+   * The reading pane: a title, badges, a summary, the body, the machine-checked
+   * numbers, and the cross-references. **No plate, no bevel, no rivets** — the one
+   * place on this screen the material stops, because this is the text a player is
+   * actually reading and the frozen legibility rule outranks the register.
+   *
+   * Emphasis here is the value ramp and nothing else: the title is chalk-bright,
+   * the body is Bone, the summary and the see-also are the low step. The badges
+   * used to be plasma and the fact values used to be plasma; both are Bone now,
+   * because Bone spends no hue on a menu.
+   */
+  private drawDetail(detail: CodexDetailView | null, pane: Rect, m: FrameMetrics): void {
     this.detailMask.clear();
     this.detailMask.rect(pane.x, pane.y, pane.width, pane.height).fill({ color: 0xffffff });
 
     const showEmpty = detail === null;
     this.detailEmpty.visible = showEmpty;
-    for (const t of [this.detailTitle, this.detailBadges, this.detailSummary, this.detailBody, this.detailFactsHead, this.detailSeeAlso]) {
+    for (const t of [
+      this.detailTitle,
+      this.detailBadges,
+      this.detailSummary,
+      this.detailBody,
+      this.detailFactsHead,
+      this.detailSeeAlso,
+    ]) {
       t.visible = !showEmpty;
     }
+
+    const pad = Math.max(8, Math.round(DETAIL_PAD * m.scale));
     if (!detail) {
       this.detailEmpty.text = 'No entries.';
-      this.detailEmpty.x = pane.x + DETAIL_PAD;
-      this.detailEmpty.y = pane.y + DETAIL_PAD;
+      this.detailEmpty.style.fontSize = typeSize(DETAIL_SUMMARY_PX, m);
+      this.detailEmpty.x = pane.x + pad;
+      this.detailEmpty.y = pane.y + pad;
       this.detailContentHeight = 0;
       this.detailClip.y = 0;
       return;
     }
 
-    const wrap = Math.max(40, pane.width - 2 * DETAIL_PAD);
-    const left = pane.x + DETAIL_PAD;
-    let y = pane.y + DETAIL_PAD;
+    const wrap = Math.max(40, pane.width - 2 * pad);
+    const left = pane.x + pad;
+    const gap = Math.max(6, Math.round(DETAIL_BLOCK_GAP * m.scale));
+    let y = pane.y + pad;
 
-    y = this.placeBlock(this.detailTitle, detail.title, left, y, wrap, true);
+    const titlePx = typeSize(DETAIL_TITLE_PX, m);
+    this.detailTitle.style.fontSize = titlePx;
+    this.detailTitle.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, titlePx);
+    y = this.placeBlock(this.detailTitle, detail.title, left, y, wrap) + 2;
 
     if (detail.badges.length > 0) {
-      y += 4;
-      y = this.placeBlock(this.detailBadges, detail.badges.join('   ·   '), left, y, wrap, false);
+      y += Math.round(gap / 2);
+      const badgePx = typeSize(DETAIL_BADGE_PX, m);
+      this.detailBadges.style.fontSize = badgePx;
+      this.detailBadges.style.letterSpacing = trackingPx(TRACKING.label, badgePx);
+      y = this.placeBlock(this.detailBadges, detail.badges.join('   ·   ').toUpperCase(), left, y, wrap);
     } else {
       this.detailBadges.visible = false;
     }
 
     if (detail.summary) {
-      y += BLOCK_GAP;
-      this.detailSummary.style.fill = TEXT_DIM;
-      y = this.placeBlock(this.detailSummary, detail.summary, left, y, wrap, false);
+      y += gap;
+      // Prose: no tracking. The three tiers are for tags, control words and names.
+      this.detailSummary.style.fontSize = typeSize(DETAIL_SUMMARY_PX, m);
+      this.detailSummary.style.letterSpacing = 0;
+      this.detailSummary.style.fill = MATERIAL_SHADES.boneLo;
+      y = this.placeBlock(this.detailSummary, detail.summary, left, y, wrap);
     } else {
       this.detailSummary.visible = false;
     }
 
-    y += BLOCK_GAP;
-    y = this.placeBlock(this.detailBody, detail.body, left, y, wrap, false);
+    y += gap;
+    this.detailBody.style.fontSize = typeSize(DETAIL_BODY_PX, m);
+    this.detailBody.style.letterSpacing = 0;
+    y = this.placeBlock(this.detailBody, detail.body, left, y, wrap);
 
     if (detail.facts.length > 0) {
-      y += BLOCK_GAP;
-      y = this.placeBlock(this.detailFactsHead, 'BY THE NUMBERS', left, y, wrap, false);
-      y += 4;
+      y += gap;
+      const headPx = typeSize(EYEBROW_PX, m);
+      this.detailFactsHead.style.fontSize = headPx;
+      this.detailFactsHead.style.letterSpacing = trackingPx(TRACKING.eyebrow, headPx);
+      y = this.placeBlock(this.detailFactsHead, 'BY THE NUMBERS', left, y, wrap);
+      y += Math.round(gap / 2);
+      const factPx = typeSize(DETAIL_FACT_PX, m);
+      const column = Math.min(Math.round(FACT_VALUE_COLUMN * m.scale), wrap / 2);
       for (let i = 0; i < detail.facts.length; i++) {
         const fact = detail.facts[i];
         if (!fact) continue;
@@ -322,12 +607,16 @@ export class CodexView extends Container {
         nodes.value.visible = true;
         nodes.label.visible = true;
         nodes.value.text = fact.value;
+        nodes.value.style.fontSize = factPx;
+        nodes.value.style.letterSpacing = trackingPx(TRACKING.name, factPx);
         nodes.value.x = left;
         nodes.value.y = y;
         nodes.label.text = fact.label;
-        nodes.label.x = left + 84;
+        nodes.label.style.fontSize = typeSize(DETAIL_BADGE_PX, m);
+        nodes.label.style.letterSpacing = 0;
+        nodes.label.x = left + column;
         nodes.label.style.wordWrap = true;
-        nodes.label.style.wordWrapWidth = Math.max(20, wrap - 84);
+        nodes.label.style.wordWrapWidth = Math.max(20, wrap - column);
         nodes.label.y = y;
         y += Math.max(nodes.value.height, nodes.label.height) + 4;
       }
@@ -344,50 +633,35 @@ export class CodexView extends Container {
     }
 
     if (detail.seeAlso.length > 0) {
-      y += BLOCK_GAP;
-      y = this.placeBlock(this.detailSeeAlso, `See also — ${detail.seeAlso.join(', ')}`, left, y, wrap, false);
+      y += gap;
+      this.detailSeeAlso.style.fontSize = typeSize(DETAIL_BADGE_PX, m);
+      this.detailSeeAlso.style.letterSpacing = 0;
+      y = this.placeBlock(this.detailSeeAlso, `See also — ${detail.seeAlso.join(', ')}`, left, y, wrap);
     } else {
       this.detailSeeAlso.visible = false;
     }
 
-    this.detailContentHeight = y - pane.y + DETAIL_PAD;
+    this.detailContentHeight = y - pane.y + pad;
     this.scrollDetail(0); // re-clamp against the fresh content height
     this.detailClip.y = -this.detailScroll;
   }
 
   /** Place a text block at `(x, y)` with word-wrap, returning the y below it. */
-  private placeBlock(node: Text, text: string, x: number, y: number, wrapWidth: number, heading: boolean): number {
+  private placeBlock(node: Text, text: string, x: number, y: number, wrapWidth: number): number {
     node.visible = true;
     node.text = text;
     node.style.wordWrap = true;
     node.style.wordWrapWidth = wrapWidth;
     node.x = x;
     node.y = y;
-    return y + node.height + (heading ? 2 : 0);
-  }
-
-  private drawButton(body: Graphics, label: Text, rect: Rect, text: string, active: boolean): void {
-    // The active tab (and the selected entry) is PRIMARY plasma; everything else
-    // is STANDARD steel. No control here is ever disabled, so gray never appears.
-    const style = buttonStyle(active ? 'primary' : 'standard');
-    body.clear();
-    body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .fill({ color: style.fill, alpha: style.fillAlpha })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 6)
-      .stroke({ width: style.strokeWidth, color: style.stroke, alpha: style.strokeAlpha });
-    label.text = text;
-    label.style.fill = style.label;
-    label.alpha = style.labelAlpha;
-    label.x = rect.x + rect.width / 2;
-    label.y = rect.y + rect.height / 2;
+    return y + node.height;
   }
 
   private tabSlot(index: number): TabNodes {
     const existing = this.tabNodes[index];
     if (existing) return existing;
     const body = new Graphics();
-    const label = makeText('', FONT_HEADING, 15, TEXT_PRIMARY);
+    const label = makeText('', FONT_HEADING, TAB_PX, MATERIAL_SHADES.bone);
     label.anchor.set(0.5, 0.5);
     this.addChild(body, label);
     const nodes: TabNodes = { body, label };
@@ -399,7 +673,7 @@ export class CodexView extends Container {
     const existing = this.entryNodes[index];
     if (existing) return existing;
     const body = new Graphics();
-    const label = makeText('', FONT_HEADING, 12, TEXT_PRIMARY);
+    const label = makeText('', FONT_HEADING, ENTRY_PX, MATERIAL_SHADES.bone);
     label.anchor.set(0, 0.5);
     // Entry rows scroll with the rail clip, so they are children of it.
     this.railClip.addChild(body, label);
@@ -411,9 +685,9 @@ export class CodexView extends Container {
   private factSlot(index: number): FactNodes {
     const existing = this.factNodes[index];
     if (existing) return existing;
-    const value = makeText('', FONT_BODY, 13, PALETTE.plasma);
+    const value = makeText('', FONT_BODY, DETAIL_FACT_PX, BONE.hi);
     value.anchor.set(0, 0);
-    const label = makeText('', FONT_BODY, 12, TEXT_DIM);
+    const label = makeText('', FONT_BODY, DETAIL_BADGE_PX, MATERIAL_SHADES.boneLo);
     label.anchor.set(0, 0);
     this.detailClip.addChild(value, label);
     const nodes: FactNodes = { value, label };
@@ -427,7 +701,7 @@ function opts(isTouch: boolean, insets?: Insets): { isTouch: boolean; insets?: I
 }
 
 function makeText(text: string, fontFamily: string, fontSize: number, fill: number): Text {
-  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0.4 } });
+  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0 } });
 }
 
 function clamp(value: number, min: number, max: number): number {
