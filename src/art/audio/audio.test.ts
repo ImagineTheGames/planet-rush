@@ -576,6 +576,98 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
   });
 
+  it('holds the amended tone contract: no arcade oscillators or idioms in the bank (GDD §4.7)', () => {
+    // **The definition of done for the re-voice**, and the last thing written:
+    // it was red for the whole pass and went green when the pass finished, which
+    // is the only ordering that makes it mean anything.
+    //
+    // The four clauses are `docs/audio-revoice-spec.md` §5. Each names its
+    // exceptions here rather than in a reviewer's head, because the failure mode
+    // of a policy nobody can read is that the next agent quietly re-adds the
+    // thing it was written to keep out.
+    const voices: { sound: SoundName; spec: VoiceSpec }[] = [];
+    for (const name of SOUND_NAMES) {
+      const spec = soundSpec(name);
+      for (const v of isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec]) {
+        voices.push({ sound: name, spec: v });
+      }
+    }
+    expect(voices.length).toBeGreaterThan(80); // it walks the whole bank, not a corner
+
+    // §5.1 — the oscillators. `square` and `saw` are the two shapes the ratified
+    // Gantry/Bone handoff independently names as "what made earlier passes sound
+    // retro or cartoonish", and they were 28 of the bank's 89 voices.
+    //
+    // The alarm is the ONE sanctioned exception, and the reason is a precedence
+    // rule rather than a taste: §2.2 specifies "an unmistakable alarm", §4.9 puts
+    // it on the not-cuttable list, and a saw's dense harmonic stack is what makes
+    // a klaxon refuse to sound like music. Softening it would trade a mechanic
+    // for a register, which §4.7's own precedence forbids.
+    const SANCTIONED_SAW = new Set(['alarm.low', 'alarm.high']);
+    for (const { sound, spec } of voices) {
+      if (SANCTIONED_SAW.has(spec.name)) {
+        expect(spec.wave, `${spec.name} is the sanctioned klaxon`).toBe('saw');
+        continue;
+      }
+      expect(spec.wave, `${sound}/${spec.name} is an arcade oscillator`).not.toBe('square');
+      expect(spec.wave, `${sound}/${spec.name} is an arcade oscillator`).not.toBe('saw');
+    }
+
+    // §5.3 — the arcade idioms, retired outright. No exceptions. These are
+    // jsfxr's own vocabulary: `arpMul`/`arpTime` is the "blip up" (the synth's
+    // doc comment calls it that), `dutySweep` is "the classic sweeping buzz",
+    // and `repeat` in this bank was only ever a trill. They stay in VoiceSpec —
+    // `repeat` has a legitimate non-arcade use as a rattle and may return with a
+    // written reason — but nothing in the bank reaches for them.
+    for (const { sound, spec } of voices) {
+      const where = `${sound}/${spec.name}`;
+      expect(spec.arpMul, `${where} arpeggios`).toBeUndefined();
+      expect(spec.arpTime, `${where} arpeggios`).toBeUndefined();
+      expect(spec.dutySweep, `${where} sweeps its duty`).toBeUndefined();
+      expect(spec.repeat, `${where} trills`).toBeUndefined();
+    }
+
+    // §5.4 — modulation and glide, the clauses the audit proved actually carry
+    // the register. Removing rockChip's vibrato moved its spectral centroid by
+    // 0.6% (noise) and removing its chirp moved it 154 Hz — so a pass that only
+    // swapped waveforms could have hit every brightness target and left the toy
+    // exactly where it was.
+    //
+    // 250 ms is where a glide stops reading as a *chirp* and starts reading as a
+    // *fall*, and where a few cycles of vibrato stop reading as a *wobble* and
+    // start reading as *drift*. Longer voices are exempt by construction, which
+    // is deliberate: the station-death fall (×6.18 over 1.32 s), the collapse,
+    // the shield bubble failing (×6.92 over 0.54 s) and the ambient bed's
+    // 0.125 Hz drift are all the opposite of the thing being banned.
+    const SHORT_S = 0.25;
+    const MAX_GLIDE = 1.2;
+    /** Voices under the threshold that keep a wide glide, each with its reason. */
+    const GLIDE_EXEMPT: Readonly<Record<string, string>> = {
+      // HOLD by ratification (s7-01 §7.2): one of the two sounds a home gets,
+      // and the ache depends on it. The tear falling under the thud is the
+      // reactor being opened, not a chirp — and at 0.0063 it is the darkest
+      // voice in the bank, which is the opposite of the complaint.
+      'coreHit.tear': 'the ache — held untouched by s7-01 §7.2, and the darkest voice in the bank',
+    };
+    for (const { sound, spec } of voices) {
+      const duration = voiceDuration(spec);
+      if (duration >= SHORT_S) continue;
+      const where = `${sound}/${spec.name} (${(duration * 1000).toFixed(0)} ms)`;
+
+      // A wobble inside a voice this short is a cartoon, full stop — no exemptions.
+      expect(spec.vibratoDepth ?? 0, `${where} wobbles`).toBe(0);
+
+      if (spec.freqEnd === undefined || spec.freqEnd === spec.freq) continue;
+      const glide = Math.max(spec.freq, spec.freqEnd) / Math.max(1, Math.min(spec.freq, spec.freqEnd));
+      const reason = GLIDE_EXEMPT[spec.name];
+      if (reason !== undefined) {
+        expect(reason.length, `${where} claims an exemption with no reason`).toBeGreaterThan(20);
+        continue;
+      }
+      expect(glide, `${where} chirps ×${glide.toFixed(2)}`).toBeLessThanOrEqual(MAX_GLIDE);
+    }
+  });
+
   it('keeps the shipped mining voice under the tone the developer ratified (s4-01, s7-01)', () => {
     // **The bug report, reproduced as a number.** The developer denied the
     // rockChip trio in s4-01 with one note — *"almost there, but they should be
