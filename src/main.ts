@@ -177,6 +177,9 @@ import {
   settingsModel,
   settingsLayout,
   sameTarget,
+  controlsDevice,
+  parseControlScheme,
+  storedControlScheme,
   SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
@@ -1130,6 +1133,12 @@ async function boot(): Promise<void> {
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
+  // Whether a pad is CONNECTED — a different question from which device last
+  // acted, and the one the pause menu's CONTROLS row asks (u8-01): the row is a
+  // standing description of the hardware, so a connected pad reads TWIN STICKS
+  // whether or not it was the last thing touched. Kept live by the connect /
+  // disconnect listeners below.
+  let gamepadConnected = anyGamepadConnected();
 
   // --- Pause menu (developer ratification, p10) ------------------------------
   //     ESC (desktop) or a touch corner button opens an overlay over a match in
@@ -1196,12 +1205,18 @@ async function boot(): Promise<void> {
 
   // Gamepad connect/disconnect are logged so the end-to-end verification pass can
   // confirm the pad registered (GDD §2.4). Polling in GamepadSource does the real
-  // work — it scans for the first connected pad — so play needs no event here.
+  // work — it scans for the first connected pad — so PLAY needs no event here;
+  // what does need them is the CONTROLS row's word (u8-01), which has to say
+  // TWIN STICKS the moment a pad appears and stop saying it the moment it goes.
+  // The disconnect re-scans rather than clearing the flag, because a second pad
+  // may still be plugged in.
   window.addEventListener('gamepadconnected', (e) => {
     console.info(`[gamepad] connected: ${(e as GamepadEvent).gamepad.id}`);
+    gamepadConnected = true;
   });
   window.addEventListener('gamepaddisconnected', () => {
     console.info('[gamepad] disconnected');
+    gamepadConnected = anyGamepadConnected();
   });
 
   const touch = new TouchController({ screenWidth: transform.logicalWidth });
@@ -2175,7 +2190,7 @@ async function boot(): Promise<void> {
       case 'controls':
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
         audio.cue('detent');
         break;
       case 'reduceVfx':
@@ -2228,7 +2243,7 @@ async function boot(): Promise<void> {
     pauseSettings.visible = settingsUp;
     if (settingsUp) {
       pauseSettings.update(
-        settingsModel(matchSettings, fireMode, controlScheme, {
+        settingsModel(matchSettings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
           hover: pauseSettingsHover,
           press: pauseSettingsPress,
         }),
@@ -3896,7 +3911,7 @@ async function boot(): Promise<void> {
       setScheme(scheme: 'sticks' | 'tap'): void {
         controlScheme = scheme;
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
       },
       /** Park the local ship at the arena centre with one bot a short hop away in
        *  weapon range, both out of spawn protection, and clear the asteroid field so
@@ -4697,7 +4712,7 @@ async function boot(): Promise<void> {
     if (e.code === 'KeyC') {
       controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
       tapPilot.clear();
-      platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+      platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
     }
     // Minimap toggle (field request v0.2.2): the `M` keyboard shortcut on PC, the
     // desktop convenience over the primary click/tap gesture — the same toggle the
@@ -5031,7 +5046,27 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
  *  existing schemes stay the untouched default and a bad key can never seat an
  *  unknown scheme. Read through the same platform seam as the fire mode. */
 function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): ControlScheme {
-  return platform.storage.get(CONTROL_SCHEME_KEY) === 'tap' ? 'tap' : 'sticks';
+  // The stored string is the UI's own round trip (`./ui` `parseControlScheme` /
+  // `storedControlScheme`), so the persisted value and the scheme it seats can
+  // never drift apart — and `sticks` keeps meaning the default scheme even now
+  // that no screen prints that word on a PC (u8-01).
+  return parseControlScheme(platform.storage.get(CONTROL_SCHEME_KEY));
+}
+
+/**
+ * Is a gamepad connected RIGHT NOW? The one browser read behind the CONTROLS
+ * row's `TWIN STICKS` (u8-01) — asked here, in the wiring layer, because
+ * `src/ui` must stay pure and headless-testable and sniffing `navigator` is the
+ * platform's job. Scans every slot rather than assuming slot 0, exactly as
+ * `GamepadSource` does: browsers assign a pad's index lazily and it varies by
+ * device and port.
+ */
+function anyGamepadConnected(): boolean {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return false;
+  for (const pad of navigator.getGamepads()) {
+    if (pad && pad.connected) return true;
+  }
+  return false;
 }
 
 /** The hull to pre-select in the lobby: the last one this player chose, or the
@@ -5381,6 +5416,12 @@ function openMainMenu(
   // with. The CONTROLS settings row shows and toggles it here, persisting to that
   // seam so the choice carries into the match exactly as the fire mode does.
   let controlScheme = readControlScheme(platform);
+  // Whether a pad is connected, for the CONTROLS row's word (u8-01): STICKS on
+  // touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a PC without one. The menu
+  // has no input funnel and no `activeDevice`, so this is the whole of what it
+  // needs to know about the hardware — and it is a live value, because a pad can
+  // be plugged in or die while the screen is open (see the listeners below).
+  let gamepadConnected = anyGamepadConnected();
   let settings: SettingsState = createSettings();
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
@@ -5709,7 +5750,10 @@ function openMainMenu(
     if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
     if (settingsView.visible) {
       settingsView.update(
-        settingsModel(settings, fireMode, controlScheme, { hover: settingsHover, press: settingsPress }),
+        settingsModel(settings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
+          hover: settingsHover,
+          press: settingsPress,
+        }),
       );
     }
     if (codexView.visible) codexView.update(codexModel(codexState));
@@ -6274,7 +6318,7 @@ function openMainMenu(
         // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
         // and carries into the match exactly as the fire mode does.
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
         ctx.cue('detent');
         break;
       case 'reduceVfx':
@@ -6491,6 +6535,23 @@ function openMainMenu(
     render();
   }
 
+  /**
+   * A pad appeared or went away while the menu is up (u8-01).
+   *
+   * The menu is static — it redraws on a state change, not every frame — so the
+   * new word has to be *pushed*, or a pad plugged in on the settings screen would
+   * leave `KEYBOARD + MOUSE` on screen until something else happened to trigger a
+   * render. Connect trusts its own event; disconnect re-scans, because a second
+   * pad may still be plugged in.
+   */
+  function setGamepadConnected(connected: boolean): void {
+    if (connected === gamepadConnected) return;
+    gamepadConnected = connected;
+    render();
+  }
+  const onGamepadConnected = (): void => setGamepadConnected(true);
+  const onGamepadDisconnected = (): void => setGamepadConnected(anyGamepadConnected());
+
   function relayout(): void {
     // Landscape lock first: re-apply the root transform for the new canvas size,
     // then re-lay the menu in the resulting logical (landscape) viewport — the
@@ -6514,6 +6575,8 @@ function openMainMenu(
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
+    window.removeEventListener('gamepadconnected', onGamepadConnected);
+    window.removeEventListener('gamepaddisconnected', onGamepadDisconnected);
     window.visualViewport?.removeEventListener('resize', relayout);
     ctx.root.removeChild(menuView, settingsView, codexView, entryView);
     menuView.destroy({ children: true });
@@ -6531,6 +6594,8 @@ function openMainMenu(
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);
+  window.addEventListener('gamepadconnected', onGamepadConnected);
+  window.addEventListener('gamepaddisconnected', onGamepadDisconnected);
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);

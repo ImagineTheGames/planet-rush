@@ -1,0 +1,46 @@
+{
+  "probe": "u8-01 CONTROLS label per device",
+  "base": "http://localhost:4173",
+  "capturedAt": "2026-08-06T07:53:02.713Z",
+  "steps": [
+    {
+      "step": "desktop, no pad",
+      "persisted": null,
+      "crop": "089bfd71160d57b7"
+    },
+    {
+      "step": "desktop, pad connected",
+      "persisted": null,
+      "crop": "13d4f0615db74f36"
+    },
+    {
+      "step": "desktop, pad disconnected",
+      "persisted": null,
+      "crop": "089bfd71160d57b7"
+    },
+    {
+      "step": "desktop, TAP COMMANDER",
+      "persisted": "tap",
+      "crop": "e8f21361e129ff5d"
+    },
+    {
+      "step": "desktop, back to the default scheme",
+      "persisted": "sticks"
+    },
+    {
+      "step": "phone (touch), no pad",
+      "persisted": null,
+      "crop": "fae4326da356163b"
+    },
+    {
+      "step": "phone (touch), pad connected",
+      "persisted": null,
+      "crop": "fae4326da356163b"
+    }
+  ],
+  "revertedExactly": true,
+  "padChangedTheRow": true,
+  "desktopErrors": [],
+  "touchUnaffectedByPad": true,
+  "phoneErrors": []
+}
