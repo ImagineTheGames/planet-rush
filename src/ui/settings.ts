@@ -393,7 +393,7 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
 
   const title = beamContent(frame.header, metrics);
 
-  const footerStrip = beamContent(frame.footer, metrics);
+  const footerStrip = beamContent(frame.footer, metrics, 'footer');
   const backHeight = Math.min(plateHeight('compact', metrics), footerStrip.height);
   const backWidth = Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width);
   const back: Rect = {

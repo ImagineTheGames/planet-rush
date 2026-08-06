@@ -18,10 +18,12 @@ import { describe, it, expect } from 'vitest';
 import {
   BEAM,
   PLATE_SCALES,
+  RIVET,
   ROW,
   TOUCH_MIN,
   TYPE_MIN,
   VALUE_CHIP,
+  beamContentInset,
   frameMetrics,
   plateHeight,
   plateTypeSize,
@@ -141,10 +143,26 @@ describe('safe areas and degenerate viewports', () => {
     expect(frame.footer.y + frame.footer.height).toBe(PHONE.height - 20);
   });
 
-  it('insets a beam\'s own content by the page margin on top of the safe area', () => {
+  it('insets a footer\'s content by the page margin on top of the safe area', () => {
     const frame = gantryFrame(PHONE, { left: 44 });
-    const strip = beamContent(frame.header, frame.metrics);
+    const strip = beamContent(frame.footer, frame.metrics, 'footer');
     expect(strip.x).toBe(44 + frame.metrics.margin);
+  });
+
+  it('starts a HEADER\'s content clear of the rivets bolted through it', () => {
+    // The rivets are hardware and do not scale, so on a phone the derived 24px
+    // margin puts the eyebrow's first two letters underneath them — which is
+    // exactly what u7-01's first phone golden showed.
+    const phone = frameMetrics(PHONE.width, PHONE.height);
+    const rivetRight = RIVET.inset + (RIVET.perCluster * RIVET.pitch - RIVET.gap);
+    expect(phone.margin).toBeLessThan(rivetRight);
+    expect(beamContentInset(phone, 'header')).toBeGreaterThan(rivetRight);
+    expect(beamContentInset(phone, 'footer')).toBe(phone.margin);
+
+    // …and on the desktop the rule reproduces the handoff's own 44px margin,
+    // because that is where the two numbers meet.
+    const desktop = frameMetrics(DESKTOP.width, DESKTOP.height);
+    expect(beamContentInset(desktop, 'header')).toBe(BEAM.margin);
   });
 
   it('gives way — beams before content — on a viewport too short for both', () => {

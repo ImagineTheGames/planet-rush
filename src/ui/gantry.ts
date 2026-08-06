@@ -36,8 +36,8 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { frameMetrics } from '../art/materials';
-import type { FrameMetrics, PlateRole } from '../art/materials';
+import { beamContentInset, frameMetrics } from '../art/materials';
+import type { BeamKind, FrameMetrics, PlateRole } from '../art/materials';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -118,15 +118,20 @@ export function gantryFrame(viewport: Viewport, insets?: Insets): GantryFrame {
 }
 
 /**
- * The strip inside a beam that its content may occupy: the beam inset by the page
- * margin on both ends. Used for the wordmark, the eyebrow cluster, and the one
- * plate a footer beam is allowed to carry (settings' DONE).
+ * The strip inside a beam that its content may occupy. Used for the wordmark, the
+ * eyebrow cluster, and the one plate a footer beam is allowed to carry (settings'
+ * DONE).
+ *
+ * The inset is {@link ../art/materials} `beamContentInset`, not the bare page
+ * margin: a header beam is bolted, and its rivets do not scale with the frame, so
+ * on a phone the margin alone would run the eyebrow straight through them.
  */
-export function beamContent(beam: Rect, m: FrameMetrics): Rect {
+export function beamContent(beam: Rect, m: FrameMetrics, kind: BeamKind = 'header'): Rect {
+  const inset = beamContentInset(m, kind);
   return {
-    x: beam.x + m.margin,
+    x: beam.x + inset,
     y: beam.y,
-    width: Math.max(0, beam.width - m.margin * 2),
+    width: Math.max(0, beam.width - inset * 2),
     height: beam.height,
   };
 }

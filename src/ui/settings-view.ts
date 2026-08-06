@@ -61,9 +61,16 @@ const DONE_PX = 22;
 /** The pip bar's height and the gap between two pips (handoff 14 / 4). */
 const PIP_HEIGHT = 14;
 const PIP_GAP = 4;
-/** How much of a volume row's width the label reserves before the bar starts
- *  (handoff: a fixed 176px label column on a 680px row). */
-const VOLUME_LABEL_SHARE = 176 / 680;
+/**
+ * The label column on a volume row — the handoff's fixed 176px, at the reference.
+ *
+ * It scales with the PLATE, not with the row: what has to fit in it is
+ * `MASTER VOLUME` set in Oxanium, and type scales with `plateScale`. Taking it as
+ * a share of the row instead (176/680 = 26%) is what put the pips through the
+ * middle of the word on a 390px phone column, where 26% is 101px and the label is
+ * ~122 — u7-01's first phone golden.
+ */
+const VOLUME_LABEL_COLUMN = 176;
 
 interface RowNodes {
   readonly body: Graphics;
@@ -257,8 +264,12 @@ export class SettingsView extends Container {
       node.y = box.y + box.height / 2 + (state === 'press' ? 1 : 0);
     }
 
-    // The pips start after the label's own column and run to the steppers.
-    const pipsX = bar.x + Math.min(bar.width * 0.62, rect.width * VOLUME_LABEL_SHARE + ROW.padX * m.plateScale);
+    // The pips start after the label's column and run to the steppers. The
+    // measured label is a second bound rather than the only one, so a face that
+    // sets wider than expected still cannot be written over.
+    const column = bar.x + Math.round((ROW.padX + VOLUME_LABEL_COLUMN) * m.plateScale);
+    const afterLabel = nodes.label.x + nodes.label.width + Math.max(8, Math.round(ROW.padX * m.plateScale));
+    const pipsX = Math.min(Math.max(column, afterLabel), bar.x + bar.width);
     const pipsW = Math.max(0, bar.x + bar.width - pipsX - PIP_GAP);
     if (pipsW <= 0 || max <= 0) return;
     const gap = Math.max(2, Math.round(PIP_GAP * m.plateScale));
