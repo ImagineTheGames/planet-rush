@@ -35,7 +35,6 @@
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
-import { PALETTE } from '@render/index';
 import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import {
@@ -47,6 +46,7 @@ import {
 } from './healthbar';
 import type { HealthBar } from './healthbar';
 import { FONT_BODY, TEXT_PRIMARY } from './typography';
+import { hudTracking, INSTRUMENT_RADIUS, INSTRUMENT_TRACK } from './instrument';
 
 /** Layout-registry id for the health-bar layer (one entry, the union of bars). */
 export const HEALTHBAR_ID = 'healthbars';
@@ -54,8 +54,10 @@ export const HEALTHBAR_ID = 'healthbars';
 export const HEALTHBAR_ANCHOR: AnchorSpec = { region: 'full' };
 
 /** Alpha of the empty track behind the fill — present so a missing chunk reads
- *  as absence, not as nothing drawn. Steel, never a material colour of its own. */
-const TRACK_ALPHA = 0.28;
+ *  as absence, not as nothing drawn. Steel, never a material colour of its own —
+ *  and since u7-07 the Bone ramp's own `rulePlate` step (./instrument
+ *  `INSTRUMENT_TRACK`) rather than raw `hullSteel`, so a track is spent by role. */
+const TRACK_ALPHA = 0.34;
 
 /** The numeric "68/70" readout beside the bar (field request v0.2.4): Oxanium
  *  numerals (style-guide §7), small enough not to fight the name/difficulty-tag
@@ -145,19 +147,21 @@ export class HealthBarView extends Container {
       const g = this.slot(i);
       g.clear();
       // Track first, then the owner-colour fill over its left portion.
-      g.roundRect(left, top, width, height, 1).fill({
-        color: PALETTE.hullSteel,
+      // Square corners (./instrument `INSTRUMENT_RADIUS`): a bar is a surface,
+      // and the handoff cuts corners only on plates that stand off the screen.
+      g.roundRect(left, top, width, height, INSTRUMENT_RADIUS).fill({
+        color: INSTRUMENT_TRACK,
         alpha: TRACK_ALPHA,
       });
       const fillW = width * bar.fraction;
       if (fillW > 0) {
-        g.roundRect(left, top, fillW, height, 1).fill({ color: bar.color, alpha: 0.95 });
+        g.roundRect(left, top, fillW, height, INSTRUMENT_RADIUS).fill({ color: bar.color, alpha: 0.95 });
       }
       // The own ship's bar carries an identity-colour outline — the second half
       // of "reads as mine" (larger + framed), so it stands out from the field of
       // enemy bars without borrowing a reserved colour (style-guide §2 / §3).
       if (bar.local) {
-        g.roundRect(left, top, width, height, 1).stroke({ width: 1, color: bar.color, alpha: 0.9 });
+        g.roundRect(left, top, width, height, INSTRUMENT_RADIUS).stroke({ width: 1, color: bar.color, alpha: 0.9 });
       }
 
       if (left < minX) minX = left;
@@ -276,7 +280,14 @@ export class HealthBarView extends Container {
     if (!t) {
       t = new Text({
         text: '',
-        style: { fontFamily: FONT_BODY, fontSize: NUMBER_SIZE, fill: TEXT_PRIMARY, letterSpacing: 0.3 },
+        // `name` tracking: "68/70" is a VALUE, which is what that tier is for
+        // — not the flat 0.3px this layer used to spell (./instrument).
+        style: {
+          fontFamily: FONT_BODY,
+          fontSize: NUMBER_SIZE,
+          fill: TEXT_PRIMARY,
+          letterSpacing: hudTracking('name', NUMBER_SIZE),
+        },
       });
       t.anchor.set(0, 0); // top-left: positioned from its computed top-left corner
       t.alpha = NUMBER_ALPHA;

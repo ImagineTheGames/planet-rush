@@ -667,12 +667,14 @@ export class Hud extends Container {
     this.oreGroup.x = PAD;
     this.oreGroup.y = PAD;
 
-    // Wave clock: three stacked, centre-anchored lines. The wave NAME is a proper
-    // noun and the countdown a value, so both take the `name` tier; `MATCH 0:02`
-    // is the tag naming what is being counted, so it takes `eyebrow`.
+    // Wave clock: three stacked, centre-anchored lines. All three take the `name`
+    // tier — the wave is a proper noun and the two clocks are VALUES, which is
+    // exactly what that tier is for. `eyebrow` was tried and rejected on
+    // `MATCH 0:02`: at .26em a clock reads as a tag rather than as a time, and the
+    // tier is chosen by the job the text does, not by how small it is.
     this.waveName = this.makeText('', FONT_HEADING, TYPE.waveName, TEXT_PRIMARY, 'normal', 'name');
     this.waveNext = this.makeText('', FONT_NUMERAL, TYPE.waveNext, INSTRUMENT_KEY, 'bold', 'name');
-    this.waveMatch = this.makeText('', FONT_NUMERAL, TYPE.waveMatch, TEXT_MUTED, 'normal', 'eyebrow');
+    this.waveMatch = this.makeText('', FONT_NUMERAL, TYPE.waveMatch, TEXT_MUTED, 'normal', 'name');
     for (const t of [this.waveName, this.waveNext, this.waveMatch]) t.anchor.set(0.5, 0);
     this.waveGroup.addChild(this.waveChrome, this.waveName, this.waveNext, this.waveMatch);
 
@@ -705,6 +707,10 @@ export class Hud extends Container {
     this.stationGroup.addChild(this.stationChrome, this.stationBar, this.stationLabel, this.coreLabel);
     this.stationGroup.visible = false;
 
+    // The strip's own chrome draws behind its labels, inside the strip group, so
+    // the rule + scrim are part of what `controls-strip` registers.
+    this.stripGroup.addChild(this.stripChrome);
+
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
     // Both are drawn only while the alarm is sounding — threat red is never a
     // resting-state colour (style-guide §2).
@@ -732,7 +738,6 @@ export class Hud extends Container {
       this.oreGroup,
       this.waveGroup,
       this.stationGroup,
-      this.stripChrome,
       this.stripGroup,
       // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
       // the collapse frame and the danger tells must read over it, and the wheel
@@ -820,7 +825,7 @@ export class Hud extends Container {
     set(this.bankedText, TYPE.bank, 'name');
     set(this.waveName, TYPE.waveName, 'name');
     set(this.waveNext, TYPE.waveNext, 'name');
-    set(this.waveMatch, TYPE.waveMatch, 'eyebrow');
+    set(this.waveMatch, TYPE.waveMatch, 'name');
     set(this.stationLabel, TYPE.eyebrow, 'eyebrow');
     set(this.coreLabel, TYPE.coreValue, 'name');
     set(this.promptText, TYPE.prompt, 'label');
@@ -859,25 +864,32 @@ export class Hud extends Container {
 
   // --- Instrument chrome: scrims and rules, never plates (u7-07) -----------
   //
-  // Each corner readout carries its own darkness and its own closing edge, and
-  // nothing else. The scrim hangs from the screen edge the readout hangs from and
-  // decays to nothing; the rule marks where the readout ends. Between the three
-  // clusters the glass is clear, which is what makes this "instruments on glass"
-  // rather than a header beam with holes in it (./instrument).
+  // Each readout carries its own darkness and its own closing edge, and nothing
+  // else. Between the clusters the glass is clear, which is what makes this
+  // "instruments on glass" rather than a header beam with holes in it
+  // (./instrument).
+  //
+  // **Every scrim is drawn inside its own element's rect** — never bled out to the
+  // screen edge. That is not a stylistic preference: an element's registered
+  // footprint is what it DRAWS (`describeLayout` reads `getBounds()`), so a scrim
+  // reaching past the HUD margin would push `ore-hud` and `station-hp` out of
+  // their declared anchors, which QA's layout contract catches on a real device
+  // and did — `tests/mobile/layout.spec.ts` failed on exactly that with the first
+  // version of this code. The corner scrims therefore fade at ALL FOUR edges
+  // rather than hanging from the screen edge: a soft blot under the readout,
+  // clear of the margin, invisible at its own boundary.
 
   /** The top-left ore cluster's chrome, in the group's own space (origin at the
-   *  cluster's top-left). Redrawn when the number changes width, not per frame. */
+   *  cluster's top-left, i.e. the HUD margin). Redrawn when the number changes
+   *  width, not per frame. */
   private drawOreChrome(): void {
     const m = this.metrics;
     const width = Math.max(this.totalLabel.width, this.bankedText.width) + hudSpace(18, m);
-    const height = this.bankedText.y + this.bankedText.height;
-    const bleed = hudSpace(SCRIM_BLEED, m);
+    const ruleY = this.bankedText.y + this.bankedText.height + hudSpace(4, m);
     const g = this.oreChrome;
     g.clear();
-    // The scrim reaches back past the readout to the screen edge itself (−PAD),
-    // so the darkness starts before the type does rather than at its cap-height.
-    drawScrim(g, -PAD, -PAD, width + PAD + bleed, height + PAD + bleed, 'top', SCRIM.corner);
-    drawEdgeRule(g, 0, height + hudSpace(4, m), width, 1, INSTRUMENT_RULE);
+    drawScrim(g, 0, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, 0, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
   /** The top-centre wave clock's chrome. Centre-anchored like the clock itself. */
@@ -885,12 +897,11 @@ export class Hud extends Container {
     const m = this.metrics;
     const width =
       Math.max(this.waveName.width, this.waveNext.width, this.waveMatch.width) + hudSpace(24, m);
-    const height = this.waveMatch.y + this.waveMatch.height;
-    const bleed = hudSpace(SCRIM_BLEED, m);
+    const ruleY = this.waveMatch.y + this.waveMatch.height + hudSpace(4, m);
     const g = this.waveChrome;
     g.clear();
-    drawScrim(g, -width / 2, -PAD, width, height + PAD + bleed, 'top', SCRIM.corner);
-    drawEdgeRule(g, -width / 2, height + hudSpace(4, m), width, 1, INSTRUMENT_RULE);
+    drawScrim(g, -width / 2, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, -width / 2, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
   /** The top-right HOME cluster's chrome. Right-anchored: the group's origin is
@@ -898,21 +909,26 @@ export class Hud extends Container {
   private drawStationChrome(): void {
     const m = this.metrics;
     const width = HP_BAR_WIDTH + hudSpace(18, m);
-    const height = HP_BAR_TOP + HP_BAR_HEIGHT;
-    const bleed = hudSpace(SCRIM_BLEED, m);
+    const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
     g.clear();
-    drawScrim(g, -width, -PAD, width + PAD, height + PAD + bleed, 'top', SCRIM.corner);
-    drawEdgeRule(g, -width, height + hudSpace(4, m), width, 1, INSTRUMENT_RULE);
+    drawScrim(g, -width, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, -width, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
-  /** The desktop controls strip's chrome: the footer beam's Bone rule, which is
-   *  the only part of a beam that can live on glass, over a scrim hanging from
-   *  the bottom edge. Drawn in SCREEN space (the strip's own group is offset). */
+  /**
+   * The desktop controls strip's chrome: the footer beam's Bone rule — the only
+   * part of a beam that can live on glass — over a scrim hanging from the bottom
+   * edge, which is the one place a scrim MAY hang from a screen edge, because
+   * `bottom-strip` is the one anchor whose zone reaches it (full width,
+   * y ∈ [H−48, H], margin 0). Drawn in the strip group's own space, so it is part
+   * of what `controls-strip` registers rather than a sibling smuggled out of the
+   * measurement.
+   */
   private drawStripChrome(width: number): void {
     const m = this.metrics;
-    const top = this.screenHeight - STRIP_ROW - STRIP_PAD - hudSpace(10, m);
-    const height = this.screenHeight - top;
+    const top = -hudSpace(10, m);
+    const height = STRIP_ROW + STRIP_PAD - top;
     const g = this.stripChrome;
     g.clear();
     if (width <= 0) return;
@@ -1004,7 +1020,6 @@ export class Hud extends Container {
   private updateControlsStrip(frame: HudFrame): void {
     const show = showControlsStrip(frame.isTouch);
     this.stripGroup.visible = show;
-    this.stripChrome.visible = show;
     if (!show) {
       this.stripChrome.clear();
       return;

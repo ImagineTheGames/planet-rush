@@ -281,24 +281,23 @@ export function drawScrim(
 ): void {
   if (w <= 0 || h <= 0 || peak <= 0 || bands <= 0) return;
   const alphas = nestedAlphas(scrimTargets(peak, bands));
-  const taper = Math.min(h * SCRIM_TAPER, w / 2);
-  for (let i = 0; i < alphas.length; i++) {
-    const t = alphas.length === 1 ? 1 : i / (alphas.length - 1); // 0 outermost → 1 core
+  const n = alphas.length;
+  if (n === 0) return;
+  // How far the innermost band shrinks: to `1/bands` of the extent it decays
+  // along, never to zero — a band with no area draws nothing, and the composited
+  // coverage would then fall short of `peak` by exactly one band.
+  const shrink = 1 - 1 / bands;
+  // The long-axis taper, capped at 40% of the width from each side so the core
+  // always keeps a fifth of the rect to be dark in, however flat the rect is.
+  const taper = Math.min(h * SCRIM_TAPER, w * 0.4);
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0 : i / (n - 1); // 0 = outermost/faintest, 1 = core
     const inset = taper * t;
     const bx = x + inset;
     const bw = w - inset * 2;
-    let by = y;
-    let bh = h;
-    if (anchor === 'top') {
-      bh = h * (1 - t) + h / bands;
-    } else if (anchor === 'bottom') {
-      bh = h * (1 - t) + h / bands;
-      by = y + h - bh;
-    } else {
-      const vinset = (h / 2) * t;
-      by = y + vinset;
-      bh = h - vinset * 2;
-    }
+    const bh = h * (1 - t * shrink);
+    const by =
+      anchor === 'top' ? y : anchor === 'bottom' ? y + h - bh : y + (h - bh) / 2;
     if (bw <= 0 || bh <= 0) continue;
     canvas.poly([bx, by, bx + bw, by, bx + bw, by + bh, bx, by + bh], true);
     canvas.fill({ color: SCRIM_COLOR, alpha: alphas[i]! });
@@ -403,3 +402,27 @@ export const INSTRUMENT_RADIUS = 0;
  * glass rather than standing off it.
  */
 export const MINIMAP_CHAMFER = 14;
+
+/**
+ * The gantry silhouette as a flat polygon: a box with the **top-right and
+ * bottom-left** corners cut back by `c`, and the other two square. Never all four
+ * — the asymmetry is the direction's signature, and a box with four cut corners
+ * is an octagon, not a gantry.
+ *
+ * {@link ../art/materials} `drawPlate` builds the same shape by clipping two
+ * half-planes, because it has a full plate's worth of nested bands to run through
+ * them. The two HUD surfaces that wear this silhouette draw one outline each, so
+ * they take the outline directly.
+ */
+export function gantryPoly(x: number, y: number, w: number, h: number, chamfer: number): number[] {
+  const c = Math.max(0, Math.min(chamfer, Math.min(w, h) / 2));
+  if (c === 0) return [x, y, x + w, y, x + w, y + h, x, y + h];
+  return [
+    x, y,
+    x + w - c, y,
+    x + w, y + c,
+    x + w, y + h,
+    x + c, y + h,
+    x, y + h - c,
+  ];
+}

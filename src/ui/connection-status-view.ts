@@ -6,12 +6,29 @@
  * plasma while there is hope (connecting / reconnecting), threat red once the
  * connection is genuinely lost, which is the one moment on this overlay that is
  * real danger and so the one moment red is earned (style-guide §2).
+ *
+ * ## The one HUD element that is genuinely a PLATE (u7-07)
+ *
+ * {@link ./instrument} states the rule for everything drawn during a match: no
+ * plates over gameplay, because the world has to read through. This overlay is
+ * the exception the rule implies rather than a breach of it. It is **modal over a
+ * stopped world** — a 0.7 scrim across the whole viewport is already there, taps
+ * behind it are caught, and the thing it is reporting is that the match has
+ * become unreachable. There is nothing to read through, so a surface costs the
+ * player nothing and buys the legibility a dialog needs.
+ *
+ * So it takes the ratified plate silhouette — the gantry cut, top-right and
+ * bottom-left ({@link ./instrument} `gantryPoly`) — and the one tracking scale,
+ * and keeps its severity accent, because that accent is STATE and not chrome.
+ * Its copy stays plain and diagnostic per GDD §4.7's match/machine line: a
+ * dropped socket is a machine fact, and the mining authority has no voice for it.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Viewport } from '@platform/layout-registry';
 import { FONT_BODY, FONT_HEADING, TEXT_DIM, TEXT_PRIMARY } from './typography';
+import { gantryPoly, hudTracking } from './instrument';
 import {
   CONNECTION_STATUS_ID,
   connectionStatusHitTest,
@@ -26,6 +43,12 @@ import type {
 import type { Insets } from './menu-geometry';
 
 export const CONNECTION_STATUS_ANCHOR: AnchorSpec = { region: 'center' };
+
+/** The card's gantry cut — `PLATE_SCALES.hero`'s 26px, since the card is the
+ *  screen's one surface and the handoff's largest plate is where that cut is
+ *  drawn. The action inside it takes `compact`'s 18. */
+const CARD_CHAMFER = 26;
+const ACTION_CHAMFER = 18;
 
 /**
  * The connection overlay. Add once, {@link resize} on viewport changes,
@@ -51,11 +74,13 @@ export class ConnectionStatusView extends Container {
     this.viewport = { width: screenWidth, height: screenHeight };
     this.insets = insets;
     this.layout = connectionStatusLayout(this.viewport, this.insets ? { insets: this.insets } : {});
-    this.headline = makeText('', FONT_HEADING, 22, TEXT_PRIMARY);
+    // The tracking tiers, by job: the headline is a value/state, the detail line
+    // is a sentence, the action is a control's own word (./instrument).
+    this.headline = makeText('', FONT_HEADING, 22, TEXT_PRIMARY, 'name');
     this.headline.anchor.set(0.5, 0.5);
-    this.detail = makeText('', FONT_BODY, 13, TEXT_DIM);
+    this.detail = makeText('', FONT_BODY, 13, TEXT_DIM, 'label');
     this.detail.anchor.set(0.5, 0.5);
-    this.actionLabel = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
+    this.actionLabel = makeText('', FONT_HEADING, 13, TEXT_PRIMARY, 'label');
     this.actionLabel.anchor.set(0.5, 0.5);
     this.addChild(this.scrim, this.card, this.headline, this.detail, this.actionBody, this.actionLabel);
   }
@@ -91,11 +116,13 @@ export class ConnectionStatusView extends Container {
       .rect(-this.viewport.width, -this.viewport.height, this.viewport.width * 3, this.viewport.height * 3)
       .fill({ color: PALETTE.vacuum, alpha: 0.7 });
 
+    // The gantry silhouette, at the handoff's own hero-plate cut — this is a
+    // plate, and the direction cuts two corners on a plate, never four.
     this.card.clear();
     this.card
-      .roundRect(panel.x, panel.y, panel.width, panel.height, 10)
+      .poly(gantryPoly(panel.x, panel.y, panel.width, panel.height, CARD_CHAMFER), true)
       .fill({ color: PALETTE.vacuum, alpha: 0.98 })
-      .roundRect(panel.x, panel.y, panel.width, panel.height, 10)
+      .poly(gantryPoly(panel.x, panel.y, panel.width, panel.height, CARD_CHAMFER), true)
       .stroke({ width: 2, color: accent, alpha: 0.85 });
 
     this.headline.text = model.headline;
@@ -112,9 +139,9 @@ export class ConnectionStatusView extends Container {
     if (showAction) {
       this.actionBody
         .clear()
-        .roundRect(action.x, action.y, action.width, action.height, 6)
+        .poly(gantryPoly(action.x, action.y, action.width, action.height, ACTION_CHAMFER), true)
         .fill({ color: accent, alpha: 0.16 })
-        .roundRect(action.x, action.y, action.width, action.height, 6)
+        .poly(gantryPoly(action.x, action.y, action.width, action.height, ACTION_CHAMFER), true)
         .stroke({ width: 2, color: accent, alpha: 0.85 });
       this.actionLabel.text = model.action ?? '';
       this.actionLabel.x = action.x + action.width / 2;
@@ -132,6 +159,15 @@ function setVisible(visible: boolean, ...nodes: Array<Graphics | Text>): void {
   for (const node of nodes) node.visible = visible;
 }
 
-function makeText(text: string, fontFamily: string, fontSize: number, fill: number): Text {
-  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0.5, align: 'center' } });
+function makeText(
+  text: string,
+  fontFamily: string,
+  fontSize: number,
+  fill: number,
+  tier: 'eyebrow' | 'label' | 'name' = 'label',
+): Text {
+  return new Text({
+    text,
+    style: { fontFamily, fontSize, fill, letterSpacing: hudTracking(tier, fontSize), align: 'center' },
+  });
 }

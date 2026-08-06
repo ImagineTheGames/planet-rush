@@ -43,6 +43,7 @@ import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_LOCAL_HEIGHT } from './healthbar';
 import type { Nameplate, NameplateKind } from './nameplates';
+import { hudTracking } from './instrument';
 
 /** Layout-registry id for the nameplate layer (one entry, the union of labels). */
 export const NAMEPLATE_ID = 'nameplates';
@@ -53,6 +54,11 @@ export const NAMEPLATE_ANCHOR: AnchorSpec = { region: 'full' };
 const FONT_NAME = 'Oxanium, "DejaVu Sans Mono", monospace';
 /** Label size, CSS px — small chrome over the world, legible at thumb-scale. */
 const FONT_SIZE = 12;
+/** A name IS a proper noun, so it takes the ratified `name` tier — and so do the
+ *  two tags that trail it, because they are read as part of the same row. This
+ *  replaces the flat `letterSpacing: 0.5` all three pools used to spell, which is
+ *  one of the six drifted values the Gantry handoff set out to retire. */
+const NAME_TRACKING = hudTracking('name', FONT_SIZE);
 
 /** Clearance above a ship's health-bar cluster to the label's baseline, CSS px —
  *  so name, bar and ship stack as one unit without touching. */
@@ -300,7 +306,7 @@ export class NameplateView extends Container {
     if (!t) {
       t = new Text({
         text: '',
-        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: 0.5 },
+        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: NAME_TRACKING },
       });
       t.anchor.set(0.5, 1); // bottom-centre: grows upward from the entity
       this.labels[i] = t;
@@ -316,7 +322,7 @@ export class NameplateView extends Container {
     if (!t) {
       t = new Text({
         text: '',
-        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: 0.5 },
+        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: NAME_TRACKING },
       });
       t.anchor.set(0, 1); // bottom-left: sits just past the name, same baseline
       this.suffixes[i] = t;
@@ -332,7 +338,7 @@ export class NameplateView extends Container {
     if (!t) {
       t = new Text({
         text: '',
-        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: 0.5 },
+        style: { fontFamily: FONT_NAME, fontSize: FONT_SIZE, fill: 0xffffff, letterSpacing: NAME_TRACKING },
       });
       t.anchor.set(0, 1);
       this.teamTags[i] = t;
