@@ -52,6 +52,45 @@ Do not rely on a lighter backdrop; there isn't one.
 Threat red `#B23A3A` carries the danger half of the same discipline: it is
 damage, alarm, and enemy fire only — never a neutral or friendly accent.
 
+### 2.1 The cost-numeral carve-out — one exception, stated in both colours *(amended 2026-08-06 — the ratified Gantry/Bone build wheel, u7-02; see `docs/design/gantry-bone-handoff.md` and GDD §2.5)*
+
+There is exactly **one** place in this game where a RESERVED colour is spent on a
+piece of interface, and this section is it, written down so it is a decision
+rather than a drift:
+
+> **A cost numeral on the build wheel is signal yellow `#F2D24B` when the player
+> can pay it, and threat red `#B23A3A` when they cannot.**
+
+The yellow half was already carved out above ("cost numerals on the build
+wheel") and is unchanged. The red half is new, and it is the *same* carve-out on
+the *same* numerals rather than a second one: the ratified design colours an
+unaffordable cost red precisely so that the wheel needs no "need 2 more" copy —
+the numbers already say it. It survives the RESERVED test because it is not
+chrome taking a warm hue for decoration; it is the **price of a thing telling
+you it is out of reach**, which is the same "this is against you" reading red
+carries on a damage ring.
+
+Four hard limits travel with it, and they are what keep an exception from
+becoming a licence:
+
+1. **The numerals only.** Nothing else on the wheel may go red — not a wedge
+   body, not a label, not a ring, not a target line, not a count. (The wheel's
+   press-*rejection* flash is a separate, earlier ratification — field report
+   v0.2.2 — and is red as a refusal tell, not as chrome.)
+2. **Only for "you cannot pay this."** A wedge that is capped, or inert (a full
+   reactor, one on its repair cooldown, a collapsed match) draws its cost slot in
+   **steel**, never red: red there would name the wrong reason. Poverty is the
+   only thing this red is allowed to mean.
+3. **No new hue.** `#B23A3A` is the frozen threat red of §1, unmodified. This
+   amendment adds no colour to the palette.
+4. **It does not travel.** "Cost numerals on the build wheel" is a statement
+   about cost numerals on the build wheel. It licenses nothing in a menu, on the
+   HUD, in the lobby, or on any other screen.
+
+Everything else in the Gantry/Bone direction is deliberately hueless — the
+accent is **Bone**, which is brightness rather than colour (`src/art/materials.ts`)
+— which is exactly what leaves this one carve-out affordable.
+
 ---
 
 ## 3. Player colour and identity
