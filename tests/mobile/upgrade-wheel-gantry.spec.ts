@@ -202,12 +202,9 @@ async function pressAt(page: Page, x: number, y: number, touch: boolean): Promis
   await waitForSimTicks(page, 3, { what: 'the press to resolve' });
 }
 
-/**
- * Open the BUILD wheel through the REAL affordance for this device — the BUILD
- * button under the left thumb on touch, the `E` binding on desktop (GDD §2.4's
- * table, both cells) — and prove it opened by the registry, not by a seam.
- */
-async function openBuildForReal(page: Page, touch: boolean): Promise<void> {
+/** One real press on this device's BUILD affordance — the button under the left
+ *  thumb on touch, the `E` binding on desktop (GDD §2.4's table, both cells). */
+async function pressBuildAffordance(page: Page, touch: boolean): Promise<void> {
   if (touch) {
     const lvp = await page.evaluate(() => {
       const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
@@ -221,7 +218,32 @@ async function openBuildForReal(page: Page, touch: boolean): Promise<void> {
     await page.keyboard.press('e');
   }
   await waitForSimTicks(page, 4, { what: 'the build wheel opening' });
-  expect(await registered(page, 'build-wheel'), 'the real open affordance did not open the build wheel').not.toBeNull();
+}
+
+/**
+ * Open the BUILD wheel through the REAL affordance, and prove it opened by the
+ * layout registry rather than by a seam.
+ *
+ * Retries the press, and the guard is what makes that safe: the affordance is a
+ * TOGGLE, so a blind second press would close a wheel the first one opened —
+ * hence the registry check before every attempt. A retry is needed because the
+ * precondition is the sim's, not the test's: the wheel only opens while the ship
+ * is docked at its own station (`updateBuildWheel`), and on a loaded runner
+ * running three projects the first press can land in the frames before the
+ * client has resolved that. Waiting on the wheel alone would hang; pressing
+ * again after a beat is the honest retry.
+ */
+async function openBuildForReal(page: Page, touch: boolean): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await registered(page, 'build-wheel')) return;
+    await pressBuildAffordance(page, touch);
+    if (await registered(page, 'build-wheel')) return;
+    await waitForSimTicks(page, 10, { what: 'the ship to settle docked at its station' });
+  }
+  expect(
+    await registered(page, 'build-wheel'),
+    'three real presses on the BUILD affordance did not open the build wheel',
+  ).not.toBeNull();
 }
 
 /** A real press at the drawn centre of wedge `index` of `count`, on whichever
