@@ -645,12 +645,27 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // "Ships are toys, explosions are fireworks" (GDD §4.7): a bang, then a
-  // sparkle over the top of it. Generous, and quickly over.
+  /**
+   * **A pressure failure**, in the amended contract's own words (GDD §4.7): *"a
+   * hard concussive front, a metallic shear, debris settling. No sparkle."*
+   *
+   * The retired paragraph said *"explosions are fireworks"* and this sound was
+   * that sentence implemented — a bang with a bright square trill sparkling over
+   * the top of it. The `sparkle` layer is **deleted rather than re-voiced**: it
+   * had no job except to be a firework, and the contract that asked for one is
+   * gone. Nothing replaces it in kind; what stands where it stood is a **shear**,
+   * a short band of filtered noise that decays fast — plate letting go, not
+   * light going up.
+   *
+   * The `boom` is untouched. A concussive front was always the right sound; it
+   * is `noise`, which §5.2 keeps wherever the thing making the sound is
+   * genuinely broadband, and an explosion is the definition of that.
+   */
   [SOUND.shipExplode]: {
     name: 'shipExplode',
     layers: [
       {
+        // The concussive front. Unchanged — this was never the arcade half.
         spec: {
           name: 'shipExplode.boom',
           wave: 'noise',
@@ -666,31 +681,36 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         },
       },
       {
+        // The hull failing: was a square with duty 0.2 falling ×5.50 — a tone
+        // generator doing an impact's job. Filtered noise does the job itself.
         spec: {
           name: 'shipExplode.crack',
-          wave: 'square',
+          wave: 'noise',
           attack: 0.001,
-          hold: 0.012,
+          hold: 0.014,
           decay: 0.1,
-          freq: 660,
-          freqEnd: 120,
-          duty: 0.2,
-          gain: 0.22,
+          punch: 0.6,
+          freq: 480,
+          freqEnd: 420,
+          lowPass: 3000,
+          highPass: 300,
+          gain: 0.24,
           seed: 0xdeae,
         },
       },
       {
+        // The metallic shear, in the sparkle's place: a band of noise up where
+        // torn plate rings, gone almost immediately. It does not rise.
         spec: {
-          name: 'shipExplode.sparkle',
-          wave: 'square',
-          attack: 0.004,
-          hold: 0.03,
-          decay: 0.3,
-          freq: 1240,
-          freqEnd: 1900,
-          repeat: 0.07,
-          duty: 0.28,
-          gain: 0.16,
+          name: 'shipExplode.shear',
+          wave: 'noise',
+          attack: 0.002,
+          hold: 0.02,
+          decay: 0.16,
+          freq: 2400,
+          lowPass: 5200,
+          highPass: 1600,
+          gain: 0.15,
           seed: 0xdeaf,
         },
         at: 0.07,
