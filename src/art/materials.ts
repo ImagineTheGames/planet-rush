@@ -504,6 +504,75 @@ export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): nu
   return Math.max(m.margin, RIVET.inset + cluster + RIVET_CLEARANCE);
 }
 
+// ---------------------------------------------------------------------------
+// 3c. The roster row — the densest surface in the set, desktop AND phone
+// ---------------------------------------------------------------------------
+//
+// The lobby's roster carries more per row than anything else in the game: an
+// identity bar, a P-number, a name, a slot-state control, a side chip, a
+// difficulty chip and a ping — and the handoff ADDS a leading OPEN/CLOSED
+// button. Its metrics get their own block for the same reason §3b exists: the
+// handoff drew them once, at 1280×720, and a 390-wide phone is not that.
+//
+// Two rules decide every number below, and they are the ones the u7-03 brief
+// states:
+//
+//  1. **The look is ratified; the metric adapts.** Every width here is the
+//     handoff's own, scaled by {@link FrameMetrics.plateScale} — never re-picked.
+//  2. **Nothing on this row goes under the thumb.** A roster row is made of
+//     controls, not of text, so the row's own height IS a control's height
+//     ({@link rowHeight}, floored at {@link TOUCH_MIN}) and each segment spans
+//     the row rather than sitting inset inside it. A row that only works with a
+//     mouse is a failed screen here.
+
+/**
+ * The roster row at the handoff's reference, in px.
+ *
+ * `stateWidth` / `trailingWidth` are the handoff's own two row buttons — the
+ * leading `OPEN` / `CLOSED` and the trailing slot it collapses difficulty into.
+ * `sideWidth` is **ours, and deliberately wider than the design's**: the handoff
+ * draws a `T1` chip, and our ratified side chip carries the WORD (`FRIENDLY A`,
+ * GDD §2.1 amended 2026-08-05), which needs the room a letter does not.
+ */
+export const ROSTER = {
+  /** Row height — the handoff's row surface ({@link ROW}), restated here so the
+   *  roster reads as the same furniture as a settings row. */
+  height: ROW.height,
+  /** The identity bar down a row's leading edge ({@link ROW_BAR_WIDTH}). */
+  bar: ROW_BAR_WIDTH,
+  /** The leading slot-state button (`OPEN` / `BOT` / `CLOSED` / `TAKEN`). */
+  stateWidth: 72,
+  /** The trailing slot — the handoff collapses difficulty and OPEN into one. */
+  trailingWidth: 62,
+  /** The side chip, holding `FRIENDLY A` rather than the handoff's `T1`. */
+  sideWidth: 96,
+  /**
+   * Air between two roster rows. **Zero, and that is the design.** The handoff
+   * draws a roster as a LIST — abutting surfaces with a rule between them — not
+   * as a stack of floating cards, and the two 1px rules of two abutting `inert`
+   * plates *are* that separator. It is also what buys the last three pixels of
+   * row height on the notched landscape phone, where 4 × 48 has to fit in 195.
+   */
+  gap: 0,
+  /** Inset from a row segment's edge to the word inside it. */
+  padX: 12,
+} as const;
+
+/** A roster row's height at these metrics: the handoff's 64px surface, never
+ *  under the thumb floor — the same resolver a settings row uses. */
+export function rosterRowHeight(m: FrameMetrics): number {
+  return rowHeight(m);
+}
+
+/**
+ * One of the roster row's horizontal metrics at these metrics — a segment width
+ * or a padding. Scales with the PLATE, like everything else that sits *on* a
+ * surface rather than framing one, and never rounds away to nothing.
+ */
+export function rosterMetric(referencePx: number, m: FrameMetrics): number {
+  return Math.max(1, Math.round(referencePx * m.plateScale));
+}
+
 /**
  * Chrome type — a beam's eyebrow, the wordmark, a heading. Scales with the
  * FRAME, because that is the thing it sits inside, and never below
@@ -1318,6 +1387,15 @@ export type BeamKind = 'header' | 'footer';
  * same beam inverted — the accent rule sits on top, the fill falls away
  * downward, and it wears no rivets (nothing is bolted to the bottom of a frame).
  *
+ * **`height` is the beam the FRAME resolved, not the handoff's 92.** It defaults
+ * to {@link BEAM.height} for a caller drawing at the reference, and every screen
+ * should pass its own {@link FrameMetrics} `beam` instead: a phone's beam is
+ * ~50px, and painting the reference 92 into it put the header's Bone accent rule
+ * 40px *below* the beam, straight through the first plate on the screen, and ran
+ * the footer's gradient off the bottom edge before it reached its dark end
+ * (found in u7-03's first read of u7-01's phone goldens — the rule measured at
+ * y=90 on a 390px-tall viewport whose header ends at y=50).
+ *
  * Pass `rivets = false` on a screen whose header carries a control where the
  * fasteners would sit. Allocates nothing.
  */
@@ -1328,9 +1406,11 @@ export function drawBeam(
   width: number,
   kind: BeamKind,
   rivets = true,
+  height = BEAM.height,
 ): void {
   if (width <= 0) return;
-  const h = BEAM.height;
+  const h = Math.max(0, height);
+  if (h <= 0) return;
   const stops = kind === 'header' ? BEAM.headerStops : BEAM.footerStops;
   const bandH = h / BEAM.bands;
 
