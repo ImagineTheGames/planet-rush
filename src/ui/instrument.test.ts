@@ -44,6 +44,7 @@ import {
   SCRIM,
   SCRIM_BANDS,
   SCRIM_COLOR,
+  SCRIM_CORE,
   TICK_WIDTH,
 } from './instrument';
 
@@ -75,6 +76,31 @@ class Recorder implements PlateCanvas {
     if (!this.pending) return;
     this.shapes.push({ points: this.pending, color: style.color, alpha: style.alpha });
     this.pending = null;
+  }
+
+  /**
+   * What a point on screen actually ends up covered by: the composite of every
+   * recorded band whose rect contains it. This is the only honest way to ask
+   * "how dark is the readout's own pixel" of a stack of nested translucent
+   * bands — the band count and each band's alpha say nothing on their own.
+   */
+  coverageAt(x: number, y: number): number {
+    let covered = 0;
+    for (const s of this.shapes) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      let top = Infinity;
+      let bottom = -Infinity;
+      for (let i = 0; i + 1 < s.points.length; i += 2) {
+        lo = Math.min(lo, s.points[i]!);
+        hi = Math.max(hi, s.points[i]!);
+        top = Math.min(top, s.points[i + 1]!);
+        bottom = Math.max(bottom, s.points[i + 1]!);
+      }
+      if (x < lo || x > hi || y < top || y > bottom) continue;
+      covered += s.alpha * (1 - covered);
+    }
+    return covered;
   }
 
   /** The axis-aligned union of everything drawn. */
@@ -188,6 +214,60 @@ describe('the rule: no plates over gameplay', () => {
     const bottom = scrim('bottom', SCRIM.corner).shapes;
     for (const s of bottom) expect(bottomOf(s)).toBeCloseTo(RECT.y + RECT.h, 6);
     expect(topOf(bottom[bottom.length - 1]!)).toBeGreaterThan(topOf(bottom[0]!));
+  });
+
+  it('the stated peak is a plateau the readout sits on, not a sliver through it', () => {
+    // The regression this pins is the one the shipped baseline had, and it is
+    // invisible in the constants: SCRIM.corner said 0.55 while the top-left ore
+    // cluster's actual core was 12px wide and 5px tall inside a 58×54 rect, so
+    // `TOTAL` over a lit asteroid kept ~80% of the rock and ghosted. A scrim that
+    // reaches its peak nowhere the type is has not darkened the type.
+    //
+    // The cluster's real reference rect: `drawOreChrome` at hudMetrics 1.
+    const r = new Recorder();
+    const [x, y, w, h] = [16, 16, 58, 54];
+    drawScrim(r, x, y, w, h, 'center', SCRIM.corner);
+
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    expect(r.coverageAt(cx, cy)).toBeCloseTo(SCRIM.corner, 6);
+    // …and, the point of the plateau, still the peak a quarter of the way out to
+    // each edge — which is where the label's own glyphs are.
+    for (const [dx, dy] of [
+      [-0.29, -0.29],
+      [0.29, -0.29],
+      [-0.29, 0.29],
+      [0.29, 0.29],
+    ] as const) {
+      expect(r.coverageAt(cx + dx * w, cy + dy * h)).toBeCloseTo(SCRIM.corner, 6);
+    }
+
+    // The boundary stays invisible: one faint band on the rect's own edge.
+    expect(r.coverageAt(x, cy)).toBeLessThan(SCRIM.corner / 4);
+    expect(r.coverageAt(cx, y)).toBeLessThan(SCRIM.corner / 4);
+  });
+
+  it('steps its falloff finely enough not to band over a lit asteroid', () => {
+    // GDD §5.4 counts banding as a bug wherever a gradient is stepped: "a
+    // gradient whose steps the eye can find is not one soft edge but several hard
+    // ones". A scrim is a stepped gradient over the brightest thing on the
+    // screen, so the two terms that decide whether a step is findable — how much
+    // coverage it adds, and how far apart the steps sit — are pinned here.
+    const r = new Recorder();
+    const [w, h] = [58, 54];
+    drawScrim(r, 0, 0, w, h, 'center', SCRIM.corner);
+    expect(r.shapes.length).toBe(SCRIM_BANDS);
+
+    // Coverage per step, against the ~134-luminance swing of a lit asteroid over
+    // vacuum: 4 luminance steps is the practical floor for "invisible".
+    const perStep = SCRIM.corner / SCRIM_BANDS;
+    expect(perStep * 134).toBeLessThan(4.5);
+
+    // And the steps themselves land less than a pixel apart on the smallest rect
+    // the HUD draws one on, so there is no edge to find in the first place.
+    const taper = Math.min(h * 0.6, (w * (1 - SCRIM_CORE)) / 2);
+    expect(taper / (SCRIM_BANDS - 1)).toBeLessThan(1);
+    expect(((h * (1 - SCRIM_CORE)) / 2) / (SCRIM_BANDS - 1)).toBeLessThan(1);
   });
 
   it('the prompt scrim leaves the build wheel behind it legible', () => {

@@ -116,6 +116,7 @@ import {
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
+  SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
   promptPad,
   PROMPT_STROKE,
@@ -1141,7 +1142,7 @@ export class Hud extends Container {
     if (model.hasShield && model.shieldFraction > 0) {
       const sw = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.shieldFraction);
       this.stationBar
-        .roundRect(-sw, y - SHIELD_BAR_HEIGHT - 2, sw, SHIELD_BAR_HEIGHT, r)
+        .roundRect(-sw, y - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP, sw, SHIELD_BAR_HEIGHT, r)
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
     }
 

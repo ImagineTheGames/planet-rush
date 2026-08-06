@@ -37,7 +37,10 @@ import {
   PANEL_EDGE_PAD,
   HUD_PAD,
   HP_BAR_WIDTH,
+  HP_BAR_HEIGHT,
   HP_BAR_TOP,
+  HP_VALUE_ROW,
+  SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
   promptBounds,
   promptBand,
@@ -231,10 +234,21 @@ describe('station-hp placement', () => {
   });
 
   it('leaves room for the shield overbar above the core bar', () => {
-    // The shield overbar is drawn SHIELD_BAR_HEIGHT + 2 above the core bar's top
-    // edge; that has to stay below the label, i.e. inside the element's own
-    // footprint rather than poking out above y = HUD_PAD.
-    expect(SHIELD_BAR_HEIGHT + 2).toBeLessThanOrEqual(HP_BAR_TOP);
+    // The shield overbar is drawn SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP above the
+    // core bar's top edge; that has to stay below the label, i.e. inside the
+    // element's own footprint rather than poking out above y = HUD_PAD.
+    expect(SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP).toBeLessThanOrEqual(HP_BAR_TOP);
+  });
+
+  it('does not draw the shield overbar through the core VALUE', () => {
+    // The regression this pins shipped on `main`: the overbar's top edge sat one
+    // pixel under `100/100`'s baseline, so a station with a generator standing
+    // struck its own number through. The value row owns the top of the element and
+    // the overbar starts below it — with air, not flush.
+    const overbarTop = HP_BAR_TOP - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP;
+    expect(overbarTop).toBeGreaterThanOrEqual(HP_VALUE_ROW);
+    // …and the whole stack still hangs inside the footprint the registry records.
+    expect(stationHpBounds(1280).height).toBe(HP_BAR_TOP + HP_BAR_HEIGHT);
   });
 });
 

@@ -127,8 +127,26 @@ export const HP_BAR_WIDTH = 140;
 export const HP_BAR_HEIGHT = 10;
 /** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
 export const SHIELD_BAR_HEIGHT = 4;
-/** The bar's top edge within the element, below the `HOME` label, CSS px. */
-export const HP_BAR_TOP = 16;
+/** Air between the shield overbar and the core bar it stands in front of, CSS px. */
+export const SHIELD_BAR_GAP = 2;
+/**
+ * The row above the bar that carries `HOME` and the `100/100` core value, CSS px:
+ * one line of {@link ./hud} `TYPE.coreValue` ink (≈10 px at the 11 px floor) plus
+ * four pixels of air under its baseline.
+ *
+ * That air is the point. The element is a stack of three things in a corner, and
+ * the one that gets squeezed is the number: with the bar's top hard-coded at 16
+ * the shield overbar landed **one pixel under the value's baseline**, so a station
+ * with a generator standing drew a plasma line flush against the underside of
+ * `100/100` and the numerals read as struck through. It is on `main`'s own frozen
+ * baseline and in this brief's `before-*` evidence — a pre-existing defect this
+ * pass found by shooting the corner at 5× rather than by reading the diff.
+ */
+export const HP_VALUE_ROW = 14;
+/** The bar's top edge within the element, under the value row and the shield
+ *  overbar that stands above it. Derived, never typed twice — the collision above
+ *  is what a hand-picked number bought. */
+export const HP_BAR_TOP = HP_VALUE_ROW + SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP;
 
 /**
  * The own-station HP element's drawn footprint: the right-aligned `HOME` label

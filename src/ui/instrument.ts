@@ -213,8 +213,34 @@ export const SCRIM = {
 } as const;
 
 /** Flat bands a scrim's falloff is stepped into. Pixi `Graphics` has no cheap
- *  gradient; a step is invisible in a falloff and free to batch. */
-export const SCRIM_BANDS = 10;
+ *  gradient; a step is invisible in a falloff and free to batch. Eighteen rather
+ *  than ten because {@link SCRIM_CORE} packs the same falloff into the outer
+ *  fifth of the rect: the bands sit closer together in *space*, so each one's
+ *  edge has to move less than a pixel or the falloff stops being a falloff and
+ *  starts being the banding GDD §5.4 calls a bug. */
+export const SCRIM_BANDS = 18;
+
+/**
+ * The fraction of a scrim's extent that holds **full strength** before the
+ * falloff starts — the plateau, exactly as {@link RULE_CORE} is the plateau on an
+ * edge rule.
+ *
+ * **This is the number that decides whether a scrim does its job at all**, and
+ * the first version of this file did not have it. Without a plateau the bands
+ * shrink all the way to `1/SCRIM_BANDS` of the rect, so the stated peak is
+ * reached only in a sliver: on the top-left ore cluster (58×54 at the reference)
+ * the 0.55 core was 12 px wide and 5 px tall, and the readout it was drawn for
+ * sat almost entirely in the fade. Measured on the shipped baseline, `TOTAL` over
+ * a lit asteroid kept ~80% of the rock's luminance — the label ghosted, which is
+ * the exact failure the scrim replaced the panel to avoid (style-guide §9).
+ *
+ * With the plateau the strongest band keeps `SCRIM_CORE` of the rect in **both**
+ * axes, so the type is under the coverage the constant advertises and only the
+ * outer fifth is fade. Flat rects are unaffected where it matters — a
+ * 1280×40 strip's taper is still bounded by its own height (below) — so this buys
+ * the corner clusters their darkness without turning the strip into a beam.
+ */
+export const SCRIM_CORE = 0.6;
 
 /**
  * How far a scrim tapers **inward along the long axis** as it strengthens, as a
@@ -283,13 +309,15 @@ export function drawScrim(
   const alphas = nestedAlphas(scrimTargets(peak, bands));
   const n = alphas.length;
   if (n === 0) return;
-  // How far the innermost band shrinks: to `1/bands` of the extent it decays
-  // along, never to zero — a band with no area draws nothing, and the composited
-  // coverage would then fall short of `peak` by exactly one band.
-  const shrink = 1 - 1 / bands;
-  // The long-axis taper, capped at 40% of the width from each side so the core
-  // always keeps a fifth of the rect to be dark in, however flat the rect is.
-  const taper = Math.min(h * SCRIM_TAPER, w * 0.4);
+  // How far the innermost band shrinks: to `SCRIM_CORE` of the extent it decays
+  // along, so the stated peak lands on a plateau the readout actually sits on
+  // rather than on a sliver through the middle of it.
+  const shrink = 1 - SCRIM_CORE;
+  // The long-axis taper, bounded by the same plateau from the other side, so the
+  // core keeps `SCRIM_CORE` of the width however square the rect is — a corner
+  // cluster is nearly square, and it was the case the short-axis rule alone left
+  // with a 12px-wide core.
+  const taper = Math.min(h * SCRIM_TAPER, (w * (1 - SCRIM_CORE)) / 2);
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1); // 0 = outermost/faintest, 1 = core
     const inset = taper * t;
