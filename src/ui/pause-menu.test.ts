@@ -12,13 +12,22 @@
  *     one stray tap cannot kill a match (developer §1).
  *  3. **Back-one-level is one gesture.** ESC / the corner button `toggle` opens
  *     and then steps back a level at a time, never skipping straight out.
+ *
+ * …and, since u7-05, a fourth: **the overlay is Gantry/Bone, and the safe action
+ * is its ONE bright plate.** Under Bone the emphasis IS the brightness, so
+ * developer §1's "STAY is the emphasised default" is now a statement about plate
+ * roles — which makes it something a test can hold rather than a look someone has
+ * to notice slipping.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveAnchor } from '@platform/layout-registry';
 import type { Viewport } from '@platform/layout-registry';
+import { BEAM, PLATE_SCALES, TOUCH_MIN } from '../art/materials';
+import { countPrimaries, singlePrimary } from './gantry';
 import {
   PAUSE_BUTTON_ANCHOR,
   PAUSE_BUTTON_ID,
+  PAUSE_BUTTON_SIZE,
   PAUSE_ID,
   isPauseOpen,
   nextPauseScreen,
@@ -198,7 +207,7 @@ describe('pauseLayout + pauseHitTest', () => {
 
   it('places one rect per button, in order, all inside the content box', () => {
     const ids = pauseButtons('menu');
-    const layout = pauseLayout(viewport, ids.length);
+    const layout = pauseLayout(viewport, ids);
     expect(layout.buttons).toHaveLength(3);
     for (const r of layout.buttons) {
       expect(r.x).toBeGreaterThanOrEqual(layout.content.x);
@@ -208,22 +217,140 @@ describe('pauseLayout + pauseHitTest', () => {
 
   it('routes a tap on a button rect to that button, and misses to null', () => {
     const ids = pauseButtons('menu');
-    const layout = pauseLayout(viewport, ids.length);
+    const layout = pauseLayout(viewport, ids);
     const exitRect = layout.buttons[2]!;
     const cx = exitRect.x + exitRect.width / 2;
     const cy = exitRect.y + exitRect.height / 2;
     expect(pauseHitTest(layout, cx, cy, ids)).toEqual({ kind: 'exit' });
-    // A tap between the headline and the buttons hits nothing.
+    // A tap up in the header beam hits nothing — the beam names the screen, it is
+    // not a control.
     expect(pauseHitTest(layout, layout.content.x + 1, layout.content.y + 1, ids)).toBeNull();
   });
 
   it('the confirm layout maps its two rects to leave/stay in order', () => {
     const ids = pauseButtons('confirm');
-    const layout = pauseLayout(viewport, ids.length);
+    const layout = pauseLayout(viewport, ids);
     const leave = layout.buttons[0]!;
     const stay = layout.buttons[1]!;
     expect(pauseHitTest(layout, leave.x + 1, leave.y + 1, ids)).toEqual({ kind: 'leave' });
     expect(pauseHitTest(layout, stay.x + 1, stay.y + 1, ids)).toEqual({ kind: 'stay' });
+  });
+
+  it('keeps the plates clear of both beams', () => {
+    const ids = pauseButtons('menu');
+    const layout = pauseLayout(viewport, ids);
+    const first = layout.buttons[0]!;
+    const last = layout.buttons[layout.buttons.length - 1]!;
+    expect(first.y).toBeGreaterThanOrEqual(layout.header.y + layout.header.height);
+    expect(last.y + last.height).toBeLessThanOrEqual(layout.footer.y + 0.001);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GANTRY / BONE (u7-05) — the material, and what it may not do
+// ---------------------------------------------------------------------------
+//
+// The re-skin's two hard rules, and the phone. Every number below is derived in
+// `../art/materials`; what is asserted here is that this SCREEN consumes them —
+// a screen can pick a legal plate role and still put two bright ones on itself.
+
+describe('the Gantry/Bone pause overlay', () => {
+  it('draws exactly ONE bright plate, on both of its screens', () => {
+    for (const screen of ['menu', 'confirm'] as const) {
+      const roles = pauseMenuModel(screen).buttons.map((b) => b.role);
+      expect(singlePrimary(roles), `${screen} drew two bright plates`).toBe(true);
+      expect(countPrimaries(roles), `${screen} drew no bright plate`).toBe(1);
+    }
+  });
+
+  it('puts that one bright plate on the SAFE action — RESUME, and STAY', () => {
+    // The safety property developer §1 asked for, restated in the material: under
+    // Bone the emphasis IS the brightness, so "STAY is the emphasised default"
+    // means "STAY is the screen's only primary plate" and nothing else.
+    const menu = pauseMenuModel('menu').buttons;
+    expect(menu.find((b) => b.role === 'primary')!.id).toBe('resume');
+    const confirm = pauseMenuModel('confirm').buttons;
+    expect(confirm.find((b) => b.role === 'primary')!.id).toBe('stay');
+    expect(confirm.find((b) => b.id === 'leave')!.role).toBe('secondary');
+  });
+
+  it('marks the primary by SIZE as well — brightness is only half of it', () => {
+    const menu = pauseMenuModel('menu').buttons;
+    expect(menu.find((b) => b.id === 'resume')!.scale).toBe('hero');
+    expect(menu.find((b) => b.id === 'exit')!.scale).toBe('standard');
+    const layout = pauseLayout({ width: 1280, height: 720 }, pauseButtons('menu'));
+    expect(layout.buttons[0]!.height).toBeGreaterThan(layout.buttons[1]!.height);
+  });
+
+  it('never draws a plate in the disabled costume — every button is actionable', () => {
+    for (const screen of ['menu', 'confirm'] as const) {
+      for (const b of pauseMenuModel(screen).buttons) expect(b.role).not.toBe('inert');
+    }
+  });
+
+  it('carries the handoff\'s own numbers on the desktop it was drawn at', () => {
+    const layout = pauseLayout({ width: 1280, height: 720 }, pauseButtons('menu'));
+    expect(layout.metrics.margin).toBe(BEAM.margin); // 44
+    expect(layout.header.height).toBe(BEAM.height); // 92
+    expect(layout.buttons[0]!.height).toBe(PLATE_SCALES.hero.height); // 80
+    expect(layout.buttons[1]!.height).toBe(PLATE_SCALES.standard.height); // 72
+  });
+
+  it('takes a press to rest → press, and a hover to rest → hover', () => {
+    const pressed = pauseMenuModel('menu', { hover: 'exit', press: 'exit' });
+    // A finger that is down is not hovering: press outranks hover on one plate.
+    expect(pressed.buttons.find((b) => b.id === 'exit')!.state).toBe('press');
+    expect(pressed.buttons.find((b) => b.id === 'resume')!.state).toBe('rest');
+    const hovered = pauseMenuModel('menu', { hover: 'settings' });
+    expect(hovered.buttons.find((b) => b.id === 'settings')!.state).toBe('hover');
+  });
+
+  describe('on a phone, reached mid-play', () => {
+    // Planet Rush is landscape-locked, so a phone held either way hands the
+    // overlay a WIDE, SHORT logical viewport. Both are checked: the overlay is
+    // opened mid-match, and a match is played held whichever way the player holds it.
+    for (const [name, vp] of [
+      ['iPhone, 844×390 logical', { width: 844, height: 390 }],
+      ['Pixel, 915×412 logical', { width: 915, height: 412 }],
+    ] as const) {
+      it(`${name}: every plate clears the 48px thumb floor`, () => {
+        for (const screen of ['menu', 'confirm'] as const) {
+          const layout = pauseLayout(vp, pauseButtons(screen), { isTouch: true });
+          for (const r of layout.buttons) {
+            expect(r.height, `${screen} on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+          }
+        }
+      });
+
+      it(`${name}: the stack still fits between the beams`, () => {
+        const layout = pauseLayout(vp, pauseButtons('menu'), { isTouch: true });
+        const last = layout.buttons[2]!;
+        expect(last.y + last.height).toBeLessThanOrEqual(layout.footer.y + 0.001);
+        // …and the size hierarchy survives the squeeze, so the primary is still
+        // the biggest plate rather than three equal bars.
+        expect(layout.buttons[0]!.height).toBeGreaterThan(last.height);
+      });
+    }
+
+    it('the corner affordance is a thumb target, not a 40px chip', () => {
+      // The one control on this screen that was under the floor. It is the
+      // touch-only way IN, so it is the one a phone player must be able to hit.
+      expect(PAUSE_BUTTON_SIZE).toBe(TOUCH_MIN);
+      const rect = pauseButtonRect({ width: 844, height: 390 });
+      expect(Math.min(rect.width, rect.height)).toBeGreaterThanOrEqual(TOUCH_MIN);
+    });
+  });
+
+  it('never lets a beam claim a screen it cannot frame', () => {
+    // A comically small viewport yields zero-extent rects, never backwards ones —
+    // and a zero-extent rect is untappable, which is the rule every layout here keeps.
+    for (const vp of [{ width: 4, height: 4 }, { width: 0, height: 0 }]) {
+      const layout = pauseLayout(vp, pauseButtons('menu'));
+      for (const r of [layout.header, layout.footer, layout.content, layout.title, ...layout.buttons]) {
+        expect(r.width).toBeGreaterThanOrEqual(0);
+        expect(r.height).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });
 
@@ -240,8 +367,8 @@ describe('the touch pause affordance', () => {
     // Inset from the LEFT past the ore readout, hard against the top.
     expect(rect.x).toBeGreaterThan(16);
     expect(rect.y).toBe(16);
-    expect(rect.width).toBe(40);
-    expect(rect.height).toBe(40);
+    expect(rect.width).toBe(PAUSE_BUTTON_SIZE);
+    expect(rect.height).toBe(PAUSE_BUTTON_SIZE);
   });
 
   it('declares stable ids and registry-accepted anchors', () => {
