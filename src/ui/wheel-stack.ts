@@ -42,6 +42,7 @@
 import type { WheelProfile } from '../art/materials';
 import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 import type { SegmentState, WheelSegment } from './build-wheel';
+import { tierPips } from './upgrade-wheel';
 import type { UpgradeSummaryPip, UpgradeWedge } from './upgrade-wheel';
 
 // ---------------------------------------------------------------------------
@@ -244,12 +245,11 @@ export function upgradeCostWords(wedge: UpgradeWedge): string | null {
   return wedge.costLabel;
 }
 
-/** A weapon track's tiers as one pip row — `DAMAGE ●●○` — and the rows stacked,
- *  which is what the WEAPON wedge draws in place of a stat line. */
+/** A weapon track's tiers as one pip row — `DAMAGE ●●○`. The glyphs themselves
+ *  come from {@link tierPips}, the same function every track wedge's own ladder
+ *  row uses, so the two places pips are drawn cannot draw them differently. */
 export function pipRow(pip: UpgradeSummaryPip): string {
-  const filled = '●'.repeat(Math.max(0, Math.min(pip.tier, pip.maxTier)));
-  const empty = '○'.repeat(Math.max(0, pip.maxTier - pip.tier));
-  return `${pip.label} ${filled}${empty}`;
+  return `${pip.label} ${tierPips(pip.tier, pip.maxTier)}`;
 }
 
 /** The WEAPON wedge's stat line: one {@link pipRow} per weapon track. */
