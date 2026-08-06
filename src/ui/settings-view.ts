@@ -47,6 +47,7 @@ import { FONT_BODY, FONT_HEADING } from './typography';
 import { SETTINGS_ID, VOLUME_STEPS, settingsHitTest, settingsLayout, volumeButtons } from './settings';
 import type { SettingsLayout, SettingsModel, SettingsRowView, SettingsTarget } from './settings';
 import type { Insets } from './menu-geometry';
+import { ScreenCache } from './screen-cache';
 
 export const SETTINGS_ANCHOR: AnchorSpec = { region: 'full' };
 
@@ -92,6 +93,8 @@ export class SettingsView extends Container {
   private readonly eyebrow: Text;
   private readonly rowNodes: RowNodes[] = [];
   private readonly backBody = new Graphics();
+  /** A settings screen is static between state changes — see ./screen-cache. */
+  private readonly cache = new ScreenCache(this);
   private readonly backLabel: Text;
 
   private layout: SettingsLayout;
@@ -110,6 +113,9 @@ export class SettingsView extends Container {
 
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
     this.layout = settingsLayout({ width, height }, opts(isTouch, insets));
+    // The cached texture is the size the OLD viewport rasterised to; refreshing
+    // it in place would blit a stale-sized screen, so drop it (./screen-cache).
+    this.cache.invalidate();
   }
 
   hitTest(x: number, y: number): SettingsTarget | null {
@@ -147,6 +153,10 @@ export class SettingsView extends Container {
     }
 
     this.drawBack(model, back, metrics);
+    // Everything above is now on the display list; rasterise it once so the
+    // frames between state changes cost one blit rather than ~170 translucent
+    // polygons (./screen-cache).
+    this.cache.refresh();
   }
 
   /** The header beam: the heading hard left, the standing instruction hard right. */

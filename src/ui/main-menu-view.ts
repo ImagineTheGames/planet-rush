@@ -59,6 +59,7 @@ import type {
   MainMenuOption,
 } from './main-menu';
 import type { Insets } from './menu-geometry';
+import { ScreenCache } from './screen-cache';
 
 export const MAIN_MENU_ANCHOR: AnchorSpec = { region: 'full' };
 
@@ -94,6 +95,8 @@ export class MainMenuView extends Container {
   private readonly eyebrow: Text;
   private readonly status: Text;
   private readonly buttonNodes: ButtonNodes[] = [];
+  /** A title screen is static between state changes — see ./screen-cache. */
+  private readonly cache = new ScreenCache(this);
 
   private layout: MainMenuLayout;
 
@@ -113,6 +116,9 @@ export class MainMenuView extends Container {
 
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
     this.layout = mainMenuLayout({ width, height }, opts(isTouch, insets));
+    // The cached texture is the size the OLD viewport rasterised to; refreshing
+    // it in place would blit a stale-sized screen, so drop it (./screen-cache).
+    this.cache.invalidate();
   }
 
   hitTest(x: number, y: number): MainMenuOption | null {
@@ -149,6 +155,10 @@ export class MainMenuView extends Container {
       if (!rect || !button) continue;
       this.drawButton(this.buttonSlot(i), button, rect, metrics);
     }
+    // Everything above is now on the display list; rasterise it once so the
+    // frames between state changes cost one blit rather than ~170 translucent
+    // polygons (./screen-cache).
+    this.cache.refresh();
   }
 
   /**
