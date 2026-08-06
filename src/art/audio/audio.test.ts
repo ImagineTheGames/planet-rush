@@ -763,7 +763,41 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       [SOUND.rockChip, SOUND.hullHit, 3.92, 'am I mining or shooting a ship (§2.3)'],
       [SOUND.rockChip, SOUND.shotImpact, 4.68, 'my shot chipped rock vs my shot landed'],
       [SOUND.turretFire, SOUND.shotImpact, 16.78, 'a turret fired at me vs something landed'],
+
+      // --- Pairs the s7-02 re-voice CREATED, guarded at what it ships -------
+      //
+      // Sweeping all 780 pairs in the bank before and after the re-voice turned
+      // up twenty that converged, which is the predicted failure mode of a
+      // unified palette and the reason this sweep was run rather than assumed.
+      // Two of them were pairs a player genuinely has to tell apart AND had
+      // become similar in structure as well as in brightness; both were moved
+      // apart before shipping, and are pinned here at what they ship as.
+      //
+      // holdFull and upgradeBought both became "several struck notes rising",
+      // both mid-match, and both starting on A5 — they measured ×1.03 apart, the
+      // tightest thing this pass produced. upgradeBought went up a register
+      // rather than holdFull moving, because holdFull REPEATS while a hold is
+      // full and must not fatigue, where a purchase lands once and §7.3 wants it
+      // the brighter of the two.
+      [SOUND.holdFull, SOUND.upgradeBought, 1.28, 'fly home vs your purchase landed'],
+      // "A rock paid out" vs "my turret just died" — both broadband bodies with
+      // a tonal tail, both about a third of a second. The ore glint went up a
+      // fourth to clear it, which also keeps it the one thing in `rockBurst`
+      // that goes up (style-guide §2).
+      [SOUND.rockBurst, SOUND.turretDown, 1.2, 'a rock paid out vs my turret died'],
     ];
+
+    // **What this metric cannot see, stated so nobody "fixes" a non-problem.**
+    // Centroid and zcr are brightness proxies. They are blind to timbre class
+    // (broadband noise vs a harmonic stack), to phrase structure (one note vs
+    // three), and to duration. The other eighteen converged pairs are all
+    // separated by exactly those: a held loop against a one-shot
+    // (thruster/respawnGo, holdFull/thruster), noise against struck sine at the
+    // same brightness (rockCrack/upgradeBought, rockChip/purchaseConfirm), or a
+    // 0.03 s tick against a 1.25 s phrase (bankOre/matchEnd). Two of them —
+    // pressTick/rejectBuzz and upgradeBought/pressTick — involve a voice that is
+    // FALLBACK ONLY: `CUE_UI` routes `press` to the ratified `pick` cue, so the
+    // bank's pressTick does not sound in a browser at all.
 
     for (const [a, b, today, mechanic] of PAIRS) {
       const ma = measure(a);

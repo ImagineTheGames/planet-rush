@@ -412,8 +412,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       // the one thing in this sound that goes *up* (style-guide §2). It was a
       // square gliding up a minor seventh; the rise is now two struck notes
       // instead of one bent one, which says the same thing without the chirp.
-      ...struck('rockBurst.ore', 784, { gain: 0.22, decay: 0.1, hold: 0.02, at: 0.05, partials: GLASS_PAIR, seed: 0x33ab }),
-      ...struck('rockBurst.glint', 1174.66, { gain: 0.18, decay: 0.12, hold: 0.02, at: 0.11, partials: GLASS_PAIR, seed: 0x33ae }),
+      ...struck('rockBurst.ore', 1046.5, { gain: 0.2, decay: 0.1, hold: 0.02, at: 0.05, partials: GLASS_PAIR, seed: 0x33ab }),
+      ...struck('rockBurst.glint', 1567.98, { gain: 0.16, decay: 0.12, hold: 0.02, at: 0.11, partials: GLASS_PAIR, seed: 0x33ae }),
     ],
   },
 
@@ -962,9 +962,9 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.upgradeBought]: {
     name: 'upgradeBought',
     layers: [
-      ...struck('upgradeBought.a', 880, { gain: 0.24, decay: 0.14, hold: 0.02, partials: GLASS_PAIR, seed: 0x9b5d }),
-      ...struck('upgradeBought.b', 1046.5, { gain: 0.24, decay: 0.14, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0x9b60 }),
-      ...struck('upgradeBought.c', 1318.51, { gain: 0.26, decay: 0.24, hold: 0.02, at: 0.16, seed: 0x9b63 }),
+      ...struck('upgradeBought.a', 1046.5, { gain: 0.22, decay: 0.14, hold: 0.02, partials: GLASS_PAIR, seed: 0x9b5d }),
+      ...struck('upgradeBought.b', 1318.51, { gain: 0.22, decay: 0.14, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0x9b60 }),
+      ...struck('upgradeBought.c', 1760, { gain: 0.24, decay: 0.24, hold: 0.02, at: 0.16, seed: 0x9b63 }),
     ],
   },
 
