@@ -35,7 +35,7 @@ import {
   UPGRADE_LADDER,
 } from './upgrade-wheel';
 import type { UpgradeWheelSignals, UpgradeTiers } from './upgrade-wheel';
-import { statWords, costWords, tierPips, MAXED_COST, STAT_ARROW } from './upgrade-wheel';
+import { statLabelOf, costLabelOf, tierPips, MAXED_COST, STAT_ARROW } from './upgrade-wheel';
 import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
 
 function tiers(over: Partial<Record<UpgradeTrack, number>> = {}): UpgradeTiers {
@@ -398,8 +398,8 @@ describe('the stat line — the densest text on any wheel (u7-06)', () => {
   });
 
   it('is a STRING, so the numeric fields are untouched by it', () => {
-    expect(typeof statWords('100%', '115%')).toBe('string');
-    expect(statWords('10', null)).toBe('10');
+    expect(typeof statLabelOf('100%', '115%')).toBe('string');
+    expect(statLabelOf('10', null)).toBe('10');
   });
 });
 
@@ -435,9 +435,9 @@ describe('the cost line — `cost/held`, the Build wheel\'s grammar (u7-06)', ()
   });
 
   it('keeps the cost line a STRING, so the numeric guarantee survives it', () => {
-    expect(typeof costWords(4, 9)).toBe('string');
-    expect(costWords(4, 0)).toBe('4/0');
-    expect(costWords(4, -3)).toBe('4/0');
+    expect(typeof costLabelOf(4, 9)).toBe('string');
+    expect(costLabelOf(4, 0)).toBe('4/0');
+    expect(costLabelOf(4, -3)).toBe('4/0');
   });
 });
 

@@ -302,7 +302,7 @@ export const MAXED_COST = 'MAX';
  * — for the phone profile, the same move `capBuiltLabelCompact` makes on the
  * Build wheel. Both values survive it; only the spaces go.
  */
-export function statWords(current: string, next: string | null, compact = false): string {
+export function statLabelOf(current: string, next: string | null, compact = false): string {
   if (next === null) return current;
   return compact ? `${current}${STAT_ARROW}${next}` : `${current} ${STAT_ARROW} ${next}`;
 }
@@ -316,7 +316,7 @@ export function statWords(current: string, next: string | null, compact = false)
  * floors it (`upgradeWheelModel`): a wheel that quoted `12/7.6` in one place and
  * `7` in the other would be disagreeing with itself about the player's wallet.
  */
-export function costWords(cost: number, ore: number): string {
+export function costLabelOf(cost: number, ore: number): string {
   return `${cost}/${Math.floor(Math.max(0, ore))}`;
 }
 
@@ -685,8 +685,8 @@ export function upgradeWedge(
       // A finished ladder keeps showing what it finished AT — this is the screen
       // where a player finds out ship stats exist — and says MAX once, in the cost
       // slot, where a capped Build-wheel wedge says FULL.
-      statLabel: statWords(current, null),
-      statLabelCompact: statWords(current, null, true),
+      statLabel: statLabelOf(current, null),
+      statLabelCompact: statLabelOf(current, null, true),
       costLabel: MAXED_COST,
       tierLabel: tierPips(tier, maxTier),
       angle,
@@ -706,12 +706,12 @@ export function upgradeWedge(
     cost,
     state: cost !== null && affordable(signals.ore, cost) ? 'ready' : 'unaffordable',
     summary: null,
-    statLabel: statWords(current, next),
-    statLabelCompact: statWords(current, next, true),
+    statLabel: statLabelOf(current, next),
+    statLabelCompact: statLabelOf(current, next, true),
     // A ladder rung with no price in its `costs` array is malformed rather than
     // finished, and it is already refused by the `unaffordable` state above — so
     // it quotes nothing rather than claiming to be MAX.
-    costLabel: cost === null ? null : costWords(cost, signals.ore),
+    costLabel: cost === null ? null : costLabelOf(cost, signals.ore),
     tierLabel: tierPips(tier, maxTier),
     angle,
   };

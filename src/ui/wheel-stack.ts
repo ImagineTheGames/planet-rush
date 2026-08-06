@@ -42,7 +42,7 @@
 import type { WheelProfile } from '../art/materials';
 import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 import type { SegmentState, WheelSegment } from './build-wheel';
-import type { UpgradeSummaryPip, UpgradeWedge, UpgradeWedgeState } from './upgrade-wheel';
+import type { UpgradeSummaryPip, UpgradeWedge } from './upgrade-wheel';
 
 // ---------------------------------------------------------------------------
 // The lines
@@ -264,13 +264,8 @@ export function pipRows(pips: readonly UpgradeSummaryPip[]): string {
  *  at all, so its `OPEN ▸` is chalk, exactly like UPGRADE SHIP's. */
 export function upgradeCostPaint(wedge: UpgradeWedge): CostPaint {
   if (wedge.kind === 'weapon') return 'none';
-  return upgradeCostPaintFor(wedge.state);
-}
-
-/** {@link upgradeCostPaint} for a bare state — the track wedges' half of it. */
-export function upgradeCostPaintFor(state: UpgradeWedgeState): CostPaint {
-  if (state === 'ready') return 'ore';
-  return state === 'unaffordable' ? 'refused' : 'spent';
+  if (wedge.state === 'ready') return 'ore';
+  return wedge.state === 'unaffordable' ? 'refused' : 'spent';
 }
 
 /** What a segment spends on, in words — the design's `YOUR PLANET` / `YOUR SHIP`
