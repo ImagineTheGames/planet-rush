@@ -27,15 +27,11 @@
 
 import { FireMode } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
+import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
+import type { FrameMetrics, PlateRole } from '../art/materials';
+import { beamContent, gantryFrame } from './gantry';
 import { FONT_HEADING } from './typography';
-import {
-  MENU_COLUMN_MAX,
-  MENU_ROW_GAP,
-  centeredGrid,
-  clamp,
-  hitRect,
-  menuContent,
-} from './menu-geometry';
+import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -177,29 +173,64 @@ export type SettingsTarget =
 // The per-frame model
 // ---------------------------------------------------------------------------
 
+/** A control's interaction state, as the view draws it. Mirrors `materials.ts`
+ *  `PlateState`; restated here so a consumer of the model need not import art. */
+export type SettingsControlState = 'rest' | 'hover' | 'press';
+
+/** What the pointer is doing on the screen. A volume row's −/+ are separate
+ *  targets, so hover/press are addressed by the same {@link SettingsTarget} the
+ *  hit test returns rather than by row index. */
+export interface SettingsPointer {
+  readonly hover?: SettingsTarget | null;
+  readonly press?: SettingsTarget | null;
+}
+
 /** One row, as the view draws it: a label on the left and, on the right, either
- *  a toggle pill (`value`) or a stepped volume bar (`level` / `max`). */
+ *  a toggle chip (`value`) or a stepped volume bar (`level` / `max`). */
 export interface SettingsRowView {
   readonly kind: SettingsRowSpec['kind'];
   readonly label: string;
   /** For a toggle: the current word (`MANUAL` / `ON`). Empty for a volume. */
   readonly value: string;
-  /** For a toggle: whether it reads as "engaged" (plasma) or "off" (steel). */
+  /** For a toggle: whether it reads as "engaged". Under Gantry/Bone this is no
+   *  longer a hue — the settings screen spends none — so an engaged toggle is
+   *  the brightest *hairline* on the chip, not a coloured one. */
   readonly on: boolean;
+  /** The row plate's state. A row is an `inert` plate: a surface that holds the
+   *  control, hovered and pressed but never bright. */
+  readonly state: SettingsControlState;
   /** For a volume: the filled step count and the total. */
   readonly channel?: VolumeChannel;
   readonly level?: number;
   readonly max?: number;
+  /** For a volume: the −/+ steppers' own states. */
+  readonly minusState?: SettingsControlState;
+  readonly plusState?: SettingsControlState;
 }
 
 /** The settings screen for one frame. */
 export interface SettingsModel {
   readonly title: string;
+  /** The header beam's right-hand eyebrow, verbatim from the handoff. It is the
+   *  screen's one piece of instruction, and it is true: every row applies the
+   *  instant it is tapped, which is also why the way out says DONE. */
+  readonly eyebrow: string;
   readonly rows: readonly SettingsRowView[];
   /** The way out. `DONE` rather than `BACK`: the changes are already applied, so
    *  the button confirms rather than cancels — there is nothing to discard. */
   readonly backLabel: string;
+  /** DONE's plate state. */
+  readonly backState: SettingsControlState;
+  /**
+   * DONE is this screen's ONE bright plate; every row is `inert`. That is the
+   * constraint the Bone accent carries with it (`./gantry` `singlePrimary`), and
+   * `settings.test.ts` holds the screen to it.
+   */
+  readonly backRole: PlateRole;
 }
+
+/** The header beam's eyebrow, from the handoff's settings screen. */
+export const SETTINGS_EYEBROW = 'CHANGES SAVE IMMEDIATELY';
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
@@ -212,7 +243,12 @@ export function settingsModel(
   state: SettingsState,
   fireMode: FireMode,
   controlScheme: ControlScheme,
+  pointer: SettingsPointer = {},
 ): SettingsModel {
+  /** The state of one target: pressed beats hovered, and neither is at rest. */
+  const stateOf = (target: SettingsTarget): SettingsControlState =>
+    sameTarget(pointer.press, target) ? 'press' : sameTarget(pointer.hover, target) ? 'hover' : 'rest';
+
   const rows: SettingsRowView[] = SETTINGS_ROWS.map((spec) => {
     switch (spec.kind) {
       case 'fireMode':
@@ -221,6 +257,7 @@ export function settingsModel(
           label: 'FIRE MODE',
           value: fireMode === FireMode.AutoAim ? 'AUTO-AIM' : 'MANUAL',
           on: fireMode === FireMode.AutoAim,
+          state: stateOf({ kind: 'fireMode' }),
         };
       case 'controls':
         // The ratified wording (p6-01): "CONTROLS: STICKS / TAP COMMANDER". The
@@ -231,6 +268,7 @@ export function settingsModel(
           label: 'CONTROLS',
           value: controlScheme === 'tap' ? 'TAP COMMANDER' : 'STICKS',
           on: controlScheme === 'tap',
+          state: stateOf({ kind: 'controls' }),
         };
       case 'reduceVfx':
         return {
@@ -238,6 +276,7 @@ export function settingsModel(
           label: 'REDUCE VFX',
           value: state.reduceVfx ? 'ON' : 'OFF',
           on: state.reduceVfx,
+          state: stateOf({ kind: 'reduceVfx' }),
         };
       case 'volume':
         return {
@@ -245,13 +284,41 @@ export function settingsModel(
           label: VOLUME_LABELS[spec.channel],
           value: '',
           on: state.volumes[spec.channel] > 0,
+          // The bar between the steppers is a readout, not a control, so the row
+          // plate itself never lights up — only its two ends do.
+          state: 'rest',
           channel: spec.channel,
           level: volumeLevel(state, spec.channel),
           max: VOLUME_STEPS,
+          minusState: stateOf({ kind: 'volume', channel: spec.channel, dir: -1 }),
+          plusState: stateOf({ kind: 'volume', channel: spec.channel, dir: 1 }),
         };
     }
   });
-  return { title: 'SETTINGS', rows, backLabel: 'DONE' };
+  return {
+    title: 'SETTINGS',
+    eyebrow: SETTINGS_EYEBROW,
+    rows,
+    backLabel: 'DONE',
+    backState: stateOf({ kind: 'back' }),
+    backRole: 'primary',
+  };
+}
+
+/**
+ * Whether two hit-test targets name the same control. Structural, because the
+ * wiring layer hands back whatever {@link settingsHitTest} returned and those are
+ * fresh objects every call — identity would never match. Two nulls (the pointer
+ * is off every control) are the same target; one null is not.
+ */
+export function sameTarget(
+  a: SettingsTarget | null | undefined,
+  b: SettingsTarget | null | undefined,
+): boolean {
+  if (!a || !b) return !a && !b;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'volume' && b.kind === 'volume') return a.channel === b.channel && a.dir === b.dir;
+  return true;
 }
 
 const VOLUME_LABELS: Record<VolumeChannel, string> = {
@@ -264,11 +331,6 @@ const VOLUME_LABELS: Record<VolumeChannel, string> = {
 // Layout
 // ---------------------------------------------------------------------------
 
-export const SETTINGS_TITLE_HEIGHT = 44;
-export const SETTINGS_ROW_HEIGHT = 48;
-export const SETTINGS_ROW_HEIGHT_TOUCH = 60;
-export const SETTINGS_BACK_HEIGHT = 48;
-export const SETTINGS_BACK_HEIGHT_TOUCH = 56;
 /** The −/+ buttons on a volume row are squares hung off the row's right edge. */
 export const VOLUME_BUTTON_GAP = 6;
 /**
@@ -286,75 +348,106 @@ export interface SettingsLayoutOptions {
   readonly insets?: Insets;
 }
 
-/** The settings screen's rects: the title band, one rect per {@link SETTINGS_ROWS}
- *  in order, and the DONE button. */
+/**
+ * The settings screen's rects.
+ *
+ * Under Gantry/Bone the heading and the way out live **in the beams**: SETTINGS
+ * is drawn in the header, DONE is a plate in the footer, and the rows own the
+ * whole band between. `title` therefore names the strip inside the header beam
+ * rather than a slice of the content box, and `back` is the footer's plate.
+ */
 export interface SettingsLayout {
   readonly content: Rect;
+  readonly header: Rect;
+  readonly footer: Rect;
+  /** The heading's strip inside the header beam. */
   readonly title: Rect;
   readonly rows: readonly Rect[];
+  /** The DONE plate, right-aligned in the footer beam (handoff). */
   readonly back: Rect;
+  /** A volume row's −/+ square size, so the hit test and the view agree. */
+  readonly stepper: number;
   readonly isTouch: boolean;
+  readonly metrics: FrameMetrics;
 }
 
+/** DONE's width at the reference — the handoff's 300px footer plate. */
+const BACK_WIDTH = 300;
+
 /**
- * Lay the screen out for a viewport. Title off the top, DONE off the bottom, the
- * rows centred in the band between — capped so a desktop gets a tidy 480px
- * column rather than one full-width row per setting.
+ * Lay the screen out for a viewport. Heading in the header beam, DONE in the
+ * footer beam, the rows centred in the band between.
+ *
+ * The two-column wrap is unchanged and still load-bearing: a phone under the
+ * landscape lock gives the screen a wide-but-short logical viewport, and six
+ * thumb-height rows do not stack into 260px of band. What changed is where the
+ * numbers come from — {@link ../art/materials} `rowHeight` and `frameMetrics`
+ * rather than a pair of hand-picked desktop/touch constants — so the row height
+ * is the handoff's 64px on a desktop and the thumb floor on a phone, derived
+ * once for every screen in the set.
  */
 export function settingsLayout(viewport: Viewport, options: SettingsLayoutOptions = {}): SettingsLayout {
   const isTouch = options.isTouch ?? false;
-  const content = menuContent(viewport, options.insets);
+  const frame = gantryFrame(viewport, options.insets);
+  const { metrics } = frame;
 
-  const titleHeight = Math.min(SETTINGS_TITLE_HEIGHT, content.height);
-  const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
+  const title = beamContent(frame.header, metrics);
 
-  const backHeight = Math.min(
-    isTouch ? SETTINGS_BACK_HEIGHT_TOUCH : SETTINGS_BACK_HEIGHT,
-    Math.max(0, content.height - titleHeight),
-  );
-  const backWidth = Math.min(MENU_COLUMN_MAX, content.width);
+  const footerStrip = beamContent(frame.footer, metrics);
+  const backHeight = Math.min(plateHeight('compact', metrics), footerStrip.height);
+  const backWidth = Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width);
   const back: Rect = {
-    x: content.x + (content.width - backWidth) / 2,
-    y: content.y + content.height - backHeight,
-    width: backWidth,
-    height: backHeight,
+    x: footerStrip.x + footerStrip.width - backWidth,
+    y: footerStrip.y + (footerStrip.height - backHeight) / 2,
+    width: Math.max(0, backWidth),
+    height: Math.max(0, backHeight),
   };
 
-  const band: Rect = {
-    x: content.x,
-    y: title.y + titleHeight + MENU_ROW_GAP,
-    width: content.width,
-    height: Math.max(0, back.y - MENU_ROW_GAP - (title.y + titleHeight + MENU_ROW_GAP)),
-  };
-  const rowHeight = isTouch ? SETTINGS_ROW_HEIGHT_TOUCH : SETTINGS_ROW_HEIGHT;
+  const band = frame.band;
+  const rowH = rowHeight(metrics);
+  const gap = metrics.rowGap;
+  const columnWidth = Math.min(COLUMN.settings, band.width);
   // How many rows fit in one column at the full (thumb) row height? If fewer than
   // all of them, wrap into as many columns as it takes — capped — so no row is
   // ever compressed below its target just to fit the height. On a tall desktop
   // every row fits in one column and this is a no-op.
-  const perColumnFit = Math.floor((band.height + MENU_ROW_GAP) / (rowHeight + MENU_ROW_GAP));
+  const perColumnFit = Math.floor((band.height + gap) / (rowH + gap));
   const columns = Math.min(
     SETTINGS_MAX_COLUMNS,
     Math.max(1, Math.ceil(SETTINGS_ROWS.length / Math.max(1, perColumnFit))),
   );
-  const rows = centeredGrid(band, SETTINGS_ROWS.length, MENU_COLUMN_MAX, rowHeight, columns);
+  const rows = centeredGrid(band, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
+  const stepper = stepperSize(rows[0], metrics);
 
-  return { content, title, rows, back, isTouch };
+  return { content: frame.content, header: frame.header, footer: frame.footer, title, rows, back, stepper, isTouch, metrics };
+}
+
+/** The −/+ square's edge: the handoff's 40px, never under the thumb floor, and
+ *  never taller than the row it hangs off or wider than a sixth of it. */
+function stepperSize(row: Rect | undefined, m: FrameMetrics): number {
+  if (!row) return 0;
+  return Math.max(0, Math.min(valueChipHeight(m), row.height, row.width / 6));
 }
 
 /**
  * The −/+ button squares on a volume row, hung off its right edge. Shared by the
  * hit test and the view so the button a finger lands on is the button that was
  * drawn there. The bar fills the space to their left.
+ *
+ * `size` comes from {@link SettingsLayout.stepper}; the default keeps a caller
+ * that has only a rect working, at the pre-Gantry sizing.
  */
-export function volumeButtons(row: Rect): { minus: Rect; plus: Rect; bar: Rect } {
-  const size = Math.max(0, Math.min(row.height, row.width / 6));
-  const plus: Rect = { x: row.x + row.width - size, y: row.y, width: size, height: row.height };
-  const minus: Rect = {
-    x: plus.x - VOLUME_BUTTON_GAP - size,
-    y: row.y,
-    width: size,
-    height: row.height,
-  };
+export function volumeButtons(
+  row: Rect,
+  size = Math.max(0, Math.min(row.height, row.width / 6)),
+): { minus: Rect; plus: Rect; bar: Rect } {
+  const s = Math.max(0, Math.min(size, row.width / 2));
+  // The squares are centred in the row's height — a 40px stepper on a 64px row
+  // is the handoff's proportion, and it is what stops the control reading as a
+  // full-height bar glued to the plate's edge.
+  const y = row.y + (row.height - s) / 2;
+  const plus: Rect = { x: row.x + row.width - s, y, width: s, height: s };
+  const minus: Rect = { x: plus.x - VOLUME_BUTTON_GAP - s, y, width: s, height: s };
   const barRight = minus.x - VOLUME_BUTTON_GAP;
   const bar: Rect = { x: row.x, y: row.y, width: Math.max(0, barRight - row.x), height: row.height };
   return { minus, plus, bar };
@@ -377,7 +470,7 @@ export function settingsHitTest(layout: SettingsLayout, x: number, y: number): S
     if (spec.kind === 'fireMode') return { kind: 'fireMode' };
     if (spec.kind === 'controls') return { kind: 'controls' };
     if (spec.kind === 'reduceVfx') return { kind: 'reduceVfx' };
-    const { minus, plus } = volumeButtons(rect);
+    const { minus, plus } = volumeButtons(rect, layout.stepper);
     if (hitRect(plus, x, y)) return { kind: 'volume', channel: spec.channel, dir: 1 };
     if (hitRect(minus, x, y)) return { kind: 'volume', channel: spec.channel, dir: -1 };
     return null; // the bar itself is inert

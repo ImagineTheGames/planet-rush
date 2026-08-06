@@ -176,6 +176,7 @@ import {
   MAP_STORAGE_KEY,
   settingsModel,
   settingsLayout,
+  sameTarget,
   SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
@@ -1154,6 +1155,26 @@ async function boot(): Promise<void> {
   const pauseSettings = new SettingsView(transform.logicalWidth, transform.logicalHeight, isTouch);
   pauseSettings.visible = false;
   gameRoot.addChild(pauseSettings);
+  // Gantry/Bone plate states for the in-match settings screen (u7-01) — the same
+  // three the pre-match screen has, so one settings screen behaves one way
+  // wherever it is opened from. Hover is a pointer affordance and simply never
+  // fires on touch; press is released on pointer-up or on a cancelled gesture.
+  let pauseSettingsHover: SettingsTarget | null = null;
+  let pauseSettingsPress: SettingsTarget | null = null;
+  const releasePauseSettingsPress = (): void => {
+    pauseSettingsPress = null;
+  };
+  app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
+  app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
+  app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
+    if (pauseScreen !== 'settings') return;
+    const lp = toLogical(e.clientX, e.clientY);
+    pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+  });
+  app.canvas.addEventListener('pointerleave', () => {
+    pauseSettingsHover = null;
+    pauseSettingsPress = null;
+  });
 
   const merged = createControlState();
   const sources: { source: InputSource; state: ControlState; device: DeviceKind }[] = [
@@ -2058,6 +2079,9 @@ async function boot(): Promise<void> {
   function handlePausePointer(lx: number, ly: number): void {
     if (pauseScreen === 'settings') {
       const hit = pauseSettings.hitTest(lx, ly);
+      // The plate goes down before it acts (u7-01), and is released on pointer-up.
+      pauseSettingsPress = hit;
+      pauseSettingsHover = hit;
       if (hit) applyPauseSettings(hit);
       return;
     }
@@ -2151,7 +2175,14 @@ async function boot(): Promise<void> {
     pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
     const settingsUp = pauseScreen === 'settings';
     pauseSettings.visible = settingsUp;
-    if (settingsUp) pauseSettings.update(settingsModel(matchSettings, fireMode, controlScheme));
+    if (settingsUp) {
+      pauseSettings.update(
+        settingsModel(matchSettings, fireMode, controlScheme, {
+          hover: pauseSettingsHover,
+          press: pauseSettingsPress,
+        }),
+      );
+    }
     pauseView.updateButton(pauseButtonVisible({ isTouch, available: pauseAvailable() }));
     syncDownloadLog();
   }
@@ -5321,6 +5352,14 @@ function openMainMenu(
   let codexDrag:
     | { startX: number; startY: number; lastX: number; lastY: number; moved: boolean; overRail: boolean }
     | null = null;
+  // Gantry/Bone plate states (u7-01). The material has three — rest, hover, press
+  // — and the model is a pure function of these, so the wiring layer owns nothing
+  // but "what is the pointer on, and is it down". Touch never hovers, so on a
+  // phone `hover` stays null and only `press` moves.
+  let menuHover: MainMenuOption | null = null;
+  let menuPress: MainMenuOption | null = null;
+  let settingsHover: SettingsTarget | null = null;
+  let settingsPress: SettingsTarget | null = null;
   ctx.root.addChild(menuView, settingsView, codexView, entryView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
@@ -5596,8 +5635,12 @@ function openMainMenu(
     settingsView.visible = screen === 'settings';
     codexView.visible = screen === 'codex';
     entryView.visible = screen === 'online';
-    if (menuView.visible) menuView.update(mainMenuModel());
-    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode, controlScheme));
+    if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
+    if (settingsView.visible) {
+      settingsView.update(
+        settingsModel(settings, fireMode, controlScheme, { hover: settingsHover, press: settingsPress }),
+      );
+    }
     if (codexView.visible) codexView.update(codexModel(codexState));
     if (entryView.visible) entryView.update(entryModel(entry, connectNarration()));
     seam.screen = screen;
@@ -6154,11 +6197,17 @@ function openMainMenu(
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (screen === 'menu') {
       const hit = menuView.hitTest(x, y);
+      // The plate goes down before it acts, so a press that navigates away has
+      // still been *seen* to be a press. Routing is unchanged: the menu has always
+      // acted on pointer-DOWN, and the landscape-lock suite taps it that way.
+      menuPress = hit;
+      menuHover = hit;
       // PLAY opens the doors — the one way in (ratified). There is no second front
       // door to route, and no path from here that builds a world.
       if (hit === 'play') openDoors();
       else if (hit === 'codex') openCodex();
       else if (hit === 'settings') openSettings();
+      else render();
     } else if (screen === 'online') {
       const hit = entryView.hitTest(x, y);
       if (hit) applyEntryTarget(hit);
@@ -6167,7 +6216,10 @@ function openMainMenu(
       // here, which is exactly the shortcut the ratified flow replaced.
     } else if (screen === 'settings') {
       const hit = settingsView.hitTest(x, y);
+      settingsPress = hit;
+      settingsHover = hit;
       if (hit) applySettings(hit);
+      else render();
     } else {
       // Codex: begin a tap-or-drag. The tap fires on pointer-up only if the finger
       // did not travel far enough to be a scroll — so a drag over a long body
@@ -6183,6 +6235,28 @@ function openMainMenu(
   const CODEX_DRAG_SLOP = 8;
 
   function onPointerMove(e: PointerEvent): void {
+    // Hover, on the two Gantry/Bone screens. A hovered plate lifts further off
+    // the screen (`materials.ts` deepens its cast shadow) and brightens one step
+    // — the handoff's 90ms hover, which is a pointer affordance and simply never
+    // fires on touch. Redraw only when the plate under the pointer CHANGES, so a
+    // mouse crossing the screen does not rebuild geometry per event.
+    if (screen === 'menu' || screen === 'settings') {
+      const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+      if (screen === 'menu') {
+        const hit = menuView.hitTest(x, y);
+        if (hit !== menuHover) {
+          menuHover = hit;
+          render();
+        }
+        return;
+      }
+      const hit = settingsView.hitTest(x, y);
+      if (!sameTarget(settingsHover, hit)) {
+        settingsHover = hit;
+        render();
+      }
+      return;
+    }
     if (screen !== 'codex' || !codexDrag) return;
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (Math.abs(y - codexDrag.startY) > CODEX_DRAG_SLOP || Math.abs(x - codexDrag.startX) > CODEX_DRAG_SLOP) {
@@ -6200,6 +6274,20 @@ function openMainMenu(
   }
 
   function onPointerUp(e: PointerEvent): void {
+    // A finger lifting releases the plate it was holding, on whichever screen it
+    // was held. `pointercancel` routes here too, so a gesture the browser steals
+    // cannot strand a plate in its pressed state.
+    if (menuPress !== null || settingsPress !== null) {
+      menuPress = null;
+      settingsPress = null;
+      // Touch has no hover to fall back to: a lifted finger leaves nothing under
+      // it, so the plate returns to rest rather than to a hover it never had.
+      if (e.pointerType === 'touch') {
+        menuHover = null;
+        settingsHover = null;
+      }
+      if (screen === 'menu' || screen === 'settings') render();
+    }
     if (screen !== 'codex' || !codexDrag) {
       codexDrag = null;
       return;
@@ -6252,6 +6340,18 @@ function openMainMenu(
     if (e.code === 'Enter' || e.code === 'Space') openDoors();
   }
 
+  /** The pointer left the canvas: nothing is hovered and nothing is held. Without
+   *  this a plate keeps its hover after the mouse has gone, which reads as a
+   *  stuck control on a screen whose whole affordance is "the bright one". */
+  function onPointerLeave(): void {
+    if (menuHover === null && menuPress === null && settingsHover === null && settingsPress === null) return;
+    menuHover = null;
+    menuPress = null;
+    settingsHover = null;
+    settingsPress = null;
+    render();
+  }
+
   function relayout(): void {
     // Landscape lock first: re-apply the root transform for the new canvas size,
     // then re-lay the menu in the resulting logical (landscape) viewport — the
@@ -6270,6 +6370,7 @@ function openMainMenu(
     app.canvas.removeEventListener('pointermove', onPointerMove);
     app.canvas.removeEventListener('pointerup', onPointerUp);
     app.canvas.removeEventListener('pointercancel', onPointerUp);
+    app.canvas.removeEventListener('pointerleave', onPointerLeave);
     app.canvas.removeEventListener('wheel', onWheel);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
@@ -6286,6 +6387,7 @@ function openMainMenu(
   app.canvas.addEventListener('pointermove', onPointerMove);
   app.canvas.addEventListener('pointerup', onPointerUp);
   app.canvas.addEventListener('pointercancel', onPointerUp);
+  app.canvas.addEventListener('pointerleave', onPointerLeave);
   app.canvas.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
