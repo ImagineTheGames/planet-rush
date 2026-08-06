@@ -214,6 +214,132 @@ const REAL_CONTEXT_FITS: RealSatisfiesSubset = true;
 
 const ALL_KINDS: TellKind[] = Object.values(TELL);
 
+// ---------------------------------------------------------------------------
+// Spectral measurement — the s7-02 re-voice's evidence
+// ---------------------------------------------------------------------------
+//
+// The re-voice (GDD §4.7 as amended 2026-08-06, `docs/audio-revoice-spec.md`) is
+// judged by ear but *asserted* by number, and the numbers are the audit's: the
+// working implementations below are copied from `spikes/tone-audit/`, not
+// imported from it. A test may not depend on a throwaway spike — but it also may
+// not measure a different thing than the document it is enforcing, so these are
+// deliberately the same arithmetic rather than a tidier equivalent.
+
+/** In-place iterative radix-2 FFT. Lengths are powers of two. */
+function fft(re: Float64Array, im: Float64Array): void {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j]!, re[i]!];
+      [im[i], im[j]] = [im[j]!, im[i]!];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wRe = Math.cos(ang);
+    const wIm = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let curRe = 1;
+      let curIm = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const uRe = re[i + k]!;
+        const uIm = im[i + k]!;
+        const vRe = re[i + k + len / 2]! * curRe - im[i + k + len / 2]! * curIm;
+        const vIm = re[i + k + len / 2]! * curIm + im[i + k + len / 2]! * curRe;
+        re[i + k] = uRe + vRe;
+        im[i + k] = uIm + vIm;
+        re[i + k + len / 2] = uRe - vRe;
+        im[i + k + len / 2] = uIm - vIm;
+        const nextRe = curRe * wRe - curIm * wIm;
+        curIm = curRe * wIm + curIm * wRe;
+        curRe = nextRe;
+      }
+    }
+  }
+}
+
+/** The FFT_N-sample window with the most energy, zero-padded if the sound is shorter. */
+function loudestWindow(samples: Float32Array, n: number): Float32Array {
+  if (samples.length <= n) {
+    const out = new Float32Array(n);
+    out.set(samples);
+    return out;
+  }
+  const step = Math.max(1, Math.floor(n / 4));
+  let best = 0;
+  let bestEnergy = -1;
+  for (let start = 0; start + n <= samples.length; start += step) {
+    let e = 0;
+    for (let i = start; i < start + n; i++) {
+      const v = samples[i] ?? 0;
+      e += v * v;
+    }
+    if (e > bestEnergy) {
+      bestEnergy = e;
+      best = start;
+    }
+  }
+  return samples.slice(best, best + n);
+}
+
+/** Hann-windowed magnitude spectrum of the loudest window, and its bin width in Hz. */
+function spectrum(samples: Float32Array): { mag: Float64Array; binHz: number } {
+  const N = 8192;
+  const frame = loudestWindow(samples, N);
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    // Hann: without it the frame edges are a step and every bin smears.
+    re[i] = (frame[i] ?? 0) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  }
+  fft(re, im);
+  const mag = new Float64Array(N / 2);
+  for (let k = 0; k < N / 2; k++) mag[k] = Math.hypot(re[k] ?? 0, im[k] ?? 0);
+  return { mag, binHz: DEFAULT_SAMPLE_RATE / N };
+}
+
+/**
+ * Spectral centroid in Hz — the amplitude-weighted mean frequency, and the single
+ * closest number to *"how bright is this"*. Magnitude-weighted rather than
+ * power-weighted: magnitude tracks perceived brightness more evenly across the
+ * very different levels in this bank.
+ */
+function spectralCentroidHz(samples: Float32Array): number {
+  const { mag, binHz } = spectrum(samples);
+  let num = 0;
+  let den = 0;
+  for (let k = 1; k < mag.length; k++) {
+    num += (mag[k] ?? 0) * k * binHz;
+    den += mag[k] ?? 0;
+  }
+  return den > 0 ? num / den : 0;
+}
+
+/** Share of spectral energy in `[lo, hi)` Hz, 0..1. */
+function bandShare(samples: Float32Array, lo: number, hi: number): number {
+  const { mag, binHz } = spectrum(samples);
+  let band = 0;
+  let total = 0;
+  for (let k = 1; k < mag.length; k++) {
+    const e = (mag[k] ?? 0) ** 2;
+    total += e;
+    if (k * binHz >= lo && k * binHz < hi) band += e;
+  }
+  return total > 0 ? band / total : 0;
+}
+
+/** Zero crossings per sample over the whole buffer — the cheap brightness proxy. */
+function zeroCrossingRate(samples: Float32Array): number {
+  let n = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
+  }
+  return samples.length > 0 ? n / samples.length : 0;
+}
+
 /** Drive an engine for `seconds` at 60 Hz, advancing the fake clock with it. */
 function run(engine: AudioEngine, ctx: FakeAudioContext, seconds: number, each?: () => void): void {
   const dt = 1 / 60;
@@ -448,6 +574,241 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(isLayered(soundSpec(SOUND.rockCrack))).toBe(false);
     expect(isLayered(soundSpec(SOUND.shipExplode))).toBe(true);
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
+  });
+
+  it('holds the amended tone contract: no arcade oscillators or idioms in the bank (GDD §4.7)', () => {
+    // **The definition of done for the re-voice**, and the last thing written:
+    // it was red for the whole pass and went green when the pass finished, which
+    // is the only ordering that makes it mean anything.
+    //
+    // The four clauses are `docs/audio-revoice-spec.md` §5. Each names its
+    // exceptions here rather than in a reviewer's head, because the failure mode
+    // of a policy nobody can read is that the next agent quietly re-adds the
+    // thing it was written to keep out.
+    const voices: { sound: SoundName; spec: VoiceSpec }[] = [];
+    for (const name of SOUND_NAMES) {
+      const spec = soundSpec(name);
+      for (const v of isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec]) {
+        voices.push({ sound: name, spec: v });
+      }
+    }
+    expect(voices.length).toBeGreaterThan(80); // it walks the whole bank, not a corner
+
+    // §5.1 — the oscillators. `square` and `saw` are the two shapes the ratified
+    // Gantry/Bone handoff independently names as "what made earlier passes sound
+    // retro or cartoonish", and they were 28 of the bank's 89 voices.
+    //
+    // The alarm is the ONE sanctioned exception, and the reason is a precedence
+    // rule rather than a taste: §2.2 specifies "an unmistakable alarm", §4.9 puts
+    // it on the not-cuttable list, and a saw's dense harmonic stack is what makes
+    // a klaxon refuse to sound like music. Softening it would trade a mechanic
+    // for a register, which §4.7's own precedence forbids.
+    const SANCTIONED_SAW = new Set(['alarm.low', 'alarm.high']);
+    for (const { sound, spec } of voices) {
+      if (SANCTIONED_SAW.has(spec.name)) {
+        expect(spec.wave, `${spec.name} is the sanctioned klaxon`).toBe('saw');
+        continue;
+      }
+      expect(spec.wave, `${sound}/${spec.name} is an arcade oscillator`).not.toBe('square');
+      expect(spec.wave, `${sound}/${spec.name} is an arcade oscillator`).not.toBe('saw');
+    }
+
+    // §5.3 — the arcade idioms, retired outright. No exceptions. These are
+    // jsfxr's own vocabulary: `arpMul`/`arpTime` is the "blip up" (the synth's
+    // doc comment calls it that), `dutySweep` is "the classic sweeping buzz",
+    // and `repeat` in this bank was only ever a trill. They stay in VoiceSpec —
+    // `repeat` has a legitimate non-arcade use as a rattle and may return with a
+    // written reason — but nothing in the bank reaches for them.
+    for (const { sound, spec } of voices) {
+      const where = `${sound}/${spec.name}`;
+      expect(spec.arpMul, `${where} arpeggios`).toBeUndefined();
+      expect(spec.arpTime, `${where} arpeggios`).toBeUndefined();
+      expect(spec.dutySweep, `${where} sweeps its duty`).toBeUndefined();
+      expect(spec.repeat, `${where} trills`).toBeUndefined();
+    }
+
+    // §5.4 — modulation and glide, the clauses the audit proved actually carry
+    // the register. Removing rockChip's vibrato moved its spectral centroid by
+    // 0.6% (noise) and removing its chirp moved it 154 Hz — so a pass that only
+    // swapped waveforms could have hit every brightness target and left the toy
+    // exactly where it was.
+    //
+    // 250 ms is where a glide stops reading as a *chirp* and starts reading as a
+    // *fall*, and where a few cycles of vibrato stop reading as a *wobble* and
+    // start reading as *drift*. Longer voices are exempt by construction, which
+    // is deliberate: the station-death fall (×6.18 over 1.32 s), the collapse,
+    // the shield bubble failing (×6.92 over 0.54 s) and the ambient bed's
+    // 0.125 Hz drift are all the opposite of the thing being banned.
+    const SHORT_S = 0.25;
+    const MAX_GLIDE = 1.2;
+    /** Voices under the threshold that keep a wide glide, each with its reason. */
+    const GLIDE_EXEMPT: Readonly<Record<string, string>> = {
+      // HOLD by ratification (s7-01 §7.2): one of the two sounds a home gets,
+      // and the ache depends on it. The tear falling under the thud is the
+      // reactor being opened, not a chirp — and at 0.0063 it is the darkest
+      // voice in the bank, which is the opposite of the complaint.
+      'coreHit.tear': 'the ache — held untouched by s7-01 §7.2, and the darkest voice in the bank',
+    };
+    for (const { sound, spec } of voices) {
+      const duration = voiceDuration(spec);
+      if (duration >= SHORT_S) continue;
+      const where = `${sound}/${spec.name} (${(duration * 1000).toFixed(0)} ms)`;
+
+      // A wobble inside a voice this short is a cartoon, full stop — no exemptions.
+      expect(spec.vibratoDepth ?? 0, `${where} wobbles`).toBe(0);
+
+      if (spec.freqEnd === undefined || spec.freqEnd === spec.freq) continue;
+      const glide = Math.max(spec.freq, spec.freqEnd) / Math.max(1, Math.min(spec.freq, spec.freqEnd));
+      const reason = GLIDE_EXEMPT[spec.name];
+      if (reason !== undefined) {
+        expect(reason.length, `${where} claims an exemption with no reason`).toBeGreaterThan(20);
+        continue;
+      }
+      expect(glide, `${where} chirps ×${glide.toFixed(2)}`).toBeLessThanOrEqual(MAX_GLIDE);
+    }
+  });
+
+  it('keeps the shipped mining voice under the tone the developer ratified (s4-01, s7-01)', () => {
+    // **The bug report, reproduced as a number.** The developer denied the
+    // rockChip trio in s4-01 with one note — *"almost there, but they should be
+    // lower in tone"* — and `candidates.test.ts` locked that ratification into a
+    // ceiling on `./candidates`. But candidates are a review artifact imported by
+    // nothing in the game, so the SHIPPED voice was never held to it: s7-01
+    // measured `bank.ts`'s rockChip byte-identical to its a3-02 form, at 0.0483
+    // against a ratified ceiling of 0.034, and nothing looked. That is why the
+    // second report — *"rockchip needs to be redone as well, it still has that
+    // toony sound"* (2026-08-05) — describes a sound that never changed.
+    //
+    // This test is the missing guard. Same window, same ceiling, same arithmetic
+    // as `candidates.test.ts`, pointed at the voice the player actually hears.
+    const CEILING = 0.034;
+    const windowedZcr = (samples: Float32Array): number => {
+      const from = Math.round(0.003 * DEFAULT_SAMPLE_RATE); // past the attack transient
+      const to = Math.min(samples.length, from + 2048);
+      let n = 0;
+      for (let i = from + 1; i < to; i++) if ((samples[i]! >= 0) !== (samples[i - 1]! >= 0)) n++;
+      return n / Math.max(1, to - from);
+    };
+    const chip = renderSound(soundSpec(SOUND.rockChip));
+    expect(windowedZcr(chip), 'the shipped mining voice is not lower in tone').toBeLessThan(CEILING);
+
+    // **And a floor, because "lower" has one, and it is the phone.** A phone
+    // speaker rolls off hard below 500 Hz. s4-01's approved-but-never-shipped
+    // candidate "a" put 89% of its energy under that line — on `TELL.mineHit`, a
+    // voice that fires all match, on a device the mobile gate (GDD §4.3) makes a
+    // first-class target. It would have arrived as "the mining sound is gone".
+    // So the ceiling above and this floor bracket the voice together: lower than
+    // the ratification demands, and still a sound a phone can make.
+    expect(
+      bandShare(chip, 500, DEFAULT_SAMPLE_RATE / 2),
+      'the mining voice has fallen below what a phone speaker can emit',
+    ).toBeGreaterThan(0.4);
+  });
+
+  it('keeps every pair of tells a player must not confuse apart (s7-01 §8)', () => {
+    // **A regression net, not a goal** (s7-01 §9 T1). It went up GREEN on the
+    // pre-re-voice bank and is asserted here so the s7-02 re-voice cannot do the
+    // one thing a re-voice is uniquely able to do: converge nine voices onto one
+    // clean struck note and turn two obvious mechanics into a coin flip. GDD §4.7
+    // as amended is explicit that the audible-tell mandate (§3.6) OUTRANKS the
+    // register — "an asset pass that makes two mechanics harder to tell apart has
+    // failed this section, not satisfied it."
+    //
+    // A pair's **separation** is the larger of its two measured ratios:
+    // {@link spectralCentroidHz} (how bright) and {@link zeroCrossingRate} (the
+    // cheap proxy the rock-vs-hull test already uses). Larger-of-two, because the pairs
+    // do not all separate on the same axis — `shieldHit`/`coreHit` is carried
+    // almost entirely by zcr (×9.02) and barely at all by centroid (×1.61), and
+    // requiring both would fail a bank that is perfectly legible.
+    //
+    // The floor is **90% of today's separation, capped at ×3** — the cap is the
+    // deliberate part. 90% is the tolerance a legitimate re-voice needs; the cap
+    // exists because past a factor of three in brightness two tells are already
+    // unmistakable, and a bare 90%-of-today rule would have frozen
+    // `turretFire`/`shotImpact` at ×16.78 and forbidden exactly the re-voice
+    // s7-01 §7.2 orders for it ("the single most arcade voice in the bank").
+    // A net catches a collapse; it does not pin the bank to its own history.
+    const CAP = 3;
+
+    const measured = new Map<SoundName, { centroid: number; zcr: number }>();
+    const measure = (name: SoundName) => {
+      let m = measured.get(name);
+      if (!m) {
+        const samples = renderSound(soundSpec(name));
+        m = { centroid: spectralCentroidHz(samples), zcr: zeroCrossingRate(samples) };
+        measured.set(name, m);
+      }
+      return m;
+    };
+    const ratio = (a: number, b: number) => (Math.min(a, b) > 0 ? Math.max(a, b) / Math.min(a, b) : Infinity);
+
+    // [a, b, separation measured on the pre-re-voice bank, the mechanic it protects]
+    const PAIRS: readonly (readonly [SoundName, SoundName, number, string])[] = [
+      // The tightest pair in the bank, and BOTH are re-voiced by s7-02: picked a
+      // chunk up vs banked a chunk — the whole held-ore-vs-banked-ore economy.
+      [SOUND.oreCollect, SOUND.depositTick, 2.0, 'picked a chunk up vs banked a chunk (§2.3)'],
+      // Your buy was refused vs your reactor is being eaten. Both low, both bad
+      // news, and the second is what the alarm is built on top of.
+      [SOUND.rejectBuzz, SOUND.coreHit, 1.26, 'a refused buy vs a reactor hit (§2.2)'],
+      // §2.2's grammar: shields redden and die before the reactor begins to fill.
+      // A besieged player must hear which layer is being eaten. Carried by zcr.
+      [SOUND.shieldHit, SOUND.coreHit, 9.02, 'their shield ate it vs the reactor did (§2.2)'],
+      // Seconds apart, off one wheel press.
+      [SOUND.buildComplete, SOUND.purchaseConfirm, 1.27, 'the defence arrived vs the buy registered'],
+      [SOUND.respawnBeep, SOUND.spawnPulse, 1.77, 'the respawn clock vs spawn protection (§2.1, §2.7)'],
+      // Both low, both two-note, both loud — and `waveArrive` is losing the saw
+      // that currently separates them most, while the alarm keeps its own (§5.1).
+      [SOUND.alarm, SOUND.waveArrive, 2.45, 'home is under attack vs a wave arrived (§2.2, §2.3)'],
+      // The game's central inversion. Also guarded on its own, below.
+      [SOUND.rockChip, SOUND.hullHit, 3.92, 'am I mining or shooting a ship (§2.3)'],
+      [SOUND.rockChip, SOUND.shotImpact, 4.68, 'my shot chipped rock vs my shot landed'],
+      [SOUND.turretFire, SOUND.shotImpact, 16.78, 'a turret fired at me vs something landed'],
+
+      // --- Pairs the s7-02 re-voice CREATED, guarded at what it ships -------
+      //
+      // Sweeping all 780 pairs in the bank before and after the re-voice turned
+      // up twenty that converged, which is the predicted failure mode of a
+      // unified palette and the reason this sweep was run rather than assumed.
+      // Two of them were pairs a player genuinely has to tell apart AND had
+      // become similar in structure as well as in brightness; both were moved
+      // apart before shipping, and are pinned here at what they ship as.
+      //
+      // holdFull and upgradeBought both became "several struck notes rising",
+      // both mid-match, and both starting on A5 — they measured ×1.03 apart, the
+      // tightest thing this pass produced. upgradeBought went up a register
+      // rather than holdFull moving, because holdFull REPEATS while a hold is
+      // full and must not fatigue, where a purchase lands once and §7.3 wants it
+      // the brighter of the two.
+      [SOUND.holdFull, SOUND.upgradeBought, 1.28, 'fly home vs your purchase landed'],
+      // "A rock paid out" vs "my turret just died" — both broadband bodies with
+      // a tonal tail, both about a third of a second. The ore glint went up a
+      // fourth to clear it, which also keeps it the one thing in `rockBurst`
+      // that goes up (style-guide §2).
+      [SOUND.rockBurst, SOUND.turretDown, 1.2, 'a rock paid out vs my turret died'],
+    ];
+
+    // **What this metric cannot see, stated so nobody "fixes" a non-problem.**
+    // Centroid and zcr are brightness proxies. They are blind to timbre class
+    // (broadband noise vs a harmonic stack), to phrase structure (one note vs
+    // three), and to duration. The other eighteen converged pairs are all
+    // separated by exactly those: a held loop against a one-shot
+    // (thruster/respawnGo, holdFull/thruster), noise against struck sine at the
+    // same brightness (rockCrack/upgradeBought, rockChip/purchaseConfirm), or a
+    // 0.03 s tick against a 1.25 s phrase (bankOre/matchEnd). Two of them —
+    // pressTick/rejectBuzz and upgradeBought/pressTick — involve a voice that is
+    // FALLBACK ONLY: `CUE_UI` routes `press` to the ratified `pick` cue, so the
+    // bank's pressTick does not sound in a browser at all.
+
+    for (const [a, b, today, mechanic] of PAIRS) {
+      const ma = measure(a);
+      const mb = measure(b);
+      const separation = Math.max(ratio(ma.centroid, mb.centroid), ratio(ma.zcr, mb.zcr));
+      const floor = Math.min(0.9 * today, CAP);
+      expect(
+        separation,
+        `${a} / ${b} collapsed — ${mechanic}. was ×${today.toFixed(2)}, now ×${separation.toFixed(2)}, floor ×${floor.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(floor);
+    }
   });
 });
 

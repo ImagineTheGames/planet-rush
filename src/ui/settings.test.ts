@@ -10,12 +10,13 @@ import { describe, it, expect } from 'vitest';
 import { FireMode } from '@platform/actions';
 import {
   DEFAULT_VOLUMES,
+  SETTINGS_EYEBROW,
   SETTINGS_ROWS,
-  SETTINGS_ROW_HEIGHT_TOUCH,
   VOLUME_CHANNELS,
   VOLUME_STEPS,
   adjustVolume,
   createSettings,
+  sameTarget,
   setReduceVfx,
   setVolume,
   settingsHitTest,
@@ -27,6 +28,8 @@ import {
 } from './settings';
 import type { VolumeChannel } from './settings';
 import { hitRect } from './menu-geometry';
+import { singlePrimary } from './gantry';
+import { BEAM, COLUMN, ROW, TOUCH_MIN, rowHeight, frameMetrics } from '../art/materials';
 
 const VIEWPORT = { width: 1280, height: 720 };
 const center = (r: { x: number; y: number; width: number; height: number }) => ({
@@ -128,18 +131,114 @@ describe('the frame model reads its values from their true sources', () => {
     expect(model.rows.map((r) => r.kind)).toEqual(SETTINGS_ROWS.map((r) => r.kind));
     expect(model.rows).toHaveLength(SETTINGS_ROWS.length);
   });
+
+  it('carries the header beam\'s standing instruction, verbatim from the handoff', () => {
+    expect(settingsModel(createSettings(), FireMode.Manual, 'sticks').eyebrow).toBe(SETTINGS_EYEBROW);
+  });
+});
+
+// The constraint Bone carries with it: the primary action relies on brightness
+// and size rather than hue, so it must never share a screen with a second bright
+// plate. On this screen DONE is that plate — every row, however "engaged" the
+// setting behind it, is a surface.
+describe('one bright plate, and only one', () => {
+  it('makes DONE the screen\'s only primary', () => {
+    const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap');
+    expect(model.backRole).toBe('primary');
+    expect(singlePrimary([model.backRole])).toBe(true);
+  });
+
+  it('never brightens a row, even with every toggle engaged', () => {
+    // Six rows all "on" is the worst case for a screen that marks state by
+    // brightness — if a row could go primary, this is where it would.
+    const loud = setVolume(toggleReduceVfx(createSettings()), 'master', 1);
+    const model = settingsModel(loud, FireMode.AutoAim, 'tap');
+    expect(model.rows.some((r) => r.on)).toBe(true);
+    // The model exposes no role for a row precisely because a row has no choice
+    // of one; the view draws every row `inert`. Asserted as the whole screen's
+    // primary count, which is the thing that must stay at one.
+    expect(singlePrimary([model.backRole, ...model.rows.map(() => 'inert' as const)])).toBe(true);
+  });
+});
+
+describe('rest / hover / press', () => {
+  it('resolves a row\'s state, with a press outranking a hover', () => {
+    const rest = settingsModel(createSettings(), FireMode.Manual, 'sticks');
+    expect(rest.rows.every((r) => r.state === 'rest')).toBe(true);
+    expect(rest.backState).toBe('rest');
+
+    const hovered = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+      hover: { kind: 'reduceVfx' },
+    });
+    expect(hovered.rows.find((r) => r.kind === 'reduceVfx')?.state).toBe('hover');
+    expect(hovered.rows.find((r) => r.kind === 'fireMode')?.state).toBe('rest');
+
+    const pressed = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+      hover: { kind: 'back' },
+      press: { kind: 'back' },
+    });
+    expect(pressed.backState).toBe('press');
+  });
+
+  it('addresses a volume row\'s two ends separately — the bar between them is inert', () => {
+    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+      press: { kind: 'volume', channel: 'sfx', dir: 1 },
+    });
+    const sfx = model.rows.find((r) => r.channel === 'sfx');
+    const master = model.rows.find((r) => r.channel === 'master');
+    expect(sfx?.plusState).toBe('press');
+    expect(sfx?.minusState).toBe('rest');
+    // The row plate itself never lights up: the bar is a readout, not a control.
+    expect(sfx?.state).toBe('rest');
+    // And the same stepper on a different channel is a different control.
+    expect(master?.plusState).toBe('rest');
+  });
+
+  it('compares targets structurally, because the hit test returns fresh objects', () => {
+    expect(sameTarget({ kind: 'back' }, { kind: 'back' })).toBe(true);
+    expect(sameTarget({ kind: 'back' }, { kind: 'fireMode' })).toBe(false);
+    expect(
+      sameTarget({ kind: 'volume', channel: 'sfx', dir: 1 }, { kind: 'volume', channel: 'sfx', dir: 1 }),
+    ).toBe(true);
+    expect(
+      sameTarget({ kind: 'volume', channel: 'sfx', dir: 1 }, { kind: 'volume', channel: 'sfx', dir: -1 }),
+    ).toBe(false);
+    // Two nulls (the pointer is off every control) are the same target; one is not.
+    expect(sameTarget(null, null)).toBe(true);
+    expect(sameTarget(null, { kind: 'back' })).toBe(false);
+  });
 });
 
 describe('layout and hit test agree', () => {
-  it('places a row per setting inside the content box, title on top, DONE on the bottom', () => {
+  it('places a row per setting between the beams, heading in one and DONE in the other', () => {
     const layout = settingsLayout(VIEWPORT);
     expect(layout.rows).toHaveLength(SETTINGS_ROWS.length);
     for (const row of layout.rows) {
       expect(row.x).toBeGreaterThanOrEqual(layout.content.x - 0.5);
-      expect(row.y).toBeGreaterThanOrEqual(layout.title.y + layout.title.height);
-      expect(row.y + row.height).toBeLessThanOrEqual(layout.back.y + 0.5);
+      expect(row.y).toBeGreaterThanOrEqual(layout.header.y + layout.header.height);
+      expect(row.y + row.height).toBeLessThanOrEqual(layout.footer.y + 0.5);
     }
-    expect(layout.back.y + layout.back.height).toBeLessThanOrEqual(layout.content.y + layout.content.height + 0.5);
+    // The heading rides the header beam; DONE is a plate inside the footer beam,
+    // right-aligned in it (handoff).
+    expect(layout.title.y).toBe(layout.header.y);
+    expect(layout.back.y).toBeGreaterThanOrEqual(layout.footer.y - 0.5);
+    expect(layout.back.y + layout.back.height).toBeLessThanOrEqual(layout.footer.y + layout.footer.height + 0.5);
+    expect(layout.back.x + layout.back.width).toBeLessThanOrEqual(
+      layout.content.x + layout.content.width + 0.5,
+    );
+  });
+
+  it('draws the RATIFIED desktop numbers at the handoff\'s own reference', () => {
+    // The derivation must reproduce its own sample: 44px margins, 92px beams, a
+    // 680px row column, 64px rows.
+    const layout = settingsLayout(VIEWPORT);
+    expect(layout.metrics.margin).toBe(BEAM.margin);
+    expect(layout.header.height).toBe(BEAM.height);
+    expect(layout.footer.height).toBe(BEAM.height);
+    expect(layout.rows[0]?.height).toBe(ROW.height);
+    expect(layout.rows[0]?.width).toBe(COLUMN.settings);
+    // One column on a desktop: every row fits the band at full height.
+    expect(new Set(layout.rows.map((r) => Math.round(r.x))).size).toBe(1);
   });
 
   it('routes a tap on DONE to back', () => {
@@ -165,7 +264,7 @@ describe('layout and hit test agree', () => {
     const idx = SETTINGS_ROWS.findIndex((r) => r.kind === 'volume');
     const row = layout.rows[idx]!;
     const channel = (SETTINGS_ROWS[idx] as { channel: VolumeChannel }).channel;
-    const { minus, plus, bar } = volumeButtons(row);
+    const { minus, plus, bar } = volumeButtons(row, layout.stepper);
 
     expect(settingsHitTest(layout, center(plus).x, center(plus).y)).toEqual({ kind: 'volume', channel, dir: 1 });
     expect(settingsHitTest(layout, center(minus).x, center(minus).y)).toEqual({ kind: 'volume', channel, dir: -1 });
@@ -203,14 +302,32 @@ describe('short, wide touch viewport (portrait phone under the landscape lock)',
 
   it('keeps every row at its FULL thumb height rather than compressing it', () => {
     const layout = settingsLayout(PHONE, { isTouch: true });
+    const m = frameMetrics(PHONE.width, PHONE.height);
     expect(layout.rows).toHaveLength(SETTINGS_ROWS.length);
     for (const row of layout.rows) {
       // No sliver: each row is its intended thumb height, to the pixel.
-      expect(row.height).toBeCloseTo(SETTINGS_ROW_HEIGHT_TOUCH, 5);
+      expect(row.height).toBeCloseTo(rowHeight(m), 5);
+      expect(row.height).toBeGreaterThanOrEqual(TOUCH_MIN);
     }
     // It could only manage that by using more than one column.
     const distinctX = new Set(layout.rows.map((r) => Math.round(r.x)));
     expect(distinctX.size).toBeGreaterThan(1);
+  });
+
+  it('keeps the −/+ steppers thumb-sized, where the handoff\'s 40px would not be', () => {
+    const layout = settingsLayout(PHONE, { isTouch: true });
+    const idx = SETTINGS_ROWS.findIndex((r) => r.kind === 'volume');
+    const { minus, plus } = volumeButtons(layout.rows[idx]!, layout.stepper);
+    for (const box of [minus, plus]) {
+      expect(box.width).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(box.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+    }
+  });
+
+  it('keeps DONE reachable and thumb-sized inside the footer beam', () => {
+    const layout = settingsLayout(PHONE, { isTouch: true });
+    expect(layout.back.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+    expect(settingsHitTest(layout, center(layout.back).x, center(layout.back).y)).toEqual({ kind: 'back' });
   });
 
   it('the CONTROLS row is present, on-screen, and tappable across its whole width', () => {
@@ -232,8 +349,22 @@ describe('short, wide touch viewport (portrait phone under the landscape lock)',
     for (const row of layout.rows) {
       expect(row.x).toBeGreaterThanOrEqual(layout.content.x - 0.5);
       expect(row.x + row.width).toBeLessThanOrEqual(layout.content.x + layout.content.width + 0.5);
-      expect(row.y).toBeGreaterThanOrEqual(layout.title.y + layout.title.height - 0.5);
-      expect(row.y + row.height).toBeLessThanOrEqual(layout.back.y + 0.5);
+      expect(row.y).toBeGreaterThanOrEqual(layout.header.y + layout.header.height - 0.5);
+      expect(row.y + row.height).toBeLessThanOrEqual(layout.footer.y + 0.5);
+    }
+  });
+
+  it('respects a sideways notch — nothing is drawn under the safe-area inset', () => {
+    // A phone held in portrait rotates the root, so the notch that was at the top
+    // arrives on one SIDE of the logical viewport. Beams stop at it; rows stop at
+    // it plus the page margin.
+    const insets = { top: 0, bottom: 0, left: 44, right: 44 };
+    const layout = settingsLayout(PHONE, { isTouch: true, insets });
+    expect(layout.header.x).toBe(insets.left);
+    expect(layout.header.x + layout.header.width).toBe(PHONE.width - insets.right);
+    for (const row of layout.rows) {
+      expect(row.x).toBeGreaterThanOrEqual(insets.left);
+      expect(row.x + row.width).toBeLessThanOrEqual(PHONE.width - insets.right + 0.5);
     }
   });
 });

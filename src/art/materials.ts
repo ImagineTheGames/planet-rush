@@ -317,6 +317,212 @@ export function contentHeight(height: number): number {
 export const ROW_BAR_WIDTH = 4;
 
 // ---------------------------------------------------------------------------
+// 3b. The same frame on a phone — the metrics the handoff does not carry
+// ---------------------------------------------------------------------------
+//
+// Verified before this section was written: the handoff is **desktop-authored**.
+// It has no `@media` block, no viewport meta, and the words mobile, touch, phone
+// and portrait appear nowhere in it. Its numbers — 44px margins, 92px beams, the
+// 800/680px content columns, 80/72/64/56px plates — are one 1280×720 sample of
+// the look, not the look itself.
+//
+// So the rule this section encodes, and the one the remaining screens inherit
+// rather than re-deriving: **the LOOK is ratified; the METRICS adapt.** Every
+// number below is the handoff's own number multiplied by a single frame scale,
+// with two floors that are allowed to win:
+//
+//  1. **{@link TOUCH_MIN}** — nothing a finger presses goes under 48px, ever. A
+//     plate that reads correctly and cannot be hit is not the look, it is a bug
+//     wearing the look.
+//  2. **{@link TYPE_MIN}** — an 11px floor on type. A 12px eyebrow scaled
+//     linearly to a 390px-tall logical viewport is 6.5px, which is not small
+//     type, it is a smudge.
+//
+// Planet Rush is landscape-locked (`src/platform/orientation.ts`), so a phone
+// held in portrait hands the menus a WIDE, SHORT logical viewport — 844×390 on
+// the iPhone profile, 915×412 on the Pixel one. The short axis is therefore the
+// binding constraint on a phone and the long axis is not, which is why the scale
+// below takes the *minimum* of the two ratios rather than keying off width.
+
+/** The reference viewport every metric in this file was drawn at. */
+export const REFERENCE_VIEWPORT = { width: 1280, height: 720 } as const;
+
+/**
+ * The smallest a control may be along either axis, CSS px. The thumb floor the
+ * UI lane has kept since M1 — it outranks any scaled-down metric here, because a
+ * plate the look approves of and a thumb cannot hit is not a plate.
+ */
+export const TOUCH_MIN = 48;
+
+/** The smallest type may be scaled to, CSS px. Below this an Oxanium eyebrow
+ *  stops being small and starts being a smudge. */
+export const TYPE_MIN = 11;
+
+/** How far the frame scale may fall before it stops falling. Past this the frame
+ *  is already smaller than anything it holds and the layouts' own compression
+ *  (zero-extent ⇒ untappable) is the correct behaviour, not a smaller beam. */
+export const FRAME_SCALE_FLOOR = 0.25;
+
+/** The gap between two stacked plates in a menu column (handoff: the title
+ *  screen's 15px), and between two settings rows (the settings screen's 7px). */
+export const PLATE_GAP = 15;
+export const ROW_GAP = 7;
+
+/**
+ * A settings/ship row: the surface scale the handoff draws at 64px, which is
+ * taller than {@link PLATE_SCALES}'s `compact` and shorter than its `standard`
+ * because it is a *surface*, not a raised plate. Its padding is 20px, four
+ * tighter than a compact plate's, for the same reason.
+ */
+export const ROW = { height: 64, padX: 20 } as const;
+
+/**
+ * The value control on a settings row — the `MANUAL` / `STICKS` / `OFF` chip and
+ * the −/+ steppers beside a level.
+ *
+ * The handoff draws it at 40px, which is **under** the thumb floor, so this is
+ * one of the numbers that adapts — and it adapts *everywhere*, not only on a
+ * phone, because a viewport cannot tell you whether the screen in front of it is
+ * a touchscreen. A desktop therefore draws a 48px stepper where the handoff drew
+ * 40; on a 64px row that is a proportion change of 8px and no change at all to
+ * the look, which is the trade the brief authorises ("where a literal metric
+ * cannot survive, the look wins and the number adapts").
+ */
+export const VALUE_CHIP = { height: 40, minWidth: 190, padX: 18 } as const;
+
+/**
+ * The content column each screen centres its plates in, at the reference. Two
+ * numbers, both read off the handoff: the title's stack of plates is 800 wide,
+ * the settings rows are 680. A narrower viewport gives up the margin first and
+ * the column second — it never re-picks either.
+ */
+export const COLUMN = { title: 800, settings: 680 } as const;
+
+/**
+ * The frame, resolved for one viewport. Everything a screen needs to place the
+ * beams, the margins and the plates — derived once, handed down, never
+ * re-derived per element.
+ */
+export interface FrameMetrics {
+  /** The viewport's size against the reference, ≤ 1. Drives chrome and type. */
+  readonly scale: number;
+  /**
+   * The scale plates are drawn at. **Never below the thumb floor**, so it is
+   * `scale` on a desktop and a larger number on a phone — which is exactly the
+   * adaptation the brief authorises: at 844×390 a linearly-scaled hero plate is
+   * 43px tall, and 43px is not a control.
+   */
+  readonly plateScale: number;
+  /** Left/right/top/bottom page margin (handoff 44). */
+  readonly margin: number;
+  /** Header and footer beam height (handoff 92). */
+  readonly beam: number;
+  /** Gap between a beam and the content band (handoff 28). */
+  readonly gutter: number;
+  /** Gap between two stacked plates (handoff 15). */
+  readonly gap: number;
+  /** Gap between two settings rows (handoff 7). */
+  readonly rowGap: number;
+}
+
+function clampNum(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * Resolve {@link FrameMetrics} for a viewport.
+ *
+ * At the reference (and on any desktop at least that big) every number below is
+ * the handoff's own: margin 44, beam 92, gutter 28, plates 80/72/56, rows 64.
+ * That is deliberate — the ratified sample must survive its own derivation, or
+ * the derivation is a redesign.
+ */
+export function frameMetrics(width: number, height: number): FrameMetrics {
+  const raw = Math.min(width / REFERENCE_VIEWPORT.width, height / REFERENCE_VIEWPORT.height);
+  const scale = clampNum(Number.isFinite(raw) ? raw : 1, FRAME_SCALE_FLOOR, 1);
+  // The plate floor, stated once: the SMALLEST plate family a screen draws
+  // (`compact` — BACK, DONE) is what must clear the thumb, and the rest keep
+  // their ratios above it, so the size hierarchy that carries "PLAY is the
+  // primary" survives the phone instead of collapsing to three equal bars.
+  const plateScale = clampNum(Math.max(scale, TOUCH_MIN / PLATE_SCALES.compact.height), scale, 1);
+  return {
+    scale,
+    plateScale,
+    margin: Math.max(12, Math.round(BEAM.margin * scale)),
+    // A beam may never eat more than a fifth of the screen it frames: two 92px
+    // beams on a 390px-tall logical viewport would take 47% of it before a
+    // single plate is drawn.
+    beam: Math.max(0, Math.min(Math.round(BEAM.height * scale), Math.round(height * 0.2))),
+    gutter: Math.max(8, Math.round(BEAM.gutter * scale)),
+    gap: Math.max(6, Math.round(PLATE_GAP * scale)),
+    rowGap: Math.max(4, Math.round(ROW_GAP * scale)),
+  };
+}
+
+/** A plate's height at these metrics — the scale's reference height, floored at
+ *  the thumb minimum by {@link FrameMetrics.plateScale}. */
+export function plateHeight(scale: PlateScale, m: FrameMetrics): number {
+  return Math.max(0, Math.round(PLATE_SCALES[scale].height * m.plateScale));
+}
+
+/** A settings/ship row's height at these metrics. Never under the thumb floor. */
+export function rowHeight(m: FrameMetrics): number {
+  return Math.max(TOUCH_MIN, Math.round(ROW.height * m.plateScale));
+}
+
+/** A row's value chip / stepper size at these metrics. 40px at the reference,
+ *  the thumb floor on a phone. */
+export function valueChipHeight(m: FrameMetrics): number {
+  return Math.max(TOUCH_MIN, Math.round(VALUE_CHIP.height * m.plateScale));
+}
+
+/** A plate's horizontal padding at these metrics. */
+export function platePadX(scale: PlateScale, m: FrameMetrics): number {
+  return Math.max(8, Math.round(PLATE_SCALES[scale].padX * m.plateScale));
+}
+
+/** Air between a beam's rivet cluster and the first content beside it. */
+const RIVET_CLEARANCE = 3;
+
+/**
+ * How far a beam's own content must start from that beam's end.
+ *
+ * A header beam is **bolted**: {@link RIVET} puts a two-head cluster 20px in from
+ * each end, and the rivets are hardware — a 6px bolt is a 6px bolt whatever size
+ * the screen is, so unlike the margins they do not scale. At the handoff's 44px
+ * margin they clear the eyebrow cluster by exactly 3px and the question never
+ * comes up; at a phone's derived 24px margin they sit *underneath the first two
+ * letters of it* (found in u7-01's first phone golden). So the beam's content
+ * starts clear of its fasteners rather than through them — a rule that reproduces
+ * the handoff's 44 on a desktop and holds at any size.
+ *
+ * A footer carries no rivets, so its content starts at the plain page margin.
+ */
+export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): number {
+  if (kind !== 'header') return m.margin;
+  const cluster = RIVET.perCluster * RIVET.pitch - RIVET.gap;
+  return Math.max(m.margin, RIVET.inset + cluster + RIVET_CLEARANCE);
+}
+
+/**
+ * Chrome type — a beam's eyebrow, the wordmark, a heading. Scales with the
+ * FRAME, because that is the thing it sits inside, and never below
+ * {@link TYPE_MIN}.
+ */
+export function typeSize(referencePx: number, m: FrameMetrics): number {
+  return Math.max(TYPE_MIN, Math.round(referencePx * m.scale));
+}
+
+/**
+ * Type that sits ON a plate — a label, a sub-line, a chip's value. Scales with
+ * the PLATE, not the frame, so a phone's floored-up plate does not end up
+ * carrying desktop-shrunk type rattling around inside it.
+ */
+export function plateTypeSize(referencePx: number, m: FrameMetrics): number {
+  return Math.max(TYPE_MIN, Math.round(referencePx * m.plateScale));
+}
+
+// ---------------------------------------------------------------------------
 // 4. Rivets — where plates meet
 // ---------------------------------------------------------------------------
 
@@ -810,20 +1016,41 @@ export function plateMaterial(
  * imports PixiJS — which is what keeps `src/art/` testable without a canvas.
  */
 export interface PlateCanvas {
+  /**
+   * **The callee OWNS `points`.** PixiJS 8's `Polygon` constructor stores the
+   * array it is handed by reference (`this.points = flat`), so a caller that
+   * reuses one scratch buffer hands every polygon in the drawing the same array
+   * and the whole plate collapses onto the last shape marked. These primitives
+   * therefore pass a fresh array per shape — see {@link fillChamfered}.
+   */
   poly(points: number[], close?: boolean): void;
   circle(x: number, y: number, radius: number): void;
   /**
    * **Must consume `style` synchronously.** These primitives hand the same
-   * mutable object to every fill so a draw allocates nothing; `Graphics.fill`
-   * copies its input into the geometry immediately, which is what makes that
-   * safe. A test recorder must copy the object rather than retain it.
+   * mutable object to every fill so a draw allocates no styles;
+   * `GraphicsContext.fill` converts its input into a fresh fill style
+   * immediately, which is what makes that safe. A test recorder must copy the
+   * object rather than retain it.
    */
   fill(style: { color: number; alpha: number }): void;
 }
 
 // Two scratch polygons, ping-ponged through the two chamfer clips, and one
-// scratch fill style. Reused for every shape of every plate — this is why a draw
-// allocates nothing.
+// scratch fill style. The clipping work reuses these; only the finished outline
+// is copied out (see below), so a draw allocates one small array per marked
+// shape and nothing else.
+//
+// **Why the copy is not optional.** PixiJS 8's `Polygon` stores the points array
+// it is handed *by reference* — `this.points = flat`, no slice — and
+// `GraphicsContext.fill` clones the path only shallowly. Handing every shape the
+// same scratch buffer therefore does not draw a plate: it draws the LAST shape
+// marked, N times, on top of itself, which renders a whole screen of Gantry/Bone
+// plates as a single 3px accent tick (found in u7-01's first golden run). The
+// fill STYLE really is converted synchronously, so that one stays shared.
+//
+// This is not a per-frame cost. A plate's look changes only when its state does
+// — a hover, a press, a resize — which is a user event, not a frame; the
+// per-frame path writes no geometry at all.
 const PA: number[] = [];
 const PB: number[] = [];
 const FILL = { color: 0, alpha: 1 };
@@ -896,7 +1123,8 @@ function fillChamfered(
   clipHalf(PA, PB, 1, d1);
   clipHalf(PB, PA, -1, d2);
   if (PA.length < 6) return;
-  canvas.poly(PA, true);
+  // `slice()`, not `PA`: the canvas keeps what it is handed (see PlateCanvas).
+  canvas.poly(PA.slice(), true);
   fillWith(canvas, color, alpha);
 }
 
@@ -911,9 +1139,7 @@ function fillBox(
   alpha: number,
 ): void {
   if (bw <= 0 || bh <= 0 || alpha <= 0) return;
-  PA.length = 0;
-  PA.push(bx, by, bx + bw, by, bx + bw, by + bh, bx, by + bh);
-  canvas.poly(PA, true);
+  canvas.poly([bx, by, bx + bw, by, bx + bw, by + bh, bx, by + bh], true);
   fillWith(canvas, color, alpha);
 }
 

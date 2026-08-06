@@ -277,6 +277,208 @@ test('golden: PORTRAIT-HELD phone BUILD WHEEL — the wheel survives the lock', 
   await expect(page).toHaveScreenshot('phone-portrait-build-wheel.png', GOLDEN);
 });
 
+// ---------------------------------------------------------------------------
+// The FRONT DOOR, in Gantry/Bone (u7-01 — ratified 2026-08-05)
+// ---------------------------------------------------------------------------
+//
+// The developer ratified a LOOK ("the theme and looks is what we want") and
+// should be able to see whether they got it. The frozen-match baselines above
+// cannot show it: `?debug=1` skips the menu by contract, so the title and
+// settings screens appear in no baseline in this repo and a total re-skin of
+// them would leave every golden byte-identical.
+//
+// These five cover the two screens u7-01 owns, on both form factors and
+// portrait-held — the state the landscape lock rotates the whole root through,
+// where a menu has been stranded off-screen before (the M1 field report).
+//
+// Determinism, and the one thing it does not cover: a clean boot is what shows
+// the menu (`?debug=1` skips it, and `?freeze=1` is gated on `debug`, so there is
+// no frozen flavour of these screens to ask for). Neither screen animates and
+// both are pure functions of the viewport, so the frame is stable — EXCEPT the
+// build badge in the bottom-left corner, which carries the commit sha and
+// therefore changes every commit.
+//
+// That is deliberately not masked. The stamp is ~250 inked pixels against a
+// 1.02 M-pixel desktop frame (0.03% of `maxDiffPixelRatio`'s 1% budget), so a new
+// sha cannot fail a baseline — and leaving it in means every one of these images
+// answers "which build am I looking at?", which is the whole reason the badge is
+// never hidden behind a flag in the first place.
+
+/**
+ * Boot a clean build to the main menu and wait until it is laid out and settled.
+ *
+ * "Settled" is two things, and the second one is not optional on a phone. The
+ * menu lays out in the LOGICAL (landscape) viewport, and under emulation that
+ * viewport arrives in more than one step — the initial size, then whatever
+ * `visualViewport` reports once the mobile chrome has resolved — each of which
+ * re-lays the screen out. Screenshotting between the two produced a frame that
+ * changed under Playwright's own stability check and hung the comparison until
+ * it timed out. So: wait for the seam, then wait for the logical viewport to
+ * report the same size twice running, and only then shoot.
+ */
+async function bootMenu(page: Page): Promise<void> {
+  await page.goto('/');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const m = (window as unknown as {
+        __mainMenu?: { visible: boolean; screen: string; controls: unknown[] };
+      }).__mainMenu;
+      return !!m && m.visible && m.controls.length > 0;
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
+  await waitForStableViewport(page);
+  await page.waitForTimeout(1200);
+}
+
+/**
+ * The menu screens' screenshot options.
+ *
+ * Same pixel tolerance as {@link GOLDEN}, but a longer assertion timeout: these
+ * boot the REAL app rather than a frozen sim, and `toHaveScreenshot` will not
+ * shoot until it has taken two identical frames in a row. On a software-GL runner
+ * with three device projects in flight, the menu's first couple of frames land
+ * slower than the 10 s default allows — which fails as a *timeout*, not as a
+ * pixel diff, and reads like a broken screen when it is a slow one. Measured
+ * settled and byte-identical across six consecutive frames once it is up.
+ */
+const MENU_GOLDEN = { ...GOLDEN, timeout: 30_000 } as const;
+
+/** Poll the menu's own logical viewport until it stops moving. */
+async function waitForStableViewport(page: Page): Promise<void> {
+  const read = async (): Promise<string> =>
+    page.evaluate(() => {
+      const m = (window as unknown as {
+        __mainMenu?: { logicalViewport: { width: number; height: number } };
+      }).__mainMenu;
+      return m ? `${m.logicalViewport.width}x${m.logicalViewport.height}` : '';
+    });
+  let previous = await read();
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(200);
+    const next = await read();
+    if (next !== '' && next === previous) return;
+    previous = next;
+  }
+}
+
+/**
+ * Open the settings screen the way a player does — a real press at the physical
+ * point the seam says SETTINGS is drawn at, through the landscape-lock remap —
+ * rather than by calling a debug method. A baseline of a screen reached by a
+ * seam proves the screen renders; a baseline of one reached by a press proves it
+ * is also reachable.
+ */
+async function openSettings(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'settings');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(point, 'the menu reports where SETTINGS is drawn').not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { screen: string } }).__mainMenu?.screen === 'settings',
+    undefined,
+    { timeout: 10_000 },
+  );
+  // The pointer is left sitting on where SETTINGS was, which on a desktop would
+  // hover whatever settings row landed under it. Park it in a corner so the
+  // baseline is the screen at rest rather than the screen mid-hover.
+  await page.mouse.move(1, 1);
+  await page.waitForTimeout(300);
+}
+
+test('golden: desktop title screen — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → one full-frame golden comparison',
+    measuredSeconds: 8,
+  });
+
+  await bootMenu(page);
+  await expect(page).toHaveScreenshot('desktop-title.png', MENU_GOLDEN);
+});
+
+test('golden: desktop settings screen — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the main menu → viewport + font settle → press SETTINGS → one full-frame golden comparison',
+    measuredSeconds: 10,
+  });
+
+  await bootMenu(page);
+  await openSettings(page);
+  await expect(page).toHaveScreenshot('desktop-settings.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone title screen — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 12,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await expect(page).toHaveScreenshot('phone-landscape-title.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone settings screen — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot to the main menu → viewport + font settle → press SETTINGS → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootMenu(page);
+  await openSettings(page);
+  await expect(page).toHaveScreenshot('phone-landscape-settings.png', MENU_GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone title screen — the frame survives the lock', async ({
+  page,
+}, testInfo) => {
+  // The phone profiles are portrait by default and Planet Rush is landscape-locked,
+  // so this frame goes through the 90° rotation the desktop never touches — and the
+  // beams, the margins and the plate stack are all children of the rotating root.
+  // A frame verified on a desktop proves nothing about a held phone.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot to the main menu PORTRAIT-HELD (landscape lock rotation) → viewport + font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 12,
+  });
+
+  await bootMenu(page);
+  await expect(page).toHaveScreenshot('phone-portrait-title.png', MENU_GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone settings screen — six thumb rows, two columns', async ({
+  page,
+}, testInfo) => {
+  // The screen the field report was actually on: under the landscape lock a
+  // portrait phone hands settings a wide, short logical viewport, and six rows do
+  // not stack into it at thumb height. This is the baseline of the two-column
+  // answer, in the new material.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot to the main menu PORTRAIT-HELD → viewport + font settle → press SETTINGS → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 14,
+  });
+
+  await bootMenu(page);
+  await openSettings(page);
+  await expect(page).toHaveScreenshot('phone-portrait-settings.png', MENU_GOLDEN);
+});
+
 test('golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the lock', async ({
   page,
 }, testInfo) => {
