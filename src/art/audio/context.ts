@@ -75,6 +75,22 @@ export interface BiquadFilterNodeLike extends AudioNodeLike {
   readonly frequency: AudioParamLike;
 }
 
+/**
+ * A convolver — the one shared room behind the UI cue set (`./ui-cues`).
+ *
+ * The single exception to *"the interesting DSP already happened, offline"*, and
+ * a deliberate one: the Gantry/Bone handoff specifies **one short shared reverb**
+ * behind all nine cues, and convolving its 2.2-second impulse into every cue on
+ * the CPU would cost a phone hundreds of milliseconds at unlock to reproduce
+ * something one native node does for free. It is **optional** on the context
+ * below, so a webview without it plays the cues dry rather than not at all.
+ */
+export interface ConvolverNodeLike extends AudioNodeLike {
+  buffer: AudioBufferLike | null;
+  /** Web Audio normalises an impulse by default; the room is authored for that. */
+  normalize: boolean;
+}
+
 /** A rendered mono sound, ready to play. */
 export interface AudioBufferLike {
   readonly duration: number;
@@ -114,6 +130,12 @@ export interface AudioContextLike {
   createStereoPanner(): StereoPannerNodeLike;
   /** The optional distance lowpass (`../spatial`), built only when it muffles. */
   createBiquadFilter(): BiquadFilterNodeLike;
+  /**
+   * The UI cue set's shared room (`./ui-cues`). **Optional** — the one call in
+   * the subset that a context is allowed not to have, because a context that
+   * lacks it should cost the player a reverb tail and nothing else.
+   */
+  createConvolver?(): ConvolverNodeLike;
   resume(): Promise<void>;
 }
 

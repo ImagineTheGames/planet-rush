@@ -50,7 +50,8 @@ import type { PlayerId } from '@shared/types';
 import { DeathMoment } from '../vfx/death-moment';
 import { TELL, type TellKind, type TellQueue } from '../tells';
 import { UnderAttackAlarm, type AlarmOptions } from './alarm';
-import { SOUND, TELL_SOUND, CUE_SOUND, type SoundName, type AudioCue } from './bank';
+import { SOUND, TELL_SOUND, CUE_SOUND, CUE_UI, type SoundName, type AudioCue } from './bank';
+import { UiCuePlayer, type UiCuePlayerOptions } from './ui-cues';
 import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
 import { AudioGraph, type LoopHandle, type MixOptions, type Spatial } from './graph';
@@ -116,6 +117,8 @@ export interface AudioEngineOptions {
   /** Run the adaptive soundtrack (`./music`). On by default; cuttable (§4.9 item 3). */
   readonly music?: boolean;
   readonly musicMix?: MusicDirectorOptions;
+  /** The UI cue set's own knobs (`./ui-cues`) — level, stacking window, seed. */
+  readonly uiCues?: UiCuePlayerOptions;
 }
 
 /**
@@ -136,6 +139,14 @@ export class AudioEngine {
   readonly musicScore: MusicScore;
   /** The soundtrack, playing, or `null` when running silent. */
   readonly music: MusicDirector | null;
+  /**
+   * The Gantry/Bone UI cue set (`./ui-cues`), or `null` when running silent.
+   *
+   * Public because the set is a *contract* the developer ratified by ear, not an
+   * implementation detail: a live-stage run reads `playCount` / `stackedCount`
+   * off it to prove the right cue fired, and exactly one of them.
+   */
+  readonly uiCues: UiCuePlayer | null;
 
   private readonly thruster: SustainedVoice | null;
   private readonly ownsDeath: boolean;
@@ -182,6 +193,11 @@ export class AudioEngine {
     this.musicScore = new MusicScore();
     this.music = this.graph ? new MusicDirector(this.graph, this.musicScore, options.musicMix ?? {}) : null;
     if (!this.wantsMusic) this.music?.setEnabled(false);
+    // Into the SFX bus, not the destination: the cue set rides the player's SFX
+    // slider, ducks under the alarm with everything else, and — the one that
+    // matters — sits upstream of the duck node, so the three seconds of quiet on
+    // a station's death multiply it too (GDD §4.7). Protected in the mixer.
+    this.uiCues = ctx && this.graph ? new UiCuePlayer(ctx, this.graph.buses.sfx, options.uiCues ?? {}) : null;
   }
 
   /** True when there is a real mix behind this engine. */
@@ -242,6 +258,9 @@ export class AudioEngine {
     if (this.started) return;
     this.started = true;
     this.graph?.preload();
+    // The cue set too: the first press of the menu is the worst frame to spend a
+    // render on, and it is also the first thing a player hears of the game.
+    this.uiCues?.preload();
     if (this.wantsAmbient) this.startAmbient();
   }
 
@@ -387,16 +406,33 @@ export class AudioEngine {
    * haptic seams: call it wherever the game already raises a haptic, so buzz and
    * blip land together.
    *
+   * **Since s6-01 most of these are the Gantry/Bone cue set** (`./ui-cues`) — the
+   * struck-glass voices the developer chose themselves — routed by {@link CUE_UI}.
+   * The UI's own three-word vocabulary (`press` / `confirm` / `reject`,
+   * `src/ui/sfx.ts`) is untouched and now speaks in that set: a pick, a purchase,
+   * a refusal. Cues the handoff does not cover — the deposit tick, the respawn
+   * clock, the minimap ping — keep their bank voices.
+   *
    * Non-diegetic, so it plays at full level with no earshot falloff — a menu is
    * not a place in the world. It still respects the three-second hush (GDD §4.7):
-   * nothing sounds while a home is dying, cues included. A jitter keeps a rapid
-   * menu walk from sounding like one machine part.
+   * nothing sounds while a home is dying, cues included — the quiet is protected
+   * here *and* in the mixer, since the cue player hangs off the SFX bus which is
+   * upstream of the duck.
+   *
+   * @param index Slot index for a stepped cue (`join`): one semitone per seat.
    */
-  cue(kind: AudioCue): void {
+  cue(kind: AudioCue, index = 0): void {
     const graph = this.graph;
     if (!graph) return;
     if (this.death.gain <= HUSHED) {
       this.skipped++;
+      return;
+    }
+    const glass = CUE_UI[kind];
+    if (glass && this.uiCues) {
+      // One state change, one sound: the player refuses a cue that lands on top
+      // of another (rule 1), and `played` counts the cue, not its two buffers.
+      if (this.uiCues.play(glass, index)) this.played++;
       return;
     }
     if (graph.play(CUE_SOUND[kind], 1, graph.jitter(0.04))) this.played++;
@@ -427,6 +463,7 @@ export class AudioEngine {
     this.ambientLoop = null;
     this.alarmLoop?.stop(0.1);
     this.alarmLoop = null;
+    this.uiCues?.dispose();
     this.graph?.dispose();
     this.started = false;
   }

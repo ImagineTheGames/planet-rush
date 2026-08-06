@@ -13,6 +13,7 @@
  * | `graph.ts` | four gain nodes and a buffer cache: the whole mix |
  * | `weapons.ts` | held voices — the rock/hull firing pair, and the thruster |
  * | `alarm.ts` | the under-attack alarm (GDD §2.2): a mechanic, not polish |
+ * | `ui-cues.ts` | the Gantry/Bone UI cue set — one pane of struck glass (s6-01) |
  * | `music.ts` | the adaptive soundtrack — four stems that follow match phase |
  * | `unlock.ts` | the first user gesture, and the iOS half of it (risk 7) |
  * | `engine.ts` | the routing: tells in, sound out |
@@ -38,6 +39,7 @@ export * from './spatial';
 export * from './graph';
 export * from './weapons';
 export * from './alarm';
+export * from './ui-cues';
 export * from './music';
 export * from './unlock';
 export * from './engine';
