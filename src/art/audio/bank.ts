@@ -304,25 +304,29 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     seed: 0x9e37,
   },
 
-  // Hull hit: the same event on plate, an octave and a half up, thin and rude —
-  // a bright saw with a spit of high noise over it, so a player who caught a ship
-  // by accident knows it in about 80 ms. The spit is what puts its spectral centre
-  // well above the chip's, the one dimension that survives a bad phone speaker.
+  // Hull hit: the same event on plate, an octave and a half up — **a round on
+  // plate, not a buzz.** The saw is retired (§5.1): its documented job was
+  // *"bright and rude"*, and rudeness is not the register — *cut* is, which a
+  // triangle with noise mixed into it and the same high-pass gives without the
+  // buzz. The spit is kept untouched: it is what puts this voice's spectral
+  // centre well above the chip's, the one dimension that survives a bad phone
+  // speaker, and that pair is the game's central inversion (GDD §2.3).
   [SOUND.hullHit]: {
     name: 'hullHit',
     layers: [
       {
         spec: {
           name: 'hullHit.bite',
-          wave: 'saw',
+          wave: 'triangle',
           attack: 0.001,
           hold: 0.01,
           decay: 0.06,
           punch: 0.5,
           freq: 452,
-          freqEnd: 268,
+          freqEnd: 400, // ×1.13 — was ×1.69, a chirp inside 71 ms
+          noiseMix: 0.22,
           highPass: 340,
-          gain: 0.26,
+          gain: 0.33,
           seed: 0x4dc3,
         },
       },
@@ -520,33 +524,44 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   },
 
   // Pressure beat regeneration (GDD §2.6): the bubble failing, and falling.
+  //
+  // **The ×6.92 fall stays.** A bubble failing *is* a collapse, it runs over
+  // 544 ms where a glide reads as a fall rather than as a chirp, and §5.4 exempts
+  // it by construction — a reviewer who "fixes" this glide has removed the
+  // mechanic. Only the oscillator moves: triangle with noise mixed in, same
+  // envelope, same glide, same level.
   [SOUND.shieldDown]: {
     name: 'shieldDown',
     layers: [
       {
         spec: {
           name: 'shieldDown.fall',
-          wave: 'saw',
+          wave: 'triangle',
           attack: 0.004,
           hold: 0.04,
           decay: 0.5,
           freq: 900,
           freqEnd: 130,
-          lowPass: 3000,
-          gain: 0.34,
+          noiseMix: 0.06,
+          lowPass: 2400,
+          gain: 0.36,
           seed: 0x4dc7,
         },
       },
       {
+        // The burst. Its own ×3.25 glide *was* inside 171 ms, which is a chirp
+        // by the same rule the fall is exempt from; the fall underneath is what
+        // carries the drop, so the pop only has to be the transient.
         spec: {
           name: 'shieldDown.pop',
           wave: 'noise',
           attack: 0.001,
           hold: 0.01,
           decay: 0.16,
-          freq: 520,
-          freqEnd: 160,
-          gain: 0.22,
+          freq: 460,
+          freqEnd: 400,
+          lowPass: 2800, // banded, so the burst is pressure rather than hiss
+          gain: 0.24,
           seed: 0x4dc8,
         },
       },
@@ -915,34 +930,42 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
 
   // The metronome of the match (GDD §2.3). Two low notes, like a foghorn: the
   // field just moved closer to the middle and everyone is nearer everyone.
+  //
+  // **The two notes and their pitches are the mechanic**, so they are kept to the
+  // Hz. Only the saw goes: filtered triangles with low noise air in them, which
+  // is the same signal without the buzz. This one is watched — the alarm keeps
+  // its saw (§5.1) and the saw was the thing separating these two most, so
+  // `audio.test.ts` guards the alarm/waveArrive pair by name.
   [SOUND.waveArrive]: {
     name: 'waveArrive',
     layers: [
       {
         spec: {
           name: 'waveArrive.horn',
-          wave: 'saw',
+          wave: 'triangle',
           attack: 0.03,
           hold: 0.22,
           decay: 0.3,
           freq: 147,
           vibratoDepth: 0.015,
-          vibratoRate: 6,
+          vibratoRate: 6, // 550 ms voice: drift, not a wobble (§5.4 exempt)
+          noiseMix: 0.12,
           lowPass: 1400,
-          gain: 0.34,
+          gain: 0.36,
           seed: 0xff8a,
         },
       },
       {
         spec: {
           name: 'waveArrive.fifth',
-          wave: 'saw',
+          wave: 'triangle',
           attack: 0.03,
           hold: 0.2,
           decay: 0.4,
           freq: 220,
+          noiseMix: 0.1,
           lowPass: 1600,
-          gain: 0.22,
+          gain: 0.24,
           seed: 0xff8b,
         },
         at: 0.18,
@@ -1477,7 +1500,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    */
   [SOUND.pressTick]: {
     name: 'pressTick',
-    layers: [...struck('pressTick', 1661, { gain: 0.14, decay: 0.022, hold: 0.005, seed: 0x7a70 })],
+    layers: [...struck('pressTick', 1661, { gain: 0.1, decay: 0.022, hold: 0.005, seed: 0x7a70 })],
   },
 
   // `confirm` ([12, 40, 12]): a rising perfect fourth, the two beats spaced to the
@@ -1513,22 +1536,42 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  // The nope: a low, flat, faintly gritty buzz that falls a little and stops. No
-  // haptic twin — a rejected buy is the one cue the motor stays out of — so the
-  // ear carries it alone. Threat-red in sound (style-guide §1): this did nothing.
+  /**
+   * **Two notes a minor second apart, resolving nowhere** — the amended §4.7
+   * writes this asset out by hand, and the ratified `refused` cue (`./ui-cues`)
+   * is already exactly that. This is its fallback, so it is built to the same
+   * shape at the same pitches: A♭6 and the minor second above it, beating
+   * against each other, over the same low body that keeps it from floating.
+   *
+   * It was a saw — *"the nope"*, a buzzer. Recognisable as the family and
+   * unmistakably not a yes is a better refusal than a buzz, and it moves this
+   * voice UP and away from {@link SOUND.coreHit}, which is the pair §8 flags:
+   * *a refused buy* and *your reactor is being eaten* were ×1.12 apart.
+   *
+   * Still no haptic twin — a rejected buy is the one cue the motor stays out of
+   * — so the ear carries it alone.
+   */
   [SOUND.rejectBuzz]: {
     name: 'rejectBuzz',
-    wave: 'saw',
-    attack: 0.002,
-    hold: 0.06,
-    decay: 0.07,
-    freq: 150,
-    freqEnd: 118,
-    noiseMix: 0.14,
-    lowPass: 2000,
-    duty: 0.5,
-    gain: 0.26,
-    seed: 0xb23f,
+    layers: [
+      ...struck('rejectBuzz.a', 1661, { gain: 0.14, decay: 0.09, hold: 0.03, partials: GLASS_PAIR, seed: 0xb23f }),
+      ...struck('rejectBuzz.b', 1760, { gain: 0.14, decay: 0.09, hold: 0.03, at: 0.05, partials: GLASS_PAIR, seed: 0xb241 }),
+      {
+        // The body under the pair — the `refused` cue's own sub, which is what
+        // stops two high struck notes reading as a chime.
+        spec: {
+          name: 'rejectBuzz.body',
+          wave: 'sine',
+          attack: 0.003,
+          hold: 0.03,
+          decay: 0.1,
+          freq: 84,
+          freqEnd: 80,
+          gain: 0.13,
+          seed: 0xb243,
+        },
+      },
+    ],
   },
 
   /**
