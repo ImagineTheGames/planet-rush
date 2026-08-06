@@ -425,6 +425,12 @@ export const CLASS_BLOCK_FRACTION = 0.42;
 // The entry screen (./lobby-entry) — the door, and the keypad behind JOIN
 // ---------------------------------------------------------------------------
 
+/** Doors on the entry screen — mirrors `./lobby-entry` DOOR_ORDER.length
+ *  (asserted equal in the tests), kept here so the geometry stays free of the
+ *  model, exactly like {@link KEYPAD_KEY_COUNT}. Four since u9-01 added CAMPAIGN
+ *  above SOLO. */
+export const DOOR_COUNT = 4;
+
 /** Door buttons: ≥56 px for the same reason RUSH! is (GDD §2.4 — a plain tap). */
 export const DOOR_HEIGHT = 56;
 export const DOOR_HEIGHT_TOUCH = 64;
@@ -433,6 +439,31 @@ export const DOOR_HINT_HEIGHT = 18;
 /** A door never runs the full width of a desktop — a 1920px-wide button reads as
  *  a banner, not a control. Capped, and centred in whatever is left. */
 export const DOOR_WIDTH_MAX = 420;
+
+/**
+ * The height below which four stacked doors stop being buttons.
+ *
+ * The fourth door (CAMPAIGN, u9-01) is what forced this constant to exist. A
+ * phone in landscape — **the primary mobile layout of this screen**, see the file
+ * header — has about 187 px of band between the message and the action row, and
+ * four blocks of button-plus-hint do not fit in it: stacked, each door would come
+ * out under 20 px tall, which is not a tap target, it is a stripe.
+ *
+ * So the doors do what the hull tiles and the roster already do on a short band —
+ * they change ARRANGEMENT rather than shrink past usefulness ({@link TileShape},
+ * {@link placeSeats}). Below this height the stack becomes two columns, and every
+ * door comes back to full size.
+ *
+ * 40, because it sits above the smallest stacked door the three-door screen ever
+ * shipped (49 px on a 320×568 portrait phone, which must therefore keep its
+ * stack) and well below the 56/64 a roomy band gives.
+ */
+export const DOOR_STACK_MIN = 40;
+/** …and the columns are only worth taking if each one can still carry a door
+ *  wide enough to read a label and its hint on. Narrower than this the stack is
+ *  kept, small doors and all — two unreadable columns are worse than one
+ *  readable list. */
+export const DOOR_COLUMN_MIN_WIDTH = 240;
 
 /** The four code cells: big, because this is the number being read across a
  *  room and typed one character at a time (GDD §4.2). */
@@ -827,6 +858,21 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
 // The entry screen's layout
 // ---------------------------------------------------------------------------
 
+/**
+ * How the doors are arranged (u9-01, the fourth door):
+ *
+ *  - `stack`   — four down the middle, in `DOOR_ORDER`. The shape every screen
+ *                with the height for it gets, and the one the developer's
+ *                "CAMPAIGN goes ontop of Solo" describes literally.
+ *  - `columns` — two columns of two, filled **column-major** like the lobby
+ *                roster ({@link placeSeats}): CAMPAIGN over SOLO on the left,
+ *                CREATE over JOIN on the right. The landscape-phone shape, where
+ *                height is the scarce axis and width is not — and the reason it
+ *                is column-major rather than row-major is precisely so CAMPAIGN
+ *                is still directly above SOLO.
+ */
+export type DoorShape = 'stack' | 'columns';
+
 /** Every rect the entry screen draws in. Both screens are laid out every time —
  *  they cost a dozen rects, the view draws only the active one, and a layout
  *  that does not branch on state cannot be wrong for the state it is in. */
@@ -836,8 +882,10 @@ export interface EntryLayout {
   readonly title: Rect;
   /** The one line under it: the prompt, or the failure (`./lobby-entry`). */
   readonly message: Rect;
-  /** The three doors, in `DOOR_ORDER`. Home screen. */
+  /** The four doors, in `DOOR_ORDER`. Home screen. */
   readonly doors: readonly Rect[];
+  /** How those doors were arranged — one column or two. */
+  readonly doorShape: DoorShape;
   /** The four code cells, left to right. Join screen. */
   readonly cells: readonly Rect[];
   /** The keypad, in `KEYPAD_KEYS` order: across a row, then down. */
@@ -941,11 +989,15 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: actionHeight,
   };
 
+  const doors: Rect[] = [];
+  const doorShape = placeDoors(doors, middle, isTouch);
+
   return {
     content,
     title,
     message,
-    doors: placeDoors(middle, isTouch),
+    doors,
+    doorShape,
     ...placeCodeEntry(middle),
     back,
     erase,
@@ -990,32 +1042,50 @@ export function entryHitTest(
 }
 
 /**
- * The three doors, stacked and centred in the band, each with room for its hint
- * line underneath. Stacked on every device: three full-width-ish buttons down
- * the middle is the one arrangement that works identically on a 320px phone and
- * a 1920px desktop, and this is the screen where "it works everywhere" beats
- * "it uses the space".
+ * The four doors, centred in the band, each with room for its hint line
+ * underneath — the line that is what tells a player SOLO needs no connection
+ * (GDD §4.8 risk 6), so the buttons compress and the hint never does.
+ *
+ * One column wherever the band can give four stacked doors a real button height
+ * ({@link DOOR_STACK_MIN}); two columns of two where it cannot, which since the
+ * fourth door is every phone in landscape. The columns fill **column-major** —
+ * CAMPAIGN over SOLO, then CREATE over JOIN — for the same reason the roster
+ * does ({@link placeSeats}): `DOOR_ORDER` still reads top to bottom, so the door
+ * the developer asked to sit "ontop of Solo" sits on top of it in both shapes.
+ *
+ * Returns the shape it settled on.
  */
-function placeDoors(band: Rect, isTouch: boolean): Rect[] {
-  const count = 3;
+function placeDoors(out: Rect[], band: Rect, isTouch: boolean): DoorShape {
   const hint = DOOR_HINT_HEIGHT;
   const wanted = isTouch ? DOOR_HEIGHT_TOUCH : DOOR_HEIGHT;
-  // Compress the buttons — never the hint, which is what tells a player that
-  // SOLO needs no connection (GDD §4.8 risk 6).
-  const height = Math.max(
-    0,
-    Math.min(wanted, (band.height - (count - 1) * BLOCK_GAP) / count - hint),
-  );
-  const width = Math.min(DOOR_WIDTH_MAX, band.width);
+  const doorHeight = (rows: number): number =>
+    Math.max(0, Math.min(wanted, (band.height - (rows - 1) * BLOCK_GAP) / rows - hint));
+
+  const stacked = doorHeight(DOOR_COUNT);
+  const columnWidth = Math.max(0, (Math.min(DOOR_WIDTH_MAX * 2 + BLOCK_GAP, band.width) - BLOCK_GAP) / 2);
+  // Only trade the stack away for columns that are actually better: the stack has
+  // to be too short to press AND the halved width has to still carry a door.
+  const columns = stacked < DOOR_STACK_MIN && columnWidth >= DOOR_COLUMN_MIN_WIDTH ? 2 : 1;
+
+  const rows = Math.ceil(DOOR_COUNT / columns);
+  const height = columns === 2 ? doorHeight(rows) : stacked;
+  const width = columns === 2 ? columnWidth : Math.min(DOOR_WIDTH_MAX, band.width);
   const block = height + hint;
-  const total = count * block + (count - 1) * BLOCK_GAP;
+  const total = rows * block + (rows - 1) * BLOCK_GAP;
   const top = band.y + Math.max(0, (band.height - total) / 2);
-  const x = band.x + (band.width - width) / 2;
-  const doors: Rect[] = [];
-  for (let i = 0; i < count; i++) {
-    doors.push({ x, y: top + i * (block + BLOCK_GAP), width, height });
+  const spread = columns * width + (columns - 1) * BLOCK_GAP;
+  const left = band.x + (band.width - spread) / 2;
+  for (let i = 0; i < DOOR_COUNT; i++) {
+    const column = Math.floor(i / rows);
+    const row = i % rows;
+    out.push({
+      x: left + column * (width + BLOCK_GAP),
+      y: top + row * (block + BLOCK_GAP),
+      width,
+      height,
+    });
   }
-  return doors;
+  return columns === 2 ? 'columns' : 'stack';
 }
 
 /**

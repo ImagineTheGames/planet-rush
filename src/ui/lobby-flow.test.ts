@@ -38,7 +38,7 @@ import {
   wireFireMode,
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
-import { DOOR_ORDER, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
+import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import {
   CLASS_ORDER,
   DEFAULT_SHIP_CLASS,
@@ -61,7 +61,7 @@ import { createSettings, volumeLevel } from './settings';
 
 /** The index of a door in the order the view draws it — the same lookup the
  *  hit-test does, so a test can tap by name. */
-function doorIndex(door: 'solo' | 'create' | 'join'): number {
+function doorIndex(door: 'campaign' | 'solo' | 'create' | 'join'): number {
   return DOOR_ORDER.indexOf(door);
 }
 
@@ -117,6 +117,33 @@ function slots(count: number, humans: number[]): LobbySlot[] {
 }
 
 // ---------------------------------------------------------------------------
+
+describe('the CAMPAIGN teaser resolves into nothing at all (u9-01)', () => {
+  it('opens no transport, sends nothing, and leaves the flow on the doors', () => {
+    // The whole point, at the seam that owns the transport: a door with no intent
+    // produces no effect, so the campaign teaser CANNOT reach the network — not
+    // by a stray branch in `main.ts`, and not by a future edit to this flow.
+    const before = createFlow();
+    const after = flowTapEntry(before, { kind: 'door', index: doorIndex('campaign') }, mulberry32(7));
+
+    expect(kinds(after)).toEqual([]);
+    expect(after.state.screen).toBe('entry');
+    expect(after.state.entry.screen).toBe('home');
+    expect(after.state.lobby).toBeNull();
+    expect(after.state.room).toBeNull(); // no code was minted for it
+    expect(after.state.entry.notice).toBe(ENTRY_COMING_SOON);
+  });
+
+  it('does not strand the player — SOLO still opens the lobby right after it', () => {
+    const rng = mulberry32(7);
+    let state = flowTapEntry(createFlow(), { kind: 'door', index: doorIndex('campaign') }, rng).state;
+    const opened = flowTapEntry(state, { kind: 'door', index: doorIndex('solo') }, rng);
+    expect(kinds(opened)).toEqual(['open-transport']);
+    expect(opened.state.entry.notice).toBe('');
+    state = flowConnected(opened.state, 0).state;
+    expect(state.screen).toBe('lobby');
+  });
+});
 
 describe('the door resolves into a room (rule 1 — one room code, end to end)', () => {
   it('opens a transport on SOLO and puts the same code on the lobby', () => {

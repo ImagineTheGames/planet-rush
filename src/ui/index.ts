@@ -464,9 +464,11 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
 // --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
 //
-// The screen *before* the lobby: PLAY SOLO / CREATE ROOM / JOIN ROOM, and the
-// on-screen keypad a room code is typed on (the game is a canvas — there is no
-// DOM input to focus, see `./lobby-entry`).
+// The screen *before* the lobby: CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN ROOM,
+// and the on-screen keypad a room code is typed on (the game is a canvas — there
+// is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a teaser: it is lit
+// and pressable, and pressing it says `Coming Soon…` without going anywhere
+// (`chooseDoor` returns no intent for it — u9-01).
 //
 // **Wiring seam**, continuing the one above:
 //
@@ -497,7 +499,9 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 export {
   DOOR_OPTIONS,
   DOOR_ORDER,
+  ENTRY_COMING_SOON,
   ENTRY_ERRORS,
+  doorOption,
   KEYPAD_COLUMNS,
   KEYPAD_KEYS,
   KEYPAD_ROWS,
@@ -528,8 +532,16 @@ export type {
   EntryStatus,
 } from './lobby-entry';
 
-export { entryHitTest, entryLayout, DOOR_HEIGHT, DOOR_HEIGHT_TOUCH, KEY_MAX, KEY_MIN } from './lobby-geometry';
-export type { EntryLayout, EntryTarget } from './lobby-geometry';
+export {
+  entryHitTest,
+  entryLayout,
+  DOOR_COUNT,
+  DOOR_HEIGHT,
+  DOOR_HEIGHT_TOUCH,
+  KEY_MAX,
+  KEY_MIN,
+} from './lobby-geometry';
+export type { DoorShape, EntryLayout, EntryTarget } from './lobby-geometry';
 
 export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 
