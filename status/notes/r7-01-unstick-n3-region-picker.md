@@ -194,4 +194,56 @@ line is `npm run test:mobile`, which has to mean the real command.
 
 ## NEXT
 
-<!-- filled in as the runs land -->
+### The proof the brief asked for, and the one it did not expect
+
+The brief wanted "one failure to zero, with no snapshot file in your diff". The
+second half is provable outright and is now airtight:
+
+```
+git diff --stat origin/main HEAD -- tests/mobile/     → empty
+git rev-parse origin/main:…/phone-landscape-build-wheel-iphone-linux.png
+git rev-parse HEAD:…/phone-landscape-build-wheel-iphone-linux.png
+                                       → 39548c3…  ==  39548c3…
+```
+
+Identical blob. This proves I re-baselined nothing — **and** it re-proves the
+previous session's finding from a second direction: main's baseline for the
+failing golden is byte-identical to the one my branch already carried, so the
+merge cannot have changed what that test compares against. The stale-baseline
+theory is not merely unsupported, it is excluded.
+
+### State of the DoD
+
+| line | result |
+|---|---|
+| `npx tsc --noEmit` | **green** |
+| `npm test -- --run` | 3824/3825 — one red, `capacity-regression`, **red on main too and worse** (see above) |
+| `npm run test:mobile` | in flight, waiting on :4173 |
+| `git merge-base --is-ancestor origin/main HEAD` | **green** (`c3e53b8`) |
+
+### Remaining
+
+1. Land the mobile run against **this lane's** build and record its summary line.
+   `/tmp/r7-mobile-run.sh` blocks until the bytes served at :4173 match this
+   lane's `dist/index.html` md5, so the run cannot start against a neighbour.
+   Note `ss`/`netstat` return nothing in this sandbox — a port check has to be
+   curl + fingerprint, not a socket list. That cost one false start.
+2. Update PR #305's body with the before/after and the blob-identity proof.
+3. Do **not** expect the wheel golden to be deterministic here: at load 30–50 on
+   8 cores it is the most marginal test in the matrix, and its fix (q9-01's
+   retry) is on an unmerged branch. If it times out again locally that is the
+   same clock failure, not a pixel disagreement — check for the absence of
+   actual/expected/diff PNGs before believing anything else.
+
+### For the Director
+
+- **Main is red** on `tests/net/capacity/capacity-regression.test.ts` (114.66 ms
+  vs a 33 ms gate on a loaded box). Mine, and I have the fix shape, but it is a
+  capacity gate and wants its own brief + re-measurement rather than a drive-by
+  edit. Say the word and I will take it.
+- **q9-01's golden retry is sitting unmerged** on `agent/qa/q9-golden-retry-31x`.
+  It is the actual fix for the red in this brief. Nothing I can do from here.
+- **:4173 is contended across lanes** and `reuseExistingServer` is true locally,
+  so any lane can silently run the mobile suite against another lane's bundle and
+  report the result as its own. That is a shared-infrastructure bug worth a fix
+  (an env-overridable port in QA's config would do it).
