@@ -30,7 +30,7 @@ All seven Stage 1 tasks. Four commits, in the plan's needs order.
 - **`ff13b44` — Task 1.7's doc half.** GDD §1 loss condition amended (dated marker, old
   wording recorded); §2.7 gains one clause saying the rule holds in Teams.
 
-DoD: `npx tsc --noEmit` clean; `npm test -- --run` green (3692 → 3728 tests).
+DoD: `npx tsc --noEmit` clean; `npm test -- --run` green (3692 → 3721 tests).
 
 ## DECISIONS
 

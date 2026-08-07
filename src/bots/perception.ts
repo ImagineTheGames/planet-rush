@@ -502,13 +502,18 @@ function perceiveStation(
   };
 }
 
+/** Every FFA bot's ally list, shared: a teams-of-one match allocates nothing
+ *  here per view (GDD §4.3), and there is nothing to allocate. */
+const NO_ALLIES: readonly AllyView[] = Object.freeze([]);
+
 /**
  * The roster of slots on `id`'s own side, ascending by id and never including
  * `id` itself ({@link AllyView}).
  *
  * Walks `world.ships` — a slot with a ship is a slot in the match — and asks the
  * sim's one allegiance predicate per candidate, exactly as the ship and station
- * loops below do. It never re-derives a side from a `team` number of its own.
+ * loops in {@link perceive} do. It never re-derives a side from a `team` number
+ * of its own.
  *
  * Derelict homes cannot appear here: a derelict has no ship, and it reads as its
  * own team anyway (`teamOf` falls back to the owner id), so it is nobody's ally.
@@ -516,11 +521,8 @@ function perceiveStation(
  * The insertion below keeps the list sorted without `Array.sort` — at most seven
  * entries, so it is cheaper than a comparator and, more to the point, it makes
  * the ordering a property of *this* function rather than of the engine's sort
- * (GDD §4.8). **FFA returns the same frozen empty array every time**, so a
- * teams-of-one match allocates nothing here per view (GDD §4.3).
+ * (GDD §4.8).
  */
-const NO_ALLIES: readonly AllyView[] = Object.freeze([]);
-
 function allyRoster(world: World, id: PlayerId): readonly AllyView[] {
   let allies: AllyView[] | null = null;
   for (const other of world.ships) {
