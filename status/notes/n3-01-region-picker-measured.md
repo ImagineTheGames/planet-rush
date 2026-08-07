@@ -95,3 +95,28 @@ body.
   nearest reads `—` (the honest failure, not a wrong number) and the fix is a
   per-region host in `MATCH_HEALTH_URL`, a config change in one file.
 * **Not blocked on anything.**
+
+---
+
+## RE-VERIFIED (resume, 2026-08-07)
+
+Nothing to build; the branch was already complete and pushed. What a resume
+checked, so the next one does not re-check it:
+
+* `npx tsc --noEmit` — clean.
+* `npm test -- --run` — 3824/3825. The one failure was
+  `tests/net/capacity/capacity-regression.test.ts > the loop stays inside the
+  tick budget at 12 rooms` (`215.87 > 33`), which **passes in isolation**
+  (`npx vitest run tests/net/capacity/capacity-regression.test.ts` → 4/4, 62s of
+  wall clock). It is m11-01's wall-clock perf guard and it measures the tick
+  loop under whatever else the box is running; that full-suite run took 410s on
+  a loaded machine. **Not this lane** — n3-01 touches the probe, the allocator's
+  `/regions`, and the doors/JOIN wiring, none of which is in the tick loop.
+  If a future run sees it red, re-run it alone before believing it.
+* Branch is 5 ahead / **0 behind** `origin/main` — no merge owed.
+* PR #305 open, `MERGEABLE`, head `def6b04` == local `HEAD`.
+
+The only real gap this resume found: `/status/notes/n3-01-...md` (the absolute
+path in the brief) was still the blank template while the committed copy under
+`status/notes/` held the note. They are two different files on this box — write
+**both**.
