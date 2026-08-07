@@ -81,13 +81,45 @@ EXCEEDS `maxDiffPixelRatio` (0.01 here). The two desktop BUILD WHEEL goldens sho
 rock field at 0.71% of the frame, so they passed and kept a stale pale-rock baseline.
 They have to be **deleted** and regenerated, not merely updated.
 
+## Evidence, as measured
+
+The QA Manager's `evidence/probe-art-palette.mjs`, run against a preview of this branch
+(port 4287, bundle verified). Exact fills in `live/scene-field-crop.png` vs
+`docs/art-direction/scene-gallery.html`:
+
+| | before | after | board | distance |
+|---|---|---|---|---|
+| body | `#939BA5` L154 | `#484E57` L77 | `#454E59` L77 | **4** |
+| facet | `#5A626B` L97 | `#40474F` L70 | `#3E4750` L69 | **2** |
+| ink | `#2D3239` L49 | `#272C32` L43 | `#262C34` L43 | **2** |
+
+The probe reports the ink as `#24292F` (L40) and `#2A2F36` (L46), bracketing the
+board's L43 — those are exactly `#272C32` at the rim's alpha 0.9 composited over Vacuum
+and over the body. Considered and rejected: taking the rim to full opacity so the
+composite lands on `#262C34` exactly. The board does stroke opaque, but 0.9 is the
+generator's convention everywhere, QA's verdict named the TOKEN (`rockFissure`), and
+the token is already 2 away. Not worth re-shooting every golden for.
+
+WCAG, on the rock's own pixels: body-vs-Vacuum 6.78 → **2.27** (board 2.26); signal
+yellow-vs-body 1.89 → **5.63** (board 5.67).
+
+## Status
+
+- DoD 1 `npx tsc --noEmit` — clean.
+- DoD 2 `npm test -- --run` — 229 files, **3769 passed**.
+- DoD 3 `npm run test:mobile` — the suite passes (**95 passed**) via
+  `evidence/a3-rock-palette/playwright.a3.config.ts`, which is the same tests on a
+  private port. The literal command is queued behind port 4173, held by another lane.
+- DoD 4 goldens differ from `origin/main` — 7 files.
+
 ## NEXT
 
-- Re-run the goldens on 4287, then delete + regenerate the two desktop build-wheel
-  baselines the tolerance hides.
-- QA probe (`evidence/probe-art-palette.mjs`) against a fresh live capture; output
-  into the PR body.
-- Full `npm test -- --run`, `npm run test:mobile`, then PR.
-- `tests/net/online-2p.test.ts` flaked once under the full parallel run
-  (41.6 vs a <40 bound) and passes in isolation; it is a net timing test that touches
-  no renderer. Re-check on the final run.
+- The literal `npm run test:mobile` on 4173 (watcher: `/tmp/a3-mobile-dod.sh`), then
+  the PR.
+- Known load-sensitive flakes seen once each on a busy box and passing on re-run,
+  neither reachable from a fill colour:
+  - `tests/net/online-2p.test.ts` — 41.6 against a <40 bound. Passed in the final run.
+  - `tests/mobile/build-wheel-gantry.spec.ts:214,292` — "the real open affordance did
+    not open the wheel", a keypress→`waitForSimTicks(4)` race. Verified against a
+    `main` worktree (passes there), then verified passing on this branch on a quiet
+    box. Not a regression.
