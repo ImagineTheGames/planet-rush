@@ -136,14 +136,32 @@ and the whole defect lived in the board plus the absence of a guard.
 
 ## NEXT
 
-- [ ] Confirm the mobile golden suite is green (running).
-- [ ] Push and open the PR.
+**Done and pushed. PR #313 is open** —
+https://github.com/ImagineTheGames/planet-rush/pull/313
 
-### Known, and NOT mine
+Nothing outstanding on my side. The one thing a future session should watch:
 
-`tests/net/capacity/capacity-regression.test.ts > the loop stays inside the tick
-budget at 12 rooms` fails (62.86 ms vs a 33 ms budget). **Pre-existing**: it fails
-identically with the working tree reset to `origin/main` content, it is a
-load-sensitive netcode/server timing test, and it touches nothing this branch
-changes. a2-03's working notes call the same test a flake (`092210e`, "the
-capacity flake proves itself a flake"). Everything else is green — 3836 passed.
+- [ ] **When a2-03 (PR #312) merges**, `src/art/stations.ts` conflicts.
+      `STATION_HULL_EXCLUSIONS` and `stationHullParts()` must survive the
+      resolution, and the Cutterhead's own parts must be named through the
+      manifest. `compliance.test.ts` does not conflict and fails loudly if the
+      constant vanishes — that is the backstop, not the plan.
+
+### Known, and NOT mine — both verified against `origin/main` content
+
+Both failures were reproduced with the working tree reset to `origin/main`
+(`git stash -u && git checkout origin/main -- .`, run, then `reset --hard` and
+`stash pop`). Neither is adopted or re-baselined here; both are reported in the
+PR body.
+
+1. `tests/net/capacity/capacity-regression.test.ts > the loop stays inside the
+   tick budget at 12 rooms` — 62.86 ms vs a 33 ms budget. Load-sensitive
+   netcode/server timing; a2-03's notes call the same test a flake (`092210e`).
+   Otherwise 3836 passed.
+2. Four **UPGRADE WHEEL** goldens (desktop payable / desktop unpayable /
+   landscape-phone compact / portrait-held). Mobile goldens: 31 passed, 4 failed.
+   This branch touches no `src/ui/` code and no upgrade snapshot; they were last
+   re-shot on `origin/main`'s own tip (`377bd25`, in merge `eb75891`).
+
+**Every golden the station silhouette shows in passes unchanged** — the five
+frozen scenes, desktop and phone, FFA and TEAMS, including the portrait lock.
