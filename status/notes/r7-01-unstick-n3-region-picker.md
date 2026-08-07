@@ -6,9 +6,38 @@ you work; a future you reads it first. This is a working note, not evidence —
 
 ## BUILT
 
-<!-- filled in as commits land -->
+- **`c3e53b8` — the merge, this time actually committed.** A previous session's
+  notes claimed the merge was done; the branch disagreed and the branch wins.
+  `git merge-base --is-ancestor 8688880 HEAD` said NO, and there was no merge
+  commit in the log — so it was staged-and-lost, never committed. Redone against
+  the *current* `origin/main` (`81f5b76`, which had moved on again to pick up
+  a2-08's art evidence). Clean, zero conflicts. It touches nothing of mine:
+  `git diff HEAD^1 HEAD -- src/net/ server/ allocator/ docs/region-picker.md`
+  is empty, and the only `tests/` movement is a3-01's same seven baseline PNGs.
 
 ## DECISIONS
+
+### Trust the branch over the notes — the merge had not landed
+
+The previous session's DECISIONS say "Merged `origin/main` anyway". It had not
+been committed. This is exactly the case the brief's RESUME line covers, and the
+reason the note's own header says a line written here is not evidence. Re-checked
+from git rather than from the note, and redid it.
+
+### The q9-01 retry is the real fix for this red, and it is NOT on main yet
+
+`status/notes/q9-01-golden-retry-and-the-31x-runner.md` is QA diagnosing this
+exact failure from the other side: a golden that dies on the clock on a loaded
+runner, fixed with `GOLDEN_RETRIES = 2` scoped to `goldens.spec.ts`. Their note
+records runner slowdown samples of 5.9×, ~21× and ~31× against a `CI_SLOW_FACTOR`
+of 10, and argues — correctly — that a retry can turn a *timeout* green and has
+no mechanism to turn a *diff* green (a frozen scene is a pure function of the
+seeded world, so a real mismatch mismatches on every attempt).
+
+It lives on `agent/qa/q9-golden-retry-31x` and is **not merged**: `GOLDEN_RETRIES`
+does not appear in `origin/main:tests/mobile/shot-budget.ts`. So I cannot inherit
+it, and I will not reach into `tests/mobile/` to copy it — that is QA's file and
+their PR. Named in my PR body as the fix this red is actually waiting on.
 
 ### The brief's diagnosis is wrong, and the evidence says so plainly
 
