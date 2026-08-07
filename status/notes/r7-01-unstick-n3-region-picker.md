@@ -6,7 +6,18 @@ you work; a future you reads it first. This is a working note, not evidence —
 
 ## BUILT
 
-- **`c3e53b8` — the merge, this time actually committed.** A previous session's
+- **The second merge — `origin/main` had moved again, and this time it carried
+  the actual fix.** Between sessions main went `81f5b76 → d2797dc`, merging
+  PR #311 from `agent/qa/q9-golden-retry-31x`. That is the *exact* branch the
+  previous session named as holding the real fix for this red and could not
+  inherit. It is now inherited: `GOLDEN_RETRIES = 2` is in the tree
+  (`tests/mobile/shot-budget.ts:279`, applied at `goldens.spec.ts:42` via
+  `test.describe.configure({ retries: GOLDEN_RETRIES })`), together with q9-01's
+  re-fitted capture intercept (550 → 600 ms). Clean merge, zero conflicts, and
+  it touches nothing of mine — `git diff HEAD^1 HEAD -- src/net/ server/ docs/`
+  is empty. Its whole footprint is six QA-owned files under `tests/`.
+
+- **`c3e53b8` — the first merge, this time actually committed.** A previous session's
   notes claimed the merge was done; the branch disagreed and the branch wins.
   `git merge-base --is-ancestor 8688880 HEAD` said NO, and there was no merge
   commit in the log — so it was staged-and-lost, never committed. Redone against
@@ -24,7 +35,20 @@ been committed. This is exactly the case the brief's RESUME line covers, and the
 reason the note's own header says a line written here is not evidence. Re-checked
 from git rather than from the note, and redid it.
 
-### The q9-01 retry is the real fix for this red, and it is NOT on main yet
+### The q9-01 retry is the real fix for this red — and it LANDED (was: not on main)
+
+**Superseded, in my favour.** Everything below was written when
+`agent/qa/q9-golden-retry-31x` was unmerged. It merged as `d2797dc`
+(PR #311) and this session's merge inherited it. The prediction the previous
+session made — that this red is a clock failure whose fix is QA's retry, not a
+baseline I could shoot — is now testable rather than argued, and the discipline
+of *not* reaching into `tests/mobile/` to copy the fix is what let it arrive
+cleanly through main instead of as a conflicting duplicate. Kept verbatim below
+because the reasoning is what made waiting the right call.
+
+---
+
+
 
 `status/notes/q9-01-golden-retry-and-the-31x-runner.md` is QA diagnosing this
 exact failure from the other side: a golden that dies on the clock on a loaded
@@ -113,7 +137,33 @@ Corroborating: `a3-01` closed its own DoD as "mobile suite green at **96/0** on 
   QA's contract to silence someone else's infrastructure problem. Flagged to QA
   in the PR body instead.
 
-### `npm test -- --run` has one red, it is MAIN's, and I am not fixing it under this brief
+### `npm test -- --run` is now FULLY GREEN — and that confirms the load diagnosis
+
+Post-merge, on a quiet box: **233 files, 3829/3829 passed, 218.89s.** The
+capacity-regression test that was red twice last session passed without a single
+character changing in it.
+
+That is the cleanest possible confirmation of the call recorded below. Last
+session measured `maxLagMs` at 56.96 on this branch and 114.66 on clean `main`,
+at load average 31–50 on 8 cores. This session's run started at load average
+**~8** and the same assertion — `expect(maxLagMs).toBeLessThan(33)` — passed.
+Same code, same gate, different box load, opposite result. The number was
+tracking the host, exactly as argued.
+
+**This vindicates not touching it, and it does not retract the bug.** The gate is
+still an absolute lag gate on a host whose own design notes (`m11-01`) say lag is
+not a capacity reading there — it will go red again the next time a neighbouring
+lane loads the box, and a genuine 2× regression on a quiet runner would look
+identical to today's green. Had I "fixed" it last session by loosening the
+threshold, I would have permanently weakened a real capacity gate to silence a
+symptom that resolved itself in forty minutes. The inconsistency is still worth
+its own brief with re-measurement; it is no longer blocking anything.
+
+The original reasoning, from when it was red:
+
+---
+
+### (was) `npm test -- --run` has one red, it is MAIN's, and I am not fixing it under this brief
 
 `tests/net/capacity/capacity-regression.test.ts > the loop stays inside the tick
 budget at 12 rooms` — `expect(maxLagMs).toBeLessThan(33)`.
@@ -212,38 +262,69 @@ failing golden is byte-identical to the one my branch already carried, so the
 merge cannot have changed what that test compares against. The stale-baseline
 theory is not merely unsupported, it is excluded.
 
+Re-verified this session against the *new* `origin/main` (`d2797dc`): still
+`39548c3…` on both sides, and `git diff --stat origin/main HEAD -- tests/`
+carries only my own three net/allocator test files, **zero PNGs**. Two merges
+have now passed over this branch without moving that baseline by a byte.
+
+### The region picker still measures — checked, not assumed
+
+The brief's one substantive "must not change". Both merges left `src/net/`
+untouched, and the tests still assert measurement rather than a table:
+`region-probe.test.ts` drives `measureRegionPing` through an injected clock and
+fetch (an unreachable host measures `null`, a non-2xx is not a measurement, an
+edge that ignored the steer is not a measurement of the region asked for), and
+`region-picker.test.ts` measures **real round trips against live localhost
+servers** — its own header says "no artificial latency and no sleep: the numbers
+here are whatever localhost costs". A fixture-substitution regression would have
+to delete these, not merely pass them.
+
 ### State of the DoD
 
 | line | result |
 |---|---|
-| `npx tsc --noEmit` | **green** |
-| `npm test -- --run` | 3824/3825 — one red, `capacity-regression`, **red on main too and worse** (see above) |
-| `npm run test:mobile` | in flight, waiting on :4173 |
-| `git merge-base --is-ancestor origin/main HEAD` | **green** (`c3e53b8`) |
+| `npx tsc --noEmit` | **green** (exit 0) |
+| `npm test -- --run` | **green — 233 files, 3829/3829, 218.89s.** The capacity red is gone on a quiet box, untouched |
+| `npm run test:mobile` | in flight against a fingerprint-guarded :4173 serving this lane's post-merge `dist` |
+| `git merge-base --is-ancestor origin/main HEAD` | **green** vs `d2797dc` |
 
 ### Remaining
 
-1. Land the mobile run against **this lane's** build and record its summary line.
-   `/tmp/r7-mobile-run.sh` blocks until the bytes served at :4173 match this
-   lane's `dist/index.html` md5, so the run cannot start against a neighbour.
-   Note `ss`/`netstat` return nothing in this sandbox — a port check has to be
-   curl + fingerprint, not a socket list. That cost one false start.
-2. Update PR #305's body with the before/after and the blob-identity proof.
-3. Do **not** expect the wheel golden to be deterministic here: at load 30–50 on
-   8 cores it is the most marginal test in the matrix, and its fix (q9-01's
-   retry) is on an unmerged branch. If it times out again locally that is the
-   same clock failure, not a pixel disagreement — check for the absence of
-   actual/expected/diff PNGs before believing anything else.
+1. Record the mobile summary line, then update PR #305's body with the
+   before/after and the blob-identity proof.
+2. On reading the result: the wheel golden now has **two retries** behind it
+   (inherited, not written by me). If it still fails, check for the presence of
+   actual/expected/diff PNGs *before* believing anything about pixels — their
+   absence still means the clock, and a retry cannot turn a genuine diff green.
+
+### The port-4173 guard, generalised
+
+`ss`/`netstat` return nothing in this sandbox, so a port check must be curl +
+fingerprint rather than a socket list. Two further wrinkles found this session:
+the preview binds **IPv6-only** — `curl 127.0.0.1:4173` returns `000` while
+`localhost` and `[::1]` return 200, so a v4-only probe reports "free" for a port
+that is very much taken — and `vite preview` serves from disk, so a preview
+started before a rebuild silently begins serving the new bundle without a
+restart. `/tmp/r7-after.sh` therefore compares the md5 of the *served bytes*
+against `dist/index.html` immediately before launching and aborts on mismatch.
+That is the check that makes a local mobile run mean anything on a shared box.
 
 ### For the Director
 
-- **Main is red** on `tests/net/capacity/capacity-regression.test.ts` (114.66 ms
-  vs a 33 ms gate on a loaded box). Mine, and I have the fix shape, but it is a
-  capacity gate and wants its own brief + re-measurement rather than a drive-by
-  edit. Say the word and I will take it.
-- **q9-01's golden retry is sitting unmerged** on `agent/qa/q9-golden-retry-31x`.
-  It is the actual fix for the red in this brief. Nothing I can do from here.
+- **q9-01's golden retry has landed** (`d2797dc`, PR #311) and this branch has
+  inherited it. The item the previous session escalated is closed.
+- **The capacity gate is still wrong, just no longer red.**
+  `tests/net/capacity/capacity-regression.test.ts` asserts an absolute
+  `maxLagMs < 33` on a host where `m11-01`'s own measurements say lag is not a
+  capacity reading. It read 114.66 ms on clean `main` at load 31–50 and passes
+  today at load ~8 — so it will flip red again whenever a neighbouring lane is
+  busy, and a real 2× regression on a quiet runner would be invisible to it. The
+  fix mirrors the ramp's `baselineExceedsLimit`: measure the idle loop-lag floor
+  and hold the assertion only where the reading means something. It is my file
+  and I have the fix shape; it wants its own brief with re-measurement (the file
+  itself says budgets move only with a re-measured `docs/server-capacity.md` in
+  the same commit), not a drive-by edit inside a region-picker unstick.
 - **:4173 is contended across lanes** and `reuseExistingServer` is true locally,
   so any lane can silently run the mobile suite against another lane's bundle and
-  report the result as its own. That is a shared-infrastructure bug worth a fix
-  (an env-overridable port in QA's config would do it).
+  report the result as its own — it fails *quietly*, with plausible numbers. An
+  env-overridable port in QA's `playwright.config.ts` would fix it for everyone.
