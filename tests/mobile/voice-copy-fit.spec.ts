@@ -35,18 +35,37 @@
  * `src/ui/typography.ts` names Audiowide/Oxanium and says the page loads them.
  * It does not: there is no `@font-face` in `index.html` and no font file in the
  * repo, so every string here is really drawn in the fallback (`Trebuchet MS` /
- * `DejaVu Sans Mono` and their substitutes). This spec measures the FULL declared
+ * `Liberation Mono` and their substitutes). This spec measures the FULL declared
  * stack, so it measures whatever the page actually resolves — and if the real
  * faces are ever added, it re-measures against them and fails if a label stopped
  * fitting. Audiowide is materially wider than Trebuchet, so that is a real
  * possibility and the headroom is reported below rather than merely asserted.
+ *
+ * ── WHY THE STACKS ARE IMPORTED AND NOT RETYPED (r6-01) ────────────────────
+ * This file shipped with its own copy of the two stacks, and the body one said
+ * `"DejaVu Sans Mono"` — the value a1-01 had already retired on `main` for the
+ * exact reason that bit here. DejaVu is on the GitHub runner and NOT in the
+ * studio container, so the two machines measured two different faces:
+ *
+ *   container  fell through to generic `monospace` -> WenQuanYi Zen Hei Mono,
+ *              5.500px/char at 11px  -> the solo hint measured 385/420, "8%
+ *              headroom", GREEN
+ *   CI runner  matched DejaVu Sans Mono, 6.626px/char -> 464/420, OVER, RED
+ *
+ * So this spec passed locally and failed on CI for 43 hours while reporting a
+ * confident headroom column, and the copy it was guarding really was too long.
+ * The real stack names **Liberation Mono**, which Playwright installs as a hard
+ * dependency of its chromium on every Linux it supports and which the container
+ * ships too — 6.601px/char, within 0.4% of the runner's DejaVu. Importing it is
+ * what makes a measurement taken here mean the same thing there.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { budgetTest } from './budgets';
-
-// --- The type stacks, verbatim from src/ui/typography.ts --------------------
-const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
-const FONT_BODY = 'Oxanium, "DejaVu Sans Mono", monospace';
+// IMPORTED, never re-typed. This file used to carry its own copy of the two
+// stacks, and the copy went stale the moment a1-01 changed the real one — see
+// the note above. `src/ui/typography.ts` is pure data (no Pixi, no DOM), so a
+// spec can read it directly, and now a face swap is one line in one place.
+import { FONT_BODY, FONT_HEADING } from '../../src/ui/typography';
 
 /**
  * One measured claim: a string, the face and size it is drawn at, and the box it
