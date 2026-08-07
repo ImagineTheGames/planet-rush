@@ -1,0 +1,553 @@
+{
+  "base": "http://localhost:4188",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "deviceScaleFactor": 2,
+  "frames": [
+    {
+      "name": "scene-arena-full",
+      "what": "whole pinned arena, nothing staged",
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "shipWorld": {
+          "x": 1968,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1280,
+          "h": 800
+        },
+        "ticks": 0,
+        "worldHash": "4302b39e",
+        "freezeTick": 120,
+        "build": {
+          "sha": "369d7a6",
+          "time": "2026-08-07T13:14:08.671Z"
+        }
+      }
+    },
+    {
+      "name": "scene-field-crop",
+      "what": "asteroid field, left of the home ring, nothing staged"
+    },
+    {
+      "name": "scene-home-defended",
+      "what": "local home: freeze-stamped turrets, mid-build scaffold, two shields",
+      "center": {
+        "x": 640,
+        "y": 400
+      }
+    },
+    {
+      "name": "scene-staged-muzzle-full",
+      "what": "pinned arena with a rival turret muzzle staged",
+      "staged": {
+        "firingShip": 1,
+        "turret": {
+          "shooter": 1,
+          "origin": {
+            "x": 1810.940258945177,
+            "y": 1734.940258945177
+          },
+          "end": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          },
+          "hit": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          }
+        }
+      },
+      "muzzleCount": 1
+    },
+    {
+      "name": "scene-siege-full",
+      "what": "pinned arena, station spawn protection lifted, core besieged",
+      "siege": {
+        "coreHp": 100,
+        "maxCoreHp": 100,
+        "banked": 11
+      },
+      "shipAlphaNote": {
+        "ticks": 0
+      }
+    },
+    {
+      "name": "scene-siege-home",
+      "what": "the defended home at full opacity with a damaged core",
+      "siege": {
+        "coreHp": 100,
+        "maxCoreHp": 100,
+        "banked": 11
+      }
+    },
+    {
+      "name": "scene-alarm-full",
+      "what": "whole screen after sustained core damage — the alarm state",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ],
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "ticks": 1001
+      }
+    },
+    {
+      "name": "scene-alarm-home",
+      "what": "the damaged home, cropped on the ship",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ]
+    },
+    {
+      "name": "fight-full",
+      "what": "whole screen while the ship is firing, driven by real keyboard + mouse",
+      "start": {
+        "x": 1968,
+        "y": 1200
+      },
+      "mid": {
+        "x": 1705.9057871495436,
+        "y": 1200
+      },
+      "end": {
+        "x": 1968,
+        "y": 1200
+      }
+    },
+    {
+      "name": "ui-lobby-full",
+      "what": "the lobby, clean boot, hull tiles + arena cards + RUSH!"
+    },
+    {
+      "name": "hull-0-interceptor",
+      "what": "hull index 0 as the running game draws it",
+      "picked": {
+        "selectedClass": "interceptor",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "ui-match-hud-full",
+      "what": "the live match HUD, clean boot, Vanguard"
+    },
+    {
+      "name": "hull-1-vanguard",
+      "what": "hull index 1 as the running game draws it",
+      "picked": {
+        "selectedClass": "vanguard",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "hull-2-excavator",
+      "what": "hull index 2 as the running game draws it",
+      "picked": {
+        "selectedClass": "excavator",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "hull-3-hauler",
+      "what": "hull index 3 as the running game draws it",
+      "picked": {
+        "selectedClass": "hauler",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "ui-menu-title",
+      "what": "the title screen, clean boot"
+    },
+    {
+      "name": "ui-menu-doors",
+      "what": "the doors: CAMPAIGN / PLAY SOLO / CREATE / JOIN"
+    },
+    {
+      "name": "ui-build-wheel-full",
+      "what": "the build & upgrade wheel, open, on the pinned arena",
+      "opened": {
+        "open": true
+      },
+      "wedges": []
+    }
+  ],
+  "freeze": {
+    "shipScreen": {
+      "x": 640,
+      "y": 400
+    },
+    "shipWorld": {
+      "x": 1968,
+      "y": 1200
+    },
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "ticks": 0,
+    "worldHash": "4302b39e",
+    "freezeTick": 120,
+    "build": {
+      "sha": "369d7a6",
+      "time": "2026-08-07T13:14:08.671Z"
+    }
+  },
+  "siege": {
+    "coreHp": 100,
+    "maxCoreHp": 100,
+    "banked": 11
+  },
+  "sceneErrors": [],
+  "alarm": {
+    "coreHp": [
+      100,
+      95,
+      90,
+      85,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50,
+      45,
+      40
+    ],
+    "geo": {
+      "shipScreen": {
+        "x": 640,
+        "y": 400
+      },
+      "ticks": 1001
+    },
+    "errors": []
+  },
+  "fight": {
+    "start": {
+      "x": 1968,
+      "y": 1200
+    },
+    "mid": {
+      "x": 1705.9057871495436,
+      "y": 1200
+    },
+    "end": {
+      "x": 1968,
+      "y": 1200
+    },
+    "burst": [
+      {
+        "name": "fight-burst-0",
+        "input": {
+          "frame": 410,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-1",
+        "input": {
+          "frame": 515,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-2",
+        "input": {
+          "frame": 620,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-3",
+        "input": {
+          "frame": 740,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-4",
+        "input": {
+          "frame": 860,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-5",
+        "input": {
+          "frame": 980,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-6",
+        "input": {
+          "frame": 1100,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-7",
+        "input": {
+          "frame": 1220,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      }
+    ],
+    "errors": []
+  },
+  "hulls": [
+    {
+      "i": 0,
+      "name": "hull-0-interceptor",
+      "picked": {
+        "selectedClass": "interceptor",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 1,
+      "name": "hull-1-vanguard",
+      "picked": {
+        "selectedClass": "vanguard",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 2,
+      "name": "hull-2-excavator",
+      "picked": {
+        "selectedClass": "excavator",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 3,
+      "name": "hull-3-hauler",
+      "picked": {
+        "selectedClass": "hauler",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    }
+  ],
+  "wheel": {
+    "opened": {
+      "open": true
+    },
+    "wedges": []
+  }
+}
