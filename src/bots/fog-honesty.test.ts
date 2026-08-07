@@ -29,19 +29,56 @@
  * The last test guards the guard: it asserts the scrambler really did change
  * facts a cheating bot would have noticed, so this file can never pass by
  * scrambling nothing.
+ *
+ * ### Teams (Stage 1 Task 1.5, `docs/team-bots-plan.md`)
+ *
+ * **Every case below runs twice: once over an FFA world and once over a 4v4.**
+ * That is not thoroughness for its own sake — it is the lesson p16-01 paid for.
+ * FFA is teams-of-one, so a guarantee about allies *reduces to a tautology* in
+ * the default mode and passes forever without being tested once
+ * (`docs/bot-teams-allegiance-p16.md` §2). Stage 1 is the first work to put an
+ * ally on the view at all (`BotView.allies`), and Stage 2 will put a callout
+ * radio beside it, so the moment to land the guard is **before** the thing it
+ * guards.
+ *
+ * The scrambler already exempts nothing but the observer itself, which means a
+ * teammate's unscouted core, hold, bank, tiers and off-screen hull are all lied
+ * about exactly as a stranger's are — and that is the claim: **sharing a side is
+ * not a scouting report.** The teams half of the guard-on-the-guard test asserts
+ * the lie really did land on an *ally*, so "we ran it on teams" can never be
+ * vacuously true.
  */
 
 import { describe, it, expect } from 'vitest';
 import { mulberry32, type Rng } from '@shared/types';
 import { SENSOR_RANGE, createWorld, type World } from '../sim';
 import { createBot } from './bot';
-import { botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harness';
+import { MATCH_SLOTS, botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harness';
 import { DEFAULT_PERCEPTION, perceive } from './perception';
 import { ROSTER } from './personalities';
 
+/**
+ * The two lineups every case runs. `undefined` is the FFA roster shape the
+ * offline client boots with — **no `team` key at all** — and the 4v4 is the
+ * shape in which "a bot may not launder a teammate's knowledge" stops being a
+ * tautology.
+ */
+const LINEUPS: readonly { readonly name: string; readonly teams?: readonly number[] }[] = [
+  { name: 'FFA' },
+  { name: 'TEAMS 4v4', teams: [0, 0, 0, 0, 1, 1, 1, 1] },
+];
+
+/** The seats of a lineup — the whole cast, eight slots, optionally sided. */
+function seatsFor(teams?: readonly number[]): ReturnType<typeof fillEmptySlots> {
+  return fillEmptySlots([], MATCH_SLOTS, ROSTER, teams);
+}
+
 /** A full offline match, mid-flight: eight stations, the whole cast. */
-function match(seed: number): { world: World; bots: ReturnType<typeof createBots> } {
-  const seats = fillEmptySlots();
+function match(
+  seed: number,
+  teams?: readonly number[],
+): { world: World; bots: ReturnType<typeof createBots> } {
+  const seats = seatsFor(teams);
   const world = createWorld({ seed, players: botLobby(seats) });
   return { world, bots: createBots(seats, { seed }) };
 }
@@ -94,6 +131,14 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
       ship.hull = 1 + noise(rng, ship.maxHull - 1);
       ship.angle = noise(rng, Math.PI * 2);
       ship.vel = { x: noise(rng, 200) - 100, y: noise(rng, 200) - 100 };
+      // Whether a hull is flying or wreckage is not drawn either, once it is
+      // off screen. This one is aimed squarely at `BotView.allies` (Stage 1):
+      // the roster carries a teammate's **home**, which is public smoke at any
+      // range, and deliberately not whether the teammate's *ship* is alive —
+      // a teammate dying in a far corner is on nobody's screen. Flip it here,
+      // and any future field that quietly leaks it fails this file.
+      ship.alive = !ship.alive;
+      ship.respawnTimer = noise(rng, 5);
     }
   }
 
@@ -120,8 +165,14 @@ function decideFresh(world: World, id: number, personality: (typeof ROSTER)[numb
 
 /** Sample a running match at a spread of ticks — opening, mid-field, and deep
  *  into the fight — rather than at one convenient instant. */
-function sampleTicks(seed: number, everyTicks: number, seconds: number, visit: (w: World) => void): void {
-  const { world, bots } = match(seed);
+function sampleTicks(
+  seed: number,
+  everyTicks: number,
+  seconds: number,
+  teams: readonly number[] | undefined,
+  visit: (w: World) => void,
+): void {
+  const { world, bots } = match(seed, teams);
   runHeadlessMatch(world, bots, {
     maxSeconds: seconds,
     onTick: (w, tick) => {
@@ -130,21 +181,21 @@ function sampleTicks(seed: number, everyTicks: number, seconds: number, visit: (
   });
 }
 
-describe('fog-honesty — the trees decide on the view, and only the view', () => {
+describe.each(LINEUPS)('fog-honesty in $name — the trees decide on the view, and only the view', ({ teams }) => {
   it('emits identical actions when every hidden number is scrambled, all match long', () => {
     const rng = mulberry32(0xf0_9d);
     let compared = 0;
 
-    sampleTicks(17, 600, 240, (world) => {
+    sampleTicks(17, 600, 240, teams, (world) => {
       const scrambledFor = new Map<number, World>();
-      for (const seat of fillEmptySlots()) {
+      for (const seat of seatsFor(teams)) {
         if (!world.ships.find((s) => s.id === seat.id)?.alive) continue;
         const lied = clone(world);
         scrambleHidden(lied, seat.id, rng);
         scrambledFor.set(seat.id, lied);
       }
 
-      for (const seat of fillEmptySlots()) {
+      for (const seat of seatsFor(teams)) {
         const lied = scrambledFor.get(seat.id);
         if (!lied) continue;
         const honest = decideFresh(world, seat.id, seat.personality);
@@ -160,7 +211,7 @@ describe('fog-honesty — the trees decide on the view, and only the view', () =
 
   it('holds for every character at every difficulty, including a wounded one', () => {
     const rng = mulberry32(7);
-    const { world, bots } = match(23);
+    const { world, bots } = match(23, teams);
     runHeadlessMatch(world, bots, { maxSeconds: 90 });
 
     // Hurt everyone: the retreat, defend and opportunity branches all become
@@ -179,7 +230,7 @@ describe('fog-honesty — the trees decide on the view, and only the view', () =
   });
 
   it('scrambles something a cheat would have noticed — the guard on the guard', () => {
-    const { world, bots } = match(5);
+    const { world, bots } = match(5, teams);
     runHeadlessMatch(world, bots, { maxSeconds: 120 });
 
     const lied = clone(world);
@@ -195,6 +246,24 @@ describe('fog-honesty — the trees decide on the view, and only the view', () =
 
     // Meanwhile the view a bot is *given* is unchanged — which is the whole
     // point: the lie lives entirely in the half of the world it cannot see.
+    // In TEAMS this is also the structural statement about `BotView.allies`:
+    // the roster is three public facts, so a world that lied about everything
+    // else on this bot's own side still produces a byte-identical view.
     expect(perceive(lied, 0)).toEqual(perceive(world, 0));
+
+    // …and in TEAMS, the lie landed on a TEAMMATE, not only on strangers.
+    // Without this the teams half of the sweep would be "we ran it twice" and
+    // nothing more: FFA is teams-of-one, so an ally guarantee that is never
+    // aimed at an actual ally is a tautology (p16-01's lesson, §2).
+    if (teams) {
+      const allies = perceive(world, 0).allies.map((a) => a.id);
+      expect(allies.length).toBeGreaterThan(0);
+      const bank = (w: World): number[] =>
+        allies.map((id) => w.ships.find((s) => s.id === id)!.banked);
+      const core = (w: World): number[] =>
+        allies.map((id) => w.stations.find((p) => p.owner === id)!.coreHp);
+      expect(bank(lied)).not.toEqual(bank(world));
+      expect(core(lied)).not.toEqual(core(world));
+    }
   });
 });
