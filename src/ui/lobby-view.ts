@@ -64,6 +64,7 @@ import type { ClassTileContent, Insets, LobbyLayout, LobbyTarget } from './lobby
 import { MapPickerView } from './map-picker-view';
 import { mapPickerModel } from './map-picker';
 import type { MapPickerLayout } from './map-picker';
+import { FONT_BODY, FONT_HEADING } from './typography';
 // One grade→colour table for both surfaces that show a ping, so the roster row
 // and the in-match stamp can never disagree about what "amber" means — and the
 // model's own rule for whether a row has the width to carry a number at all.
@@ -74,8 +75,9 @@ import { pingFits } from '../net/ping';
 // Typography & neutrals (style-guide §7 — shared with the HUD and the wheel)
 // ---------------------------------------------------------------------------
 
-const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
-const FONT_BODY = 'Oxanium, "DejaVu Sans Mono", monospace';
+// Both stacks come from ./typography (imported above) rather than being spelled
+// out a second time — that module owns them so a face swap is one line, and this
+// copy drifting from it is what a1-01 found on the CI runner.
 
 /** Neutral light UI text. Chalk-white — never signal yellow (style-guide §2). */
 const TEXT_PRIMARY = 0xdce3ec;
