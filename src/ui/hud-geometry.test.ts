@@ -22,6 +22,8 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
+import { hudMetrics, hudType } from './instrument';
+import { collapsedRect } from './minimap';
 import {
   wheelBounds,
   panelBounds,
@@ -35,11 +37,18 @@ import {
   PANEL_EDGE_PAD,
   HUD_PAD,
   HP_BAR_WIDTH,
+  HP_BAR_HEIGHT,
   HP_BAR_TOP,
+  HP_VALUE_ROW,
+  SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
   promptBounds,
+  promptBand,
+  promptPad,
   promptWrapWidth,
-  PROMPT_CENTER_Y,
+  PROMPT_MIN_TEXT_WIDTH,
+  PROMPT_STRIP_RESERVE,
+  PROMPT_THUMB_COLUMN,
   respawnBounds,
   respawnWrapWidth,
   RESPAWN_CENTER_Y,
@@ -62,19 +71,27 @@ import type { WedgeFace } from './wheel-stack';
 interface Profile {
   readonly name: string;
   readonly vp: Viewport;
+  /** What this profile IS, for the assertions whose answer depends on the device
+   *  rather than only on the viewport: the phones carry thumb sticks and no
+   *  controls strip, the desktop carries the strip and no sticks (GDD §2.2/§2.4). */
+  readonly isTouch: boolean;
 }
 
 const PROFILES: readonly Profile[] = [
-  { name: 'iphone/portrait', vp: { width: 390, height: 844 } },
-  { name: 'iphone/landscape', vp: { width: 844, height: 390 } },
-  { name: 'pixel/portrait', vp: { width: 412, height: 915 } },
-  { name: 'pixel/landscape', vp: { width: 915, height: 412 } },
-  { name: 'desktop', vp: { width: 1280, height: 800 } },
+  { name: 'iphone/portrait', vp: { width: 390, height: 844 }, isTouch: true },
+  { name: 'iphone/landscape', vp: { width: 844, height: 390 }, isTouch: true },
+  { name: 'pixel/portrait', vp: { width: 412, height: 915 }, isTouch: true },
+  { name: 'pixel/landscape', vp: { width: 915, height: 412 }, isTouch: true },
+  { name: 'desktop', vp: { width: 1280, height: 800 }, isTouch: false },
   // Not in the emulation matrix; the smallest screens the game claims to run on
   // (GDD §4.3 "mobile-browser playability"). A thumb-scale overlay has to hold
   // here too, and the panel's viewport clamp exists because of this row.
-  { name: 'iphone-se/portrait', vp: { width: 375, height: 667 } },
-  { name: 'small/portrait', vp: { width: 320, height: 568 } },
+  { name: 'iphone-se/portrait', vp: { width: 375, height: 667 }, isTouch: true },
+  { name: 'small/portrait', vp: { width: 320, height: 568 }, isTouch: true },
+  // …and the same device the way the landscape lock actually hands it over. This
+  // is the one row in the matrix where the bottom band cannot hold a prompt; the
+  // degradation is asserted by name below rather than left to be discovered.
+  { name: 'small/landscape', vp: { width: 568, height: 320 }, isTouch: true },
 ];
 
 /** The four upgrade tracks (GDD §2.5: power, engine, cargo, hull). */
@@ -226,10 +243,21 @@ describe('station-hp placement', () => {
   });
 
   it('leaves room for the shield overbar above the core bar', () => {
-    // The shield overbar is drawn SHIELD_BAR_HEIGHT + 2 above the core bar's top
-    // edge; that has to stay below the label, i.e. inside the element's own
-    // footprint rather than poking out above y = HUD_PAD.
-    expect(SHIELD_BAR_HEIGHT + 2).toBeLessThanOrEqual(HP_BAR_TOP);
+    // The shield overbar is drawn SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP above the
+    // core bar's top edge; that has to stay below the label, i.e. inside the
+    // element's own footprint rather than poking out above y = HUD_PAD.
+    expect(SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP).toBeLessThanOrEqual(HP_BAR_TOP);
+  });
+
+  it('does not draw the shield overbar through the core VALUE', () => {
+    // The regression this pins shipped on `main`: the overbar's top edge sat one
+    // pixel under `100/100`'s baseline, so a station with a generator standing
+    // struck its own number through. The value row owns the top of the element and
+    // the overbar starts below it — with air, not flush.
+    const overbarTop = HP_BAR_TOP - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP;
+    expect(overbarTop).toBeGreaterThanOrEqual(HP_VALUE_ROW);
+    // …and the whole stack still hangs inside the footprint the registry records.
+    expect(stationHpBounds(1280).height).toBe(HP_BAR_TOP + HP_BAR_HEIGHT);
   });
 });
 
@@ -244,53 +272,182 @@ describe('station-hp placement', () => {
 describe('onboarding placement', () => {
   const FULL_PAD: AnchorSpec = { region: 'full', margin: HUD_PAD };
 
+  /** Both device answers, because the band is different on each: desktop reserves
+   *  the controls strip at the bottom, touch reserves the thumb columns at the
+   *  sides. A prompt verified on one says nothing about the other. */
+  const DEVICES: readonly { name: string; isTouch: boolean }[] = [
+    { name: 'desktop-input', isTouch: false },
+    { name: 'touch', isTouch: true },
+  ];
+
+  /** One line box of prompt type at this viewport — the HUD's own scaled 16px
+   *  heading, times the ~1.3 leading Pixi lays a Text out with. Derived rather
+   *  than pinned at 20, because the whole point of the frame scale is that a
+   *  phone's prompt is smaller and the band arithmetic has to see that. */
+  const lineBox = (vp: Viewport): number =>
+    Math.ceil(hudType(16, hudMetrics(vp.width, vp.height)) * 1.3);
+
+  /** The band's legibility floor: the narrowest it is ever allowed to be, however
+   *  much of the screen the wheel, the sticks and the map have already taken. */
+  const floorWidth = (vp: Viewport): number =>
+    PROMPT_MIN_TEXT_WIDTH + promptPad(vp.width, vp.height).x;
+
   /** A worst-case prompt: text wrapped to the widest line the wrap allows, over
-   *  enough lines to cover the longest authored string on the narrowest phone.
-   *  Line box ≈ 20px at the prompt's 16px heading type. */
-  const worstCase = (vp: Viewport, lines: number): { w: number; h: number } => ({
-    w: promptWrapWidth(vp.width),
-    h: lines * 20,
+   *  enough lines to cover the longest authored string on the narrowest phone. */
+  const worstCase = (vp: Viewport, isTouch: boolean, lines: number): { w: number; h: number } => ({
+    w: promptWrapWidth(vp.width, vp.height, isTouch),
+    h: lines * lineBox(vp),
   });
 
   for (const { name, vp } of PROFILES) {
-    it(`stays on screen and inside the HUD margin at ${name}`, () => {
-      const { w, h } = worstCase(vp, 4);
-      expectWithin(promptBounds(vp.width, vp.height, w, h), FULL_PAD, vp, 'onboarding');
-    });
+    for (const dev of DEVICES) {
+      it(`stays on screen and inside the HUD margin at ${name} / ${dev.name}`, () => {
+        const { w, h } = worstCase(vp, dev.isTouch, 4);
+        expectWithin(
+          promptBounds(vp.width, vp.height, w, h, dev.isTouch),
+          FULL_PAD,
+          vp,
+          'onboarding',
+        );
+      });
+    }
   }
 
-  it('lands exactly on the HUD margin at the wrap ceiling — the assertion that earns its keep', () => {
-    // The prompt claims `full` + PAD *because* it is wrapped to fit it. If the
-    // wrap budget ever stops paying for PROMPT_PAD_X and the stroke, a prompt
-    // whose text reaches the ceiling registers wider than its own anchor zone —
-    // and it is the longest prompt on the narrowest phone that would do it, the
-    // one case least likely to be looked at by eye.
+  it('lands exactly on its band at the wrap ceiling — the assertion that earns its keep', () => {
+    // The prompt claims `full` + PAD *because* it is wrapped to fit inside it, and
+    // since u7-07 it makes the stronger promise too: it fits the CLEAR BAND, which
+    // is narrower. If the wrap budget ever stops paying for PROMPT_PAD_X and the
+    // stroke, a prompt whose text reaches the ceiling registers wider than the band
+    // it was measured for — and runs under a thumb stick on the one screen least
+    // likely to be looked at by eye.
     for (const { name, vp } of PROFILES) {
-      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 20);
-      expect(b.x, name).toBeCloseTo(HUD_PAD, 6);
-      expect(b.x + b.width, name).toBeCloseTo(vp.width - HUD_PAD, 6);
+      for (const dev of DEVICES) {
+        const band = promptBand(vp.width, vp.height, dev.isTouch);
+        const b = promptBounds(
+          vp.width,
+          vp.height,
+          promptWrapWidth(vp.width, vp.height, dev.isTouch),
+          20,
+          dev.isTouch,
+        );
+        const label = `${name} / ${dev.name}`;
+        expect(b.x, label).toBeGreaterThanOrEqual(band.x - 1e-6);
+        expect(b.x + b.width, label).toBeLessThanOrEqual(band.x + band.width + 1e-6);
+        expect(b.width, label).toBeCloseTo(band.width, 6);
+      }
     }
   });
 
-  it('sits below the ship it is talking about, and clear of the controls strip', () => {
-    // GDD §2.10's prompts point at the ship and the world; a panel drawn over the
-    // centre would cover the thing it names. PROMPT_CENTER_Y is below centre —
-    // and still clear of the bottom edge once the panel has height.
-    expect(PROMPT_CENTER_Y).toBeGreaterThan(0.5);
+  it('hangs from the bottom of its band, clear of the strip and the safe margin', () => {
     for (const { name, vp } of PROFILES) {
-      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 4 * 20);
-      expect(b.y, name).toBeGreaterThan(vp.height / 2);
-      expect(b.y + b.height, name).toBeLessThanOrEqual(vp.height - HUD_PAD);
+      for (const dev of DEVICES) {
+        const band = promptBand(vp.width, vp.height, dev.isTouch);
+        const b = promptBounds(vp.width, vp.height, 200, 20, dev.isTouch);
+        const label = `${name} / ${dev.name}`;
+        expect(b.y + b.height, label).toBeCloseTo(band.y + band.height, 6);
+        const reserve = dev.isTouch ? 0 : PROMPT_STRIP_RESERVE;
+        expect(b.y + b.height, label).toBeLessThanOrEqual(vp.height - HUD_PAD - reserve + 1e-6);
+      }
     }
   });
 
-  it('is wider than any band the vocabulary offers — which is why it is `full`', () => {
-    // The same test the wheel gets, for the same reason: if a sentence ever does
-    // fit a third-width band, revisit the anchor instead of keeping `full`.
+  it('CLEARS THE BUILD WHEEL at a one-line prompt — the collision u7-07 was written for', () => {
+    // The regression this brief names: at 844×390 the wheel spans y 54.6 → 335.4
+    // (72% of the screen) and the old `PROMPT_CENTER_Y = 0.72` put the prompt at
+    // y 259 → 302, squarely over the REPAIR REACTOR and RADAR wedges — and the
+    // SPEND prompt fires WHILE the wheel is open by design (GDD §2.10), so that
+    // was its normal state, not an edge case.
+    //
+    // Asserted per profile against the device class that profile ACTUALLY IS: the
+    // phones are touch (no controls strip, thumb columns instead) and the desktop
+    // is not. The cross-product is deliberately not asserted here — a 844×390
+    // window driven by a keyboard has to pay for BOTH a 280px-tall wheel and the
+    // strip's reserve, and 390px of height cannot cover both. The prompt degrades
+    // there exactly as documented: it keeps its bottom edge, grows up into the
+    // wheel, and the wedge reads through it (SCRIM.prompt). The `full` + PAD
+    // assertion above still covers that case, which is the promise that matters.
+    //
+    // A one-line prompt is the case that has to be clean, because it is the case
+    // that happens: every authored prompt fits one line of the band on every
+    // profile in the matrix.
+    const degraded: string[] = [];
+    for (const { name, vp, isTouch } of PROFILES) {
+      const wheel = wheelBounds(vp.width, vp.height);
+      const b = promptBounds(vp.width, vp.height, 200, lineBox(vp), isTouch);
+      if (b.y < wheel.y + wheel.height) {
+        degraded.push(
+          `${name} (prompt top ${b.y.toFixed(1)}, wheel bottom ${(wheel.y + wheel.height).toFixed(1)})`,
+        );
+      }
+    }
+
+    // …and the screens where it CANNOT clear, named. The band is the room left
+    // between the wheel's bottom edge and the HUD margin; on a 320px-tall screen
+    // the wheel's own 120px minimum radius (hud-geometry `WHEEL_MIN_RADIUS`) takes
+    // 240 of those 320 px, leaving 18px for a 33px prompt. So the prompt keeps its
+    // bottom edge and grows 9px up into the bottom wedges, and reads through them
+    // (SCRIM.prompt). Pinning the SET here means a change that makes a second
+    // screen degrade fails this test instead of quietly shipping.
+    expect(degraded, 'exactly one profile in the matrix cannot hold a prompt under the wheel')
+      .toEqual(['small/landscape (prompt top 271.0, wheel bottom 280.0)']);
+  });
+
+  it('clears the touch thumb columns — or falls back to the legibility floor, never between', () => {
+    // The other half of the fix: the band stops short of the columns
+    // `@platform/touch-visuals` puts the sticks / FIRE in, so the wrap can never
+    // produce a line that reaches them.
+    //
+    // There is one screen where it CANNOT: a 390px-wide logical viewport has
+    // 390 − 2·16 − 2·156 = 46px left between the two thumb columns, which is not a
+    // prompt, it is a word. The floor wins there and the prompt is drawn over a
+    // stick — deliberately, because a legible prompt over a stick beats an
+    // illegible one beside it (GDD §2.10: a prompt the player cannot read is a
+    // prompt that did not fire). What this asserts is that those are the only two
+    // answers: fully clear, or exactly at the floor.
     for (const { name, vp } of PROFILES) {
-      const b = promptBounds(vp.width, vp.height, promptWrapWidth(vp.width), 20);
-      const centerZone = resolveAnchor({ region: 'center', margin: HUD_PAD }, vp);
-      expect(b.width, name).toBeGreaterThan(centerZone.width);
+      const band = promptBand(vp.width, vp.height, true);
+      const clearsLeft = band.x >= HUD_PAD + PROMPT_THUMB_COLUMN - 1e-6;
+      const clearsRight = band.x + band.width <= vp.width - HUD_PAD - PROMPT_THUMB_COLUMN + 1e-6;
+      const atFloor = Math.abs(band.width - floorWidth(vp)) < 1e-6;
+      expect(
+        (clearsLeft && clearsRight) || atFloor,
+        `${name}: band ${fmt(band)} neither clears the thumb columns nor sits at the floor`,
+      ).toBe(true);
+    }
+  });
+
+  it('clears the minimap\'s collapsed corner square — or falls back to the floor', () => {
+    // The prompt and the corner map share the bottom band. The band is limited by
+    // the map's own `collapsedRect` rather than by a copy of its numbers, so the
+    // two cannot drift apart the day the map's size or its FIRE-column clearance
+    // changes. Same two-answer rule as the thumb columns above.
+    for (const { name, vp } of PROFILES) {
+      for (const isTouch of [false, true]) {
+        const band = promptBand(vp.width, vp.height, isTouch);
+        const map = collapsedRect(vp, isTouch);
+        const clears = band.x + band.width <= map.x + 1e-6;
+        const atFloor = Math.abs(band.width - floorWidth(vp)) < 1e-6;
+        expect(
+          clears || atFloor,
+          `${name} / touch=${isTouch}: band right ${(band.x + band.width).toFixed(1)} vs map left ${map.x.toFixed(1)}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('never collapses below a legible line, however crowded the screen', () => {
+    // The floor that stops the band arithmetic from producing a two-word prompt on
+    // a small screen: a band is never narrower than the wrap floor plus its own
+    // padding, whatever the wheel and the thumb columns have taken.
+    for (const { name, vp } of PROFILES) {
+      for (const isTouch of [false, true]) {
+        const band = promptBand(vp.width, vp.height, isTouch);
+        expect(band.width, `${name} / touch=${isTouch}`).toBeGreaterThanOrEqual(
+          floorWidth(vp) - 1e-6,
+        );
+        expect(promptWrapWidth(vp.width, vp.height, isTouch), `${name} / touch=${isTouch}`)
+          .toBeGreaterThanOrEqual(PROMPT_MIN_TEXT_WIDTH);
+      }
     }
   });
 });

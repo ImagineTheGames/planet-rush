@@ -37,7 +37,8 @@
 import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { PANEL_FILL, PANEL_RULE, RADIUS } from './chrome';
+import { PANEL_FILL } from './chrome';
+import { gantryPoly, INSTRUMENT_RULE, MINIMAP_CHAMFER } from './instrument';
 import { playerColor } from './station-hp';
 import {
   fitBounds,
@@ -69,11 +70,23 @@ export const MINIMAP_EXPANDED_ANCHOR: AnchorSpec = { region: 'full', margin: MIN
 /** Backdrop opacity — dim enough that the match reads through an expanded overlay
  *  ("the game continues behind it"), solid enough to read the dots on the corner. */
 const BACKDROP_ALPHA = 0.72;
-const BORDER_ALPHA = 0.55;
+const BORDER_ALPHA = 0.7;
 const BORDER_WIDTH = 1.5;
-/** The unified card radius (./chrome) — the ui-mockup rounds the minimap frame
- *  like every other full card. */
-const CORNER_RADIUS = RADIUS.card;
+/**
+ * The gantry corner cut, scaled down on a small square so it never eats a
+ * quarter of an 80px touch map (`gantryPoly` clamps at half the short side).
+ *
+ * The minimap is the ONE HUD element that wears the plate silhouette, and
+ * `./instrument` `MINIMAP_CHAMFER` states why: it is opaque by necessity — dots
+ * on a transparent screen are not readable — so it is the only place on the glass
+ * where the world does not read through, and the only place the plate's outline
+ * is honest. It gets the cut and the Bone rule; it does not get a bezel, a sheen
+ * or a cast shadow, because it is set INTO the glass rather than standing off it.
+ * The ui-mockup's 12px round-rect that this replaces was pre-Gantry chrome.
+ */
+function chamferFor(rect: Rect): number {
+  return Math.min(MINIMAP_CHAMFER, Math.min(rect.width, rect.height) * 0.16);
+}
 /** Collapse-ring stroke, CSS px. */
 const RING_WIDTH = 1.5;
 
@@ -210,17 +223,19 @@ export class MinimapView extends Container {
   // --- Drawing --------------------------------------------------------------
 
   private drawFrame(rect: Rect, state: MinimapState): void {
+    const c = chamferFor(rect);
     this.frameG.clear();
     this.frameG
-      .roundRect(rect.x, rect.y, rect.width, rect.height, CORNER_RADIUS)
+      .poly(gantryPoly(rect.x, rect.y, rect.width, rect.height, c), true)
       .fill({ color: PANEL_FILL, alpha: BACKDROP_ALPHA });
     // Border inset by the stroke width so the drawn geometry never spills past the
     // fill's bounds — which keeps getBounds() exactly the rect the registry checks.
-    // The unified panel rule (./chrome), the same hairline every menu/HUD panel wears.
+    // The Bone rule (./instrument), which is what every edge in the ratified
+    // direction is drawn in, replacing the pre-Gantry `PANEL_RULE` hairline.
     const i = BORDER_WIDTH;
     this.frameG
-      .roundRect(rect.x + i, rect.y + i, rect.width - 2 * i, rect.height - 2 * i, CORNER_RADIUS - 1)
-      .stroke({ width: BORDER_WIDTH, color: PANEL_RULE, alpha: BORDER_ALPHA });
+      .poly(gantryPoly(rect.x + i, rect.y + i, rect.width - 2 * i, rect.height - 2 * i, c - 1), true)
+      .stroke({ width: BORDER_WIDTH, color: INSTRUMENT_RULE, alpha: BORDER_ALPHA });
 
     // A small close hint in the expanded overlay's top-right — the whole overlay
     // collapses on a tap, so this is a legibility cue, not the only target.
@@ -240,7 +255,7 @@ export class MinimapView extends Container {
 
   private drawMask(rect: Rect): void {
     this.maskG.clear();
-    this.maskG.roundRect(rect.x, rect.y, rect.width, rect.height, CORNER_RADIUS).fill(0xffffff);
+    this.maskG.poly(gantryPoly(rect.x, rect.y, rect.width, rect.height, chamferFor(rect)), true).fill(0xffffff);
   }
 
   /** Rebuild the throttled content Graphics (everything but the own-ship dot) and
