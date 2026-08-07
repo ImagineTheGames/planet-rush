@@ -89,3 +89,37 @@ is not merged** (open PR #312). They are not a picture of the Cutterhead. They
 are a picture of the *rule*: the hull draws no gun, the buildings layer draws
 every gun, and the count is the truth. That rule is what `STATION_HULL_EXCLUSIONS`
 holds, and it holds whichever body a2-03 lands.
+
+---
+
+## 4 · The zoom tests — "owner-colour legibility at any zoom"
+
+Added to `capture-board.mjs` after the first pass, because both sections
+`use href="#bD"` and therefore inherit the geometry change rather than restating
+it — which is exactly why they are worth shooting.
+
+| file | what to look for |
+|---|---|
+| `scale-390.png` | D, E and F at **1:1 in a 390 px viewport** — the size the design is really judged at. Before: small grey gun stubs poke past the beacon ring at the cardinals. After: the outline is clean. The owner read is unchanged, because it was never the guns carrying it — it is the beacon ring, its four pips, and the lug keyway. |
+| `scale-downscale.png` | The same sprite at **128 / 72 / 44 / 28 / 18 px, silhouette only, no rings**. This is the one that answers the brief's "must not soften the Cutterhead back toward a generic structure": at 128 px the outline is still lugged, the throat is still toothed, and the spoil boom still leaves the circle. The anti-planetoid read was never the guns' job, and it survives them coming off intact down to 18 px. |
+
+---
+
+## The suite results this branch was measured against
+
+**Mobile goldens, in the container:** 31 passed, 4 failed. The four are all
+**UPGRADE WHEEL** — and they fail *identically with the working tree reset to
+`origin/main` content*, so they are pre-existing and belong to whoever owns
+`src/ui/`. Every golden the station silhouette shows in passes unchanged:
+
+```
+✓ golden: desktop frozen scene
+✓ golden: landscape phone frozen scene
+✓ golden: desktop frozen TEAMS scene — FRIENDLY A / ENEMY B
+✓ golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B
+✓ golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the lock
+```
+
+**Unit suite:** 3836 passed, 1 failed —
+`tests/net/capacity/capacity-regression.test.ts`, also confirmed failing on
+`origin/main` content, also not this branch's.

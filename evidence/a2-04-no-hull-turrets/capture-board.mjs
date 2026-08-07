@@ -28,6 +28,11 @@ const SECTIONS = [
   { key: 'e-live', sel: '#dir-e .card.wide', note: 'E · where TURRET on the corner cut was' },
   { key: 'f-live', sel: '#dir-f .card.wide', note: 'F · where TURRET on the rim was' },
   { key: 'defend-card', sel: '.grid6 .card:nth-child(5)', note: 'the DEFEND vocabulary card' },
+  // The two zoom tests the brief's "owner-colour legibility at any zoom" rides on.
+  // Both `use href="#bD"`, so they inherit the geometry change rather than
+  // restating it — which is exactly why they are worth shooting.
+  { key: 'scale-390', sel: 'section:has-text("Does it survive at the size") .grid3', note: 'D/E/F at 1:1 in a 390 px viewport' },
+  { key: 'scale-downscale', sel: 'section:has-text("Does it survive at the size") .grid .card.wide', note: 'the downscale strip toward the far-zoom read' },
 ];
 
 async function shoot(page, url, out) {
