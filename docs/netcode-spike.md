@@ -319,6 +319,18 @@ The day-0 "50× heavier real workload" fear was pessimistic: the real room is
 
 ### 2. Room density, MEASURED → DEFAULT_MAX_ROOMS 64 → 32
 
+> **SUPERSEDED 2026-08-07 by `docs/server-capacity.md` (m11-01): 32 → 6.** Keep
+> reading this section — the arithmetic below is correct and the section is left
+> standing rather than edited, because *how* it was wrong is the lesson. It gates
+> the fleet against **one whole core's 16.67 ms frame**. The guest is metered at
+> **6.25% of a core sustained**, so "~42% of budget" is nearly seven times the
+> quota the Machine is actually billed for; it would throttle long before the loop
+> noticed. It also measures the *sim* — over a real socket a room costs 1.7× again
+> (4.7 ms of CPU per second, not 2.8). Both corrections point the same way, and the
+> ceiling now tracks the quota: **8 rooms fit a shared-cpu-1x, 6 is advertised.**
+> The "5× target-core factor" flagged as open below is *still* open and is still
+> the largest remaining assumption.
+
 The old `DEFAULT_MAX_ROOMS = 64` comment cited the spike's *stand-in* estimate.
 The measurement replaces it. Extrapolating the fleet cost to the deploy target —
 a shared-cpu-1x Fly guest, taken at the day-0 §2 estimate of **~5× slower** than

@@ -4,16 +4,36 @@
  * The screen *before* {@link ./lobby}: the three ways a match is entered
  * (GDD §2.1, §4.2), and the on-screen pad a room code is typed on.
  *
+ *   CAMPAIGN      not built yet. It answers `Coming Soon…` and goes nowhere.
  *   PLAY SOLO     no server, no code to read out — bots fill all eight seats.
  *   CREATE ROOM   a fresh code, generated here and shown for the room to read.
  *   JOIN ROOM     type the code somebody else is holding up.
  *
  * **This is the one and only front door** (ratified: one play flow). The main
  * menu's PLAY opens *this* screen — there is no second entry point that skips it —
- * and all three doors land in the SAME lobby ({@link ./lobby}): SOLO opens it
- * offline, CREATE opens it online with the room code up while the host configures,
- * JOIN opens it online as a guest watching the seats fill. One screen decides how
- * you get in; one screen decides what the match is.
+ * and all three PLAYABLE doors land in the SAME lobby ({@link ./lobby}): SOLO opens
+ * it offline, CREATE opens it online with the room code up while the host
+ * configures, JOIN opens it online as a guest watching the seats fill. One screen
+ * decides how you get in; one screen decides what the match is.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY CAMPAIGN IS A DOOR AND NOT A GREYED BUTTON (u9-01, 2026-08-06)
+ * ---------------------------------------------------------------------------
+ * The developer asked for a CAMPAIGN button above SOLO that says `Coming Soon…`
+ * when you press it. That is deliberately *not* {@link EntryDoorView.enabled}
+ * `false`: this screen already has a disabled state and it means one specific
+ * thing — **"needs a server and there isn't one"** — drawn in the shared dim
+ * tokens ({@link ./button-theme}), which by the ratified p4-03 rule must always
+ * carry their reason. A door that is greyed for a *different* reason would be a
+ * second meaning wearing the first one's costume, and a teaser that greys out
+ * reads as broken rather than as unbuilt.
+ *
+ * So {@link EntryDoorOption.comingSoon} is its own concept, sitting beside
+ * {@link EntryDoorOption.needsNetwork}: the door is live, full-contrast and
+ * tappable, and pressing it puts {@link ENTRY_COMING_SOON} in the screen's one
+ * message slot ({@link EntryState.notice}). It opens no transport, moves no
+ * screen and strands nobody — the next press of any door behaves exactly as it
+ * always did, and the notice clears the moment something else is asked for.
  *
  * Pure and DOM-free like every model in this directory. It decides; the geometry
  * ({@link ./lobby-geometry} `entryLayout`) holds the rects and the view
@@ -53,6 +73,7 @@
  */
 
 import type { Rng } from '@shared/types';
+import type { PlateRole, PlateScale, PlateState } from '../art/materials';
 import type { RoomCode } from '../net/transport';
 import type { ResolveFailure } from '../net/allocator-client';
 import { resolveFailureMessage } from './online-copy';
@@ -67,18 +88,24 @@ import {
 } from './lobby';
 
 // ---------------------------------------------------------------------------
-// The three doors
+// The four doors
 // ---------------------------------------------------------------------------
 
 /**
- * A way into a match. Ordered as the screen offers them: the one that always
- * works first, then the one that starts a room, then the one that needs someone
- * else to have started one.
+ * A way into a match — or, for `campaign`, a way the screen says there is not one
+ * yet. Ordered as the screen offers them: the one that is coming, then the one
+ * that always works, then the one that starts a room, then the one that needs
+ * someone else to have started one.
  */
-export type EntryDoor = 'solo' | 'create' | 'join';
+export type EntryDoor = 'campaign' | 'solo' | 'create' | 'join';
 
-/** Door order, top to bottom / left to right. */
-export const DOOR_ORDER: readonly EntryDoor[] = ['solo', 'create', 'join'];
+/**
+ * Door order, top to bottom (and, where the band is too short to stack four,
+ * down the leading column first — `./lobby-geometry` `placeDoors` fills
+ * column-major, exactly as the lobby roster does, so **CAMPAIGN is above SOLO in
+ * every shape this screen has**).
+ */
+export const DOOR_ORDER: readonly EntryDoor[] = ['campaign', 'solo', 'create', 'join'];
 
 /** One door, as the button reads. Words only — this screen has no numbers. */
 export interface EntryDoorOption {
@@ -89,29 +116,61 @@ export interface EntryDoorOption {
   readonly hint: string;
   /** Whether it needs a server. SOLO does not — which is the whole point. */
   readonly needsNetwork: boolean;
+  /**
+   * Whether the door is a **teaser**: present, lit and pressable, but not built
+   * yet. Pressing it says {@link ENTRY_COMING_SOON} and does nothing else.
+   *
+   * Deliberately separate from the disabled state (see the file header): dim is
+   * this screen's word for "needs a server and there isn't one", and it always
+   * owes a reason. A teaser is not refused — it is answered.
+   */
+  readonly comingSoon: boolean;
 }
 
-/** The three doors (GDD §2.1, §4.2, §4.8). */
+/** What a {@link EntryDoorOption.comingSoon} door says when it is pressed. The
+ *  developer's own words, verbatim (u9-01, 2026-08-06), with the ellipsis
+ *  character the rest of the screen already uses (`CONNECTING…`). */
+export const ENTRY_COMING_SOON = 'Coming Soon…';
+
+/** The four doors (GDD §2.1, §4.2, §4.8; CAMPAIGN added u9-01). */
 export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
+  {
+    // Above SOLO, per the developer's report. It is FIRST because that is where it
+    // was asked for, and it costs SOLO nothing: SOLO is still one press from a cold
+    // screen, and it is still the only door drawn as the affirmative action.
+    door: 'campaign',
+    label: 'CAMPAIGN',
+    hint: 'A run of linked contracts, one claim after another.',
+    needsNetwork: false,
+    comingSoon: true,
+  },
   {
     door: 'solo',
     label: 'PLAY SOLO',
     hint: 'Set up the match. Bots fill the seats, no connection needed.',
     needsNetwork: false,
+    comingSoon: false,
   },
   {
     door: 'create',
     label: 'CREATE ROOM',
     hint: 'Set up the match and read the code out. They join you.',
     needsNetwork: true,
+    comingSoon: false,
   },
   {
     door: 'join',
     label: 'JOIN ROOM',
     hint: 'Type the code somebody is holding up.',
     needsNetwork: true,
+    comingSoon: false,
   },
 ];
+
+/** The option a door reads by, or `undefined` for a door that is not offered. */
+export function doorOption(door: EntryDoor): EntryDoorOption | undefined {
+  return DOOR_OPTIONS.find((option) => option.door === door);
+}
 
 // ---------------------------------------------------------------------------
 // The keypad
@@ -158,6 +217,18 @@ export interface EntryState {
   readonly status: EntryStatus;
   /** Why the last attempt failed, in words a player can act on. `''` if none. */
   readonly error: string;
+  /**
+   * The screen's standing ANSWER, as opposed to its refusal: today the one thing
+   * it is {@link ENTRY_COMING_SOON}, said because a teaser door was pressed. `''`
+   * when there is nothing to answer.
+   *
+   * Kept apart from {@link error} because the two are drawn differently and mean
+   * different things — an error is threat red because something is genuinely
+   * wrong (style-guide §2), and a door that is not built yet is not wrong. It is
+   * cleared by the next thing the player asks for, so it can never outlive the
+   * press it answered.
+   */
+  readonly notice: string;
 }
 
 /**
@@ -204,7 +275,7 @@ export const ENTRY_ERRORS = {
 
 /** A fresh entry screen: the home doors, nothing typed, nothing wrong. */
 export function createEntry(): EntryState {
-  return { screen: 'home', code: '', status: 'idle', error: '' };
+  return { screen: 'home', code: '', status: 'idle', error: '', notice: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -220,21 +291,37 @@ export function entryLive(state: EntryState): boolean {
 /**
  * Tap a door.
  *
- * SOLO and CREATE resolve immediately — both need a room code and neither needs
- * the player to know one, so the code is drawn here from the ratified seeded PRNG
- * (`mulberry32`, never `Math.random()`), exactly as {@link makeRoomCode}
- * documents. JOIN has nothing to resolve yet: it opens the keypad.
+ * CAMPAIGN answers and stays put — it is not built yet, so it mints no code,
+ * opens no transport and does not move the screen; it puts
+ * {@link ENTRY_COMING_SOON} in {@link EntryState.notice} and that is the whole of
+ * it. SOLO and CREATE resolve immediately — both need a room code and neither
+ * needs the player to know one, so the code is drawn here from the ratified
+ * seeded PRNG (`mulberry32`, never `Math.random()`), exactly as
+ * {@link makeRoomCode} documents. JOIN has nothing to resolve yet: it opens the
+ * keypad.
+ *
+ * Every door clears a standing notice on the way past, so the answer CAMPAIGN
+ * gave can never be left sitting over a screen that has since moved on.
  *
  * A no-op while an earlier attempt is still connecting.
  */
 export function chooseDoor(state: EntryState, door: EntryDoor, rng: Rng): EntryResult {
   if (!entryLive(state)) return { state, intent: null };
+  if (doorOption(door)?.comingSoon) {
+    // Answered, not refused: no screen change, no code, no intent for the caller
+    // to open a transport with. Pressing it twice says the same thing twice.
+    if (state.notice === ENTRY_COMING_SOON && state.error === '') return { state, intent: null };
+    return { state: { ...state, status: 'idle', error: '', notice: ENTRY_COMING_SOON }, intent: null };
+  }
   if (door === 'join') {
-    return { state: { ...state, screen: 'join', code: '', status: 'idle', error: '' }, intent: null };
+    return {
+      state: { ...state, screen: 'join', code: '', status: 'idle', error: '', notice: '' },
+      intent: null,
+    };
   }
   const room = makeRoomCode(rng);
   return {
-    state: { ...state, status: 'connecting', error: '' },
+    state: { ...state, status: 'connecting', error: '', notice: '' },
     intent: { door, room, online: door === 'create' },
   };
 }
@@ -306,7 +393,9 @@ export function submitJoin(state: EntryState): EntryResult {
  * out is a punishment for the server's behaviour.
  */
 export function entryFailed(state: EntryState, reason: string = ENTRY_ERRORS.offline): EntryState {
-  return { ...state, status: 'error', error: reason };
+  // A refusal takes the message slot from a standing notice: one line, and the
+  // thing that is actually wrong is the one that gets to use it.
+  return { ...state, status: 'error', error: reason, notice: '' };
 }
 
 /** The transport is up and the lobby owns the screen. Returns the entry screen
@@ -338,6 +427,72 @@ export function entryErrorFor(reason: ResolveFailure): string {
 export interface EntryDoorView extends EntryDoorOption {
   /** Dead while an attempt is in flight. */
   readonly enabled: boolean;
+  /**
+   * Whether this is the screen's ONE headline action (u7-04). PLAY SOLO, and only
+   * PLAY SOLO: it is the door that always works with no server (GDD §4.8 risk 6).
+   * Under Gantry/Bone that is not a colour — the primary is simply the biggest and
+   * brightest plate, and it *must never share a screen with a second bright plate*
+   * ({@link ./gantry} `singlePrimary`).
+   */
+  readonly primary: boolean;
+  /** The plate material and size this door is drawn at ({@link doorPlate}). */
+  readonly role: PlateRole;
+  readonly scale: PlateScale;
+  /** Rest / hover / press — the handoff's three plate states, driven by the
+   *  wiring layer's pointer routing. Touch never hovers, so on a phone this is
+   *  only ever `rest` or `press`. */
+  readonly state: PlateState;
+}
+
+/**
+ * The plate role and size a door is drawn at.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY CAMPAIGN IS A `secondary` PLATE AND NEVER AN `inert` ONE (u7-04)
+ * ---------------------------------------------------------------------------
+ * The re-skin had one way to get the CAMPAIGN teaser wrong, and it is the same
+ * mistake u9-01 was written against in a new material: `inert` is Gantry's word
+ * for *a surface that holds content rather than inviting a press* — a settings
+ * row, an unselected ship. A teaser drawn as a surface would read as unpressable,
+ * which is the greyed-out door that brief exists to prevent, wearing a bevel.
+ *
+ * So CAMPAIGN takes exactly the same material as CREATE ROOM and JOIN ROOM:
+ * `secondary`, full contrast, raised off the screen with a bezel and a cast
+ * shadow, and pressable — because pressing it is how the screen answers.
+ */
+export function doorPlate(option: EntryDoorOption): {
+  primary: boolean;
+  role: PlateRole;
+  scale: PlateScale;
+} {
+  // The offline door is the primary (it always works — risk 6); every other door,
+  // teaser or not, is an equally-active secondary.
+  const primary = !option.needsNetwork && !option.comingSoon;
+  return primary
+    ? { primary: true, role: 'primary', scale: 'hero' }
+    : { primary: false, role: 'secondary', scale: 'standard' };
+}
+
+/**
+ * What the pointer is doing on the entry screen: which control it is over, and
+ * which (if any) it is holding down — each as a {@link ./lobby-geometry}
+ * `entryTargetKey`, so the model never has to know what a rect is.
+ */
+export interface EntryPointer {
+  readonly hover?: string | null;
+  readonly press?: string | null;
+}
+
+/**
+ * One control's plate state. A press outranks a hover on the same plate (a finger
+ * that is down is not hovering), and a plate that is neither is at rest — the same
+ * rule {@link ./main-menu} `mainMenuModel` keeps, stated once so the two front
+ * doors cannot disagree about what a press looks like.
+ */
+export function entryPlateState(model: EntryModel, key: string): PlateState {
+  if (model.press === key) return 'press';
+  if (model.hover === key) return 'hover';
+  return 'rest';
 }
 
 /**
@@ -378,6 +533,11 @@ export interface EntryModel {
   /** The failure line, or `''`. Drawn in threat red — the one place on this
    *  screen that colour is allowed to mean something (style-guide §2). */
   readonly error: string;
+  /** The answer line, or `''` — today only {@link ENTRY_COMING_SOON}, from a press
+   *  on a teaser door. Shares the message slot with {@link prompt} and yields it to
+   *  {@link error} and to a live narration: nothing being built yet is never the
+   *  most urgent thing the screen has to say. Never red — nothing is wrong. */
+  readonly notice: string;
   /** The title line: what the player is being asked to do, or — while a connect is
    *  running — what the connection is actually doing right now. */
   readonly prompt: string;
@@ -385,7 +545,37 @@ export interface EntryModel {
    *  own standing line, so the view can draw it as the *title* it now is: bigger,
    *  lit, and with the wordmark stepping back behind it. */
   readonly narrating: boolean;
+  /**
+   * The header beam's eyebrow cluster (u7-04): the authority above, this screen's
+   * own standing status below — the title screen's construction, because this is
+   * the title screen's other half and the letterhead does not change between them.
+   */
+  readonly eyebrow: string;
+  readonly status: string;
+  /** The control the pointer is over / holding, as a `entryTargetKey` — read
+   *  through {@link entryPlateState} rather than compared by the view directly. */
+  readonly hover: string | null;
+  readonly press: string | null;
 }
+
+/**
+ * The header beam's first line: the authority, verbatim from the title screen
+ * ({@link ./main-menu} `MAIN_MENU_EYEBROW`). It is a letterhead — the same mining
+ * authority runs both screens — so repeating it is the point, not drift, and it
+ * invents no copy while `docs/copy-sweep-industrial-voice.md` Q1 is still open.
+ */
+export const ENTRY_EYEBROW = 'DEEP FIELD MINING AUTHORITY';
+
+/**
+ * …and its second line, which is this screen's own state. `ROOM CODE` is the
+ * handoff's own word for the keypad screen (it labels that panel exactly so); the
+ * doors carry the title screen's standing contract line unchanged, because the
+ * doors screen is where that contract is taken up.
+ */
+export const ENTRY_STATUS = {
+  home: 'CONTRACT OPEN · SECTOR 04',
+  join: 'ROOM CODE',
+} as const;
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
@@ -398,7 +588,11 @@ export interface EntryModel {
  * whole change exists to delete. With no narration the screen behaves exactly as it
  * always has, which is what PLAY SOLO and a mistyped room code still want.
  */
-export function entryModel(state: EntryState, narration: EntryNarration | null = null): EntryModel {
+export function entryModel(
+  state: EntryState,
+  narration: EntryNarration | null = null,
+  pointer: EntryPointer = {},
+): EntryModel {
   const live = entryLive(state);
   const cells: EntryCodeCell[] = [];
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
@@ -408,17 +602,36 @@ export function entryModel(state: EntryState, narration: EntryNarration | null =
   // An empty narration line is no narration at all — a trace that has not taken
   // its first step yet must not blank the title.
   const told = narration !== null && narration.line !== '' ? narration : null;
+  const hover = pointer.hover ?? null;
+  const press = pointer.press ?? null;
   return {
     screen: state.screen,
-    doors: DOOR_OPTIONS.map((option) => ({ ...option, enabled: live })),
+    doors: DOOR_OPTIONS.map((option, i) => {
+      const key = `door:${i}`;
+      return {
+        ...option,
+        ...doorPlate(option),
+        enabled: live,
+        // A dead screen (an attempt in flight) is at rest whatever the pointer is
+        // doing: a plate that lights up under a finger it will not answer is a lie.
+        state: !live ? 'rest' : press === key ? 'press' : hover === key ? 'hover' : 'rest',
+      };
+    }),
     cells,
     keys: KEYPAD_KEYS,
     canErase: live && state.code.length > 0,
     canSubmit: canSubmitJoin(state),
     connecting: state.status === 'connecting',
     error: told ? (told.failed ? told.line : '') : state.error,
+    // A live connect is the screen's business; a door that is not built yet can
+    // wait. The notice stands down while something is narrating.
+    notice: told ? '' : state.notice,
     prompt: told ? told.line : entryPrompt(state),
     narrating: told !== null,
+    eyebrow: ENTRY_EYEBROW,
+    status: ENTRY_STATUS[state.screen],
+    hover: live ? hover : null,
+    press: live ? press : null,
   };
 }
 

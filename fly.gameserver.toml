@@ -49,6 +49,34 @@ primary_region = "iad"
   # and every upgrade completes locally, exactly as before.
   MATCH_ROUTER = "fly"
 
+  # How many rooms this Machine advertises to the allocator, which packs
+  # seat-weighted against it — so this is a promise, not an ambition.
+  #
+  # MEASURED (m11-01, docs/server-capacity.md), not assumed: a full 8-seat room
+  # (1 human + 7 Hard bots, real sockets, 30 Hz snapshots) costs ~4.7 ms of CPU
+  # per second. The [[vm]] below is a shared-cpu-1x, metered at 6.25% of a core
+  # SUSTAINED = 62.5 ms/s; burst above that runs on credit and a match is a
+  # twelve-minute sustained load, so burst is margin, not capacity. At 70% of
+  # quota, less the ~5.9 ms/s the empty process draws, 8 rooms fit — less a 25%
+  # margin, 6. The previous advertised 32 was ~4× the truth: it came from a
+  # sim-only measurement compared against one WHOLE core's frame budget rather
+  # than against this guest's quota.
+  #
+  # Set here explicitly rather than left to DEFAULT_MAX_ROOMS so the number is
+  # visible at the deploy, and so changing guest size is a two-line diff:
+  #
+  #   guest            sustained quota   rooms   $/mo (iad)   $/room
+  #   shared-cpu-1x    6.25% of a core       8      $3.19      $0.40   ← today
+  #   shared-cpu-2x    12.5%                17      $3.89      $0.23
+  #   shared-cpu-4x    25%                  35      $7.78      $0.22
+  #   performance-1x   100%                147     $31.00      $0.21
+  #
+  # (advertise the room count less the 25% margin: 6 / 12 / 26 / 110.)
+  # docs/server-capacity.md §3 makes the recommendation — shared-cpu-2x is 22%
+  # more money for 2.1× the rooms — but the guest size is the developer's call,
+  # so this file still deploys shared-cpu-1x and advertises honestly for it.
+  MAX_ROOMS = "6"
+
 [http_service]
   internal_port = 8080
   # wss:// at the edge: redirect any plain-http dial up to https/wss.
@@ -81,9 +109,15 @@ primary_region = "iad"
     timeout = "5s"
     grace_period = "10s"
 
-# Guest size mirrors allocator/provider-fly.ts DEFAULT_GUEST: a shared-CPU core
-# with 512 MB is ample for one process holding ≤64 rooms (~2.6 ms CPU/s per
-# client, ~510 B snapshots — docs/netcode-spike.md).
+# Guest size mirrors allocator/provider-fly.ts DEFAULT_GUEST.
+#
+# The old note here read "ample for one process holding ≤64 rooms". It is not,
+# and the correction is the whole of m11-01 (docs/server-capacity.md): a shared
+# CPU is metered at 6.25% of a core sustained, and 6.25% of a core holds EIGHT
+# rooms, not 64. Memory was never the constraint and is not one now — a room is
+# ~1.2 MB measured, so these 512 MB would hold ~290 rooms and the CPU quota stops
+# it at 8. See MAX_ROOMS above for the size/cost table; going up a size is the
+# cheapest capacity on the board and is the developer's call, not this file's.
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
