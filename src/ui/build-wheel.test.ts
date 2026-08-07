@@ -15,7 +15,10 @@ import { describe, it, expect } from 'vitest';
 import {
   buildWheelModel,
   canOpenWheel,
-  radarCapLabel,
+  capBuiltLabel,
+  capBuiltLabelCompact,
+  segmentCap,
+  segmentCostLabel,
   segmentAtDirection,
   segmentAngle,
   segmentCost,
@@ -153,38 +156,135 @@ describe('RADAR — cost, one-per-station cap, and the "0/1" count (p13)', () =>
     expect(stateOf('satellite', { banked: 0, satellites: SATELLITE.capPerStation })).toBe('capped');
   });
 
-  it('shows the u2-02 "0/1" count, and "1/1" at the cap', () => {
-    expect(radarCapLabel(sig({ satellites: 0 }))).toBe(`0/${SATELLITE.capPerStation}`);
-    expect(radarCapLabel(sig({ satellites: 1 }))).toBe(`1/${SATELLITE.capPerStation}`);
+  it('shows the count over its cap, and the full count at the cap', () => {
+    expect(capBuiltLabel('satellite', sig({ satellites: 0 }))).toBe(`0 / ${SATELLITE.capPerStation} BUILT`);
+    expect(capBuiltLabel('satellite', sig({ satellites: 1 }))).toBe(`1 / ${SATELLITE.capPerStation} BUILT`);
     const seg = buildWheelModel(sig({ satellites: 0 })).segments.find((s) => s.id === 'satellite');
-    expect(seg?.capLabel).toBe('0/1');
+    expect(seg?.capLabel).toBe('0 / 1 BUILT');
   });
 
   it('re-arms after the satellite is shot down — count drops, wedge goes ready again', () => {
-    // At the cap: greyed, "1/1". The satellite dies, the sim's count drops to 0, and
-    // the wedge is buildable again with "0/1" — the count IS the re-arm tell.
+    // At the cap: greyed, "1 / 1 BUILT". The satellite dies, the sim's count drops to
+    // 0, and the wedge is buildable again with "0 / 1 BUILT" — the count IS the
+    // re-arm tell.
     expect(stateOf('satellite', { banked: 99, satellites: 1 })).toBe('capped');
     expect(stateOf('satellite', { banked: 99, satellites: 0 })).toBe('ready');
     expect(buildWheelModel(sig({ satellites: 1 })).segments.find((s) => s.id === 'satellite')?.capLabel).toBe(
-      '1/1',
+      '1 / 1 BUILT',
     );
   });
 
-  it('hangs the "0/1" count on RADAR only — null on every other wedge', () => {
-    const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
-    expect(byId.get('satellite')?.capLabel).not.toBeNull();
-    expect(byId.get('turret')?.capLabel).toBeNull();
-    expect(byId.get('shield')?.capLabel).toBeNull();
-    expect(byId.get('repair')?.capLabel).toBeNull();
-    expect(byId.get('upgrade')?.capLabel).toBeNull();
-  });
-
-  it('reads "0/1" when the caller predates the radar wedge (no satellites field)', () => {
+  it('reads "0 / 1 BUILT" when the caller predates the radar wedge (no satellites field)', () => {
     // Backward-compatible default: an old caller/fixture reads as "none built".
     const legacy: BuildWheelSignals = { ...sig() };
     delete (legacy as { satellites?: number }).satellites;
-    expect(radarCapLabel(legacy)).toBe('0/1');
+    expect(capBuiltLabel('satellite', legacy)).toBe('0 / 1 BUILT');
     expect(segmentState('satellite', legacy)).toBe('unaffordable'); // 0 ore, none built
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u7-02 — the Gantry/Bone wedge: cost/held, and the cap counts (closing u2-02)
+// ---------------------------------------------------------------------------
+//
+// The developer ratified the Gantry/Bone build wheel (2026-08-05), which draws
+// `3/4` where this wheel drew a bare `3`, and `2 / 4 BUILT` on the two wedges
+// that used to "cap silently". Both ship as STRINGS: a second numeric field on a
+// segment would break the one guarantee this module exists to keep (below), so
+// the pair travels through the same door the RADAR count already used.
+
+describe('the cost line — `cost/held`, a string (u7-02)', () => {
+  it('prints the cost over what the player can actually spend', () => {
+    const byId = new Map(buildWheelModel(sig({ cargo: 2, banked: 2 })).segments.map((s) => [s.id, s]));
+    // 2 held + 2 banked = 4 spendable, exactly the design's frame.
+    expect(byId.get('turret')?.costLabel).toBe('3/4');
+    expect(byId.get('shield')?.costLabel).toBe('5/4');
+    expect(byId.get('repair')?.costLabel).toBe('1/4');
+  });
+
+  it('quotes the same spendable total the hub prints — never a second opinion', () => {
+    const model = buildWheelModel(sig({ cargo: 1, banked: 6.8 }));
+    // The hub floors fractional ore (repair spends fractional); the wedge must
+    // print the same whole number, or the wheel disagrees with itself.
+    expect(model.ore).toBe(7);
+    expect(model.segments.find((s) => s.id === 'turret')?.costLabel).toBe('3/7');
+  });
+
+  it('says FULL where there is no price left to quote (at the cap)', () => {
+    const capped = buildWheelModel(sig({ banked: 99, turrets: TURRET.capPerStation }));
+    const turret = capped.segments.find((s) => s.id === 'turret');
+    expect(turret?.state).toBe('capped');
+    expect(turret?.costLabel).toBe('FULL');
+    // ...and the numeric cost underneath it is untouched — the label is a label.
+    expect(turret?.cost).toBe(TURRET.cost);
+  });
+
+  it('gives UPGRADE SHIP no cost line at all — it opens a screen (GDD §2.5)', () => {
+    const upgrade = buildWheelModel(sig({ banked: 99 })).segments.find((s) => s.id === 'upgrade');
+    expect(upgrade?.costLabel).toBeNull();
+    expect(upgrade?.cost).toBeNull();
+    expect(upgrade?.opensPanel).toBe(true);
+  });
+
+  it('keeps the cost line a STRING, so the numeric guarantee survives it', () => {
+    // The whole reason `cost/held` is not two numbers: `segmentCostLabel` returns a
+    // string, so no rate, stat or wallet total can ever occupy a numeric field.
+    expect(typeof segmentCostLabel('turret', sig({ banked: 4 }))).toBe('string');
+  });
+});
+
+describe('the count/cap line — every capped wedge shows it (u7-02, closing u2-02)', () => {
+  it('shows a count over its cap on TURRET, SHIELD and RADAR', () => {
+    const byId = new Map(
+      buildWheelModel(sig({ turrets: 2, shields: 0, satellites: 0 })).segments.map((s) => [s.id, s]),
+    );
+    // The design's own frame: "2 / 4 BUILT" and "0 / 2 BUILT".
+    expect(byId.get('turret')?.capLabel).toBe('2 / 4 BUILT');
+    expect(byId.get('shield')?.capLabel).toBe('0 / 2 BUILT');
+    expect(byId.get('satellite')?.capLabel).toBe('0 / 1 BUILT');
+  });
+
+  it('leaves it off the two wedges with no cap', () => {
+    // REPAIR REACTOR is rationed by a cooldown, not a cap, and carries its
+    // effect/reason line instead; UPGRADE SHIP spends nothing here.
+    const byId = new Map(buildWheelModel(sig()).segments.map((s) => [s.id, s]));
+    expect(byId.get('repair')?.capLabel).toBeNull();
+    expect(byId.get('upgrade')?.capLabel).toBeNull();
+    expect(segmentCap('repair')).toBeNull();
+    expect(segmentCap('upgrade')).toBeNull();
+  });
+
+  it('counts against the sim\'s own caps, so the line can never promise a refused build', () => {
+    expect(segmentCap('turret')).toBe(TURRET.capPerStation);
+    expect(segmentCap('shield')).toBe(SHIELD.capPerStation);
+    expect(segmentCap('satellite')).toBe(SATELLITE.capPerStation);
+  });
+
+  it('counts QUEUED construction, so a player cannot buy past the cap (GDD §2.5)', () => {
+    // The caller passes the sim's `turretCount`, which counts standing PLUS under
+    // construction. Three standing + one building reads 4/4 and the wedge is capped
+    // — the count and the refusal are the same fact, shown and enforced.
+    const queued = buildWheelModel(sig({ banked: 99, turrets: 4 }));
+    const turret = queued.segments.find((s) => s.id === 'turret');
+    expect(turret?.capLabel).toBe('4 / 4 BUILT');
+    expect(turret?.state).toBe('capped');
+  });
+
+  it('carries a compact form for the phone profile — fewer characters, same count', () => {
+    // A 72° wedge is ~115 px wide at a 390 px phone's wheel radius, so the phone
+    // profile drops the padding rather than the information (src/art/materials.ts,
+    // WHEEL_PROFILES.phone).
+    const s = sig({ turrets: 2 });
+    expect(capBuiltLabelCompact('turret', s)).toBe('2/4 BUILT');
+    expect(buildWheelModel(s).segments.find((x) => x.id === 'turret')?.capLabelCompact).toBe('2/4 BUILT');
+    expect(capBuiltLabelCompact('repair', s)).toBeNull();
+  });
+
+  it('is a STRING on every wedge — the count can never become a second number', () => {
+    for (const seg of buildWheelModel(sig({ turrets: 1 })).segments) {
+      expect(seg.capLabel === null || typeof seg.capLabel === 'string').toBe(true);
+      expect(seg.capLabelCompact === null || typeof seg.capLabelCompact === 'string').toBe(true);
+    }
   });
 });
 
