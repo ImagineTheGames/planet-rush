@@ -248,6 +248,38 @@ describe('beam metrics', () => {
     expect(ruleY(header)).toBe(BEAM.height - BEAM.rule.width);
     expect(ruleY(footer)).toBe(0);
   });
+
+  it('draws a beam at the height the FRAME resolved, not the reference 92', () => {
+    // The bug this pins: a phone's beam is ~50px, and painting the handoff's 92
+    // into it put the header's Bone accent rule 40px BELOW the beam — through
+    // the first plate on the screen — and ran the footer's gradient off the
+    // bottom edge before it reached its dark end (measured in u7-01's shipped
+    // phone goldens: the rule at y=90 on a 390px-tall viewport).
+    const phoneBeam = 50;
+    const header = new Recorder();
+    drawBeam(header, 0, 0, 844, 'header', false, phoneBeam);
+    const footer = new Recorder();
+    drawBeam(footer, 0, 340, 844, 'footer', false, phoneBeam);
+    const ruleY = (r: Recorder) => {
+      const op = r.ops.filter((o) => o.color === BEAM.rule.color).at(-1);
+      return op ? op.points[1] : null;
+    };
+    expect(ruleY(header)).toBe(phoneBeam - BEAM.rule.width);
+    expect(ruleY(footer)).toBe(340);
+
+    // …and nothing the beam paints escapes the rect it was given (the fill's
+    // last band overlaps by BAND_OVERLAP, which is the only slack allowed).
+    const bottom = (r: Recorder) =>
+      Math.max(...r.ops.flatMap((o) => o.points.filter((_, i) => i % 2 === 1)));
+    expect(bottom(header)).toBeLessThanOrEqual(phoneBeam + 1);
+    expect(bottom(footer)).toBeLessThanOrEqual(340 + phoneBeam + 1);
+  });
+
+  it('draws nothing for a beam with no height', () => {
+    const rec = new Recorder();
+    drawBeam(rec, 0, 0, 1280, 'header', true, 0);
+    expect(rec.ops).toHaveLength(0);
+  });
 });
 
 describe('the plate', () => {
