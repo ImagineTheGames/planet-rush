@@ -120,3 +120,35 @@ The only real gap this resume found: `/status/notes/n3-01-...md` (the absolute
 path in the brief) was still the blank template while the committed copy under
 `status/notes/` held the note. They are two different files on this box — write
 **both**.
+
+---
+
+## RE-VERIFIED AGAIN (second resume, 2026-08-07)
+
+Nothing built; nothing was owed. This resume re-ran the DoD from scratch rather
+than trusting the section above, and the picture is unchanged:
+
+* `npx tsc --noEmit` — clean.
+* `npm test -- --run` — 3824/3825, 386s. Same single red, same test:
+  `capacity-regression > the loop stays inside the tick budget at 12 rooms`,
+  this time `38.96 > 33` (last resume saw `215.87`). **Passes in isolation**,
+  re-confirmed: 4/4 in 62.7s, and its own log line reports healthy margins
+  (`marginal 5.1 ms/s per room = 4.9× a sim step · advertised capacity 6`).
+  The number moving from 215.87 → 38.96 between two runs of an unchanged tree
+  is itself the proof: this measures the box, not the branch.
+* Branch is **6 ahead / 0 behind** `origin/main` — no merge owed.
+* PR #305 open, `MERGEABLE`, head `f8c6753` == local `HEAD`; worktree clean.
+* Both note paths (`/status/notes/` and `status/notes/`) verified as separate
+  directories — `readlink -f` gives `/status` vs `/lanes/lane-3/status` — and
+  written identically. The previous resume's fix held.
+* Spot-checked the brief's four required test cases exist by name, rather than
+  taking BUILT's word: unreachable-host fallback (`an unreachable host measures
+  nothing, and says so` + timeout + non-2xx + wrong-region + lossy-hop),
+  default = lowest (`picks the fastest region`, `never defaults to a region it
+  could not measure`), override end-to-end (`the override is honoured end to
+  end`), allocator-only regions (`fetchFleetRegions — the allocator is the only
+  source`). All four are covered.
+
+**Do not re-verify this again on the next resume.** The branch is finished and
+delivered; the only open item is the UI-lane handoff under NEXT, which is not
+this lane's to close.
