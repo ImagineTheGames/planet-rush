@@ -48,6 +48,61 @@ export function wheelRadius(viewportWidth: number, viewportHeight: number): numb
   );
 }
 
+// --- One wedge: is it thumb-sized, and do its words fit? (u7-02) ------------
+//
+// The Gantry/Bone pass puts four lines of text on a wedge — the name, what it
+// spends on, `cost/held`, and the count over its cap — inside a fixed radial
+// space. On a 390 px phone that space is 95 px deep and ~115 px across, and a
+// line that runs past it crosses a spoke into its neighbour. l2-02's copy
+// overflowed its chrome for exactly this reason and only the phone profiles
+// caught it, so the budget is computed here, in the pure layer, where a test can
+// hold every worst-case string to it (./hud-geometry.test.ts).
+
+/**
+ * The width available to a wedge's words at a given radius, CSS px: the chord of
+ * the wedge's arc there, less a margin so a line stops short of the spokes rather
+ * than touching them.
+ *
+ * A radial menu narrows as it approaches the hub, which is why the word stack
+ * hangs from the rim (where the arc is widest) rather than centring in the ring —
+ * the *last* line of a four-line stack is the one this budget bites on.
+ */
+export function wedgeChordWidth(
+  radiusAtLine: number,
+  segments: number,
+  margin = WEDGE_TEXT_MARGIN,
+): number {
+  if (segments <= 0 || radiusAtLine <= 0) return 0;
+  const half = Math.PI / segments;
+  return Math.max(0, 2 * radiusAtLine * Math.sin(half) - 2 * margin);
+}
+
+/** Clearance a wedge's words keep from the spoke on each side, CSS px. */
+export const WEDGE_TEXT_MARGIN = 4;
+
+/**
+ * One wedge as a touch target: the arc it spans at its own mid-radius, and how
+ * deep the ring is. GDD §2.4 makes the wheel a touch target first, and the
+ * platform floor is 48 px on the shorter of the two — a wedge that is 200 px of
+ * arc and 20 px deep is not a button, it is a hairline.
+ */
+export function wedgeHitTarget(
+  viewportWidth: number,
+  viewportHeight: number,
+  segments: number,
+  hubFraction: number,
+): { arc: number; depth: number; min: number } {
+  const outer = wheelRadius(viewportWidth, viewportHeight);
+  const inner = outer * hubFraction;
+  const mid = (outer + inner) / 2;
+  const arc = segments > 0 ? (2 * Math.PI * mid) / segments : 0;
+  const depth = outer - inner;
+  return { arc, depth, min: Math.min(arc, depth) };
+}
+
+/** The platform floor for a tappable affordance, CSS px (GDD §2.4, §4.3 mobile). */
+export const TOUCH_TARGET_MIN = 48;
+
 /**
  * The wheel's drawn footprint: a `2r` square centred on the screen. The follow
  * camera keeps the local ship — and so the station it is docked at — at the
