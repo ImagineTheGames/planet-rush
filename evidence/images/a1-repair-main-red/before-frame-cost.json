@@ -1,0 +1,23 @@
+{
+  "desktop": {
+    "match": 34.79999999701977,
+    "doors": 130.5,
+    "codex": 96.79999999701977,
+    "doorsRatio": 3.75,
+    "codexRatio": 2.78
+  },
+  "phone-landscape": {
+    "match": 85.79999999701977,
+    "doors": 506.3999999985099,
+    "codex": 304.69999999925494,
+    "doorsRatio": 5.9,
+    "codexRatio": 3.55
+  },
+  "phone-portrait": {
+    "match": 84.60000000149012,
+    "doors": 510.1000000014901,
+    "codex": 311.5999999977648,
+    "doorsRatio": 6.03,
+    "codexRatio": 3.68
+  }
+}
