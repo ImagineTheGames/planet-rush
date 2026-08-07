@@ -1,0 +1,143 @@
+{
+  "scenes": [
+    {
+      "i": 0,
+      "title": "Mining run",
+      "cap": "Mining runBeam on rock, cracks spreading, freed ore drifting into the hold. Hold squares fill one by one — the greed clock starts here."
+    },
+    {
+      "i": 1,
+      "title": "Asteroid wave drop",
+      "cap": "Asteroid wave dropA new wave spawns nearer the center and the whole lobby converges on the same rock. The metronome that forces contact."
+    },
+    {
+      "i": 2,
+      "title": "Sieging a defended planet — alone",
+      "cap": "Sieging a defended planet — aloneTwo turrets + shield vs one ship. Your hull is bleeding, their core is untouched. The GDD's promise: an occupied planet punishes a lone attacker."
+    },
+    {
+      "i": 3,
+      "title": "Two attackers crack the turtle",
+      "cap": "Two attackers crack the turtleUnspoken alliance: constant damage means shields never regen and the owner can't channel repair. Why being the leader is dangerous."
+    },
+    {
+      "i": 4,
+      "title": "Home defense — the ship is the wall",
+      "cap": "Home defense — the ship is the wallTurrets deter; you and the turrets together kill. The raider breaks off burning. Being home is what makes turrets matter."
+    },
+    {
+      "i": 5,
+      "title": "Repair channel",
+      "cap": "Repair channelParked at your own core, ore draining, HP crawling back. Any hit cancels it. Repair costs the two things you can't spare: ore and time."
+    },
+    {
+      "i": 6,
+      "title": "Dogfight in open space",
+      "cap": "Dogfight in open spaceClass identity decides it: the Excavator wins if it lands the beam, the Interceptor wins if it doesn't have to. Same beam that mines."
+    },
+    {
+      "i": 7,
+      "title": "Interception — the loaded hauler",
+      "cap": "Interception — the loaded haulerA full hold is a target. Kill it and half that ore spills into space. The reason \"one more rock\" is a real gamble."
+    },
+    {
+      "i": 8,
+      "title": "The alarm — the game's whole design in one frame",
+      "cap": "The alarm — the game's whole design in one frameDeep in the field, hold nearly full, and your core starts taking hits. Every system exists to make this second hurt."
+    },
+    {
+      "i": 9,
+      "title": "Death & spill",
+      "cap": "Death & spillShips are cheap: 5 seconds, upgrades intact. But half your hold is now loose in space for anyone. The cost is time and position, never progress."
+    },
+    {
+      "i": 10,
+      "title": "Wreck scavenging",
+      "cap": "Wreck scavengingThe dead player's ore stays on the map, and nobody can haul it away in one trip. Small cargo turns a corpse into a battlefield."
+    },
+    {
+      "i": 11,
+      "title": "Collapse phase",
+      "cap": "Collapse phaseWave 5 mined out. Shields dead, repair off, wrecks everywhere, two cripples circling. The rule that guarantees the match ends."
+    },
+    {
+      "i": 12,
+      "title": "Match start",
+      "cap": "Match startSpawn protection glowing, 3 ore in the bank, no defenses anywhere. The opening choice: turret, upgrade, or bank it?"
+    },
+    {
+      "i": 13,
+      "title": "Victory / defeat",
+      "cap": "Victory / defeatSame screen either way, with REMATCH as the loud button. Eliminated players see this instantly — nobody watches bots finish."
+    }
+  ],
+  "hullCards": [
+    {
+      "i": 0,
+      "title": "INTERCEPTOR — Quadfin (S8)"
+    },
+    {
+      "i": 1,
+      "title": "VANGUARD — Anvil (S9)"
+    },
+    {
+      "i": 2,
+      "title": "EXCAVATOR — Pincer (S7)"
+    },
+    {
+      "i": 3,
+      "title": "HAULER — Hammerhead (S3)"
+    }
+  ],
+  "uiPanels": [
+    {
+      "i": 0,
+      "head": "",
+      "w": 1130,
+      "h": 636,
+      "viewBox": "0 0 1280 720"
+    },
+    {
+      "i": 1,
+      "head": "Upgrade panel — the only place stats live",
+      "w": 1130,
+      "h": 353,
+      "viewBox": "0 0 1280 400"
+    }
+  ],
+  "uiDivs": [
+    {
+      "sel": ".lobby",
+      "name": "ui-div-lobby",
+      "found": true,
+      "box": {
+        "x": 54,
+        "y": 268.75,
+        "width": 1132,
+        "height": 463.5
+      }
+    },
+    {
+      "sel": ".menuwrap",
+      "name": "ui-div-menu",
+      "found": true,
+      "box": {
+        "x": 54,
+        "y": 325.25,
+        "width": 1132,
+        "height": 674.75
+      }
+    },
+    {
+      "sel": ".flow",
+      "name": "ui-div-flow",
+      "found": true,
+      "box": {
+        "x": 54,
+        "y": 661,
+        "width": 1132,
+        "height": 48
+      }
+    }
+  ]
+}

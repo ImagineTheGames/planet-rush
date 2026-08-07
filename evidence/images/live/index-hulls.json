@@ -1,0 +1,192 @@
+{
+  "base": "http://localhost:4188",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "deviceScaleFactor": 2,
+  "frames": [
+    {
+      "name": "ui-lobby-full",
+      "what": "the lobby, clean boot, hull tiles + arena cards + RUSH!"
+    },
+    {
+      "name": "hull-0-interceptor",
+      "what": "hull index 0 as the running game draws it",
+      "picked": {
+        "selectedClass": "interceptor",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "spawnFade": {
+        "ok": true,
+        "waitedMs": 56042,
+        "steel": 1048,
+        "faded": 3
+      },
+      "errors": []
+    },
+    {
+      "name": "ui-match-hud-full",
+      "what": "the live match HUD, clean boot, Vanguard"
+    },
+    {
+      "name": "hull-1-vanguard",
+      "what": "hull index 1 as the running game draws it",
+      "picked": {
+        "selectedClass": "vanguard",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "spawnFade": {
+        "ok": true,
+        "waitedMs": 31922,
+        "steel": 577,
+        "faded": 9
+      },
+      "errors": []
+    },
+    {
+      "name": "hull-2-excavator",
+      "what": "hull index 2 as the running game draws it",
+      "picked": {
+        "selectedClass": "excavator",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "spawnFade": {
+        "ok": true,
+        "waitedMs": 48888,
+        "steel": 1312,
+        "faded": 7
+      },
+      "errors": []
+    },
+    {
+      "name": "hull-3-hauler",
+      "what": "hull index 3 as the running game draws it",
+      "picked": {
+        "selectedClass": "hauler",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      },
+      "live": {
+        "shipPos": {
+          "x": 1968,
+          "y": 1200
+        },
+        "logical": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "spawnFade": {
+        "ok": true,
+        "waitedMs": 43733,
+        "steel": 1154,
+        "faded": 26
+      },
+      "errors": []
+    }
+  ],
+  "hulls": [
+    {
+      "i": 0,
+      "name": "hull-0-interceptor",
+      "picked": {
+        "selectedClass": "interceptor",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 1,
+      "name": "hull-1-vanguard",
+      "picked": {
+        "selectedClass": "vanguard",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 2,
+      "name": "hull-2-excavator",
+      "picked": {
+        "selectedClass": "excavator",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    },
+    {
+      "i": 3,
+      "name": "hull-3-hauler",
+      "picked": {
+        "selectedClass": "hauler",
+        "classOrder": [
+          "interceptor",
+          "vanguard",
+          "excavator",
+          "hauler"
+        ]
+      }
+    }
+  ]
+}
