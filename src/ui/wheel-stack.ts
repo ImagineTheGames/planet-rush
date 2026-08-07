@@ -1,5 +1,5 @@
 /**
- * src/ui/wheel-stack.ts — what a build-wheel wedge SAYS, and where. OWNER: UI.
+ * src/ui/wheel-stack.ts — what a wedge SAYS, and where. OWNER: UI.
  *
  * The Gantry/Bone build wheel (u7-02, `docs/design/gantry-bone-handoff.html`
  * screen 5a) draws a wedge as a stack of lines hanging from just inside the rim:
@@ -9,7 +9,16 @@
  *     3/4               ← cost over spendable ore
  *     2 / 4 BUILT       ← the count over its cap
  *
- * The *drawing* of that is `./build-wheel-view`, which needs PixiJS. The
+ * Since u7-06 the **upgrade** wheel's wedges are built here too, in the same
+ * four slots, because they are the same control and the brief for that screen is
+ * explicit that it must not re-solve what this one already answered:
+ *
+ *     ENGINE            ← the name, Audiowide
+ *     111% → 123%       ← the stat this tier moves (GDD §2.5)
+ *     12/8              ← cost over spendable ore
+ *     ●●○               ← where this track sits on its ladder
+ *
+ * The *drawing* of both is `./build-wheel-view`, which needs PixiJS. The
  * *decisions* — which line carries what, and which copy a given wheel radius can
  * afford — are here, pure and PixiJS-free, for one reason: the wedge is a fixed
  * radial space and its copy is not, so "does the longest value still fit at the
@@ -33,6 +42,8 @@
 import type { WheelProfile } from '../art/materials';
 import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 import type { SegmentState, WheelSegment } from './build-wheel';
+import { tierPips } from './upgrade-wheel';
+import type { UpgradeSummaryPip, UpgradeWedge } from './upgrade-wheel';
 
 // ---------------------------------------------------------------------------
 // The lines
@@ -124,6 +135,137 @@ export function buildWedgeLines(seg: WheelSegment, m: WheelProfile): readonly We
   }
 
   return lines;
+}
+
+// ---------------------------------------------------------------------------
+// The upgrade wheel's wedges (u7-06) — the same four slots, filled differently
+// ---------------------------------------------------------------------------
+//
+// The upgrade wheel is the same radial control and the same wedge geometry, so
+// it takes the same stack rather than a parallel one. What differs is only what
+// each slot carries, and that is the whole of the difference:
+//
+//   slot     build wheel            upgrade wheel
+//   ------   --------------------   -------------------------------------------
+//   name     TURRET                 ENGINE                (Audiowide, wraps)
+//   sub      YOUR STATION           111% → 123%           (the stat — GDD §2.5)
+//   cost     3/4  ·  FULL  ·  OPEN ▸   12/8  ·  MAX  ·  OPEN ▸
+//   detail   2 / 4 BUILT            ●●○                   (position on a ladder)
+//
+// One consequence worth stating out loud, because it is the sharpest constraint
+// on this screen: the upgrade wheel has FOUR wedges where the build wheel has
+// five, so a wedge is a 90° slice rather than a 72° one and its words sit on a
+// wider arc. That is why the stat line — the densest text on any wheel in the
+// game — fits the phone profile at full copy where the build wheel's target line
+// had to go compact. It is a fact about today's ladder, not a law: the ladder is
+// data (p2-03 adds projectile tracks), so `hud-geometry.test.ts` holds this
+// stack to the fit budget at a GROWN ladder too, where the compact form is what
+// keeps it inside the arc.
+
+/**
+ * The words an upgrade wedge shows, in order, for a given wheel profile — the
+ * upgrade wheel's {@link buildWedgeLines}.
+ *
+ * The WEAPON wedge is the one that fills the slots differently: its stat line is
+ * a pip row per weapon track ({@link pipRows} — the at-a-glance summary ratified
+ * in v0.2.2), it quotes {@link OPENS_SCREEN} where the others quote a price
+ * because it opens a screen rather than spending, and it has no ladder of its own
+ * to pip.
+ */
+export function upgradeWedgeLines(wedge: UpgradeWedge, m: WheelProfile): readonly WedgeLine[] {
+  const lines: WedgeLine[] = [
+    {
+      slot: 'name',
+      text: wrapWedgeName(wedge.label),
+      face: 'display',
+      size: m.name,
+      tracking: DISPLAY_TRACKING.heading,
+      lead: WEDGE_LEAD.name,
+      gap: m.gapName,
+    },
+  ];
+
+  // Line 2 — the stat this tier moves, or the WEAPON wedge's pip rows.
+  const sub = wedge.kind === 'weapon' ? pipRows(wedge.summary ?? []) : statWords(wedge, m);
+  if (sub.length > 0) {
+    lines.push({
+      slot: 'sub',
+      text: sub,
+      face: 'numeral',
+      size: m.sub,
+      tracking: TRACKING.label,
+      lead: WEDGE_LEAD.body,
+      gap: m.gapSub,
+    });
+  }
+
+  // Line 3 — `cost/held`, `MAX`, or the words that say this one opens a screen.
+  const cost = upgradeCostWords(wedge);
+  if (cost !== null) {
+    lines.push({
+      slot: 'cost',
+      text: cost,
+      face: 'numeral',
+      size: m.cost,
+      tracking: TRACKING.name,
+      lead: WEDGE_LEAD.body,
+      gap: m.gapCost,
+    });
+  }
+
+  // Line 4 — where this track sits on its ladder, in pips (u7-06).
+  if (wedge.tierLabel.length > 0) {
+    lines.push({
+      slot: 'detail',
+      text: wedge.tierLabel,
+      face: 'numeral',
+      size: m.detail,
+      tracking: TRACKING.label,
+      lead: WEDGE_LEAD.body,
+      gap: 0,
+    });
+  }
+
+  return lines;
+}
+
+/** The stat line for this profile — the padded form where there is room for it,
+ *  the compact one where there is not. The same `capWords` split, on the line
+ *  that actually carries the ship stats. */
+export function statWords(wedge: UpgradeWedge, m: WheelProfile): string {
+  return m.copy === 'compact' ? wedge.statLabelCompact : wedge.statLabel;
+}
+
+/** What the upgrade wedge's cost slot draws: `cost/held`, `MAX`, or the words
+ *  that say this wedge opens a screen (the WEAPON wedge — the same `OPEN ▸` the
+ *  Build wheel's UPGRADE SHIP carries, in the same slot, so the one affordance
+ *  that means "there is another screen behind this" looks identical on both). */
+export function upgradeCostWords(wedge: UpgradeWedge): string | null {
+  if (wedge.kind === 'weapon') return OPENS_SCREEN;
+  return wedge.costLabel;
+}
+
+/** A weapon track's tiers as one pip row — `DAMAGE ●●○`. The glyphs themselves
+ *  come from {@link tierPips}, the same function every track wedge's own ladder
+ *  row uses, so the two places pips are drawn cannot draw them differently. */
+export function pipRow(pip: UpgradeSummaryPip): string {
+  return `${pip.label} ${tierPips(pip.tier, pip.maxTier)}`;
+}
+
+/** The WEAPON wedge's stat line: one {@link pipRow} per weapon track. */
+export function pipRows(pips: readonly UpgradeSummaryPip[]): string {
+  return pips.map(pipRow).join('\n');
+}
+
+/** The upgrade wheel's cost paint. `ready` is ore; a tier the player cannot pay
+ *  for is refused-red, the same carve-out as the Build wheel's; a maxed row is
+ *  steel — deliberately not red, because "you are poor" is the one thing that is
+ *  *not* wrong with pressing a finished track. The WEAPON wedge quotes no price
+ *  at all, so its `OPEN ▸` is chalk, exactly like UPGRADE SHIP's. */
+export function upgradeCostPaint(wedge: UpgradeWedge): CostPaint {
+  if (wedge.kind === 'weapon') return 'none';
+  if (wedge.state === 'ready') return 'ore';
+  return wedge.state === 'unaffordable' ? 'refused' : 'spent';
 }
 
 /** What a segment spends on, in words — the design's `YOUR PLANET` / `YOUR SHIP`

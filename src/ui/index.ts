@@ -112,7 +112,7 @@ export {
 } from './build-button';
 export type { BuildButtonSignals } from './build-button';
 
-// --- Upgrade WHEEL — the only place ship stats appear (GDD §2.2, §2.5) ------
+// --- Upgrade WHEEL — where ship stats appear in a match (GDD §2.2, §2.5) ----
 //
 // Rebuilt from a table-panel into a radial wheel (field report v0.2 — "it should
 // be a wheel menu as well"), drawn by the same view as the Build wheel. One wedge
