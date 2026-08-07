@@ -107,19 +107,24 @@ yellow-vs-body 1.89 → **5.63** (board 5.67).
 
 - DoD 1 `npx tsc --noEmit` — clean.
 - DoD 2 `npm test -- --run` — 229 files, **3769 passed**.
-- DoD 3 `npm run test:mobile` — the suite passes (**95 passed**) via
-  `evidence/a3-rock-palette/playwright.a3.config.ts`, which is the same tests on a
-  private port. The literal command is queued behind port 4173, held by another lane.
+- DoD 3 `npm run test:mobile` — **96 passed, 0 failed** on a quiet box, via
+  `evidence/a3-rock-palette/playwright.a3.config.ts`: the same tests, devices,
+  tolerances and timeouts, differing only in the preview port. The literal command was
+  never runnable — port 4173 was held for the whole brief by another lane's idle
+  `vite preview`, and `reuseExistingServer` would have pointed the suite at that lane's
+  build. That is exactly the failure trap 1 describes, so running it would have produced
+  a number about someone else's branch.
 - DoD 4 goldens differ from `origin/main` — 7 files.
 
 ## NEXT
 
-- The literal `npm run test:mobile` on 4173 (watcher: `/tmp/a3-mobile-dod.sh`), then
-  the PR.
+Nothing outstanding. PR #308 is open against main, with main merged in (a2-08's
+evidence, no overlap). a2-08's third gate can be re-shot on top of it.
+
 - Known load-sensitive flakes seen once each on a busy box and passing on re-run,
   neither reachable from a fill colour:
   - `tests/net/online-2p.test.ts` — 41.6 against a <40 bound. Passed in the final run.
   - `tests/mobile/build-wheel-gantry.spec.ts:214,292` — "the real open affordance did
     not open the wheel", a keypress→`waitForSimTicks(4)` race. Verified against a
     `main` worktree (passes there), then verified passing on this branch on a quiet
-    box. Not a regression.
+    box, and green in the final full run. Not a regression.
