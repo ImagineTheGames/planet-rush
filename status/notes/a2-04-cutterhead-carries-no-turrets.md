@@ -21,8 +21,17 @@ need the turrets on it, those will be built externally as it already is...."*
   attributed amendment note at the head of the board, in the source comment, and
   in the footer.
 
-- **`<pending>` — `STATION_HULL_EXCLUSIONS` + the two-way guard.**
-  `src/art/stations.ts` and `src/art/compliance.test.ts`.
+- **`d5a01ac` — `STATION_HULL_EXCLUSIONS` + the two-way guard.**
+  `src/art/stations.ts` (the constant, and `stationHullParts()` — a named parts
+  manifest that `stationSprite()` is composed from and nothing appended) and
+  `src/art/compliance.test.ts` (both directions; 27 tests green).
+
+- **`7ada2da` — the evidence.** `evidence/a2-04-no-hull-turrets/`:
+  `capture-board.mjs` (the board's own DOM sections at `origin/main` vs HEAD)
+  and `frames.html` + `capture-frames.mjs` (the shipped `Renderer` against the
+  shipped sim, four panels: 0 built / 4 built / 2 shot down / ring shot empty,
+  each caption read back off `data-turrets`). Plus `frames-before/`, the same
+  four with `stations.ts` reverted — **zero differing pixels on every panel**.
 
 ---
 
@@ -103,12 +112,38 @@ draws.
 | `TURRET.capPerStation` silently raised 4 → 6 | fail | ✅ direction 2 |
 | art hull grows an honestly-named `lug` inside extent | pass | ✅ (no false positive on structure) |
 
+The last row is the one that killed the first design. See the rejected classifier
+above.
+
+### Goldens: none moved, and that is the finding
+
+Every re-baseline rule was applied and the honest answer is that **nothing
+renders differently**. Proven three ways rather than asserted:
+
+1. `stationSprite()`'s output is byte-identical to `origin/main` on all four
+   variants (15 / 21 / 12 / 27 shapes) — the manifest is a re-composition.
+2. `frames-before/` vs `frames/`: the four live-render panels, captured with
+   `stations.ts` at `origin/main` and at HEAD. **0 differing pixels, max channel
+   delta 0**, on all four.
+3. The mobile golden suite, run in the container.
+
+The brief warns "if no snapshot moves, either the change did not land or your DoD
+is lying to you." Here the third possibility is the true one, and the brief
+allowed for it: **the removal was a no-op in code** (the art never drew turrets)
+and the whole defect lived in the board plus the absence of a guard.
+
 ---
 
 ## NEXT
 
-- [ ] Commit the generator + guard.
-- [ ] Goldens: re-baseline in the container, eyes on every image.
-- [ ] Evidence: station before/after at one zoom; station with 4 turrets standing;
-      station with the ring shot empty.
-- [ ] PR body: the no-op evidence for part 2, and the a2-03 merge-conflict flag.
+- [ ] Confirm the mobile golden suite is green (running).
+- [ ] Push and open the PR.
+
+### Known, and NOT mine
+
+`tests/net/capacity/capacity-regression.test.ts > the loop stays inside the tick
+budget at 12 rooms` fails (62.86 ms vs a 33 ms budget). **Pre-existing**: it fails
+identically with the working tree reset to `origin/main` content, it is a
+load-sensitive netcode/server timing test, and it touches nothing this branch
+changes. a2-03's working notes call the same test a flake (`092210e`, "the
+capacity flake proves itself a flake"). Everything else is green — 3836 passed.
