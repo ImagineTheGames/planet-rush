@@ -254,6 +254,137 @@ test('golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B', asyn
 });
 
 // ---------------------------------------------------------------------------
+// The Gantry/Bone BUILD WHEEL (u7-02 — ratified 2026-08-05)
+// ---------------------------------------------------------------------------
+//
+// The frozen scenes above are a ship two seconds into a match, so the Build
+// wheel is closed in every one of them and the screen this deliverable rebuilt
+// is invisible to the whole golden suite. These open it.
+//
+// The wheel is staged through `__pressStage.openBuild(ore)` — the ?debug=1 seam
+// that parks the local ship docked at its own station, banks it a stated amount
+// and opens the wheel. Nothing else is touched, so the frame stays as
+// deterministic as the scenes above: the seeded world is still pinned at
+// FREEZE_TICK, and `stampDefenseShowcase` has already stood the local station's
+// four turrets (three built, one on the scaffold) and two shields, which is what
+// makes this frame carry the cap counts at all.
+//
+// What each baseline is FOR, so a reviewer knows what a diff means:
+//   · the four-line wedge stack — name / target / `cost/held` / count over cap;
+//   · `FULL` and `4 / 4 BUILT` on a capped wedge (turret, shield);
+//   · the cost numeral in BOTH of its ratified colours — signal yellow at ore 8
+//     where RADAR's 6 is payable, threat red at ore 4 where it is not;
+//   · `OPEN ▸` where UPGRADE SHIP would otherwise carry a price;
+//   · and the whole look at a phone's radius, where the copy goes compact.
+
+/** The design's own frame: four ore in the bank, so the wheel has one thing it
+ *  can afford and several it cannot. */
+const WHEEL_ORE_SHORT = 4;
+/** Eight ore: RADAR's 6 is payable, so the cost numeral draws in signal yellow. */
+const WHEEL_ORE_FLUSH = 8;
+
+interface PressStage {
+  openBuild(ore: number): { open: boolean; banked: number } | null;
+  wedges(): Array<{ id: string; costLabel: string; caps: string; costPaint: string }>;
+}
+
+/** Boot the frozen scene and open the Build wheel at the local station with
+ *  `ore` banked. Fails naming what is missing, rather than baselining a scene
+ *  that quietly stopped carrying the thing it is a baseline OF. */
+async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
+  await bootFrozen(page);
+  const staged = await page.evaluate((o) => {
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return s ? s.openBuild(o) : null;
+  }, ore);
+  expect(staged, 'the ?debug=1 press stage is installed').not.toBeNull();
+  expect(staged!.open, 'the Build wheel is up at the local station').toBe(true);
+  // The wedges are drawn from the render loop, not from the call above — so wait
+  // on the frames that draw them, not on a stopwatch. This helper was written on
+  // the pre-q8-01 `waitForTimeout(500)` pattern and merged in after that pattern
+  // was retired everywhere else in this file: opening the wheel is exactly the
+  // kind of state change ./render-settle.ts exists for, and a software-GL runner
+  // that fits no frames into 500 ms would shoot the wheel before it had wedges.
+  await settleFrames(page);
+  const wedges = await page.evaluate(() => {
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return s ? s.wedges() : [];
+  });
+  const turret = wedges.find((w) => w.id === 'turret');
+  const radar = wedges.find((w) => w.id === 'satellite');
+  expect(turret?.caps, 'the capped TURRET wedge is counting (u7-02)').toMatch(/^4\s*\/\s*4 BUILT$/);
+  expect(turret?.costLabel, 'a capped wedge quotes no price').toBe('FULL');
+  expect(radar?.costLabel, 'the RADAR wedge shows cost over spendable ore').toBe(`6/${ore}`);
+  expect(radar?.costPaint, 'the cost numeral takes the colour its state ratifies').toBe(
+    ore >= 6 ? 'ore' : 'refused',
+  );
+}
+
+test('golden: desktop BUILD WHEEL — a payable cost, in signal yellow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → open the Build wheel with 8 ore → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  await bootFrozenBuildWheel(page, WHEEL_ORE_FLUSH);
+  await expect(page).toHaveScreenshot('desktop-build-wheel.png', GOLDEN);
+});
+
+test('golden: desktop BUILD WHEEL — a cost that cannot be paid, in threat red', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → open the Build wheel with 4 ore → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  // The second half of the style-guide §2.1 carve-out. Two baselines rather than
+  // one because the colours are the whole amendment: a single frame could only
+  // ever show one of them, and "the red one still looks right" is exactly the
+  // thing a reviewer has to be able to check with their eyes.
+  await bootFrozenBuildWheel(page, WHEEL_ORE_SHORT);
+  await expect(page).toHaveScreenshot('desktop-build-wheel-short.png', GOLDEN);
+});
+
+test('golden: landscape phone BUILD WHEEL — the compact copy, at 390 px', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → open the Build wheel with 4 ore → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  // The hard one. A 390 px phone gives the wheel a 140 px radius, so a wedge's
+  // four lines sit on a 72° arc barely 115 px across — which is why the metrics
+  // are stated twice (src/art/materials.ts WHEEL_PROFILES) and why the count line
+  // goes compact here. This baseline is what proves the derived numbers landed.
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootFrozenBuildWheel(page, WHEEL_ORE_SHORT);
+  await expect(page).toHaveScreenshot('phone-landscape-build-wheel.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone BUILD WHEEL — the wheel survives the lock', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD (landscape lock rotation) → open the Build wheel with 4 ore → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  // Held in portrait, the whole game root is rotated 90° by the landscape lock
+  // (src/platform/orientation.ts) and the wheel is drawn as a child of it. A
+  // radial control verified on a desktop proves nothing about a held phone, and
+  // this project has been bitten by exactly that (PR #93).
+  await bootFrozenBuildWheel(page, WHEEL_ORE_SHORT);
+  await expect(page).toHaveScreenshot('phone-portrait-build-wheel.png', GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
 // The FRONT DOOR, in Gantry/Bone (u7-01 — ratified 2026-08-05)
 // ---------------------------------------------------------------------------
 //
@@ -622,6 +753,239 @@ test('golden: landscape phone CODEX — a tab row, a rail and an article at 844p
   await bootMenu(page);
   await openCodex(page);
   await expect(page).toHaveScreenshot('phone-landscape-codex.png', MENU_GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// THE PAUSE MENU and THE END-OF-MATCH SUMMARY, in Gantry/Bone (u7-05)
+// ---------------------------------------------------------------------------
+//
+// The other two screens the Gantry chain forgot, and — like the doors and the
+// CODEX before them — **they appeared in no golden**, for a reason worth stating
+// once: every baseline above shoots either a MENU (`/`, which never reaches a
+// match) or a FROZEN MATCH (`?debug=1`, which never reaches an overlay). Both of
+// these screens live in the gap: mid-play, over a match. A total re-skin of
+// either left every baseline in this file byte-identical.
+//
+// End-of-match in particular deserved one and had none: it is the screen a player
+// stares at longest, it is the one screen carrying the tone contract's
+// station-death beat (GDD §4.7), and until now nothing could tell whether it had
+// quietly become a celebration.
+//
+// Six baselines, each chosen for what it alone can fail:
+//   desktop-pause               the three-plate stack, one of them bright
+//   phone-landscape-pause       the same stack in a 50px-beam frame at 844×390
+//   phone-portrait-pause        …through the landscape lock's 90° rotation
+//   desktop-pause-confirm       a DIFFERENT shape: two plates, and the bright one
+//                               is the SECOND — the "STAY is the default" rule,
+//                               which is now a brightness rule and nothing else
+//   desktop-end-result          the result: the identity rule, and REMATCH bright
+//   phone-portrait-end-eliminated  threat red, the cause line, SPECTATE, held
+//
+// Determinism. The four pause shots and the ELIMINATED one ride `?freeze=1`: the
+// overlay is a pure function of the viewport and the world under it is pinned.
+// The RESULT screen cannot be frozen — `world.match.phase` only reaches 'ended'
+// on a sim TICK — so it is shot over a live match, which is deterministic for a
+// different reason: since u7-05 that overlay's backdrop is opaque and covers the
+// whole viewport, so the running match under it contributes no pixels. The build
+// badge stays unmasked here exactly as it is above.
+
+/**
+ * The two mid-play seams these screens are reached through, named locally rather
+ * than on `Window`: the live-stage specs already declare their own (richer)
+ * shapes for both, and two `declare global` blocks for one property do not merge
+ * — they collide. Every other reader in this file casts at the call site for the
+ * same reason.
+ */
+interface PauseSeam {
+  read(): {
+    open: boolean;
+    controls: { kind: string; physicalCenter: { x: number; y: number } }[];
+    buttonPoint: { x: number; y: number };
+  };
+}
+interface EndSeam {
+  eliminateLocal(): boolean;
+  endMatch(): boolean;
+  screen(): 'none' | 'defeated' | 'result';
+}
+type StagedWindow = { __pauseStage?: PauseSeam; __endScreenStage?: EndSeam };
+
+/** Boot the FROZEN debug scene and wait for the mid-play seams to be installed. */
+async function bootStaged(page: Page, url = '/?debug=1&freeze=1'): Promise<void> {
+  await bootFrozen(page, url);
+  await waitForStages(page);
+}
+
+/**
+ * Boot the debug build with the sim RUNNING — the one screen that needs it. The
+ * result screen is reached when `world.match.phase` becomes 'ended', which only
+ * happens on a sim tick, so `?freeze=1` (whose whole job is that there are no
+ * ticks) cannot reach it. `bootFrozen`'s wait is on the freeze hook, so this is
+ * the same boot with that one wait replaced by the seams themselves.
+ */
+async function bootLive(page: Page): Promise<void> {
+  await page.goto('/?debug=1');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await waitForStages(page);
+  await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
+  await settleFrames(page);
+}
+
+async function waitForStages(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as StagedWindow;
+      return typeof w.__pauseStage?.read === 'function' && typeof w.__endScreenStage?.screen === 'function';
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
+/**
+ * Open the pause overlay the way THIS device does — ESC on a keyboard, a thumb on
+ * the corner affordance on a phone (the corner button is touch-only by contract,
+ * `pauseButtonVisible`). A baseline of a screen reached by a real press proves it
+ * is reachable as well as drawn.
+ */
+async function openPause(page: Page, touch: boolean): Promise<void> {
+  if (touch) {
+    const point = await page.evaluate(
+      () => (window as unknown as StagedWindow).__pauseStage!.read().buttonPoint,
+    );
+    await page.touchscreen.tap(Math.round(point.x), Math.round(point.y));
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForFunction(
+    () => (window as unknown as StagedWindow).__pauseStage!.read().open === true,
+    undefined,
+    { timeout: 10_000 },
+  );
+  // Park the pointer off every plate: a hovered plate is a brighter plate, and
+  // the baseline is the screen at REST.
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Press a pause control at the physical point the client says it drew it at. */
+async function pressPause(page: Page, kind: string): Promise<void> {
+  const point = await page.evaluate((k) => {
+    const c = (window as unknown as StagedWindow).__pauseStage!.read().controls.find((x) => x.kind === k);
+    return c ? c.physicalCenter : null;
+  }, kind);
+  expect(point, `the pause overlay reports where ${kind} is drawn`).not.toBeNull();
+  await page.mouse.click(Math.round(point!.x), Math.round(point!.y));
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Stage an end screen through the sim's OWN elimination path and wait for the
+ *  wiring to put it up. Never fakes the UI — only the deaths that drive it. */
+async function stageEnd(page: Page, want: 'defeated' | 'result'): Promise<void> {
+  const staged = await page.evaluate((w) => {
+    const stage = (window as unknown as StagedWindow).__endScreenStage!;
+    return w === 'defeated' ? stage.eliminateLocal() : stage.endMatch();
+  }, want);
+  expect(staged, `the end-screen stage set up the ${want} case`).toBe(true);
+  await page.waitForFunction(
+    (w) => (window as unknown as StagedWindow).__endScreenStage!.screen() === w,
+    want,
+    { timeout: 15_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+test('golden: desktop PAUSE MENU — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → ESC → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  await bootStaged(page);
+  await openPause(page, false);
+  await expect(page).toHaveScreenshot('desktop-pause.png', GOLDEN);
+});
+
+test('golden: desktop PAUSE CONFIRM — the bright plate is the SAFE one', async ({ page }, testInfo) => {
+  // The one screen in the game where the emphasised button is not the first one,
+  // and the rule it exists for (developer §1) is now carried by brightness alone.
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → ESC → press EXIT TO MENU → font settle → one full-frame golden comparison',
+    measuredSeconds: 7,
+  });
+
+  await bootStaged(page);
+  await openPause(page, false);
+  await pressPause(page, 'exit');
+  await expect(page).toHaveScreenshot('desktop-pause-confirm.png', GOLDEN);
+});
+
+test('golden: landscape phone PAUSE MENU — a 50px beam frame at 844×390', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → tap the corner affordance → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootStaged(page);
+  await openPause(page, true);
+  await expect(page).toHaveScreenshot('phone-landscape-pause.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone PAUSE MENU — the overlay through the lock', async ({
+  page,
+}, testInfo) => {
+  // How a phone is actually held mid-match, and the transform the desktop never
+  // touches. Also the shot that shows the corner affordance's own placement, since
+  // the tap that opened this overlay had to land on it.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD (landscape lock rotation) → tap the corner affordance → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  await bootStaged(page);
+  await openPause(page, true);
+  await expect(page).toHaveScreenshot('phone-portrait-pause.png', GOLDEN);
+});
+
+test('golden: desktop END OF MATCH — the result, and the identity rule', async ({ page }, testInfo) => {
+  // Shot over a LIVE match on purpose: `world.match.phase` only reaches 'ended' on
+  // a sim tick, so there is no frozen flavour of this screen to ask for. It is
+  // deterministic because the overlay is opaque over the whole viewport.
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the debug match → stage a resolved match → font settle → one full-frame golden comparison',
+    measuredSeconds: 7,
+  });
+
+  await bootLive(page);
+  await stageEnd(page, 'result');
+  await expect(page).toHaveScreenshot('desktop-end-of-match.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone ELIMINATED — the one red word, held', async ({
+  page,
+}, testInfo) => {
+  // The other face of the screen: threat red on the result (your reactor was
+  // destroyed — damage, the one thing style-guide §2 reserves red for), the
+  // placement-and-cause line, and SPECTATE instead of BACK TO MENU. Frozen: an
+  // elimination needs no tick to resolve, so this one is pinned.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD → stage a local elimination → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  await bootStaged(page);
+  await stageEnd(page, 'defeated');
+  await expect(page).toHaveScreenshot('phone-portrait-eliminated.png', GOLDEN);
 });
 
 test('golden: PORTRAIT-HELD phone CODEX — the dense screen through the lock', async ({

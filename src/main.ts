@@ -1176,19 +1176,39 @@ async function boot(): Promise<void> {
   // fires on touch; press is released on pointer-up or on a cancelled gesture.
   let pauseSettingsHover: SettingsTarget | null = null;
   let pauseSettingsPress: SettingsTarget | null = null;
+  // …and the same three states for the two full-screen overlays' own plates
+  // (u7-05). Both are made of the material now, and a plate that never lifts under
+  // the cursor or sinks under a finger is only two-thirds of the direction.
+  let pauseHover: PauseButton | null = null;
+  let pausePress: PauseButton | null = null;
+  let endHover: EndButton | null = null;
+  let endPress: EndButton | null = null;
   const releasePauseSettingsPress = (): void => {
     pauseSettingsPress = null;
+    pausePress = null;
+    endPress = null;
   };
   app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
   app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
   app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
-    if (pauseScreen !== 'settings') return;
     const lp = toLogical(e.clientX, e.clientY);
-    pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+    if (pauseScreen === 'settings') {
+      pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+      return;
+    }
+    if (isPauseOpen(pauseScreen)) {
+      pauseHover = pauseView.hitTest(lp.x, lp.y)?.kind ?? null;
+      return;
+    }
+    if (endOverlay.visible) endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
   });
   app.canvas.addEventListener('pointerleave', () => {
     pauseSettingsHover = null;
     pauseSettingsPress = null;
+    pauseHover = null;
+    pausePress = null;
+    endHover = null;
+    endPress = null;
   });
 
   const merged = createControlState();
@@ -1408,6 +1428,8 @@ async function boot(): Promise<void> {
     // and it always consumes the event.
     if (endOverlay.visible) {
       const target = endOverlay.hitTest(lp.x, lp.y);
+      endPress = target?.kind ?? null;
+      endHover = endPress;
       if (target) {
         haptics.haptic('tap');
         // ONE sound per state change (s6-01 rule 1): `handleEndTarget` names the
@@ -1988,10 +2010,14 @@ async function boot(): Promise<void> {
     if (desired === 'none') {
       if (endOverlay.visible) endOverlay.visible = false;
       if (endButtonsShown.length) endButtonsShown = [];
+      // A screen that is gone is not being hovered: a stale hover would light a
+      // plate up the moment the overlay came back, under a cursor that never moved.
+      endHover = null;
+      endPress = null;
       return;
     }
     if (!endOverlay.visible) endOverlay.visible = true;
-    const model = endOfMatchModel(currentOutcome(over));
+    const model = endOfMatchModel(currentOutcome(over), { hover: endHover, press: endPress });
     endButtonsShown = model.buttons.map((b) => b.id);
     endOverlay.update(model);
   }
@@ -2132,6 +2158,9 @@ async function boot(): Promise<void> {
       return;
     }
     const target = pauseView.hitTest(lx, ly);
+    // The plate goes down before it acts (u7-01), and is released on pointer-up.
+    pausePress = target?.kind ?? null;
+    pauseHover = pausePress;
     if (target) handlePauseButton(target.kind);
   }
 
@@ -2238,9 +2267,21 @@ async function boot(): Promise<void> {
    *  rendered frame. Offline the loop has already frozen the sim; render keeps
    *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
   function syncPause(): void {
+    // A closed overlay is not being hovered, and a plate that is no longer on the
+    // screen is not being held down (u7-05) — otherwise the next ESC would open
+    // the menu with RESUME already lit under a cursor that never moved.
+    if (!isPauseOpen(pauseScreen)) {
+      pauseHover = null;
+      pausePress = null;
+    }
     // The pause overlay: the menu or the confirm. While the settings screen is up
     // the overlay hides (the real settings view takes its place), so feed 'closed'.
-    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    pauseView.update(
+      pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen, {
+        hover: pauseHover,
+        press: pausePress,
+      }),
+    );
     const settingsUp = pauseScreen === 'settings';
     pauseSettings.visible = settingsUp;
     if (settingsUp) {
@@ -3477,6 +3518,20 @@ async function boot(): Promise<void> {
         }
         return true;
       },
+      /** The same staging with the LOCAL seat as the survivor, so the VICTORY
+       *  face of the result screen can be photographed and gated (u7-05). It is
+       *  the only one of the four the other methods cannot reach — `endMatch`
+       *  always leaves someone else standing — and it is the one the winner's
+       *  identity rule only appears on. Drives the sim's own `destroyCore`, like
+       *  its sibling; the win itself is still resolved by the sim's next tick. */
+      winLocal(): boolean {
+        const mine = world.stations.find((p) => p.owner === LOCAL_PLAYER && p.alive);
+        if (!mine) return false;
+        for (const p of world.stations) {
+          if (p.owner !== LOCAL_PLAYER && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
       },
@@ -3719,6 +3774,50 @@ async function boot(): Promise<void> {
       bank(): number | null {
         const ship = world.ships.find(isLocalShip);
         return ship ? ship.banked : null;
+      },
+      /**
+       * The Build-wheel wedges the real view DREW last frame — the whole
+       * four-line stack (u7-02): the name, what it spends on, the `cost/held`
+       * string, the count over its cap, and how the cost numeral was painted.
+       *
+       * Read-back only, the sibling of `__upgradeWheelStage.wedges()`: a
+       * real-input spec still drives the wheel with genuine taps and clicks and
+       * uses this to read what the shipped bundle rendered. The UI's own model is
+       * unit-green (src/ui/build-wheel.test.ts); what a unit test cannot reach is
+       * that the booted client draws those strings.
+       */
+      wedges(): ReturnType<typeof hud.debugBuildWedges> {
+        return hud.debugBuildWedges();
+      },
+      /**
+       * A LOGICAL screen point in CLIENT (physical CSS) space, so a real-input
+       * spec can tap a drawn affordance on EITHER form factor. On a portrait
+       * phone under the landscape lock the logical point is rotated back through
+       * `logicalToPhysical` (identity on desktop) and offset by the canvas rect —
+       * the exact inverse of the `toLogical` every real pointer crosses.
+       *
+       * The same mapping `__repairStage.repairWedgeClientPoint()` does for its one
+       * wedge, generalised: without it a portrait-held test can only ever drive
+       * the one affordance somebody already wrote a bespoke point for.
+       */
+      clientPoint(x: number, y: number): { x: number; y: number } {
+        const p = logicalToPhysical(x, y, transform);
+        const rect = app.canvas.getBoundingClientRect();
+        return { x: p.x + rect.left, y: p.y + rect.top };
+      },
+      /** The logical viewport the wheel and the touch affordances are drawn in —
+       *  landscape even on a portrait-held phone, because of the lock. */
+      logicalViewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** Bank exactly `ore` on the local ship, so a spec can re-price the wheel
+       *  between assertions (affordable → unaffordable) without reopening it. */
+      setOre(ore: number): number | null {
+        const ship = world.ships.find(isLocalShip);
+        if (!ship) return null;
+        ship.cargo = 0;
+        ship.banked = ore;
+        return ship.banked;
       },
     };
     try {
@@ -4396,7 +4495,7 @@ async function boot(): Promise<void> {
       }
       if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
         const ids = pauseButtons(pauseScreen);
-        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        const l = pauseLayout({ width: w, height: h }, ids, { isTouch });
         return l.buttons.map((r, i) => ({
           kind: ids[i] ?? 'button',
           physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),

@@ -44,14 +44,17 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_LOCAL_HEIGHT } from './healthbar';
 import type { Nameplate, NameplateKind } from './nameplates';
 import { hudTracking } from './instrument';
+import { FONT_BODY } from './typography';
 
 /** Layout-registry id for the nameplate layer (one entry, the union of labels). */
 export const NAMEPLATE_ID = 'nameplates';
 /** Labels float over the world anywhere on screen — `full`, like the health bars. */
 export const NAMEPLATE_ANCHOR: AnchorSpec = { region: 'full' };
 
-/** Oxanium — the HUD body face (style-guide §5.6). Fallback until it self-hosts. */
-const FONT_NAME = 'Oxanium, "DejaVu Sans Mono", monospace';
+/** Oxanium — the HUD body face (style-guide §5.6/§7), read from ./typography so
+ *  a name over a hull is drawn in the same stack as everything else. Spelling the
+ *  stack out here again is the drift that module exists to prevent (a1-01). */
+const FONT_NAME = FONT_BODY;
 /** Label size, CSS px — small chrome over the world, legible at thumb-scale. */
 const FONT_SIZE = 12;
 /** A name IS a proper noun, so it takes the ratified `name` tier — and so do the

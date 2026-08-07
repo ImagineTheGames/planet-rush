@@ -18,6 +18,12 @@
  *   PORT          listen port                              (default 8080)
  *   HOST          bind address                             (default 0.0.0.0)
  *   MATCH_SEED    fixed boot seed, for a reproducible run  (default: random)
+ *   MAX_ROOMS     ceiling on concurrent rooms, and the capacity this Machine
+ *                 advertises to the allocator (default: the measured
+ *                 `DEFAULT_MAX_ROOMS`, docs/server-capacity.md). Set it to run a
+ *                 capacity ramp *past* the advertised ceiling — the number is a
+ *                 measurement, and a measurement you cannot exceed on purpose is
+ *                 a number you can only ever confirm.
  *   TICKET_SECRET allocator↔Machine key; **its presence is the only switch** for
  *                 ticket enforcement (M9 fleet membership) (default: off — solo)
  *   ALLOCATOR_URL where to POST heartbeats; unset = a solo/self-hosted server
@@ -69,12 +75,20 @@ const identity = readMachineIdentity(process.env);
 const ticketSecret = process.env['TICKET_SECRET'];
 const allocatorUrl = process.env['ALLOCATOR_URL'];
 
+/** The room ceiling, overridable per deploy (and per capacity run). Anything that
+ *  is not a positive integer is ignored rather than obeyed: a typo'd `MAX_ROOMS`
+ *  must not silently deploy a Machine that advertises `NaN` capacity. */
+const maxRoomsEnv = Number(process.env['MAX_ROOMS']);
+const maxRooms =
+  Number.isInteger(maxRoomsEnv) && maxRoomsEnv > 0 ? maxRoomsEnv : undefined;
+
 const matches = new MatchServer({
   seed,
   // `exactOptionalPropertyTypes` is on: only pass a key when it has a value, so
   // enforcement stays off (not "on with undefined") on the solo path.
   ...(ticketSecret !== undefined ? { ticketSecret } : {}),
   ...(identity.machine ? { machineId: identity.machine } : {}),
+  ...(maxRooms !== undefined ? { maxRooms } : {}),
 });
 const startedAt = Date.now();
 
@@ -91,6 +105,15 @@ const cordon = new Cordon();
 // number over a full match to tell a healthy shared core from a credit-exhausted
 // one that has fallen back to its low baseline.
 const lag = new EventLoopLagMonitor();
+
+/** Cumulative process CPU (user + system) in ms, since boot. `process.cpuUsage()`
+ *  reports microseconds and counts every thread, which is what a container quota
+ *  bills — so this is the number to difference across a ramp step, not a load
+ *  average and not a percentage this process would have to guess a window for. */
+const cpuMs = (): number => {
+  const { user, system } = process.cpuUsage();
+  return (user + system) / 1000;
+};
 
 const http = createServer((request: IncomingMessage, response: ServerResponse) => {
   // Plain HTTP routes, so a health check or a cordon never has to speak WebSocket.
@@ -109,6 +132,19 @@ const http = createServer((request: IncomingMessage, response: ServerResponse) =
         // sign a shared core has run out of burst credit and the fleet needs a
         // performance CPU size (docs/netcode-spike.md, "Status since (hosting)").
         loopLagMs: Math.round(lag.p99() * 100) / 100,
+        // ── The second axis, and the one with no memory (m11 capacity) ──
+        //
+        // `loopLagMs` is a p99 over a 256-sample window at 2 Hz, so it remembers
+        // a spike for over two minutes: it tracks *rising* load quickly and falls
+        // back slowly, which is right for an alarm and wrong for a ramp step that
+        // wants to know what THIS N costs. Cumulative CPU has no memory at all —
+        // difference it across a window and you have the server's true draw over
+        // exactly that window, which is also the quantity a shared-vCPU quota
+        // throttles on (docs/server-capacity.md). Both are published because
+        // neither alone is the answer: lag says when the loop is losing, CPU says
+        // how close to the quota it is before it does.
+        cpuMs: Math.round(cpuMs()),
+        rssMb: Math.round((process.memoryUsage.rss() / (1024 * 1024)) * 10) / 10,
         uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       }),
     );

@@ -686,7 +686,9 @@ export type {
 export { SettingsView, SETTINGS_ANCHOR } from './settings-view';
 
 export {
+  END_OF_MATCH_EYEBROW,
   END_OF_MATCH_ID,
+  endButtonPlate,
   endButtons,
   endKind,
   endOfMatchHitTest,
@@ -700,6 +702,7 @@ export type {
   EndKind,
   EndOfMatchLayout,
   EndOfMatchModel,
+  EndPointer,
   EndTarget,
   MatchOutcome,
 } from './end-of-match';
@@ -724,6 +727,7 @@ export {
   PAUSE_ID,
   isPauseOpen,
   nextPauseScreen,
+  pauseButtonPlate,
   pauseButtonRect,
   pauseButtonVisible,
   pauseButtons,
@@ -740,6 +744,7 @@ export type {
   PauseLayout,
   PauseLayoutOptions,
   PauseMenuModel,
+  PausePointer,
   PauseScreen,
   PauseTarget,
 } from './pause-menu';

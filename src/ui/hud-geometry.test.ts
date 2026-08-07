@@ -52,7 +52,16 @@ import {
   respawnBounds,
   respawnWrapWidth,
   RESPAWN_CENTER_Y,
+  wheelRadius,
+  wedgeChordWidth,
+  wedgeHitTarget,
+  TOUCH_TARGET_MIN,
 } from './hud-geometry';
+import { wheelMetrics } from '../art/materials';
+import { buildWheelModel, WHEEL_ORDER } from './build-wheel';
+import type { BuildWheelSignals } from './build-wheel';
+import { buildWedgeLines, capWords, placeWedgeLines, targetWords } from './wheel-stack';
+import type { WedgeFace } from './wheel-stack';
 
 // ---------------------------------------------------------------------------
 // The device matrix — QA's playwright.config.ts profiles, both orientations,
@@ -565,4 +574,133 @@ describe('anchor honesty', () => {
     expect(b.width).toBeCloseTo(full.width, 6);
     expect(b.height).toBeCloseTo(full.height, 6);
   });
+});
+
+// ---------------------------------------------------------------------------
+// The wedge, at the narrowest profile with the longest values (u7-02)
+// ---------------------------------------------------------------------------
+//
+// The Gantry/Bone pass puts FOUR lines on a wedge — the name, what it spends on,
+// `cost/held`, and the count over its cap — in a radial space that does not grow
+// when they do. On a 390 px phone the wheel is 280 px across and one wedge is a
+// 72° slice of it, so a line has ~100 px. l2-02 shipped copy that overflowed its
+// chrome for exactly this reason, and only the phone profiles caught it.
+//
+// The oracle below is a *conservative* text metric, not a font: real advance
+// widths for Audiowide and Oxanium at these sizes are narrower than these
+// constants, so a string that passes here fits on the device with room to spare,
+// and the goldens (tests/mobile/goldens.spec.ts) are what confirm the pixels.
+
+/** Upper bound on a glyph's advance, as a fraction of the font size. Measured
+ *  generously: Oxanium's widest digits and caps sit near .60em, Audiowide's near
+ *  .82em. Tracking is added on top, per glyph, exactly as PixiJS applies it. */
+const ADVANCE: Record<WedgeFace, number> = { numeral: 0.6, display: 0.82 };
+
+function textWidth(s: string, size: number, tracking: number, face: WedgeFace): number {
+  // The widest LINE of a wrapped string is what has to fit, not the whole string.
+  const lines = s.split('\n');
+  let widest = 0;
+  for (const line of lines) {
+    widest = Math.max(widest, line.length * (size * ADVANCE[face] + size * tracking));
+  }
+  return widest;
+}
+
+/**
+ * The frame that makes every line as long as it can ever be at once: a
+ * late-match hoard (a three-digit spendable total, so every `cost/held` is five
+ * characters), every cap full (so every count is its widest), and a station
+ * cooling down from a repair (so REPAIR REACTOR draws its longest string, the
+ * live two-digit countdown, rather than a comfortable "+15 HP").
+ */
+const WORST_CASE: BuildWheelSignals = {
+  requested: true,
+  docked: true,
+  shipAlive: true,
+  stationAlive: true,
+  cargo: 0,
+  banked: 999,
+  turrets: 4,
+  shields: 2,
+  satellites: 1,
+  coreHp: 40,
+  maxCoreHp: 100,
+  repairGate: 15,
+};
+
+describe('a wedge at 390 px, with its longest values (u7-02)', () => {
+  /** The narrowest profile the game claims, held in the play orientation. */
+  const PHONE: Viewport = { width: 844, height: 390 };
+  const SEGMENTS = WHEEL_ORDER.length;
+
+  /** Walk one wheel's real wedges and assert every drawn line fits the arc AT
+   *  ITS OWN RADIUS — the bottom line sits where the wedge is narrowest, which is
+   *  the whole reason this exists. */
+  function assertWedgesFit(vp: Viewport): void {
+    const outer = wheelRadius(vp.width, vp.height);
+    const m = wheelMetrics(outer);
+    for (const seg of buildWheelModel(WORST_CASE).segments) {
+      const { placed, innerRadius } = placeWedgeLines(buildWedgeLines(seg, m), outer, m);
+      for (const line of placed) {
+        const budget = wedgeChordWidth(line.radius, SEGMENTS);
+        const w = textWidth(line.text, line.size, line.tracking, line.face);
+        expect(
+          w,
+          `${seg.id}/${line.slot}: "${line.text.replace('\n', ' ')}" is ${w.toFixed(0)}px at r=${line.radius.toFixed(0)}, where the wedge is only ${budget.toFixed(0)}px wide`,
+        ).toBeLessThanOrEqual(budget);
+      }
+      // ...and the stack stays in the ring rather than running under the hub.
+      expect(innerRadius, `${seg.id}: the stack runs past the hub`).toBeGreaterThanOrEqual(outer * m.hub);
+    }
+  }
+
+  it('every line of every wedge fits, at the narrowest profile', () => {
+    expect(wheelMetrics(wheelRadius(PHONE.width, PHONE.height)).copy).toBe('compact');
+    assertWedgesFit(PHONE);
+  });
+
+  for (const { name, vp } of PROFILES) {
+    it(`[${name}] every line of every wedge fits`, () => {
+      assertWedgesFit(vp);
+    });
+  }
+
+  it('the desktop profile takes the handoff\'s own numbers, not a scaled phone', () => {
+    // The look is stated twice on purpose. At a desktop radius the wedge must be
+    // drawing the handoff's 17/12/20/12 stack and its full copy — if this drifts,
+    // the desktop screen has quietly become an upscaled phone.
+    const m = wheelMetrics(wheelRadius(1280, 800));
+    expect(m.copy).toBe('full');
+    expect(m.name).toBeGreaterThanOrEqual(16);
+    expect(m.cost).toBeGreaterThanOrEqual(19);
+    const turret = buildWheelModel(WORST_CASE).segments.find((s) => s.id === 'turret')!;
+    expect(capWords(turret, m)).toBe('4 / 4 BUILT');
+  });
+
+  it('the phone profile keeps the count, and spends the padding instead', () => {
+    // What "compact" gives up is characters, never information: the count is
+    // still there, and so is the target line — GDD §2.5 makes both load-bearing.
+    const m = wheelMetrics(wheelRadius(390, 844));
+    const turret = buildWheelModel(WORST_CASE).segments.find((s) => s.id === 'turret')!;
+    expect(capWords(turret, m)).toBe('4/4 BUILT');
+    expect(targetWords(turret)).toBe('YOUR STATION');
+  });
+});
+
+describe('a wedge is a touch target first (GDD §2.4)', () => {
+  for (const { name, vp } of PROFILES) {
+    it(`[${name}] every wedge clears the 48 px floor in both directions`, () => {
+      const m = wheelMetrics(wheelRadius(vp.width, vp.height));
+      const t = wedgeHitTarget(vp.width, vp.height, WHEEL_ORDER.length, m.hub);
+      expect(t.min, `wedge is ${t.arc.toFixed(0)}px of arc by ${t.depth.toFixed(0)}px deep`).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_MIN,
+      );
+    });
+
+    it(`[${name}] the hub BACK disc clears it too`, () => {
+      const outer = wheelRadius(vp.width, vp.height);
+      const m = wheelMetrics(outer);
+      expect(2 * outer * m.hub).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN);
+    });
+  }
 });
