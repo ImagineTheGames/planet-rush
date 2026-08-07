@@ -67,6 +67,7 @@ import { entryPlateState } from './lobby-entry';
 import type { EntryCodeCell, EntryDoorView, EntryModel } from './lobby-entry';
 import { entryHitTest, entryLayout } from './lobby-geometry';
 import type { EntryLayout, EntryTarget, Insets } from './lobby-geometry';
+import { ScreenCache } from './screen-cache';
 import { FONT_BODY, FONT_HEADING } from './typography';
 
 // ---------------------------------------------------------------------------
@@ -156,6 +157,8 @@ export class LobbyEntryView extends Container {
   private readonly submit: ButtonNodes;
   /** The home screen's own trailing footer control. */
   private readonly settings: ButtonNodes;
+  /** The doors are static between state changes — see ./screen-cache. */
+  private readonly cache = new ScreenCache(this);
 
   private layout: EntryLayout;
   private screen: EntryModel['screen'] = 'home';
@@ -191,6 +194,9 @@ export class LobbyEntryView extends Container {
   /** Re-lay-out for a new viewport, device or safe area. */
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
     this.layout = entryLayout({ width, height }, opts(isTouch, insets));
+    // The cached texture is the size the OLD viewport rasterised to; refreshing
+    // it in place would blit a stale-sized screen, so drop it (./screen-cache).
+    this.cache.invalidate();
   }
 
   /**
@@ -211,6 +217,14 @@ export class LobbyEntryView extends Container {
   update(model: EntryModel): void {
     this.screen = model.screen;
     if (!this.visible) return;
+    // This screen is called per FRAME (src/main.ts `render`), and under Gantry it
+    // is now four door plates plus two beam plates plus two beams — around 350
+    // large translucent polygons, painted at `resolution: devicePixelRatio`. That
+    // is a per-frame cost the hairline version did not have, and on a software
+    // rasteriser it pegs the page's main thread. Redraw only when the model
+    // actually changed; blit the rest of the time (./screen-cache).
+    const signature = JSON.stringify(model);
+    if (this.cache.unchanged(signature)) return;
 
     const { header, footer, metrics } = this.layout;
 
@@ -286,6 +300,11 @@ export class LobbyEntryView extends Container {
     if (home) {
       this.drawFooterPlate(this.settings, this.layout.settings, model, 'settings', false, !model.connecting, metrics);
     }
+
+    // Everything above is now on the display list; rasterise it once so the frames
+    // between state changes cost one blit rather than the whole plate set
+    // (./screen-cache).
+    this.cache.refresh(signature);
   }
 
   // --- The header beam ------------------------------------------------------

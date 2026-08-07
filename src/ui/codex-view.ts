@@ -69,6 +69,7 @@ import {
 import type { FrameMetrics } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { ScreenCache } from './screen-cache';
 import { FONT_BODY, FONT_HEADING } from './typography';
 import {
   CODEX_ID,
@@ -183,6 +184,8 @@ export class CodexView extends Container {
   // Reset scroll when the shown content changes (a new tab or a new entry).
   private lastSection = '';
   private lastDetailTitle = '';
+  /** The CODEX is static between state changes and scrolls — see ./screen-cache. */
+  private readonly cache = new ScreenCache(this);
 
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
@@ -253,6 +256,9 @@ export class CodexView extends Container {
     // Layout is recomputed with the live entry count on the next update; recompute
     // now with the last known count so a resize between frames is not stale.
     this.layout = codexLayout({ width, height }, this.layout.railEntries.length, opts(isTouch, insets));
+    // The cached texture is the size the OLD viewport rasterised to; refreshing
+    // it in place would blit a stale-sized screen, so drop it (./screen-cache).
+    this.cache.invalidate();
   }
 
   hitTest(x: number, y: number): CodexTarget | null {
@@ -298,6 +304,21 @@ export class CodexView extends Container {
       this.detailScroll = 0;
     }
 
+    // This screen is called per FRAME, and it is the densest one in the set: four
+    // tab chips, up to a rail full of row plates, two beams and a BACK plate, every
+    // one of them a stack of translucent bands painted at `resolution:
+    // devicePixelRatio`. Redraw only when something actually changed; blit the rest
+    // of the time (./screen-cache).
+    //
+    // The two SCROLL offsets ride in the signature because they are the one piece
+    // of this screen's state the model does not carry (`scrollRail` / `scrollDetail`
+    // are driven straight from the wheel and the drag) — without them a scrolled
+    // rail would blit the un-scrolled frame back. The re-clamps inside `drawRail` /
+    // `drawDetail` can move an offset mid-draw; that costs one extra redraw on the
+    // next frame and then settles, because a clamped offset is a fixed point.
+    const signature = `${JSON.stringify(model)}|${this.railScroll}|${this.detailScroll}`;
+    if (this.cache.unchanged(signature)) return;
+
     // Opaque backdrop over the whole viewport, drawn from the beams outward so the
     // beams' translucent fill has the void to sit on.
     this.backdrop.clear();
@@ -314,6 +335,11 @@ export class CodexView extends Container {
     this.drawTabs(model, tabs, metrics);
     this.drawRail(model, rail, metrics);
     this.drawDetail(model.detail, detail, metrics);
+
+    // Everything above is now on the display list; rasterise it once so the frames
+    // between state changes cost one blit rather than the whole screen
+    // (./screen-cache).
+    this.cache.refresh(signature);
   }
 
   /** The header beam: the heading hard left, the section title hard right — the

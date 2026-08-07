@@ -1176,19 +1176,39 @@ async function boot(): Promise<void> {
   // fires on touch; press is released on pointer-up or on a cancelled gesture.
   let pauseSettingsHover: SettingsTarget | null = null;
   let pauseSettingsPress: SettingsTarget | null = null;
+  // …and the same three states for the two full-screen overlays' own plates
+  // (u7-05). Both are made of the material now, and a plate that never lifts under
+  // the cursor or sinks under a finger is only two-thirds of the direction.
+  let pauseHover: PauseButton | null = null;
+  let pausePress: PauseButton | null = null;
+  let endHover: EndButton | null = null;
+  let endPress: EndButton | null = null;
   const releasePauseSettingsPress = (): void => {
     pauseSettingsPress = null;
+    pausePress = null;
+    endPress = null;
   };
   app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
   app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
   app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
-    if (pauseScreen !== 'settings') return;
     const lp = toLogical(e.clientX, e.clientY);
-    pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+    if (pauseScreen === 'settings') {
+      pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+      return;
+    }
+    if (isPauseOpen(pauseScreen)) {
+      pauseHover = pauseView.hitTest(lp.x, lp.y)?.kind ?? null;
+      return;
+    }
+    if (endOverlay.visible) endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
   });
   app.canvas.addEventListener('pointerleave', () => {
     pauseSettingsHover = null;
     pauseSettingsPress = null;
+    pauseHover = null;
+    pausePress = null;
+    endHover = null;
+    endPress = null;
   });
 
   const merged = createControlState();
@@ -1408,6 +1428,8 @@ async function boot(): Promise<void> {
     // and it always consumes the event.
     if (endOverlay.visible) {
       const target = endOverlay.hitTest(lp.x, lp.y);
+      endPress = target?.kind ?? null;
+      endHover = endPress;
       if (target) {
         haptics.haptic('tap');
         // ONE sound per state change (s6-01 rule 1): `handleEndTarget` names the
@@ -1988,10 +2010,14 @@ async function boot(): Promise<void> {
     if (desired === 'none') {
       if (endOverlay.visible) endOverlay.visible = false;
       if (endButtonsShown.length) endButtonsShown = [];
+      // A screen that is gone is not being hovered: a stale hover would light a
+      // plate up the moment the overlay came back, under a cursor that never moved.
+      endHover = null;
+      endPress = null;
       return;
     }
     if (!endOverlay.visible) endOverlay.visible = true;
-    const model = endOfMatchModel(currentOutcome(over));
+    const model = endOfMatchModel(currentOutcome(over), { hover: endHover, press: endPress });
     endButtonsShown = model.buttons.map((b) => b.id);
     endOverlay.update(model);
   }
@@ -2132,6 +2158,9 @@ async function boot(): Promise<void> {
       return;
     }
     const target = pauseView.hitTest(lx, ly);
+    // The plate goes down before it acts (u7-01), and is released on pointer-up.
+    pausePress = target?.kind ?? null;
+    pauseHover = pausePress;
     if (target) handlePauseButton(target.kind);
   }
 
@@ -2238,9 +2267,21 @@ async function boot(): Promise<void> {
    *  rendered frame. Offline the loop has already frozen the sim; render keeps
    *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
   function syncPause(): void {
+    // A closed overlay is not being hovered, and a plate that is no longer on the
+    // screen is not being held down (u7-05) — otherwise the next ESC would open
+    // the menu with RESUME already lit under a cursor that never moved.
+    if (!isPauseOpen(pauseScreen)) {
+      pauseHover = null;
+      pausePress = null;
+    }
     // The pause overlay: the menu or the confirm. While the settings screen is up
     // the overlay hides (the real settings view takes its place), so feed 'closed'.
-    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    pauseView.update(
+      pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen, {
+        hover: pauseHover,
+        press: pausePress,
+      }),
+    );
     const settingsUp = pauseScreen === 'settings';
     pauseSettings.visible = settingsUp;
     if (settingsUp) {
@@ -3477,6 +3518,20 @@ async function boot(): Promise<void> {
         }
         return true;
       },
+      /** The same staging with the LOCAL seat as the survivor, so the VICTORY
+       *  face of the result screen can be photographed and gated (u7-05). It is
+       *  the only one of the four the other methods cannot reach — `endMatch`
+       *  always leaves someone else standing — and it is the one the winner's
+       *  identity rule only appears on. Drives the sim's own `destroyCore`, like
+       *  its sibling; the win itself is still resolved by the sim's next tick. */
+      winLocal(): boolean {
+        const mine = world.stations.find((p) => p.owner === LOCAL_PLAYER && p.alive);
+        if (!mine) return false;
+        for (const p of world.stations) {
+          if (p.owner !== LOCAL_PLAYER && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
       },
@@ -4440,7 +4495,7 @@ async function boot(): Promise<void> {
       }
       if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
         const ids = pauseButtons(pauseScreen);
-        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        const l = pauseLayout({ width: w, height: h }, ids, { isTouch });
         return l.buttons.map((r, i) => ({
           kind: ids[i] ?? 'button',
           physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
@@ -6933,6 +6988,18 @@ interface LobbySeam {
    *  on RUSH remaps to the logical control, rather than only driving rush()
    *  programmatically (tests/mobile/landscape-lock.spec.ts). */
   rushControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /**
+   * The MODE toggle (FFA ⇄ TEAMS), as drawn: its logical rect and the physical
+   * point a real press has to land on, through the landscape-lock rotation — the
+   * same shape {@link rushControl} reports.
+   *
+   * Read-only, and it exists for one reason: FFA draws **no side label anywhere**
+   * (GDD §2.1 — teams-of-one has no side worth naming), so a baseline of an FFA
+   * lobby cannot show the `FRIENDLY A` / `ENEMY B` chips at all, and a change to
+   * them would leave every image byte-identical. A test presses this the way a
+   * player does and then shoots the roster (u7-03, tests/mobile/goldens.spec.ts).
+   */
+  modeControl: { logical: Rect; physicalCenter: { x: number; y: number } };
   /** True while the RUSH! countdown is running. */
   counting: boolean;
   /** The hull the built world gave the local ship, or null until the match boots
@@ -7083,6 +7150,7 @@ function openLobby(
     seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    modeControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
     hintTitle: null,
@@ -7165,6 +7233,11 @@ function openLobby(
     seam.rushControl = {
       logical: { ...rush },
       physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
+    };
+    const mode = layout.modeToggle;
+    seam.modeControl = {
+      logical: { ...mode },
+      physicalCenter: ctx.toPhysical(mode.x + mode.width / 2, mode.y + mode.height / 2),
     };
     seam.counting = model.countdown.active;
     // The hull tiles' physical centres — the codex hull-description hover targets.

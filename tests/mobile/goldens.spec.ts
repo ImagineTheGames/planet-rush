@@ -219,10 +219,12 @@ async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
   expect(staged, 'the ?debug=1 press stage is installed').not.toBeNull();
   expect(staged!.open, 'the Build wheel is up at the local station').toBe(true);
   // The wedges are drawn from the render loop, not from the call above — so wait
-  // on the FRAMES, not on a stopwatch (q8-01, ./render-settle.ts). u7-02 wrote
-  // this as `waitForTimeout(500)` before q8-01 landed on main; the two met in
-  // this merge and the contract test (tests/mobile-shot-budget-contract.test.ts)
-  // caught it.
+  // on the frames that draw them, not on a stopwatch. This helper was written on
+  // the pre-q8-01 `waitForTimeout(500)` pattern and merged in after that pattern
+  // was retired everywhere else in this file: opening the wheel is exactly the
+  // kind of state change ./render-settle.ts exists for, and a software-GL runner
+  // that fits no frames into 500 ms would shoot the wheel before it had wedges.
+  // `tests/mobile-shot-budget-contract.test.ts` is what catches a relapse.
   await settleFrames(page);
   const wedges = await page.evaluate(() => {
     const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
@@ -805,6 +807,239 @@ test('golden: landscape phone CODEX — a tab row, a rail and an article at 844p
   await expect(page).toHaveScreenshot('phone-landscape-codex.png', MENU_GOLDEN);
 });
 
+// ---------------------------------------------------------------------------
+// THE PAUSE MENU and THE END-OF-MATCH SUMMARY, in Gantry/Bone (u7-05)
+// ---------------------------------------------------------------------------
+//
+// The other two screens the Gantry chain forgot, and — like the doors and the
+// CODEX before them — **they appeared in no golden**, for a reason worth stating
+// once: every baseline above shoots either a MENU (`/`, which never reaches a
+// match) or a FROZEN MATCH (`?debug=1`, which never reaches an overlay). Both of
+// these screens live in the gap: mid-play, over a match. A total re-skin of
+// either left every baseline in this file byte-identical.
+//
+// End-of-match in particular deserved one and had none: it is the screen a player
+// stares at longest, it is the one screen carrying the tone contract's
+// station-death beat (GDD §4.7), and until now nothing could tell whether it had
+// quietly become a celebration.
+//
+// Six baselines, each chosen for what it alone can fail:
+//   desktop-pause               the three-plate stack, one of them bright
+//   phone-landscape-pause       the same stack in a 50px-beam frame at 844×390
+//   phone-portrait-pause        …through the landscape lock's 90° rotation
+//   desktop-pause-confirm       a DIFFERENT shape: two plates, and the bright one
+//                               is the SECOND — the "STAY is the default" rule,
+//                               which is now a brightness rule and nothing else
+//   desktop-end-result          the result: the identity rule, and REMATCH bright
+//   phone-portrait-end-eliminated  threat red, the cause line, SPECTATE, held
+//
+// Determinism. The four pause shots and the ELIMINATED one ride `?freeze=1`: the
+// overlay is a pure function of the viewport and the world under it is pinned.
+// The RESULT screen cannot be frozen — `world.match.phase` only reaches 'ended'
+// on a sim TICK — so it is shot over a live match, which is deterministic for a
+// different reason: since u7-05 that overlay's backdrop is opaque and covers the
+// whole viewport, so the running match under it contributes no pixels. The build
+// badge stays unmasked here exactly as it is above.
+
+/**
+ * The two mid-play seams these screens are reached through, named locally rather
+ * than on `Window`: the live-stage specs already declare their own (richer)
+ * shapes for both, and two `declare global` blocks for one property do not merge
+ * — they collide. Every other reader in this file casts at the call site for the
+ * same reason.
+ */
+interface PauseSeam {
+  read(): {
+    open: boolean;
+    controls: { kind: string; physicalCenter: { x: number; y: number } }[];
+    buttonPoint: { x: number; y: number };
+  };
+}
+interface EndSeam {
+  eliminateLocal(): boolean;
+  endMatch(): boolean;
+  screen(): 'none' | 'defeated' | 'result';
+}
+type StagedWindow = { __pauseStage?: PauseSeam; __endScreenStage?: EndSeam };
+
+/** Boot the FROZEN debug scene and wait for the mid-play seams to be installed. */
+async function bootStaged(page: Page, url = '/?debug=1&freeze=1'): Promise<void> {
+  await bootFrozen(page, url);
+  await waitForStages(page);
+}
+
+/**
+ * Boot the debug build with the sim RUNNING — the one screen that needs it. The
+ * result screen is reached when `world.match.phase` becomes 'ended', which only
+ * happens on a sim tick, so `?freeze=1` (whose whole job is that there are no
+ * ticks) cannot reach it. `bootFrozen`'s wait is on the freeze hook, so this is
+ * the same boot with that one wait replaced by the seams themselves.
+ */
+async function bootLive(page: Page): Promise<void> {
+  await page.goto('/?debug=1');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await waitForStages(page);
+  await page.evaluate(() => (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts?.ready);
+  await settleFrames(page);
+}
+
+async function waitForStages(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as StagedWindow;
+      return typeof w.__pauseStage?.read === 'function' && typeof w.__endScreenStage?.screen === 'function';
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
+/**
+ * Open the pause overlay the way THIS device does — ESC on a keyboard, a thumb on
+ * the corner affordance on a phone (the corner button is touch-only by contract,
+ * `pauseButtonVisible`). A baseline of a screen reached by a real press proves it
+ * is reachable as well as drawn.
+ */
+async function openPause(page: Page, touch: boolean): Promise<void> {
+  if (touch) {
+    const point = await page.evaluate(
+      () => (window as unknown as StagedWindow).__pauseStage!.read().buttonPoint,
+    );
+    await page.touchscreen.tap(Math.round(point.x), Math.round(point.y));
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForFunction(
+    () => (window as unknown as StagedWindow).__pauseStage!.read().open === true,
+    undefined,
+    { timeout: 10_000 },
+  );
+  // Park the pointer off every plate: a hovered plate is a brighter plate, and
+  // the baseline is the screen at REST.
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Press a pause control at the physical point the client says it drew it at. */
+async function pressPause(page: Page, kind: string): Promise<void> {
+  const point = await page.evaluate((k) => {
+    const c = (window as unknown as StagedWindow).__pauseStage!.read().controls.find((x) => x.kind === k);
+    return c ? c.physicalCenter : null;
+  }, kind);
+  expect(point, `the pause overlay reports where ${kind} is drawn`).not.toBeNull();
+  await page.mouse.click(Math.round(point!.x), Math.round(point!.y));
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Stage an end screen through the sim's OWN elimination path and wait for the
+ *  wiring to put it up. Never fakes the UI — only the deaths that drive it. */
+async function stageEnd(page: Page, want: 'defeated' | 'result'): Promise<void> {
+  const staged = await page.evaluate((w) => {
+    const stage = (window as unknown as StagedWindow).__endScreenStage!;
+    return w === 'defeated' ? stage.eliminateLocal() : stage.endMatch();
+  }, want);
+  expect(staged, `the end-screen stage set up the ${want} case`).toBe(true);
+  await page.waitForFunction(
+    (w) => (window as unknown as StagedWindow).__endScreenStage!.screen() === w,
+    want,
+    { timeout: 15_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+test('golden: desktop PAUSE MENU — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → ESC → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  await bootStaged(page);
+  await openPause(page, false);
+  await expect(page).toHaveScreenshot('desktop-pause.png', GOLDEN);
+});
+
+test('golden: desktop PAUSE CONFIRM — the bright plate is the SAFE one', async ({ page }, testInfo) => {
+  // The one screen in the game where the emphasised button is not the first one,
+  // and the rule it exists for (developer §1) is now carried by brightness alone.
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → ESC → press EXIT TO MENU → font settle → one full-frame golden comparison',
+    measuredSeconds: 7,
+  });
+
+  await bootStaged(page);
+  await openPause(page, false);
+  await pressPause(page, 'exit');
+  await expect(page).toHaveScreenshot('desktop-pause-confirm.png', GOLDEN);
+});
+
+test('golden: landscape phone PAUSE MENU — a 50px beam frame at 844×390', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → tap the corner affordance → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootStaged(page);
+  await openPause(page, true);
+  await expect(page).toHaveScreenshot('phone-landscape-pause.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone PAUSE MENU — the overlay through the lock', async ({
+  page,
+}, testInfo) => {
+  // How a phone is actually held mid-match, and the transform the desktop never
+  // touches. Also the shot that shows the corner affordance's own placement, since
+  // the tap that opened this overlay had to land on it.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD (landscape lock rotation) → tap the corner affordance → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  await bootStaged(page);
+  await openPause(page, true);
+  await expect(page).toHaveScreenshot('phone-portrait-pause.png', GOLDEN);
+});
+
+test('golden: desktop END OF MATCH — the result, and the identity rule', async ({ page }, testInfo) => {
+  // Shot over a LIVE match on purpose: `world.match.phase` only reaches 'ended' on
+  // a sim tick, so there is no frozen flavour of this screen to ask for. It is
+  // deterministic because the overlay is opaque over the whole viewport.
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the debug match → stage a resolved match → font settle → one full-frame golden comparison',
+    measuredSeconds: 7,
+  });
+
+  await bootLive(page);
+  await stageEnd(page, 'result');
+  await expect(page).toHaveScreenshot('desktop-end-of-match.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone ELIMINATED — the one red word, held', async ({
+  page,
+}, testInfo) => {
+  // The other face of the screen: threat red on the result (your reactor was
+  // destroyed — damage, the one thing style-guide §2 reserves red for), the
+  // placement-and-cause line, and SPECTATE instead of BACK TO MENU. Frozen: an
+  // elimination needs no tick to resolve, so this one is pinned.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD → stage a local elimination → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  await bootStaged(page);
+  await stageEnd(page, 'defeated');
+  await expect(page).toHaveScreenshot('phone-portrait-eliminated.png', GOLDEN);
+});
+
 test('golden: PORTRAIT-HELD phone CODEX — the dense screen through the lock', async ({
   page,
 }, testInfo) => {
@@ -820,4 +1055,191 @@ test('golden: PORTRAIT-HELD phone CODEX — the dense screen through the lock', 
   await bootMenu(page);
   await openCodex(page);
   await expect(page).toHaveScreenshot('phone-portrait-codex.png', MENU_GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// The LOBBY and SHIP SELECT, in Gantry/Bone (u7-03 — ratified 2026-08-05)
+// ---------------------------------------------------------------------------
+//
+// The screen where the design and our shipped reality diverge most, and the one
+// with the most per row in the game: an identity bar, a P-number, a name, a
+// slot-state control, a side chip, a difficulty chip and a ping — beside four
+// hull tiles carrying six stats each, and four arena cards.
+//
+// It appears in no baseline in this repo before now. `?debug=1` skips the lobby
+// by contract exactly as it skips the menu, so a total re-skin of it would have
+// left every existing golden byte-identical — the same hole u7-01 opened these
+// menu baselines to close, one screen further along.
+//
+// Five images, because this screen has three things worth seeing and two of them
+// need a mode change to appear:
+//
+//   · desktop / phone-landscape / portrait-HELD — the frame, the roster, ship
+//     select with its stats, and the arena row, on both form factors and through
+//     the 90° rotation the landscape lock puts a held phone through;
+//   · desktop + phone-landscape in TEAMS — the `FRIENDLY A` / `ENEMY B` side
+//     chips, which FFA draws nowhere at all (GDD §2.1: teams-of-one has no side
+//     worth naming), so an FFA-only baseline could never show a change to them.
+//
+// Determinism: the lobby is a pure function of its state, nothing on it animates
+// before RUSH! is pressed, and the offline lobby seats the same seven-character
+// cast at the same difficulties on every boot (`ui/lobby` `castForEmptySeat`
+// mirrors the server's rule). The build badge in the corner carries the commit
+// sha and is deliberately not masked, for the reason stated above.
+
+/** The `window.__lobby` seam (`src/main.ts` LobbySeam), narrowed to what a
+ *  baseline needs: is it up, and where are the two controls we press. */
+interface LobbyGoldenSeam {
+  readonly visible: boolean;
+  readonly slotCount: number;
+  readonly mode: string;
+  readonly seatStates: readonly { readonly label: string }[];
+  readonly modeControl: { readonly physicalCenter: { readonly x: number; readonly y: number } };
+}
+
+/**
+ * Boot clean and walk the ratified play flow to the lobby with REAL presses —
+ * PLAY → the doors → PLAY SOLO → the roster — rather than by calling a seam.
+ * A baseline of a screen reached by a press proves it is also reachable.
+ */
+async function openLobby(page: Page): Promise<void> {
+  await bootMenu(page);
+  const play = await page.evaluate(() => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === 'play');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(play, 'the menu reports where PLAY is drawn').not.toBeNull();
+  await page.mouse.click(play!.x, play!.y);
+
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as {
+        __onlineMenu?: { visible: boolean; doorControls: unknown[] };
+      }).__onlineMenu;
+      return !!d && d.visible && d.doorControls.length > 0;
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+  const solo = await page.evaluate(() => {
+    const d = (window as unknown as {
+      __onlineMenu?: { doorControls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__onlineMenu;
+    const c = d?.doorControls.find((k) => k.kind === 'solo');
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  expect(solo, 'the doors report where PLAY SOLO is drawn').not.toBeNull();
+  await page.mouse.click(solo!.x, solo!.y);
+
+  await page.waitForFunction(
+    () => {
+      const l = (window as unknown as { __lobby?: LobbyGoldenSeam }).__lobby;
+      return !!l && l.visible && l.slotCount === 8 && l.seatStates.length === 8;
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+  // The pointer is left sitting where PLAY SOLO was, which on a desktop would
+  // hover whatever roster row landed under it. Park it so the baseline is the
+  // screen at rest rather than the screen mid-hover — then wait for the frames
+  // that redraw it, in frames rather than in milliseconds (./render-settle.ts).
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Press MODE the way a player does, and wait for the roster to re-word itself
+ *  in `FRIENDLY` / `ENEMY`. Read-back proof, not a seam call. */
+async function switchToTeams(page: Page): Promise<void> {
+  const mode = await page.evaluate(() => {
+    const l = (window as unknown as { __lobby?: LobbyGoldenSeam }).__lobby;
+    return l ? { x: l.modeControl.physicalCenter.x, y: l.modeControl.physicalCenter.y } : null;
+  });
+  expect(mode, 'the lobby reports where the MODE toggle is drawn').not.toBeNull();
+  await page.mouse.click(mode!.x, mode!.y);
+  await page.waitForFunction(
+    () => (window as unknown as { __lobby?: LobbyGoldenSeam }).__lobby?.mode === 'teams',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+/** Portrait → landscape, for the profiles that declare portrait viewports. */
+async function rotateToLandscape(page: Page): Promise<void> {
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width });
+}
+
+test('golden: desktop lobby + ship select — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot to the menu → press PLAY → press PLAY SOLO → lobby settle → one full-frame golden comparison',
+    measuredSeconds: 12,
+  });
+
+  await openLobby(page);
+  await expect(page).toHaveScreenshot('desktop-lobby.png', MENU_GOLDEN);
+});
+
+test('golden: desktop lobby in TEAMS — FRIENDLY A / ENEMY B on the roster', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot → lobby → press MODE → TEAMS roster settle → one full-frame golden comparison',
+    measuredSeconds: 14,
+  });
+
+  await openLobby(page);
+  await switchToTeams(page);
+  await expect(page).toHaveScreenshot('desktop-lobby-teams.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone lobby + ship select — Gantry/Bone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot → press PLAY → press PLAY SOLO → lobby settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 16,
+  });
+
+  await rotateToLandscape(page);
+  await openLobby(page);
+  await expect(page).toHaveScreenshot('phone-landscape-lobby.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone lobby in TEAMS — the side chips under a thumb', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot → lobby → press MODE → TEAMS roster settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 18,
+  });
+
+  await rotateToLandscape(page);
+  await openLobby(page);
+  await switchToTeams(page);
+  await expect(page).toHaveScreenshot('phone-landscape-lobby-teams.png', MENU_GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone lobby — the roster survives the lock', async ({
+  page,
+}, testInfo) => {
+  // The phone profiles are portrait by default and Planet Rush is landscape-locked,
+  // so this frame goes through the 90° rotation the desktop never touches — and
+  // the beams, the separator and eight roster rows are all children of the
+  // rotating root. A frame verified on a desktop proves nothing about a held
+  // phone, and this screen is the one with the most controls per row in the game.
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot to the menu PORTRAIT-HELD (landscape lock rotation) → press PLAY → press PLAY SOLO → lobby settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 16,
+  });
+
+  await openLobby(page);
+  await expect(page).toHaveScreenshot('phone-portrait-lobby.png', MENU_GOLDEN);
 });

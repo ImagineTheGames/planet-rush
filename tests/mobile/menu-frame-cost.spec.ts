@@ -42,6 +42,22 @@
  * machine** — the heaviest screen the game legitimately draws. The front door
  * being no more expensive than the whole game is the actual invariant, it is
  * self-calibrating, and it is the one the regression broke by 14×.
+ *
+ * ── WHY IT COVERS EVERY GANTRY SCREEN, NOT JUST THE TITLE (a1-01) ──────────
+ * It came back. u7-04 re-skinned the two screens the handoff's list forgot — THE
+ * DOORS and THE CODEX — in the same material, and neither took the cache, because
+ * this gate only ever measured the TITLE screen. The failure reproduced the u7-01
+ * signature exactly: on the software-GL runner `page.screenshot`, `page.evaluate`
+ * and `waitForFunction` all timed out on any test that walked through the doors,
+ * and `campaign-door.spec.ts`'s first test went from 39 s green to >120 s timed
+ * out. Sixteen tests red across four specs, two of them (`slot-state`,
+ * `landscape-lock`) in files that branch never touched — they only *pass through*
+ * the doors on their way to the lobby.
+ *
+ * So the ratio is now asserted for **every static Gantry screen the player can
+ * reach from the title**, in one pass, against one match sample. A screen added to
+ * the set and not added here is a screen that can peg the runner in silence, which
+ * is the expensive thing this file exists to prevent — twice now.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { budgetTest } from './budgets';
@@ -73,6 +89,76 @@ async function medianFrameMs(page: Page, frames = 60): Promise<number> {
     deltas.sort((a, b) => a - b);
     return deltas[Math.floor(deltas.length / 2)] ?? 0;
   }, frames);
+}
+
+/** The frozen match's median frame time — the yardstick every screen is measured
+ *  against, sampled in the same page on the same machine (see the header). */
+async function matchFrameMs(page: Page): Promise<number> {
+  await page.goto('/?debug=1&freeze=1');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => (window as unknown as { __planetRush?: { frozen?: boolean } }).__planetRush?.frozen === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  return medianFrameMs(page);
+}
+
+/** Boot clean to the title screen, at rest. */
+async function bootMenu(page: Page): Promise<void> {
+  await page.goto('/');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => {
+      const m = (window as unknown as { __mainMenu?: { visible: boolean; controls: unknown[] } }).__mainMenu;
+      return !!m && m.visible && m.controls.length > 0;
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
+/**
+ * Press one of the title screen's own plates, at the point the app reports it
+ * drew it. A mouse click rather than a CDP touch on purpose: this test measures
+ * fill rate, not input, and the menu answers a click on every profile.
+ *
+ * The pointer is parked off every plate afterwards, because a hovered plate is a
+ * brighter plate and a hover that lands mid-sample would redraw the screen —
+ * which is the very thing being measured.
+ */
+async function pressMenuControl(page: Page, kind: string): Promise<void> {
+  const point = await page.evaluate((want) => {
+    const m = (window as unknown as {
+      __mainMenu?: { controls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__mainMenu;
+    const c = m?.controls.find((k) => k.kind === want);
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  }, kind);
+  expect(point, `the menu reports where ${kind.toUpperCase()} is drawn`).not.toBeNull();
+  await page.mouse.click(Math.round(point!.x), Math.round(point!.y));
+  await page.mouse.move(1, 1);
+}
+
+/**
+ * The same, for a door on THE DOORS screen — those controls hang off
+ * `__onlineMenu.doorControls` rather than the title's `__mainMenu.controls`, so
+ * they need their own reader. Same reason for parking the pointer afterwards: a
+ * hovered plate is a brighter plate, and a hover landing mid-sample redraws the
+ * screen being measured.
+ */
+async function pressDoor(page: Page, kind: string): Promise<void> {
+  const point = await page.evaluate((want) => {
+    const m = (window as unknown as {
+      __onlineMenu?: { doorControls: { kind: string; physicalCenter: { x: number; y: number } }[] };
+    }).__onlineMenu;
+    const c = m?.doorControls.find((k) => k.kind === want);
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  }, kind);
+  expect(point, `the doors report where ${kind.toUpperCase()} is drawn`).not.toBeNull();
+  await page.mouse.click(Math.round(point!.x), Math.round(point!.y));
+  await page.mouse.move(1, 1);
 }
 
 test('the static title screen costs no more per frame than the live match', async ({
@@ -115,4 +201,107 @@ test('the static title screen costs no more per frame than the live match', asyn
       'The Gantry/Bone plates are ~170 translucent polygons and something has stopped caching them — ' +
       'see src/ui/screen-cache.ts.',
   ).toBeLessThan(MAX_RATIO);
+});
+
+/**
+ * The same guard, on every static Gantry screen a player can reach from the
+ * title — THE DOORS, THE LOBBY, THE CODEX — in one pass against one match
+ * sample.
+ *
+ * THE LOBBY is here rather than in a test of its own because this file's header
+ * states the rule that keeps it honest: a screen added to the set and not added
+ * here is a screen that can peg the runner in silence. It is also the screen that
+ * would break the budget hardest — it draws around **thirty** Gantry plates
+ * (eight roster rows, their leading state controls and trailing chips, four hull
+ * tiles, four arena cards and two toggles) where the title screen draws three,
+ * and it is the reason `src/ui/screen-cache.ts` is a shared primitive rather than
+ * a title-screen detail (u7-03).
+ *
+ * The lobby also carries a failure the other two cannot: its `update()` runs per
+ * frame against a model whose countdown holds a FLOAT, so a cache signature that
+ * serialised it would re-rasterise the whole screen sixty times a second while a
+ * player watches RUSH! count down — strictly worse than not caching at all. The
+ * signature carries the countdown's LABEL instead (`ui/lobby-view` `signatureOf`);
+ * sampling the lobby at rest catches a leak of either kind the same way.
+ */
+test('THE DOORS, THE LOBBY and THE CODEX cost no more per frame than the live match', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
+  budgetTest({
+    work: 'boot the frozen match \u2192 sample 60 frames \u2192 boot the menu \u2192 press PLAY (the doors) \u2192 sample \u2192 press PLAY SOLO (the lobby) \u2192 sample \u2192 back \u2192 press CODEX \u2192 sample \u2192 compare all three medians against the match',
+    measuredSeconds: 32,
+  });
+
+  // The yardstick first, so the three screens are compared against a match sampled
+  // on this machine in this run — the same self-calibration the title test uses.
+  const matchMs = await matchFrameMs(page);
+  expect(matchMs, 'the match sampled a sane frame time to compare against').toBeGreaterThan(0);
+
+  await bootMenu(page);
+
+  // THE DOORS — the first screen a player touches after PLAY, and the one every
+  // menu-booting spec in this suite walks through on its way to the lobby. When
+  // this went uncached it did not fail here; it failed in `slot-state.spec.ts`.
+  await pressMenuControl(page, 'play');
+  await page.waitForFunction(
+    () => (window as unknown as { __onlineMenu?: { visible: boolean } }).__onlineMenu?.visible === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  const doorsMs = await medianFrameMs(page);
+
+  // THE LOBBY — straight on through the door we are already standing at, so the
+  // densest screen in the set costs one press rather than a second boot.
+  await pressDoor(page, 'solo');
+  await page.waitForFunction(
+    () => (window as unknown as { __lobby?: { visible: boolean } }).__lobby?.visible === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  const lobbyMs = await medianFrameMs(page);
+
+  // THE CODEX — the densest screen in the game: a tab row, a rail of row plates
+  // and an article, all in the same stepped material.
+  await bootMenu(page);
+  await pressMenuControl(page, 'codex');
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { screen: string } }).__mainMenu?.screen === 'codex',
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  const codexMs = await medianFrameMs(page);
+
+  // Every screen is reported in ONE assertion rather than one `expect` each, so a
+  // failure names every screen that regressed instead of stopping at the first.
+  // When this fires it is usually a shared cause (a screen family that stopped
+  // caching), and seeing only the alphabetically-unlucky one sends the next reader
+  // hunting for a second bug that is the same bug.
+  const measured = [
+    { name: 'THE DOORS', ms: doorsMs },
+    { name: 'THE LOBBY', ms: lobbyMs },
+    { name: 'THE CODEX', ms: codexMs },
+  ];
+  // Record what was measured even when it passes: this ratio is the thing that
+  // creeps, and a green run that quietly moved from 1\u00d7 to 3\u00d7 is the last warning
+  // before a red one.
+  test.info().annotations.push({
+    type: 'frame-cost',
+    description:
+      `match ${matchMs.toFixed(1)}ms/frame \u00b7 ` +
+      measured.map((s) => `${s.name} ${s.ms.toFixed(1)}ms (${(s.ms / matchMs).toFixed(1)}\u00d7)`).join(' \u00b7 '),
+  });
+  const over = measured.filter((s) => s.ms / matchMs >= MAX_RATIO);
+  expect(
+    over.map((s) => `${s.name} ${s.ms.toFixed(1)}ms/frame (${(s.ms / matchMs).toFixed(1)}\u00d7 the match)`),
+    `against the live match's ${matchMs.toFixed(1)}ms/frame, with all screens measured as ` +
+      measured.map((s) => `${s.name} ${s.ms.toFixed(1)}ms`).join(', ') +
+      '. A Gantry plate is ~56 translucent polygons, and a screen over the ratio is painting all of ' +
+      'them every frame — it is missing its ScreenCache (src/ui/screen-cache.ts). Left alone this ' +
+      'does not read as "the menu is slow": it reads as the mobile suite going red in specs nobody ' +
+      'touched.',
+  ).toEqual([]);
 });
