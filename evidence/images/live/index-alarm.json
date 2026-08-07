@@ -1,0 +1,84 @@
+{
+  "base": "http://localhost:4188",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "deviceScaleFactor": 2,
+  "build": {
+    "sha": "c2d401f",
+    "time": "2026-08-07T18:30:04.615Z"
+  },
+  "frames": [
+    {
+      "name": "scene-alarm-full",
+      "what": "whole screen after sustained core damage — the alarm state",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ],
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "ticks": 1298
+      }
+    },
+    {
+      "name": "scene-alarm-home",
+      "what": "the damaged home, cropped on the ship",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ]
+    }
+  ],
+  "alarm": {
+    "coreHp": [
+      100,
+      95,
+      90,
+      85,
+      80,
+      75,
+      70,
+      65,
+      60,
+      55,
+      50,
+      45,
+      40
+    ],
+    "geo": {
+      "shipScreen": {
+        "x": 640,
+        "y": 400
+      },
+      "ticks": 1298
+    },
+    "errors": []
+  }
+}

@@ -5,6 +5,10 @@
     "height": 800
   },
   "deviceScaleFactor": 2,
+  "build": {
+    "sha": "c2d401f",
+    "time": "2026-08-07T18:30:04.615Z"
+  },
   "frames": [
     {
       "name": "scene-arena-full",
@@ -26,8 +30,8 @@
         "worldHash": "4302b39e",
         "freezeTick": 120,
         "build": {
-          "sha": "369d7a6",
-          "time": "2026-08-07T13:14:08.671Z"
+          "sha": "c2d401f",
+          "time": "2026-08-07T18:30:04.615Z"
         }
       }
     },
@@ -105,8 +109,8 @@
     "worldHash": "4302b39e",
     "freezeTick": 120,
     "build": {
-      "sha": "369d7a6",
-      "time": "2026-08-07T13:14:08.671Z"
+      "sha": "c2d401f",
+      "time": "2026-08-07T18:30:04.615Z"
     }
   },
   "siege": {

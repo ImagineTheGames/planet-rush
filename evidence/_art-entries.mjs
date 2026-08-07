@@ -15,8 +15,14 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MANIFEST = join(HERE, 'manifest.json');
 
+// Two builds are represented here, deliberately. The SCENE gate was re-shot after
+// a3-01 landed the asteroid levers; the SHIPS and UI gates were verified on the
+// earlier build and their composites are byte-identical after a rebuild, so their
+// verdicts stand on untouched pixels and they keep the sha they were witnessed on.
 const SHA = '369d7a6';
 const AT = '2026-08-07T14:35:00Z';
+const SHA_SCENE = 'c2d401f';
+const AT_SCENE = '2026-08-07T18:40:00Z';
 
 const PREAMBLE =
   'SELF-WITNESSED, 2026-08-07T13:20Z–14:35Z, on the build under test 369d7a6 — the repo at this branch\'s merge base, ' +
@@ -28,6 +34,20 @@ const PREAMBLE =
   'colour-corrected or composited except the nearest-neighbour magnification labelled on the ships figure. ' +
   'Instruments committed beside this manifest: capture-art-boards.mjs, capture-art-live.mjs, probe-art-palette.mjs, ' +
   'build-art-composites.mjs.';
+
+const PREAMBLE_SCENE =
+  'SELF-WITNESSED, 2026-08-07T18:30Z–18:45Z, on the build under test c2d401f — the repo at this branch\'s tip after ' +
+  'merging origin/main, built HERE with `npx vite build` and served by `vite preview` on :4188. dist/version.json reads ' +
+  'sha c2d401f, built 2026-08-07T18:30:04.615Z, the same sha `curl :4188/version.json` returns, and — the check I ' +
+  'trust most — THE RUNNING GAME RENDERS "c2d401f" ITSELF in the bottom-left corner of the live frames, which I ' +
+  'magnified 3x and read (it is the right-hand panel of the "Rock against rock" row). So these live frames cannot be ' +
+  'older captures relabelled. Viewport 1280x800, deviceScaleFactor 2. EVERY live panel on the scene composite was ' +
+  're-shot on this build — the scene, alarm and fight capture sections all re-run — so no frame is carried over ' +
+  'from the previous pass; I checked this specifically, because the scene composite draws on fight and alarm frames as ' +
+  'well as scene ones, and a composite that mixed two builds would be worthless. The BOARD half is the same committed ' +
+  'docs/art-direction/scene-gallery.html crops as the failed pass, unchanged: the last commit touching ' +
+  'docs/art-direction/ predates both captures, so the board did not move under the comparison. Nothing is retouched or ' +
+  'colour-corrected; the only processing anywhere is the nearest-neighbour magnification labelled on the figure.';
 
 const FADE_NOTE =
   'THE TRAP THIS GATE IS BUILT AROUND, REPORTED BECAUSE I NEARLY FILED IT AS THE HEADLINE FINDING. ' +
@@ -48,15 +68,16 @@ const entries = [
     id: 'art-vs-board-scene',
     area: 'art',
     title:
-      'FAILED — the game\'s battle scene against scene-gallery.html: planets, turrets, shields, the damage arc and the ' +
-      'alarm all read as the boards\' world, but the ASTEROID FAMILY never received either of the art campaign\'s two ' +
-      'levers. Live rock body is #939BA5 against the board\'s #454E59 (luminance 155 vs 79 — about twice the value), ' +
-      'and its outline is rockFissure #2D3239 rather than the single crisp ink #262C34 that the same build paints ' +
-      'correctly on every ship',
+      'VERIFIED (was FAILED, re-shot on c2d401f) — the game\'s battle scene against scene-gallery.html. The asteroid ' +
+      'family, the one thing that failed the previous pass, now carries both of the art campaign\'s levers: live rock ' +
+      'body measures #484E57 against the board\'s #454E59 — luminance 77.4 vs 76.9, half a step — where the same crop ' +
+      'on the previous build measured #939BA5 at luminance 155, twice the board\'s value. The rock rim reads #2A2F36 ' +
+      'against the board\'s #262C34 ink. Rock now recedes as a dark slab instead of advancing as the palest thing in ' +
+      'frame, and planets, turrets, shields, the core-damage arc, vacuum and gold continue to read as the boards\' world',
     image: 'images/art-vs-board-scene.png',
-    capturedAt: AT,
-    buildSha: SHA,
-    verdict: 'failed',
+    capturedAt: AT_SCENE,
+    buildSha: SHA_SCENE,
+    verdict: 'verified',
     attestation: '',
   },
   {
@@ -93,17 +114,61 @@ const entries = [
 // --- the attestations -------------------------------------------------------
 
 entries[0].attestation = [
-  PREAMBLE,
+  PREAMBLE_SCENE,
   '',
-  'WHAT THE COMPOSITE PAIRS. Four pairs, board left, live right. (1) MINING RUN — board scene-gallery.html "Mining run" ' +
+  'WHY THIS ENTRY WAS RE-SHOT, AND WHAT I REFUSED TO DO LAST TIME. On 369d7a6 this gate FAILED, and it failed on ' +
+  'measured pixels rather than taste: the live asteroid body read #939BA5 at luminance 155 against the board\'s ' +
+  '#454E59 at 79. I declined to flip that verdict across three separate resume passes, because QA does not write game ' +
+  'code and the only honest way to turn it green was for art to move two constants. Art has now moved them ' +
+  '(src/art/palette.ts:194 DERIVED.rockBody 0x939ba5 -> 0x484e57, :196 DERIVED.rockFissure 0x2d3239 -> 0x272c32, ' +
+  'merged to main as PR #308). This entry is the re-shoot of that gate against the same unchanged boards.',
+  '',
+  'THE MEASUREMENT THAT DECIDES IT, TAKEN TWICE BY TWO INDEPENDENT ROUTES. Route 1, evidence/probe-art-palette.mjs, ' +
+  'modal opaque colour per region. Route 2, deliberately NOT my instrument: I decoded the same committed PNGs with ' +
+  'pngjs in throwaway code and took the modal colour above luminance 30 (that threshold excludes vacuum #0D1015 at ' +
+  '15.7 and the boards\' panel wash #141922 at 24.6, which otherwise dominate every frame and hide the subject). ' +
+  'BOTH ROUTES RETURN THE SAME HEXES. ASTEROID BODY: live #484E57, luminance 77.4, 42.1% of the drawn pixels in the ' +
+  'field crop; board #454E59, luminance 76.9, 40.5% of the drawn pixels in scene-00. A DIFFERENCE OF HALF A ' +
+  'LUMINANCE STEP, on the family GAP-ANALYSIS annotates "Every rock, the whole match". The board hex is confirmed ' +
+  'present at #454E59 in scene-00, scene-01 and scene-07 independently. ASTEROID RIM: live #2A2F36 (luminance 46.4) ' +
+  'and #24292F (40.4) against the board\'s ink #262C34 (43.3). For scale, the previous pass measured this same crop ' +
+  'at #939BA5 / luminance 155 — the live rock was almost exactly twice the board\'s value.',
+  '',
+  'WHERE THE NUMBERS ARE NOT EXACT, SAID PLAINLY RATHER THAN ROUNDED AWAY. This is not a byte match and I am not ' +
+  'going to call it one. The shipped constant 0x484e57 is (72,78,87); the board\'s #454E59 is (69,78,89) — an RGB ' +
+  'distance of about 3.6. The shipped rockFissure 0x272c32 is (39,44,50) against the board ink (38,44,52), distance ' +
+  'about 2.2, and it renders at the rock\'s antialiased edge as #2A2F36, distance about 5 from the ink. Art adopted ' +
+  'the board\'s VALUE rather than transcribing its hex, and at these distances the difference is invisible at any ' +
+  'zoom a player will ever see — I could not tell the two rocks apart in the 3x side-by-side, and the luminance ' +
+  'figures say why. What failed before was a factor of two; what remains is a rounding.',
+  '',
+  'WHAT I SAW WITH MY OWN EYES, WHICH IS THE POINT OF THIS ROLE. I opened every frame. In "The field itself" the ' +
+  'board draws dark charcoal slabs inside one crisp ink line, and the live crop beside it now draws the same thing: ' +
+  'seven rocks sitting as dark masses against the vacuum, with the yellow ore pips and the green-teal moss arcs as ' +
+  'the brightest things in the crop. On the previous build the rock BODY was the brightest thing in that crop. In the ' +
+  'wide arena frame the hierarchy the boards teach is now intact: the planet ring, the ore gold and the plasma blue ' +
+  'carry the eye and the rock field recedes behind them. The clearest single tell is in the 3x magnification: the ' +
+  'rock body is plainly DARKER than the bone "Thrust" / "Aim" HUD text sitting next to it, where on 369d7a6 it was ' +
+  'lighter than that text.',
+  '',
+  'WHAT THE BUILD DRAWS THAT THE BOARD DOES NOT, AND WHY IT IS NOT A DIVERGENCE. The live rock carries a second, ' +
+  'slightly darker facet tone (#40474F, luminance 70.1, 19.8% of the drawn pixels) inside the body, plus a darker ' +
+  'rim, moss arcs and ore pips, where the board draws one flat fill and a single gold slash. I checked whether that ' +
+  'second tone drags the family off the board\'s value and it does not: 70.1 and 77.4 both sit inside the board\'s ' +
+  'band, so the rock still reads as one dark slab with relief on it. Added detail, not a value error.',
+  '',
+  'WHAT THE COMPOSITE PAIRS. Five pairs, board left, live right. (1) MINING RUN — board scene-gallery.html "Mining run" ' +
   'against a frame the shipped build produced from REAL INPUT: ?debug=1, the ship flown 748 world units west with the ' +
   'keyboard (shipWorld 1968 -> 1220, read back off __planetRush) and the trigger held on a real mouse, with the input ' +
   'probe reporting fire:true. (2) SIEGE — board "Sieging a defended planet — alone" against ?debug=1&freeze=1 ' +
   '(worldHash 4302b39e), the freeze stamp\'s three turret Mks, mid-build scaffold and two shields, then ' +
   '__repairStage.siege(105) to lift the station\'s spawn protection and bleed the core through the sim\'s own ' +
   'damageStation. (3) ALARM — board "The alarm — the game\'s whole design in one frame" against a LIVE unpinned match ' +
-  'where twelve queued core hits took coreHp from 100 to 40, read back off the sim each step. (4) THE FIELD — board ' +
-  '"Asteroid wave drop" against the pinned arena left of the home ring, nothing staged.',
+  'where twelve queued core hits took coreHp from 100 to 40, read back off the sim each step. (4) ROCK AGAINST ROCK ' +
+  'AT 3x — a 420x130 crop of the board\'s own rock beside a 420x130 crop of the live frame, both magnified 3x ' +
+  'nearest-neighbour, both shot at deviceScaleFactor 2, so it is a like-for-like magnification; this pair is new this ' +
+  'pass and is where the gate is actually decided by eye. (5) THE FIELD — board "Asteroid wave drop" against the ' +
+  'pinned arena left of the home ring, nothing staged.',
   '',
   'WHAT READS RIGHT, AND IT IS MOST OF THE FRAME. The siege pair is close to the board beat for beat: a steel-blue ' +
   'ocean with green continents and a gold core, a bright plasma shield ring carrying A RED CORE-DAMAGE ARC down its ' +
@@ -113,17 +178,14 @@ entries[0].attestation = [
   'measure #F2D24B against #F2D24B — exact. And the SHIP family in these same frames measures #7E8894, the board\'s ' +
   'steel, unmodified (see art-vs-board-ships).',
   '',
-  'THE DEFECT. THE ASTEROIDS. The live asteroid body measures #939BA5 — distance ZERO from DERIVED.rockBody 0x939ba5 ' +
-  '(src/art/palette.ts:169), which palette.ts itself derives as "hullSteel mixed 16% toward WHITE". The board\'s rock ' +
-  'measures #454E59. Luminance 155 against 79: the live rock is roughly twice the board\'s value, and it is the one ' +
-  'family that is on screen for the whole match. Its outline is no better — I measure #373D44 on screen, which is ' +
-  'DERIVED.rockFissure 0x2d3239 blended at the rock\'s edge, where the board draws #262C34. These are not my ' +
-  'judgement calls about a direction: they are, verbatim, the two "current" cells of the art campaign\'s OWN gap table ' +
-  '(docs/art-direction/GAP-ANALYSIS.md §2, Lever A row "Asteroids / wrecks" and Lever B row "Asteroid body ' +
-  'DERIVED.rockBody #939BA5 (a *light* tint) -> #454E59 (dark charcoal)"), and they are unmoved. GAP-ANALYSIS calls ' +
-  'Lever A "the single highest impact-per-effort change on the board" and annotates the rock row "Every rock, the ' +
-  'whole match". The same build applied both levers to the ships correctly, which is exactly what makes this a gap ' +
-  'rather than a change of direction: the campaign landed on one family and not the other. OWNER: Art.',
+  'THE ROW THAT FAILED LAST TIME, NOW CLOSED. Both cells of the art campaign\'s own gap table ' +
+  '(docs/art-direction/GAP-ANALYSIS.md §2 — Lever A row "Asteroids / wrecks", Lever B row "Asteroid body ' +
+  'DERIVED.rockBody #939BA5 (a *light* tint) -> #454E59 (dark charcoal)") have been spent. GAP-ANALYSIS calls Lever A ' +
+  '"the single highest impact-per-effort change on the board" and annotates the rock row "Every rock, the whole ' +
+  'match", which is why this one family was enough to fail the whole gate. The measured on-screen body is #484E57, ' +
+  'distance ZERO from the shipped constant DERIVED.rockBody 0x484e57 — so nothing is compositing, fading or tinting ' +
+  'between the constant and the pixel, and the value I am reading is the paint itself. The ship family in these same ' +
+  'frames still measures #7E8894 exactly, so the levers now sit on BOTH families rather than one.',
   '',
   'DIFFERENCES THAT ARE NOT DEFECTS, EACH WITH THE RATIFICATION THAT MAKES THEM SO. (a) THE BEAM IS GONE. The board ' +
   'draws one continuous plasma beam from ship to rock and captions the dogfight "Same beam that mines"; the shipped ' +
@@ -135,11 +197,15 @@ entries[0].attestation = [
   'moved bluer, as asked, inside the ramp. (c) THE ATMOSPHERE RING is a broken teal arc where the board draws a yellow ' +
   'dashed one. (d) THE ALARM SAYS IT QUIETLY. The board puts a hard red banner "PLANET UNDER ATTACK" across the top ' +
   'and drains MY PLANET to a red stub; the live build fires the red vignette and the red ring arc, but the words are ' +
-  'a neutral coach line — "Your station is under attack — follow the arrow" — in bone on the standard dark plate, and ' +
-  'the HOME bar top-right was still full-width plasma at 94/100 in the frame where the alarm was already up. I am ' +
-  'recording that as an OBSERVATION rather than a defect: style-guide §2 reserves threat red #B23A3A for exactly this ' +
-  'tell and the build is spending it, and I found no ratification either way on the banner. UI should decide whether ' +
-  'the board\'s banner survived the Gantry pass.',
+  'a neutral coach line — "Your station is under attack — follow the arrow" — in bone on the standard dark plate. On ' +
+  'this re-shoot the HOME bar had drained to 40/100, matching the sim readback, so it does register the damage — but ' +
+  'it is still drawn in PLASMA BLUE where the board draws a red stub. (That is a correction to my previous pass, ' +
+  'which caught the bar at 94/100 and could not tell whether it moved at all; it does.) I am recording this as an ' +
+  'OBSERVATION rather than a defect: style-guide §2 reserves threat red #B23A3A for exactly this tell and the build ' +
+  'is spending it on the vignette and the ring arc, and I found no ratification either way on the banner or the bar ' +
+  'colour. UI should decide whether the board\'s banner survived the Gantry pass. It is NOT a blocker for this gate: ' +
+  'this gate asks whether the game reads as the boards\' WORLD, and the alarm wording is a copy and threat-colour ' +
+  'question that was carried as an open observation when the ships and UI gates passed too.',
   '',
   'A SECOND TRAP, REPORTED BECAUSE I NEARLY FILED IT TOO. Every live arena frame carries a bright vertical rule at ' +
   '~83% of the width, #454C54, 4 CSS px wide, running the entire height with a peak per-column delta of 103 against ' +
@@ -152,13 +218,26 @@ entries[0].attestation = [
   '',
   FADE_NOTE,
   '',
-  'VERDICT: FAILED. Planets, turrets, shields, the core-damage arc, the alarm state, vacuum and gold all read as the ' +
-  'boards\' world, and the ship family carries the campaign\'s levers exactly. The asteroids do not: body #939BA5 ' +
-  'against #454E59 and outline #2D3239 against #262C34, both of them the art campaign\'s own named targets, both ' +
-  'untouched. On the boards a rock is a dark charcoal slab inside one crisp ink line and it recedes; in the build it ' +
-  'is the palest thing in the frame and it advances. Because rock is the family that fills every mining, wave and ' +
-  'field scene in scene-gallery.html, the composite does not support "the game reads as the boards\' world" and this ' +
-  'gate does not pass. The fix is two shade constants and is already specified in GAP-ANALYSIS §2.',
+  'WHAT I DID NOT WITNESS, STATED PLAINLY. This entry covers the desktop battle scene at 1280x800 only. I did not ' +
+  'pair the wreck sprites, the turret Mk tiers, the ore-deposit props or any phone layout against their boards, and ' +
+  'scene-gallery.html panels other than the five paired here are not scored. I also did not re-shoot the SHIPS or UI ' +
+  'gates on c2d401f: their frames remain from 369d7a6, their composites rebuild byte-identical, and they keep the ' +
+  'verdicts and the build sha they were witnessed on. The asteroid change is confined to the rock family, so it ' +
+  'cannot have moved the hull plate or the HUD furniture those gates turn on — but I am recording that they were not ' +
+  're-witnessed rather than implying they were.',
+  '',
+  'VERDICT: VERIFIED. The one defect that failed this gate is closed, and it is closed on measured pixels from a ' +
+  'build that stamps its own sha into the frame. The asteroid body reads #484E57 at luminance 77.4 against the ' +
+  'board\'s #454E59 at 76.9 — half a step, where the previous build sat at 155, twice the board — and the rim reads ' +
+  '#2A2F36 against the board\'s #262C34 ink. Both figures were re-derived by a second, independent decode of the same ' +
+  'PNGs. By eye, in the 3x side-by-side and in the full field crop, a live rock is now what a board rock is: a dark ' +
+  'slab that recedes, with the ore gold and the plasma blue carrying the frame. Planets, turrets, shields, the ' +
+  'core-damage arc at the sim-reported 55/100, the alarm state, vacuum #0D1015 and gold #F2D24B continue to read as ' +
+  'the boards\' world. The differences that remain are the ratified ones (the retired mining beam, the §5.2 ocean, ' +
+  'the teal atmosphere ring) plus one open OBSERVATION handed to UI (the alarm speaks in bone rather than the board\'s ' +
+  'red banner, and the HOME bar drains in plasma blue rather than red) — the same observation that was carried when ' +
+  'the ships and UI gates passed. On the question this gate asks — does the battle scene read as scene-gallery.html\'s ' +
+  'world — the answer on c2d401f is yes.',
 ].join('\n');
 
 entries[1].attestation = [
