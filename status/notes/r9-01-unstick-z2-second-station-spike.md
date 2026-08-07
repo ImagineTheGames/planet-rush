@@ -153,6 +153,40 @@ No `git clean`, and nothing lost. `evidence/netcode/` and `fly.capacity.toml`
 are another lane's debris in this tree — left untracked and uncommitted; they
 are not mine.
 
+### Post-merge attempt 1 was invalidated by the box, and I am saying so
+
+The first post-merge run (22:31–22:43) collapsed: **12 failures**, and the shape
+of them is the tell — `layout.spec.ts` anchor contracts, `menu-frame-cost`,
+`slot-state`, `landscape-lock` rotation. Those touch no pixel this merge moved.
+Individual tests that cost 20–40 s in the pre-merge run were taking **3.0m, 5.2m,
+7.1m**.
+
+Measured cause, not inferred:
+
+```
+22:38  load average: 68.77, 59.23, 41.57      (8 logical cores -> ~8.6x oversubscribed)
+       4223 zombie processes
+       lane-1 AND lane-3 each running their own Playwright suite concurrently
+       9 vitest processes outside this lane
+```
+
+The preview server was **healthy throughout** — `curl localhost:4292` answered
+**200 in 6.4 ms** while the browsers were starving. So this was client-side CPU
+starvation in Chromium, not a server fault and not a code fault.
+
+And the diagnostic that matters most:
+`test-results/goldens-golden-landscape-p-85a5a--the-compact-copy-at-390-px-iphone/`
+contains **`trace.zip` and no PNG at all** — no actual, no expected, no diff.
+That is q9-01's timeout signature verbatim, and it is the same signature as the
+CI red this brief was written about. A pixel mismatch writes three PNGs; this
+wrote none, because nothing was ever captured.
+
+**What I did:** stopped the run, kept its log at `/tmp/mobile-after-attempt1.log`,
+and waited for the box before re-running. The pre-merge line was paid at load
+16–31; quoting an after-line paid at 54–69 against it would compare the two
+boxes, not the two trees. Both attempts are disclosed in the PR body — this is
+not a re-roll until green, and the first attempt's failures are named there.
+
 ### Rejected
 
 - **Re-baselining the golden.** Refused by the brief, and independently
@@ -170,11 +204,14 @@ are not mine.
 
 ## NEXT
 
-1. Post-merge mobile suite (running, port 4292) — its summary line is the second
-   half of the evidence.
-2. Push, and put both summary lines in the PR body with no snapshot in the diff.
+1. Re-run the post-merge mobile suite once the box is under load ~20 (waiter
+   armed, 40-minute cap). Attempt 1 is recorded above as invalid-by-environment.
+2. Put BOTH post-merge attempts in the PR body next to the pre-merge line, with
+   no snapshot in the diff.
 
-Nothing is blocking. If the post-merge run goes red on `:270`, the brief's
-instruction stands: say so plainly and name #311 — except that #311 is now
-*merged here*, so a red would mean the retry did not cover it, which is QA's
-call and not a licence to re-baseline.
+Nothing is blocking. If the clean re-run still reds on the landscape build-wheel
+golden, the brief's instruction stands: say so plainly and attribute it. #311 is
+now merged *here*, so such a red would mean the two CI retries did not cover the
+tail — QA's call, and still not a licence to re-baseline. Do not widen
+`maxDiffPixelRatio` and do not raise `GOLDEN_SHOT_TIMEOUT_MS` under any
+circumstances.
