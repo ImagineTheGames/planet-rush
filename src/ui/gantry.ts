@@ -36,8 +36,8 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { beamContentInset, frameMetrics } from '../art/materials';
-import type { BeamKind, FrameMetrics, PlateRole } from '../art/materials';
+import { beamContentInset, frameMetrics, plateHeight } from '../art/materials';
+import type { BeamKind, FrameMetrics, PlateRole, PlateScale } from '../art/materials';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,39 @@ export function beamContent(beam: Rect, m: FrameMetrics, kind: BeamKind = 'heade
     width: Math.max(0, beam.width - inset * 2),
     height: beam.height,
   };
+}
+
+/** Which end of a beam a plate is bolted to. */
+export type BeamAlign = 'leading' | 'trailing';
+
+/**
+ * Place one plate inside a beam's own strip — the settings screen's DONE, the
+ * doors screen's BACK and SETTINGS, the CODEX's BACK.
+ *
+ * The settings screen worked this out first and did it inline; three more screens
+ * want the same three lines, so it lives here rather than being copied a fourth
+ * time. A beam plate is **centred in the beam's height** at its scale's own plate
+ * height (never stretched to fill the beam — a plate as tall as the frame stops
+ * reading as a control), and anchored to one end of the strip.
+ *
+ * `offset` moves the plate inward from its anchored end, which is how two plates
+ * share one end of a beam (ERASE sits a gutter inboard of JOIN).
+ */
+export function beamPlate(
+  strip: Rect,
+  m: FrameMetrics,
+  align: BeamAlign,
+  width: number,
+  scale: PlateScale = 'compact',
+  offset = 0,
+): Rect {
+  const h = Math.max(0, Math.min(plateHeight(scale, m), strip.height));
+  const w = Math.max(0, Math.min(width, strip.width));
+  const x =
+    align === 'leading'
+      ? strip.x + offset
+      : strip.x + strip.width - w - offset;
+  return { x, y: strip.y + (strip.height - h) / 2, width: w, height: h };
 }
 
 // ---------------------------------------------------------------------------

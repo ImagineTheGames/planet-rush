@@ -7,26 +7,33 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { FireMode } from '@platform/actions';
+import { FireMode, describeBindings } from '@platform/actions';
+import type { DeviceKind } from '@platform/actions';
 import {
+  CONTROL_SCHEME_STORAGE,
   DEFAULT_VOLUMES,
   SETTINGS_EYEBROW,
   SETTINGS_ROWS,
+  STICKS_LABELS,
+  TAP_COMMANDER_LABEL,
   VOLUME_CHANNELS,
   VOLUME_STEPS,
   adjustVolume,
+  controlsDevice,
   createSettings,
+  parseControlScheme,
   sameTarget,
   setReduceVfx,
   setVolume,
   settingsHitTest,
   settingsLayout,
   settingsModel,
+  storedControlScheme,
   toggleReduceVfx,
   volumeButtons,
   volumeLevel,
 } from './settings';
-import type { VolumeChannel } from './settings';
+import type { ControlScheme, VolumeChannel } from './settings';
 import { hitRect } from './menu-geometry';
 import { singlePrimary } from './gantry';
 import { BEAM, COLUMN, ROW, TOUCH_MIN, rowHeight, frameMetrics } from '../art/materials';
@@ -94,17 +101,18 @@ describe('the value and how it changes', () => {
 
 describe('the frame model reads its values from their true sources', () => {
   it('shows the fire mode passed in, both ways', () => {
-    const manual = settingsModel(createSettings(), FireMode.Manual, 'sticks');
-    const auto = settingsModel(createSettings(), FireMode.AutoAim, 'sticks');
+    const manual = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard');
+    const auto = settingsModel(createSettings(), FireMode.AutoAim, 'sticks', 'keyboard');
     expect(manual.rows[0]).toMatchObject({ kind: 'fireMode', value: 'MANUAL', on: false });
     expect(auto.rows[0]).toMatchObject({ kind: 'fireMode', value: 'AUTO-AIM', on: true });
   });
 
   it('shows the control scheme passed in, the ratified wording, both ways', () => {
-    const sticks = settingsModel(createSettings(), FireMode.Manual, 'sticks');
-    const tap = settingsModel(createSettings(), FireMode.Manual, 'tap');
-    // "CONTROLS: STICKS / TAP COMMANDER" — the label names the setting, the pill
-    // shows the seated scheme; Tap Commander is the engaged (on) state.
+    const sticks = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'touch');
+    const tap = settingsModel(createSettings(), FireMode.Manual, 'tap', 'keyboard');
+    // The label names the setting, the pill shows the seated scheme; Tap Commander
+    // is the engaged (on) state. The default scheme's WORD is per-device (u8-01,
+    // asserted in full below) — on touch it is still STICKS.
     expect(sticks.rows.find((r) => r.kind === 'controls')).toMatchObject({
       label: 'CONTROLS',
       value: 'STICKS',
@@ -119,7 +127,7 @@ describe('the frame model reads its values from their true sources', () => {
 
   it('shows reduce VFX and carries every volume as filled steps', () => {
     const s = setVolume(toggleReduceVfx(createSettings()), 'master', 0.5);
-    const model = settingsModel(s, FireMode.Manual, 'sticks');
+    const model = settingsModel(s, FireMode.Manual, 'sticks', 'keyboard');
     const vfx = model.rows.find((r) => r.kind === 'reduceVfx');
     expect(vfx).toMatchObject({ value: 'ON', on: true });
     const master = model.rows.find((r) => r.channel === 'master');
@@ -127,13 +135,95 @@ describe('the frame model reads its values from their true sources', () => {
   });
 
   it('lists one row per SETTINGS_ROWS, in order', () => {
-    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks');
+    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard');
     expect(model.rows.map((r) => r.kind)).toEqual(SETTINGS_ROWS.map((r) => r.kind));
     expect(model.rows).toHaveLength(SETTINGS_ROWS.length);
   });
 
   it('carries the header beam\'s standing instruction, verbatim from the handoff', () => {
-    expect(settingsModel(createSettings(), FireMode.Manual, 'sticks').eyebrow).toBe(SETTINGS_EYEBROW);
+    expect(settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard').eyebrow).toBe(SETTINGS_EYEBROW);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u8-01 — the CONTROLS row names the device in front of the player
+// ---------------------------------------------------------------------------
+//
+// The bug, verbatim from the field report (2026-08-06, with a screenshot of
+// `CONTROLS · STICKS` on a PC): "this is wrong for pc, it should be KEYBOARD +
+// MOUSE or MOUSE ONLY and not sticks (there are no sticks, unless someone is
+// playing with gamepad... then wen can call it TWIN STICKS (but only if gamepad
+// detected)". `'sticks'` was the scheme's INTERNAL name printed verbatim on every
+// device. The internal name stays; the word the player reads does not.
+describe('the CONTROLS row says what the player actually holds (u8-01)', () => {
+  /** The word the row shows, through the real model — the shipped path, not the
+   *  label table on its own. */
+  const controlsWord = (scheme: ControlScheme, device: DeviceKind): string | undefined =>
+    settingsModel(createSettings(), FireMode.Manual, scheme, device).rows.find((r) => r.kind === 'controls')
+      ?.value;
+
+  it('names each device exactly once, and never prints the internal name on a PC', () => {
+    expect(controlsWord('sticks', 'touch')).toBe('STICKS');
+    expect(controlsWord('sticks', 'gamepad')).toBe('TWIN STICKS');
+    expect(controlsWord('sticks', 'keyboard')).toBe('KEYBOARD + MOUSE');
+    // The exact screenshot state: a desktop with no pad must not read the bare
+    // scheme name, whatever else changes about the wording.
+    expect(controlsWord('sticks', 'keyboard')).not.toBe('STICKS');
+  });
+
+  it('reads TAP COMMANDER on every device — a scheme is not a device', () => {
+    for (const device of ['keyboard', 'gamepad', 'touch'] as const) {
+      expect(controlsWord('tap', device)).toBe(TAP_COMMANDER_LABEL);
+    }
+  });
+
+  it('flips KEYBOARD + MOUSE → TWIN STICKS when a pad connects, and back when it goes', () => {
+    // What the wiring layer does with `gamepadconnected` / `gamepaddisconnected`:
+    // the flag moves, the device is re-derived, the row is re-rendered.
+    const desktopWord = (gamepadConnected: boolean): string | undefined =>
+      controlsWord('sticks', controlsDevice({ isTouch: false, gamepadConnected }));
+
+    expect(desktopWord(false)).toBe('KEYBOARD + MOUSE');
+    expect(desktopWord(true)).toBe('TWIN STICKS');
+    // A pad whose battery dies must not leave a stale TWIN STICKS behind — the
+    // same class of lie this brief exists to remove.
+    expect(desktopWord(false)).toBe('KEYBOARD + MOUSE');
+  });
+
+  it('leaves touch alone — the virtual sticks are real and on the glass', () => {
+    expect(controlsDevice({ isTouch: true, gamepadConnected: false })).toBe('touch');
+    expect(controlsDevice({ isTouch: true, gamepadConnected: true })).toBe('touch');
+    expect(controlsWord('sticks', 'touch')).toBe('STICKS');
+  });
+
+  it('is KEYBOARD + MOUSE and not "MOUSE ONLY", because the bindings say so', () => {
+    // The developer offered either wording; the binding table settles it. A player
+    // cannot move without the keyboard, so "mouse only" would replace one false
+    // label with another. Read from `describeBindings` — the same map that drives
+    // the sim — so a re-binding that made the mouse sufficient would fail here
+    // rather than leave the label quietly wrong.
+    const rows = describeBindings('keyboard', FireMode.Manual);
+    expect(rows.find((r) => r.action === 'thrust')?.binding).toBe('WASD');
+    expect(rows.find((r) => r.action === 'aim')?.binding).toBe('Mouse');
+    expect(STICKS_LABELS.keyboard).toBe('KEYBOARD + MOUSE');
+  });
+
+  it('changed the word only — the persisted scheme is still the string "sticks"', () => {
+    // A save written by any earlier build says `sticks`, and renaming the stored
+    // value would seat an unknown scheme for anyone who already has a preference.
+    // Asserted as literal storage strings, in both directions, so a future rename
+    // of the union cannot silently break saved preferences.
+    expect(CONTROL_SCHEME_STORAGE.sticks).toBe('sticks');
+    expect(CONTROL_SCHEME_STORAGE.tap).toBe('tap');
+    for (const scheme of ['sticks', 'tap'] as const) {
+      expect(parseControlScheme(storedControlScheme(scheme))).toBe(scheme);
+    }
+    expect(storedControlScheme('sticks')).toBe('sticks');
+    expect(parseControlScheme('sticks')).toBe('sticks');
+    // And anything else a storage seam can hand back folds to the default.
+    for (const stale of [null, undefined, '', 'STICKS', 'twin-sticks', 'keyboard']) {
+      expect(parseControlScheme(stale)).toBe('sticks');
+    }
   });
 });
 
@@ -143,7 +233,7 @@ describe('the frame model reads its values from their true sources', () => {
 // setting behind it, is a surface.
 describe('one bright plate, and only one', () => {
   it('makes DONE the screen\'s only primary', () => {
-    const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap');
+    const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'keyboard');
     expect(model.backRole).toBe('primary');
     expect(singlePrimary([model.backRole])).toBe(true);
   });
@@ -152,7 +242,7 @@ describe('one bright plate, and only one', () => {
     // Six rows all "on" is the worst case for a screen that marks state by
     // brightness — if a row could go primary, this is where it would.
     const loud = setVolume(toggleReduceVfx(createSettings()), 'master', 1);
-    const model = settingsModel(loud, FireMode.AutoAim, 'tap');
+    const model = settingsModel(loud, FireMode.AutoAim, 'tap', 'keyboard');
     expect(model.rows.some((r) => r.on)).toBe(true);
     // The model exposes no role for a row precisely because a row has no choice
     // of one; the view draws every row `inert`. Asserted as the whole screen's
@@ -163,17 +253,17 @@ describe('one bright plate, and only one', () => {
 
 describe('rest / hover / press', () => {
   it('resolves a row\'s state, with a press outranking a hover', () => {
-    const rest = settingsModel(createSettings(), FireMode.Manual, 'sticks');
+    const rest = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard');
     expect(rest.rows.every((r) => r.state === 'rest')).toBe(true);
     expect(rest.backState).toBe('rest');
 
-    const hovered = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+    const hovered = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard', {
       hover: { kind: 'reduceVfx' },
     });
     expect(hovered.rows.find((r) => r.kind === 'reduceVfx')?.state).toBe('hover');
     expect(hovered.rows.find((r) => r.kind === 'fireMode')?.state).toBe('rest');
 
-    const pressed = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+    const pressed = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard', {
       hover: { kind: 'back' },
       press: { kind: 'back' },
     });
@@ -181,7 +271,7 @@ describe('rest / hover / press', () => {
   });
 
   it('addresses a volume row\'s two ends separately — the bar between them is inert', () => {
-    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks', {
+    const model = settingsModel(createSettings(), FireMode.Manual, 'sticks', 'keyboard', {
       press: { kind: 'volume', channel: 'sfx', dir: 1 },
     });
     const sfx = model.rows.find((r) => r.channel === 'sfx');

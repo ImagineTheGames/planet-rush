@@ -115,6 +115,11 @@ import { pingFits } from '../net/ping';
 // Reference type sizes, read off the handoff's lobby / ship-select screens
 // ---------------------------------------------------------------------------
 
+// Both font stacks come from ./typography (imported above) rather than being
+// spelled out a second time — that module owns them so a face swap is one line,
+// and this file's own local copy drifting from it is what a1-01 found on the CI
+// runner. Nothing below re-declares one.
+
 /** `CREW MUSTER` in the header beam, and `ROOM` above the code. */
 const HEADING_PX = 22;
 const EYEBROW_PX = 12;

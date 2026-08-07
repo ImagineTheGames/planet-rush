@@ -54,6 +54,10 @@ there, and touching a target attacks it* — both PC (click) and mobile (touch),
 mining included ("a rock is just a target"). The other schemes are untouched and
 **default**; Tap Commander is a scheme selected in settings ("CONTROLS: Sticks /
 Tap Commander"), persisted like the fire mode (`planet-rush:controlScheme`).
+*(u8-01, 2026-08-06: the row's player-facing word for the default scheme is now
+the device in front of the player — `STICKS` on touch, `TWIN STICKS` when a pad is
+detected, `KEYBOARD + MOUSE` on a PC without one, read off this very table. The
+scheme's internal name and its persisted value are untouched and still `sticks`.)*
 
 It is **not a fourth device** and it is **not a new action** — it is a *local
 pilot* (`src/platform/tap-pilot.ts`) that turns the player's standing **order** (a

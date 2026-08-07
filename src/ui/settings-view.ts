@@ -146,12 +146,10 @@ export class SettingsView extends Container {
       .fill({ color: PALETTE.vacuum, alpha: 0.96 });
 
     this.beams.clear();
-    // The beams are drawn at the height the FRAME resolved, not the handoff's
-    // 92 — see ../art/materials `drawBeam`.
-    if (header.height > 0)
-      drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
-    if (footer.height > 0)
-      drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
+    // The beams paint the height the FRAME reserved, not a flat 92 (u7-04) — see
+    // `../art/materials` drawBeam for what the mismatch did on a phone.
+    if (header.height > 0) drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
+    if (footer.height > 0) drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
 
     this.drawHeader(model, title, metrics);
 

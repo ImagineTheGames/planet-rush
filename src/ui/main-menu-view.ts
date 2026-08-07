@@ -148,12 +148,12 @@ export class MainMenuView extends Container {
       .fill({ color: PALETTE.vacuum, alpha: 1 });
 
     this.beams.clear();
-    // The beams are drawn at the height the FRAME resolved, not the handoff's
-    // 92 — see ../art/materials `drawBeam`.
-    if (header.height > 0)
-      drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
-    if (footer.height > 0)
-      drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
+    // The beams paint the height the FRAME reserved, not a flat 92 (u7-04) — on a
+    // phone `frameMetrics` caps a beam at a fifth of the viewport, and painting the
+    // desktop number there put the header's accent rule 42px into the content band
+    // and the footer's body off the bottom of the screen.
+    if (header.height > 0) drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);
+    if (footer.height > 0) drawBeam(this.beams, footer.x, footer.y, footer.width, 'footer', true, footer.height);
 
     this.drawHeader(model, header, title, eyebrow, metrics);
 

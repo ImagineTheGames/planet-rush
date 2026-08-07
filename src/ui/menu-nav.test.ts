@@ -94,6 +94,18 @@ describe('ONE play flow: PLAY opens the doors, and every door lands in the lobby
     expect(NAV_EDGES.some((e) => e.from === 'main-menu' && e.to === 'lobby-online')).toBe(false);
   });
 
+  it('adds no edge for the CAMPAIGN teaser — it answers in place (u9-01)', () => {
+    // The doors screen grew a fourth button that navigates NOWHERE. That has to be
+    // an asserted absence rather than an oversight: an edge here would claim a
+    // screen exists, and the reachability proof would then demand an exit from a
+    // screen nobody can be on.
+    expect(NAV_EDGES.some((e) => /CAMPAIGN/i.test(e.via))).toBe(false);
+    expect(NAV_SCREENS.some((s) => /campaign/i.test(s))).toBe(false);
+    // …and the doors screen still leaves for the menu without starting a match.
+    expect(screenExits('online').some((e) => e.to === 'main-menu')).toBe(true);
+    expect(reachesMainMenuWithoutMatch('online')).toBe(true);
+  });
+
   it('reaches the offline lobby from PLAY SOLO and the online one from CREATE / JOIN', () => {
     const doors = NAV_EDGES.filter((e) => e.from === 'online' || e.from === 'online-keypad');
     expect(doors.some((e) => e.via === 'PLAY SOLO' && e.to === 'lobby')).toBe(true);

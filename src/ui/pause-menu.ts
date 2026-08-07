@@ -26,13 +26,30 @@
  * the drawing reuses the real settings screen ({@link ./settings-view}) so there
  * is one settings UI, not two.
  *
+ * ── GANTRY / BONE (u7-05) ───────────────────────────────────────────────────
+ * The overlay is made of the same material as the title and settings screens:
+ * a header beam carrying the screen's own name, a footer beam, and the actions
+ * as PLATES in the band between (`src/art/materials.ts`, the a5-01 vocabulary).
+ * Nothing about *what the screen says* moved — the words, the buttons, the state
+ * machine and the freeze rule are character for character what they were.
+ *
+ * **RESUME is the one bright plate**, and on the confirm screen **STAY is**. Bone
+ * spends no hue, so the primary action is simply the brightest and largest plate
+ * on screen, and it only works while there is exactly one ({@link ./gantry}
+ * `singlePrimary`, held by `pause-menu.test.ts`). That is the same safety
+ * property the old plasma fill carried — the eye, and any errant default, land on
+ * the safe action — restated in the material the rest of the menus are made of.
+ *
  * Pure and PixiJS-free, like the rest of the HUD's decision layer — it decides
  * what the screen says, where a tap lands, and whether the sim freezes;
  * {@link ./pause-menu-view} only colours it. Unit-tests headless.
  */
 
 import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
-import { centeredColumn, hitRect, menuContent } from './menu-geometry';
+import { COLUMN, TOUCH_MIN, plateHeight } from '../art/materials';
+import type { FrameMetrics, PlateRole, PlateScale, PlateState } from '../art/materials';
+import { beamContent, gantryFrame, stackPlates } from './gantry';
+import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -162,19 +179,54 @@ export function pauseButtons(screen: PauseScreen): readonly PauseButton[] {
 // The per-frame model
 // ---------------------------------------------------------------------------
 
+/**
+ * The plate a button is drawn as. The emphasised action is a `primary` `hero`
+ * plate — the brightest AND the largest, which is the whole of what Bone has to
+ * mark an action with — and everything else is a `secondary` `standard` plate,
+ * fully active steel and never the disabled costume.
+ *
+ * RESUME on the menu and STAY on the confirm are the emphasised ones, so the safe
+ * action is the bright one on both screens (developer §1: one accidental tap must
+ * not kill a match).
+ */
+export function pauseButtonPlate(id: PauseButton): { role: PlateRole; scale: PlateScale } {
+  return isPrimaryButton(id)
+    ? { role: 'primary', scale: 'hero' }
+    : { role: 'secondary', scale: 'standard' };
+}
+
+/** Whether a button is its screen's emphasised action. */
+function isPrimaryButton(id: PauseButton): boolean {
+  return id === 'resume' || id === 'stay';
+}
+
 export interface PauseButtonView {
   readonly id: PauseButton;
   readonly label: string;
-  /** Drawn as the affirmative/emphasised action (plasma): RESUME on the menu, and
-   *  STAY on the confirm — the safe default in both cases. */
+  /** The emphasised action: RESUME on the menu, STAY on the confirm — the safe
+   *  default in both cases. Under Gantry/Bone this is no longer a *colour*
+   *  difference (see {@link pauseButtonPlate}). */
   readonly primary: boolean;
+  readonly role: PlateRole;
+  readonly scale: PlateScale;
+  /** Rest / hover / press — the handoff's three plate states, driven by the
+   *  wiring layer's pointer routing (`src/main.ts`). Touch never hovers. */
+  readonly state: PlateState;
+}
+
+/** What the pointer is doing on the overlay: which button it is over, and which
+ *  (if any) it is holding down. */
+export interface PausePointer {
+  readonly hover?: PauseButton | null;
+  readonly press?: PauseButton | null;
 }
 
 export interface PauseMenuModel {
   readonly screen: PauseScreen;
-  /** PAUSED, or the confirm's question. Empty when no buttons are drawn. */
+  /** PAUSED, or the confirm's question. Empty when no buttons are drawn. Drawn in
+   *  the header beam, where every screen in the set puts its own name. */
   readonly headline: string;
-  /** One quiet line under the headline, or empty. */
+  /** One quiet line beside the headline, or empty. */
   readonly subhead: string;
   readonly buttons: readonly PauseButtonView[];
 }
@@ -184,13 +236,23 @@ export interface PauseMenuModel {
  * decides nothing. `settings` and `closed` return an empty, headline-less model —
  * the pause view hides itself and the settings screen (or the match) owns the
  * frame.
+ *
+ * A press outranks a hover on the same plate (a finger that is down is not
+ * hovering), and a plate that is neither is at rest — the same rule the title
+ * screen keeps.
  */
-export function pauseMenuModel(screen: PauseScreen): PauseMenuModel {
-  const buttons: PauseButtonView[] = pauseButtons(screen).map((id) => ({
-    id,
-    label: BUTTON_LABELS[id],
-    primary: id === 'resume' || id === 'stay',
-  }));
+export function pauseMenuModel(screen: PauseScreen, pointer: PausePointer = {}): PauseMenuModel {
+  const buttons: PauseButtonView[] = pauseButtons(screen).map((id) => {
+    const { role, scale } = pauseButtonPlate(id);
+    return {
+      id,
+      label: BUTTON_LABELS[id],
+      primary: isPrimaryButton(id),
+      role,
+      scale,
+      state: (pointer.press === id ? 'press' : pointer.hover === id ? 'hover' : 'rest') as PlateState,
+    };
+  });
   return {
     screen,
     headline: headlineFor(screen),
@@ -211,14 +273,22 @@ function subheadFor(screen: PauseScreen): string {
 }
 
 // ---------------------------------------------------------------------------
-// Layout — a centred headline over a stack of buttons (the ./menu-geometry ruler)
+// Layout — the Gantry frame: a named beam, a plate stack, a footer beam
 // ---------------------------------------------------------------------------
-
-export const PAUSE_HEADLINE_HEIGHT = 64;
-export const PAUSE_SUBHEAD_HEIGHT = 26;
-export const PAUSE_BUTTON_HEIGHT = 52;
-export const PAUSE_BUTTON_HEIGHT_TOUCH = 60;
-export const PAUSE_BUTTON_WIDTH_MAX = 320;
+//
+// The old geometry placed a 44px headline at 26% of the content box over a
+// `centeredColumn` of 52/60px rows — the pre-Gantry ruler, with its own
+// desktop/touch pair of button heights. All of that is replaced by the frame the
+// rest of the menus share ({@link ./gantry} `gantryFrame`): the screen names
+// itself in the header beam, its actions are plates in the band, and every metric
+// — margin, beam, gutter, plate height, thumb floor — is derived once in
+// {@link ../art/materials} `frameMetrics` rather than picked here.
+//
+// Which numbers that changes on a phone, and why, is the whole of §3b of that
+// file: the LOOK is ratified, the METRICS adapt, and the 48px thumb floor
+// outranks any scaled-down metric. `isTouch` no longer picks a taller button —
+// the floor is a property of the viewport, not of the input device, and it is
+// applied on every platform.
 
 export interface PauseLayoutOptions {
   readonly isTouch?: boolean;
@@ -227,50 +297,53 @@ export interface PauseLayoutOptions {
 
 export interface PauseLayout {
   readonly content: Rect;
-  readonly headline: Rect;
-  readonly subhead: Rect;
+  /** The header beam, full width inside the safe area. */
+  readonly header: Rect;
+  /** The footer beam. Carries no control — the overlay's actions are all in the
+   *  band — so it is structure, and the frame the DOWNLOAD LOG affordance
+   *  (`src/net/playtest-log-button`) sits over in the bottom-right corner. */
+  readonly footer: Rect;
+  /** The strip inside the header beam the screen's name and its line sit in. */
+  readonly title: Rect;
   /** One rect per button, in the model's button order. */
   readonly buttons: readonly Rect[];
   readonly isTouch: boolean;
+  readonly metrics: FrameMetrics;
 }
 
 /**
- * Lay the overlay out: the headline block a little above centre, the buttons
- * stacked below it — the same placement the end-of-match summary uses, so the two
- * full-screen overlays read as one family. `buttonCount` is passed rather than a
- * model so the geometry stays pure (two buttons on confirm, three on the menu,
- * placed the same way).
+ * Lay the overlay out for a viewport.
+ *
+ * `buttonIds` rather than a count, because the plates are no longer all one
+ * height: the emphasised action is a `hero` plate and the rest are `standard`
+ * ({@link pauseButtonPlate}), and size is half of what marks it as the primary.
+ * They are centred in the band and **compress proportionally** rather than
+ * overflowing, so that size difference survives a viewport too short to hold the
+ * stack at full height.
  */
 export function pauseLayout(
   viewport: Viewport,
-  buttonCount: number,
+  buttonIds: readonly PauseButton[],
   options: PauseLayoutOptions = {},
 ): PauseLayout {
   const isTouch = options.isTouch ?? false;
-  const content = menuContent(viewport, options.insets);
+  const frame = gantryFrame(viewport, options.insets);
+  const { metrics } = frame;
 
-  const headlineHeight = Math.min(PAUSE_HEADLINE_HEIGHT, content.height);
-  const subheadHeight = Math.min(PAUSE_SUBHEAD_HEIGHT, Math.max(0, content.height - headlineHeight));
-  const blockTop = content.y + Math.max(0, content.height * 0.26 - headlineHeight / 2);
-  const headline: Rect = { x: content.x, y: blockTop, width: content.width, height: headlineHeight };
-  const subhead: Rect = {
-    x: content.x,
-    y: headline.y + headlineHeight,
-    width: content.width,
-    height: subheadHeight,
+  const title = beamContent(frame.header, metrics);
+  const columnWidth = Math.min(COLUMN.title, frame.band.width);
+  const heights = buttonIds.map((id) => plateHeight(pauseButtonPlate(id).scale, metrics));
+  const buttons = stackPlates(frame.band, columnWidth, heights, metrics.gap);
+
+  return {
+    content: frame.content,
+    header: frame.header,
+    footer: frame.footer,
+    title,
+    buttons,
+    isTouch,
+    metrics,
   };
-
-  const rowHeight = isTouch ? PAUSE_BUTTON_HEIGHT_TOUCH : PAUSE_BUTTON_HEIGHT;
-  const stackTop = Math.max(subhead.y + subheadHeight, content.y + content.height * 0.5);
-  const band: Rect = {
-    x: content.x,
-    y: stackTop,
-    width: content.width,
-    height: Math.max(0, content.y + content.height - stackTop),
-  };
-  const buttons = centeredColumn(band, Math.max(0, buttonCount), PAUSE_BUTTON_WIDTH_MAX, rowHeight);
-
-  return { content, headline, subhead, buttons, isTouch };
 }
 
 /**
@@ -320,8 +393,19 @@ export const PAUSE_ANCHOR: AnchorSpec = { region: 'full' };
 export const PAUSE_BUTTON_ID = 'pause-button';
 export const PAUSE_BUTTON_ANCHOR: AnchorSpec = { region: 'full', margin: 0 };
 
-/** Side of the square pause button, CSS px — a comfortable thumb target. */
-export const PAUSE_BUTTON_SIZE = 40;
+/**
+ * Side of the square pause button, CSS px.
+ *
+ * **48, not the 40 it shipped at (u7-05).** This is the one control on either of
+ * these two screens that was under the thumb floor, and it is the one a player
+ * reaches for mid-play on a phone — the touch-only way into the overlay. 40px is
+ * `VALUE_CHIP`'s number, and {@link ../art/materials} `valueChipHeight` already
+ * floors *that* at {@link TOUCH_MIN} everywhere for the same reason; this is the
+ * same trade in the same direction ("where a literal metric cannot survive, the
+ * look wins and the number adapts"). It stays clear of the ore total either way —
+ * see {@link PAUSE_BUTTON_LEFT}.
+ */
+export const PAUSE_BUTTON_SIZE = TOUCH_MIN;
 /** Inset from the top edge, matching the HUD's own `HUD_PAD`. */
 export const PAUSE_BUTTON_MARGIN = 16;
 /** Inset from the left edge — past the top-left ore TOTAL block (its label + a

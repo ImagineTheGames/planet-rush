@@ -41,6 +41,23 @@ function world2(): World {
   });
 }
 
+/**
+ * A quiet four-slot world under an optional side table. `teams` omitted means
+ * **no `team` key at all** — the FFA roster shape the offline client boots with,
+ * and the one `createWorld` reads as teams-of-one.
+ */
+function world4(teams?: readonly number[]): World {
+  return createWorld({
+    seed: 7,
+    players: [0, 1, 2, 3].map((id) => {
+      const spec = { id, shipClass: ShipClass.Vanguard };
+      return teams?.[id] === undefined ? spec : { ...spec, team: teams[id]! };
+    }),
+    bounds: { width: 6000, height: 6000 },
+    asteroidCount: 0,
+  });
+}
+
 const ship = (w: World, id: number) => w.ships.find((s) => s.id === id)!;
 const station = (w: World, owner: number) => w.stations.find((p) => p.owner === owner)!;
 
@@ -80,6 +97,92 @@ describe('perception — the cockpit', () => {
     expect(view.self.alive).toBe(false);
     expect(view.ships).toHaveLength(0);
     expect(view.stations).toHaveLength(0);
+  });
+});
+
+/**
+ * **The view answers "is that one of mine?"** (Stage 1 Task 1.2,
+ * `docs/team-bots-plan.md`).
+ *
+ * A tree may not import `sim/allegiance.ts` — it has no `World` to hand it — so
+ * the side of every entity is stamped into the view (p16-01's `hostile`), and
+ * Stage 1 adds the one thing p16-01 had no reason to: the **roster of my own
+ * side**, which is what a bot needs to model the *win condition* rather than its
+ * own survival (`sim/match.ts` `resolveWinner`: the last TEAM with a core wins).
+ *
+ * The FFA case is asserted next to every teams case, because FFA is teams-of-one
+ * and that is what makes the whole thing degrade structurally: no allies, no
+ * ally list, no team-aware branch that can fire.
+ */
+describe('perception — my own side', () => {
+  it('reports the ally, and only the ally, at every range in a 2v2', () => {
+    const w = world4([0, 0, 1, 1]);
+    const me = ship(w, 0);
+
+    // Nose to nose, and then three arenas away: the roster does not move.
+    for (const at of [{ x: ship(w, 1).pos.x, y: ship(w, 1).pos.y }, { x: -9000, y: -9000 }]) {
+      me.pos = at;
+      const view = perceive(w, 0);
+      expect(view.self.team).toBe(0);
+      expect(view.allies.map((a) => a.id)).toEqual([1]);
+      expect(view.allies[0]!.stationAlive).toBe(true);
+      expect(view.allies[0]!.stationPos).toEqual(station(w, 1).pos);
+    }
+
+    // The other side sees the mirror image, and nobody is their own ally.
+    expect(perceive(w, 2).allies.map((a) => a.id)).toEqual([3]);
+    expect(perceive(w, 1).allies.map((a) => a.id)).toEqual([0]);
+    for (const id of [0, 1, 2, 3]) {
+      expect(perceive(w, id).allies.some((a) => a.id === id)).toBe(false);
+    }
+  });
+
+  it('has no allies at all in FFA — teams-of-one', () => {
+    const w = world4();
+    for (const id of [0, 1, 2, 3]) {
+      const view = perceive(w, id);
+      expect(view.allies).toEqual([]);
+      // Teams-of-one: a slot's side is its own id, and every hull is hostile.
+      expect(view.self.team).toBe(id);
+      expect(view.ships.every((s) => s.hostile)).toBe(true);
+      expect(view.stations.every((s) => s.hostile)).toBe(true);
+    }
+  });
+
+  it('lists a four-strong side ascending by id, self excluded', () => {
+    const w = createWorld({
+      seed: 3,
+      players: [0, 1, 2, 3, 4, 5, 6, 7].map((id) => ({
+        id,
+        shipClass: ShipClass.Vanguard,
+        team: id % 2,
+      })),
+      bounds: { width: 6000, height: 6000 },
+      asteroidCount: 0,
+    });
+    expect(perceive(w, 4).allies.map((a) => a.id)).toEqual([0, 2, 6]);
+    expect(perceive(w, 1).allies.map((a) => a.id)).toEqual([3, 5, 7]);
+  });
+
+  it('reports an ally home as a wreck, which is public at any range', () => {
+    const w = world4([0, 0, 1, 1]);
+    station(w, 1).alive = false;
+    ship(w, 0).pos = { x: 9000, y: 9000 };
+
+    const ally = perceive(w, 0).allies[0]!;
+    expect(ally.stationAlive).toBe(false);
+    // …and nothing else about it came along for the ride. The roster is three
+    // public facts; an ally's HP is scouted like anyone else's (Trap 8).
+    expect(Object.keys(ally).sort()).toEqual(['id', 'stationAlive', 'stationPos']);
+  });
+
+  it('still knows its own side while dead — the roster is not a sighting', () => {
+    const w = world4([0, 0, 1, 1]);
+    ship(w, 0).alive = false;
+    const view = perceive(w, 0);
+    expect(view.ships).toHaveLength(0);
+    expect(view.stations).toHaveLength(0);
+    expect(view.allies.map((a) => a.id)).toEqual([1]);
   });
 });
 

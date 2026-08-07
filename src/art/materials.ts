@@ -1420,6 +1420,26 @@ export type BeamKind = 'header' | 'footer';
  *
  * Pass `rivets = false` on a screen whose header carries a control where the
  * fasteners would sit. Allocates nothing.
+ *
+ * ---------------------------------------------------------------------------
+ * `height` — the beam paints the height the FRAME reserved for it (u7-04)
+ * ---------------------------------------------------------------------------
+ * This used to be hard-wired to {@link BEAM.height}, the handoff's 92, whatever
+ * rect the caller had laid out. On a desktop that is the same number and nothing
+ * moved. On a phone it is not: {@link frameMetrics} caps a beam at a fifth of the
+ * viewport (50px on an 844×390 handset), and the beam went on painting 92 — so a
+ * header's Bone accent rule landed 42px *below* the band the screen had reserved
+ * for its content, and a footer's dark body started 14px past the bottom edge and
+ * was never seen at all. The screen the mismatch got away with was the title,
+ * whose plates are centred in the band and happened to clear it; on a dense screen
+ * (the CODEX's tab row sits directly under the beam) it would have painted over
+ * the content.
+ *
+ * So the beam takes the height it was given, and its gradient stops, its accent
+ * rule and its bands all scale with it — the same "the look is ratified, the
+ * metrics adapt" rule the rest of this file is built on. The default is the
+ * handoff's own 92, so a caller that has no frame to hand (the material tests)
+ * still draws the reference beam.
  */
 export function drawBeam(
   canvas: PlateCanvas,
@@ -1430,9 +1450,8 @@ export function drawBeam(
   rivets = true,
   height: number = BEAM.height,
 ): void {
-  if (width <= 0) return;
-  const h = Math.max(0, height);
-  if (h <= 0) return;
+  if (width <= 0 || height <= 0) return;
+  const h = height;
   const stops = kind === 'header' ? BEAM.headerStops : BEAM.footerStops;
   const bandH = h / BEAM.bands;
 

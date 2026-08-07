@@ -130,21 +130,34 @@ export interface MatchServerConfig {
 }
 
 /**
- * Default room ceiling — a **measured** number, not the day-0 stand-in estimate
- * it replaced. `tests/harness/fleet-density.test.ts` stands up this many real
- * rooms, each running eight Hard bots (the worst case: bot AI runs server-side
- * and costs more than a human's input), and times one 60 Hz tick of the whole
- * fleet. At 32 the fleet costs ~1.5 ms/tick on the i9 dev core (~9% of the
- * 16.67 ms budget); the ~5×-slower shared-cpu-1x Fly guest the fleet deploys to
- * lands near ~45% of budget on the sustained (mean) cost the /health `loopLagMs`
- * gate watches — real headroom for a *hard* ceiling that must also absorb memory,
- * socket fan-out, and a noisy shared host. 64 (the previous value) measured out to
- * ~88% of the estimated target core at p99-adjacent load: too close to saturation
- * to be a ceiling. A performance CPU size lifts this (docs/netcode-spike.md,
- * "Status since (hosting)" — the live 20-minute sustained-CPU gate can re-raise it
- * once the real guest is measured).
+ * Default room ceiling, and the capacity a Machine advertises to the allocator.
+ *
+ * **Measured over the real wire, against the guest's quota** — m11-01,
+ * `docs/server-capacity.md`. A full 8-seat room (1 human + 7 Hard bots, real
+ * sockets, 30 Hz snapshots) costs **~4.7 ms of CPU per second of wall clock**.
+ * A `shared-cpu-1x` — what `fly.gameserver.toml` deploys — is metered at
+ * **6.25% of a core sustained**, i.e. 62.5 ms/s. At 70% of that, less the
+ * ~5.9 ms/s the empty process draws, **8 rooms fit**; less a 25% margin, **6**.
+ *
+ * This replaces 32, which was not careless but was measured against the wrong
+ * budget. `tests/harness/fleet-density.test.ts` timed the *sim* (0.047 ms per
+ * room-tick — the wire, the bots' fan-out, snapshot encoding and the control
+ * path are not in a bare `step()`, and together they are 1.7× again) and then
+ * compared 32 rooms against **one whole core's** 16.67 ms frame. 45% of a core
+ * is seven times a `shared-cpu-1x`'s entire sustained quota: the Machine would
+ * have throttled long before the loop noticed, and every room on it together.
+ *
+ * The loop is **not** the binding constraint on a shared guest — 40 rooms held a
+ * 5.5 ms p99 loop lag on a full core — so this ceiling tracks the CPU quota, and
+ * any Machine with a different quota MUST set `MAX_ROOMS` (`server/index.ts`).
+ * The €4 VPS fallback has a real core and wants ~100; a `shared-cpu-2x` wants 12.
+ * The default is deliberately wrong for those, in the safe direction:
+ * under-advertising costs capacity, over-advertising costs every player at once.
+ *
+ * `tests/net/capacity/capacity-regression.test.ts` gates the per-room cost this
+ * number is derived from, so it cannot drift back without CI saying so.
  */
-export const DEFAULT_MAX_ROOMS = 32;
+export const DEFAULT_MAX_ROOMS = 6;
 
 /**
  * The per-room shape a *new*-room join asks for (variable-slots Task C1): the

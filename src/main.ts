@@ -143,6 +143,7 @@ import {
   // into the right words.
   LobbyEntryView,
   entryLayout,
+  entryTargetKey,
   DOOR_OPTIONS,
   createEntry,
   entryModel,
@@ -157,6 +158,7 @@ import {
   KEYPAD_KEYS,
   regionPickerVisible,
   CodexView,
+  codexTargetKey,
   codexModel,
   codexLayout,
   createCodex,
@@ -177,6 +179,9 @@ import {
   settingsModel,
   settingsLayout,
   sameTarget,
+  controlsDevice,
+  parseControlScheme,
+  storedControlScheme,
   SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
@@ -1130,6 +1135,12 @@ async function boot(): Promise<void> {
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
+  // Whether a pad is CONNECTED — a different question from which device last
+  // acted, and the one the pause menu's CONTROLS row asks (u8-01): the row is a
+  // standing description of the hardware, so a connected pad reads TWIN STICKS
+  // whether or not it was the last thing touched. Kept live by the connect /
+  // disconnect listeners below.
+  let gamepadConnected = anyGamepadConnected();
 
   // --- Pause menu (developer ratification, p10) ------------------------------
   //     ESC (desktop) or a touch corner button opens an overlay over a match in
@@ -1165,19 +1176,39 @@ async function boot(): Promise<void> {
   // fires on touch; press is released on pointer-up or on a cancelled gesture.
   let pauseSettingsHover: SettingsTarget | null = null;
   let pauseSettingsPress: SettingsTarget | null = null;
+  // …and the same three states for the two full-screen overlays' own plates
+  // (u7-05). Both are made of the material now, and a plate that never lifts under
+  // the cursor or sinks under a finger is only two-thirds of the direction.
+  let pauseHover: PauseButton | null = null;
+  let pausePress: PauseButton | null = null;
+  let endHover: EndButton | null = null;
+  let endPress: EndButton | null = null;
   const releasePauseSettingsPress = (): void => {
     pauseSettingsPress = null;
+    pausePress = null;
+    endPress = null;
   };
   app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
   app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
   app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
-    if (pauseScreen !== 'settings') return;
     const lp = toLogical(e.clientX, e.clientY);
-    pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+    if (pauseScreen === 'settings') {
+      pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+      return;
+    }
+    if (isPauseOpen(pauseScreen)) {
+      pauseHover = pauseView.hitTest(lp.x, lp.y)?.kind ?? null;
+      return;
+    }
+    if (endOverlay.visible) endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
   });
   app.canvas.addEventListener('pointerleave', () => {
     pauseSettingsHover = null;
     pauseSettingsPress = null;
+    pauseHover = null;
+    pausePress = null;
+    endHover = null;
+    endPress = null;
   });
 
   const merged = createControlState();
@@ -1196,12 +1227,18 @@ async function boot(): Promise<void> {
 
   // Gamepad connect/disconnect are logged so the end-to-end verification pass can
   // confirm the pad registered (GDD §2.4). Polling in GamepadSource does the real
-  // work — it scans for the first connected pad — so play needs no event here.
+  // work — it scans for the first connected pad — so PLAY needs no event here;
+  // what does need them is the CONTROLS row's word (u8-01), which has to say
+  // TWIN STICKS the moment a pad appears and stop saying it the moment it goes.
+  // The disconnect re-scans rather than clearing the flag, because a second pad
+  // may still be plugged in.
   window.addEventListener('gamepadconnected', (e) => {
     console.info(`[gamepad] connected: ${(e as GamepadEvent).gamepad.id}`);
+    gamepadConnected = true;
   });
   window.addEventListener('gamepaddisconnected', () => {
     console.info('[gamepad] disconnected');
+    gamepadConnected = anyGamepadConnected();
   });
 
   const touch = new TouchController({ screenWidth: transform.logicalWidth });
@@ -1391,6 +1428,8 @@ async function boot(): Promise<void> {
     // and it always consumes the event.
     if (endOverlay.visible) {
       const target = endOverlay.hitTest(lp.x, lp.y);
+      endPress = target?.kind ?? null;
+      endHover = endPress;
       if (target) {
         haptics.haptic('tap');
         // ONE sound per state change (s6-01 rule 1): `handleEndTarget` names the
@@ -1971,10 +2010,14 @@ async function boot(): Promise<void> {
     if (desired === 'none') {
       if (endOverlay.visible) endOverlay.visible = false;
       if (endButtonsShown.length) endButtonsShown = [];
+      // A screen that is gone is not being hovered: a stale hover would light a
+      // plate up the moment the overlay came back, under a cursor that never moved.
+      endHover = null;
+      endPress = null;
       return;
     }
     if (!endOverlay.visible) endOverlay.visible = true;
-    const model = endOfMatchModel(currentOutcome(over));
+    const model = endOfMatchModel(currentOutcome(over), { hover: endHover, press: endPress });
     endButtonsShown = model.buttons.map((b) => b.id);
     endOverlay.update(model);
   }
@@ -2115,6 +2158,9 @@ async function boot(): Promise<void> {
       return;
     }
     const target = pauseView.hitTest(lx, ly);
+    // The plate goes down before it acts (u7-01), and is released on pointer-up.
+    pausePress = target?.kind ?? null;
+    pauseHover = pausePress;
     if (target) handlePauseButton(target.kind);
   }
 
@@ -2175,7 +2221,7 @@ async function boot(): Promise<void> {
       case 'controls':
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
         audio.cue('detent');
         break;
       case 'reduceVfx':
@@ -2221,14 +2267,26 @@ async function boot(): Promise<void> {
    *  rendered frame. Offline the loop has already frozen the sim; render keeps
    *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
   function syncPause(): void {
+    // A closed overlay is not being hovered, and a plate that is no longer on the
+    // screen is not being held down (u7-05) — otherwise the next ESC would open
+    // the menu with RESUME already lit under a cursor that never moved.
+    if (!isPauseOpen(pauseScreen)) {
+      pauseHover = null;
+      pausePress = null;
+    }
     // The pause overlay: the menu or the confirm. While the settings screen is up
     // the overlay hides (the real settings view takes its place), so feed 'closed'.
-    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    pauseView.update(
+      pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen, {
+        hover: pauseHover,
+        press: pausePress,
+      }),
+    );
     const settingsUp = pauseScreen === 'settings';
     pauseSettings.visible = settingsUp;
     if (settingsUp) {
       pauseSettings.update(
-        settingsModel(matchSettings, fireMode, controlScheme, {
+        settingsModel(matchSettings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
           hover: pauseSettingsHover,
           press: pauseSettingsPress,
         }),
@@ -3460,6 +3518,20 @@ async function boot(): Promise<void> {
         }
         return true;
       },
+      /** The same staging with the LOCAL seat as the survivor, so the VICTORY
+       *  face of the result screen can be photographed and gated (u7-05). It is
+       *  the only one of the four the other methods cannot reach — `endMatch`
+       *  always leaves someone else standing — and it is the one the winner's
+       *  identity rule only appears on. Drives the sim's own `destroyCore`, like
+       *  its sibling; the win itself is still resolved by the sim's next tick. */
+      winLocal(): boolean {
+        const mine = world.stations.find((p) => p.owner === LOCAL_PLAYER && p.alive);
+        if (!mine) return false;
+        for (const p of world.stations) {
+          if (p.owner !== LOCAL_PLAYER && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
       },
@@ -3896,7 +3968,7 @@ async function boot(): Promise<void> {
       setScheme(scheme: 'sticks' | 'tap'): void {
         controlScheme = scheme;
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
       },
       /** Park the local ship at the arena centre with one bot a short hop away in
        *  weapon range, both out of spawn protection, and clear the asteroid field so
@@ -4379,7 +4451,7 @@ async function boot(): Promise<void> {
       }
       if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
         const ids = pauseButtons(pauseScreen);
-        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        const l = pauseLayout({ width: w, height: h }, ids, { isTouch });
         return l.buttons.map((r, i) => ({
           kind: ids[i] ?? 'button',
           physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
@@ -4697,7 +4769,7 @@ async function boot(): Promise<void> {
     if (e.code === 'KeyC') {
       controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
       tapPilot.clear();
-      platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+      platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
     }
     // Minimap toggle (field request v0.2.2): the `M` keyboard shortcut on PC, the
     // desktop convenience over the primary click/tap gesture — the same toggle the
@@ -5031,7 +5103,27 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
  *  existing schemes stay the untouched default and a bad key can never seat an
  *  unknown scheme. Read through the same platform seam as the fire mode. */
 function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): ControlScheme {
-  return platform.storage.get(CONTROL_SCHEME_KEY) === 'tap' ? 'tap' : 'sticks';
+  // The stored string is the UI's own round trip (`./ui` `parseControlScheme` /
+  // `storedControlScheme`), so the persisted value and the scheme it seats can
+  // never drift apart — and `sticks` keeps meaning the default scheme even now
+  // that no screen prints that word on a PC (u8-01).
+  return parseControlScheme(platform.storage.get(CONTROL_SCHEME_KEY));
+}
+
+/**
+ * Is a gamepad connected RIGHT NOW? The one browser read behind the CONTROLS
+ * row's `TWIN STICKS` (u8-01) — asked here, in the wiring layer, because
+ * `src/ui` must stay pure and headless-testable and sniffing `navigator` is the
+ * platform's job. Scans every slot rather than assuming slot 0, exactly as
+ * `GamepadSource` does: browsers assign a pad's index lazily and it varies by
+ * device and port.
+ */
+function anyGamepadConnected(): boolean {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return false;
+  for (const pad of navigator.getGamepads()) {
+    if (pad && pad.connected) return true;
+  }
+  return false;
 }
 
 /** The hull to pre-select in the lobby: the last one this player chose, or the
@@ -5312,6 +5404,11 @@ interface OnlineSeam {
   status: EntryState['status'];
   /** The refusal line, in the player's words, or `''`. */
   error: string;
+  /** The ANSWER line, or `''` — `Coming Soon…` while the CAMPAIGN teaser's press
+   *  is standing (u9-01). Separate from {@link error} exactly as it is in the
+   *  model: a door that is not built yet is not a failure, and a live-stage run
+   *  that read it off `error` would be asserting the wrong thing. */
+  notice: string;
   /**
    * The screen's TITLE, exactly as drawn: the standing line (`MINE · DEFEND ·
    * ATTACK`, `ENTER THE ROOM CODE`) when nothing is connecting, and the live
@@ -5329,12 +5426,30 @@ interface OnlineSeam {
   /** The globally-unique code the allocator minted on a successful CREATE, or
    *  `null`. Never client-guessed (M3 — use `assignment.code` verbatim). */
   resolvedCode: string | null;
-  /** The three doors and BACK, each with the physical point a real press must land
+  /** The four doors and BACK, each with the physical point a real press must land
    *  on (through the landscape-lock remap) — the front-door handles a live-stage run
    *  drives the ratified flow through with real input on both form factors, rather
-   *  than by calling the seam methods below. */
-  doorControls: readonly { kind: string; physicalCenter: { x: number; y: number } }[];
+   *  than by calling the seam methods below.
+   *
+   *  `physicalBounds` is the same rect as a box rather than a point, both corners
+   *  through the rotation and re-normalised. The mobile suite turns it into a
+   *  screenshot region and counts the pixels inside it, which is how this project
+   *  proves a control was DRAWN and not merely modelled (`playwright.config.ts`,
+   *  and the u5 seat-state control before it). */
+  doorControls: readonly {
+    kind: string;
+    physicalCenter: { x: number; y: number };
+    physicalBounds: { x: number; y: number; width: number; height: number };
+  }[];
+  /** The message slot under the wordmark, as drawn — the line that carries the
+   *  tagline, a refusal, or the CAMPAIGN teaser's `Coming Soon…` (u9-01). Reported
+   *  so the mobile suite can shoot the words themselves rather than trust the
+   *  string the model handed the view. */
+  messageBounds: { x: number; y: number; width: number; height: number };
   open(): void;
+  /** CAMPAIGN — the teaser above SOLO (u9-01). Says `Coming Soon…` and goes
+   *  nowhere: no transport, no lobby, no screen change. */
+  campaign(): void;
   /** PLAY SOLO — the offline door. Needs no server, and lands in the same lobby the
    *  online doors do (ratified: one lobby, both modes). */
   solo(): void;
@@ -5381,6 +5496,12 @@ function openMainMenu(
   // with. The CONTROLS settings row shows and toggles it here, persisting to that
   // seam so the choice carries into the match exactly as the fire mode does.
   let controlScheme = readControlScheme(platform);
+  // Whether a pad is connected, for the CONTROLS row's word (u8-01): STICKS on
+  // touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a PC without one. The menu
+  // has no input funnel and no `activeDevice`, so this is the whole of what it
+  // needs to know about the hardware — and it is a live value, because a pad can
+  // be plugged in or die while the screen is open (see the listeners below).
+  let gamepadConnected = anyGamepadConnected();
   let settings: SettingsState = createSettings();
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
@@ -5431,6 +5552,14 @@ function openMainMenu(
   let menuPress: MainMenuOption | null = null;
   let settingsHover: SettingsTarget | null = null;
   let settingsPress: SettingsTarget | null = null;
+  // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
+  // same hover/press routing the title and settings screens have had since u7-01.
+  // Both are keyed by a plain string rather than a target object, because a pad of
+  // 32 keys and a rail of 14 entries want an index in the key, not a comparison.
+  let entryHover: string | null = null;
+  let entryPress: string | null = null;
+  let codexHover: string | null = null;
+  let codexPress: string | null = null;
   ctx.root.addChild(menuView, settingsView, codexView, entryView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
@@ -5474,12 +5603,15 @@ function openMainMenu(
     screen: 'home',
     status: 'idle',
     error: '',
+    notice: '',
     title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
     resolvedCode: null,
     doorControls: [],
+    messageBounds: { x: 0, y: 0, width: 0, height: 0 },
     open: (): void => openDoors(),
+    campaign: (): void => chooseEntryDoor('campaign'),
     solo: (): void => chooseEntryDoor('solo'),
     create: (): void => chooseEntryDoor('create'),
     join: (): void => chooseEntryDoor('join'),
@@ -5709,11 +5841,16 @@ function openMainMenu(
     if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
     if (settingsView.visible) {
       settingsView.update(
-        settingsModel(settings, fireMode, controlScheme, { hover: settingsHover, press: settingsPress }),
+        settingsModel(settings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
+          hover: settingsHover,
+          press: settingsPress,
+        }),
       );
     }
-    if (codexView.visible) codexView.update(codexModel(codexState));
-    if (entryView.visible) entryView.update(entryModel(entry, connectNarration()));
+    if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
+    if (entryView.visible) {
+      entryView.update(entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }));
+    }
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -5739,30 +5876,46 @@ function openMainMenu(
     onlineSeam.error = entry.error;
     // Read off the same model the view draws, never re-derived — a seam that
     // computes its own answer can agree with a screen that says something else.
-    onlineSeam.title = entryModel(entry, connectNarration()).prompt;
+    const model = entryModel(entry, connectNarration());
+    onlineSeam.title = model.prompt;
+    onlineSeam.notice = model.notice;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
     const { w, h } = ctx.logicalSize();
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
       ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
+    // Both corners through the rotation, then re-normalised — under the landscape
+    // lock the two corners swap sides, so a raw (x, y, w, h) built from one of them
+    // would be a backwards box on a phone.
+    const box = (r: Rect): { x: number; y: number; width: number; height: number } => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    };
+    const control = (kind: string, r: Rect): OnlineSeam['doorControls'][number] => ({
+      kind,
+      physicalCenter: point(r),
+      physicalBounds: box(r),
+    });
+    const nowhere: Rect = { x: 0, y: 0, width: 0, height: 0 };
     const front =
       entry.screen === 'join'
         ? [
             // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
             // room code by pressing the very keys a player's thumb finds.
-            ...KEYPAD_KEYS.map((ch, i) => ({
-              kind: `key:${ch}`,
-              physicalCenter: point(layout.keys[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-            })),
-            { kind: 'erase', physicalCenter: point(layout.erase) },
-            { kind: 'submit', physicalCenter: point(layout.submit) },
+            ...KEYPAD_KEYS.map((ch, i) => control(`key:${ch}`, layout.keys[i] ?? nowhere)),
+            control('erase', layout.erase),
+            control('submit', layout.submit),
           ]
-        : DOOR_OPTIONS.map((option, i) => ({
-            kind: option.door,
-            physicalCenter: point(layout.doors[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-          }));
-    onlineSeam.doorControls = [...front, { kind: 'back', physicalCenter: point(layout.back) }];
+        : DOOR_OPTIONS.map((option, i) => control(option.door, layout.doors[i] ?? nowhere));
+    onlineSeam.doorControls = [...front, control('back', layout.back)];
+    onlineSeam.messageBounds = box(layout.message);
   }
 
   /** Open THE DOORS — what PLAY does now (ratified: one play flow), and the only
@@ -5790,6 +5943,15 @@ function openMainMenu(
    *  away and `boot()` opens the lobby offline; CREATE / JOIN go through the
    *  allocator and open the same lobby online once the room welcomes us. */
   function chooseEntryDoor(door: EntryDoor): void {
+    if (door === 'campaign') {
+      // The teaser (u9-01). It answers in place: `chooseDoor` puts `Coming Soon…`
+      // in the entry state's notice and returns no intent, so there is nothing to
+      // resolve, no socket to open and no screen to leave. Rendering is the whole
+      // of the effect.
+      entry = chooseDoor(entry, door, onlineRng).state;
+      render();
+      return;
+    }
     if (door === 'solo') {
       endConnectTrace();
       beginSolo();
@@ -6274,7 +6436,7 @@ function openMainMenu(
         // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
         // and carries into the match exactly as the fire mode does.
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
         ctx.cue('detent');
         break;
       case 'reduceVfx':
@@ -6325,7 +6487,12 @@ function openMainMenu(
       }
     } else if (screen === 'online') {
       const hit = entryView.hitTest(x, y);
+      // The plate goes down before it acts, so a press that navigates away has
+      // still been *seen* to be a press (u7-04, the same routing as the menu).
+      entryPress = entryTargetKey(hit);
+      entryHover = entryPress;
       if (hit) applyEntryTarget(hit);
+      else render();
       // A tap off the controls does nothing: the doors are three buttons and a
       // keypad, and RUSH! is the LOBBY's now — it used to be a bare tap-anywhere
       // here, which is exactly the shortcut the ratified flow replaced.
@@ -6341,6 +6508,11 @@ function openMainMenu(
       // scrolls it instead of selecting whatever entry it started on.
       const rail = codexLayoutNow().rail;
       codexDrag = { startX: x, startY: y, lastX: x, lastY: y, moved: false, overRail: withinRect(rail, x, y) };
+      // The plate goes down under the finger, and comes back up on pointer-up
+      // whether the gesture turned out to be a tap or a scroll (u7-04).
+      codexPress = codexTargetKey(codexView.hitTest(x, y));
+      codexHover = codexPress;
+      render();
     }
     e.preventDefault();
   }
@@ -6357,9 +6529,9 @@ function openMainMenu(
    */
   function hoverKey(x: number, y: number): string | null {
     if (screen === 'menu') return menuView.hitTest(x, y);
-    if (screen === 'online') return keyOf(entryView.hitTest(x, y));
+    if (screen === 'online') return entryTargetKey(entryView.hitTest(x, y));
     if (screen === 'settings') return keyOf(settingsView.hitTest(x, y));
-    return keyOf(codexView.hitTest(x, y));
+    return codexTargetKey(codexView.hitTest(x, y));
   }
 
   let hovered: string | null = null;
@@ -6394,6 +6566,18 @@ function openMainMenu(
           settingsHover = hit;
           render();
         }
+      } else if (screen === 'online') {
+        const hit = entryTargetKey(entryView.hitTest(p.x, p.y));
+        if (hit !== entryHover) {
+          entryHover = hit;
+          render();
+        }
+      } else if (screen === 'codex') {
+        const hit = codexTargetKey(codexView.hitTest(p.x, p.y));
+        if (hit !== codexHover) {
+          codexHover = hit;
+          render();
+        }
       }
     }
     if (screen !== 'codex' || !codexDrag) return;
@@ -6416,16 +6600,20 @@ function openMainMenu(
     // A finger lifting releases the plate it was holding, on whichever screen it
     // was held. `pointercancel` routes here too, so a gesture the browser steals
     // cannot strand a plate in its pressed state.
-    if (menuPress !== null || settingsPress !== null) {
+    if (menuPress !== null || settingsPress !== null || entryPress !== null || codexPress !== null) {
       menuPress = null;
       settingsPress = null;
+      entryPress = null;
+      codexPress = null;
       // Touch has no hover to fall back to: a lifted finger leaves nothing under
       // it, so the plate returns to rest rather than to a hover it never had.
       if (e.pointerType === 'touch') {
         menuHover = null;
         settingsHover = null;
+        entryHover = null;
+        codexHover = null;
       }
-      if (screen === 'menu' || screen === 'settings') render();
+      render();
     }
     if (screen !== 'codex' || !codexDrag) {
       codexDrag = null;
@@ -6491,6 +6679,23 @@ function openMainMenu(
     render();
   }
 
+  /**
+   * A pad appeared or went away while the menu is up (u8-01).
+   *
+   * The menu is static — it redraws on a state change, not every frame — so the
+   * new word has to be *pushed*, or a pad plugged in on the settings screen would
+   * leave `KEYBOARD + MOUSE` on screen until something else happened to trigger a
+   * render. Connect trusts its own event; disconnect re-scans, because a second
+   * pad may still be plugged in.
+   */
+  function setGamepadConnected(connected: boolean): void {
+    if (connected === gamepadConnected) return;
+    gamepadConnected = connected;
+    render();
+  }
+  const onGamepadConnected = (): void => setGamepadConnected(true);
+  const onGamepadDisconnected = (): void => setGamepadConnected(anyGamepadConnected());
+
   function relayout(): void {
     // Landscape lock first: re-apply the root transform for the new canvas size,
     // then re-lay the menu in the resulting logical (landscape) viewport — the
@@ -6514,6 +6719,8 @@ function openMainMenu(
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
+    window.removeEventListener('gamepadconnected', onGamepadConnected);
+    window.removeEventListener('gamepaddisconnected', onGamepadDisconnected);
     window.visualViewport?.removeEventListener('resize', relayout);
     ctx.root.removeChild(menuView, settingsView, codexView, entryView);
     menuView.destroy({ children: true });
@@ -6531,6 +6738,8 @@ function openMainMenu(
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);
+  window.addEventListener('gamepadconnected', onGamepadConnected);
+  window.addEventListener('gamepaddisconnected', onGamepadDisconnected);
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);
