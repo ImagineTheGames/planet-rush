@@ -161,6 +161,20 @@ export function thinkOnce(
   dt: number,
   env: Perception = DEFAULT_PERCEPTION,
 ): readonly Action[] {
+  // **Elimination is checked before the cadence, not after it.** A core dies
+  // between decisions, and the held stream is a hand still on the stick — so a
+  // bot eliminated a tick after it pressed thrust went on re-emitting that press
+  // until its reaction interval next came round. Measured at 4 ticks in a real
+  // 2v2 (Stage 1 Task 1.7), which is small, invisible, and squarely against the
+  // sentence above: an eliminated bot emits nothing at all, from the tick its
+  // match ends. The sim skips a dead ship's intent entirely (`sim/step.ts`), so
+  // this changes no world state — it changes what the harness *claims*, and the
+  // claim is the thing other agents build on.
+  if (isEliminated(world, bot.seat.id)) {
+    bot.actions = NO_ACTIONS;
+    return NO_ACTIONS;
+  }
+
   bot.sinceDecision += dt;
   if (bot.sinceDecision < bot.reactionInterval) return bot.actions;
   bot.sinceDecision = 0;
@@ -170,6 +184,22 @@ export function thinkOnce(
   // Emit the decision once; hold only what a human would still be holding.
   bot.actions = holdable(decided);
   return decided;
+}
+
+/**
+ * Is this slot's match over (GDD §2.7)? A cheap direct read rather than a view:
+ * `perceive` is the expensive half of a tick and there is nothing to perceive.
+ *
+ * **A dead home ends that player's match even when their side plays on** —
+ * ratified by the developer, 2026-08-05 ("if your core dies you are out"), which
+ * is what `destroyCore` → `eliminate` has always done (`sim/match.ts`) and what
+ * `src/bots/team-winning.test.ts` pins from this side.
+ */
+function isEliminated(world: World, id: PlayerId): boolean {
+  for (const ship of world.ships) {
+    if (ship.id === id) return ship.eliminated;
+  }
+  return false;
 }
 
 /**
