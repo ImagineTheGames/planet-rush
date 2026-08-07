@@ -194,11 +194,46 @@ sibling contract's whole point (q7-01).
 
 **A deliberately-broken baseline, on CI, producing a downloadable report with
 the actual/expected/diff images in it.** The break paints a magenta block over
-3.0% of `phone-landscape-frozen-iphone-linux.png` — comfortably above the 1%
-tolerance, so it fails on pixels and not on chance. Reverted before merge.
+`phone-landscape-frozen-iphone-linux.png` — comfortably above the 1% tolerance,
+so it fails on pixels and not on chance.
 
-_(Run links and the artifact's manifest are appended below once the run
-completes; see the PR body for the same.)_
+It landed on **run
+[31143332754](https://github.com/ImagineTheGames/planet-rush/actions/runs/31143332754)**,
+at commit `301d032`:
+
+```
+1 failed · 62 skipped · 78 passed (29.6m)
+  [iphone] goldens.spec.ts:92 golden: landscape phone frozen scene
+
+10679 pixels (ratio 0.04 of all image pixels) are different.
+  - expect.toHaveScreenshot(phone-landscape-frozen.png) with timeout 45000ms
+    - taking page screenshot … fonts loaded
+    - 10679 pixels (ratio 0.04 of all image pixels) are different.
+    - waiting 100ms before taking screenshot
+    - taking page screenshot … fonts loaded
+    - captured a stable screenshot          ← the pair converged, in-budget
+    - 10679 pixels (ratio 0.04 of all image pixels) are different.
+
+artifact  playwright-report  3,606,979 bytes
+          index.html                          627,934 B, report inlined
+          data/*.png                          3 × 844×390 — actual, expected, diff
+          data/*.zip                          2 × trace (run + retry)
+```
+
+Two things there are worth more than the artifact's mere existence, and both are
+the part-2 half of this brief landing on a *real loaded runner* rather than in a
+local re-enactment: the assertion failed as a **diff and not a timeout**, and it
+`captured a stable screenshot` — the dpr-3 stabilisation pair converged inside
+45 s on a run that took 29.6 minutes against a normal ~9.
+
+The three images are pinned in `./q8-golden-diff-artifact/`, because the artifact
+itself expires in 7 days (ci.yml `retention-days: 7`). Their provenance is
+checkable rather than asserted: the pinned `expected.png` has git blob sha1
+`2f789c72…`, byte-identical to the baseline blob `207e1b7` committed.
+
+**The break is reverted** — `33d60fb`, restoring blob `cb6120f`, which is what
+`origin/main` carries for that file. It was *not* reverted when it should have
+been; see §G.
 
 Locally, with `CI=1` and the same break, before/after the fix:
 
@@ -229,3 +264,38 @@ after :  expect.toHaveScreenshot(...) with timeout 45000ms
   `tests/live-stage/` have the same reporter blindness but no `toHaveScreenshot`
   goldens, so nothing there fails invisibly today. Worth a follow-up, not worth
   widening this one.
+
+---
+
+## G. Why this PR sat red for a day (the unreverted break)
+
+Worth writing down, because the failure was this branch's own and the mechanism
+is one any evidence-by-sabotage brief can walk into.
+
+`207e1b7` painted the magenta block and said, in its own message, *"Reverted in
+the following commit."* The following commit — `6e82fc2` — is a docs change. The
+revert was never made. The sabotaged blob has been the committed baseline since,
+and `npm run test:mobile` has failed on exactly it, once, on every run since.
+
+The merge of `main` could not catch it, and that is the interesting part. `main`
+still carries the *pre-break* blob for that file, so git saw "branch modified it,
+main did not" and kept the branch's side without a word. **The merge was clean
+precisely because a sabotaged baseline is indistinguishable from a legitimately
+re-shot one.** Nothing in the tooling can tell those apart — only the commit that
+was supposed to follow, and did not.
+
+Two things follow, and the second is the one worth keeping:
+
+- The four goldens `a1-01` repaired on `main` (the doors and CODEX screens) are
+  **not** implicated. They pass at this branch's merged HEAD — visible in run
+  31143332754's log, where `desktop THE DOORS`, `desktop CODEX` and the rest are
+  all green and the failure count is 1. Re-derived, not assumed: which side was
+  wrong is *this branch*, on exactly one file, and `main` was right. After the
+  revert the branch and `main` agree on every byte of every baseline.
+- **An intentional break is only safe if the revert is in the same commit as the
+  evidence it produces, or is gated so it cannot merge.** Trusting a *future*
+  commit to undo it is how it ships. The evidence does not need the break to be
+  in the tree at merge time — it needs the break to have been in the tree at
+  *run* time, and a run is already an immutable record. So the honest shape is:
+  break, push, let CI fail, pull the artifact down, revert, and commit the
+  artifact — which is what `./q8-golden-diff-artifact/` now is.
