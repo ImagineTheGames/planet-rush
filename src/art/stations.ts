@@ -16,6 +16,10 @@
  *  - **Health is a damage ring**, drawn only inside sensor range (GDD §2.2) —
  *    enemy station HP is scouted, never broadcast, and this file gives the
  *    renderer no way to draw a ring it wasn't asked for.
+ *  - **The hull carries no turrets** — see {@link STATION_HULL_EXCLUSIONS}.
+ *    Turrets are bought, capped and destructible (GDD §2.5, §2.6), so they are
+ *    the buildings layer's ({@link ../art/buildings}), never the hull's; a
+ *    station's silhouette has to tell the truth about how many are standing.
  *
  * Continents come from the ratified `mulberry32` (`@shared/types`) seeded by
  * variant, so a variant is byte-identical on every machine and every run — the
@@ -125,40 +129,124 @@ export function continentPolygons(variant: number): number[][] {
 }
 
 // ---------------------------------------------------------------------------
+// What the hull deliberately does NOT draw (a2-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry per ratified removal. Adding to this list is a design decision.
+ *
+ * **`turret`** — the developer, 2026-08-07: *"an ammendment to the new mining
+ * station, we dont need the turrets on it, those will be built externally as it
+ * already is...."* The concept board this generator amplifies
+ * (`docs/art-direction/facility-concepts-r2.html`) drew four turrets into every
+ * facility body and called that part "never the problem." It is a problem, and
+ * mechanically rather than aesthetically: a turret is **bought** at the Build &
+ * Upgrade wheel for 3 ore over ~10 s, **capped** at 4 a station, and
+ * **individually destructible** (GDD §2.5, §2.6). Draw four into the hull and
+ * all three break where the player looks:
+ *
+ *  1. a station with 4 built turrets renders 8;
+ *  2. a fresh spawn with 0 built still reads as a fortress;
+ *  3. the re-arm tell ("when a turret is shot down the count drops and the wedge
+ *     lights again," §2.5) dies — the count says none, the picture says one.
+ *
+ * (3) is the general rule pointed at art: **a display whose empty state is
+ * indistinguishable from its full state will lie to you.** The hull draws the
+ * *mounting ground*; the gun that stands on it is {@link turretSprite}
+ * (`./buildings`), placed by the renderer's turret layer at whatever count the
+ * sim says is standing.
+ *
+ * This is a **named** exclusion rather than a silent absence on purpose. Removing
+ * BANK from the build wheel once silently removed the radar-satellite wedge and
+ * no test noticed for three releases. `compliance.test.ts` asserts this list from
+ * both directions: the hull emits nothing on it, **and** everything not on it is
+ * still reachable — the second assertion being the one that matters, because a
+ * test that only proved the hull bare would stay green if turrets were deleted
+ * from the game entirely.
+ */
+export const STATION_HULL_EXCLUSIONS = ['turret'] as const;
+
+/** A feature the station hull is forbidden to emit. */
+export type StationHullExclusion = (typeof STATION_HULL_EXCLUSIONS)[number];
+
+// ---------------------------------------------------------------------------
 // Sprites
 // ---------------------------------------------------------------------------
 
 /**
- * A home world at unit radius: ocean disc, patina continents, limb shading, and
- * the signal-yellow core at the centre. No ownership and no health — those are
- * separate rings (below) so the renderer can obey the fog rule (GDD §2.2).
+ * One named group of shapes in the station hull.
+ *
+ * The manifest exists so {@link STATION_HULL_EXCLUSIONS} has something to be
+ * checked *against*. An exclusion asserted over an anonymous shape list can only
+ * ever be checked by reading the source; asserted over named parts it is a test.
+ * {@link stationSprite} is composed from this list and nothing else, so the
+ * manifest cannot fall behind what the hull actually draws — `compliance.test.ts`
+ * asserts the shape counts match, which is what makes it exhaustive rather than
+ * a comment that happens to be typed in code.
+ */
+export interface StationHullPart {
+  /** Lower-case feature name. Checked against {@link STATION_HULL_EXCLUSIONS}. */
+  readonly part: string;
+  /** The shapes this part contributes, in draw order. */
+  readonly shapes: readonly Shape[];
+}
+
+/**
+ * The station hull, part by part, at unit radius: ocean disc, patina continents,
+ * limb shading, and the signal-yellow core at the centre. No ownership and no
+ * health — those are separate rings (below) so the renderer can obey the fog rule
+ * (GDD §2.2) — and, by {@link STATION_HULL_EXCLUSIONS}, nothing that shoots.
+ */
+export function stationHullParts(variant: number): readonly StationHullPart[] {
+  const v = variant % STATION_VARIANT_COUNT;
+  return [
+    { part: 'ocean', shapes: [circle(0, 0, 1, fill(DERIVED.oceanSteel, 'material'))] },
+    {
+      // Continents: a shade offset behind gives every coastline a south-east
+      // shadow, which is what stops the landmasses reading as flat stickers.
+      part: 'continents',
+      shapes: [
+        ...continentPolygons(v).map((p) =>
+          poly(p.map((n) => round(n + 0.03)), fill(DERIVED.continentShade, 'material')),
+        ),
+        ...continentPolygons(v).map((p) => poly(p, fill(PALETTE.patina, 'material'))),
+        ...continentPolygons(v).map((p) => poly(p, stroke(DERIVED.continentLight, 0.015, 'material', 0.5))),
+      ],
+    },
+    {
+      // Limb: dark on the south-east rim, a thin lit edge on the north-west.
+      part: 'limb',
+      shapes: [
+        poly(
+          annulusPoints(0, 0, 1, 0.82, -Math.PI * 0.35, Math.PI * 0.6, 28),
+          fill(DERIVED.oceanDeep, 'material', 0.55),
+        ),
+        poly(
+          annulusPoints(0, 0, 1, 0.93, Math.PI * 0.75, Math.PI * 1.35, 20),
+          fill(DERIVED.hullLight, 'material', 0.22),
+        ),
+      ],
+    },
+    {
+      // The core: the win condition, and the reason yellow is allowed here (§2).
+      part: 'core',
+      shapes: [
+        circle(0, 0, 0.34, fill(PALETTE.signalYellow, 'core', 0.16)),
+        circle(0, 0, 0.22, fill(PALETTE.signalYellow, 'core')),
+        circle(0, 0, 0.11, fill(DERIVED.coreHot, 'core')),
+      ],
+    },
+  ];
+}
+
+/**
+ * The station hull as one sprite — {@link stationHullParts}, flattened, and
+ * **nothing appended afterwards**. Every shape the hull draws therefore belongs
+ * to a named part, which is the property the exclusion test leans on.
  */
 export function stationSprite(variant: number): SpriteDef {
   const v = variant % STATION_VARIANT_COUNT;
-  const shapes: Shape[] = [
-    // Ocean.
-    circle(0, 0, 1, fill(DERIVED.oceanSteel, 'material')),
-    // Continents: a shade offset behind gives every coastline a south-east
-    // shadow, which is what stops the landmasses reading as flat stickers.
-    ...continentPolygons(v).map((p) =>
-      poly(p.map((n) => round(n + 0.03)), fill(DERIVED.continentShade, 'material')),
-    ),
-    ...continentPolygons(v).map((p) => poly(p, fill(PALETTE.patina, 'material'))),
-    ...continentPolygons(v).map((p) => poly(p, stroke(DERIVED.continentLight, 0.015, 'material', 0.5))),
-    // Limb: dark on the south-east rim, a thin lit edge on the north-west.
-    poly(
-      annulusPoints(0, 0, 1, 0.82, -Math.PI * 0.35, Math.PI * 0.6, 28),
-      fill(DERIVED.oceanDeep, 'material', 0.55),
-    ),
-    poly(
-      annulusPoints(0, 0, 1, 0.93, Math.PI * 0.75, Math.PI * 1.35, 20),
-      fill(DERIVED.hullLight, 'material', 0.22),
-    ),
-    // The core: the win condition, and the reason yellow is allowed here (§2).
-    circle(0, 0, 0.34, fill(PALETTE.signalYellow, 'core', 0.16)),
-    circle(0, 0, 0.22, fill(PALETTE.signalYellow, 'core')),
-    circle(0, 0, 0.11, fill(DERIVED.coreHot, 'core')),
-  ];
+  const shapes: Shape[] = stationHullParts(v).flatMap((p) => [...p.shapes]);
   return sprite(`station/v${v}`, 1, shapes);
 }
 
