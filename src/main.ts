@@ -154,6 +154,7 @@ import {
   eraseEntryCode,
   backToDoors,
   submitJoin,
+  canSubmitJoin,
   DOOR_ORDER,
   KEYPAD_KEYS,
   regionPickerVisible,
@@ -273,6 +274,13 @@ import {
   allocatorUrlFromEnv,
   allocateRoom,
   joinRoom,
+  // The region picker (n3): the fleet's regions with a ping this client measured,
+  // the room's region on the JOIN screen, and the two lines that say either.
+  readRoomAdvert,
+  surveyRegions,
+  formatRegionChoices,
+  formatRoomRegion,
+  regionLabel,
   createOnlineSession,
   allocatorTransport,
   attachSessionLog,
@@ -318,6 +326,8 @@ import type {
   ConnectTrace,
   ConnectStep,
   SessionLogHandle,
+  /** The fleet's regions with their measured pings, and the default they imply. */
+  RegionSurvey,
   // The room code the doors resolved and the lobby opens on — one code, end to end
   // (the unified play flow; `./ui/lobby-flow` rule 1).
   RoomCode,
@@ -5465,8 +5475,21 @@ interface OnlineSeam {
   title: string;
   /** The code typed so far on the join screen. */
   code: string;
-  /** Whether the region picker draws — `false` at one region (launch). */
+  /** Whether the region picker draws — `false` until the fleet advertises more
+   *  than one region, which is a count, not a flag (n3). */
   regionPickerVisible: boolean;
+  /** The fleet's regions in survey order (fastest measured first), each with the
+   *  ping this client measured or `null` when it could not be measured. */
+  regions: readonly RegionInfo[];
+  /** The region a CREATE will ask for: the player's override, else the lowest
+   *  measured, else `null` — and `null` sends no region, leaving the allocator's
+   *  edge inference to decide exactly as it did before there was a picker. */
+  regionSelected: string | null;
+  /** That list as one line — `GRU 38ms · [IAD 224ms]`, the selection bracketed. */
+  regionLine: string;
+  /** Pick a region for the next CREATE. Ignores an id the fleet does not
+   *  advertise: a picker cannot select a row it did not draw. */
+  selectRegion(id: string): void;
   /** The globally-unique code the allocator minted on a successful CREATE, or
    *  `null`. Never client-guessed (M3 — use `assignment.code` verbatim). */
   resolvedCode: string | null;
@@ -5558,7 +5581,21 @@ function openMainMenu(
   // (`regionPickerVisible === false`).
   let entry: EntryState = createEntry();
   let onlineResolved: string | null = null;
-  const onlineRegions: readonly RegionInfo[] = [{ id: 'iad', label: 'US East' }];
+  // The fleet's regions, MEASURED (n3). Empty until the survey lands — and empty
+  // is the honest state for the offline build, an allocator that is down, and a
+  // fleet with no /regions route, all of which keep the picker suppressed by count
+  // (`regionPickerVisible`) rather than by a flag. No region is named in this file:
+  // the list is the allocator's, and the number beside each one is a round trip
+  // this client timed (`src/net/region-probe`).
+  let onlineRegions: readonly RegionInfo[] = [];
+  let regionSurvey: RegionSurvey | null = null;
+  /** The region the PLAYER picked, when they overrode the measured default. */
+  let regionChoice: string | null = null;
+  /** The probe in flight, so two callers share one sweep of the fleet. */
+  let regionProbe: Promise<void> | null = null;
+  /** The last line the picker wrote into the doors' message slot, so a re-measure
+   *  may replace its own line and nothing else's. */
+  let lastRegionLine = '';
   // A room code the entry model needs for an offline-loopback create; discarded
   // for online (the allocator mints the real one). Seeded, never `Math.random()`.
   const onlineRng = mulberry32(0x51ac37);
@@ -5651,6 +5688,10 @@ function openMainMenu(
     title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
+    regions: onlineRegions,
+    regionSelected: null,
+    regionLine: '',
+    selectRegion: (id: string): void => chooseRegion(id),
     resolvedCode: null,
     doorControls: [],
     messageBounds: { x: 0, y: 0, width: 0, height: 0 },
@@ -5925,6 +5966,12 @@ function openMainMenu(
     onlineSeam.notice = model.notice;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
+    // The measured fleet (n3), republished every render so the picker's rows and
+    // its selection are read from one place rather than remembered in two.
+    onlineSeam.regions = onlineRegions;
+    onlineSeam.regionPickerVisible = regionPickerVisible(onlineRegions);
+    onlineSeam.regionSelected = selectedRegion() ?? null;
+    onlineSeam.regionLine = formatRegionChoices(onlineRegions, selectedRegion());
     const { w, h } = ctx.logicalSize();
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
@@ -5972,6 +6019,128 @@ function openMainMenu(
     // A fresh visit starts a fresh story; a panel left over from a previous
     // refusal must not sit under a door the player has not tapped yet.
     endConnectTrace();
+    render();
+    // …and the fleet is measured while the player reads the doors, so CREATE has
+    // a real number behind its region by the time it is pressed. Fire-and-forget:
+    // nothing on this screen waits for it, and a fleet that never answers costs
+    // the picker, never the doors (n3).
+    void surveyFleet();
+  }
+
+  // --- The region picker (n3) ----------------------------------------------
+
+  /**
+   * The region the next CREATE will ask for: the player's override first, then the
+   * lowest ping this client MEASURED, then nothing at all.
+   *
+   * "Nothing at all" is a real answer and the most important one: with no fleet,
+   * no allocator, or nothing measurable, the allocate carries no `region` field
+   * and `allocator/edge-region.ts` infers the creator's region from Fly's edge —
+   * the behaviour that shipped in m10-15a and that this picker sits on top of
+   * rather than replaces. The old bug was the opposite: a hard-coded `iad` that
+   * outranked the inference and pinned every creator to Virginia.
+   */
+  function selectedRegion(): string | undefined {
+    if (regionChoice !== null && onlineRegions.some((r) => r.id === regionChoice)) {
+      return regionChoice;
+    }
+    return regionSurvey?.defaultId;
+  }
+
+  /** The player's override. An id the fleet does not advertise is ignored — a
+   *  picker cannot select a row it did not draw. */
+  function chooseRegion(id: string): void {
+    if (!onlineRegions.some((r) => r.id === id)) return;
+    regionChoice = id;
+    ctx.cue('press');
+    if (entry.screen === 'home' && entry.status === 'idle') {
+      lastRegionLine = formatRegionChoices(onlineRegions, selectedRegion());
+      entry = { ...entry, notice: lastRegionLine };
+    }
+    render();
+  }
+
+  /**
+   * Measure the fleet: every region the allocator advertises, each timed by a real
+   * round trip to that region's own `/health` (`src/net/region-probe`), plus the
+   * line the player reads before choosing.
+   *
+   * Run **on every visit to the doors**, because a ping is only worth showing if
+   * it is this session's — a number measured twenty minutes and one network ago is
+   * a stale claim about a live connection. Concurrent callers share the one probe
+   * in flight rather than starting a second (the JOIN preview joins whatever the
+   * doors already began).
+   *
+   * It cannot fail loudly: no allocator (the offline build), no `/regions` route,
+   * or a fleet nobody can reach all leave the list empty, the picker suppressed,
+   * and CREATE exactly as it was.
+   */
+  function surveyFleet(): Promise<void> {
+    if (regionProbe !== null) return regionProbe;
+    const run = measureFleet().finally(() => {
+      if (regionProbe === run) regionProbe = null;
+    });
+    regionProbe = run;
+    return run;
+  }
+
+  /** The probe itself; {@link surveyFleet} owns the de-duplication. */
+  async function measureFleet(): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    if (base === null) return;
+    const survey = await surveyRegions({ baseUrl: base });
+    // The player may have left the doors while the probes were in flight; the
+    // measurement is still worth keeping (it is this client's, not this screen's),
+    // but nothing is drawn from it.
+    regionSurvey = survey;
+    onlineRegions = survey.regions.map((region) => ({
+      id: region.id,
+      label: regionLabel(region.id),
+      pingMs: region.pingMs,
+    }));
+    playtest.recordConnect('regions', {
+      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
+      default: survey.defaultId ?? null,
+    });
+    if (screen !== 'online') return;
+    // The doors' message slot carries the fleet: `GRU 38ms · [IAD 224ms]`. It is
+    // the same slot the CAMPAIGN teaser answers in, so it yields to an error and
+    // to a live connect narration — a ping is never the most urgent line. A line
+    // this function wrote before is replaced (the numbers are fresher); anything
+    // else on the slot is left alone.
+    const ours = entry.notice === '' || entry.notice === lastRegionLine;
+    if (entry.screen === 'home' && entry.status === 'idle' && ours) {
+      lastRegionLine = formatRegionChoices(onlineRegions, selectedRegion());
+      entry = { ...entry, notice: lastRegionLine };
+    }
+    render();
+  }
+
+  /**
+   * What the JOIN screen says once a full code is typed, BEFORE the player commits:
+   * where the room is, and what that region costs *them*.
+   *
+   * A joiner places nothing — the room is where its creator put it — so this is
+   * not a choice, it is a disclosure: the host's region is the ping profile of
+   * every guest, and the honest moment to say so is while BACK is still one tap
+   * away. It decides nothing (`readRoomAdvert` is advisory by construction): the
+   * join itself remains the only thing that can refuse a player.
+   */
+  async function previewJoinRoom(code: string): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    if (base === null) return;
+    const config = { baseUrl: base };
+    const advert = await readRoomAdvert(config, code);
+    // Stale by the time it answered — the player erased, backed out, or has already
+    // committed. Drop it rather than write over a screen that has moved on.
+    if (advert === null || screen !== 'online' || entry.screen !== 'join') return;
+    if (entry.code !== code || entry.status !== 'idle') return;
+    if (regionSurvey === null) await surveyFleet();
+    if (entry.code !== code || entry.screen !== 'join' || entry.status !== 'idle') return;
+    const measured = regionSurvey?.regions.find((r) => r.id === advert.region);
+    const line = formatRoomRegion(advert.region, measured?.pingMs ?? null);
+    if (line === '') return;
+    entry = { ...entry, notice: line };
     render();
   }
 
@@ -6033,12 +6202,18 @@ function openMainMenu(
           ctx.cue(next === entry ? 'reject' : 'press');
           entry = next;
           render();
+          // A complete code is worth asking the allocator about *before* the
+          // player commits: where the room is, and what that costs them (n3).
+          if (canSubmitJoin(entry)) void previewJoinRoom(entry.code);
         }
         return;
       }
       case 'erase':
         ctx.cue('back');
         entry = eraseEntryCode(entry);
+        // The room preview described a code that is no longer typed; a line about
+        // someone else's room must not outlive the code it was read for (n3).
+        if (entry.notice !== '' && !canSubmitJoin(entry)) entry = { ...entry, notice: '' };
         render();
         return;
       case 'back':
@@ -6093,14 +6268,17 @@ function openMainMenu(
       return;
     }
     const config = { baseUrl: base };
-    // The region the player CHOSE, and only that. At launch there is one region in
-    // the list and the picker is suppressed (`regionPickerVisible === false`), so
-    // nobody has chosen anything — and sending `iad` anyway is what pinned every
-    // creator to Virginia, including the one in Minas Gerais. Sent empty, the
-    // allocator infers the creator's region from Fly's edge and prefers it whenever
-    // it has capacity (`allocator/edge-region.ts`); a real picker, once there is one
-    // to pick from, overrides that inference exactly as before.
-    const region = regionPickerVisible(onlineRegions) ? onlineRegions[0]?.id : undefined;
+    // The region this CREATE asks for: the one the player picked, else the one this
+    // client MEASURED fastest, else nothing (n3, `selectedRegion`).
+    //
+    // "Nothing" is the load-bearing case and it is unchanged from m10-15a: sent
+    // empty, the allocator infers the creator's region from Fly's edge and prefers
+    // it whenever it has capacity (`allocator/edge-region.ts`). What was wrong
+    // before that fix was a hard-coded `iad` — not a preference but a pin, and it
+    // outranked the inference, which is how a creator in Minas Gerais was placed in
+    // Virginia on purpose. Nothing here may reintroduce a region this client did
+    // not either measure or get told to use.
+    const region = selectedRegion();
     // Step 1 of the lifecycle the log carries end to end (brief §1): the allocate.
     // It is now also the first line the *player* reads — "ALLOCATING ROOM…" — and
     // every step below likewise reaches the screen through `traceStep`, so the

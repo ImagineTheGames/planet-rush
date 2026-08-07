@@ -478,17 +478,65 @@ export function regionLabel(id: string): string {
  *  a zero (rule 1). */
 export const NO_PING = '—';
 
+/**
+ * The least a row needs to print itself. Deliberately looser than {@link RegionPing}
+ * — a *missing* ping and a `null` one are the same thing to a reader, and the UI's
+ * own region model (`src/ui/online-copy` `RegionInfo`) carries it as optional — so
+ * the formatters below take either and print the same em dash for both.
+ */
+export interface RegionPingRow {
+  readonly id: string;
+  readonly pingMs?: number | null;
+}
+
 /** One region as the picker reads it: `GRU 38ms`, or `GRU —` when there is no
  *  measurement. The code, not the place name: it is short, it is what the
  *  allocator's placement line says, and it is what a player reports back. */
-export function formatRegionPing(region: Pick<RegionPing, 'id' | 'pingMs'>): string {
-  return `${region.id.toUpperCase()} ${region.pingMs === null ? NO_PING : `${Math.round(region.pingMs)}ms`}`;
+export function formatRegionPing(region: RegionPingRow): string {
+  const ping = region.pingMs;
+  return `${region.id.toUpperCase()} ${ping === null || ping === undefined ? NO_PING : `${Math.round(ping)}ms`}`;
 }
 
 /** The whole fleet on one line — `GRU 38ms · IAD 224ms`, in survey order, so the
  *  fastest reads first. `''` for an empty fleet, which draws nothing. */
-export function formatRegionPings(regions: readonly Pick<RegionPing, 'id' | 'pingMs'>[]): string {
+export function formatRegionPings(regions: readonly RegionPingRow[]): string {
   return regions.map(formatRegionPing).join(' · ');
+}
+
+/**
+ * The same line with the **selected** region marked: `[GRU 38ms] · IAD 224ms`.
+ * The brackets are the whole of the selection state in text — a picker drawn as
+ * plates says it with a plate, and this is what the same fact looks like in the
+ * one message line the doors screen already has.
+ */
+export function formatRegionChoices(
+  regions: readonly RegionPingRow[],
+  selectedId: string | null | undefined,
+): string {
+  return regions
+    .map((region) => {
+      const text = formatRegionPing(region);
+      return region.id === selectedId ? `[${text}]` : text;
+    })
+    .join(' · ');
+}
+
+/**
+ * What a JOIN screen says before the player commits: `ROOM IN GRU · YOUR PING
+ * 38ms`, or `ROOM IN GRU · PING —` when this client could not measure that region.
+ *
+ * The room's region is not the joiner's choice — it is the *host's*, and it is the
+ * ping profile of every guest — so the honest place to say it is here, on the
+ * screen where the player can still back out, rather than after the socket is open
+ * and the match has started. `''` when the allocator did not say where the room is
+ * (a room known only through a reservation), because a blank is better than a
+ * guess about someone else's connection.
+ */
+export function formatRoomRegion(region: string, pingMs: number | null | undefined): string {
+  const id = region.trim();
+  if (id.length === 0) return '';
+  const ping = pingMs === null || pingMs === undefined ? `PING ${NO_PING}` : `YOUR PING ${Math.round(pingMs)}ms`;
+  return `ROOM IN ${id.toUpperCase()} · ${ping}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -18,8 +18,10 @@ import {
   TIMED_OUT,
   defaultRegionId,
   fetchFleetRegions,
+  formatRegionChoices,
   formatRegionPing,
   formatRegionPings,
+  formatRoomRegion,
   measureRegionPing,
   regionLabel,
   summariseRegions,
@@ -332,5 +334,23 @@ describe('the line the lobby prints', () => {
   it('names a datacentre it knows, and falls back to the code for one it does not', () => {
     expect(regionLabel('gru')).toBe('São Paulo');
     expect(regionLabel('xyz')).toBe('XYZ');
+  });
+
+  it('brackets the selected region, so the line carries the choice as well as the numbers', () => {
+    const pings = [
+      { id: 'gru', pingMs: 38 },
+      { id: 'iad', pingMs: 224 },
+    ];
+    expect(formatRegionChoices(pings, 'iad')).toBe('GRU 38ms · [IAD 224ms]');
+    // Nothing chosen yet (nothing measured) — the line still reads, unmarked.
+    expect(formatRegionChoices(pings, null)).toBe('GRU 38ms · IAD 224ms');
+  });
+
+  it('tells a joiner where the room is and what it costs THEM, before they commit', () => {
+    expect(formatRoomRegion('gru', 38)).toBe('ROOM IN GRU · YOUR PING 38ms');
+    expect(formatRoomRegion('gru', null)).toBe(`ROOM IN GRU · PING ${NO_PING}`);
+    // A room the allocator located only through a reservation has no region yet —
+    // and a blank beats a guess about someone else's connection.
+    expect(formatRoomRegion('', 38)).toBe('');
   });
 });
