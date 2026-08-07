@@ -122,9 +122,34 @@ export const DERIVED_RECIPES = {
   hullDark: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Panel gaps, thruster wells, a dead station core.' },
   decalInk: { base: 'hullSteel', toward: 'vacuum', t: 0.78, why: 'The player-number hull decal, stencilled into the steel.' },
 
-  rockBody: { base: 'hullSteel', toward: 'white', t: 0.16, why: 'Asteroid mineral body — neutral steel-grey (§6).' },
-  rockShadow: { base: 'hullSteel', toward: 'vacuum', t: 0.32, why: 'Asteroid facets, so a rock reads as a solid at 24px.' },
-  rockFissure: { base: 'hullSteel', toward: 'vacuum', t: 0.72, why: 'Crack lines across the three mining stages (§6).' },
+  // The rock family sits on the DARK half of the ramp (a3-01). It used to be a
+  // white-tint, which put the body at luminance 154 against the boards' 77 — the
+  // one family the a2 art campaign's value lever (GAP-ANALYSIS §2, Lever B) never
+  // reached, and the measured reason `art-vs-board-scene` failed. All three stops
+  // move together so the field reads as one material: a body, a facet one stop
+  // under it, and the ink the boards draw every rock inside. Each is the nearest
+  // vacuum-shade of `hullSteel` to its board tone — the board hexes are not on the
+  // ramp (no consistent `t` reproduces them channel-for-channel), so "nearest stop"
+  // is as close as "no seventh hue" permits, and each lands within 3/255 per
+  // channel of the board with its luminance matched to ±1.
+  rockBody: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.48,
+    why: 'Asteroid mineral body — dark charcoal steel (§6; boards #454E59, luma 77).',
+  },
+  rockShadow: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.545,
+    why: 'Asteroid facets and satellite pebbles, one stop under the body (boards #3E4750).',
+  },
+  rockFissure: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.77,
+    why: 'The rock ink: rim and crack lines across the three mining stages (§6; boards #262C34).',
+  },
 
   oceanSteel: { base: 'hullSteel', toward: 'vacuum', t: 0.42, why: 'MiningStation oceans — steel-blue, inside the palette (§5).' },
   oceanDeep: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Limb darkening / night side of a station.' },
@@ -166,9 +191,9 @@ export const DERIVED = {
   hullDark: 0x383e45,
   decalInk: 0x262a31,
 
-  rockBody: 0x939ba5,
-  rockShadow: 0x5a626b,
-  rockFissure: 0x2d3239,
+  rockBody: 0x484e57,
+  rockShadow: 0x40474f,
+  rockFissure: 0x272c32,
 
   oceanSteel: 0x4f565f,
   oceanDeep: 0x383e45,

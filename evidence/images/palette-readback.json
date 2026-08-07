@@ -1,0 +1,2579 @@
+{
+  "tokens": {
+    "vacuum": "#0D1015",
+    "ink": "#262C34",
+    "hullSteel": "#7E8894",
+    "hullLightBoard": "#8F99A6",
+    "hullLightCurrent": "#A5ACB4",
+    "hullDark": "#383E45",
+    "bone": "#C6CDD6",
+    "signalGold": "#F2D24B",
+    "ore": "#FFC93E",
+    "plasma": "#4DC3FF",
+    "danger": "#E24A3B",
+    "threat": "#B23A3A",
+    "rockBodyBoard": "#454E59",
+    "rockBodyShipped": "#484E57",
+    "rockBodyPreFix": "#939BA5",
+    "oceanBoard": "#2E6E9E",
+    "oceanCurrent": "#4F565F"
+  },
+  "regions": {
+    "rockLive": [
+      {
+        "hex": "#484E57",
+        "share": 0.027,
+        "pixels": 33880,
+        "nearest": {
+          "token": "rockBodyShipped",
+          "hex": "#484E57",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#40474F",
+        "share": 0.0132,
+        "pixels": 16508,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 13
+        }
+      },
+      {
+        "hex": "#2A2F36",
+        "share": 0.0069,
+        "pixels": 8662,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 5
+        }
+      },
+      {
+        "hex": "#24292F",
+        "share": 0.0042,
+        "pixels": 5223,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 6
+        }
+      },
+      {
+        "hex": "#424851",
+        "share": 0.0027,
+        "pixels": 3414,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 10
+        }
+      },
+      {
+        "hex": "#272C32",
+        "share": 0.0012,
+        "pixels": 1458,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 2
+        }
+      },
+      {
+        "hex": "#4C9683",
+        "share": 0.0009,
+        "pixels": 1171,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 55
+        }
+      },
+      {
+        "hex": "#31363E",
+        "share": 0.0008,
+        "pixels": 957,
+        "nearest": {
+          "token": "hullDark",
+          "hex": "#383E45",
+          "distance": 13
+        }
+      }
+    ],
+    "rockBoard": [
+      {
+        "hex": "#454E59",
+        "share": 0.0473,
+        "pixels": 31542,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#262C34",
+        "share": 0.0159,
+        "pixels": 10611,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#252D3A",
+        "share": 0.0068,
+        "pixels": 4534,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 6
+        }
+      },
+      {
+        "hex": "#4DC3FF",
+        "share": 0.0033,
+        "pixels": 2194,
+        "nearest": {
+          "token": "plasma",
+          "hex": "#4DC3FF",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#7E8894",
+        "share": 0.003,
+        "pixels": 2032,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#3E4750",
+        "share": 0.0026,
+        "pixels": 1742,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 13
+        }
+      },
+      {
+        "hex": "#F2D24B",
+        "share": 0.0023,
+        "pixels": 1507,
+        "nearest": {
+          "token": "signalGold",
+          "hex": "#F2D24B",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#8B95A5",
+        "share": 0.0015,
+        "pixels": 971,
+        "nearest": {
+          "token": "hullLightBoard",
+          "hex": "#8F99A6",
+          "distance": 6
+        }
+      }
+    ],
+    "hullLive": {
+      "hull-0-interceptor": [
+        {
+          "hex": "#7E8894",
+          "share": 0.0137,
+          "pixels": 625,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#292D34",
+          "share": 0.0029,
+          "pixels": 132,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 3
+          }
+        },
+        {
+          "hex": "#525A63",
+          "share": 0.0029,
+          "pixels": 130,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 6
+          }
+        },
+        {
+          "hex": "#3D7BFF",
+          "share": 0.0023,
+          "pixels": 106,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 74
+          }
+        },
+        {
+          "hex": "#262B32",
+          "share": 0.002,
+          "pixels": 91,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 2
+          }
+        },
+        {
+          "hex": "#69727D",
+          "share": 0.0015,
+          "pixels": 69,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 38
+          }
+        },
+        {
+          "hex": "#3F464E",
+          "share": 0.0012,
+          "pixels": 56,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#1F232A",
+          "share": 0.0009,
+          "pixels": 43,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 15
+          }
+        }
+      ],
+      "hull-1-vanguard": [
+        {
+          "hex": "#515861",
+          "share": 0.0076,
+          "pixels": 346,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 3
+          }
+        },
+        {
+          "hex": "#7E8894",
+          "share": 0.0052,
+          "pixels": 238,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#3D7BFF",
+          "share": 0.0026,
+          "pixels": 118,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 74
+          }
+        },
+        {
+          "hex": "#7F868F",
+          "share": 0.0015,
+          "pixels": 68,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 5
+          }
+        },
+        {
+          "hex": "#9EA5AD",
+          "share": 0.0014,
+          "pixels": 62,
+          "nearest": {
+            "token": "hullLightCurrent",
+            "hex": "#A5ACB4",
+            "distance": 12
+          }
+        },
+        {
+          "hex": "#292D34",
+          "share": 0.0012,
+          "pixels": 56,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 3
+          }
+        },
+        {
+          "hex": "#757C85",
+          "share": 0.001,
+          "pixels": 45,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 21
+          }
+        },
+        {
+          "hex": "#1F232A",
+          "share": 0.0009,
+          "pixels": 43,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 15
+          }
+        }
+      ],
+      "hull-2-excavator": [
+        {
+          "hex": "#7E8894",
+          "share": 0.0219,
+          "pixels": 996,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#525962",
+          "share": 0.0064,
+          "pixels": 291,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 5
+          }
+        },
+        {
+          "hex": "#3D7BFF",
+          "share": 0.006,
+          "pixels": 271,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 74
+          }
+        },
+        {
+          "hex": "#292E35",
+          "share": 0.0029,
+          "pixels": 131,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 4
+          }
+        },
+        {
+          "hex": "#262A31",
+          "share": 0.0018,
+          "pixels": 81,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 4
+          }
+        },
+        {
+          "hex": "#3F464E",
+          "share": 0.0016,
+          "pixels": 75,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#9EA5AE",
+          "share": 0.0016,
+          "pixels": 74,
+          "nearest": {
+            "token": "hullLightCurrent",
+            "hex": "#A5ACB4",
+            "distance": 12
+          }
+        },
+        {
+          "hex": "#69727D",
+          "share": 0.0016,
+          "pixels": 72,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 38
+          }
+        }
+      ],
+      "hull-3-hauler": [
+        {
+          "hex": "#7E8894",
+          "share": 0.0193,
+          "pixels": 876,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#515861",
+          "share": 0.0143,
+          "pixels": 650,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 3
+          }
+        },
+        {
+          "hex": "#3D7BFF",
+          "share": 0.0049,
+          "pixels": 221,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 74
+          }
+        },
+        {
+          "hex": "#939CA6",
+          "share": 0.0038,
+          "pixels": 174,
+          "nearest": {
+            "token": "rockBodyPreFix",
+            "hex": "#939BA5",
+            "distance": 1
+          }
+        },
+        {
+          "hex": "#292E35",
+          "share": 0.0034,
+          "pixels": 154,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 4
+          }
+        },
+        {
+          "hex": "#69727D",
+          "share": 0.0022,
+          "pixels": 98,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 38
+          }
+        },
+        {
+          "hex": "#3F464E",
+          "share": 0.0021,
+          "pixels": 96,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#272B32",
+          "share": 0.002,
+          "pixels": 91,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 2
+          }
+        }
+      ]
+    },
+    "hullBoard": {
+      "hull-svg-0": [
+        {
+          "hex": "#262C34",
+          "share": 0.0211,
+          "pixels": 3567,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#7E8894",
+          "share": 0.0173,
+          "pixels": 2918,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#4DC3FF",
+          "share": 0.0098,
+          "pixels": 1653,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#6E7987",
+          "share": 0.0071,
+          "pixels": 1198,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 25
+          }
+        },
+        {
+          "hex": "#1E242B",
+          "share": 0.0007,
+          "pixels": 121,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#3B424B",
+          "share": 0.0005,
+          "pixels": 91,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 8
+          }
+        },
+        {
+          "hex": "#2B323A",
+          "share": 0.0004,
+          "pixels": 67,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 10
+          }
+        },
+        {
+          "hex": "#525963",
+          "share": 0.0003,
+          "pixels": 52,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 6
+          }
+        }
+      ],
+      "hull-svg-1": [
+        {
+          "hex": "#7E8894",
+          "share": 0.0325,
+          "pixels": 5505,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#4DC3FF",
+          "share": 0.0207,
+          "pixels": 3503,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#262C34",
+          "share": 0.0181,
+          "pixels": 3057,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#8F99A6",
+          "share": 0.011,
+          "pixels": 1870,
+          "nearest": {
+            "token": "hullLightBoard",
+            "hex": "#8F99A6",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#1E232A",
+          "share": 0.0004,
+          "pixels": 68,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 16
+          }
+        },
+        {
+          "hex": "#616A75",
+          "share": 0.0003,
+          "pixels": 58,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 35
+          }
+        },
+        {
+          "hex": "#4BBBF4",
+          "share": 0.0003,
+          "pixels": 53,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#3B424B",
+          "share": 0.0003,
+          "pixels": 45,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 8
+          }
+        }
+      ],
+      "hull-svg-2": [
+        {
+          "hex": "#262C34",
+          "share": 0.0267,
+          "pixels": 4507,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#7E8894",
+          "share": 0.0241,
+          "pixels": 4060,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#4DC3FF",
+          "share": 0.0103,
+          "pixels": 1730,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#6E7987",
+          "share": 0.0052,
+          "pixels": 875,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 25
+          }
+        },
+        {
+          "hex": "#5A6470",
+          "share": 0.0013,
+          "pixels": 222,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 25
+          }
+        },
+        {
+          "hex": "#525964",
+          "share": 0.0007,
+          "pixels": 110,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 7
+          }
+        },
+        {
+          "hex": "#68717C",
+          "share": 0.0006,
+          "pixels": 99,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 40
+          }
+        },
+        {
+          "hex": "#1E232A",
+          "share": 0.0004,
+          "pixels": 73,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 16
+          }
+        }
+      ],
+      "hull-svg-3": [
+        {
+          "hex": "#262C34",
+          "share": 0.0317,
+          "pixels": 5379,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#6E7987",
+          "share": 0.0241,
+          "pixels": 4092,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 25
+          }
+        },
+        {
+          "hex": "#7E8894",
+          "share": 0.0171,
+          "pixels": 2912,
+          "nearest": {
+            "token": "hullSteel",
+            "hex": "#7E8894",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#4DC3FF",
+          "share": 0.0125,
+          "pixels": 2124,
+          "nearest": {
+            "token": "plasma",
+            "hex": "#4DC3FF",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#8F99A6",
+          "share": 0.0101,
+          "pixels": 1713,
+          "nearest": {
+            "token": "hullLightBoard",
+            "hex": "#8F99A6",
+            "distance": 0
+          }
+        },
+        {
+          "hex": "#1F242B",
+          "share": 0.0009,
+          "pixels": 147,
+          "nearest": {
+            "token": "ink",
+            "hex": "#262C34",
+            "distance": 14
+          }
+        },
+        {
+          "hex": "#373F48",
+          "share": 0.0006,
+          "pixels": 98,
+          "nearest": {
+            "token": "hullDark",
+            "hex": "#383E45",
+            "distance": 3
+          }
+        },
+        {
+          "hex": "#5A626C",
+          "share": 0.0005,
+          "pixels": 82,
+          "nearest": {
+            "token": "oceanCurrent",
+            "hex": "#4F565F",
+            "distance": 21
+          }
+        }
+      ]
+    },
+    "planetLive": [
+      {
+        "hex": "#0D1017",
+        "share": 0.7899,
+        "pixels": 71092,
+        "nearest": {
+          "token": "vacuum",
+          "hex": "#0D1015",
+          "distance": 2
+        }
+      },
+      {
+        "hex": "#2F4A63",
+        "share": 0.0909,
+        "pixels": 8177,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 24
+        }
+      },
+      {
+        "hex": "#AC3D44",
+        "share": 0.023,
+        "pixels": 2071,
+        "nearest": {
+          "token": "threat",
+          "hex": "#B23A3A",
+          "distance": 12
+        }
+      },
+      {
+        "hex": "#49B4EB",
+        "share": 0.0158,
+        "pixels": 1426,
+        "nearest": {
+          "token": "plasma",
+          "hex": "#4DC3FF",
+          "distance": 25
+        }
+      },
+      {
+        "hex": "#1B3547",
+        "share": 0.0126,
+        "pixels": 1137,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 24
+        }
+      },
+      {
+        "hex": "#3C77F5",
+        "share": 0.0087,
+        "pixels": 780,
+        "nearest": {
+          "token": "plasma",
+          "hex": "#4DC3FF",
+          "distance": 79
+        }
+      },
+      {
+        "hex": "#7E8894",
+        "share": 0.0071,
+        "pixels": 641,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#45867F",
+        "share": 0.0048,
+        "pixels": 432,
+        "nearest": {
+          "token": "oceanBoard",
+          "hex": "#2E6E9E",
+          "distance": 45
+        }
+      }
+    ],
+    "planetLiveFadedForContrast": [
+      {
+        "hex": "#0D1017",
+        "share": 0.5362,
+        "pixels": 48262,
+        "nearest": {
+          "token": "vacuum",
+          "hex": "#0D1015",
+          "distance": 2
+        }
+      },
+      {
+        "hex": "#2C4F6A",
+        "share": 0.1205,
+        "pixels": 10847,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 30
+        }
+      },
+      {
+        "hex": "#162B3A",
+        "share": 0.0951,
+        "pixels": 8559,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 17
+        }
+      },
+      {
+        "hex": "#42868A",
+        "share": 0.0453,
+        "pixels": 4078,
+        "nearest": {
+          "token": "oceanBoard",
+          "hex": "#2E6E9E",
+          "distance": 37
+        }
+      }
+    ],
+    "planetBoard": [
+      {
+        "hex": "#2E6E9E",
+        "share": 0.3899,
+        "pixels": 23597,
+        "nearest": {
+          "token": "oceanBoard",
+          "hex": "#2E6E9E",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#4FA08B",
+        "share": 0.2697,
+        "pixels": 16320,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 54
+        }
+      },
+      {
+        "hex": "#0D1015",
+        "share": 0.217,
+        "pixels": 13130,
+        "nearest": {
+          "token": "vacuum",
+          "hex": "#0D1015",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#F2D24B",
+        "share": 0.0518,
+        "pixels": 3136,
+        "nearest": {
+          "token": "signalGold",
+          "hex": "#F2D24B",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#E24A3B",
+        "share": 0.0227,
+        "pixels": 1376,
+        "nearest": {
+          "token": "danger",
+          "hex": "#E24A3B",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#262C34",
+        "share": 0.0126,
+        "pixels": 760,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#4C9B8C",
+        "share": 0.0019,
+        "pixels": 115,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 54
+        }
+      },
+      {
+        "hex": "#32749C",
+        "share": 0.0013,
+        "pixels": 76,
+        "nearest": {
+          "token": "oceanBoard",
+          "hex": "#2E6E9E",
+          "distance": 7
+        }
+      }
+    ],
+    "hudLive": [
+      {
+        "hex": "#5A626B",
+        "share": 0.0251,
+        "pixels": 23133,
+        "nearest": {
+          "token": "oceanCurrent",
+          "hex": "#4F565F",
+          "distance": 20
+        }
+      },
+      {
+        "hex": "#3C77F4",
+        "share": 0.0117,
+        "pixels": 10804,
+        "nearest": {
+          "token": "plasma",
+          "hex": "#4DC3FF",
+          "distance": 79
+        }
+      },
+      {
+        "hex": "#939BA5",
+        "share": 0.0079,
+        "pixels": 7292,
+        "nearest": {
+          "token": "rockBodyPreFix",
+          "hex": "#939BA5",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#454C54",
+        "share": 0.0039,
+        "pixels": 3574,
+        "nearest": {
+          "token": "rockBodyBoard",
+          "hex": "#454E59",
+          "distance": 5
+        }
+      },
+      {
+        "hex": "#2E333B",
+        "share": 0.0037,
+        "pixels": 3386,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 13
+        }
+      },
+      {
+        "hex": "#DCE3EC",
+        "share": 0.0036,
+        "pixels": 3350,
+        "nearest": {
+          "token": "bone",
+          "hex": "#C6CDD6",
+          "distance": 38
+        }
+      },
+      {
+        "hex": "#363B43",
+        "share": 0.0021,
+        "pixels": 1952,
+        "nearest": {
+          "token": "hullDark",
+          "hex": "#383E45",
+          "distance": 4
+        }
+      },
+      {
+        "hex": "#8B95A5",
+        "share": 0.0018,
+        "pixels": 1697,
+        "nearest": {
+          "token": "hullLightBoard",
+          "hex": "#8F99A6",
+          "distance": 6
+        }
+      },
+      {
+        "hex": "#2A2F35",
+        "share": 0.0016,
+        "pixels": 1500,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 5
+        }
+      },
+      {
+        "hex": "#32373E",
+        "share": 0.0016,
+        "pixels": 1476,
+        "nearest": {
+          "token": "hullDark",
+          "hex": "#383E45",
+          "distance": 12
+        }
+      }
+    ],
+    "hudBoard": [
+      {
+        "hex": "#2E6E9E",
+        "share": 0.0353,
+        "pixels": 19145,
+        "nearest": {
+          "token": "oceanBoard",
+          "hex": "#2E6E9E",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#4FA08B",
+        "share": 0.0127,
+        "pixels": 6912,
+        "nearest": {
+          "token": "hullSteel",
+          "hex": "#7E8894",
+          "distance": 54
+        }
+      },
+      {
+        "hex": "#4DC3FF",
+        "share": 0.0082,
+        "pixels": 4464,
+        "nearest": {
+          "token": "plasma",
+          "hex": "#4DC3FF",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#C6CDD6",
+        "share": 0.0073,
+        "pixels": 3977,
+        "nearest": {
+          "token": "bone",
+          "hex": "#C6CDD6",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#242B35",
+        "share": 0.005,
+        "pixels": 2729,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 2
+        }
+      },
+      {
+        "hex": "#F2D24B",
+        "share": 0.0044,
+        "pixels": 2390,
+        "nearest": {
+          "token": "signalGold",
+          "hex": "#F2D24B",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#CC4437",
+        "share": 0.0038,
+        "pixels": 2054,
+        "nearest": {
+          "token": "danger",
+          "hex": "#E24A3B",
+          "distance": 23
+        }
+      },
+      {
+        "hex": "#E24A3B",
+        "share": 0.0038,
+        "pixels": 2045,
+        "nearest": {
+          "token": "danger",
+          "hex": "#E24A3B",
+          "distance": 0
+        }
+      },
+      {
+        "hex": "#3A4354",
+        "share": 0.0025,
+        "pixels": 1377,
+        "nearest": {
+          "token": "hullDark",
+          "hex": "#383E45",
+          "distance": 16
+        }
+      },
+      {
+        "hex": "#1D232E",
+        "share": 0.0022,
+        "pixels": 1212,
+        "nearest": {
+          "token": "ink",
+          "hex": "#262C34",
+          "distance": 14
+        }
+      }
+    ]
+  },
+  "seam": {
+    "live/ui-match-hud-full.png": {
+      "width": 3840,
+      "height": 2400,
+      "bands": [
+        {
+          "x0": 14,
+          "x1": 16,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#161A24",
+          "xFrac": 0.004
+        },
+        {
+          "x0": 40,
+          "x1": 55,
+          "width": 16,
+          "peakDelta": 11,
+          "mean": "#171B20",
+          "xFrac": 0.01
+        },
+        {
+          "x0": 61,
+          "x1": 67,
+          "width": 7,
+          "peakDelta": 10,
+          "mean": "#0D1015",
+          "xFrac": 0.016
+        },
+        {
+          "x0": 269,
+          "x1": 315,
+          "width": 47,
+          "peakDelta": 33,
+          "mean": "#31363C",
+          "xFrac": 0.07
+        },
+        {
+          "x0": 322,
+          "x1": 331,
+          "width": 10,
+          "peakDelta": 12,
+          "mean": "#495150",
+          "xFrac": 0.084
+        },
+        {
+          "x0": 336,
+          "x1": 342,
+          "width": 7,
+          "peakDelta": 8,
+          "mean": "#445051",
+          "xFrac": 0.087
+        },
+        {
+          "x0": 350,
+          "x1": 362,
+          "width": 13,
+          "peakDelta": 8,
+          "mean": "#4B5153",
+          "xFrac": 0.091
+        },
+        {
+          "x0": 390,
+          "x1": 391,
+          "width": 2,
+          "peakDelta": 6,
+          "mean": "#434950",
+          "xFrac": 0.102
+        },
+        {
+          "x0": 400,
+          "x1": 401,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#3E444B",
+          "xFrac": 0.104
+        },
+        {
+          "x0": 405,
+          "x1": 431,
+          "width": 27,
+          "peakDelta": 15,
+          "mean": "#333638",
+          "xFrac": 0.105
+        },
+        {
+          "x0": 443,
+          "x1": 456,
+          "width": 14,
+          "peakDelta": 14,
+          "mean": "#24292F",
+          "xFrac": 0.115
+        },
+        {
+          "x0": 462,
+          "x1": 477,
+          "width": 16,
+          "peakDelta": 16,
+          "mean": "#0D1015",
+          "xFrac": 0.12
+        },
+        {
+          "x0": 600,
+          "x1": 608,
+          "width": 9,
+          "peakDelta": 7,
+          "mean": "#181F23",
+          "xFrac": 0.156
+        },
+        {
+          "x0": 659,
+          "x1": 712,
+          "width": 54,
+          "peakDelta": 39,
+          "mean": "#474B4F",
+          "xFrac": 0.172
+        },
+        {
+          "x0": 716,
+          "x1": 727,
+          "width": 12,
+          "peakDelta": 9,
+          "mean": "#565C64",
+          "xFrac": 0.186
+        },
+        {
+          "x0": 749,
+          "x1": 760,
+          "width": 12,
+          "peakDelta": 8,
+          "mean": "#5F656D",
+          "xFrac": 0.195
+        },
+        {
+          "x0": 767,
+          "x1": 772,
+          "width": 6,
+          "peakDelta": 8,
+          "mean": "#606465",
+          "xFrac": 0.2
+        },
+        {
+          "x0": 793,
+          "x1": 793,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#5E6363",
+          "xFrac": 0.207
+        },
+        {
+          "x0": 847,
+          "x1": 864,
+          "width": 18,
+          "peakDelta": 16,
+          "mean": "#52575F",
+          "xFrac": 0.221
+        },
+        {
+          "x0": 869,
+          "x1": 902,
+          "width": 34,
+          "peakDelta": 36,
+          "mean": "#171B20",
+          "xFrac": 0.226
+        },
+        {
+          "x0": 1786,
+          "x1": 1786,
+          "width": 1,
+          "peakDelta": 7,
+          "mean": "#0F161C",
+          "xFrac": 0.465
+        },
+        {
+          "x0": 1797,
+          "x1": 1804,
+          "width": 8,
+          "peakDelta": 21,
+          "mean": "#181E24",
+          "xFrac": 0.468
+        },
+        {
+          "x0": 1814,
+          "x1": 1815,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#0F151B",
+          "xFrac": 0.472
+        },
+        {
+          "x0": 2182,
+          "x1": 2184,
+          "width": 3,
+          "peakDelta": 9,
+          "mean": "#111A29",
+          "xFrac": 0.568
+        },
+        {
+          "x0": 2196,
+          "x1": 2202,
+          "width": 7,
+          "peakDelta": 8,
+          "mean": "#101824",
+          "xFrac": 0.572
+        },
+        {
+          "x0": 2212,
+          "x1": 2213,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#121C2C",
+          "xFrac": 0.576
+        },
+        {
+          "x0": 2224,
+          "x1": 2225,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#111A2A",
+          "xFrac": 0.579
+        },
+        {
+          "x0": 2235,
+          "x1": 2237,
+          "width": 3,
+          "peakDelta": 11,
+          "mean": "#121D2E",
+          "xFrac": 0.582
+        },
+        {
+          "x0": 2250,
+          "x1": 2251,
+          "width": 2,
+          "peakDelta": 8,
+          "mean": "#101620",
+          "xFrac": 0.586
+        },
+        {
+          "x0": 2634,
+          "x1": 2636,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#0F161C",
+          "xFrac": 0.686
+        },
+        {
+          "x0": 3147,
+          "x1": 3152,
+          "width": 6,
+          "peakDelta": 8,
+          "mean": "#0D1015",
+          "xFrac": 0.82
+        },
+        {
+          "x0": 3182,
+          "x1": 3185,
+          "width": 4,
+          "peakDelta": 34,
+          "mean": "#0D1015",
+          "xFrac": 0.829
+        },
+        {
+          "x0": 3196,
+          "x1": 3235,
+          "width": 40,
+          "peakDelta": 103,
+          "mean": "#454C54",
+          "xFrac": 0.832
+        }
+      ]
+    },
+    "live/scene-arena-full.png": {
+      "width": 2560,
+      "height": 1600,
+      "bands": [
+        {
+          "x0": 175,
+          "x1": 190,
+          "width": 16,
+          "peakDelta": 16,
+          "mean": "#0E1116",
+          "xFrac": 0.068
+        },
+        {
+          "x0": 199,
+          "x1": 201,
+          "width": 3,
+          "peakDelta": 7,
+          "mean": "#23272E",
+          "xFrac": 0.078
+        },
+        {
+          "x0": 208,
+          "x1": 223,
+          "width": 16,
+          "peakDelta": 17,
+          "mean": "#333A38",
+          "xFrac": 0.081
+        },
+        {
+          "x0": 239,
+          "x1": 239,
+          "width": 1,
+          "peakDelta": 7,
+          "mean": "#303639",
+          "xFrac": 0.093
+        },
+        {
+          "x0": 250,
+          "x1": 251,
+          "width": 2,
+          "peakDelta": 6,
+          "mean": "#2E3236",
+          "xFrac": 0.098
+        },
+        {
+          "x0": 255,
+          "x1": 265,
+          "width": 11,
+          "peakDelta": 12,
+          "mean": "#2F3234",
+          "xFrac": 0.1
+        },
+        {
+          "x0": 269,
+          "x1": 270,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#272C33",
+          "xFrac": 0.105
+        },
+        {
+          "x0": 282,
+          "x1": 283,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#282B2B",
+          "xFrac": 0.11
+        },
+        {
+          "x0": 293,
+          "x1": 302,
+          "width": 10,
+          "peakDelta": 10,
+          "mean": "#1E2228",
+          "xFrac": 0.114
+        },
+        {
+          "x0": 308,
+          "x1": 321,
+          "width": 14,
+          "peakDelta": 13,
+          "mean": "#0F1217",
+          "xFrac": 0.12
+        },
+        {
+          "x0": 403,
+          "x1": 403,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#141A1E",
+          "xFrac": 0.157
+        },
+        {
+          "x0": 410,
+          "x1": 412,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#141D20",
+          "xFrac": 0.16
+        },
+        {
+          "x0": 436,
+          "x1": 464,
+          "width": 29,
+          "peakDelta": 20,
+          "mean": "#181C22",
+          "xFrac": 0.17
+        },
+        {
+          "x0": 468,
+          "x1": 472,
+          "width": 5,
+          "peakDelta": 8,
+          "mean": "#262B31",
+          "xFrac": 0.183
+        },
+        {
+          "x0": 495,
+          "x1": 496,
+          "width": 2,
+          "peakDelta": 6,
+          "mean": "#36393C",
+          "xFrac": 0.193
+        },
+        {
+          "x0": 522,
+          "x1": 524,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#30363E",
+          "xFrac": 0.204
+        },
+        {
+          "x0": 528,
+          "x1": 530,
+          "width": 3,
+          "peakDelta": 7,
+          "mean": "#383D3D",
+          "xFrac": 0.206
+        },
+        {
+          "x0": 534,
+          "x1": 539,
+          "width": 6,
+          "peakDelta": 9,
+          "mean": "#343B40",
+          "xFrac": 0.209
+        },
+        {
+          "x0": 568,
+          "x1": 585,
+          "width": 18,
+          "peakDelta": 11,
+          "mean": "#272B32",
+          "xFrac": 0.222
+        },
+        {
+          "x0": 590,
+          "x1": 606,
+          "width": 17,
+          "peakDelta": 18,
+          "mean": "#0D1015",
+          "xFrac": 0.23
+        },
+        {
+          "x0": 1186,
+          "x1": 1186,
+          "width": 1,
+          "peakDelta": 8,
+          "mean": "#0E131A",
+          "xFrac": 0.463
+        },
+        {
+          "x0": 1198,
+          "x1": 1202,
+          "width": 5,
+          "peakDelta": 20,
+          "mean": "#1A1E25",
+          "xFrac": 0.468
+        },
+        {
+          "x0": 1214,
+          "x1": 1214,
+          "width": 1,
+          "peakDelta": 9,
+          "mean": "#0E1219",
+          "xFrac": 0.474
+        },
+        {
+          "x0": 1356,
+          "x1": 1359,
+          "width": 4,
+          "peakDelta": 7,
+          "mean": "#131F2D",
+          "xFrac": 0.53
+        },
+        {
+          "x0": 1449,
+          "x1": 1465,
+          "width": 17,
+          "peakDelta": 9,
+          "mean": "#1F2938",
+          "xFrac": 0.566
+        },
+        {
+          "x0": 1475,
+          "x1": 1475,
+          "width": 1,
+          "peakDelta": 9,
+          "mean": "#1F2B3C",
+          "xFrac": 0.576
+        },
+        {
+          "x0": 1479,
+          "x1": 1482,
+          "width": 4,
+          "peakDelta": 8,
+          "mean": "#1D293E",
+          "xFrac": 0.578
+        },
+        {
+          "x0": 1488,
+          "x1": 1489,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#212A34",
+          "xFrac": 0.581
+        },
+        {
+          "x0": 1503,
+          "x1": 1503,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#182739",
+          "xFrac": 0.587
+        },
+        {
+          "x0": 1548,
+          "x1": 1548,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#182431",
+          "xFrac": 0.605
+        },
+        {
+          "x0": 1584,
+          "x1": 1587,
+          "width": 4,
+          "peakDelta": 7,
+          "mean": "#151D2A",
+          "xFrac": 0.619
+        },
+        {
+          "x0": 2098,
+          "x1": 2101,
+          "width": 4,
+          "peakDelta": 8,
+          "mean": "#0D1015",
+          "xFrac": 0.82
+        },
+        {
+          "x0": 2108,
+          "x1": 2118,
+          "width": 11,
+          "peakDelta": 24,
+          "mean": "#12161B",
+          "xFrac": 0.823
+        },
+        {
+          "x0": 2126,
+          "x1": 2133,
+          "width": 8,
+          "peakDelta": 57,
+          "mean": "#0D1015",
+          "xFrac": 0.83
+        },
+        {
+          "x0": 2140,
+          "x1": 2147,
+          "width": 8,
+          "peakDelta": 103,
+          "mean": "#454C54",
+          "xFrac": 0.836
+        },
+        {
+          "x0": 2154,
+          "x1": 2161,
+          "width": 8,
+          "peakDelta": 52,
+          "mean": "#0E1116",
+          "xFrac": 0.841
+        }
+      ]
+    },
+    "live/scene-alarm-full.png": {
+      "width": 2560,
+      "height": 1600,
+      "bands": [
+        {
+          "x0": 14,
+          "x1": 21,
+          "width": 8,
+          "peakDelta": 43,
+          "mean": "#0D1015",
+          "xFrac": 0.005
+        },
+        {
+          "x0": 175,
+          "x1": 190,
+          "width": 16,
+          "peakDelta": 17,
+          "mean": "#0D1015",
+          "xFrac": 0.068
+        },
+        {
+          "x0": 199,
+          "x1": 201,
+          "width": 3,
+          "peakDelta": 8,
+          "mean": "#22272D",
+          "xFrac": 0.078
+        },
+        {
+          "x0": 208,
+          "x1": 227,
+          "width": 20,
+          "peakDelta": 15,
+          "mean": "#313837",
+          "xFrac": 0.081
+        },
+        {
+          "x0": 272,
+          "x1": 278,
+          "width": 7,
+          "peakDelta": 10,
+          "mean": "#2C2F2F",
+          "xFrac": 0.106
+        },
+        {
+          "x0": 293,
+          "x1": 302,
+          "width": 10,
+          "peakDelta": 10,
+          "mean": "#1D2228",
+          "xFrac": 0.114
+        },
+        {
+          "x0": 308,
+          "x1": 321,
+          "width": 14,
+          "peakDelta": 14,
+          "mean": "#0E1116",
+          "xFrac": 0.12
+        },
+        {
+          "x0": 411,
+          "x1": 413,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#141C1F",
+          "xFrac": 0.161
+        },
+        {
+          "x0": 436,
+          "x1": 449,
+          "width": 14,
+          "peakDelta": 18,
+          "mean": "#13161C",
+          "xFrac": 0.17
+        },
+        {
+          "x0": 453,
+          "x1": 464,
+          "width": 12,
+          "peakDelta": 19,
+          "mean": "#292D33",
+          "xFrac": 0.177
+        },
+        {
+          "x0": 468,
+          "x1": 471,
+          "width": 4,
+          "peakDelta": 8,
+          "mean": "#262A31",
+          "xFrac": 0.183
+        },
+        {
+          "x0": 495,
+          "x1": 496,
+          "width": 2,
+          "peakDelta": 6,
+          "mean": "#36393C",
+          "xFrac": 0.193
+        },
+        {
+          "x0": 522,
+          "x1": 524,
+          "width": 3,
+          "peakDelta": 6,
+          "mean": "#30363E",
+          "xFrac": 0.204
+        },
+        {
+          "x0": 528,
+          "x1": 530,
+          "width": 3,
+          "peakDelta": 7,
+          "mean": "#383D3D",
+          "xFrac": 0.206
+        },
+        {
+          "x0": 534,
+          "x1": 539,
+          "width": 6,
+          "peakDelta": 9,
+          "mean": "#343B40",
+          "xFrac": 0.209
+        },
+        {
+          "x0": 568,
+          "x1": 585,
+          "width": 18,
+          "peakDelta": 11,
+          "mean": "#272B32",
+          "xFrac": 0.222
+        },
+        {
+          "x0": 590,
+          "x1": 606,
+          "width": 17,
+          "peakDelta": 18,
+          "mean": "#0D1015",
+          "xFrac": 0.23
+        },
+        {
+          "x0": 1186,
+          "x1": 1186,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#0F151B",
+          "xFrac": 0.463
+        },
+        {
+          "x0": 1198,
+          "x1": 1202,
+          "width": 5,
+          "peakDelta": 21,
+          "mean": "#1B2026",
+          "xFrac": 0.468
+        },
+        {
+          "x0": 1214,
+          "x1": 1214,
+          "width": 1,
+          "peakDelta": 8,
+          "mean": "#0E141A",
+          "xFrac": 0.474
+        },
+        {
+          "x0": 1411,
+          "x1": 1411,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#0D1015",
+          "xFrac": 0.551
+        },
+        {
+          "x0": 1455,
+          "x1": 1456,
+          "width": 2,
+          "peakDelta": 8,
+          "mean": "#111A29",
+          "xFrac": 0.568
+        },
+        {
+          "x0": 1466,
+          "x1": 1467,
+          "width": 2,
+          "peakDelta": 12,
+          "mean": "#121B2C",
+          "xFrac": 0.573
+        },
+        {
+          "x0": 1475,
+          "x1": 1483,
+          "width": 9,
+          "peakDelta": 9,
+          "mean": "#13141A",
+          "xFrac": 0.576
+        },
+        {
+          "x0": 1490,
+          "x1": 1492,
+          "width": 3,
+          "peakDelta": 13,
+          "mean": "#161A27",
+          "xFrac": 0.582
+        },
+        {
+          "x0": 1496,
+          "x1": 1496,
+          "width": 1,
+          "peakDelta": 8,
+          "mean": "#141419",
+          "xFrac": 0.584
+        },
+        {
+          "x0": 1505,
+          "x1": 1505,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#13141A",
+          "xFrac": 0.588
+        },
+        {
+          "x0": 2098,
+          "x1": 2101,
+          "width": 4,
+          "peakDelta": 8,
+          "mean": "#0D1015",
+          "xFrac": 0.82
+        },
+        {
+          "x0": 2108,
+          "x1": 2118,
+          "width": 11,
+          "peakDelta": 24,
+          "mean": "#12161B",
+          "xFrac": 0.823
+        },
+        {
+          "x0": 2126,
+          "x1": 2133,
+          "width": 8,
+          "peakDelta": 57,
+          "mean": "#0D1015",
+          "xFrac": 0.83
+        },
+        {
+          "x0": 2140,
+          "x1": 2147,
+          "width": 8,
+          "peakDelta": 103,
+          "mean": "#454C54",
+          "xFrac": 0.836
+        },
+        {
+          "x0": 2154,
+          "x1": 2161,
+          "width": 8,
+          "peakDelta": 52,
+          "mean": "#0E1116",
+          "xFrac": 0.841
+        },
+        {
+          "x0": 2538,
+          "x1": 2545,
+          "width": 8,
+          "peakDelta": 44,
+          "mean": "#0D1015",
+          "xFrac": 0.991
+        }
+      ]
+    },
+    "live/ui-menu-title.png": {
+      "width": 2560,
+      "height": 1600,
+      "bands": [
+        {
+          "x0": 466,
+          "x1": 497,
+          "width": 32,
+          "peakDelta": 134,
+          "mean": "#717478",
+          "xFrac": 0.182
+        },
+        {
+          "x0": 534,
+          "x1": 539,
+          "width": 6,
+          "peakDelta": 51,
+          "mean": "#363B41",
+          "xFrac": 0.209
+        },
+        {
+          "x0": 548,
+          "x1": 553,
+          "width": 6,
+          "peakDelta": 103,
+          "mean": "#737679",
+          "xFrac": 0.214
+        },
+        {
+          "x0": 562,
+          "x1": 567,
+          "width": 6,
+          "peakDelta": 52,
+          "mean": "#353A41",
+          "xFrac": 0.22
+        },
+        {
+          "x0": 587,
+          "x1": 650,
+          "width": 64,
+          "peakDelta": 50,
+          "mean": "#3B4045",
+          "xFrac": 0.229
+        },
+        {
+          "x0": 656,
+          "x1": 678,
+          "width": 23,
+          "peakDelta": 21,
+          "mean": "#363B41",
+          "xFrac": 0.256
+        },
+        {
+          "x0": 684,
+          "x1": 687,
+          "width": 4,
+          "peakDelta": 9,
+          "mean": "#41454A",
+          "xFrac": 0.267
+        },
+        {
+          "x0": 694,
+          "x1": 704,
+          "width": 11,
+          "peakDelta": 12,
+          "mean": "#42464C",
+          "xFrac": 0.271
+        },
+        {
+          "x0": 709,
+          "x1": 717,
+          "width": 9,
+          "peakDelta": 24,
+          "mean": "#383C42",
+          "xFrac": 0.277
+        },
+        {
+          "x0": 724,
+          "x1": 729,
+          "width": 6,
+          "peakDelta": 24,
+          "mean": "#45494E",
+          "xFrac": 0.283
+        },
+        {
+          "x0": 736,
+          "x1": 737,
+          "width": 2,
+          "peakDelta": 6,
+          "mean": "#3A3F45",
+          "xFrac": 0.287
+        },
+        {
+          "x0": 742,
+          "x1": 743,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#363A40",
+          "xFrac": 0.29
+        },
+        {
+          "x0": 749,
+          "x1": 755,
+          "width": 7,
+          "peakDelta": 13,
+          "mean": "#33373E",
+          "xFrac": 0.293
+        },
+        {
+          "x0": 763,
+          "x1": 764,
+          "width": 2,
+          "peakDelta": 11,
+          "mean": "#3B4046",
+          "xFrac": 0.298
+        },
+        {
+          "x0": 773,
+          "x1": 774,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#33373E",
+          "xFrac": 0.302
+        },
+        {
+          "x0": 779,
+          "x1": 780,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#383C42",
+          "xFrac": 0.304
+        },
+        {
+          "x0": 786,
+          "x1": 788,
+          "width": 3,
+          "peakDelta": 16,
+          "mean": "#3C4147",
+          "xFrac": 0.307
+        },
+        {
+          "x0": 793,
+          "x1": 793,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#33373E",
+          "xFrac": 0.31
+        },
+        {
+          "x0": 801,
+          "x1": 802,
+          "width": 2,
+          "peakDelta": 8,
+          "mean": "#33373E",
+          "xFrac": 0.313
+        },
+        {
+          "x0": 818,
+          "x1": 820,
+          "width": 3,
+          "peakDelta": 9,
+          "mean": "#373C42",
+          "xFrac": 0.32
+        },
+        {
+          "x0": 826,
+          "x1": 827,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#383D43",
+          "xFrac": 0.323
+        },
+        {
+          "x0": 832,
+          "x1": 834,
+          "width": 3,
+          "peakDelta": 10,
+          "mean": "#32363D",
+          "xFrac": 0.325
+        },
+        {
+          "x0": 838,
+          "x1": 839,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#393D43",
+          "xFrac": 0.327
+        },
+        {
+          "x0": 846,
+          "x1": 847,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#393D43",
+          "xFrac": 0.33
+        },
+        {
+          "x0": 852,
+          "x1": 853,
+          "width": 2,
+          "peakDelta": 15,
+          "mean": "#32363D",
+          "xFrac": 0.333
+        },
+        {
+          "x0": 857,
+          "x1": 859,
+          "width": 3,
+          "peakDelta": 10,
+          "mean": "#383D43",
+          "xFrac": 0.335
+        },
+        {
+          "x0": 866,
+          "x1": 867,
+          "width": 2,
+          "peakDelta": 18,
+          "mean": "#3C4147",
+          "xFrac": 0.338
+        },
+        {
+          "x0": 880,
+          "x1": 881,
+          "width": 2,
+          "peakDelta": 8,
+          "mean": "#32363D",
+          "xFrac": 0.344
+        },
+        {
+          "x0": 885,
+          "x1": 886,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#31363C",
+          "xFrac": 0.346
+        },
+        {
+          "x0": 899,
+          "x1": 901,
+          "width": 3,
+          "peakDelta": 16,
+          "mean": "#3A3F45",
+          "xFrac": 0.351
+        },
+        {
+          "x0": 911,
+          "x1": 918,
+          "width": 8,
+          "peakDelta": 9,
+          "mean": "#31363C",
+          "xFrac": 0.356
+        },
+        {
+          "x0": 925,
+          "x1": 926,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#373C42",
+          "xFrac": 0.361
+        },
+        {
+          "x0": 931,
+          "x1": 931,
+          "width": 1,
+          "peakDelta": 7,
+          "mean": "#31363C",
+          "xFrac": 0.364
+        },
+        {
+          "x0": 937,
+          "x1": 938,
+          "width": 2,
+          "peakDelta": 16,
+          "mean": "#3B4046",
+          "xFrac": 0.366
+        },
+        {
+          "x0": 951,
+          "x1": 952,
+          "width": 2,
+          "peakDelta": 14,
+          "mean": "#30353B",
+          "xFrac": 0.371
+        },
+        {
+          "x0": 957,
+          "x1": 957,
+          "width": 1,
+          "peakDelta": 8,
+          "mean": "#373B41",
+          "xFrac": 0.374
+        },
+        {
+          "x0": 964,
+          "x1": 966,
+          "width": 3,
+          "peakDelta": 8,
+          "mean": "#35393F",
+          "xFrac": 0.377
+        },
+        {
+          "x0": 984,
+          "x1": 985,
+          "width": 2,
+          "peakDelta": 8,
+          "mean": "#30353B",
+          "xFrac": 0.384
+        },
+        {
+          "x0": 998,
+          "x1": 999,
+          "width": 2,
+          "peakDelta": 16,
+          "mean": "#3A3E44",
+          "xFrac": 0.39
+        },
+        {
+          "x0": 1010,
+          "x1": 1017,
+          "width": 8,
+          "peakDelta": 16,
+          "mean": "#30353B",
+          "xFrac": 0.395
+        },
+        {
+          "x0": 1024,
+          "x1": 1025,
+          "width": 2,
+          "peakDelta": 9,
+          "mean": "#363B40",
+          "xFrac": 0.4
+        },
+        {
+          "x0": 1029,
+          "x1": 1031,
+          "width": 3,
+          "peakDelta": 13,
+          "mean": "#2F3439",
+          "xFrac": 0.402
+        },
+        {
+          "x0": 1035,
+          "x1": 1037,
+          "width": 3,
+          "peakDelta": 10,
+          "mean": "#363A40",
+          "xFrac": 0.404
+        },
+        {
+          "x0": 1042,
+          "x1": 1045,
+          "width": 4,
+          "peakDelta": 8,
+          "mean": "#34383E",
+          "xFrac": 0.407
+        },
+        {
+          "x0": 1050,
+          "x1": 1050,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#2F3439",
+          "xFrac": 0.41
+        },
+        {
+          "x0": 1063,
+          "x1": 1065,
+          "width": 3,
+          "peakDelta": 9,
+          "mean": "#2F3439",
+          "xFrac": 0.415
+        },
+        {
+          "x0": 1077,
+          "x1": 1079,
+          "width": 3,
+          "peakDelta": 18,
+          "mean": "#393E43",
+          "xFrac": 0.421
+        },
+        {
+          "x0": 1086,
+          "x1": 1086,
+          "width": 1,
+          "peakDelta": 9,
+          "mean": "#2E3339",
+          "xFrac": 0.424
+        },
+        {
+          "x0": 1091,
+          "x1": 1093,
+          "width": 3,
+          "peakDelta": 10,
+          "mean": "#2E3338",
+          "xFrac": 0.426
+        },
+        {
+          "x0": 1099,
+          "x1": 1100,
+          "width": 2,
+          "peakDelta": 12,
+          "mean": "#373C42",
+          "xFrac": 0.429
+        },
+        {
+          "x0": 1109,
+          "x1": 1109,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#2E3338",
+          "xFrac": 0.433
+        },
+        {
+          "x0": 1115,
+          "x1": 1116,
+          "width": 2,
+          "peakDelta": 7,
+          "mean": "#33373D",
+          "xFrac": 0.436
+        },
+        {
+          "x0": 1122,
+          "x1": 1129,
+          "width": 8,
+          "peakDelta": 8,
+          "mean": "#2E3338",
+          "xFrac": 0.438
+        },
+        {
+          "x0": 1138,
+          "x1": 1140,
+          "width": 3,
+          "peakDelta": 15,
+          "mean": "#393D43",
+          "xFrac": 0.445
+        },
+        {
+          "x0": 1148,
+          "x1": 1150,
+          "width": 3,
+          "peakDelta": 12,
+          "mean": "#2D3237",
+          "xFrac": 0.448
+        },
+        {
+          "x0": 1155,
+          "x1": 1155,
+          "width": 1,
+          "peakDelta": 8,
+          "mean": "#33373D",
+          "xFrac": 0.451
+        },
+        {
+          "x0": 1162,
+          "x1": 1164,
+          "width": 3,
+          "peakDelta": 19,
+          "mean": "#383D42",
+          "xFrac": 0.454
+        },
+        {
+          "x0": 1168,
+          "x1": 1168,
+          "width": 1,
+          "peakDelta": 6,
+          "mean": "#2D3237",
+          "xFrac": 0.456
+        },
+        {
+          "x0": 1176,
+          "x1": 1177,
+          "width": 2,
+          "peakDelta": 10,
+          "mean": "#2D3237",
+          "xFrac": 0.459
+        },
+        {
+          "x0": 2062,
+          "x1": 2093,
+          "width": 32,
+          "peakDelta": 96,
+          "mean": "#494D52",
+          "xFrac": 0.805
+        }
+      ]
+    }
+  }
+}
