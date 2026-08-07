@@ -15,7 +15,28 @@
  *   node evidence/a2-03-cutterhead/verify-served-build.mjs [port]
  */
 const port = Number(process.argv[2] ?? process.env.A2_03_PREVIEW_PORT ?? 4291);
-const base = `http://localhost:${port}`;
+
+/**
+ * `vite preview` binds `localhost`, which in this container resolves to `::1`
+ * only, while Node's `fetch` prefers the A record and gets ECONNREFUSED on
+ * `127.0.0.1`. Chromium is happy either way, so the browser sees a server this
+ * script cannot — which would make a *verifier* the flakiest thing in the
+ * pipeline. So it tries all three spellings and uses the first that answers.
+ */
+async function resolveBase() {
+  for (const host of ['localhost', '127.0.0.1', '[::1]']) {
+    const candidate = `http://${host}:${port}`;
+    try {
+      const r = await fetch(candidate + '/', { signal: AbortSignal.timeout(4000) });
+      if (r.ok) return candidate;
+    } catch {
+      // try the next spelling
+    }
+  }
+  throw new Error(`nothing answering on port ${port} as localhost, 127.0.0.1 or [::1]`);
+}
+
+const base = await resolveBase();
 
 /** The planetoid renderer's ocean hex — hand-drawn, off-palette, now deleted. */
 const PLANETOID = '3099235'; // 0x2f4a63, as the minifier writes it
