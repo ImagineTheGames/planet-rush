@@ -75,7 +75,7 @@ export interface ProbeTargeter {
 export class FlyPreferRegionTargeter implements ProbeTargeter {
   constructor(private readonly healthUrl: string) {}
 
-  probeFor(region: string): RegionProbe {
+  probeFor(region: string, _machine?: MachineId): RegionProbe {
     return { url: this.healthUrl, headers: { [FLY_PREFER_REGION_HEADER]: region } };
   }
 }
