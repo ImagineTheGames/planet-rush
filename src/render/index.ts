@@ -32,7 +32,8 @@ import { SENSOR_RANGE, TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../
 import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
 import { areEnemies } from '../sim/allegiance';
 import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
-import { atmosphereHaloSprite } from '../art/stations';
+import { atmosphereHaloSprite, beaconRingSprite, stationSprite, stationVariantFor } from '../art/stations';
+import { stationWreckSprite } from '../art/wrecks';
 import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
@@ -669,25 +670,34 @@ export class Renderer {
     g.x = station.pos.x;
     g.y = station.pos.y;
 
+    // THE CUTTERHEAD, from the art pipeline (a2-03; `src/art/stations.ts`,
+    // `src/art/wrecks.ts`), drawn by the same `drawSprite` verb as every turret,
+    // shield and hull on this stage.
+    //
+    // This block used to hand-draw a blue-green planetoid — three discs and a
+    // ring stroke, in hexes (`0x2f4a63`, `0x2a3038`, `0x1a1f26`) that are not in
+    // the palette and that no compliance audit could ever see, because the audit
+    // walks the sprite IR and this was never a sprite. So the generators were
+    // reviewed, catalogued and audited while the game drew something else, and
+    // the facility board's whole verdict — *"none of these look like a mining
+    // space station"* — was being passed on art the player never saw.
+    // `stationSprite`/`stationWreckSprite`/`beaconRingSprite` are now what
+    // renders, which is what makes the ratified direction reach the screen and
+    // what puts the station inside the palette contract for the first time.
+    const variant = stationVariantFor(station.owner);
     if (dead) {
-      // A wreck: the ocean has gone out, the beacon is off, the core is spent.
-      // Still solid, still on the map, still worth flying to for its debris.
-      g.circle(0, 0, r).fill({ color: 0x2a3038, alpha: 0.95 });
-      g.circle(0, 0, r).stroke({ width: 2, color: PALETTE.hullSteel, alpha: 0.35 });
-      g.circle(0, 0, r * 0.34).fill({ color: 0x1a1f26 });
+      // A derelict: the core is out, the beacon is off, the ore is still there.
+      // Still solid, still on the map, still worth flying to (GDD §2.7).
+      drawSprite(g, stationWreckSprite(variant), r);
       g.alpha = 1;
       return;
     }
 
-    // Earthlike inside the Cold Vacuum palette (style-guide §5.4): steel-blue
-    // ocean, patina continents, and a signal-yellow core — the win condition, so
-    // it obeys the yellow rule.
-    g.circle(0, 0, r).fill(0x2f4a63); // ocean
-    g.circle(-r * 0.3, -r * 0.25, r * 0.42).fill({ color: PALETTE.patina, alpha: 0.85 });
-    g.circle(r * 0.34, r * 0.22, r * 0.3).fill({ color: PALETTE.patina, alpha: 0.7 });
-    // Beacon ring: ownership, always visible (style-guide §5.4).
-    g.circle(0, 0, r + 5).stroke({ width: 3, color: playerColor(station.owner), alpha: 0.9 });
-    g.circle(0, 0, r * 0.28).fill(PALETTE.signalYellow); // core
+    drawSprite(g, stationSprite(variant, station.owner), r);
+    // Ownership, always visible (style-guide §5.4): four arcs and four pips, so
+    // the beacon reads as a beacon rather than an outline and keeps a shape a
+    // colourblind player can pick out next to a neighbouring slot's ring.
+    drawSprite(g, beaconRingSprite(station.owner), r);
     g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
   }
 
