@@ -23,7 +23,6 @@ import {
   damageRingSprite,
   stationSprite,
   stationVariantFor,
-  stationVariantNote,
   repairAuraSprite,
   STATION_VARIANT_COUNT,
 } from './stations';
@@ -85,11 +84,14 @@ function entries(): CatalogueEntry[] {
   // Exactly the eight the game builds — `stationVariantFor(owner)` is `owner % 4`,
   // so this row is four arrangements AND eight roster colours at once, and it is
   // the eight sprites a full match actually pools.
+  // The tile caption is centred in a 104px cell, so it stays SHORT — a variant's
+  // one-line note (`stationVariantNote`) belongs in a failing-test message, not
+  // here, where four of them side by side overlap into an unreadable smear.
   for (const slot of ALL_SLOTS) {
     const v = stationVariantFor(slot);
     out.push({
       group: 'Facilities — the Cutterhead: 4 arrangements × 8 owners',
-      label: `P${slot + 1} · v${v}: ${stationVariantNote(v)}`,
+      label: `P${slot + 1} · v${v}`,
       def: stationSprite(v, slot),
     });
   }
@@ -175,7 +177,7 @@ function entries(): CatalogueEntry[] {
     out.push({ group: 'Wrecks — the quiet (and the lootable derelict)', label: `derelict v${v}`, def: stationWreckSprite(v) });
   }
   for (const seed of [0, 4]) {
-    out.push({ group: 'Wrecks — the quiet', label: `debris ${seed}`, def: debrisFieldSprite(seed) });
+    out.push({ group: 'Wrecks — the quiet (and the lootable derelict)', label: `debris ${seed}`, def: debrisFieldSprite(seed) });
   }
 
   // --- VFX ------------------------------------------------------------------
