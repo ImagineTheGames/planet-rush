@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { createWorld, TICK_DT, type World } from '../sim';
+import { areEnemies, createWorld, TICK_DT, type World } from '../sim';
 import { IDLE_ACTIONS, NO_ACTIONS, createBot, createDoNothingBot, doNothing } from './bot';
 import {
   MATCH_SLOTS,
@@ -71,6 +71,67 @@ describe('harness — filling the lobby', () => {
   it('never claims a slot a human holds, even in a solo lobby', () => {
     expect(fillEmptySlots([7]).some((s) => s.id === 7)).toBe(false);
     expect(fillEmptySlots([], 1)).toEqual([{ id: 0, personality: ROSTER[0] }]);
+  });
+});
+
+/**
+ * **A seat carries a side, all the way into the world** (Stage 1 Task 1.1,
+ * `docs/team-bots-plan.md`).
+ *
+ * Before this, `botLobby` mapped a seat to `{id, shipClass}` and dropped
+ * everything else, so the shipped bot path could not express a team match at
+ * all — the offline client and the QA harness each stamped teams onto the roster
+ * themselves, *after* the bots were seated. A caller that seated a team lineup
+ * and forgot to do that got bots the simulation had never heard of (Trap 1).
+ *
+ * The FFA half of every case below is the one that matters most: an FFA lobby
+ * must produce specs with **no `team` key at all**, because `createWorld`
+ * defaults an absent team to the player's own id (teams-of-one) and a present
+ * `undefined` is a different thing entirely (Trap 10).
+ */
+describe('harness — a seat carries a side (TEAMS)', () => {
+  it('carries a per-slot team table from the lobby into the world', () => {
+    const seats = fillEmptySlots([], 4, ROSTER, [0, 0, 1, 1]);
+    expect(seats.map((s) => s.team)).toEqual([0, 0, 1, 1]);
+
+    const rows = botLobby(seats);
+    expect(rows.map((r) => r.team)).toEqual([0, 0, 1, 1]);
+
+    // And the sim agrees, through its own one predicate — not through a second
+    // notion of allegiance living in the bot layer.
+    const world = createWorld({ seed: 5, players: rows, asteroidCount: 0 });
+    expect(areEnemies(world, 0, 1)).toBe(false);
+    expect(areEnemies(world, 0, 2)).toBe(true);
+    expect(areEnemies(world, 2, 3)).toBe(false);
+  });
+
+  it('leaves the team key ABSENT in FFA, not undefined', () => {
+    const seats = fillEmptySlots([], 4);
+    for (const seat of seats) expect('team' in seat).toBe(false);
+    for (const row of botLobby(seats)) expect('team' in row).toBe(false);
+
+    // Teams-of-one: every other slot is a foe, exactly as before teams existed.
+    const world = createWorld({ seed: 5, players: botLobby(seats), asteroidCount: 0 });
+    expect(areEnemies(world, 0, 1)).toBe(true);
+    expect(areEnemies(world, 1, 2)).toBe(true);
+  });
+
+  it('leaves a slot the table does not mention on its own side', () => {
+    // A short table is a partial one, not a crash and not a silent team 0.
+    const seats = fillEmptySlots([], 4, ROSTER, [1, 1]);
+    expect(seats.map((s) => s.team)).toEqual([1, 1, undefined, undefined]);
+    expect('team' in seats[2]!).toBe(false);
+
+    const world = createWorld({ seed: 5, players: botLobby(seats), asteroidCount: 0 });
+    expect(areEnemies(world, 0, 1)).toBe(false);
+    expect(areEnemies(world, 2, 3)).toBe(true);
+  });
+
+  it('seats the same cast whether or not the lineup has teams', () => {
+    const ffa = fillEmptySlots();
+    const teams = fillEmptySlots([], MATCH_SLOTS, ROSTER, [0, 0, 0, 0, 1, 1, 1, 1]);
+    expect(teams.map((s) => s.personality)).toEqual(ffa.map((s) => s.personality));
+    expect(teams.map((s) => s.id)).toEqual(ffa.map((s) => s.id));
   });
 });
 

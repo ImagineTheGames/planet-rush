@@ -53,6 +53,25 @@ import { context, createBrain, runTree } from './tree';
 export interface BotSeat {
   readonly id: PlayerId;
   readonly personality: PersonalityId;
+  /**
+   * The side this bot fights for (TEAMS; `docs/team-bots-plan.md` Task 1.1).
+   *
+   * **Optional, and absent rather than `undefined` in FFA.** `PlayerSpec.team`
+   * (`sim/state.ts`) defaults an absent team to the player's own id — i.e.
+   * teams-of-one — so an FFA lobby that never mentions teams builds the
+   * byte-identical world it always did. `botLobby` (`./harness`) therefore
+   * carries this through with a conditional spread and never assigns
+   * `team: undefined`, which `exactOptionalPropertyTypes` forbids anyway.
+   *
+   * A seat carries it because **the bot layer had no way to express a team match
+   * at all**: `botLobby` mapped a seat to `{id, shipClass}` and dropped the rest,
+   * so the offline client and the QA harness each had to stamp teams onto the
+   * roster themselves *after* the bots were seated. Nothing downstream re-derives
+   * allegiance from this field — the sim owns that question
+   * (`sim/allegiance.ts`), and a bot reads the answer off its view's `hostile`
+   * stamps and `BotView.allies`.
+   */
+  readonly team?: number;
 }
 
 // ---------------------------------------------------------------------------
