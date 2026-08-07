@@ -119,7 +119,7 @@ only a loopback. All of it is recorded in `docs/netcode-spike.md` → *Status si
 | Item | Status | Where |
 |---|---|---|
 | Tick headroom against the **real** sim + server-side bot AI + fan-out | **CLOSED** — measured | `tests/harness/fleet-density.test.ts`; spike §1 |
-| Room density → `DEFAULT_MAX_ROOMS` | **CLOSED** — measured; 64 → **32** | `tests/harness/fleet-density.test.ts`; `server/match-server.ts` |
+| Room density → `DEFAULT_MAX_ROOMS` | **REOPENED and RE-CLOSED 2026-08-07; 32 → 6** — the first measurement gated the fleet against a whole core's frame, not the guest's 6.25% quota, and measured the sim rather than the wire | **`docs/server-capacity.md`**; `tests/net/capacity/`; `server/match-server.ts` |
 | Sustained CPU gate (20 min, real guest, `loopLagMs`) | **INSTRUMENTED, OPEN** — `/health` reports `loopLagMs`; the 20-min live run is owed | `server/index.ts`; spike §3 |
 | TCP head-of-line under real loss (risk 3) | **OPEN** — stack is end-to-end; needs a lossy link | spike §4 |
 | Reconnect-resume, ship + cargo | **DONE in-process**, live pass owed | `tests/net/reconnect-resume.test.ts`; spike §5 |
@@ -128,13 +128,19 @@ only a loopback. All of it is recorded in `docs/netcode-spike.md` → *Status si
 The two measured results in one line each:
 
 - **Room cost is ~0.043 ms/tick for eight Hard bots** (the worst case — bot AI
-  runs server-side and costs more than a human's input). At the new ceiling of
+  runs server-side and costs more than a human's input). At the then-ceiling of
   **32 rooms** the fleet is ~1.4 ms/tick (~8% of the 16.67 ms budget) on the dev
-  core; extrapolated to the ~5×-slower shared-cpu-1x Fly guest that is ~42% of
-  budget — real headroom for a *hard* ceiling. 64 rooms landed near ~88% at the
-  same extrapolation: too close to saturation to be a ceiling. The `loopLagMs`
-  gate (below) is what reconciles the 5× *estimate* with the real guest and can
-  raise the ceiling on a performance CPU.
+  core, ~42% extrapolated to a ~5×-slower shared core.
+
+  > **SUPERSEDED 2026-08-07 — `docs/server-capacity.md`.** That paragraph compares
+  > against **one whole core's frame**; a `shared-cpu-1x` is metered at **6.25% of
+  > a core sustained**, so ~42% of a core is ~7× the quota the Machine is billed
+  > for. Measured over the real wire a room costs **4.7 ms of CPU per second**
+  > (the sim-only figure misses fan-out, encode and the control path by 1.7×), so
+  > **8 rooms fit that guest and 6 is advertised** — `MAX_ROOMS` in
+  > `fly.gameserver.toml`, `DEFAULT_MAX_ROOMS` in `server/match-server.ts`.
+  > Memory never binds (a room is ~1.2 MB), and going one guest size up is 22%
+  > more money for 2.1× the rooms — a table, and the developer's call.
 
 - **The load signal is on the front door.** `/health` now reports `loopLagMs`
   (p99 event-loop lag). The gate: one 8-player match for a **full 20 minutes**
