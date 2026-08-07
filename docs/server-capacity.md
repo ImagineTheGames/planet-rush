@@ -113,6 +113,10 @@ step 4, ceiling 40 · settle 20 s · sample 45 s per step. The safety line was
 lifted for this run so the whole curve would be collected rather than stopping at
 the first breach.
 
+The instrument's own unedited output is committed beside this document at
+`docs/runs/2026-08-07-local-i9-shared-bundle.md`, so every number below can be
+checked against the thing that produced it.
+
 **Baseline (0 rooms):** p99 loop lag 0.89 ms · CPU 0.6% of a core · RSS 62.7 MB
 
 | rooms | live | loop lag median (ms) | loop lag max (ms) | CPU (% of core) | CPU/room (ms/s) | RSS (MB) | snapshot B/s per client |
