@@ -76,6 +76,11 @@ describe('golden-comparison budget', () => {
     expect(captureMsFor(megapixelsOf(DESKTOP))).toBeGreaterThanOrEqual(960);
     expect(captureMsFor(megapixelsOf(PIXEL))).toBeGreaterThanOrEqual(1_570);
     expect(captureMsFor(megapixelsOf(IPHONE))).toBeGreaterThanOrEqual(1_810);
+
+    // …and above the LANDSCAPE dpr-3 capture re-measured at q9-01 (~1.92 s),
+    // which is the frame the heaviest golden actually shoots and the one the
+    // old fit sat 30-odd ms under. Same pixel count, ~20% dearer than portrait.
+    expect(captureMsFor(megapixelsOf(IPHONE))).toBeGreaterThanOrEqual(1_920);
   });
 
   it('budgets every frame in the matrix above the default it used to ride', () => {

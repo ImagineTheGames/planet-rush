@@ -25,16 +25,39 @@
  *   pixel     412×915 dpr 2.6   2.55 MP   ~1.57 s per capture
  *   iphone    390×844 dpr 3     2.96 MP   ~1.81 s per capture
  *
- * A dpr-3 phone frame rasterises ~2.9× the pixels of the dpr-1 desktop control
- * — and then, at `scale: 'css'`, gets resampled back down to 844×390, which
- * costs MORE than handing the device pixels straight over (the same captures at
- * `scale: 'device'` ran ~1.51 s). So the golden path is the expensive one, and
- * the *pair* the stabilisation loop needs costs ~3.6 s in the container before
+ * A dpr-3 phone frame rasterises ~2.9× the pixels of the dpr-1 desktop control,
+ * so the *pair* the stabilisation loop needs costs ~3.6 s in the container before
  * the comparison itself starts. On a software-GL runner (./budget-model.ts
  * CI_SLOW_FACTOR) that pair does not come close to fitting inside 5 s — which is
  * exactly how PR #291 went red on its two `iphone` goldens, on a run that took
  * 31.8 min against a normal ~9, while the same baselines passed in-container at
  * the same commit. The frame was never wrong; the clock was.
+ *
+ * ── RE-MEASURED AT 369d7a6, ON THE HEAVIEST GOLDEN (q9-01) ─────────────────
+ * Same container, same Playwright, four consecutive captures per row, of the
+ * phone BUILD WHEEL frame (boot → open the wheel → settle) rather than the plain
+ * frozen scene:
+ *
+ *                                 scale:'css'   scale:'device'   px in one capture
+ *   iphone LANDSCAPE 844×390 dpr3   ~1.92 s        ~1.91 s          2.96 MP
+ *   iphone PORTRAIT  390×844 dpr3   ~1.59 s        ~1.59 s          2.96 MP
+ *   desktop         1280×800 dpr1   ~0.65 s        ~0.70 s          1.02 MP
+ *
+ * Two things in that table are worth keeping.
+ *
+ * FIRST: `scale: 'device'` is no longer cheaper — it is the same, to within
+ * noise, on every profile. The older note above read the css resample as the
+ * expensive step; it is not, the readback and encode are, and they are paid
+ * either way. So the obvious lever for making the heaviest golden cheaper does
+ * not exist: switching would force a re-shoot of every phone baseline at 4.5×
+ * the PNG bytes and buy nothing. Do not try it again on the old reasoning.
+ *
+ * SECOND: at IDENTICAL pixel counts, the landscape capture costs ~20% more than
+ * the portrait one — so a model keyed on megapixels alone slightly under-predicts
+ * the orientation the heaviest golden actually shoots (the spec rotates before
+ * booting). The intercept below is raised to cover it. Every rounding in this
+ * file goes one way, and this is that rule applied to a new measurement rather
+ * than a change of method.
  *
  * ── THE ARITHMETIC ─────────────────────────────────────────────────────────
  *   capture(mp)  = CAPTURE_FIXED_MS + CAPTURE_PER_MEGAPIXEL_MS × mp
@@ -78,8 +101,17 @@ export interface ShotFrame {
  * The intercept of the fit over the three measured projects (~0.50 s), rounded
  * up. Every rounding in this file goes the same way — a capture is never assumed
  * to be cheaper than it measured.
+ *
+ * Raised 550 → 600 at q9-01. The re-measurement above found the LANDSCAPE dpr-3
+ * capture at ~1.92 s where the old fit projected 1.88 s — optimistic by 30-odd
+ * ms, on exactly the frame the heaviest golden shoots. Orientation is not in the
+ * model (megapixels are the same both ways) and does not need to be: lifting the
+ * intercept covers it and keeps the invariant this file states — a projection
+ * sits at or above what was measured — true rather than nearly true. Nothing
+ * downstream moves: every budget in {@link DEVICE_MATRIX} rounds to the same
+ * step it did before, which is asserted in tests/mobile-shot-budget-contract.test.ts.
  */
-export const CAPTURE_FIXED_MS = 550;
+export const CAPTURE_FIXED_MS = 600;
 
 /**
  * Per-megapixel cost: the GPU readback, the css-scale resample and the encode of
