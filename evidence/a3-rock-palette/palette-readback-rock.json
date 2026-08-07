@@ -1,0 +1,167 @@
+{
+  "note": "The ROCK regions of evidence/images/palette-readback.json, produced by the QA Manager's evidence/probe-art-palette.mjs against a preview of this branch (port 4287, build verified by verify-served-build.mjs). Full file is QA-owned and not committed here.",
+  "rockLive": [
+    {
+      "hex": "#484E57",
+      "share": 0.027,
+      "pixels": 33880,
+      "nearest": {
+        "token": "rockBodyBoard",
+        "hex": "#454E59",
+        "distance": 4
+      }
+    },
+    {
+      "hex": "#40474F",
+      "share": 0.0132,
+      "pixels": 16508,
+      "nearest": {
+        "token": "rockBodyBoard",
+        "hex": "#454E59",
+        "distance": 13
+      }
+    },
+    {
+      "hex": "#2A2F36",
+      "share": 0.0069,
+      "pixels": 8662,
+      "nearest": {
+        "token": "ink",
+        "hex": "#262C34",
+        "distance": 5
+      }
+    },
+    {
+      "hex": "#24292F",
+      "share": 0.0042,
+      "pixels": 5223,
+      "nearest": {
+        "token": "ink",
+        "hex": "#262C34",
+        "distance": 6
+      }
+    },
+    {
+      "hex": "#424851",
+      "share": 0.0027,
+      "pixels": 3414,
+      "nearest": {
+        "token": "rockBodyBoard",
+        "hex": "#454E59",
+        "distance": 10
+      }
+    },
+    {
+      "hex": "#272C32",
+      "share": 0.0012,
+      "pixels": 1458,
+      "nearest": {
+        "token": "ink",
+        "hex": "#262C34",
+        "distance": 2
+      }
+    },
+    {
+      "hex": "#4C9683",
+      "share": 0.0009,
+      "pixels": 1171,
+      "nearest": {
+        "token": "hullSteel",
+        "hex": "#7E8894",
+        "distance": 55
+      }
+    },
+    {
+      "hex": "#31363E",
+      "share": 0.0008,
+      "pixels": 957,
+      "nearest": {
+        "token": "hullDark",
+        "hex": "#383E45",
+        "distance": 13
+      }
+    }
+  ],
+  "rockBoard": [
+    {
+      "hex": "#454E59",
+      "share": 0.0473,
+      "pixels": 31542,
+      "nearest": {
+        "token": "rockBodyBoard",
+        "hex": "#454E59",
+        "distance": 0
+      }
+    },
+    {
+      "hex": "#262C34",
+      "share": 0.0159,
+      "pixels": 10611,
+      "nearest": {
+        "token": "ink",
+        "hex": "#262C34",
+        "distance": 0
+      }
+    },
+    {
+      "hex": "#252D3A",
+      "share": 0.0068,
+      "pixels": 4534,
+      "nearest": {
+        "token": "ink",
+        "hex": "#262C34",
+        "distance": 6
+      }
+    },
+    {
+      "hex": "#4DC3FF",
+      "share": 0.0033,
+      "pixels": 2194,
+      "nearest": {
+        "token": "plasma",
+        "hex": "#4DC3FF",
+        "distance": 0
+      }
+    },
+    {
+      "hex": "#7E8894",
+      "share": 0.003,
+      "pixels": 2032,
+      "nearest": {
+        "token": "hullSteel",
+        "hex": "#7E8894",
+        "distance": 0
+      }
+    },
+    {
+      "hex": "#3E4750",
+      "share": 0.0026,
+      "pixels": 1742,
+      "nearest": {
+        "token": "rockBodyBoard",
+        "hex": "#454E59",
+        "distance": 13
+      }
+    },
+    {
+      "hex": "#F2D24B",
+      "share": 0.0023,
+      "pixels": 1507,
+      "nearest": {
+        "token": "signalGold",
+        "hex": "#F2D24B",
+        "distance": 0
+      }
+    },
+    {
+      "hex": "#8B95A5",
+      "share": 0.0015,
+      "pixels": 971,
+      "nearest": {
+        "token": "hullLightBoard",
+        "hex": "#8F99A6",
+        "distance": 6
+      }
+    }
+  ]
+}
