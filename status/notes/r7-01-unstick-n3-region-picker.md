@@ -113,6 +113,85 @@ Corroborating: `a3-01` closed its own DoD as "mobile suite green at **96/0** on 
   QA's contract to silence someone else's infrastructure problem. Flagged to QA
   in the PR body instead.
 
+### `npm test -- --run` has one red, it is MAIN's, and I am not fixing it under this brief
+
+`tests/net/capacity/capacity-regression.test.ts > the loop stays inside the tick
+budget at 12 rooms` — `expect(maxLagMs).toBeLessThan(33)`.
+
+Measured, same box, minutes apart:
+
+| tree | maxLagMs | verdict |
+|---|---|---|
+| this branch, post-merge | **56.96** | red |
+| `origin/main` @ `81f5b76`, clean worktree | **114.66** | red, twice as bad |
+
+Main is *worse than my branch*, so the number is tracking box load, not code. Load
+average was 31–50 on 8 cores throughout — the same oversubscription that produced
+the golden timeout. My branch's only `server/` change is CORS headers on the
+`/health` HTTP route (`git diff <merge-base> HEAD -- server/` is 35 lines, all of
+it request-path, none of it tick-path), and the file's own **normalised** gate —
+the one it calls "a gate rather than a flake" — passed comfortably at
+**1.4× a sim step** against a budget of 12.
+
+The test file is mine (`OWNER: Netcode Engineer`). I still did not touch it:
+
+* **`m11-01` already decided this.** Its notes record, from measurement on this
+  host: empty process p99 loop lag **5.84 ms**; two rooms **24.6 ms** at 3.4% CPU
+  ("dominated by the wave metronome and host jitter, not by saturation"); forty
+  rooms on a full core **1–11 ms**. Conclusion, verbatim: *"the ramp now flags
+  `baselineExceedsLimit` and says in its own report that the lag column is not a
+  capacity reading on such a host. That is why the CI gate is a CPU gate
+  (normalised to a bare sim step, so it is portable across runners) and **not a
+  lag gate**."* The CI-able subset nonetheless kept an absolute lag gate. That is
+  a real inconsistency between the design and the test, and it is the actual bug.
+* **But it is a capacity gate, and gates are not edited in passing.** The right
+  fix mirrors the ramp's own `baselineExceedsLimit`: measure the host's idle
+  loop-lag floor and hold the assertion only where the reading means something.
+  That is a re-measurement job with its own brief — the file says in terms that
+  budgets move "only with a re-measured `docs/server-capacity.md` in the same
+  commit". Weakening a server capacity gate inside an unrelated unstick, on a
+  branch about a region picker, is how a real 2× regression walks in later.
+
+So: reported, not silenced. Same discipline the previous session applied to QA's
+`measuredSeconds`, and the same one that kept me out of `tests/mobile/` today.
+Flagged for the Director — **main is currently red on this test**, which is
+everyone's problem, not just mine.
+
+### Port 4173 is shared across lanes, and a local mobile run can silently test SOMEONE ELSE'S BUILD
+
+The single most important thing found this session, and it poisons local mobile
+evidence on this box generally.
+
+`playwright.config.ts` hardcodes `PREVIEW_PORT = 4173` with
+`reuseExistingServer: !process.env.CI` — true locally. The lanes share a host.
+At 19:56 I found 4173 already answering 200, owned by
+
+```
+659201 node /lanes/lane-1/node_modules/.bin/vite preview --port 4173 --strictPort
+```
+
+— **lane-1's** dist, a different branch's bundle. Had I run `npm run test:mobile`
+then, Playwright would have reused it and every result would have described
+lane-1's tree while being reported as mine. Green or red, the run would have been
+worthless, and nothing in the output would have said so.
+
+This is very likely what the previous session's "before" run measured. That run
+(`/tmp/mobile-before.log`, 19:41, pre-merge) reported **4 failed / 92 passed** —
+PORTRAIT-HELD lobby golden, `landscape-lock`, `slot-state`, desktop
+`build-wheel-gantry` — and **not** the build-wheel golden this brief is about. A
+red set that shares nothing with the CI red it is supposed to reproduce is the
+signature of a run against the wrong tree.
+
+My memory note `mobile-suite-preview-orphaning` says to bring your own preview.
+It did not say to check *whose* preview is already there. Both matter; the second
+is worse, because orphaning fails loudly (~150 ms per test) and this fails
+quietly with plausible numbers.
+
+**What I did:** did not run against it, and did not kill another lane's process.
+Waiting for 4173 to free, then claiming it with this lane's own preview. Did not
+edit `playwright.config.ts` to move the port — QA owns that file, and the DoD
+line is `npm run test:mobile`, which has to mean the real command.
+
 ## NEXT
 
 <!-- filled in as the runs land -->
