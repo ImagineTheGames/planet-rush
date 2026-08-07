@@ -443,10 +443,11 @@ export {
   classStatCell,
   classTileContent,
   LOBBY_PAD,
-  RUSH_HEIGHT,
-  RUSH_HEIGHT_TOUCH,
-  SEAT_ROW_MAX,
-  SEAT_ROW_MAX_TOUCH,
+  // Row and button HEIGHTS are no longer lobby literals: since u7-03 they come
+  // from the frame (`src/art/materials` `rosterRowHeight` / `plateHeight`), which
+  // floors every one of them at the thumb on every platform rather than choosing
+  // between a desktop number and a touch number.
+  RUSH_WIDTH_MAX,
   TWO_COLUMN_MIN_WIDTH,
   lobbyHitTest,
   lobbyLayout,

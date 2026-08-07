@@ -50,8 +50,29 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
+import {
+  DISPLAY_TRACKING,
+  MATERIAL_SHADES,
+  TRACKING,
+  trackingPx,
+  WHEEL_HALO,
+  wheelMetrics,
+} from '../art/materials';
+import type { WheelProfile } from '../art/materials';
 import { SEGMENT_ARC } from './build-wheel';
 import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel';
+import {
+  buildWedgeLines,
+  capWords,
+  costWords,
+  segmentCostPaint,
+  targetWords,
+  WEDGE_LEAD,
+  wrapWedgeName,
+} from './wheel-stack';
+import type { CostPaint, WedgeLine } from './wheel-stack';
+
+export type { CostPaint } from './wheel-stack';
 import { upgradeWedgeArc } from './upgrade-wheel';
 import type {
   UpgradeWheelModel,
@@ -64,22 +85,44 @@ import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
-import { PANEL_FILL, TEXT_MUTED } from './chrome';
+import { TEXT_MUTED } from './chrome';
 import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 
 /** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
- *  shape. Repair (p5-08) is the one that needs this: a live-stage test reads back
- *  the REPAIR wedge's real second line ("+15 HP", the partial, or a reason) off
- *  the shipped bundle, the same discipline as {@link DrawnUpgradeWedge}. */
+ *  shape. Repair (p5-08) is the one that needed this first: a live-stage test
+ *  reads back the REPAIR wedge's real effect line ("+15 HP", the partial, or a
+ *  reason) off the shipped bundle, the same discipline as {@link
+ *  DrawnUpgradeWedge}. Since u7-02 it carries the whole four-line stack, so the
+ *  new `cost/held` and count/cap lines are read back the same way. */
 export interface DrawnBuildWedge {
   readonly id: WheelSegment['id'];
   readonly label: string;
-  /** The second line the wedge drew — a target ("YOUR STATION") or, for repair,
-   *  its effect/reason line. */
+  /**
+   * The wedge's *reason* line as drawn — repair's effect/reason copy ("+15 HP",
+   * "REPAIR in 12s"), or the target line ("YOUR STATION") on every other wedge.
+   *
+   * Deliberately not "whatever is on visual line 2": this field is what the wedge
+   * *says about itself*, and the p5-08 live-stage spec reads the repair deal off
+   * it. Since u7-02 repair's line is drawn on the fourth line rather than the
+   * second (the design's own stack order), and the field still answers the same
+   * question.
+   */
   readonly sub: string;
+  /** The target line as drawn — "YOUR STATION" / "YOUR SHIP", or their compact
+   *  phone forms. Every wedge names which (GDD §2.5). */
+  readonly target: string;
+  /** The count/cap line as drawn — "2 / 4 BUILT" — or `''` on an uncapped wedge. */
+  readonly caps: string;
+  /** The `cost/held` line as drawn — "3/4", "FULL", or "OPEN ▸" on the one wedge
+   *  that opens a screen instead of spending. */
+  readonly costLabel: string;
   readonly cost: number | null;
   /** Whether the wedge drew bright (pressable) or dark (refused, with a reason). */
   readonly ready: boolean;
+  /** How the cost numeral was painted — the ratified style-guide §2 carve-out:
+   *  `ore` (signal yellow, payable), `refused` (threat red, not payable), `spent`
+   *  (steel, capped or inert), or `none` (no numeral drawn). */
+  readonly costPaint: CostPaint;
 }
 
 /** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
@@ -117,19 +160,48 @@ const TEXT_DIM = PALETTE.hullSteel;
 // ---------------------------------------------------------------------------
 // Geometry
 // ---------------------------------------------------------------------------
+//
+// The radii come from the ratified Gantry/Bone profile for this wheel's actual
+// drawn radius ({@link wheelMetrics}), which states the look twice — once at the
+// handoff's desktop radius and once at a 390 px phone's — and interpolates. The
+// hub disc IS the inner edge of the wedge ring, exactly as the handoff draws it
+// (a 150 px hub inside a 470 px disc), so there is one number rather than two
+// that have to be kept in step.
 
-/** Wheel radii as a fraction of the reference size, so the whole thing scales
- *  with the viewport instead of being pinned to desktop pixels. */
-const HUB_RADIUS = 0.22;
-const INNER_RADIUS = 0.30;
-/** Where a wedge's words sit, between the inner ring and the outer edge. */
-const LABEL_RADIUS = 0.60;
+/** Where a wedge's word stack ENDS, as a fraction of the outer radius: the stack
+ *  hangs from just inside the rim, where the arc is widest, and grows inward.
+ *  Anchoring it at the rim rather than centring it in the ring is what lets a
+ *  four-line stack fit a 72° wedge on a phone. */
+function labelTopRadius(m: WheelProfile, outer: number): number {
+  return outer - m.labelInset * outer;
+}
 
 /** Ease the raw 0→1 pop progress so it settles rather than arriving linearly —
  *  a small overshoot-free ease-out reads as a wheel "snapping" into place. */
 function easePop(t: number): number {
   const c = t < 0 ? 0 : t > 1 ? 1 : t;
   return 1 - (1 - c) * (1 - c);
+}
+
+/**
+ * Solve the per-ring alpha for a set of NESTED translucent rings, given the
+ * coverage each should leave behind it — the same increment-not-target algebra
+ * `src/art/materials.ts` uses for a plate's cast shadow, because it is the same
+ * problem: a ring painted over the ones beneath it must carry the *difference*,
+ * or a stepped falloff reads as a stack of grey hoops.
+ */
+function nestedRingAlphas(targets: readonly number[]): number[] {
+  const out: number[] = [];
+  let covered = 0;
+  for (const target of targets) {
+    if (target <= covered || covered >= 1) {
+      out.push(0);
+      continue;
+    }
+    out.push((target - covered) / (1 - covered));
+    covered = target;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,39 +221,67 @@ function bodyAlpha(ready: boolean): number {
   return ready ? 0.9 : 0.45;
 }
 
+/** The colour a {@link CostPaint} resolves to (the paints themselves, and the
+ *  style-guide §2 carve-out they implement, live in {@link ./wheel-stack}). */
+function costColor(paint: CostPaint): number {
+  switch (paint) {
+    case 'ore':
+      return PALETTE.signalYellow;
+    case 'refused':
+      return PALETTE.threatRed;
+    case 'spent':
+      return MATERIAL_SHADES.tickSteel;
+    case 'none':
+      return TEXT_PRIMARY;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // One wedge's children (shared shape for both wheels)
 // ---------------------------------------------------------------------------
 
 interface WedgeNodes {
   readonly body: Graphics;
-  /** The label/sub/cost/arrow, parented together so a press-down or confirm pulse
-   *  scales — and a rejection shakes — the whole cluster as one (press feedback,
-   *  field report v0.2.2). Positioned at the wedge's label point; its children sit
-   *  at offsets from there. */
+  /** The name/target/cost/count lines and the arrow, parented together so a
+   *  press-down or confirm pulse scales — and a rejection shakes — the whole
+   *  cluster as one (press feedback, field report v0.2.2). Positioned at the
+   *  wedge's label point; its children sit at offsets from there. */
   readonly cluster: Container;
+  /** Line 1 — the wedge's own name, Audiowide. Multi-word names wrap. */
   readonly label: Text;
-  /** The second line: a build target ("YOUR STATION") or a stat value ("10 → 13"). */
+  /** Line 2 — what it spends on ("YOUR STATION"), or a stat value ("10 → 13")
+   *  on the upgrade wheel. */
   readonly sub: Text;
+  /** Line 3 — the `cost/held` numerals, or `FULL` / `OPEN ▸`. */
   readonly cost: Text;
-  /** The arrow that marks UPGRADE SHIP as the one that opens a screen. */
+  /** Line 4 — the count over its cap ("2 / 4 BUILT"), or repair's effect/reason
+   *  line ("+15 HP", "REPAIR in 12s"). Empty on a wedge that has neither. */
+  readonly detail: Text;
+  /** The arrow that marks the upgrade wheel's WEAPON wedge as one that opens a
+   *  screen. (The Build wheel's UPGRADE SHIP says it in words — `OPEN ▸`.) */
   readonly arrow: Graphics;
 }
 
 /** The normalised descriptor {@link BuildWheelView.drawWedge} draws — the one
- *  shape both wheels reduce to, so the drawing code is written once. */
+ *  shape both wheels reduce to, so the drawing code is written once. The lines
+ *  themselves, and which slot carries what, are decided in {@link ./wheel-stack}
+ *  so they can be held to a fit budget headless. */
 interface WedgeDraw {
   readonly angle: number;
-  readonly label: string;
-  readonly sub: string;
+  /** The stack, top-first. A slot that has nothing to say is simply absent. */
+  readonly lines: readonly WedgeLine[];
   readonly cost: number | null;
   /** Bright vs. dark (dimmed-with-a-reason). */
   readonly ready: boolean;
-  /** Whether the cost numeral is payable — drives its yellow-vs-grey. */
-  readonly costReady: boolean;
-  /** Draw the "opens a screen" arrow — UPGRADE SHIP on the Build wheel, and the
-   *  WEAPON wedge on the upgrade wheel (both open a wheel behind them). */
+  /** How the cost slot is painted (style-guide §2's carve-out, both colours). */
+  readonly costPaint: CostPaint;
+  /** Draw the "opens a screen" arrow — the upgrade wheel's WEAPON wedge. */
   readonly arrow: boolean;
+}
+
+/** The text a `WedgeDraw` put in one slot, or `''` if the slot is unused. */
+function slotText(d: WedgeDraw, slot: WedgeLine['slot']): string {
+  return d.lines.find((l) => l.slot === slot)?.text ?? '';
 }
 
 /** A weapon track's tiers as filled-vs-empty pip glyphs: `●●○` at tier 2 of 3.
@@ -220,6 +320,9 @@ export class BuildWheelView extends Container {
    *  (`CLOSE` at the top level) that a hub tap / ESC acts on. */
   private readonly buildHubBackChevron = new Graphics();
   private readonly buildHubBackLabel: Text;
+  /** The short fading hairline between the hub's total and its BACK word (the
+   *  handoff's hub divider). */
+  private readonly buildHubRule = new Graphics();
   /** The hub disc as a tap surface — sized to the hub ring each frame so the HUD
    *  can register the BACK affordance thumb-sized (field report v0.2.4). Invisible
    *  fill: the ring is already drawn by {@link drawRings}; this only carries the
@@ -233,7 +336,17 @@ export class BuildWheelView extends Container {
   private readonly upgradeHubLabel: Text;
   private readonly upgradeHubBackChevron = new Graphics();
   private readonly upgradeHubBackLabel: Text;
+  private readonly upgradeHubRule = new Graphics();
   private readonly upgradeHubHit = new Graphics();
+
+  // The hub group is measured by {@link drawHub} and placed by {@link drawHubBack}
+  // once its full height is known, so the whole stack sits centred in the disc
+  // rather than hanging off a guessed offset. These carry the measurement across.
+  private hubOreNode: Text | null = null;
+  private hubCaptionNode: Text | null = null;
+  private hubOreCentre = 0;
+  private hubCaptionTop = 0;
+  private hubStackHeight = 0;
 
   /** Whether the last frame was a touch device — decides the hub BACK's key hint
    *  (`· ESC` on PC only, field report v0.2.4 "ESC mirrors it … legend shows it").
@@ -262,15 +375,16 @@ export class BuildWheelView extends Container {
     // level; here, the top level, that CLOSES the wheel).
     this.buildHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.buildHubOre.anchor.set(0.5, 0.5);
-    this.buildHubLabel = makeText('ORE', FONT_HEADING, 11, TEXT_MUTED);
+    this.buildHubLabel = makeText('ORE', FONT_NUMERAL, 11, TEXT_MUTED, 'bold');
     this.buildHubLabel.anchor.set(0.5, 0);
-    this.buildHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
+    this.buildHubBackLabel = makeText('', FONT_NUMERAL, 9, TEXT_MUTED, 'bold');
     this.buildHubBackLabel.anchor.set(0.5, 0);
     this.buildGroup.addChild(
       this.buildHubHit,
       this.buildRings,
       this.buildHubOre,
       this.buildHubLabel,
+      this.buildHubRule,
       this.buildHubBackChevron,
       this.buildHubBackLabel,
     );
@@ -280,15 +394,16 @@ export class BuildWheelView extends Container {
     // lobby, so it names whose ship you are spending on.
     this.upgradeHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.upgradeHubOre.anchor.set(0.5, 0.5);
-    this.upgradeHubLabel = makeText('', FONT_HEADING, 10, TEXT_MUTED);
+    this.upgradeHubLabel = makeText('', FONT_NUMERAL, 10, TEXT_MUTED, 'bold');
     this.upgradeHubLabel.anchor.set(0.5, 0);
-    this.upgradeHubBackLabel = makeText('', FONT_HEADING, 9, TEXT_PRIMARY);
+    this.upgradeHubBackLabel = makeText('', FONT_NUMERAL, 9, TEXT_MUTED, 'bold');
     this.upgradeHubBackLabel.anchor.set(0.5, 0);
     this.upgradeGroup.addChild(
       this.upgradeHubHit,
       this.upgradeRings,
       this.upgradeHubOre,
       this.upgradeHubLabel,
+      this.upgradeHubRule,
       this.upgradeHubBackChevron,
       this.upgradeHubBackLabel,
     );
@@ -401,33 +516,60 @@ export class BuildWheelView extends Container {
   private drawBuildWheel(model: BuildWheelModel, time: number, feedback?: PressFeedback): void {
     this.lastUpgradeDrawn = false; // the upgrade wheel is not the one on top
     const r = this.radius;
-    const inner = r * INNER_RADIUS;
-    const hub = r * HUB_RADIUS;
+    const m = wheelMetrics(r);
+    const inner = r * m.hub;
+    const hub = inner;
 
-    this.drawRings(this.buildRings, r, hub);
+    this.drawRings(this.buildRings, r, hub, m);
+    this.drawSpokes(this.buildRings, inner, r, model.segments.length, m);
 
     for (let i = 0; i < model.segments.length; i++) {
       const seg = model.segments[i];
       if (!seg) continue;
       const nodes = this.wedgeNodes(this.buildGroup, this.buildWedges, i);
-      this.drawWedge(nodes, buildSegmentDraw(seg), inner, r, SEGMENT_ARC, this.sample(feedback, 'build', i, time));
+      this.drawWedge(
+        nodes,
+        buildSegmentDraw(seg, m),
+        inner,
+        r,
+        SEGMENT_ARC,
+        m,
+        this.sample(feedback, 'build', i, time),
+      );
     }
     // Any pooled wedges beyond this model's segment count stay hidden.
     this.hideWedgesFrom(this.buildWedges, model.segments.length);
 
-    this.buildHubOre.text = `${model.ore}`;
-    this.buildHubOre.y = 4;
-    this.buildHubLabel.y = this.buildHubOre.y + 12;
-    this.buildHubLabel.text = 'ORE';
-    this.drawHubBack(this.buildHubBackChevron, this.buildHubBackLabel, this.buildHubHit, hub, model.hubBack);
+    this.drawHub(this.buildHubOre, this.buildHubLabel, `${model.ore}`, 'ORE', m);
+    this.drawHubBack(
+      this.buildHubBackChevron,
+      this.buildHubBackLabel,
+      this.buildHubHit,
+      this.buildHubRule,
+      hub,
+      m,
+      model.hubBack,
+    );
 
-    // Capture what was drawn for the ?debug=1 repair-wedge live-stage seam: the
-    // REAL second line each wedge rendered (repair's "+15 HP"/partial/reason),
-    // straight off the descriptors the view just drew from.
+    // Capture what was drawn for the ?debug=1 live-stage seams — the REAL lines
+    // each wedge rendered (repair's "+15 HP"/partial/reason, the `cost/held`
+    // string, the count over its cap), straight off the descriptors the view just
+    // drew from, so a Playwright test reads the shipped client rather than a model.
     this.lastBuildDrawn = true;
     this.lastBuildWedges = model.segments.map((seg) => {
-      const d = buildSegmentDraw(seg);
-      return { id: seg.id, label: d.label, sub: d.sub, cost: d.cost, ready: d.ready };
+      const d = buildSegmentDraw(seg, m);
+      return {
+        id: seg.id,
+        label: seg.label,
+        // Line 2 as drawn: repair's effect/reason, else what the wedge spends on.
+        sub: slotText(d, 'sub'),
+        target: targetWords(seg),
+        caps: capWords(seg, m) ?? '',
+        costLabel: costWords(seg) ?? '',
+        cost: d.cost,
+        ready: d.ready,
+        costPaint: d.costPaint,
+      };
     });
   }
 
@@ -438,30 +580,31 @@ export class BuildWheelView extends Container {
   private drawUpgradeWheel(model: UpgradeWheelModel, time: number, feedback?: PressFeedback): void {
     this.lastBuildDrawn = false; // the Build wheel is not the one on top
     const r = this.radius;
-    const inner = r * INNER_RADIUS;
-    const hub = r * HUB_RADIUS;
+    const m = wheelMetrics(r);
+    const inner = r * m.hub;
+    const hub = inner;
     const arc = upgradeWedgeArc(model.wedges.length);
 
-    this.drawRings(this.upgradeRings, r, hub);
+    this.drawRings(this.upgradeRings, r, hub, m);
+    this.drawSpokes(this.upgradeRings, inner, r, model.wedges.length, m);
 
     for (let i = 0; i < model.wedges.length; i++) {
       const wedge = model.wedges[i];
       if (!wedge) continue;
       const nodes = this.wedgeNodes(this.upgradeGroup, this.upgradeWedges, i);
-      this.drawWedge(nodes, upgradeWedgeDraw(wedge), inner, r, arc, this.sample(feedback, 'upgrade', i, time));
+      this.drawWedge(nodes, upgradeWedgeDraw(wedge, m), inner, r, arc, m, this.sample(feedback, 'upgrade', i, time));
     }
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
 
-    this.upgradeHubOre.text = `${model.ore}`;
-    this.upgradeHubOre.y = 4;
-    this.upgradeHubLabel.y = this.upgradeHubOre.y + 12;
     // Name the hull whose stats these are — the class is the lobby choice.
-    this.upgradeHubLabel.text = model.className;
+    this.drawHub(this.upgradeHubOre, this.upgradeHubLabel, `${model.ore}`, model.className, m);
     this.drawHubBack(
       this.upgradeHubBackChevron,
       this.upgradeHubBackLabel,
       this.upgradeHubHit,
+      this.upgradeHubRule,
       hub,
+      m,
       model.hubBack,
     );
 
@@ -512,11 +655,20 @@ export class BuildWheelView extends Container {
    * both nodes. The chevron points UP — "go up a level" — and is plasma, the same
    * accent the forward arrows use, so backward/forward read as one language.
    */
-  private drawHubBack(chevron: Graphics, label: Text, hit: Graphics, hub: number, hb: HubBack | null): void {
+  private drawHubBack(
+    chevron: Graphics,
+    label: Text,
+    hit: Graphics,
+    rule: Graphics,
+    hub: number,
+    m: WheelProfile,
+    hb: HubBack | null,
+  ): void {
     if (!hb) {
       chevron.visible = false;
       label.visible = false;
       hit.visible = false;
+      rule.visible = false;
       return;
     }
     // The tap surface is the whole hub disc — thumb-sized (field report v0.2.4).
@@ -525,32 +677,173 @@ export class BuildWheelView extends Container {
     hit.visible = true;
     hit.clear();
     hit.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.001 });
+
     // CLOSE / BACK, plus the PC key that mirrors the hub tap (field report v0.2.4).
     label.visible = true;
     label.text = this.isTouch ? hb.label : `${hb.label} · ESC`;
-    label.y = -18;
+    restyle(label, m.hubBack, trackingPx(TRACKING.eyebrow, m.hubBack));
 
+    // The up-chevron — "go up a level" — sits BETWEEN the rule and the word,
+    // pointing back at the total above it, so the gesture and its label read as
+    // one thing rather than as a word with a mark stranded under it.
     chevron.visible = true;
     chevron.clear();
-    // A small up-chevron centred over the label — "go up a level".
-    chevron.poly([-5, 3, 0, -3, 5, 3]).stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
-    chevron.y = -25;
+    const c = Math.max(3, m.detent * 0.55);
+    chevron
+      .poly([-c, c * 0.6, 0, -c * 0.6, c, c * 0.6])
+      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
+
+    // Now that every piece has been measured, centre the whole hub group on the
+    // disc — the handoff's hub is a stack centred in its circle, and hanging it
+    // off a guessed offset is what left it sitting on the bottom rim.
+    const gap = Math.max(4, m.gapCost + 2);
+    const chevronH = c * 1.2;
+    const total = this.hubStackHeight + gap + chevronH + 2 + label.height;
+    const top = -total / 2;
+    if (this.hubOreNode) this.hubOreNode.y = top + this.hubOreCentre;
+    if (this.hubCaptionNode) this.hubCaptionNode.y = top + this.hubCaptionTop;
+
+    const ruleY = top + this.hubStackHeight + gap / 2;
+    rule.visible = true;
+    rule.clear();
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      const w = m.hubRule * (1 - (0.8 * i) / steps);
+      rule.moveTo(-w / 2, ruleY).lineTo(w / 2, ruleY).stroke({
+        width: 1,
+        color: MATERIAL_SHADES.hairline,
+        alpha: 0.3,
+      });
+    }
+    chevron.y = ruleY + gap / 2 + chevronH / 2;
+    label.y = chevron.y + chevronH / 2 + 2;
   }
 
-  private drawRings(rings: Graphics, r: number, hub: number): void {
-    // Backing disc + hub ring. Redrawn per frame: one Graphics, open for seconds.
+  /** The hub's live ore total and its caption — the handoff's `40px` numeral over
+   *  a tracked eyebrow. The Build wheel captions it `ORE`; the upgrade wheel names
+   *  the hull whose stats are being spent on. Measured here and *placed* by
+   *  {@link drawHubBack}, which is the piece that knows how tall the whole group
+   *  ends up and so where the middle of it is. */
+  private drawHub(ore: Text, caption: Text, value: string, word: string, m: WheelProfile): void {
+    ore.text = value;
+    restyle(ore, m.hubOre, trackingPx(TRACKING.name, m.hubOre));
+    caption.text = word;
+    restyle(caption, m.hubCaption, trackingPx(TRACKING.eyebrow, m.hubCaption));
+    // The numeral is anchored on its own centre, the caption on its top edge —
+    // record both as offsets from the top of the pair so the group can be centred.
+    this.hubOreNode = ore;
+    this.hubCaptionNode = caption;
+    this.hubOreCentre = ore.height / 2;
+    this.hubCaptionTop = ore.height + 2;
+    this.hubStackHeight = ore.height + 2 + caption.height;
+    ore.y = this.hubOreCentre;
+    caption.y = this.hubCaptionTop;
+  }
+
+  /**
+   * The disc the wedges sit on — the Gantry/Bone build wheel (u7-02), and the one
+   * place in this file where "no plates over gameplay" is actually enforced.
+   *
+   * Drawn outermost-first:
+   *
+   *  1. **The halo** — a pool of void with no edge ({@link WHEEL_HALO}), stepped
+   *     into nested rings whose alphas carry the increment rather than the target
+   *     ({@link nestedRingAlphas}). This is what the wheel reads *against*. The
+   *     handoff gives it a `radial-gradient` rather than a card precisely so the
+   *     fight stays visible up to the disc; a rectangle would give the HUD a
+   *     corner, and a corner is what turns a wheel into a panel.
+   *  2. **A faint halo ring**, the handoff's `inset:-26px` hairline — the machined
+   *     edge of the pool, so the falloff has somewhere to end.
+   *  3. **The disc**, still translucent (the world reads through it) in the
+   *     Gantry face tone rather than the old flat panel fill.
+   *  4. **An inner vignette**, the handoff's `inset 0 0 56px` — the rim is a
+   *     machined lip, so the disc is darker where it turns away from the light.
+   *  5. **The rim**, lit along its top and shadowed along its bottom: the
+   *     handoff's whole diagnosis ("a lit top edge, a shadowed under-line")
+   *     stated on a circle instead of on a rectangle.
+   *  6. **The index diamond** at twelve o'clock — where segment 0 begins.
+   *
+   * Redrawn per frame: one Graphics, open for seconds at a time.
+   */
+  private drawRings(rings: Graphics, r: number, hub: number, m: WheelProfile): void {
     rings.clear();
-    // The unified panel material (./chrome) for both discs — the wheel is a floating
-    // panel like every other; its identity stays the plasma rings, not the fill.
+
+    // 1 + 2. The halo, and the hairline that ends it.
+    const holdR = r * WHEEL_HALO.holdTo;
+    const fadeR = r * WHEEL_HALO.fadeTo;
+    const bands = WHEEL_HALO.bands;
+    const targets: number[] = [];
+    for (let i = 0; i < bands; i++) {
+      // 1 at the outer edge of the falloff, 1/bands at its inner edge; squared, so
+      // the pool has a soft shoulder rather than a linear ramp.
+      const outward = (bands - i) / bands;
+      targets.push(WHEEL_HALO.peak * (1 - outward) * (1 - outward));
+    }
+    const alphas = nestedRingAlphas(targets);
+    for (let i = 0; i < bands; i++) {
+      const radius = fadeR + ((holdR - fadeR) * i) / bands;
+      const alpha = alphas[i] ?? 0;
+      if (alpha <= 0) continue;
+      rings.circle(0, 0, radius).fill({ color: PALETTE.vacuum, alpha });
+    }
+    rings.circle(0, 0, holdR).fill({ color: PALETTE.vacuum, alpha: WHEEL_HALO.peak });
     rings
-      .circle(0, 0, r)
-      .fill({ color: PANEL_FILL, alpha: 0.88 })
-      .circle(0, 0, r)
-      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.35 })
-      .circle(0, 0, hub)
-      .fill({ color: PANEL_FILL, alpha: 0.95 })
-      .circle(0, 0, hub)
-      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.6 });
+      .circle(0, 0, r + m.haloOffset)
+      .stroke({ width: m.haloRing, color: PALETTE.hullSteel, alpha: 0.14 });
+
+    // 3. The disc. Translucent on purpose: the wheel opens over a live fight.
+    rings.circle(0, 0, r).fill({ color: MATERIAL_SHADES.faceShade, alpha: 0.88 });
+
+    // 4. The inner vignette — nested rings inside the rim, darkening outward.
+    const vig = Math.max(1, Math.round(m.vignette / 6));
+    for (let i = 0; i < vig; i++) {
+      const t = (i + 1) / vig;
+      rings
+        .circle(0, 0, r - (m.vignette * (1 - t)) / 1)
+        .stroke({ width: m.vignette / vig + 1, color: PALETTE.vacuum, alpha: 0.16 * t });
+    }
+
+    // 5. The rim: lit across the top, shadowed across the bottom.
+    rings
+      .arc(0, 0, r, Math.PI, 2 * Math.PI)
+      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleLit, alpha: 0.95 });
+    rings
+      .arc(0, 0, r, 0, Math.PI)
+      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleDeep, alpha: 0.95 });
+
+    // 6. The index diamond at twelve o'clock — a machined mark, chalk-white.
+    const d = m.detent;
+    rings
+      .poly([0, -r - d / 2, d / 2, -r, 0, -r + d / 2, -d / 2, -r])
+      .fill({ color: TEXT_PRIMARY, alpha: 0.9 });
+
+    // The hub disc, with the same lit-top / shadowed-bottom rim.
+    rings.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.95 });
+    rings
+      .arc(0, 0, hub, Math.PI, 2 * Math.PI)
+      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleLit, alpha: 0.9 });
+    rings
+      .arc(0, 0, hub, 0, Math.PI)
+      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleDeep, alpha: 0.9 });
+  }
+
+  /** The hairline spokes between wedges — the handoff's 1.2° conic dividers.
+   *  Drawn once for the whole wheel rather than per wedge, so a wedge's own
+   *  press/confirm overlays never paint over a divider. */
+  private drawSpokes(rings: Graphics, inner: number, outer: number, count: number, m: WheelProfile): void {
+    if (count <= 1) return;
+    const arc = (2 * Math.PI) / count;
+    for (let i = 0; i < count; i++) {
+      // Boundaries sit half an arc off each wedge centre; segment 0 is centred at
+      // twelve o'clock, so the first boundary is half an arc clockwise from it.
+      const a = -Math.PI / 2 + arc * (i + 0.5);
+      const cos = Math.cos(a);
+      const sin = Math.sin(a);
+      rings
+        .moveTo(cos * inner, sin * inner)
+        .lineTo(cos * outer, sin * outer)
+        .stroke({ width: m.spoke, color: MATERIAL_SHADES.hairline, alpha: 0.45 });
+    }
   }
 
   /** Draw one wedge: the body, the words, the second line, and the cost — and
@@ -564,6 +857,7 @@ export class BuildWheelView extends Container {
     inner: number,
     outer: number,
     arc: number,
+    m: WheelProfile,
     fb: ControlFeedback = NEUTRAL_FEEDBACK,
   ): void {
     const half = arc / 2;
@@ -599,41 +893,67 @@ export class BuildWheelView extends Container {
       trace().stroke({ width: 2, color: PALETTE.threatRed, alpha: fb.reject });
     }
 
-    const lx = Math.cos(d.angle) * outer * LABEL_RADIUS;
-    const ly = Math.sin(d.angle) * outer * LABEL_RADIUS;
-    // The cluster carries the words; the feedback scales it (press-down / confirm
-    // pulse) and shakes it sideways (rejection).
+    // --- The word stack (the handoff's four lines) --------------------------
+    //
+    // Type sizes come from the resolved profile, so the same look states itself
+    // at 235 px and at 140 px rather than one of them being a scaled accident.
+    // Which slot carries what is {@link ./wheel-stack}'s call; this only paints
+    // and places. Each line is measured after its text is set and stacked under
+    // the one above, so a wrapped name or a multi-line pip block pushes the rest
+    // down instead of overlapping it.
+    const slots: Record<WedgeLine['slot'], Text> = {
+      name: nodes.label,
+      sub: nodes.sub,
+      cost: nodes.cost,
+      detail: nodes.detail,
+    };
+    for (const t of [nodes.label, nodes.sub, nodes.cost, nodes.detail]) t.visible = false;
+
+    let y = 0;
+    for (const line of d.lines) {
+      const t = slots[line.slot];
+      t.visible = true;
+      t.text = line.text;
+      // The name dims with its wedge; the two muted lines stay muted (they are
+      // read, not acted on); the cost slot takes the one RESERVED carve-out —
+      // signal yellow when payable, threat red when not, steel where there is no
+      // price to pay at all (style-guide §2, amended 2026-08-06).
+      t.style.fill =
+        line.slot === 'name'
+          ? d.ready
+            ? TEXT_PRIMARY
+            : TEXT_DIM
+          : line.slot === 'cost'
+            ? costColor(d.costPaint)
+            : TEXT_MUTED;
+      restyle(t, line.size, trackingPx(line.tracking, line.size));
+      t.y = y;
+      y += t.height + line.gap;
+    }
+    const stackHeight = y;
+
+    const top = labelTopRadius(m, outer);
+    // The cluster's own origin is its top-centre (children are anchored 0.5, 0),
+    // so the pivot puts the pulse's centre of gravity in the middle of the stack.
+    const centre = top - stackHeight / 2;
+    const lx = Math.cos(d.angle) * centre;
+    const ly = Math.sin(d.angle) * centre;
+    nodes.cluster.pivot.set(0, stackHeight / 2);
     nodes.cluster.visible = true;
     nodes.cluster.x = lx + fb.shakeX;
     nodes.cluster.y = ly;
     nodes.cluster.scale.set(fb.scale);
 
-    nodes.label.visible = true;
-    nodes.label.text = d.label;
-    nodes.label.style.fill = d.ready ? TEXT_PRIMARY : TEXT_DIM;
-
-    nodes.sub.visible = true;
-    nodes.sub.text = d.sub;
-
-    if (d.cost !== null) {
-      nodes.cost.visible = true;
-      nodes.cost.text = `${d.cost}`;
-      // Yellow only when payable — a half-lit yellow still reads as "ore is here"
-      // at a glance, and that trust is what style-guide §2 forbids spending.
-      nodes.cost.style.fill = d.costReady ? PALETTE.signalYellow : TEXT_DIM;
-    } else {
-      nodes.cost.visible = false;
-    }
-
-    // An "opens a screen" arrow points right (UPGRADE SHIP, WEAPON), off the
-    // label's trailing edge. (BACK is no longer a wedge — it lives on the hub,
-    // field report v0.2.4 — so a wedge only ever draws the forward arrow.)
+    // An "opens a screen" arrow points right, off the name's trailing edge — the
+    // upgrade wheel's WEAPON wedge. The Build wheel's UPGRADE SHIP says it in
+    // words instead (`OPEN ▸`, the handoff's own copy), which is the same
+    // affordance in the slot the other wedges spend on a cost.
     nodes.arrow.visible = d.arrow;
     if (d.arrow) {
       nodes.arrow.clear();
       nodes.arrow.poly([0, -5, 8, 0, 0, 5]).fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
       nodes.arrow.x = nodes.label.width / 2 + 10;
-      nodes.arrow.y = -9;
+      nodes.arrow.y = nodes.label.y + nodes.label.height / 2 - 5;
     }
   }
 
@@ -644,24 +964,23 @@ export class BuildWheelView extends Container {
 
     const body = new Graphics();
     const cluster = new Container();
+    // Sizes are set per frame from the resolved wheel profile ({@link restyle});
+    // these are only the faces and the roles. The name is the one display face on
+    // the wheel; everything else is Oxanium, per style-guide §7.
     const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
-    const sub = makeText('', FONT_HEADING, 9, TEXT_MUTED);
+    const sub = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
+    const detail = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
     const arrow = new Graphics();
-    for (const t of [label, sub, cost]) t.anchor.set(0.5, 0);
-    // Children sit at fixed offsets from the cluster origin (the wedge's label
-    // point), so scaling/offsetting the cluster moves the whole label group.
-    label.y = -16;
-    sub.y = -2;
-    cost.y = 12;
-    // The cluster is pivoted on its own centre so a confirm pulse swells about the
-    // label rather than growing off one corner.
-    cluster.pivot.set(0, -2);
-    cluster.addChild(label, sub, cost, arrow);
+    for (const t of [label, sub, cost, detail]) {
+      t.anchor.set(0.5, 0);
+      t.style.align = 'center';
+    }
+    cluster.addChild(label, sub, cost, detail, arrow);
     group.addChild(body);
     group.addChild(cluster);
 
-    const nodes: WedgeNodes = { body, cluster, label, sub, cost, arrow };
+    const nodes: WedgeNodes = { body, cluster, label, sub, cost, detail, arrow };
     pool[index] = nodes;
     return nodes;
   }
@@ -684,28 +1003,30 @@ export class BuildWheelView extends Container {
 // Model → wedge descriptor (the only place the two wheels differ)
 // ---------------------------------------------------------------------------
 
-/** A Build-wheel segment as a wedge: label, its target, its cost. */
-function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
+/**
+ * A Build-wheel segment as a wedge — the handoff's four lines (u7-02):
+ *
+ *   NAME / what it spends on / `cost/held` / the count over its cap.
+ *
+ * Every wedge names its target on line 2 now — "every label names which" (GDD
+ * §2.5), words not a number — and line 4 carries whichever of the two things a
+ * wedge has to add: its **count over its cap** (TURRET, SHIELD, RADAR — u7-02,
+ * closing u2-02) or, on REPAIR REACTOR, the **effect/reason** copy that is the
+ * one ratified exception to "the only number is the cost" (p5-08: the HP a tap
+ * buys, or why it is refused). UPGRADE SHIP has neither, and spends its cost slot
+ * on the words that say it opens a screen.
+ */
+function buildSegmentDraw(seg: WheelSegment, m: WheelProfile): WedgeDraw {
   return {
     angle: seg.angle,
-    label: seg.label,
-    // REPAIR CORE is the one wedge that names its effect: the HP a tap buys, or the
-    // reason it's refused (p5-08 — a discrete purchase, so the deal must be legible
-    // before the tap). RADAR names its "0/1" count/cap instead (p13 — one per
-    // station, and the count is the "it re-arms after it's shot down" tell). Every
-    // other wedge's second line names its target — "every label names which"
-    // (GDD §2.5), station or ship, words not a number.
-    sub: seg.repair
-      ? seg.repair.line
-      : seg.capLabel
-        ? seg.capLabel
-        : seg.target === 'ship'
-          ? 'YOUR SHIP'
-          : 'YOUR STATION',
+    lines: buildWedgeLines(seg, m),
     cost: seg.cost,
     ready: wedgeReady(seg.state),
-    costReady: seg.state === 'ready',
-    arrow: seg.opensPanel,
+    // UPGRADE SHIP keeps its arrow rather than a number — it is the one segment
+    // that opens a second screen (GDD §2.5), and the handoff says so in the slot
+    // the others spend on a price: `OPEN ▸`, in chalk rather than in ore yellow.
+    costPaint: segmentCostPaint(seg),
+    arrow: false,
   };
 }
 
@@ -714,7 +1035,7 @@ function buildSegmentDraw(seg: WheelSegment): WedgeDraw {
  *  finished ladder. The WEAPON wedge carries its tier pips and an arrow (it opens
  *  the sub-wheel). BACK is not a wedge any more — it lives on the hub (field
  *  report v0.2.4). */
-function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
+function upgradeWedgeDraw(wedge: UpgradeWedge, m: WheelProfile): WedgeDraw {
   if (wedge.kind === 'weapon') {
     // The pips ARE the second line — the main wheel says the weapon tiers at a
     // glance without the sub-wheel (RATIFIED v0.2.2, item 3). No cost: it opens a
@@ -722,24 +1043,79 @@ function upgradeWedgeDraw(wedge: UpgradeWedge): WedgeDraw {
     const sub = (wedge.summary ?? []).map(pipRow).join('\n');
     return {
       angle: wedge.angle,
-      label: wedge.label,
-      sub,
+      lines: upgradeLines(wedge.label, sub, null, m),
       cost: null,
       ready: wedgeReady(wedge.state),
-      costReady: false,
+      costPaint: 'none',
       arrow: true,
     };
   }
   const sub = wedge.state === 'maxed' ? `${wedge.current} · MAX` : `${wedge.current} → ${wedge.next}`;
+  // The upgrade panel prices a row, not a purchase against a wallet: `cost/held`
+  // is the Build wheel's grammar (GDD §2.5 leaves this screen alone), so the cost
+  // slot here stays the bare numeral it has always been — painted by the same
+  // ore/refused/spent rule, which is what makes an unaffordable tier legible.
   return {
     angle: wedge.angle,
-    label: wedge.label,
-    sub,
+    lines: upgradeLines(wedge.label, sub, wedge.cost === null ? null : `${wedge.cost}`, m),
     cost: wedge.cost,
     ready: wedgeReady(wedge.state),
-    costReady: wedge.state === 'ready',
+    costPaint: upgradeCostPaint(wedge.state),
     arrow: false,
   };
+}
+
+/** An upgrade wedge's stack: name, its stat value (or pip rows), its cost. Same
+ *  three slots and the same profile type as the Build wheel's, so both wheels
+ *  scale from one place. */
+function upgradeLines(
+  label: string,
+  sub: string,
+  cost: string | null,
+  m: WheelProfile,
+): readonly WedgeLine[] {
+  const lines: WedgeLine[] = [
+    {
+      slot: 'name',
+      text: wrapWedgeName(label),
+      face: 'display',
+      size: m.name,
+      tracking: DISPLAY_TRACKING.heading,
+      lead: WEDGE_LEAD.name,
+      gap: m.gapName,
+    },
+  ];
+  if (sub.length > 0) {
+    lines.push({
+      slot: 'sub',
+      text: sub,
+      face: 'numeral',
+      size: m.sub,
+      tracking: TRACKING.label,
+      lead: WEDGE_LEAD.body,
+      gap: m.gapSub,
+    });
+  }
+  if (cost !== null) {
+    lines.push({
+      slot: 'cost',
+      text: cost,
+      face: 'numeral',
+      size: m.cost,
+      tracking: TRACKING.name,
+      lead: WEDGE_LEAD.body,
+      gap: 0,
+    });
+  }
+  return lines;
+}
+
+/** The upgrade wheel's cost paint. `ready` is ore; a tier the player cannot pay
+ *  for is refused-red, the same carve-out as the Build wheel's; a maxed or
+ *  otherwise dead row is steel. */
+function upgradeCostPaint(state: UpgradeWedgeState): CostPaint {
+  if (state === 'ready') return 'ore';
+  return state === 'unaffordable' ? 'refused' : 'spent';
 }
 
 // ---------------------------------------------------------------------------
@@ -754,4 +1130,20 @@ function makeText(
   fontWeight: TextStyleFontWeight = 'normal',
 ): Text {
   return new Text({ text, style: { fontFamily, fontSize, fill, fontWeight, letterSpacing: 0.5 } });
+}
+
+/**
+ * Re-size and re-track one line to the resolved wheel profile — the mechanism by
+ * which the same look states itself at 235 px and at 140 px.
+ *
+ * Guarded on the current values: a Pixi `TextStyle` setter dirties the text and
+ * forces a re-measure, and this runs for every line of every wedge every frame
+ * the wheel is open. Sizes only actually change on a resize, so the guard turns a
+ * per-frame restyle into a no-op.
+ */
+function restyle(text: Text, fontSize: number, letterSpacing: number): void {
+  const size = Math.round(fontSize * 100) / 100;
+  const spacing = Math.round(letterSpacing * 100) / 100;
+  if (text.style.fontSize !== size) text.style.fontSize = size;
+  if (text.style.letterSpacing !== spacing) text.style.letterSpacing = spacing;
 }

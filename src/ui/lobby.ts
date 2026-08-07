@@ -73,6 +73,7 @@
 import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
+import { BONE, MATERIAL_SHADES } from '../art/materials';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
@@ -100,6 +101,27 @@ export const LOBBY_SLOTS = MATCH_SLOTS;
 /** The word on the start button, and on the countdown when it reaches zero
  *  (GDD §2.1: "a match countdown ('RUSH!') starts the game"). */
 export const RUSH_LABEL = 'RUSH!';
+
+/**
+ * What the header beam calls this screen, and the eyebrow over the room code
+ * (u7-03 — Gantry/Bone frames every screen with a heading in its header beam;
+ * `CREW MUSTER` is the handoff's own word for the lobby, recorded in the tracking
+ * scale it ships with, `../art/materials` DISPLAY_TRACKING).
+ *
+ * It sits here rather than in the view for the same reason `MAIN_MENU_TITLE`
+ * does: the copy sweep (`docs/copy-sweep-industrial-voice.md`) reads the models,
+ * and a string typed into a draw call is a string nobody can find.
+ */
+export const LOBBY_TITLE = 'CREW MUSTER';
+/**
+ * `CLAIM`, not `ROOM` (GDD §4.7 register 2; sweep doc §3 "lobby ROOM → CLAIM").
+ * u7-03 extracted this string out of the view and, forking from before the
+ * sweep, carried the pre-sweep word up with it — so the merge restores the
+ * ratified noun into u7-03's constant rather than reverting the extraction.
+ * The room *code* stays a code: the noun above it moved, the code did not
+ * (see `lobby-entry.ts` ENTRY_ERRORS, and r1-01's `CLAIM CODE` keypad fix).
+ */
+export const LOBBY_EYEBROW = 'CLAIM';
 
 /** Seconds the RUSH countdown runs for. Long enough to put a thumb back on the
  *  stick, short enough that nobody reads it twice. TUNABLE */
@@ -398,20 +420,26 @@ export const STAT_PIPS = 5;
  * for the same reason: the frozen palette's reserved rules are a contract, so
  * the colours are pinned by a unit test rather than trusted to a view.
  *
- * **Pips are CHROME.** They are not ore and they are not danger, so signal
- * yellow `#F2D24B` and threat red `#B23A3A` are both out (style-guide §2 — "signal
- * yellow means ore or danger, and nothing else"), and no seventh hue enters the
- * palette either: a filled pip is the plasma this screen already selects with,
- * or the chalk it already writes in, and the unfilled remainder is hull steel at
- * a glance-level alpha.
+ * **Pips are CHROME, and under Gantry/Bone chrome spends no hue at all** (u7-03).
+ * They were plasma-on-the-picked-hull and chalk elsewhere, which was correct
+ * while the lobby's selection accent was plasma; the ratified direction makes
+ * selection a *brighter plate* rather than a colour (*"the primary action is
+ * simply the brightest plate on screen … it spends no colour on the menu, which
+ * leaves the palette's hues free to mean things during a match"*), so the pips
+ * moved onto the same Bone ramp the settings screen's volume pips use.
+ *
+ * What has not changed is the rule underneath: a pip is not ore and not danger,
+ * so signal yellow `#F2D24B` and threat red `#B23A3A` are both out (style-guide
+ * §2), and no seventh hue enters — every tone here is a declared value-ramp step
+ * on hull steel (`../art/materials` MATERIAL_RECIPES), verified there.
  */
 export const STAT_PIP_COLORS = {
-  /** Filled, on the hull you have picked — the lobby's own selection accent. */
-  selected: PALETTE.plasma,
-  /** Filled, on any other tile — neutral chalk, the lobby's primary text tone. */
-  filled: 0xdce3ec,
-  /** The unfilled remainder of a bar. */
-  empty: PALETTE.hullSteel,
+  /** Filled, on the hull you have picked — the brightest metal on the tile. */
+  selected: BONE.hi,
+  /** Filled, on any other tile — one ramp step down. */
+  filled: MATERIAL_SHADES.bone,
+  /** The unfilled remainder of a bar — the shaded end of the same ramp. */
+  empty: MATERIAL_SHADES.chipFaceLit,
 } as const;
 
 /** The stats a hull tile shows, in GDD §2.11's own table order. Exactly the six

@@ -3775,6 +3775,50 @@ async function boot(): Promise<void> {
         const ship = world.ships.find(isLocalShip);
         return ship ? ship.banked : null;
       },
+      /**
+       * The Build-wheel wedges the real view DREW last frame — the whole
+       * four-line stack (u7-02): the name, what it spends on, the `cost/held`
+       * string, the count over its cap, and how the cost numeral was painted.
+       *
+       * Read-back only, the sibling of `__upgradeWheelStage.wedges()`: a
+       * real-input spec still drives the wheel with genuine taps and clicks and
+       * uses this to read what the shipped bundle rendered. The UI's own model is
+       * unit-green (src/ui/build-wheel.test.ts); what a unit test cannot reach is
+       * that the booted client draws those strings.
+       */
+      wedges(): ReturnType<typeof hud.debugBuildWedges> {
+        return hud.debugBuildWedges();
+      },
+      /**
+       * A LOGICAL screen point in CLIENT (physical CSS) space, so a real-input
+       * spec can tap a drawn affordance on EITHER form factor. On a portrait
+       * phone under the landscape lock the logical point is rotated back through
+       * `logicalToPhysical` (identity on desktop) and offset by the canvas rect —
+       * the exact inverse of the `toLogical` every real pointer crosses.
+       *
+       * The same mapping `__repairStage.repairWedgeClientPoint()` does for its one
+       * wedge, generalised: without it a portrait-held test can only ever drive
+       * the one affordance somebody already wrote a bespoke point for.
+       */
+      clientPoint(x: number, y: number): { x: number; y: number } {
+        const p = logicalToPhysical(x, y, transform);
+        const rect = app.canvas.getBoundingClientRect();
+        return { x: p.x + rect.left, y: p.y + rect.top };
+      },
+      /** The logical viewport the wheel and the touch affordances are drawn in —
+       *  landscape even on a portrait-held phone, because of the lock. */
+      logicalViewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** Bank exactly `ore` on the local ship, so a spec can re-price the wheel
+       *  between assertions (affordable → unaffordable) without reopening it. */
+      setOre(ore: number): number | null {
+        const ship = world.ships.find(isLocalShip);
+        if (!ship) return null;
+        ship.cargo = 0;
+        ship.banked = ore;
+        return ship.banked;
+      },
     };
     try {
       Object.defineProperty(window, '__pressStage', {
@@ -6944,6 +6988,18 @@ interface LobbySeam {
    *  on RUSH remaps to the logical control, rather than only driving rush()
    *  programmatically (tests/mobile/landscape-lock.spec.ts). */
   rushControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /**
+   * The MODE toggle (FFA ⇄ TEAMS), as drawn: its logical rect and the physical
+   * point a real press has to land on, through the landscape-lock rotation — the
+   * same shape {@link rushControl} reports.
+   *
+   * Read-only, and it exists for one reason: FFA draws **no side label anywhere**
+   * (GDD §2.1 — teams-of-one has no side worth naming), so a baseline of an FFA
+   * lobby cannot show the `FRIENDLY A` / `ENEMY B` chips at all, and a change to
+   * them would leave every image byte-identical. A test presses this the way a
+   * player does and then shoots the roster (u7-03, tests/mobile/goldens.spec.ts).
+   */
+  modeControl: { logical: Rect; physicalCenter: { x: number; y: number } };
   /** True while the RUSH! countdown is running. */
   counting: boolean;
   /** The hull the built world gave the local ship, or null until the match boots
@@ -7094,6 +7150,7 @@ function openLobby(
     seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    modeControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
     hintTitle: null,
@@ -7176,6 +7233,11 @@ function openLobby(
     seam.rushControl = {
       logical: { ...rush },
       physicalCenter: ctx.toPhysical(rush.x + rush.width / 2, rush.y + rush.height / 2),
+    };
+    const mode = layout.modeToggle;
+    seam.modeControl = {
+      logical: { ...mode },
+      physicalCenter: ctx.toPhysical(mode.x + mode.width / 2, mode.y + mode.height / 2),
     };
     seam.counting = model.countdown.active;
     // The hull tiles' physical centres — the codex hull-description hover targets.

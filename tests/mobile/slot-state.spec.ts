@@ -40,7 +40,7 @@
  * is walked too, in the second test, because both are real ways to hold it.
  */
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
-import { decode, count, isPlasma, isNonVacuum, type Img, type Region } from './pixels';
+import { decode, count, isNonVacuum, type Img, type Pred, type Region } from './pixels';
 import { budgetTest } from './budgets';
 
 const TOUCH_PROJECTS = ['iphone', 'pixel'];
@@ -112,12 +112,31 @@ interface LobbySeam {
 const DRAWN_MIN_PX = 60;
 
 /**
- * …and of PLASMA specifically, which is the "reads as pressable" edge a live
- * control carries and a dead one does not (`./pixels` `isPlasma`, keyed off the
- * frozen `#4DC3FF`). Lower than the in-match affordance bars in emulation.spec.ts
- * because this is a 1px stroke around a small button, not a FIRE ring.
+ * …and of the BRIGHT HAIRLINE specifically, which is the "reads as pressable"
+ * edge a live control carries and a dead one does not.
+ *
+ * **It used to be plasma** (`./pixels` `isPlasma`, keyed off the frozen
+ * `#4DC3FF`), because the lobby's selection accent was plasma. The ratified
+ * Gantry/Bone direction spends **no hue at all** on a menu — *"the primary action
+ * is simply the brightest plate on screen … it spends no colour on the menu,
+ * which leaves the palette's hues free to mean things during a match"* — so a
+ * live control is now the brightest METAL rather than the only blue thing, and
+ * the predicate has to move with it or it would be testing a colour the
+ * direction deliberately removed.
+ *
+ * What the test asserts is unchanged, and it is the thing that matters: a
+ * control the host can cycle reads differently from one they cannot, within one
+ * frame, in pixels.
  */
 const LIVE_EDGE_MIN_PX = 20;
+
+/**
+ * A Bone hairline: a bright, COOL NEUTRAL pixel — no channel warmer than blue,
+ * and light enough to be the bordered edge of a `secondary` chip rather than the
+ * shaded face of an `inert` one. `boneLo` is `#8c95a0`, the face tones are all
+ * under `#33`, so the bar sits between them with room on both sides.
+ */
+const isBoneEdge: Pred = (r, g, b) => b >= g && g >= r && b >= 110 && b - r < 40;
 
 // --- Input ------------------------------------------------------------------
 
@@ -250,6 +269,27 @@ function regionOf(bounds: Rect, vp: { width: number; height: number }): Region {
   };
 }
 
+/**
+ * Just the control's LEADING BORDER — a 4px strip down its left edge, with the
+ * top and bottom fifths trimmed off.
+ *
+ * The affordance being measured is the chip's own hairline, and the two things
+ * that would otherwise swamp it both live outside this strip: the WORD, which is
+ * centred and is bright on a dead control too (a dead control still has to say
+ * `TAKEN`), and the *"this row is yours"* marker, which runs along the row's top
+ * and bottom edges. Trimming to the border is what makes the count a fact about
+ * whether the control reads pressable rather than about how many letters it has.
+ */
+function edgeRegion(bounds: Rect, vp: { width: number; height: number }): Region {
+  const trim = bounds.height * 0.2;
+  return {
+    x0: bounds.x / vp.width,
+    y0: (bounds.y + trim) / vp.height,
+    x1: (bounds.x + 4) / vp.width,
+    y1: (bounds.y + bounds.height - trim) / vp.height,
+  };
+}
+
 function contains(outer: Rect, inner: Rect, tol = 0.5): boolean {
   return (
     inner.x >= outer.x - tol &&
@@ -327,7 +367,7 @@ test('the control reads pressable where it works and dead where it refuses', asy
   page,
 }, testInfo) => {
   budgetTest({
-    work: 'landscape boot → press through to the lobby → screenshot → compare the plasma edge on a live row against the un-cyclable one → press RUSH! → re-read',
+    work: 'landscape boot → press through to the lobby → screenshot → compare the Bone edge on a live row against the un-cyclable one → press RUSH! → re-read',
     measuredSeconds: 14,
   });
 
@@ -350,18 +390,19 @@ test('the control reads pressable where it works and dead where it refuses', asy
   expect(live, 'a lobby with a seat the host can cycle').toBeTruthy();
   expect(dead!.label, 'the seat you are sitting in reads as taken').toBe('TAKEN');
 
-  const livePlasma = count(img, regionOf(live!.physicalBounds, vp), isPlasma).matched;
-  const deadPlasma = count(img, regionOf(dead!.physicalBounds, vp), isPlasma).matched;
+  const liveEdge = count(img, edgeRegion(live!.physicalBounds, vp), isBoneEdge).matched;
+  const deadEdge = count(img, edgeRegion(dead!.physicalBounds, vp), isBoneEdge).matched;
 
-  // A live control carries the plasma edge every other pressable thing on this
-  // screen carries (the MODE / ABUNDANCE pills, the selected hull tile)…
-  expect(livePlasma, 'a live state control has no plasma edge — it does not read as pressable').toBeGreaterThan(
+  // A live control carries the bright Bone hairline every other pressable thing
+  // on this screen carries (the MODE / ORE chips, the difficulty chip, the
+  // selected hull tile)…
+  expect(liveEdge, 'a live state control has no bright edge — it does not read as pressable').toBeGreaterThan(
     LIVE_EDGE_MIN_PX,
   );
   // …and the dead one does not wear it. A dead-looking button beats a lying one:
   // this is the assertion that a guest, a locked lobby or an occupied seat cannot
   // be given a control that looks live and then refuses.
-  expect(deadPlasma, 'an un-cyclable seat is drawn as if it were pressable').toBeLessThan(livePlasma / 2);
+  expect(deadEdge, 'an un-cyclable seat is drawn as if it were pressable').toBeLessThan(liveEdge / 2);
   // …but it is still DRAWN, in steel — dead is not absent. The row still has to
   // say what state it is in.
   expect(

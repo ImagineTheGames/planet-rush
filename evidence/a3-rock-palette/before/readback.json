@@ -1,0 +1,784 @@
+{
+  "label": "before",
+  "base": "http://localhost:4198",
+  "frames": [
+    {
+      "name": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "deviceScaleFactor": 1,
+      "ticks": 0,
+      "worldHash": "4302b39e",
+      "freezeTick": 120,
+      "build": "369d7a6",
+      "errors": [],
+      "rocks": [
+        {
+          "i": 0,
+          "box": {
+            "x": 17,
+            "y": 18,
+            "w": 98,
+            "h": 70
+          },
+          "pixels": 4891,
+          "colours": [
+            {
+              "hex": "#5A626B",
+              "share": 0.3812,
+              "luma": 96.6,
+              "crVsVacuum": 3.08,
+              "crVsSignalYellow": 4.15
+            },
+            {
+              "hex": "#101318",
+              "share": 0.2583,
+              "luma": 18.7,
+              "crVsVacuum": 1.02,
+              "crVsSignalYellow": 12.49
+            },
+            {
+              "hex": "#939BA5",
+              "share": 0.1064,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#353A42",
+              "share": 0.0187,
+              "luma": 57.4,
+              "crVsVacuum": 1.67,
+              "crVsSignalYellow": 7.68
+            },
+            {
+              "hex": "#F2D24B",
+              "share": 0.0182,
+              "luma": 204.2,
+              "crVsVacuum": 12.79,
+              "crVsSignalYellow": 1
+            },
+            {
+              "hex": "#464D55",
+              "share": 0.0179,
+              "luma": 75.8,
+              "crVsVacuum": 2.23,
+              "crVsSignalYellow": 5.75
+            },
+            {
+              "hex": "#31363D",
+              "share": 0.0165,
+              "luma": 53.3,
+              "crVsVacuum": 1.57,
+              "crVsSignalYellow": 8.17
+            },
+            {
+              "hex": "#505860",
+              "share": 0.0156,
+              "luma": 86.5,
+              "crVsVacuum": 2.64,
+              "crVsSignalYellow": 4.85
+            }
+          ]
+        },
+        {
+          "i": 1,
+          "box": {
+            "x": 222,
+            "y": 260,
+            "w": 76,
+            "h": 77
+          },
+          "pixels": 4366,
+          "colours": [
+            {
+              "hex": "#939BA5",
+              "share": 0.5506,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#0D1015",
+              "share": 0.2457,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#656D76",
+              "share": 0.0393,
+              "luma": 107.6,
+              "crVsVacuum": 3.63,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#363C43",
+              "share": 0.0263,
+              "luma": 59,
+              "crVsVacuum": 1.71,
+              "crVsSignalYellow": 7.48
+            },
+            {
+              "hex": "#7C848D",
+              "share": 0.0145,
+              "luma": 130.6,
+              "crVsVacuum": 5.03,
+              "crVsSignalYellow": 2.54
+            },
+            {
+              "hex": "#4E555D",
+              "share": 0.0126,
+              "luma": 83.8,
+              "crVsVacuum": 2.52,
+              "crVsSignalYellow": 5.07
+            },
+            {
+              "hex": "#31363D",
+              "share": 0.0109,
+              "luma": 53.3,
+              "crVsVacuum": 1.57,
+              "crVsSignalYellow": 8.17
+            },
+            {
+              "hex": "#23282D",
+              "share": 0.0106,
+              "luma": 39.1,
+              "crVsVacuum": 1.28,
+              "crVsSignalYellow": 9.98
+            }
+          ]
+        },
+        {
+          "i": 2,
+          "box": {
+            "x": 183,
+            "y": 552,
+            "w": 69,
+            "h": 89
+          },
+          "pixels": 4160,
+          "colours": [
+            {
+              "hex": "#5A626B",
+              "share": 0.3495,
+              "luma": 96.6,
+              "crVsVacuum": 3.08,
+              "crVsSignalYellow": 4.15
+            },
+            {
+              "hex": "#0D1015",
+              "share": 0.3004,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#939BA5",
+              "share": 0.1031,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#31363D",
+              "share": 0.0226,
+              "luma": 53.3,
+              "crVsVacuum": 1.57,
+              "crVsSignalYellow": 8.17
+            },
+            {
+              "hex": "#505860",
+              "share": 0.0194,
+              "luma": 86.5,
+              "crVsVacuum": 2.64,
+              "crVsSignalYellow": 4.85
+            },
+            {
+              "hex": "#353A42",
+              "share": 0.0191,
+              "luma": 57.4,
+              "crVsVacuum": 1.67,
+              "crVsSignalYellow": 7.68
+            },
+            {
+              "hex": "#464D55",
+              "share": 0.0164,
+              "luma": 75.8,
+              "crVsVacuum": 2.23,
+              "crVsSignalYellow": 5.75
+            },
+            {
+              "hex": "#3D434A",
+              "share": 0.0147,
+              "luma": 66,
+              "crVsVacuum": 1.91,
+              "crVsSignalYellow": 6.71
+            }
+          ]
+        },
+        {
+          "i": 3,
+          "box": {
+            "x": 97,
+            "y": 464,
+            "w": 71,
+            "h": 64
+          },
+          "pixels": 3366,
+          "colours": [
+            {
+              "hex": "#939BA5",
+              "share": 0.4868,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#0D1015",
+              "share": 0.2502,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#656C76",
+              "share": 0.046,
+              "luma": 107,
+              "crVsVacuum": 3.59,
+              "crVsSignalYellow": 3.56
+            },
+            {
+              "hex": "#363C43",
+              "share": 0.0231,
+              "luma": 59,
+              "crVsVacuum": 1.71,
+              "crVsSignalYellow": 7.48
+            },
+            {
+              "hex": "#7C848D",
+              "share": 0.0227,
+              "luma": 130.6,
+              "crVsVacuum": 5.03,
+              "crVsSignalYellow": 2.54
+            },
+            {
+              "hex": "#4E555D",
+              "share": 0.0218,
+              "luma": 83.8,
+              "crVsVacuum": 2.52,
+              "crVsSignalYellow": 5.07
+            },
+            {
+              "hex": "#5B636C",
+              "share": 0.0178,
+              "luma": 97.6,
+              "crVsVacuum": 3.13,
+              "crVsSignalYellow": 4.09
+            },
+            {
+              "hex": "#1C2025",
+              "share": 0.0139,
+              "luma": 31.4,
+              "crVsVacuum": 1.16,
+              "crVsSignalYellow": 10.99
+            }
+          ]
+        },
+        {
+          "i": 4,
+          "box": {
+            "x": 93,
+            "y": 250,
+            "w": 64,
+            "h": 71
+          },
+          "pixels": 3312,
+          "colours": [
+            {
+              "hex": "#0E1116",
+              "share": 0.2606,
+              "luma": 16.7,
+              "crVsVacuum": 1.01,
+              "crVsSignalYellow": 12.69
+            },
+            {
+              "hex": "#5A626B",
+              "share": 0.2597,
+              "luma": 96.6,
+              "crVsVacuum": 3.08,
+              "crVsSignalYellow": 4.15
+            },
+            {
+              "hex": "#939BA5",
+              "share": 0.1965,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#656D76",
+              "share": 0.0319,
+              "luma": 107.6,
+              "crVsVacuum": 3.63,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#464D55",
+              "share": 0.0207,
+              "luma": 75.8,
+              "crVsVacuum": 2.23,
+              "crVsSignalYellow": 5.75
+            },
+            {
+              "hex": "#2D3239",
+              "share": 0.0161,
+              "luma": 49.3,
+              "crVsVacuum": 1.48,
+              "crVsSignalYellow": 8.66
+            },
+            {
+              "hex": "#31363D",
+              "share": 0.0161,
+              "luma": 53.3,
+              "crVsVacuum": 1.57,
+              "crVsSignalYellow": 8.17
+            },
+            {
+              "hex": "#353A42",
+              "share": 0.0161,
+              "luma": 57.4,
+              "crVsVacuum": 1.67,
+              "crVsSignalYellow": 7.68
+            }
+          ]
+        },
+        {
+          "i": 5,
+          "box": {
+            "x": 1207,
+            "y": 641,
+            "w": 61,
+            "h": 66
+          },
+          "pixels": 3252,
+          "colours": [
+            {
+              "hex": "#1F232A",
+              "share": 0.389,
+              "luma": 34.6,
+              "crVsVacuum": 1.21,
+              "crVsSignalYellow": 10.58
+            },
+            {
+              "hex": "#0D1016",
+              "share": 0.1811,
+              "luma": 15.8,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.78
+            },
+            {
+              "hex": "#2E333B",
+              "share": 0.1674,
+              "luma": 50.4,
+              "crVsVacuum": 1.5,
+              "crVsSignalYellow": 8.53
+            },
+            {
+              "hex": "#21252C",
+              "share": 0.0378,
+              "luma": 36.6,
+              "crVsVacuum": 1.24,
+              "crVsSignalYellow": 10.32
+            },
+            {
+              "hex": "#31363E",
+              "share": 0.0199,
+              "luma": 53.4,
+              "crVsVacuum": 1.57,
+              "crVsSignalYellow": 8.16
+            },
+            {
+              "hex": "#273E4E",
+              "share": 0.0189,
+              "luma": 56.9,
+              "crVsVacuum": 1.71,
+              "crVsSignalYellow": 7.48
+            },
+            {
+              "hex": "#345089",
+              "share": 0.0139,
+              "luma": 78.1,
+              "crVsVacuum": 2.41,
+              "crVsSignalYellow": 5.31
+            },
+            {
+              "hex": "#23313C",
+              "share": 0.0124,
+              "luma": 46.1,
+              "crVsVacuum": 1.43,
+              "crVsSignalYellow": 8.94
+            }
+          ]
+        },
+        {
+          "i": 6,
+          "box": {
+            "x": 24,
+            "y": 725,
+            "w": 61,
+            "h": 47
+          },
+          "pixels": 2118,
+          "colours": [
+            {
+              "hex": "#939BA5",
+              "share": 0.4189,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#0E1116",
+              "share": 0.2529,
+              "luma": 16.7,
+              "crVsVacuum": 1.01,
+              "crVsSignalYellow": 12.69
+            },
+            {
+              "hex": "#656D76",
+              "share": 0.0436,
+              "luma": 107.6,
+              "crVsVacuum": 3.63,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#4F9A87",
+              "share": 0.0283,
+              "luma": 129.4,
+              "crVsVacuum": 5.72,
+              "crVsSignalYellow": 2.24
+            },
+            {
+              "hex": "#353B42",
+              "share": 0.0195,
+              "luma": 58,
+              "crVsVacuum": 1.68,
+              "crVsSignalYellow": 7.6
+            },
+            {
+              "hex": "#499381",
+              "share": 0.0185,
+              "luma": 122.8,
+              "crVsVacuum": 5.24,
+              "crVsSignalYellow": 2.44
+            },
+            {
+              "hex": "#1C2026",
+              "share": 0.0167,
+              "luma": 31.5,
+              "crVsVacuum": 1.17,
+              "crVsSignalYellow": 10.98
+            },
+            {
+              "hex": "#7C848D",
+              "share": 0.015,
+              "luma": 130.6,
+              "crVsVacuum": 5.03,
+              "crVsSignalYellow": 2.54
+            }
+          ]
+        },
+        {
+          "i": 7,
+          "box": {
+            "x": 185,
+            "y": 193,
+            "w": 63,
+            "h": 47
+          },
+          "pixels": 2071,
+          "colours": [
+            {
+              "hex": "#939BA5",
+              "share": 0.3479,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#0E1116",
+              "share": 0.2915,
+              "luma": 16.7,
+              "crVsVacuum": 1.01,
+              "crVsSignalYellow": 12.69
+            },
+            {
+              "hex": "#656D77",
+              "share": 0.0777,
+              "luma": 107.7,
+              "crVsVacuum": 3.64,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#4F9A87",
+              "share": 0.0426,
+              "luma": 129.4,
+              "crVsVacuum": 5.72,
+              "crVsSignalYellow": 2.24
+            },
+            {
+              "hex": "#2E3339",
+              "share": 0.0155,
+              "luma": 50.2,
+              "crVsVacuum": 1.5,
+              "crVsSignalYellow": 8.55
+            },
+            {
+              "hex": "#4A9482",
+              "share": 0.0142,
+              "luma": 123.8,
+              "crVsVacuum": 5.31,
+              "crVsSignalYellow": 2.41
+            },
+            {
+              "hex": "#738A8C",
+              "share": 0.0142,
+              "luma": 131.4,
+              "crVsVacuum": 5.21,
+              "crVsSignalYellow": 2.45
+            },
+            {
+              "hex": "#353B42",
+              "share": 0.0128,
+              "luma": 58,
+              "crVsVacuum": 1.68,
+              "crVsSignalYellow": 7.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "phone-landscape",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "deviceScaleFactor": 3,
+      "ticks": 0,
+      "worldHash": "4302b39e",
+      "freezeTick": 120,
+      "build": "369d7a6",
+      "errors": [],
+      "rocks": [
+        {
+          "i": 0,
+          "box": {
+            "x": 13,
+            "y": 164,
+            "w": 227,
+            "h": 232
+          },
+          "pixels": 39104,
+          "colours": [
+            {
+              "hex": "#939BA5",
+              "share": 0.5675,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#0D1015",
+              "share": 0.2544,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#373D44",
+              "share": 0.0421,
+              "luma": 60,
+              "crVsVacuum": 1.74,
+              "crVsSignalYellow": 7.37
+            },
+            {
+              "hex": "#656D77",
+              "share": 0.0342,
+              "luma": 107.7,
+              "crVsVacuum": 3.64,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#2A2F35",
+              "share": 0.0274,
+              "luma": 46.2,
+              "crVsVacuum": 1.41,
+              "crVsSignalYellow": 9.06
+            },
+            {
+              "hex": "#5C646D",
+              "share": 0.0079,
+              "luma": 98.6,
+              "crVsVacuum": 3.17,
+              "crVsSignalYellow": 4.03
+            },
+            {
+              "hex": "#F2D24B",
+              "share": 0.0071,
+              "luma": 204.2,
+              "crVsVacuum": 12.79,
+              "crVsSignalYellow": 1
+            },
+            {
+              "hex": "#7C848D",
+              "share": 0.0053,
+              "luma": 130.6,
+              "crVsVacuum": 5.03,
+              "crVsSignalYellow": 2.54
+            }
+          ]
+        },
+        {
+          "i": 1,
+          "box": {
+            "x": 6,
+            "y": 878,
+            "w": 163,
+            "h": 114
+          },
+          "pixels": 10278,
+          "colours": [
+            {
+              "hex": "#0D1015",
+              "share": 0.4095,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#939BA5",
+              "share": 0.2942,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#5A626B",
+              "share": 0.0657,
+              "luma": 96.6,
+              "crVsVacuum": 3.08,
+              "crVsSignalYellow": 4.15
+            },
+            {
+              "hex": "#656D77",
+              "share": 0.0457,
+              "luma": 107.7,
+              "crVsVacuum": 3.64,
+              "crVsSignalYellow": 3.52
+            },
+            {
+              "hex": "#363C43",
+              "share": 0.0373,
+              "luma": 59,
+              "crVsVacuum": 1.71,
+              "crVsSignalYellow": 7.48
+            },
+            {
+              "hex": "#272B32",
+              "share": 0.034,
+              "luma": 42.6,
+              "crVsVacuum": 1.34,
+              "crVsSignalYellow": 9.54
+            },
+            {
+              "hex": "#2A2F35",
+              "share": 0.0302,
+              "luma": 46.2,
+              "crVsVacuum": 1.41,
+              "crVsSignalYellow": 9.06
+            },
+            {
+              "hex": "#21252B",
+              "share": 0.0094,
+              "luma": 36.5,
+              "crVsVacuum": 1.24,
+              "crVsSignalYellow": 10.33
+            }
+          ]
+        },
+        {
+          "i": 2,
+          "box": {
+            "x": 0,
+            "y": 1042,
+            "w": 108,
+            "h": 128
+          },
+          "pixels": 9710,
+          "colours": [
+            {
+              "hex": "#0D1015",
+              "share": 0.2921,
+              "luma": 15.7,
+              "crVsVacuum": 1,
+              "crVsSignalYellow": 12.79
+            },
+            {
+              "hex": "#939BA5",
+              "share": 0.2604,
+              "luma": 153.7,
+              "crVsVacuum": 6.78,
+              "crVsSignalYellow": 1.89
+            },
+            {
+              "hex": "#5A626B",
+              "share": 0.1284,
+              "luma": 96.6,
+              "crVsVacuum": 3.08,
+              "crVsSignalYellow": 4.15
+            },
+            {
+              "hex": "#4DC3FF",
+              "share": 0.0512,
+              "luma": 166.6,
+              "crVsVacuum": 9.59,
+              "crVsSignalYellow": 1.33
+            },
+            {
+              "hex": "#373D44",
+              "share": 0.0372,
+              "luma": 60,
+              "crVsVacuum": 1.74,
+              "crVsSignalYellow": 7.37
+            },
+            {
+              "hex": "#2A2F35",
+              "share": 0.0325,
+              "luma": 46.2,
+              "crVsVacuum": 1.41,
+              "crVsSignalYellow": 9.06
+            },
+            {
+              "hex": "#F2D24B",
+              "share": 0.0293,
+              "luma": 204.2,
+              "crVsVacuum": 12.79,
+              "crVsSignalYellow": 1
+            },
+            {
+              "hex": "#DFC24A",
+              "share": 0.026,
+              "luma": 189,
+              "crVsVacuum": 10.85,
+              "crVsSignalYellow": 1.18
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -504,6 +504,89 @@ export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): nu
   return Math.max(m.margin, RIVET.inset + cluster + RIVET_CLEARANCE);
 }
 
+// ---------------------------------------------------------------------------
+// 3c. The roster row — the densest surface in the set, desktop AND phone
+// ---------------------------------------------------------------------------
+//
+// The lobby's roster carries more per row than anything else in the game: an
+// identity bar, a P-number, a name, a slot-state control, a side chip, a
+// difficulty chip and a ping — and the handoff ADDS a leading OPEN/CLOSED
+// button. Its metrics get their own block for the same reason §3b exists: the
+// handoff drew them once, at 1280×720, and a 390-wide phone is not that.
+//
+// Two rules decide every number below, and they are the ones the u7-03 brief
+// states:
+//
+//  1. **The look is ratified; the metric adapts.** Every width here is the
+//     handoff's own, scaled by {@link FrameMetrics.plateScale} — never re-picked.
+//  2. **Nothing on this row goes under the thumb.** A roster row is made of
+//     controls, not of text, so the row's own height IS a control's height
+//     ({@link rowHeight}, floored at {@link TOUCH_MIN}) and each segment spans
+//     the row rather than sitting inset inside it. A row that only works with a
+//     mouse is a failed screen here.
+
+/**
+ * The roster row at the handoff's reference, in px.
+ *
+ * `stateWidth` / `trailingWidth` are the handoff's own two row buttons — the
+ * leading `OPEN` / `CLOSED` and the trailing slot it collapses difficulty into.
+ * `sideWidth` is **ours, and deliberately wider than the design's**: the handoff
+ * draws a `T1` chip, and our ratified side chip carries the WORD (`FRIENDLY A`,
+ * GDD §2.1 amended 2026-08-05), which needs the room a letter does not.
+ *
+ * **The three widths do NOT scale, and that is the derivation rather than an
+ * omission.** What has to fit inside them is a word, and type on this screen
+ * bottoms out at {@link TYPE_MIN} — an 11px `CLOSED` is 11px wide per glyph on a
+ * phone exactly as on a desktop, so a button sized to hold it cannot shrink with
+ * the frame. The row's *height* and its *padding* do scale ({@link rowHeight},
+ * {@link rosterMetric}), because those hold air rather than letters.
+ */
+export const ROSTER = {
+  /** Row height — the handoff's row surface ({@link ROW}), restated here so the
+   *  roster reads as the same furniture as a settings row. */
+  height: ROW.height,
+  /** The identity bar down a row's leading edge ({@link ROW_BAR_WIDTH}). */
+  bar: ROW_BAR_WIDTH,
+  /** The leading slot-state button — the handoff's own `OPEN` / `CLOSED` button
+   *  on the far left of the row, holding our four words. */
+  stateWidth: 72,
+  /** The trailing slot — the handoff collapses difficulty and OPEN into one.
+   *  54, the width `MEDIUM` measures at 11px Audiowide plus its padding, rather
+   *  than the handoff's own 62: the word decides, and ours is shorter. */
+  trailingWidth: 54,
+  /** The side chip, holding `FRIENDLY A` rather than the handoff's `T1` — 88,
+   *  the measured 64px of word plus padding (u3). The design's chip holds two
+   *  characters and is a third of this; the ratified WORD is why it cannot be. */
+  sideWidth: 88,
+  /**
+   * Air between two roster rows. **Zero, and that is the design.** The handoff
+   * draws a roster as a LIST — abutting surfaces with a rule between them — not
+   * as a stack of floating cards, and the two 1px rules of two abutting `inert`
+   * plates *are* that separator. It is also what buys the last three pixels of
+   * row height on the notched landscape phone, where 4 × 48 has to fit in 195.
+   */
+  gap: 0,
+  /** Inset from a row segment's edge to the word inside it. 8, not the settings
+   *  row's 20: a roster row is a strip of segments, and every pixel of padding on
+   *  it is a pixel off a player's name (see `lobby-geometry` SEAT_ROW_BODY_MIN). */
+  padX: 8,
+} as const;
+
+/** A roster row's height at these metrics: the handoff's 64px surface, never
+ *  under the thumb floor — the same resolver a settings row uses. */
+export function rosterRowHeight(m: FrameMetrics): number {
+  return rowHeight(m);
+}
+
+/**
+ * One of the roster row's horizontal metrics at these metrics — a segment width
+ * or a padding. Scales with the PLATE, like everything else that sits *on* a
+ * surface rather than framing one, and never rounds away to nothing.
+ */
+export function rosterMetric(referencePx: number, m: FrameMetrics): number {
+  return Math.max(1, Math.round(referencePx * m.plateScale));
+}
+
 /**
  * Chrome type — a beam's eyebrow, the wordmark, a heading. Scales with the
  * FRAME, because that is the thing it sits inside, and never below
@@ -1176,6 +1259,13 @@ function cutBottomLeft(bx: number, by: number, bh: number, c: number): number {
  * `x`/`y`/`width`/`height` are the plate's *outer* box; the press offset is
  * applied inside, so a caller never moves the rect itself. Allocates nothing.
  * Call it when the state changes, not every frame.
+ *
+ * **`tick`** is the 3px accent bar at the head of the plate's content, and it
+ * assumes the handoff's own composition: a label hung off it, starting after it.
+ * A plate whose content is a *grid* rather than a label — a lobby hull tile's six
+ * stat cells, an arena card's preview — starts at its own tighter padding and the
+ * tick lands in the middle of it, so those pass `false`. It is a parameter rather
+ * than a fourth role because nothing else about the material changes.
  */
 export function drawPlate(
   canvas: PlateCanvas,
@@ -1186,6 +1276,7 @@ export function drawPlate(
   role: PlateRole,
   scale: PlateScale,
   state: PlateState = 'rest',
+  tick = true,
 ): void {
   if (width <= 0 || height <= 0) return;
   const m = plateMaterial(role, state, plateFamily(scale));
@@ -1260,7 +1351,7 @@ export function drawPlate(
   }
 
   // 6. The accent tick — the 3px bar at the head of the plate's content.
-  if (m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
+  if (tick && m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
     const th = Math.min(g.tickHeight, fh);
     fillBox(canvas, fx + g.padX, fy + (fh - th) / 2, g.tickWidth, th, m.tick.color, m.tick.alpha);
   }
@@ -1307,6 +1398,272 @@ export function beamRivetY(beamY: number): number {
   return beamY + RIVET.top;
 }
 
+// ---------------------------------------------------------------------------
+// 8. The build wheel — TWO profiles of one look (u7-02)
+// ---------------------------------------------------------------------------
+//
+// The handoff draws the build wheel once, at 1280×720, at an outer radius of
+// 235 px. Verified before this table was written: the file has **no `@media`
+// query, no viewport meta and no occurrence of the words mobile, touch, phone or
+// portrait** — its metrics are one desktop sample of the look, not the look
+// itself. The wheel is the sharpest case in the set, because unlike a menu it is
+// a radial control operated by a thumb over a live fight: at 390 px the whole
+// wheel is 280 px across, and the handoff's 17/12/20/12 px type stack does not
+// fit inside a 72° wedge at that size.
+//
+// So the look is stated **twice** — once at the radius the handoff drew it, once
+// at the radius a 390 px phone gives it — and {@link wheelMetrics} interpolates
+// between them for every radius in between. The desktop column is the handoff's
+// own numbers, verbatim; the phone column is derived, and every number that is
+// NOT a pure scale of its desktop twin is marked `⤺` with the reason.
+//
+// Why not simply scale? A radial menu shrinks in two dimensions but its text
+// only shrinks in one, and the arc a wedge's words sit in shrinks faster than
+// the words do. Pure scaling of the desktop column at 140/235 = 0.596 gives a
+// 7.2 px target line and a 7.2 px cap count — under the 12 px legibility floor
+// style-guide §7 sets for Oxanium, and unreadable under a thumb. The phone
+// column therefore floors the type and buys the room back from the gaps, the
+// label inset, and the two-word copy (see {@link WheelCopyScale}).
+
+/**
+ * How much room a wedge's words have, which decides which copy they carry.
+ *
+ *  - `full` — the handoff's own copy: `YOUR STATION`, `2 / 4 BUILT`.
+ *  - `compact` — the same lines with the padding words gone: `STATION`,
+ *    `2/4 BUILT`. Nothing is *dropped* — a wedge still names its target and
+ *    still shows its count, because GDD §2.5 makes both load-bearing — it is
+ *    said in fewer characters, which is the only lever a fixed arc leaves.
+ */
+export type WheelCopyScale = 'full' | 'compact';
+
+/** One profile of the build wheel's look. All px at that profile's own
+ *  {@link WheelProfile.radius}; fractions are of that radius. */
+export interface WheelProfile {
+  /** The outer-ring radius this profile's px are stated at. */
+  readonly radius: number;
+  /** Hub disc radius, as a fraction of the outer radius. The wedge ring starts
+   *  here, so it is also the inner edge of a wedge. */
+  readonly hub: number;
+  /** Gap between the outer edge and the top of a wedge's word stack, as a
+   *  fraction of the outer radius. */
+  readonly labelInset: number;
+  /** The wedge's own name — Audiowide, the one display face on the wheel. */
+  readonly name: number;
+  /** The target line ("YOUR STATION") — Oxanium, `TRACKING.label`. */
+  readonly sub: number;
+  /** The `cost/held` numeral — Oxanium, the wheel's one number. */
+  readonly cost: number;
+  /** The count/cap line ("2 / 4 BUILT") and repair's effect line — Oxanium. */
+  readonly detail: number;
+  /** Leading below the name / the target line / the cost, px. */
+  readonly gapName: number;
+  readonly gapSub: number;
+  readonly gapCost: number;
+  /** The hub's live ore total, its `ORE` caption, and its BACK word. */
+  readonly hubOre: number;
+  readonly hubCaption: number;
+  readonly hubBack: number;
+  /** Width of the hairline rule between the hub's caption and its BACK word. */
+  readonly hubRule: number;
+  /** The 2 px ring that bounds the disc, and the hub's own ring. */
+  readonly ring: number;
+  /** The faint halo ring outside the disc, and how far out it sits. */
+  readonly haloRing: number;
+  readonly haloOffset: number;
+  /** The hairline spokes between wedges. */
+  readonly spoke: number;
+  /** The index diamond at twelve o'clock — the wheel's "you are here" mark. */
+  readonly detent: number;
+  /** How far the inner vignette reaches in from the rim. */
+  readonly vignette: number;
+  /** Which copy the wedges carry at this size. */
+  readonly copy: WheelCopyScale;
+}
+
+/**
+ * The two profiles. `desktop` is read straight off the handoff's build-wheel
+ * screen; `phone` is the same look re-derived for a 390 px-wide device, where
+ * the wheel's radius is 140 px (`wheelRadius(844, 390)` — the play orientation).
+ */
+export const WHEEL_PROFILES = {
+  /** The handoff, verbatim: 470 px disc, 150 px hub, 17/12/20/12 type. */
+  desktop: {
+    radius: 235,
+    hub: 0.319, //  75 / 235
+    labelInset: 0.094, //  22 / 235
+    name: 17,
+    sub: 12,
+    cost: 20,
+    detail: 12,
+    gapName: 4,
+    gapSub: 7,
+    gapCost: 5,
+    hubOre: 40,
+    hubCaption: 12,
+    hubBack: 12,
+    hubRule: 38,
+    ring: 2,
+    haloRing: 1,
+    haloOffset: 26,
+    spoke: 1.5,
+    detent: 8,
+    vignette: 56,
+    copy: 'full',
+  },
+  /**
+   * 390 px wide, held in the play orientation: a 280 px wheel. Derived.
+   *
+   *  - `name` 12 ⤺ (scale would give 10.1) — Audiowide is the wedge's identity
+   *    and the first thing a thumb reads; it takes the floor rather than the
+   *    ramp, and long names wrap to two lines exactly as the handoff wraps
+   *    `REPAIR / CORE`.
+   *  - `sub` / `detail` 9 ⤺ (scale would give 7.2) — the size the shipped wheel
+   *    already draws its second line at, so this is the proven floor rather than
+   *    a new guess. Paired with `compact` copy, which is what actually buys the
+   *    room: `STATION` is 7 characters where `YOUR STATION` is 12, and a wedge's
+   *    words sit on a 72° arc that is only ~115 px wide at this radius.
+   *  - `cost` 16 ⤺ (scale would give 11.9) — the cost is the one number on the
+   *    wedge and the only thing on it that is read *while* a fight is running.
+   *  - `labelInset` 0.06 ⤺ (scale-invariant would be 0.094) — the stack is
+   *    proportionally taller at this size, so it starts closer to the rim, where
+   *    the arc is widest, rather than centring in the ring.
+   *  - `gapName/gapSub/gapCost` 2/3/2 ⤺ — leading is the cheapest thing to give
+   *    back, and giving it back is what keeps a four-line stack inside a 95 px
+   *    ring without shrinking a word.
+   *  - `hubOre` 26 ⤺ (scale would give 23.8) — the hub number is the same
+   *    "spendable" total the HUD prints; it holds its shipped size.
+   *  - `vignette` 30, `detent` 6, `spoke` 1, `ring` 1.5 — geometry, scaled.
+   */
+  phone: {
+    radius: 140,
+    hub: 0.32,
+    labelInset: 0.06,
+    name: 12,
+    sub: 9,
+    cost: 16,
+    detail: 9,
+    gapName: 2,
+    gapSub: 3,
+    gapCost: 2,
+    hubOre: 26,
+    hubCaption: 9,
+    hubBack: 9,
+    hubRule: 26,
+    ring: 1.5,
+    haloRing: 1,
+    haloOffset: 14,
+    spoke: 1,
+    detent: 6,
+    vignette: 30,
+    copy: 'compact',
+  },
+} as const satisfies Record<'desktop' | 'phone', WheelProfile>;
+
+/**
+ * The radius at or above which a wedge carries the handoff's `full` copy. Set
+ * midway between the two profiles: below it the arc is closer to the phone's
+ * than to the desktop's, and `YOUR STATION` is the first thing that stops
+ * fitting on it.
+ */
+export const WHEEL_FULL_COPY_RADIUS = 188;
+
+/**
+ * The wheel's look at an arbitrary radius: the two profiles, interpolated, and
+ * then re-scaled so that a radius past the desktop reference keeps growing with
+ * the wheel rather than freezing at 235 px of type.
+ *
+ * Below the phone reference the numbers scale *down* with the radius, so a
+ * viewport narrower than 390 px shrinks the look rather than overflowing it.
+ */
+export function wheelMetrics(radius: number): WheelProfile {
+  const lo = WHEEL_PROFILES.phone;
+  const hi = WHEEL_PROFILES.desktop;
+  if (radius <= lo.radius) {
+    const k = Math.max(0, radius) / lo.radius;
+    return scaleWheelProfile(lo, k, radius);
+  }
+  if (radius >= hi.radius) {
+    const k = radius / hi.radius;
+    return scaleWheelProfile(hi, k, radius);
+  }
+  const t = (radius - lo.radius) / (hi.radius - lo.radius);
+  const mix = (a: number, b: number): number => a + (b - a) * t;
+  return {
+    radius,
+    hub: mix(lo.hub, hi.hub),
+    labelInset: mix(lo.labelInset, hi.labelInset),
+    name: mix(lo.name, hi.name),
+    sub: mix(lo.sub, hi.sub),
+    cost: mix(lo.cost, hi.cost),
+    detail: mix(lo.detail, hi.detail),
+    gapName: mix(lo.gapName, hi.gapName),
+    gapSub: mix(lo.gapSub, hi.gapSub),
+    gapCost: mix(lo.gapCost, hi.gapCost),
+    hubOre: mix(lo.hubOre, hi.hubOre),
+    hubCaption: mix(lo.hubCaption, hi.hubCaption),
+    hubBack: mix(lo.hubBack, hi.hubBack),
+    hubRule: mix(lo.hubRule, hi.hubRule),
+    ring: mix(lo.ring, hi.ring),
+    haloRing: mix(lo.haloRing, hi.haloRing),
+    haloOffset: mix(lo.haloOffset, hi.haloOffset),
+    spoke: mix(lo.spoke, hi.spoke),
+    detent: mix(lo.detent, hi.detent),
+    vignette: mix(lo.vignette, hi.vignette),
+    copy: radius >= WHEEL_FULL_COPY_RADIUS ? 'full' : 'compact',
+  };
+}
+
+/** One profile scaled by `k`, for radii outside the two references. Fractions
+ *  (`hub`, `labelInset`) and the copy scale are scale-invariant and do not move. */
+function scaleWheelProfile(p: WheelProfile, k: number, radius: number): WheelProfile {
+  return {
+    radius,
+    hub: p.hub,
+    labelInset: p.labelInset,
+    name: p.name * k,
+    sub: p.sub * k,
+    cost: p.cost * k,
+    detail: p.detail * k,
+    gapName: p.gapName * k,
+    gapSub: p.gapSub * k,
+    gapCost: p.gapCost * k,
+    hubOre: p.hubOre * k,
+    hubCaption: p.hubCaption * k,
+    hubBack: p.hubBack * k,
+    hubRule: p.hubRule * k,
+    ring: p.ring * k,
+    haloRing: p.haloRing * k,
+    haloOffset: p.haloOffset * k,
+    spoke: p.spoke * k,
+    detent: p.detent * k,
+    vignette: p.vignette * k,
+    copy: radius >= WHEEL_FULL_COPY_RADIUS ? 'full' : 'compact',
+  };
+}
+
+/**
+ * The dark halo the wheel sits in, as coverage targets outermost-first — the
+ * handoff's `radial-gradient(rgba(13,16,21,.7) 52%, transparent 78%)` on a box
+ * inset by −120 px, i.e. a soft pool of void that reaches `peak` under the wheel
+ * and is gone by 1.18× its radius.
+ *
+ * **This is the whole "no plates over gameplay" mechanism.** The wheel does not
+ * get a rectangle; it gets a pool of darkness with no edge, so the fight it is
+ * drawn over stays visible right up to the disc and the wheel still has
+ * something to read against. A plate would give it a corner, and a corner is
+ * what makes a HUD read as a panel.
+ */
+export const WHEEL_HALO = {
+  /** Peak coverage, under the disc. */
+  peak: 0.7,
+  /** Where the falloff starts, as a multiple of the wheel radius. */
+  holdTo: 0.79,
+  /** Where it reaches zero, as a multiple of the wheel radius. */
+  fadeTo: 1.18,
+  /** Rings the falloff is stepped into. Bare void behind it, so it steps high. */
+  bands: 14,
+} as const;
+
 /** Which end of the screen a beam frames. */
 export type BeamKind = 'header' | 'footer';
 
@@ -1317,6 +1674,15 @@ export type BeamKind = 'header' | 'footer';
  * Bone accent rule along its underside, and two rivet clusters. A footer is the
  * same beam inverted — the accent rule sits on top, the fill falls away
  * downward, and it wears no rivets (nothing is bolted to the bottom of a frame).
+ *
+ * **`height` is the beam the FRAME resolved, not the handoff's 92.** It defaults
+ * to {@link BEAM.height} for a caller drawing at the reference, and every screen
+ * should pass its own {@link FrameMetrics} `beam` instead: a phone's beam is
+ * ~50px, and painting the reference 92 into it put the header's Bone accent rule
+ * 40px *below* the beam, straight through the first plate on the screen, and ran
+ * the footer's gradient off the bottom edge before it reached its dark end
+ * (found in u7-03's first read of u7-01's phone goldens — the rule measured at
+ * y=90 on a 390px-tall viewport whose header ends at y=50).
  *
  * Pass `rivets = false` on a screen whose header carries a control where the
  * fasteners would sit. Allocates nothing.

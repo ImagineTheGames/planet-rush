@@ -40,6 +40,7 @@
 
 import { mulberry32 } from '@shared/types';
 import { DERIVED, PALETTE } from './palette';
+import { LINE } from './tokens';
 import {
   arcPoints,
   blob,
@@ -57,6 +58,21 @@ import {
 
 /** The three visible mining stages (style-guide §6). */
 export const CRACK_STAGES = 3;
+
+/**
+ * The body rim weight, in unit-radius, from `LINE.rock` — the first generator to
+ * actually consume the token (a3-01).
+ *
+ * `LINE` quotes **px at board scale**, and the boards draw rocks with a flat
+ * `stroke-width="3"` regardless of how big the rock is (scene-gallery.html, the
+ * mining-run scene: four bodies of unit radius 25–42 all inked at 3). Their mean
+ * radius is ≈ 35 px, which is also where the sim's asteroids sit (`ASTEROID`
+ * radius 22–46), so the two scales line up and `LINE.rock` lands at 3/35 of a
+ * unit radius. The generator had picked 0.05 before any of this was written down;
+ * a dark body needs the heavier line more than a pale one did, which is why the
+ * ink and the value levers were always meant to land together.
+ */
+const RIM_WEIGHT = round(LINE.rock / 35);
 
 /**
  * The ratified pool (docs/art-direction §5.5), in board order A1..A6. The index
@@ -372,7 +388,7 @@ export function asteroidSprite(options: AsteroidSpriteOptions): SpriteDef {
   const outline = outlineFor(options.seed, kind);
   const rng = rockRng(options.seed, 4);
 
-  const rim = stroke(DERIVED.rockFissure, 0.05, 'material', 0.9);
+  const rim = stroke(DERIVED.rockFissure, RIM_WEIGHT, 'material', 0.9);
   const bodyInk: Paint = fill(kind === 'geode' ? DERIVED.rockShadow : DERIVED.rockBody, 'material');
 
   const shapes: Shape[] = [];
