@@ -64,6 +64,19 @@ export const isPlasma: Pred = (r, g, b) => b > 110 && b >= g && g >= r && b - r 
 export const isBlueGlow: Pred = (r, g, b) => b - r > 20 && g - r > 8 && b > 38;
 
 /**
+ * **Chalk-bright Bone** — the near-white top of the `hullSteel` value ramp that
+ * Gantry/Bone uses for emphasis on a MENU (`src/art/materials.ts` `BONE.hi`).
+ *
+ * It exists because the ratified direction *"spends no colour on the menu — the
+ * primary action is simply the brightest metal on screen"*, so the thing a menu
+ * assertion has to count is brightness, not hue. Neutral by construction (the
+ * ramp is a value operation on steel, so r≈g≈b), and well clear of the low Bone
+ * step a resting menu line is drawn in (`#8C95A0` = 140,149,160): a resting
+ * message slot counts ZERO of these and an emphasised one counts hundreds.
+ */
+export const isBoneLit: Pred = (r, g, b) => r > 170 && g > 170 && b > 170;
+
+/**
  * Signal-yellow `#F2D24B` (242,210,75): ore / the "ORE" banked total in the HUD
  * top-left. Used as the "game HUD is visible" anchor (proves no overlay covers).
  */

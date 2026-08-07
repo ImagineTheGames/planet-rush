@@ -464,9 +464,11 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
 // --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
 //
-// The screen *before* the lobby: PLAY SOLO / CREATE ROOM / JOIN ROOM, and the
-// on-screen keypad a room code is typed on (the game is a canvas — there is no
-// DOM input to focus, see `./lobby-entry`).
+// The screen *before* the lobby: CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN ROOM,
+// and the on-screen keypad a room code is typed on (the game is a canvas — there
+// is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a teaser: it is lit
+// and pressable, and pressing it says `Coming Soon…` without going anywhere
+// (`chooseDoor` returns no intent for it — u9-01).
 //
 // **Wiring seam**, continuing the one above:
 //
@@ -497,7 +499,9 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 export {
   DOOR_OPTIONS,
   DOOR_ORDER,
+  ENTRY_COMING_SOON,
   ENTRY_ERRORS,
+  doorOption,
   KEYPAD_COLUMNS,
   KEYPAD_KEYS,
   KEYPAD_ROWS,
@@ -528,8 +532,18 @@ export type {
   EntryStatus,
 } from './lobby-entry';
 
-export { entryHitTest, entryLayout, DOOR_HEIGHT, DOOR_HEIGHT_TOUCH, KEY_MAX, KEY_MIN } from './lobby-geometry';
-export type { EntryLayout, EntryTarget } from './lobby-geometry';
+export {
+  entryHitTest,
+  entryLayout,
+  entryTargetKey,
+  DOOR_COUNT,
+  // DOOR_HEIGHT / DOOR_HEIGHT_TOUCH are gone (u7-04): a door is a Gantry PLATE
+  // now, so its height comes from `frameMetrics` like every other plate in the
+  // set rather than from a per-screen constant. See `./lobby-geometry`.
+  KEY_MAX,
+  KEY_MIN,
+} from './lobby-geometry';
+export type { DoorShape, EntryLayout, EntryTarget } from './lobby-geometry';
 
 export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 
@@ -628,27 +642,35 @@ export {
 } from './menu-geometry';
 
 export {
+  CONTROL_SCHEME_STORAGE,
   DEFAULT_VOLUMES,
   SETTINGS_EYEBROW,
   SETTINGS_ID,
   SETTINGS_ROWS,
+  STICKS_LABELS,
+  TAP_COMMANDER_LABEL,
   VOLUME_CHANNELS,
   VOLUME_STEP,
   VOLUME_STEPS,
   adjustVolume,
+  controlsDevice,
+  controlsValue,
   createSettings,
+  parseControlScheme,
   sameTarget,
   setReduceVfx,
   setVolume,
   settingsHitTest,
   settingsLayout,
   settingsModel,
+  storedControlScheme,
   toggleReduceVfx,
   volumeButtons,
   volumeLevel,
 } from './settings';
 export type {
   ControlScheme,
+  ControlsDeviceInputs,
   SettingsControlState,
   SettingsLayout,
   SettingsModel,
@@ -664,7 +686,9 @@ export type {
 export { SettingsView, SETTINGS_ANCHOR } from './settings-view';
 
 export {
+  END_OF_MATCH_EYEBROW,
   END_OF_MATCH_ID,
+  endButtonPlate,
   endButtons,
   endKind,
   endOfMatchHitTest,
@@ -678,6 +702,7 @@ export type {
   EndKind,
   EndOfMatchLayout,
   EndOfMatchModel,
+  EndPointer,
   EndTarget,
   MatchOutcome,
 } from './end-of-match';
@@ -702,6 +727,7 @@ export {
   PAUSE_ID,
   isPauseOpen,
   nextPauseScreen,
+  pauseButtonPlate,
   pauseButtonRect,
   pauseButtonVisible,
   pauseButtons,
@@ -718,6 +744,7 @@ export type {
   PauseLayout,
   PauseLayoutOptions,
   PauseMenuModel,
+  PausePointer,
   PauseScreen,
   PauseTarget,
 } from './pause-menu';
@@ -834,12 +861,13 @@ export {
   CODEX_TITLE,
   CODEX_BACK_LABEL,
   CODEX_ID,
-  CODEX_ENTRY_GAP,
-  CODEX_TITLE_HEIGHT,
-  CODEX_TAB_HEIGHT,
-  CODEX_TAB_HEIGHT_TOUCH,
-  CODEX_ENTRY_HEIGHT,
-  CODEX_ENTRY_HEIGHT_TOUCH,
+  // The five per-screen size constants (CODEX_ENTRY_GAP / _TITLE_HEIGHT /
+  // _TAB_HEIGHT / _TAB_HEIGHT_TOUCH / _ENTRY_HEIGHT / _ENTRY_HEIGHT_TOUCH) are
+  // gone in u7-04: the CODEX is on the shared Gantry frame, so its rows, its tab
+  // chips and its gaps come from `frameMetrics` like the rest of the set. See
+  // `./codex`'s layout header for what each one became.
+  CODEX_RAIL_MIN,
+  CODEX_RAIL_MAX,
   activeEntries,
   activeEntry,
   activeEntryIndex,
@@ -847,6 +875,9 @@ export {
   codexLayout,
   codexModel,
   codexRailContentHeight,
+  codexEntryPlate,
+  codexTabPlate,
+  codexTargetKey,
   createCodex,
   formatFactValue,
   normalizeCodex,

@@ -275,7 +275,7 @@ Recorded in full so l2-02 does not go looking.
 | Line | Current | |
 |---|---|---|
 | 221–222 | `'FIRE MODE'` / `'AUTO-AIM'` / `'MANUAL'` | `[FIXED]` — GDD §2.4 verbatim |
-| 231–232 | `'CONTROLS'` / `'TAP COMMANDER'` / `'STICKS'` | `[FIXED]` — ratified p6-01, GDD §2.4 |
+| CONTROLS row | `'CONTROLS'` / `'TAP COMMANDER'` / `'STICKS'` · `'TWIN STICKS'` · `'KEYBOARD + MOUSE'` | `[FIXED]` — ratified **u8-01 (2026-08-06)**, GDD §2.4, superseding p6-01: the default scheme's word is per-device (touch / gamepad / desktop) and the internal name `'sticks'` is no longer printed anywhere |
 | 238–239 | `'REDUCE VFX'` / `ON` / `OFF` | `[FIXED]` — GDD §4.3 verbatim |
 | 254 | `'SETTINGS'` / `'DONE'` | `[HOLD]` — §3.1 |
 | 258–260 | `MASTER` / `SFX` / `MUSIC VOLUME` | `[HOLD]` — plain, universal |
