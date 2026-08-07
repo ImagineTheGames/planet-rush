@@ -81,6 +81,12 @@
  * share — the lobby row beside each human's name, and one mono line in the corner
  * of the match — where before every measured millisecond went only to an
  * instrument.
+ *
+ * `./region-probe` is that same instinct one screen earlier: the fleet's regions,
+ * each with a round trip this client **measured** before a room is placed, so the
+ * automatic (edge-inferred) region becomes a choice a player can see the cost of —
+ * `GRU 38ms · IAD 224ms` — and override. Absent, never zero: a region that could
+ * not be timed shows an em dash and can never be the default.
  */
 
 export * from './transport';
@@ -107,6 +113,7 @@ export * from './connect-trace-view';
 export * from './link-loss';
 export * from './link-loss-view';
 export * from './allocator-client';
+export * from './region-probe';
 export * from './server-url';
 export * from './websocket-transport';
 export * from './session';

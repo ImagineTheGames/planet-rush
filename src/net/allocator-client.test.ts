@@ -14,6 +14,7 @@ import {
   allocatorUrlFromEnv,
   joinRoom,
   probeRoomLiveness,
+  readRoomAdvert,
 } from './allocator-client';
 import type { FetchLike, FetchResponse } from './allocator-client';
 
@@ -262,5 +263,75 @@ describe('probeRoomLiveness', () => {
     expect(
       await probeRoomLiveness({ baseUrl: 'https://alloc.example.com', fetch }, 'QK7P'),
     ).toBe('unknown');
+  });
+});
+
+describe('readRoomAdvert — what a joiner sees BEFORE committing', () => {
+  it('reads the room’s region and shape from the same GET the liveness probe makes', async () => {
+    const { fetch, calls } = stubFetch({
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          code: 'QK7P',
+          machine: 'm-abc',
+          region: 'gru',
+          size: 4,
+          mode: 'teams',
+          joinableSeats: 2,
+          joinable: true,
+        }),
+    });
+    const advert = await readRoomAdvert({ baseUrl: 'https://alloc.example.com', fetch }, 'QK7P');
+
+    expect(calls).toEqual([
+      { url: 'https://alloc.example.com/rooms/QK7P', method: 'GET', body: undefined },
+    ]);
+    // The region is the field this exists for: the HOST’s region is the ping
+    // profile of every guest, so a joiner is owed it before they commit.
+    expect(advert).toEqual({
+      code: 'QK7P',
+      machine: 'm-abc',
+      region: 'gru',
+      size: 4,
+      mode: 'teams',
+      joinableSeats: 2,
+      joinable: true,
+    });
+  });
+
+  it('survives a room the allocator knows only through a reservation (no region yet)', async () => {
+    const { fetch } = stubFetch({
+      status: 200,
+      json: () => Promise.resolve({ code: 'QK7P', machine: 'm-abc', region: '', joinable: true }),
+    });
+    const advert = await readRoomAdvert({ baseUrl: 'https://alloc.example.com', fetch }, 'QK7P');
+    expect(advert).toMatchObject({ region: '', joinable: true });
+    expect(advert?.size).toBeUndefined();
+  });
+
+  it('reads silence as joinable — this preview decides nothing; the join does', async () => {
+    const { fetch } = stubFetch({
+      status: 200,
+      json: () => Promise.resolve({ code: 'QK7P', region: 'iad' }),
+    });
+    expect((await readRoomAdvert({ baseUrl: 'https://alloc.example.com', fetch }, 'QK7P'))?.joinable).toBe(true);
+  });
+
+  it('is null for a room that has ended, an unreachable allocator, or an unusable answer', async () => {
+    const config = { baseUrl: 'https://alloc.example.com' };
+    const gone = stubFetch({ status: 404, json: () => Promise.resolve({ error: 'not-found' }) });
+    expect(await readRoomAdvert({ ...config, fetch: gone.fetch }, 'QK7P')).toBeNull();
+
+    const offline: FetchLike = () => Promise.reject(new Error('offline'));
+    expect(await readRoomAdvert({ ...config, fetch: offline }, 'QK7P')).toBeNull();
+
+    const nonsense = stubFetch({ status: 200, json: () => Promise.resolve({ nothing: true }) });
+    expect(await readRoomAdvert({ ...config, fetch: nonsense.fetch }, 'QK7P')).toBeNull();
+  });
+
+  it('escapes the code exactly as the liveness probe does', async () => {
+    const { fetch, calls } = stubFetch({ status: 404 });
+    await readRoomAdvert({ baseUrl: 'https://alloc.example.com', fetch }, 'a/b');
+    expect(calls[0]?.url).toBe('https://alloc.example.com/rooms/a%2Fb');
   });
 });

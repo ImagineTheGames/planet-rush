@@ -147,6 +147,33 @@ function seatOf(room: { lobbyState(): LobbySlot[] }, player: PlayerId): LobbySlo
   return room.lobbyState().find((slot) => slot.player === player);
 }
 
+/**
+ * Wait for a joiner to have read its OWN `welcome` — the barrier that has to come
+ * before `openClient(guestSession, …, guestSession.you, …)`.
+ *
+ * `room.humanCount === 2` is the SERVER's barrier, and it rises one hop too early:
+ * the count goes up when the socket is seated, which is strictly before the
+ * `welcome` carrying this client's player id has crossed back and been read here.
+ * `OnlineSession.player` starts at `0` (`src/net/session`), so a guest opened inside
+ * that window builds its lobby with `you: 0` — and in a room whose creator IS player
+ * 0, `you === host`, so the guest's model believes it is the CREATOR. Every host-only
+ * rule then inverts silently: `pressRush` is accepted from a guest, `isYou` lands on
+ * the host's seat, and the bot difficulties and match shape ride out from a client
+ * that has no business sending them.
+ *
+ * Two live humans in one room never share an id, so "the two sessions disagree about
+ * who they are" is exactly "the joiner has been welcomed" — and it is a state to wait
+ * for, not a duration to sleep through.
+ */
+async function welcomed(guest: OnlineSession, host: OnlineSession): Promise<void> {
+  await until(
+    'the joiner to read its own welcome — until it does it still answers to the host’s id',
+    () => guest.you !== host.you,
+    5_000,
+    () => `guest says ${guest.you}, host says ${host.you}`,
+  );
+}
+
 /** Run the RUSH! countdown the way the render ticker does, and send `startMatch` on
  *  the ONE frame it reaches zero — not on the press (`src/ui/lobby-flow` rule 2). */
 function runCountdown(client: Client): void {
@@ -232,6 +259,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     expect(guestSeat?.state).toBe('human');
 
     // --- The guest's own lobby: their seat, and read-only room config -----------
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'RUSH', guestSession.you, host.lobby().you);
     const guestModel = lobbyModel(guest.lobby());
     expect(guestModel.seats[guest.lobby().you]?.isYou, 'a joiner sees themselves in their slot').toBe(
@@ -303,6 +331,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'WAIT', guestSession.you, hostSession.you);
 
     // A guest's RUSH! is refused twice over — by the lobby model (it is not theirs to
@@ -379,6 +408,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'BACK', guestSession.you, hostSession.you);
     const host = openClient(hostSession, 'BACK', hostSession.you, hostSession.you);
 
@@ -456,6 +486,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     await until('the joiner to reach the host roster', () => lobbyModel(host.lobby()).humanCount === 2);
 
     // The SEAT arrives — requirement 2's live-fill half, on the host's screen.
@@ -522,6 +553,7 @@ describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'TEAM', guestSession.you, hostSession.you);
 
     // The host flips TEAMS and puts the two humans on ONE side, the two bot seats
