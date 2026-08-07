@@ -571,14 +571,19 @@ export interface EntryModel {
 export const ENTRY_EYEBROW = 'DEEP FIELD MINING AUTHORITY';
 
 /**
- * …and its second line, which is this screen's own state. `ROOM CODE` is the
- * handoff's own word for the keypad screen (it labels that panel exactly so); the
- * doors carry the title screen's standing contract line unchanged, because the
- * doors screen is where that contract is taken up.
+ * …and its second line, which is this screen's own state. The handoff labels that
+ * panel `ROOM CODE`; l2-02 files it as `CLAIM CODE`, because this string landed
+ * (u7-04's header beam) after the sweep had already read this file, and left the
+ * keypad saying `ROOM CODE` two lines above its own `ENTER THE CLAIM CODE`. One
+ * screen cannot hold both vocabularies. It invents nothing: `CLAIM` is the
+ * ratified fiction word and `CODE` stays `CODE`, which is the sweep's hard limit —
+ * a player types four characters read off somebody else's screen. The doors carry
+ * the title screen's standing contract line unchanged, because the doors screen is
+ * where that contract is taken up.
  */
 export const ENTRY_STATUS = {
   home: 'CONTRACT OPEN · SECTOR 04',
-  join: 'ROOM CODE',
+  join: 'CLAIM CODE',
 } as const;
 
 /**

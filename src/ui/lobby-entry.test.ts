@@ -681,12 +681,25 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
 
   it('carries the title screen’s letterhead, and names the screen you are on', () => {
     // No new voice is invented for a screen the handoff never drew: the authority
-    // line is the title screen's, verbatim, and the keypad's status is the
-    // handoff's own word for that panel.
+    // line is the title screen's, verbatim, and the keypad's status names that
+    // panel in the ratified vocabulary — `CLAIM`, and a code is still a CODE.
     expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
     expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    expect(entryModel(join).status).toBe('ROOM CODE');
+    expect(entryModel(join).status).toBe('CLAIM CODE');
+  });
+
+  it('never lets the keypad hold two vocabularies at once (l2-02 merge gap)', () => {
+    // u7-04 added the header beam's status line AFTER the sweep had read this file,
+    // so the screen shipped saying ROOM CODE directly above ENTER THE CLAIM CODE.
+    // Encoded as a condition rather than pinned prose: whatever these two say, they
+    // may not disagree about what the thing is called.
+    const join = chooseDoor(createEntry(), 'join', rng()).state;
+    const model = entryModel(join);
+    expect(model.status).toContain('CLAIM');
+    expect(model.prompt).toContain('CLAIM');
+    expect(model.status).not.toContain('ROOM');
+    expect(model.prompt).not.toContain('ROOM');
   });
 
   it('keeps the footer plates inside the footer BEAM, and BACK where it was', () => {
