@@ -230,7 +230,7 @@ test('THE DOORS, THE LOBBY and THE CODEX cost no more per frame than the live ma
   test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
   budgetTest({
     work: 'boot the frozen match \u2192 sample 60 frames \u2192 boot the menu \u2192 press PLAY (the doors) \u2192 sample \u2192 press PLAY SOLO (the lobby) \u2192 sample \u2192 back \u2192 press CODEX \u2192 sample \u2192 compare all three medians against the match',
-    measuredSeconds: 40,
+    measuredSeconds: 32,
   });
 
   // The yardstick first, so the three screens are compared against a match sampled
