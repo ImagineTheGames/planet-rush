@@ -140,9 +140,22 @@ frozen home has **two shield generators standing**, and a shield is a translucen
 plasma bubble over the whole body. That is the shield doing its job. Do not read
 the live column as palette drift — it was nearly read that way here.
 
+## Status
+
+- DoD 1 `npx tsc --noEmit` — clean.
+- DoD 2 `npm test -- --run` — 3773 passed, **1 failed**:
+  `tests/net/capacity/capacity-regression.test.ts` "the loop stays inside the tick
+  budget at 12 rooms", 41.29 ms against a 33 ms budget. **Verified failing
+  identically on a clean `origin/main` worktree in this container** — pre-existing,
+  load-sensitive, server-loop only, no path to art. Do not chase it from here.
+- DoD 3 goldens differ from `origin/main` — 5 files.
+- `tests/mobile/goldens.spec.ts` on the private port — 31 passed.
+- The whole mobile suite on the private port — **96 passed, 0 failed**.
+
+PR: https://github.com/ImagineTheGames/planet-rush/pull/312
+
 ## NEXT
 
-- PR against main.
 - GDD §5.4 still says the home is a planetoid with steel-blue oceans and
   patina continents. The pick supersedes that in fact. `style-guide.md` §5 has
   moved and carries a note; **GDD is the Director's file** — proposed as an
