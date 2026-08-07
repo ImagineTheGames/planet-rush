@@ -161,7 +161,7 @@ so they render offline and carry no licence risk.
 
 | Face | Use | Why |
 |---|---|---|
-| **Audiowide** | Wordmark, headings, menu confirmations | Rounded retro-techno — playful without being a toy, which is exactly the tone brief (§8). |
+| **Audiowide** | Wordmark, headings, menu confirmations | Rounded retro-techno — playful without being a toy, which is exactly the tone brief (§8). *(Note 2026-08-06: this justification quotes the retired tone paragraph, and "retro" is now the word §8 rules out. **The face itself is unchanged and still frozen** — a typeface swap is a separate decision with its own cost, and it is raised as an open question in `docs/audio-revoice-spec.md` §10, not taken here.)* |
 | **Oxanium** | HUD numerals, body text | Designed for game interfaces; holds up at 12px; shares Audiowide's squared geometry without competing with it. |
 
 **Rules:**
@@ -176,27 +176,51 @@ so they render offline and carry no licence risk.
 
 ## 8. Tone — the emotional contract (GDD §4.7, verbatim)
 
+*(Amended 2026-08-06 — the tone paragraph is replaced at the source. This mirror
+now carries the new one, and the pre-pivot "when a **planet** dies" wording is
+gone with it. The full rationale, the old/new worked table, and the precedence
+rule live in GDD §4.7; the audio execution list is `docs/audio-revoice-spec.md`.)*
+
 Every asset, every VFX, every sound is judged against this paragraph. It is
 quoted here unaltered as the contract:
 
-> *Planet Rush is a Saturday-morning space brawl: fast, bright, and a little
-> cheeky. Ships are toys, explosions are fireworks, bots are cartoon rivals with
-> names. But homes are the one serious thing in it — when a planet dies, the game
-> goes briefly quiet, the wreck stays on the map all match, and nobody jokes for
-> three seconds. Arcade on the surface, a small ache underneath.*
+> *Planet Rush is a clean, modern science-fiction brawl: fast, precise, and cold.
+> Ships are machines, explosions are pressure failures, bots are operators with
+> names and habits. But homes are the one serious thing in it — when a station
+> dies, the game goes briefly quiet, the wreck stays on the map all match, and
+> nobody jokes for three seconds. Engineered on the surface, a small ache
+> underneath.*
 
 **Operational reading for Art & Audio:**
 
-- **Arcade on the surface:** ships are toys, explosions are fireworks. VFX are
-  bright, punchy, generous — beam impacts, muzzle flashes, thruster trails,
-  spawn glow all lean fun and readable, not gritty-realistic.
+- **Engineered on the surface:** ships are machines, explosions are pressure
+  failures. Assets are clean, precise and unornamented — an asset carries the
+  material it needs and nothing decorative. *Clean* is not the same as sparse:
+  impacts, muzzle flashes, thruster trails and spawn glow stay punchy and
+  readable, because legibility is a mechanic (below). What goes is the toy —
+  sparkle over an explosion, a wobble on a chip, an arcade blip on a purchase.
+- **Modern / futura:** it must read as equipment built this century, not as a
+  1980s cabinet. Forward-looking and engineered, never retro-futurist. The
+  ratified Gantry/Bone UI direction (`docs/design/gantry-bone-handoff.md`) is the
+  worked example: machined plates, lit top edges, rivets — and, in sound, *"no
+  square, no saw, no pitch bends — each of those is what made earlier passes
+  sound retro or cartoonish."*
 - **A small ache underneath:** homes are the one serious thing. The
-  **planet-death moment goes briefly quiet** — audio drops out, the beat holds
+  **station-death moment goes briefly quiet** — audio drops out, the beat holds
   for ~3 seconds, and nobody jokes. This quiet is a *mechanic of tone*, not
-  polish, and cannot be cut.
+  polish, and cannot be cut. It is **unchanged by the 2026-08-06 amendment**: a
+  clean, cold palette makes the drop bigger, not smaller.
 - Every mechanic in GDD §2 gets a **visible and audible tell** — that is the
-  Art & Audio mandate. If a moment doesn't read at a glance, that's a design
-  bug found in pre-production, not on day 6 (GDD §5.8).
+  Art & Audio mandate, and it **outranks the register**. If a re-styled or
+  re-voiced asset makes two mechanics harder to tell apart, it has failed this
+  section. If a moment doesn't read at a glance, that's a design bug found in
+  pre-production, not on day 6 (GDD §5.8).
+- **Precedence, when they compete:** mechanic legibility first, then the frozen
+  palette (§1–§2 — no new hue enters on a tone amendment), then the register.
+- **Scope of the 2026-08-06 amendment:** ratified and applied to **audio** only
+  (s7-02, per `docs/audio-revoice-spec.md`). Its **VFX** and **bot-naming**
+  consequences are open developer questions and are **not** ratified — do not
+  restyle an explosion or rename a bot against this section until they are.
 
 ---
 

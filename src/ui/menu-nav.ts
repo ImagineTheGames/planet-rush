@@ -129,6 +129,14 @@ export const NAV_EDGES: readonly NavEdge[] = [
   { from: 'main-menu', to: 'codex', via: 'CODEX' },
 
   // --- The doors (openMainMenu.applyEntryTarget / chooseEntryDoor) -------------
+  // FOUR doors are drawn here since u9-01, but only three are edges: **CAMPAIGN
+  // adds none.** It is a teaser (`src/ui/lobby-entry` `comingSoon`) — pressing it
+  // writes `Coming Soon…` into the screen's message slot and moves nothing, so
+  // there is no screen to travel to and no exit it could owe. Recorded here
+  // deliberately rather than left to be noticed: this graph is the audit, and a
+  // control that navigates nowhere is a fact about the map, not a gap in it. The
+  // day CAMPAIGN is built it gains a node and an edge, in the same PR as the code.
+  //
   // BACK leaves for the menu (closeOnline); Escape does the same on a pointer.
   { from: 'online', to: 'main-menu', via: 'BACK', escape: true },
   { from: 'online', to: 'online-keypad', via: 'JOIN A CLAIM' },

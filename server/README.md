@@ -101,6 +101,15 @@ redeploys with a plain `fly deploy --config fly.allocator.toml`.
 | `PORT` | `8080` | Listen port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `MATCH_SEED` | random at boot | Fixes the seed, so a whole run is reproducible |
+| `MAX_ROOMS` | `DEFAULT_MAX_ROOMS` (6) | Room ceiling, and the capacity this Machine advertises to the allocator |
+
+**`MAX_ROOMS` is sized to the guest's CPU *quota*, not to its core.** The default
+6 is the measured, margined number for a `shared-cpu-1x` — 6.25% of a core
+sustained, and a full 8-seat room costs ~4.7 ms of CPU per second
+(`docs/server-capacity.md`). It is deliberately wrong for anything bigger, in the
+safe direction: **a self-hosted server on a real core should start with
+`MAX_ROOMS=100`**, and `shared-cpu-2x` wants 12. Over-advertising costs every
+player on the Machine at once, so the default fails small.
 
 ## The files
 

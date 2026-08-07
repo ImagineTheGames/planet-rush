@@ -19,6 +19,20 @@
  * nothing live left to spectate. That single rule — `spectate ⟺ !matchOver` — is
  * the whole difference between the two summaries, and it is asserted headless.
  *
+ * ── GANTRY / BONE, AND THE ACHE (u7-05) ─────────────────────────────────────
+ * This is the screen a player stares at longest, and the one screen in the game
+ * that carries the tone contract's planet-death beat (GDD §4.7 — *"when a station
+ * dies, the game goes briefly quiet … nobody jokes for three seconds"*). So it is
+ * made of the same material as every other screen, and of nothing else: beams, a
+ * result set in the band, and two plates. No celebration, no fireworks, no fill
+ * of colour — the restraint is the treatment.
+ *
+ * **REMATCH is the one bright plate.** GDD §4.7 makes Rematch the button that
+ * always survives, §2.7 makes it the thing offered *immediately* on a death, and
+ * a screen a player sits on needs its way forward to be unmistakable. The
+ * alternative on each variant is a way *out* (BACK TO MENU) or a way to keep
+ * watching (SPECTATE), and neither is the action the design ratified.
+ *
  * Pure and DOM-free: this derives the words and the buttons from a plain
  * {@link MatchOutcome}; {@link endOfMatchLayout} places them and
  * `./end-of-match-view` draws them.
@@ -26,8 +40,12 @@
 
 import type { PlayerId } from '@shared/types';
 import type { Rect, Viewport } from '@platform/layout-registry';
+import { COLUMN, ROW_BAR_WIDTH, plateHeight } from '../art/materials';
+import type { FrameMetrics, PlateRole, PlateScale, PlateState } from '../art/materials';
+import { beamContent, gantryFrame, stackPlates } from './gantry';
+import { MAIN_MENU_EYEBROW } from './main-menu';
 import { playerColor } from './station-hp';
-import { centeredColumn, hitRect, menuContent } from './menu-geometry';
+import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -103,21 +121,68 @@ export function endButtons(outcome: MatchOutcome): readonly EndButton[] {
 // The per-frame model
 // ---------------------------------------------------------------------------
 
+/**
+ * The plate a button is drawn as. REMATCH is the `primary` `hero` plate — the
+ * brightest and the largest, which is the whole of what Bone has to mark an
+ * action with — and SPECTATE / BACK TO MENU are `secondary` `standard` plates:
+ * fully active steel, never the greyed-out costume the field report caught.
+ */
+export function endButtonPlate(id: EndButton): { role: PlateRole; scale: PlateScale } {
+  return id === 'rematch'
+    ? { role: 'primary', scale: 'hero' }
+    : { role: 'secondary', scale: 'standard' };
+}
+
 export interface EndButtonView {
   readonly id: EndButton;
   readonly label: string;
-  /** Rematch is the affirmative action and reads as plasma; spectate is chrome. */
+  /** Rematch is the affirmative action — under Gantry/Bone the brightest plate
+   *  rather than the plasma one; spectate and the menu are chrome. */
   readonly primary: boolean;
+  readonly role: PlateRole;
+  readonly scale: PlateScale;
+  /** Rest / hover / press — the handoff's three plate states, driven by the
+   *  wiring layer's pointer routing (`src/main.ts`). Touch never hovers. */
+  readonly state: PlateState;
 }
+
+/** What the pointer is doing on the summary: which button it is over, and which
+ *  (if any) it is holding down. */
+export interface EndPointer {
+  readonly hover?: EndButton | null;
+  readonly press?: EndButton | null;
+}
+
+/**
+ * The standing tag in the header beam.
+ *
+ * **Not new copy** — it is the front door's own eyebrow, character for character
+ * ({@link ./main-menu} `MAIN_MENU_EYEBROW`), so the screen that files the result
+ * is signed by the same authority that issued the contract. The beam wanted a tag
+ * and the alternative was inventing a sentence for the one screen a brief tells
+ * you not to add words to.
+ */
+export const END_OF_MATCH_EYEBROW = MAIN_MENU_EYEBROW;
 
 export interface EndOfMatchModel {
   readonly kind: EndKind;
+  /** The standing authority tag in the header beam. */
+  readonly eyebrow: string;
   /** VICTORY / DEFEAT / DRAW / ELIMINATED. */
   readonly headline: string;
   /** One line under it, in plain words. */
   readonly subhead: string;
-  /** The winner's player colour, to accent a victory or name a defeat's victor;
-   *  `null` on a draw or an elimination, where there is no one to colour. */
+  /**
+   * The winner's player colour; `null` on a draw or an elimination, where there
+   * is no one to colour.
+   *
+   * Under Gantry/Bone this no longer *letters* the result. It is drawn as the
+   * 4px identity rule between the headline and its line — {@link ../art/materials}
+   * `ROW_BAR_WIDTH`, the one place this direction puts an identity colour ("never
+   * as a background wash — that was making identity read as chrome"). The screen
+   * still reports exactly who took the claim: the rule says it in colour, the line
+   * under it says it in words.
+   */
   readonly accent: number | null;
   readonly buttons: readonly EndButtonView[];
 }
@@ -143,16 +208,27 @@ const HEADLINES: Record<EndKind, string> = {
   eliminated: 'ELIMINATED',
 };
 
-/** Build the frame model — the words and the buttons for one outcome. */
-export function endOfMatchModel(outcome: MatchOutcome): EndOfMatchModel {
+/**
+ * Build the frame model — the words and the buttons for one outcome. A press
+ * outranks a hover on the same plate (a finger that is down is not hovering), and
+ * a plate that is neither is at rest.
+ */
+export function endOfMatchModel(outcome: MatchOutcome, pointer: EndPointer = {}): EndOfMatchModel {
   const kind = endKind(outcome);
-  const buttons: EndButtonView[] = endButtons(outcome).map((id) => ({
-    id,
-    label: BUTTON_LABELS[id],
-    primary: id === 'rematch',
-  }));
+  const buttons: EndButtonView[] = endButtons(outcome).map((id) => {
+    const { role, scale } = endButtonPlate(id);
+    return {
+      id,
+      label: BUTTON_LABELS[id],
+      primary: id === 'rematch',
+      role,
+      scale,
+      state: (pointer.press === id ? 'press' : pointer.hover === id ? 'hover' : 'rest') as PlateState,
+    };
+  });
   return {
     kind,
+    eyebrow: END_OF_MATCH_EYEBROW,
     headline: HEADLINES[kind],
     subhead: subheadFor(kind, outcome),
     accent: accentFor(kind, outcome),
@@ -240,11 +316,16 @@ function playerLabel(player: PlayerId | null): string {
 // Layout
 // ---------------------------------------------------------------------------
 
+/** The result's own strip, at the 1280×720 reference — the block the headline is
+ *  set in. Scales with the frame like every other chrome metric. */
 export const END_HEADLINE_HEIGHT = 72;
+/** The line under the result, at the reference. */
 export const END_SUBHEAD_HEIGHT = 28;
-export const END_BUTTON_HEIGHT = 52;
-export const END_BUTTON_HEIGHT_TOUCH = 60;
-export const END_BUTTON_WIDTH_MAX = 320;
+/** The identity rule's width at the reference: a short bar, not a divider across
+ *  the screen — it marks a player, and a player is not a section break. */
+export const END_RULE_WIDTH = 200;
+/** Air above and below the identity rule, at the reference. */
+export const END_RULE_GAP = 14;
 
 export interface EndOfMatchLayoutOptions {
   readonly isTouch?: boolean;
@@ -253,51 +334,106 @@ export interface EndOfMatchLayoutOptions {
 
 export interface EndOfMatchLayout {
   readonly content: Rect;
+  /** The header beam, full width inside the safe area. */
+  readonly header: Rect;
+  /** The footer beam. */
+  readonly footer: Rect;
+  /** The strip inside the header beam the standing authority tag sits in. */
+  readonly title: Rect;
+  /** The result word's own block, centred in what the plates leave of the band. */
   readonly headline: Rect;
+  /** The 4px identity rule under it — zero-extent when there is no one to mark. */
+  readonly rule: Rect;
+  /** The line under the rule. */
   readonly subhead: Rect;
   /** One rect per button, in the model's button order. */
   readonly buttons: readonly Rect[];
   readonly isTouch: boolean;
+  readonly metrics: FrameMetrics;
 }
 
 /**
- * Lay the summary out: the headline and its line sit in the upper half, the
- * buttons stack at the bottom. `buttonCount` is passed rather than a model so the
- * geometry stays pure — one or two buttons, placed the same way.
+ * Lay the summary out for a viewport.
+ *
+ * The composition is the one that shipped — the result in the upper band, the
+ * actions stacked below it — rebuilt on the frame every other screen uses
+ * ({@link ./gantry} `gantryFrame`). The plates are laid out FIRST, bottom-anchored
+ * at their own heights, and the result takes whatever band is left: on a
+ * 390px-tall phone that is the difference between a result with room to breathe
+ * and two buttons squeezed under it, and a stack that has quietly walked off the
+ * bottom edge.
+ *
+ * `buttonIds` rather than a count, because REMATCH is a `hero` plate and its
+ * companion is a `standard` one ({@link endButtonPlate}) — size is half of what
+ * marks the primary, and a count cannot say which is which.
  */
 export function endOfMatchLayout(
   viewport: Viewport,
-  buttonCount: number,
+  buttonIds: readonly EndButton[],
   options: EndOfMatchLayoutOptions = {},
 ): EndOfMatchLayout {
   const isTouch = options.isTouch ?? false;
-  const content = menuContent(viewport, options.insets);
+  const frame = gantryFrame(viewport, options.insets);
+  const m = frame.metrics;
+  const band = frame.band;
 
-  const headlineHeight = Math.min(END_HEADLINE_HEIGHT, content.height);
-  const subheadHeight = Math.min(END_SUBHEAD_HEIGHT, Math.max(0, content.height - headlineHeight));
-  // The headline block sits a little above centre, so the eye lands on the
-  // result and travels down to the buttons rather than starting on them.
-  const blockTop = content.y + Math.max(0, content.height * 0.28 - headlineHeight / 2);
-  const headline: Rect = { x: content.x, y: blockTop, width: content.width, height: headlineHeight };
+  const title = beamContent(frame.header, m);
+
+  // The plates, bottom-anchored in the band at their own heights.
+  const columnWidth = Math.min(COLUMN.title, band.width);
+  const heights = buttonIds.map((id) => plateHeight(endButtonPlate(id).scale, m));
+  const stackHeight = Math.min(
+    band.height,
+    heights.reduce((a, b) => a + b, 0) + Math.max(0, heights.length - 1) * m.gap,
+  );
+  const stackBand: Rect = {
+    x: band.x,
+    y: band.y + band.height - stackHeight,
+    width: band.width,
+    height: stackHeight,
+  };
+  const buttons = stackPlates(stackBand, columnWidth, heights, m.gap);
+
+  // …and the result, centred in what is left above them.
+  const resultHeight = Math.max(0, band.height - stackHeight - m.gutter);
+  const headlineHeight = Math.min(Math.round(END_HEADLINE_HEIGHT * m.scale), resultHeight);
+  const ruleGap = Math.round(END_RULE_GAP * m.scale);
+  const subheadHeight = Math.min(
+    Math.round(END_SUBHEAD_HEIGHT * m.scale),
+    Math.max(0, resultHeight - headlineHeight),
+  );
+  const ruleHeight = Math.min(ROW_BAR_WIDTH, Math.max(0, resultHeight - headlineHeight - subheadHeight));
+  const ruleBlock = ruleHeight > 0 ? ruleHeight + ruleGap * 2 : 0;
+  const blockHeight = headlineHeight + ruleBlock + subheadHeight;
+  const blockTop = band.y + Math.max(0, (resultHeight - blockHeight) / 2);
+
+  const headline: Rect = { x: band.x, y: blockTop, width: band.width, height: headlineHeight };
+  const ruleWidth = Math.min(Math.round(END_RULE_WIDTH * m.scale), band.width);
+  const rule: Rect = {
+    x: band.x + (band.width - ruleWidth) / 2,
+    y: headline.y + headlineHeight + ruleGap,
+    width: ruleHeight > 0 ? ruleWidth : 0,
+    height: ruleHeight,
+  };
   const subhead: Rect = {
-    x: content.x,
-    y: headline.y + headlineHeight,
-    width: content.width,
+    x: band.x,
+    y: headline.y + headlineHeight + ruleBlock,
+    width: band.width,
     height: subheadHeight,
   };
 
-  const rowHeight = isTouch ? END_BUTTON_HEIGHT_TOUCH : END_BUTTON_HEIGHT;
-  // The button stack lives in the bottom third, clear of the subhead.
-  const stackTop = Math.max(subhead.y + subheadHeight, content.y + content.height * 0.62);
-  const band: Rect = {
-    x: content.x,
-    y: stackTop,
-    width: content.width,
-    height: Math.max(0, content.y + content.height - stackTop),
+  return {
+    content: frame.content,
+    header: frame.header,
+    footer: frame.footer,
+    title,
+    headline,
+    rule,
+    subhead,
+    buttons,
+    isTouch,
+    metrics: m,
   };
-  const buttons = centeredColumn(band, Math.max(0, buttonCount), END_BUTTON_WIDTH_MAX, rowHeight);
-
-  return { content, headline, subhead, buttons, isTouch };
 }
 
 /**

@@ -41,17 +41,33 @@
 
 import { mulberry32 } from '@shared/types';
 
-/** The five oscillator shapes. */
+/**
+ * The five oscillator shapes.
+ *
+ * Two of them are **retired from `./bank`** by the amended tone contract (GDD
+ * §4.7, 2026-08-06, `docs/audio-revoice-spec.md` §5.1). They stay in the synth —
+ * this is a policy about the bank, not a deletion from the instrument — and
+ * `audio.test.ts` holds the bank to it.
+ */
 export type Wave =
-  /** Hollow and arcade — the default voice of a toy (tone contract, §8). */
+  /**
+   * Hollow and arcade. **Not used in the bank** (0 of 112 voices, from 21 of 89):
+   * a square with a low duty was a tone generator standing in for a struck body,
+   * and a struck body is what the register actually wants.
+   */
   | 'square'
-  /** Bright and rude: firing voices, alarms. */
+  /**
+   * Bright and rude. **Used in the bank once**, by {@link SOUND.alarm} and only
+   * there: rudeness is not the register, but a saw's dense harmonic stack is
+   * what stops a klaxon sounding like music, and §2.2's *"unmistakable alarm"*
+   * is a mechanic. Legibility outranks register (§4.7).
+   */
   | 'saw'
-  /** Soft: ambience, the mote-quiet end of the set. */
+  /** Soft: ambience, the struck partials, the mote-quiet end of the set. */
   | 'sine'
-  /** Between the two: builds, confirmations. */
+  /** Bodies and melody: builds, clangs, the soundtrack. */
   | 'triangle'
-  /** Pitched sample-and-hold noise: rock, explosions, grinding. */
+  /** Pitched sample-and-hold noise: rock, explosions, grinding, pressure. */
   | 'noise';
 
 /**

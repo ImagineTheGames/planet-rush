@@ -438,9 +438,15 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       return shipClass === undefined ? rest(state) : withLobby(state, selectShipClass(lobby, shipClass));
     }
     case 'seat':
-      // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
-      // Milestone E); the host shrinks or shapes the match here. A guest's tap and
-      // a human seat are no-ops in `./lobby`, so a refused tap costs the wire zero.
+    case 'seatState':
+      // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E); the host
+      // shrinks or shapes the match here. TWO rects reach it and they are the same
+      // action, deliberately: the row BODY, which is where the cycle has always
+      // lived, and — since u5 — the row's LEADING STATE control, the drawn, labelled
+      // button that finally SAYS a slot can be closed (the developer could not tell
+      // that it could). One case, so the control and the body can never drift into
+      // doing two different things. A guest's tap and a human seat are no-ops in
+      // `./lobby`, so a refused tap costs the wire zero.
       return withLobby(state, cycleSeatState(lobby, target.index));
     case 'seatChip':
       // The row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH modes

@@ -38,8 +38,15 @@ import {
   wireFireMode,
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
-import { DOOR_ORDER, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
-import { CLASS_ORDER, DEFAULT_SHIP_CLASS, MODE_LABELS, RUSH_COUNTDOWN_SECONDS, lobbyModel } from './lobby';
+import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
+import {
+  CLASS_ORDER,
+  DEFAULT_SHIP_CLASS,
+  MODE_LABELS,
+  RUSH_COUNTDOWN_SECONDS,
+  SEAT_STATE_CYCLE,
+  lobbyModel,
+} from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
@@ -54,7 +61,7 @@ import { createSettings, volumeLevel } from './settings';
 
 /** The index of a door in the order the view draws it — the same lookup the
  *  hit-test does, so a test can tap by name. */
-function doorIndex(door: 'solo' | 'create' | 'join'): number {
+function doorIndex(door: 'campaign' | 'solo' | 'create' | 'join'): number {
   return DOOR_ORDER.indexOf(door);
 }
 
@@ -110,6 +117,33 @@ function slots(count: number, humans: number[]): LobbySlot[] {
 }
 
 // ---------------------------------------------------------------------------
+
+describe('the CAMPAIGN teaser resolves into nothing at all (u9-01)', () => {
+  it('opens no transport, sends nothing, and leaves the flow on the doors', () => {
+    // The whole point, at the seam that owns the transport: a door with no intent
+    // produces no effect, so the campaign teaser CANNOT reach the network — not
+    // by a stray branch in `main.ts`, and not by a future edit to this flow.
+    const before = createFlow();
+    const after = flowTapEntry(before, { kind: 'door', index: doorIndex('campaign') }, mulberry32(7));
+
+    expect(kinds(after)).toEqual([]);
+    expect(after.state.screen).toBe('entry');
+    expect(after.state.entry.screen).toBe('home');
+    expect(after.state.lobby).toBeNull();
+    expect(after.state.room).toBeNull(); // no code was minted for it
+    expect(after.state.entry.notice).toBe(ENTRY_COMING_SOON);
+  });
+
+  it('does not strand the player — SOLO still opens the lobby right after it', () => {
+    const rng = mulberry32(7);
+    let state = flowTapEntry(createFlow(), { kind: 'door', index: doorIndex('campaign') }, rng).state;
+    const opened = flowTapEntry(state, { kind: 'door', index: doorIndex('solo') }, rng);
+    expect(kinds(opened)).toEqual(['open-transport']);
+    expect(opened.state.entry.notice).toBe('');
+    state = flowConnected(opened.state, 0).state;
+    expect(state.screen).toBe('lobby');
+  });
+});
 
 describe('the door resolves into a room (rule 1 — one room code, end to end)', () => {
   it('opens a transport on SOLO and puts the same code on the lobby', () => {
@@ -273,6 +307,22 @@ describe('the room tells the server what it chose', () => {
     const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
     expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
 
+    // …and so does the LEADING state control (u5) — the drawn, labelled button
+    // that finally says a slot can be closed. Two rects, ONE action: they walk the
+    // same ring in the same order, so the control can never become a second,
+    // subtly-different cycle bolted beside the first.
+    let viaBody = inLobby(0, 0);
+    let viaControl = inLobby(0, 0);
+    for (let i = 0; i < SEAT_STATE_CYCLE.length + 1; i++) {
+      viaBody = flowTapLobby(viaBody, { kind: 'seat', index: 5 }).state;
+      viaControl = flowTapLobby(viaControl, { kind: 'seatState', index: 5 }).state;
+      expect(
+        viaControl.lobby?.seats[5]?.occupant,
+        `tap ${i + 1}: the control and the body disagree`,
+      ).toBe(viaBody.lobby?.seats[5]?.occupant);
+    }
+    expect(viaControl.lobby?.seats[5]?.occupant).toBe('bot'); // four taps = once round + one
+
     // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
     // the TEAMS lobby had lost when the side control took the only chip.
     const tiered = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
@@ -293,6 +343,7 @@ describe('the room tells the server what it chose', () => {
       { kind: 'mode' } as const,
       { kind: 'abundance' } as const,
       { kind: 'seat', index: 2 } as const,
+      { kind: 'seatState', index: 2 } as const,
       { kind: 'seatChip', index: 2 } as const,
       { kind: 'seatTeamChip', index: 2 } as const,
     ]) {
@@ -455,6 +506,21 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
           state.lobby?.seats[SEAT]?.occupant,
         );
+
+        // …and so does the LEADING STATE control (u5) — the one that SAYS so. It
+        // belongs in this guard for the reason the guard exists: an affordance
+        // that is laid out in one mode and not another, or in one lobby and not
+        // the other, is the class of miss this describe block was written for.
+        const stateControl = tapCentre(layout, layout.seatStates[SEAT]!);
+        expect(stateControl, `state control reachable in ${mode}`).toEqual({
+          kind: 'seatState',
+          index: SEAT,
+        });
+        const viaControl = flowTapLobby(state, stateControl!);
+        expect(
+          viaControl.state.lobby?.seats[SEAT]?.occupant,
+          `state control cycles the seat in ${mode}`,
+        ).toBe(cycled.state.lobby?.seats[SEAT]?.occupant);
 
         // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
         // This is the exact control the TEAMS lobby had lost.

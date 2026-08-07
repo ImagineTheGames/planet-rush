@@ -25,8 +25,10 @@
  *    be legible and the column can be halved, the roster becomes two columns of
  *    four — P1–P4 down the left, P5–P8 down the right.
  *  - **Tile arrangement** ({@link TileShape}): four stacked, a 2×2, or one row
- *    of four — whichever keeps a tile tall *and* wide enough to carry its role
- *    blurb, which is the only reason the tile exists (GDD §2.11).
+ *    of four — whichever keeps a tile tall *and* wide enough to carry its name,
+ *    its hull and its **stat grid** (u4, 2026-08-05 — pips AND numbers; GDD
+ *    §2.5 / §2.11 amended). What a tile can hold at a given size, and in what
+ *    order it gives things up, is {@link classTileContent}.
  *
  * All three are decided by the **content box's dimensions**, never by
  * `isTouch`: a tablet in landscape gets the same reading as a desktop of the
@@ -49,8 +51,10 @@
  * behind the ROTATE overlay anyway — the roster compresses and the tiles do
  * not: the roster is a list to *read* (its only tap is the host's difficulty
  * cycle), while the tiles and RUSH! are the two choices every player makes with
- * a thumb. The view then drops a row's detail line below 30px and a tile's
- * blurb below 64px rather than clipping either.
+ * a thumb. The view then drops a row's detail line below 30px, and a tile gives
+ * up its blurb (and, below that, its hull nickname) by the ladder in
+ * {@link classTileContent} — **never its stats** at any size the layout will
+ * actually produce — rather than clipping anything.
  *
  * Nothing is ever laid out outside {@link LobbyLayout.content}, which is itself
  * the viewport inset by the safe area — so a notch, a home indicator or a
@@ -58,6 +62,9 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
+import { COLUMN, TOUCH_MIN, plateHeight } from '../art/materials';
+import type { FrameMetrics, PlateScale } from '../art/materials';
+import { beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
 
 // ---------------------------------------------------------------------------
 // Safe area
@@ -116,9 +123,11 @@ export const SEAT_ROW_LEGIBLE = 26;
  *  splits into two 177 px rows, which still hold a chip, a name and a tier. */
 export const TWO_ROSTER_MIN_WIDTH = 360;
 
-/** Hull tile heights. 64 is the height the view needs to draw the role blurb —
- *  the blurb is the whole point of the tile (GDD §2.11), so it is defended by
- *  changing the tiles' *arrangement* before their height (see {@link TileShape}). */
+/** Hull tile heights. 64 is the height that carries a tile's whole IDENTITY
+ *  block — its name, its hull, and the 3×2 grid of stat pips-and-numbers (u4,
+ *  {@link classTileContent}; the constants below are asserted to add up to it).
+ *  It is defended by changing the tiles' *arrangement* before their height (see
+ *  {@link TileShape}). Above it the tile also carries its role blurb. */
 export const CLASS_TILE_MIN = 64;
 export const CLASS_TILE_MAX = 108;
 /** The floor a tile keeps even when the band cannot spare the full blurb height:
@@ -133,6 +142,86 @@ export const CLASS_TILE_COMPACT = 44;
 /** Narrower than this a tile cannot carry a name over a wrapped blurb, so an
  *  arrangement that would produce one is rejected in favour of a taller shape. */
 export const CLASS_TILE_MIN_WIDTH = 150;
+
+// ---------------------------------------------------------------------------
+// Inside a hull tile — the identity block, and the stat grid (u4, 2026-08-05:
+// "both pips and numbers"). The tile is no longer a name over a blurb: it now
+// carries six stats, each as a coarse pip bar over its actual figure, read off
+// the sim's own class table (`./lobby` shipStatLines).
+//
+// Six of those on a 390-wide phone is the hard case this block is dimensioned
+// for, so the tile has a stated PRIORITY LADDER and {@link classTileContent} is
+// the one place it lives — the view draws whatever the ladder returns and
+// decides nothing:
+//
+//   1. the class NAME       — a tile with no name is not a choice
+//   2. the STAT GRID        — the reason this brief exists; the thing a player
+//                             is comparing four tiles for
+//   3. the HULL nickname    — the silhouette's name (Quadfin…), flavour the
+//                             codex also carries
+//   4. the role BLURB       — the sentence, which already dropped below 64px
+//                             before this brief and still does
+//
+// One deliberate exception to rung 2, and it is a fallback rather than a hole:
+// where a tile is below the stat grid's OWN floor — too short for two rows, or
+// too narrow for three legible cells — the tile degrades to the pre-u4 card
+// (name over hull) rather than to a bare name. Nothing the layout actually
+// produces on any profile in QA's matrix lands there (asserted), and a tile that
+// small would have shown a clipped grid, which is the thing this ladder exists
+// to prevent.
+//
+// Each rung is dropped whole rather than clipped — a half-sentence and a
+// half-visible stat row both read worse than none — and the ladder is asserted
+// against the real QA device matrix in `./lobby-geometry.test.ts`, portrait and
+// landscape, so "legible at phone scale" is a test rather than a hope.
+// ---------------------------------------------------------------------------
+
+/** Inset from a tile's edge to its content. Tight, because six stat cells and
+ *  four words share a 152×56 tile on a phone in landscape — the primary mobile
+ *  layout of this screen. */
+export const CLASS_TILE_PAD = 3;
+/** The class-name line. Audiowide 12's MEASURED box (ascent + descent) on the
+ *  self-hosted face, not a guess — the first cut of this block guessed the line
+ *  heights and every tile drew its stats through its hull nickname. */
+export const CLASS_NAME_LINE = 14;
+/** The hull-nickname line (Oxanium 9, measured box 12). */
+export const CLASS_HULL_LINE = 12;
+/** The role blurb — two wrapped Oxanium-10 lines. */
+export const CLASS_BLURB_LINE = 22;
+
+/** Stats on a tile — GDD §2.11's six table columns (`./lobby` STAT_SPECS,
+ *  asserted equal in the tests). Mirrored rather than imported so the geometry
+ *  stays free of the model, exactly like {@link LOBBY_SLOT_ROWS}. */
+export const STAT_COUNT = 6;
+/** One stat cell: its figure on a text line (Oxanium 8, measured box 10), its
+ *  pip bar directly beneath. */
+export const STAT_ROW_TEXT = 10;
+export const STAT_PIP_BAR = 3;
+export const STAT_ROW_HEIGHT = STAT_ROW_TEXT + STAT_PIP_BAR;
+/** Air between two rows of the stat grid. */
+export const STAT_ROW_GAP = 2;
+/** Air between two columns of it. */
+export const STAT_CELL_GAP = 4;
+/** Air above and below the whole stat block, when the tile has height to spare.
+ *  **Elastic**: a roomy desktop tile takes all of it so the block reads as its
+ *  own thing rather than a third line of prose, and the tightest phone tile takes
+ *  none — the stats themselves never pay for the spacing. */
+export const STAT_BLOCK_AIR = 5;
+/** A cell wide enough to lay all six across in ONE row — `SPD 130%` over five
+ *  pips with room to spare. The wide-tile (desktop `stack`) shape, which reads
+ *  like GDD §2.11's own table row. */
+export const STAT_CELL_WIDE = 42;
+/** The narrowest a cell may get before the grid is dropped rather than drawn
+ *  with figures running into each other. Three columns of this fit inside every
+ *  tile the layout is willing to produce, which is why 3 is the floor
+ *  arrangement and there is no 2-column shape. */
+export const STAT_CELL_FLOOR = 36;
+
+/** Height of a stat grid of `rows` rows. */
+export function statGridHeight(rows: number): number {
+  const n = Math.max(0, Math.floor(rows));
+  return n === 0 ? 0 : n * STAT_ROW_HEIGHT + (n - 1) * STAT_ROW_GAP;
+}
 
 // ---------------------------------------------------------------------------
 // The arena (map) row — the four map cards, moved off the PLAY flow into the
@@ -170,8 +259,9 @@ export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 // toggles carved off the TOP of the roster box, never a band of their own: the
 // roster is a list to read and it is what compresses (the file header's rule), so
 // the hull tiles and the arena cards keep their thumb floors on the tightest
-// phone. The per-seat OPEN/BOT/CLOSED cycle is the row itself; the per-row TEAM /
-// difficulty control is a chip at the row's right edge (below).
+// phone. The per-seat OPEN/BOT/CLOSED cycle is a LABELLED control at the row's
+// LEADING edge since u5 (below); the per-row TEAM / difficulty control is a chip
+// at the row's right edge (below).
 // ---------------------------------------------------------------------------
 
 /** Height of the MODE/ABUNDANCE strip at the top of the roster. A plain tap
@@ -181,6 +271,74 @@ export const CONTROLS_HEIGHT_TOUCH = 38;
 /** Widest a single toggle grows — the two split the roster width, capped so they
  *  read as controls, not banners, on a wide desktop roster column. */
 export const CONTROL_MAX_WIDTH = 200;
+
+/**
+ * Width of the identity STRIPE down a roster row's leading edge — the trim that
+ * carries the slot's player colour (style-guide §3 rule 2).
+ *
+ * It lives here rather than in the view since u5, because the row's leading edge
+ * stopped being decoration the drawing code could place on its own: the STATE
+ * control is laid out immediately right of the stripe, so the two are one piece
+ * of geometry and the view reads both from this file.
+ */
+export const SEAT_STRIPE = 4;
+
+/**
+ * Width of a roster row's LEADING STATE control — the OPEN / BOT / CLOSED cycle,
+ * finally drawn and finally named (u5, 2026-08-05).
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS
+ * ---------------------------------------------------------------------------
+ * The cycle itself is old ({@link LobbyTarget} `seat`, `./lobby` `cycleSeatState`)
+ * and it worked from the day it shipped — on a plain tap of the row BODY, with
+ * nothing drawn to say the row was tappable and nothing naming the three states
+ * it walks. The developer's report is the whole case: *"theres no way visible way
+ * to know that you can close slots right now."* The screen advertised its two
+ * lesser controls — the DIFFICULTY chip and the TEAM chip, both drawn chips with
+ * backgrounds — and hid the one that decides whether a slot is a human, a bot, or
+ * shut. A control that works but cannot be discovered is not shipped (the same
+ * class as the M1 miss that created the mobile suite: `playwright.config.ts`,
+ * "caught invisible touch UI").
+ *
+ * So the state is an **explicit, labelled, leading** control that states the
+ * CURRENT state and reads as pressable — deliberately the shape the UI design
+ * handoff independently proposed (slot state as `OPEN` / `CLOSED` buttons on the
+ * far left of each row). That direction is not ratified as a whole and this is
+ * NOT that lobby; it is built leading-and-labelled so that if the design lands it
+ * is a re-skin rather than a rewrite.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IT MAY NOT COST
+ * ---------------------------------------------------------------------------
+ * A leading control is the first thing on this screen to take width off the
+ * *front* of a row, and the row already had two guarantees carved off its back
+ * ({@link SEAT_CHIP_WIDTH}, {@link SEAT_TEAM_CHIP_WIDTH}) plus the body zone
+ * between them ({@link SEAT_TEAM_CHIP_MIN_BODY}). Neither may move, so the state
+ * control is bounded three ways and takes whichever is smallest — its own width,
+ * a share of a narrow row, and whatever is left once the body keeps
+ * {@link SEAT_ROW_BODY_MIN}. The order across a row is therefore fixed at every
+ * width: `stripe | STATE | body | team chip | difficulty chip`.
+ */
+export const SEAT_STATE_WIDTH = 58;
+/** …never more than this share of a narrow row. */
+export const SEAT_STATE_MAX_FRACTION = 0.28;
+/**
+ * …and below this the control is dropped whole rather than drawn as a stub too
+ * small to carry a word (the ladder `classTileContent` keeps for a hull tile: a
+ * clipped affordance reads worse than none). No row the layout produces on any
+ * profile in QA's matrix lands here — asserted in `./lobby-geometry.test.ts` —
+ * and a row that did would fall back to the pre-u5 behaviour, where the row body
+ * is still the cycle.
+ */
+export const SEAT_STATE_MIN = 34;
+/**
+ * The row BODY the state control must leave between itself and the trailing
+ * chips. The body is still the seat-state cycle's tap target (u5 adds a control,
+ * it does not take one away — a wide desktop row is a generous target and stays
+ * one), so it may be squeezed by the new control but never closed by it.
+ */
+export const SEAT_ROW_BODY_MIN = 16;
 
 /** Width of a roster row's trailing DIFFICULTY chip — the bot-tier cycle
  *  (EASY/MEDIUM/HARD). Carved off the RIGHT of the row in BOTH modes: it is the
@@ -193,6 +351,25 @@ export const SEAT_CHIP_WIDTH = 54;
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /** Inset of the chip from the row's edges. */
 export const SEAT_CHIP_PAD = 3;
+
+/**
+ * The height below which a roster row draws NONE of its per-row controls — the
+ * state control, the difficulty chip and the team chip alike.
+ *
+ * It was three separate `> 8` literals in the view before u5, which is one guess
+ * per control and no statement about their relationship. Stated once, here, it
+ * says the thing that matters: **a row either carries its controls or carries
+ * none of them.** The state control can never be the one a shrinking row drops
+ * first — dropping it first is precisely the shape of the bug u5 exists to fix
+ * (a screen that keeps its lesser controls and loses its main one).
+ *
+ * Rows this short only happen where the roster has been compressed hard (the file
+ * header's rule: the roster is a list and it is what gives, so the hull tiles and
+ * the arena cards keep their thumb floors). `./lobby-geometry.test.ts` asserts
+ * every LANDSCAPE profile — the orientation this screen is used in — stays above
+ * it.
+ */
+export const SEAT_CONTROL_MIN_HEIGHT = 8;
 
 /** Width of a roster row's TEAM chip (TEAMS only) — wide enough for the WORD the
  *  chip carries since the developer reported a teams match they could not read
@@ -248,17 +425,67 @@ export const ROSTER_COLUMN_FRACTION = 0.56;
 export const CLASS_BLOCK_FRACTION = 0.42;
 
 // ---------------------------------------------------------------------------
-// The entry screen (./lobby-entry) — the door, and the keypad behind JOIN
+// The entry screen (./lobby-entry) — the doors, and the keypad behind JOIN
+//
+// ── GANTRY / BONE (u7-04) ──────────────────────────────────────────────────
+// The doors screen is framed like the title and settings screens now: a header
+// beam, a footer beam, a page margin, and one content band between them
+// ({@link ./gantry} `gantryFrame`). Everything the frame decides — the margins,
+// the beam heights, the plate heights, the gutters — comes from
+// `../art/materials` `frameMetrics`, so this screen draws the handoff's own 44 /
+// 92 / 80 / 72 on a desktop and their derived counterparts on a phone rather than
+// a second hand-picked set.
+//
+// Three of this screen's own numbers went away with that, and it is worth saying
+// which and why, because they were load-bearing before:
+//
+//  - `DOOR_HEIGHT` / `DOOR_HEIGHT_TOUCH` (56 / 64) — a door is a PLATE now, so
+//    its height is `plateHeight(scale, metrics)`: a hero plate for PLAY SOLO and
+//    a standard plate for the other three. The thumb floor is enforced once, for
+//    every screen, by `frameMetrics.plateScale`.
+//  - `DOOR_HINT_HEIGHT` (18) — the hint is no longer a line of text floating
+//    below the button. It is the plate's SUB-LINE, inside the plate under the
+//    label, exactly as the handoff draws `Open a rig and take the field` under
+//    PLAY. That is what freed the height the fourth door needed.
+//  - `DOOR_WIDTH_MAX` (420) — superseded by the shared `COLUMN.title` (800), the
+//    column the title screen already centres its stack in. Two front doors, one
+//    column width.
 // ---------------------------------------------------------------------------
 
-/** Door buttons: ≥56 px for the same reason RUSH! is (GDD §2.4 — a plain tap). */
-export const DOOR_HEIGHT = 56;
-export const DOOR_HEIGHT_TOUCH = 64;
-/** Room under each door for its one-line hint ("Seven bots, no connection…"). */
-export const DOOR_HINT_HEIGHT = 18;
-/** A door never runs the full width of a desktop — a 1920px-wide button reads as
- *  a banner, not a control. Capped, and centred in whatever is left. */
-export const DOOR_WIDTH_MAX = 420;
+/** Doors on the entry screen — mirrors `./lobby-entry` DOOR_ORDER.length
+ *  (asserted equal in the tests), kept here so the geometry stays free of the
+ *  model, exactly like {@link KEYPAD_KEY_COUNT}. Four since u9-01 added CAMPAIGN
+ *  above SOLO. */
+export const DOOR_COUNT = 4;
+
+/**
+ * …and the columns are only worth taking if each column can still carry a door
+ * wide enough to read a label and its sub-line on. Narrower than this the stack
+ * is kept, compressed plates and all — two unreadable columns are worse than one
+ * readable list.
+ *
+ * The two-column shape is now a genuine LAST RESORT rather than the phone's
+ * ordinary answer. Before u7-04 a landscape phone had to take it: four blocks of
+ * button-plus-hint did not fit that band, and stacked they came out under 20px
+ * each. With the hint inside the plate a block is one plate tall, and four of
+ * them stack at 54–60px on the same handset — above the thumb floor, in the order
+ * the developer asked for. So the columns branch survives only for a band too
+ * short to give four plates a pressable height at all, which no profile in QA's
+ * device matrix produces (asserted in `./lobby-entry.test.ts`).
+ */
+export const DOOR_COLUMN_MIN_WIDTH = 240;
+
+/**
+ * The strip at the top of the content band that carries the screen's one line —
+ * the tagline `MINE · DEFEND · ATTACK`, the keypad's prompt, the CAMPAIGN
+ * teaser's `Coming Soon…`, a refusal, or the live connect narration.
+ *
+ * Reference px, scaled by the frame like every other chrome metric. It is sized
+ * for the largest thing the slot ever carries (the 17px narration line, which may
+ * wrap to two lines on a phone), because that line is the connecting screen's
+ * real title and must not be the thing a short band clips.
+ */
+export const ENTRY_MESSAGE_HEIGHT = 44;
 
 /** The four code cells: big, because this is the number being read across a
  *  room and typed one character at a time (GDD §4.2). */
@@ -276,9 +503,22 @@ export const KEYPAD_COLUMNS = 8;
 /** Keys in the alphabet — mirrors `./lobby-entry` KEYPAD_KEYS.length. */
 export const KEYPAD_KEY_COUNT = 32;
 
-/** The BACK / JOIN pair under the pad. */
-export const ENTRY_ACTION_HEIGHT = 48;
-export const ENTRY_ACTION_HEIGHT_TOUCH = 56;
+/**
+ * The footer beam's plates, at the handoff's reference width.
+ *
+ * `ENTRY_ACTION_HEIGHT` / `_TOUCH` (48 / 56) are gone with the same reasoning as
+ * the door heights above: a footer control is a `compact` plate, so its height is
+ * `plateHeight('compact', metrics)` — the settings screen's DONE, one dialect.
+ * What is left is how WIDE each word's plate is, and they differ because the
+ * words do: `SETTINGS` needs more metal than `BACK`.
+ *
+ * Read off the handoff's own footer, which draws BACK at 140 and its trailing
+ * action a shade wider.
+ */
+export const ENTRY_BACK_WIDTH = 140;
+export const ENTRY_SETTINGS_WIDTH = 190;
+export const ENTRY_ERASE_WIDTH = 160;
+export const ENTRY_SUBMIT_WIDTH = 160;
 
 // ---------------------------------------------------------------------------
 // The layout
@@ -309,6 +549,11 @@ export interface LobbyLayout {
   readonly roomCode: Rect;
   /** The eight roster rows, in slot order, top to bottom. */
   readonly seats: readonly Rect[];
+  /** Each roster row's LEADING STATE control — the OPEN/BOT/CLOSED cycle, named
+   *  (u5). Nested inside its {@link seats} row at the leading edge, right of the
+   *  identity stripe, so the hit-test finds it *before* the row body. Aligned to
+   *  `seats`; zero-extent on a row too narrow to carry a legible one. */
+  readonly seatStates: readonly Rect[];
   /** Each roster row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH
    *  modes (n2). Nested inside its {@link seats} row on the right, so the hit-test
    *  checks it *before* the row body. Aligned to `seats`. */
@@ -352,8 +597,16 @@ export type LobbyTarget =
   /** BACK — leaves the lobby for the main menu (u2 menu-back), the exit every
    *  screen carries. Top-left of the title band. */
   | { readonly kind: 'leave' }
-  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E). */
+  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E).
+   *  Since u5 the same cycle also has a control that SAYS so ({@link seatState});
+   *  the body is kept because a wide row is a generous target and taking it away
+   *  would be a second change nobody asked for. */
   | { readonly kind: 'seat'; readonly index: number }
+  /** The row's LEADING STATE control — the same OPEN/BOT/CLOSED cycle as the row
+   *  body, drawn and named (u5). A distinct target rather than a second `seat`
+   *  rect so the flow, the seam and the tests can talk about the *control* rather
+   *  than about the row that happens to contain it. */
+  | { readonly kind: 'seatState'; readonly index: number }
   /** The row's trailing DIFFICULTY chip — the bot-tier cycle, present in BOTH
    *  modes (n2). The flow routes it to the difficulty cycle in either mode. */
   | { readonly kind: 'seatChip'; readonly index: number }
@@ -481,6 +734,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     height: Math.max(0, rosterBox.height - controls.height - (controls.height > 0 ? ROW_GAP : 0)),
   };
   const seatColumns = placeSeats(seats, seatsBox, seatRowMax(isTouch));
+  const seatStates = seats.map((rect) => stateRect(rect));
   const seatChips = seats.map((rect) => chipRect(rect));
   const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!));
   const mapColumns = placeMaps(maps, mapBand);
@@ -491,6 +745,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     leave,
     roomCode,
     seats,
+    seatStates,
     seatChips,
     seatTeamChips,
     modeToggle: controls.modeToggle,
@@ -519,6 +774,41 @@ function placeControls(roster: Rect, isTouch: boolean): { modeToggle: Rect; abun
   const modeToggle: Rect = { x: roster.x, y: roster.y, width, height };
   const abundance: Rect = { x: roster.x + roster.width - width, y: roster.y, width, height };
   return { modeToggle, abundance, height };
+}
+
+/**
+ * A roster row's LEADING STATE control — the OPEN / BOT / CLOSED cycle, named
+ * (u5; see {@link SEAT_STATE_WIDTH} for why it exists).
+ *
+ * Placed immediately right of the identity stripe and bounded three ways, taking
+ * whichever is smallest: its own width, a share of a narrow row, and whatever is
+ * left once the row body keeps {@link SEAT_ROW_BODY_MIN} clear of the trailing
+ * chips' guaranteed zone ({@link SEAT_TEAM_CHIP_MIN_BODY}). That last bound is
+ * the one that matters: it is what makes "u5 moved layout and moved nothing else"
+ * true by construction rather than by care — no width of row can let this control
+ * reach the space the team chip was already promised, so the difficulty chip, the
+ * team chip and the body between them keep every guarantee they had.
+ *
+ * Below {@link SEAT_STATE_MIN} the control is dropped whole rather than drawn as
+ * a stub with a clipped word in it.
+ */
+function stateRect(seat: Rect): Rect {
+  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
+  const x = seat.x + SEAT_STRIPE + SEAT_CHIP_PAD;
+  // Where the trailing chips' zone begins — the body has to fit before it.
+  const bodyStart = seat.x + seat.width * SEAT_TEAM_CHIP_MIN_BODY;
+  const room = Math.min(
+    SEAT_STATE_WIDTH,
+    seat.width * SEAT_STATE_MAX_FRACTION,
+    bodyStart - SEAT_ROW_BODY_MIN - x,
+  );
+  const width = room >= SEAT_STATE_MIN ? room : 0;
+  return {
+    x,
+    y: seat.y + SEAT_CHIP_PAD,
+    width,
+    height: width > 0 ? Math.max(0, seat.height - 2 * SEAT_CHIP_PAD) : 0,
+  };
 }
 
 /**
@@ -580,11 +870,14 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
   for (let i = 0; i < layout.seats.length; i++) {
-    // A row's trailing chips win over its body: the difficulty chip cycles the
-    // bot's tier (both modes), the team chip to its left cycles the side (TEAMS);
-    // a tap anywhere else on the row cycles the seat state. Both chips sit strictly
-    // right of the row centre, so the centre — what the hit-test contract taps —
-    // is always the body.
+    // A row's own controls win over its body: the LEADING state control names and
+    // cycles OPEN/BOT/CLOSED (u5), the trailing difficulty chip cycles the bot's
+    // tier (both modes), and the team chip to its left cycles the side (TEAMS); a
+    // tap anywhere else on the row cycles the seat state too. The three sit at the
+    // row's leading edge and strictly right of its centre respectively, so the
+    // BODY between them — what the hit-test contract taps — is never one of them.
+    const stateControl = layout.seatStates[i];
+    if (stateControl && hit(stateControl, x, y)) return { kind: 'seatState', index: i };
     const teamChip = layout.seatTeamChips[i];
     if (teamChip && hit(teamChip, x, y)) return { kind: 'seatTeamChip', index: i };
     const chip = layout.seatChips[i];
@@ -600,17 +893,42 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
 // The entry screen's layout
 // ---------------------------------------------------------------------------
 
+/**
+ * How the doors are arranged (u9-01, the fourth door):
+ *
+ *  - `stack`   — four down the middle, in `DOOR_ORDER`. The shape every screen
+ *                with the height for it gets, and the one the developer's
+ *                "CAMPAIGN goes ontop of Solo" describes literally.
+ *  - `columns` — two columns of two, filled **column-major** like the lobby
+ *                roster ({@link placeSeats}): CAMPAIGN over SOLO on the left,
+ *                CREATE over JOIN on the right. The landscape-phone shape, where
+ *                height is the scarce axis and width is not — and the reason it
+ *                is column-major rather than row-major is precisely so CAMPAIGN
+ *                is still directly above SOLO.
+ */
+export type DoorShape = 'stack' | 'columns';
+
 /** Every rect the entry screen draws in. Both screens are laid out every time —
  *  they cost a dozen rects, the view draws only the active one, and a layout
  *  that does not branch on state cannot be wrong for the state it is in. */
 export interface EntryLayout {
   readonly content: Rect;
-  /** Wordmark band. */
+  /** The header beam, full width inside the safe area (u7-04). */
+  readonly header: Rect;
+  /** The footer beam, which carries BACK and SETTINGS (or BACK / ERASE / JOIN). */
+  readonly footer: Rect;
+  /** The wordmark's strip INSIDE the header beam — no longer a slice of the
+   *  content box. Same move the title screen made in u7-01: under Gantry the
+   *  wordmark lives in the beam, centred across it. */
   readonly title: Rect;
+  /** The eyebrow cluster's strip inside the header beam, left of the wordmark. */
+  readonly eyebrow: Rect;
   /** The one line under it: the prompt, or the failure (`./lobby-entry`). */
   readonly message: Rect;
-  /** The three doors, in `DOOR_ORDER`. Home screen. */
+  /** The four doors, in `DOOR_ORDER`. Home screen. */
   readonly doors: readonly Rect[];
+  /** How those doors were arranged — one column or two. */
+  readonly doorShape: DoorShape;
   /** The four code cells, left to right. Join screen. */
   readonly cells: readonly Rect[];
   /** The keypad, in `KEYPAD_KEYS` order: across a row, then down. */
@@ -631,6 +949,9 @@ export interface EntryLayout {
    *  takes the rest. */
   readonly settings: Rect;
   readonly isTouch: boolean;
+  /** The frame this screen was resolved at — handed to the view so it scales its
+   *  type and its plate padding off the same numbers the rects came from. */
+  readonly metrics: FrameMetrics;
 }
 
 /** What a tap on the entry screen hit. Index-based, like {@link LobbyTarget}:
@@ -647,11 +968,35 @@ export type EntryTarget =
   | { readonly kind: 'settings' };
 
 /**
- * Lay the entry screen out for a viewport.
+ * A stable string naming one entry-screen control — `door:1`, `key:7`, `back`.
  *
- * Same discipline as {@link lobbyLayout}: space is handed out top-down — title,
- * message, the action row off the bottom — and every block is *capped* rather
- * than stretched, so nothing can escape the content box by construction.
+ * The pointer layer needs to say "the finger is on THIS control" without holding
+ * a rect, and both the hover cue (`src/main.ts`) and the plate's rest/hover/press
+ * state (`./lobby-entry` `entryPlateState`) ask the same question. Stating the key
+ * format once, here, beside the target it names, is what keeps the two from
+ * drifting into two spellings of one control.
+ */
+export function entryTargetKey(target: EntryTarget | null): string | null {
+  if (!target) return null;
+  switch (target.kind) {
+    case 'door':
+      return `door:${target.index}`;
+    case 'key':
+      return `key:${target.index}`;
+    default:
+      return target.kind;
+  }
+}
+
+/**
+ * Lay the entry screen out for a viewport, in the Gantry frame (u7-04).
+ *
+ * The furniture comes from {@link ./gantry} `gantryFrame`: a header beam carrying
+ * the eyebrow cluster and the wordmark, a footer beam carrying this screen's
+ * secondary actions, and one content band between them. Inside the band, space is
+ * handed out top-down — the message line, then everything else — and every block
+ * is *capped* rather than stretched, so nothing can escape the content box by
+ * construction, exactly as {@link lobbyLayout} does.
  *
  * Where the two screens compete for the same band, the **keys win and the cells
  * give**: a code cell that is a little small is still readable, while a key too
@@ -659,74 +1004,96 @@ export type EntryTarget =
  */
 export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}): EntryLayout {
   const isTouch = options.isTouch ?? false;
-  const content = contentBox(viewport, options.insets);
+  const frame = gantryFrame(viewport, options.insets);
+  const m = frame.metrics;
 
-  const titleHeight = Math.min(TITLE_HEIGHT, content.height);
-  const title: Rect = { x: content.x, y: content.y, width: content.width, height: titleHeight };
-  const messageHeight = Math.min(DOOR_HINT_HEIGHT, Math.max(0, content.height - titleHeight));
-  const message: Rect = {
-    x: content.x,
-    y: content.y + titleHeight,
-    width: content.width,
-    height: messageHeight,
+  // --- The header beam ------------------------------------------------------
+  // Same construction as the title screen: the eyebrow cluster takes the left
+  // share of the beam, the wordmark is centred across the whole of it, and the
+  // view shrinks the wordmark (never the cluster) if the two would collide.
+  const beamStrip = beamContent(frame.header, m);
+  const eyebrow: Rect = {
+    x: beamStrip.x,
+    y: beamStrip.y,
+    width: Math.max(0, beamStrip.width * ENTRY_EYEBROW_SHARE),
+    height: beamStrip.height,
   };
+  const title: Rect = { ...beamStrip };
 
-  // --- The action row, hung off the bottom ---------------------------------
-  const actionHeight = Math.min(
-    isTouch ? ENTRY_ACTION_HEIGHT_TOUCH : ENTRY_ACTION_HEIGHT,
-    Math.max(0, content.height - titleHeight - messageHeight),
+  // --- The footer beam ------------------------------------------------------
+  // BACK is bolted to the leading end on BOTH screens — the exit every screen
+  // carries (u2 menu-back), and it must not move as the screen changes under it.
+  // The trailing end carries the screen's other control: SETTINGS on the doors,
+  // JOIN on the keypad, with ERASE a gutter inboard of it.
+  const footerStrip = beamContent(frame.footer, m, 'footer');
+  // Three plates share the beam on the KEYPAD screen and two on the doors, so the
+  // three-plate case is what the widths are solved against: a beam that fits BACK
+  // + ERASE + JOIN fits BACK + SETTINGS with room to spare. They shrink together
+  // by one factor rather than each clamping itself — clamping each to the strip
+  // independently is what let BACK run under ERASE on a 390px phone, where the
+  // three reference widths add up to more beam than there is.
+  const footerGutter = m.gutter;
+  const wanted = (ENTRY_BACK_WIDTH + ENTRY_ERASE_WIDTH + ENTRY_SUBMIT_WIDTH) * m.plateScale;
+  const room = Math.max(0, footerStrip.width - 2 * footerGutter);
+  const squeeze = wanted > 0 ? Math.min(1, room / wanted) : 0;
+  const plateW = (reference: number): number =>
+    Math.max(0, Math.min(Math.floor(reference * m.plateScale * squeeze), footerStrip.width));
+  const back = beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH));
+  const settings = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SETTINGS_WIDTH));
+  const submit = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH));
+  const erase = beamPlate(
+    footerStrip,
+    m,
+    'trailing',
+    plateW(ENTRY_ERASE_WIDTH),
+    'compact',
+    submit.width + footerGutter,
   );
-  const actionsY = content.y + content.height - actionHeight;
-  const actionWidth = Math.min(DOOR_WIDTH_MAX + 2 * BLOCK_GAP, content.width);
-  const actionX = content.x + (content.width - actionWidth) / 2;
-  // BACK and the erase key share the left half; JOIN takes the right, because it
-  // is the one of the three that ends the screen.
-  const third = Math.max(0, (actionWidth - 2 * ROW_GAP) / 3);
-  const back: Rect = { x: actionX, y: actionsY, width: third, height: actionHeight };
-  const erase: Rect = { x: actionX + third + ROW_GAP, y: actionsY, width: third, height: actionHeight };
-  const submit: Rect = {
-    x: actionX + 2 * (third + ROW_GAP),
-    y: actionsY,
-    width: third,
-    height: actionHeight,
-  };
 
   // --- The band both screens divide ----------------------------------------
-  const middleY = message.y + messageHeight + BLOCK_GAP;
+  const messageHeight = Math.min(
+    frame.band.height,
+    Math.max(0, Math.round(ENTRY_MESSAGE_HEIGHT * m.scale)),
+  );
+  const message: Rect = {
+    x: frame.band.x,
+    y: frame.band.y,
+    width: frame.band.width,
+    height: messageHeight,
+  };
+  const middleY = message.y + messageHeight + m.gutter;
   const middle: Rect = {
-    x: content.x,
+    x: frame.band.x,
     y: middleY,
-    width: content.width,
-    height: Math.max(0, actionsY - BLOCK_GAP - middleY),
+    width: frame.band.width,
+    height: Math.max(0, frame.band.y + frame.band.height - middleY),
   };
 
-  // The home screen's own bottom controls, in the same band the join screen hangs
-  // its action row from — the two screens never draw together, so these rects can
-  // sit under the keypad's row and the hit test (which is told the live screen)
-  // keeps them apart. BACK reuses the join screen's left-anchored `back` rect —
-  // the exit every screen must carry (u2 menu-back) — so the button holds its
-  // place as the screen changes; SETTINGS takes the remainder of the band.
-  const settingsX = actionX + third + ROW_GAP;
-  const settings: Rect = {
-    x: settingsX,
-    y: actionsY,
-    width: Math.max(0, actionX + actionWidth - settingsX),
-    height: actionHeight,
-  };
+  const doors: Rect[] = [];
+  const doorShape = placeDoors(doors, middle, m);
 
   return {
-    content,
+    content: frame.content,
+    header: frame.header,
+    footer: frame.footer,
     title,
+    eyebrow,
     message,
-    doors: placeDoors(middle, isTouch),
+    doors,
+    doorShape,
     ...placeCodeEntry(middle),
     back,
     erase,
     submit,
     settings,
     isTouch,
+    metrics: m,
   };
 }
+
+/** How much of the header beam the eyebrow cluster may claim before the view
+ *  starts shrinking the wordmark to clear it. The title screen's own share. */
+const ENTRY_EYEBROW_SHARE = 0.34;
 
 /**
  * The target a tap at `(x, y)` hits on the entry screen, or `null`.
@@ -763,33 +1130,87 @@ export function entryHitTest(
 }
 
 /**
- * The three doors, stacked and centred in the band, each with room for its hint
- * line underneath. Stacked on every device: three full-width-ish buttons down
- * the middle is the one arrangement that works identically on a 320px phone and
- * a 1920px desktop, and this is the screen where "it works everywhere" beats
- * "it uses the space".
+ * The four doors as PLATES, centred in the band (u7-04).
+ *
+ * The hint line moved *inside* the plate — it is the sub-line under the label, the
+ * construction the handoff draws on the title screen — so a door is one plate
+ * tall instead of a button plus a caption, and the plate heights come from the
+ * frame: a **hero** plate for the one primary door and a **standard** plate for
+ * the other three, which is how Bone says "this is the action" (size, and
+ * brightness, and nothing else). {@link ./gantry} `stackPlates` centres the stack
+ * and **compresses it proportionally** rather than overflowing, so that size
+ * difference survives a band that cannot hold the stack at full height.
+ *
+ * One column wherever four plates come out pressable; two columns of two where
+ * they do not — a last resort now rather than the phone's ordinary answer (see
+ * {@link DOOR_COLUMN_MIN_WIDTH}). The columns fill **column-major** — CAMPAIGN
+ * over SOLO, then CREATE over JOIN — for the same reason the roster does
+ * ({@link placeSeats}): `DOOR_ORDER` still reads top to bottom, so the door the
+ * developer asked to sit "ontop of Solo" sits on top of it in both shapes.
+ *
+ * Returns the shape it settled on.
  */
-function placeDoors(band: Rect, isTouch: boolean): Rect[] {
-  const count = 3;
-  const hint = DOOR_HINT_HEIGHT;
-  const wanted = isTouch ? DOOR_HEIGHT_TOUCH : DOOR_HEIGHT;
-  // Compress the buttons — never the hint, which is what tells a player that
-  // SOLO needs no connection (GDD §4.8 risk 6).
-  const height = Math.max(
-    0,
-    Math.min(wanted, (band.height - (count - 1) * BLOCK_GAP) / count - hint),
-  );
-  const width = Math.min(DOOR_WIDTH_MAX, band.width);
-  const block = height + hint;
-  const total = count * block + (count - 1) * BLOCK_GAP;
-  const top = band.y + Math.max(0, (band.height - total) / 2);
-  const x = band.x + (band.width - width) / 2;
-  const doors: Rect[] = [];
-  for (let i = 0; i < count; i++) {
-    doors.push({ x, y: top + i * (block + BLOCK_GAP), width, height });
+function placeDoors(out: Rect[], band: Rect, m: FrameMetrics): DoorShape {
+  const heights = DOOR_PLATE_SCALES.map((scale) => plateHeight(scale, m));
+  const columnCap = Math.min(COLUMN.title, band.width);
+
+  // What a single stack gives. `stackPlates` is the authority on that — asking it
+  // and measuring the answer is what stops this function owning a second copy of
+  // the compression rule.
+  const stacked = stackPlates(band, columnCap, heights, m.gap);
+  const shortest = stacked.reduce((lo, r) => Math.min(lo, r.height), Infinity);
+  const halfWidth = Math.max(0, (Math.min(COLUMN.title, band.width) - m.gap) / 2);
+  // Only trade the stack away for columns that are actually better: the stack has
+  // to have compressed a plate below the thumb floor AND the halved width has to
+  // still carry a door with a label and a sub-line on it.
+  const columns = shortest < TOUCH_MIN && halfWidth >= DOOR_COLUMN_MIN_WIDTH ? 2 : 1;
+
+  if (columns === 1) {
+    out.push(...stacked);
+    return 'stack';
   }
-  return doors;
+
+  // Two columns, filled column-major, and the ROWS across them are TOP-aligned
+  // rather than each column being centred in the band on its own: the left column
+  // is taller than the right (it carries the hero), so centring each would leave
+  // the two rows visibly out of register. Top-aligned, both rows line up and the
+  // primary simply hangs lower — which reads as "this one is bigger", which is the
+  // thing the size difference is there to say.
+  const perColumn = Math.ceil(DOOR_COUNT / columns);
+  const gaps = (perColumn - 1) * m.gap;
+  let tallest = 0;
+  for (let c = 0; c < columns; c++) {
+    const slice = heights.slice(c * perColumn, (c + 1) * perColumn);
+    tallest = Math.max(tallest, slice.reduce((a, b) => a + b, 0));
+  }
+  // One compression factor across both columns, so a squeezed band shrinks the
+  // stack without changing the ratio between a hero plate and a standard one.
+  const k = tallest > 0 ? Math.min(1, Math.max(0, band.height - gaps) / tallest) : 0;
+  const spread = columns * halfWidth + (columns - 1) * m.gap;
+  const left = band.x + Math.max(0, (band.width - spread) / 2);
+  const top = band.y + Math.max(0, (band.height - (tallest * k + gaps)) / 2);
+  for (let c = 0; c < columns; c++) {
+    let y = top;
+    for (let r = 0; r < perColumn; r++) {
+      const h = (heights[c * perColumn + r] ?? 0) * k;
+      out.push({ x: left + c * (halfWidth + m.gap), y, width: halfWidth, height: h });
+      y += h + m.gap;
+    }
+  }
+  return 'columns';
 }
+
+/**
+ * Which plate scale each door is drawn at, in {@link DOOR_COUNT} order — and so
+ * how tall it is. Mirrors `./lobby-entry` `doorPlate`, which owns the *role* half
+ * of the same decision; the two are asserted consistent in the tests.
+ *
+ * PLAY SOLO is the hero, and it is the only one: it is the door that always works
+ * with no server (GDD §4.8 risk 6), so it is the screen's headline action, and
+ * under Bone the headline action is the biggest and brightest plate — and there is
+ * exactly one ({@link ./gantry} `singlePrimary`).
+ */
+const DOOR_PLATE_SCALES: readonly PlateScale[] = ['standard', 'hero', 'standard', 'standard'];
 
 /**
  * The code cells over the keypad.
@@ -954,6 +1375,131 @@ function placeTiles(
     });
   }
   return shape;
+}
+
+// ---------------------------------------------------------------------------
+// Inside one hull tile
+// ---------------------------------------------------------------------------
+
+/** Where a hull tile's four content blocks go, and which of them fit. Every rect
+ *  is absolute screen space and inside the tile; a block that does not fit is
+ *  reported `false` **and** zero-height, so a view that ignores the flag still
+ *  cannot draw a clipped one. */
+export interface ClassTileContent {
+  /** The class name — always drawn (rung 1 of the ladder). */
+  readonly name: Rect;
+  /** The hull nickname (Quadfin…) — rung 3. */
+  readonly hull: Rect;
+  /** The whole stat grid — rung 2, the pips-and-numbers block (u4). */
+  readonly stats: Rect;
+  /** The role blurb — rung 4, the first to go. */
+  readonly blurb: Rect;
+  readonly showHull: boolean;
+  readonly showStats: boolean;
+  readonly showBlurb: boolean;
+  /** Columns the six stats fall into: 6 (one table-like row, wide tiles) or 3. */
+  readonly statColumns: number;
+  /** …and the rows that follow from it: 1 or 2. */
+  readonly statRows: number;
+  /** One cell's width — the room a `SPD 130%` and its pip bar have. */
+  readonly cellWidth: number;
+}
+
+/**
+ * Divide one hull tile between its name, its hull, its stat grid and its blurb,
+ * by the priority ladder in the constants header above.
+ *
+ * Pure and rect-in/rect-out, for the same reason the rest of this file is: the
+ * hard case is six stats on a 172×66 tile — a phone on its side, which is the
+ * primary mobile layout of this screen — and that is a case worth asserting
+ * headless on every device profile rather than eyeballing once.
+ */
+export function classTileContent(tile: Rect): ClassTileContent {
+  const pad = CLASS_TILE_PAD;
+  const x = tile.x + pad;
+  const width = Math.max(0, tile.width - 2 * pad);
+  const height = Math.max(0, tile.height - 2 * pad);
+
+  // Six across whenever a cell can carry its figure over five pips comfortably
+  // (the desktop tile, which then reads like GDD §2.11's own table row); 3×2
+  // otherwise, which is the shape every phone gets. There is no 2-column shape:
+  // three columns fit inside any tile {@link placeTiles} is willing to produce.
+  const wideCell = (width - (STAT_COUNT - 1) * STAT_CELL_GAP) / STAT_COUNT;
+  const statColumns = wideCell >= STAT_CELL_WIDE ? STAT_COUNT : 3;
+  const statRows = Math.ceil(STAT_COUNT / statColumns);
+  const cellWidth = (width - (statColumns - 1) * STAT_CELL_GAP) / statColumns;
+  const gridHeight = statGridHeight(statRows);
+
+  // A tile wide enough for a grid RESERVES the grid's height whether or not it
+  // is tall enough to draw one. Without that, a short tile would "win back" its
+  // hull line by failing to fit its stats — the ladder running backwards, and a
+  // nickname blinking off as a tile grew. A tile too NARROW for a legible grid
+  // is the documented fallback: it reserves nothing and degrades to the pre-u4
+  // card, because no amount of height will earn it a grid.
+  const fitsWidth = cellWidth >= STAT_CELL_FLOOR;
+  const reserved = fitsWidth ? gridHeight : 0;
+  const showStats = fitsWidth && height >= CLASS_NAME_LINE + gridHeight;
+  const statsHeight = showStats ? gridHeight : 0;
+  const showHull = height >= CLASS_NAME_LINE + CLASS_HULL_LINE + reserved;
+  const hullHeight = showHull ? CLASS_HULL_LINE : 0;
+  const showBlurb =
+    showHull && height >= CLASS_NAME_LINE + CLASS_HULL_LINE + reserved + CLASS_BLURB_LINE;
+
+  // Leftover height buys AIR around the stat block, up to STAT_BLOCK_AIR each
+  // side — so the block reads as its own thing on a roomy tile instead of a
+  // third line of prose, while a phone tile that has nothing to spare spends
+  // nothing. Elastic rather than fixed because a fixed gap would have to come
+  // out of the stats' own budget on exactly the device that can least afford it.
+  const used =
+    CLASS_NAME_LINE + hullHeight + statsHeight + (showBlurb ? CLASS_BLURB_LINE : 0);
+  const slack = Math.max(0, height - used);
+  const airAbove = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack / 2)) : 0;
+  const airBelow = showStats ? Math.min(STAT_BLOCK_AIR, Math.floor(slack) - airAbove) : 0;
+
+  let y = tile.y + pad;
+  const name: Rect = { x, y, width, height: Math.min(CLASS_NAME_LINE, height) };
+  y += name.height;
+  const hull: Rect = { x, y, width, height: hullHeight };
+  y += hullHeight + airAbove;
+  const stats: Rect = { x, y, width, height: statsHeight };
+  y += statsHeight + airBelow;
+  // The blurb takes whatever is left below it — it wraps, so extra height is
+  // extra lines rather than dead space. Never past the tile's own bottom.
+  const blurbHeight = showBlurb ? Math.max(0, tile.y + tile.height - pad - y) : 0;
+  const blurb: Rect = { x, y, width, height: blurbHeight };
+
+  return {
+    name,
+    hull,
+    stats,
+    blurb,
+    showHull,
+    showStats,
+    showBlurb,
+    statColumns,
+    statRows,
+    cellWidth,
+  };
+}
+
+/**
+ * The rect of the `index`th stat cell inside a tile's grid — reading order is
+ * `./lobby`'s own stat order, across a row then down, the same discipline
+ * {@link placeTiles} uses for the tiles themselves.
+ *
+ * The view calls this rather than doing the arithmetic itself, so "no cell ever
+ * escapes its tile" is asserted once, here, instead of per drawing site.
+ */
+export function classStatCell(content: ClassTileContent, index: number): Rect {
+  const i = Math.max(0, Math.floor(index));
+  const column = i % content.statColumns;
+  const row = Math.floor(i / content.statColumns);
+  return {
+    x: content.stats.x + column * (content.cellWidth + STAT_CELL_GAP),
+    y: content.stats.y + row * (STAT_ROW_HEIGHT + STAT_ROW_GAP),
+    width: content.cellWidth,
+    height: STAT_ROW_HEIGHT,
+  };
 }
 
 /**

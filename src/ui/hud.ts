@@ -93,6 +93,7 @@ import type { MinimapFrame, MinimapInsets } from './minimap';
 import { MinimapView } from './minimap-view';
 import type { DrawnMinimap } from './minimap-view';
 import { PANEL_FILL, PANEL_FILL_ALPHA, PANEL_RULE, PANEL_RULE_ALPHA, TEXT_MUTED, RADIUS } from './chrome';
+import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -120,11 +121,11 @@ import {
 // Typography & neutral colours
 // ---------------------------------------------------------------------------
 
-/** Audiowide — wordmark/headings/labels (style-guide §5.6). Fallback until the
- *  self-hosted face loads. */
-const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
-/** Oxanium — HUD numerals/body (style-guide §5.6). Holds up at 12px. */
-const FONT_NUMERAL = 'Oxanium, "DejaVu Sans Mono", monospace';
+// Audiowide for headings, Oxanium for numerals (style-guide §5.6/§7) — both read
+// from ./typography (imported above) rather than spelled out a second time here.
+// That module owns the stacks precisely so a face swap is one line; this file
+// having its own copy is what would have left the HUD's numerals in a different
+// fallback from the menus' on the CI runner (a1-01).
 
 /** Neutral light HUD text. Chalk-white — NOT signal yellow (RESERVED, §2). */
 const TEXT_PRIMARY = 0xdce3ec;
@@ -1140,13 +1141,21 @@ export class Hud extends Container {
   }
 
   /**
-   * Route a click/tap at a screen point to the minimap. If it lands on the active
-   * surface (the corner square, or the whole overlay when expanded) the model
-   * toggles and this returns `true` — the caller then consumes the event so the
-   * same press never also flies the ship or engages a stick under it. Returns
-   * `false` (leaving the event to fall through) when the minimap isn't showing or
-   * the point missed. The ONE entry point PC clicks and mobile taps share, so the
-   * two platforms can never diverge (docs/input-parity.md; ./minimap.test.ts).
+   * Route a click/tap at a screen point to the minimap, and report whether the
+   * caller must consume the event (so the same press never also flies the ship or
+   * engages a stick under it). The ONE entry point PC clicks and mobile taps
+   * share, so the two platforms can never diverge (docs/input-parity.md;
+   * ./minimap.test.ts). Its two states answer differently, deliberately
+   * ({@link ./minimap} `Minimap.tap`, developer report u6-01):
+   *
+   * - **EXPANDED** — the overlay is MODAL. *Every* press collapses it and returns
+   *   `true`, whether it landed on the overlay or outside it. Previously an
+   *   outside press returned `false`, fell through to gameplay, and left the
+   *   overlay open — the defect u6-01 fixes.
+   * - **COLLAPSED** — only a press that lands ON the corner square returns `true`;
+   *   a miss returns `false` and falls through, because the player is flying.
+   *
+   * `false` also when the minimap isn't showing at all.
    */
   minimapTap(x: number, y: number): boolean {
     if (!this.minimap.visible) return false;

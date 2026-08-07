@@ -143,6 +143,7 @@ import {
   // into the right words.
   LobbyEntryView,
   entryLayout,
+  entryTargetKey,
   DOOR_OPTIONS,
   createEntry,
   entryModel,
@@ -157,6 +158,7 @@ import {
   KEYPAD_KEYS,
   regionPickerVisible,
   CodexView,
+  codexTargetKey,
   codexModel,
   codexLayout,
   createCodex,
@@ -176,6 +178,10 @@ import {
   MAP_STORAGE_KEY,
   settingsModel,
   settingsLayout,
+  sameTarget,
+  controlsDevice,
+  parseControlScheme,
+  storedControlScheme,
   SETTINGS_ROWS,
   createSettings,
   toggleReduceVfx,
@@ -325,7 +331,7 @@ import codexShips from '../content/codex/codex-ships.json';
 import codexSystems from '../content/codex/codex-systems.json';
 import codexStrategy from '../content/codex/codex-strategy.json';
 import { personality } from './bots';
-import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext } from './art/audio';
+import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext, type AudioCue } from './art/audio';
 import { TellQueue, TELL_CAPACITY } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
 
@@ -736,6 +742,10 @@ async function boot(): Promise<void> {
     // PLAY is a valid user gesture (field request v0.1.1): enter fullscreen +
     // native landscape lock here. A no-op on desktop and where unsupported.
     enterImmersive: () => fullscreen.enter(),
+    // The menu and the lobby finally have a voice (s6-01). The unlock is already
+    // armed above, so the FIRST tap on this screen resumes the context and every
+    // one after it lands on a live mix.
+    cue: (kind, index) => audio.cue(kind, index),
   };
 
   const mainMenu = flags.debug ? null : openMainMenu(app, platform, frontCtx);
@@ -1125,6 +1135,12 @@ async function boot(): Promise<void> {
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
+  // Whether a pad is CONNECTED — a different question from which device last
+  // acted, and the one the pause menu's CONTROLS row asks (u8-01): the row is a
+  // standing description of the hardware, so a connected pad reads TWIN STICKS
+  // whether or not it was the last thing touched. Kept live by the connect /
+  // disconnect listeners below.
+  let gamepadConnected = anyGamepadConnected();
 
   // --- Pause menu (developer ratification, p10) ------------------------------
   //     ESC (desktop) or a touch corner button opens an overlay over a match in
@@ -1154,6 +1170,46 @@ async function boot(): Promise<void> {
   const pauseSettings = new SettingsView(transform.logicalWidth, transform.logicalHeight, isTouch);
   pauseSettings.visible = false;
   gameRoot.addChild(pauseSettings);
+  // Gantry/Bone plate states for the in-match settings screen (u7-01) — the same
+  // three the pre-match screen has, so one settings screen behaves one way
+  // wherever it is opened from. Hover is a pointer affordance and simply never
+  // fires on touch; press is released on pointer-up or on a cancelled gesture.
+  let pauseSettingsHover: SettingsTarget | null = null;
+  let pauseSettingsPress: SettingsTarget | null = null;
+  // …and the same three states for the two full-screen overlays' own plates
+  // (u7-05). Both are made of the material now, and a plate that never lifts under
+  // the cursor or sinks under a finger is only two-thirds of the direction.
+  let pauseHover: PauseButton | null = null;
+  let pausePress: PauseButton | null = null;
+  let endHover: EndButton | null = null;
+  let endPress: EndButton | null = null;
+  const releasePauseSettingsPress = (): void => {
+    pauseSettingsPress = null;
+    pausePress = null;
+    endPress = null;
+  };
+  app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
+  app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
+  app.canvas.addEventListener('pointermove', (e: PointerEvent) => {
+    const lp = toLogical(e.clientX, e.clientY);
+    if (pauseScreen === 'settings') {
+      pauseSettingsHover = pauseSettings.hitTest(lp.x, lp.y);
+      return;
+    }
+    if (isPauseOpen(pauseScreen)) {
+      pauseHover = pauseView.hitTest(lp.x, lp.y)?.kind ?? null;
+      return;
+    }
+    if (endOverlay.visible) endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
+  });
+  app.canvas.addEventListener('pointerleave', () => {
+    pauseSettingsHover = null;
+    pauseSettingsPress = null;
+    pauseHover = null;
+    pausePress = null;
+    endHover = null;
+    endPress = null;
+  });
 
   const merged = createControlState();
   const sources: { source: InputSource; state: ControlState; device: DeviceKind }[] = [
@@ -1171,12 +1227,18 @@ async function boot(): Promise<void> {
 
   // Gamepad connect/disconnect are logged so the end-to-end verification pass can
   // confirm the pad registered (GDD §2.4). Polling in GamepadSource does the real
-  // work — it scans for the first connected pad — so play needs no event here.
+  // work — it scans for the first connected pad — so PLAY needs no event here;
+  // what does need them is the CONTROLS row's word (u8-01), which has to say
+  // TWIN STICKS the moment a pad appears and stop saying it the moment it goes.
+  // The disconnect re-scans rather than clearing the flag, because a second pad
+  // may still be plugged in.
   window.addEventListener('gamepadconnected', (e) => {
     console.info(`[gamepad] connected: ${(e as GamepadEvent).gamepad.id}`);
+    gamepadConnected = true;
   });
   window.addEventListener('gamepaddisconnected', () => {
     console.info('[gamepad] disconnected');
+    gamepadConnected = anyGamepadConnected();
   });
 
   const touch = new TouchController({ screenWidth: transform.logicalWidth });
@@ -1350,8 +1412,10 @@ async function boot(): Promise<void> {
       const pb = pauseButtonRect({ width: transform.logicalWidth, height: transform.logicalHeight });
       if (inRect(pressPoint, pb)) {
         haptics.haptic('tap');
-        audio.cue('press');
+        // A toggle says which way it went (s6-01 rule 3): opening the overlay is a
+        // forward pick, dismissing it is the falling fourth.
         pauseScreen = nextPauseScreen(pauseScreen, 'toggle');
+        audio.cue(pauseScreen === 'closed' ? 'back' : 'press');
         e.stopImmediatePropagation();
         e.preventDefault();
         return;
@@ -1364,9 +1428,13 @@ async function boot(): Promise<void> {
     // and it always consumes the event.
     if (endOverlay.visible) {
       const target = endOverlay.hitTest(lp.x, lp.y);
+      endPress = target?.kind ?? null;
+      endHover = endPress;
       if (target) {
         haptics.haptic('tap');
-        audio.cue('press'); // the audible twin of the press haptic (engine.ts)
+        // ONE sound per state change (s6-01 rule 1): `handleEndTarget` names the
+        // cue for the button that was actually hit — REMATCH, SPECTATE or BACK —
+        // so this site no longer fires a generic tick underneath it.
         handleEndTarget(target.kind);
       }
       e.stopImmediatePropagation();
@@ -1394,8 +1462,10 @@ async function boot(): Promise<void> {
     const build = buildButtonRect(isTouch, buildVisible, w, h);
     if (build && inRect(pressPoint, build)) {
       haptics.haptic('tap');
-      audio.cue('press'); // the BUILD button opened/closed the wheel — a press tick
       buildWheel.toggle();
+      // The BUILD button opened or CLOSED the wheel — and those are opposite
+      // directions, so they are opposite cues (s6-01 rule 3).
+      audio.cue(buildWheel.open ? 'press' : 'back');
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -1451,7 +1521,10 @@ async function boot(): Promise<void> {
       // The open wheel consumes every press, so a tap on it never also flies the
       // ship or opens a stick under it.
       haptics.haptic('tap');
-      if (!wedgeSounded) audio.cue('press'); // the BACK/dismiss tick (a wedge sounded itself)
+      // A press on the open panel that did NOT land on a wedge dismisses it — a
+      // backwards move, so it takes the falling fourth, never a forward tick
+      // (s6-01 rule 3). A wedge sounded itself through the HUD's shared driver.
+      if (!wedgeSounded) audio.cue('back');
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
@@ -1470,6 +1543,9 @@ async function boot(): Promise<void> {
         // through to fly the ship or engage a stick under it.
         wheelBackOneLevel();
         haptics.haptic('tap');
+        // The hub is BACK, and until s6-01 it was the one back in the game with no
+        // sound at all. Falling fourth: the player learns it in about three presses.
+        audio.cue('back');
         e.stopImmediatePropagation();
         e.preventDefault();
         return;
@@ -1484,15 +1560,20 @@ async function boot(): Promise<void> {
 
     if (buildWheel.press(pressPoint.x, pressPoint.y, buildWheelLayout, panelLayout, UPGRADE_SEGMENT)) {
       haptics.haptic('tap'); // a wedge/segment was pressed — the lightest press tell
-      if (!buildWedgeSounded) audio.cue('press'); // …and its audible twin, unless the wedge sounded itself
+      // A wedge sounded itself through the HUD's shared driver. Anything else the
+      // open wheel consumes here is a press OUTSIDE it, which closes it
+      // (`WheelInput.press` → `close()`) — a back, not a pick (s6-01 rule 3).
+      if (!buildWedgeSounded) audio.cue('back');
       e.stopImmediatePropagation();
       e.preventDefault();
       return;
     }
 
     // The minimap (field request v0.2.2): a click/tap on the corner square opens
-    // the centred overlay; a tap anywhere on the overlay collapses it again. The
-    // SAME gesture on PC and mobile — `pressPoint` is already in logical space,
+    // the centred overlay; while the overlay is OPEN it is modal — a press
+    // anywhere collapses it, on the map or off it, and is consumed here rather
+    // than falling through to the pilot/sticks below (developer report u6-01).
+    // The SAME gesture on PC and mobile — `pressPoint` is already in logical space,
     // where the minimap lays out, and `hud.minimapTap` runs the same pure hit test
     // both platforms use (docs/input-parity.md). Checked LAST among the interactive
     // surfaces — after the end/fullscreen overlays, the BUILD button and the open
@@ -1500,6 +1581,9 @@ async function boot(): Promise<void> {
     // a control drawn near or over it always wins the press, and the map only takes
     // one that lands on nothing else. When it does claim a press we consume the
     // event so the same press never also flies the ship or engages a stick under it.
+    // (COLLAPSED it claims only a press that lands on the corner square, so a press
+    // that misses the glance widget still flies the ship — the deliberate half of
+    // the asymmetry, since the player is flying.)
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
       audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
@@ -1926,10 +2010,14 @@ async function boot(): Promise<void> {
     if (desired === 'none') {
       if (endOverlay.visible) endOverlay.visible = false;
       if (endButtonsShown.length) endButtonsShown = [];
+      // A screen that is gone is not being hovered: a stale hover would light a
+      // plate up the moment the overlay came back, under a cursor that never moved.
+      endHover = null;
+      endPress = null;
       return;
     }
     if (!endOverlay.visible) endOverlay.visible = true;
-    const model = endOfMatchModel(currentOutcome(over));
+    const model = endOfMatchModel(currentOutcome(over), { hover: endHover, press: endPress });
     endButtonsShown = model.buttons.map((b) => b.id);
     endOverlay.update(model);
   }
@@ -1961,9 +2049,19 @@ async function boot(): Promise<void> {
    *  camera onto the live match, BACK TO MENU → a clean boot (which lands back on
    *  the main menu). */
   function handleEndTarget(kind: EndButton): void {
-    if (kind === 'rematch') rematch();
-    else if (kind === 'spectate') startSpectate();
-    else if (kind === 'menu') window.location.reload();
+    // The end screen's three buttons, in the cue set's own grammar (s6-01):
+    // REMATCH is the screen's headline yes (the rising fifth), SPECTATE a plain
+    // forward pick, BACK TO MENU the falling fourth — a back never sounds forward.
+    if (kind === 'rematch') {
+      audio.cue('accept');
+      rematch();
+    } else if (kind === 'spectate') {
+      audio.cue('press');
+      startSpectate();
+    } else if (kind === 'menu') {
+      audio.cue('back');
+      window.location.reload();
+    }
   }
 
   /** SPECTATE (GDD §2.7 "spectate if they want to watch"): drop the DEFEATED
@@ -2053,10 +2151,16 @@ async function boot(): Promise<void> {
   function handlePausePointer(lx: number, ly: number): void {
     if (pauseScreen === 'settings') {
       const hit = pauseSettings.hitTest(lx, ly);
+      // The plate goes down before it acts (u7-01), and is released on pointer-up.
+      pauseSettingsPress = hit;
+      pauseSettingsHover = hit;
       if (hit) applyPauseSettings(hit);
       return;
     }
     const target = pauseView.hitTest(lx, ly);
+    // The plate goes down before it acts (u7-01), and is released on pointer-up.
+    pausePress = target?.kind ?? null;
+    pauseHover = pausePress;
     if (target) handlePauseButton(target.kind);
   }
 
@@ -2064,21 +2168,29 @@ async function boot(): Promise<void> {
    *  LEAVE tears the match down to the menu (the confirm is the guard). */
   function handlePauseButton(kind: PauseButton): void {
     haptics.haptic('tap');
-    audio.cue('press');
+    // Each button says which way it goes (s6-01, rule 3): RESUME, STAY and LEAVE
+    // all step BACK out of a screen, so all three take the falling fourth; the two
+    // that open one are forward picks. A back that used a forward cue is exactly
+    // the confusion the falling interval exists to prevent.
     switch (kind) {
       case 'resume':
+        audio.cue('back');
         pauseScreen = nextPauseScreen(pauseScreen, 'resume');
         break;
       case 'settings':
+        audio.cue('press');
         pauseScreen = nextPauseScreen(pauseScreen, 'openSettings');
         break;
       case 'exit':
+        audio.cue('press');
         pauseScreen = nextPauseScreen(pauseScreen, 'requestExit');
         break;
       case 'stay':
+        audio.cue('back');
         pauseScreen = nextPauseScreen(pauseScreen, 'cancelExit');
         break;
       case 'leave':
+        audio.cue('back');
         exitToMenu();
         break;
     }
@@ -2089,30 +2201,44 @@ async function boot(): Promise<void> {
    *  at once and persist, reduce-VFX and the volumes drive the running renderer
    *  and mixer through {@link applyAudioMix}. DONE steps back to the pause menu. */
   function applyPauseSettings(target: SettingsTarget): void {
+    // One cue per row, named by what the row DOES (s6-01): DONE steps back out of
+    // the screen, every setting steps one notch, and a slider already at its end
+    // refuses. Sounded per branch rather than once at the bottom, because "a
+    // control was touched" and "the setting moved" are different facts, and rule 2
+    // says the sound is the one that carries the outcome.
     switch (target.kind) {
       case 'back':
+        haptics.haptic('tap');
+        audio.cue('back');
         pauseScreen = nextPauseScreen(pauseScreen, 'closeSettings');
         return;
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         touch.setFireMode(fireMode);
         platform.storage.set(FIRE_MODE_KEY, fireMode);
+        audio.cue('detent');
         break;
       case 'controls':
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
+        audio.cue('detent');
         break;
       case 'reduceVfx':
         matchSettings = toggleReduceVfx(matchSettings);
+        audio.cue('detent');
         break;
-      case 'volume':
-        matchSettings = adjustVolume(matchSettings, target.channel, target.dir);
+      case 'volume': {
+        const next = adjustVolume(matchSettings, target.channel, target.dir);
+        // The one slider whose own cue proves it worked — and whose floor and
+        // ceiling say so out loud instead of being read off a bar.
+        audio.cue(next.volumes[target.channel] === matchSettings.volumes[target.channel] ? 'reject' : 'detent');
+        matchSettings = next;
         applyAudioMix();
         break;
+      }
     }
     haptics.haptic('tap');
-    audio.cue('press');
   }
 
   /** Push the live match volumes into the mixer (engine.ts). A no-op set of calls
@@ -2141,12 +2267,31 @@ async function boot(): Promise<void> {
    *  rendered frame. Offline the loop has already frozen the sim; render keeps
    *  running, so the overlay is live and RESUME picks the sim back up seamlessly. */
   function syncPause(): void {
+    // A closed overlay is not being hovered, and a plate that is no longer on the
+    // screen is not being held down (u7-05) — otherwise the next ESC would open
+    // the menu with RESUME already lit under a cursor that never moved.
+    if (!isPauseOpen(pauseScreen)) {
+      pauseHover = null;
+      pausePress = null;
+    }
     // The pause overlay: the menu or the confirm. While the settings screen is up
     // the overlay hides (the real settings view takes its place), so feed 'closed'.
-    pauseView.update(pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen));
+    pauseView.update(
+      pauseMenuModel(pauseScreen === 'settings' ? 'closed' : pauseScreen, {
+        hover: pauseHover,
+        press: pausePress,
+      }),
+    );
     const settingsUp = pauseScreen === 'settings';
     pauseSettings.visible = settingsUp;
-    if (settingsUp) pauseSettings.update(settingsModel(matchSettings, fireMode, controlScheme));
+    if (settingsUp) {
+      pauseSettings.update(
+        settingsModel(matchSettings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
+          hover: pauseSettingsHover,
+          press: pauseSettingsPress,
+        }),
+      );
+    }
     pauseView.updateButton(pauseButtonVisible({ isTouch, available: pauseAvailable() }));
     syncDownloadLog();
   }
@@ -3373,6 +3518,20 @@ async function boot(): Promise<void> {
         }
         return true;
       },
+      /** The same staging with the LOCAL seat as the survivor, so the VICTORY
+       *  face of the result screen can be photographed and gated (u7-05). It is
+       *  the only one of the four the other methods cannot reach — `endMatch`
+       *  always leaves someone else standing — and it is the one the winner's
+       *  identity rule only appears on. Drives the sim's own `destroyCore`, like
+       *  its sibling; the win itself is still resolved by the sim's next tick. */
+      winLocal(): boolean {
+        const mine = world.stations.find((p) => p.owner === LOCAL_PLAYER && p.alive);
+        if (!mine) return false;
+        for (const p of world.stations) {
+          if (p.owner !== LOCAL_PLAYER && p.alive) destroyCore(world, p);
+        }
+        return true;
+      },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
       },
@@ -3809,7 +3968,7 @@ async function boot(): Promise<void> {
       setScheme(scheme: 'sticks' | 'tap'): void {
         controlScheme = scheme;
         tapPilot.clear();
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
       },
       /** Park the local ship at the arena centre with one bot a short hop away in
        *  weapon range, both out of spawn protection, and clear the asteroid field so
@@ -4059,6 +4218,24 @@ async function boot(): Promise<void> {
       state(): ReturnType<typeof hud.debugMinimap> {
         return hud.debugMinimap();
       },
+      /** The LOGICAL (landscape) viewport the minimap lays out in — so a test can
+       *  pick a press point that is provably OUTSIDE the drawn rect (u6-01: the
+       *  press off the open overlay) instead of hardcoding a corner that a layout
+       *  change could quietly move onto the map. */
+      viewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** The PHYSICAL (CSS px) point a REAL press must land on to arrive at a
+       *  LOGICAL point — the landscape lock's rotation, applied for the test.
+       *  Identity on desktop and on any already-landscape viewport; on a PORTRAIT
+       *  handset the root is rotated 90°, so a test that wants to press "off the
+       *  map" has to press the rotated point or it presses somewhere else entirely.
+       *  Read-back only: the press itself is still a real synthesized pointer/touch
+       *  on the canvas, crossing the same `toLogical` every real press crosses
+       *  (the same discipline as `__repairStage`'s wedge point). */
+      physicalPoint(lx: number, ly: number): Vec2 {
+        return logicalToPhysical(lx, ly, transform);
+      },
       /**
        * Stage a radar satellite on the local station (feature f1) and park a
        * distant enemy in the band only that satellite's LARGE sensor can reach —
@@ -4274,7 +4451,7 @@ async function boot(): Promise<void> {
       }
       if (pauseScreen === 'menu' || pauseScreen === 'confirm') {
         const ids = pauseButtons(pauseScreen);
-        const l = pauseLayout({ width: w, height: h }, ids.length, { isTouch });
+        const l = pauseLayout({ width: w, height: h }, ids, { isTouch });
         return l.buttons.map((r, i) => ({
           kind: ids[i] ?? 'button',
           physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
@@ -4592,7 +4769,7 @@ async function boot(): Promise<void> {
     if (e.code === 'KeyC') {
       controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
       tapPilot.clear();
-      platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+      platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
     }
     // Minimap toggle (field request v0.2.2): the `M` keyboard shortcut on PC, the
     // desktop convenience over the primary click/tap gesture — the same toggle the
@@ -4874,6 +5051,16 @@ function isLocalShip(s: { id: number }): boolean {
 }
 
 /** Whether a point is inside a screen rect (CSS px). */
+/**
+ * A hit-test result as a stable identity string — the key the hover cue (s6-01)
+ * compares frame to frame, so one crossing of one control makes exactly one
+ * sound. `null` off every control, which is a hover of nothing.
+ */
+function keyOf(hit: unknown): string | null {
+  if (hit === null || hit === undefined) return null;
+  return typeof hit === 'string' ? hit : JSON.stringify(hit);
+}
+
 function inRect(p: Vec2, r: { x: number; y: number; width: number; height: number }): boolean {
   return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
 }
@@ -4916,7 +5103,27 @@ function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouc
  *  existing schemes stay the untouched default and a bad key can never seat an
  *  unknown scheme. Read through the same platform seam as the fire mode. */
 function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): ControlScheme {
-  return platform.storage.get(CONTROL_SCHEME_KEY) === 'tap' ? 'tap' : 'sticks';
+  // The stored string is the UI's own round trip (`./ui` `parseControlScheme` /
+  // `storedControlScheme`), so the persisted value and the scheme it seats can
+  // never drift apart — and `sticks` keeps meaning the default scheme even now
+  // that no screen prints that word on a PC (u8-01).
+  return parseControlScheme(platform.storage.get(CONTROL_SCHEME_KEY));
+}
+
+/**
+ * Is a gamepad connected RIGHT NOW? The one browser read behind the CONTROLS
+ * row's `TWIN STICKS` (u8-01) — asked here, in the wiring layer, because
+ * `src/ui` must stay pure and headless-testable and sniffing `navigator` is the
+ * platform's job. Scans every slot rather than assuming slot 0, exactly as
+ * `GamepadSource` does: browsers assign a pad's index lazily and it varies by
+ * device and port.
+ */
+function anyGamepadConnected(): boolean {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return false;
+  for (const pad of navigator.getGamepads()) {
+    if (pad && pad.connected) return true;
+  }
+  return false;
 }
 
 /** The hull to pre-select in the lobby: the last one this player chose, or the
@@ -5100,6 +5307,16 @@ interface MenuContext {
    *  that makes both legal (field request v0.1.1). No-op on desktop / where
    *  unsupported, so the menu can call it unconditionally. */
   enterImmersive(): void;
+  /**
+   * Sound a UI cue — the Gantry/Bone set (`art/audio/ui-cues`, s6-01).
+   *
+   * The front-of-match screens (menu, doors, codex, settings, lobby) had no
+   * sound at all: the audio engine is built in `boot()`, and these two screens
+   * are opened as free functions that could not see it. This is the same narrow
+   * seam `src/ui/sfx.ts` gives the HUD — the screen names an EVENT (a hover, a
+   * pick, a detent, a back) and the audio module decides everything else.
+   */
+  cue(kind: AudioCue, index?: number): void;
 }
 
 /** One menu control as the landscape-lock seam reports it: its logical rect (for
@@ -5187,6 +5404,11 @@ interface OnlineSeam {
   status: EntryState['status'];
   /** The refusal line, in the player's words, or `''`. */
   error: string;
+  /** The ANSWER line, or `''` — `Coming Soon…` while the CAMPAIGN teaser's press
+   *  is standing (u9-01). Separate from {@link error} exactly as it is in the
+   *  model: a door that is not built yet is not a failure, and a live-stage run
+   *  that read it off `error` would be asserting the wrong thing. */
+  notice: string;
   /**
    * The screen's TITLE, exactly as drawn: the standing line (`MINE · DEFEND ·
    * ATTACK`, `ENTER THE ROOM CODE`) when nothing is connecting, and the live
@@ -5204,12 +5426,30 @@ interface OnlineSeam {
   /** The globally-unique code the allocator minted on a successful CREATE, or
    *  `null`. Never client-guessed (M3 — use `assignment.code` verbatim). */
   resolvedCode: string | null;
-  /** The three doors and BACK, each with the physical point a real press must land
+  /** The four doors and BACK, each with the physical point a real press must land
    *  on (through the landscape-lock remap) — the front-door handles a live-stage run
    *  drives the ratified flow through with real input on both form factors, rather
-   *  than by calling the seam methods below. */
-  doorControls: readonly { kind: string; physicalCenter: { x: number; y: number } }[];
+   *  than by calling the seam methods below.
+   *
+   *  `physicalBounds` is the same rect as a box rather than a point, both corners
+   *  through the rotation and re-normalised. The mobile suite turns it into a
+   *  screenshot region and counts the pixels inside it, which is how this project
+   *  proves a control was DRAWN and not merely modelled (`playwright.config.ts`,
+   *  and the u5 seat-state control before it). */
+  doorControls: readonly {
+    kind: string;
+    physicalCenter: { x: number; y: number };
+    physicalBounds: { x: number; y: number; width: number; height: number };
+  }[];
+  /** The message slot under the wordmark, as drawn — the line that carries the
+   *  tagline, a refusal, or the CAMPAIGN teaser's `Coming Soon…` (u9-01). Reported
+   *  so the mobile suite can shoot the words themselves rather than trust the
+   *  string the model handed the view. */
+  messageBounds: { x: number; y: number; width: number; height: number };
   open(): void;
+  /** CAMPAIGN — the teaser above SOLO (u9-01). Says `Coming Soon…` and goes
+   *  nowhere: no transport, no lobby, no screen change. */
+  campaign(): void;
   /** PLAY SOLO — the offline door. Needs no server, and lands in the same lobby the
    *  online doors do (ratified: one lobby, both modes). */
   solo(): void;
@@ -5256,6 +5496,12 @@ function openMainMenu(
   // with. The CONTROLS settings row shows and toggles it here, persisting to that
   // seam so the choice carries into the match exactly as the fire mode does.
   let controlScheme = readControlScheme(platform);
+  // Whether a pad is connected, for the CONTROLS row's word (u8-01): STICKS on
+  // touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a PC without one. The menu
+  // has no input funnel and no `activeDevice`, so this is the whole of what it
+  // needs to know about the hardware — and it is a live value, because a pad can
+  // be plugged in or die while the screen is open (see the listeners below).
+  let gamepadConnected = anyGamepadConnected();
   let settings: SettingsState = createSettings();
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
@@ -5298,6 +5544,22 @@ function openMainMenu(
   let codexDrag:
     | { startX: number; startY: number; lastX: number; lastY: number; moved: boolean; overRail: boolean }
     | null = null;
+  // Gantry/Bone plate states (u7-01). The material has three — rest, hover, press
+  // — and the model is a pure function of these, so the wiring layer owns nothing
+  // but "what is the pointer on, and is it down". Touch never hovers, so on a
+  // phone `hover` stays null and only `press` moves.
+  let menuHover: MainMenuOption | null = null;
+  let menuPress: MainMenuOption | null = null;
+  let settingsHover: SettingsTarget | null = null;
+  let settingsPress: SettingsTarget | null = null;
+  // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
+  // same hover/press routing the title and settings screens have had since u7-01.
+  // Both are keyed by a plain string rather than a target object, because a pad of
+  // 32 keys and a rail of 14 entries want an index in the key, not a comparison.
+  let entryHover: string | null = null;
+  let entryPress: string | null = null;
+  let codexHover: string | null = null;
+  let codexPress: string | null = null;
   ctx.root.addChild(menuView, settingsView, codexView, entryView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
@@ -5341,12 +5603,15 @@ function openMainMenu(
     screen: 'home',
     status: 'idle',
     error: '',
+    notice: '',
     title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
     resolvedCode: null,
     doorControls: [],
+    messageBounds: { x: 0, y: 0, width: 0, height: 0 },
     open: (): void => openDoors(),
+    campaign: (): void => chooseEntryDoor('campaign'),
     solo: (): void => chooseEntryDoor('solo'),
     create: (): void => chooseEntryDoor('create'),
     join: (): void => chooseEntryDoor('join'),
@@ -5573,10 +5838,19 @@ function openMainMenu(
     settingsView.visible = screen === 'settings';
     codexView.visible = screen === 'codex';
     entryView.visible = screen === 'online';
-    if (menuView.visible) menuView.update(mainMenuModel());
-    if (settingsView.visible) settingsView.update(settingsModel(settings, fireMode, controlScheme));
-    if (codexView.visible) codexView.update(codexModel(codexState));
-    if (entryView.visible) entryView.update(entryModel(entry, connectNarration()));
+    if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
+    if (settingsView.visible) {
+      settingsView.update(
+        settingsModel(settings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
+          hover: settingsHover,
+          press: settingsPress,
+        }),
+      );
+    }
+    if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
+    if (entryView.visible) {
+      entryView.update(entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }));
+    }
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -5602,30 +5876,46 @@ function openMainMenu(
     onlineSeam.error = entry.error;
     // Read off the same model the view draws, never re-derived — a seam that
     // computes its own answer can agree with a screen that says something else.
-    onlineSeam.title = entryModel(entry, connectNarration()).prompt;
+    const model = entryModel(entry, connectNarration());
+    onlineSeam.title = model.prompt;
+    onlineSeam.notice = model.notice;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
     const { w, h } = ctx.logicalSize();
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
       ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
+    // Both corners through the rotation, then re-normalised — under the landscape
+    // lock the two corners swap sides, so a raw (x, y, w, h) built from one of them
+    // would be a backwards box on a phone.
+    const box = (r: Rect): { x: number; y: number; width: number; height: number } => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    };
+    const control = (kind: string, r: Rect): OnlineSeam['doorControls'][number] => ({
+      kind,
+      physicalCenter: point(r),
+      physicalBounds: box(r),
+    });
+    const nowhere: Rect = { x: 0, y: 0, width: 0, height: 0 };
     const front =
       entry.screen === 'join'
         ? [
             // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
             // room code by pressing the very keys a player's thumb finds.
-            ...KEYPAD_KEYS.map((ch, i) => ({
-              kind: `key:${ch}`,
-              physicalCenter: point(layout.keys[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-            })),
-            { kind: 'erase', physicalCenter: point(layout.erase) },
-            { kind: 'submit', physicalCenter: point(layout.submit) },
+            ...KEYPAD_KEYS.map((ch, i) => control(`key:${ch}`, layout.keys[i] ?? nowhere)),
+            control('erase', layout.erase),
+            control('submit', layout.submit),
           ]
-        : DOOR_OPTIONS.map((option, i) => ({
-            kind: option.door,
-            physicalCenter: point(layout.doors[i] ?? { x: 0, y: 0, width: 0, height: 0 }),
-          }));
-    onlineSeam.doorControls = [...front, { kind: 'back', physicalCenter: point(layout.back) }];
+        : DOOR_OPTIONS.map((option, i) => control(option.door, layout.doors[i] ?? nowhere));
+    onlineSeam.doorControls = [...front, control('back', layout.back)];
+    onlineSeam.messageBounds = box(layout.message);
   }
 
   /** Open THE DOORS — what PLAY does now (ratified: one play flow), and the only
@@ -5653,6 +5943,15 @@ function openMainMenu(
    *  away and `boot()` opens the lobby offline; CREATE / JOIN go through the
    *  allocator and open the same lobby online once the room welcomes us. */
   function chooseEntryDoor(door: EntryDoor): void {
+    if (door === 'campaign') {
+      // The teaser (u9-01). It answers in place: `chooseDoor` puts `Coming Soon…`
+      // in the entry state's notice and returns no intent, so there is nothing to
+      // resolve, no socket to open and no screen to leave. Rendering is the whole
+      // of the effect.
+      entry = chooseDoor(entry, door, onlineRng).state;
+      render();
+      return;
+    }
     if (door === 'solo') {
       endConnectTrace();
       beginSolo();
@@ -5664,28 +5963,43 @@ function openMainMenu(
     if (result.intent) void startResolve(door, result.intent.room);
   }
 
-  /** Route an entry-screen target — the same targets a real tap produces. */
+  /**
+   * Route an entry-screen target — the same targets a real tap produces.
+   *
+   * Every branch names its cue (s6-01): a door and a keypad digit are forward
+   * picks, an ERASE is a step back through what you typed rather than a leave, so
+   * it takes the falling `back` like every other backwards move on the screen.
+   */
   function applyEntryTarget(target: EntryTarget): void {
     switch (target.kind) {
       case 'door': {
         const door = DOOR_ORDER[target.index];
-        if (door) chooseEntryDoor(door);
+        if (door) {
+          ctx.cue('press');
+          chooseEntryDoor(door);
+        }
         return;
       }
       case 'key': {
         const key = KEYPAD_KEYS[target.index];
         if (key !== undefined) {
-          entry = typeEntryCode(entry, key);
+          const next = typeEntryCode(entry, key);
+          // A full code refuses the next digit: the sound says so before the
+          // unchanged screen does — rule 2, on the smallest control in the game.
+          ctx.cue(next === entry ? 'reject' : 'press');
+          entry = next;
           render();
         }
         return;
       }
       case 'erase':
+        ctx.cue('back');
         entry = eraseEntryCode(entry);
         render();
         return;
       case 'back':
         // From the keypad, back to the doors; from the doors, back to the menu.
+        ctx.cue('back');
         if (entry.screen === 'join') {
           entry = backToDoors(entry).state;
           endConnectTrace();
@@ -5696,12 +6010,15 @@ function openMainMenu(
         return;
       case 'submit': {
         const result = submitJoin(entry);
+        // An incomplete code is refused; a real one is the screen's headline yes.
+        ctx.cue(result.intent ? 'accept' : 'reject');
         entry = result.state;
         render();
         if (result.intent) void startResolve('join', result.intent.room);
         return;
       }
       case 'settings':
+        ctx.cue('press');
         openSettings();
         return;
     }
@@ -6052,15 +6369,20 @@ function openMainMenu(
   function applyCodex(target: CodexTarget): void {
     switch (target.kind) {
       case 'back':
+        ctx.cue('back');
         closeCodex();
         return;
       case 'tab': {
+        // A tab or an entry moves the selection one notch — a detent, which is
+        // the one cue in the set that does not detune, because it fires often.
         const tab = CODEX_TABS[target.index];
         if (tab) codexState = selectCodexTab(codexState, tab.id);
+        ctx.cue('detent');
         break;
       }
       case 'entry':
         codexState = selectCodexEntry(codexState, target.index);
+        ctx.cue('detent');
         break;
     }
     render();
@@ -6101,25 +6423,34 @@ function openMainMenu(
   function applySettings(target: SettingsTarget): void {
     switch (target.kind) {
       case 'back':
+        ctx.cue('back');
         closeSettings();
         return;
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         platform.storage.set(FIRE_MODE_KEY, fireMode);
+        ctx.cue('detent');
         break;
       case 'controls':
         // Sticks ⇄ Tap Commander, persisted to the same seam the match reads at
         // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
         // and carries into the match exactly as the fire mode does.
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
-        platform.storage.set(CONTROL_SCHEME_KEY, controlScheme);
+        platform.storage.set(CONTROL_SCHEME_KEY, storedControlScheme(controlScheme));
+        ctx.cue('detent');
         break;
       case 'reduceVfx':
         settings = toggleReduceVfx(settings);
+        ctx.cue('detent');
         break;
-      case 'volume':
-        settings = adjustVolume(settings, target.channel, target.dir);
+      case 'volume': {
+        // A slider already at its end refuses — audibly, so a player nudging the
+        // master down hears the floor arrive instead of watching for it.
+        const next = adjustVolume(settings, target.channel, target.dir);
+        ctx.cue(next.volumes[target.channel] === settings.volumes[target.channel] ? 'reject' : 'detent');
+        settings = next;
         break;
+      }
     }
     render();
   }
@@ -6131,26 +6462,57 @@ function openMainMenu(
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (screen === 'menu') {
       const hit = menuView.hitTest(x, y);
+      // The plate goes down before it acts, so a press that navigates away has
+      // still been *seen* to be a press. Routing is unchanged: the menu has always
+      // acted on pointer-DOWN, and the landscape-lock suite taps it that way.
+      menuPress = hit;
+      menuHover = hit;
       // PLAY opens the doors — the one way in (ratified). There is no second front
       // door to route, and no path from here that builds a world.
-      if (hit === 'play') openDoors();
-      else if (hit === 'codex') openCodex();
-      else if (hit === 'settings') openSettings();
+      // PLAY is the screen's one headline action, so it gets the two-note rising
+      // `accept`; the two side doors are plain forward picks (s6-01).
+      if (hit === 'play') {
+        ctx.cue('accept');
+        openDoors();
+      } else if (hit === 'codex') {
+        ctx.cue('press');
+        openCodex();
+      } else if (hit === 'settings') {
+        ctx.cue('press');
+        openSettings();
+      } else {
+        // A press on the bare screen: nothing to sound, but the plate states may
+        // have moved (a press released off every control), so redraw (u7-01).
+        render();
+      }
     } else if (screen === 'online') {
       const hit = entryView.hitTest(x, y);
+      // The plate goes down before it acts, so a press that navigates away has
+      // still been *seen* to be a press (u7-04, the same routing as the menu).
+      entryPress = entryTargetKey(hit);
+      entryHover = entryPress;
       if (hit) applyEntryTarget(hit);
+      else render();
       // A tap off the controls does nothing: the doors are three buttons and a
       // keypad, and RUSH! is the LOBBY's now — it used to be a bare tap-anywhere
       // here, which is exactly the shortcut the ratified flow replaced.
     } else if (screen === 'settings') {
       const hit = settingsView.hitTest(x, y);
+      settingsPress = hit;
+      settingsHover = hit;
       if (hit) applySettings(hit);
+      else render();
     } else {
       // Codex: begin a tap-or-drag. The tap fires on pointer-up only if the finger
       // did not travel far enough to be a scroll — so a drag over a long body
       // scrolls it instead of selecting whatever entry it started on.
       const rail = codexLayoutNow().rail;
       codexDrag = { startX: x, startY: y, lastX: x, lastY: y, moved: false, overRail: withinRect(rail, x, y) };
+      // The plate goes down under the finger, and comes back up on pointer-up
+      // whether the gesture turned out to be a tap or a scroll (u7-04).
+      codexPress = codexTargetKey(codexView.hitTest(x, y));
+      codexHover = codexPress;
+      render();
     }
     e.preventDefault();
   }
@@ -6159,7 +6521,65 @@ function openMainMenu(
    *  a tap. */
   const CODEX_DRAG_SLOP = 8;
 
+  /**
+   * The control the cursor is over, as a stable string — or `null` off every
+   * control. The hover cue is a **state change**, not a stream: it fires when
+   * this key changes, so crossing one button makes one sound and holding still
+   * over it makes none (rule 1). Touch has no hover, so it never computes one.
+   */
+  function hoverKey(x: number, y: number): string | null {
+    if (screen === 'menu') return menuView.hitTest(x, y);
+    if (screen === 'online') return entryTargetKey(entryView.hitTest(x, y));
+    if (screen === 'settings') return keyOf(settingsView.hitTest(x, y));
+    return codexTargetKey(codexView.hitTest(x, y));
+  }
+
+  let hovered: string | null = null;
+
   function onPointerMove(e: PointerEvent): void {
+    // Desktop hover, on every front-of-match screen (s6-01). Skipped on touch —
+    // a finger dragging across a menu is not hovering it, and a stream of glass
+    // notes under a scroll is exactly the cue stacking rule 1 forbids.
+    if (e.pointerType !== 'touch' && !codexDrag) {
+      const p = ctx.toLogical(e.clientX, e.clientY);
+      const key = hoverKey(p.x, p.y);
+      if (key !== hovered) {
+        hovered = key;
+        if (key !== null) ctx.cue('hover');
+      }
+      // The VISUAL half of the same hover, on the two Gantry/Bone screens
+      // (u7-01): a hovered plate lifts further off the screen (`materials.ts`
+      // deepens its cast shadow) and brightens one step — the handoff's 90ms
+      // hover. It rides s6-01's pointer-type gate rather than a second one, so
+      // the plate that lights up is exactly the plate that sounds. Redraw only
+      // when the plate under the pointer CHANGES, so a mouse crossing the screen
+      // does not rebuild geometry per event.
+      if (screen === 'menu') {
+        const hit = menuView.hitTest(p.x, p.y);
+        if (hit !== menuHover) {
+          menuHover = hit;
+          render();
+        }
+      } else if (screen === 'settings') {
+        const hit = settingsView.hitTest(p.x, p.y);
+        if (!sameTarget(settingsHover, hit)) {
+          settingsHover = hit;
+          render();
+        }
+      } else if (screen === 'online') {
+        const hit = entryTargetKey(entryView.hitTest(p.x, p.y));
+        if (hit !== entryHover) {
+          entryHover = hit;
+          render();
+        }
+      } else if (screen === 'codex') {
+        const hit = codexTargetKey(codexView.hitTest(p.x, p.y));
+        if (hit !== codexHover) {
+          codexHover = hit;
+          render();
+        }
+      }
+    }
     if (screen !== 'codex' || !codexDrag) return;
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
     if (Math.abs(y - codexDrag.startY) > CODEX_DRAG_SLOP || Math.abs(x - codexDrag.startX) > CODEX_DRAG_SLOP) {
@@ -6177,6 +6597,24 @@ function openMainMenu(
   }
 
   function onPointerUp(e: PointerEvent): void {
+    // A finger lifting releases the plate it was holding, on whichever screen it
+    // was held. `pointercancel` routes here too, so a gesture the browser steals
+    // cannot strand a plate in its pressed state.
+    if (menuPress !== null || settingsPress !== null || entryPress !== null || codexPress !== null) {
+      menuPress = null;
+      settingsPress = null;
+      entryPress = null;
+      codexPress = null;
+      // Touch has no hover to fall back to: a lifted finger leaves nothing under
+      // it, so the plate returns to rest rather than to a hover it never had.
+      if (e.pointerType === 'touch') {
+        menuHover = null;
+        settingsHover = null;
+        entryHover = null;
+        codexHover = null;
+      }
+      render();
+    }
     if (screen !== 'codex' || !codexDrag) {
       codexDrag = null;
       return;
@@ -6229,6 +6667,35 @@ function openMainMenu(
     if (e.code === 'Enter' || e.code === 'Space') openDoors();
   }
 
+  /** The pointer left the canvas: nothing is hovered and nothing is held. Without
+   *  this a plate keeps its hover after the mouse has gone, which reads as a
+   *  stuck control on a screen whose whole affordance is "the bright one". */
+  function onPointerLeave(): void {
+    if (menuHover === null && menuPress === null && settingsHover === null && settingsPress === null) return;
+    menuHover = null;
+    menuPress = null;
+    settingsHover = null;
+    settingsPress = null;
+    render();
+  }
+
+  /**
+   * A pad appeared or went away while the menu is up (u8-01).
+   *
+   * The menu is static — it redraws on a state change, not every frame — so the
+   * new word has to be *pushed*, or a pad plugged in on the settings screen would
+   * leave `KEYBOARD + MOUSE` on screen until something else happened to trigger a
+   * render. Connect trusts its own event; disconnect re-scans, because a second
+   * pad may still be plugged in.
+   */
+  function setGamepadConnected(connected: boolean): void {
+    if (connected === gamepadConnected) return;
+    gamepadConnected = connected;
+    render();
+  }
+  const onGamepadConnected = (): void => setGamepadConnected(true);
+  const onGamepadDisconnected = (): void => setGamepadConnected(anyGamepadConnected());
+
   function relayout(): void {
     // Landscape lock first: re-apply the root transform for the new canvas size,
     // then re-lay the menu in the resulting logical (landscape) viewport — the
@@ -6247,10 +6714,13 @@ function openMainMenu(
     app.canvas.removeEventListener('pointermove', onPointerMove);
     app.canvas.removeEventListener('pointerup', onPointerUp);
     app.canvas.removeEventListener('pointercancel', onPointerUp);
+    app.canvas.removeEventListener('pointerleave', onPointerLeave);
     app.canvas.removeEventListener('wheel', onWheel);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
+    window.removeEventListener('gamepadconnected', onGamepadConnected);
+    window.removeEventListener('gamepaddisconnected', onGamepadDisconnected);
     window.visualViewport?.removeEventListener('resize', relayout);
     ctx.root.removeChild(menuView, settingsView, codexView, entryView);
     menuView.destroy({ children: true });
@@ -6263,10 +6733,13 @@ function openMainMenu(
   app.canvas.addEventListener('pointermove', onPointerMove);
   app.canvas.addEventListener('pointerup', onPointerUp);
   app.canvas.addEventListener('pointercancel', onPointerUp);
+  app.canvas.addEventListener('pointerleave', onPointerLeave);
   app.canvas.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', relayout);
   window.addEventListener('orientationchange', relayout);
+  window.addEventListener('gamepadconnected', onGamepadConnected);
+  window.addEventListener('gamepaddisconnected', onGamepadDisconnected);
   window.visualViewport?.addEventListener('resize', relayout);
 
   installMainMenuSeam(seam);
@@ -6433,6 +6906,36 @@ interface LobbySeam {
   content: Rect;
   /** One roster row's height — a thumb-size assertion target. */
   seatHeight: number;
+  /** The eight roster rows' logical rects — the anchor each per-row control has to
+   *  sit inside (u5). */
+  seatRows: readonly Rect[];
+  /**
+   * Each roster row's LEADING STATE control, as it was actually DRAWN (u5) — the
+   * word on it, whether it reads live or dead, its logical rect, and the physical
+   * point a real press must land on (through the landscape-lock rotation, like
+   * {@link rushControl}).
+   *
+   * Read-back only. The mobile suite presses the physical point for real and reads
+   * the label back from here — "test the door as a door": a seam is for observing
+   * what happened, never for opening the thing under test.
+   */
+  seatStates: readonly {
+    index: number;
+    /** `OPEN` / `BOT` / `CLOSED` / `TAKEN` — the current state, in words. */
+    label: string;
+    /** Whether this client may cycle this seat right now: the host, before RUSH!,
+     *  and never a human seat. What decides whether the control draws pressable. */
+    live: boolean;
+    logical: Rect;
+    physicalCenter: { x: number; y: number };
+    /** The same rect in PHYSICAL (un-rotated, CSS-px) space — both corners mapped
+     *  through the landscape-lock transform and re-normalised, so it is a real box
+     *  in either orientation. The mobile suite turns it into a screenshot region
+     *  and counts the pixels inside it: this control's whole defect was that it
+     *  was never DRAWN, and a seam that only reported rects would have said it was
+     *  fine on the day it was invisible (`playwright.config.ts`). */
+    physicalBounds: Rect;
+  }[];
   /** RUSH!'s height — likewise. */
   rushHeight: number;
   /** The RUSH! control's logical rect + the physical point a tap must land on to
@@ -6587,6 +7090,8 @@ function openLobby(
     logicalViewport: { width: size0.w, height: size0.h },
     content: { x: 0, y: 0, width: 0, height: 0 },
     seatHeight: 0,
+    seatRows: [],
+    seatStates: [],
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
@@ -6638,6 +7143,31 @@ function openLobby(
     seam.logicalViewport = { width: w, height: h };
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
+    seam.seatRows = layout.seats.map((r) => ({ ...r }));
+    // The per-row STATE controls, exactly as drawn (u5): the word, the live/dead
+    // look, the rect and the physical press point. Built from the SAME layout the
+    // view drew from and the SAME model row it drew the word from, so the seam
+    // cannot report a control the screen does not have.
+    seam.seatStates = layout.seatStates.map((r, i) => {
+      const a = ctx.toPhysical(r.x, r.y);
+      const b = ctx.toPhysical(r.x + r.width, r.y + r.height);
+      return {
+        index: i,
+        label: model.seats[i]?.stateLabel ?? '',
+        live: model.seats[i]?.canCycleState ?? false,
+        logical: { ...r },
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+        // Both corners through the rotation, then re-normalised — under the
+        // landscape lock the two corners swap sides, so a raw (x, y, w, h) built
+        // from one of them would be a backwards box on a phone.
+        physicalBounds: {
+          x: Math.min(a.x, b.x),
+          y: Math.min(a.y, b.y),
+          width: Math.abs(b.x - a.x),
+          height: Math.abs(b.y - a.y),
+        },
+      };
+    });
     seam.rushHeight = layout.rushButton.height;
     // The RUSH! rect in logical (landscape) space and the physical tap point it
     // un-rotates from — computed through the same `ctx.toPhysical` the menu seam
@@ -6653,7 +7183,33 @@ function openLobby(
       index: i,
       physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
     }));
+    soundSeatArrivals(model);
   }
+
+  /**
+   * Seats that have filled with a PERSON since the last render, sounded once each
+   * (s6-01: *"seat joins — one note, stepping up by slot index"*).
+   *
+   * Derived from the drawn model rather than from the wire, so a joiner arriving
+   * over the socket, a reclaim after a reconnect, and a host's own seat all reach
+   * it by the one path that also puts the row on screen: if you can see them, you
+   * heard them. The first render seeds the set instead of sounding it — the seats
+   * already in the room when you walked in did not just join.
+   */
+  function soundSeatArrivals(model: ReturnType<typeof lobbyModel>): void {
+    const occupied = new Set<PlayerId>();
+    model.seats.forEach((seat, index) => {
+      if (seat.isBot || seat.isClosed || seat.openToJoin) return;
+      occupied.add(seat.player);
+      if (seated === null || seated.has(seat.player)) return;
+      // One semitone per slot, so a roster filling up walks up the scale.
+      ctx.cue('join', index);
+    });
+    seated = occupied;
+  }
+
+  /** Seats with a person in them as of the last render. `null` before the first. */
+  let seated: Set<PlayerId> | null = null;
 
   // --- Codex reuse (GDD §2.10 point 2): the hint under the pointer ------------
 
@@ -6738,6 +7294,8 @@ function openLobby(
     const next = selectShipClass(state, shipClass);
     if (next === state) return; // a refused / repeated pick costs the wire nothing
     state = next;
+    // The selection stepped one tile: a detent, the same notch the wheel makes.
+    ctx.cue('detent');
     sendChoice();
     render();
   }
@@ -6752,6 +7310,7 @@ function openLobby(
     const next = selectMap(state, mapIdAt(index));
     if (next === state) return;
     state = next;
+    ctx.cue('detent');
     platform.storage.set(MAP_STORAGE_KEY, state.mapId);
     render();
   }
@@ -6771,6 +7330,7 @@ function openLobby(
    */
   function leaveToMenu(): void {
     if (resolved) return;
+    ctx.cue('back');
     room?.session.close();
     const menuUrl = window.location.origin + window.location.pathname;
     window.location.assign(menuUrl);
@@ -6783,7 +7343,15 @@ function openLobby(
   function rush(): void {
     if (resolved) return;
     const next = pressRush(state);
-    if (next === state) return;
+    // A guest's RUSH! is refused (`canStart`) and the screen says WAITING FOR THE
+    // HOST — but the *sound* says it first, which is rule 2 on the one button
+    // everybody presses. The countdown starting gets the RUSH! cue itself: five
+    // notes climbing, then the confirm's three struck at once and held.
+    if (next === state) {
+      ctx.cue('reject');
+      return;
+    }
+    ctx.cue('rush');
     state = next;
     render();
   }
@@ -6843,6 +7411,20 @@ function openLobby(
    *  that opened a codex dossier does not also act — GDD §2.10 point 2's
    *  "non-blocking"). Hit-tested at the press-DOWN point, which is robust when a
    *  synthetic touchEnd carries no coordinates (landscape-lock physical taps). */
+  /**
+   * Sound a slot-editor cycle and return the new state (s6-01).
+   *
+   * The lobby's five cycles — seat state, bot tier, side, mode, abundance — all
+   * answer a refused tap by returning the *identical* state object (a guest, a
+   * locked roster after RUSH!). That identity is the outcome, so it is what picks
+   * the cue: a notch that moved is a detent, one that did not is a refusal. The
+   * player hears which before the unchanged row can tell them.
+   */
+  function stepped(before: LobbyState, after: LobbyState): LobbyState {
+    ctx.cue(after === before ? 'reject' : 'detent');
+    return after;
+  }
+
   function act(hit: NonNullable<ReturnType<typeof view.hitTest>>): void {
     switch (hit.kind) {
       case 'class':
@@ -6852,12 +7434,19 @@ function openLobby(
         selectMapAt(hit.index);
         break;
       case 'seat':
-        // The row body cycles the seat's OPEN → BOT → CLOSED state (variable-slots
-        // Milestone E) — the host shrinks or shapes the match here. Persist the
+      case 'seatState':
+        // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E) — the
+        // host shrinks or shapes the match here. Reached from the row BODY, where
+        // it has always lived, and from the row's LEADING STATE control, the drawn
+        // and labelled button u5 added because nothing on this screen said a slot
+        // could be closed at all. One case, so the two can never diverge. Persist the
         // resulting size so a returning host reopens on the same count, and tell the
         // room: closing a seat changes which bots it will cast, and the cast list
         // rides the host's own `lobbyChoice`.
-        state = cycleSeatState(state, hit.index);
+        // A guest's tap returns the identical state — so the sound is the same
+        // refusal the host's tap is a detent (s6-01, rule 2). One helper for all
+        // five slot-editor cycles below, so they can never disagree.
+        state = stepped(state, cycleSeatState(state, hit.index));
         platform.storage.set(MATCH_SIZE_KEY, String(matchSizeOf(state)));
         sendChoice();
         render();
@@ -6867,7 +7456,7 @@ function openLobby(
         // the shared slot-editor control, so a bot's tier is reachable in TEAMS
         // exactly as in FFA (the TEAMS lobby had lost it when the side control took
         // the only chip). Online the room is told, in empty-seat order.
-        state = cycleBotDifficulty(state, hit.index);
+        state = stepped(state, cycleBotDifficulty(state, hit.index));
         sendChoice();
         render();
         break;
@@ -6876,21 +7465,21 @@ function openLobby(
         // TEAMS (n2). A model no-op in FFA (teams-of-one). The room is told, because
         // a side authored here and never sent is a lobby that says TEAMS over a
         // free-for-all world (m10 teams-wire).
-        state = cycleSeatTeam(state, hit.index);
+        state = stepped(state, cycleSeatTeam(state, hit.index));
         sendChoice();
         render();
         break;
       case 'mode':
         // FFA ⇄ TEAMS. Persisted, so a returning host finds their last mode — and
         // sent, because the room advertises its mode and builds its world from it.
-        state = toggleMode(state);
+        state = stepped(state, toggleMode(state));
         platform.storage.set(MATCH_MODE_KEY, state.mode);
         sendChoice();
         render();
         break;
       case 'abundance':
         // SCARCE → STANDARD → RICH (ratified p11). Persisted like the mode.
-        state = cycleAbundance(state);
+        state = stepped(state, cycleAbundance(state));
         platform.storage.set(ABUNDANCE_KEY, state.abundance);
         render();
         break;
@@ -6949,11 +7538,23 @@ function openLobby(
       }
       return;
     }
-    // No button down — desktop hover: the codex hint for the row under the cursor.
+    // No button down — desktop hover: the codex hint for the row under the cursor,
+    // and (s6-01) one note of glass the moment the cursor CROSSES onto a control.
+    // Keyed on the control's identity, so moving within one row is silent: a hover
+    // is a state change, not a stream (rule 1). Touch never gets here with no
+    // button down, so a finger dragging the roster sounds nothing.
+    const key = keyOf(view.hitTest(x, y));
+    if (key !== hovered) {
+      hovered = key;
+      if (key !== null && e.pointerType !== 'touch') ctx.cue('hover');
+    }
     const resolved = resolveHint(x, y);
     if (resolved) showHint(resolved);
     else hideHint();
   }
+
+  /** The lobby control the cursor was last over — the hover cue's state. */
+  let hovered: string | null = null;
 
   function onPointerUp(): void {
     const p = press;

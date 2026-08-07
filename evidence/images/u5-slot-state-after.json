@@ -1,0 +1,203 @@
+{
+  "capture": "u5-slot-state-affordance",
+  "label": "after",
+  "base": "http://localhost:4173",
+  "profiles": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "deviceScaleFactor": 1,
+      "input": "pointer",
+      "orientation": "landscape",
+      "lobbyIsTouch": false,
+      "logicalViewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "stateControlsDrawn": 8,
+      "stateLabelsOnOpen": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "stateControlRect": {
+        "x": 23,
+        "y": 169,
+        "width": 58,
+        "height": 38
+      },
+      "sizeBefore": 8,
+      "sizeAfterTwoPresses": 7,
+      "labelsAfterTwoPresses": [
+        "TAKEN",
+        "CLOSED",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "images": [
+        "images/u5-slot-state-after-desktop-open.png",
+        "images/u5-slot-state-after-desktop-closed.png"
+      ],
+      "consoleErrors": []
+    },
+    {
+      "id": "iphone-landscape",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "deviceScaleFactor": 3,
+      "input": "touch",
+      "orientation": "landscape",
+      "lobbyIsTouch": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      },
+      "stateControlsDrawn": 8,
+      "stateLabelsOnOpen": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "stateControlRect": {
+        "x": 23,
+        "y": 151.87,
+        "width": 56.6896,
+        "height": 12.869999999999997
+      },
+      "sizeBefore": 8,
+      "sizeAfterTwoPresses": 7,
+      "labelsAfterTwoPresses": [
+        "TAKEN",
+        "CLOSED",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "images": [
+        "images/u5-slot-state-after-iphone-landscape-open.png",
+        "images/u5-slot-state-after-iphone-landscape-closed.png"
+      ],
+      "consoleErrors": []
+    },
+    {
+      "id": "iphone-portrait",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "deviceScaleFactor": 3,
+      "input": "touch",
+      "orientation": "portrait-held",
+      "lobbyIsTouch": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      },
+      "stateControlsDrawn": 8,
+      "stateLabelsOnOpen": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "stateControlRect": {
+        "x": 23,
+        "y": 151.87,
+        "width": 56.6896,
+        "height": 12.869999999999997
+      },
+      "sizeBefore": 8,
+      "sizeAfterTwoPresses": 7,
+      "labelsAfterTwoPresses": [
+        "TAKEN",
+        "CLOSED",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "images": [
+        "images/u5-slot-state-after-iphone-portrait-open.png",
+        "images/u5-slot-state-after-iphone-portrait-closed.png"
+      ],
+      "consoleErrors": []
+    },
+    {
+      "id": "pixel-landscape",
+      "viewport": {
+        "width": 915,
+        "height": 412
+      },
+      "deviceScaleFactor": 2.6,
+      "input": "touch",
+      "orientation": "landscape",
+      "lobbyIsTouch": true,
+      "logicalViewport": {
+        "width": 915.0000335620012,
+        "height": 411.9230920323259
+      },
+      "stateControlsDrawn": 8,
+      "stateLabelsOnOpen": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "stateControlRect": {
+        "x": 23,
+        "y": 155.92577202598028,
+        "width": 58,
+        "height": 16.925772025980287
+      },
+      "sizeBefore": 8,
+      "sizeAfterTwoPresses": 7,
+      "labelsAfterTwoPresses": [
+        "TAKEN",
+        "CLOSED",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "images": [
+        "images/u5-slot-state-after-pixel-landscape-open.png",
+        "images/u5-slot-state-after-pixel-landscape-closed.png"
+      ],
+      "consoleErrors": []
+    }
+  ]
+}

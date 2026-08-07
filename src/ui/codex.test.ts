@@ -16,10 +16,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Rect } from '@platform/layout-registry';
+import { TOUCH_MIN } from '../art/materials';
+import { singlePrimary } from './gantry';
 import {
   CODEX_BACK_LABEL,
-  CODEX_ENTRY_HEIGHT,
-  CODEX_ENTRY_HEIGHT_TOUCH,
   CODEX_TABS,
   CODEX_TITLE,
   activeEntries,
@@ -27,10 +27,13 @@ import {
   activeEntryIndex,
   codexBotHint,
   codexShipHint,
+  codexEntryPlate,
   codexHitTest,
   codexLayout,
   codexModel,
   codexRailContentHeight,
+  codexTabPlate,
+  codexTargetKey,
   createCodex,
   formatFactValue,
   normalizeCodex,
@@ -261,18 +264,30 @@ describe('layout', () => {
     }
   });
 
-  it('gives touch a taller tab and taller entries', () => {
-    const desktop = layoutFor(VIEWPORT, 3, { isTouch: false });
-    const touch = layoutFor(VIEWPORT, 3, { isTouch: true });
-    expect(desktop.entryHeight).toBe(CODEX_ENTRY_HEIGHT);
-    expect(touch.entryHeight).toBe(CODEX_ENTRY_HEIGHT_TOUCH);
-    expect(touch.tabs[0]!.height).toBeGreaterThan(desktop.tabs[0]!.height);
+  it('clears the thumb floor on every device, WITHOUT being told it is one (u7-04)', () => {
+    // The tabs used to be 44px on a pointer and 52 under a thumb, which meant a
+    // caller that forgot `isTouch` shipped a 44px tab to a finger. Under Gantry the
+    // floor is a property of the FRAME, not of the flag: `valueChipHeight` and
+    // `rowHeight` never return less than TOUCH_MIN, so the same viewport gives the
+    // same thumb-sized control whether or not anyone remembered to say "touch".
+    // The brief's one hard number for this screen is the tab row's 48.
+    for (const isTouch of [false, true]) {
+      for (const vp of [VIEWPORT, { width: 844, height: 390 }, { width: 390, height: 844 }]) {
+        const l = codexLayout(vp, 3, { isTouch });
+        expect(l.tabs[0]!.height, `tab height at ${vp.width}×${vp.height}`).toBeGreaterThanOrEqual(
+          TOUCH_MIN,
+        );
+        expect(l.entryHeight, `entry height at ${vp.width}×${vp.height}`).toBeGreaterThanOrEqual(
+          TOUCH_MIN,
+        );
+      }
+    }
   });
 
   it('reports the rail content height so the view can clamp its scroll', () => {
     const l = layoutFor(VIEWPORT, 14, { isTouch: true }); // SYSTEMS-sized
     const h = codexRailContentHeight(l);
-    expect(h).toBe(14 * l.entryHeight + 13 * 6);
+    expect(h).toBe(14 * l.entryHeight + 13 * l.entryGap);
     // Fourteen thumb-height rows overflow a short landscape rail — the case the
     // view scrolls.
     expect(h).toBeGreaterThan(l.rail.height);
@@ -281,6 +296,7 @@ describe('layout', () => {
   it('never lets the rail take more than half the width on a narrow viewport', () => {
     const l = codexLayout({ width: 360, height: 320 }, 3);
     expect(l.rail.width).toBeLessThanOrEqual(l.content.width / 2 + 0.001);
+    expect(l.detail.width).toBeGreaterThanOrEqual(l.rail.width);
     expect(l.detail.width).toBeGreaterThanOrEqual(0);
   });
 
@@ -289,6 +305,76 @@ describe('layout', () => {
     for (const rect of [l.title, l.back, ...l.tabs, l.rail, l.detail, ...l.railEntries]) {
       expect(rect.width).toBeGreaterThanOrEqual(0);
       expect(rect.height).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('the CODEX in Gantry/Bone (u7-04)', () => {
+  const state = createCodex(REAL, 'bots');
+
+  it('draws NO bright plate — a reference screen has no headline action', () => {
+    // Zero primaries is legal and correct here: `singlePrimary` allows it, and a
+    // screen you consult rather than act on should not be shouting at you. BACK is
+    // secondary, every rail row is a secondary plate or an inert surface, and the
+    // active TAB's brightness is a CHIP state, which is a different size family
+    // (`./gantry` countPrimaries takes a screen's PLATES).
+    const model = codexModel(state);
+    const platePlates = ['secondary' as const, ...model.entries.map((e) => codexEntryPlate(e))];
+    expect(singlePrimary(platePlates)).toBe(true);
+    expect(platePlates.filter((r) => r === 'primary')).toHaveLength(0);
+  });
+
+  it('marks the ACTIVE TAB and the SELECTED ENTRY differently (the brief’s rule)', () => {
+    const model = codexModel(state);
+    const active = model.tabs.filter((t) => t.active);
+    const selected = model.entries.filter((e) => e.selected);
+    expect(active).toHaveLength(1);
+    expect(selected).toHaveLength(1);
+
+    // The tab is marked by BRIGHTNESS — it takes the brightest chip material.
+    expect(codexTabPlate(active[0]!)).toBe('primary');
+    expect(codexTabPlate(model.tabs.find((t) => !t.active)!)).toBe('secondary');
+
+    // The entry is NOT: it rises from a surface to a raised plate (and the view
+    // hangs a Bone bar off its leading edge). Different question, different mark —
+    // the two never share a treatment.
+    expect(codexEntryPlate(selected[0]!)).toBe('secondary');
+    expect(codexEntryPlate(model.entries.find((e) => !e.selected)!)).toBe('inert');
+    expect(codexEntryPlate(selected[0]!)).not.toBe(codexTabPlate(active[0]!));
+  });
+
+  it('presses and hovers, keyed by the same string the pointer layer routes on', () => {
+    expect(codexTargetKey({ kind: 'back' })).toBe('back');
+    expect(codexTargetKey({ kind: 'tab', index: 2 })).toBe('tab:2');
+    expect(codexTargetKey({ kind: 'entry', index: 5 })).toBe('entry:5');
+    expect(codexTargetKey(null)).toBeNull();
+
+    const hovered = codexModel(state, { hover: 'tab:1' });
+    expect(hovered.tabs[1]?.state).toBe('hover');
+    expect(hovered.tabs[0]?.state).toBe('rest');
+    // A press outranks a hover on the same plate.
+    const pressed = codexModel(state, { hover: 'tab:1', press: 'tab:1' });
+    expect(pressed.tabs[1]?.state).toBe('press');
+    expect(codexModel(state, { press: 'back' }).backState).toBe('press');
+    expect(codexModel(state, { press: 'entry:2' }).entries[2]?.state).toBe('press');
+  });
+
+  it('keeps the ARTICLE the wider pane, and clear of the rail, on every profile', () => {
+    // The reading pane is what the screen is for; the rail is an index into it.
+    for (const vp of [
+      { width: 1280, height: 800 },
+      { width: 844, height: 390 },
+      { width: 390, height: 844 },
+      { width: 915, height: 412 },
+    ]) {
+      const l = codexLayout(vp, 14, { isTouch: true });
+      expect(l.detail.width, `article wider at ${vp.width}×${vp.height}`).toBeGreaterThan(l.rail.width);
+      expect(l.rail.x + l.rail.width, `panes clear at ${vp.width}×${vp.height}`).toBeLessThanOrEqual(
+        l.detail.x,
+      );
+      // …and both live between the beams, never under one.
+      expect(l.rail.y).toBeGreaterThanOrEqual(l.header.y + l.header.height);
+      expect(l.detail.y + l.detail.height).toBeLessThanOrEqual(l.footer.y + 0.5);
     }
   });
 });
@@ -313,7 +399,7 @@ describe('hit test', () => {
   });
 
   it('shifts entry hits by the rail scroll', () => {
-    const stride = l.entryHeight + 6;
+    const stride = l.entryHeight + l.entryGap;
     const topOfRail = { x: l.rail.x + 4, y: l.rail.y + l.entryHeight / 2 };
     // Unscrolled, the top of the rail is entry 0.
     expect(codexHitTest(l, topOfRail.x, topOfRail.y)).toEqual({ kind: 'entry', index: 0 });
@@ -325,7 +411,7 @@ describe('hit test', () => {
   });
 
   it('drops an entry scrolled above the rail top (clipped, so untappable)', () => {
-    const stride = l.entryHeight + 6;
+    const stride = l.entryHeight + l.entryGap;
     // With a full-stride scroll, entry 0's shifted rect is entirely above the
     // rail, so nothing at a point above the rail top is hit.
     expect(codexHitTest(l, l.rail.x + 4, l.rail.y - 2, stride)).toBeNull();
