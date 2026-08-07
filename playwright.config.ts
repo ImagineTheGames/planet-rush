@@ -101,7 +101,7 @@ export default defineConfig({
   projects: [
     {
       name: 'iphone',
-      // 2.96 MP a capture — ~9× the desktop control's, and the reason PR #291's
+      // 2.96 MP a capture — ~2.9× the desktop control's, and the reason PR #291's
       // two `iphone` goldens ran out of clock on a loaded runner while passing
       // everywhere else (tests/mobile/shot-budget.ts).
       use: {

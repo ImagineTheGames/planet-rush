@@ -104,9 +104,9 @@ export const STABILISATION_CAPTURES = 2;
 export const SHOT_ROUND_TO_MS = 15_000;
 
 /**
- * The floor under every golden comparison, whatever the arithmetic says: 3× the
- * two-line-check default it used to ride. Keeps the smallest frame in the matrix
- * from inheriting a budget that is technically sufficient and visibly fragile.
+ * The floor under every golden comparison, whatever the arithmetic says: 6× the
+ * 5 s default it used to ride. Keeps the smallest frame in the matrix from
+ * inheriting a budget that is technically sufficient and visibly fragile.
  */
 export const SHOT_FLOOR_MS = 30_000;
 
@@ -135,7 +135,8 @@ export function shotBudgetMsFor(frame: ShotFrame): number {
  * drift away from the pixel count it was derived from.
  */
 export const DEVICE_MATRIX = {
-  /** iPhone-ish. The expensive one: 2.96 MP a capture, ~9× the desktop control. */
+  /** iPhone-ish. The expensive one: dpr 3 squares to 9× the pixels per CSS
+   *  pixel, and 2.96 MP a capture — ~2.9× the desktop control's area. */
   iphone: { width: 390, height: 844, deviceScaleFactor: 3 },
   /** Pixel-ish. */
   pixel: { width: 412, height: 915, deviceScaleFactor: 2.6 },
