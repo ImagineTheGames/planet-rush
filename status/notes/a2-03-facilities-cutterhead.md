@@ -154,6 +154,29 @@ the live column as palette drift — it was nearly read that way here.
 
 PR: https://github.com/ImagineTheGames/planet-rush/pull/312
 
+## Re-verified on resume — 2026-08-07T20:2x
+
+A later session re-ran the whole DoD against a moved `origin/main` (`81f5b76`).
+Nothing needed rebuilding; recording the numbers so the next session does not
+re-run a 7-minute suite to learn the same thing.
+
+- DoD 1 `npx tsc --noEmit` — clean.
+- DoD 2 `npm test -- --run` — **3774 passed, 0 failed. The capacity test passed
+  this time.** That confirms the diagnosis above: it is a load-sensitive flake on
+  a busy box, not a regression. Same commit, same container, opposite result.
+- DoD 3 — the same 5 golden files still differ from the new `origin/main`.
+- `origin/main` moved ahead of the branch point (`c2d401f` → `81f5b76`, PRs #309
+  and #310) but **only under `evidence/` and `status/notes/`** — no `src/`, no
+  goldens. So a3-01's rock move does not restale these baselines and the branch
+  does not need a merge. `gh pr view` reports MERGEABLE.
+- All five committed goldens re-examined by eye this session: every one shows the
+  bore head — teeth, hoppers, deck plates, lit core — and not the teal planetoid.
+  Ownership rings, shield bubbles and the beacon stack are intact at all three
+  form factors, including the portrait rotation.
+- CI on #312: `Typecheck, test, build` **pass** on both runs. `Mobile emulation
+  (Playwright)` is the one that matters here — it re-shoots the goldens on GitHub's
+  runner, a different box from the one that baselined them.
+
 ## NEXT
 
 - GDD §5.4 still says the home is a planetoid with steel-blue oceans and
