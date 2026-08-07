@@ -35,7 +35,8 @@ import {
   UPGRADE_LADDER,
 } from './upgrade-wheel';
 import type { UpgradeWheelSignals, UpgradeTiers } from './upgrade-wheel';
-import { CARGO_CAP_MAX, SHIP_STATS } from '../sim/constants';
+import { statLabelOf, costLabelOf, tierPips, MAXED_COST, STAT_ARROW } from './upgrade-wheel';
+import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
 
 function tiers(over: Partial<Record<UpgradeTrack, number>> = {}): UpgradeTiers {
   return { ...STOCK_TIERS, ...over };
@@ -355,5 +356,182 @@ describe('formatting', () => {
   it('rounds stat values to whole numbers — a wheel is not a spreadsheet', () => {
     expect(formatTrackValue(12.5, 'integer')).toBe('13');
     expect(formatTrackValue(129.999, 'percent')).toBe('130%');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The wedge's own lines (u7-06) — strings, so `cost` stays the only price
+// ---------------------------------------------------------------------------
+//
+// The upgrade wheel takes the Gantry/Bone build wheel's four-slot stack rather
+// than a parallel one (u7-02, ./wheel-stack). These pin what this module puts in
+// the three slots it owns, and — the load-bearing part — that all three are
+// strings, so the guarantee that keeps rates and wallet totals out of a wedge's
+// numeric fields survives them.
+
+describe('the stat line — the densest text on any wheel (u7-06)', () => {
+  it('gives current → next, the triple GDD §2.5 makes the point of this screen', () => {
+    const engine = wedgeOf('ENGINE', { shipClass: ShipClass.Vanguard, ore: 99 });
+    expect(engine.current).toBe('100%');
+    expect(engine.next).toBe('115%');
+    expect(engine.statLabel).toBe('100% → 115%');
+  });
+
+  it('drops ONLY the padding in its compact form — both values survive', () => {
+    const engine = wedgeOf('ENGINE', { ore: 99 });
+    expect(engine.statLabelCompact).toBe('100%→115%');
+    // The same move the Build wheel makes from "2 / 4 BUILT" to "2/4 BUILT":
+    // characters go, information does not.
+    expect(engine.statLabelCompact.replace(STAT_ARROW, ` ${STAT_ARROW} `)).toBe(engine.statLabel);
+  });
+
+  it('a finished ladder still shows what it finished AT — this is where stats live', () => {
+    const hull = wedgeOf('HULL', { tiers: tiers({ [UpgradeTrack.Hull]: 3 }), ore: 999 });
+    expect(hull.state).toBe('maxed');
+    // Vanguard hull 50 × the ladder's top step of 1.6.
+    expect(hull.current).toBe('80');
+    // The value stays; MAX is said once, in the cost slot, where a capped Build
+    // wheel wedge says FULL — never twice on the same wedge.
+    expect(hull.statLabel).toBe('80');
+    expect(hull.statLabel).not.toContain(MAXED_COST);
+    expect(hull.costLabel).toBe(MAXED_COST);
+  });
+
+  it('is a STRING, so the numeric fields are untouched by it', () => {
+    expect(typeof statLabelOf('100%', '115%')).toBe('string');
+    expect(statLabelOf('10', null)).toBe('10');
+  });
+});
+
+describe('the cost line — `cost/held`, the Build wheel\'s grammar (u7-06)', () => {
+  it('prints the cost over what the player can actually spend', () => {
+    const byLabel = new Map(upgradeWheelModel(sig({ ore: 8 })).wedges.map((w) => [w.label, w]));
+    expect(byLabel.get('ENGINE')?.costLabel).toBe('3/8');
+    expect(byLabel.get('CARGO')?.costLabel).toBe('2/8');
+    expect(byLabel.get('HULL')?.costLabel).toBe('3/8');
+  });
+
+  it('quotes the same spendable total the hub prints — never a second opinion', () => {
+    // The hub floors fractional ore (repair spends fractional); the wedge must
+    // print the same whole number, or the wheel disagrees with itself.
+    const model = upgradeWheelModel(sig({ ore: 6.8 }));
+    expect(model.ore).toBe(6);
+    expect(model.wedges.find((w) => w.label === 'HULL')?.costLabel).toBe('3/6');
+  });
+
+  it('says why a wedge dimmed without a word of copy — 12/8 is four short', () => {
+    const engine = wedgeOf('ENGINE', { tiers: tiers({ [UpgradeTrack.Engine]: 2 }), ore: 8 });
+    expect(engine.state).toBe('unaffordable');
+    expect(engine.costLabel).toBe('12/8');
+    // ...and the numeric cost underneath it is untouched — the label is a label.
+    expect(engine.cost).toBe(12);
+  });
+
+  it('gives the WEAPON wedge no cost line at all — it opens a screen (GDD §2.5)', () => {
+    const weapon = wedgeOf('WEAPON', { ore: 999 });
+    expect(weapon.costLabel).toBeNull();
+    expect(weapon.cost).toBeNull();
+    expect(weapon.state).toBe('ready');
+  });
+
+  it('keeps the cost line a STRING, so the numeric guarantee survives it', () => {
+    expect(typeof costLabelOf(4, 9)).toBe('string');
+    expect(costLabelOf(4, 0)).toBe('4/0');
+    expect(costLabelOf(4, -3)).toBe('4/0');
+  });
+});
+
+describe('the ladder pips — how many rungs are left (u7-06)', () => {
+  it('pips every track wedge, not only the two behind WEAPON', () => {
+    const model = upgradeWheelModel(sig({ tiers: tiers({ [UpgradeTrack.Engine]: 2 }), ore: 99 }));
+    const byLabel = new Map(model.wedges.map((w) => [w.label, w]));
+    expect(byLabel.get('ENGINE')?.tierLabel).toBe('●●○');
+    expect(byLabel.get('CARGO')?.tierLabel).toBe('○○○');
+    expect(byLabel.get('HULL')?.tierLabel).toBe('○○○');
+  });
+
+  it('fills every pip on a finished ladder', () => {
+    expect(wedgeOf('HULL', { tiers: tiers({ [UpgradeTrack.Hull]: 3 }) }).tierLabel).toBe('●●●');
+  });
+
+  it('leaves the WEAPON wedge to its per-track summary instead', () => {
+    const weapon = wedgeOf('WEAPON');
+    expect(weapon.tierLabel).toBe('');
+    expect(weapon.summary?.map((p) => p.label)).toEqual(['DAMAGE', 'SPEED']);
+  });
+
+  it('is glyphs, not a numeral — no colour is spent and no number is added', () => {
+    expect(tierPips(1, 3)).toBe('●○○');
+    expect(tierPips(0, 2)).toBe('○○');
+    // Out-of-range tiers clamp rather than producing a ragged row.
+    expect(tierPips(9, 3)).toBe('●●●');
+    expect(tierPips(-1, 2)).toBe('○○');
+  });
+});
+
+describe('a wedge\'s only numeric fields are the ones it always had (u7-06)', () => {
+  it('adds three lines and no fourth number', () => {
+    // A TRACK wedge — the WEAPON wedge navigates and so carries a null cost.
+    const wedge = wedgeOf('ENGINE', { ore: 99 });
+    const numericKeys = Object.entries(wedge)
+      .filter(([, v]) => typeof v === 'number')
+      .map(([k]) => k)
+      .sort();
+    // `tier`/`maxTier` are a position on a ladder and `angle` is geometry; `cost`
+    // is the one number that is a PRICE. Everything the Gantry pass added — the
+    // stat line, `cost/held`, the pips — travels as a string.
+    expect(numericKeys).toEqual(['angle', 'cost', 'maxTier', 'tier']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The ladder is the sim's, not a copy of it (u7-06)
+// ---------------------------------------------------------------------------
+//
+// "Costs come from the sim's constants — the wheel can never print a price the
+// sim does not honour." This file used to re-type the whole table and assert in
+// a comment that the two agreed. They did, and nothing checked it; the same
+// duplication in the `UpgradeTrack` enum drifted the moment SPEED split off
+// DAMAGE (#108). The ladder is derived now, and these are what say so.
+
+describe('the ladder is the sim\'s ratified table (u7-06)', () => {
+  for (const track of Object.values(UpgradeTrack)) {
+    it(`[${track}] prints the price the sim charges, and the step it applies`, () => {
+      const ui = UPGRADE_LADDER[track];
+      const sim = UPGRADES[track];
+      expect(ui.costs).toEqual(sim.costs);
+      expect(ui.steps).toEqual(sim.steps);
+      expect(ui.mode).toBe(sim.mode);
+      // The words on the wedge are the sim's too — "a rename is a data edit
+      // here, never UI code" (constants.ts).
+      expect(ui.label).toBe(sim.label);
+      expect(ui.group).toBe(sim.group);
+    });
+  }
+
+  it('takes the ceiling from the sim, so it clamps where buyUpgrade refuses', () => {
+    expect(UPGRADE_LADDER[UpgradeTrack.Cargo].max).toBe(UPGRADES[UpgradeTrack.Cargo].max);
+    expect(UPGRADE_LADDER[UpgradeTrack.Cargo].max).toBe(CARGO_CAP_MAX);
+  });
+
+  it('reads its print format off the sim\'s unit, so a percentage track prints one', () => {
+    // The one thing the sim has no opinion about is typography — but even that is
+    // derived, so a track that starts reporting `%` starts printing `%`.
+    expect(UPGRADE_LADDER[UpgradeTrack.Engine].format).toBe('percent');
+    expect(UPGRADE_LADDER[UpgradeTrack.Speed].format).toBe('percent');
+    expect(UPGRADE_LADDER[UpgradeTrack.Power].format).toBe('integer');
+    expect(UPGRADE_LADDER[UpgradeTrack.Cargo].format).toBe('integer');
+    expect(UPGRADE_LADDER[UpgradeTrack.Hull].format).toBe('integer');
+    for (const track of Object.values(UpgradeTrack)) {
+      expect(UPGRADE_LADDER[track].format === 'percent').toBe(UPGRADES[track].unit === '%');
+    }
+  });
+
+  it('groups WEAPON off the sim\'s own metadata', () => {
+    // The sub-wheel is data, not layout: `WEAPON_GROUP` has to be the string the
+    // sim tags DAMAGE and SPEED with, or the sub-wheel silently empties.
+    expect(UPGRADES[UpgradeTrack.Power].group).toBe(WEAPON_GROUP);
+    expect(UPGRADES[UpgradeTrack.Speed].group).toBe(WEAPON_GROUP);
+    expect(UPGRADES[UpgradeTrack.Engine].group).toBeUndefined();
   });
 });

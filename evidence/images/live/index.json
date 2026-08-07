@@ -7,148 +7,6 @@
   "deviceScaleFactor": 2,
   "frames": [
     {
-      "name": "scene-arena-full",
-      "what": "whole pinned arena, nothing staged",
-      "geo": {
-        "shipScreen": {
-          "x": 640,
-          "y": 400
-        },
-        "shipWorld": {
-          "x": 1968,
-          "y": 1200
-        },
-        "viewport": {
-          "w": 1280,
-          "h": 800
-        },
-        "ticks": 0,
-        "worldHash": "4302b39e",
-        "freezeTick": 120,
-        "build": {
-          "sha": "369d7a6",
-          "time": "2026-08-07T13:14:08.671Z"
-        }
-      }
-    },
-    {
-      "name": "scene-field-crop",
-      "what": "asteroid field, left of the home ring, nothing staged"
-    },
-    {
-      "name": "scene-home-defended",
-      "what": "local home: freeze-stamped turrets, mid-build scaffold, two shields",
-      "center": {
-        "x": 640,
-        "y": 400
-      }
-    },
-    {
-      "name": "scene-staged-muzzle-full",
-      "what": "pinned arena with a rival turret muzzle staged",
-      "staged": {
-        "firingShip": 1,
-        "turret": {
-          "shooter": 1,
-          "origin": {
-            "x": 1810.940258945177,
-            "y": 1734.940258945177
-          },
-          "end": {
-            "x": 1810.940258945177,
-            "y": 1644.940258945177
-          },
-          "hit": {
-            "x": 1810.940258945177,
-            "y": 1644.940258945177
-          }
-        }
-      },
-      "muzzleCount": 1
-    },
-    {
-      "name": "scene-siege-full",
-      "what": "pinned arena, station spawn protection lifted, core besieged",
-      "siege": {
-        "coreHp": 100,
-        "maxCoreHp": 100,
-        "banked": 11
-      },
-      "shipAlphaNote": {
-        "ticks": 0
-      }
-    },
-    {
-      "name": "scene-siege-home",
-      "what": "the defended home at full opacity with a damaged core",
-      "siege": {
-        "coreHp": 100,
-        "maxCoreHp": 100,
-        "banked": 11
-      }
-    },
-    {
-      "name": "scene-alarm-full",
-      "what": "whole screen after sustained core damage — the alarm state",
-      "coreHp": [
-        100,
-        95,
-        90,
-        85,
-        80,
-        75,
-        70,
-        65,
-        60,
-        55,
-        50,
-        45,
-        40
-      ],
-      "geo": {
-        "shipScreen": {
-          "x": 640,
-          "y": 400
-        },
-        "ticks": 1001
-      }
-    },
-    {
-      "name": "scene-alarm-home",
-      "what": "the damaged home, cropped on the ship",
-      "coreHp": [
-        100,
-        95,
-        90,
-        85,
-        80,
-        75,
-        70,
-        65,
-        60,
-        55,
-        50,
-        45,
-        40
-      ]
-    },
-    {
-      "name": "fight-full",
-      "what": "whole screen while the ship is firing, driven by real keyboard + mouse",
-      "start": {
-        "x": 1968,
-        "y": 1200
-      },
-      "mid": {
-        "x": 1705.9057871495436,
-        "y": 1200
-      },
-      "end": {
-        "x": 1968,
-        "y": 1200
-      }
-    },
-    {
       "name": "ui-lobby-full",
       "what": "the lobby, clean boot, hull tiles + arena cards + RUSH!"
     },
@@ -267,6 +125,236 @@
         "open": true
       },
       "wedges": []
+    },
+    {
+      "name": "scene-arena-full",
+      "what": "whole pinned arena, nothing staged",
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "shipWorld": {
+          "x": 1968,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1280,
+          "h": 800
+        },
+        "ticks": 0,
+        "worldHash": "4302b39e",
+        "freezeTick": 120,
+        "build": {
+          "sha": "c2d401f",
+          "time": "2026-08-07T18:30:04.615Z"
+        }
+      }
+    },
+    {
+      "name": "scene-field-crop",
+      "what": "asteroid field, left of the home ring, nothing staged"
+    },
+    {
+      "name": "scene-home-defended",
+      "what": "local home: freeze-stamped turrets, mid-build scaffold, two shields",
+      "center": {
+        "x": 640,
+        "y": 400
+      }
+    },
+    {
+      "name": "scene-staged-muzzle-full",
+      "what": "pinned arena with a rival turret muzzle staged",
+      "staged": {
+        "firingShip": 1,
+        "turret": {
+          "shooter": 1,
+          "origin": {
+            "x": 1810.940258945177,
+            "y": 1734.940258945177
+          },
+          "end": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          },
+          "hit": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          }
+        }
+      },
+      "muzzleCount": 1
+    },
+    {
+      "name": "scene-siege-full",
+      "what": "pinned arena, station spawn protection lifted, core besieged",
+      "siege": {
+        "coreHp": 55,
+        "maxCoreHp": 100,
+        "banked": 11
+      },
+      "shipAlphaNote": {
+        "ticks": 0
+      }
+    },
+    {
+      "name": "scene-siege-home",
+      "what": "the defended home at full opacity with a damaged core",
+      "siege": {
+        "coreHp": 55,
+        "maxCoreHp": 100,
+        "banked": 11
+      }
+    },
+    {
+      "name": "scene-alarm-full",
+      "what": "whole screen after sustained core damage — the alarm state",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ],
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "ticks": 1298
+      }
+    },
+    {
+      "name": "scene-alarm-home",
+      "what": "the damaged home, cropped on the ship",
+      "coreHp": [
+        100,
+        95,
+        90,
+        85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        50,
+        45,
+        40
+      ]
+    },
+    {
+      "name": "fight-burst-0",
+      "what": "mining/dogfight burst sample 0 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-1",
+      "what": "mining/dogfight burst sample 1 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-2",
+      "what": "mining/dogfight burst sample 2 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-3",
+      "what": "mining/dogfight burst sample 3 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-4",
+      "what": "mining/dogfight burst sample 4 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-5",
+      "what": "mining/dogfight burst sample 5 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-6",
+      "what": "mining/dogfight burst sample 6 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-7",
+      "what": "mining/dogfight burst sample 7 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-full",
+      "what": "whole screen while the ship is firing, driven by real keyboard + mouse",
+      "start": {
+        "x": 1968,
+        "y": 1200
+      },
+      "mid": {
+        "x": 1224.6579242041619,
+        "y": 1200
+      },
+      "end": {
+        "x": 1220.2338622516222,
+        "y": 1200
+      }
     }
   ],
   "freeze": {
@@ -286,12 +374,12 @@
     "worldHash": "4302b39e",
     "freezeTick": 120,
     "build": {
-      "sha": "369d7a6",
-      "time": "2026-08-07T13:14:08.671Z"
+      "sha": "c2d401f",
+      "time": "2026-08-07T18:30:04.615Z"
     }
   },
   "siege": {
-    "coreHp": 100,
+    "coreHp": 55,
     "maxCoreHp": 100,
     "banked": 11
   },
@@ -317,7 +405,7 @@
         "x": 640,
         "y": 400
       },
-      "ticks": 1001
+      "ticks": 1298
     },
     "errors": []
   },
@@ -327,18 +415,18 @@
       "y": 1200
     },
     "mid": {
-      "x": 1705.9057871495436,
+      "x": 1224.6579242041619,
       "y": 1200
     },
     "end": {
-      "x": 1968,
+      "x": 1220.2338622516222,
       "y": 1200
     },
     "burst": [
       {
         "name": "fight-burst-0",
         "input": {
-          "frame": 410,
+          "frame": 446,
           "types": [
             "thrust",
             "aim",
@@ -357,7 +445,7 @@
       {
         "name": "fight-burst-1",
         "input": {
-          "frame": 515,
+          "frame": 502,
           "types": [
             "thrust",
             "aim",
@@ -376,7 +464,7 @@
       {
         "name": "fight-burst-2",
         "input": {
-          "frame": 620,
+          "frame": 556,
           "types": [
             "thrust",
             "aim",
@@ -395,7 +483,7 @@
       {
         "name": "fight-burst-3",
         "input": {
-          "frame": 740,
+          "frame": 609,
           "types": [
             "thrust",
             "aim",
@@ -414,7 +502,7 @@
       {
         "name": "fight-burst-4",
         "input": {
-          "frame": 860,
+          "frame": 663,
           "types": [
             "thrust",
             "aim",
@@ -433,7 +521,7 @@
       {
         "name": "fight-burst-5",
         "input": {
-          "frame": 980,
+          "frame": 717,
           "types": [
             "thrust",
             "aim",
@@ -452,7 +540,7 @@
       {
         "name": "fight-burst-6",
         "input": {
-          "frame": 1100,
+          "frame": 772,
           "types": [
             "thrust",
             "aim",
@@ -471,7 +559,7 @@
       {
         "name": "fight-burst-7",
         "input": {
-          "frame": 1220,
+          "frame": 831,
           "types": [
             "thrust",
             "aim",
@@ -549,5 +637,39 @@
       "open": true
     },
     "wedges": []
+  },
+  "builds": {
+    "scene": {
+      "sha": "c2d401f",
+      "frames": [
+        "scene-arena-full",
+        "scene-field-crop",
+        "scene-home-defended",
+        "scene-siege-full",
+        "scene-siege-home",
+        "scene-staged-muzzle-full"
+      ]
+    },
+    "alarm": {
+      "sha": "c2d401f",
+      "frames": [
+        "scene-alarm-full",
+        "scene-alarm-home"
+      ]
+    },
+    "fight": {
+      "sha": "c2d401f",
+      "frames": [
+        "fight-burst-0",
+        "fight-burst-1",
+        "fight-burst-2",
+        "fight-burst-3",
+        "fight-burst-4",
+        "fight-burst-5",
+        "fight-burst-6",
+        "fight-burst-7",
+        "fight-full"
+      ]
+    }
   }
 }

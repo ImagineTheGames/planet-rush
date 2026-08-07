@@ -1,0 +1,287 @@
+{
+  "base": "http://localhost:4188",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "deviceScaleFactor": 2,
+  "build": {
+    "sha": "c2d401f",
+    "time": "2026-08-07T18:30:04.615Z"
+  },
+  "frames": [
+    {
+      "name": "fight-burst-0",
+      "what": "mining/dogfight burst sample 0 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-1",
+      "what": "mining/dogfight burst sample 1 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-2",
+      "what": "mining/dogfight burst sample 2 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-3",
+      "what": "mining/dogfight burst sample 3 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-4",
+      "what": "mining/dogfight burst sample 4 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-5",
+      "what": "mining/dogfight burst sample 5 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-6",
+      "what": "mining/dogfight burst sample 6 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-burst-7",
+      "what": "mining/dogfight burst sample 7 of 8, trigger held on a real mouse",
+      "crop": {
+        "x": 0,
+        "y": 90,
+        "width": 760,
+        "height": 620
+      },
+      "firing": true
+    },
+    {
+      "name": "fight-full",
+      "what": "whole screen while the ship is firing, driven by real keyboard + mouse",
+      "start": {
+        "x": 1968,
+        "y": 1200
+      },
+      "mid": {
+        "x": 1224.6579242041619,
+        "y": 1200
+      },
+      "end": {
+        "x": 1220.2338622516222,
+        "y": 1200
+      }
+    }
+  ],
+  "fight": {
+    "start": {
+      "x": 1968,
+      "y": 1200
+    },
+    "mid": {
+      "x": 1224.6579242041619,
+      "y": 1200
+    },
+    "end": {
+      "x": 1220.2338622516222,
+      "y": 1200
+    },
+    "burst": [
+      {
+        "name": "fight-burst-0",
+        "input": {
+          "frame": 446,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-1",
+        "input": {
+          "frame": 502,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-2",
+        "input": {
+          "frame": 556,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-3",
+        "input": {
+          "frame": 609,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-4",
+        "input": {
+          "frame": 663,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-5",
+        "input": {
+          "frame": 717,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-6",
+        "input": {
+          "frame": 772,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "fight-burst-7",
+        "input": {
+          "frame": 831,
+          "types": [
+            "thrust",
+            "aim",
+            "fire",
+            "build"
+          ],
+          "fire": true,
+          "build": false,
+          "aim": true,
+          "thrust": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      }
+    ],
+    "errors": []
+  }
+}

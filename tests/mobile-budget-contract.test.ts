@@ -114,8 +114,13 @@ describe('tests/mobile budget contract', () => {
     expect(budgetMsFor(28)).toBe(300_000); // 28 s × 10 = 280 s → rounds up to 300 s
     expect(budgetMsFor(15)).toBe(150_000);
 
-    // The allowance covers the observed runner slowdown (5.9× at 11659df) with
-    // room, and stays inside the band LESSONS §5 records for software GL.
+    // The allowance covers the runner slowdown we NORMALLY see (5.9× at 11659df)
+    // with room, and sits at the top of the band LESSONS §5 records for software
+    // GL. It deliberately does not chase the tail: 21× (PR #291) and 31×
+    // (369d7a6) have both been measured, and sizing every budget in the suite for
+    // 31× would give a genuine hang minutes to hide in. The tail is covered by an
+    // extra ATTEMPT on the goldens instead — tests/mobile/shot-budget.ts
+    // `GOLDEN_CI_RETRIES`, and the sample table in ./mobile/budget-model.ts.
     expect(CI_SLOW_FACTOR).toBeGreaterThanOrEqual(6);
     expect(CI_SLOW_FACTOR).toBeLessThanOrEqual(10);
   });

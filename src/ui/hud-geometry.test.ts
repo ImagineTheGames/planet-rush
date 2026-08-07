@@ -51,8 +51,18 @@ import {
 import { wheelMetrics } from '../art/materials';
 import { buildWheelModel, WHEEL_ORDER } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
-import { buildWedgeLines, capWords, placeWedgeLines, targetWords } from './wheel-stack';
+import { buildWedgeLines, capWords, placeWedgeLines, statWords, targetWords, upgradeWedgeLines } from './wheel-stack';
 import type { WedgeFace } from './wheel-stack';
+import {
+  upgradeWheelModel,
+  upgradeWheelSlots,
+  UPGRADE_LADDER,
+  UpgradeTrack,
+  WHEEL_TRACK_ORDER,
+  STOCK_TIERS,
+} from './upgrade-wheel';
+import type { UpgradeLadder, UpgradeWheelSignals } from './upgrade-wheel';
+import { ShipClass } from '@shared/types';
 
 // ---------------------------------------------------------------------------
 // The device matrix — QA's playwright.config.ts profiles, both orientations,
@@ -546,4 +556,186 @@ describe('a wedge is a touch target first (GDD §2.4)', () => {
       expect(2 * outer * m.hub).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// The UPGRADE wedge, at the narrowest profile with its longest values (u7-06)
+// ---------------------------------------------------------------------------
+//
+// The upgrade wheel is the same radial control and takes the same four-slot
+// stack (./wheel-stack), so it takes the same budget — but its hard case is a
+// different one. The build wheel's is the count line; this wheel's is the STAT
+// line, the densest text on any wheel in the game (`111% → 123%`, two formatted
+// values and a glyph on one row), and it sits on this screen because a player
+// comparing two upgrades reads it carefully.
+//
+// Two things make it fit where the build wheel's copy had to go compact, and
+// both are worth stating because neither is a law:
+//
+//  1. the upgrade wheel has FOUR wedges to the build wheel's five, so a wedge is
+//     a 90° slice rather than 72° and the arc under the words is wider; and
+//  2. the ladder is DATA (`upgradeWheelModel` takes it as a parameter, and
+//     p2-03's projectile tracks are due), so wedge count is not fixed.
+//
+// (2) is why the loop below runs a GROWN ladder as well as today's: the file
+// promises new tracks appear "for free", and free has to include still fitting.
+
+/** Every wedge on both levels of the upgrade wheel, for one frame. */
+function upgradeWedgesOf(signals: UpgradeWheelSignals, ladder: UpgradeLadder, order: readonly UpgradeTrack[]) {
+  return [false, true].flatMap((weaponOpen) => {
+    const model = upgradeWheelModel({ ...signals, weaponOpen }, ladder, order);
+    const count = upgradeWheelSlots(weaponOpen, ladder, order).length;
+    return model.wedges.map((wedge) => ({ wedge, count, level: weaponOpen ? 'weapon' : 'main' }));
+  });
+}
+
+/**
+ * The frame that makes every upgrade line as long as it can be at once: the
+ * HAULER (the widest class bases, so the biggest printed values), one tier off
+ * the top of every ladder (so both a three-digit current AND a three-digit next
+ * are printed side by side), and a late-match three-digit hoard so `cost/held`
+ * is at its widest.
+ */
+const WORST_UPGRADE: UpgradeWheelSignals = {
+  open: true,
+  weaponOpen: false,
+  shipClass: ShipClass.Hauler,
+  tiers: {
+    [UpgradeTrack.Power]: 2,
+    [UpgradeTrack.Engine]: 2,
+    [UpgradeTrack.Cargo]: 2,
+    [UpgradeTrack.Hull]: 2,
+    [UpgradeTrack.Speed]: 1,
+  },
+  ore: 999,
+};
+
+/**
+ * Today's ladder with one more standalone track — a **fifth** main-wheel wedge,
+ * the same 72° slice the build wheel already runs at every profile. The module
+ * header promises new tracks appear "with no change to this file or the view",
+ * and free has to include still fitting.
+ *
+ * ── THE TWO CEILINGS, MEASURED (for whoever grows this next) ────────────────
+ * Growth is not unlimited, and the limits are worth writing down here rather
+ * than discovering them in a screenshot:
+ *
+ *  1. **Seven main-wheel wedges.** At 390 px the WEAPON wedge's `OPEN ▸` is
+ *     67 px at the phone profile's 16 px cost size, and a seventh of the wheel
+ *     is a 59 px arc where that line sits. Six fit; seven needs a compact form
+ *     for that line, or paging.
+ *  2. **Four weapon tracks.** The WEAPON wedge draws one pip ROW per weapon
+ *     track, so the sub-wheel growing pushes the main wheel's `OPEN ▸` inward
+ *     to where the arc is narrowest — at four rows it lands at r≈50 on a phone
+ *     and runs past it. p2-03's tracks are projectile tracks and so carry the
+ *     WEAPON group, which makes this the ceiling that bites first: the third
+ *     weapon track is the one to measure again.
+ */
+const GROWN_LADDER: UpgradeLadder = {
+  ...UPGRADE_LADDER,
+  ...(Object.fromEntries([
+    ['shielding', { ...UPGRADE_LADDER[UpgradeTrack.Hull], label: 'SHIELDING' }],
+  ]) as Record<string, unknown>),
+} as unknown as UpgradeLadder;
+
+/** The grown walk order: the weapon group stays contiguous and leading, exactly
+ *  as `WHEEL_TRACK_ORDER` keeps it, so the collapse still finds one run. */
+const GROWN_ORDER = [...WHEEL_TRACK_ORDER, 'shielding'] as unknown as UpgradeTrack[];
+
+/** Tiers for the grown ladder: one off the top of every track, including the new
+ *  one, so the longest current→next pair is printed on each. */
+const GROWN_TIERS = { ...WORST_UPGRADE.tiers, shielding: 2 } as unknown as Record<string, number>;
+
+describe('an upgrade wedge at 390 px, with its longest values (u7-06)', () => {
+  function assertUpgradeWedgesFit(
+    vp: Viewport,
+    ladder: UpgradeLadder = UPGRADE_LADDER,
+    order: readonly UpgradeTrack[] = WHEEL_TRACK_ORDER,
+    tiersOver: Record<string, number> = {},
+  ): void {
+    const outer = wheelRadius(vp.width, vp.height);
+    const m = wheelMetrics(outer);
+    const signals = { ...WORST_UPGRADE, tiers: { ...WORST_UPGRADE.tiers, ...tiersOver } as never };
+    for (const { wedge, count, level } of upgradeWedgesOf(signals, ladder, order)) {
+      const { placed, innerRadius } = placeWedgeLines(upgradeWedgeLines(wedge, m), outer, m);
+      for (const line of placed) {
+        const budget = wedgeChordWidth(line.radius, count);
+        const w = textWidth(line.text, line.size, line.tracking, line.face);
+        expect(
+          w,
+          `${level}/${wedge.label}/${line.slot}: "${line.text.replace(/\n/g, ' ')}" is ${w.toFixed(0)}px ` +
+            `at r=${line.radius.toFixed(0)}, where a wedge of ${count} is only ${budget.toFixed(0)}px wide`,
+        ).toBeLessThanOrEqual(budget);
+      }
+      expect(
+        innerRadius,
+        `${level}/${wedge.label}: the stack runs past the hub`,
+      ).toBeGreaterThanOrEqual(outer * m.hub);
+    }
+  }
+
+  for (const { name, vp } of PROFILES) {
+    it(`[${name}] every line of every upgrade wedge fits`, () => {
+      assertUpgradeWedgesFit(vp);
+    });
+  }
+
+  for (const { name, vp } of PROFILES) {
+    it(`[${name}] still fits when the ladder GROWS by a track (p2-03)`, () => {
+      assertUpgradeWedgesFit(vp, GROWN_LADDER, GROWN_ORDER, GROWN_TIERS);
+    });
+  }
+
+  it('the phone takes the compact stat line, the desktop the padded one', () => {
+    // The compact form is what buys the headroom at a grown ladder; both say the
+    // same two values, and neither drops one.
+    const phone = wheelMetrics(wheelRadius(390, 844));
+    const desktop = wheelMetrics(wheelRadius(1280, 800));
+    expect(phone.copy).toBe('compact');
+    expect(desktop.copy).toBe('full');
+    const wedge = upgradeWheelModel({ ...WORST_UPGRADE, tiers: STOCK_TIERS }).wedges.find(
+      (w) => w.label === 'ENGINE',
+    )!;
+    // The HAULER's stock engine (GDD §2.11) and what the first tier buys.
+    expect(statWords(wedge, desktop)).toBe('85% → 98%');
+    expect(statWords(wedge, phone)).toBe('85%→98%');
+  });
+});
+
+describe('an upgrade wedge is a touch target first (GDD §2.4)', () => {
+  // Both LEVELS: the main wheel's four wedges and the sub-wheel's two. The
+  // sub-wheel is the easier case (a 180° slice), but it is a level a thumb lands
+  // on during a live fight and so is asserted rather than assumed.
+  for (const { name, vp } of PROFILES) {
+    for (const weaponOpen of [false, true]) {
+      const level = weaponOpen ? 'weapon sub-wheel' : 'main wheel';
+      it(`[${name}] every ${level} wedge clears the 48 px floor in both directions`, () => {
+        const m = wheelMetrics(wheelRadius(vp.width, vp.height));
+        const count = upgradeWheelSlots(weaponOpen).length;
+        const t = wedgeHitTarget(vp.width, vp.height, count, m.hub);
+        expect(
+          t.min,
+          `${level}: ${count} wedges, ${t.arc.toFixed(0)}px of arc by ${t.depth.toFixed(0)}px deep`,
+        ).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN);
+      });
+    }
+  }
+
+  it('stays a target if the ladder grows by a track (p2-03)', () => {
+    // Five main-wheel wedges — the build wheel's own count. The day a wedge
+    // stops clearing the floor is the day the wheel needs paging, and this is
+    // where that is found out.
+    for (const { name, vp } of PROFILES) {
+      const m = wheelMetrics(wheelRadius(vp.width, vp.height));
+      const count = upgradeWheelSlots(false, GROWN_LADDER, GROWN_ORDER).length;
+      // Five main-wheel wedges: the four of today plus SHIELDING, with the now
+      // four-strong weapon run still collapsed into one WEAPON wedge.
+      expect(count).toBe(5);
+      expect(upgradeWheelSlots(true, GROWN_LADDER, GROWN_ORDER).length).toBe(2);
+      const t = wedgeHitTarget(vp.width, vp.height, count, m.hub);
+      expect(t.min, `${name}: ${t.arc.toFixed(0)}px arc × ${t.depth.toFixed(0)}px deep`).toBeGreaterThanOrEqual(
+        TOUCH_TARGET_MIN,
+      );
+    }
+  });
 });
