@@ -504,6 +504,89 @@ export function beamContentInset(m: FrameMetrics, kind: BeamKind = 'header'): nu
   return Math.max(m.margin, RIVET.inset + cluster + RIVET_CLEARANCE);
 }
 
+// ---------------------------------------------------------------------------
+// 3c. The roster row — the densest surface in the set, desktop AND phone
+// ---------------------------------------------------------------------------
+//
+// The lobby's roster carries more per row than anything else in the game: an
+// identity bar, a P-number, a name, a slot-state control, a side chip, a
+// difficulty chip and a ping — and the handoff ADDS a leading OPEN/CLOSED
+// button. Its metrics get their own block for the same reason §3b exists: the
+// handoff drew them once, at 1280×720, and a 390-wide phone is not that.
+//
+// Two rules decide every number below, and they are the ones the u7-03 brief
+// states:
+//
+//  1. **The look is ratified; the metric adapts.** Every width here is the
+//     handoff's own, scaled by {@link FrameMetrics.plateScale} — never re-picked.
+//  2. **Nothing on this row goes under the thumb.** A roster row is made of
+//     controls, not of text, so the row's own height IS a control's height
+//     ({@link rowHeight}, floored at {@link TOUCH_MIN}) and each segment spans
+//     the row rather than sitting inset inside it. A row that only works with a
+//     mouse is a failed screen here.
+
+/**
+ * The roster row at the handoff's reference, in px.
+ *
+ * `stateWidth` / `trailingWidth` are the handoff's own two row buttons — the
+ * leading `OPEN` / `CLOSED` and the trailing slot it collapses difficulty into.
+ * `sideWidth` is **ours, and deliberately wider than the design's**: the handoff
+ * draws a `T1` chip, and our ratified side chip carries the WORD (`FRIENDLY A`,
+ * GDD §2.1 amended 2026-08-05), which needs the room a letter does not.
+ *
+ * **The three widths do NOT scale, and that is the derivation rather than an
+ * omission.** What has to fit inside them is a word, and type on this screen
+ * bottoms out at {@link TYPE_MIN} — an 11px `CLOSED` is 11px wide per glyph on a
+ * phone exactly as on a desktop, so a button sized to hold it cannot shrink with
+ * the frame. The row's *height* and its *padding* do scale ({@link rowHeight},
+ * {@link rosterMetric}), because those hold air rather than letters.
+ */
+export const ROSTER = {
+  /** Row height — the handoff's row surface ({@link ROW}), restated here so the
+   *  roster reads as the same furniture as a settings row. */
+  height: ROW.height,
+  /** The identity bar down a row's leading edge ({@link ROW_BAR_WIDTH}). */
+  bar: ROW_BAR_WIDTH,
+  /** The leading slot-state button — the handoff's own `OPEN` / `CLOSED` button
+   *  on the far left of the row, holding our four words. */
+  stateWidth: 72,
+  /** The trailing slot — the handoff collapses difficulty and OPEN into one.
+   *  54, the width `MEDIUM` measures at 11px Audiowide plus its padding, rather
+   *  than the handoff's own 62: the word decides, and ours is shorter. */
+  trailingWidth: 54,
+  /** The side chip, holding `FRIENDLY A` rather than the handoff's `T1` — 88,
+   *  the measured 64px of word plus padding (u3). The design's chip holds two
+   *  characters and is a third of this; the ratified WORD is why it cannot be. */
+  sideWidth: 88,
+  /**
+   * Air between two roster rows. **Zero, and that is the design.** The handoff
+   * draws a roster as a LIST — abutting surfaces with a rule between them — not
+   * as a stack of floating cards, and the two 1px rules of two abutting `inert`
+   * plates *are* that separator. It is also what buys the last three pixels of
+   * row height on the notched landscape phone, where 4 × 48 has to fit in 195.
+   */
+  gap: 0,
+  /** Inset from a row segment's edge to the word inside it. 8, not the settings
+   *  row's 20: a roster row is a strip of segments, and every pixel of padding on
+   *  it is a pixel off a player's name (see `lobby-geometry` SEAT_ROW_BODY_MIN). */
+  padX: 8,
+} as const;
+
+/** A roster row's height at these metrics: the handoff's 64px surface, never
+ *  under the thumb floor — the same resolver a settings row uses. */
+export function rosterRowHeight(m: FrameMetrics): number {
+  return rowHeight(m);
+}
+
+/**
+ * One of the roster row's horizontal metrics at these metrics — a segment width
+ * or a padding. Scales with the PLATE, like everything else that sits *on* a
+ * surface rather than framing one, and never rounds away to nothing.
+ */
+export function rosterMetric(referencePx: number, m: FrameMetrics): number {
+  return Math.max(1, Math.round(referencePx * m.plateScale));
+}
+
 /**
  * Chrome type — a beam's eyebrow, the wordmark, a heading. Scales with the
  * FRAME, because that is the thing it sits inside, and never below
@@ -1176,6 +1259,13 @@ function cutBottomLeft(bx: number, by: number, bh: number, c: number): number {
  * `x`/`y`/`width`/`height` are the plate's *outer* box; the press offset is
  * applied inside, so a caller never moves the rect itself. Allocates nothing.
  * Call it when the state changes, not every frame.
+ *
+ * **`tick`** is the 3px accent bar at the head of the plate's content, and it
+ * assumes the handoff's own composition: a label hung off it, starting after it.
+ * A plate whose content is a *grid* rather than a label — a lobby hull tile's six
+ * stat cells, an arena card's preview — starts at its own tighter padding and the
+ * tick lands in the middle of it, so those pass `false`. It is a parameter rather
+ * than a fourth role because nothing else about the material changes.
  */
 export function drawPlate(
   canvas: PlateCanvas,
@@ -1186,6 +1276,7 @@ export function drawPlate(
   role: PlateRole,
   scale: PlateScale,
   state: PlateState = 'rest',
+  tick = true,
 ): void {
   if (width <= 0 || height <= 0) return;
   const m = plateMaterial(role, state, plateFamily(scale));
@@ -1260,7 +1351,7 @@ export function drawPlate(
   }
 
   // 6. The accent tick — the 3px bar at the head of the plate's content.
-  if (m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
+  if (tick && m.tick && g.tickHeight > 0 && g.tickWidth > 0) {
     const th = Math.min(g.tickHeight, fh);
     fillBox(canvas, fx + g.padX, fy + (fh - th) / 2, g.tickWidth, th, m.tick.color, m.tick.alpha);
   }
@@ -1583,6 +1674,15 @@ export type BeamKind = 'header' | 'footer';
  * Bone accent rule along its underside, and two rivet clusters. A footer is the
  * same beam inverted — the accent rule sits on top, the fill falls away
  * downward, and it wears no rivets (nothing is bolted to the bottom of a frame).
+ *
+ * **`height` is the beam the FRAME resolved, not the handoff's 92.** It defaults
+ * to {@link BEAM.height} for a caller drawing at the reference, and every screen
+ * should pass its own {@link FrameMetrics} `beam` instead: a phone's beam is
+ * ~50px, and painting the reference 92 into it put the header's Bone accent rule
+ * 40px *below* the beam, straight through the first plate on the screen, and ran
+ * the footer's gradient off the bottom edge before it reached its dark end
+ * (found in u7-03's first read of u7-01's phone goldens — the rule measured at
+ * y=90 on a 390px-tall viewport whose header ends at y=50).
  *
  * Pass `rivets = false` on a screen whose header carries a control where the
  * fasteners would sit. Allocates nothing.

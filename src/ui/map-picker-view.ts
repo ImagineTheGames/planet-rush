@@ -6,22 +6,43 @@
  * Graphics and Text and owns nothing but which child is which — the same shape as
  * {@link ./main-menu-view}.
  *
+ * ---------------------------------------------------------------------------
+ * GANTRY / BONE (u7-03)
+ * ---------------------------------------------------------------------------
+ * The arena row lives inside the lobby (p2 field rule — one pre-match room where
+ * you pick your hull AND your arena), and the lobby is Gantry/Bone now. A card
+ * drawn as a 1px hairline in the middle of a screen of machined plates is the
+ * exact "five dialects of one direction" drift the handoff exists to fix, so a
+ * card is a plate: `secondary` where it is the pick, `inert` where it is not —
+ * the same pair the hull tiles beside it use, and never `primary`, because RUSH!
+ * is the lobby's one bright plate.
+ *
  * The frozen contract, where it could only be broken here (style-guide §1, §2):
  *  - Names in Audiowide (words), blurbs in Oxanium (body) — never crossed (§7).
- *  - The selected card is marked in **plasma** (energy/selection); an unselected
- *    one is steel. No **signal yellow** anywhere — a map card is neither ore nor
- *    danger, and the reserved rule is the one that carries the most weight (§2).
- *  - The mini preview draws each home station as a **patina** disc, the station's
- *    own body colour (§5), inside a steel arena frame. The picture is
+ *  - Selection is a **raised plate**, not a hue: Bone spends no colour on a menu,
+ *    which is what leaves the palette's hues free to mean things in a match. No
+ *    **signal yellow** anywhere — a map card is neither ore nor danger, and the
+ *    reserved rule is the one that carries the most weight (§2).
+ *  - The mini preview keeps drawing each home station as a **patina** disc, the
+ *    station's own body colour (§5), inside a steel arena frame. That one *is* a
+ *    material read rather than chrome — it is a picture of the board — so it
+ *    survives a direction that spends no colour on its controls. The picture is
  *    `map.stations(...)` normalised into the box, so it is the board the sim will
  *    build — it cannot drift from the registry.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
 import { PALETTE } from '@render/index';
+import {
+  BONE,
+  MATERIAL_SHADES,
+  TRACKING,
+  DISPLAY_TRACKING,
+  drawPlate,
+  trackingPx,
+} from '../art/materials';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { FONT_BODY, FONT_HEADING, TEXT_PRIMARY } from './typography';
-import { PANEL_FILL, PANEL_RULE, TEXT_MUTED, RADIUS } from './chrome';
+import { FONT_BODY, FONT_HEADING } from './typography';
 import { MAP_PICKER_ID, mapPickerHitTest } from './map-picker';
 import type { MapCardModel, MapPickerLayout, MapPickerModel, MapPreview } from './map-picker';
 
@@ -85,14 +106,26 @@ export class MapPickerView extends Container {
   }
 
   private drawCard(nodes: CardNodes, card: MapCardModel, rect: Rect): void {
-    const tint = card.selected ? PALETTE.plasma : PALETTE.hullSteel;
-
     nodes.body.clear();
-    nodes.body
-      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
-      .fill({ color: tint, alpha: card.selected ? 0.16 : 0.07 })
-      .roundRect(rect.x, rect.y, rect.width, rect.height, RADIUS.control)
-      .stroke({ width: card.selected ? 2 : 1, color: tint, alpha: card.selected ? 0.95 : 0.55 });
+    if (rect.width <= 0 || rect.height <= 0) {
+      this.hideCard(nodes);
+      return;
+    }
+    // A card is a plate: raised where it is the pick, a surface where it is not.
+    // No accent tick: a card's content is a PREVIEW box starting at its own 8px
+    // padding, and the tick would land inside the picture.
+    drawPlate(
+      nodes.body,
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      card.selected ? 'secondary' : 'inert',
+      'compact',
+      'rest',
+      false,
+    );
+    nodes.name.style.fill = card.selected ? BONE.hi : MATERIAL_SHADES.bone;
 
     // --- The preview box, off the top of the card -----------------------------
     const previewBox: Rect = {
@@ -137,11 +170,7 @@ export class MapPickerView extends Container {
       const tx = rect.x + rect.width - tw - CARD_PAD;
       const ty = rect.y + CARD_PAD;
       nodes.veteranBg.clear();
-      nodes.veteranBg
-        .roundRect(tx, ty, tw, th, 3)
-        .fill({ color: PANEL_FILL, alpha: 0.7 })
-        .roundRect(tx, ty, tw, th, 3)
-        .stroke({ width: 1, color: PANEL_RULE, alpha: 0.8 });
+      drawPlate(nodes.veteranBg, tx, ty, tw, th, 'secondary', 'chip', 'rest', false);
       nodes.veteran.x = tx + padX;
       nodes.veteran.y = ty + padY;
     } else {
@@ -167,11 +196,12 @@ export class MapPickerView extends Container {
     const drawX = box.x + (box.width - drawW) / 2;
     const drawY = box.y + (box.height - drawH) / 2;
 
-    // The arena frame — steel, the "space with a steel frame" read (maps.ts).
-    g.roundRect(drawX, drawY, drawW, drawH, 3)
-      .fill({ color: PANEL_FILL, alpha: 0.6 })
-      .roundRect(drawX, drawY, drawW, drawH, 3)
-      .stroke({ width: 1, color: PANEL_RULE, alpha: 0.5 });
+    // The arena frame — steel, the "space with a steel frame" read (maps.ts),
+    // now in the same two tones the plates around it are cut from.
+    g.rect(drawX, drawY, drawW, drawH)
+      .fill({ color: MATERIAL_SHADES.faceShade, alpha: 0.9 })
+      .rect(drawX, drawY, drawW, drawH)
+      .stroke({ width: 1, color: MATERIAL_SHADES.ruleDeep, alpha: 0.9 });
 
     // Each home station: a patina disc (its body colour), scaled to the box.
     const dotR = Math.max(1.5, Math.min(drawW, drawH) * 0.05);
@@ -199,14 +229,15 @@ export class MapPickerView extends Container {
     if (existing) return existing;
     const body = new Graphics();
     const preview = new Graphics();
-    const name = makeText('', FONT_HEADING, 15, TEXT_PRIMARY);
+    const name = makeText('', FONT_HEADING, 15, MATERIAL_SHADES.bone);
+    name.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, 15);
     name.anchor.set(0.5, 0);
     const blurb = new Text({
       text: '',
       style: {
         fontFamily: FONT_BODY,
         fontSize: 11,
-        fill: TEXT_MUTED,
+        fill: MATERIAL_SHADES.boneLo,
         align: 'center',
         wordWrap: true,
         wordWrapWidth: 120,
@@ -215,7 +246,8 @@ export class MapPickerView extends Container {
     });
     blurb.anchor.set(0.5, 0);
     const veteranBg = new Graphics();
-    const veteran = makeText('VETERAN', FONT_BODY, 9, TEXT_PRIMARY);
+    const veteran = makeText('VETERAN', FONT_BODY, 9, MATERIAL_SHADES.bone);
+    veteran.style.letterSpacing = trackingPx(TRACKING.eyebrow, 9);
     veteran.anchor.set(0, 0);
     // Draw order: body, preview, text, then the tag on top.
     this.addChild(body, preview, name, blurb, veteranBg, veteran);
@@ -226,7 +258,7 @@ export class MapPickerView extends Container {
 }
 
 function makeText(text: string, fontFamily: string, fontSize: number, fill: number): Text {
-  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0.5 } });
+  return new Text({ text, style: { fontFamily, fontSize, fill, letterSpacing: 0 } });
 }
 
 function zeroRect(): Rect {
