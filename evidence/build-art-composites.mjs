@@ -153,7 +153,7 @@ async function main() {
            { src: img('boards/scene-00.png'),
              cap: '“Beam on rock, cracks spreading, freed ore drifting into the hold.” One continuous plasma beam from the ship to the rock; rocks are dark charcoal slabs with ink outlines and yellow ore diamonds; a four-square hold meter top-left; ASTEROID WAVE 2/5 top-right.' },
            { src: img('live/fight-burst-3.png'),
-             cap: 'The same act in the shipped build. <b>NO beam</b>: the ship throws discrete round shots — two of the player’s in flight at centre, and one red enemy round to the right. The player’s Vanguard sits right of centre at full opacity with a 50/50 hull bar and two dark hold pips beneath it. Rocks are <b>pale grey</b> slabs carrying yellow ore pips, green-teal moss arcs and darker grey inner cores. Three rivals are named and coloured by roster — Sable (orange), Warden (slate-blue), Rusty (spring) — each with an HP bar. The coach line reads “Hold Left mouse on the asteroid — your shots…”.' }),
+             cap: 'The same act in the shipped build, re-shot on c2d401f. <b>NO beam</b>: the ship throws discrete round shots — two of the player’s are in flight as small plasma-blue discs strung out to the left of the ship, along the line it is firing. The player’s Vanguard sits right of centre at full opacity with a 50/50 blue hull bar and two dark hold pips beneath it. Rocks are now <b>dark slate</b> slabs carrying yellow ore pips, green-teal moss arcs and a darker inner facet — on the previous build this same caption had to say “pale grey”. Rivals are named and coloured by roster — Patch (MEDIUM) in pink at 70/70, Bolt (EASY) in spring bottom-right. The coach line reads “Hold Left mouse on the asteroid — your shots…”.' }),
       pair('Sieging a defended planet',
            'board scene-gallery.html §The Triangle — Attack · live: ?debug=1&freeze=1 (worldHash 4302b39e), the freeze stamp’s turrets + shields, then __repairStage.siege(105) to lift spawn protection and bleed the core',
            { src: img('boards/scene-02.png'),
@@ -165,21 +165,30 @@ async function main() {
            { src: img('boards/scene-08.png'),
              cap: 'A red-bordered frame, a hard red banner “▶ PLANET UNDER ATTACK ◀” across the top, MY PLANET drained to a red stub, a big red HOME arrow at the screen edge, and the question “one more rock, or fly home?”.' },
            { src: img('live/scene-alarm-full.png'),
-             cap: 'The alarm is real and it is red: a dark red vignette frames the whole screen and a red arc appears on the home ring. But the words are a neutral coach line — “Your station is under attack — follow the arrow” in bone on the standard dark plate — not a red banner, and the HOME bar top-right is still full-width plasma blue at 94/100 rather than a red stub. No screen-edge HOME arrow is drawn (the ship is at home, so there is no direction to point).' }),
+             cap: 'The alarm is real and it is red: a dark red vignette frames the whole screen and a red arc runs most of the way round the home ring. But the words are a neutral coach line — “Your station is under attack — follow the arrow” in bone on the standard dark plate — not a red banner. The HOME bar top-right has drained to <b>40/100</b> (matching the sim readback), and it is still drawn in <b>plasma blue</b> where the board draws a red stub. No screen-edge HOME arrow (the ship is at the planet, so there is no direction to point). Rocks down the left edge read as dark slate. <b>The build sha <code>c2d401f</code> is rendered by the game in the bottom-left corner of this frame</b> — see the provenance crop below, which is this frame’s own corner at 3×.' }),
+      pair('Rock against rock at 3× — and the build identifying itself',
+           'both panels are 420×130 source pixels magnified 3× nearest-neighbour (labelled; no other processing). Both sources were shot at deviceScaleFactor 2, so this is a like-for-like magnification. Compare material and value, not size — the board illustrates a rock larger than the game camera renders one.',
+           { src: img('boards/provenance-rock-corner.png'),
+             cap: 'The board’s rock at 3×: a flat slate fill <b>#454E59 (luminance 76.9)</b> inside one crisp darker ink line <b>#262C34 (43.3)</b>, with a single gold ore slash. This is the material the campaign asked the game to adopt.' },
+           { src: img('live/provenance-sha-corner.png'),
+             cap: 'The live rock at the same 3×: body <b>#484E57 (luminance 77.4)</b>, rim and facet ink measuring <b>#2A2F36 (46.4)</b> and <b>#24292F (40.4)</b> — <b>half a luminance step from the board’s body, three from its ink</b>. The build adds relief the flat board does not draw (a darker rim, two facet discs, green-teal moss arcs, gold ore pips), but the material now reads as the same rock. Note also that the body is plainly <i>darker</i> than the bone “Thrust” / “Aim” HUD text beside it; on the previous build it was lighter than that text. And the game’s own corner stamp reads <b>c2d401f</b> — the same sha as <code>dist/version.json</code> and as the commit this branch was built from, so the live frames on this page cannot be stale captures relabelled.' }),
       pair('The field itself',
            'board scene-gallery.html §Mining run (rocks only) · live: the pinned arena, left of the home ring, nothing staged',
            { src: img('boards/scene-01.png'), cap: 'Asteroid-wave drop as the boards draw rock: dark charcoal bodies inside one crisp ink line.' },
-           { src: img('live/scene-field-crop.png'), cap: 'The same rocks in the build: pale grey bodies, a darker grey inner core, yellow ore pips and green-teal moss arcs. Outlined, but in a lighter grey than the board’s ink.' }),
-      `<div class="row"><div class="rowhead"><h2>The two shades this comparison turns on</h2>
-         <span class="note">measured off the PNGs above by evidence/probe-art-palette.mjs — modal opaque colour of each region</span></div>
+           { src: img('live/scene-field-crop.png'), cap: 'The same rocks in the build, re-shot on c2d401f: <b>dark slate bodies inside a darker rim</b> — the same read as the board panel beside them, and the change this re-shoot exists to test. Seven rocks sit as dark masses against the vacuum; the brightest things in the crop are the yellow ore pips and the green-teal moss arcs, exactly as on the board, where before the rock body itself was the palest thing in frame. The live rocks additionally carry a slightly darker inner facet and the moss arcs, which the board’s flat fill does not draw.' }),
+      `<div class="row"><div class="rowhead"><h2>The shades this comparison turns on — the two that failed last pass, now closed</h2>
+         <span class="note">measured off the PNGs above by evidence/probe-art-palette.mjs — modal opaque colour of each region. The two asteroid rows were independently re-derived by decoding the same PNGs with pngjs and taking the modal colour above luminance 30 (i.e. excluding vacuum and the boards’ panel wash); both methods return the same hexes.</span></div>
         <div style="grid-column:1/-1">${palTable([
           { what: 'asteroid body — <b>on screen the whole match</b>', live: rockLive.hex,
-            liveNote: `${(rockLive.share * 100).toFixed(1)}% of the field crop · = DERIVED.rockBody 0x939ba5`,
-            board: rockBoard.hex, cls: 'gap',
-            read: 'THE GAP. Luminance 155 vs 79 — the live rock is roughly twice the board’s value. This is the exact “current” cell of GAP-ANALYSIS §2 Lever B (“a <i>light</i> tint” → “#454E59 dark charcoal”), unmoved.' },
-          { what: 'asteroid outline', live: '#373D44', liveNote: '= DERIVED.rockFissure 0x2d3239, blended',
-            board: '#262C34', cls: 'gap',
-            read: 'THE GAP. Lever A asks every family to share one crisp ink #262C34; the ships got it (see art-vs-board-ships), rock did not.' },
+            liveNote: `${(rockLive.share * 100).toFixed(1)}% of the field crop · = DERIVED.rockBody 0x484e57`,
+            board: rockBoard.hex, cls: 'ok',
+            read: 'CLOSED. Luminance <b>77.4 vs 76.9</b> — half a step apart, on the family GAP-ANALYSIS annotates “every rock, the whole match”. The previous pass measured this same crop at <b>#939BA5, luminance 155</b> against the same board: the live rock was twice the board’s value and was the palest thing in frame. GAP-ANALYSIS §2 Lever B is spent.' },
+          { what: 'asteroid outline', live: '#2A2F36', liveNote: 'antialiased rim · = DERIVED.rockFissure 0x272c32',
+            board: '#262C34', cls: 'ok',
+            read: 'CLOSED. Lever A asks every family to share one crisp ink #262C34; rock now sits 5 from it in RGB (luminance 46.4 vs 43.3), against #2D3239 blending to #373D44 before. The ships already had it — now the whole scene shares one ink.' },
+          { what: 'asteroid inner facet', live: '#40474F', liveNote: '19.8% of drawn pixels in the field crop',
+            board: '—', cls: 'res',
+            read: 'live-only, and NOT a value error: the build gives each rock a second, slightly darker facet tone (luminance 70.1) inside the body, where the board draws one flat fill. Both live tones sit inside the board’s value band, so the rock still reads as one dark slab — this is added relief, not a divergence.' },
           { what: 'ship hull plate, for contrast', live: '#7E8894', board: '#7E8894', cls: 'ok',
             read: 'exact match — the levers DID land on the ship family, which is what makes the rock rows above a gap rather than a direction' },
           { what: 'home ocean', live: '#2F4A63', liveNote: 'off the un-faded siege frame; the spawn-faded frame reads #2C4F6A', board: '#2E6E9E', cls: 'res',
@@ -197,7 +206,7 @@ async function main() {
     ].join('');
     await shoot(browser, page1(
       'art-vs-board-scene — the live battle scene against docs/art-direction/scene-gallery.html',
-      `Every LIVE panel is the shipped preview build (<b>vite build → vite preview</b>, version.json sha <b>369d7a6</b>, built 2026-08-07T13:14:08Z) at 1280×800, deviceScaleFactor 2. Every BOARD panel is <b>docs/art-direction/scene-gallery.html</b> shot from the repo at the same scale — element screenshots keyed to the board’s own <code>.scene</code> figures, so a board edit moves the crop rather than silently changing what this claims to show. Nothing is retouched and nothing is colour-corrected. The captions describe only what is on the pixels. <b>Frames used for colour are past spawn protection</b> — a spawn-protected ship draws at <code>alpha 0.5</code> and a station at <code>0.75</code>, so a value read off the pinned opening frame measures the fade, not the paint.`,
+      `Every LIVE panel is the shipped preview build (<b>vite build → vite preview</b>, version.json sha <b>c2d401f</b>, built 2026-08-07T18:30:04Z) at 1280×800, deviceScaleFactor 2 — <b>re-shot after a3-01 landed the two asteroid levers</b>; every live frame on this page is from that build, none carried over. Every BOARD panel is <b>docs/art-direction/scene-gallery.html</b> shot from the repo at the same scale — element screenshots keyed to the board’s own <code>.scene</code> figures, so a board edit moves the crop rather than silently changing what this claims to show. Nothing is retouched and nothing is colour-corrected. The captions describe only what is on the pixels. <b>Frames used for colour are past spawn protection</b> — a spawn-protected ship draws at <code>alpha 0.5</code> and a station at <code>0.75</code>, so a value read off the pinned opening frame measures the fade, not the paint.`,
       body), 'art-vs-board-scene.png', 1580);
   }
 

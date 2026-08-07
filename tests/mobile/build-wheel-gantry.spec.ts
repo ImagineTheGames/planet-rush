@@ -149,12 +149,9 @@ async function useLandscape(page: Page): Promise<void> {
   if (vp && vp.height > vp.width) await page.setViewportSize({ width: vp.height, height: vp.width });
 }
 
-/**
- * Open the Build wheel through the REAL affordance for this device — the BUILD
- * button under the left thumb on touch, the `E` binding on desktop (GDD §2.4's
- * table, both cells) — and prove it opened by the registry, not by a seam.
- */
-async function openWheelForReal(page: Page, touch: boolean): Promise<void> {
+/** One real press on this device's BUILD affordance — the button under the left
+ *  thumb on touch, the `E` binding on desktop (GDD §2.4's table, both cells). */
+async function pressBuildAffordance(page: Page, touch: boolean): Promise<void> {
   if (touch) {
     // The button is drawn in LOGICAL space (landscape, even portrait-held), so
     // the tap point crosses the client's own transform on the way back out.
@@ -170,7 +167,32 @@ async function openWheelForReal(page: Page, touch: boolean): Promise<void> {
     await page.keyboard.press('e');
   }
   await waitForSimTicks(page, 4, { what: 'the wheel opening' });
-  expect(await registered(page, 'build-wheel'), 'the real open affordance did not open the wheel').not.toBeNull();
+}
+
+/**
+ * Open the Build wheel through the REAL affordance, and prove it opened by the
+ * registry rather than by a seam.
+ *
+ * Retries the press, and the guard is what makes that safe: the affordance is a
+ * TOGGLE, so a blind second press would close a wheel the first one opened —
+ * hence the registry check before every attempt. A retry is needed because the
+ * precondition is the SIM's, not the test's: the wheel only opens while the ship
+ * is docked at its own station (`updateBuildWheel`), and on a runner driving
+ * three device profiles at once the first press can land in the frames before
+ * the client has resolved that. Waiting on the wheel alone would hang; pressing
+ * again after a beat is the honest retry. (Found by a full-suite run, u7-06.)
+ */
+async function openWheelForReal(page: Page, touch: boolean): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await registered(page, 'build-wheel')) return;
+    await pressBuildAffordance(page, touch);
+    if (await registered(page, 'build-wheel')) return;
+    await waitForSimTicks(page, 10, { what: 'the ship to settle docked at its station' });
+  }
+  expect(
+    await registered(page, 'build-wheel'),
+    'three real presses on the BUILD affordance did not open the wheel',
+  ).not.toBeNull();
 }
 
 /** Bank exactly `ore` and let the wheel redraw against it. */

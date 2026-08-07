@@ -52,14 +52,14 @@ Do not rely on a lighter backdrop; there isn't one.
 Threat red `#B23A3A` carries the danger half of the same discipline: it is
 damage, alarm, and enemy fire only — never a neutral or friendly accent.
 
-### 2.1 The cost-numeral carve-out — one exception, stated in both colours *(amended 2026-08-06 — the ratified Gantry/Bone build wheel, u7-02; see `docs/design/gantry-bone-handoff.md` and GDD §2.5)*
+### 2.1 The cost-numeral carve-out — one exception, stated in both colours *(amended 2026-08-06 — the ratified Gantry/Bone build wheel, u7-02; **scope clarified 2026-08-06 by u7-06 — it covers BOTH wheels**; see `docs/design/gantry-bone-handoff.md` and GDD §2.5)*
 
 There is exactly **one** place in this game where a RESERVED colour is spent on a
 piece of interface, and this section is it, written down so it is a decision
 rather than a drift:
 
-> **A cost numeral on the build wheel is signal yellow `#F2D24B` when the player
-> can pay it, and threat red `#B23A3A` when they cannot.**
+> **A cost numeral on the Build & Upgrade wheel is signal yellow `#F2D24B` when
+> the player can pay it, and threat red `#B23A3A` when they cannot.**
 
 The yellow half was already carved out above ("cost numerals on the build
 wheel") and is unchanged. The red half is new, and it is the *same* carve-out on
@@ -83,9 +83,28 @@ becoming a licence:
    only thing this red is allowed to mean.
 3. **No new hue.** `#B23A3A` is the frozen threat red of §1, unmodified. This
    amendment adds no colour to the palette.
-4. **It does not travel.** "Cost numerals on the build wheel" is a statement
-   about cost numerals on the build wheel. It licenses nothing in a menu, on the
-   HUD, in the lobby, or on any other screen.
+4. **It does not travel.** "Cost numerals on the Build & Upgrade wheel" is a
+   statement about cost numerals on the Build & Upgrade wheel. It licenses
+   nothing in a menu, on the HUD, in the lobby, or on any other screen.
+
+**Scope: the two wheels, which are one control *(clarified 2026-08-06, u7-06 —
+flagged for the Director; nothing shipped changed colour)*.** As first written
+this section said "the build wheel" throughout, and limit 4 said the carve-out
+travels nowhere else. Read strictly that excluded the **upgrade wheel** — which
+had already been drawing an unaffordable tier's cost in threat red since before
+this section existed, and which is not "another screen" in the sense limit 4 is
+guarding against: it is the second level of the same radial control, reached by
+pressing a wedge of the first, drawn by the same code, and since u7-06 quoting
+its price in the same `cost/held` grammar. A player crosses between them in one
+press; a rule that changed colour across that press would be the drift this
+section exists to prevent.
+
+So the wording is "the Build & Upgrade wheel" — the control GDD §2.5 names, both
+its levels — and **no pixel changed colour when it was corrected.** All four
+limits above apply unchanged on both levels; in particular a **maxed** track
+draws its `MAX` in steel, not red, under limit 2, because a finished ladder is
+not a poverty problem. Everything limit 4 rules out — menus, the HUD, the lobby,
+any other screen — stays ruled out.
 
 Everything else in the Gantry/Bone direction is deliberately hueless — the
 accent is **Bone**, which is brightness rather than colour (`src/art/materials.ts`)
