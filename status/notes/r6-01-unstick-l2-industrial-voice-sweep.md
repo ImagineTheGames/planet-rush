@@ -139,8 +139,16 @@ own header says NOT FOR COMMIT). Verify `/version.json` matches HEAD every run.
   it is much better evidence than a locally re-created failure.
 - `dd9267e` — the three voiced screens re-shot on the merged tree.
 
-Remaining: **CI on #283 only.** Nothing else is outstanding and nothing is
-blocked. No other brief's work is reversed anywhere in this branch.
+**CI on #283 is GREEN.** The 43-hour red is closed:
+
+```
+Mobile emulation (Playwright)   pass   29m37s
+Typecheck, test, build          pass    6m33s
+```
+
+`mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`. Nothing outstanding, nothing
+blocked, no other brief's work reversed anywhere in this branch. The branch is
+ready for review/merge; that call is not mine to make.
 
 If CI is still red, do NOT assume the copy again — the local instrument now
 agrees with the runner to 0.2% (`ENTRY_ERRORS.full` 454 here / 455 there), so a
