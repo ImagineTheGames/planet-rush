@@ -10,6 +10,23 @@
  * in one process — the exact object `server/index.ts` hosts — **each filled with
  * eight Hard bots**, and measures what one 60 Hz tick of the whole fleet costs.
  *
+ * ── THIS FILE NO LONGER SETS THE CEILING (m11-01, docs/server-capacity.md) ──
+ *
+ * It used to, and it set it wrong: 32. Two reasons, and the second is the one
+ * that mattered. It measures the **sim** — the wire, the per-socket fan-out,
+ * snapshot encoding and the JSON control path are not in a bare fleet tick, and
+ * together they cost 1.7× again. And it gates against **one whole core's 16.67 ms
+ * frame**, while the guest the fleet deploys to is metered at 6.25% of a core
+ * sustained. 45% of a core is seven times that quota: the Machine throttles long
+ * before the loop notices, and every room on it together.
+ *
+ * The ceiling is now derived from the **CPU quota**, measured over the real wire
+ * by `tests/net/capacity/` and recorded in `docs/server-capacity.md`. What this
+ * file still does, and still does better than anything else, is gate the *sim
+ * cost* of a full fleet in CI without a socket in sight — so a sim regression
+ * that made a room heavy shows up here first, in seconds. Read its gates as
+ * "the fleet still keeps up with real time", not as "this is how many fit".
+ *
  * **Why eight Hard bots is the worst case, not a convenience.** A bot runs its AI
  * *on the server*, every tick, through the same `Action` channel a human's input
  * would arrive on (`server/room.ts`). A human seat is *cheaper*: it costs one
@@ -224,12 +241,15 @@ describe('fleet density — DEFAULT_MAX_ROOMS full of Hard bots', () => {
     // chosen ceiling the mean is well under a fifth of the budget here.
     expect(mean).toBeLessThan(TICK_BUDGET_MS);
 
-    // Gate 2 — the ceiling survives the deploy target. The 5×-slower shared-core
-    // estimate must still fit one 60 Hz tick on the sustained (mean) cost that the
-    // /health `loopLagMs` gate watches. This is what justifies the constant: if a
-    // regression made a room heavy enough that DEFAULT_MAX_ROOMS of them could not
-    // fit the estimated target core, this fails and the constant must drop (or the
-    // room get cheaper), exactly as the hosting plan intends. The estimate is
+    // Gate 2 — the fleet's SIM cost survives the deploy target's core speed. The
+    // 5×-slower shared-core estimate must still fit one 60 Hz tick on the
+    // sustained (mean) cost. Note what this does and does not say: it is about the
+    // core being fast enough, never about the *quota* being large enough, and the
+    // quota is what actually binds (see the header — 45% of a core is 7× a
+    // shared-cpu-1x's entire sustained budget). So this is a regression gate on
+    // room weight, not the justification for DEFAULT_MAX_ROOMS; that lives in
+    // docs/server-capacity.md and is gated by
+    // tests/net/capacity/capacity-regression.test.ts. The estimate is
     // i9-normalised (see `effectiveSlowdown`) so the gate asserts the same
     // extrapolated cost on any core — it does not silently loosen into a no-op on a
     // slow CI runner, nor double-count that runner's own slowness into a false fail.

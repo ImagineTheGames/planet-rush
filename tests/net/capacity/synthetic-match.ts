@@ -269,6 +269,17 @@ export class SyntheticFleet {
   }
 
   /**
+   * Take over an already-open match so this driver flies it too. A match opened
+   * by {@link openSyntheticMatch} directly is **inert** until something steps it
+   * — it holds a socket and receives snapshots, but sends no input. That is a
+   * quiet failure (the room is still "live", it just is not being played), so
+   * anything that opens a match outside `add` must adopt it here.
+   */
+  adopt(match: SyntheticMatch & { step(nowMs: number): void }): void {
+    this.matches.push(match);
+  }
+
+  /**
    * Open `count` more rooms. Serial, with a small gap: opening thirty rooms in
    * one burst measures the *allocator's* burst behaviour and the server's room
    * construction, not its steady-state tick cost, and a burst of `createWorld`

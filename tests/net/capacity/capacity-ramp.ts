@@ -109,6 +109,19 @@ export interface RampResult {
   readonly honestN: number | null;
   /** True when the run ended because it ran out of ramp, not out of headroom. */
   readonly ranOutOfRamp: boolean;
+  /**
+   * **The empty process was already lagging past the safety line.**
+   *
+   * `loopLagMs` is a p99, so it reports the worst few of 256 samples — and on a
+   * noisy host (a laptop, a shared CI runner, anything under WSL2) the scheduler
+   * supplies those spikes for free, with no rooms open at all. When that is true
+   * the lag axis is measuring the *host*, the 10 ms line is unreachable, and the
+   * honest N below is not a capacity result. The CPU axis has no such problem —
+   * it is a cumulative counter differenced over a window — which is why a run
+   * that trips this flag can still produce a usable answer through
+   * `./guest-model.ts`, and why the CI gate is a CPU gate.
+   */
+  readonly baselineExceedsLimit: boolean;
 }
 
 const DEFAULTS = {
@@ -195,6 +208,14 @@ export async function runCapacityRamp(
     if (startRooms !== 0) {
       log(`WARNING: the target already hosts ${startRooms} room(s) — the baseline is not empty`);
     }
+    const baselineExceedsLimit = baseline.lagMedianMs > opts.lagLimitMs;
+    if (baselineExceedsLimit) {
+      log(
+        `WARNING: the EMPTY process already reports ${baseline.lagMedianMs.toFixed(2)} ms p99 lag, ` +
+          `past the ${opts.lagLimitMs} ms line. This host's own jitter is the measurement; read the ` +
+          `CPU column, not the lag column.`,
+      );
+    }
 
     let honestN: number | null = null;
     let ranOutOfRamp = true;
@@ -256,6 +277,7 @@ export async function runCapacityRamp(
       steps,
       honestN,
       ranOutOfRamp,
+      baselineExceedsLimit,
     };
   } finally {
     fleet.stop();
@@ -355,6 +377,17 @@ export function renderRampMarkdown(result: RampResult): string {
     );
   }
   lines.push('');
+  if (result.baselineExceedsLimit) {
+    lines.push(
+      `> **The lag column on this run is not a capacity reading.** The EMPTY process already ` +
+        `reported ${result.baseline.lagMedianMs.toFixed(2)} ms p99 loop lag, past the ` +
+        `${result.limitMs} ms line — this host supplies its own scheduler spikes, and a p99 ` +
+        `reports exactly those. Read the CPU column, which is a differenced counter and has no ` +
+        `such floor, and take the room count from \`guest-model.ts\`. The lag gate belongs on a ` +
+        `quiet Machine (docs/server-capacity.md, the hosted runbook).`,
+    );
+    lines.push('');
+  }
   if (result.honestN === null && result.ranOutOfRamp) {
     lines.push(
       `**Result: no breach up to ${result.options.maxRooms} rooms.** The honest N is *at least* ` +

@@ -44,17 +44,41 @@ import { SyntheticFleet, openSyntheticMatch } from './synthetic-match';
 import type { SyntheticMatch } from './synthetic-match';
 import type { HealthReading } from './target';
 
-/** Rooms the gate runs at. Small enough to finish in CI, large enough that the
- *  marginal cost is not swamped by the empty process's floor. */
-const ROOMS = 4;
+/**
+ * **Two loads, not one load and a floor.**
+ *
+ * The obvious shape — measure the empty process, then N rooms, subtract — is
+ * what the first version did, and it was unstable: the "floor" of an empty
+ * process is not the floor of a process holding N sockets, so the subtraction
+ * leaves per-room socket cost sitting in the per-room number, and at small N
+ * that dominates. It read 28× a sim step where the long ramp reads ~4×.
+ *
+ * Differencing two *loaded* points cancels everything that does not scale with
+ * rooms — listener, timers, lag probe, GC baseline — and leaves the marginal
+ * cost, which is the quantity the whole brief is about.
+ */
+const ROOMS_LOW = 4;
+const ROOMS_HIGH = 12;
 
 /** Seconds of steady-state CPU sampled per phase. */
-const WINDOW_MS = 12_000;
+const WINDOW_MS = 15_000;
 
 /** Let room construction and the opening `fullEntityState` broadcast finish
  *  before the CPU window opens — a transient billed to steady state would make
  *  the gate flap with runner speed. */
-const SETTLE_MS = 6_000;
+const SETTLE_MS = 5_000;
+
+/**
+ * Extra time under load before the FIRST window, on top of the settle.
+ *
+ * A freshly booted V8 runs interpreted and re-optimises for tens of seconds, and
+ * that shows up as CPU. With a 5 s lead-in the first window read 106 ms/s at
+ * four rooms and the second read 101 ms/s at twelve — a *negative* marginal cost
+ * per room, which is not a subtle measurement error, it is the JIT finishing.
+ * Warming up under real load first is the fix; the long ramp got this for free
+ * because its 60 s baseline and 20 s settle came before its first window.
+ */
+const WARMUP_MS = 20_000;
 
 /**
  * **The gate.** How many times a room may cost more than one bare 8-station sim
@@ -67,7 +91,7 @@ const SETTLE_MS = 6_000;
  * and well below a doubling so a real regression cannot pass. Move it only with
  * a re-measured `docs/server-capacity.md` in the same commit.
  */
-const MAX_ROOM_COST_IN_SIM_STEPS = 30;
+const MAX_ROOM_COST_IN_SIM_STEPS = 12;
 
 /** The tick budget the whole thing is drawn against: 33 ms at the 30 Hz
  *  broadcast (GDD §4.2). At four rooms a healthy loop is nowhere near it. */
@@ -76,7 +100,7 @@ const TICK_BUDGET_MS = 33;
 let server: LocalServer;
 let core: CoreSpeed;
 let fleet: SyntheticFleet;
-let probe: SyntheticMatch;
+let probe: SyntheticMatch & { step(nowMs: number): void };
 const decoded: { ships: number; projectiles: number }[] = [];
 
 /** CPU drawn between two readings, ms of CPU per second of wall clock. */
@@ -86,23 +110,32 @@ function cpuMsPerSec(from: HealthReading, to: HealthReading): number {
   return (to.cpuMs - from.cpuMs) / wall;
 }
 
-let floorMsPerSec = NaN;
-let loadedMsPerSec = NaN;
+let lowMsPerSec = NaN;
+let highMsPerSec = NaN;
 let maxLagMs = 0;
 
+/** Settle, then sample CPU across the window, watching loop lag as it goes. */
+async function phase(): Promise<number> {
+  await new Promise((r) => setTimeout(r, SETTLE_MS));
+  const from = await server.health();
+  const deadline = Date.now() + WINDOW_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 500));
+    maxLagMs = Math.max(maxLagMs, (await server.health()).loopLagMs);
+  }
+  return cpuMsPerSec(from, await server.health());
+}
+
 beforeAll(async () => {
-  core = measureCoreSpeed(6_000);
-  server = await startLocalServer({ maxRooms: ROOMS + 8, seed: 0x11_11 });
+  // Timed before anything heavy is spawned: the bundle rebuild is a multi-core
+  // vite build, and a core stamped on a box still recovering from one reads ~6×
+  // slow (see `ramp-cli.ts`).
+  core = measureCoreSpeed(20_000);
+  server = await startLocalServer({ maxRooms: ROOMS_HIGH + 8, seed: 0x11_11 });
 
-  // Phase 1 — the empty process. Its floor is not a room's cost (see the ramp's
-  // "marginal, not average"), so it is measured and subtracted.
-  const floorFrom = await server.health();
-  await new Promise((r) => setTimeout(r, WINDOW_MS));
-  const floorTo = await server.health();
-  floorMsPerSec = cpuMsPerSec(floorFrom, floorTo);
-
-  // Phase 2 — the rooms. One of them reports its snapshots so assertion 1 can
-  // look at real bytes; the other three stay on the counting-only path.
+  // The low point. One room reports its snapshots so assertion 1 can look at
+  // real bytes; the rest stay on the counting-only path. The probe is adopted by
+  // the fleet or nothing would ever fly it.
   fleet = new SyntheticFleet(server);
   probe = await openSyntheticMatch(server, {
     onSnapshot: (payload) => {
@@ -112,21 +145,18 @@ beforeAll(async () => {
       decoded.push({ ships: snap.ships.length, projectiles: snap.projectiles.length });
     },
   });
-  await fleet.add(ROOMS - 1);
+  fleet.adopt(probe);
+  await fleet.add(ROOMS_LOW - 1);
+  await new Promise((r) => setTimeout(r, WARMUP_MS));
+  lowMsPerSec = await phase();
 
-  await new Promise((r) => setTimeout(r, SETTLE_MS));
-  const loadFrom = await server.health();
-  const deadline = Date.now() + WINDOW_MS;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 500));
-    maxLagMs = Math.max(maxLagMs, (await server.health()).loopLagMs);
-  }
-  const loadTo = await server.health();
-  loadedMsPerSec = cpuMsPerSec(loadFrom, loadTo);
-}, 180_000);
+  // The high point. The difference between the two is the marginal cost.
+  await fleet.add(ROOMS_HIGH - ROOMS_LOW);
+  highMsPerSec = await phase();
+}, 240_000);
 
 afterAll(async () => {
-  probe?.close();
+  // `stop()` closes the probe too — it was adopted.
   fleet?.stop();
   await server?.stop();
 });
@@ -142,20 +172,22 @@ it('the load is real: eight ships on the wire, and shots in flight', () => {
 
 it('every room stayed seated and flying', () => {
   expect(fleet.failures).toEqual([]);
-  expect(fleet.live).toBe(ROOMS - 1);
+  expect(fleet.live).toBe(ROOMS_HIGH);
   expect(probe.failure).toBeNull();
-  expect(probe.inputsSent).toBeGreaterThan(60 * 5);
+  // A match nothing steps still looks "live" while sending no input at all —
+  // the exact quiet failure `SyntheticFleet.adopt` exists to prevent.
+  expect(probe.inputsSent).toBeGreaterThan(60 * 20);
 });
 
-it('the loop stays inside the tick budget at four rooms', () => {
+it(`the loop stays inside the tick budget at ${ROOMS_HIGH} rooms`, () => {
   expect(maxLagMs).toBeLessThan(TICK_BUDGET_MS);
 });
 
 it('a room costs no more than its budgeted multiple of a bare sim step', () => {
-  expect(Number.isFinite(floorMsPerSec)).toBe(true);
-  expect(Number.isFinite(loadedMsPerSec)).toBe(true);
+  expect(Number.isFinite(lowMsPerSec)).toBe(true);
+  expect(Number.isFinite(highMsPerSec)).toBe(true);
 
-  const perRoomMsPerSec = (loadedMsPerSec - floorMsPerSec) / ROOMS;
+  const perRoomMsPerSec = (highMsPerSec - lowMsPerSec) / (ROOMS_HIGH - ROOMS_LOW);
   // One room's cost per tick, in units of one bare 8-station sim step on this
   // very core — the portable form (see the header).
   const costInSimSteps = perRoomMsPerSec / 60 / core.msPerStep;
@@ -164,10 +196,10 @@ it('a room costs no more than its budgeted multiple of a bare sim step', () => {
   // numbers that produced it must be in the log, not re-derivable only by
   // re-running it.
   console.log(
-    `[capacity] ${core.cpu} · ${core.msPerStep.toFixed(4)} ms/step · floor ` +
-      `${floorMsPerSec.toFixed(1)} ms/s · ${ROOMS} rooms ${loadedMsPerSec.toFixed(1)} ms/s · ` +
-      `per room ${perRoomMsPerSec.toFixed(1)} ms/s = ${costInSimSteps.toFixed(1)}× a sim step · ` +
-      `advertised capacity ${DEFAULT_MAX_ROOMS}`,
+    `[capacity] ${core.cpu} · ${core.msPerStep.toFixed(4)} ms/step · ` +
+      `${ROOMS_LOW} rooms ${lowMsPerSec.toFixed(1)} ms/s → ${ROOMS_HIGH} rooms ` +
+      `${highMsPerSec.toFixed(1)} ms/s · marginal ${perRoomMsPerSec.toFixed(1)} ms/s per room ` +
+      `= ${costInSimSteps.toFixed(1)}× a sim step · advertised capacity ${DEFAULT_MAX_ROOMS}`,
   );
 
   expect(perRoomMsPerSec).toBeGreaterThan(0);

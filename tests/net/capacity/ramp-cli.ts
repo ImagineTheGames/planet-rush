@@ -100,6 +100,15 @@ async function main(): Promise<void> {
     log,
   };
 
+  // Measured FIRST, before anything else is spawned. The very first run of this
+  // CLI stamped 0.0968 ms/step and every run since has stamped ~0.0152 — because
+  // that run rebuilt the server bundle (a multi-core vite build) immediately
+  // beforehand and timed the sim on a hot, contended box. The core stamp is only
+  // worth having if it is taken on a quiet one.
+  log(`measuring this core on the sim's own hot loop…`);
+  const core = measureCoreSpeed();
+  log(`  ${core.cpu} — ${core.msPerStep.toFixed(4)} ms per 8-station step`);
+
   const local = args.get('local') === 'true';
   let target: CapacityTarget;
   if (local) {
@@ -119,10 +128,6 @@ async function main(): Promise<void> {
       ...(args.get('region') !== undefined ? { region: args.get('region')! } : {}),
     });
   }
-
-  log(`measuring this core on the sim's own hot loop…`);
-  const core = measureCoreSpeed();
-  log(`  ${core.cpu} — ${core.msPerStep.toFixed(4)} ms per 8-station step`);
 
   try {
     const result = await runCapacityRamp(target, rampOptions);

@@ -158,8 +158,10 @@ export function openLoadSocket(url: string): Promise<LoadSocket> {
       close: die,
     };
 
-    socket.on('connect', onReady);
-    if (secure) socket.on('secureConnect', onReady);
+    // One event, not both: a TLSSocket emits `connect` before its handshake and
+    // `secureConnect` after, and writing the upgrade on the earlier one would
+    // hand the request to a socket that is not yet speaking TLS.
+    socket.on(secure ? 'secureConnect' : 'connect', onReady);
     function onReady(): void {
       // The request-target carries the query, so a `?ticket=` routing hint reaches
       // the Fly upgrade hop exactly as a browser would deliver it (M10 machine-pin).
