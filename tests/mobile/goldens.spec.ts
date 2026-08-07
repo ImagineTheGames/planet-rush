@@ -20,7 +20,26 @@
 import { test, expect, type Page } from '@playwright/test';
 import { budgetTest } from './budgets';
 import { settleFrames } from './render-settle';
-import { GOLDEN_SHOT_TIMEOUT_MS } from './shot-budget';
+import { GOLDEN_RETRIES, GOLDEN_SHOT_TIMEOUT_MS } from './shot-budget';
+
+/**
+ * One extra attempt on CI, for this file and no other (q9-01).
+ *
+ * A 31× runner took the phone BUILD WHEEL golden past its 90 s budget and past
+ * its single retry, and reddened `main` against a baseline that was correct — a
+ * timeout, with no actual/expected/diff, because nothing was ever captured. The
+ * fix is an attempt, not a bigger ceiling: chasing 31× with budgets would give a
+ * genuine hang minutes to hide in.
+ *
+ * It cannot mask a real regression. Every scene in this file is frozen and
+ * deterministic, so a frame that mismatches its baseline mismatches on all three
+ * attempts, and Playwright reports `flaky` only when an attempt PASSES. The
+ * scope is the reviewable part, and it is pinned mechanically by
+ * tests/mobile-shot-budget-contract.test.ts: the number lives in
+ * ./shot-budget.ts, it is applied here at file scope, and the suite-wide
+ * `retries: 1` in playwright.config.ts is unchanged for every behavioural spec.
+ */
+test.describe.configure({ retries: GOLDEN_RETRIES });
 
 /**
  * The options every golden in this file passes, and the two things they say.

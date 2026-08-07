@@ -178,3 +178,70 @@ export const DEVICE_MATRIX = {
 export const GOLDEN_SHOT_TIMEOUT_MS = Math.max(
   ...Object.values(DEVICE_MATRIX).map((frame) => shotBudgetMsFor(frame)),
 );
+
+// ── THE RETRY, AND WHY IT IS THE RIGHT INSTRUMENT FOR THE TAIL ──────────────
+//
+// Everything above sizes a budget from measured work × a slowdown allowance. It
+// answers "how slow is the runner?" with one number, and that number cannot be
+// right for both the typical run and the tail. Measured on this project:
+//
+//   the suite, in the studio container            ~1.5 min
+//   the suite, on a normal GitHub runner          ~8.9 min   →  5.9×  (11659df)
+//   the suite, on the runner that reddened main   47.2 min   → ~31×   (369d7a6)
+//
+// `CI_SLOW_FACTOR` is already 10 — the TOP of the 3–10× band LESSONS §5 records
+// — and the 31× run still blew through it: the phone BUILD WHEEL golden hit its
+// 90 s test budget (9 s measured × 10) and failed its single retry, taking `main`
+// red on a baseline nobody disputes. There was no diff image, because nothing was
+// ever captured to compare.
+//
+// Raising the factor is the wrong fix, and the arithmetic says why. At 31× that
+// 9 s golden needs a 4.5-minute budget — and every budget in the suite grows with
+// it, so a genuine hang would sit undetected for minutes behind a ceiling sized
+// for the worst runner anyone has ever drawn. That trades a rare, loud red for a
+// slow, silent one. A budget should be sized for the runner we normally get.
+//
+// A RETRY is sized for the runner we rarely get, and it is the correct shape for
+// this failure specifically:
+//
+//   · the failure is a TIMEOUT — a contended runner, not a wrong frame — and a
+//     re-run on a quieter slot is exactly what fixes it;
+//   · a real pixel mismatch is DETERMINISTIC. The frozen scene is a pure function
+//     of the seeded world (goldens.spec.ts), so a frame that differs from its
+//     baseline differs on every attempt, and Playwright only reports `flaky`
+//     when an attempt actually PASSES. An extra attempt therefore cannot turn a
+//     regression green — it can only turn a timeout that was never about pixels
+//     green. That is the claim a reviewer has to be able to check, and it is
+//     checkable: tests/mobile-shot-budget-contract.test.ts pins the scope, and
+//     the deliberate-break run in tests/reports/golden-retry-and-the-31x-runner-q9.md
+//     shows a mismatching baseline failing all three attempts with a diff.
+//
+// The cost is bounded and only paid on a run that is already red: a failing
+// golden now costs three attempts instead of two. Nothing that passes pays
+// anything at all.
+//
+/**
+ * Retries a golden gets ON CI, over and above the first attempt — so three
+ * attempts in total, against the suite-wide two (`retries: 1`,
+ * playwright.config.ts).
+ *
+ * Deliberately NOT the global. The suite-wide 1 stays where it is: the rest of
+ * tests/mobile/ asserts on BEHAVIOUR (a tap lands, a lock holds, a wheel opens),
+ * where a second re-run really could paper over a genuine intermittent bug in the
+ * product. The goldens are the one family in the suite where the assertion is a
+ * pure function of a frozen world, and that is what makes the extra attempt safe
+ * here and nowhere else.
+ */
+export const GOLDEN_CI_RETRIES = 2;
+
+/**
+ * The retry count the golden file takes, given whether this is CI. Zero locally
+ * — a golden that fails on this hardware is telling you something, and re-running
+ * it twice more just costs a minute before it says the same thing.
+ */
+export function goldenRetriesFor(ci: boolean): number {
+  return ci ? GOLDEN_CI_RETRIES : 0;
+}
+
+/** Resolved for this process; what goldens.spec.ts hands to `test.describe.configure`. */
+export const GOLDEN_RETRIES = goldenRetriesFor(!!process.env.CI);
