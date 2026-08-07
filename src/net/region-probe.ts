@@ -195,14 +195,11 @@ export async function measureRegionPing(
     const started = clock();
     let outcome: SampleOutcome;
     try {
-      const answered = await race(
-        doFetch(target.url, target.headers !== undefined ? { headers: target.headers } : {}),
-        timeoutMs,
-      );
-      outcome =
-        answered === TIMED_OUT
-          ? { ok: false, failure: 'timeout' }
-          : await readSample(answered, region.id);
+      // The deadline covers the WHOLE sample — the request and reading the body —
+      // because a response whose body never arrives is a hang, and a hang the
+      // deadline does not cover is a lobby that never finishes measuring.
+      const answered = await race(takeSample(doFetch, target, region.id), timeoutMs);
+      outcome = answered === TIMED_OUT ? { ok: false, failure: 'timeout' } : answered;
     } catch {
       // `fetch` itself threw: offline, DNS, TLS, or a CORS grant the region's
       // Machine never gave us. The region is not reachable from here, which is a
@@ -237,6 +234,20 @@ export async function measureRegionPing(
 type SampleOutcome =
   | { readonly ok: true }
   | { readonly ok: false; readonly failure: RegionPingFailure; readonly servedBy?: string };
+
+/** One whole sample: the request, and the answer read. Throws only where `fetch`
+ *  does, which the caller treats as `unreachable`. */
+async function takeSample(
+  doFetch: FetchLike,
+  target: RegionProbeTarget,
+  region: string,
+): Promise<SampleOutcome> {
+  const response = await doFetch(
+    target.url,
+    target.headers !== undefined ? { headers: target.headers } : {},
+  );
+  return readSample(response, region);
+}
 
 /**
  * Read one probe response: 2xx, and — when it names a region — the region asked
