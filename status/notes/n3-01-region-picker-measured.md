@@ -13,7 +13,11 @@ running log).
 |---|---|
 | `742a026` | `allocator/probe-target.ts` (the vendor seam: where to TIME a region), `/regions` publishes a probe target per region, `src/net/region-probe.ts` (the client measurement), `src/net/cors.ts` (the grant, now shared by allocator **and** match server), `/health` gets a CORS grant + preflight, `readRoomAdvert` in the allocator client. |
 | `7a2187f` | Tests: `src/net/region-probe.test.ts` (25), `src/net/cors.test.ts` (9), `tests/allocator/probe-target.test.ts` (8), `/regions` probe cases in `tests/allocator/index.test.ts`, `readRoomAdvert` cases in `src/net/allocator-client.test.ts`, and `tests/net/region-picker.test.ts` — a real allocator + two live `/health` listeners, end to end. |
-| _(pending)_ | `src/main.ts` wiring + `docs/region-picker.md`. |
+| `d3390e3` | `src/main.ts` wiring — survey on every visit to the doors, the override into the allocate body, the JOIN preview, the `__onlineMenu` seam — plus `docs/region-picker.md`. |
+| `43d62d0` | The probe's deadline now covers reading the body, not just the request (a body that never streams is a hang the deadline missed). |
+
+**DoD:** `npx tsc --noEmit` clean; `npm test -- --run` green on the final tree —
+233 files / 3825 tests. **PR:** #305.
 
 **What a player gets, today, without any UI work:** the doors screen's message
 slot carries the measured fleet — `GRU 38ms · [IAD 224ms]`, the selection
