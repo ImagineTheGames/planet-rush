@@ -65,6 +65,7 @@ import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
 import { PANEL_FILL, TEXT_MUTED } from './chrome';
+import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 
 /** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
  *  shape. Repair (p5-08) is the one that needs this: a live-stage test reads back
@@ -100,8 +101,11 @@ export interface DrawnUpgradeWedge {
 // Typography & neutrals (style-guide §5.6 — shared with the HUD)
 // ---------------------------------------------------------------------------
 
-const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
-const FONT_NUMERAL = 'Oxanium, "DejaVu Sans Mono", monospace';
+// The two stacks come from ./typography (imported above), which exists so a face
+// swap is one line rather than a grep. This file used to spell them out again,
+// which is exactly the drift that module prevents — and it bit (a1-01): the shared
+// stack's fallback moved and this copy did not, so the wheel would have drawn its
+// ore total in a different face from the HUD's on the CI runner.
 
 /** Neutral light UI text. Chalk-white — never signal yellow (style-guide §2). */
 const TEXT_PRIMARY = 0xdce3ec;
