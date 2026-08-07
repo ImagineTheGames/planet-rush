@@ -115,7 +115,7 @@ export function wheelBounds(viewportWidth: number, viewportHeight: number): Rect
 }
 
 // ---------------------------------------------------------------------------
-// The upgrade panel (GDD §2.5 — the only place ship stats appear)
+// The upgrade panel (GDD §2.5 — where ship stats appear during a match)
 // ---------------------------------------------------------------------------
 
 /** Widest the upgrade panel ever gets, CSS px — past this the four rows stop

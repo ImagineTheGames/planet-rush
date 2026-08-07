@@ -21,8 +21,11 @@
  * *state* — and no other number. The wheel says what a thing costs and what it
  * acts on; the game teaches what it's worth. **UPGRADE SHIP** carries an arrow
  * instead of a number ({@link WheelSegment.opensPanel}): it is the one segment
- * that opens a second screen, the upgrade wheel ({@link ./upgrade-wheel}), which
- * is the only place ship stats are ever shown.
+ * that opens a second screen, the upgrade wheel ({@link ./upgrade-wheel}), where
+ * ship stats are shown during a match. (Not the *only* place they are shown any
+ * more — ship-select carries them too, as pips AND numbers, ratified 2026-08-05
+ * and folded into GDD §2.5. That is a statement about ship-select; this wheel is
+ * unchanged, and a segment's only number is still its cost.)
  *
  * **The wheel opens at your own station, and only there** (GDD §2.5, §2.4 "E
  * (near own station)") — {@link buildWheelModel} returns `open: false` anywhere

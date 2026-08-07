@@ -1,0 +1,421 @@
+{
+  "capture": "u7-06-gantry-upgrade-wheel",
+  "side": "after",
+  "base": "http://localhost:4173",
+  "profiles": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/after-desktop-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100% → 115%",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2 → 4",
+              "costLabel": "2/99",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "HULL",
+              "stat": "50 → 60",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/after-desktop-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100% → 115%",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2 → 4",
+              "costLabel": "2/1",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "HULL",
+              "stat": "50 → 60",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/after-desktop-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": "10 → 13",
+              "costLabel": "4/99",
+              "tiers": "○○○",
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "SPEED",
+              "stat": "100% → 115%",
+              "costLabel": "8/99",
+              "tiers": "○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "id": "phone-landscape",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-landscape-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100%→115%",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2→4",
+              "costLabel": "2/99",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "HULL",
+              "stat": "50→60",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-landscape-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100%→115%",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2→4",
+              "costLabel": "2/1",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "HULL",
+              "stat": "50→60",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-landscape-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": "10→13",
+              "costLabel": "4/99",
+              "tiers": "○○○",
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "SPEED",
+              "stat": "100%→115%",
+              "costLabel": "8/99",
+              "tiers": "○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "id": "phone-portrait",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-portrait-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100%→115%",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2→4",
+              "costLabel": "2/99",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "HULL",
+              "stat": "50→60",
+              "costLabel": "3/99",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-portrait-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": "DAMAGE ○○○\nSPEED ○○",
+              "costLabel": "OPEN ▸",
+              "tiers": "",
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": "none"
+            },
+            {
+              "label": "ENGINE",
+              "stat": "100%→115%",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "CARGO",
+              "stat": "2→4",
+              "costLabel": "2/1",
+              "tiers": "○○○",
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            },
+            {
+              "label": "HULL",
+              "stat": "50→60",
+              "costLabel": "3/1",
+              "tiers": "○○○",
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": "refused"
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/after-phone-portrait-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": "10→13",
+              "costLabel": "4/99",
+              "tiers": "○○○",
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": "ore"
+            },
+            {
+              "label": "SPEED",
+              "stat": "100%→115%",
+              "costLabel": "8/99",
+              "tiers": "○○",
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": "ore"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ]
+}
