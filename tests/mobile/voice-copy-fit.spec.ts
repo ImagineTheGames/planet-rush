@@ -139,14 +139,19 @@ const CASES: readonly FitCase[] = [
     size: 12,
     box: 812,
   },
-  // The longest of the three hints, bounded by the DOOR (420) rather than by the
-  // content box: the hint is centred under its button and reads as part of it, so
-  // the button's width is the honest container even though nothing clips at it.
-  // This is the tightest case in the sweep — 92% of the box — and it is the one
-  // to watch if a fourth door or a longer hint is ever proposed.
+  // The longest of the FOUR hints (u9-01 added CAMPAIGN; this said "three"),
+  // bounded by the DOOR (420) rather than by the content box: the hint is centred
+  // under its button and reads as part of it, so the button's width is the honest
+  // container even though nothing clips at it.
+  //
+  // Still the tightest case in the sweep, and the one that actually overflowed:
+  // at 70 chars it drew 462px into a 420px door. Shortened to 57 (r6-01), it
+  // draws 376px — 10% headroom, in line with its siblings (CAMPAIGN 337px,
+  // OPEN A CLAIM 343px). The budget is 63 characters at 11px: Liberation Mono
+  // is 0.6em, so 420 / 6.601 = 63.6. Watch this one if a longer hint is proposed.
   {
     where: 'DOOR_OPTIONS.solo hint',
-    text: 'Work the claim alone. Bots hold the other seats. No connection needed.',
+    text: 'Work the claim alone. Bots hold the other seats. Offline.',
     font: FONT_BODY,
     size: 11,
     box: 420,

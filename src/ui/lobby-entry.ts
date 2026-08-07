@@ -147,7 +147,24 @@ export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
   {
     door: 'solo',
     label: 'SOLO CONTRACT',
-    hint: 'Work the claim alone. Bots hold the other seats. No connection needed.',
+    // `Offline.`, not `No connection needed.` — 57 chars against the door's 420px
+    // at 11px, 376px drawn, 10% headroom (tests/mobile/voice-copy-fit.spec.ts).
+    //
+    // The sweep is what broke this one. The pre-sweep line was 60 chars and fit
+    // at 6% headroom; rewriting it into the voice took it to 70 and 462px, and
+    // it was the only label in the game that overflowed. GDD §4.7: "Length is
+    // part of clarity… a longer in-register word that ellipsizes has traded
+    // information for flavour." Nothing here truncates — `drawDoor` centres and
+    // lets it spill — so the overflow was silent and the copy is what gives.
+    //
+    // `offline` is not a shortening invented to fit. It is the register's own
+    // word for this state (§4.7 vocabulary: "held / lost / offline / refused"
+    // instead of "victory, defeat, error, oops"), and it is already what this
+    // codebase calls this door — `voice-door-labels.test.ts` requires every
+    // "still works" refusal to name THE OFFLINE DOOR by its current label. So
+    // the third sentence now uses the same word the other two screens use for
+    // it, and the fact survives intact: no network is needed to take this door.
+    hint: 'Work the claim alone. Bots hold the other seats. Offline.',
     needsNetwork: false,
     comingSoon: false,
   },
