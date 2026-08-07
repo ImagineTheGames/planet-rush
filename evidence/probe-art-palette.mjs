@@ -40,7 +40,13 @@ const TOKENS = {
   danger: '#E24A3B',
   threat: '#B23A3A',
   rockBodyBoard: '#454E59',
-  rockBodyCurrent: '#939BA5',
+  // Shipped rock body as of c2d401f, after a3-01 pulled DERIVED.rockBody to 0x484e57.
+  rockBodyShipped: '#484E57',
+  // The pre-fix value, kept ONLY so a stray sighting of it is labelled for what it
+  // is rather than matched to some unrelated token. Nothing should read this in the
+  // asteroid family any more; if the rock rows start matching it again, that is a
+  // regression of a3-01.
+  rockBodyPreFix: '#939BA5',
   oceanBoard: '#2E6E9E',
   oceanCurrent: '#4F565F',
 };

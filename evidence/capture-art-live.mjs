@@ -27,10 +27,18 @@
  * Writes images/live/*.png and images/live/index.json (what each frame is, the
  * geometry it was cropped against, and any console error the page raised).
  *
- * Usage: node evidence/capture-art-live.mjs   (needs preview on $EVIDENCE_BASE_URL)
+ * PROVENANCE. Every run reads /version.json off the served build and records it.
+ * A sectioned run writes images/live/index-<section>.json AND merges itself into
+ * index.json, replacing only the frames it re-shot; index.json.builds is then a
+ * per-section ledger of which build each frame came from. This matters because the
+ * scene composite draws on the scene, alarm and fight sections at once — if those
+ * ever disagree, the composite is mixing builds and must not be published.
+ *
+ * Usage: node evidence/capture-art-live.mjs [scene|alarm|fight|hulls|ui|all]
+ *        (needs preview on $EVIDENCE_BASE_URL)
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
@@ -42,8 +50,56 @@ const VP = { width: 1280, height: 800 };
 const DSF = 2;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const notes = { base: BASE, viewport: VP, deviceScaleFactor: DSF, frames: [] };
+const notes = { base: BASE, viewport: VP, deviceScaleFactor: DSF, build: null, frames: [] };
 const record = (o) => { notes.frames.push(o); console.log('[frame]', JSON.stringify(o)); };
+
+/**
+ * Every index file records the build it was shot against. Without this a sectioned
+ * re-shoot leaves frames whose provenance can only be inferred from file mtimes —
+ * which is exactly the kind of thing an attestation must not have to guess at.
+ */
+async function readBuild() {
+  // `vite preview` may bind IPv6-only, and node's fetch resolves "localhost" to
+  // 127.0.0.1 first and gives up where Chromium falls through to ::1. Try each
+  // family so the provenance stamp never fails for a reason unrelated to the game.
+  const urls = [BASE, BASE.replace('//localhost:', '//[::1]:'), BASE.replace('//localhost:', '//127.0.0.1:')];
+  const tried = [];
+  for (const u of [...new Set(urls)]) {
+    try {
+      const r = await fetch(`${u}/version.json`);
+      if (r.ok) return r.json();
+      tried.push(`${u} -> ${r.status}`);
+    } catch (e) { tried.push(`${u} -> ${e.cause?.code ?? e.message}`); }
+  }
+  throw new Error(`could not read version.json — is vite preview serving ${BASE}? tried: ${tried.join('; ')}`);
+}
+
+/**
+ * Merge a sectioned run into images/live/index.json instead of leaving that file
+ * describing an older build. Frames named by THIS run replace their previous
+ * entries; sections not re-shot are preserved untouched, each keeping the build
+ * stamp it was actually captured on. `builds` therefore reads as a per-section
+ * provenance ledger, and a composite drawing on two sections can be checked for
+ * whether it is mixing builds.
+ */
+function mergeIndex(section) {
+  const path = join(OUT, 'index.json');
+  let base = { base: BASE, viewport: VP, deviceScaleFactor: DSF, builds: {}, frames: [] };
+  if (existsSync(path)) base = JSON.parse(readFileSync(path, 'utf8'));
+  base.builds ??= {};
+  // Anything this run re-shot supersedes the old record of the same frame.
+  const fresh = new Set(notes.frames.map((f) => f.name));
+  base.frames = base.frames.filter((f) => !fresh.has(f.name)).concat(notes.frames);
+  for (const k of ['freeze', 'siege', 'sceneErrors', 'alarm', 'fight', 'hulls', 'wheel']) {
+    if (notes[k] !== undefined) base[k] = notes[k];
+  }
+  base.builds[section] = { sha: notes.build?.sha ?? null, frames: [...fresh].sort() };
+  base.viewport = VP;
+  base.deviceScaleFactor = DSF;
+  writeFileSync(path, JSON.stringify(base, null, 2));
+  console.log('[index] merged section', section, '->', base.frames.length, 'frames;',
+    'builds =', JSON.stringify(Object.fromEntries(Object.entries(base.builds).map(([k, v]) => [k, v.sha]))));
+}
 
 async function boot(browser, query, dsf = DSF) {
   const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: dsf });
@@ -227,7 +283,11 @@ async function captureFight(browser) {
     await sleep(320);
     const name = `fight-burst-${i}`;
     await shot(page, name, { x: 0, y: 90, width: 760, height: 620 });
-    burst.push({ name, input: await page.evaluate(() => JSON.parse(JSON.stringify(window.__planetRush.input ?? null))) });
+    const input = await page.evaluate(() => JSON.parse(JSON.stringify(window.__planetRush.input ?? null)));
+    burst.push({ name, input });
+    // These are real deliverables — art-vs-board-scene pairs fight-burst-3 against
+    // the board's mining run — so they belong in frames[], not only in notes.fight.
+    record({ name, what: `mining/dogfight burst sample ${i} of 8, trigger held on a real mouse`, crop: { x: 0, y: 90, width: 760, height: 620 }, firing: input?.fire ?? null });
   }
   await shot(page, 'fight-full');
   await page.mouse.up();
@@ -330,13 +390,20 @@ async function main() {
   const browser = await chromium.launch();
   const only = process.argv[2] ?? 'all';
   const want = (s) => only === 'all' || only === s;
+  notes.build = await readBuild();
+  console.log('[build]', JSON.stringify(notes.build));
   if (want('scene')) await captureScene(browser);
   if (want('alarm')) await captureAlarm(browser);
   if (want('fight')) await captureFight(browser);
   if (want('hulls')) await captureHulls(browser);
   if (want('ui')) await captureUi(browser);
   await browser.close();
-  writeFileSync(join(OUT, `index${only === 'all' ? '' : '-' + only}.json`), JSON.stringify(notes, null, 2));
+  if (only === 'all') {
+    writeFileSync(join(OUT, 'index.json'), JSON.stringify(notes, null, 2));
+  } else {
+    writeFileSync(join(OUT, `index-${only}.json`), JSON.stringify(notes, null, 2));
+    mergeIndex(only);
+  }
   console.log('[done] frames=', notes.frames.length);
 }
 
