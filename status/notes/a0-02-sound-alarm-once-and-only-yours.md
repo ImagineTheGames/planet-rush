@@ -798,6 +798,24 @@ fixed it, and nothing notifies you when they do. Re-check every inherited-red cl
 each round against the *current* main, not against the run ID you recorded when you
 wrote it.
 
+**CI is now FULLY GREEN on this branch, for the first time in the lane's life** —
+at `9ee7d85`: `Typecheck, test, build` (both runs), all six
+`Mobile emulation (Playwright) — shard N/6`, and the roll-up
+`Mobile emulation (Playwright)`. The PR body's old red-CI section was replaced with
+the account above rather than deleted silently, because a reviewer who saw the
+earlier red should find out what happened to it. `mergeStateStatus` should now read
+CLEAN rather than the UNSTABLE it has shown since round 4.
+
+**One real bug in my own conflict resolution, caught by reading the result rather
+than trusting the diff** (`9ee7d85`). Resolving `docs/design-amendments.md` left the
+`---` separator immediately under the last line of this lane's entry, with no blank
+line. Markdown reads `---` directly beneath text as a **setext heading**, so that
+closing sentence would have rendered as an H2 in the middle of the document. Fixed,
+and both files are now scanned for the pattern:
+`awk '/^---$/{if(prev!="")print NR} {prev=$0}'`. Worth keeping — this file gets a
+top-of-file insertion conflict every time any lane lands an amendment, which is
+three times now, and the resolution puts a separator next to text every time.
+
 **Housekeeping.** 33 foreign `tests/live-stage/*-evidence.png` were dirty at session
 start — `git checkout -- tests/live-stage/`, never committed, as every round. Only my
 own spec was run (not the full suite), so nothing went dirty again: `git status` after
