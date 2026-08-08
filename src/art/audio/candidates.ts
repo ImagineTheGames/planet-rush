@@ -509,14 +509,60 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // === FIGHT (a0-01b) =======================================================
+  //
+  // §4.7's own worked line for this family is *"a pressure failure: a hard
+  // concussive front, a metallic shear, debris settling. No sparkle"* — so none of
+  // the twenty-one offers below has a sparkle layer in it, and the three that a
+  // slot does offer are three different machines rather than three levels of one:
+  //
+  //   a  a **coil discharge** — a corner opening under charge, then a hard snap
+  //   b  a **mass driver** — pneumatic weight, air released, a low body moving
+  //   c  a **particle shear** — a thin ionised band with the room behind it
+  //
+  // The pair §8 guards hardest runs through here: `rockChip` / `hullHit` is *am I
+  // mining or shooting a ship*, the game's central inversion. Every `hullHit` offer
+  // keeps a hard transient above 1.4 kHz for that reason, including the heavy one.
   hullHit: {
     label: "Hull Hit",
     context: "A weapon shot bites an enemy ship/turret/shield/core.",
     current: 'hullHit',
     candidates: [
-      { id: 'a', character: "sharp metallic clang-ping", spec: {"name":"hh_a_clang","layers":[{"spec":{"name":"hh_a_clangBody","wave":"square","attack":0.001,"hold":0.008,"decay":0.05,"punch":0.6,"freq":900,"freqEnd":500,"duty":0.3,"highPass":400,"gain":0.22,"seed":20483}},{"spec":{"name":"hh_a_clangTick","wave":"noise","attack":0.001,"hold":0.004,"decay":0.03,"freq":2200,"highPass":1200,"gain":0.14,"seed":20484}}]} },
-      { id: 'b', character: "meaty crunching impact", spec: {"name":"hh_b_crunch","layers":[{"spec":{"name":"hh_b_crunchBody","wave":"noise","attack":0.001,"hold":0.02,"decay":0.09,"freq":500,"freqEnd":200,"lowPass":1800,"gain":0.3,"seed":20485}},{"spec":{"name":"hh_b_crunchSnap","wave":"triangle","attack":0.001,"hold":0.008,"decay":0.04,"freq":300,"freqEnd":150,"gain":0.18,"seed":20486},"at":0.005}]} },
-      { id: 'c', character: "bright zippy sweep-hit", spec: {"name":"hh_c_bright","layers":[{"spec":{"name":"hh_c_brightSweep","wave":"saw","attack":0.001,"hold":0.012,"decay":0.07,"freq":600,"freqEnd":1400,"highPass":300,"gain":0.2,"seed":20487}},{"spec":{"name":"hh_c_airHiss","wave":"noise","attack":0.001,"hold":0.01,"decay":0.06,"freq":1800,"highPass":1000,"gain":0.14,"seed":20488}}]} },
+      {
+        id: 'a',
+        character: "coil bite on plate, hard and dry",
+        spec: {
+          name: 'hullHit_a_coilBite',
+          layers: [
+            ...plate('hullHit_a.plate', 1450, { gain: 0.42, decay: 0.06, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.7, grain: 0.34, seed: 30300 }),
+            swept('hullHit_a.coil', { wave: 'noise', freq: 900, from: 1200, to: 3600, q: 7, gain: 0.34, attack: 0.0006, hold: 0.003, decay: 0.035, curve: 7, hp: 600, seed: 30304 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "mass driver round, weight behind it",
+        spec: {
+          name: 'hullHit_b_massDriver',
+          layers: [
+            swept('hullHit_b.body', { wave: 'triangle', freq: 190, freqEnd: 160, from: 2600, to: 420, q: 3.4, gain: 0.44, attack: 0.0008, hold: 0.01, decay: 0.1, curve: 5, punch: 0.8, noiseMix: 0.3, seed: 30310 }),
+            band('hullHit_b.strike', 1700, { gain: 0.4, decay: 0.03, q: 5, curve: 7, punch: 0.6, seed: 30312 }),
+            swept('hullHit_b.air', { wave: 'noise', freq: 420, from: 1800, to: 700, q: 2.2, gain: 0.2, attack: 0.002, hold: 0.008, decay: 0.07, curve: 4, hp: 220, at: 0.008, seed: 30313 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "particle shear, thin and ionised",
+        spec: {
+          name: 'hullHit_c_particleShear',
+          layers: [
+            swept('hullHit_c.shear', { wave: 'noise', freq: 2600, from: 5200, to: 1800, q: 7, gain: 0.75, attack: 0.0006, hold: 0.005, decay: 0.06, curve: 6, hp: 1400, seed: 30320 }),
+            band('hullHit_c.skin', 3200, { gain: 0.5, decay: 0.035, q: 9, curve: 7, punch: 0.5, seed: 30322 }),
+            swept('hullHit_c.floor', { wave: 'noise', freq: 300, from: 700, to: 300, q: 2, gain: 0.14, attack: 0.001, hold: 0.004, decay: 0.05, curve: 5, seed: 30323 }),
+          ],
+        },
+      },
     ],
   },
   rockCrack: {
@@ -699,14 +745,49 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // The single most arcade voice in the denied bank was a duty-swept square with a
+  // four-to-one downward sweep — a 1980s laser. None of these three slides in
+  // pitch at all: what moves in every one of them is the filter, which is a
+  // machine losing or gaining energy rather than a cartoon falling over (§5.4).
   turretFire: {
     label: "Turret Fire",
     context: "Your turret or ship fires a shot.",
     current: 'turretFire',
     candidates: [
-      { id: 'a', character: "sharp bright arcade zap", spec: {"name":"tf_a_zap","wave":"square","attack":0.001,"hold":0.008,"decay":0.05,"punch":0.7,"freq":900,"freqEnd":300,"freqMin":30,"duty":0.15,"dutySweep":-2,"gain":0.28,"seed":20507} },
-      { id: 'b', character: "meaty punchy cannon thud", spec: {"name":"tf_b_thud","wave":"triangle","attack":0.001,"hold":0.02,"decay":0.09,"punch":0.8,"freq":260,"freqEnd":90,"freqMin":30,"noiseMix":0.15,"lowPass":2500,"gain":0.32,"seed":20508} },
-      { id: 'c', character: "airy breathy pulse", spec: {"name":"tf_c_pulse","wave":"sine","attack":0.002,"hold":0.015,"decay":0.07,"freq":700,"freqEnd":350,"vibratoDepth":0.05,"vibratoRate":40,"noiseMix":0.3,"highPass":200,"gain":0.24,"seed":20509} },
+      {
+        id: 'a',
+        character: "coil discharge, corner snapping open",
+        spec: {
+          name: 'turretFire_a_coilDischarge',
+          layers: [
+            swept('turretFire_a.charge', { wave: 'noise', freq: 700, from: 400, to: 4200, q: 8, gain: 0.85, attack: 0.004, hold: 0.004, decay: 0.045, curve: 6, hp: 300, seed: 30330 }),
+            swept('turretFire_a.body', { wave: 'triangle', freq: 145, from: 2200, to: 380, q: 4.5, gain: 0.4, attack: 0.0008, hold: 0.006, decay: 0.075, curve: 5.5, punch: 0.7, noiseMix: 0.28, seed: 30332 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "gas-driven slug, breech and air",
+        spec: {
+          name: 'turretFire_b_gasSlug',
+          layers: [
+            swept('turretFire_b.breech', { wave: 'sine', freq: 74, from: 240, to: 110, q: 2.4, gain: 0.42, attack: 0.001, hold: 0.012, decay: 0.1, curve: 4.5, punch: 0.8, noiseMix: 0.16, seed: 30340 }),
+            grains('turretFire_b.gas', { freq: 820, freqEnd: 560, grain: 0.003, gain: 0.5, hold: 0.008, decay: 0.09, curve: 4, from: 3800, to: 1300, q: 3, hp: 620, at: 0.004, seed: 30342 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "particle lance, thin band and hiss",
+        spec: {
+          name: 'turretFire_c_particleLance',
+          layers: [
+            band('turretFire_c.lance', 2400, { gain: 0.55, decay: 0.05, q: 9, curve: 6, punch: 0.6, seed: 30350 }),
+            swept('turretFire_c.hiss', { wave: 'noise', freq: 1800, from: 4200, to: 1200, q: 3.6, gain: 0.6, attack: 0.001, hold: 0.006, decay: 0.07, curve: 5, hp: 900, seed: 30351 }),
+            swept('turretFire_c.kick', { wave: 'sine', freq: 120, from: 260, q: 2, gain: 0.2, attack: 0.001, hold: 0.004, decay: 0.05, curve: 5, seed: 30352 }),
+          ],
+        },
+      },
     ],
   },
   shotImpact: {
@@ -714,39 +795,170 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A turret/ship projectile lands.",
     current: 'shotImpact',
     candidates: [
-      { id: 'a', character: "sharp tight crack", spec: {"name":"si_a_crack","wave":"noise","attack":0.001,"hold":0.004,"decay":0.035,"freq":1400,"freqEnd":500,"highPass":700,"gain":0.24,"seed":20510} },
-      { id: 'b', character: "meaty low thump", spec: {"name":"si_b_thump","layers":[{"spec":{"name":"si_b_thumpBody","wave":"sine","attack":0.001,"hold":0.015,"decay":0.06,"punch":0.4,"freq":180,"freqEnd":90,"freqMin":30,"gain":0.28,"seed":20511}},{"spec":{"name":"si_b_thumpGrit","wave":"noise","attack":0.001,"hold":0.008,"decay":0.04,"freq":700,"highPass":300,"gain":0.12,"seed":20512}}]} },
-      { id: 'c', character: "airy muffled puff", spec: {"name":"si_c_puff","wave":"noise","attack":0.003,"hold":0.02,"decay":0.09,"freq":500,"freqEnd":200,"lowPass":1200,"gain":0.18,"seed":20513} },
+      {
+        id: 'a',
+        character: "hard contact tick, no body",
+        spec: {
+          name: 'shotImpact_a_contactTick',
+          layers: [
+            ...plate('shotImpact_a.tick', 1900, { gain: 0.4, decay: 0.028, ratios: [1, 2.41], q: 7, curve: 7, punch: 0.7, grain: 0.4, seed: 30360 }),
+            band('shotImpact_a.edge', 4400, { gain: 0.4, decay: 0.018, q: 8, curve: 8, seed: 30364 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "dull thump into structure",
+        spec: {
+          name: 'shotImpact_b_structureThump',
+          layers: [
+            swept('shotImpact_b.thump', { wave: 'sine', freq: 130, freqEnd: 105, from: 480, to: 210, q: 2.6, gain: 0.44, attack: 0.0008, hold: 0.008, decay: 0.07, curve: 5.5, punch: 0.7, noiseMix: 0.2, seed: 30365 }),
+            band('shotImpact_b.contact', 1500, { gain: 0.3, decay: 0.02, q: 5, curve: 8, seed: 30366 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "spray of grit off the hull",
+        spec: {
+          name: 'shotImpact_c_gritSpray',
+          layers: [
+            grains('shotImpact_c.spray', { freq: 2600, freqEnd: 1900, grain: 0.002, gain: 0.55, hold: 0.004, decay: 0.055, curve: 5, punch: 0.5, from: 7400, to: 3200, q: 3, hp: 2200, seed: 30370 }),
+          ],
+        },
+      },
     ],
   },
+  // §8's most important pair mechanically is `shieldHit` / `coreHit` — §2.2's
+  // grammar is *shields redden and die before the reactor begins to fill*, and a
+  // besieged player has to hear which layer is being eaten. So every shield offer
+  // here rings and every core offer below is dull, low and closing: the two slots
+  // are separated by material, not just by pitch, in all nine combinations.
   shieldHit: {
     label: "Shield Hit",
     context: "A shield absorbs a hit — struck bell, not broken.",
     current: 'shieldHit',
     candidates: [
-      { id: 'a', character: "crystal chime shimmer", spec: {"name":"sh_a_chime","layers":[{"spec":{"name":"sh_a_chimeMain","wave":"sine","attack":0.002,"hold":0.04,"decay":0.35,"freq":1800,"freqEnd":1600,"vibratoDepth":0.03,"vibratoRate":18,"gain":0.22,"seed":20514}},{"spec":{"name":"sh_a_overtone","wave":"sine","attack":0.002,"hold":0.02,"decay":0.15,"freq":2600,"gain":0.1,"seed":20515}}]} },
-      { id: 'b', character: "rubbery elastic bounce", spec: {"name":"sh_b_bounce","layers":[{"spec":{"name":"sh_b_bounceMain","wave":"triangle","attack":0.002,"hold":0.02,"decay":0.12,"punch":0.4,"freq":500,"freqEnd":350,"gain":0.3,"seed":20516}},{"spec":{"name":"sh_b_body","wave":"sine","attack":0.002,"hold":0.015,"decay":0.1,"freq":250,"gain":0.16,"seed":20517}}]} },
-      { id: 'c', character: "synthetic energy-field buzz", spec: {"name":"sh_c_buzz","layers":[{"spec":{"name":"sh_c_buzzMain","wave":"square","attack":0.002,"hold":0.03,"decay":0.2,"freq":1100,"freqEnd":980,"duty":0.4,"vibratoDepth":0.04,"vibratoRate":22,"gain":0.2,"seed":20518}},{"spec":{"name":"sh_c_shimmer","wave":"triangle","attack":0.002,"hold":0.02,"decay":0.12,"freq":2000,"gain":0.12,"seed":20519}}]} },
+      {
+        id: 'a',
+        character: "field skin ringing, tight",
+        spec: {
+          name: 'shieldHit_a_fieldSkin',
+          layers: [
+            ...plate('shieldHit_a.skin', 1550, { gain: 0.36, decay: 0.26, ratios: [1, 2.41, 4.17], q: 9, curve: 4, punch: 0.4, grain: 0.22, seed: 30380 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "absorbed pressure, elastic give",
+        spec: {
+          name: 'shieldHit_b_elasticGive',
+          layers: [
+            swept('shieldHit_b.give', { wave: 'triangle', freq: 520, freqEnd: 470, from: 900, to: 2600, q: 6, gain: 0.4, attack: 0.003, hold: 0.02, decay: 0.2, curve: 3.2, noiseMix: 0.18, vib: [0.012, 11], seed: 30390 }),
+            swept('shieldHit_b.load', { wave: 'sine', freq: 175, from: 400, to: 220, q: 2.4, gain: 0.24, attack: 0.002, hold: 0.01, decay: 0.12, curve: 4, seed: 30392 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "static discharge across the bubble",
+        spec: {
+          name: 'shieldHit_c_staticDischarge',
+          layers: [
+            grains('shieldHit_c.static', { freq: 1700, freqEnd: 1500, grain: 0.0045, gain: 0.55, hold: 0.012, decay: 0.2, curve: 4, from: 3600, to: 1600, q: 4, hp: 800, seed: 30400 }),
+            band('shieldHit_c.ring', 2300, { gain: 0.34, decay: 0.16, q: 11, curve: 4.5, seed: 30402 }),
+          ],
+        },
+      },
     ],
   },
+  // The ×6.9 fall stays in all three — a bubble failing IS a collapse, and §5.4
+  // exempts it by construction. What differs is what is falling.
   shieldDown: {
     label: "Shield Down",
     context: "A shield's bubble fails and falls.",
     current: 'shieldDown',
     candidates: [
-      { id: 'a', character: "descending power-down wail", spec: {"name":"sd_a_wail","layers":[{"spec":{"name":"sd_a_wailMain","wave":"square","attack":0.005,"hold":0.05,"decay":0.6,"freq":1100,"freqEnd":100,"freqMin":30,"duty":0.35,"dutySweep":-1,"lowPass":2500,"gain":0.3,"seed":20520}},{"spec":{"name":"sd_a_thud","wave":"sine","attack":0.002,"hold":0.02,"decay":0.1,"freq":200,"freqEnd":80,"freqMin":30,"gain":0.16,"seed":20521}}]} },
-      { id: 'b', character: "bubble-burst pop and splash", spec: {"name":"sd_b_pop","layers":[{"spec":{"name":"sd_b_popMain","wave":"noise","attack":0.001,"hold":0.008,"decay":0.1,"punch":0.6,"freq":700,"freqEnd":200,"gain":0.28,"seed":20522}},{"spec":{"name":"sd_b_splash","wave":"noise","attack":0.002,"hold":0.03,"decay":0.25,"freq":400,"freqEnd":150,"lowPass":1500,"gain":0.2,"seed":20523}}]} },
-      { id: 'c', character: "electrical fizzle-out crackle", spec: {"name":"sd_c_fizzle","layers":[{"spec":{"name":"sd_c_fizzleMain","wave":"noise","attack":0.002,"hold":0.05,"decay":0.35,"freq":900,"freqEnd":300,"repeat":0.03,"highPass":500,"gain":0.22,"seed":20524}},{"spec":{"name":"sd_c_spark","wave":"square","attack":0.001,"hold":0.01,"decay":0.08,"freq":1800,"freqEnd":600,"duty":0.15,"gain":0.14,"seed":20525},"at":0.01}]} },
+      {
+        id: 'a',
+        character: "field collapsing, resonance closing",
+        spec: {
+          name: 'shieldDown_a_fieldCollapse',
+          layers: [
+            swept('shieldDown_a.fall', { wave: 'triangle', freq: 1450, freqEnd: 210, from: 4800, to: 900, q: 10, gain: 0.44, attack: 0.003, hold: 0.02, decay: 0.44, curve: 2.6, noiseMix: 0.12, hp: 300, seed: 30410 }),
+            band('shieldDown_a.snap', 2600, { gain: 0.45, decay: 0.05, q: 7, curve: 6, punch: 0.5, seed: 30412 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "pressure loss, air dumping out",
+        spec: {
+          name: 'shieldDown_b_pressureLoss',
+          layers: [
+            swept('shieldDown_b.dump', { wave: 'noise', freq: 700, freqEnd: 110, from: 2600, to: 220, q: 2.4, gain: 0.44, attack: 0.002, hold: 0.04, decay: 0.42, curve: 2.4, punch: 0.5, seed: 30420 }),
+            swept('shieldDown_b.sub', { wave: 'sine', freq: 90, freqEnd: 52, from: 200, q: 1.8, gain: 0.26, attack: 0.006, hold: 0.03, decay: 0.3, curve: 2.2, at: 0.05, seed: 30422 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "ionised skin tearing, room behind it",
+        spec: {
+          name: 'shieldDown_c_skinTear',
+          layers: [
+            grains('shieldDown_c.tear', { freq: 1500, freqEnd: 260, grain: 0.006, gain: 0.5, hold: 0.03, decay: 0.34, curve: 3, from: 4200, to: 600, q: 3.4, hp: 400, seed: 30430 }),
+            ...returns('shieldDown_c.room', { freq: 500, gain: 0.16, decay: 0.26, from: 1600, to: 500, at: 0.12, gap: 0.13, count: 2, seed: 30433 }),
+          ],
+        },
+      },
     ],
   },
+  // One of the two sounds homes get, and the ache depends on it (§7.2): SERIOUS,
+  // low, dropping, no sparkle anywhere near it. All three are dull by
+  // construction — nothing above 1 kHz survives more than 40 ms in any of them —
+  // and all three keep clear of `rejectBuzz`, the §8 pair that reads as *your buy
+  // was refused* against *your reactor is being eaten*.
   coreHit: {
     label: "Core Hit",
     context: "A home core takes damage. SERIOUS — low, drops, no sparkle.",
     current: 'coreHit',
     candidates: [
-      { id: 'a', character: "deep sub thud with grit", spec: {"name":"ch_a_thud","layers":[{"spec":{"name":"ch_a_thudMain","wave":"sine","attack":0.002,"hold":0.03,"decay":0.3,"punch":0.45,"freq":150,"freqEnd":45,"freqMin":30,"gain":0.4,"seed":20526}},{"spec":{"name":"ch_a_rumble","wave":"noise","attack":0.002,"hold":0.03,"decay":0.2,"freq":200,"freqEnd":80,"lowPass":900,"gain":0.16,"seed":20527}}]} },
-      { id: 'b', character: "low metallic groan and creak", spec: {"name":"ch_b_groan","layers":[{"spec":{"name":"ch_b_groanMain","wave":"saw","attack":0.005,"hold":0.06,"decay":0.45,"freq":140,"freqEnd":55,"freqMin":30,"lowPass":1200,"gain":0.4,"seed":20528}},{"spec":{"name":"ch_b_creak","wave":"noise","attack":0.003,"hold":0.02,"decay":0.15,"freq":300,"freqEnd":100,"lowPass":700,"gain":0.14,"seed":20529}}]} },
-      { id: 'c', character: "muffled distant boom", spec: {"name":"ch_c_boom","layers":[{"spec":{"name":"ch_c_boomMain","wave":"sine","attack":0.004,"hold":0.08,"decay":0.55,"punch":0.3,"freq":90,"freqEnd":40,"freqMin":30,"gain":0.42,"seed":20530}},{"spec":{"name":"ch_c_dust","wave":"noise","attack":0.005,"hold":0.05,"decay":0.3,"freq":250,"freqEnd":90,"lowPass":600,"gain":0.16,"seed":20531}}]} },
+      {
+        id: 'a',
+        character: "reactor slug, deep and closing",
+        spec: {
+          name: 'coreHit_a_reactorSlug',
+          layers: [
+            swept('coreHit_a.slug', { wave: 'sine', freq: 112, freqEnd: 44, from: 300, to: 96, q: 2.6, gain: 0.5, attack: 0.002, hold: 0.024, decay: 0.3, curve: 2.6, punch: 0.7, noiseMix: 0.1, seed: 30440 }),
+            swept('coreHit_a.tear', { wave: 'noise', freq: 230, freqEnd: 100, from: 700, to: 200, q: 2.4, gain: 0.2, attack: 0.001, hold: 0.01, decay: 0.16, curve: 4, seed: 30442 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "structural groan under the hit",
+        spec: {
+          name: 'coreHit_b_structuralGroan',
+          layers: [
+            swept('coreHit_b.hit', { wave: 'triangle', freq: 108, freqEnd: 74, from: 600, to: 200, q: 3.4, gain: 0.44, attack: 0.002, hold: 0.02, decay: 0.26, curve: 3, punch: 0.6, noiseMix: 0.22, seed: 30450 }),
+            swept('coreHit_b.groan', { wave: 'triangle', freq: 168, freqEnd: 140, from: 620, to: 330, q: 6, gain: 0.32, attack: 0.02, hold: 0.06, decay: 0.34, curve: 2.2, noiseMix: 0.2, vib: [0.02, 5], at: 0.05, seed: 30452 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "distant concussion, room answering",
+        spec: {
+          name: 'coreHit_c_distantConcussion',
+          layers: [
+            swept('coreHit_c.front', { wave: 'noise', freq: 190, freqEnd: 62, from: 900, to: 180, q: 2.2, gain: 0.42, attack: 0.004, hold: 0.03, decay: 0.28, curve: 2.6, punch: 0.5, seed: 30460 }),
+            swept('coreHit_c.sub', { wave: 'sine', freq: 62, freqEnd: 46, from: 160, q: 1.8, gain: 0.28, attack: 0.006, hold: 0.02, decay: 0.24, curve: 2.4, seed: 30462 }),
+            ...returns('coreHit_c.room', { freq: 220, gain: 0.14, decay: 0.22, from: 600, to: 220, at: 0.1, gap: 0.12, count: 2, seed: 30464 }),
+          ],
+        },
+      },
     ],
   },
   turretDown: {
@@ -754,9 +966,41 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A turret is destroyed.",
     current: 'turretDown',
     candidates: [
-      { id: 'a', character: "sparking short-circuit collapse", spec: {"name":"td_a_fizz","layers":[{"spec":{"name":"td_a_fizzMain","wave":"noise","attack":0.002,"hold":0.05,"decay":0.3,"freq":600,"freqEnd":150,"repeat":0.04,"highPass":300,"gain":0.3,"seed":20532}},{"spec":{"name":"td_a_spark","wave":"square","attack":0.001,"hold":0.015,"decay":0.1,"freq":1600,"freqEnd":400,"duty":0.2,"gain":0.18,"seed":20533},"at":0.02}]} },
-      { id: 'b', character: "heavy metal collapse thud", spec: {"name":"td_b_collapse","layers":[{"spec":{"name":"td_b_collapseMain","wave":"noise","attack":0.003,"hold":0.05,"decay":0.4,"punch":0.5,"freq":220,"freqEnd":70,"freqMin":30,"lowPass":1200,"gain":0.32,"seed":20534}},{"spec":{"name":"td_b_thud","wave":"sine","attack":0.002,"hold":0.03,"decay":0.25,"freq":120,"freqEnd":60,"freqMin":30,"gain":0.24,"seed":20535},"at":0.03}]} },
-      { id: 'c', character: "brittle glassy shatter-clang", spec: {"name":"td_c_shatter","layers":[{"spec":{"name":"td_c_shatterMain","wave":"noise","attack":0.001,"hold":0.02,"decay":0.2,"freq":1400,"freqEnd":500,"highPass":600,"gain":0.28,"seed":20536}},{"spec":{"name":"td_c_clang","wave":"square","attack":0.002,"hold":0.02,"decay":0.18,"freq":900,"freqEnd":450,"duty":0.25,"gain":0.2,"seed":20537},"at":0.03}]} },
+      {
+        id: 'a',
+        character: "mount shearing, metal letting go",
+        spec: {
+          name: 'turretDown_a_mountShear',
+          layers: [
+            swept('turretDown_a.shear', { wave: 'noise', freq: 420, freqEnd: 130, from: 3000, to: 420, q: 3.4, gain: 0.34, attack: 0.001, hold: 0.02, decay: 0.28, curve: 3.4, punch: 0.7, seed: 30470 }),
+            ...plate('turretDown_a.mount', 640, { gain: 0.3, decay: 0.22, ratios: [1, 2.41], q: 7, curve: 4.5, at: 0.05, seed: 30472 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "collapse onto the deck, weight down",
+        spec: {
+          name: 'turretDown_b_deckCollapse',
+          layers: [
+            swept('turretDown_b.fall', { wave: 'noise', freq: 260, freqEnd: 70, from: 1600, to: 260, q: 2.6, gain: 0.42, attack: 0.002, hold: 0.03, decay: 0.34, curve: 2.8, punch: 0.6, seed: 30480 }),
+            swept('turretDown_b.deck', { wave: 'sine', freq: 74, from: 200, to: 120, q: 2, gain: 0.3, attack: 0.002, hold: 0.02, decay: 0.26, curve: 3, at: 0.08, seed: 30482 }),
+            grains('turretDown_b.debris', { freq: 300, freqEnd: 190, grain: 0.03, gain: 0.22, hold: 0.04, decay: 0.24, curve: 3.4, from: 1400, to: 420, q: 2.6, hp: 160, at: 0.1, seed: 30483 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "power cell venting, then quiet",
+        spec: {
+          name: 'turretDown_c_cellVent',
+          layers: [
+            band('turretDown_c.rupture', 1400, { gain: 0.44, decay: 0.05, q: 6, curve: 6, punch: 0.7, seed: 30490 }),
+            grains('turretDown_c.vent', { freq: 900, freqEnd: 380, grain: 0.0035, gain: 0.55, hold: 0.05, decay: 0.3, curve: 3, from: 3400, to: 700, q: 3.6, hp: 500, at: 0.01, seed: 30491 }),
+            ...returns('turretDown_c.room', { freq: 380, gain: 0.12, decay: 0.2, from: 1200, to: 400, at: 0.16, gap: 0.12, count: 2, seed: 30493 }),
+          ],
+        },
+      },
     ],
   },
   shipExplode: {

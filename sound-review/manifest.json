@@ -38,19 +38,19 @@
         {
           "id": "a",
           "wav": "previews/hullHit/a.wav",
-          "character": "sharp metallic clang-ping",
+          "character": "coil bite on plate, hard and dry",
           "params": "src/art/audio/candidates.ts#hullHit.a"
         },
         {
           "id": "b",
           "wav": "previews/hullHit/b.wav",
-          "character": "meaty crunching impact",
+          "character": "mass driver round, weight behind it",
           "params": "src/art/audio/candidates.ts#hullHit.b"
         },
         {
           "id": "c",
           "wav": "previews/hullHit/c.wav",
-          "character": "bright zippy sweep-hit",
+          "character": "particle shear, thin and ionised",
           "params": "src/art/audio/candidates.ts#hullHit.c"
         }
       ]
@@ -168,19 +168,19 @@
         {
           "id": "a",
           "wav": "previews/turretFire/a.wav",
-          "character": "sharp bright arcade zap",
+          "character": "coil discharge, corner snapping open",
           "params": "src/art/audio/candidates.ts#turretFire.a"
         },
         {
           "id": "b",
           "wav": "previews/turretFire/b.wav",
-          "character": "meaty punchy cannon thud",
+          "character": "gas-driven slug, breech and air",
           "params": "src/art/audio/candidates.ts#turretFire.b"
         },
         {
           "id": "c",
           "wav": "previews/turretFire/c.wav",
-          "character": "airy breathy pulse",
+          "character": "particle lance, thin band and hiss",
           "params": "src/art/audio/candidates.ts#turretFire.c"
         }
       ]
@@ -194,19 +194,19 @@
         {
           "id": "a",
           "wav": "previews/shotImpact/a.wav",
-          "character": "sharp tight crack",
+          "character": "hard contact tick, no body",
           "params": "src/art/audio/candidates.ts#shotImpact.a"
         },
         {
           "id": "b",
           "wav": "previews/shotImpact/b.wav",
-          "character": "meaty low thump",
+          "character": "dull thump into structure",
           "params": "src/art/audio/candidates.ts#shotImpact.b"
         },
         {
           "id": "c",
           "wav": "previews/shotImpact/c.wav",
-          "character": "airy muffled puff",
+          "character": "spray of grit off the hull",
           "params": "src/art/audio/candidates.ts#shotImpact.c"
         }
       ]
@@ -220,19 +220,19 @@
         {
           "id": "a",
           "wav": "previews/shieldHit/a.wav",
-          "character": "crystal chime shimmer",
+          "character": "field skin ringing, tight",
           "params": "src/art/audio/candidates.ts#shieldHit.a"
         },
         {
           "id": "b",
           "wav": "previews/shieldHit/b.wav",
-          "character": "rubbery elastic bounce",
+          "character": "absorbed pressure, elastic give",
           "params": "src/art/audio/candidates.ts#shieldHit.b"
         },
         {
           "id": "c",
           "wav": "previews/shieldHit/c.wav",
-          "character": "synthetic energy-field buzz",
+          "character": "static discharge across the bubble",
           "params": "src/art/audio/candidates.ts#shieldHit.c"
         }
       ]
@@ -246,19 +246,19 @@
         {
           "id": "a",
           "wav": "previews/shieldDown/a.wav",
-          "character": "descending power-down wail",
+          "character": "field collapsing, resonance closing",
           "params": "src/art/audio/candidates.ts#shieldDown.a"
         },
         {
           "id": "b",
           "wav": "previews/shieldDown/b.wav",
-          "character": "bubble-burst pop and splash",
+          "character": "pressure loss, air dumping out",
           "params": "src/art/audio/candidates.ts#shieldDown.b"
         },
         {
           "id": "c",
           "wav": "previews/shieldDown/c.wav",
-          "character": "electrical fizzle-out crackle",
+          "character": "ionised skin tearing, room behind it",
           "params": "src/art/audio/candidates.ts#shieldDown.c"
         }
       ]
@@ -272,19 +272,19 @@
         {
           "id": "a",
           "wav": "previews/coreHit/a.wav",
-          "character": "deep sub thud with grit",
+          "character": "reactor slug, deep and closing",
           "params": "src/art/audio/candidates.ts#coreHit.a"
         },
         {
           "id": "b",
           "wav": "previews/coreHit/b.wav",
-          "character": "low metallic groan and creak",
+          "character": "structural groan under the hit",
           "params": "src/art/audio/candidates.ts#coreHit.b"
         },
         {
           "id": "c",
           "wav": "previews/coreHit/c.wav",
-          "character": "muffled distant boom",
+          "character": "distant concussion, room answering",
           "params": "src/art/audio/candidates.ts#coreHit.c"
         }
       ]
@@ -298,19 +298,19 @@
         {
           "id": "a",
           "wav": "previews/turretDown/a.wav",
-          "character": "sparking short-circuit collapse",
+          "character": "mount shearing, metal letting go",
           "params": "src/art/audio/candidates.ts#turretDown.a"
         },
         {
           "id": "b",
           "wav": "previews/turretDown/b.wav",
-          "character": "heavy metal collapse thud",
+          "character": "collapse onto the deck, weight down",
           "params": "src/art/audio/candidates.ts#turretDown.b"
         },
         {
           "id": "c",
           "wav": "previews/turretDown/c.wav",
-          "character": "brittle glassy shatter-clang",
+          "character": "power cell venting, then quiet",
           "params": "src/art/audio/candidates.ts#turretDown.c"
         }
       ]
