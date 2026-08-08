@@ -114,15 +114,66 @@ light `emulation.spec.ts` work. That is Decision §4's `[pixel]`/`[iphone]`
 inversion reproduced on an independent spec — two dpr-3 software-GL pages on
 4 cores starve each other's main thread, and every CDP round trip costs a frame.
 
+**Shard 2 was red too** — four `[iphone]` goldens dead at 90 s with
+`Page.captureScreenshot: Internal server error, session closed`. Checked against
+run `31249237259`: **the same four passed there at 40.6 / 34.1 / 20.4 s.** The
+goldens did not change. What changed is that MY re-balance seated
+`iphone|goldens` beside `pixel|upgrade-wheel-gantry`, the second-heaviest brick.
+That is the finding of the whole brief and it indicts the plan, not the specs:
+LPT balances the SUM of a shard's work and says nothing about whether two
+expensive dpr-3 pages are resident at the same INSTANT.
+
+## BUILT — session 2
+
+| commit | what |
+|---|---|
+| `86f57e9` | `docs`: the session-2 note |
+| `0ce1f1a` | `ci`: **`workers: 1` in CI, N=4 → 8, `MEASURED_SECONDS` refreshed off run 31258319576** |
+| `7559e04` | `docs`: report §6 — the regression, the four measurements, the N table; §3a + appendix re-derived |
+
+## DECISIONS — session 2
+
+### 5 · `workers: 1` came IN scope, and the evidence is why
+
+Session 1 scoped it OUT as `a0-00c` because it "wants its own measurement rather
+than a guess." It now has four, all off the runner: the 0.28 vs 1.5 fps trace
+reading; `build-wheel-gantry:314` at 300 s `[pixel]` / 126 s `[iphone]` in one
+run; `build-flow:157` at >330 s / 276 s across projects against a 32 s
+in-container measurement; and the four goldens above. That is no longer a guess,
+and the DoD gates on green — the contention IS the thing blocking it.
+
+**Rejected: a local A/B** (`taskset -c 0-3`, `--workers=2` vs `1`). Started it,
+then threw the arm away: `pgrep` showed another lane's vitest and a `vite
+preview` on the same box and on **port 4173**, which this config also uses with
+`reuseExistingServer` — the a0-06 note's trap verbatim. A contended 8-core box
+cannot measure contention, and the real runner answers it in one push.
+
+### 6 · N=8 is derived, not picked
+
+Total serial 8355 s → even split 1044 s; heaviest indivisible brick
+(`iphone|goldens`) 1032 s. So 8 is the LARGEST N that still divides evenly — at
+N=9 the makespan flatlines at 1032 s and the spread goes 28 s → 123 s. Verified
+by running the planner across N=2…9, table in report §3a.
+
+### 7 · An inflated cost table is safe, and this is why it did not need re-measuring first
+
+The 8355 s were measured at `workers: 2`, so they carry the tax the change
+removes. That is fine: **LPT balances on RATIOS, so a uniform scale factor cannot
+change the assignment.** What breaks a plan is a cost wrong *relative to its
+neighbours* — exactly what the stale table had become once §5's fixes halved two
+of its biggest rows. It also makes 17.7 min/shard the WORST case.
+
 ## NEXT
 
-- Local controlled measurement of `build-flow.spec.ts` at `--workers=2` vs
-  `--workers=1`, pinned to 4 cores (`taskset -c 0-3`), running now. This is the
-  number that decides whether `workers: 1` comes IN scope from `a0-00c`.
-- Refresh `MEASURED_SECONDS` off this run's real per-unit costs (parser written;
-  3 of 4 shards aggregated, total 5369 s serial, heaviest brick now 688 s not
-  1338 s). A halved heaviest brick is what makes a larger N viable.
-- Then re-plan N / workers together, push, and watch #321 to zero failing checks.
+- **Watching run `31259840319`** (8 shards, `workers: 1`). This is the DoD gate.
+- If green: take the WIP marker off #321 — **the last deliverable item.** (Body
+  was already rewritten in session 1; re-check the title/body for a stale `N=4`.)
+- If a shard is still red: read it before reacting. A per-test timeout now would
+  falsify the contention hypothesis rather than confirm it, and the honest
+  outcome would be to scope the offending spec's rewrite, not raise its budget.
+- Refresh the table once more off a green 8-shard run (report §8) — it is a
+  `workers: 2` snapshot scheduling a `workers: 1` suite. Balance is unaffected
+  (ratios); only §6b's absolute minutes read high.
 
 Known-unrelated: `tests/net/capacity/capacity-regression.test.ts` fails locally
 under load (34.6 ms vs a 33 ms budget) and passes both isolated and in CI. Not
