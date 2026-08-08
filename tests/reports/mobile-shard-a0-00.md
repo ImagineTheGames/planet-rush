@@ -448,6 +448,36 @@ There are **no** actual/expected/diff PNGs in this artifact, and that is correct
 rather than a gap: all four failures are timeouts, so no frame was ever captured
 to compare. No baseline is in question.
 
+### 7a · Retrieved again, off the re-balanced run, and re-measured
+
+Repeated on `playwright-report-shard-3` from run `31258319576` — a different
+non-zero shard, a different failure, the current config:
+
+```
+$ gh run download 31258319576 --name playwright-report-shard-3
+data/  index.html  trace/          9.9M
+index.html                         545 KB, self-contained
+data/*.zip                         2 traces × 4.2 MB
+                                   = 2 attempts × 1 failure (retries: 1)
+each trace                         117 entries: test.trace, 0-trace.trace,
+                                   0-trace.network, 0-trace.stacks,
+                                   110 screencast frames
+```
+
+The inspectability holds, and the screencast is a measuring instrument as well
+as a picture. Frame timestamps out of the failing `build-flow.spec.ts:157`
+trace:
+
+| | median | mean | p90 | max |
+|---|---|---|---|---|
+| frame period | **3.39 s** | 3.01 s | 3.85 s | 9.08 s |
+
+**0.30 fps** — an independent reproduction of §4b's 0.28 fps, on a different
+spec, in a different run, and the direct cause of a test measured at 32 s
+in-container spending more than 330 s here. This is the number `workers: 1`
+exists to move, and re-running this extraction against a green 8-shard trace is
+how a0-00c should check that it did.
+
 ## 8. Re-measuring the cost table
 
 The table is a snapshot and snapshots go stale. `tests/mobile-shard-plan.test.ts`
