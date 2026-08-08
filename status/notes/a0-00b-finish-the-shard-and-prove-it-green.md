@@ -202,12 +202,35 @@ would actually make a larger N pay.
 
 PR #321 title + body rewritten to what shipped; no WIP marker, not a draft.
 
+### 11 · #321 MERGED mid-flight — and two DoD gates went red because of it
+
+**#321 merged at `caa24d5`, 14:09:45, green.** The substance of the brief is in
+`main`. But it merged **one commit before** `bb3396d` (report §6e — the measured
+numbers for the N=6 config that is what actually ships), and that broke the DoD:
+
+- gate 4 (`gh pr list --head … .[0].number`) lists **OPEN** PRs only → empty →
+  `test -n "$n"` fails. A merged PR does not satisfy it.
+- gate 5 (`merge-base --is-ancestor origin/main HEAD`) → `main` moved past me
+  (my own merge, plus #316 and a style-guide commit) → fails.
+
+**Fix, in order:** merged `origin/main` back in (`9557198`, clean — main already
+contained my sharding work, so the only delta was the §6e docs), then opened
+**PR #322** for the remaining commit. Gate 4 now resolves to 322, gate 5 passes.
+
+**Trap worth naming:** on this team a PR can be merged out from under you the
+moment its checks go green. Push the *evidence* commit before or with the change
+it describes — do not leave the report trailing the config by one commit, or the
+merge lands the code and strands the numbers.
+
 ## NEXT
 
-- **Nothing outstanding.** All five DoD gates verified locally at `caa24d5` +
-  the report commit: `tsc` clean · `npm test -- --run` 3963/3963 · report tracked
-  · `origin/main` is an ancestor · PR checks green. Final push is the report's
-  §6e numbers; watch that run to zero failing checks and the brief is done.
+- **Watch PR #322's checks to zero failing.** That is the last gate. Everything
+  else is verified: `tsc` clean on the merged tree · report tracked ·
+  `origin/main` is an ancestor again · the shipped config (N=6, `workers: 1`,
+  659 s table) confirmed intact after the merge.
+- `npm test -- --run` on the merged tree: **3973/3973 passed, 237 files** — one
+  earlier run had shown `1 failed / 3972` and both re-runs were clean, i.e. the
+  load-flaky perf test again (see the trap below), not a regression.
 - `a0-00c` re-scoped: **split the `iphone|goldens` brick.** At 659 s it is the
   only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
   Also correct `sim-clock.ts`'s "~1 fps" with the measured 0.28–1.5 range.
