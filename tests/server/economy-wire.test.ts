@@ -32,6 +32,7 @@ import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
 import type { WireFrame } from '../../src/net/wire';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
+import { seatBots } from './seat-bots';
 
 /** A socket that keeps its frames, in order — the ordering is half the contract. */
 class FakeSocket implements ServerSocket {
@@ -94,6 +95,7 @@ describe('the economy channel', () => {
     join(host, code);
     guest = connect();
     join(guest, code);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(16);
     advance(200);

@@ -391,15 +391,24 @@ export {
   cycleSeatTeam,
   defaultCharacterForEmptySeat,
   seatDifficulty,
+  // Where a lobby slot lands in the sim's DENSE roster (a0-11) — the two
+  // numberings stop agreeing the moment a seat is left open or closed.
+  denseSeatIndex,
   eraseRoomCode,
   hostControls,
   isJoinableRoomCode,
+  // "In the match" — a human or a bot, and nothing else. Every count on the
+  // screen is taken through it (GDD §2.1, amended 2026-08-07).
+  isParticipant,
   lobbyMatchConfig,
   lobbyModel,
   // The authored sides, in the two orders the two ends index by (m10 teams-wire):
   // per-SLOT for the server, DENSE for the world the client builds itself.
   lobbyRosterCast,
   lobbyRosterTeams,
+  // …and the host's per-seat OPEN / BOT / CLOSED authoring, in the SLOT order the
+  // server indexes it by (a0-11 — `LobbyChoiceMessage.seats`).
+  lobbyWireSeats,
   lobbyWireTeams,
   makeRoomCode,
   matchSizeOf,
@@ -413,6 +422,11 @@ export {
   selectShipClass,
   setPlayerName,
   startLobbyMatch,
+  // Why RUSH! is refused, in the words the screen shows (a0-11; GDD §2.1
+  // amended) — a refused button that says nothing is a dead control.
+  NEEDS_TWO,
+  NEEDS_TWO_SIDES,
+  startRefusal,
   // The one place a side's player-facing name lives — `FRIENDLY A` / `ENEMY B`,
   // the WORD relative to the viewer and the LETTER absolute — shared by the lobby
   // roster and the in-match nameplates so they can never disagree. `SIDE_COLORS`

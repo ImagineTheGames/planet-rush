@@ -31,6 +31,7 @@ import type { EntityEventMessage, ServerMessage } from '../../src/net/transport'
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
 import type { StationHealthData } from '../../src/net/entity-events';
+import { seatBots } from './seat-bots';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -76,6 +77,7 @@ describe('station health on the wire', () => {
     socket = new FakeSocket();
     client = server.connect(socket);
     client.receive(encodeClientMessage({ type: 'join', room: 'FOGY' }));
+    client.receive(seatBots());
     client.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(16);
     socket.clear();

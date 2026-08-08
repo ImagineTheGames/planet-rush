@@ -80,6 +80,17 @@ export interface SyntheticMatchOptions {
 /** The seven bots that fill the room. All Hard — the expensive tree (GDD §2.9). */
 const SEVEN_HARD_BOTS = ['hard', 'hard', 'hard', 'hard', 'hard', 'hard', 'hard'] as const;
 
+/**
+ * …and the ROSTER that puts them there (a0-11; GDD §2.1 *amended 2026-08-07*).
+ *
+ * The load model is "one human seat + 7 Hard bots", and it used to get the bots
+ * for free: the room turned every socket-less seat into one. It no longer does —
+ * a seat left OPEN is an empty chair — so the host has to seat them, which is
+ * exactly what the shipping client does. Without this the measured room is a
+ * ONE-ship room and the whole capacity curve is a reading of the wrong thing.
+ */
+const ONE_HUMAN_SEVEN_BOTS = ['open', 'bot', 'bot', 'bot', 'bot', 'bot', 'bot', 'bot'] as const;
+
 class Match implements SyntheticMatch {
   readonly stats: LoadSocketStats;
   live = false;
@@ -201,6 +212,7 @@ export async function openSyntheticMatch(
       shipClass: options.shipClass ?? 'vanguard',
       fireMode: 'auto',
       botDifficulties: SEVEN_HARD_BOTS,
+      seats: ONE_HUMAN_SEVEN_BOTS,
       mode: 'ffa',
     }),
   );

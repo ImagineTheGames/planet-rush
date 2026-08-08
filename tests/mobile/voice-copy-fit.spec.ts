@@ -129,6 +129,13 @@ const CASES: readonly FitCase[] = [
     size: 11,
     box: 812,
   },
+  // …and the HOST's refusals (a0-11; `src/ui/lobby` NEEDS_TWO / NEEDS_TWO_SIDES).
+  // These share the strip with the head-count tally, and the strip is the first
+  // thing the narrowest footer gives up — a refusal that does not fit is not
+  // drawn at all (`lobby-view.ts`: `visible = … rushHint.width >= text width`),
+  // which is the dead button it was written to replace.
+  { where: 'lobby rushHint (needs 2)', text: 'NEEDS 2 — ADD A BOT OR WAIT', font: FONT_BODY, size: 11, box: 812 },
+  { where: 'lobby rushHint (needs 2 sides)', text: 'NEEDS 2 SIDES', font: FONT_BODY, size: 11, box: 812 },
 
   // --- The entry screen's refusals (lobby-entry-view.ts, 12px body) ----------
   // The longest of the four, which is the one that decides the set.
