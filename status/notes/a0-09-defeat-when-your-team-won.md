@@ -183,6 +183,9 @@ Set, so the worry was a roster mutating under a displayed screen and flipping
 VICTORY to DEFEAT. It cannot: the set is derived once and never mutated, and dead
 allies stay in it.
 
+Shipped as **`0deeeff`**, PR **#328** (open, all CI green: typecheck/test/build +
+all 6 mobile shards). All four DoD gates pass on the pushed branch.
+
 **The port trap, again, and worse.** `tests/live-stage/playwright.config.ts` pins
 4173 with `reuseExistingServer: !CI` — and **lane-1 was mid-run on that same port**
 during this session. Ran instead on a private port (4196, `strictPort`,
@@ -195,7 +198,11 @@ tests/live-stage/...` with no file argument runs the WHOLE live-stage directory
 
 ## NEXT
 
-Open follow-ups for whoever picks them up:
+**Nothing outstanding for the brief.** #327 is merged, #328 is open and green.
+The only thing left is #328 being reviewed and merged; if a future session finds
+it merged, this brief is done end to end.
+
+Open follow-ups for whoever picks them up — none of them block a0-09:
 
 1. **Names on the end screen** — above. Blocked on a0-06 by choice, not by code.
 2. **The side is not drawn, only worded.** GDD §2.1's "added indicator" has no
