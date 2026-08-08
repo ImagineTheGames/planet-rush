@@ -30,13 +30,53 @@
  *                                               ▼
  *   oscillator (square / saw / triangle / sine / pitched noise)
  *                                               │
- *   ADSR-ish envelope (attack · hold+punch · decay)
+ *   ADSR-ish envelope (attack · hold+punch · decay, linear or exponential)
  *                                               │
- *   one-pole low-pass ── one-pole high-pass ── clamp ── edge fades
+ *   low-pass (one-pole, or resonant + swept) ── one-pole high-pass
+ *                                               │
+ *                                     clamp ── edge fades
  * ```
  *
  * There is no filter node, no oscillator node and no worklet anywhere in the
  * game: all of this happens once, on the CPU, at load.
+ *
+ * ## What round 2 of the re-voice added, and why (s8-01, 2026-08-08)
+ *
+ * The first re-voice (s7-02) obeyed the amended tone contract to the letter —
+ * `square` left the bank, `saw` survived only in the sanctioned klaxon — and the
+ * developer heard **the same complaint again**. Measured afterwards, the reason
+ * was structural rather than tonal: round 1 changed *which oscillator* a sound
+ * used and changed nothing about *how a sound is made*. Four properties survived
+ * it untouched, and all four read as "cheap synthesized toy" whatever waveform
+ * is underneath them:
+ *
+ *  - **A linear decay.** This model had exactly one envelope shape, `1 - d`.
+ *    Nothing physical decays in a straight line; a linear ramp to silence is the
+ *    most synthetic envelope there is, and every percussive voice had one.
+ *  - **Bare tone generators.** The struck confirmations were stacks of unfiltered
+ *    sine partials — a raw sine is a test tone, and a stack of them with a linear
+ *    decay is a glockenspiel. Retiring `square` for *that* is a lateral move.
+ *  - **No filter movement at all.** Both filters were one-pole and static. There
+ *    was not one swept or resonant filter anywhere in the bank.
+ *  - **No transient material.** A strike was the attack segment of a tone, never
+ *    the sound of two things touching.
+ *
+ * So round 2 extends the *instrument* instead of re-shuffling the oscillators:
+ * {@link VoiceSpec.decayCurve} (a real decay tail), {@link VoiceSpec.resonance}
+ * and {@link VoiceSpec.lowPassEnd} (the resonant sweep — the single most
+ * characteristic gesture in modern science-fiction sound), and
+ * {@link VoiceSpec.bandPass} (narrow, pitched, metallic noise — a transient made
+ * of the material rather than of a tone). All four are optional and default to
+ * the previous behaviour exactly, so this is an addition to the model and not a
+ * change to it.
+ *
+ * What is deliberately **not** here is a reverb. Space belongs to a handful of
+ * large events — an explosion, a station dying, the collapse — and putting a tail
+ * on a 28 ms interface tick only smears the mix on the speaker the mobile gate
+ * (GDD §4.3) makes a first-class target. Reflections are written as ordinary
+ * layers in `./bank`, for the reason {@link mixInto} already gives: stacking
+ * rendered parts keeps the sound readable as data, where growing the voice model
+ * into a small modular synth nobody can tune does not.
  */
 
 import { mulberry32 } from '@shared/types';
@@ -92,6 +132,19 @@ export interface VoiceSpec {
   readonly decay: number;
   /** Extra gain at the start of `hold`, decaying across it. Adds a transient. */
   readonly punch?: number;
+  /**
+   * Curvature of the decay. Omitted or 0 is the original **linear** ramp; higher
+   * values bend it into an exponential fall that drops fast and then hangs on —
+   * a real tail. 3–5 is a struck body, 8+ is a click with a whisper after it.
+   *
+   * This is the parameter round 2 of the re-voice turned on almost everywhere
+   * (s8-01). A linear ramp to silence is not a decay any physical object has, and
+   * a bank full of them reads as synthetic no matter which oscillator is under
+   * them — which is precisely what the first re-voice discovered the hard way.
+   * The curve still reaches exactly zero at the end of `decay`, so it can never
+   * introduce the step discontinuity {@link fadeEdges} exists to prevent.
+   */
+  readonly decayCurve?: number;
 
   // --- Pitch ---------------------------------------------------------------
   /** Starting frequency, Hz. */
@@ -118,8 +171,42 @@ export interface VoiceSpec {
   readonly dutySweep?: number;
   /** Blend of noise over the tonal wave, 0..1. Grit without going full noise. */
   readonly noiseMix?: number;
-  /** One-pole low-pass cutoff, Hz. Omit for none. */
+  /** Low-pass cutoff, Hz. Omit for none. One-pole unless {@link resonance} is set. */
   readonly lowPass?: number;
+  /**
+   * Cutoff at the END of the voice, Hz — an exponential **filter sweep** on
+   * {@link lowPass}, the same shape the pitch glide uses.
+   *
+   * A sweep is a different gesture from a glide and the tone contract treats it
+   * differently: a *pitch* slide inside a short voice is the chirp §5.4 retires,
+   * where a *filter* closing over a fixed pitch is a machine losing or gaining
+   * energy — a coil dumping charge, a bubble failing, a drive spinning up. It is
+   * the gesture the register is built on, which is why round 2 added it.
+   */
+  readonly lowPassEnd?: number;
+  /**
+   * Resonance (Q) on the low-pass, ~0.5 (flat) to ~12 (a whistle at the corner).
+   *
+   * Setting it promotes the one-pole into a state-variable filter with a peak at
+   * the cutoff. That peak is what makes filtered noise read as **material** — a
+   * band that rings briefly is metal, where a flat low-pass over the same noise
+   * is just a duller hiss. With {@link lowPassEnd} it is the resonant sweep.
+   *
+   * The SVF is stable while its coefficient stays under 1, so the cutoff is
+   * clamped to {@link SVF_MAX_HZ_FRACTION} of the sample rate (about 6.5 kHz at
+   * 44.1 k). Above that a resonant peak is inaudible on a phone speaker anyway,
+   * so the clamp costs nothing the register wanted.
+   */
+  readonly resonance?: number;
+  /**
+   * Take the resonant filter's **band-pass** output instead of its low-pass.
+   *
+   * Requires {@link resonance}. Narrow, pitched, and made entirely of whatever
+   * went into it — over `noise` this is the metallic transient the register runs
+   * on: the sound of two hard things touching, rather than the attack segment of
+   * a tone standing in for one.
+   */
+  readonly bandPass?: boolean;
   /** One-pole high-pass cutoff, Hz. Omit for none. */
   readonly highPass?: number;
 
@@ -138,6 +225,16 @@ export const EDGE_FADE_S = 0.0015;
 
 /** Entries in the sample-and-hold noise table — jsfxr's pitched-noise trick. */
 const NOISE_TABLE = 32;
+
+/**
+ * Highest cutoff the resonant filter is allowed, as a fraction of the sample rate.
+ *
+ * A Chamberlin state-variable filter is stable while `2·sin(π·fc/sr) < 1`, which
+ * is `fc < sr/6`; this sits just under that with margin for the resonance term.
+ * About 6.5 kHz at 44.1 k — above which a resonant peak is inaudible on a phone
+ * speaker regardless, so nothing the register wants is lost to the clamp.
+ */
+export const SVF_MAX_HZ_FRACTION = 1 / 6.8;
 
 /** Total length of a voice in seconds. */
 export function voiceDuration(spec: VoiceSpec): number {
@@ -188,6 +285,14 @@ export function renderVoice(
   const repeat = spec.repeat && spec.repeat > 0 ? spec.repeat : Infinity;
   const noiseMix = clamp(spec.noiseMix ?? (spec.wave === 'noise' ? 1 : 0), 0, 1);
 
+  // Decay shape. 0 (the default) is the original linear ramp; anything above it
+  // is an exponential fall, normalised so it still reaches exactly zero at the
+  // end of `decay` — a tail that stopped short of silence would be the very
+  // click `fadeEdges` exists to prevent.
+  const decayCurve = Math.max(0, spec.decayCurve ?? 0);
+  const decayFloor = decayCurve > 0 ? Math.exp(-decayCurve) : 0;
+  const decaySpan = 1 - decayFloor;
+
   // One-pole coefficients. The two filters do **not** share a mapping: a
   // low-pass smooths toward the input (`1 - exp(-2π fc/sr)`, which tends to 0 as
   // the cutoff falls), while an RC high-pass differentiates and its coefficient
@@ -195,6 +300,30 @@ export function renderVoice(
   // it costs about 25 dB on every sound that names a `highPass`.
   const lpA = spec.lowPass ? onePoleLow(spec.lowPass, rate) : 1;
   const hpA = spec.highPass ? onePoleHigh(spec.highPass, rate) : 0;
+
+  // The resonant path. Engaged only by naming a `resonance`, so every existing
+  // spec renders through the one-pole above exactly as it did before.
+  const resonant = spec.lowPass !== undefined && spec.resonance !== undefined && spec.resonance > 0;
+  const svfMax = rate * SVF_MAX_HZ_FRACTION;
+  const cut0 = resonant ? clamp(spec.lowPass ?? svfMax, 20, svfMax) : 0;
+  const cut1 = resonant ? clamp(spec.lowPassEnd ?? spec.lowPass ?? svfMax, 20, svfMax) : 0;
+  // Damping is 1/Q: a small number is a tall peak. Floored so the filter cannot
+  // be driven into self-oscillation by a spec with a silly Q in it.
+  const svfDamp = resonant ? clamp(1 / Math.max(0.5, spec.resonance ?? 1), 0.05, 2) : 1;
+  const svfBand = spec.bandPass === true;
+  // Makeup gain, so `gain` keeps meaning "peak amplitude" through a resonant
+  // filter. This matters more here than it looks: `./bank` sets every level as a
+  // literal precisely so the mix's balance is reviewable as a column of numbers,
+  // and a filter that quietly multiplies by six destroys that property.
+  //
+  // The band output's peak gain is exactly `1/damp`, so it is compensated
+  // exactly. The resonant low-pass passes DC at unity and peaks at `1/damp`, so
+  // full compensation would make the low end vanish; the square root splits the
+  // difference — half the emphasis in dB — which keeps the corner singing and
+  // the body intact.
+  const svfMakeup = resonant ? (svfBand ? svfDamp : Math.sqrt(svfDamp)) : 1;
+  let svfLow = 0;
+  let svfBandState = 0;
 
   const rng = mulberry32((spec.seed ?? 1) >>> 0);
   const noise = new Float32Array(NOISE_TABLE);
@@ -247,12 +376,26 @@ export function renderVoice(
       env = 1 + punch * (1 - h);
     } else {
       const d = decay > 0 ? (t - attack - hold) / decay : 1;
-      env = Math.max(0, 1 - d);
+      const k = Math.max(0, Math.min(1, d));
+      env = decayCurve > 0 ? (Math.exp(-decayCurve * k) - decayFloor) / decaySpan : 1 - k;
     }
 
     // --- Filters -----------------------------------------------------------
     let v = sample * env * gain;
-    if (lpA < 1) {
+    if (resonant) {
+      // Chamberlin state-variable filter, cutoff swept exponentially across the
+      // voice. Two extra state variables and one `sin` per sample, once at load.
+      const p = duration > 0 ? clamp(t / duration, 0, 1) : 0;
+      const fc = cut0 * Math.pow(cut1 / cut0, p);
+      const f = 2 * Math.sin((Math.PI * fc) / rate);
+      svfLow += f * svfBandState;
+      const high = v - svfLow - svfDamp * svfBandState;
+      svfBandState += f * high;
+      // The band output is the metallic one; the low output is the resonant
+      // low-pass. Both are clamped here as well as at the end because a tall Q
+      // on a transient can overshoot well past the input before it settles.
+      v = clamp((svfBand ? svfBandState : svfLow) * svfMakeup, -4, 4);
+    } else if (lpA < 1) {
       lp += (v - lp) * lpA;
       v = lp;
     }
