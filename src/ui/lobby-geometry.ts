@@ -304,11 +304,14 @@ export function statGridHeight(rows: number): number {
 // compresses the roster (a list) rather than itself.
 // ---------------------------------------------------------------------------
 
-/** Map cards in the row — the four ratified maps (`../sim/maps` MAPS, and
+/** Map cards in the row — the ratified maps (`../sim/maps` MAPS, and
  *  `./map-picker` MAP_ORDER, asserted equal in the tests). Mirrored rather than
  *  imported so the geometry stays free of the model, exactly like
- *  {@link LOBBY_SLOT_ROWS}. */
-export const LOBBY_MAP_COUNT = 4;
+ *  {@link LOBBY_SLOT_ROWS}. Six since a0-12 added the two two-sided team boards;
+ *  the row is `n`-generic ({@link placeMaps}), so this is the only line that
+ *  moved and {@link LOBBY_MAP_MIN_WIDTH}'s 48 u thumb floor still holds six
+ *  across on every device in the geometry suite. */
+export const LOBBY_MAP_COUNT = 6;
 /** Map card height ceiling — cards are capped here (a tall desktop/portrait band
  *  does not blow the cards up into banners) and compress below it on a short
  *  landscape band. */
@@ -321,16 +324,42 @@ export const LOBBY_MAP_ROW_MIN = 52;
  *  and the hull tiles divide the rest. */
 export const LOBBY_MAP_BAND_FRACTION = 0.26;
 /**
- * Below this per-card width a row of four folds to a 2×2.
+ * Below this per-card width the arena row folds to 2 columns.
  *
- * **48 since u7-03, down from 60: the thumb floor, not a taste.** The arena row
- * now rides the bottom of the ship-select column rather than the full width of
- * the band, so a 2×2 there is *half as tall* as the row it replaces — on the
- * iPhone SE in landscape the fold turned four 57×65 cards into eight… four 119×29
- * ones, which is a card no thumb can hit. A slim card reads fine (a preview over a
- * name); a short one does not, so the row of four is what is defended.
+ * **44 since a0-12, down from 48; 48 since u7-03, down from 60 — the thumb floor,
+ * not a taste.** The arena row rides the bottom of the ship-select column rather
+ * than the full width of the band, so a fold there is *half as tall* as the row it
+ * replaces — on the iPhone SE in landscape the u7-03 fold turned four 57×65 cards
+ * into four 119×29 ones, which is a card no thumb can hit. A slim card reads fine
+ * (a preview over a name); a short one does not, so the ROW is what is defended.
+ *
+ * a0-12 took the registry from four maps to six and re-ran exactly that argument.
+ * At six the row wants 44.4 u a card on small/portrait, 45.2 on ipad/portrait and
+ * 47.4 on iphone/landscape — all three just under the old 48, so all three folded,
+ * to *three* rows, giving cards 32, 32 and **18.5** u tall against a 44 u thumb
+ * floor. Held as one row instead, the same three come out 44.4×108, 45.2×108 and
+ * 47.4×67.6: over the floor in BOTH dimensions on every profile in the geometry
+ * suite, which the fold is not in either. So the trigger is now the thumb floor
+ * itself — fold only when a card would be untappably narrow, because the thing on
+ * the other side of the fold is always worse.
  */
-export const LOBBY_MAP_MIN_WIDTH = 48;
+export const LOBBY_MAP_MIN_WIDTH = 44;
+/**
+ * Tightest gutter the arena row will squeeze to before it gives up and folds
+ * ({@link placeMaps}). Cards still read as separate cards this close; the thing
+ * on the other side of the fold — a 17 u card — reads as nothing.
+ *
+ * **The arena row is now FULL, and this constant is where that shows.** At six
+ * maps the binding case is a notched iPhone in landscape: the band is 277.6 u
+ * wide, six thumb-floor cards need 264 of it, and the five gutters get the
+ * remaining 13.6 — 2.7 each. So the worst device lands *exactly* on the 44 u
+ * floor with no slack left anywhere: not in the gutter, not in the card, not in
+ * the band. A SEVENTH map cannot join this row. Whoever adds one needs a real UI
+ * answer first — a scrolling or paged row, a taller arena band, or an explicit
+ * decision to drop under the thumb floor on that device — and not another
+ * downward nudge to a constant here, because there is nothing left to nudge.
+ */
+export const LOBBY_MAP_GAP_MIN = 2;
 /** Cards don't sprawl on a wide desktop. */
 export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
 
@@ -1986,21 +2015,31 @@ function placeMaps(out: Rect[], band: Rect): number {
     for (let i = 0; i < n; i++) out.push({ x: band.x, y: band.y, width: 0, height: 0 });
     return 0;
   }
-  const rowWidth = (band.width - (n - 1) * ROW_GAP) / n;
+  // Gutters compress BEFORE the row folds (a0-12). At six cards a notched iPhone
+  // in landscape hands this band 277.6 u, and six thumb-floor cards need 264 of
+  // it — leaving 13.6 for five gutters where the standard `ROW_GAP` wants 30. The
+  // fold is not the cheaper answer: that band is 64 u tall, so folding to three
+  // rows gives 17.4 u cards and folding to two gives 29.1, both far under the
+  // floor a single row clears outright. So the gutter gives way first, down to
+  // {@link LOBBY_MAP_GAP_MIN} — cards still read as separate cards at 3 u apart,
+  // and a card no thumb can hit does not read as anything.
+  const solved = (band.width - n * LOBBY_MAP_MIN_WIDTH) / (n - 1);
+  const gap = Math.min(ROW_GAP, Math.max(LOBBY_MAP_GAP_MIN, solved));
+  const rowWidth = (band.width - (n - 1) * gap) / n;
   const columns = rowWidth >= LOBBY_MAP_MIN_WIDTH ? n : 2;
   const rows = Math.ceil(n / columns);
-  const cardWidth = Math.min((band.width - (columns - 1) * ROW_GAP) / columns, LOBBY_MAP_CARD_MAX_WIDTH);
-  const cardHeight = Math.min(rowHeight(band.height, rows, ROW_GAP, LOBBY_MAP_ROW_MAX), band.height);
-  const blockWidth = columns * cardWidth + (columns - 1) * ROW_GAP;
-  const blockHeight = rows * cardHeight + (rows - 1) * ROW_GAP;
+  const cardWidth = Math.min((band.width - (columns - 1) * gap) / columns, LOBBY_MAP_CARD_MAX_WIDTH);
+  const cardHeight = Math.min(rowHeight(band.height, rows, gap, LOBBY_MAP_ROW_MAX), band.height);
+  const blockWidth = columns * cardWidth + (columns - 1) * gap;
+  const blockHeight = rows * cardHeight + (rows - 1) * gap;
   const originX = band.x + Math.max(0, (band.width - blockWidth) / 2);
   const originY = band.y + Math.max(0, (band.height - blockHeight) / 2);
   for (let i = 0; i < n; i++) {
     const column = i % columns;
     const row = Math.floor(i / columns);
     out.push({
-      x: originX + column * (cardWidth + ROW_GAP),
-      y: originY + row * (cardHeight + ROW_GAP),
+      x: originX + column * (cardWidth + gap),
+      y: originY + row * (cardHeight + gap),
       width: cardWidth,
       height: cardHeight,
     });

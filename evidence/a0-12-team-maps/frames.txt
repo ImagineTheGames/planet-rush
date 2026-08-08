@@ -1,0 +1,19 @@
+working tree HEAD : 058fcd579f164a380ac730aa12692f6b60173cf8
+served /version.json: {"sha":"058fcd5","time":"2026-08-08T19:16:01.258Z"}
+
+The Crescents (crescents) — live 4v4 at gameplay zoom, ?debug=1&sides=2
+  build      {"sha":"058fcd5","time":"2026-08-08T19:16:01.258Z","dirty":true}   ticks 314  fps 4
+  shipWorld  (411.8, 1426.0)  in a 2400x2400 arena -> side A (near)
+  sky        ironVeil  (MAP_NEBULA.crescents; the registry pins it, backdrop.test.ts asserts it,
+             and the frame shows it — Iron Veil's flat sheets / Deep Ember's rim coals)
+  wrote crescents-match.png
+
+The Line (line) — live 4v4 at gameplay zoom, ?debug=1&sides=2
+  build      {"sha":"058fcd5","time":"2026-08-08T19:16:01.258Z","dirty":true}   ticks 194  fps 3
+  shipWorld  (682.7, 1186.2)  in a 3200x2000 arena -> side A (near)
+  sky        deepEmber  (MAP_NEBULA.line; the registry pins it, backdrop.test.ts asserts it,
+             and the frame shows it — Iron Veil's flat sheets / Deep Ember's rim coals)
+  wrote line-match.png
+
+wrote lobby-4v4-crescents.png  (map crescents preselected via planet-rush:mapId, mode TEAMS)
+wrote lobby-4v4-line.png  (map line preselected via planet-rush:mapId, mode TEAMS)
