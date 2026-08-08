@@ -1,0 +1,120 @@
+# Captured 2026-08-08T20:39:25Z — npx vite-node spikes/progression/measure-ratified-xp.ts
+# HEAD: 854fa64
+
+
+=== RATIFIED-WEIGHT XP MEASUREMENT (a0-13) ===
+real shipped bot cast · N=8 · octagon · seeds 1..12 · shipped §2.8 constants
+weights: ore 1x · damage 2x · ship kill 5x · station kill 10x
+
+ATTRIBUTION HONESTY — HP reconstructed by the shadow attributor:
+lobby                                 attributed  unattrib   ofWhich   recon  recon*   ended
+EASY  mirror (Rusty/Bolt)                  24662     13836  90% clps     64%     95%   12/12
+MEDIUM mirror (Foreman/Patch)             139575     18879  77% clps     88%     97%   12/12
+HARD  mirror (Sable/Vulture/Warden)        85436      4310  64% clps     95%     98%   12/12
+MIXED cast (shipped fill order)            94661      8209  68% clps     92%     97%   12/12
+  recon* = attributed ÷ (total − collapse residual): the share of damage that HAD an attacker.
+
+WHO ACTUALLY KILLS A STATION — a player, or the Crush (GDD §2.3):
+lobby                                 byPlayer   byCrush    crush%
+EASY  mirror (Rusty/Bolt)                    0        96      100%
+MEDIUM mirror (Foreman/Patch)                2        82       98%
+HARD  mirror (Sable/Vulture/Warden)         75         9       11%
+MIXED cast (shipped fill order)             61        23       27%
+
+PER-PLAYER ACCRUAL PER MATCH (median over all player-matches):
+lobby                                     ore    dmgHP    shipK    statK    spent     dist   deaths     secs
+EASY  mirror (Rusty/Bolt)                28.2      228      4.0      0.0     14.0    57705      4.0      850
+MEDIUM mirror (Foreman/Patch)            23.1     1443     21.0      0.0     17.0    62208     24.0      835
+HARD  mirror (Sable/Vulture/Warden)      12.8      689     11.0      0.0      8.0    33486     16.0      823
+MIXED cast (shipped fill order)          28.9      768     12.5      0.0     17.0    63430     16.5      835
+
+PER-PLAYER ACCRUAL PER MATCH (MEAN — medians hide the kill/build tail):
+lobby                                     ore    dmgHP    shipK    statK   struct     upgr   repair     dist
+EASY  mirror (Rusty/Bolt)                30.9      257      5.3      0.0      3.5      1.1      0.0    59138
+MEDIUM mirror (Foreman/Patch)            25.6     1454     21.1      0.0      3.4      2.0      0.5    60636
+HARD  mirror (Sable/Vulture/Warden)      33.2      890     14.9      0.8      3.2      2.3      1.2    48585
+MIXED cast (shipped fill order)          33.0      986     15.6      0.6      4.1      1.9      1.1    59107
+
+=== THE UNIT QUESTION — "damage dealt 2x" per WHAT? ===
+Composition of one match's XP (all lobbies pooled, scale 1, no tier multiplier):
+dmgUnit                     ore%      dmg%    shipK%    statK%     rawXP
+1 HP (literal)                2%       94%        4%        0%      1518
+10 HP                        11%       63%       25%        1%       224
+25 HP                        17%       41%       40%        2%       145
+50 HP (one base hull)        22%       25%       50%        3%       118
+100 HP (one core)            25%       15%       58%        3%       105
+
+=== PAY AT dmgUnit=25 HP, WITH THE TIER MULTIPLIER ===
+
+multiplier: none (control)
+lobby                                    medXP    winner  firstOut    spread    XP/min
+EASY  mirror (Rusty/Bolt)                   67        35       120      0.3x         5
+MEDIUM mirror (Foreman/Patch)              243       235       206      1.1x        17
+HARD  mirror (Sable/Vulture/Warden)        133       390        56      6.9x        10
+MIXED cast (shipped fill order)            161       445        51      8.7x        12
+
+multiplier: 0.75 / 1.0 / 1.25 (recommended)
+lobby                                    medXP    winner  firstOut    spread    XP/min
+EASY  mirror (Rusty/Bolt)                   58        31        99      0.3x         4
+MEDIUM mirror (Foreman/Patch)              243       235       206      1.1x        17
+HARD  mirror (Sable/Vulture/Warden)        162       466        70      6.7x        12
+MIXED cast (shipped fill order)            162       443        62      7.2x        12
+
+multiplier: 0.50 / 1.0 / 1.50 (wide)
+lobby                                    medXP    winner  firstOut    spread    XP/min
+EASY  mirror (Rusty/Bolt)                   46        26        80      0.3x         3
+MEDIUM mirror (Foreman/Patch)              243       235       206      1.1x        17
+HARD  mirror (Sable/Vulture/Warden)        192       542        83      6.5x        14
+MIXED cast (shipped fill order)            155       442        72      6.1x        11
+
+=== THE SPREAD PROBLEM — four weights with no participation floor ===
+winner-median ÷ first-out-median. Below 1.0x means DYING FIRST PAYS BETTER.
+lobby                                   R only    R+part      medR     medR+     R+win    R+last
+EASY  mirror (Rusty/Bolt)                 0.3x      0.9x        58       295       296       325
+MEDIUM mirror (Foreman/Patch)             1.1x      2.1x       243       513       739       357
+HARD  mirror (Sable/Vulture/Warden)       6.7x     12.1x       162       321      1200       100
+MIXED cast (shipped fill order)           7.2x     10.8x       162       407      1118       103
+
+=== LEVEL CURVE, RE-FITTED AGAINST THE RATIFIED WEIGHTS ===
+ratified four only : median 149 XP, mean 185 XP (scale 1).
+ratified + s4 part.: median 399 XP, mean 459 XP (scale 1).
+s4 measured median 634 XP against weight set A — the pay moved, so the curve must be re-proved.
+
+R only, base=300, scale 1  —  xpToNext(L) = 300·L^1.6,  match pays ~149 XP
+   level      toNext    cumTotal     matches
+       2         300         300         2.0
+       3         909        1209         8.1
+       4        1740        2949        19.8
+       5        2757        5706        38.4
+       6        3940        9646        64.9
+       8        6750       21670       145.8
+      10       10090       40117       269.9
+      15       20461      120594       811.3
+      20       33352      260633      1753.5
+
+R only, base=300, scale 4  —  xpToNext(L) = 300·L^1.6,  match pays ~595 XP
+   level      toNext    cumTotal     matches
+       2         300         300         0.5
+       3         909        1209         2.0
+       4        1740        2949         5.0
+       5        2757        5706         9.6
+       6        3940        9646        16.2
+       8        6750       21670        36.4
+      10       10090       40117        67.5
+      15       20461      120594       202.8
+      20       33352      260633       438.4
+
+R+participation, base=300, scale 1  —  xpToNext(L) = 300·L^1.6,  match pays ~399 XP
+   level      toNext    cumTotal     matches
+       2         300         300         0.8
+       3         909        1209         3.0
+       4        1740        2949         7.4
+       5        2757        5706        14.3
+       6        3940        9646        24.2
+       8        6750       21670        54.4
+      10       10090       40117       100.6
+      15       20461      120594       302.5
+      20       33352      260633       653.8
+
+done.
+
