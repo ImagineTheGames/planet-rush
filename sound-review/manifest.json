@@ -688,19 +688,19 @@
         {
           "id": "a",
           "wav": "previews/ambient/a.wav",
-          "character": "deep frozen drone, distant creak",
+          "character": "hull grain, distant particulate",
           "params": "src/art/audio/candidates.ts#ambient.a"
         },
         {
           "id": "b",
           "wav": "previews/ambient/b.wav",
-          "character": "thin metallic hull hum, static crackle",
+          "character": "a low pressure swell, slow and deep",
           "params": "src/art/audio/candidates.ts#ambient.b"
         },
         {
           "id": "c",
           "wav": "previews/ambient/c.wav",
-          "character": "void breath, slow pressure swell",
+          "character": "resonant hull, one band breathing",
           "params": "src/art/audio/candidates.ts#ambient.c"
         }
       ]
@@ -714,19 +714,19 @@
         {
           "id": "a",
           "wav": "previews/musicBed/a.wav",
-          "character": "warm hollow triad, breathing",
+          "character": "granular bed, texture under an open fifth",
           "params": "src/art/audio/candidates.ts#musicBed.a"
         },
         {
           "id": "b",
           "wav": "previews/musicBed/b.wav",
-          "character": "sparse open fifth, airy",
+          "character": "filtered analogue triad, low and seated",
           "params": "src/art/audio/candidates.ts#musicBed.b"
         },
         {
           "id": "c",
           "wav": "previews/musicBed/c.wav",
-          "character": "murky sub-heavy triad, muffled",
+          "character": "wide detuned space, unisons beating",
           "params": "src/art/audio/candidates.ts#musicBed.c"
         }
       ]
@@ -740,19 +740,19 @@
         {
           "id": "a",
           "wav": "previews/musicPulse/a.wav",
-          "character": "single deep thud heartbeat",
+          "character": "a dry contact pulse, machine-timed",
           "params": "src/art/audio/candidates.ts#musicPulse.a"
         },
         {
           "id": "b",
           "wav": "previews/musicPulse/b.wav",
-          "character": "double-thump lub-dub heartbeat",
+          "character": "a low pressure thud, a room under it",
           "params": "src/art/audio/candidates.ts#musicPulse.b"
         },
         {
           "id": "c",
           "wav": "previews/musicPulse/c.wav",
-          "character": "fast nervous ticking pulse",
+          "character": "a narrow band pip, doubling",
           "params": "src/art/audio/candidates.ts#musicPulse.c"
         }
       ]
@@ -766,19 +766,19 @@
         {
           "id": "a",
           "wav": "previews/musicTheme/a.wav",
-          "character": "marching square-lead riff",
+          "character": "the riff as grained plucks, no sustain",
           "params": "src/art/audio/candidates.ts#musicTheme.a"
         },
         {
           "id": "b",
           "wav": "previews/musicTheme/b.wav",
-          "character": "syncopated staccato stabs",
+          "character": "the riff on filtered analogue, corner closing",
           "params": "src/art/audio/candidates.ts#musicTheme.b"
         },
         {
           "id": "c",
           "wav": "previews/musicTheme/c.wav",
-          "character": "slow rising modal march",
+          "character": "the riff in detuned metal, space behind it",
           "params": "src/art/audio/candidates.ts#musicTheme.c"
         }
       ]
@@ -792,19 +792,19 @@
         {
           "id": "a",
           "wav": "previews/musicDread/a.wav",
-          "character": "grinding semitone clash",
+          "character": "a grinding grain bed, no pitch centre",
           "params": "src/art/audio/candidates.ts#musicDread.a"
         },
         {
           "id": "b",
           "wav": "previews/musicDread/b.wav",
-          "character": "distant sub rumble, faint flutter",
+          "character": "sub rumble with pressure in the room",
           "params": "src/art/audio/candidates.ts#musicDread.b"
         },
         {
           "id": "c",
           "wav": "previews/musicDread/c.wav",
-          "character": "detuned unison smear",
+          "character": "detuned unisons beating, metal in the smear",
           "params": "src/art/audio/candidates.ts#musicDread.c"
         }
       ]
@@ -818,19 +818,19 @@
         {
           "id": "a",
           "wav": "previews/musicWin/a.wav",
-          "character": "quick bright fanfare pop",
+          "character": "three dry hits rising, no shine",
           "params": "src/art/audio/candidates.ts#musicWin.a"
         },
         {
           "id": "b",
           "wav": "previews/musicWin/b.wav",
-          "character": "cascading bell shimmer",
+          "character": "a low swell lifting, weight behind it",
           "params": "src/art/audio/candidates.ts#musicWin.b"
         },
         {
           "id": "c",
           "wav": "previews/musicWin/c.wav",
-          "character": "big brassy triumphant swell",
+          "character": "bands opening, metal ringing out",
           "params": "src/art/audio/candidates.ts#musicWin.c"
         }
       ]
@@ -844,19 +844,19 @@
         {
           "id": "a",
           "wav": "previews/musicLoss/a.wav",
-          "character": "slow descending sigh",
+          "character": "a grained fall, everything letting go",
           "params": "src/art/audio/candidates.ts#musicLoss.a"
         },
         {
           "id": "b",
           "wav": "previews/musicLoss/b.wav",
-          "character": "dissonant stumbling collapse",
+          "character": "a low descent, pressure leaving",
           "params": "src/art/audio/candidates.ts#musicLoss.b"
         },
         {
           "id": "c",
           "wav": "previews/musicLoss/c.wav",
-          "character": "single low tolling bell",
+          "character": "one detuned toll, unresolved",
           "params": "src/art/audio/candidates.ts#musicLoss.c"
         }
       ]

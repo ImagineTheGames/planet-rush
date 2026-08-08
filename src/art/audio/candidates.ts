@@ -1662,14 +1662,74 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // === THE SOUNDTRACK AND THE AIR (a0-01b) ==================================
+  //
+  // Seven slots that play for a whole match, so nothing here is allowed to be an
+  // event: no attack anyone can point at, no melody in the beds, nothing a player
+  // notices twice. This family had the worst measured spread on the whole board
+  // before this pass — `musicBed` and `musicDread` each scored a profile distance
+  // of 0.00 against `current` AND against each other on every pair, because all
+  // four sounds in each slot were the same sub-bass triad at four levels. Three
+  // takes on one idea is exactly what the brief calls a fake choice, and here it
+  // was literally true.
+  //
+  // So the three offers separate on *material*, which is the only axis a drone has:
+  //
+  //   a  a **granular bed** — particulate texture, no pitch centre to speak of
+  //   b  **filtered analogue** — a low body behind a resonant corner, mass and weight
+  //   c  **wide detuned space** — unisons beating against each other, with metal in
+  //      the smear and a room behind it
+  //
+  // None of the looping offers names a `lowPassEnd`, for the reason the thruster
+  // comment gives: a filter sweep inside a loop body wraps at the loop rate.
   ambient: {
     label: "Ambient Bed",
     context: "The constant background loop during ordinary play — must vanish into the background over ~15 minutes.",
     current: 'ambient',
     candidates: [
-      { id: 'a', character: "deep frozen drone, distant creak", spec: {"name":"ambient_frozenDrone","loop":true,"crossfade":0.7,"layers":[{"spec":{"name":"ambientA_bed","wave":"sine","attack":0,"hold":9,"decay":0,"freq":55,"vibratoDepth":0.005,"vibratoRate":0.09,"gain":0.28,"seed":20628},"at":0},{"spec":{"name":"ambientA_detune","wave":"sine","attack":0,"hold":9,"decay":0,"freq":55.4,"gain":0.2,"seed":20629},"at":0},{"spec":{"name":"ambientA_fifth","wave":"triangle","attack":0,"hold":9,"decay":0,"freq":82.5,"vibratoDepth":0.004,"vibratoRate":0.07,"lowPass":650,"gain":0.1,"seed":20630},"at":0},{"spec":{"name":"ambientA_creak","wave":"noise","attack":0,"hold":9,"decay":0,"freq":35,"lowPass":250,"highPass":35,"gain":0.06,"seed":20631},"at":0}]} },
-      { id: 'b', character: "thin metallic hull hum, static crackle", spec: {"name":"ambient_hullHum","loop":true,"crossfade":0.5,"layers":[{"spec":{"name":"ambientB_hum","wave":"triangle","attack":0,"hold":7,"decay":0,"freq":110,"vibratoDepth":0.006,"vibratoRate":0.15,"lowPass":1200,"gain":0.22,"seed":20632},"at":0},{"spec":{"name":"ambientB_detune","wave":"triangle","attack":0,"hold":7,"decay":0,"freq":110.6,"lowPass":1200,"gain":0.16,"seed":20633},"at":0},{"spec":{"name":"ambientB_overtone","wave":"sine","attack":0,"hold":7,"decay":0,"freq":165,"gain":0.08,"seed":20634},"at":0},{"spec":{"name":"ambientB_crackle","wave":"noise","attack":0,"hold":7,"decay":0,"freq":60,"lowPass":500,"highPass":80,"gain":0.1,"seed":20635},"at":0}]} },
-      { id: 'c', character: "void breath, slow pressure swell", spec: {"name":"ambient_voidBreath","loop":true,"crossfade":0.8,"layers":[{"spec":{"name":"ambientC_swell","wave":"sine","attack":0,"hold":10,"decay":0,"freq":55,"vibratoDepth":0.02,"vibratoRate":0.03,"gain":0.26,"seed":20636},"at":0},{"spec":{"name":"ambientC_beat","wave":"sine","attack":0,"hold":10,"decay":0,"freq":55.25,"vibratoDepth":0.02,"vibratoRate":0.03,"gain":0.2,"seed":20637},"at":0},{"spec":{"name":"ambientC_undertone","wave":"sine","attack":0,"hold":10,"decay":0,"freq":41,"gain":0.14,"seed":20638},"at":0},{"spec":{"name":"ambientC_hiss","wave":"noise","attack":0,"hold":10,"decay":0,"freq":25,"lowPass":200,"highPass":20,"gain":0.05,"seed":20639},"at":0}]} },
+      {
+        id: 'a',
+        character: "hull grain, distant particulate",
+        spec: {
+          name: 'ambient_a_hullGrain',
+          loop: true,
+          crossfade: 0.7,
+          layers: [
+            place({ name: 'ambient_a.grit', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 320, lowPass: 900, resonance: 3.2, gain: 0.24, seed: 33000 }),
+            place({ name: 'ambient_a.dust', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 140, lowPass: 380, resonance: 2.2, highPass: 90, gain: 0.18, seed: 33001 }),
+            place({ name: 'ambient_a.floor', wave: 'sine', attack: 0, hold: 9, decay: 0, freq: 55, gain: 0.14, seed: 33002 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low pressure swell, slow and deep",
+        spec: {
+          name: 'ambient_b_pressureSwell',
+          loop: true,
+          crossfade: 0.8,
+          layers: [
+            place({ name: 'ambient_b.mass', wave: 'triangle', attack: 0, hold: 10, decay: 0, freq: 55, vibratoDepth: 0.02, vibratoRate: 0.03, noiseMix: 0.08, lowPass: 190, resonance: 2.6, gain: 0.34, seed: 33010 }),
+            place({ name: 'ambient_b.under', wave: 'sine', attack: 0, hold: 10, decay: 0, freq: 41.2, gain: 0.2, seed: 33011 }),
+            place({ name: 'ambient_b.air', wave: 'noise', attack: 0, hold: 10, decay: 0, freq: 30, lowPass: 150, resonance: 1.6, gain: 0.08, seed: 33012 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "resonant hull, one band breathing",
+        spec: {
+          name: 'ambient_c_bandBreathing',
+          loop: true,
+          crossfade: 0.7,
+          layers: [
+            place({ name: 'ambient_c.band', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 220, lowPass: 470, resonance: 10, bandPass: true, gain: 0.4, seed: 33020 }),
+            place({ name: 'ambient_c.beat', wave: 'triangle', attack: 0, hold: 9, decay: 0, freq: 110, vibratoDepth: 0.004, vibratoRate: 0.07, noiseMix: 0.1, lowPass: 620, resonance: 5, gain: 0.2, seed: 33021 }),
+            place({ name: 'ambient_c.beat2', wave: 'triangle', attack: 0, hold: 9, decay: 0, freq: 110.7, noiseMix: 0.1, lowPass: 620, resonance: 5, gain: 0.16, seed: 33022 }),
+            place({ name: 'ambient_c.floor', wave: 'sine', attack: 0, hold: 9, decay: 0, freq: 55, gain: 0.12, seed: 33023 }),
+          ],
+        },
+      },
     ],
   },
   musicBed: {
@@ -1677,9 +1737,50 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Mining / building with no active threat — the calm foundation drone.",
     current: 'musicBed',
     candidates: [
-      { id: 'a', character: "warm hollow triad, breathing", spec: {"name":"musicBed_warmHollow","loop":true,"crossfade":0.5,"layers":[{"spec":{"name":"bedA_root","wave":"triangle","attack":0,"hold":7,"decay":0,"freq":55,"vibratoDepth":0.005,"vibratoRate":0.12,"lowPass":650,"gain":0.2,"seed":20640},"at":0},{"spec":{"name":"bedA_third","wave":"sine","attack":0,"hold":7,"decay":0,"freq":65.41,"vibratoDepth":0.007,"vibratoRate":0.09,"gain":0.15,"seed":20641},"at":0},{"spec":{"name":"bedA_fifth","wave":"sine","attack":0,"hold":7,"decay":0,"freq":82.41,"vibratoDepth":0.004,"vibratoRate":0.1,"gain":0.11,"seed":20642},"at":0}]} },
-      { id: 'b', character: "sparse open fifth, airy", spec: {"name":"musicBed_openFifth","loop":true,"crossfade":0.6,"layers":[{"spec":{"name":"bedB_root","wave":"sine","attack":0,"hold":8,"decay":0,"freq":55,"vibratoDepth":0.003,"vibratoRate":0.06,"gain":0.2,"seed":20643},"at":0},{"spec":{"name":"bedB_fifth","wave":"triangle","attack":0,"hold":8,"decay":0,"freq":82.41,"lowPass":900,"gain":0.14,"seed":20644},"at":0},{"spec":{"name":"bedB_octave","wave":"sine","attack":0,"hold":8,"decay":0,"freq":110,"vibratoDepth":0.004,"vibratoRate":0.05,"gain":0.08,"seed":20645},"at":0}]} },
-      { id: 'c', character: "murky sub-heavy triad, muffled", spec: {"name":"musicBed_murkySub","loop":true,"crossfade":0.4,"layers":[{"spec":{"name":"bedC_root","wave":"triangle","attack":0,"hold":6,"decay":0,"freq":55,"lowPass":350,"gain":0.24,"seed":20646},"at":0},{"spec":{"name":"bedC_third","wave":"triangle","attack":0,"hold":6,"decay":0,"freq":65.41,"lowPass":300,"gain":0.16,"seed":20647},"at":0},{"spec":{"name":"bedC_fifth","wave":"sine","attack":0,"hold":6,"decay":0,"freq":82.41,"lowPass":400,"gain":0.1,"seed":20648},"at":0},{"spec":{"name":"bedC_sub","wave":"sine","attack":0,"hold":6,"decay":0,"freq":27.5,"gain":0.1,"seed":20649},"at":0}]} },
+      {
+        id: 'a',
+        character: "granular bed, texture under an open fifth",
+        spec: {
+          name: 'musicBed_a_granularBed',
+          loop: true,
+          crossfade: 0.5,
+          layers: [
+            place({ name: 'musicBed_a.texture', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 430, lowPass: 1300, resonance: 3.4, highPass: 140, gain: 0.26, seed: 33030 }),
+            place({ name: 'musicBed_a.grain', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 165, lowPass: 640, resonance: 4.2, gain: 0.2, seed: 33031 }),
+            place({ name: 'musicBed_a.root', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 55, noiseMix: 0.06, lowPass: 260, resonance: 2, gain: 0.2, seed: 33032 }),
+            place({ name: 'musicBed_a.fifth', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 82.41, gain: 0.12, seed: 33033 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "filtered analogue triad, low and seated",
+        spec: {
+          name: 'musicBed_b_filteredAnalogue',
+          loop: true,
+          crossfade: 0.6,
+          layers: [
+            place({ name: 'musicBed_b.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, vibratoDepth: 0.004, vibratoRate: 0.09, noiseMix: 0.05, lowPass: 155, resonance: 3.6, gain: 0.4, seed: 33040 }),
+            place({ name: 'musicBed_b.third', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 65.41, noiseMix: 0.05, lowPass: 150, resonance: 3.2, gain: 0.26, seed: 33041 }),
+            place({ name: 'musicBed_b.fifth', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 82.41, lowPass: 160, resonance: 2.4, gain: 0.18, seed: 33042 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "wide detuned space, unisons beating",
+        spec: {
+          name: 'musicBed_c_detunedSpace',
+          loop: true,
+          crossfade: 0.6,
+          layers: [
+            place({ name: 'musicBed_c.u0', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 110, noiseMix: 0.07, lowPass: 720, resonance: 6, gain: 0.26, seed: 33050 }),
+            place({ name: 'musicBed_c.u1', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 110.8, noiseMix: 0.07, lowPass: 700, resonance: 6, gain: 0.24, seed: 33051 }),
+            place({ name: 'musicBed_c.u2', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 164.81, vibratoDepth: 0.003, vibratoRate: 0.05, lowPass: 900, resonance: 4, gain: 0.16, seed: 33052 }),
+            place({ name: 'musicBed_c.floor', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, gain: 0.16, seed: 33053 }),
+          ],
+        },
+      },
     ],
   },
   musicPulse: {
@@ -1687,19 +1788,119 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Threat detected, tension climbing toward a siege — a heartbeat over a floor.",
     current: 'musicPulse',
     candidates: [
-      { id: 'a', character: "single deep thud heartbeat", spec: {"name":"musicPulse_singleThud","loop":true,"crossfade":0.04,"layers":[{"spec":{"name":"pulseA_floor","wave":"triangle","attack":0,"hold":0.75,"decay":0,"freq":55,"lowPass":380,"gain":0.07,"seed":20650},"at":0},{"spec":{"name":"pulseA_kick","wave":"sine","attack":0.005,"hold":0.02,"decay":0.55,"punch":0.6,"freq":100,"freqEnd":40,"freqMin":35,"gain":0.28,"repeat":0.75,"seed":20651},"at":0},{"spec":{"name":"pulseA_tick","wave":"triangle","attack":0.002,"hold":0.008,"decay":0.06,"freq":200,"gain":0.08,"repeat":0.75,"seed":20652},"at":0}]} },
-      { id: 'b', character: "double-thump lub-dub heartbeat", spec: {"name":"musicPulse_lubDub","loop":true,"crossfade":0.05,"layers":[{"spec":{"name":"pulseB_floor","wave":"triangle","attack":0,"hold":1,"decay":0,"freq":55,"lowPass":350,"gain":0.06,"seed":20653},"at":0},{"spec":{"name":"pulseB_lub","wave":"sine","attack":0.004,"hold":0.015,"decay":0.18,"punch":0.65,"freq":120,"freqEnd":48,"freqMin":35,"gain":0.26,"repeat":1,"seed":20654},"at":0},{"spec":{"name":"pulseB_dub","wave":"sine","attack":0.004,"hold":0.015,"decay":0.35,"punch":0.5,"freq":95,"freqEnd":38,"freqMin":35,"gain":0.22,"repeat":1,"seed":20655},"at":0.22}]} },
-      { id: 'c', character: "fast nervous ticking pulse", spec: {"name":"musicPulse_nervousTick","loop":true,"crossfade":0.02,"layers":[{"spec":{"name":"pulseC_floor","wave":"triangle","attack":0,"hold":0.4,"decay":0,"freq":55,"lowPass":400,"gain":0.05,"seed":20656},"at":0},{"spec":{"name":"pulseC_kick","wave":"sine","attack":0.003,"hold":0.01,"decay":0.22,"punch":0.4,"freq":140,"freqEnd":60,"freqMin":40,"gain":0.18,"repeat":0.4,"seed":20657},"at":0},{"spec":{"name":"pulseC_tick","wave":"square","attack":0.002,"hold":0.006,"decay":0.05,"duty":0.3,"freq":440,"gain":0.1,"repeat":0.4,"seed":20658},"at":0}]} },
+      {
+        id: 'a',
+        character: "a dry contact pulse, machine-timed",
+        spec: {
+          name: 'musicPulse_a_contactPulse',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            place({ name: 'musicPulse_a.floor', wave: 'noise', attack: 0, hold: 0.75, decay: 0, freq: 90, lowPass: 280, resonance: 2.4, gain: 0.1, seed: 33060 }),
+            grains('musicPulse_a.hit', { freq: 340, freqEnd: 190, grain: 0.008, gain: 0.34, attack: 0.002, hold: 0.02, decay: 0.16, curve: 4, from: 1500, q: 3, hp: 110, punch: 0.5, seed: 33061 }),
+            grains('musicPulse_a.tail', { freq: 210, freqEnd: 140, grain: 0.022, gain: 0.16, attack: 0.004, hold: 0.03, decay: 0.3, curve: 3, from: 700, q: 2.6, at: 0.06, seed: 33062 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low pressure thud, a room under it",
+        spec: {
+          name: 'musicPulse_b_pressureThud',
+          loop: true,
+          crossfade: 0.05,
+          layers: [
+            place({ name: 'musicPulse_b.floor', wave: 'sine', attack: 0, hold: 1, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 200, resonance: 2, gain: 0.1, seed: 33070 }),
+            swept('musicPulse_b.thud', { wave: 'sine', freq: 104, freqEnd: 44, from: 320, to: 110, q: 2.4, gain: 0.38, attack: 0.004, hold: 0.02, decay: 0.34, curve: 2.8, punch: 0.6, seed: 33071 }),
+            swept('musicPulse_b.room', { wave: 'noise', freq: 130, freqEnd: 80, from: 420, to: 160, q: 1.8, gain: 0.14, attack: 0.02, hold: 0.04, decay: 0.4, curve: 2, at: 0.09, seed: 33072 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "a narrow band pip, doubling",
+        spec: {
+          name: 'musicPulse_c_bandPip',
+          loop: true,
+          crossfade: 0.03,
+          layers: [
+            place({ name: 'musicPulse_c.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 240, resonance: 2.2, gain: 0.1, seed: 33080 }),
+            band('musicPulse_c.p0', 620, { gain: 0.92, decay: 0.1, q: 5.5, curve: 5, attack: 0.002, seed: 33081 }),
+            band('musicPulse_c.p1', 465, { gain: 0.8, decay: 0.16, q: 6, curve: 4.5, attack: 0.002, at: 0.19, seed: 33082 }),
+          ],
+        },
+      },
     ],
   },
   musicTheme: {
+    // §7.5 re-voices this slot and says what to keep: *"same riff, same key"*. So
+    // all three offers sound the shipped seven notes — A3 C4 E4 D4 C4 A3 E3 — at
+    // the shipped times, and the ONLY thing the developer is choosing between is
+    // what is playing them. That is the whole thesis of the round in one slot:
+    // round 1 changed the oscillator under this riff and the developer heard the
+    // same music. The instrument is the offer.
     label: "Music Theme — Siege",
     context: "Active combat / base under assault — a short A-minor riff over a pad.",
     current: 'musicTheme',
     candidates: [
-      { id: 'a', character: "marching square-lead riff", spec: {"name":"musicTheme_marching","loop":true,"crossfade":0.08,"layers":[{"spec":{"name":"themeA_pad","wave":"triangle","attack":0,"hold":4,"decay":0,"freq":110,"vibratoDepth":0.004,"vibratoRate":0.18,"lowPass":1100,"gain":0.13,"seed":20659},"at":0},{"spec":{"name":"themeA_n0","wave":"square","attack":0.01,"hold":0.18,"decay":0.05,"duty":0.4,"freq":220,"gain":0.13,"seed":20660},"at":0},{"spec":{"name":"themeA_n1","wave":"square","attack":0.01,"hold":0.18,"decay":0.05,"duty":0.4,"freq":261.63,"gain":0.13,"seed":20661},"at":0.45},{"spec":{"name":"themeA_n2","wave":"square","attack":0.01,"hold":0.18,"decay":0.05,"duty":0.4,"freq":329.63,"gain":0.13,"seed":20662},"at":0.9},{"spec":{"name":"themeA_n3","wave":"square","attack":0.01,"hold":0.22,"decay":0.06,"duty":0.4,"freq":293.66,"gain":0.13,"seed":20663},"at":1.35},{"spec":{"name":"themeA_n4","wave":"square","attack":0.01,"hold":0.18,"decay":0.05,"duty":0.4,"freq":261.63,"gain":0.13,"seed":20664},"at":1.9},{"spec":{"name":"themeA_n5","wave":"square","attack":0.01,"hold":0.18,"decay":0.05,"duty":0.4,"freq":220,"gain":0.13,"seed":20665},"at":2.35},{"spec":{"name":"themeA_n6","wave":"square","attack":0.01,"hold":0.3,"decay":0.08,"duty":0.4,"freq":196,"gain":0.12,"seed":20666},"at":2.8}]} },
-      { id: 'b', character: "syncopated staccato stabs", spec: {"name":"musicTheme_staccatoStabs","loop":true,"crossfade":0.06,"layers":[{"spec":{"name":"themeB_pad","wave":"triangle","attack":0,"hold":4,"decay":0,"freq":82.41,"vibratoDepth":0.006,"vibratoRate":0.25,"lowPass":900,"gain":0.12,"seed":20667},"at":0},{"spec":{"name":"themeB_n0","wave":"square","attack":0.004,"hold":0.06,"decay":0.03,"duty":0.2,"dutySweep":0.15,"freq":220,"gain":0.14,"seed":20668},"at":0.1},{"spec":{"name":"themeB_n1","wave":"square","attack":0.004,"hold":0.06,"decay":0.03,"duty":0.2,"dutySweep":0.15,"freq":220,"gain":0.13,"seed":20669},"at":0.35},{"spec":{"name":"themeB_n2","wave":"square","attack":0.004,"hold":0.06,"decay":0.03,"duty":0.2,"dutySweep":0.15,"freq":329.63,"gain":0.14,"seed":20670},"at":0.7},{"spec":{"name":"themeB_n3","wave":"square","attack":0.004,"hold":0.06,"decay":0.03,"duty":0.2,"dutySweep":0.15,"freq":261.63,"gain":0.13,"seed":20671},"at":1.15},{"spec":{"name":"themeB_n4","wave":"square","attack":0.004,"hold":0.08,"decay":0.04,"duty":0.2,"dutySweep":0.15,"freq":349.23,"gain":0.14,"seed":20672},"at":1.6},{"spec":{"name":"themeB_n5","wave":"square","attack":0.004,"hold":0.06,"decay":0.03,"duty":0.2,"dutySweep":0.15,"freq":293.66,"gain":0.13,"seed":20673},"at":2.2},{"spec":{"name":"themeB_n6","wave":"square","attack":0.004,"hold":0.1,"decay":0.05,"duty":0.2,"dutySweep":0.15,"freq":220,"gain":0.12,"seed":20674},"at":2.8}]} },
-      { id: 'c', character: "slow rising modal march", spec: {"name":"musicTheme_risingModal","loop":true,"crossfade":0.1,"layers":[{"spec":{"name":"themeC_pad","wave":"triangle","attack":0,"hold":4,"decay":0,"freq":110,"vibratoDepth":0.003,"vibratoRate":0.12,"lowPass":1000,"gain":0.14,"seed":20675},"at":0},{"spec":{"name":"themeC_n0","wave":"square","attack":0.015,"hold":0.5,"decay":0.1,"duty":0.5,"freq":220,"gain":0.12,"seed":20676},"at":0},{"spec":{"name":"themeC_n1","wave":"square","attack":0.015,"hold":0.5,"decay":0.1,"duty":0.5,"freq":246.94,"gain":0.12,"seed":20677},"at":0.7},{"spec":{"name":"themeC_n2","wave":"square","attack":0.015,"hold":0.5,"decay":0.1,"duty":0.5,"freq":261.63,"gain":0.13,"seed":20678},"at":1.4},{"spec":{"name":"themeC_n3","wave":"square","attack":0.015,"hold":0.6,"decay":0.15,"duty":0.5,"freq":329.63,"gain":0.13,"seed":20679},"at":2.1},{"spec":{"name":"themeC_n4","wave":"square","attack":0.015,"hold":0.7,"decay":0.2,"duty":0.5,"freq":440,"gain":0.12,"seed":20680},"at":2.9}]} },
+      {
+        id: 'a',
+        character: "the riff as grained plucks, no sustain",
+        spec: {
+          name: 'musicTheme_a_grainedPlucks',
+          loop: true,
+          crossfade: 0.08,
+          layers: [
+            place({ name: 'musicTheme_a.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 220, lowPass: 700, resonance: 3.6, highPass: 90, gain: 0.14, seed: 33090 }),
+            grains('musicTheme_a.n0', { freq: 220, freqEnd: 176, grain: 0.007, gain: 0.21, attack: 0.003, hold: 0.03, decay: 0.3, curve: 3.6, from: 1500, q: 3.4, hp: 150, seed: 33091 }),
+            grains('musicTheme_a.n1', { freq: 261.63, freqEnd: 209, grain: 0.007, gain: 0.21, attack: 0.003, hold: 0.03, decay: 0.3, curve: 3.6, from: 1700, q: 3.4, hp: 170, at: 0.5, seed: 33092 }),
+            grains('musicTheme_a.n2', { freq: 329.63, freqEnd: 264, grain: 0.006, gain: 0.21, attack: 0.003, hold: 0.035, decay: 0.36, curve: 3.6, from: 2100, q: 3.4, hp: 200, at: 1, seed: 33093 }),
+            grains('musicTheme_a.n3', { freq: 293.66, freqEnd: 235, grain: 0.006, gain: 0.196, attack: 0.003, hold: 0.035, decay: 0.42, curve: 3.6, from: 1900, q: 3.4, hp: 190, at: 1.5, seed: 33094 }),
+            grains('musicTheme_a.n4', { freq: 261.63, freqEnd: 209, grain: 0.007, gain: 0.196, attack: 0.003, hold: 0.035, decay: 0.42, curve: 3.6, from: 1700, q: 3.4, hp: 170, at: 2.1, seed: 33095 }),
+            grains('musicTheme_a.n5', { freq: 220, freqEnd: 176, grain: 0.007, gain: 0.182, attack: 0.004, hold: 0.05, decay: 0.7, curve: 3.4, from: 1500, q: 3.4, hp: 150, at: 2.7, seed: 33096 }),
+            grains('musicTheme_a.n6', { freq: 164.81, freqEnd: 132, grain: 0.009, gain: 0.182, attack: 0.004, hold: 0.07, decay: 0.56, curve: 3.4, from: 1100, q: 3.2, hp: 110, at: 3.3, seed: 33097 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "the riff on filtered analogue, corner closing",
+        spec: {
+          name: 'musicTheme_b_filteredAnalogue',
+          loop: true,
+          crossfade: 0.08,
+          layers: [
+            place({ name: 'musicTheme_b.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110, noiseMix: 0.05, lowPass: 260, resonance: 3, gain: 0.18, seed: 33100 }),
+            swept('musicTheme_b.n0', { wave: 'triangle', freq: 220, from: 2625, to: 380, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.028, decay: 0.352, curve: 3.6, noiseMix: 0.1, seed: 33101 }),
+            swept('musicTheme_b.n1', { wave: 'triangle', freq: 261.63, from: 2975, to: 430, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.028, decay: 0.352, curve: 3.6, noiseMix: 0.1, at: 0.5, seed: 33102 }),
+            swept('musicTheme_b.n2', { wave: 'triangle', freq: 329.63, from: 3675, to: 540, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.035, decay: 0.416, curve: 3.6, noiseMix: 0.1, at: 1, seed: 33103 }),
+            swept('musicTheme_b.n3', { wave: 'triangle', freq: 293.66, from: 3325, to: 480, q: 5.5, gain: 0.29, attack: 0.004, hold: 0.035, decay: 0.48, curve: 3.6, noiseMix: 0.1, at: 1.5, seed: 33104 }),
+            swept('musicTheme_b.n4', { wave: 'triangle', freq: 261.63, from: 2975, to: 430, q: 5.5, gain: 0.29, attack: 0.004, hold: 0.035, decay: 0.48, curve: 3.6, noiseMix: 0.1, at: 2.1, seed: 33105 }),
+            swept('musicTheme_b.n5', { wave: 'triangle', freq: 220, from: 2625, to: 380, q: 5.5, gain: 0.28, attack: 0.006, hold: 0.049, decay: 0.8, curve: 3.6, noiseMix: 0.1, at: 2.7, seed: 33106 }),
+            swept('musicTheme_b.n6', { wave: 'triangle', freq: 164.81, from: 1925, to: 300, q: 5.5, gain: 0.28, attack: 0.006, hold: 0.07, decay: 0.64, curve: 3.6, noiseMix: 0.1, at: 3.3, seed: 33107 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "the riff in detuned metal, space behind it",
+        spec: {
+          name: 'musicTheme_c_detunedMetal',
+          loop: true,
+          crossfade: 0.08,
+          layers: [
+            place({ name: 'musicTheme_c.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110, noiseMix: 0.08, lowPass: 800, resonance: 5.5, gain: 0.14, seed: 33110 }),
+            place({ name: 'musicTheme_c.pad2', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110.6, noiseMix: 0.08, lowPass: 800, resonance: 5.5, gain: 0.12, seed: 33111 }),
+            ...plate('musicTheme_c.n0', 220, { gain: 0.3, decay: 0.352, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, seed: 33112 }),
+            ...plate('musicTheme_c.n1', 261.63, { gain: 0.3, decay: 0.352, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 0.5, seed: 33115 }),
+            ...plate('musicTheme_c.n2', 329.63, { gain: 0.3, decay: 0.416, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 1, seed: 33118 }),
+            ...plate('musicTheme_c.n3', 293.66, { gain: 0.29, decay: 0.48, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 1.5, seed: 33121 }),
+            ...plate('musicTheme_c.n4', 261.63, { gain: 0.29, decay: 0.48, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 2.1, seed: 33124 }),
+            ...plate('musicTheme_c.n5', 220, { gain: 0.28, decay: 0.8, ratios: [1, 2.41], q: 8, curve: 3.4, grain: 0.22, edge: 0.5, at: 2.7, seed: 33127 }),
+            ...plate('musicTheme_c.n6', 164.81, { gain: 0.28, decay: 0.64, ratios: [1, 2.41], q: 8, curve: 3.4, grain: 0.22, edge: 0.5, at: 3.3, seed: 33130 }),
+          ],
+        },
+      },
     ],
   },
   musicDread: {
@@ -1707,9 +1908,49 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Core critical, defeat imminent — no melody, no resolution; thinning dread.",
     current: 'musicDread',
     candidates: [
-      { id: 'a', character: "grinding semitone clash", spec: {"name":"musicDread_semitoneGrind","loop":true,"crossfade":0.4,"layers":[{"spec":{"name":"dreadA_low","wave":"triangle","attack":0,"hold":6,"decay":0,"freq":55,"lowPass":450,"gain":0.19,"seed":20681},"at":0},{"spec":{"name":"dreadA_clash","wave":"sine","attack":0,"hold":6,"decay":0,"freq":58.27,"gain":0.15,"seed":20682},"at":0},{"spec":{"name":"dreadA_sub","wave":"sine","attack":0,"hold":6,"decay":0,"freq":27.5,"gain":0.13,"seed":20683},"at":0},{"spec":{"name":"dreadA_air","wave":"noise","attack":0,"hold":6,"decay":0,"freq":28,"lowPass":220,"gain":0.05,"seed":20684},"at":0}]} },
-      { id: 'b', character: "distant sub rumble, faint flutter", spec: {"name":"musicDread_subRumble","loop":true,"crossfade":0.5,"layers":[{"spec":{"name":"dreadB_low","wave":"sine","attack":0,"hold":7,"decay":0,"freq":41.2,"lowPass":200,"gain":0.2,"seed":20685},"at":0},{"spec":{"name":"dreadB_beat","wave":"sine","attack":0,"hold":7,"decay":0,"freq":41.5,"lowPass":200,"gain":0.16,"seed":20686},"at":0},{"spec":{"name":"dreadB_sub","wave":"sine","attack":0,"hold":7,"decay":0,"freq":30.9,"gain":0.14,"seed":20687},"at":0},{"spec":{"name":"dreadB_flutter","wave":"noise","attack":0,"hold":7,"decay":0,"freq":20,"lowPass":150,"gain":0.04,"seed":20688},"at":0}]} },
-      { id: 'c', character: "detuned unison smear", spec: {"name":"musicDread_unisonSmear","loop":true,"crossfade":0.45,"layers":[{"spec":{"name":"dreadC_low","wave":"triangle","attack":0,"hold":6,"decay":0,"freq":55,"lowPass":400,"gain":0.18,"seed":20689},"at":0},{"spec":{"name":"dreadC_smear","wave":"triangle","attack":0,"hold":6,"decay":0,"freq":55.6,"lowPass":400,"gain":0.16,"seed":20690},"at":0},{"spec":{"name":"dreadC_smear2","wave":"sine","attack":0,"hold":6,"decay":0,"freq":54.5,"vibratoDepth":0.01,"vibratoRate":0.04,"gain":0.12,"seed":20691},"at":0},{"spec":{"name":"dreadC_sub","wave":"sine","attack":0,"hold":6,"decay":0,"freq":27.5,"gain":0.1,"seed":20692},"at":0},{"spec":{"name":"dreadC_dust","wave":"noise","attack":0,"hold":6,"decay":0,"freq":32,"lowPass":280,"highPass":25,"gain":0.06,"seed":20693},"at":0}]} },
+      {
+        id: 'a',
+        character: "a grinding grain bed, no pitch centre",
+        spec: {
+          name: 'musicDread_a_grindingGrain',
+          loop: true,
+          crossfade: 0.4,
+          layers: [
+            place({ name: 'musicDread_a.grind', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 260, lowPass: 820, resonance: 3.8, highPass: 110, gain: 0.3, seed: 33140 }),
+            place({ name: 'musicDread_a.scrape', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 96, lowPass: 340, resonance: 4.4, gain: 0.24, seed: 33141 }),
+            place({ name: 'musicDread_a.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 41.2, gain: 0.18, seed: 33142 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "sub rumble with pressure in the room",
+        spec: {
+          name: 'musicDread_b_pressureRumble',
+          loop: true,
+          crossfade: 0.5,
+          layers: [
+            place({ name: 'musicDread_b.rumble', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.2, noiseMix: 0.1, lowPass: 130, resonance: 4, gain: 0.44, seed: 33150 }),
+            place({ name: 'musicDread_b.beat', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 41.55, lowPass: 130, resonance: 2.6, gain: 0.28, seed: 33151 }),
+            place({ name: 'musicDread_b.sub', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 30.9, gain: 0.2, seed: 33152 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "detuned unisons beating, metal in the smear",
+        spec: {
+          name: 'musicDread_c_metalSmear',
+          loop: true,
+          crossfade: 0.45,
+          layers: [
+            place({ name: 'musicDread_c.band', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 165, lowPass: 400, resonance: 11, bandPass: true, gain: 0.4, seed: 33160 }),
+            place({ name: 'musicDread_c.u0', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 82.41, noiseMix: 0.08, lowPass: 560, resonance: 6, gain: 0.24, seed: 33161 }),
+            place({ name: 'musicDread_c.u1', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 87.31, noiseMix: 0.08, lowPass: 560, resonance: 6, gain: 0.22, seed: 33162 }),
+            place({ name: 'musicDread_c.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 27.5, gain: 0.14, seed: 33163 }),
+          ],
+        },
+      },
     ],
   },
   musicWin: {
@@ -1717,19 +1958,89 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
     current: 'musicWin',
     candidates: [
-      { id: 'a', character: "quick bright fanfare pop", spec: {"name":"musicWin_fanfarePop","layers":[{"spec":{"name":"winA_n0","wave":"square","attack":0.008,"hold":0.08,"decay":0.05,"duty":0.4,"freq":220,"gain":0.22,"seed":20694},"at":0},{"spec":{"name":"winA_n1","wave":"triangle","attack":0.008,"hold":0.08,"decay":0.05,"freq":277.18,"gain":0.22,"seed":20695},"at":0.1},{"spec":{"name":"winA_n2","wave":"square","attack":0.008,"hold":0.08,"decay":0.05,"duty":0.4,"freq":329.63,"gain":0.22,"seed":20696},"at":0.2},{"spec":{"name":"winA_n3","wave":"triangle","attack":0.006,"hold":0.14,"decay":0.18,"freq":440,"gain":0.24,"seed":20697},"at":0.3},{"spec":{"name":"winA_shine","wave":"sine","attack":0.004,"hold":0.1,"decay":0.4,"freq":880,"gain":0.14,"seed":20698},"at":0.3}]} },
-      { id: 'b', character: "cascading bell shimmer", spec: {"name":"musicWin_bellCascade","layers":[{"spec":{"name":"winB_n0","wave":"triangle","attack":0.01,"hold":0.05,"decay":0.3,"freq":440,"gain":0.18,"seed":20699},"at":0},{"spec":{"name":"winB_n1","wave":"sine","attack":0.01,"hold":0.05,"decay":0.3,"freq":554.37,"gain":0.18,"seed":20700},"at":0.09},{"spec":{"name":"winB_n2","wave":"triangle","attack":0.01,"hold":0.05,"decay":0.35,"freq":659.25,"gain":0.18,"seed":20701},"at":0.18},{"spec":{"name":"winB_n3","wave":"sine","attack":0.008,"hold":0.08,"decay":0.45,"freq":880,"gain":0.2,"seed":20702},"at":0.27},{"spec":{"name":"winB_shine","wave":"sine","attack":0.006,"hold":0.06,"decay":0.6,"freq":1108.73,"gain":0.14,"seed":20703},"at":0.34}]} },
-      { id: 'c', character: "big brassy triumphant swell", spec: {"name":"musicWin_brassySwell","layers":[{"spec":{"name":"winC_n0","wave":"saw","attack":0.02,"hold":0.1,"decay":0.15,"punch":0.3,"freq":220,"gain":0.2,"seed":20704},"at":0},{"spec":{"name":"winC_n1","wave":"saw","attack":0.02,"hold":0.1,"decay":0.15,"punch":0.3,"freq":277.18,"gain":0.2,"seed":20705},"at":0.14},{"spec":{"name":"winC_n2","wave":"saw","attack":0.015,"hold":0.16,"decay":0.3,"punch":0.4,"freq":329.63,"gain":0.22,"seed":20706},"at":0.28},{"spec":{"name":"winC_swell","wave":"saw","attack":0.02,"hold":0.2,"decay":0.5,"punch":0.5,"freq":440,"lowPass":3500,"gain":0.24,"seed":20707},"at":0.42}]} },
+      {
+        id: 'a',
+        character: "three dry hits rising, no shine",
+        spec: {
+          name: 'musicWin_a_dryHits',
+          layers: [
+            grains('musicWin_a.n0', { freq: 440, freqEnd: 350, grain: 0.006, gain: 0.34, attack: 0.005, hold: 0.06, decay: 0.14, curve: 4, from: 2200, to: 900, q: 3.4, hp: 300, seed: 33170 }),
+            grains('musicWin_a.n1', { freq: 554.37, freqEnd: 440, grain: 0.005, gain: 0.32, attack: 0.005, hold: 0.06, decay: 0.16, curve: 4, from: 2800, to: 1150, q: 3.4, hp: 380, at: 0.12, seed: 33171 }),
+            grains('musicWin_a.n2', { freq: 659.25, freqEnd: 520, grain: 0.005, gain: 0.3, attack: 0.005, hold: 0.09, decay: 0.5, curve: 3.4, from: 3300, to: 1350, q: 3.6, hp: 440, at: 0.26, seed: 33172 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low swell lifting, weight behind it",
+        spec: {
+          name: 'musicWin_b_lowSwell',
+          layers: [
+            swept('musicWin_b.lift', { wave: 'triangle', freq: 220, from: 400, to: 2200, q: 4, gain: 0.36, attack: 0.03, hold: 0.16, decay: 0.1, curve: 2.4, noiseMix: 0.12, seed: 33180 }),
+            swept('musicWin_b.top', { wave: 'triangle', freq: 330, from: 2000, to: 620, q: 4.4, gain: 0.4, attack: 0.006, hold: 0.06, decay: 0.5, curve: 2.8, punch: 0.4, noiseMix: 0.1, at: 0.28, seed: 33181 }),
+            swept('musicWin_b.floor', { wave: 'sine', freq: 110, from: 300, q: 1.8, gain: 0.24, attack: 0.01, hold: 0.1, decay: 0.44, curve: 2.4, at: 0.04, seed: 33182 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "bands opening, metal ringing out",
+        spec: {
+          name: 'musicWin_c_bandsOpening',
+          layers: [
+            band('musicWin_c.n0', 440, { gain: 0.46, decay: 0.14, q: 8, curve: 4.5, attack: 0.003, hold: 0.01, seed: 33190 }),
+            band('musicWin_c.n1', 554.37, { gain: 0.44, decay: 0.18, q: 8.5, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.12, seed: 33191 }),
+            ...plate('musicWin_c.n2', 659.25, { gain: 0.46, decay: 0.56, ratios: [1, 2.41], q: 9, curve: 3.6, grain: 0.18, edge: 0.6, at: 0.26, seed: 33193 }),
+          ],
+        },
+      },
     ],
   },
   musicLoss: {
+    // *"The one thing in the soundtrack allowed to be sad"* (§7.5). All three fall
+    // and none of them lands anywhere: no offer here resolves to its root, and no
+    // offer runs past the shipped 1.32 s longest-tail invariant (§8) — a winner
+    // has to be promotable into the bank without breaking the beat it protects.
     label: "Defeat Sting",
     context: "Match lost (after the three-second quiet) — one-shot, falling minor phrase that settles low.",
     current: 'musicLoss',
     candidates: [
-      { id: 'a', character: "slow descending sigh", spec: {"name":"musicLoss_descendingSigh","layers":[{"spec":{"name":"lossA_n0","wave":"triangle","attack":0.015,"hold":0.18,"decay":0.2,"freq":220,"gain":0.2,"seed":20708},"at":0},{"spec":{"name":"lossA_n1","wave":"sine","attack":0.015,"hold":0.18,"decay":0.22,"freq":196,"gain":0.19,"seed":20709},"at":0.28},{"spec":{"name":"lossA_n2","wave":"triangle","attack":0.02,"hold":0.2,"decay":0.3,"freq":164.81,"gain":0.18,"seed":20710},"at":0.58},{"spec":{"name":"lossA_n3","wave":"sine","attack":0.02,"hold":0.4,"decay":0.8,"freq":110,"lowPass":900,"gain":0.2,"seed":20711},"at":0.92}]} },
-      { id: 'b', character: "dissonant stumbling collapse", spec: {"name":"musicLoss_stumblingCollapse","layers":[{"spec":{"name":"lossB_n0","wave":"square","attack":0.01,"hold":0.1,"decay":0.12,"duty":0.35,"freq":220,"gain":0.19,"seed":20712},"at":0},{"spec":{"name":"lossB_n1","wave":"saw","attack":0.01,"hold":0.08,"decay":0.15,"freq":207.65,"gain":0.17,"seed":20713},"at":0.18},{"spec":{"name":"lossB_n2","wave":"square","attack":0.015,"hold":0.12,"decay":0.18,"duty":0.35,"freq":174.61,"gain":0.18,"seed":20714},"at":0.4},{"spec":{"name":"lossB_n3","wave":"saw","attack":0.02,"hold":0.3,"decay":0.7,"freq":87.31,"lowPass":700,"gain":0.2,"seed":20715},"at":0.68}]} },
-      { id: 'c', character: "single low tolling bell", spec: {"name":"musicLoss_tollingBell","layers":[{"spec":{"name":"lossC_n0","wave":"sine","attack":0.02,"hold":0.1,"decay":0.6,"freq":220,"gain":0.2,"seed":20716},"at":0},{"spec":{"name":"lossC_n1","wave":"sine","attack":0.02,"hold":0.15,"decay":0.9,"freq":130.81,"gain":0.2,"seed":20717},"at":0.75},{"spec":{"name":"lossC_n2","wave":"sine","attack":0.025,"hold":0.2,"decay":1.4,"freq":55,"lowPass":500,"gain":0.22,"seed":20718},"at":1.7}]} },
+      {
+        id: 'a',
+        character: "a grained fall, everything letting go",
+        spec: {
+          name: 'musicLoss_a_grainedFall',
+          layers: [
+            grains('musicLoss_a.n0', { freq: 220, freqEnd: 186, grain: 0.012, gain: 0.32, attack: 0.012, hold: 0.14, decay: 0.2, curve: 3, from: 1000, to: 560, q: 3, hp: 90, seed: 33200 }),
+            grains('musicLoss_a.n1', { freq: 174.61, freqEnd: 148, grain: 0.014, gain: 0.3, attack: 0.014, hold: 0.14, decay: 0.24, curve: 2.8, from: 800, to: 440, q: 3, hp: 70, at: 0.3, seed: 33201 }),
+            grains('musicLoss_a.n2', { freq: 130.81, freqEnd: 108, grain: 0.018, gain: 0.28, attack: 0.016, hold: 0.16, decay: 0.5, curve: 2.4, from: 600, to: 300, q: 2.8, hp: 55, at: 0.62, seed: 33202 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low descent, pressure leaving",
+        spec: {
+          name: 'musicLoss_b_pressureLeaving',
+          layers: [
+            swept('musicLoss_b.n0', { wave: 'triangle', freq: 164.81, freqEnd: 155.56, from: 560, to: 230, q: 4, gain: 0.34, attack: 0.014, hold: 0.14, decay: 0.22, curve: 2.6, noiseMix: 0.1, seed: 33210 }),
+            swept('musicLoss_b.n1', { wave: 'triangle', freq: 123.47, freqEnd: 116.54, from: 400, to: 170, q: 4, gain: 0.34, attack: 0.016, hold: 0.14, decay: 0.26, curve: 2.4, noiseMix: 0.1, at: 0.3, seed: 33211 }),
+            swept('musicLoss_b.n2', { wave: 'sine', freq: 82.41, freqEnd: 73.42, from: 200, to: 88, q: 2.6, gain: 0.38, attack: 0.02, hold: 0.16, decay: 0.52, curve: 2, noiseMix: 0.06, at: 0.62, seed: 33212 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "one detuned toll, unresolved",
+        spec: {
+          name: 'musicLoss_c_detunedToll',
+          layers: [
+            swept('musicLoss_c.toll', { wave: 'triangle', freq: 146.83, freqEnd: 138, from: 760, to: 260, q: 5, gain: 0.54, attack: 0.008, hold: 0.03, decay: 0.62, curve: 2.6, noiseMix: 0.12, seed: 33220 }),
+            swept('musicLoss_c.beat', { wave: 'triangle', freq: 148.6, freqEnd: 139.6, from: 720, to: 250, q: 5, gain: 0.4, attack: 0.01, hold: 0.03, decay: 0.6, curve: 2.6, noiseMix: 0.12, at: 0.012, seed: 33221 }),
+            ...returns('musicLoss_c.room', { freq: 300, gain: 0.18, decay: 0.3, from: 700, to: 240, at: 0.42, gap: 0.3, count: 2, seed: 33223 }),
+          ],
+        },
+      },
     ],
   },
   pressTick: {
