@@ -960,9 +960,9 @@ function clampSize(size: number | undefined, count: number): number {
  * nobody touches opens on the whole seven-character cast, each at its own tier,
  * which is exactly what it previewed before the host had a character control.
  *
- * It replaces {@link defaultDifficultyForEmptySeat}: the default is now stated in
- * the units the host actually edits, and the tier follows from it rather than the
- * other way round.
+ * It replaces the tier-shaped default this file used to keep: the default is now
+ * stated in the units the host actually edits, and the tier follows from it rather
+ * than the other way round.
  */
 export function defaultCharacterForEmptySeat(emptyIndex: number): PersonalityId {
   const at = Math.max(0, Math.floor(emptyIndex)) % ROSTER.length;
@@ -1224,7 +1224,7 @@ export function activeTeams(state: LobbyState): number {
  * Cycle one seat's occupancy — the host's tap on a roster row: OPEN → BOT →
  * CLOSED → OPEN ({@link SEAT_STATE_CYCLE}). A no-op from a guest, after RUSH!, or
  * on a HUMAN seat — you cannot cycle a seat somebody is sitting in (the same three
- * refusals {@link cycleBotDifficulty} keeps, plus the human guard). Closing a seat
+ * refusals {@link cycleSeatCharacter} keeps, plus the human guard). Closing a seat
  * is never blocked on the count — the developer ratified "show, never block"; the
  * floor of two is enforced at {@link canStart}, not here.
  */
