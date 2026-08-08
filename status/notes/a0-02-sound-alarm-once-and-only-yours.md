@@ -93,6 +93,34 @@ Also `--host 127.0.0.1` on both ends: left alone `vite preview` listens on `::1`
 while Node's `fetch` tries `127.0.0.1` first, and the readiness probe times out
 against a server printing its own URL to the log.
 
+## THE LIVE-STAGE SUITE IS ALREADY RED ON MAIN — read this before re-running it
+
+`npm run test:live-stage` does not pass on `origin/main`, untouched. Measured, not
+assumed: a worktree at `4960540` with this repo's `node_modules`, the suite's
+preview port moved off 4173 so it could not borrow anything, full run —
+
+| run | failed | passed | skipped |
+|---|---|---|---|
+| `origin/main`, untouched | 25 | 70 | 3 |
+| this branch (run A) | 24 | 72 | 3 |
+| this branch (run B, final HEAD) | 27 | 69 | 3 |
+
+The new spec passes in every run. Run A's failing set is a strict **subset** of
+main's; run B adds `minimap.spec.ts:662` and `ore-conservation.spec.ts:98`, and
+**both pass in isolation on this branch** (9/9) — they are load flakes on a box
+shared with other lanes, not this change. The shared failure mode is `__lobby`
+never appearing after
+`__mainMenu.play()` — the doors screen now sits between them — across
+`fullscreen`, `unified-play-flow`, `lobby-flow`, `map-picker`, `upgrade-wheel`,
+`connect-trace`, `codex-lobby`, `repair-core`, `tap-markers`, `minimap` and one
+`audio-alive` test. It is not this lane's to fix and it is not this lane's to
+hide: do not spend a session chasing it here, and do not report the suite as
+green.
+
+Counts wobble run to run (24, 27, and 28 in a contended run without the new spec
+at all) — the box is shared across lanes. Every spec that failed on this branch
+and not on main passed when re-run alone.
+
 ## NEXT
 
 - Evidence against the LIVE deployment: an online match on a non-zero slot, own
