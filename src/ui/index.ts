@@ -607,7 +607,9 @@ export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 //   //             refused/dropped → drain(flowFailed(flow, ENTRY_ERRORS.full))
 
 export {
+  FLOW_SCREENS,
   createFlow,
+  flowCloseHangar,
   flowCloseSettings,
   flowConnected,
   flowEliminated,
@@ -616,13 +618,17 @@ export {
   flowLobbySlots,
   flowMatchEnded,
   flowMatchStart,
+  flowOpenHangar,
   flowOpenSettings,
+  flowScreenHandler,
   flowTapEnd,
   flowTapEntry,
+  flowTapHangar,
   flowTapLobby,
   flowTapSettings,
   resetFlow,
   setFlowFireMode,
+  setFlowProfile,
   tickFlow,
   wireFireMode,
 } from './lobby-flow';
@@ -837,6 +843,9 @@ export {
   mainMenuHitTest,
   mainMenuLayout,
   mainMenuModel,
+  mainMenuRoute,
+  mainMenuStep,
+  mainMenuIndexOf,
 } from './main-menu';
 export type {
   MainMenuButtonState,
@@ -939,6 +948,68 @@ export { CodexView, CODEX_ANCHOR } from './codex-view';
 // via codexBotHint / codexShipHint. It never hit-tests, so it can never eat a
 // lobby tap ("non-blocking").
 export { CodexHintView } from './codex-hint-view';
+
+// --- The HANGAR — the fourth main-menu door (a0-14) -------------------------
+//
+// Where a player looks at what they have and what they are working toward: their
+// ship drawn from the REAL generators, their level and progress toward the next
+// (read from the one profile, `src/progression/`, never recomputed here), and
+// the level→unlock list of cosmetics.
+//
+// It is NOT a store: no currency, no price, no purchase. And the boundary that
+// keeps it honest is in the contract rather than in the content — a cosmetic may
+// vary colour, livery, decals, trim and engine glow, and may NEVER vary outline,
+// proportions or class-identifying geometry, because a silhouette on the minimap
+// is information (style-guide §4, GDD §2.11).
+//
+//   const hangar = new HangarView(w, h, isTouch);
+//   ctx.root.addChild(hangar);
+//   // HANGAR pressed on the menu → hangar.visible = true; menuView.visible = false
+//   // on a state change: hangar.update(hangarModel({ profile, shipClass }))
+//   // on tap: const hit = hangar.hitTest(x, y)
+//   //   'back'     → hangar.visible = false; back to the menu
+//   //   'cosmetic' → equipCosmetic(profile, c); saveProfile(platform.storage, next)
+//
+// The list ships EMPTY, and the screen is built to be worth opening anyway —
+// `model.empty` carries the line to draw where the rows would be, because an
+// empty grid is indistinguishable from a broken one (LESSONS §20).
+export {
+  COSMETICS,
+  COSMETIC_INVARIANT,
+  COSMETIC_SLOTS,
+  COSMETIC_SLOT_SURFACE,
+  COSMETIC_VARIABLE,
+  HANGAR_BACK_LABEL,
+  HANGAR_EMPTY_LINE,
+  HANGAR_EYEBROW,
+  HANGAR_ID,
+  HANGAR_TITLE,
+  cosmeticStatus,
+  equipCosmetic,
+  equippedId,
+  hangarHitTest,
+  hangarLayout,
+  hangarModel,
+  hangarTargetKey,
+  isUnlocked,
+  sameHangarTarget,
+} from './hangar';
+export type {
+  Cosmetic,
+  CosmeticSlot,
+  CosmeticStatus,
+  HangarLayout,
+  HangarLayoutOptions,
+  HangarLevelView,
+  HangarModel,
+  HangarPointer,
+  HangarRowView,
+  HangarShipView,
+  HangarState,
+  HangarTarget,
+} from './hangar';
+
+export { HangarView, HANGAR_ANCHOR } from './hangar-view';
 
 // --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
 //

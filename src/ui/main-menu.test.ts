@@ -20,8 +20,11 @@ import {
   mainMenuLayout,
   mainMenuModel,
   mainMenuRoute,
+  mainMenuStep,
+  mainMenuIndexOf,
 } from './main-menu';
 import type { Rect } from '@platform/layout-registry';
+import type { MainMenuOption } from './main-menu';
 import { CODEX_TABS } from './codex';
 import { NAV_EDGES, NAV_SCREENS, reachesMainMenuWithoutMatch } from './menu-nav';
 import type { NavScreen } from './menu-nav';
@@ -202,6 +205,40 @@ describe('the wiring contract: every screen handled, every item routed', () => {
     expect(new Set(FLOW_SCREENS).size).toBe(FLOW_SCREENS.length);
     expect(FLOW_SCREENS).toContain('hangar');
     expect(flowScreenHandler('hangar')).toBe('flowTapHangar');
+  });
+
+  it('reaches HANGAR by KEYBOARD — every door is on the focus ring', () => {
+    // The menu used to answer exactly one key (Enter, which was PLAY), so a
+    // keyboard player could reach the first plate and nothing else. a0-14 asks
+    // for the fourth door to be reachable by keyboard as well as by tap, so the
+    // focus ring is the menu's own list and this proves it lands on all four.
+    const walk: MainMenuOption[] = [];
+    let at: MainMenuOption = 'play';
+    for (let i = 0; i < MAIN_MENU_ITEMS.length; i++) {
+      at = mainMenuStep(mainMenuIndexOf(at), 1);
+      walk.push(at);
+    }
+    expect(walk).toEqual(['codex', 'settings', 'hangar', 'play']); // and it wraps
+    expect(walk).toContain('hangar');
+
+    // Backwards too — HANGAR is one step UP from PLAY, which is the fastest way
+    // to the newest door and the reason the ring wraps at all.
+    expect(mainMenuStep(mainMenuIndexOf('play'), -1)).toBe('hangar');
+  });
+
+  it('starts the focus ring on PLAY, so Enter alone still means PLAY', () => {
+    // The compatibility clause: every keyboard path that existed before a0-14
+    // behaves identically. Index 0 is PLAY and a zero step never moves.
+    expect(MAIN_MENU_ITEMS[0]?.kind).toBe('play');
+    expect(mainMenuIndexOf('play')).toBe(0);
+    expect(mainMenuStep(0, 0)).toBe('play');
+  });
+
+  it('folds a junk focus index rather than stepping off the list', () => {
+    for (const index of [Number.NaN, -99, 999, 2.5]) {
+      expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toContain(mainMenuStep(index, 1));
+    }
+    expect(mainMenuIndexOf('hangar')).toBe(MAIN_MENU_ITEMS.length - 1);
   });
 
   it('opens and leaves the hangar through the flow, by tap and by key', () => {

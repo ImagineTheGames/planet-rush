@@ -152,6 +152,34 @@ export function mainMenuRoute(option: MainMenuOption): NavScreen | null {
   }
 }
 
+/**
+ * Move the keyboard focus `delta` places through the stack, wrapping at both
+ * ends, and answer the option it lands on.
+ *
+ * The menu used to answer exactly one key — Enter/Space, which was PLAY — so a
+ * keyboard player could reach the first plate and nothing else. That was
+ * survivable while the other two doors were also reachable by mouse on the same
+ * screen; it stops being survivable the moment a screen has to be *demonstrably*
+ * reachable without a pointer (a0-14). Focus starts at PLAY, so Enter with
+ * nothing moved is still PLAY and every existing keyboard path is unchanged.
+ *
+ * Pure and index-based, so "three steps down reaches HANGAR" is a unit test
+ * rather than a click-through.
+ */
+export function mainMenuStep(index: number, delta: number): MainMenuOption {
+  const count = MAIN_MENU_ITEMS.length;
+  const safe = Number.isFinite(index) ? Math.trunc(index) : 0;
+  const next = (((safe + delta) % count) + count) % count;
+  return MAIN_MENU_ITEMS[next]!.kind;
+}
+
+/** The index of an option in the stack — the inverse of {@link mainMenuStep},
+ *  for a wiring layer that holds the focus as a `MainMenuOption`. */
+export function mainMenuIndexOf(option: MainMenuOption): number {
+  const index = MAIN_MENU_ITEMS.findIndex((item) => item.kind === option);
+  return index < 0 ? 0 : index;
+}
+
 /** The wordmark, in Audiowide (style-guide §5.6) — the one place the game names
  *  itself before a match. */
 export const MAIN_MENU_TITLE = 'PLANET RUSH';
