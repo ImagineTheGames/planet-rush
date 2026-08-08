@@ -45,7 +45,7 @@ import {
   type GainNodeLike,
   type StereoPannerNodeLike,
 } from './context';
-import { AudioEngine, EARSHOT_FAR, EARSHOT_NEAR } from './engine';
+import { ALARM_DUCK_S, AudioEngine, EARSHOT_FAR, EARSHOT_NEAR } from './engine';
 import { AudioGraph, MIX_DEFAULTS, renderSound } from './graph';
 import {
   cutoffFor,
@@ -1370,9 +1370,11 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(siege.engine.alarm.active).toBe(true);
   });
 
-  it('starts one alarm loop and ducks the ambience under it', () => {
-    // Music off here so the loop count is just the two this test is about — the
-    // soundtrack's own ducking has its own test below.
+  it('sounds ONE alarm sting and starts no loop — the klaxon does not keep playing (s9-01)', () => {
+    // The developer, 2026-08-07: "also for the alarm, it should only play once,
+    // and not keep playing". It used to be `graph.startLoop(SOUND.alarm)`, held
+    // for as long as the state machine was `active` — which under sustained fire
+    // is the whole siege. Music off so the loop count is only what this is about.
     const { ctx, engine } = engineOn({ local: 0, music: false });
     const q = new TellQueue(4);
     q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
@@ -1380,9 +1382,147 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
 
     expect(engine.alarm.active).toBe(true);
     const loops = ctx.sources.filter((s) => s.loop);
-    expect(loops.length).toBe(2); // the bed, and the alarm — one of each
+    expect(loops.length).toBe(1); // the ambient bed, and nothing else
+    expect(engine.alarmSounds).toBe(1); // one sting for the engagement
     const ambientRamps = (engine.graph!.buses.ambient.gain as FakeParam).events;
     expect(ambientRamps.some((e) => e.kind === 'ramp' && e.value < 1)).toBe(true);
+  });
+
+  it('sounds the alarm ONCE per engagement, however long the siege lasts (s9-01)', () => {
+    // The defect, as arithmetic. `UnderAttackAlarm` holds `active` for at least
+    // MIN_HOLD_S and keeps holding while the pressure stays over RELEASE, so a
+    // besieger who never lets up holds it up indefinitely. Ten seconds of
+    // unbroken fire is one engagement, and therefore exactly one sound.
+    const { ctx, engine } = engineOn({ local: 0, music: false });
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+    run(engine, ctx, 10, () => engine.consume(q));
+
+    expect(engine.alarm.active).toBe(true); // still under siege…
+    expect(engine.alarmSounds).toBe(1); // …and it rang once, ten seconds ago
+  });
+
+  it('rings again only after a release and a RE-engage — the hysteresis is the re-trigger guard (s9-01)', () => {
+    // MIN_HOLD_S and the separate lower RELEASE were written to stop a *looping*
+    // alarm stuttering. With a one-shot they keep the same numbers and do a
+    // better job: they are what stops an attacker's dodge-and-return
+    // machine-gunning the klaxon. So the second sting has to cost a real release.
+    const { ctx, engine } = engineOn({ local: 0, music: false });
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+
+    run(engine, ctx, 2, () => engine.consume(q)); // siege one
+    expect(engine.alarmSounds).toBe(1);
+
+    // The attacker breaks off. The hold expires, the pressure leaks away, and
+    // the alarm releases — nothing sounds on the way down.
+    run(engine, ctx, 4);
+    expect(engine.alarm.active).toBe(false);
+    expect(engine.alarmSounds).toBe(1);
+
+    run(engine, ctx, 2, () => engine.consume(q)); // …and comes back: siege two
+    expect(engine.alarm.active).toBe(true);
+    expect(engine.alarmSounds).toBe(2); // one more, not one per frame
+  });
+
+  it('counts one sting per engagement with no audio hardware at all (GDD §4.1)', () => {
+    // The rule is arithmetic, not a mix feature: it holds in the mode the match
+    // server, the QA harness and CI run in, where there is no context to play into.
+    const engine = new AudioEngine({ local: 4 });
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 4);
+    for (let i = 0; i < 600; i++) {
+      engine.consume(q);
+      engine.update(1 / 60);
+    }
+    expect(engine.alarm.active).toBe(true);
+    expect(engine.alarmSounds).toBe(1);
+  });
+
+  it('lets the mix back up after the sting, rather than pinning it down for the whole siege (s9-01)', () => {
+    // The other half of the one-shot: `syncAlarm` used to duck for the length of
+    // the LOOP and restore on release, which with a one-shot would leave the game
+    // quiet for a siege that is no longer announcing itself. Duck for the sting;
+    // restore; leave the siege to the arrow.
+    const { ctx, engine } = engineOn({ local: 0 });
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+    run(engine, ctx, 1, () => engine.consume(q));
+    expect(engine.alarmSounds).toBe(1);
+
+    // A bus's gain rides `player level × duck factor`, so "unducked" is the
+    // player's own level — which is the point of the duck being a factor: the
+    // restore gives back exactly what the slider was set to, not a hardcoded 1.
+    const lastGain = (bus: 'music' | 'sfx' | 'ambient') => {
+      const events = (engine.graph!.buses[bus].gain as FakeParam).events;
+      return events[events.length - 1]!.value;
+    };
+    const level = (bus: 'music' | 'sfx' | 'ambient') => engine.graph!.busLevel(bus);
+    expect(lastGain('music')).toBeLessThan(level('music')); // ducked, mid-sting
+
+    // Keep the siege going well past the sting: the mix comes back anyway.
+    run(engine, ctx, 3, () => engine.consume(q));
+    expect(engine.alarm.active).toBe(true); // still besieged…
+    expect(engine.alarmSounds).toBe(1); // …still one sound…
+    expect(lastGain('music')).toBe(level('music')); // …and the soundtrack is back
+    expect(lastGain('ambient')).toBe(level('ambient'));
+    expect(lastGain('sfx')).toBe(level('sfx'));
+  });
+
+  it('ducks for at least as long as the alarm actually sounds', () => {
+    // ALARM_DUCK_S is a constant rather than the rendered buffer's length,
+    // because the duck runs headless too. This is what keeps the constant honest:
+    // re-voice the klaxon longer and the duck must be re-tuned, not silently left
+    // to lift halfway through its own sound.
+    const samples = renderSound(soundSpec(SOUND.alarm));
+    const seconds = samples.length / DEFAULT_SAMPLE_RATE;
+    expect(ALARM_DUCK_S).toBeGreaterThanOrEqual(seconds);
+  });
+
+  it('keeps the sting on the ALARM bus, so the SFX slider cannot turn a mechanic off', () => {
+    // The alarm is a mechanic and on the not-cuttable list (§4.9); it has its own
+    // bus for exactly that reason. The loop used to name it and the one-shot has
+    // to as well — `flat()` defaults to `sfx`, which is the easy way to lose this.
+    const { ctx, engine } = engineOn({ local: 0, music: false, ambient: false });
+    // Follow every playing source through its gain node to the bus it sums into,
+    // and measure the DELTA the siege causes — the mix has other voices in it.
+    const into = (bus: AudioNodeLike) =>
+      ctx.sources.filter((s) => (s.outputs[0] as FakeGain | undefined)?.outputs[0] === bus).length;
+    const before = into(engine.graph!.buses.alarm);
+
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+    run(engine, ctx, 1, () => engine.consume(q));
+    expect(engine.alarmSounds).toBe(1);
+
+    // Exactly one new voice on the alarm bus — the sting. (The core-hit tells
+    // that raised it are ordinary located combat and sum into `sfx`, as ever.)
+    expect(into(engine.graph!.buses.alarm)).toBe(before + 1);
+
+    // And the SFX slider at zero leaves it audible, which is what the separate
+    // bus is FOR: a mechanic on the not-cuttable list is not a sound effect.
+    engine.setSfxVolume(0);
+    expect(engine.graph!.busLevel('sfx')).toBe(0);
+    expect(engine.graph!.busLevel('alarm')).toBeGreaterThan(0);
+  });
+
+  it('rings for YOUR station and no other, with the listener on a NON-ZERO slot (s9-01)', () => {
+    // The bug the developer reported was never in this predicate — it was in who
+    // told it the local slot (`main.ts` captured LOCAL_PLAYER by value at boot,
+    // before the server had seated the joiner, so every online client believed it
+    // was slot 0). A test on slot 0 cannot see that class of defect at all: with
+    // `local` wrong-but-zero, "my station" and "slot 0's station" are the same
+    // set. So this one sits on slot 3 and asserts both directions.
+    const ringsFor = (owner: number) => {
+      const { ctx, engine } = engineOn({ local: 3, music: false });
+      const q = new TellQueue(4);
+      q.push(TELL.coreHit, 0, 0, 0, 0.5, owner);
+      run(engine, ctx, 2, () => engine.consume(q));
+      return { active: engine.alarm.active, sounds: engine.alarmSounds };
+    };
+    expect(ringsFor(3)).toEqual({ active: true, sounds: 1 }); // your own home
+    expect(ringsFor(0)).toEqual({ active: false, sounds: 0 }); // slot 0's — the bug
+    expect(ringsFor(5)).toEqual({ active: false, sounds: 0 }); // any other rival
   });
 
   it('ducks the soundtrack and the SFX under the alarm, not just the ambience', () => {

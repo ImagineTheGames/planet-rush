@@ -1166,13 +1166,19 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    *
    * Two rising klaxon tones, the second a minor third above the first — the
    * interval every emergency signal ever built uses, because it is the one that
-   * refuses to sound like music. It loops for as long as the pressure lasts
-   * (`./alarm`), so the body is a single bar with no silence at the seam.
+   * refuses to sound like music.
+   *
+   * **A one-shot since s9-01, not a loop** (developer, 2026-08-07: *"it should
+   * only play once, and not keep playing"*). It used to be a looping body played
+   * for as long as the pressure lasted; it is now a single bar, sounded once per
+   * engagement by `./engine` syncAlarm, with the screen-edge arrow carrying the
+   * duration instead (GDD §2.2, amended 2026-08-07). The spec loses `loop` and
+   * its seam crossfade and gains the ordinary edge fades every other one-shot in
+   * this bank has — the bar itself, the two tones and their levels, is untouched,
+   * so what a player hears once is exactly what they used to hear repeatedly.
    */
   [SOUND.alarm]: {
     name: 'alarm',
-    loop: true,
-    crossfade: 0.02,
     layers: [
       {
         spec: {
