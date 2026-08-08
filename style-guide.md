@@ -34,6 +34,29 @@ additive layer that lives only on trim — they never replace a material colour.
 **Contrast rule:** every entity must read against Vacuum `#0D1015` on its own.
 Do not rely on a lighter backdrop; there isn't one.
 
+### 1.1 The ground — Floor `#010204` *(amended 2026-08-07 — the developer picked Floor off the backdrop compositor, a0-07: "i like floor"; `src/art/tokens.ts` `FLOOR`)*
+
+| Role | Hex | Job |
+|---|---|---|
+| **Floor** | `#010204` | The **backdrop only** — the ground the star-field and its nebula are composited over. Nothing else in the game is ever painted in it. |
+
+This is **not a seventh material colour** and it does not replace Vacuum. It is
+the same cool blue-black at a much lower value — hue 220° against Vacuum's
+217.5°, luma 1.9 against Vacuum's 15.7 — and the two have different jobs:
+
+- **Vacuum `#0D1015` is unchanged and unmoved.** It is still the dark endpoint
+  of the value ramp every derived shade is mixed toward, still the HUD panel
+  fill, and still the tone the contrast rule above is quoted against.
+- **Floor `#010204` is the ground the play-field is drawn on**, and only that.
+  `src/art/compliance.ts` fails any sprite that paints an entity in it.
+
+**Rock legibility does not need defending against this, and it was measured
+rather than argued.** A darker ground raises contrast for everything lighter
+than it, which on this palette is everything: `rockBody #484E57` reads
+**2.27:1** against Vacuum and **2.47:1** against Floor — **8.9% more contrast**.
+Space is black and the asteroids are grey. Do not add rim lighting, a contrast
+floor, or any other compensation for a problem that does not exist.
+
 ---
 
 ## 2. The RESERVED rule (the rule that carries the most weight)
@@ -109,6 +132,43 @@ any other screen — stays ruled out.
 Everything else in the Gantry/Bone direction is deliberately hueless — the
 accent is **Bone**, which is brightness rather than colour (`src/art/materials.ts`)
 — which is exactly what leaves this one carve-out affordable.
+
+### 2.2 The sky carve-out — a warm nebula, bounded by a number *(amended 2026-08-07 — the six ratified skies, a0-07; **`src/art/compliance.ts` enforces every limit below**)*
+
+The developer ratified six backdrops, one per map (`src/art/backdrop.ts`
+`MAP_NEBULA`). Two of them are warm — **Iron Veil** ("a rust band") and **Deep
+Ember** ("sparse, low alpha, felt at the edges") — and rust and dying coals are
+threat red's hue. So:
+
+> **Threat red `#B23A3A` and its shades may appear on the backdrop wash (paint
+> role `sky`) at an alpha of `0.06` or less, and nowhere else outside `danger`.**
+
+This is a narrower exception than §2.1, and it is the only one on the danger
+half of the rule. What keeps it from becoming a licence:
+
+1. **It is a number, not a judgement.** `SKY_RESERVED_ALPHA_MAX = 0.06` in
+   `src/art/compliance.ts`; a sky ink over it fails the audit, in CI, the same
+   way yellow on a thruster does. `SKY_ALPHA_MAX = 0.12` bounds every *other*
+   sky ink besides.
+2. **The composite is provably not a signal.** Deep rust at 6% over Floor lands
+   at luma ≈ 5/255 — an **eighth** of the ink outline every sprite in the game
+   is drawn with (`rockFissure`, luma 43), and a **thirtieth** of the damage
+   fill it shares a hue with. It cannot be mistaken for "this hurts" because it
+   is not bright enough to be mistaken for anything.
+3. **Signal yellow gets nothing.** No carve-out, no alpha, no exception: `sky`
+   is not in the audit's `YELLOW_ROLES` and never will be. The colour that
+   carries the most weight in this guide does not appear on the backdrop at all.
+4. **The sky is not an entity and never becomes one.** Role `sky` is the void's
+   own wash; the audit fails it on any sprite that is not the backdrop's, and
+   fails **Floor** itself on any role but `sky`.
+5. **It does not travel.** Nebula washes on the play-field backdrop. It licenses
+   no red in a menu, a HUD panel, a lobby, a wheel, or a particle.
+
+The two warm skies are **built but assigned to no map** in a0-07 — the four live
+maps take NONE, Coalsack, Patina Drift and Plasma Reef, none of which spends a
+reserved hue at all. Iron Veil and Deep Ember wait in the registry for the maps
+`a0-12` is building, which gives the Director a clean seam to veto this section
+on before a single shipped frame depends on it.
 
 ---
 
