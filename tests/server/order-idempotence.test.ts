@@ -40,6 +40,7 @@ import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
 import type { WireFrame } from '../../src/net/wire';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
+import { seatBots } from './seat-bots';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -116,6 +117,7 @@ describe('an identified order is simulated exactly once', () => {
     const socket = new FakeSocket();
     host = { socket, connection: server.connect(socket) };
     host.connection.receive(encodeClientMessage({ type: 'join', room: code }));
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(50);
 
@@ -237,6 +239,7 @@ describe('the order echo — what authority says it did', () => {
     const socket = new FakeSocket();
     host = { socket, connection: server.connect(socket) };
     host.connection.receive(encodeClientMessage({ type: 'join', room: code }));
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(50);
     const ship = world().ships.find((s) => s.id === 0)!;

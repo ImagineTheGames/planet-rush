@@ -95,13 +95,57 @@ export interface JoinMessage {
   ticket?: string;
 }
 
+/**
+ * What one lobby slot is set to (GDD §2.1's three seat states, on the wire —
+ * a0-11, 2026-08-07).
+ *
+ *  - `open`   — a competitive human seat. Somebody may be in it already (the
+ *               server owns that fact, and answers it with {@link LobbySlot.ready});
+ *               if nobody is at RUSH!, it takes the field with **nothing** — no
+ *               ship, no station, no bot.
+ *  - `bot`    — the host put an AI here. The only state that seats a bot.
+ *  - `closed` — out of the match entirely, and no joiner may take it.
+ *
+ * Deliberately its own union rather than the sim's `SlotState`
+ * (`src/sim/match-config`), which spells the same three words with a different
+ * meaning for `open` — there it means "a live competitive slot in the world", so
+ * an *unclaimed* open seat resolves to `closed` before it reaches the sim. The
+ * room still needs all three, because it is the thing a joiner arrives at.
+ */
+export type LobbySeatState = 'open' | 'bot' | 'closed';
+
 /** Lobby choices before RUSH!: ship class and, for the creator, bot difficulty. */
 export interface LobbyChoiceMessage {
   type: 'lobbyChoice';
   shipClass: ShipClass;
   fireMode: FireMode;
-  /** Only honored from the room creator; ignored otherwise (GDD §4.2). */
+  /**
+   * One entry per **BOT seat**, in slot order — the tier the host set for each
+   * (a0-11 changed what this counts: it used to be one per *empty* seat, back
+   * when an empty seat was a bot). `server/room.ts` `castFor` indexes it in the
+   * same order it seats bots in, so entry `i` is the `i`th bot the room casts.
+   *
+   * Only honored from the room creator; ignored otherwise (GDD §4.2).
+   */
   botDifficulties?: readonly BotDifficulty[];
+  /**
+   * The host's per-seat OPEN / BOT / CLOSED authoring, indexed by slot id
+   * (0..7) — the lobby's own roster, on the wire (a0-11).
+   *
+   * Without this the server had no way to know which seats the host meant to be
+   * bots, so it filled **every** socket-less seat with one — and the moment the
+   * lobby stopped doing that (GDD §2.1 *amended 2026-08-07*), the room would have
+   * built a world nobody on screen had asked for: six ghost bots behind six seats
+   * drawn OPEN. That is precisely the class of bug §2.1's preview exists to
+   * prevent, so the rule travels rather than being kept in two places.
+   *
+   * A seat a human is sitting in is sent as `open`; who is *in* a seat is the
+   * server's own answer, and this is the host speaking about the empty ones.
+   * Honored from the room creator only — a joiner cannot reshape the roster.
+   * Absent from a pre-a0-11 client, which reads as "no opinion" and leaves the
+   * room on its own defaults.
+   */
+  seats?: readonly LobbySeatState[];
   /**
    * The match MODE the host's lobby is on — FFA or TEAMS (GDD §2.1).
    *
@@ -285,6 +329,21 @@ export interface LobbySlot {
   shipClass: ShipClass;
   ready: boolean;
   /**
+   * What this seat is **set to** — the room's echo of the host's authoring
+   * (a0-11). `ready` says whether a human is sitting in it *now*; this says what
+   * happens to it at RUSH! if nobody is.
+   *
+   * It exists because the pair `isBot`/`ready` has no third value: before a0-11
+   * every socket-less seat was going to be a bot, so "open" and "bot" were the
+   * same future and the roster could infer it. Now they are different futures,
+   * and a guest reading the broadcast has no way to tell a seat the host set to
+   * BOT from one they left OPEN — nor can the *host's own* client, whose local
+   * authoring would otherwise be overwritten by the next broadcast that says
+   * "not a bot yet". Optional, so a pre-a0-11 server's slot still satisfies the
+   * type; absent, a reader keeps whatever state it had.
+   */
+  state?: LobbySeatState;
+  /**
    * The side this slot fights for (variable-slots Task C4). FFA is teams-of-one,
    * so `team === player`; TEAMS shares one `team` across allies. Optional so a
    * `LobbySlot` a pre-teams client builds still satisfies the type — an absent
@@ -335,6 +394,22 @@ export interface MatchStartMessage {
   /** Every seat as the server seated it — humans and bots alike, in slot order,
    *  each with the hull the lobby locked in (GDD §2.11). */
   slots: readonly MatchStartSlot[];
+  /**
+   * The slot **this recipient** is flying, in the roster above (a0-11).
+   *
+   * RUSH! is where a room stops having lobby seats and starts having sim players,
+   * and those two numberings are not the same the moment a seat is left OPEN or
+   * CLOSED: the sim's roster is dense `0..N-1` by ratified design (`RoomConfig.slots`
+   * — "no sparse id ever enters the sim", spike §S2 / Trap 6), while the lobby's
+   * ids are whatever seats people happen to be in. Before a0-11 nothing was ever
+   * dropped, so the two agreed and `welcome.you` held for the whole match.
+   *
+   * The room therefore compacts at RUSH! and tells each client the seat it came
+   * out on. Sent per recipient, which is why it rides `matchStart` rather than the
+   * broadcast roster. Optional: a pre-a0-11 server omits it and the client keeps
+   * the seat its `welcome` named, which is exactly the old behaviour.
+   */
+  you?: PlayerId;
   /** Play bounds, when the room overrode the sim default. */
   bounds?: { width: number; height: number };
   /** Asteroids per wave, when the room overrode the sim default. */

@@ -174,6 +174,9 @@ describe('the playtest log over a real socket', () => {
     const poll = setInterval(() => attached.poll(), 50);
 
     await until('the seat to be welcomed', () => log.events.some((e) => e.msg === 'welcome'), 5_000);
+    // One human is not a match (a0-11; GDD §2.1 amended): the host seats the other
+    // chair, exactly as the shipping lobby's slot editor does, before RUSH!.
+    session.chooseInLobby({ shipClass: ShipClass.Vanguard, seats: ['open', 'bot'] });
     session.startMatch();
     await until('the match to start', () => log.events.some((e) => e.msg === 'matchStart'), 5_000);
 

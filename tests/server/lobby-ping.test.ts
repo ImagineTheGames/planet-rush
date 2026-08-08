@@ -21,6 +21,7 @@ import type { WireFrame } from '../../src/net/wire';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
 import { LOBBY_PING_INTERVAL_MS } from '../../server/room';
+import { seatBots } from './seat-bots';
 
 /** A socket whose round trip the test controls. `rttMs` is a live read on the
  *  room's side, exactly as `server/ws.ts`'s probe is. */
@@ -189,6 +190,7 @@ describe('lobbyState carries each human seat its ping', () => {
     join(); // a second seat, so the match can start
     host.socket.rtt = 70;
     advance(LOBBY_PING_INTERVAL_MS);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(1);
     expect(server.room(code)?.state).toBe('live');

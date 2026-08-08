@@ -76,7 +76,7 @@ import { PALETTE, PLAYER_COLORS } from '@render/index';
 import { BONE, MATERIAL_SHADES } from '../art/materials';
 import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
-import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
+import type { BotDifficulty, LobbySeatState, LobbySlot, RoomCode } from '../net/transport';
 import { seatPing } from '../net/ping';
 import type { PingReadout } from '../net/ping';
 import type { MatchConfig, MatchMode, SlotConfig, SlotState } from '../sim/match-config';
@@ -694,18 +694,26 @@ export function isJoinableRoomCode(code: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Who holds a seat.
+ * Who holds a seat *(the `open` rung rewritten a0-11, 2026-08-07)*.
  *
  *  - `human`  — a player is in it.
- *  - `bot`    — a bot is in it: seated by the server at RUSH!, or LOCKED to a bot
- *               by the host (so a joiner can't take it — the explicit-bot state of
- *               the OPEN/BOT/CLOSED cycle).
- *  - `open`   — nobody yet: it *previews* the bot that will fill it, and anyone
- *               with the room code can still take it (GDD §2.1, §4.2).
+ *  - `bot`    — the host put an AI there. This is where the cast preview and
+ *               {@link defaultDifficultyForEmptySeat} belong, and the only state
+ *               that puts a bot on the field.
+ *  - `open`   — **empty, waiting for a human.** It contributes no ship, no
+ *               station, no colour and **no bot**: if nobody takes it, it is
+ *               simply not in the match. Anyone with the room code still can
+ *               (GDD §2.1, §4.2).
  *  - `closed` — out of the match ENTIRELY (variable-slots Milestone E): no player,
- *               no station, no colour on the field. `N = count(occupant !==
- *               'closed')`, and it is the seat state that shrinks a match below
- *               eight. Maps to `SlotState.'closed'` (`../sim/match-config`).
+ *               no station, no colour on the field. Maps to `SlotState.'closed'`
+ *               (`../sim/match-config`), and so — now — does an unclaimed `open`.
+ *
+ * `open` used to mean "a bot will sit here", which collapsed the very distinction
+ * §2.1 draws between *a competitive human seat* and *AI-filled*. The developer
+ * asked for it back — *"it should start with all slots OPEN and no bots in it (it
+ * should be up to player to fill it up with bots if they want)"* — and §2.1 is
+ * amended to match: **`N` counts humans plus bots**, and the only difference left
+ * between `open` and `closed` is that a joiner can still take an open seat.
  */
 export type SeatOccupant = 'human' | 'bot' | 'open' | 'closed';
 
@@ -826,12 +834,34 @@ export interface LobbyOptions {
 }
 
 /**
- * A fresh lobby: you in your seat, every other seat open and previewing the
- * character who would fly it.
+ * A fresh lobby: you in your seat, and every other seat **empty** — no bot, no
+ * cast preview, nothing AI-filled until the host says so (a0-11; GDD §2.1
+ * *amended 2026-08-07*).
  *
  * The host's seat is seated too when it isn't yours — joining a room means
  * somebody created it, and a creator with no body in the chair would read as an
  * open seat holding the RUSH! button.
+ *
+ * ---------------------------------------------------------------------------
+ * THE ONE PLACE THE TWO FLAVOURS OF THIS SCREEN GENUINELY DIFFER
+ * ---------------------------------------------------------------------------
+ * An `online` room seeds its non-host seats **OPEN**; an **offline** one seeds
+ * them **BOT**.
+ *
+ * That is not a second design. The developer's report is about the room you
+ * *create to play online*: *"when creating a room to play online it should start
+ * with all slots OPEN and no bots in it."* An OPEN seat means "waiting for a
+ * human", and offline there is no wire for a human to arrive on — the seat could
+ * wait forever. This file already said as much in two places before a0-11
+ * ({@link LobbySeatView.openToJoin} is false offline; `seatSlotState` resolved an
+ * open seat to a bot offline), so the rule has simply moved to where it can be
+ * *seen*: the solo roster now says BOT on the rows that are bots, instead of
+ * saying OPEN on rows nobody could ever take. PLAY SOLO is therefore unchanged —
+ * it still opens on a full house you can RUSH immediately — and it is the online
+ * room that starts empty.
+ *
+ * Everything downstream of the seat state is identical in both, which is the
+ * property the affordance guard in `./lobby-flow.test.ts` holds us to.
  */
 export function createLobby(options: LobbyOptions): LobbyState {
   const count = Math.max(1, Math.floor(options.slots ?? LOBBY_SLOTS));
@@ -845,16 +875,23 @@ export function createLobby(options: LobbyOptions): LobbyState {
   // is one option, not a special path. A human seat is never closed (below), so a
   // guest welcomed past `size` still holds their seat.
   const size = clampSize(options.size, count);
+  const online = options.online ?? true;
   const seats: LobbySeat[] = [];
   let emptyIndex = 0;
   for (let player = 0; player < count; player++) {
     const human = player === you || player === host;
     const closed = !human && player >= size;
-    const occupant: SeatOccupant = human ? 'human' : closed ? 'closed' : 'open';
+    // OPEN online (waiting for a human, and nothing else), BOT offline (there is
+    // no wire for a human to arrive on) — see this function's header.
+    const occupant: SeatOccupant = human ? 'human' : closed ? 'closed' : online ? 'open' : 'bot';
     seats.push({
       player,
       occupant,
       shipClass: player === you ? shipClass : DEFAULT_SHIP_CLASS,
+      // The tier a seat *would* fly at, seeded even on an OPEN seat that is
+      // flying nothing: the host cycling it to BOT should land on the character's
+      // own tier rather than a flat Medium (GDD §2.9, the whole-cast default),
+      // and a seat that empties again keeps the tier it had.
       difficulty: human || closed ? 'medium' : defaultDifficultyForEmptySeat(emptyIndex++),
       personality: null,
       team: defaultTeamForSlot(player),
@@ -874,7 +911,7 @@ export function createLobby(options: LobbyOptions): LobbyState {
     mode: options.mode ?? 'ffa',
     abundance: options.abundance ?? DEFAULT_ABUNDANCE,
     countdown: 0,
-    online: options.online ?? true,
+    online,
   });
 }
 
@@ -919,15 +956,19 @@ export function castForEmptySeat(emptyIndex: number, difficulty: BotDifficulty):
   return ROSTER[emptyIndex % ROSTER.length] as PersonalityId;
 }
 
-/** Recompute every non-human seat's previewed character from its difficulty and
- *  its position in empty-seat order. Called after anything that moves either. */
+/** Recompute every BOT seat's character from its difficulty and its position in
+ *  bot-seat order. Called after anything that moves either.
+ *
+ *  Only a `bot` seat casts (a0-11). A human sits in their own seat, a closed seat
+ *  is a shut door, and an **open** seat is empty — none of the three previews an
+ *  AI, and none of them consumes a cast index, because none of them is a seat the
+ *  room will cast into. That index is the one the server counts in
+ *  (`server/room.ts` `castFor`), so it must count exactly the seats the server
+ *  will seat a bot in and nothing else. */
 function withCast(state: LobbyState): LobbyState {
   let emptyIndex = 0;
   const seats = state.seats.map((seat) => {
-    // A human sits in their seat, a closed seat holds nobody: neither previews a
-    // bot, and a closed seat must not consume an empty-seat cast index (it is not
-    // a seat the room will ever cast into).
-    if (seat.occupant === 'human' || seat.occupant === 'closed') {
+    if (seat.occupant !== 'bot') {
       return seat.personality === null ? seat : { ...seat, personality: null };
     }
     const personality = castForEmptySeat(emptyIndex++, seat.difficulty);
@@ -1016,6 +1057,9 @@ export function setPlayerName(state: LobbyState, name: string): LobbyState {
 export function nameFor(state: LobbyState, slot: PlayerId): string {
   const seat = state.seats.find((s) => s.player === slot);
   if (!seat) return `P${Math.floor(slot) + 1}`;
+  // An empty seat has no name to give — it is not in the match (a0-11) — and says
+  // so, in the same word the roster row shows.
+  if (seat.occupant === 'open') return 'OPEN';
   if (seat.occupant !== 'human') {
     const character = seat.personality ? PERSONALITIES[seat.personality] : null;
     return character?.name ?? `P${slot + 1}`;
@@ -1076,22 +1120,58 @@ export function botDifficulties(state: LobbyState): readonly BotDifficulty[] {
 // Variable matches — mode, seat state, teams, abundance (Milestone E)
 // ---------------------------------------------------------------------------
 
-/** Whether a seat will fly a bot: an OPEN preview or a host-LOCKED bot. Not a
- *  human (their own hull), not CLOSED (nobody). The one predicate the cast, the
- *  difficulty tap and the config builder share. */
+/**
+ * Whether a seat will fly a bot. **Exactly the host-set BOT seats** (a0-11) — an
+ * OPEN seat flies nothing at all now, which is the whole of the developer's
+ * report. The one predicate the cast, the difficulty tap and the config builder
+ * share, so there is no second place that could disagree about what a bot is.
+ */
 export function isBotSeat(occupant: SeatOccupant): boolean {
-  return occupant === 'open' || occupant === 'bot';
+  return occupant === 'bot';
 }
 
-/** The seats that take the field — everything not CLOSED, in slot order. `N` is
- *  its length (2..8 when the lobby can RUSH). */
+/**
+ * Whether a seat is **in the match**: a human or a bot, and nothing else
+ * (a0-11; GDD §2.1 *amended 2026-08-07* — "`N` is the count of humans plus
+ * bots").
+ *
+ * A CLOSED seat is a shut door and an OPEN one is an empty chair; neither brings
+ * a ship, a station or a colour, and the only difference between them is that a
+ * joiner can still sit in the open one. Every count on this screen — `N`, the
+ * team tally, the side roster, the RUSH! gate — is taken through here.
+ */
+export function isParticipant(occupant: SeatOccupant): boolean {
+  return occupant === 'human' || occupant === 'bot';
+}
+
+/** The seats that take the field — humans and bots, in slot order. `N` is its
+ *  length (2..8 when the lobby can RUSH). */
 export function activeSeats(state: LobbyState): readonly LobbySeat[] {
-  return state.seats.filter((s) => s.occupant !== 'closed');
+  return state.seats.filter((s) => isParticipant(s.occupant));
 }
 
-/** `N` — the match size, the count of non-closed seats. */
+/** `N` — the match size, the count of humans plus bots. */
 export function matchSizeOf(state: LobbyState): number {
   return activeSeats(state).length;
+}
+
+/**
+ * Where `slot` lands in the **dense** roster the sim builds (`configToPlayers`,
+ * spike Trap 6): the count of participating seats before it, or `null` when that
+ * seat is not in the match at all.
+ *
+ * The lobby's slot ids are sparse the moment a seat is open or closed, and the
+ * sim's are never allowed to be — so a caller that has to say "which ship is
+ * mine" in the sim's own numbering (the offline boot, a0-11 Part 2) asks here
+ * rather than assuming the two agree.
+ */
+export function denseSeatIndex(state: LobbyState, slot: PlayerId): number | null {
+  let dense = 0;
+  for (const seat of state.seats) {
+    if (seat.player === slot) return isParticipant(seat.occupant) ? dense : null;
+    if (isParticipant(seat.occupant)) dense++;
+  }
+  return null;
 }
 
 /** The distinct sides manned by the active seats — TEAMS needs at least two, or
@@ -1124,7 +1204,9 @@ export function sideRosterOf(state: LobbyState, player: PlayerId): ReadonlySet<P
   const seat = state.seats.find((s) => s.player === player);
   if (!seat) return side;
   for (const s of state.seats) {
-    if (s.occupant !== 'closed' && s.team === seat.team) side.add(s.player);
+    // Participants only (a0-11): an empty OPEN seat is on nobody's side, exactly
+    // as a shut CLOSED one is — neither has a ship for an ally to fight beside.
+    if (isParticipant(s.occupant) && s.team === seat.team) side.add(s.player);
   }
   return side;
 }
@@ -1197,10 +1279,12 @@ export function cycleAbundance(state: LobbyState): LobbyState {
  * from its seat —
  *
  *  - a CLOSED seat → `closed` (dropped at world-build, shrinks `N`);
- *  - a host-locked BOT → `bot`;
+ *  - a host-set BOT → `bot`;
  *  - a HUMAN → `open` (a live competitive seat);
- *  - an OPEN preview → `open` online (a joiner can still take it) or `bot`
- *    offline (there is no wire for a joiner, so the empty seats are the cast).
+ *  - an unclaimed OPEN seat → `closed` too (a0-11): it brings no ship and no
+ *    station, so the world must be built without it. The two differ in the lobby
+ *    — a joiner can still take the open one — and not at all in the sim, which
+ *    only ever asks "is there a player here?"
  *
  * `team` rides FFA as the slot id (teams-of-one) and TEAMS as the authored side;
  * the bot fields ride only bot-bearing slots. This is the single handoff to the
@@ -1208,7 +1292,7 @@ export function cycleAbundance(state: LobbyState): LobbyState {
  */
 export function lobbyMatchConfig(state: LobbyState): MatchConfig {
   const slots: SlotConfig[] = state.seats.map((seat) => {
-    const slotState = seatSlotState(seat.occupant, state.online);
+    const slotState = seatSlotState(seat.occupant);
     const bot = slotState === 'bot';
     return {
       index: seat.player,
@@ -1249,19 +1333,41 @@ export function lobbyRosterTeams(state: LobbyState): number[] {
   return configToPlayers(lobbyMatchConfig(state)).map((spec) => spec.team ?? spec.id);
 }
 
-/** One seat's occupancy as the config's {@link SlotState}: an OPEN preview is a
- *  joinable seat online but a bot offline (no wire for a joiner). */
-function seatSlotState(occupant: SeatOccupant, online: boolean): SlotState {
+/** One seat's occupancy as the config's {@link SlotState}. An unclaimed OPEN seat
+ *  resolves to `closed` (a0-11): the sim has no third answer for "nobody is here",
+ *  and "nobody is here" is exactly what an open seat means now. */
+function seatSlotState(occupant: SeatOccupant): SlotState {
   switch (occupant) {
     case 'closed':
+    case 'open':
       return 'closed';
     case 'bot':
       return 'bot';
     case 'human':
       return 'open';
-    case 'open':
-      return online ? 'open' : 'bot';
   }
+}
+
+/**
+ * The per-seat states as **the wire spells them**: one entry per physical lobby
+ * slot 0..7, in slot order (a0-11 — `LobbyChoiceMessage.seats`).
+ *
+ * The host's authoring of the roster is match shape exactly as the mode and the
+ * sides are, and it rides the same low-frequency message for the same reason. A
+ * `human` seat is sent as `open`: on the wire "who is *in* a seat" is the
+ * **server's** answer (it owns the sockets), and this array is the host saying
+ * what should happen to the seats nobody is in. Without it the room and the
+ * screen disagree about the one thing §2.1's preview exists to prevent — the
+ * host's BOT seats would be invisible to the server, and its OPEN seats would be
+ * auto-filled behind the roster's back.
+ *
+ * Note this is emphatically **not** {@link seatSlotState}: there an unclaimed
+ * OPEN seat resolves to `closed`, because the *sim* has no third answer for
+ * "nobody is here". The room does — a joiner can still arrive — so the wire keeps
+ * all three.
+ */
+export function lobbyWireSeats(state: LobbyState): LobbySeatState[] {
+  return state.seats.map((seat) => (seat.occupant === 'human' ? 'open' : seat.occupant));
 }
 
 // ---------------------------------------------------------------------------
@@ -1271,12 +1377,26 @@ function seatSlotState(occupant: SeatOccupant, online: boolean): SlotState {
 /**
  * Apply a `lobbyState` broadcast (`src/net/transport.ts` {@link LobbySlot}).
  *
- * The wire slot carries `isBot` and `ready` but has no third state for "nobody
- * yet", so the reading is: a bot is a bot; a seat the server has marked `ready`
- * has a human in it (the room sets `ready` the moment a socket is seated); and
- * anything else is still open. That is true of both authorities — the match
- * server, which seats bots only at RUSH!, and `LocalLoopback`, which seats them
- * immediately — so one rule reads both.
+ * A bot the server has actually seated is a bot; a seat the server has marked
+ * `ready` has a person in it (the room sets `ready` the moment a socket is
+ * seated); and anything else takes the room's own echo of what the seat is **set
+ * to** (`LobbySlot.state`, a0-11), which is what carries the host's OPEN / BOT /
+ * CLOSED authoring back to every screen in the room. A person always outranks the
+ * authoring — you cannot bot a seat somebody is sitting in — which is why `state`
+ * is read last, and why a seat that reads `human` here falls back to `open`
+ * rather than to itself when the room has no opinion.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE `state` FIELD, AND WHAT BREAKS WITHOUT IT
+ * ---------------------------------------------------------------------------
+ * `isBot`/`ready` has no third value, and until a0-11 it did not need one: every
+ * socket-less seat was going to be a bot, so "open" and "bot" were the same
+ * future. Now they are different futures decided by the host, and the server
+ * seats no bot until RUSH! — so every `lobbyState` broadcast reads "not a bot
+ * yet" for a seat the host deliberately set to BOT. Folding that in blind would
+ * silently undo the host's own authoring on the next broadcast, on the host's own
+ * screen. Absent (a pre-a0-11 room), the seat keeps the state it already had,
+ * which preserves exactly the local-truth behaviour that shipped before.
  *
  * Your own seat keeps *your* pending hull while the lobby is still gathering:
  * the echo of a pick you made two frames ago must not flick the tile you are
@@ -1286,16 +1406,11 @@ export function applyLobbySlots(state: LobbyState, slots: readonly LobbySlot[]):
   const seats = state.seats.map((seat) => {
     const wire = slots[seat.player];
     if (!wire) return seat;
-    // The wire has no "closed" flag yet (the server seam is Milestone C), so a
-    // seat the host closed locally stays closed unless the wire actually seats a
-    // human or a bot in it — an `open`-reading wire slot never re-opens it.
     const occupant: SeatOccupant = wire.isBot
       ? 'bot'
       : wire.ready
         ? 'human'
-        : seat.occupant === 'closed'
-          ? 'closed'
-          : 'open';
+        : (wire.state ?? (seat.occupant === 'human' ? 'open' : seat.occupant));
     const mine = seat.player === state.you && state.phase === 'gathering';
     return {
       ...seat,
@@ -1337,21 +1452,55 @@ export function seatLocalPlayer(state: LobbyState, you: PlayerId, host = state.h
 // ---------------------------------------------------------------------------
 
 /**
- * Whether RUSH! can be pressed right now: the host, still gathering, with a legal
- * match to start. Empty seats are never a reason to wait — they become bots (GDD
- * §2.1, §4.2) — but two things gate the start (variable-slots Milestone E):
+ * Why RUSH! is refused right now, in the words the screen shows — or `null` when
+ * it is not (a0-11; GDD §2.1 *amended 2026-08-07*: "RUSH! is refused, with a
+ * reason, below two participants").
  *
- *  - **At least two players.** A match needs two live cores ({@link MIN_MATCH_SIZE},
- *    the sim's `< 2` win guard); a host who closed all but one seat cannot RUSH.
+ * The reason is the a0-11 half. Before it, an empty seat was never a cause to
+ * wait, because it became a bot; now a room can genuinely be one person in eight
+ * empty chairs, and a RUSH! button that simply refused would be a dead control
+ * with no account of itself. Two things gate the start (the second is
+ * variable-slots Milestone E's, unchanged):
+ *
+ *  - **At least two participants** — humans plus bots ({@link matchSizeOf},
+ *    {@link MIN_MATCH_SIZE}, the sim's `< 2` win guard). The reason names the way
+ *    out, and there are two of them, which is why it is one sentence rather than
+ *    a code: wait for somebody, or seat a bot yourself.
  *  - **In TEAMS, at least two sides.** One team is FFA in a costume (the secondary
  *    ratified default: ≥1 player per team). Any *split* is allowed — 3v1 is fine,
  *    counts are shown never blocked — but not a single team.
+ *
+ * A guest gets no reason at all: RUSH! is not theirs to press and "waiting for the
+ * host" is the view's own line, not a refusal of something they attempted.
+ */
+export function startRefusal(state: LobbyState): string | null {
+  if (!hostControls(state)) return null;
+  if (matchSizeOf(state) < MIN_MATCH_SIZE) return NEEDS_TWO;
+  if (state.mode === 'teams' && activeTeams(state) < 2) return NEEDS_TWO_SIDES;
+  return null;
+}
+
+/**
+ * Refusal copy. Here rather than in a draw call for the reason every other string
+ * on this screen is (the copy sweep reads the models, GDD §4.7 register 2), and in
+ * the interface voice: it states the situation, then the way out.
+ *
+ * Short on purpose. It is drawn in the footer beam's one hint strip beside RUSH!
+ * (`./lobby-view` `hintText`), which the narrowest phone spends entirely on the
+ * two plates — a line that does not fit is a line that is not drawn, and a refusal
+ * nobody reads is the dead button it was written to replace.
+ */
+export const NEEDS_TWO = 'NEEDS 2 — ADD A BOT OR WAIT';
+export const NEEDS_TWO_SIDES = 'NEEDS 2 SIDES';
+
+/**
+ * Whether RUSH! can be pressed right now: the host, still gathering, with a legal
+ * match to start — exactly {@link startRefusal} having nothing to say. One
+ * predicate behind both, so the button's *look* and the button's *reason* can
+ * never disagree about whether it is live.
  */
 export function canStart(state: LobbyState): boolean {
-  if (!hostControls(state)) return false;
-  if (matchSizeOf(state) < MIN_MATCH_SIZE) return false;
-  if (state.mode === 'teams' && activeTeams(state) < 2) return false;
-  return true;
+  return hostControls(state) && startRefusal(state) === null;
 }
 
 /** Press RUSH! — starts the countdown every player watches, and locks the hull
@@ -1498,6 +1647,10 @@ export interface LobbyModel {
   readonly classLocked: boolean;
   readonly countdown: { readonly active: boolean; readonly label: string; readonly seconds: number };
   readonly canStart: boolean;
+  /** …and, when it cannot, WHY, in the words the screen shows — or null
+   *  ({@link startRefusal}, a0-11). A refused button that says nothing is a dead
+   *  control; this is the sentence under it. */
+  readonly startRefusal: string | null;
   readonly hostControls: boolean;
   /** Seats with a person in them, and seats that will be (or are) bots. */
   readonly humanCount: number;
@@ -1515,9 +1668,10 @@ export function lobbyModel(state: LobbyState): LobbyModel {
   // what makes each row's state control draw live or dead — honestly, per seat.
   const canEdit = hostControls(state);
   const seats = state.seats.map((seat) => seatView(state, seat, viewer, canEdit));
-  // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
-  // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
-  const active = seats.filter((s) => !s.isClosed);
+  // Counts are of the PARTICIPANTS only — humans plus bots (a0-11; GDD §2.1
+  // amended). A closed seat is a shut door and an open one is an empty chair;
+  // neither is a player, so neither reaches the RUSH hint or the team tally.
+  const active = seats.filter((s) => isParticipant(s.state));
   const humanCount = active.filter((s) => !s.isBot).length;
   const botCount = active.filter((s) => s.isBot).length;
   return {
@@ -1540,6 +1694,7 @@ export function lobbyModel(state: LobbyState): LobbyModel {
       seconds: state.countdown,
     },
     canStart: canStart(state),
+    startRefusal: startRefusal(state),
     hostControls: state.you === state.host,
     humanCount,
     botCount,
@@ -1581,13 +1736,18 @@ function seatView(
   const isBot = isBotSeat(seat.occupant);
   const isClosed = seat.occupant === 'closed';
   const character = seat.personality ? PERSONALITIES[seat.personality] : null;
+  // An OPEN seat now names nobody, because nobody is in it and nobody is booked
+  // to be (a0-11). It reads as the invitation it is — the row a joiner takes —
+  // rather than previewing a character the match will not contain.
   const name = isClosed
     ? 'CLOSED'
-    : isBot
-      ? (character?.name ?? 'BOT')
-      : seat.player === state.you
-        ? state.name
-        : `PLAYER ${seat.player + 1}`;
+    : seat.occupant === 'open'
+      ? 'OPEN'
+      : isBot
+        ? (character?.name ?? 'BOT')
+        : seat.player === state.you
+          ? state.name
+          : `PLAYER ${seat.player + 1}`;
   return {
     player: seat.player,
     decal: `P${seat.player + 1}`,
@@ -1616,10 +1776,10 @@ function seatView(
     // to arrive on, so nothing is ever "claimable by room code" (the empty seats
     // are simply the bot cast).
     openToJoin: seat.occupant === 'open' && state.phase !== 'started' && state.online,
-    // `isBot` here is the OPEN-or-BOT predicate, so an unclaimed seat previewing a
-    // character is covered by the same rule the wire keeps: no number on a row
-    // nobody is dialing in from.
-    ping: seatPing({ isBot: isBot || isClosed, rtt: seat.rtt }),
+    // No number on a row nobody is dialing in from: a bot is inside the sim, and
+    // an empty or shut seat has no connection to time. Stated as "anything that is
+    // not a human in a chair" so the three cases cannot drift apart.
+    ping: seatPing({ isBot: seat.occupant !== 'human', rtt: seat.rtt }),
     ...(isBot ? { botDifficulty: seat.difficulty } : {}),
   };
 }
