@@ -90,6 +90,7 @@ green after merging `origin/main` (f7d06b0).
   index changed (bot-seat order, not empty-seat order). a0-06 was not on
   `origin/main` at f7d06b0, so nothing collided; if it lands first, the merge
   point is `withCast` and `botDifficulties`.
+- **The one CI shard caught what the unit suite could not.** `tests/mobile/slot-state.spec.ts:447` drives the seat ring with *real presses* and started by finding a row labelled `OPEN` in the SOLO lobby — which no longer has one. Fixed in `2f3…` (see git log) by starting the same walk one rung along, and by making the OPEN rung assert what it now MEANS (the seat is empty and brings no ship) rather than that it restores `N`. Vitest could never have caught it: the spec presses pixels. Shards 3 and 6, all three device projects.
 - **The 4173 trap, again.** The first golden run "passed" against another lane's
   bundle (served sha 6ee54b8 vs HEAD b6e61ca). Re-ran on a private port 4191 with
   `reuseExistingServer: false`; the served sha was then this branch's. Both
