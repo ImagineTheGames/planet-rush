@@ -318,25 +318,25 @@
     {
       "id": "shipExplode",
       "label": "Ship Explosion",
-      "context": "A ship blows up — firework: bang then sparkle, quickly over.",
+      "context": "A ship blows up — a pressure failure, over quickly. No sparkle (§4.7).",
       "current": "previews/shipExplode/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/shipExplode/a.wav",
-          "character": "deep boom with shimmer trail",
+          "character": "hull rupture, debris scattering",
           "params": "src/art/audio/candidates.ts#shipExplode.a"
         },
         {
           "id": "b",
           "wav": "previews/shipExplode/b.wav",
-          "character": "chaotic popcorn crackle burst",
+          "character": "pressure blast, air dumping out",
           "params": "src/art/audio/candidates.ts#shipExplode.b"
         },
         {
           "id": "c",
           "wav": "previews/shipExplode/c.wav",
-          "character": "cartoon whistle then bang",
+          "character": "containment breach, shear and room",
           "params": "src/art/audio/candidates.ts#shipExplode.c"
         }
       ]
@@ -350,19 +350,19 @@
         {
           "id": "a",
           "wav": "previews/shipSpawn/a.wav",
-          "character": "smooth rise, soft landing thud",
+          "character": "drive spooling into a contact",
           "params": "src/art/audio/candidates.ts#shipSpawn.a"
         },
         {
           "id": "b",
           "wav": "previews/shipSpawn/b.wav",
-          "character": "sci-fi sweep, bell settle",
+          "character": "mass arriving, pressure seating",
           "params": "src/art/audio/candidates.ts#shipSpawn.b"
         },
         {
           "id": "c",
           "wav": "previews/shipSpawn/c.wav",
-          "character": "impact thud then power-up rise",
+          "character": "field forming, band closing on a note",
           "params": "src/art/audio/candidates.ts#shipSpawn.c"
         }
       ]
@@ -376,19 +376,19 @@
         {
           "id": "a",
           "wav": "previews/spawnPulse/a.wav",
-          "character": "soft sine blip",
+          "character": "field grain, a soft particulate tick",
           "params": "src/art/audio/candidates.ts#spawnPulse.a"
         },
         {
           "id": "b",
           "wav": "previews/spawnPulse/b.wav",
-          "character": "gentle round pulse",
+          "character": "a low bubble pip, pressure holding",
           "params": "src/art/audio/candidates.ts#spawnPulse.b"
         },
         {
           "id": "c",
           "wav": "previews/spawnPulse/c.wav",
-          "character": "faint shimmer tick",
+          "character": "a thin band shimmering, barely there",
           "params": "src/art/audio/candidates.ts#spawnPulse.c"
         }
       ]
@@ -402,19 +402,19 @@
         {
           "id": "a",
           "wav": "previews/thruster/a.wav",
-          "character": "deep gritty roar",
+          "character": "plasma drive, particulate and dry",
           "params": "src/art/audio/candidates.ts#thruster.a"
         },
         {
           "id": "b",
           "wav": "previews/thruster/b.wav",
-          "character": "buzzy electric hum",
+          "character": "reaction mass, low pressure roar",
           "params": "src/art/audio/candidates.ts#thruster.b"
         },
         {
           "id": "c",
           "wav": "previews/thruster/c.wav",
-          "character": "airy whoosh thrust",
+          "character": "induction turbine, one narrow band",
           "params": "src/art/audio/candidates.ts#thruster.c"
         }
       ]

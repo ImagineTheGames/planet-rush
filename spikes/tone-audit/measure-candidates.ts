@@ -222,10 +222,25 @@ function measure(id: string, character: string, spec: SoundSpec): Measured {
 }
 
 const json = process.argv.includes('--json');
+/**
+ * `--only=shipSpawn,thruster` narrows the run to a few slots.
+ *
+ * 40 slots × 4 sounds is about a minute of FFT, which is fine once and too slow
+ * to sit inside the edit/measure/re-cut loop a family is actually written in.
+ * Absent, every slot runs — the verdict at the bottom only means what it says
+ * when nothing was skipped, so a filtered run says so on its last line.
+ */
+const onlyArg = process.argv.find((a) => a.startsWith('--only='));
+const only = onlyArg ? new Set(onlyArg.slice('--only='.length).split(',').filter(Boolean)) : null;
+const order = only ? CANDIDATE_SLOT_ORDER.filter((id) => only.has(id)) : CANDIDATE_SLOT_ORDER;
+for (const id of only ?? []) {
+  if (!CANDIDATE_SLOT_ORDER.includes(id)) throw new Error(`--only names an unknown slot: ${id}`);
+}
+
 const slots: unknown[] = [];
 let failures = 0;
 
-for (const slotId of CANDIDATE_SLOT_ORDER) {
+for (const slotId of order) {
   const slot = CANDIDATE_SLOTS[slotId]!;
   const rows: Measured[] = [
     measure('current', 'the shipped a0-01 re-voice', soundSpec(slot.current as SoundName)),
@@ -285,7 +300,8 @@ if (json) {
     ),
   );
 } else {
-  console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} pair(s) too close`}`);
+  const scope = only ? ` (${order.length} of ${CANDIDATE_SLOT_ORDER.length} slots — filtered run)` : '';
+  console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} pair(s) too close`}${scope}`);
 }
 
 process.exit(failures === 0 ? 0 : 1);

@@ -1003,14 +1003,70 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // === SHIP (a0-01b) ========================================================
+  //
+  // A hull is a machine with a drive in it, and these four slots are that machine
+  // arriving, holding, and coming apart. The three offers are three propulsion
+  // technologies rather than three sizes of one bang:
+  //
+  //   a  a **plasma drive** — granular, particulate, the sound of matter being
+  //      thrown; dry, no ring anywhere in it
+  //   b  **reaction mass** — pneumatic weight, a low body under a closing filter
+  //   c  a **containment field** — a narrow resonant band that forms or fails,
+  //      the only one of the three with metal in it, and the only one with a room
+  //
+  // `shipExplode`'s `context` used to read *"firework: bang then sparkle"* — a
+  // direct quote of the retired §4.7 paragraph, printed on the board next to the
+  // play button. §7.2 of `docs/audio-revoice-spec.md` retires that layer by name
+  // (*"explosions are fireworks implemented — delete it"*), so the line goes too:
+  // a description the offers deliberately contradict is worse than no description.
+  //
+  // §8 guards `respawnBeep` / `spawnPulse` — the countdown against the protection
+  // tick — at ×1.20 of centroid, the second-tightest pair in the bank. They are
+  // deliberately given different metaphors here and in the interface family: this
+  // one is a **field** (soft, particulate, low), that one is a **clock** (hard,
+  // narrow, high). Measured at the bottom of the family, not assumed.
   shipExplode: {
     label: "Ship Explosion",
-    context: "A ship blows up — firework: bang then sparkle, quickly over.",
+    context: "A ship blows up — a pressure failure, over quickly. No sparkle (§4.7).",
     current: 'shipExplode',
     candidates: [
-      { id: 'a', character: "deep boom with shimmer trail", spec: {"name":"se_a_boom","layers":[{"spec":{"name":"se_a_boomMain","wave":"noise","attack":0.002,"hold":0.07,"decay":0.55,"punch":0.5,"freq":380,"freqEnd":50,"freqMin":30,"lowPass":2000,"gain":0.34,"seed":20538}},{"spec":{"name":"se_a_crack","wave":"square","attack":0.001,"hold":0.01,"decay":0.09,"freq":700,"freqEnd":140,"duty":0.22,"gain":0.2,"seed":20539}},{"spec":{"name":"se_a_trail","wave":"triangle","attack":0.005,"hold":0.04,"decay":0.4,"freq":1400,"freqEnd":2200,"repeat":0.09,"gain":0.14,"seed":20540},"at":0.08}]} },
-      { id: 'b', character: "chaotic popcorn crackle burst", spec: {"name":"se_b_popcorn","layers":[{"spec":{"name":"se_b_pop1","wave":"noise","attack":0.001,"hold":0.02,"decay":0.12,"freq":800,"freqEnd":300,"repeat":0.045,"gain":0.26,"seed":20541}},{"spec":{"name":"se_b_pop2","wave":"noise","attack":0.001,"hold":0.015,"decay":0.1,"freq":1100,"freqEnd":400,"repeat":0.06,"gain":0.2,"seed":20542},"at":0.02},{"spec":{"name":"se_b_snap","wave":"square","attack":0.001,"hold":0.008,"decay":0.06,"freq":900,"freqEnd":200,"duty":0.18,"gain":0.16,"seed":20543}}]} },
-      { id: 'c', character: "cartoon whistle then bang", spec: {"name":"se_c_whistle","layers":[{"spec":{"name":"se_c_whistleMain","wave":"sine","attack":0.004,"hold":0.05,"decay":0.12,"freq":500,"freqEnd":1600,"vibratoDepth":0.02,"vibratoRate":10,"gain":0.2,"seed":20544}},{"spec":{"name":"se_c_bang","wave":"noise","attack":0.001,"hold":0.05,"decay":0.4,"punch":0.5,"freq":400,"freqEnd":70,"freqMin":30,"lowPass":2000,"gain":0.28,"seed":20545},"at":0.13},{"spec":{"name":"se_c_bling","wave":"square","attack":0.003,"hold":0.02,"decay":0.2,"freq":1800,"freqEnd":2400,"duty":0.3,"gain":0.14,"seed":20546},"at":0.16}]} },
+      {
+        id: 'a',
+        character: "hull rupture, debris scattering",
+        spec: {
+          name: 'shipExplode_a_hullRupture',
+          layers: [
+            swept('shipExplode_a.front', { wave: 'noise', freq: 260, freqEnd: 66, from: 1700, to: 240, q: 2.8, gain: 0.34, attack: 0.001, hold: 0.03, decay: 0.3, curve: 3, punch: 0.8, seed: 31000 }),
+            band('shipExplode_a.shear', 1450, { gain: 0.3, decay: 0.05, q: 5, curve: 6, punch: 0.5, at: 0.006, seed: 31001 }),
+            grains('shipExplode_a.debris', { freq: 560, freqEnd: 200, grain: 0.011, gain: 0.32, hold: 0.05, decay: 0.42, curve: 3, from: 2400, to: 560, q: 3, hp: 220, at: 0.04, seed: 31002 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "pressure blast, air dumping out",
+        spec: {
+          name: 'shipExplode_b_pressureBlast',
+          layers: [
+            swept('shipExplode_b.blast', { wave: 'noise', freq: 210, freqEnd: 48, from: 1500, to: 160, q: 2.2, gain: 0.32, attack: 0.002, hold: 0.05, decay: 0.42, curve: 2.4, punch: 0.7, seed: 31010 }),
+            swept('shipExplode_b.sub', { wave: 'sine', freq: 66, freqEnd: 38, from: 180, q: 1.8, gain: 0.24, attack: 0.003, hold: 0.03, decay: 0.36, curve: 2.2, seed: 31011 }),
+            grains('shipExplode_b.vent', { freq: 780, freqEnd: 300, grain: 0.004, gain: 0.24, hold: 0.06, decay: 0.34, curve: 2.8, from: 2200, to: 500, q: 2.8, hp: 300, at: 0.02, seed: 31012 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "containment breach, shear and room",
+        spec: {
+          name: 'shipExplode_c_containmentBreach',
+          layers: [
+            band('shipExplode_c.tear', 2600, { gain: 0.78, decay: 0.05, q: 7, curve: 7, punch: 0.8, seed: 31020 }),
+            swept('shipExplode_c.field', { wave: 'triangle', freq: 420, freqEnd: 150, from: 3800, to: 380, q: 6, gain: 0.62, attack: 0.001, hold: 0.02, decay: 0.3, curve: 3.4, noiseMix: 0.35, at: 0.004, seed: 31021 }),
+            ...returns('shipExplode_c.room', { freq: 700, gain: 0.34, decay: 0.26, from: 2000, to: 500, at: 0.12, gap: 0.14, count: 3, seed: 31023 }),
+          ],
+        },
+      },
     ],
   },
   shipSpawn: {
@@ -1018,9 +1074,40 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A ship arrives on the field",
     current: 'shipSpawn',
     candidates: [
-      { id: 'a', character: "smooth rise, soft landing thud", spec: {"name":"shipSpawn_smoothRise","layers":[{"spec":{"name":"riseSmooth","wave":"triangle","attack":0.02,"hold":0.06,"decay":0.18,"freq":180,"freqEnd":760,"gain":0.32,"seed":20547},"at":0},{"spec":{"name":"landSoft","wave":"square","attack":0.002,"hold":0.02,"decay":0.1,"freq":900,"duty":0.35,"gain":0.2,"seed":20548},"at":0.22}]} },
-      { id: 'b', character: "sci-fi sweep, bell settle", spec: {"name":"shipSpawn_sweepChime","layers":[{"spec":{"name":"sweepWarp","wave":"saw","attack":0.015,"hold":0.05,"decay":0.2,"freq":150,"freqEnd":1000,"vibratoDepth":0.06,"vibratoRate":8,"gain":0.3,"seed":20549},"at":0},{"spec":{"name":"chimeSettle","wave":"triangle","attack":0.003,"hold":0.04,"decay":0.15,"freq":1200,"gain":0.22,"seed":20550},"at":0.24}]} },
-      { id: 'c', character: "impact thud then power-up rise", spec: {"name":"shipSpawn_thudRise","layers":[{"spec":{"name":"thudArrive","wave":"noise","attack":0.002,"hold":0.02,"decay":0.08,"punch":0.5,"freq":150,"freqEnd":80,"lowPass":800,"highPass":30,"gain":0.3,"seed":20551},"at":0},{"spec":{"name":"riseQuick","wave":"square","attack":0.01,"hold":0.04,"decay":0.14,"freq":300,"freqEnd":820,"duty":0.4,"gain":0.26,"seed":20552},"at":0.03}]} },
+      {
+        id: 'a',
+        character: "drive spooling into a contact",
+        spec: {
+          name: 'shipSpawn_a_driveSpool',
+          layers: [
+            grains('shipSpawn_a.spool', { freq: 240, freqEnd: 460, grain: 0.006, gain: 0.3, hold: 0.06, decay: 0.14, curve: 2, from: 700, to: 2800, q: 3.4, hp: 140, seed: 31030 }),
+            ...plate('shipSpawn_a.arrive', 520, { gain: 0.34, decay: 0.2, ratios: [1, 2.41], q: 6, curve: 5, grain: 0.36, at: 0.19, seed: 31032 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "mass arriving, pressure seating",
+        spec: {
+          name: 'shipSpawn_b_massArrive',
+          layers: [
+            swept('shipSpawn_b.approach', { wave: 'noise', freq: 150, freqEnd: 190, from: 400, to: 1700, q: 2.6, gain: 0.3, attack: 0.03, hold: 0.06, decay: 0.1, curve: 2, seed: 31040 }),
+            swept('shipSpawn_b.seat', { wave: 'sine', freq: 96, freqEnd: 72, from: 300, to: 120, q: 2.2, gain: 0.4, attack: 0.002, hold: 0.024, decay: 0.2, curve: 3, punch: 0.6, noiseMix: 0.14, at: 0.2, seed: 31042 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "field forming, band closing on a note",
+        spec: {
+          name: 'shipSpawn_c_fieldForm',
+          layers: [
+            swept('shipSpawn_c.form', { wave: 'triangle', freq: 330, from: 600, to: 4200, q: 8, gain: 0.42, attack: 0.04, hold: 0.05, decay: 0.09, curve: 2, noiseMix: 0.22, seed: 31050 }),
+            band('shipSpawn_c.lock', 1240, { gain: 0.8, decay: 0.16, q: 9, curve: 5.5, punch: 0.5, at: 0.18, seed: 31052 }),
+            band('shipSpawn_c.ring', 830, { gain: 0.55, decay: 0.24, q: 11, curve: 4.5, at: 0.185, seed: 31053 }),
+          ],
+        },
+      },
     ],
   },
   spawnPulse: {
@@ -1028,9 +1115,36 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Quiet repeating tick during 10s of spawn protection",
     current: 'spawnPulse',
     candidates: [
-      { id: 'a', character: "soft sine blip", spec: {"name":"spawnPulse_softSine","wave":"sine","attack":0.005,"hold":0.015,"decay":0.1,"freq":900,"freqEnd":1100,"gain":0.1,"seed":20553} },
-      { id: 'b', character: "gentle round pulse", spec: {"name":"spawnPulse_gentlePulse","wave":"triangle","attack":0.008,"hold":0.03,"decay":0.15,"freq":700,"freqEnd":850,"gain":0.09,"seed":20554} },
-      { id: 'c', character: "faint shimmer tick", spec: {"name":"spawnPulse_shimmerTick","wave":"square","attack":0.006,"hold":0.02,"decay":0.1,"freq":1200,"freqEnd":1500,"duty":0.2,"vibratoDepth":0.05,"vibratoRate":25,"gain":0.1,"seed":20555} },
+      {
+        id: 'a',
+        character: "field grain, a soft particulate tick",
+        spec: {
+          name: 'spawnPulse_a_fieldGrain',
+          layers: [
+            grains('spawnPulse_a.grain', { freq: 700, freqEnd: 520, grain: 0.004, gain: 0.2, hold: 0.012, decay: 0.08, curve: 4, from: 1600, to: 800, q: 3, hp: 240, seed: 31060 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low bubble pip, pressure holding",
+        spec: {
+          name: 'spawnPulse_b_bubblePip',
+          layers: [
+            swept('spawnPulse_b.pip', { wave: 'sine', freq: 210, from: 700, to: 260, q: 3.2, gain: 0.22, attack: 0.004, hold: 0.014, decay: 0.1, curve: 3.4, noiseMix: 0.12, seed: 31070 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "a thin band shimmering, barely there",
+        spec: {
+          name: 'spawnPulse_c_thinBand',
+          layers: [
+            band('spawnPulse_c.skin', 1560, { gain: 0.62, decay: 0.11, q: 7, curve: 5, attack: 0.003, hold: 0.006, seed: 31080 }),
+          ],
+        },
+      },
     ],
   },
   thruster: {
@@ -1038,9 +1152,50 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Held engine note while the throttle is open (loops continuously)",
     current: 'thruster',
     candidates: [
-      { id: 'a', character: "deep gritty roar", spec: {"name":"thruster_deepRoar","loop":true,"crossfade":0.04,"layers":[{"spec":{"name":"roarDeep","wave":"noise","attack":0,"hold":0.4,"decay":0,"freq":160,"lowPass":700,"highPass":50,"gain":0.32,"seed":20556},"at":0},{"spec":{"name":"subTone","wave":"sine","attack":0,"hold":0.4,"decay":0,"freq":60,"gain":0.14,"seed":20557},"at":0}]} },
-      { id: 'b', character: "buzzy electric hum", spec: {"name":"thruster_buzzyHum","loop":true,"crossfade":0.04,"layers":[{"spec":{"name":"buzzSquare","wave":"square","attack":0,"hold":0.4,"decay":0,"freq":140,"duty":0.5,"noiseMix":0.2,"lowPass":1200,"gain":0.22,"seed":20558},"at":0},{"spec":{"name":"humSine","wave":"sine","attack":0,"hold":0.4,"decay":0,"freq":70,"gain":0.16,"seed":20559},"at":0}]} },
-      { id: 'c', character: "airy whoosh thrust", spec: {"name":"thruster_airyWhoosh","loop":true,"crossfade":0.04,"layers":[{"spec":{"name":"airNoise","wave":"noise","attack":0,"hold":0.4,"decay":0,"freq":260,"lowPass":1800,"highPass":150,"gain":0.24,"seed":20560},"at":0},{"spec":{"name":"toneUnder","wave":"triangle","attack":0,"hold":0.4,"decay":0,"freq":100,"noiseMix":0.1,"lowPass":900,"gain":0.18,"seed":20561},"at":0}]} },
+      // A loop has no envelope to carry character — `hold` runs flat and `decay`
+      // is zero, which is what `./candidates.test.ts` checks for. So all three
+      // are made of *material* instead: the grain rate, the corner, the Q. None
+      // of them names a `lowPassEnd`: a filter sweep inside a loop body wraps
+      // into a 2.5 Hz wobble at the loop rate, which is a helicopter, not a drive.
+      {
+        id: 'a',
+        character: "plasma drive, particulate and dry",
+        spec: {
+          name: 'thruster_a_plasmaDrive',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            grains('thruster_a.plasma', { freq: 190, freqEnd: 190, grain: 0.0025, gain: 0.34, attack: 0, hold: 0.4, decay: 0, from: 2200, q: 2.4, hp: 90, seed: 31090 }),
+            place({ name: 'thruster_a.core', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 74, lowPass: 300, resonance: 1.6, gain: 0.2, seed: 31091 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "reaction mass, low pressure roar",
+        spec: {
+          name: 'thruster_b_reactionMass',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            place({ name: 'thruster_b.roar', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 120, lowPass: 520, resonance: 2.8, gain: 0.36, seed: 31100 }),
+            place({ name: 'thruster_b.mass', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 52, noiseMix: 0.18, lowPass: 200, resonance: 1.4, gain: 0.24, seed: 31101 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "induction turbine, one narrow band",
+        spec: {
+          name: 'thruster_c_inductionTurbine',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            place({ name: 'thruster_c.turbine', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 430, lowPass: 1450, resonance: 9, bandPass: true, gain: 0.6, seed: 31110 }),
+            place({ name: 'thruster_c.stator', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 145, noiseMix: 0.3, lowPass: 900, resonance: 4, gain: 0.3, seed: 31111 }),
+          ],
+        },
+      },
     ],
   },
   buildPlaced: {
