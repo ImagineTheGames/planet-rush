@@ -51,9 +51,25 @@ always be lit...."*
   something else (e.g. the suffix) — the developer withdrew the mechanism, not
   just its magnitude.
 
+- **Evidence** (`evidence/capture-a0-04-nameplates.mjs`, images `a0-04-nameplate-*`).
+  Frozen PAIR: `damageEnemy(1)` then `stageBot()` parks the bot at a fixed spot
+  clear of the home-station art; `damageEnemy(0.35)` + `stageBot()` puts the SAME
+  ship back at the SAME spot at 25/70, so the two crops differ in one variable.
+  Live BRAWL: past spawn protection (`ticks > 700`, else the damage is absorbed),
+  damage every bot through `__planetRush.damageShip` until ≥3 labelled ships wear
+  bars, then shoot the frame. The live frame is bracketed by two readbacks — the
+  sim is not frozen, so neither list matches the picture exactly, and both print.
+
+## VERIFIED
+
+- `npx tsc --noEmit` clean; `npx vitest run` 234 files / 3899 tests pass.
+- Live-stage `nameplates.spec.ts` (2 tests) green against this branch's own
+  preview build (sha `a080840`) on a private port — 4173 is shared across lanes.
+- Looked at every frame. Pair: "Rusty (EASY)" identical brightness, calm vs
+  25/70. Brawl: Warden 39/55, Sable 15/35, Rusty 54/70 — all lit, every bar
+  readable directly beneath its name. Every drawn alpha in all three scenes: 0.92.
+
 ## NEXT
 
-- Evidence capture: calm ship / shot ship / crowded brawl frames off the real
-  preview bundle (`evidence/capture-a0-04-nameplates.mjs`), with the drawn alpha
-  logged per plate.
-- Open the PR once tsc + vitest + live-stage are green and the frames are in.
+- PR open; nothing outstanding. If a future brief wants the own-ship label on,
+  `showOwnShipLabel` is still the seam — untouched here.
