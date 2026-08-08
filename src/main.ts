@@ -1066,6 +1066,7 @@ async function boot(): Promise<void> {
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
+    installStationHealthStage();
     installAudioStage();
   }
 
@@ -4349,6 +4350,81 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__minimapStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__stationHealthStage` — the ?debug=1 live-stage seam for the
+   * a0-05 evidence: **a rival station's damage ring reads true at any range**
+   * (GDD §2.2, amended 2026-08-07). The unit tests assert the rule in the sim and
+   * the instruction count in the renderer; what they cannot reach is the one
+   * thing the developer actually reported — what the ring looks like on a real
+   * boot, approaching and going away.
+   *
+   * `stage(coreFraction, distance)` parks the local ship a given distance from a
+   * RIVAL home and sets that home's core to a fraction of max, then reports the
+   * geometry back (the rival's slot, the exact fraction, the surface distance,
+   * and where the station projects on screen) so the capture can prove the frame
+   * is the frame it claims to be rather than trusting a screenshot. Four calls
+   * make the four frames: damaged near, damaged far, healthy near, healthy far.
+   *
+   * The distance is measured to the station's SURFACE, the same way the retired
+   * `SENSOR_RANGE` was, so "180" in a capture script means exactly the old cut.
+   *
+   * Staging only — it writes the same plain sim data the render loop already
+   * reads every frame (`coreHp`, `pos`), never a render or fog decision, so the
+   * ring in the frame is drawn by the real pipeline and the seam cannot fake the
+   * thing it is evidence for. Best paired with `?freeze=1`, which pins the sim so
+   * the staged frame holds still. Behind ?debug=1 only.
+   */
+  function installStationHealthStage(): void {
+    const stage = {
+      stage(
+        coreFraction: number,
+        distance: number,
+      ): {
+        owner: PlayerId;
+        coreFraction: number;
+        surfaceDistance: number;
+        radius: number;
+        screen: Vec2;
+      } | null {
+        const local = world.ships.find(isLocalShip);
+        const rival = world.stations.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
+        if (!local || !rival) return null;
+        const f = coreFraction < 0 ? 0 : coreFraction > 1 ? 1 : coreFraction;
+        rival.coreHp = f * rival.maxCoreHp;
+        // Offset along X, the wider screen axis: the camera is translate-only at
+        // 1:1, so a 16:9 viewport reaches ~640 world units sideways and only ~400
+        // vertically. Staging sideways is what lets a genuinely long-range frame
+        // still contain the station — and the fact that there IS a ceiling here
+        // is the honest shape of the amendment: "always visible" means the ring
+        // never lies about a station you can see, not that the screen got bigger.
+        local.pos.x = rival.pos.x + rival.radius + distance;
+        local.pos.y = rival.pos.y;
+        local.vel.x = 0;
+        local.vel.y = 0;
+        local.alive = true;
+        const at: Vec2 = { x: 0, y: 0 };
+        renderer.projectToScreen(rival.pos, at);
+        return {
+          owner: rival.owner,
+          coreFraction: rival.coreHp / rival.maxCoreHp,
+          surfaceDistance: distance,
+          radius: rival.radius,
+          screen: at,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__stationHealthStage', {
         value: stage,
         writable: false,
         configurable: false,

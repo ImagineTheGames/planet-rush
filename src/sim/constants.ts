@@ -922,10 +922,21 @@ export const WRECK = {
 /** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
 export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
 
-/** Sensor range: distance at which an enemy station's damage ring becomes
- *  visible (GDD §2.8) — defined as 2× shield radius. Fog is a mechanic
- *  (GDD §2.2); the sim exposes the range, the UI/bots honor it. TUNABLE */
-export const SENSOR_RANGE: Tunable<number> = 2 * SHIELD.radius;
+// `SENSOR_RANGE` — RETIRED 2026-08-07 (a0-05, GDD §2.2/§2.8 amended).
+//
+// It was `2 * SHIELD.radius` (180 units) and it had exactly one job: the radius
+// inside which an enemy station's damage ring was drawn. The developer withdrew
+// that rule — *"you can see other stations healths only when you are near, it
+// should always show the health regardless of proximity or else it looks like a
+// glitch"* — so the constant now gates nothing, and a tunable that gates nothing
+// is a trap for the next person who tunes it (LESSONS §14: name the removal, do
+// not let it rot). It is deleted rather than zeroed: a `0` would still read as a
+// live knob, and setting it back to 180 would silently restore a retracted
+// design. The rule that replaced it is a predicate, not a distance —
+// `stationHealthVisible` in `./sensing`.
+//
+// Nothing else referenced it. The three coverage radii below are a DIFFERENT
+// mechanic (minimap fog, feature f1) and are untouched by the amendment.
 
 // ---------------------------------------------------------------------------
 // Sensor coverage — the minimap fog-of-war model (RATIFIED developer feature f1)
@@ -938,9 +949,14 @@ export const SENSOR_RANGE: Tunable<number> = 2 * SHIELD.radius;
 // satellite's LARGE sensor (`SATELLITE.sensorRange`). Static geography (station
 // positions) is REMEMBERED once seen; live entities (ships, projectiles,
 // satellites) are visible only under CURRENT coverage — so a satellite's death
-// collapses its coverage immediately (`./sensing`). These are distinct from
-// `SENSOR_RANGE` above, which is the narrower "read an enemy core's HP" scout
-// radius, not the minimap-presence radius.
+// collapses its coverage immediately (`./sensing`).
+//
+// These are the minimap-PRESENCE radii — "is that thing on my map at all". They
+// were always distinct from the retired `SENSOR_RANGE`, which was the narrower
+// "read an enemy core's HP" scout radius; the a0-05 amendment retired that one
+// and left these three exactly as they were. A radar satellite's value was never
+// station HP (it never gated the damage ring), so the amendment costs it nothing
+// — see the note on {@link SATELLITE}.
 
 /**
  * A ship's own LOCAL sensor radius — the modest baseline coverage every player
@@ -977,6 +993,16 @@ export const STATION_SENSOR_RANGE: Tunable<number> = 300;
  * high-value, undefended-by-default structure, so building one is a real
  * opportunity cost against a turret ring or a second shield, and hunting an
  * enemy's satellite is a legitimate strategy. All TUNABLE (QA owns the table).
+ *
+ * **a0-05 note — what the always-visible amendment did to it: nothing.** The
+ * satellite never gated station HP. Its `sensorRange` feeds `./sensing`, which
+ * decides minimap PRESENCE (which stations, rocks, ships and shots are on your
+ * map) and remembers static geography once seen. The damage ring was gated by the
+ * retired `SENSOR_RANGE`, a separate 180-unit radius measured from the viewer's
+ * SHIP, which a satellite never contributed to. So the four things a satellite
+ * buys — a 900-unit live-entity window, permanent mapping of every rock inside
+ * it, a coverage disc that survives your ship dying, and a target the enemy has
+ * to come and kill — are all still exactly what they were.
  */
 export const SATELLITE = {
   /** Ore to build one — above a shield's 5 (feature f1 balance note). */

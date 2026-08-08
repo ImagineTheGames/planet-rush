@@ -34,6 +34,14 @@
  * home knowledge, the same rule the bot perception uses for its own ship and
  * station — GDD §2.2). Enemies and neutral bodies are fog-gated.
  *
+ * **Station HEALTH is not part of that fog** (GDD §2.2, amended 2026-08-07;
+ * a0-05). Presence and health are two different questions and this module now
+ * answers both: coverage decides whether a station is on your *map*,
+ * {@link stationHealthVisible} decides whether its damage ring tells the truth,
+ * and the answer to the second is always yes. The two were never the same gate —
+ * the retired `SENSOR_RANGE` was a third, much smaller radius that only the ring
+ * ever used.
+ *
  * Determinism (GDD §4.8): every coverage test is a squared-distance compare
  * (`dx*dx + dy*dy <= reach*reach`, no sqrt), fixed iteration order, no RNG. The
  * memory is plain integers, derived purely from world state, so a replay
@@ -47,7 +55,58 @@
 
 import type { PlayerId, Vec2 } from '@shared/types';
 import { SATELLITE, SHIP_SENSOR_RANGE, STATION_SENSOR_RANGE } from './constants';
-import type { Ship, World } from './state';
+import type { MiningStation, Ship, World } from './state';
+
+// ---------------------------------------------------------------------------
+// Station health — always visible (GDD §2.2, amended 2026-08-07; a0-05)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether `viewer` may read `station`'s health — **always true**, at every range,
+ * for every station, living or wrecked.
+ *
+ * The developer, 2026-08-07, verbatim: *"you can see other stations healths only
+ * when you are near, it should always show the health regardless of proximity or
+ * else it looks like a glitch approaching and getting far it looks like its full
+ * health even if its damaged."* GDD §2.2's *"enemy station health is scouted, not
+ * broadcast"* is withdrawn, and the `SENSOR_RANGE` constant that enforced it is
+ * retired (`./constants`).
+ *
+ * **The bug was worse than the design retraction.** Out of the old 180-unit
+ * radius no ring was drawn at all — but the owner-colour beacon ring underneath
+ * it *is* always drawn, so a station with a quarter of its core left read exactly
+ * like a station at full health. The unknown state was indistinguishable from the
+ * healthy state (LESSONS §20), which is the direction a display must never fail
+ * in: the player cannot tell they are being lied to, because "no red" is what
+ * "fine" looks like.
+ *
+ * **This is a predicate, not a distance, and that is deliberate.** Returning a
+ * range would invite someone to tune it back down; there is no number to tune,
+ * because there is no gate. The only thing still standing between a player and a
+ * rival's health is whether that station is on their screen at all, and that is a
+ * viewport question the sim does not own and must not guess at. Every consumer
+ * that already has an "am I drawing this" test uses that test and nothing
+ * narrower — `src/render` draws the ring for every station it draws, the bot
+ * perception layer reads a station's numbers at its own `visualRange` (the
+ * on-screen test it already applies to hull bars and turret counts, so bots and
+ * humans learn the same things at the same moment — GDD §2.9), and the server
+ * sends every client every station's health because it cannot know their
+ * viewport.
+ *
+ * The parameters are unused and stay in the signature on purpose: they are the
+ * two things a health-visibility rule could ever legitimately depend on, so a
+ * future rule has somewhere to land, and every call site already reads as a
+ * question rather than an assumption.
+ *
+ * What did NOT change: **ship** hull is still an on-screen-only read, enemy cargo
+ * and bank are still drawn nowhere at any range, and the ring grammar is
+ * untouched — owner colour whole is health remaining, threat red fills it
+ * clockwise from twelve, red is only ever the damage (GDD §2.2, §5.4). This
+ * changes *when* the ring is drawn, never *what* it means.
+ */
+export function stationHealthVisible(_viewer: PlayerId, _station: MiningStation): boolean {
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Coverage sources

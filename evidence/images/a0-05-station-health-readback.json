@@ -1,0 +1,46 @@
+{
+  "retiredSensorRange": 180,
+  "frames": {
+    "a0-05-1-damaged-close.png": {
+      "owner": 1,
+      "coreFraction": 0.25,
+      "surfaceDistance": 90,
+      "radius": 64,
+      "screen": {
+        "x": 486,
+        "y": 400
+      }
+    },
+    "a0-05-2-damaged-far.png": {
+      "owner": 1,
+      "coreFraction": 0.25,
+      "surfaceDistance": 500,
+      "radius": 64,
+      "screen": {
+        "x": 76,
+        "y": 400
+      }
+    },
+    "a0-05-3-healthy-close.png": {
+      "owner": 1,
+      "coreFraction": 1,
+      "surfaceDistance": 90,
+      "radius": 64,
+      "screen": {
+        "x": 486,
+        "y": 400
+      }
+    },
+    "a0-05-4-healthy-far.png": {
+      "owner": 1,
+      "coreFraction": 1,
+      "surfaceDistance": 500,
+      "radius": 64,
+      "screen": {
+        "x": 76,
+        "y": 400
+      }
+    }
+  },
+  "pageErrors": []
+}

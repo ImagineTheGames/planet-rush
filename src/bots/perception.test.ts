@@ -7,7 +7,9 @@
  * hard as they check its presence:
  *
  *   1. a bot knows its own ship and its own station completely;
- *   2. an enemy core's HP is `null` until the bot flies inside sensor range;
+ *   2. an enemy core's HP is `null` until the home is on the bot's screen
+ *      (a0-05: the health gate widened from the retired `SENSOR_RANGE` to
+ *      `visualRange` when GDD §2.2 made the damage ring always-visible);
  *   3. a wreck is visible from any distance (smoke carries) while its numbers
  *      are not;
  *   4. entities outside visual range are not in the view at all, and enemy
@@ -17,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { createWorld, SENSOR_RANGE, WAVE_COUNT, WAVE_INTERVAL_S, type World } from '../sim';
+import { createWorld, WAVE_COUNT, WAVE_INTERVAL_S, type World } from '../sim';
 import {
   DEFAULT_PERCEPTION,
   HUMAN_VISUAL_RANGE,
@@ -186,13 +188,14 @@ describe('perception — my own side', () => {
   });
 });
 
-describe('perception — enemy stations are scouted, not broadcast', () => {
-  it("hides a rival's core HP until the bot is inside sensor range", () => {
+describe('perception — a rival home\'s numbers need it on screen (a0-05)', () => {
+  it("hides a rival's core HP only once the home is off screen", () => {
     const w = world2();
     const target = station(w, 1);
     const me = ship(w, 0);
 
     // Parked far away: position and ownership are public, the numbers are not.
+    // A human cannot read a ring that is not being drawn on their screen either.
     me.pos = { x: target.pos.x + 2000, y: target.pos.y };
     const far = perceive(w, 0).stations.find((p) => p.owner === 1)!;
     expect(far.pos).toEqual(target.pos);
@@ -202,14 +205,32 @@ describe('perception — enemy stations are scouted, not broadcast', () => {
     expect(far.turrets).toBeNull();
     expect(far.underAttack).toBeNull();
 
-    // Flown in: sensor range is measured to the surface, so standing on the
-    // rock always reads as scouted.
-    me.pos = { x: target.pos.x + target.radius + SENSOR_RANGE - 1, y: target.pos.y };
+    // On screen: measured to the surface, so standing on the rock always reads.
+    // Since GDD §2.2 was amended this is the SAME gate the turret count uses —
+    // the renderer draws the damage ring on every station it draws, so a bot
+    // reads it wherever a human would (GDD §2.9 symmetry).
+    me.pos = { x: target.pos.x + target.radius + DEFAULT_PERCEPTION.visualRange - 1, y: target.pos.y };
     const near = perceive(w, 0).stations.find((p) => p.owner === 1)!;
     expect(near.scouted).toBe(true);
     expect(near.coreHp).toBe(target.coreHp);
     expect(near.shieldHp).toBe(0);
     expect(near.turrets).toBe(0);
+  });
+
+  it('reads a wounded home from clear across the screen — the a0-05 report', () => {
+    // The developer, 2026-08-07: *"approaching and getting far it looks like its
+    // full health even if its damaged."* The old gate was 180 units; a home four
+    // times further out than that, and plainly on screen, used to read `null`
+    // (i.e. "assume full") to a bot exactly as it drew no ring for a human.
+    const w = world2();
+    const target = station(w, 1);
+    const me = ship(w, 0);
+    target.coreHp = target.maxCoreHp * 0.25;
+
+    me.pos = { x: target.pos.x + target.radius + 700, y: target.pos.y };
+    const seen = perceive(w, 0).stations.find((p) => p.owner === 1)!;
+    expect(seen.scouted).toBe(true);
+    expect(seen.coreHp).toBe(target.maxCoreHp * 0.25);
   });
 
   it('shows a wreck from any distance but never its numbers', () => {
@@ -262,10 +283,13 @@ describe('perception — enemy ships', () => {
 
 describe('perception — the envelope', () => {
   it("clamps any caller to a human's vision (difficulty may not cheat)", () => {
-    const env = resolvePerception({ visualRange: 100_000, sensorRange: 100_000 });
+    const env = resolvePerception({ visualRange: 100_000 });
     expect(env.visualRange).toBe(HUMAN_VISUAL_RANGE);
-    expect(env.sensorRange).toBe(HUMAN_VISUAL_RANGE);
-    expect(resolvePerception().sensorRange).toBe(SENSOR_RANGE);
+    expect(resolvePerception().visualRange).toBe(DEFAULT_PERCEPTION.visualRange);
+    // There is one range left to clamp. `sensorRange` was retired with the
+    // always-visible amendment (a0-05) rather than widened, so no caller can
+    // narrow station health back down behind the renderer's back.
+    expect(Object.keys(resolvePerception())).not.toContain('sensorRange');
   });
 
   it('narrowing the envelope narrows what the view contains', () => {

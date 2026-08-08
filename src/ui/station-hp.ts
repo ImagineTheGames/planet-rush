@@ -6,11 +6,12 @@
  * five things the HUD shows at all times, because it is the loss condition
  * (GDD §1) and therefore something the player acts on.
  *
- * **Your own station only.** Enemy station health is scouted, never broadcast
- * (GDD §2.2, style-guide §5): a rival's HP appears as a damage ring on that
- * station within sensor range, and never as a HUD bar. This module models one
- * bar, for one station — the local player's — and there is deliberately no code
- * path here that takes another player's station.
+ * **Your own station only.** A rival's HP appears as a damage ring on that
+ * station — always visible since GDD §2.2 was amended on 2026-08-07 (a0-05) —
+ * and never as a HUD bar. The amendment moved *when* the ring is drawn; it did
+ * not put anyone else's station on this panel. This module models one bar, for
+ * one station — the local player's — and there is deliberately no code path here
+ * that takes another player's station.
  *
  * Colour: **the player's identity colour** (style-guide §3 rule 2 — HP bars are
  * one of the six places identity colour is allowed). The roster is read from the
