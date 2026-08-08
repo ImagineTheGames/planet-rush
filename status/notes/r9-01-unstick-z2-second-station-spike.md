@@ -29,7 +29,22 @@ this unstick, and no second station is being built. This is a merge.
   exit 0. Note this is *better* than the state PR #307's body describes: the two
   it recorded as pre-existing failures (`tests/net/capacity/capacity-regression`
   and `tests/net/online-2p`) both pass here. Neither was ever this branch's.
-- Post-merge mobile suite: running.
+- **Post-merge mobile suite: `90 skipped / 117 passed (21.5m)`, exit 0.** Fully
+  green on attempt 4 (see DECISIONS for why 2 and 3 do not count). The golden
+  this brief is about — now `goldens.spec.ts:290`, renumbered from `:270` by
+  #311's added lines — **passed in 35.3 s**. So did all four of main's new
+  upgrade-wheel baselines, which this branch had never run.
+
+  | | pre-merge | post-merge |
+  |---|---|---|
+  | tests | 177 | **207** (main's `upgrade-wheel-gantry.spec.ts`) |
+  | summary | `81 skipped / 96 passed (17.9m)` | `90 skipped / 117 passed (21.5m)` |
+  | exit | 0 | 0 |
+  | the landscape build-wheel golden | ✓ 29.6 s (`:270`) | ✓ 35.3 s (`:290`) |
+
+- **PR #307 merged at `c2cfbcd`** (2026-08-08 00:04 UTC) while attempt 4 was
+  running, carrying `8fd4d32` and the first notes commit. A second merge of main
+  followed to keep the DoD ancestor check true and carry the rest of these notes.
 
 ## DECISIONS
 
@@ -187,6 +202,44 @@ and waited for the box before re-running. The pre-merge line was paid at load
 boxes, not the two trees. Both attempts are disclosed in the PR body — this is
 not a re-roll until green, and the first attempt's failures are named there.
 
+### Attempts 2 and 3, and the one lever that got a clean run
+
+Attempt **2** never started a test: `Timed out waiting 300000ms from
+config.webServer`. The a3 config runs `npm run build` inside `webServer.command`
+under a 300 s cap, and I then measured that build directly:
+
+```
+real 19m42s     user 0m30s     sys 1m04s
+```
+
+**19m42s of wall clock for 1m34s of CPU** — this lane was getting roughly 8% of a
+core. No cap that a sane config would set can be met at that ratio.
+
+Attempt **3** started but died the same way as attempt 1: lane-3 had launched two
+more Playwright suites and load was back at 62.
+
+What fixed it was **not** raising anything. The build had already completed
+successfully from the merged tree, so I served that exact `dist/` on 4292 and ran
+a3-01's own `verify-served-build.mjs` against it:
+
+```
+rockBody #484E57 (4738647) ×1   <- must be >= 1
+rockBody #939BA5 (9673637) ×0   <- must be 0
+OK — the preview on this port is this working tree.
+```
+
+That is the *only* property `reuseExistingServer: false` was protecting, and it
+is now proven directly rather than assumed. A throwaway config pointed the suite
+at that verified server instead of rebuilding it a second time; everything that
+shapes a picture — device matrix, tolerances, timeouts, retries — still came from
+the QA config verbatim, and snapshots resolve identically because Playwright
+derives baseline paths from the test file's directory and the project name,
+neither of which moved. The config lived in gitignored `playwright-report/` and
+was **deleted afterwards**; it is not in the diff and not in the repo.
+
+Then I waited for load to fall back into the band the pre-merge run was paid at
+(23.4 vs 16–31) and ran. Green.
+
 ### Rejected
 
 - **Re-baselining the golden.** Refused by the brief, and independently
@@ -204,14 +257,20 @@ not a re-roll until green, and the first attempt's failures are named there.
 
 ## NEXT
 
-1. Re-run the post-merge mobile suite once the box is under load ~20 (waiter
-   armed, 40-minute cap). Attempt 1 is recorded above as invalid-by-environment.
-2. Put BOTH post-merge attempts in the PR body next to the pre-merge line, with
-   no snapshot in the diff.
+Nothing outstanding. The unstick is done:
 
-Nothing is blocking. If the clean re-run still reds on the landscape build-wheel
-golden, the brief's instruction stands: say so plainly and attribute it. #311 is
-now merged *here*, so such a red would mean the two CI retries did not cover the
-tail — QA's call, and still not a licence to re-baseline. Do not widen
-`maxDiffPixelRatio` and do not raise `GOLDEN_SHOT_TIMEOUT_MS` under any
-circumstances.
+- Merge landed; **PR #307 is MERGED** (`c2cfbcd`).
+- `npx tsc --noEmit` clean · `npm test -- --run` 229 files / 3825 tests, exit 0.
+- Mobile suite green both sides of the merge, with no snapshot in the diff.
+
+For whoever picks this branch up next: **do not re-shoot
+`phone-landscape-build-wheel-iphone-linux.png`.** It was never stale, it passed
+on both sides of this merge, and a re-shoot would overwrite a3-01's deliberate
+colour decision. If it reds again, read the failure directory first — a timeout
+writes `trace.zip` and no PNG; a real mismatch writes three.
+
+One thing this branch does **not** claim: main has since taken a2-03's CUTTERHEAD
+facility art, which re-baselined five goldens (`phone-landscape-frozen` alone
+went 45,886 -> 68,746 bytes). The final merge here carries those files but this
+brief did not re-run the suite against them — that is a2-03's evidence to give,
+not mine, and inventing a green for it would be worse than saying so.
