@@ -540,6 +540,59 @@ reasoning, unchanged: different brief, fails identically on clean `origin/main`,
 and an unrelated audio spec going green inside the alarm PR is how a real
 regression hides.
 
+## ROUND 8 (this session) — nothing to build; every gate green, and the deploy has not moved
+
+**Inspected the remote first**, which is round 7's own lesson and it cost nothing:
+`git fetch origin` → `origin/agent/sound/s9-alarm-once-and-ownership` is `e88d49c`,
+**identical to local HEAD**, so the branch is fully pushed and six rounds of work
+were already there. PR #318 **OPEN / MERGEABLE**. The PR body was checked and is
+**current** — round 7 already put `b32d0a7` and the 3955-test clean run into it,
+so nothing was stale.
+
+Re-verified at HEAD rather than trusting round 7's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (450 s) |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.5 m test / 4.0 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** (`__alarmStage` false, `alarmStings` false, `__pauseStage` true) |
+| CI | "Typecheck, test, build" **SUCCESS**; "Mobile emulation" IN_PROGRESS — the same queue as rounds 4-7, which is why `mergeStateStatus` reads UNSTABLE |
+
+**The ancestry gate was watched, per round 7's warning, and it held**: `origin/main`
+did not move between rounds 7 and 8, so the merge at `927ba98` still covers it.
+
+**The capacity test was green again** on a full parallel run — sixth data point,
+same call: contended box, not this lane, not a regression.
+
+**Both evidence artifacts came back byte-identical.** `git status` after the live
+run showed *only* the untracked throwaway config — no evidence churn at all. That
+is round 6's caption fix doing its job: the numbers that are a claim (seats, ally
+rosters) are stable, and the host's incidental `0/0` counters no longer rewrite the
+committed file when a bot happens not to reach the core. The live probe's output
+also matched the committed `evidence/s9-01-live-probe.json` byte for byte.
+
+**The deliverables were re-checked at HEAD, not just assumed from these notes**,
+because main has merged into this branch twice since they were written: GDD §2.2
+carries the *(amended 2026-08-07)* marker and the "sound announces, arrow sustains"
+paragraph; `docs/design-amendments.md` carries the entry with the developer's
+sentence quoted; and the brief's three required tests are all present by name in
+`audio.test.ts` — `sounds the alarm ONCE per engagement` (1525),
+`rings again only after a release and a RE-engage` (1539), and
+`rings for YOUR station and no other, with the listener on a NON-ZERO slot` (1665).
+
+**Housekeeping, as predicted every round:** 36 foreign
+`tests/live-stage/*-evidence.png` were dirty at session start from the previous
+session's full run — `git checkout -- tests/live-stage/`, never committed. The
+throwaway `playwright.live-stage-private.tmp.config.ts` was already present from
+round 7 and was reused rather than recreated (it is untracked by design); the 4173
+trap did not bite because the private port was used from the first run. Delete it
+at the end of the session.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **sixth** time, same
+reasoning, unchanged.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
