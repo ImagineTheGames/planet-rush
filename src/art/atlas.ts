@@ -156,10 +156,10 @@ export function beaconTexture(cache: SpriteTextureCache, owner: number, size: nu
 }
 
 /**
- * The scouted damage ring. **Call this only when the viewer is inside sensor
- * range** — enemy station HP is earned by scouting, never broadcast (GDD §2.2).
- * The atlas cannot enforce that; it just refuses to make it convenient to draw
- * a ring nobody asked for.
+ * The damage ring. Draw it for every station you draw: station health reads true
+ * at any range (GDD §2.2, amended 2026-08-07 — the previous "call this only
+ * inside sensor range" rule was withdrawn, and out of range the always-visible
+ * beacon ring made a wounded home look untouched).
  */
 export function damageRingTexture(cache: SpriteTextureCache, station: StationLike, size: number): Texture {
   const fraction = station.maxCoreHp > 0 ? station.coreHp / station.maxCoreHp : 0;

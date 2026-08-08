@@ -18,7 +18,7 @@
  * Three rules they honor, the same three the shipped bots honor:
  *
  *  1. **Fog-honest.** A strategy sees a `BotView` (`src/bots/perception.ts`) and
- *     nothing else. It cannot read a core's HP it has not scouted.
+ *     nothing else. It cannot read a core's HP that is not on its screen.
  *  2. **The same action interface a human uses** (GDD §2.4). Every strategy's
  *     entire output is `Action[]`; the sim validates every order and never
  *     trusts the sender.
