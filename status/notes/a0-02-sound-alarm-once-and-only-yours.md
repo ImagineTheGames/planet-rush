@@ -471,6 +471,75 @@ private-port config created before the first run (so the 4173 trap again did not
 bite) and deleted after each. The `audio-alive.spec.ts:239` ramp fix was left out
 for the **fourth** time, same reasoning, unchanged.
 
+## ROUND 7 (this session) — main moved, so the branch moved; and a RESUME failure worth recording
+
+**Read this part first if you are a future session of this lane.** I did not
+inspect the branch before working. `git status` was clean, `git log` showed
+`main`'s tip, and I took the brief at face value and **re-implemented the whole
+lane from `main`** — the one-shot, the seat wiring, the scope wiring, a
+live-stage spec, the GDD amendment, a fresh working note — four commits, all of
+it duplicating work that was already six rounds deep and already on a PR. It
+surfaced only when `git push` was rejected as non-fast-forward.
+
+Nothing was lost: the push was rejected, not forced, and the parallel branch was
+deleted after diffing it against the real one. But the hour was. **The RESUME
+step is not optional and it is not `git status` — it is
+`git fetch origin <branch> && git log origin/<branch>`, before reading the
+brief.** A brief describes the *task*; only the remote describes the *state*. A
+clean tree on `main` is exactly what a resumed lane looks like from the inside.
+
+The diff was checked before discarding, in case the parallel attempt held
+anything the real branch did not. It did not: this branch's `scope.ts` also
+dedupes `presenter.ts` (mine left two copies of the rule), its `syncAlarm` has
+the voice-cap retry mine lacked, and it has the live probe, the evidence JSON
+and the ~20 fps finding. The one genuine difference was a **two-bar** sting
+against this branch's one bar — deliberately not adopted, because re-voicing is
+out of scope for this brief (GDD §4.7's blast radius) and the developer's
+sentence was about *how often*, not about *what it sounds like*.
+
+### What actually needed doing
+
+`origin/main` had moved from `03ed194` to **`b32d0a7`** (PR #320, the darker
+backdrop), so the **ancestry gate was failing** — the first round where a real
+gate was red at session start. Merged `origin/main` in (60 files, the a0-07
+backdrop work and its re-baselined goldens) and re-verified everything on the
+merged tree rather than trusting round 6's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 (before and after the merge) |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.9 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass**, after the merge |
+| deploy probe | **moved to `b32d0a7`, still pre-fix** |
+
+The suite count moved 3910 → **3955** because main brought `src/art/backdrop.test.ts`
+and the a0-07 goldens with it, not because anything here grew.
+
+**The capacity test was green this round**, on a full parallel run, at 235 files.
+That is the fourth data point and it agrees with rounds 4 and 5: load, not this
+lane. (I also hit it red once on the parallel attempt's tree and green in
+isolation minutes later — same box, same code. Same story.)
+
+`evidence/s9-01-alarm-ownership.json` came back **byte-identical** again;
+`evidence/s9-01-live-probe.json` was refreshed to the new served sha.
+
+**The deploy is on `b32d0a7`, which is `origin/main` exactly** — so the pipeline
+is current and simply has not been given this branch yet. The by-ear item is
+blocked on the merge, not on a stuck deploy. That is a slightly better answer
+than rounds 3-6 could give, when the served sha lagged main.
+
+**Housekeeping.** The throwaway private-port config was created before the first
+run and deleted after, as prescribed — the 4173 trap did not bite the seat spec.
+It *may* have bitten the parallel attempt's full-suite run on 4173 earlier in the
+session; that run is void either way and its numbers are not recorded here.
+`tests/live-stage/` was reverted clean before the reset.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **fifth** time, same
+reasoning, unchanged: different brief, fails identically on clean `origin/main`,
+and an unrelated audio spec going green inside the alarm PR is how a real
+regression hides.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
@@ -486,3 +555,9 @@ for the **fourth** time, same reasoning, unchanged.
 - Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
   or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
   are explicitly unratified, GDD §4.7 blast radius).
+- **Before you touch this branch: `git fetch origin agent/sound/s9-alarm-once-and-ownership`
+  and read `git log origin/…`.** Round 7 skipped that and rebuilt the whole lane
+  from `main` before the push rejection caught it. `git status` being clean says
+  nothing — that is what a resumed lane looks like from the inside.
+- Watch the ancestry gate every round now: `origin/main` moved under this branch
+  between rounds 6 and 7 and turned a passing gate red with no code change here.
