@@ -8008,6 +8008,21 @@ function openLobby(
   }
 
   function onPointerLeave(): void {
+    // **A PINNED dossier is dismissed by a tap, never by the pointer going away**
+    // (a0-06). This guard is not defensive tidiness — without it the `?` works on
+    // a desktop and does nothing at all on a phone, which is precisely the
+    // desktop-only failure the control exists to remove:
+    //
+    // a TOUCH pointer ceases to exist the instant the finger lifts, so the browser
+    // fires `pointerleave` immediately after every tap's `pointerup`. That leave
+    // arrived a fraction of a millisecond after the tap had opened the dossier and
+    // closed it again, invisibly — the hint was set and cleared inside one frame,
+    // so nothing was ever drawn and nothing errored (caught by the live-stage
+    // phone case, which is the only place it could have been).
+    //
+    // A HOVER hint still dies here, which is what this handler was written for:
+    // the cursor left, so the thing that followed it goes with it.
+    if (pinnedHintSeat !== null) return;
     if (!press) hideHint();
   }
 
