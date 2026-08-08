@@ -593,6 +593,73 @@ at the end of the session.
 The `audio-alive.spec.ts:239` ramp fix was left out for the **sixth** time, same
 reasoning, unchanged.
 
+## ROUND 9 (this session) — every gate green; the only build was correcting the PR body against itself
+
+**Remote inspected first**, per round 7's lesson: `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` is `8ef0f3e`, **identical to local
+HEAD**, so eight rounds of work were already pushed. PR #318 **OPEN / MERGEABLE**,
+`headRefOid` == HEAD. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 8's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (290 s) |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.5 m test / 4.4 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** — unchanged for a third round |
+| CI | "Typecheck, test, build" **pass** (both runs); "Mobile emulation" pending — the same runner queue as rounds 4-8, which is why `mergeStateStatus` reads UNSTABLE |
+
+**The ancestry gate was watched again and held** — `origin/main` has not moved since
+round 7's merge.
+
+**The capacity test was green again** — seventh data point (2 red, 5 green, always
+4/4 in isolation). The load-flake call is settled.
+
+**Zero evidence churn this round, and for a better reason than luck**: only my own
+spec was run, not the full suite, so no foreign `tests/live-stage/*-evidence.png`
+were touched at all — `git status` showed *only* the untracked throwaway config, both
+before and after the live run. `evidence/s9-01-alarm-ownership.json` and
+`evidence/s9-01-live-probe.json` both came back byte-identical to the committed ones.
+Note the live probe's `servedAt` is the **deployment's** timestamp out of
+`version.json`, not the probe's run time — which is why that file is byte-stable
+across rounds rather than churning on every run.
+
+### What actually got built: the PR body contradicted itself
+
+Rounds 4-8 kept the DoD table current but left the paragraph *underneath* it frozen
+at round 3. So the table read **"0 failed"** and the very next line opened *"The one
+unit failure, named rather than rounded off…"*. Read cold by QA or the Director, that
+is a document arguing with itself about whether the suite passes — and the failing
+reading is the one that stops a merge.
+
+Fixed, along with two stale facts in the same table:
+
+- the `npm test` row named `e88d49c` (round 7) and said *"five data points"*; now
+  names `8ef0f3e` and seven, and records that the clean run has repeated four rounds
+  running;
+- the `test:live-stage` row said *"twice at `08415ff`"*; now also names `8ef0f3e` and
+  quotes the guest readout inline, so the claim is legible without opening the run;
+- the contradicting paragraph is rewritten in the past tense — the capacity test is
+  kept **named** rather than deleted now that it is green, because a reader who saw
+  the earlier red rounds should find out what happened to it, not find it silently
+  gone.
+
+**This is the round-6 lesson again in a different file.** "Nothing to build" is the
+right answer only after checking the *artifacts* as well as the gates. The gates were
+all green before I touched anything; the defect was in the prose that tells a human
+what the gates mean.
+
+**The deploy section of the PR body needed no edit** — today's probe returned the
+same sha, the same markers and the same `servedAt` as the committed readout, so what
+was written in round 7 is still literally true.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **seventh** time, same
+reasoning, unchanged: different brief, fails identically on clean `origin/main`, and
+an unrelated audio spec going green inside the alarm PR is how a real regression
+hides.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
