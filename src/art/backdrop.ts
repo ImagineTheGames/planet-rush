@@ -760,7 +760,7 @@ export const NEBULA_IDS: readonly NebulaId[] = [
  * cross-checked against the sim's own registry by `backdrop.test.ts` — art does
  * not import the sim at runtime, but the test refuses to let the two drift.
  */
-export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond';
+export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'crescents';
 
 /**
  * **One entry per map. A map's sky is part of its identity, like its layout.**
@@ -768,11 +768,11 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond';
  * A named registry, deliberately — not a hash of the id and not `index % 6`. A
  * modulo would repeat a sky the moment a fifth map lands and would assign it
  * without anyone choosing; this way each line is a decision that can be argued
- * with. The four assigned skies, ranked by measured per-screen overdraw, are
- * NONE `0.000` · Coalsack `0.691` · Patina Drift `0.863` · Plasma Reef `1.121`,
- * and the rule that placed them is: **the cheapest sky goes on the board that
- * runs on the most devices, and the costliest on the board with the fewest
- * entities.** Map by map:
+ * with. The six skies, ranked by measured per-screen overdraw, are NONE `0.000`
+ * · Iron Veil `0.208` · Coalsack `0.691` · Deep Ember `0.746` · Patina Drift
+ * `0.863` · Plasma Reef `1.121`, and the rule that placed them is: **the
+ * cheapest sky goes on the board that runs on the most devices, and the
+ * costliest on the board with the fewest entities.** Map by map:
  *
  *  - **`octagon` → NONE.** The Ring is the default: it is what `?debug=1` boots,
  *    what a returning player finds pre-selected, and the first thing a phone
@@ -798,30 +798,52 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond';
  *    middle. It is the one board with fill-rate to spare — and under
  *    `VfxAutoQuality` the reef is the sky that drops, so a throttled phone stops
  *    paying for it entirely.
+ *  - **`crescents` → Iron Veil.** (a0-12, claiming one of the two skies this
+ *    registry held open.) The Crescents is the busiest *frame* in the set: two
+ *    arcs of four face each other across one small bowl, every home is the same
+ *    short run from the commons, and it is derelict-fill, so below eight it also
+ *    carries wrecks and their debris. Four stations, their turrets, the whole
+ *    commons and eight ships can share one screen at the moment of contact —
+ *    nowhere else does. By the rule above the busiest board takes the cheapest
+ *    coloured sky, and Iron Veil is it at **0.208**, a third of Coalsack's. A
+ *    laminated iron band with rust through it also suits a board that is a wall
+ *    you stand inside.
+ *  - **`line` → Deep Ember.** The Line is the thinnest board per screen and the
+ *    exact complement of the reasoning above: eight homes strung down two picket
+ *    lines 2027 u apart, so a screen holds a couple of stations and a great deal
+ *    of empty corridor. Deep Ember at 0.746 is affordable there, and its shape is
+ *    the argument — "five dying coals at the rim… the middle of the screen, where
+ *    the fight is, stays clean" is a description of this map's contested corridor.
+ *    The warmth sits out where the lines are and never over the ground being
+ *    fought for.
  *
- * Deliberately *not* assigned: {@link UNASSIGNED_NEBULAE}.
+ * **Every sky now has a map** — the hole `UNASSIGNED_NEBULAE` stated is closed.
+ * One consequence is worth naming rather than discovering: Iron Veil and Deep
+ * Ember are the two skies that spend a RESERVED hue under the style-guide §2.2
+ * carve-out, and until now no shipped board depended on it. Two boards do now,
+ * so §2.2 is load-bearing rather than merely permitted. Nothing changed about
+ * the ink — the audit's `SKY_RESERVED_ALPHA_MAX` still holds both to a whisper
+ * (peak luma 9.3 and 9.7 of 255 over Floor) — but the Director's clean seam to
+ * veto §2.2 is now a seam with two maps standing on it.
  */
 export const MAP_NEBULA: Readonly<Record<MapId, NebulaId>> = {
   octagon: 'none',
   compass: 'coalsack',
   diamond: 'patinaDrift',
   oval: 'plasmaReef',
+  crescents: 'ironVeil',
+  line: 'deepEmber',
 };
 
 /**
- * The two skies with no map yet — **named and unassigned, not guessed**.
+ * The skies with no map yet — **named and unassigned, not guessed**.
  *
- * `a0-12` is building two new 4v4-balanced maps, and these are the skies they
- * take. Leaving the hole stated (and asserted by `backdrop.test.ts`) is the
- * honest shape: a registry with a documented gap says "two maps are coming",
- * where a modulo would have silently given some map a second-hand sky.
- *
- * It is also the safe shape. These are the two skies that spend a RESERVED hue
- * under the style-guide §2.2 carve-out, so as things stand **no map that ships
- * today depends on that carve-out at all** — which gives the Director a clean
- * seam to veto §2.2 on before a live board needs it.
+ * Empty since a0-12: six maps, six skies, one each. The list stays (and
+ * `backdrop.test.ts` still asserts it equals the set of unassigned skies) so the
+ * next sky or the next map lands in a registry that still states its own holes
+ * rather than one that quietly stopped counting.
  */
-export const UNASSIGNED_NEBULAE: readonly NebulaId[] = ['ironVeil', 'deepEmber'];
+export const UNASSIGNED_NEBULAE: readonly NebulaId[] = [];
 
 /** The sky a map flies under. An unknown id falls back to the default map's, so
  *  a stale saved map key can never crash or blank the backdrop. */
