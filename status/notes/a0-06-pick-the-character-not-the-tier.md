@@ -310,3 +310,68 @@ return to.
 There is no version of this that converges, either: a frame can never carry the
 hash of the commit that contains it. The committed set is shot one commit back
 and that is correct, not stale.
+
+### Session 2026-08-08 (fifth) — a finished merge nobody had pushed
+
+**Read this first: the branch was inherited GREEN but one commit short of being
+real.** `a74a199` — a merge of `origin/main` (a0-05 station health, a0-00b mobile
+shards) into a0-06 — was sitting in the local repo **committed and unpushed**,
+made by a session that recorded itself in neither this note nor the remote. PR
+**#319** therefore read **CONFLICTING**, because GitHub was still looking at
+`ee2b622`, which predates the resolution. Nothing was wrong with the work; it had
+simply never left the box.
+
+Pushed fast-forward `ee2b622..a74a199`. That single push is what cleared the PR.
+
+**The lesson, and it is not "merge more carefully":** a merge commit that is not
+pushed looks *identical to a clean branch* from inside the workspace — `git
+status` is empty, every gate passes, the note says green. The only thing that
+tells you is `git log origin/<branch>..HEAD`. **Check the remote ref before
+believing the local tree**, especially on a resume, and check the PR's
+`mergeable` field rather than assuming a red one means unresolved conflicts —
+here it meant unpushed ones.
+
+**What the merge brought in, verified rather than trusted** (a0-05 edits four
+files inside `src/bots/`, which is why this was worth reading rather than
+assuming): `perception.ts`, `targeting.ts`, `hard.ts` are a0-05's sensor-range
+retirement, ratified in GDD §2.2/§2.9 and not this brief's to litigate.
+`personalities.ts` moved **9 lines and all of them are a doc comment** on
+`memorySeconds` — `DIFFICULTY_TUNING`'s numbers, the trees and the weights are
+untouched, so the brief's "what must not change" list holds. `castDisplayNames`
+and the `fillEmptySlots` cast parameter came through the auto-merge intact.
+
+**`PREVIEW_PORT` is on this branch after all.** The note above says it survived
+only on the discarded duplicate; it is in fact live at
+`tests/live-stage/playwright.config.ts:33` (`Number(process.env.PREVIEW_PORT ??
+4173)`). Still marked *(a0-06, proposed)* — `tests/live-stage/` is Platform's.
+Used it here (`PREVIEW_PORT=4191`) and the run never collided.
+
+#### DoD on the pushed head
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **3992 passed, 0 failed**, 238 files. `capacity-regression`
+  passed this time; it is a wall-clock benchmark and it only trips under lane
+  contention, which is the same conclusion as sessions 2 and 4. Do not chase it.
+- `npm run test:live-stage` — full sweep, `PREVIEW_PORT=4191`. **All three
+  `lobby-cast` cases pass** (cast round trip, `?` by click on PC, `?` by tap at
+  390 px landscape); no `lobby-cast` directory appears under `test-results/`,
+  which is where Playwright puts failures.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor origin/main HEAD`
+  OK against `13e9649`.
+
+**The proof, re-measured and not re-asserted:** the run regenerated
+`lobby-cast-readback.txt` **byte-identical** (`bac2592b…`) on top of the a0-05 +
+a0-00b merge — a fresh boot of the real client through the front door still seats
+exactly the cast the lobby picked: seven Hard bots, three Wardens / two Sables /
+two Vultures, `identical: true`. **That file is the evidence; the PNGs are the
+picture of it.** Worth stating plainly: a0-05 changed how stations are *drawn* at
+range, and the cast seam did not notice, which is what "this brief changes who
+you choose, not how a bot plays" is supposed to mean.
+
+**Trap #2 confirmed again, with a correction to how you watch it:** the full run
+dirtied all 42 tracked `*-evidence.png`. Restored the 38 that belong to other
+briefs with `git checkout -- tests/live-stage/` (never `git clean`). Also — do
+**not** pipe the run through `| tail -N` if you intend to watch it: the pipe
+buffers everything until the process exits, so the output file sits at 0 bytes
+for the entire hour and looks hung. Watch `git status` and `ls -1t test-results/`
+instead; the newest regenerated frame tells you which spec is executing.
