@@ -428,9 +428,21 @@ const BACK_WIDTH = 300;
 /** The share of the band's width the ship bay claims. A landscape phone is wide
  *  and short: the bay wants to be square-ish, and the list wants the rest. */
 const BAY_SHARE = 0.42;
-/** The level block's height, as a share of the right pane — enough for the
- *  level, the bar and the two figures under it. */
+/**
+ * The level block's height.
+ *
+ * Two bounds, and the tighter wins. A pure *share* of the band is what the first
+ * cut used, and on a desktop it opened a hand's width of dead panel between the
+ * bar and the list — the block only ever holds a word, a bar and two figures,
+ * however tall the band is. So the second bound is content-shaped
+ * (`rowHeight × LEVEL_ROWS`), which is what actually binds on a tall screen;
+ * the share still binds on a short one, where the content bound would eat the
+ * list.
+ */
 const LEVEL_SHARE = 0.42;
+/** The level block, measured in row heights: the level word, the bar, and the
+ *  line of figures under it, with the gaps between them. */
+const LEVEL_ROWS = 2.6;
 /** The XP bar's height at the reference. */
 const XP_BAR_HEIGHT = 14;
 /** The gap between the bay and the right pane. */
@@ -477,7 +489,7 @@ export function hangarLayout(viewport: Viewport, options: HangarLayoutOptions = 
   const bay: Rect = { x, y: band.y, width: bayWidth, height: band.height };
   const paneX = x + bayWidth + gap;
 
-  const levelHeight = Math.max(0, band.height * LEVEL_SHARE);
+  const levelHeight = Math.max(0, Math.min(band.height * LEVEL_SHARE, rowHeight(metrics) * LEVEL_ROWS));
   const levelPanel: Rect = { x: paneX, y: band.y, width: paneWidth, height: levelHeight };
 
   const barHeight = Math.max(0, Math.min(Math.round(XP_BAR_HEIGHT * metrics.plateScale), levelHeight / 3));

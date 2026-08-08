@@ -74,7 +74,7 @@ const EMPTY_PX = 13;
 
 /** How much of the bay the ship may claim, leaving room for its name below and
  *  air around it. A ship pinned to the walls of its own bay reads as clipped. */
-const SHIP_FILL = 0.62;
+const SHIP_FILL = 0.7;
 /** The share of the bay's height the caption block (name / hull / blurb) takes. */
 const CAPTION_SHARE = 0.34;
 
