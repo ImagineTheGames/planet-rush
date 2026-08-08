@@ -151,13 +151,6 @@ async function bootClient(
   await page.waitForFunction(() => window.__mainMenu?.visible === true, undefined, {
     timeout: 60_000,
   });
-  // The seam under test must be present on this CLEAN boot — not behind ?debug=1,
-  // which cannot reach an online match at all. If this wait times out, the seam
-  // was gated and the claim below is unprovable in a real browser.
-  await page.waitForFunction(() => typeof window.__alarmStage?.read === 'function', undefined, {
-    timeout: 60_000,
-  });
-
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('no canvas bounding box');
   const press = async (p: PhysicalPoint): Promise<void> => {
@@ -250,6 +243,15 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
       await client.page.waitForFunction(() => window.__mainMenu?.matchStarted === true, undefined, {
         timeout: 90_000,
       });
+      // The seam installs with the match loop (like `__pauseStage`), on this CLEAN
+      // boot — not behind ?debug=1, which drops straight into an OFFLINE match and
+      // could never see an online one. A timeout here means it was gated and the
+      // claim below is unprovable in a real browser.
+      await client.page.waitForFunction(
+        () => typeof window.__alarmStage?.read === 'function',
+        undefined,
+        { timeout: 30_000 },
+      );
     }
     // One rendered frame, so the match loop has run and derived the alarm's side
     // from live world truth at least once (`setAlarmScope`, `main.ts`).

@@ -1425,6 +1425,28 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(engine.alarmSounds).toBe(2); // one more, not one per frame
   });
 
+  it('retries a sting the busy mix refused, rather than losing the announcement (s9-01)', () => {
+    // A loop never had to survive the voice cap; a single sting does. The mix
+    // refuses a one-shot when all 24 voices are in flight, and a fierce siege
+    // frame is exactly when that happens — which is exactly when the alarm must
+    // not be the thing that gets dropped (§4.9, not cuttable). So the engagement
+    // stays unclaimed until a sting actually starts.
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine({ context: ctx, local: 0, music: false, ambient: false, mix: { maxVoices: 1 } });
+    engine.start();
+    const q = new TellQueue(4);
+    q.push(TELL.coreHit, 0, 0, 0, 0.5, 0);
+
+    // Every voice spent on core-hit one-shots: the alarm engages with the mix full.
+    run(engine, ctx, 1, () => engine.consume(q));
+    expect(engine.alarm.active).toBe(true);
+
+    // Stop feeding tells and let the in-flight voice expire; the pending sting
+    // lands on the first frame there is room for it, and only once.
+    run(engine, ctx, 1.5);
+    expect(engine.alarmSounds).toBe(1);
+  });
+
   it('counts one sting per engagement with no audio hardware at all (GDD §4.1)', () => {
     // The rule is arithmetic, not a mix feature: it holds in the mode the match
     // server, the QA harness and CI run in, where there is no context to play into.

@@ -598,14 +598,16 @@ export class AudioEngine {
    *   passes 1: an emergency signal that drifts in pitch is a worse signal, and
    *   §2.2's "unmistakable" is the same two tones every time.
    */
-  private flat(sound: SoundName, level: number, bus: Bus = 'sfx', rate?: number): void {
+  private flat(sound: SoundName, level: number, bus: Bus = 'sfx', rate?: number): boolean {
     const graph = this.graph;
-    if (!graph) return;
+    if (!graph) return false;
     if (this.death.gain <= HUSHED) {
       this.skipped++;
-      return;
+      return false;
     }
-    if (graph.play(sound, clamp01(level), rate ?? graph.jitter(), bus)) this.played++;
+    const started = graph.play(sound, clamp01(level), rate ?? graph.jitter(), bus);
+    if (started) this.played++;
+    return started;
   }
 
   /**
@@ -632,14 +634,21 @@ export class AudioEngine {
    */
   private syncAlarm(dt: number): void {
     if (this.alarm.count !== this.alarmSounded) {
-      // A fresh engagement. Claim it whatever happens next, so a sting lost to
-      // the hush is not re-attempted every frame for the rest of the siege.
-      this.alarmSounded = this.alarm.count;
       // The klaxon is a cockpit alert, not a located hit: full and centred, like
       // the wave horn and the death fall. `flat` also enforces the three seconds
       // of quiet — nothing sounds over a dying home, the alarm included (§4.7).
       const hushed = this.death.gain <= HUSHED;
-      this.flat(SOUND.alarm, 1, 'alarm', 1);
+      const started = this.flat(SOUND.alarm, 1, 'alarm', 1);
+      // The mix can REFUSE a one-shot: the voice cap is 24 and a fierce siege
+      // frame spends them. A loop never had to survive that; a single sting does,
+      // and a dropped one would silently cost a not-cuttable mechanic its whole
+      // announcement (§4.9). So leave the engagement unclaimed and try again next
+      // frame — it lands as soon as a voice frees, which is milliseconds. The
+      // headless engine (no graph) and the death hush both fall through instead:
+      // there is nothing to retry for, and retrying through the three seconds of
+      // quiet would fire the klaxon on the far side of them.
+      if (!started && !hushed && this.graph) return;
+      this.alarmSounded = this.alarm.count;
       if (!hushed) {
         this.alarmStings++;
         this.alarmDuckLeft = ALARM_DUCK_S;
