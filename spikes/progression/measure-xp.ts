@@ -71,8 +71,8 @@ function makeObserver(world: World): Observer {
     prevCargo: world.ships.map((s) => s.cargo),
     prevBanked: world.ships.map((s) => s.banked),
     prevTiers: world.ships.map((s) => sumTiers(s.tiers)),
-    prevCore: world.planets.map((p) => p.coreHp),
-    prevAlive: world.planets.map((p) => p.alive),
+    prevCore: world.stations.map((p) => p.coreHp),
+    prevAlive: world.stations.map((p) => p.alive),
     buildIds: Array.from({ length: n }, () => new Set<number>()),
     acc: Array.from({ length: n }, blank),
   };
@@ -94,7 +94,7 @@ function observe(o: Observer, world: World): void {
     o.prevTiers[i] = t;
   });
   // Planets are index-aligned to ships in a dense FFA roster (owner === id === i).
-  world.planets.forEach((p, i) => {
+  world.stations.forEach((p, i) => {
     const a = o.acc[i];
     if (!a) return;
     const dCore = p.coreHp - o.prevCore[i]!;
@@ -111,7 +111,7 @@ function observe(o: Observer, world: World): void {
 function finalize(o: Observer, world: World): Accrual[] {
   const elimOrder = world.match.eliminated; // first death = worst placement
   const n = world.ships.length;
-  world.planets.forEach((p, i) => {
+  world.stations.forEach((p, i) => {
     const a = o.acc[i];
     if (!a) return;
     a.structures = o.buildIds[i]!.size;
