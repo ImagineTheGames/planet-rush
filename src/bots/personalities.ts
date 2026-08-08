@@ -484,13 +484,27 @@ export function castDisplayNames(
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   const seen = new Map<PersonalityId, number>();
-  return cast.map((id) => {
-    if (id == null) return null;
-    const name = PERSONALITIES[id]?.name;
-    if (name === undefined) return null;
-    if ((counts.get(id) ?? 0) < 2) return name;
+  const out: (string | null)[] = [];
+  // An indexed `for`, not `map`: callers build this table by slot id
+  // (`table[bot.seat.id] = …`), which leaves HOLES wherever a human sits, and
+  // `Array.prototype.map` copies a hole through as a hole rather than visiting it.
+  // The contract above says a slot with no character reads `null`, and a hole
+  // reads `undefined` — a distinction that would surface as a nameplate saying
+  // nothing at all.
+  for (let i = 0; i < cast.length; i++) {
+    const id = cast[i];
+    const name = id == null ? undefined : PERSONALITIES[id]?.name;
+    if (id == null || name === undefined) {
+      out[i] = null;
+      continue;
+    }
+    if ((counts.get(id) ?? 0) < 2) {
+      out[i] = name;
+      continue;
+    }
     const nth = (seen.get(id) ?? 0) + 1;
     seen.set(id, nth);
-    return `${name} ${nth}`;
-  });
+    out[i] = `${name} ${nth}`;
+  }
+  return out;
 }

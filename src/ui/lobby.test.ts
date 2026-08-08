@@ -30,7 +30,7 @@ import {
   CLASS_OPTIONS,
   COLOR_NAMES,
   DEFAULT_SHIP_CLASS,
-  DIFFICULTY_CYCLE,
+  CHARACTER_CYCLE,
   DIFFICULTY_LABELS,
   LOBBY_SLOTS,
   MAX_TEAMS,
@@ -56,14 +56,17 @@ import {
   countdownLabel,
   createLobby,
   cycleAbundance,
-  cycleBotDifficulty,
+  cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
-  defaultDifficultyForEmptySeat,
+  defaultCharacterForEmptySeat,
+  seatDifficulty,
   defaultTeamForSlot,
   eraseRoomCode,
   isJoinableRoomCode,
   lobbyMatchConfig,
+  lobbyRosterCast,
+  lobbyRosterTeams,
   lobbyModel,
   makeRoomCode,
   matchSizeOf,
@@ -188,27 +191,45 @@ describe('slot assignment (GDD §2.1 — eight seats, humans and bots in one id 
     expect([...names].sort()).toEqual([...ROSTER].sort());
   });
 
-  it('starts each empty seat at its own character’s tier', () => {
-    // Rusty/Bolt are Easy, Foreman/Patch Medium, Sable/Vulture/Warden Hard.
+  it('starts each empty seat on its own roster-order character', () => {
+    // Rusty, Bolt, Foreman, Patch, Sable, Vulture, Warden — one of each, at each
+    // character's own tier, which is the roster this screen has always previewed.
     for (let i = 0; i < ROSTER.length; i++) {
-      const id = ROSTER[i]!;
-      expect(defaultDifficultyForEmptySeat(i)).toBe(PERSONALITIES[id].difficulty);
+      expect(defaultCharacterForEmptySeat(i)).toBe(ROSTER[i]);
     }
   });
 
-  it('re-casts over the remaining empty seats when a human arrives', () => {
-    // The server casts by *empty-seat order* (`castFor(botIndex++)`), so a human
-    // taking seat 1 shifts everyone behind them. The roster must show that.
+  it('keeps every other seat’s character when a human arrives', () => {
+    // Before a0-06 the cast was recomputed from empty-seat order on every state
+    // change, so a joiner reshuffled the whole roster under the host. The
+    // character is authored per seat now: a human taking seat 1 takes seat 1's
+    // character out of the match and moves nobody else.
     const before = lobby();
     const after = applyLobbySlots(before, wireSlots(['human', 'human', 'open', 'open', 'open', 'open', 'open', 'open']));
 
     expect(after.seats[1]?.occupant).toBe('human');
     expect(after.seats[1]?.personality).toBeNull();
 
-    const empties = after.seats.filter((s) => s.occupant !== 'human');
-    empties.forEach((seat, index) => {
-      expect(seat.personality).toBe(castForEmptySeat(index, seat.difficulty));
-    });
+    for (const seat of after.seats.filter((s) => s.occupant !== 'human')) {
+      expect(seat.personality).toBe(before.seats[seat.player]?.personality);
+    }
+  });
+
+  it('renames a seat the SERVER re-tiered, to the name the server will seat', () => {
+    // The wire carries a tier and no character, so a bot the room has genuinely
+    // put on another tier has to resolve through `server/room.ts`'s own rule
+    // rather than keep a name this client invented.
+    const before = lobby();
+    const slots = wireSlots(['human', 'open', 'open', 'open', 'open', 'open', 'open', 'open']).map((s, i) =>
+      i === 3 ? { ...s, botDifficulty: 'hard' as const } : s,
+    );
+    const after = applyLobbySlots(before, slots);
+    // Seat 3 defaults to Patch (Medium); the wire says Hard, so it becomes a Hard
+    // character — and specifically the one `castFor` picks for its empty index.
+    expect(PERSONALITIES[before.seats[3]!.character].difficulty).not.toBe('hard');
+    expect(PERSONALITIES[after.seats[3]!.character].difficulty).toBe('hard');
+    // A seat the wire agrees with is untouched.
+    expect(after.seats[2]?.character).toBe(before.seats[2]?.character);
   });
 
   it('mirrors the server’s cast rule, repeats and all', () => {
@@ -723,42 +744,79 @@ describe('room codes (GDD §4.2 — created in the lobby, read across a room)', 
 // Host controls and RUSH!
 // ---------------------------------------------------------------------------
 
-describe('host controls (GDD §2.1 — the host picks each bot’s difficulty)', () => {
-  it('cycles a bot seat easy → medium → hard → easy for the host', () => {
+describe('host controls (GDD §2.1 amended — the host picks each bot’s CHARACTER)', () => {
+  it('cycles a bot seat through the whole roster and back', () => {
     let state = lobby();
-    const start = state.seats[1]!.difficulty;
+    const start = state.seats[1]!.character;
     const seen = [start];
-    for (let i = 0; i < 3; i++) {
-      state = cycleBotDifficulty(state, 1);
-      seen.push(state.seats[1]!.difficulty);
+    for (let i = 0; i < ROSTER.length; i++) {
+      state = cycleSeatCharacter(state, 1);
+      seen.push(state.seats[1]!.character);
     }
-    expect(seen[3]).toBe(start); // back where it started after a full cycle
-    expect(new Set(seen)).toEqual(new Set(DIFFICULTY_CYCLE));
-    expect(Object.keys(DIFFICULTY_LABELS).sort()).toEqual([...DIFFICULTY_CYCLE].sort());
+    // Back where it started after a full lap, and every character reachable.
+    expect(seen[ROSTER.length]).toBe(start);
+    expect(new Set(seen)).toEqual(new Set(CHARACTER_CYCLE));
+  });
+
+  it('shows the tier, and shows the tier of the character that is actually seated', () => {
+    // The load-bearing property of the whole change: there is no second value to
+    // disagree with the cast, so a row can never advertise a difficulty the bot in
+    // it will not fly (the developer's "i chose HARD … they were at other
+    // difficulties"). Walk every character and check the chip follows.
+    let state = lobby();
+    for (let i = 0; i < ROSTER.length; i++) {
+      const seat = state.seats[1]!;
+      expect(seatDifficulty(seat)).toBe(PERSONALITIES[seat.character].difficulty);
+      expect(lobbyModel(state).seats[1]?.botDifficulty).toBe(PERSONALITIES[seat.character].difficulty);
+      state = cycleSeatCharacter(state, 1);
+    }
+    expect(Object.keys(DIFFICULTY_LABELS).sort()).toEqual(['easy', 'hard', 'medium']);
+  });
+
+  it('lets the host seat the same character twice — the balanced 4v4 needs it', () => {
+    // Eight slots, seven characters, three of them Hard: the developer's stated
+    // goal of four Hard bots is not reachable without a repeat, so forbidding one
+    // would make their own use case impossible.
+    let state = lobby();
+    for (const slot of [1, 2, 3, 4]) {
+      while (state.seats[slot]!.character !== 'warden') state = cycleSeatCharacter(state, slot);
+    }
+    expect([1, 2, 3, 4].map((i) => state.seats[i]!.character)).toEqual([
+      'warden', 'warden', 'warden', 'warden',
+    ]);
+    // …and a repeat is NAMED apart rather than refused.
+    expect([1, 2, 3, 4].map((i) => nameFor(state, i))).toEqual([
+      'Warden 1', 'Warden 2', 'Warden 3', 'Warden 4',
+    ]);
+    // A character that does NOT repeat keeps its bare name.
+    expect(nameFor(state, 5)).toBe(PERSONALITIES[state.seats[5]!.character].name);
   });
 
   it('refuses the cycle from a guest, on a human seat, and after RUSH!', () => {
     const guest = lobby({ you: 2, host: 0 });
-    expect(cycleBotDifficulty(guest, 1)).toBe(guest);
+    expect(cycleSeatCharacter(guest, 1)).toBe(guest);
 
     const host = lobby();
-    expect(cycleBotDifficulty(host, 0)).toBe(host); // your own (human) seat
+    expect(cycleSeatCharacter(host, 0)).toBe(host); // your own (human) seat
 
     const counting = pressRush(host);
-    expect(cycleBotDifficulty(counting, 1).seats[1]?.difficulty).toBe(host.seats[1]?.difficulty);
+    expect(cycleSeatCharacter(counting, 1).seats[1]?.character).toBe(host.seats[1]?.character);
   });
 
-  it('sends difficulties in EMPTY-SEAT order, which is the order the room reads them', () => {
+  it('sends difficulties in EMPTY-SEAT order, derived from the chosen cast', () => {
     // `server/room.ts` indexes the list with `castFor(botIndex++)` over seats
-    // with no socket — slot order would hand seat 5's tier to seat 2.
-    const state = cycleBotDifficulty(
+    // with no socket — slot order would hand seat 5's tier to seat 2. The tiers
+    // themselves are now read off the characters the host picked.
+    const state = cycleSeatCharacter(
       applyLobbySlots(lobby(), wireSlots(['human', 'human', 'open', 'open', 'open', 'open', 'open', 'open'])),
       4,
     );
     const list = botDifficulties(state);
     expect(list).toHaveLength(6);
-    expect(list[2]).toBe(state.seats[4]?.difficulty);
-    expect(list).toEqual(state.seats.filter((s) => s.occupant !== 'human').map((s) => s.difficulty));
+    expect(list[2]).toBe(seatDifficulty(state.seats[4]!));
+    expect(list).toEqual(
+      state.seats.filter((s) => s.occupant !== 'human').map((s) => seatDifficulty(s)),
+    );
   });
 
   it('marks the host on the roster and hands the guest the reason they are waiting', () => {
@@ -1303,5 +1361,52 @@ describe('lobbyMatchConfig — the one handoff to the wire and the world', () =>
     expect(lobbyMatchConfig(lobby({ online: true })).slots[1]!.state).toBe('open');
     // The local human is always a live competitive seat, never a bot.
     expect(offline.slots[0]!.state).toBe('open');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lobbyRosterCast — the handoff that did not exist (a0-06)
+// ---------------------------------------------------------------------------
+
+describe('lobbyRosterCast — the lobby’s pick, in the order the world builds', () => {
+  it('carries a chosen cast out in DENSE player order, human seats null', () => {
+    // The offline half of the handoff `bootOfflineMatch` consumes. It is indexed
+    // exactly like `lobbyRosterTeams` — closed slots dropped, survivors re-indexed
+    // 0..N-1 — because the two are stamped onto the same roster.
+    let state = lobby({ online: false });
+    for (const slot of [1, 2, 3]) {
+      while (state.seats[slot]!.character !== 'warden') state = cycleSeatCharacter(state, slot);
+    }
+    const cast = lobbyRosterCast(state);
+    expect(cast).toHaveLength(LOBBY_SLOTS);
+    expect(cast[0]).toBeNull(); // your own seat — the boot leaves it to you
+    expect(cast.slice(1, 4)).toEqual(['warden', 'warden', 'warden']);
+    expect(cast).toEqual(lobbyRosterTeams(state).map((_, i) => cast[i]!)); // same length/order
+  });
+
+  it('re-indexes around a CLOSED seat, exactly as the team table does', () => {
+    // A closed slot is dropped at world-build and the survivors renumber, so entry
+    // `i` has to be the character of the ship the sim will call player `i`. Getting
+    // this wrong hands seat 5's character to seat 2 — the same class of bug the
+    // empty-seat-order rule exists for.
+    const closed = cycleSeatState(cycleSeatState(lobby({ online: false }), 3), 3);
+    expect(closed.seats[3]?.occupant).toBe('closed');
+    const cast = lobbyRosterCast(closed);
+    expect(cast).toHaveLength(LOBBY_SLOTS - 1);
+    expect(cast).toEqual(
+      closed.seats.filter((s) => s.occupant !== 'closed').map((s) => s.personality),
+    );
+    expect(lobbyRosterTeams(closed)).toHaveLength(cast.length);
+  });
+
+  it('preserves duplicates — two Wardens in, two Wardens out', () => {
+    // Seat 7 is already Warden in an untouched lobby (roster order), so put a
+    // SECOND one on seat 4 and count: the table must carry both, not fold them.
+    let state = lobby({ online: false });
+    expect(lobbyRosterCast(state).filter((c) => c === 'warden')).toHaveLength(1);
+    while (state.seats[4]!.character !== 'warden') state = cycleSeatCharacter(state, 4);
+    expect(lobbyRosterCast(state).filter((c) => c === 'warden')).toHaveLength(2);
+    expect(lobbyRosterCast(state)[4]).toBe('warden');
+    expect(lobbyRosterCast(state)[7]).toBe('warden');
   });
 });

@@ -24,6 +24,7 @@ import { FireMode, createControlState, mapActions, resetControlState } from './a
 import { PANEL_ROWS_TOP, WheelInput, writeWheelOrders } from './wheel-input';
 import { TURRET, isCollapsed, isDocked, stationOf, turretCount } from '../sim';
 import { WHEEL_ORDER, TRACK_ORDER, buildWheelModel } from '../ui';
+import { PERSONALITIES, ROSTER } from '../bots';
 
 const LOCAL = 0;
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -59,6 +60,50 @@ describe('the client boots a real match, not a sandbox (GDD §2.1)', () => {
     expect(match.bots).toHaveLength(7);
     expect(match.bots.map((b) => b.seat.id).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(match.bots.some((b) => b.seat.id === LOCAL)).toBe(false);
+  });
+
+  it('seats THE CAST THE LOBBY PICKED, in those slots (a0-06)', () => {
+    // The seam the whole a0-06 report turned on. Before it this config had no
+    // `cast` field, the call inside passed none, and the round-robin ran over the
+    // mixed roster — so the eight lines below were Rusty, Bolt, Foreman, Patch,
+    // Sable, Vulture, Warden whatever the host had chosen.
+    const chosen = ['warden', 'sable', 'vulture', 'warden', 'bolt', 'patch', 'rusty'] as const;
+    const match = bootOfflineMatch({
+      seed: 1,
+      localPlayer: LOCAL,
+      shipClass: ShipClass.Vanguard,
+      cast: [null, ...chosen],
+    });
+
+    const bySlot: (string | null)[] = [null, null, null, null, null, null, null, null];
+    for (const bot of match.bots) bySlot[bot.seat.id] = bot.seat.personality;
+    expect(bySlot).toEqual([null, ...chosen]);
+    // …and the hulls followed the characters into the world, so the silhouette on
+    // the minimap is still information (GDD §2.11).
+    for (const bot of match.bots) {
+      expect(match.world.ships[bot.seat.id]?.shipClass, `slot ${bot.seat.id}`).toBe(
+        PERSONALITIES[bot.seat.personality].shipClass,
+      );
+    }
+  });
+
+  it('honours a duplicate in the cast rather than substituting a name', () => {
+    // Two Wardens in, two Wardens out — eight slots over seven characters, only
+    // three of them Hard, so the developer's own balanced 4v4 needs the repeat.
+    const match = bootOfflineMatch({
+      seed: 1,
+      localPlayer: LOCAL,
+      shipClass: ShipClass.Vanguard,
+      cast: [null, 'warden', 'warden', 'warden', 'warden', 'sable', 'sable', 'vulture'],
+    });
+    expect(match.bots.filter((b) => b.seat.personality === 'warden')).toHaveLength(4);
+    for (const bot of match.bots) expect(bot.difficulty).toBe('hard');
+  });
+
+  it('boots exactly as before when no cast is supplied', () => {
+    // `?debug=1`, the harness, and every existing test take this path: absent the
+    // table, the roster-order fallback is byte-for-byte the old behaviour.
+    expect(boot().bots.map((b) => b.seat.personality)).toEqual([...ROSTER]);
   });
 
   it('opens the field with asteroid wave 1 already scattered (GDD §2.3)', () => {

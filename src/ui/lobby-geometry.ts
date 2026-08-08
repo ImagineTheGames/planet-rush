@@ -478,6 +478,20 @@ export const SEAT_CHIP_WIDTH = ROSTER.trailingWidth;
 /** The chip never eats more than this share of a (narrow) row, so the state-cycle
  *  body — and the row's centre, which the hit-test contract taps — stays clear. */
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
+/**
+ * …and the narrowest the tier chip is allowed to become before the row gives up
+ * something else instead *(a0-06)*.
+ *
+ * It has a floor and no drop rung, unlike every other segment on this row: GDD
+ * §2.1 promises the tier is *shown* now, so a row that dropped it would be a row
+ * that stopped keeping a design rule rather than one that ran out of pixels. 40 is
+ * `HARD` and `EASY` at full size with the row's own padding; `MEDIUM`, the one
+ * word longer than the chip at this width, is auto-fitted down — the same ladder
+ * the side chip already keeps at ITS floor (`../ui/lobby-view` `drawTeamChip`:
+ * "below that the word is auto-fitted down, never up"). It is a value, not a
+ * control, so a shrunk word costs a read rather than a target.
+ */
+export const SEAT_CHIP_MIN = 40;
 
 /**
  * Width of a roster row's trailing **`?` control** — the codex dossier for the
@@ -498,23 +512,36 @@ export const SEAT_CHIP_MAX_FRACTION = 0.4;
  * the u5 lesson about the state control applied to the row's other half.
  *
  * ---------------------------------------------------------------------------
- * WHAT IT COSTS, AND WHAT IT DOES NOT
+ * WHAT IT COSTS, AND THE ORDER A NARROWING ROW GIVES THINGS UP IN
  * ---------------------------------------------------------------------------
  * It is the row's *fifth* segment (`bar | STATE | body | team | tier | ?`) and it
  * is deliberately the narrowest: one glyph, no word, so 36 rather than the tier
- * chip's 54. It is carved off the far right and takes its width **before** the
- * tier chip is placed, because a row that could carry only one of them should
- * carry the tier — the difficulty is information GDD §2.1 now promises on the
- * row, and the dossier survives at any width through the long-press that was
- * already there.
+ * chip's 54. A fifth segment on a row that was already tight is a real cost, and
+ * the first cut of it was paid for by the wrong thing — the side chip fell off the
+ * notched landscape phone entirely, which is a ratified mechanic (m10, u3: the
+ * developer played a Teams match they could not read sides in). So the order is
+ * stated once, here, and {@link seatTrailing} is the only place it is applied:
  *
- * Below {@link SEAT_HELP_MIN} it is dropped whole rather than drawn as a clipped
- * stub — the same rung {@link SEAT_STATE_MIN} and {@link SEAT_TEAM_CHIP_MIN}
- * keep, and the reason the fallback above is stated rather than assumed.
+ *  1. **The `?` shrinks, then drops.** Its dossier is still reachable by a
+ *     long-press on the row, which shipped in c1 and is unchanged; the tier and
+ *     the side are reachable no other way. It goes first for that reason alone.
+ *  2. **The tier chip shrinks to {@link SEAT_CHIP_MIN}** and never drops — GDD
+ *     §2.1 promises the difficulty is shown.
+ *  3. **The side chip keeps {@link SEAT_TEAM_CHIP_MIN}**, below which it was
+ *     already dropped whole (u3), and the row **body keeps
+ *     {@link SEAT_ROW_BODY_MIN}** absolutely (u7-03). Neither is ever spent to
+ *     buy a `?`.
+ *
+ * Below {@link SEAT_HELP_MIN} the `?` is dropped whole rather than drawn as a
+ * clipped stub — the same rung {@link SEAT_STATE_MIN} and {@link SEAT_TEAM_CHIP_MIN}
+ * keep, and the reason the long-press fallback above is stated rather than assumed.
  */
 export const SEAT_HELP_WIDTH = 36;
-/** …and the narrowest one that is still a legible glyph rather than a smudge. */
-export const SEAT_HELP_MIN = 20;
+/** …and the narrowest one that is still a thumbable glyph rather than a smudge.
+ *  24 is what lets the notched landscape phone — the tightest row QA's matrix
+ *  produces, ~205px — carry the `?` at all; the row is full-height, so the target
+ *  is 24 × the row's 48+, not 24 square. */
+export const SEAT_HELP_MIN = 24;
 /** …never more than this share of a narrow row. Small, because it is one glyph. */
 export const SEAT_HELP_MAX_FRACTION = 0.14;
 /**
@@ -1084,12 +1111,13 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   };
   const seatColumns = placeSeats(seats, seatsBox, rosterRowHeight(metrics), gap);
   const seatStates = seats.map((rect) => stateRect(rect));
-  // Right to left: the `?` first, then the tier chip inside what it left, then the
-  // side chip inside what THAT left. Each measures from the one outboard of it, so
-  // no segment can be drawn under its neighbour at any row width (a0-06).
-  const seatHelp = seats.map((rect) => helpRect(rect));
-  const seatChips = seats.map((rect, i) => chipRect(rect, seatHelp[i]!));
-  const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!, seatStates[i]!));
+  // The three trailing segments are placed together, because they compete for one
+  // budget and placing them separately is how the side chip fell off the notched
+  // landscape phone (a0-06; {@link seatTrailing}).
+  const trailing = seats.map((rect, i) => seatTrailing(rect, seatStates[i]!));
+  const seatHelp = trailing.map((t) => t.help);
+  const seatChips = trailing.map((t) => t.tier);
+  const seatTeamChips = trailing.map((t) => t.team);
   const mapColumns = placeMaps(maps, mapBand);
 
   return {
@@ -1203,32 +1231,72 @@ function stateRect(seat: Rect): Rect {
  * hit-test contract taps a seat at its centre and must still land on the row body
  * ({@link lobbyHitTest} checks the chip first, so a tap *on* the chip wins).
  */
-function chipRect(seat: Rect, help: Rect): Rect {
-  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
-  // The `?` control is placed first and this measures from its left edge, so the
-  // tier chip's word never runs under the glyph (a0-06).
-  const right = help.width > 0 ? help.x - SEAT_CHIP_PAD : seat.x + seat.width;
-  const width = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
-  return { x: right - width, y: seat.y, width, height: seat.height };
-}
-
 /**
- * A roster row's trailing **`?` control** — the codex dossier for the character in
- * that seat (a0-06; see {@link SEAT_HELP_WIDTH} for why it is a control rather
- * than a hover). The far-right segment, taking its width before the tier chip so
- * a shrinking row loses the dossier button before it loses the difficulty, and
- * dropped whole below {@link SEAT_HELP_MIN} rather than drawn as a stub.
+ * The whole trailing group of one roster row, placed in one pass: the `?`, the
+ * tier chip, and the side chip, right to left *(a0-06)*.
+ *
+ * It is one function because they compete for one budget, and the first cut of
+ * the `?` proved what happens when three functions each hold their own opinion
+ * about how much room is left: the `?` took its 32px off the far right, the tier
+ * chip measured from *its* left edge, and the side chip — measured last, from what
+ * those two had already spent — fell to zero on the notched landscape phone. That
+ * is a ratified mechanic silently disappearing to buy a new affordance, which is
+ * the trade this file exists to make impossible.
+ *
+ * So the order of surrender is applied here and stated at {@link SEAT_HELP_WIDTH}:
+ * the `?` shrinks and then drops, the tier chip shrinks to {@link SEAT_CHIP_MIN}
+ * and never drops, and the side chip's {@link SEAT_TEAM_CHIP_MIN} and the body's
+ * {@link SEAT_ROW_BODY_MIN} are never spent at all.
  */
-function helpRect(seat: Rect): Rect {
-  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
-  const room = Math.min(SEAT_HELP_WIDTH, seat.width * SEAT_HELP_MAX_FRACTION);
-  const width = room >= SEAT_HELP_MIN ? room : 0;
-  return {
-    x: width > 0 ? seat.x + seat.width - width : seat.x,
-    y: seat.y,
-    width,
-    height: width > 0 ? seat.height : 0,
-  };
+function seatTrailing(seat: Rect, state: Rect): { help: Rect; tier: Rect; team: Rect } {
+  const empty: Rect = { x: seat.x, y: seat.y, width: 0, height: 0 };
+  if (seat.width <= 0 || seat.height <= 0) return { help: empty, tier: empty, team: empty };
+
+  // Everything after the identity bar, the state control and the row body's own
+  // absolute minimum. This is the budget; nothing below may exceed it.
+  const room = seat.x + seat.width - seatBodyEnd(seat, state);
+
+  let tier = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
+  let help = Math.min(SEAT_HELP_WIDTH, seat.width * SEAT_HELP_MAX_FRACTION);
+  if (help < SEAT_HELP_MIN) help = 0;
+
+  /** What the side chip would be left with, given the two widths above. */
+  const sideRoom = (): number =>
+    room - tier - SEAT_CHIP_PAD - (help > 0 ? help + SEAT_CHIP_PAD : 0);
+
+  const tierWant = tier;
+  // 1. The `?` gives way first, shrinking toward its floor.
+  if (sideRoom() < SEAT_TEAM_CHIP_MIN && help > 0) {
+    help = Math.min(help, room - tier - 2 * SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN);
+  }
+  // 2. Before the `?` is DROPPED, the tier chip shrinks toward its own floor to buy
+  //    it back — a control that is gone is worse than a value whose word is fitted
+  //    down, and the tier is a value.
+  if (help > 0 && help < SEAT_HELP_MIN) {
+    tier = Math.max(
+      SEAT_CHIP_MIN,
+      Math.min(tier, room - 2 * SEAT_CHIP_PAD - SEAT_HELP_MIN - SEAT_TEAM_CHIP_MIN),
+    );
+    help = Math.min(SEAT_HELP_WIDTH, room - tier - 2 * SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN);
+  }
+  // 3. Only then is it dropped whole — and the tier takes its width back, because
+  //    the row it was shrunk for is no longer being drawn. A row this narrow is
+  //    below anything QA's matrix produces, and the dossier is the only one of the
+  //    three with a second way in (the long-press).
+  if (help < SEAT_HELP_MIN) {
+    help = 0;
+    tier = Math.max(SEAT_CHIP_MIN, Math.min(tierWant, room - SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN));
+  }
+  tier = Math.max(0, Math.min(tier, room));
+
+  const helpRect: Rect =
+    help > 0
+      ? { x: seat.x + seat.width - help, y: seat.y, width: help, height: seat.height }
+      : empty;
+  const tierRight = help > 0 ? helpRect.x - SEAT_CHIP_PAD : seat.x + seat.width;
+  const tierRect: Rect =
+    tier > 0 ? { x: tierRight - tier, y: seat.y, width: tier, height: seat.height } : empty;
+  return { help: helpRect, tier: tierRect, team: teamChipRect(seat, tierRect, state) };
 }
 
 /**
