@@ -428,19 +428,19 @@
         {
           "id": "a",
           "wav": "previews/buildPlaced/a.wav",
-          "character": "heavy iron clank and settle",
+          "character": "ratchet teeth, a dry stepped bite",
           "params": "src/art/audio/candidates.ts#buildPlaced.a"
         },
         {
           "id": "b",
           "wav": "previews/buildPlaced/b.wav",
-          "character": "soft magnetic snap and lock",
+          "character": "clamp seating under load, weight down",
           "params": "src/art/audio/candidates.ts#buildPlaced.b"
         },
         {
           "id": "c",
           "wav": "previews/buildPlaced/c.wav",
-          "character": "ratchet click-lock, stepped texture",
+          "character": "magnetic lock, one narrow band shutting",
           "params": "src/art/audio/candidates.ts#buildPlaced.c"
         }
       ]
@@ -448,25 +448,25 @@
     {
       "id": "buildComplete",
       "label": "Build Complete",
-      "context": "A paid-for defence finishes building — rising perfect fifth confirmation.",
+      "context": "A paid-for defence finishes building — a rising confirmation.",
       "current": "previews/buildComplete/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/buildComplete/a.wav",
-          "character": "single-voice chiptune arpeggio fifth",
+          "character": "assembly settling, three dry contacts",
           "params": "src/art/audio/candidates.ts#buildComplete.a"
         },
         {
           "id": "b",
           "wav": "previews/buildComplete/b.wav",
-          "character": "warm sine swell, soft glow",
+          "character": "pressure system coming up to seat",
           "params": "src/art/audio/candidates.ts#buildComplete.b"
         },
         {
           "id": "c",
           "wav": "previews/buildComplete/c.wav",
-          "character": "chunky retro two-step blip",
+          "character": "two bands locking, a fifth apart",
           "params": "src/art/audio/candidates.ts#buildComplete.c"
         }
       ]
@@ -474,25 +474,25 @@
     {
       "id": "repairTick",
       "label": "Repair Tick",
-      "context": "A soft repair tick while a structure heals — noticed mostly when it stops.",
+      "context": "A soft tick as a repair purchase is applied to a structure.",
       "current": "previews/repairTick/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/repairTick/a.wav",
-          "character": "gentle rising sine chirp",
+          "character": "weld grain, dry and stepped",
           "params": "src/art/audio/candidates.ts#repairTick.a"
         },
         {
           "id": "b",
           "wav": "previews/repairTick/b.wav",
-          "character": "mellow steady triangle pulse",
+          "character": "sealant press, low and closing",
           "params": "src/art/audio/candidates.ts#repairTick.b"
         },
         {
           "id": "c",
           "wav": "previews/repairTick/c.wav",
-          "character": "tiny narrow-duty square blip",
+          "character": "servo pip, one narrow band",
           "params": "src/art/audio/candidates.ts#repairTick.c"
         }
       ]
@@ -532,19 +532,19 @@
         {
           "id": "a",
           "wav": "previews/upgradeBought/a.wav",
-          "character": "fast bright square arpeggio sparkle",
+          "character": "three dry contacts rising, no shine",
           "params": "src/art/audio/candidates.ts#upgradeBought.a"
         },
         {
           "id": "b",
           "wav": "previews/upgradeBought/b.wav",
-          "character": "shimmering layered bell harmonics",
+          "character": "pressure lifting into a seat, sub under it",
           "params": "src/art/audio/candidates.ts#upgradeBought.b"
         },
         {
           "id": "c",
           "wav": "previews/upgradeBought/c.wav",
-          "character": "glissando sparkle sweep upward",
+          "character": "three narrow bands rising, metal ringing",
           "params": "src/art/audio/candidates.ts#upgradeBought.c"
         }
       ]
@@ -558,19 +558,19 @@
         {
           "id": "a",
           "wav": "previews/waveArrive/a.wav",
-          "character": "deep dual-note saw foghorn",
+          "character": "two horn blasts, air-driven and grained",
           "params": "src/art/audio/candidates.ts#waveArrive.a"
         },
         {
           "id": "b",
           "wav": "previews/waveArrive/b.wav",
-          "character": "pulsing square siren, mechanical",
+          "character": "twin pressure horns, mass behind them",
           "params": "src/art/audio/candidates.ts#waveArrive.b"
         },
         {
           "id": "c",
           "wav": "previews/waveArrive/c.wav",
-          "character": "gritty noise-and-sub drone horn",
+          "character": "two swept bands, siren metal",
           "params": "src/art/audio/candidates.ts#waveArrive.c"
         }
       ]
@@ -584,19 +584,19 @@
         {
           "id": "a",
           "wav": "previews/collapseBegin/a.wav",
-          "character": "grinding low noise rumble bed",
+          "character": "structure grinding, grains under load",
           "params": "src/art/audio/candidates.ts#collapseBegin.a"
         },
         {
           "id": "b",
           "wav": "previews/collapseBegin/b.wav",
-          "character": "throbbing vibrato dread pulse",
+          "character": "pressure dropping, a long low swallow",
           "params": "src/art/audio/candidates.ts#collapseBegin.b"
         },
         {
           "id": "c",
           "wav": "previews/collapseBegin/c.wav",
-          "character": "crumbling stepped structural groan",
+          "character": "resonance opening, metal under strain",
           "params": "src/art/audio/candidates.ts#collapseBegin.c"
         }
       ]
@@ -610,19 +610,19 @@
         {
           "id": "a",
           "wav": "previews/stationDeath/a.wav",
-          "character": "deep collapsing sine descent",
+          "character": "the floor going out, everything letting go",
           "params": "src/art/audio/candidates.ts#stationDeath.a"
         },
         {
           "id": "b",
           "wav": "previews/stationDeath/b.wav",
-          "character": "muffled noise implosion, sub-bass swallow",
+          "character": "pressure loss, a long fall with no bottom",
           "params": "src/art/audio/candidates.ts#stationDeath.b"
         },
         {
           "id": "c",
           "wav": "previews/stationDeath/c.wav",
-          "character": "slow tolling drone, cracking decay",
+          "character": "one detuned resonance, leaving the room",
           "params": "src/art/audio/candidates.ts#stationDeath.c"
         }
       ]
@@ -636,19 +636,19 @@
         {
           "id": "a",
           "wav": "previews/matchEnd/a.wav",
-          "character": "triumphant triangle fanfare",
+          "character": "three dry contacts, rising and settling",
           "params": "src/art/audio/candidates.ts#matchEnd.a"
         },
         {
           "id": "b",
           "wav": "previews/matchEnd/b.wav",
-          "character": "warm blended sine chord swell",
+          "character": "a low swell coming to rest",
           "params": "src/art/audio/candidates.ts#matchEnd.b"
         },
         {
           "id": "c",
           "wav": "previews/matchEnd/c.wav",
-          "character": "bouncy square staircase climb",
+          "character": "wide bands opening, metal resolving",
           "params": "src/art/audio/candidates.ts#matchEnd.c"
         }
       ]
@@ -656,25 +656,25 @@
     {
       "id": "alarm",
       "label": "Home Alarm",
-      "context": "Your home is under attack (GDD §2.2) — a mechanic, not music; loops until the threat clears.",
+      "context": "Your home is under attack (GDD §2.2) — a mechanic, not music; sounded once per engagement.",
       "current": "previews/alarm/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/alarm/a.wav",
-          "character": "classic twin-tone klaxon",
+          "character": "klaxon with grain in it, driven hard",
           "params": "src/art/audio/candidates.ts#alarm.a"
         },
         {
           "id": "b",
           "wav": "previews/alarm/b.wav",
-          "character": "slow blaring foghorn siren",
+          "character": "pressure siren, a horn body under the tone",
           "params": "src/art/audio/candidates.ts#alarm.b"
         },
         {
           "id": "c",
           "wav": "previews/alarm/c.wav",
-          "character": "rapid stuttering distress pulse",
+          "character": "swept band klaxon, metal in the corner",
           "params": "src/art/audio/candidates.ts#alarm.c"
         }
       ]
