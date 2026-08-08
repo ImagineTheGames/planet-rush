@@ -41,6 +41,42 @@
  * implemented it faithfully. The re-voice is `docs/audio-revoice-spec.md` (s7-01),
  * executed under s7-02.*
  *
+ * ## Round 2, and what round 1 got wrong (s8-01, 2026-08-08)
+ *
+ * The developer denied **all forty slots at once**, in the same words as before:
+ * *"still have all the old sounds i said i didnt want there … make new ones that
+ * match the new theme (modern/sci-fi and not retro/toony)."* Measured against the
+ * live deployment first — the shipped bundle's `rockChip` is byte-identical to
+ * this file's — so they were hearing round 1, not a stale build.
+ *
+ * Round 1 obeyed the spec to the letter and still missed, because it changed
+ * **which oscillator** a sound used and nothing about **how a sound is made**.
+ * `square` left; {@link strike}'s ancestor put bare sine partials in its place,
+ * `sine` went to 48.3% of the bank, and **83 of 116 voices carried no grain, no
+ * filter and no decay curve at all** — tone generators sounding, rather than
+ * bodies being struck. An arcade blip became a toy xylophone.
+ *
+ * So round 2 is a change of instrument, not of palette. `../synth` grew four
+ * capabilities and this file spends them:
+ *
+ *  - **A real tail on everything.** `decayCurve` on every voice that decays, with
+ *    the klaxon the one named exception. A linear ramp to silence is a volume
+ *    knob turning down, and it was on every percussive sound in both passes.
+ *  - **Filter movement as the gesture.** Twenty-four voices sweep a resonant
+ *    cutoff. This is the distinction the register turns on: a *pitch* slide inside
+ *    a short voice is the chirp §5.4 retires, where a *filter* closing over a
+ *    fixed pitch is a machine losing energy — a coil dumping charge, a bubble
+ *    failing, a drive spinning up.
+ *  - **Material instead of tone.** Twenty-one band-passed noise transients, where
+ *    a tone's attack segment used to stand in for two hard things touching.
+ *  - **One room, in one place.** {@link SOUND.shipExplode} alone gets late
+ *    returns, because an explosion is the event a sense of place belongs to and a
+ *    28 ms interface tick is not.
+ *
+ * The bare-tone count is 6 of 135 now, and all six are sustained drones where a
+ * pure tone genuinely is the design. `audio.test.ts` holds the budget, and it was
+ * verified RED against the bank the developer rejected before it went green here.*
+ *
  * ## The rock-vs-hull firing voices, after the laser's retirement
  *
  * GDD §3.6 asks for *"the distinct rock-vs-hull firing sounds"* by name, because

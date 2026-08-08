@@ -91,13 +91,18 @@ import { mulberry32 } from '@shared/types';
  */
 export type Wave =
   /**
-   * Hollow and arcade. **Not used in the bank** (0 of 112 voices, from 21 of 89):
+   * Hollow and arcade. **Not used in the bank** (0 of 135 voices, from 21 of 89):
    * a square with a low duty was a tone generator standing in for a struck body,
    * and a struck body is what the register actually wants.
+   *
+   * Worth saying plainly, because retiring this shape did **not** on its own fix
+   * the complaint that retired it: the bank that replaced every `square` with a
+   * bare sine partial was judged toony a second time (s8-01). The oscillator was
+   * never carrying the register. What it is made of after the oscillator is.
    */
   | 'square'
   /**
-   * Bright and rude. **Used in the bank once**, by {@link SOUND.alarm} and only
+   * Bright and rude. **Used in the bank twice**, by {@link SOUND.alarm} and only
    * there: rudeness is not the register, but a saw's dense harmonic stack is
    * what stops a klaxon sounding like music, and §2.2's *"unmistakable alarm"*
    * is a mechanic. Legibility outranks register (§4.7).
