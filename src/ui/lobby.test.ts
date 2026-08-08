@@ -78,6 +78,7 @@ import {
   setPlayerName,
   shipStatLines,
   sideRelation,
+  sideRosterOf,
   startLobbyMatch,
   teamLabel,
   teamName,
@@ -1046,6 +1047,53 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
     expect(cycleSeatTeam(guest, 1)).toBe(guest);
     const counting = pressRush(toggleMode(lobby()));
     expect(cycleSeatTeam(counting, 1)).toBe(counting);
+  });
+
+  /**
+   * a0-09 — the roster the end-of-match summary asks "did MY side take the
+   * claim?" of (`./end-of-match` `MatchOutcome.allies`). It exists because the
+   * flow learns a match ended from a `matchEnd` message and holds no `World`; the
+   * lobby's own `team` table is the same answer, because allegiance is static
+   * match config fixed at match start (GDD §2.1, §4.2).
+   */
+  describe('the side roster the summary reads', () => {
+    it('in TEAMS holds you and every ally, and no enemy', () => {
+      const teams = toggleMode(lobby());
+      // Default alternating split: evens are side A, odds side B.
+      expect(sideRosterOf(teams, 0)).toEqual(new Set([0, 2, 4, 6]));
+      expect(sideRosterOf(teams, 1)).toEqual(new Set([1, 3, 5, 7]));
+      // Move seat 3 across and both rosters follow — one table, not two.
+      let moved = teams;
+      while (moved.seats[3]!.team !== 0) moved = cycleSeatTeam(moved, 3);
+      expect(moved.seats[3]!.team).toBe(0);
+      expect(sideRosterOf(moved, 0)).toContain(3);
+      expect(sideRosterOf(moved, 1)).not.toContain(3);
+    });
+
+    it('in FFA is you alone — teams-of-one, whatever the seats still remember', () => {
+      // A seat keeps its side across a mode switch so flipping to TEAMS and back
+      // never loses an assignment, so the gate has to be the MODE, not the table.
+      const ffa = lobby();
+      expect(ffa.seats[2]!.team).toBe(defaultTeamForSlot(2));
+      for (const slot of [0, 2, 5]) expect(sideRosterOf(ffa, slot)).toEqual(new Set([slot]));
+
+      const roundTrip = toggleMode(toggleMode(lobby()));
+      expect(sideRosterOf(roundTrip, 0)).toEqual(new Set([0]));
+    });
+
+    it('leaves CLOSED seats out — a shut door takes no field and is on no side', () => {
+      let teams = toggleMode(lobby());
+      teams = cycleSeatState(cycleSeatState(teams, 2), 2); // open → bot → closed
+      expect(teams.seats[2]!.occupant).toBe('closed');
+      expect(sideRosterOf(teams, 0)).toEqual(new Set([0, 4, 6]));
+    });
+
+    it('puts a seatless player on their own side, never on nobody’s', () => {
+      // A slot outside the roster (a spectator, a stale id) is still on its own
+      // side — the set is never empty, so the summary can never read a win by the
+      // local player as somebody else's.
+      expect(sideRosterOf(toggleMode(lobby()), 99)).toEqual(new Set([99]));
+    });
   });
 
   it('surfaces per-side counts in the model, always, never blocking a split', () => {

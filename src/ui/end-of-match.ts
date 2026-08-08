@@ -62,12 +62,38 @@ export type DeathCause = 'destroyed' | 'collapse';
 export interface MatchOutcome {
   /** The seat reading this summary — whose victory or defeat it is. */
   readonly you: PlayerId;
-  /** The surviving winner, or `null` for a draw / no-survivor end. Only
-   *  meaningful when {@link matchOver} — an elimination has no winner yet. */
+  /**
+   * The surviving winner, or `null` for a draw / no-survivor end. Only
+   * meaningful when {@link matchOver} — an elimination has no winner yet.
+   *
+   * **This is a representative of the winning side, not necessarily you.** The
+   * sim crowns the last surviving core it walks (`sim/match.ts` `resolveWinner`),
+   * and a side that ends with two cores standing reports whichever of them sits
+   * later in `world.stations` — so in TEAMS your own side's win routinely arrives
+   * under an ally's id, with your core still intact. Read it through
+   * {@link onYourSide}, never with `===`.
+   */
   readonly winner: PlayerId | null;
   /** `true`: the whole match is over. `false`: you were eliminated and the
    *  others fight on — the case that still has something to spectate. */
   readonly matchOver: boolean;
+  /**
+   * The owner slots on **your side** — you, and in TEAMS your allies.
+   *
+   * The same roster shape the audio engine already takes for the under-attack
+   * alarm (`art/audio/engine` `setAlarmScope(allies, …)`, built by
+   * `art/audio/scope` `deriveAlarmAllies`), and the wiring hands both surfaces
+   * the *same set* (`src/main.ts` `alarmAllies()`), so the screen that reports
+   * your result and the klaxon that rang for your side can never disagree about
+   * who "your side" is. One predicate, one answer (GDD §2.1; `sim/allegiance`
+   * `sameSide`).
+   *
+   * Omitted means **teams-of-one** — your side is you alone, which is exactly FFA
+   * (`sim/allegiance`: "FFA is teams-of-one"). Every FFA outcome, and every
+   * fixture written before sides existed, therefore reads character for character
+   * as it did before.
+   */
+  readonly allies?: ReadonlySet<PlayerId>;
   /** 1-based finishing place on an elimination — the "6th" of "6th of 8" (field
    *  report v0.1.2). First core to fall places last; the lone survivor is 1st.
    *  Omitted (and the placement line dropped) when the wiring didn't supply it. */
@@ -81,11 +107,44 @@ export interface MatchOutcome {
 /** What the summary says happened. */
 export type EndKind = 'victory' | 'defeat' | 'draw' | 'eliminated';
 
-/** Read a raw outcome as one of the four things a player can be told. */
+/**
+ * Is `player` on the seat's own side? — the summary's ONE allegiance question,
+ * asked in one place so the headline, the line under it and the identity rule
+ * cannot answer it three ways.
+ *
+ * A player is always on their own side (the `=== you` short-circuit), exactly as
+ * `sim/allegiance` `areEnemies` guarantees self-immunity independent of any team
+ * accounting; beyond that it is membership of {@link MatchOutcome.allies}. With
+ * no roster the side is you alone — teams-of-one, i.e. FFA.
+ */
+export function onYourSide(outcome: MatchOutcome, player: PlayerId | null): boolean {
+  if (player === null) return false;
+  if (player === outcome.you) return true;
+  return outcome.allies?.has(player) ?? false;
+}
+
+/**
+ * Read a raw outcome as one of the four things a player can be told.
+ *
+ * ── a0-09: THE IDENTITY CHECK THAT TOLD A WINNER THEY LOST ──────────────────
+ * This was `outcome.winner === outcome.you` — a pure identity test, on a type
+ * that had no notion of a side at all. In TEAMS that made an ally's win
+ * arithmetically identical to an enemy's: `winner !== you`, therefore DEFEAT. The
+ * developer's report (2026-08-07) is the whole of it — *"i lost somehow but my
+ * team is the one that won"*, over a screen reading DEFEAT and naming their own
+ * teammate. It was not a race or an edge case: **every** Teams win by anyone but
+ * the local player reported a loss, including wins where the player's own core
+ * was still standing (the sim crowns the last surviving core it walks, so a side
+ * that ends with two cores alive reports the higher slot).
+ *
+ * So the question became the one the sim has always asked: is the winner on my
+ * side? FFA is teams-of-one, so `allies` is absent there and this reduces to the
+ * old identity check character for character.
+ */
 export function endKind(outcome: MatchOutcome): EndKind {
   if (!outcome.matchOver) return 'eliminated';
   if (outcome.winner === null) return 'draw';
-  return outcome.winner === outcome.you ? 'victory' : 'defeat';
+  return onYourSide(outcome, outcome.winner) ? 'victory' : 'defeat';
 }
 
 // ---------------------------------------------------------------------------
@@ -236,10 +295,27 @@ export function endOfMatchModel(outcome: MatchOutcome, pointer: EndPointer = {})
   };
 }
 
+/**
+ * The line under the headline — and in TEAMS it has to change with the headline,
+ * not just under it (a0-09).
+ *
+ * The developer's screenshot was a DEFEAT headline over *"Player 7 took the
+ * claim."*, and **both halves were wrong**: Player 7 was their teammate, so the
+ * result was a win, and the sentence read like an opponent's win because that is
+ * the only sentence a side-blind screen had. A victory taken by an ally is
+ * therefore its own line: it says *your side* took the claim — the fact the
+ * headline just stated — and then names who actually held it, because "an ally
+ * won" without a name is a worse answer than the wrong one.
+ *
+ * The three shapes keep the same spine, `took the claim`, so §4.7 register 2
+ * still files a win and a loss in one sentence shape and congratulates neither.
+ */
 function subheadFor(kind: EndKind, outcome: MatchOutcome): string {
   switch (kind) {
     case 'victory':
-      return 'You took the claim.';
+      return outcome.winner === null || outcome.winner === outcome.you
+        ? 'You took the claim.'
+        : `Your side took the claim — ${playerLabel(outcome.winner)} held it.`;
     case 'defeat':
       return `${playerLabel(outcome.winner)} took the claim.`;
     case 'draw':
@@ -300,10 +376,35 @@ function ordinal(n: number): string {
   }
 }
 
+/**
+ * The identity rule's colour — **the winner's, on every end that has one**.
+ *
+ * ── a0-09: THE COLOUR SEAM, DECIDED ─────────────────────────────────────────
+ * This read `playerColor(you)` on victory and `playerColor(winner)` on defeat.
+ * While victory meant *you* won, those were the same number and the split was
+ * invisible; an ally victory is the first outcome that takes the victory path
+ * with someone else's name under it, so the split had to be settled rather than
+ * inherited.
+ *
+ * It resolves to the winner, for the reason this file already states about the
+ * rule: *"the rule says it in colour, the line under it says it in words"*. On an
+ * ally win the words name Player 8; painting the rule in **your** colour would
+ * put the screen's two carriers of one fact in disagreement — which is the exact
+ * class of bug a0-09 exists to fix, in a smaller font. Self-victory is unchanged
+ * character for character, because there `winner === you`.
+ *
+ * **The side is not drawn here, deliberately.** GDD §2.1 shows a side as an added
+ * indicator (nameplate underline / shared beacon-ring motif) and §5.7 is explicit
+ * about where that motif's blue/red may land: the motif only, *"never a hull,
+ * never a ship's trim, never an HP bar"* — those stay the player's identity
+ * colour. This rule is the end screen's identity surface, the HP bar's sibling,
+ * so tinting it by side would break the one rule that keeps two enemies apart at
+ * three and four sides. The side is carried where §2.1 carries it: **in words**,
+ * by {@link subheadFor}'s "Your side took the claim".
+ */
 function accentFor(kind: EndKind, outcome: MatchOutcome): number | null {
-  if (kind === 'victory') return playerColor(outcome.you);
-  if (kind === 'defeat' && outcome.winner !== null) return playerColor(outcome.winner);
-  return null;
+  if (kind !== 'victory' && kind !== 'defeat') return null;
+  return outcome.winner === null ? null : playerColor(outcome.winner);
 }
 
 /** A player as a person, not a number: "Player 3", one-based, the way the roster
