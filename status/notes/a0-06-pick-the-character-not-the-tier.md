@@ -593,6 +593,76 @@ again:** `pgrep -fa "vite preview"` is the wrong tool on this box — every lane
 `claude -p` carries the brief in its argv and matches. `ss -ltnp | grep ':41'`
 names the lane and the port directly and is what I used to pick 4196.
 
+### Session 2026-08-08 (ninth) — the second port config, and a merge that touched nothing
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, before believing anything else, which is session 5's lesson and
+the only check that catches session 7's failure mode) with 39 evidence PNGs
+dirty **and one file that was not churn**. No feature work outstanding; none
+invented.
+
+**The tree held an uncommitted change to the ROOT `playwright.config.ts`** — the
+mobile suite's config — carrying the same `PREVIEW_PORT` override this branch
+already landed for the live-stage config in `a1bc039`, with a written rationale
+that names a real a0-06 incident. It was **not** evidence churn and `git
+checkout -- tests/live-stage/` would not have touched it, but a future session
+that ran a blanket restore would have lost it. Committed it as `7701b62`,
+**separately and marked PROPOSED**, because `playwright.config.ts` and
+`tests/mobile/` are QA's — same posture as `a1bc039`. Default is still 4173, so
+CI and every existing invocation are byte-identical.
+
+Worth stating the general rule, since this is the first time a dirty tree on this
+branch contained anything but PNGs: **read `git status` before restoring it.**
+"39 modified evidence PNGs" is a pattern, not a licence — the fortieth line was a
+deliberate change with a paragraph of justification in it.
+
+**`origin/main` had moved to `f7d06b0`** (a0-09 team-aware end-of-match again,
+this time PR **#328** — the same branch's follow-up to #327, which session 8
+merged). Merged first, before measuring anything (session 7's rule). **Clean, no
+conflicts, and this time it did not even come near:** the six files are
+`src/ui/end-of-match.test.ts`, a0-09's own status note, `end-screens-teams.spec.ts`
+and three of its evidence frames. Nothing in `src/bots/`, nothing in the lobby,
+nothing in `src/main.ts`. Pushed `18cf024..cd9c96b` **immediately after
+committing**, before running a single gate.
+
+**This is the sixth merge in a row to leave the cast seam untouched.**
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run before committing the merge, which is the point).
+- `npm test -- --run` — **4032 passed, 0 failed**, 240 files.
+  `capacity-regression` passed at load ~12. Sessions 2/4/5/6/7/8 already settled
+  it as a wall-clock benchmark that only trips under lane contention; do not
+  chase it.
+- `PREVIEW_PORT=4197 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  (cast round trip 29.8s, `?` by click on PC 5.9s, `?` by tap at 390px landscape
+  26.5s). Full sweep run separately; result below.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `f7d06b0`.
+  Both amendment markers verified by grep rather than assumed — §2.1 line 56
+  *"the host picks each bot's CHARACTER"*, §2.9 line 233 *"characters, not
+  difficulty labels"*.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** on top of the #328 merge — slot 0 `null` (the human), slots
+1–7 `warden warden sable vulture warden sable vulture` in the lobby and the
+*same seven* in the match, `identical: true`. It is absent from `b17e9af`'s diff
+and **that absence IS the result**. That file is the evidence; the PNGs picture
+it.
+
+`b17e9af` re-shot the four frames (the committed set was from `2f3acf4`, older
+than this merge; the badge stamps the hash, so they now read `cd9c96b`). The
+**match frame catches no rival nameplate** this run, landing at MATCH 0:02.
+`f517ef7` caught one, `2f3acf4` did not — it is luck either way, which is
+precisely why the spec writes all seven names to the readback instead of hoping
+a plate drifts into shot. **Do not treat either outcome as a regression.**
+
+The lobby frame remains the developer's case in one picture: seven rows reading
+`Warden 1 / Warden 2 / Sable 1 / Vulture 1 / Warden 3 / Sable 2 / Vulture 2`,
+hull under each name, a read-only `HARD` chip, a `?`. The codex frame shows the
+dossier open over a *mixed-tier* cast (`EASY` / `MEDIUM` / `HARD` chips down the
+column), which is the better picture of the point: the chip is derived from
+whoever is in the seat and cannot disagree with it.
+
 ## NEXT (unchanged from session 1, restated so it is not lost)
 
 - **ONLINE still carries the tier, not the name.** `LobbyChoiceMessage` has
@@ -602,6 +672,8 @@ names the lane and the port directly and is what I used to pick 4196.
   seam (`transport.ts` → `wire.ts` → `session.ts` → `server/room.ts` `castFor`),
   four files across two other agents' ownership and outside this brief. Stated in
   the PR body and in `docs/design-amendments.md`.
-- `PREVIEW_PORT` remains marked *(a0-06, proposed)* — `tests/live-stage/` is
-  Platform's to accept or reject.
+- `PREVIEW_PORT` remains marked *(a0-06, proposed)* in **two** configs now —
+  `tests/live-stage/playwright.config.ts` (`a1bc039`, Platform's) and the root
+  `playwright.config.ts` for the mobile suite (`7701b62`, QA's). Either owner can
+  drop their own; both default to 4173 unchanged.
 - No other feature work outstanding. Do not invent any.
