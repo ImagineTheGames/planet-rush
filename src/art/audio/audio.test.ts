@@ -1681,6 +1681,59 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     expect(ringsFor(5)).toEqual({ active: false, sounds: 0 }); // any other rival
   });
 
+  it('KNOWN LIMIT: sustained core fire cannot raise the alarm below ~20 fps (s9-01 finding)', () => {
+    // Found while trying to prove the one-shot in a booted client rather than in
+    // memory: headless Chromium renders this scene at 2–4 fps, and the alarm
+    // could not be made to fire there AT ALL, however hard the core was hit.
+    //
+    // The cause is a units mismatch that predates this lane and is not its to
+    // change. Pressure is deposited per EVENT (`damage()`, +WEIGHTS[kind]) and
+    // leaked per SECOND (`update(dt)`, −LEAK·dt), and `art/vfx/observer.ts`
+    // emits at most ONE `coreHit` per station per rendered frame — it compares
+    // the core's HP against last frame's, so ten hits in one frame are one tell.
+    // Deposits therefore scale with FRAME RATE while the leak scales with time,
+    // and the break-even is a frame rate, not a damage rate:
+    //
+    //     LEAK / WEIGHTS[coreHit]  =  1.2 / 0.06  =  20 fps
+    //
+    // Above it the pressure climbs to ENGAGE; below it every frame leaks more
+    // than it deposits and the alarm is unreachable no matter how long the siege
+    // runs. This test pins the number so a change to either constant has to face
+    // it, and so the next person to find a silent alarm on a slow device finds
+    // this instead of the wire.
+    //
+    // NOT the whole mechanic: `shieldDown` and `turretDown` weigh 0.8 — over ENGAGE
+    // on their own — so a station actually losing its defences still rings at any
+    // frame rate (GDD §2.6, the events that mean the siege is winning). It is
+    // specifically the slow grind on a bare core that goes unannounced, which is
+    // also the case a player is most likely to be away from.
+    const breakEven = LEAK / WEIGHTS[TELL.coreHit]!;
+    expect(breakEven, 'the arithmetic above, from the shipped constants').toBeCloseTo(20, 6);
+
+    /** One coreHit per rendered frame for `seconds`, at `fps`. */
+    const siege = (fps: number, seconds: number) => {
+      const alarm = new UnderAttackAlarm();
+      const dt = 1 / fps;
+      for (let t = 0; t < seconds; t += dt) {
+        alarm.damage(TELL.coreHit);
+        alarm.update(dt);
+      }
+      return { active: alarm.active, pressure: alarm.pressure };
+    };
+
+    // 60 fps: 3.6/s in, 1.2/s out — it engages, and fast (this is every other
+    // test in this file, and real play on real hardware).
+    expect(siege(60, 2).active, 'a normal frame rate raises the alarm').toBe(true);
+    // 30 fps: 1.8/s in, still ahead. The design holds through a bad-but-playable
+    // frame rate, which is the case worth protecting.
+    expect(siege(30, 4).active, 'and so does a struggling one').toBe(true);
+    // 10 fps: 0.6/s in against 1.2/s out. Thirty seconds of unbroken fire on your
+    // core, and the klaxon never sounds — the pressure cannot even reach ENGAGE.
+    const slow = siege(10, 30);
+    expect(slow.active, 'but a slow device never hears it').toBe(false);
+    expect(slow.pressure, 'and is not even close — it is pinned near zero').toBeLessThan(ENGAGE);
+  });
+
   it('ducks the soundtrack and the SFX under the alarm, not just the ambience', () => {
     // The brief's mix pass: "music and SFX duck under the alarm." The soundtrack
     // and ambience drop hard; the SFX only step aside, because they are the

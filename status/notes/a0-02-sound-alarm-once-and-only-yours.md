@@ -155,23 +155,64 @@ closes it, and it is QA's to write, not this lane's to claim.
 
 ## BUILT, round 2 (this session)
 
-- `5f7738c` — the probe above, plus
-  `tests/live-stage/alarm-once-and-ownership.spec.ts`: the BEHAVIOURAL half. The
-  online spec proves the *wire* but reads a fresh match, so it stops at
-  `sounds: 0` — nothing was ever shot. This one sieges real cores in the shipped
-  bundle through the `?debug=1` write seam (a queued verb `main.ts` drains on a
-  tick boundary through the sim's own `damageStation`, so `coreHit` is emitted
-  only when HP actually falls) and samples the alarm on **every frame**:
-  A 5 s on your core → raises, engagements 1, sounds peak **1**; B released →
-  still 1; C 5 s on a **rival's** core → sounds unchanged, alarm never raises;
-  D 5 s on yours again → 2 and 2. Readout to `evidence/s9-01-alarm-once.json`.
+- `5f7738c` — `evidence/s9-01-live-probe.mjs` + its readout, and the behavioural
+  live-stage spec that the next commit removes (see below — it cannot pass here).
+- the frame-rate finding, pinned as a unit test in `audio.test.ts`
+  (`KNOWN LIMIT: …below ~20 fps`), with the live-stage spec removed in the same
+  commit and the reasoning kept in this file and the PR body.
 
-  Per-frame sampling is the whole point: an end-state read looks identical
-  whether the sting fired once or three hundred times, and "not keep playing" is
-  a claim about every *instant* of the siege. It is an OFFLINE boot, so the local
-  slot is 0 — deliberately not where ownership is proven (slot 0 is exactly the
-  seat a dead wire reads correct on); that claim stays with the online spec and
-  the `local: 3` unit test.
+## FINDING: the alarm cannot fire below ~20 fps, and it is not this lane's to fix
+
+Found by trying to prove the one-shot in a booted client instead of in memory.
+The behavioural live-stage spec (written, run, **deleted** — see below) could not
+raise the alarm in headless Chromium *at all*, however hard the core was hit.
+Measured, `?debug=1`, this bundle: **2.0 fps at 1280×800** (the live-stage
+viewport), 3.0 at 800×600, 6.7 at 640×400, 12.9 at 400×300. `setTimeout(4ms)`
+got 13 ticks in 6 s, so the main thread is saturated by the render loop.
+
+The cause is a units mismatch that predates this lane:
+
+- pressure is deposited per **event** — `damage()`, `+WEIGHTS[kind]`;
+- it leaks per **second** — `update(dt)`, `−LEAK·dt`;
+- and `art/vfx/observer.ts` emits at most **one `coreHit` per station per
+  rendered frame** (it diffs core HP against last frame, so ten hits in one
+  frame are one tell).
+
+So deposits scale with frame rate while the leak scales with time, and the
+break-even is a frame rate: `LEAK / WEIGHTS[coreHit]` = `1.2 / 0.06` = **20 fps**.
+Above it pressure climbs to ENGAGE; below it every frame leaks more than it
+deposits and no siege can ever ring the klaxon.
+
+Not the whole mechanic: `shieldDown` / `turretDown` weigh 0.8 — over ENGAGE on
+their own — so a station actually losing its defences still rings at any frame
+rate (GDD §2.6). It is the slow grind on a bare core that goes unannounced, which
+is also the case the player is most likely to be away from (§2.2's whole point).
+
+**Not fixed here, deliberately.** The honest fix is in the *observer* (emit
+`coreHit` proportional to damage, or accumulate per tick rather than per frame)
+— `src/art/vfx/observer.ts`, which is not this lane's file — and it would move
+*when* a ratified §2.2 mechanic fires. That is a Director/Art call, not a
+sound-lane one, and s9-01 is about the sting and the seat. Pinned instead by a
+unit test, `KNOWN LIMIT: sustained core fire cannot raise the alarm below ~20
+fps`, which asserts 60 fps and 30 fps engage, 10 fps never does over 30 s of
+unbroken fire, and the 20 fps arithmetic off the shipped constants. Named in the
+PR body as a follow-up.
+
+## The behavioural live-stage spec was written, run, and REMOVED
+
+`tests/live-stage/alarm-once-and-ownership.spec.ts` sieged real cores through the
+`?debug=1` write seam and sampled the alarm every frame (A: 5 s on your core →
+one sting; B: release; C: 5 s on a rival's → silence; D: re-engage → two). It is
+the right test and it cannot pass in this suite's environment, for the reason
+above — 22 frames in 5 s, and the pressure never reaches ENGAGE. Committed in
+`5f7738c`, removed in the follow-up commit rather than left red or left skipped:
+a spec that cannot pass on the box the DoD runs on is worse than no spec.
+
+**Do not re-add it without first fixing the frame rate or the deposit model.**
+The behavioural claim is carried by ten unit tests against the real `AudioEngine`
+and a recording AudioContext, which is the finer instrument anyway; the live
+class earns its keep on the *wire* (`alarm-ownership-online.spec.ts`), which is
+where the defect actually was.
 
 ## TRAP, re-hit: the preview on 4173 is shared across lanes
 
