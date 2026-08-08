@@ -8,14 +8,22 @@ the runner has to capture inside a budget. a0-00 split the job four ways.
 This report is what the split measured, what it did **not** fix, and what was
 done about that.
 
-Two sentences of summary, because the rest is arithmetic:
+Four sentences of summary, because the rest is arithmetic:
 
-- **The split works, and so does the rollup** — four runners, one required check,
-  and the one red shard correctly took the whole PR red.
+- **The split works, and so does the rollup** — the one red shard correctly took
+  the whole PR red (§2a).
 - **`--shard` divides by test COUNT, and this suite's tests are nothing like
   uniform**, so the four shards came back at 5 · 12 · 21 · 42 minutes; and the
   four tests that failed did not fail because of sharding and were never going to
-  be fixed by it.
+  be fixed by it (§3, §4).
+- **Three specs were fixed rather than re-budgeted** — a sampling loop priced in
+  frames, and two wheel specs' CDP round trips batched. −32%, nothing asserted
+  differently, no timeout raised (§5).
+- **Then the re-balance broke four goldens that used to pass, and that is the
+  most useful thing in this report** (§6). Balancing shards by total work says
+  nothing about whether two expensive pages run at the same *instant*; at
+  `workers: 2` a unit does not have a cost at all. The suite now runs **one page
+  per runner at N=8** (§6b).
 
 Sibling reports: `mobile-journey-budgets-q7.md` (a budget per test),
 `golden-diffs-and-highdpi-settle-q8.md` (a budget per golden comparison, and the
@@ -92,26 +100,33 @@ computes the identical whole plan and takes its own slice. The shards never have
 to agree at run time; they agree before it. The file list is read off **disk**
 rather than off the cost table, so a spec added and never measured still runs.
 
-**The spread, at N=4 and either side of it:**
+**The spread, at N=8 and either side of it** — against the refreshed cost table
+(run `31258319576`; the numbers below moved when §5's fixes halved two of the
+table's largest rows, and again when §6 re-measured everything):
 
 | N | serial seconds per shard | spread |
 |---|---|---|
-| 2 | 3804 / 3812 | 8 s |
-| 3 | 2538 / 2541 / 2537 | 4 s |
-| **4** | **1901 / 1907 / 1903 / 1905** | **6 s** |
-| 5 | 1513 / 1511 / 1536 / 1516 / 1540 | 29 s |
-| 6 | 1338 / 1250 / 1263 / 1259 / 1255 / 1251 | 88 s |
-| 8 | 1338 / 918 / 894 / 898 / 892 / 900 / 885 / 891 | 453 s |
+| 2 | 4180 / 4176 | 4 s |
+| 3 | 2788 / 2783 / 2785 | 5 s |
+| 4 | 2094 / 2085 / 2087 / 2090 | 9 s |
+| 5 | 1662 / 1674 / 1661 / 1687 / 1672 | 26 s |
+| 6 | 1394 / 1391 / 1388 / 1396 / 1401 / 1386 | 15 s |
+| 7 | 1184 / 1213 / 1183 / 1203 / 1194 / 1195 / 1184 | 30 s |
+| **8** | **1032 / 1042 / 1058 / 1036 / 1054 / 1038 / 1036 / 1060** | **28 s** |
+| 9 | 1032 / 918 / 916 / 917 / 909 / 912 / 914 / 919 / 919 | 123 s |
 
-Against `--shard`'s 325 → 3800 s, that is a **6-second spread instead of a
-3475-second one.** N stays at 4: past N=5 the plan stops improving because
-`iphone|upgrade-wheel-gantry.spec.ts` — 1338 s, one indivisible brick — becomes
-the binding constraint, and every further runner is bought at no gain.
+Against `--shard`'s 325 → 3800 s, that is a **28-second spread instead of a
+3475-second one.** N stops at 8 because at 9 the plan stops improving:
+`iphone|goldens.spec.ts` — 1032 s, one indivisible brick — becomes the binding
+constraint, the makespan flatlines, and every further runner is bought at no
+gain. (This section originally shipped N=4 off the pre-fix table, where the
+binding brick was `iphone|upgrade-wheel-gantry` at 1338 s. §6b is why N moved.)
 
 `tests/mobile-shard-plan.test.ts` holds this on the cheap vitest job: the union of
-the shards is exactly the matrix (61 + 60 + 62 + 30 = 213), nothing is in two of
-them, the planner is deterministic, and a spec file with no measured cost is red
-here rather than a shard that quietly grew ten minutes.
+the shards is exactly the matrix, nothing is in two of them, the planner is
+deterministic, and a spec file with no measured cost is red here rather than a
+shard that quietly grew ten minutes. It asserts balance at the N that ships and
+at its neighbours, because "it balances at 8" is a weaker claim than it looks.
 
 ## 4. Problem two: four tests that sharding was never going to fix
 
@@ -270,46 +285,134 @@ All twenty executed tests of the three specs on `iphone` + `pixel`, 4 cores,
 **−32% on the three specs that were killing the gate**, all twenty passing, with
 no assertion, budget, baseline or tolerance changed.
 
-## 6. What is NOT finished, and the follow-up it deserves
+## 6. The second run, and the thing the re-balance broke
 
-**The four failures are addressed by three different mechanisms** — the sampling
-window (large, certain), the round-trip batching (~20%, certain), and the
-re-balance (removes the pile-up that starved shard 2, effect real but not
-independently measurable). Whether that is enough margin on a runner whose
-slowdown distribution has a 31× tail (`golden-retry-and-the-31x-runner-q9.md`) is
-answered by this PR's own checks, not by this paragraph.
+The three fixes and the re-balance went to the runner as
+[`31258319576`](https://github.com/ImagineTheGames/planet-rush/actions/runs/31258319576).
+Half of it is the result §5 predicts, and half of it is this report's most
+useful finding, because **the re-balance caused a regression**.
 
-What the profiling turned up and this brief did not spend:
+| shard | result | wall |
+|---|---|---|
+| 1/4 | pass | 16m34s |
+| 2/4 | **fail** | **33m00s** |
+| 3/4 | **fail** | **24m51s** |
+| 4/4 | pass | 13m33s |
 
-**`workers: 2` is very likely the wrong setting for a software-GL runner.**
-Playwright defaults to `cpus / 2`, which is 2 on a 4-core GitHub runner, so two
-dpr-3 pages rasterise in software on the same four cores. §4b measured what that
-costs: the wheel tests' pages ran at **0.28 fps** while a test with the runner more
-to itself got **1.5 fps** — a 5× difference in the quantity every round trip is
-priced in. The `[pixel]` copy of `build-wheel-gantry.spec.ts:314` timing out at
-300 s while the *heavier* `[iphone]` copy passed at 126 s **in the same run** is
-that effect and not a property of either test.
+**The spec fixes held.** Re-summed from this run's own `list` output, against the
+table's pre-fix numbers:
 
-If that holds, `workers: 1` with a larger N is strictly better on both axes: each
-lane runs ~1.65× faster (measured, 4 cores) for the same total lane count, and the
-per-test timeouts stop being contention artifacts. It is a config change, it is
-cheap, and it wants its own measurement rather than a guess bundled into this PR.
+| unit | before | after |
+|---|---|---|
+| `iphone\|upgrade-wheel-gantry` | 1338 s | **688 s** |
+| `iphone\|menu-frame-cost` | 480 s | **186 s** |
 
-> **Follow-up brief: `a0-00c` — one page per runner.** Measure the mobile suite at
-> `workers: 1 × N=8` against `workers: 2 × N=4` on the real runner: wall time,
-> runner-minutes, and per-test duration against budget. Ship whichever wins. The
-> hypothesis, and the numbers it comes from, are §4b and §6 above.
+**But two shards went red, on two failure modes, neither of them a slow spec.**
 
-Two smaller things, named so they are not rediscovered:
+**Shard 3 — a fifth spec on the same cliff.** `build-flow.spec.ts:157` (the
+full-construction-cycle test) blew its **330 s** budget on `[iphone]`, twice. It
+was never on this brief's list of four, it is **untouched by this branch**, and
+its 330 s is its own `budgetTest({measuredSeconds: 32})` — nothing raised it.
+What makes it evidence rather than just another failure: its `[pixel]` twin
+passed the **identical test at 276 s** against the **same** budget. Two copies of
+one test, 20% apart, straddling the line.
 
-- **`tests/mobile/sim-clock.ts` says the runner renders "~1 fps".** Measured here
-  at 0.28 fps under two workers and 1.5 fps under lighter load. The doc is not
-  wrong so much as it quotes a single point on a wide distribution; a0-00c should
-  correct it with the range.
-- **The cost table in `shard-plan.ts` still holds the PRE-fix numbers**, including
-  the 300 s timeouts. That is conservative rather than wrong — it keeps the heavy
-  file isolated on its own shard — but it should be refreshed off the first green
-  four-shard run. §8 is the procedure.
+**Shard 2 — goldens that used to pass.** Four `[iphone]` goldens timed out at
+90 s with `Page.captureScreenshot: Internal server error, session closed` — the
+session did not merely crawl, it **died**. The same four in run `31249237259`:
+
+| golden | a0-00 run | after the re-balance |
+|---|---|---|
+| `goldens.spec.ts:295` phone BUILD WHEEL | 40.6 s | **timeout (>90 s)** |
+| `goldens.spec.ts:430` phone UPGRADE WHEEL | 34.1 s | **timeout (>90 s)** |
+| `goldens.spec.ts:448` PORTRAIT-HELD UPGRADE WHEEL | 20.4 s | **timeout (>90 s)** |
+
+Nothing about those goldens changed. What changed is that a duration-balanced
+plan seated `iphone|goldens` next to `pixel|upgrade-wheel-gantry`, the
+second-heaviest brick in the suite.
+
+### 6a · Balancing by total work is the wrong objective when units contend
+
+That is the finding, and it indicts §3a's plan rather than the specs:
+
+> LPT balances the **sum** of each shard's work. It says nothing about whether
+> two expensive dpr-3 pages are resident **at the same instant** — and at
+> `workers: 2` that is the only thing that decides whether a budget holds. So a
+> strictly better-balanced plan simply relocated the contention onto a new
+> victim, and paid for shard 2's 42 minutes with four goldens that used to pass.
+
+There is a deeper version of the same point. The cost table asserts that a unit
+*has* a cost. At `workers: 2` it does not: `build-wheel-gantry:314` cost 300 s on
+`[pixel]` and 126 s on the heavier `[iphone]` **in one run**; `build-flow:157`
+cost 276 s on one project and >330 s on the other. A scheduler cannot balance
+quantities that are properties of the schedule it is producing.
+
+### 6b · What was done: one page per runner, and N instead
+
+`workers: 1` in CI (`playwright.config.ts`), with wall time bought back by
+raising N rather than by putting a second page on the same four cores. Four
+independent measurements say the contention is the cause, not the specs:
+
+1. **0.28 fps vs 1.5 fps** — frame periods read out of a failure trace's own
+   screencast (§4b). One CDP round trip ≈ one frame, so 5× the frame period is
+   5× every round trip.
+2. **`build-wheel-gantry:314`** — 300 s `[pixel]` / 126 s `[iphone]`, same run.
+3. **`build-flow:157`** — >330 s `[iphone]` beside heavy `[pixel]` work, 276 s
+   `[pixel]`, against a 32 s in-container measurement.
+4. **The four goldens above** — 20–41 s, then dead sessions, with no change to
+   the goldens.
+
+**N=8, and that number is derived rather than picked.** Total serial work is
+**8355 s**, so an even split at N=8 is **1044 s**; the heaviest *indivisible*
+unit — one spec file on one project, which `fullyParallel: false` runs serially
+in one worker — is now `iphone|goldens` at **1032 s**. N=8 is therefore the
+largest N that still divides evenly. The planner, run across N:
+
+| N | makespan | spread |
+|---|---|---|
+| 4 | 2094 s (34.9 m) | 9 s |
+| 6 | 1401 s (23.4 m) | 15 s |
+| **8** | **1060 s (17.7 m)** | **28 s** |
+| 9 | 1032 s (17.2 m) | 123 s |
+| 10 | 1032 s (17.2 m) | 237 s |
+
+At N=9 the brick binds: the makespan stops falling and the ninth runner buys
+12 seconds for a spread that quadruples. N=8 is where the split stops paying.
+
+**17.7 minutes is the worst case, not the estimate.** Those 8355 seconds were
+themselves measured at `workers: 2`, so every one of them carries the contention
+tax this change removes — the projection assumes relieving contention buys
+exactly nothing. It is also why an inflated table is safe to schedule from:
+**LPT balances on ratios, so a uniform scale factor cannot change the assignment
+it produces.** What breaks a plan is a cost wrong *relative to its neighbours*,
+which is what the stale table had become once the three fixes halved two of its
+largest rows.
+
+Runner-minutes do not rise: the same total work crosses the same total cores,
+minus the tax. What rises is the per-job fixed cost (~2 min of checkout, `npm
+ci`, browser install and `npm run build`), paid 8 times instead of 4 — and paid
+in parallel, so it costs wall time zero.
+
+### 6c · Still open
+
+- **`tests/mobile/sim-clock.ts` says the runner renders "~1 fps".** Measured at
+  0.28 fps under two workers and 1.5 fps under lighter load. Not wrong so much as
+  a single point quoted from a wide distribution; it should carry the range, and
+  the range is narrower now that `workers: 1` removes the low end.
+- **The table should be refreshed once more off a green 8-shard run.** It is
+  currently a `workers: 2` snapshot being used to schedule a `workers: 1` suite.
+  Harmless for balance (ratios), but the absolute numbers in §6b's arithmetic
+  will read high until then. §8 is the procedure.
+- **`build-flow.spec.ts` has never had the round-trip audit §5b gave the two
+  wheel specs.** It is now the heaviest non-golden unit on `iphone` (570 s) and
+  its own comment argues ~45 s of that is irreducible sim advance. The gap
+  between 45 s and 570 s is worth someone's afternoon.
+
+> **Follow-up brief: `a0-00c` — the round-trip audit, finished.** Apply §5b's
+> batching to `build-flow.spec.ts` and re-measure `iphone|goldens`, the two
+> units that now floor the plan at 1032 s. Both are round-trip-bound and neither
+> has been profiled. Correct `sim-clock.ts`'s fps claim with the measured range
+> while there.
 
 ## 7. The failure artifact, retrieved from a non-zero shard
 
@@ -365,27 +468,36 @@ the quiet one (a row that has drifted).
 
 ---
 
-## Appendix · the N=4 assignment, as shipped
+## Appendix · the N=8 assignment, as shipped
+
+Costs are the refreshed `MEASURED_SECONDS` (run `31258319576`, first attempts
+only), in seconds. Spread 28 s across 8 shards.
 
 ```
-shard 1 — 1901s   iphone|upgrade-wheel-gantry 1338 · iphone|slot-state 213 ·
-                  desktop|centering 114 · iphone|landscape-lock 98 ·
-                  iphone|voice-copy-fit 77 · pixel|voice-copy-fit 61
-shard 2 — 1907s   pixel|upgrade-wheel-gantry 918 · iphone|goldens 363 ·
-                  iphone|build-wheel-gantry 221 · pixel|centering 182 ·
-                  iphone|campaign-door 93 · iphone|layout 67 ·
-                  desktop|slot-state 53 · desktop|layout 10
-shard 3 — 1903s   pixel|build-wheel-gantry 552 · desktop|goldens 444 ·
-                  pixel|landscape-lock 261 · desktop|upgrade-wheel-gantry 226 ·
-                  iphone|build-flow 204 · pixel|emulation 88 ·
-                  iphone|emulation 68 · desktop|campaign-door 60
-shard 4 — 1905s   pixel|build-flow 546 · iphone|menu-frame-cost 480 ·
-                  pixel|campaign-door 259 · desktop|build-wheel-gantry 216 ·
-                  pixel|slot-state 204 · iphone|centering 77 · pixel|layout 65 ·
-                  desktop|voice-copy-fit 23 · desktop|emulation 21 ·
-                  desktop|landscape-lock 14
+shard 1 — 1032s   iphone|goldens 1032   (+ the four zero-cost pairs: a project
+                  that skips a whole file still has to be assigned somewhere)
+shard 2 — 1042s   pixel|upgrade-wheel-gantry 918 · desktop|build-wheel-gantry 94 ·
+                  desktop|voice-copy-fit 17 · desktop|layout 13
+shard 3 — 1058s   iphone|upgrade-wheel-gantry 688 · iphone|emulation 218 ·
+                  pixel|centering 152
+shard 4 — 1036s   iphone|build-flow 570 · pixel|campaign-door 234 ·
+                  iphone|centering 173 · iphone|layout 59
+shard 5 — 1054s   iphone|build-wheel-gantry 504 · iphone|campaign-door 254 ·
+                  pixel|emulation 185 · pixel|voice-copy-fit 64 · pixel|layout 47
+shard 6 — 1038s   pixel|build-wheel-gantry 504 · iphone|slot-state 240 ·
+                  iphone|menu-frame-cost 186 · iphone|voice-copy-fit 78 ·
+                  desktop|emulation 17 · desktop|landscape-lock 13
+shard 7 — 1036s   pixel|build-flow 492 · iphone|landscape-lock 307 ·
+                  pixel|slot-state 174 · desktop|centering 63
+shard 8 — 1060s   desktop|goldens 421 · desktop|upgrade-wheel-gantry 311 ·
+                  pixel|landscape-lock 206 · desktop|campaign-door 68 ·
+                  desktop|slot-state 54
 ```
+
+Shard 1 is the shape of the constraint: `iphone|goldens` is one indivisible
+1032 s brick, so its shard carries that and nothing else. That is not a balance
+failure, it is the floor — and it is why N stops at 8.
 
 Every shard prints this, and the files it picked up, before it starts a test — a
-shard that silently ran the wrong quarter of the suite is the failure mode worth
+shard that silently ran the wrong eighth of the suite is the failure mode worth
 one line of log.
