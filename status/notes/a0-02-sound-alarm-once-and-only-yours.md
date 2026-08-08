@@ -660,6 +660,71 @@ reasoning, unchanged: different brief, fails identically on clean `origin/main`,
 an unrelated audio spec going green inside the alarm PR is how a real regression
 hides.
 
+## ROUND 10 (this session) — every gate green; the build was explaining a CI check that turned RED
+
+**Remote inspected first**, per round 7's lesson: `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` is `6ee7f09`, **identical to local
+HEAD**, so nine rounds of work were already pushed. PR #318 **OPEN / MERGEABLE**,
+`headRefOid` == HEAD. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 9's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (200 s), a **fifth** consecutive clean round |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.3 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** — unchanged for a fourth round, and **byte-identical** to the committed `evidence/s9-01-live-probe.json` |
+
+**The ancestry gate was watched again and held** — `origin/main` has not moved since
+round 7's merge.
+
+**The capacity test was green again** — eighth data point (2 red, 6 green, always 4/4
+in isolation). Settled.
+
+**Zero evidence churn, and zero foreign PNG churn**: only my own spec was run, not the
+full suite, so `git status` showed *only* the untracked throwaway config both before
+and after the live run. Round 6's caption fix and round 9's habit of not running the
+full suite are both doing their job. (The 36 foreign `tests/live-stage/*-evidence.png`
+left dirty by an earlier session were reverted at session start with
+`git checkout -- tests/live-stage/`, never committed, as every round.)
+
+### What actually got built: the CI check went from PENDING to RED
+
+Rounds 4-9 all recorded "Mobile emulation (Playwright)" as **pending** — a runner
+queue, nothing to act on. This round it has resolved, and it resolved to **failure**.
+A reviewer opening PR #318 now sees a red check where the notes and the PR body both
+said "a queue". That is a merge-stopper made of nothing, and it is exactly round 9's
+lesson in a third file: the gates were green before I touched anything; the defect was
+that the artifact did not explain what a reader was looking at.
+
+**Chased to the bottom rather than filed under "pre-existing", and it is inherited:**
+
+- main's own push build of `b32d0a7` — the exact commit merged into this branch at
+  `927ba98` — **fails the same job**, run `31248370319`.
+- Failing `[iphone]` test names extracted from both logs and diffed: **main 13,
+  this branch 12, and the branch's set is a strict SUBSET.** Nothing fails here that
+  does not fail on main; main additionally fails `upgrade-wheel-gantry.spec.ts:375`.
+- **No audio, alarm or sound spec is in either set.** The 12 are `goldens.spec.ts`
+  BUILD WHEEL / UPGRADE WHEEL / PAUSE MENU / ELIMINATED at phone sizes, plus
+  `build-flow`, `build-wheel-gantry`, `upgrade-wheel-gantry`, `menu-frame-cost`.
+- **It entered main with `b32d0a7`**: main's CI was green at `03ed194` and `9803e3b`
+  and red from `b32d0a7` on — PR #320, the darker backdrop, which re-baselined
+  goldens. `Typecheck, test, build` is green on this branch and on main.
+
+The method is reusable and worth keeping: `gh run view <id> --log-failed`, extract
+`✘ N [iphone] › …` with the trailing duration stripped, `sort -u`, then `comm` the two
+files. A subset check is the whole argument — "it fails on main too" means little
+without it, because a *different* failing set on the same job would be this lane's.
+
+Written into the PR body as its own section with the run IDs and the table, next to
+the existing live-stage red. **Do not report CI as green on this branch**, and do not
+report the mobile job as this lane's.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **eighth** time, same
+reasoning, unchanged.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
@@ -670,8 +735,10 @@ hides.
   a ~100 ms wait before `sfxBusGain` is sampled. Deliberately not folded into
   PR #318.
 - Handed over, not this lane's: the destroyed-`entryView` crash on the online
-  route (`src/ui/lobby-entry-view.ts:234`), and the ~20 fps alarm floor
-  (`src/art/vfx/observer.ts`). Both are in the PR body with their repros.
+  route (`src/ui/lobby-entry-view.ts:234`), the ~20 fps alarm floor
+  (`src/art/vfx/observer.ts`), and — new in round 10 — the **mobile-emulation CI
+  job, red on main since `b32d0a7`** (PR #320's golden re-baseline). All three are
+  in the PR body with their repros.
 - Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
   or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
   are explicitly unratified, GDD §4.7 blast radius).
@@ -681,3 +748,7 @@ hides.
   nothing — that is what a resumed lane looks like from the inside.
 - Watch the ancestry gate every round now: `origin/main` moved under this branch
   between rounds 6 and 7 and turned a passing gate red with no code change here.
+- **Check the PR's CI checks every round, not just the DoD gates.** Round 10's
+  only real finding was a check that had sat pending for six rounds and quietly
+  resolved to red — inherited from main, but invisible as such until the two
+  failing sets were diffed. `gh pr checks 318` costs one call.
