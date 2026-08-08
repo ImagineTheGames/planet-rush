@@ -230,6 +230,26 @@ export type SoundName = (typeof SOUND)[keyof typeof SOUND];
 const LOOP_CROSSFADE = 0.04;
 
 /**
+ * Where the contact transient sits relative to the note it strikes, and how
+ * narrow the band is. A little under two octaves up is where hard things ring
+ * when they touch; Q 5 is a band that reads as a material rather than a click.
+ */
+const CONTACT_RATIO = 2.4;
+const CONTACT_Q = 5;
+/** The contact's level, relative to the note's. A band-pass output is narrow. */
+const CONTACT_LEVEL = 0.55;
+
+/**
+ * Decay curvature for the fundamental; each partial above it bends harder still.
+ * A struck body loses most of its energy immediately and then hangs on, which is
+ * the difference between metal ringing and an organ stop opening.
+ */
+const PARTIAL_CURVE = 3.4;
+
+/** Pitched grain blended into the fundamental. Rises across the partials. */
+const PARTIAL_GRAIN = 0.04;
+
+/**
  * **One struck note, in the ratified material** — the world bank's half of the
  * Gantry/Bone instrument (`./ui-cues`, s6-01).
  *
@@ -244,14 +264,43 @@ const LOOP_CROSSFADE = 0.04;
  * The constants are imported, never copied. If the handoff's ratios are ever
  * re-tuned, the world moves with the UI by construction.
  *
- * This is also what replaces `square` almost everywhere it did a *confirmation's*
- * job: a square with a low duty was a tone generator standing in for a struck
- * body, and a struck body is what the register actually wants.
+ * ## Round 2: what this was, and why it had to change (s8-01)
+ *
+ * This function is where the first re-voice went wrong, so it is worth being
+ * precise about it. s7-02 replaced `square` almost everywhere it did a
+ * confirmation's job — correctly, by the letter of the spec — with a stack of
+ * **bare sine partials**: a 2 ms attack, a *hold at full level*, and a **linear**
+ * ramp to silence, carrying no filter, no grain and no transient. It shipped, and
+ * it moved `sine` from 17 of 89 voices to **56 of 116, 48.3% of the bank**.
+ *
+ * A stack of unfiltered sines with a linear decay is a glockenspiel. The pass
+ * traded an arcade blip for a toy xylophone, which is not less toony — only
+ * differently toony — and that is why the developer said the same sentence twice.
+ *
+ * The **ratios were never the problem**: 1 / 2.76 / 5.4 is inharmonic, which is
+ * the correct starting point for anything machined, and the developer chose them
+ * by ear. What was wrong was everything around them. So round 2 keeps the
+ * ratified spacing and rebuilds how it is *rendered*:
+ *
+ *  - **A contact transient.** The note now opens with a band of resonant noise
+ *    at {@link CONTACT_RATIO} — two hard things touching. That is the sound a
+ *    machine actually makes when it registers something, and it is what the
+ *    attack segment of a sine was standing in for.
+ *  - **No hold.** A struck body does not sit at full level and then fall; it
+ *    peaks and immediately begins to die. The `hold` is gone.
+ *  - **A real tail** ({@link PARTIAL_CURVE}). Exponential, bending harder on each
+ *    partial above the fundamental, so the note collapses to its root and rings
+ *    out rather than fading in a straight line like a volume knob turning down.
+ *  - **Grain** ({@link PARTIAL_GRAIN}). A trace of pitched noise on each partial.
+ *    A pure sine is a test tone; a sine with grain in it is a body.
+ *
+ * The result is the same note, in the same material, at the same pitch — struck
+ * rather than sounded.
  *
  * @param partials {@link GLASS_PARTIALS} (three, full) or {@link GLASS_PAIR}
  *   (two, thinner — the handoff's own choice for an answering note).
  */
-function struck(
+function strike(
   name: string,
   freq: number,
   opts: {
@@ -259,27 +308,57 @@ function struck(
     readonly gain: number;
     /** The fundamental's decay. Each partial above it decays faster. */
     readonly decay: number;
-    readonly hold?: number;
     /** Seconds from the start of the sound. */
     readonly at?: number;
     readonly partials?: readonly number[];
     readonly seed: number;
+    /** Scale the contact transient, 0 to drop it. Default 1. */
+    readonly contact?: number;
   },
 ): SoundLayer[] {
-  return (opts.partials ?? GLASS_PARTIALS).map((ratio, i) => {
-    const spec: VoiceSpec = {
-      name: `${name}.p${i}`,
-      wave: 'sine',
-      attack: STRIKE_S,
-      hold: opts.hold ?? 0.006,
-      decay: opts.decay * Math.pow(PARTIAL_DECAY, i),
-      freq: freq * ratio,
-      gain: opts.gain / Math.pow(i + 1, PARTIAL_ROLLOFF),
-      seed: opts.seed + i,
-    };
-    // `exactOptionalPropertyTypes`: an absent `at` is not `at: undefined`.
-    return opts.at === undefined ? { spec } : { spec, at: opts.at };
-  });
+  // `exactOptionalPropertyTypes`: an absent `at` is not `at: undefined`.
+  const place = (spec: VoiceSpec): SoundLayer => (opts.at === undefined ? { spec } : { spec, at: opts.at });
+  const contact = opts.contact ?? 1;
+  const layers: SoundLayer[] = [];
+
+  if (contact > 0) {
+    layers.push(
+      place({
+        name: `${name}.contact`,
+        wave: 'noise',
+        attack: 0.0004,
+        hold: 0.0015,
+        decay: Math.min(0.04, opts.decay * 0.55),
+        decayCurve: 7, // gone almost before it registers: this is an edge, not a layer
+        punch: 0.5,
+        freq: freq * CONTACT_RATIO,
+        lowPass: freq * CONTACT_RATIO,
+        resonance: CONTACT_Q,
+        bandPass: true,
+        gain: opts.gain * CONTACT_LEVEL * contact,
+        seed: opts.seed + 90,
+      }),
+    );
+  }
+
+  for (const [i, ratio] of (opts.partials ?? GLASS_PARTIALS).entries()) {
+    layers.push(
+      place({
+        name: `${name}.p${i}`,
+        wave: 'sine',
+        attack: STRIKE_S,
+        hold: 0, // a struck body peaks and dies; it does not sit at full level
+        decay: opts.decay * Math.pow(PARTIAL_DECAY, i),
+        decayCurve: PARTIAL_CURVE + i,
+        freq: freq * ratio,
+        noiseMix: PARTIAL_GRAIN + i * 0.012,
+        gain: opts.gain / Math.pow(i + 1, PARTIAL_ROLLOFF),
+        seed: opts.seed + i,
+      }),
+    );
+  }
+
+  return layers;
 }
 
 const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
@@ -317,15 +396,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.rockChip]: {
     name: 'rockChip',
     wave: 'noise',
-    attack: 0.0008, // a tighter strike: the transient IS the character now
-    hold: 0.009,
-    decay: 0.062, // ~72 ms, from 103 — a bite, not a grind
-    punch: 0.55, // what the wobble and the chirp used to carry, moved here
+    attack: 0.0006, // a tighter strike: the transient IS the character
+    hold: 0.006,
+    decay: 0.078,
+    decayCurve: 5.2, // the bite, then the stone: a tail, not a fade-out
+    punch: 0.6,
     freq: 92,
     freqEnd: 82, // ×1.12 — a body settling, well under the chirp threshold
-    lowPass: 820, // was 1150
-    highPass: 130, // was 60 — sub a phone cannot emit anyway
-    gain: 0.42,
+    lowPass: 900,
+    lowPassEnd: 520, // the tool coming off the rock — a sweep, not a pitch slide
+    resonance: 3.2, // the band rings: stone, rather than a duller hiss
+    highPass: 130, // sub a phone cannot emit anyway
+    gain: 0.5,
     seed: 0x9e37,
   },
 
@@ -343,15 +425,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'hullHit.bite',
           wave: 'triangle',
-          attack: 0.001,
-          hold: 0.01,
-          decay: 0.06,
-          punch: 0.5,
+          attack: 0.0008,
+          hold: 0.006,
+          decay: 0.07,
+          decayCurve: 6, // plate rings and stops; it does not fade evenly
+          punch: 0.6,
           freq: 452,
-          freqEnd: 400, // ×1.13 — was ×1.69, a chirp inside 71 ms
-          noiseMix: 0.22,
+          freqEnd: 400, // ×1.13 — a body settling, not a chirp
+          noiseMix: 0.3,
+          lowPass: 3600,
+          resonance: 2.4, // a plate resonance under the round
           highPass: 340,
-          gain: 0.33,
+          gain: 0.5,
           seed: 0x4dc3,
         },
       },
@@ -359,12 +444,16 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'hullHit.spit',
           wave: 'noise',
-          attack: 0.001,
-          hold: 0.006,
-          decay: 0.05,
+          attack: 0.0005,
+          hold: 0.003,
+          decay: 0.055,
+          decayCurve: 7,
           freq: 1500,
+          lowPass: 4200,
+          resonance: 6,
+          bandPass: true, // the metal's own ring, not a spray of hiss
           highPass: 950,
-          gain: 0.16,
+          gain: 0.42,
           seed: 0x4dc4,
         },
       },
@@ -377,15 +466,17 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.rockCrack]: {
     name: 'rockCrack',
     wave: 'noise',
-    attack: 0.002,
-    hold: 0.012,
-    decay: 0.1,
-    punch: 0.45,
+    attack: 0.0012,
+    hold: 0.008,
+    decay: 0.115,
+    decayCurve: 4.4, // stone gives, then settles
+    punch: 0.55,
     freq: 260,
     freqEnd: 220,
-    lowPass: 1900, // was 2400: flattening the fall held the grain up, so trim here
-
-    gain: 0.4,
+    lowPass: 2100,
+    lowPassEnd: 900, // the fracture closing — energy leaving, not pitch falling
+    resonance: 2.8,
+    gain: 0.26,
     seed: 0x1a2b,
   },
 
@@ -397,14 +488,17 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'rockBurst.crumble',
           wave: 'noise',
-          attack: 0.003,
-          hold: 0.05,
-          decay: 0.34,
-          punch: 0.5,
+          attack: 0.002,
+          hold: 0.03,
+          decay: 0.38,
+          decayCurve: 3.2, // debris settling, which is not a linear ramp
+          punch: 0.6,
           freq: 340,
           freqEnd: 90,
-          lowPass: 2600,
-          gain: 0.5,
+          lowPass: 2800,
+          lowPassEnd: 600, // the burst opening and closing over its own fall
+          resonance: 2.2,
+          gain: 0.4,
           seed: 0x33aa,
         },
       },
@@ -412,8 +506,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       // the one thing in this sound that goes *up* (style-guide §2). It was a
       // square gliding up a minor seventh; the rise is now two struck notes
       // instead of one bent one, which says the same thing without the chirp.
-      ...struck('rockBurst.ore', 1046.5, { gain: 0.2, decay: 0.1, hold: 0.02, at: 0.05, partials: GLASS_PAIR, seed: 0x33ab }),
-      ...struck('rockBurst.glint', 1567.98, { gain: 0.16, decay: 0.12, hold: 0.02, at: 0.11, partials: GLASS_PAIR, seed: 0x33ae }),
+      ...strike('rockBurst.ore', 1046.5, { gain: 0.2, decay: 0.19, at: 0.05, partials: GLASS_PAIR, seed: 0x33ab }),
+      ...strike('rockBurst.glint', 1567.98, { gain: 0.16, decay: 0.22, at: 0.11, partials: GLASS_PAIR, seed: 0x33ae }),
     ],
   },
 
@@ -433,7 +527,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    */
   [SOUND.oreCollect]: {
     name: 'oreCollect',
-    layers: [...struck('oreCollect', 1046.5, { gain: 0.2, decay: 0.07, hold: 0.014, seed: 0xf2d2 })],
+    layers: [...strike('oreCollect', 1046.5, { gain: 0.2, decay: 0.14, seed: 0xf2d2 })],
   },
 
   /**
@@ -448,8 +542,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.holdFull]: {
     name: 'holdFull',
     layers: [
-      ...struck('holdFull.a', 880, { gain: 0.26, decay: 0.06, hold: 0.05, seed: 0xf2d3 }),
-      ...struck('holdFull.b', 1174.66, { gain: 0.26, decay: 0.1, hold: 0.05, at: 0.11, seed: 0xf2d4 }),
+      ...strike('holdFull.a', 880, { gain: 0.26, decay: 0.13, seed: 0xf2d3 }),
+      ...strike('holdFull.b', 1174.66, { gain: 0.26, decay: 0.2, at: 0.11, seed: 0xf2d4 }),
     ],
   },
 
@@ -476,14 +570,17 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'turretFire.body',
           wave: 'triangle',
-          attack: 0.001,
-          hold: 0.012,
-          decay: 0.072,
-          punch: 0.6,
+          attack: 0.0008,
+          hold: 0.008,
+          decay: 0.085,
+          decayCurve: 5.5, // the dump, then the coil ringing down
+          punch: 0.75,
           freq: 174.61,
-          noiseMix: 0.2, // grit on the body, not a second oscillator
-          lowPass: 1300,
-          gain: 0.32,
+          noiseMix: 0.24, // grit on the body, not a second oscillator
+          lowPass: 2600,
+          lowPassEnd: 420, // THE resonant sweep: charge leaving, at a fixed pitch
+          resonance: 4.5,
+          gain: 0.52,
           seed: 0x7e88,
         },
       },
@@ -491,14 +588,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         spec: {
           name: 'turretFire.arc',
           wave: 'noise',
-          attack: 0.0006,
-          hold: 0.006,
-          decay: 0.05,
+          attack: 0.0004,
+          hold: 0.003,
+          decay: 0.055,
+          decayCurve: 8, // an arc is over before you can hear its shape
           punch: 0.5,
           freq: 780,
-          lowPass: 2600, // banded, not a hiss: an arc, not a spray
+          lowPass: 2600,
+          lowPassEnd: 1400,
+          resonance: 7,
+          bandPass: true, // the discharge itself: narrow, pitched, metallic
           highPass: 420,
-          gain: 0.18,
+          gain: 0.46,
           seed: 0x7e8b,
         },
       },
@@ -510,15 +611,18 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.shotImpact]: {
     name: 'shotImpact',
     wave: 'noise',
-    attack: 0.001,
-    hold: 0.006,
-    decay: 0.05,
+    attack: 0.0005,
+    hold: 0.003,
+    decay: 0.058,
+    decayCurve: 8, // a landing is an edge with a tail, not a burst of hiss
+    punch: 0.4,
     freq: 900,
     freqEnd: 780,
-    lowPass: 6000, // a tick, not a hiss — same reason as rockCrack's trim
+    lowPass: 5200,
+    lowPassEnd: 2600,
+    resonance: 3,
     highPass: 400,
-    gain: 0.27, // the low-pass cost it level; a landing shot still has to land
-
+    gain: 0.34, // a landing shot still has to land
     seed: 0xb23a,
   },
 
@@ -775,7 +879,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           seed: 0x3d7b,
         },
       },
-      ...struck('shipSpawn.land', 1046.5, { gain: 0.2, decay: 0.14, hold: 0.02, at: 0.2, partials: GLASS_PAIR, seed: 0x3d7c }),
+      ...strike('shipSpawn.land', 1046.5, { gain: 0.2, decay: 0.26, at: 0.2, partials: GLASS_PAIR, seed: 0x3d7c }),
     ],
   },
 
@@ -934,8 +1038,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.bankOre]: {
     name: 'bankOre',
     layers: [
-      ...struck('bankOre.drop', 880, { gain: 0.24, decay: 0.09, hold: 0.02, seed: 0xf2d5 }),
-      ...struck('bankOre.settle', 587.33, { gain: 0.2, decay: 0.16, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0xf2d8 }),
+      ...strike('bankOre.drop', 880, { gain: 0.24, decay: 0.18, seed: 0xf2d5 }),
+      ...strike('bankOre.settle', 587.33, { gain: 0.2, decay: 0.3, at: 0.08, partials: GLASS_PAIR, seed: 0xf2d8 }),
     ],
   },
 
@@ -962,9 +1066,9 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.upgradeBought]: {
     name: 'upgradeBought',
     layers: [
-      ...struck('upgradeBought.a', 1046.5, { gain: 0.22, decay: 0.14, hold: 0.02, partials: GLASS_PAIR, seed: 0x9b5d }),
-      ...struck('upgradeBought.b', 1318.51, { gain: 0.22, decay: 0.14, hold: 0.02, at: 0.08, partials: GLASS_PAIR, seed: 0x9b60 }),
-      ...struck('upgradeBought.c', 1760, { gain: 0.24, decay: 0.24, hold: 0.02, at: 0.16, seed: 0x9b63 }),
+      ...strike('upgradeBought.a', 1046.5, { gain: 0.22, decay: 0.26, partials: GLASS_PAIR, seed: 0x9b5d }),
+      ...strike('upgradeBought.b', 1318.51, { gain: 0.22, decay: 0.26, at: 0.08, partials: GLASS_PAIR, seed: 0x9b60 }),
+      ...strike('upgradeBought.c', 1760, { gain: 0.24, decay: 0.42, at: 0.16, seed: 0x9b63 }),
     ],
   },
 
@@ -1552,7 +1656,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    */
   [SOUND.pressTick]: {
     name: 'pressTick',
-    layers: [...struck('pressTick', 1661, { gain: 0.1, decay: 0.022, hold: 0.005, seed: 0x7a70 })],
+    layers: [...strike('pressTick', 1661, { gain: 0.1, decay: 0.05, seed: 0x7a70 })],
   },
 
   // `confirm` ([12, 40, 12]): a rising perfect fourth, the two beats spaced to the
@@ -1606,8 +1710,8 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.rejectBuzz]: {
     name: 'rejectBuzz',
     layers: [
-      ...struck('rejectBuzz.a', 1661, { gain: 0.14, decay: 0.09, hold: 0.03, partials: GLASS_PAIR, seed: 0xb23f }),
-      ...struck('rejectBuzz.b', 1760, { gain: 0.14, decay: 0.09, hold: 0.03, at: 0.05, partials: GLASS_PAIR, seed: 0xb241 }),
+      ...strike('rejectBuzz.a', 1661, { gain: 0.14, decay: 0.17, partials: GLASS_PAIR, seed: 0xb23f }),
+      ...strike('rejectBuzz.b', 1760, { gain: 0.14, decay: 0.17, at: 0.05, partials: GLASS_PAIR, seed: 0xb241 }),
       {
         // The body under the pair — the `refused` cue's own sub, which is what
         // stops two high struck notes reading as a chime.
@@ -1633,21 +1737,26 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    * burst thins to a stream through the mix's repeat-gap (`./graph`), exactly as
    * a wave of ore-collects does.
    *
-   * Both halves of this pair were `square` and both are re-voiced, which makes
-   * it the one place in the pass where a converging palette could genuinely cost
-   * the player information: at ×1.13 apart in spectral centre it was the tightest
-   * pair in the bank. The *falling* it used to carry as a chirp is now carried by
-   * **register** — the same struck material as its twin, a fifth and an octave
-   * below it — and the thinner two-partial form of the instrument, which is the
+   * Both halves of this pair are re-voiced in every pass, which makes it the one
+   * place a converging palette could genuinely cost the player information: at
+   * ×1.13 apart in spectral centre it was once the tightest pair in the bank. The
+   * *falling* it originally carried as a chirp is carried by **register** instead
+   * — the same struck material as its twin, now **exactly an octave below it**,
+   * which is the plainest statement of "the same chunk, one step later" the
+   * instrument can make — plus the thinner two-partial form, which is the
    * handoff's own choice for a note that answers rather than announces.
    *
-   * Measured after the re-voice the pair is ×2.0 apart, not ×1.13. `audio.test.ts`
-   * guards it by name.
+   * Round 2 also pulls its **contact transient down to 0.45** (`./bank` `strike`).
+   * Tractoring a chunk in is a machine closing on something; a chunk settling into
+   * a bin is not. The duller edge is both the right sound and what re-opens the
+   * pair — the octave alone measured ×1.75 against a guarded floor of ×1.80.
+   *
+   * `audio.test.ts` guards this pair by name.
    */
   [SOUND.depositTick]: {
     name: 'depositTick',
     layers: [
-      ...struck('depositTick', 587.33, { gain: 0.15, decay: 0.05, hold: 0.01, partials: GLASS_PAIR, seed: 0xf2d7 }),
+      ...strike('depositTick', 523.25, { gain: 0.16, decay: 0.11, partials: GLASS_PAIR, contact: 0.45, seed: 0xf2d7 }),
     ],
   },
 
@@ -1684,7 +1793,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           seed: 0x3d7e,
         },
       },
-      ...struck('respawnGo.top', 1320, { gain: 0.16, decay: 0.1, hold: 0.02, at: 0.12, partials: GLASS_PAIR, seed: 0x3d7f }),
+      ...strike('respawnGo.top', 1320, { gain: 0.16, decay: 0.2, at: 0.12, partials: GLASS_PAIR, seed: 0x3d7f }),
     ],
   },
 
