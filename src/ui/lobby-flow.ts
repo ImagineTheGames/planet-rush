@@ -103,6 +103,7 @@ import {
   seatLocalPlayer,
   selectMap,
   selectShipClass,
+  sideRosterOf,
   startLobbyMatch,
   tickLobby,
   toggleMode,
@@ -623,28 +624,49 @@ function applyFireMode(state: FlowState, fireMode: FireMode): FlowResult {
 
 /**
  * The whole match resolved (`matchEnd`, `src/net/transport.ts`). Moves to the
- * summary with the winner named — VICTORY if it is you, DEFEAT if it is someone
- * else, DRAW on the no-survivor end. Only from a live match: a `matchEnd` arriving
- * on the door or twice over is ignored.
+ * summary with the winner named — VICTORY if the winner is on **your side**,
+ * DEFEAT if they are not, DRAW on the no-survivor end. Only from a live match: a
+ * `matchEnd` arriving on the door or twice over is ignored.
  *
- * `you` is read from the lobby the match was built from, so the summary knows
- * whose result it is showing without a wire field for it.
+ * `you` **and your side** are read from the lobby the match was built from, so the
+ * summary knows whose result it is showing without a wire field for either. That
+ * is legal because allegiance is static match config fixed at match start (GDD
+ * §2.1, §4.2) — the roster that RUSHed is the roster that finished.
+ *
+ * The side is the a0-09 fix on this path: without it a Teams win by a teammate
+ * arrived here indistinguishable from an enemy's, and the summary called it a
+ * DEFEAT ({@link ./end-of-match} `endKind`). In FFA `sideRosterOf` returns you
+ * alone, so nothing about the free-for-all changes.
  */
 export function flowMatchEnded(state: FlowState, winner: PlayerId | null): FlowResult {
   if (state.screen !== 'match') return rest(state);
   const you = state.lobby?.you ?? 0;
-  return rest({ ...state, screen: 'end', end: { you, winner, matchOver: true } });
+  const allies = sideOf(state, you);
+  return rest({ ...state, screen: 'end', end: { you, winner, matchOver: true, allies } });
 }
 
 /**
  * Your core was destroyed but the match goes on (GDD §2 wreck rule). Moves to the
  * summary in its ELIMINATED form — Rematch and Spectate, because there is still a
  * match to watch. Only from a live match.
+ *
+ * It carries the side too, even though ELIMINATED does not read it: this outcome
+ * is the one a player SPECTATES from, and the `matchEnd` that follows lands on
+ * {@link flowMatchEnded} — but a seat whose side wins while it watches must reach
+ * VICTORY by the same roster it was eliminated holding, not a re-derived one.
  */
 export function flowEliminated(state: FlowState): FlowResult {
   if (state.screen !== 'match') return rest(state);
   const you = state.lobby?.you ?? 0;
-  return rest({ ...state, screen: 'end', end: { you, winner: null, matchOver: false } });
+  const allies = sideOf(state, you);
+  return rest({ ...state, screen: 'end', end: { you, winner: null, matchOver: false, allies } });
+}
+
+/** The slots on `you`'s side, for the outcome the two ends above build. Straight
+ *  through to the lobby's own roster ({@link ./lobby} `sideRosterOf`); with no
+ *  lobby to read there is no side but your own — teams-of-one, which is FFA. */
+function sideOf(state: FlowState, you: PlayerId): ReadonlySet<PlayerId> {
+  return state.lobby ? sideRosterOf(state.lobby, you) : new Set([you]);
 }
 
 /**

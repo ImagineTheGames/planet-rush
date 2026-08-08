@@ -862,11 +862,48 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
   it('shows VICTORY to the winner and DEFEAT to everyone else', () => {
     const ended = flowMatchEnded(inMatch(4, 0), 4); // seat 4 won, and seat 4 is you
     expect(ended.state.screen).toBe('end');
-    expect(ended.state.end).toEqual({ you: 4, winner: 4, matchOver: true });
+    // In FFA your side is you alone — teams-of-one, so this is the outcome the
+    // flow always built, plus the roster that says exactly that (a0-09).
+    expect(ended.state.end).toEqual({ you: 4, winner: 4, matchOver: true, allies: new Set([4]) });
     expect(endOfMatchModel(ended.state.end!).kind).toBe('victory');
 
     const lost = flowMatchEnded(inMatch(4, 0), 0);
     expect(endOfMatchModel(lost.state.end!).kind).toBe('defeat');
+  });
+
+  /**
+   * a0-09 — the developer's report, driven through the flow the online client
+   * actually runs: a TEAMS match ends on a `matchEnd` naming a TEAMMATE, and the
+   * summary must read VICTORY. Before the fix this path had no notion of a side
+   * at all, so an ally's win and an enemy's win arrived here identical.
+   *
+   * The side is read off the lobby the match was built from — legal because
+   * allegiance is static match config fixed at match start (GDD §2.1, §4.2).
+   */
+  it('shows VICTORY in TEAMS when a TEAMMATE takes the claim', () => {
+    // The host taps TEAMS on the real roster control, then RUSHes. Sides
+    // alternate by slot (`defaultTeamForSlot`), so you at seat 0 hold side A with
+    // seats 2, 4 and 6, and the odd seats hold side B.
+    const teams = flowTapLobby(inLobby(0, 0), { kind: 'mode' }).state;
+    expect(teams.lobby!.mode).toBe('teams');
+    const state = flowMatchStart(teams).state;
+    expect(state.screen).toBe('match');
+
+    const allyWon = flowMatchEnded(state, 2);
+    expect(allyWon.state.end!.allies).toEqual(new Set([0, 2, 4, 6]));
+    expect(endOfMatchModel(allyWon.state.end!).kind).toBe('victory');
+    expect(endOfMatchModel(allyWon.state.end!).subhead).toContain('Your side');
+
+    // …and an enemy's win is still a defeat.
+    expect(endOfMatchModel(flowMatchEnded(state, 1).state.end!).kind).toBe('defeat');
+
+    // Eliminated, then your side finishes it: SPECTATE, then VICTORY.
+    const dead = flowEliminated(state);
+    expect(endOfMatchModel(dead.state.end!).kind).toBe('eliminated');
+    const watching = flowTapEnd(dead.state, { kind: 'spectate' }).state;
+    expect(watching.screen).toBe('match');
+    const sideWon = flowMatchEnded(watching, 2);
+    expect(endOfMatchModel(sideWon.state.end!).kind).toBe('victory');
   });
 
   it('ignores a matchEnd that did not arrive during a live match', () => {

@@ -420,6 +420,10 @@ export {
   SIDE_COLORS,
   SIDE_WORDS,
   sideRelation,
+  // The slots on one player's side, off the lobby's own `team` table — the roster
+  // the end-of-match summary reads to answer "did MY side take the claim?"
+  // (a0-09). The lobby's twin of `art/audio/scope` `deriveAlarmAllies`.
+  sideRosterOf,
   teamLabel,
   teamName,
   viewerTeamOf,
@@ -704,6 +708,10 @@ export {
   endOfMatchHitTest,
   endOfMatchLayout,
   endOfMatchModel,
+  // The summary's ONE allegiance question (a0-09): is that player on my side?
+  // Asked here rather than re-derived, so the headline, the line under it and the
+  // identity rule can never answer it three ways.
+  onYourSide,
 } from './end-of-match';
 export type {
   DeathCause,
