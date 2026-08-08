@@ -38,8 +38,16 @@
  *  - `core`     — the station core: the win condition, so it earns yellow (§2).
  *  - `danger`   — damage, alarms, hazard stripes, enemy fire. Threat red, and
  *                 the only other place signal yellow may appear.
+ *  - `sky`      — the void's own wash: a nebula sheet or a dust lane, behind
+ *                 every entity in the game and never part of one (a0-07). It is
+ *                 a role rather than "material at a low alpha" because the
+ *                 audit treats it differently and much more strictly: signal
+ *                 yellow may never touch it at any alpha, and threat red may
+ *                 only at a whisper the audit enforces numerically
+ *                 (style-guide §2.2, ./compliance `SKY_RESERVED_ALPHA_MAX`).
+ *                 No entity sprite may ever carry it.
  */
-export type PaintRole = 'material' | 'identity' | 'energy' | 'ore' | 'core' | 'danger';
+export type PaintRole = 'material' | 'identity' | 'energy' | 'ore' | 'core' | 'danger' | 'sky';
 
 // ---------------------------------------------------------------------------
 // Paths

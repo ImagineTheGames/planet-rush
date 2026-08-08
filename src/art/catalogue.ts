@@ -32,7 +32,17 @@ import type { SpriteDef } from './shapes';
 import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 import { PARTICLE_KINDS, particleSprite } from './vfx/kinds';
 import { SHOT_FAMILIES, SHOT_TIERS, shotSprite } from './vfx/shots';
-import { STAR_LAYERS, VOID_SEED, nebulaWashSprite, starFieldSprite } from './backdrop';
+import {
+  MAP_NEBULA,
+  NEBULAE,
+  NEBULA_IDS,
+  STAR_LAYERS,
+  VOID_SEED,
+  nebulaTileSprite,
+  starFieldSprite,
+  type MapId,
+  type NebulaId,
+} from './backdrop';
 
 /** One catalogued sprite: what it is, and a caption for the contact sheet. */
 export interface CatalogueEntry {
@@ -205,13 +215,12 @@ function entries(): CatalogueEntry[] {
     }
   }
 
-  // --- The void (a2-06) -----------------------------------------------------
-  // The layered parallax star-field and nebula washes the fleet flies against
-  // (./backdrop). Sampled here at a fixed review tile so the palette audit covers
-  // the void's colours — the live field is the same generator at arena scale.
-  // Steel value-ramp stars, patina/steel nebula: no seventh hue, all role
-  // `material` (style-guide §1). A sample star that went signal yellow would be a
-  // RESERVED-rule violation like any other sprite.
+  // --- The void (a2-06, re-grounded a0-07) ----------------------------------
+  // The layered parallax star-field the fleet flies against (./backdrop). Sampled
+  // here at a fixed review tile so the palette audit covers the void's colours —
+  // the live field is the same generator at arena scale. Steel value-ramp stars:
+  // no seventh hue, all role `material` (style-guide §1). A sample star that went
+  // signal yellow would be a RESERVED-rule violation like any other sprite.
   const VOID_TILE = { w: 480, h: 300 } as const;
   const LAYER_NOTE: Record<string, string> = {
     deep: 'far dust — dim, dense, no white',
@@ -225,11 +234,24 @@ function entries(): CatalogueEntry[] {
       def: starFieldSprite(spec, VOID_SEED, VOID_TILE.w, VOID_TILE.h),
     });
   }
-  out.push({
-    group: 'The void — nebula wash',
-    label: 'patina/steel haze, 2–6% alpha',
-    def: nebulaWashSprite(VOID_SEED, VOID_TILE.w, VOID_TILE.h),
-  });
+  // The six ratified skies (a0-07), one per map. Each tile is the WHOLE stack in
+  // composite order — Floor, stars, and the sky either behind them or in front —
+  // because a 5%-alpha wash on its own is an invisible tile, and because the one
+  // sky whose entire point is what it REMOVES (Coalsack) says nothing without
+  // stars behind it to remove. Which map flies under which is on the caption.
+  const SKY_OF: Partial<Record<NebulaId, MapId>> = {};
+  for (const [mapId, nebulaId] of Object.entries(MAP_NEBULA) as [MapId, NebulaId][]) {
+    SKY_OF[nebulaId] = mapId;
+  }
+  for (const id of NEBULA_IDS) {
+    const spec = NEBULAE[id];
+    const map = SKY_OF[id];
+    out.push({
+      group: 'The void — the six skies (one per map)',
+      label: `${spec.name} — ${map ?? 'unassigned (a0-12)'}`,
+      def: nebulaTileSprite(id, VOID_SEED, VOID_TILE.w, VOID_TILE.h),
+    });
+  }
 
   return out;
 }
