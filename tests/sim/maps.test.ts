@@ -2,9 +2,9 @@
  * tests/sim/maps.test.ts — the ratified map registry (m8). OWNER: Gameplay
  * Engineer.
  *
- * Four maps, `octagon` the default. A map is a layout — arena bounds + where the
+ * Six maps, `octagon` the default. A map is a layout — arena bounds + where the
  * home stations sit — and everything downstream is the same code for every map,
- * so the suite proves two things of ALL four and a shape claim of each:
+ * so the suite proves two things of ALL of them and a shape claim of each:
  *
  *   1. **Every map honours the world rules.** Eight stations; nothing spawns
  *      within `WORLD_EDGE_MARGIN` of the wall (field report P1); the board is
@@ -20,6 +20,12 @@
  *   3. **Each map's own shape.** octagon/compass/oval: equal neighbour gaps
  *      (compass exact). diamond: exact 4-fold symmetry of each diamond, outer
  *      homes strictly farther from centre than inner.
+ *
+ * The two two-sided maps (`line`, `crescents`, a0-12) are held to 1 and 2 here
+ * like every other layout — that they joined these describe-eaches by being
+ * registered is the point of the boundary. What only a board with SIDES can be
+ * asked (the 4v4 seating, the exact mirror between the halves, the cross-station
+ * launch pocket, the equidistant middle) lives in `team-maps.test.ts`.
  *
  * See `src/sim/maps.ts` and the invariant note atop `src/sim/waves.ts`.
  */
@@ -117,8 +123,19 @@ function stationPositions(w: World): Vec2[] {
 // --- the registry itself ---------------------------------------------------
 
 describe('the map registry', () => {
-  it('has the four ratified maps with octagon the default', () => {
-    expect(MAPS.map((m) => m.id)).toEqual(['octagon', 'compass', 'oval', 'diamond']);
+  it('has the six ratified maps with octagon the default', () => {
+    // The four radial FFA boards in their ratified order, then the two two-sided
+    // team boards (a0-12). Order is load-bearing: it is the picker's card order
+    // (`ui/map-picker` MAP_ORDER) and the index a stored selection resolves
+    // through, so appending — never inserting — is what keeps a saved pick.
+    expect(MAPS.map((m) => m.id)).toEqual([
+      'octagon',
+      'compass',
+      'oval',
+      'diamond',
+      'line',
+      'crescents',
+    ]);
     expect(DEFAULT_MAP_ID).toBe('octagon');
     expect(getMap().id).toBe('octagon');
     // Unknown ids fall back to the default — boot never crashes on a stale key.

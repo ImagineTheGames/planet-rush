@@ -1,0 +1,194 @@
+[
+  {
+    "id": "line",
+    "name": "The Line",
+    "bounds": {
+      "width": 3200,
+      "height": 2000
+    },
+    "reflectionResidual": {
+      "stations": 1.6077746776921858e-13,
+      "ships": 1.6077746776921858e-13,
+      "asteroids": 3.2155493553843715e-13,
+      "count": 144
+    },
+    "midlineMirrorResidualStations": 2.5421149729252077e-13,
+    "homeOre": [
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20
+    ],
+    "sideOre": [
+      80,
+      80
+    ],
+    "sideOreExactlyEqual": true,
+    "commons": [
+      120.00000000000001,
+      120.00000000000001
+    ],
+    "commonsDelta": 0,
+    "runsToMiddle": [
+      [
+        1030.2781022617146,
+        1030.2781022617146,
+        1157.0295297873777,
+        1157.0295297873777
+      ],
+      [
+        1030.2781022617148,
+        1030.2781022617148,
+        1157.0295297873777,
+        1157.0295297873777
+      ]
+    ],
+    "pocketSlack": 81.46718188688476,
+    "turretSlack": 328.81222585408125,
+    "nearestAlly": 372.31999999999994,
+    "nearestEnemy": 2026.6400000000003,
+    "emptyCorridor": 2026.64,
+    "seating": [
+      {
+        "owner": 0,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 1,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 2,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 3,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 4,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 5,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 6,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 7,
+        "team": 1,
+        "side": "B"
+      }
+    ]
+  },
+  {
+    "id": "crescents",
+    "name": "The Crescents",
+    "bounds": {
+      "width": 2400,
+      "height": 2400
+    },
+    "reflectionResidual": {
+      "stations": 2.2737367544323206e-13,
+      "ships": 1.1368683772161603e-13,
+      "asteroids": 7.190186943645084e-13,
+      "count": 144
+    },
+    "midlineMirrorResidualStations": 3.2155493553843715e-13,
+    "homeOre": [
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20
+    ],
+    "sideOre": [
+      80,
+      80
+    ],
+    "sideOreExactlyEqual": true,
+    "commons": [
+      120.00000000000001,
+      120.00000000000001
+    ],
+    "commonsDelta": 0,
+    "runsToMiddle": [
+      [
+        915.9999999999998,
+        916,
+        916,
+        916
+      ],
+      [
+        915.9999999999998,
+        915.9999999999998,
+        915.9999999999998,
+        916.0000000000001
+      ]
+    ],
+    "pocketSlack": 67.72131141146025,
+    "turretSlack": 265.7197641477038,
+    "nearestAlly": 504.9676358567424,
+    "nearestEnemy": 1225.8472708494278,
+    "emptyCorridor": 1225.8472708494278,
+    "seating": [
+      {
+        "owner": 0,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 1,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 2,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 3,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 4,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 5,
+        "team": 1,
+        "side": "B"
+      },
+      {
+        "owner": 6,
+        "team": 0,
+        "side": "A"
+      },
+      {
+        "owner": 7,
+        "team": 1,
+        "side": "B"
+      }
+    ]
+  }
+]

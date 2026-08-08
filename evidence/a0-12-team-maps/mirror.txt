@@ -1,0 +1,72 @@
+a0-12 — two maps with four stations a side. THE MIRROR, AS NUMBERS.
+==============================================================================
+
+The two sides are related by a POINT REFLECTION through the arena centre.
+That isometry is chosen because `spawnHomeFields` stamps every home
+neighbourhood by a ROTATION, so rotating the board by pi carries stations,
+ships, home fields and the N-fold-symmetric commons onto themselves — side
+equality is the same fact as "the stamp is a rotation", not a tuning result.
+
+The Line  (line)   arena 3200x2000
+------------------------------------------------------------------------------
+  point-reflection residual, N=8 full field (144 rocks):
+      stations   1.608e-13 u
+      ships      1.608e-13 u
+      asteroids  3.216e-13 u   (position AND ore matched)
+  midline-mirror residual, station centres: 2.542e-13 u
+
+  per-home ore   20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000
+  per-side ore   A 80.000000000   B 80.000000000   exactly equal: true
+  commons split  A 120.000000000   B 120.000000000   delta 0.000e+0
+
+  run to the middle, side A  1030.278  1030.278  1157.030  1157.030
+  run to the middle, side B  1030.278  1030.278  1157.030  1157.030
+
+  SPAWN_CLEAR_POCKET slack (cross-station, worst of 9 seeds x N=2..8):  +81.5 u
+  own-turret-range slack   (worst of the same grid):                    +328.8 u
+  nearest ally 372 u | nearest enemy 2027 u  (5.44x) | empty corridor 2027 u
+
+  4v4 seating (lobby teams alternate by slot, defaultTeamForSlot = index % 2):
+      P0  team 0  ->  side A
+      P1  team 1  ->  side B
+      P2  team 0  ->  side A
+      P3  team 1  ->  side B
+      P4  team 0  ->  side A
+      P5  team 1  ->  side B
+      P6  team 0  ->  side A
+      P7  team 1  ->  side B
+
+
+The Crescents  (crescents)   arena 2400x2400
+------------------------------------------------------------------------------
+  point-reflection residual, N=8 full field (144 rocks):
+      stations   2.274e-13 u
+      ships      1.137e-13 u
+      asteroids  7.190e-13 u   (position AND ore matched)
+  midline-mirror residual, station centres: 3.216e-13 u
+
+  per-home ore   20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000  20.000000000
+  per-side ore   A 80.000000000   B 80.000000000   exactly equal: true
+  commons split  A 120.000000000   B 120.000000000   delta 0.000e+0
+
+  run to the middle, side A  916.000  916.000  916.000  916.000
+  run to the middle, side B  916.000  916.000  916.000  916.000
+
+  SPAWN_CLEAR_POCKET slack (cross-station, worst of 9 seeds x N=2..8):  +67.7 u
+  own-turret-range slack   (worst of the same grid):                    +265.7 u
+  nearest ally 505 u | nearest enemy 1226 u  (2.43x) | empty corridor 1226 u
+
+  4v4 seating (lobby teams alternate by slot, defaultTeamForSlot = index % 2):
+      P0  team 0  ->  side A
+      P1  team 1  ->  side B
+      P2  team 0  ->  side A
+      P3  team 1  ->  side B
+      P4  team 0  ->  side A
+      P5  team 1  ->  side B
+      P6  team 0  ->  side A
+      P7  team 1  ->  side B
+
+
+Every number above is produced by the shipped registry through `createWorld`,
+the same call a booted match makes. Regenerate with:
+  npx vite-node evidence/a0-12-team-maps/capture-layouts.mjs
