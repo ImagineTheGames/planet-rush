@@ -725,6 +725,90 @@ report the mobile job as this lane's.
 The `audio-alive.spec.ts:239` ramp fix was left out for the **eighth** time, same
 reasoning, unchanged.
 
+## ROUND 11 (this session) — an UNPUSHED merge was sitting on the lane, and round 10's CI finding expired
+
+**Remote inspected first**, per round 7's lesson, and this is the round where it
+paid for itself outright. `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` was `8bfa666` but **local HEAD was
+`bc999cd`, nineteen commits ahead** — a previous session had merged `origin/main`
+(at `ba3c030`, PR #321) into the lane and **never pushed it**. Every prior round
+recorded "remote identical to local"; this one was not, and a `git status` that
+reads clean says nothing about that. The nineteen were `origin/main`'s own history
+plus the merge commit, so nothing of this lane's was at risk — but the merge would
+have been silently redone or lost.
+
+**The ancestry gate was RED at session start**, for the second time in the lane's
+life (round 7 was the first). `origin/main` had moved again, to **`13e9649`**
+(PR #316, a0-05 station-health-always-visible, plus a style-guide follow-up).
+
+### What was built
+
+- **`df670d7` — merge `origin/main` (`13e9649`).** Two conflicts, both documentation
+  and both resolved by keeping *both* sides:
+  - **`GDD.md` §2.2 header.** a0-05 and this lane both appended an *(amended
+    2026-08-07)* clause to the same section heading, on the same day. Combined into
+    one header carrying both — station health always visible, **and** the alarm
+    sounding once. The alarm paragraph itself auto-merged untouched (line 87), as
+    did a0-05's new always-visible paragraph (line 83): they sit in different parts
+    of §2.2 and do not argue with each other.
+  - **`docs/design-amendments.md`.** a0-05 inserted its entry at the top of the
+    file, same as a0-03 did back at `f053f2e`. Both kept, mine first, with the `---`
+    separator restored between them. This is the third time this exact conflict has
+    happened in this file; expect it every time a lane lands an amendment.
+  - `src/main.ts` **auto-merged** — a0-05 retired `SENSOR_RANGE` in it while this
+    lane wired the seat. Verified by grep rather than assumed: `audio.setLocal`
+    (808), the `WorldObserver` (809), `setAlarmScope` fed per frame (1958),
+    `__alarmStage` (4677) and the seat assignment (790) are all intact, and no
+    `graph.startLoop(SOUND.alarm` survives anywhere.
+- **`cb69e53`** — the deploy re-probe, refreshed to the new served sha.
+
+Re-verified on the merged tree, not trusted from round 10:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3982 passed / 237 files, 0 failed** (300 s) — a **sixth** consecutive clean round. Count rose 3955 → 3982 because main brought a0-05's tests, not because anything here grew. |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.2 m test / 3.6 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass**, after the merge |
+| deploy probe | moved `b32d0a7` → **`f9b2f1f`**, **still pre-fix** |
+
+**The capacity test was green again** — ninth data point (2 red, 7 green). Settled,
+and it has now been clean for six rounds running.
+
+### Round 10's headline finding has EXPIRED, and that is the round's real work
+
+Round 10 wrote a whole PR-body section proving the red "Mobile emulation
+(Playwright)" check was inherited: red on main since `b32d0a7`, branch's failing set
+a strict subset of main's, no audio spec in either. All true when written. **It is no
+longer the situation.** PR #321 (a0-00b) landed the sharded mobile suite and
+**main's CI is green again** — at `ba3c030`, at `f9b2f1f` and at `13e9649`. Checked
+with `gh run list --branch main`, not inferred.
+
+So the branch inherited two things from this merge: the fix for the red check, and a
+**different check topology** — one job became **six shards**, `Mobile emulation
+(Playwright) — shard N/6`. A reviewer opening the PR now sees six check names that
+the PR body does not mention, next to a section explaining at length why a *seventh,
+differently-named* check is red on main. That section had gone from "the useful
+thing in the PR" to actively misleading in one merge.
+
+This is round 9's lesson for the third consecutive round, and worth stating as a
+rule rather than an anecdote: **a PR body section that documents someone else's
+red is a perishable good.** It is correct only as long as the other lane has not
+fixed it, and nothing notifies you when they do. Re-check every inherited-red claim
+each round against the *current* main, not against the run ID you recorded when you
+wrote it.
+
+**Housekeeping.** 33 foreign `tests/live-stage/*-evidence.png` were dirty at session
+start — `git checkout -- tests/live-stage/`, never committed, as every round. Only my
+own spec was run (not the full suite), so nothing went dirty again: `git status` after
+the live run showed only the deliberate probe refresh and the untracked throwaway
+config. `evidence/s9-01-alarm-ownership.json` came back **byte-identical** — round 6's
+caption fix still doing its job. The 4173 trap did not bite; the private-port config
+was already present and was reused from the first run.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **ninth** time, same
+reasoning, unchanged.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
@@ -735,10 +819,11 @@ reasoning, unchanged.
   a ~100 ms wait before `sfxBusGain` is sampled. Deliberately not folded into
   PR #318.
 - Handed over, not this lane's: the destroyed-`entryView` crash on the online
-  route (`src/ui/lobby-entry-view.ts:234`), the ~20 fps alarm floor
-  (`src/art/vfx/observer.ts`), and — new in round 10 — the **mobile-emulation CI
-  job, red on main since `b32d0a7`** (PR #320's golden re-baseline). All three are
-  in the PR body with their repros.
+  route (`src/ui/lobby-entry-view.ts:234`) and the ~20 fps alarm floor
+  (`src/art/vfx/observer.ts`). Both are in the PR body with their repros.
+  ~~the mobile-emulation CI job, red on main since `b32d0a7`~~ — **closed in
+  round 11**: PR #321 (a0-00b) sharded the suite and main's CI is green again at
+  `ba3c030` / `f9b2f1f` / `13e9649`. Nothing to hand over.
 - Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
   or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
   are explicitly unratified, GDD §4.7 blast radius).
@@ -752,3 +837,12 @@ reasoning, unchanged.
   only real finding was a check that had sat pending for six rounds and quietly
   resolved to red — inherited from main, but invisible as such until the two
   failing sets were diffed. `gh pr checks 318` costs one call.
+- **And re-check every inherited-red claim against today's main, not against the
+  run ID you recorded.** Round 11's only real finding was that round 10's red had
+  been *fixed by another lane*, silently, leaving a long PR-body section arguing
+  about a check that no longer exists under that name. Someone else's red is a
+  perishable good; nothing notifies you when it expires.
+- **`git status` clean ≠ nothing local.** Round 11 opened with **19 unpushed
+  commits** (a whole unpushed `origin/main` merge) that no `git status` would show.
+  Compare `git rev-parse HEAD` against `git rev-parse origin/<branch>` explicitly,
+  and push before running the gates so a session that dies mid-run loses nothing.
