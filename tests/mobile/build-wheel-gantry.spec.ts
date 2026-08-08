@@ -282,7 +282,10 @@ async function pressWedge(page: Page, index: number, count: number, touch: boole
   expect(p, 'the wheel is not drawn, so there is nothing to press').not.toBeNull();
   if (touch) await page.touchscreen.tap(p!.x, p!.y);
   else await page.mouse.click(p!.x, p!.y);
-  await waitForSimTicks(page, 3, { what: 'the press to resolve' });
+  // No settle here: both callers settle for longer immediately afterwards, so
+  // this one only ever cost a second crossing for sim time the caller was going
+  // to wait for anyway. Their counts absorb it (3 + 5 -> 8, 3 + 10 -> 13), so
+  // the press still resolves against exactly as much simulation as before.
 }
 
 // ===========================================================================
@@ -393,7 +396,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
       // costs three frames rather than four.
       if (wedge(await drawnWedges(page), 'shield')!.costLabel === 'FULL') break;
       await pressWedge(page, SHIELD_INDEX, 5, touch);
-      await waitForSimTicks(page, 5, { what: 'the shield order to be counted' });
+      await waitForSimTicks(page, 8, { what: 'the press to resolve and the shield order to be counted' });
     }
 
     const capState = await drawnState(page);
@@ -417,7 +420,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
     // claim "nothing moved" is actually about.
     const bankBefore = capState.bank;
     await pressWedge(page, SHIELD_INDEX, 5, touch);
-    await waitForSimTicks(page, 10, { what: 'any order the refused press might have placed' });
+    await waitForSimTicks(page, 13, { what: 'the press to resolve, and any order it might have placed' });
     const settled = await drawnState(page);
     all = settled.wedges;
     expect(wedge(all, 'shield')!.caps, `[${label}] the capped press moved the count`).toBe(atCap);

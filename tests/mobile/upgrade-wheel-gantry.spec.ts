@@ -297,6 +297,10 @@ async function openBuildForReal(page: Page, touch: boolean): Promise<Rect> {
     bounds = await registered(page, 'build-wheel');
     if (bounds) break;
     await waitForSimTicks(page, 10, { what: 'the ship to settle docked at its station' });
+    // Re-read before going round again. The affordance is a TOGGLE, so pressing
+    // on a stale "still closed" would shut a wheel that opened during the wait —
+    // which is exactly the guard the original loop's top-of-iteration check was.
+    bounds = await registered(page, 'build-wheel');
   }
   expect(bounds, 'three real presses on the BUILD affordance did not open the build wheel').not.toBeNull();
   // Handed back rather than re-read: the caller needs this rect to aim its next
