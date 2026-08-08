@@ -2855,11 +2855,15 @@ async function boot(): Promise<void> {
    * v0.2.1): a label over **every ship** and **every owned station**, tinted the
    * owner's identity colour and captioned from {@link playerNames}. The pure model
    * ({@link ./ui} `nameplateModel`) decides who is labelled (a dead ship, a
-   * destroyed station — a wreck — and the local ship's own label are all dropped)
-   * and fades a label under combat clutter; here we only project world → screen
-   * (via the same camera transform the bars use, after `renderer.draw`) and pass
-   * the sim liveness/combat facts through. Stations carry no HP/combat signal, so a
-   * rival station's label never leaks its scouted-only HP (GDD §2.2).
+   * destroyed station — a wreck — and the local ship's own label are all dropped);
+   * here we only project world → screen (via the same camera transform the bars
+   * use, after `renderer.draw`) and pass the sim liveness facts through.
+   *
+   * No combat or HP fact crosses this seam any more. It used to — `ship.firing`
+   * and the hull fraction drove the label's combat fade — and the developer
+   * withdrew that fade at a0-04 (*"they should always be lit"*), so the feed stops
+   * at ownership, liveness and position. A rival station's scouted-only HP (GDD
+   * §2.2) could never leak through a label's brightness now even in principle.
    *
    * Allocation-free after warm-up (GDD §4.3): the records are pooled and the frame
    * array reused, bounded by the entity caps (≤8 ships, ≤8 stations).
@@ -2872,8 +2876,6 @@ async function boot(): Promise<void> {
       c.kind = 'ship';
       c.alive = ship.alive && !ship.eliminated;
       c.local = ship.id === LOCAL_PLAYER;
-      c.inCombat = ship.firing;
-      c.hpFraction = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
     }
@@ -2884,10 +2886,6 @@ async function boot(): Promise<void> {
       // A standing (owned) station is labelled; a wreck (`alive` false) is not.
       c.alive = station.alive;
       c.local = false;
-      // No combat signal on a station: a rival's HP is scouted only (GDD §2.2), so
-      // the fade never becomes a back-door HP readout. Full alpha, always.
-      c.inCombat = false;
-      c.hpFraction = 1;
       renderer.projectToScreen(station.pos, c.pos);
       c.radius = station.radius;
     }
@@ -2911,7 +2909,7 @@ async function boot(): Promise<void> {
   function nameableSlot(i: number): MutNameable {
     let c = nameablePool[i];
     if (!c) {
-      c = { owner: 0, kind: 'ship', alive: false, local: false, inCombat: false, hpFraction: 1, pos: { x: 0, y: 0 }, radius: 0 };
+      c = { owner: 0, kind: 'ship', alive: false, local: false, pos: { x: 0, y: 0 }, radius: 0 };
       nameablePool[i] = c;
     }
     return c;
@@ -4896,8 +4894,6 @@ interface MutNameable {
   kind: 'ship' | 'station';
   alive: boolean;
   local: boolean;
-  inCombat: boolean;
-  hpFraction: number;
   pos: Vec2;
   radius: number;
 }
