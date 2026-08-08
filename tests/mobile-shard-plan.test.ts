@@ -46,8 +46,8 @@ const SPEC_FILES = readdirSync(MOBILE_DIR)
   .sort();
 
 /** The shard count ci.yml runs. Asserted at the number actually shipped, and at
- *  its neighbours, because "it balances at 8" is a weaker claim than it looks. */
-const CI_SHARDS = 8;
+ *  its neighbours, because "it balances at 6" is a weaker claim than it looks. */
+const CI_SHARDS = 6;
 
 describe('the mobile suite has spec files to shard at all', () => {
   it('finds them', () => {
@@ -56,7 +56,7 @@ describe('the mobile suite has spec files to shard at all', () => {
 });
 
 describe('every shard plan covers the suite exactly once', () => {
-  for (const total of [1, 2, 3, 4, 5, 8]) {
+  for (const total of [1, 2, 3, 4, 5, 6, 8]) {
     it(`N=${total}: the union of the shards is the whole matrix, with nothing twice`, () => {
       const seen = new Map<string, number[]>();
       for (let shard = 1; shard <= total; shard++) {

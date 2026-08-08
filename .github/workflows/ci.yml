@@ -133,27 +133,30 @@ jobs:
   # with `tests/mobile-shard-plan.test.ts` asserting on the cheap unit-test job
   # that the shards' union is exactly the suite and nothing is in two of them.
   #
-  # ── N=8 AT ONE WORKER, NOT N=4 AT TWO (a0-00b) ───────────────────────────
+  # ── N=6 AT ONE WORKER, NOT N=4 AT TWO (a0-00b) ───────────────────────────
   # `playwright.config.ts` pins `workers: 1` in CI — read the comment there for
   # the four measurements behind it. The short version: a second worker on a
   # 4-core software-GL runner does not halve the wall time, it multiplies every
   # CDP round trip by up to 5× and turns budgets into coin flips. N replaces it.
   #
-  # N=8 is chosen from the refreshed cost table, not from taste:
+  # N=6 is chosen from the cost table, and the table is now measured at the
+  # config it schedules — run 31258319576 was `workers: 2`, this one is the
+  # green `workers: 1` run 31259840319. That re-measurement mattered, because
+  # the contention tax was NOT uniform: `pixel|upgrade-wheel-gantry` fell 918 →
+  # 190 s (4.8×) while `iphone|goldens` fell 1032 → 659 s (1.6×). Ratios moved,
+  # so the plan moved with them.
   #
-  #   - total serial work is 8355 s, so an even split at N=8 is **1044 s**;
+  #   - total serial work is 3838 s, so an even split at N=6 is **640 s**;
   #   - the floor is the heaviest INDIVISIBLE unit — one spec file on one
   #     project, which `fullyParallel: false` runs serially in one worker — and
-  #     that is now `iphone|goldens.spec.ts` at **1032 s**, just under the even
-  #     split. N=8 is therefore the LARGEST N that still divides evenly; at N=9
-  #     the brick binds and the extra runner buys nothing.
+  #     that is `iphone|goldens.spec.ts` at **659 s**, just over the even split.
+  #     N=6 is therefore where the split stops paying: N=7 and N=8 return the
+  #     SAME 659 s makespan and only widen the spread (26 s → 136 s → 214 s), so
+  #     the 7th and 8th runners buy nothing at all.
   #   - per-job fixed cost (checkout → npm ci → cache restore → install-deps,
   #     then the webServer's `npm run build`) is ~2 min, paid in parallel.
   #
-  # Those 8355 s are themselves measured at `workers: 2`, so they carry the
-  # contention tax this change removes — meaning ~17 min/shard is the WORST
-  # case, the one where relieving contention buys nothing at all. Full table,
-  # and the N either side: tests/reports/mobile-shard-a0-00.md.
+  # Full table, and the N either side: tests/reports/mobile-shard-a0-00.md.
   mobile:
     name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
     # Run where gating matters (PRs + main) — not on every agent branch push.
@@ -166,7 +169,7 @@ jobs:
       # a real pass (the cancelled-checks hole that made the gate stricter).
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

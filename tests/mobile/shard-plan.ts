@@ -24,18 +24,19 @@
  * smallest thing a scheduler can actually move: splitting one across two shards
  * would not make it finish sooner, and splitting it across two workers is not
  * something Playwright will do. Hence `iphone|goldens.spec.ts` is one indivisible
- * 1032-second brick, and the floor on any plan is the largest brick in it
- * ({@link heaviestUnit}). That floor is why N stops at 8: an even split of the
- * suite's 8355 s is 1044 s, so N=8 is the largest N the heaviest brick does not
- * bind. At N=9 the makespan flatlines and the spread goes 28 s → 123 s.
+ * 659-second brick, and the floor on any plan is the largest brick in it
+ * ({@link heaviestUnit}). That floor is why N stops at 6: an even split of the
+ * suite's 3838 s is 640 s, just under the brick, so N=7 and N=8 return the SAME
+ * 659 s makespan and only widen the spread (26 s → 136 s → 214 s). Past 6 the
+ * extra runners are bought at no gain at all.
  *
  * ── THE ALGORITHM, AND WHY THIS ONE ────────────────────────────────────────
  * Longest-processing-time-first (LPT) greedy: sort the bricks heaviest-first,
  * drop each into the shard with the least work so far. It is four lines, it is
  * deterministic (ties break on the unit's own name, never on directory order),
- * and its makespan is provably within 4/3 − 1/(3N) of optimal — for N=8, within
- * 29% of a perfect split, and in practice much closer (28 s of spread on 1044 s,
- * i.e. under 3%). Optimal bin-packing here would buy single-digit seconds for a
+ * and its makespan is provably within 4/3 − 1/(3N) of optimal — for N=6, within
+ * 28% of a perfect split, and in practice much closer (26 s of spread on 640 s,
+ * i.e. about 4%). Optimal bin-packing here would buy single-digit seconds for a
  * scheduler nobody could review.
  *
  * Every shard computes the WHOLE plan and takes its own slice, so the shards
@@ -81,27 +82,31 @@ export interface ShardAssignment {
  * `project|file`.
  *
  * MEASURED, not estimated: summed from the `list` reporter's per-test durations
- * in the shard jobs of run **31258319576**, first attempts only — a retry is a
- * repeat of work already counted, and counting it would inflate exactly the
- * specs that are already the problem.
+ * in the six shard jobs of the GREEN run **31259840319**, first attempts only —
+ * a retry is a repeat of work already counted, and counting it would inflate
+ * exactly the specs that are already the problem.
  *
- * Refreshed off 31258319576 rather than the original 31249237259, for two
- * reasons. The three spec fixes this branch shipped moved real numbers —
- * `iphone|upgrade-wheel-gantry` 1338 → 688 s, `iphone|menu-frame-cost` 480 →
- * 186 s — and a table that still priced them at their pre-fix cost would keep
- * isolating files that are no longer heavy. And the old table was summed off a
- * run whose shard 2 was a 42-minute pile-up, which distorted everything in it.
+ * ── MEASURE AT THE CONFIG YOU SCHEDULE ────────────────────────────────────
+ * This table has been re-cut twice, and the second re-cut is the one with a
+ * lesson in it. Run 31249237259 was `--shard` by count; 31258319576 was the
+ * duration plan at `workers: 2`; this one is `workers: 1`. Going from the
+ * second to the third did not scale the numbers, it **reordered** them:
  *
- * ── WHY AN INFLATED SNAPSHOT IS STILL A CORRECT ONE ────────────────────────
- * These durations were measured at `workers: 2`, i.e. every one of them carries
- * some contention tax, and four tests in `iphone|goldens` are their 90 s budget
- * rather than their cost. That is fine, and not by luck: **LPT balances on
- * RATIOS, so a uniform scale factor cannot change the assignment it produces.**
- * What would break the plan is a cost that is wrong *relative to its
- * neighbours*, which is precisely what the stale table had become. A test that
- * hit its budget is if anything under-counted (a ceiling truncates it), and
- * under-counting the heaviest brick is the safe direction: it can only make
- * this file spread that brick's shard thinner.
+ *     pixel|upgrade-wheel-gantry   918 → 190 s   (4.8×)
+ *     iphone|build-flow            570 → 222 s   (2.6×)
+ *     iphone|goldens              1032 → 659 s   (1.6×)
+ *     iphone|upgrade-wheel-gantry  688 → 483 s   (1.4×)
+ *
+ * A UNIFORM factor would have been harmless — LPT balances on ratios, so a
+ * scale factor cannot change the assignment it produces. This was not uniform:
+ * the contention tax fell hardest on the round-trip-heavy specs, so the heaviest
+ * brick changed identity and the plan changed with it. The first `workers: 1`
+ * run, scheduled from `workers: 2` costs, came back green but spread 5m01s to
+ * 12m19s — correct, and badly balanced, for exactly this reason.
+ *
+ * So: **re-measure whenever the execution config changes**, not only when the
+ * specs do. A cost table is a statement about a suite AND the machine
+ * configuration that runs it.
  *
  * A pair that is absent ran ZERO tests: `menu-frame-cost` skips off `iphone`,
  * `build-flow` skips off `desktop`, `goldens` skips off `pixel`. Absent is not
@@ -109,38 +114,38 @@ export interface ShardAssignment {
  * apart by {@link MEASURED_FILES} rather than by a zero.
  */
 export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
-  'iphone|goldens.spec.ts': 1032,
-  'pixel|upgrade-wheel-gantry.spec.ts': 918,
-  'iphone|upgrade-wheel-gantry.spec.ts': 688,
-  'iphone|build-flow.spec.ts': 570,
-  'iphone|build-wheel-gantry.spec.ts': 504,
-  'pixel|build-wheel-gantry.spec.ts': 504,
-  'pixel|build-flow.spec.ts': 492,
-  'desktop|goldens.spec.ts': 421,
-  'desktop|upgrade-wheel-gantry.spec.ts': 311,
-  'iphone|landscape-lock.spec.ts': 307,
-  'iphone|campaign-door.spec.ts': 254,
-  'iphone|slot-state.spec.ts': 240,
-  'pixel|campaign-door.spec.ts': 234,
-  'iphone|emulation.spec.ts': 218,
-  'pixel|landscape-lock.spec.ts': 206,
-  'iphone|menu-frame-cost.spec.ts': 186,
-  'pixel|emulation.spec.ts': 185,
-  'pixel|slot-state.spec.ts': 174,
-  'iphone|centering.spec.ts': 173,
-  'pixel|centering.spec.ts': 152,
-  'desktop|build-wheel-gantry.spec.ts': 94,
-  'iphone|voice-copy-fit.spec.ts': 78,
-  'desktop|campaign-door.spec.ts': 68,
-  'pixel|voice-copy-fit.spec.ts': 64,
-  'desktop|centering.spec.ts': 63,
-  'iphone|layout.spec.ts': 59,
-  'desktop|slot-state.spec.ts': 54,
-  'pixel|layout.spec.ts': 47,
-  'desktop|voice-copy-fit.spec.ts': 17,
-  'desktop|emulation.spec.ts': 17,
-  'desktop|landscape-lock.spec.ts': 13,
-  'desktop|layout.spec.ts': 13,
+  'iphone|goldens.spec.ts': 659,
+  'iphone|upgrade-wheel-gantry.spec.ts': 483,
+  'iphone|build-wheel-gantry.spec.ts': 230,
+  'iphone|build-flow.spec.ts': 222,
+  'pixel|build-flow.spec.ts': 222,
+  'pixel|build-wheel-gantry.spec.ts': 204,
+  'pixel|upgrade-wheel-gantry.spec.ts': 190,
+  'desktop|goldens.spec.ts': 163,
+  'iphone|landscape-lock.spec.ts': 142,
+  'iphone|campaign-door.spec.ts': 139,
+  'desktop|upgrade-wheel-gantry.spec.ts': 133,
+  'pixel|campaign-door.spec.ts': 114,
+  'iphone|menu-frame-cost.spec.ts': 109,
+  'iphone|slot-state.spec.ts': 106,
+  'pixel|landscape-lock.spec.ts': 104,
+  'pixel|slot-state.spec.ts': 94,
+  'iphone|emulation.spec.ts': 81,
+  'pixel|emulation.spec.ts': 69,
+  'pixel|centering.spec.ts': 67,
+  'iphone|centering.spec.ts': 65,
+  'iphone|voice-copy-fit.spec.ts': 36,
+  'pixel|voice-copy-fit.spec.ts': 32,
+  'desktop|build-wheel-gantry.spec.ts': 30,
+  'desktop|slot-state.spec.ts': 26,
+  'desktop|campaign-door.spec.ts': 26,
+  'pixel|layout.spec.ts': 24,
+  'desktop|centering.spec.ts': 24,
+  'iphone|layout.spec.ts': 23,
+  'desktop|emulation.spec.ts': 8,
+  'desktop|voice-copy-fit.spec.ts': 7,
+  'desktop|landscape-lock.spec.ts': 7,
+  'desktop|layout.spec.ts': 2,
   'pixel|goldens.spec.ts': 0,
   'pixel|menu-frame-cost.spec.ts': 0,
   'desktop|menu-frame-cost.spec.ts': 0,
