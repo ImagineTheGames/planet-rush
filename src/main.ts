@@ -1869,7 +1869,10 @@ async function boot(): Promise<void> {
       // the golden frame is byte-deterministic.
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx);
 
-      renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
+      // `mapId` picks the backdrop's sky (a0-07): a map's nebula is part of its
+      // identity, like its layout, and `World` does not carry the id it was built
+      // from — so the boot that chose the map is what hands it to the renderer.
+      renderer.draw(world, { cameraTarget, muzzles: currentMuzzles(), mapId: chosenMapId });
       // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
       // tells off the live world (the audible twin of the VFX field, GDD §3.6),
       // sound them, then advance the standing voices, the alarm, the adaptive

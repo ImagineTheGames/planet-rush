@@ -27,7 +27,7 @@
  * it turns those inputs into the shades every generator paints with.
  */
 
-import { PALETTE as TOKEN_PALETTE, PLAYER_ROSTER, WHITE as TOKEN_WHITE } from './tokens';
+import { FLOOR as TOKEN_FLOOR, PALETTE as TOKEN_PALETTE, PLAYER_ROSTER, WHITE as TOKEN_WHITE } from './tokens';
 
 // ---------------------------------------------------------------------------
 // The six (frozen — style-guide §1), sourced from tokens.ts
@@ -48,6 +48,19 @@ export type PaletteKey = keyof typeof PALETTE;
  * Vacuum is the endpoint of a darkening one.
  */
 export const WHITE = TOKEN_WHITE;
+
+/**
+ * The **ground** the play-field is composited on (a0-07, ratified 2026-08-07):
+ * `#010204`, the same cool blue-black as Vacuum two-and-a-half hue-degrees over
+ * and eight times darker. Sourced from {@link ./tokens} `FLOOR`, where the
+ * Vacuum-vs-Floor division of labour is written down.
+ *
+ * It is not a seventh hue and not a new material: **only `./backdrop` may paint
+ * it**, and it paints exactly two things with it — the ground plane, and the
+ * Coalsack dust that occludes stars by being the ground in front of them. Vacuum
+ * is untouched and remains the ramp's dark endpoint and the HUD's panel fill.
+ */
+export const FLOOR = TOKEN_FLOOR;
 
 /**
  * The 8-slot player identity roster (style-guide §3.1), indexed by `PlayerId`.
@@ -238,12 +251,14 @@ export const MATERIAL_COLORS: ReadonlySet<number> = new Set(Object.values(PALETT
 /** The eight identity colours, as a lookup. */
 export const IDENTITY_COLORS: ReadonlySet<number> = new Set(PLAYER_COLORS);
 
-/** Every colour any sprite is allowed to carry: six + derived + roster + white. */
+/** Every colour any sprite is allowed to carry: six + derived + roster + white
+ *  + the backdrop ground (Floor — backdrop-only, see {@link FLOOR}). */
 export const ALLOWED_COLORS: ReadonlySet<number> = new Set<number>([
   ...Object.values(PALETTE),
   ...Object.values(DERIVED),
   ...PLAYER_COLORS,
   WHITE,
+  FLOOR,
 ]);
 
 /** `0x7e8894` → `'#7e8894'`. For the SVG artifacts (./svg). */
