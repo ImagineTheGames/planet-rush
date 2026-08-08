@@ -116,13 +116,30 @@ await shot(browser, {
   url: '/?debug=1',
   frozen: false,
   before: async (page) => {
-    // Take the local player's core down far enough that the clockwise threat
-    // fill is unmistakable, then let the sim carry the write to a tick boundary.
     await page.waitForFunction(() => typeof window.__planetRush?.damageCore === 'function', undefined, {
       timeout: 20_000,
     });
-    await page.evaluate(() => window.__planetRush.damageCore(0, 62));
-    await page.waitForTimeout(900);
+    // Damage is refused while `station.spawnProtect > 0` (`sim/buildings.ts`
+    // `damageStation`), and a fresh station carries `SPAWN_PROTECTION_S = 10`
+    // seconds of it. The first cut of this shot fired at t≈0, was silently
+    // refused, and produced a frame captioned "damaged" showing a station at
+    // 100/100 — so: keep asking until the core actually moves, and fail loudly
+    // if it never does rather than shipping a frame that proves nothing.
+    const hp = await page.evaluate(async () => {
+      const pr = window.__planetRush;
+      const start = pr.coreHp(0);
+      for (let i = 0; i < 60; i++) {
+        pr.damageCore(0, 62);
+        await new Promise((r) => setTimeout(r, 500));
+        const now = pr.coreHp(0);
+        if (now !== null && start !== null && now < start) return now;
+      }
+      return null;
+    });
+    if (hp === null) throw new Error('the core never took damage — the disqualifier frame would be a lie');
+    console.log(`    core took damage: ${hp} hp left`);
+    // A beat for the damage ring's fill to settle into its drawn state.
+    await page.waitForTimeout(600);
   },
 });
 
