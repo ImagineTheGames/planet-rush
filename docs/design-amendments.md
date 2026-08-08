@@ -88,6 +88,7 @@ allocator, a real match server and an online client bundle, joins a real room
 with two real browsers, and asserts the audio engine's local id equals the seat
 the server gave it — **on a non-zero slot, failing outright if the joiner is
 seated at 0**, because on slot 0 a dead wire and a live one read identically.
+
 ---
 
 ## Station health is ALWAYS VISIBLE — sensor range retired
