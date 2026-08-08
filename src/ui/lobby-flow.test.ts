@@ -325,10 +325,14 @@ describe('the room tells the server what it chose', () => {
 
     // A CLOSED row's body still re-opens the seat — one rule, stated once: the body
     // edits whatever the row is SHOWING, and a closed row shows no character.
-    const closed = flowTapLobby(
-      flowTapLobby(inLobby(0, 0), { kind: 'seatState', index: 5 }).state,
-      { kind: 'seatState', index: 5 },
-    ).state;
+    // Walk to CLOSED rather than counting taps to it: which rung the seat starts
+    // on is the flavour's business since a0-11, so two taps from `inLobby` (the
+    // SOLO door, which opens on the bot cast) land on OPEN, not CLOSED.
+    let closed = inLobby(0, 0);
+    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+      if (closed.lobby?.seats[5]?.occupant === 'closed') break;
+      closed = flowTapLobby(closed, { kind: 'seatState', index: 5 }).state;
+    }
     expect(closed.lobby?.seats[5]?.occupant).toBe('closed');
     expect(flowTapLobby(closed, { kind: 'seat', index: 5 }).state.lobby?.seats[5]?.occupant).toBe('open');
 
@@ -538,6 +542,11 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         let state = inLobbyVia(flavour.door, 0, 0);
         if (mode !== 'ffa') state = flowTapLobby(state, { kind: 'mode' }).state;
         expect(state.lobby?.mode, `lobby is in ${mode}`).toBe(mode);
+        // Setup, not the thing under test (see {@link withBotAt}): since a0-11 the
+        // online room opens this seat OPEN and empty, and the two bot affordances
+        // below only MEAN anything on a bot seat. Without this the character tap
+        // is refused and the assertion compares a value to itself.
+        state = withBotAt(state, SEAT);
         const layout = lobbyLayout(GUARD_VIEWPORT);
 
         // The CHARACTER cycle: the row body reaches it (a0-06). This is the
@@ -791,6 +800,10 @@ describe('the whole front of a match, in one pass', () => {
     drain(flowConnected(state, 0));
     drain(flowLobbySlots(state, slots(8, [0, 1])));
     drain(flowTapLobby(state, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Interceptor) }));
+    // Seat 4 has to BE a bot before it can be cast (a0-11: a wire slot arrives
+    // OPEN, and the character cycle refuses a non-bot seat). Both taps are real
+    // host edits and both are broadcast, which is why two sends appear below.
+    drain(flowTapLobby(state, { kind: 'seatState', index: 4 }));
     drain(flowTapLobby(state, { kind: 'seat', index: 4 }));
     drain(flowTapLobby(state, { kind: 'rush' }));
     // Driven the way a frame loop drives it — until the count is spent, not for
@@ -804,6 +817,7 @@ describe('the whole front of a match, in one pass', () => {
       `open:${room}`,
       'send:lobbyChoice', // the pre-selected Vanguard, on open
       'send:lobbyChoice', // the Interceptor tile
+      'send:lobbyChoice', // seat 4 set to BOT (a0-11) — an open slot casts nobody
       'send:lobbyChoice', // seat 4's character (a0-06) — the tier rides it
       'send:startMatch', // at zero, not on the press
     ]);
