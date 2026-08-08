@@ -8,7 +8,8 @@
  * labels are a fixed size regardless of camera zoom (field request rule 3) — the
  * same discipline as the over-ship health bars ({@link ./healthbar-view}).
  *
- * **The stack (field request rule 1).** A ship's status marks read as one unit,
+ * **The stack (field request rule 1, and the whole of rule 3 after a0-04).** A
+ * ship's status marks read as one unit,
  * top to bottom: the **name + difficulty-tag** row on top, the **health bar +
  * "68/70" number** row below it (the number hangs off the bar's right edge, not
  * under it — field request v0.2.4, drawn by {@link ./healthbar-view}), and the
@@ -18,6 +19,13 @@
  * (rule 3); the number sits beside the bar and so stays out of this vertical stack
  * entirely. A station label sits above the station, clear of its HP pin / damage
  * ring, by the station's own screen radius plus a gap.
+ *
+ * That clearance is now the ONLY thing keeping the health bar's claim on the eye
+ * during a brawl. Rule 3's other half — the label fading while its entity was
+ * damaged or fighting — was withdrawn by the developer at a0-04 (*"they should
+ * always be lit"*), so the geometry carries the intent alone. It is exported as
+ * {@link nameplateClusterClearance} rather than kept private precisely so a unit
+ * test can pin it without a GPU (nameplates.test.ts).
  *
  * **Pooling (GDD §4.3, risk 5).** Text objects are allocated once and reused: a
  * frame with N labels touches the first N pooled Texts (set text/tint/position —
@@ -87,6 +95,27 @@ export const NAMEPLATE_TEAM_GAP = 4;
 export const NAMEPLATE_TEAM_ALPHA = 0.85;
 
 /**
+ * Vertical clearance from the entity centre to the label's bottom edge, so the
+ * label clears the entity's status cluster (a ship's health bar, a station's HP
+ * pin) and the three stack as one unit (field request rule 1).
+ *
+ * For a SHIP it is derived from the health bar's own geometry — the bar layer
+ * puts the bar's top at `y - radius - HEALTHBAR_GAP - height` ({@link
+ * ./healthbar-view}), and this returns exactly that plus {@link
+ * NAMEPLATE_SHIP_GAP} — so the label's bottom edge is always strictly above the
+ * bar's top edge, for any radius and either bar height. That inequality is what
+ * keeps the health bar's claim on the eye during a brawl now that the combat fade
+ * is gone (a0-04); it is a pure function of the plate, exported and unit-tested
+ * (nameplates.test.ts) rather than buried in the draw loop.
+ */
+export function nameplateClusterClearance(plate: Nameplate): number {
+  if (plate.kind === 'station') return plate.radius + NAMEPLATE_STATION_GAP;
+  // Ship: clear the sprite, the bar gap, and the bar itself, then a hair more.
+  const barHeight = plate.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
+  return plate.radius + HEALTHBAR_GAP + barHeight + NAMEPLATE_SHIP_GAP;
+}
+
+/**
  * One label the layer actually drew this frame (post-cull), captured only when
  * {@link NameplateView.enableDebugCapture} has been called — the ?debug=1
  * live-stage seam behind {@link NameplateView.debugPlates}. It lets a Playwright
@@ -112,6 +141,11 @@ export interface DrawnNameplate {
   teamColor: number;
   /** The tint (owner identity colour) applied. */
   color: number;
+  /** The opacity the label was actually drawn at. Constant across every plate
+   *  since a0-04 — which is exactly why it is worth reading back: a live-stage
+   *  test (and the evidence capture) can show a fighting ship's name and a calm
+   *  one's name at the same number, not merely assert it. */
+  alpha: number;
   /** Label centre-x in screen space, CSS px (the entity it tracks). */
   x: number;
   /** Label-top y in screen space, CSS px. */
@@ -177,7 +211,7 @@ export class NameplateView extends Container {
 
       // Bottom-centre anchor: position the label's baseline just above the
       // entity's status cluster, so it grows upward and never into the bar/ship.
-      const bottom = plate.y - this.clusterClearance(plate);
+      const bottom = plate.y - nameplateClusterClearance(plate);
       const width = t.width;
       const height = t.height;
       const left = plate.x - width / 2;
@@ -228,16 +262,6 @@ export class NameplateView extends Container {
     this.debugCount = this.debugCapture ? drawn : 0;
   }
 
-  /** Vertical clearance from the entity centre to the label's bottom edge, so the
-   *  label clears the entity's status cluster (a ship's health bar, a station's HP
-   *  pin) and the three stack as one unit (field request rule 1). */
-  private clusterClearance(plate: Nameplate): number {
-    if (plate.kind === 'station') return plate.radius + NAMEPLATE_STATION_GAP;
-    // Ship: clear the sprite, the bar gap, and the bar itself, then a hair more.
-    const barHeight = plate.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
-    return plate.radius + HEALTHBAR_GAP + barHeight + NAMEPLATE_SHIP_GAP;
-  }
-
   // --- ?debug=1 live-stage seam --------------------------------------------
 
   /** Turn on capture of the drawn labels so {@link debugPlates} reports them. The
@@ -259,7 +283,7 @@ export class NameplateView extends Container {
   private recordDebug(i: number, plate: Nameplate, top: number): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: plate.x, y: top, local: plate.local };
       this.debugDrawn[i] = d;
       return;
     }
@@ -270,6 +294,7 @@ export class NameplateView extends Container {
     d.teamLabel = plate.teamLabel;
     d.teamColor = plate.teamColor;
     d.color = plate.color;
+    d.alpha = plate.alpha;
     d.x = plate.x;
     d.y = top;
     d.local = plate.local;
