@@ -27,9 +27,18 @@
  * reports its highest slot — an **ally**, even with the local reactor intact. Both
  * scenarios below are therefore genuine ally wins, not staged labels.
  *
- * Two screenshots, because both halves of the developer's screen were wrong: the
- * headline said DEFEAT and the line under it was an opponent's sentence about a
- * friend.
+ * Both halves of the developer's screen were wrong — the headline said DEFEAT and
+ * the line under it was an opponent's sentence about a friend — so the corrected
+ * end screen is shot, and so is the ELIMINATED state on the way to it.
+ *
+ * A note on the pictures, so nobody reads more into them than is there: the
+ * end-of-match backdrop is **opaque and covers the whole viewport**
+ * (`end-of-match-view.ts`). Both scenarios therefore end on *pixel-identical*
+ * frames — same headline, same subhead, same plates, with the differing world
+ * underneath painted over. That is by design, not a mistake, and it is why the
+ * eliminated run's distinguishing evidence is the ELIMINATED-with-SPECTATE frame
+ * in the MIDDLE of it rather than a duplicate of the final one. The assertions,
+ * not the screenshots, are what separate the two paths.
  */
 import { test, expect } from '@playwright/test';
 
@@ -138,6 +147,16 @@ test('eliminated → SPECTATE → your side wins: still VICTORY, never DEFEAT an
     'eliminated',
   );
   expect(dead.buttons, 'ELIMINATED still offers SPECTATE + REMATCH').toEqual(['rematch', 'spectate']);
+
+  // The ONE frame of this run that does not look like the other test's. The
+  // end-of-match backdrop is opaque and covers the whole viewport
+  // (`end-of-match-view.ts`), so both scenarios FINISH on pixel-identical
+  // screens — same CLAIM HELD, same subhead, same two plates, and the differing
+  // world underneath painted over. A second photo of that frame proves nothing
+  // the first already does. What is unique to this path is the middle of it:
+  // ELIMINATED standing while the match is still live, offering SPECTATE. That
+  // is the state the brief asks to verify survives, so that is what gets shot.
+  await page.screenshot({ path: 'tests/live-stage/teams-eliminated-spectate-evidence.png' });
 
   // --- SPECTATE: the overlay drops and the live match plays on. ---
   const before = await page.evaluate(() => window.__endScreenStage!.ticks());
