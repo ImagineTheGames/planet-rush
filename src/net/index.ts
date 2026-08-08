@@ -112,6 +112,9 @@ export * from './connect-trace';
 export * from './connect-trace-view';
 export * from './link-loss';
 export * from './link-loss-view';
+// A room with no other humans in it plays locally, and says so (a0-11).
+export * from './local-revert';
+export * from './local-revert-view';
 export * from './allocator-client';
 export * from './region-probe';
 export * from './server-url';

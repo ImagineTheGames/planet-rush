@@ -30,6 +30,7 @@ import type { WireFrame } from '../../src/net/wire';
 import type { PongMessage } from '../../src/net/transport';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
+import { seatBots } from './seat-bots';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -93,6 +94,7 @@ describe('the latency probe', () => {
     const code = server.createCode();
     connection = server.connect(socket);
     connection.receive(encodeClientMessage({ type: 'join', room: code }));
+    connection.receive(seatBots());
     connection.receive(encodeClientMessage({ type: 'startMatch' }));
     tick(2);
   });

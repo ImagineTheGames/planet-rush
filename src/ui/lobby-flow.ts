@@ -93,6 +93,7 @@ import {
   CLASS_ORDER,
   applyLobbySlots,
   botDifficulties,
+  lobbyWireSeats,
   lobbyWireTeams,
   createLobby,
   cycleAbundance,
@@ -275,7 +276,12 @@ function choiceFor(state: FlowState, lobby: LobbyState): FlowEffect {
       // the server was never told about is a roster that lies about the match being
       // built. A side authored and never sent is the whole of the developer's
       // report: a lobby that says TEAMS over a free-for-all world.
-      ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby) } : {}),
+      //
+      // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), for exactly the
+      // same reason and with a sharper edge: the lobby no longer auto-seats a bot
+      // in an empty seat, so a roster the server was never told about would have
+      // it fill every one of them behind the screen's back.
+      ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby), seats: lobbyWireSeats(lobby) } : {}),
     },
   };
 }

@@ -444,7 +444,7 @@ test('the control reads pressable where it works and dead where it refuses', asy
 // 3. The door as a door: a real press on it closes a slot
 // ===========================================================================
 
-test('a real press on the control walks OPEN → BOT → CLOSED and shrinks the match', async ({
+test('a real press on the control walks BOT → CLOSED → OPEN → BOT and shrinks the match', async ({
   page,
 }, testInfo) => {
   budgetTest({
@@ -456,8 +456,12 @@ test('a real press on the control walks OPEN → BOT → CLOSED and shrinks the 
   await pressThroughToLobby(page, testInfo.project.name);
 
   const before = await readLobby(page);
-  const target = before.seatStates.find((c) => c.live && c.label === 'OPEN');
-  expect(target, 'an OPEN seat the host can cycle').toBeTruthy();
+  // The SOLO lobby opens on the bot cast (a0-11; GDD §2.1 amended 2026-08-07 —
+  // an OPEN seat means "waiting for a human", and offline there is no wire for
+  // one to arrive on, so it would be a chair nobody could ever take). The ring is
+  // the same ring; this walk starts one rung along from where it used to.
+  const target = before.seatStates.find((c) => c.live && c.label === 'BOT');
+  expect(target, 'a BOT seat the host can cycle').toBeTruthy();
   const slot = target!.index;
   expect(before.size, 'the offline lobby opens on a full house').toBe(before.slotCount);
 
@@ -480,19 +484,21 @@ test('a real press on the control walks OPEN → BOT → CLOSED and shrinks the 
     return readLobby(page);
   };
 
-  // OPEN → BOT: the slot is locked to the AI cast; the match is still full.
-  const botted = await pressControl('BOT');
-  expect(botted.size, 'a bot still takes the field').toBe(before.size);
-
   // BOT → CLOSED: the state the developer could not find. N drops by one, which
   // is the whole point of the control — this is how a host runs a 3-station duel.
   const closed = await pressControl('CLOSED');
   expect(closed.size, 'closing a slot did not shrink the match').toBe(before.size - 1);
 
-  // CLOSED → OPEN: and the control is the way back out, so a slot closed by
-  // accident is one press from being a seat again.
-  const reopened = await pressControl('OPEN');
-  expect(reopened.size, 'reopening a slot did not restore the match size').toBe(before.size);
+  // CLOSED → OPEN: an EMPTY chair. It is out of the match exactly as the closed
+  // one was — the difference is that a joiner could take it, and offline nobody
+  // can, which is why the solo lobby does not open on this rung (a0-11).
+  const opened = await pressControl('OPEN');
+  expect(opened.size, 'an OPEN seat is empty — it brings no ship').toBe(before.size - 1);
+
+  // OPEN → BOT: and the control is the way back, so a slot emptied by accident is
+  // one press from carrying a bot again.
+  const reopened = await pressControl('BOT');
+  expect(reopened.size, 'seating a bot did not restore the match size').toBe(before.size);
 
   // Nothing else on the row moved: pressing the state control is not a way to
   // change somebody's side or a bot's tier.

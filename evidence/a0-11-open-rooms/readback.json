@@ -1,0 +1,46 @@
+{
+  "servedVersion": {
+    "sha": "3b945d6",
+    "time": "2026-08-08T18:40:22.882Z"
+  },
+  "freshRoom": {
+    "room": "AB9Y",
+    "online": true,
+    "you": 0,
+    "isHost": true,
+    "slotCount": 8,
+    "humanCount": 1,
+    "size": 1,
+    "seatLabels": [
+      "TAKEN",
+      "OPEN",
+      "OPEN",
+      "OPEN",
+      "OPEN",
+      "OPEN",
+      "OPEN",
+      "OPEN"
+    ]
+  },
+  "beforeRush": {
+    "size": 3,
+    "humanCount": 1,
+    "seatLabels": [
+      "TAKEN",
+      "BOT",
+      "OPEN",
+      "OPEN",
+      "BOT",
+      "OPEN",
+      "OPEN",
+      "OPEN"
+    ]
+  },
+  "tell": {
+    "text": "NOBODY JOINED — PLAYING LOCALLY",
+    "buttons": 0
+  },
+  "releasedRoom": "AB9Y",
+  "roomStillHeldAfterRush": false,
+  "pageErrors": []
+}

@@ -1107,6 +1107,18 @@ export function lobbyPlateRoles(model: LobbyModel): PlateRole[] {
  *  (`A 2 · B 2`), which is always shown so an uneven split is visible and never
  *  blocked (ratified). */
 function hintText(model: LobbyModel): string {
+  // WHY the button is dead comes first (a0-11; GDD §2.1 *amended 2026-08-07*:
+  // "RUSH! is refused, with a reason on screen, below two participants"). Before
+  // a0-11 the host's RUSH! could only be refused by something they had just done
+  // — closing the seventh seat, putting everyone on one side — so the head count
+  // beside it was explanation enough. It is not any more: a fresh room is one
+  // person in seven empty chairs, and `1 PLAYING · 0 BOTS` states that without
+  // saying it is the problem, or which of the two ways out to take.
+  //
+  // It replaces the tally rather than sitting beside it because there is one
+  // strip and the tally is the *count* the reason already contains.
+  const refusal = model.startRefusal;
+  if (refusal !== null) return refusal;
   if (model.mode === 'teams') {
     const sides = model.teamCounts.map((c) => `${c.label} ${c.count}`).join(' · ');
     return sides || `${model.size} PLAYERS`;
