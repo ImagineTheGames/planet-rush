@@ -1,0 +1,53 @@
+a0-08 — "sometimes picked up ore from dead ships dont count"
+
+VERDICT: ore conservation HOLDS. liveOre === seeded + injected + debrisFloor
+         − spent − deathLoss − capLoss at every frame of all three runs
+         (residual 0.0e+0 throughout, below). No ore is lost. This is a
+         legibility bug: the ore went somewhere the player was not looking.
+
+Reproduce: A0_08_WRITE_EVIDENCE=1 npx vitest run tests/harness/a0-08-evidence.test.ts
+The match-wide law: npx vitest run tests/harness/ore-conservation.test.ts
+
+--- A · loot the wreck with an EMPTY hold (0/2) ---
+before     t= 0.00s  HOLD 0/2  BANKED  3  ore on field  0  lootTake 0  lootBlocked no   ledger looted=0 dropped=0 deathLoss=0  residual 0.0e+0
+KILL       t= 0.00s  HOLD 0/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked no   ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+           the victim held 4 · DEATH_ORE_DROP_FRACTION=0.5 · 2 dropped as 2 chunks, 2 destroyed with the hull (GDD §2.3)
+tick 1     t= 0.02s  HOLD 1/2  BANKED  3  ore on field  1  lootTake 1  lootBlocked no   ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 2     t= 0.03s  HOLD 1/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked no   ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 3     t= 0.05s  HOLD 1/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked no   ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 19    t= 0.32s  HOLD 2/2  BANKED  3  ore on field  0  lootTake 1  lootBlocked no   ledger looted=2 dropped=2 deathLoss=2  residual 0.0e+0
+tick 30    t= 0.50s  HOLD 2/2  BANKED  3  ore on field  0  lootTake 0  lootBlocked no   ledger looted=2 dropped=2 deathLoss=2  residual 0.0e+0
+tick 90    t= 1.50s  HOLD 2/2  BANKED  3  ore on field  0  lootTake 0  lootBlocked no   ledger looted=2 dropped=2 deathLoss=2  residual 0.0e+0
+
+--- B · loot the SAME wreck with a FULL hold (2/2) ---
+before     t= 0.00s  HOLD 2/2  BANKED  3  ore on field  0  lootTake 0  lootBlocked no   ledger looted=0 dropped=0 deathLoss=0  residual 0.0e+0
+KILL       t= 0.00s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked no   ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+           the victim held 4 · DEATH_ORE_DROP_FRACTION=0.5 · 2 dropped as 2 chunks, 2 destroyed with the hull (GDD §2.3)
+tick 1     t= 0.02s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked YES  ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+tick 2     t= 0.03s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked YES  ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+tick 3     t= 0.05s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked YES  ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+tick 30    t= 0.50s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked YES  ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+tick 90    t= 1.50s  HOLD 2/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked YES  ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+
+--- C · loot the SAME wreck with ONE slot of room (1/2) ---
+before     t= 0.00s  HOLD 1/2  BANKED  3  ore on field  0  lootTake 0  lootBlocked no   ledger looted=0 dropped=0 deathLoss=0  residual 0.0e+0
+KILL       t= 0.00s  HOLD 1/2  BANKED  3  ore on field  2  lootTake 0  lootBlocked no   ledger looted=0 dropped=2 deathLoss=2  residual 0.0e+0
+           the victim held 4 · DEATH_ORE_DROP_FRACTION=0.5 · 2 dropped as 2 chunks, 2 destroyed with the hull (GDD §2.3)
+tick 1     t= 0.02s  HOLD 2/2  BANKED  3  ore on field  1  lootTake 1  lootBlocked YES  ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 2     t= 0.03s  HOLD 2/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked YES  ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 3     t= 0.05s  HOLD 2/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked YES  ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 30    t= 0.50s  HOLD 2/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked YES  ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+tick 90    t= 1.50s  HOLD 2/2  BANKED  3  ore on field  1  lootTake 0  lootBlocked YES  ledger looted=1 dropped=2 deathLoss=2  residual 0.0e+0
+
+READ IT LIKE THIS
+  A  HOLD 0/2 → 2/2 and BANKED stays 3. The pickup WORKED. The prominent
+     top-left readout is the banked figure, so the correct pickup moved no
+     number the player was watching (coordinated with a0-03, which renames
+     that readout to ORE).
+  B  HOLD 2/2 throughout, 2 ore left lying on the field, looted=0. The
+     tractor never even pulled: a full hold exerts no pull and refuses the
+     chunk in total silence (GDD §2.3). `lootBlocked YES` is that frame,
+     now signposted. Base hold is 2, so this is normal play.
+  C  HOLD 1/2 → 2/2, looted=1 of the 2 on offer, 1 left floating: a partial
+     take that from the cockpit looks exactly like a whole one.
+  Same kill, three outcomes, no tell between them — that is "sometimes".
