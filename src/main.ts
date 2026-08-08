@@ -343,7 +343,14 @@ import codexSystems from '../content/codex/codex-systems.json';
 import codexStrategy from '../content/codex/codex-strategy.json';
 import { castDisplayNames, personality } from './bots';
 import type { PersonalityId } from './bots';
-import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext, type AudioCue } from './art/audio';
+import {
+  AudioEngine,
+  AudioUnlock,
+  defaultUnlockTarget,
+  deriveAlarmAllies,
+  openAudioContext,
+  type AudioCue,
+} from './art/audio';
 import { TellQueue, TELL_CAPACITY } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
 
@@ -562,6 +569,18 @@ async function boot(): Promise<void> {
   //          them — the audible twin of the VFX field (GDD §3.6), fed in the loop.
   //     The starting mix is the settings screen's own DEFAULT_VOLUMES, so what the
   //     player hears matches what the sliders show, and every default is audible.
+  //
+  //     THE SEAT IS NOT KNOWN YET, AND THAT IS THE s9-01 BUG (fixed below).
+  //     The engine is built HERE, before the menu, because the unlock has to be
+  //     armed before the first gesture and the doors need a voice — but a joiner's
+  //     slot is only assigned two hundred lines down, when the server welcomes
+  //     them. `local` here is therefore a placeholder, and it is captured BY
+  //     VALUE: reassigning the `LOCAL_PLAYER` binding afterwards cannot reach the
+  //     engine. So every online client believed it was slot 0, and a player in
+  //     slot 3 heard slot 0's station being attacked and heard nothing when their
+  //     own was. `audio.setLocal` / `audioObserver` are rebound at the seat
+  //     assignment — search "s9-01" below. Do not read `LOCAL_PLAYER` into a
+  //     construction argument up here again without doing the same.
   const audioCtx = openAudioContext();
   const audio = new AudioEngine({
     context: audioCtx,
@@ -569,7 +588,6 @@ async function boot(): Promise<void> {
     mix: { master: DEFAULT_VOLUMES.master, sfx: DEFAULT_VOLUMES.sfx, music: DEFAULT_VOLUMES.music },
   });
   const audioTells = new TellQueue(TELL_CAPACITY);
-  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
   const unlockTarget = defaultUnlockTarget();
   const audioUnlock =
     audioCtx && unlockTarget
@@ -773,6 +791,25 @@ async function boot(): Promise<void> {
   // every offline match, stays seat 0).
   if (launch.kind === 'online') LOCAL_PLAYER = launch.you;
 
+  // …and tell the two things that could not read the live binding (s9-01).
+  //
+  // Rebinding the `let` above is enough for every closure — they read it when
+  // they run. It is NOT enough for anything handed the slot as a CONSTRUCTOR
+  // ARGUMENT before this line, and there are exactly two: the audio engine
+  // (built above, for the unlock and the menu's voice) and the tell observer.
+  // Both captured `0` and kept it, so in every online match on a non-zero slot
+  // the mix believed it was slot 0 — damage to slot 0's station rang the
+  // player's under-attack alarm and damage to their OWN station was silent
+  // (developer report s9, "it should only play for your station not others").
+  // `audio.setLocal()` existed the whole time and this file never called it; its
+  // only caller was `art/presenter.ts`, which is not on this boot path.
+  //
+  // The observer is CONSTRUCTED here rather than set, because its `local` is
+  // readonly by design — it colours the end-of-match tell (won or lost), and a
+  // joiner on slot 3 was getting slot 0's result sting for the same reason.
+  audio.setLocal(LOCAL_PLAYER);
+  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+
   // --- The lobby (GDD §2.1, §2.11; M4) — ONE component, EVERY door (ratified: the
   //     unified play flow). Every way in lands here, not in the match: the 8-slot
   //     roster (your seat plus the bot cast, hulls and personalities visible), the
@@ -919,6 +956,25 @@ async function boot(): Promise<void> {
   // local `LocalLoopback` (GDD §4.2). Offline, `bootMatch` builds the loopback.
   let match: ClientMatch = onlineSession ? onlineMatchAdapter(onlineSession) : bootMatch(matchSeed);
   let world = match.world;
+
+  /** Cached owner slots on the local player's side — the under-attack alarm's
+   *  roster (`art/audio/scope`). Cleared on a rematch, below. */
+  let alarmSide: ReadonlySet<PlayerId> | null = null;
+
+  /**
+   * Whose home rings THIS client's alarm, from live world truth (s9-01).
+   *
+   * Allegiance is static match config (GDD §4.2 — it travels with the match-start
+   * roster, not the per-tick snapshot), so the side is derived once from the first
+   * world it is asked about and reused every frame after; `rematch` drops it, and
+   * a reconnect reclaims the same seat on the same side. In FFA this is `{you}`
+   * and the engine would have behaved identically without it; in TEAMS it is you
+   * and your allies, which is the case the fallback got wrong.
+   */
+  function alarmAllies(): ReadonlySet<PlayerId> {
+    alarmSide ??= deriveAlarmAllies(world, LOCAL_PLAYER);
+    return alarmSide;
+  }
 
   // Reconnect grace, the render half (GDD §4.2). When a dropped client redials
   // inside the window and reclaims its seat, the server replays `matchStart` at
@@ -1098,6 +1154,14 @@ async function boot(): Promise<void> {
   // read-back plus the physical points the client itself drew, no mutators, and it
   // computes nothing until something calls `read()`.
   installPauseStage();
+  // The alarm-ownership seam ships on BOTH boots for exactly the same reason, and
+  // it is the reason s9-01 needed a new test class at all: "the audio engine
+  // believes it is the slot the server seated me at" is a claim about an ONLINE
+  // match, and `?debug=1` cannot reach one. Every audio unit test in the repo
+  // passed straight through this bug, because the defect was in who the engine
+  // was told it was, not in what it does with that. Same discipline as the pause
+  // seam — pure read-back, no mutators, nothing computed until `read()` is called.
+  installAlarmStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -1908,6 +1972,15 @@ async function boot(): Promise<void> {
       if (heard) audio.setListener(heard.pos.x, heard.pos.y);
       audioTells.clear();
       audioObserver.observe(world, frameSeconds, audioTells);
+      // Scope the alarm to the local player's SIDE from LIVE world truth, before
+      // the mix hears the tells (s9-01). `setAlarmScope` shipped with the engine
+      // and was called from nowhere but `art/presenter.ts` and its tests — never
+      // from this file, which is the one the shipped client actually boots. With
+      // it uncalled the engine falls back to "you alone", which is FFA-correct
+      // and TEAMS-wrong: an ally's station under siege never rang. The `collapse`
+      // flag is the second half — every core decays on its own once the claim
+      // closes in, and entropy is not an attacker (GDD §2.3 vs §2.2).
+      audio.setAlarmScope(alarmAllies(), world.match.phase === 'collapse');
       audio.consume(audioTells);
       audio.update(frameSeconds);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
@@ -2157,6 +2230,9 @@ async function boot(): Promise<void> {
     // ended on (the observer's first post-reset frame primes and emits nothing).
     audioObserver.reset();
     audio.reset();
+    // A rematch may re-team the board, so last match's alarm roster is a stale
+    // claim about who is on your side — the next frame re-derives it (s9-01).
+    alarmSide = null;
     pauseScreen = 'closed'; // a fresh match is never mid-pause
   }
 
@@ -4558,6 +4634,72 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__audioStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__alarmStage` — who the mix thinks you are, on a REAL boot.
+   *
+   * The s9-01 seam, and the reason it is not part of `__audioStage`: it ships on
+   * BOTH boots. `?debug=1` skips the menu straight into an offline match, so
+   * every gated seam in this file is unreachable from an online one — and the
+   * defect this exists to catch was *only* visible online. `main.ts` handed the
+   * audio engine `LOCAL_PLAYER` as a constructor argument at boot, two hundred
+   * lines before the server told this client which slot it had been seated at, so
+   * the whole mix believed it was slot 0 for the entire match. The state machine
+   * behind it is thoroughly unit-tested and every one of those tests passed:
+   * nothing was wrong with the logic, only with what it had been told.
+   *
+   * So the assertion a live-stage test makes off this is "the number the engine
+   * is using equals the seat the server actually gave me", and it can only be
+   * made from a real online join on a NON-ZERO slot — on slot 0 a broken wire and
+   * a working one produce identical readings, which is exactly why this survived.
+   *
+   * Pure read-back: three numbers and two booleans, no mutators, nothing computed
+   * until `read()` is called. Safe to ship for the same reason `__pauseStage`,
+   * `__lobby` and `__mainMenu` are.
+   */
+  function installAlarmStage(): void {
+    const stage = {
+      read(): {
+        /** The slot the AUDIO ENGINE is using as "you" — the number that was
+         *  wrong. Compare it against the seat the server welcomed this client
+         *  into (`__lobby.you`); anything else is the s9-01 bug, back. */
+        local: PlayerId;
+        /** The slot this client is flying, as the rest of `main.ts` reads it. */
+        localPlayer: PlayerId;
+        /** The owner slots whose home damage rings THIS client's alarm — you in
+         *  FFA, you and your allies in TEAMS (`art/audio/scope`). Empty before the
+         *  first match frame has derived it. */
+        allies: readonly PlayerId[];
+        /** True while the under-attack state machine is up. The screen-edge arrow
+         *  keys off the HUD's own trigger, but this is the audio half of §2.2. */
+        active: boolean;
+        /** Engagements the state machine has counted this match. */
+        engagements: number;
+        /** Alarm stings actually SOUNDED — one per engagement, never one per
+         *  frame of a siege (the developer's "it should only play once"). */
+        sounds: number;
+      } {
+        return {
+          local: audio.alarmLocal,
+          localPlayer: LOCAL_PLAYER,
+          allies: [...alarmAllies()].sort((a, b) => a - b),
+          active: audio.alarm.active,
+          engagements: audio.alarm.count,
+          sounds: audio.alarmSounds,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__alarmStage', {
         value: stage,
         writable: false,
         configurable: false,
