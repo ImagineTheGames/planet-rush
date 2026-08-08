@@ -48,16 +48,15 @@ const TOUCH_PROJECTS = ['iphone', 'pixel'];
 const isTouchProject = (name: string): boolean => TOUCH_PROJECTS.includes(name);
 
 // --- Touch-visuals BUILD button geometry (mirrors src/platform/touch-visuals.ts)
+//
+// The centre these four numbers describe is computed IN THE PAGE, inside
+// `pressBuildAffordance`, rather than here: the logical viewport it needs has to
+// be read across the wire anyway, and doing the arithmetic on this side would
+// mean a second crossing for a subtraction (see the round-trip note below).
 const EDGE_MARGIN = 28;
 const R_STICK = 64;
 const BUILD_GAP = 18;
 const R_BUILD = 38;
-
-/** Screen-space centre of the BUILD button for a viewport, CSS px. */
-function buildButtonCenter(_w: number, h: number): { x: number; y: number } {
-  const stickCenterY = h - EDGE_MARGIN - R_STICK;
-  return { x: EDGE_MARGIN + R_STICK, y: stickCenterY - R_STICK - BUILD_GAP - R_BUILD };
-}
 
 /**
  * The wheel radius at or above which a wedge carries the handoff's full copy
@@ -135,6 +134,24 @@ interface Rect {
   height: number;
 }
 
+/**
+ * ── WHY THIS FILE COUNTS ITS ROUND TRIPS (a0-00b) ──────────────────────────
+ * Profiled on PR #321's shard 2, `page.evaluate` accounted for **172 of the
+ * 249 seconds** these six tests spent — across a hundred calls that each read a
+ * getter or found an id in an array, and each cost **2–3 seconds**. Nothing was
+ * computing for 2.5 s. A CDP `Runtime.evaluate` cannot run until the page's main
+ * thread yields, and under the runner's software GL the main thread is painting
+ * for very nearly the whole frame, so **one round trip costs about one frame** —
+ * ~1 s there against ~16 ms here. This spec made ~17 of them per test; the
+ * neighbours that finish in seconds make a handful. That, and not the work it
+ * does, is why it took minutes and why `:375` and `:417` timed out at 300 s.
+ *
+ * So every read below is batched into as few crossings as the journey allows,
+ * and reads that were separate calls a frame apart are now one call that answers
+ * both. Not one assertion moves: the seams read are the same seams, the values
+ * are the same values, and the presses are still real synthesized events.
+ */
+
 /** Read the drawn upgrade wedges off the real client. Read-back only. */
 async function drawnWedges(page: Page): Promise<DrawnUpgradeWedge[]> {
   return page.evaluate(() => {
@@ -145,6 +162,30 @@ async function drawnWedges(page: Page): Promise<DrawnUpgradeWedge[]> {
 
 const wedge = (all: DrawnUpgradeWedge[], label: string): DrawnUpgradeWedge | undefined =>
   all.find((w) => w.label === label);
+
+/** What one crossing brings back: the wheels' drawn bounds and the wedges on
+ *  whichever wheel is on top, read off the SAME frame — which is also why they
+ *  can no longer disagree with each other by a frame. */
+interface DrawnState {
+  buildWheel: Rect | null;
+  upgradeWheel: Rect | null;
+  wedges: DrawnUpgradeWedge[];
+}
+
+/** The layout registry's record of what was drawn this frame, plus the wedges,
+ *  in ONE round trip (see the note above). */
+async function drawnState(page: Page): Promise<DrawnState> {
+  return page.evaluate(() => {
+    interface Entry {
+      id: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }
+    const pr = (window as unknown as { __planetRush?: { layout: Entry[] } }).__planetRush;
+    const rect = (id: string): Entry['bounds'] | null => pr?.layout.find((e) => e.id === id)?.bounds ?? null;
+    const s = (window as unknown as { __upgradeWheelStage?: UpgradeStage }).__upgradeWheelStage;
+    return { buildWheel: rect('build-wheel'), upgradeWheel: rect('upgrade-wheel'), wedges: s ? s.wedges() : [] };
+  });
+}
 
 /** The layout registry's record of what was drawn this frame. */
 async function registered(page: Page, id: string): Promise<Rect | null> {
@@ -194,24 +235,40 @@ async function toClient(page: Page, x: number, y: number): Promise<{ x: number; 
   }, { x, y });
 }
 
-/** A real press at a LOGICAL point, through the device's own event. */
+/**
+ * A real press at a LOGICAL point, through the device's own event.
+ *
+ * It does NOT wait for the sim afterwards: every caller wants a settle of its
+ * own length and used to add a second one on top, so the press paid two round
+ * trips where the journey only ever needed the caller's. The wait is now the
+ * caller's alone, and it is always still there.
+ */
 async function pressAt(page: Page, x: number, y: number, touch: boolean): Promise<void> {
   const p = await toClient(page, x, y);
   if (touch) await page.touchscreen.tap(p.x, p.y);
   else await page.mouse.click(p.x, p.y);
-  await waitForSimTicks(page, 3, { what: 'the press to resolve' });
 }
 
-/** One real press on this device's BUILD affordance — the button under the left
- *  thumb on touch, the `E` binding on desktop (GDD §2.4's table, both cells). */
+/**
+ * One real press on this device's BUILD affordance — the button under the left
+ *  thumb on touch, the `E` binding on desktop (GDD §2.4's table, both cells).
+ *
+ * The touch path resolves the button's centre and puts it through the client's
+ * own transform in ONE crossing: the viewport read and the transform were two
+ * calls a frame apart, and the geometry between them is arithmetic that does not
+ * need to come home to be done.
+ */
 async function pressBuildAffordance(page: Page, touch: boolean): Promise<void> {
   if (touch) {
-    const lvp = await page.evaluate(() => {
+    const p = await page.evaluate((geom) => {
       const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
-      return s.logicalViewport();
-    });
-    const c = buildButtonCenter(lvp.width, lvp.height);
-    const p = await toClient(page, c.x, c.y);
+      const lvp = s.logicalViewport();
+      const stickCenterY = lvp.height - geom.edgeMargin - geom.rStick;
+      return s.clientPoint(
+        geom.edgeMargin + geom.rStick,
+        stickCenterY - geom.rStick - geom.buildGap - geom.rBuild,
+      );
+    }, { edgeMargin: EDGE_MARGIN, rStick: R_STICK, buildGap: BUILD_GAP, rBuild: R_BUILD });
     await page.touchscreen.tap(p.x, p.y);
   } else {
     await page.locator('canvas').click({ position: { x: 8, y: 8 } }); // focus the canvas
@@ -233,17 +290,18 @@ async function pressBuildAffordance(page: Page, touch: boolean): Promise<void> {
  * client has resolved that. Waiting on the wheel alone would hang; pressing
  * again after a beat is the honest retry.
  */
-async function openBuildForReal(page: Page, touch: boolean): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (await registered(page, 'build-wheel')) return;
+async function openBuildForReal(page: Page, touch: boolean): Promise<Rect> {
+  let bounds = await registered(page, 'build-wheel');
+  for (let attempt = 0; attempt < 3 && !bounds; attempt++) {
     await pressBuildAffordance(page, touch);
-    if (await registered(page, 'build-wheel')) return;
+    bounds = await registered(page, 'build-wheel');
+    if (bounds) break;
     await waitForSimTicks(page, 10, { what: 'the ship to settle docked at its station' });
   }
-  expect(
-    await registered(page, 'build-wheel'),
-    'three real presses on the BUILD affordance did not open the build wheel',
-  ).not.toBeNull();
+  expect(bounds, 'three real presses on the BUILD affordance did not open the build wheel').not.toBeNull();
+  // Handed back rather than re-read: the caller needs this rect to aim its next
+  // press at, and re-reading it is a whole frame spent learning what we know.
+  return bounds!;
 }
 
 /** A real press at the drawn centre of wedge `index` of `count`, on whichever
@@ -273,11 +331,9 @@ async function pressWedge(
  * turret, shield, satellite, repair, upgrade).
  */
 async function openUpgradeForReal(page: Page, touch: boolean): Promise<Rect> {
-  await openBuildForReal(page, touch);
-  const build = await registered(page, 'build-wheel');
-  expect(build, 'the build wheel is not drawn, so UPGRADE SHIP cannot be pressed').not.toBeNull();
-  await pressWedge(page, build!, 4, 5, touch);
-  await waitForSimTicks(page, 4, { what: 'the upgrade wheel opening' });
+  const build = await openBuildForReal(page, touch);
+  await pressWedge(page, build, 4, 5, touch);
+  await waitForSimTicks(page, 7, { what: 'the upgrade wheel opening' });
   const upgrade = await registered(page, 'upgrade-wheel');
   expect(
     upgrade,
@@ -388,18 +444,25 @@ test.describe('the Gantry/Bone upgrade wedge, through the real click path (u7-06
     // Buy CARGO to the top through the sim's own validated purchase. The point of
     // this test is the drawn state of a FINISHED ladder, not the press that gets
     // there — the press path has its own test above.
+    // The read that decides whether to buy and the buy itself go over in ONE
+    // crossing: they were a frame apart, four times over, which is twelve
+    // seconds of runner spent asking a question whose answer is already on the
+    // same object as the button. `maxed` is still read from the DRAWN wedge, so
+    // the loop is still governed by what the client rendered.
     const CARGO_FLAT_INDEX = 2; // TRACK_ORDER: power, engine, cargo, hull
     for (let i = 0; i < 4; i++) {
-      const before = await drawnWedges(page);
-      if (wedge(before, 'CARGO')?.state === 'maxed') break;
-      await page.evaluate((idx) => {
+      const maxed = await page.evaluate((idx) => {
         const s = (window as unknown as { __upgradeWheelStage?: UpgradeStage }).__upgradeWheelStage;
+        if (s?.wedges().find((w) => w.label === 'CARGO')?.state === 'maxed') return true;
         s?.buyTier(idx);
+        return false;
       }, CARGO_FLAT_INDEX);
+      if (maxed) break;
       await waitForSimTicks(page, 4, { what: 'the tier to be counted' });
     }
 
-    const cargo = wedge(await drawnWedges(page), 'CARGO')!;
+    const finished = await drawnState(page);
+    const cargo = wedge(finished.wedges, 'CARGO')!;
     expect(cargo.state, `[${label}] CARGO should be at the top of its ladder`).toBe('maxed');
     expect(cargo.costLabel, `[${label}] a finished ladder quotes no price`).toBe('MAX');
     expect(cargo.costPaint, `[${label}] MAX is steel, never red — poverty is not the reason`).toBe('spent');
@@ -410,8 +473,9 @@ test.describe('the Gantry/Bone upgrade wedge, through the real click path (u7-06
     expect(cargo.stat, `[${label}] the stat line is the value, not the word MAX twice`).toBe(cargo.current);
     expect(cargo.tiers, `[${label}] a finished ladder fills every pip`).toBe('●'.repeat(cargo.maxTier));
 
-    // The wheel is still the same wheel around it.
-    expect((await registered(page, 'upgrade-wheel'))?.width).toBe(bounds.width);
+    // The wheel is still the same wheel around it — off the same frame the
+    // finished wedge was read from, which is the frame the claim is about.
+    expect(finished.upgradeWheel?.width).toBe(bounds.width);
   });
 
   test('a real press on WEAPON drills in — it does not bounce to the build wheel', async ({ page }, testInfo) => {
@@ -430,18 +494,22 @@ test.describe('the Gantry/Bone upgrade wedge, through the real click path (u7-06
 
     // WEAPON is wedge 0 — twelve o'clock on the main wheel.
     await pressWedge(page, bounds, 0, 4, touch);
-    await waitForSimTicks(page, 4, { what: 'the sub-wheel opening' });
+    await waitForSimTicks(page, 7, { what: 'the sub-wheel opening' });
 
+    // Both wheels' bounds and the wedges now on top, off ONE frame — three
+    // crossings collapsed into one, and the three can no longer disagree by a
+    // frame about which wheel the press landed on.
+    const after = await drawnState(page);
     expect(
-      await registered(page, 'upgrade-wheel'),
+      after.upgradeWheel,
       `[${label}] the WEAPON press left the upgrade wheel entirely — the exact shipped bug`,
     ).not.toBeNull();
     expect(
-      await registered(page, 'build-wheel'),
+      after.buildWheel,
       `[${label}] the WEAPON press bounced back to the build wheel`,
     ).toBeNull();
 
-    const sub = await drawnWedges(page);
+    const sub = after.wedges;
     expect(
       sub.map((w) => w.label),
       `[${label}] the sub-wheel draws the weapon-group tracks`,
