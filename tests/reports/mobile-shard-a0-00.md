@@ -24,9 +24,9 @@ Four sentences of summary, because the rest is arithmetic:
   nothing about whether two expensive pages run at the same *instant*; at
   `workers: 2` a unit does not have a cost at all. The suite now runs **one page
   per runner at N=6** (§6b, §6d).
-- **The gate is green, and it is 12m19s** — from 42m04s red, and from a 60–90
+- **The gate is green, and it is 13m55s** — from 42m04s red, and from a 60–90
   minute single job. 123 executed tests, 0 failures, 0 retries, nothing skipped
-  and no budget raised (§6d).
+  and no budget raised (§6d, §6e).
 
 Sibling reports: `mobile-journey-budgets-q7.md` (a budget per test),
 `golden-diffs-and-highdpi-settle-q8.md` (a budget per golden comparison, and the
@@ -437,6 +437,34 @@ Runner-minutes fall, and substantially: the same assertions now cost 3838 s of
 serial work instead of 8355 s, because the contention tax was pure waste. The
 per-job fixed cost (~2 min of checkout, `npm ci`, browser install and `npm run
 build`) is paid 6 times instead of 4 — in parallel, so it costs wall time zero.
+
+### 6e · N=6 as shipped, measured
+
+Run [`31260614369`](https://github.com/ImagineTheGames/planet-rush/actions/runs/31260614369) —
+**6/6 shards green, rollup green, 123 executed tests, 0 failures, 0 retries.**
+
+| shard | job wall | test time | predicted |
+|---|---|---|---|
+| 1/6 | 12m10s | 11.5 m | 11.0 m |
+| 2/6 | **10m32s** | 9.8 m | 10.6 m |
+| 3/6 | 12m42s | 11.9 m | 10.6 m |
+| 4/6 | 11m15s | 10.6 m | 10.6 m |
+| 5/6 | 12m14s | 11.6 m | 10.6 m |
+| 6/6 | **13m55s** | 13.1 m | 10.6 m |
+
+**The gate is 13m55s, and the spread is 3m23s** — against 7m18s at N=8 on the
+stale table, and against 5 · 12 · 21 · 42 minutes where this started.
+
+Two honest notes on those numbers. **The model is good but not exact**: total
+serial work came in at 3977 s against the table's 3838 s (**+3.6%**), and the
+heaviest brick at 663 s against 659 s — close enough to trust the table,
+and the residual per-shard error (up to +2.5 min on shard 6) is ordinary
+runner variance, which `golden-retry-and-the-31x-runner-q9.md` documents as
+having a long tail. **And N=6 is not strictly faster than N=8 in wall clock**
+(13m55s vs 12m19s): it trades ~1.5 minutes of gate latency for two runners
+returned to the pool, at essentially identical runner-minutes (~73 vs ~74). If
+gate latency is later worth more than two runners, N=8 is a one-line change —
+but §6c's brick split is the move that would actually make it pay.
 
 ### 6c · Still open
 

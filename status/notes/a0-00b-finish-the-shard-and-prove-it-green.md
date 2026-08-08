@@ -188,16 +188,61 @@ Re-cut the table off the green run (total serial 8355 → **3838 s**, brick
 cost table is a statement about a suite AND the machine config that runs it.
 Re-measure when the config changes, not only when the specs do.
 
+### 10 · N=6 shipped and green — run `31260614369`
+
+**6/6 shards green, rollup green, 123 tests, 0 failures, 0 retries.** Job walls
+10m32s…13m55s, spread **3m23s** (was 7m18s at N=8 on the stale table). Total
+serial 3977 s against the table's 3838 s (**+3.6%**) and the brick at 663 s vs
+659 s — the table predicts the runner well.
+
+Stated in report §6e rather than buried: **N=6 is not strictly faster than N=8**
+(13m55s vs 12m19s). It trades ~1.5 min of gate latency for two runners at the
+same runner-minutes. Splitting the golden brick (`a0-00c`) is the thing that
+would actually make a larger N pay.
+
+PR #321 title + body rewritten to what shipped; no WIP marker, not a draft.
+
+### 11 · #321 MERGED mid-flight — and two DoD gates went red because of it
+
+**#321 merged at `caa24d5`, 14:09:45, green.** The substance of the brief is in
+`main`. But it merged **one commit before** `bb3396d` (report §6e — the measured
+numbers for the N=6 config that is what actually ships), and that broke the DoD:
+
+- gate 4 (`gh pr list --head … .[0].number`) lists **OPEN** PRs only → empty →
+  `test -n "$n"` fails. A merged PR does not satisfy it.
+- gate 5 (`merge-base --is-ancestor origin/main HEAD`) → `main` moved past me
+  (my own merge, plus #316 and a style-guide commit) → fails.
+
+**Fix, in order:** merged `origin/main` back in (`9557198`, clean — main already
+contained my sharding work, so the only delta was the §6e docs), then opened
+**PR #322** for the remaining commit. Gate 4 now resolves to 322, gate 5 passes.
+
+**Trap worth naming:** on this team a PR can be merged out from under you the
+moment its checks go green. Push the *evidence* commit before or with the change
+it describes — do not leave the report trailing the config by one commit, or the
+merge lands the code and strands the numbers.
+
 ## NEXT
 
-- **Push, then watch the N=6 run to zero failing checks.** This is the DoD gate.
-  N=6 is a re-balance only — every test passed at `workers: 1` regardless of
-  grouping, so this is low-risk, but it IS a fresh run and must be confirmed.
-- Then take the WIP marker off #321 — **the last deliverable item.** Body has no
-  WIP marker (session 1) but describes N=4 and scopes `workers: 1` OUT; rewrite
-  it. Editing the body does NOT retrigger CI, so do it while the run is going.
-- `a0-00c` re-scoped again: **split the `iphone|goldens` brick.** At 659 s it is
-  the only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
+- **Watch PR #322's checks to zero failing.** That is the last gate. Everything
+  else is verified: `tsc` clean on the merged tree · report tracked ·
+  `origin/main` is an ancestor again · the shipped config (N=6, `workers: 1`,
+  659 s table) confirmed intact after the merge.
+- `npm test -- --run` on the merged tree: **3973/3973 passed, 237 files** — one
+  earlier run had shown `1 failed / 3972` and both re-runs were clean, i.e. the
+  load-flaky perf test again (see the trap below), not a regression.
+- `a0-00c` re-scoped: **split the `iphone|goldens` brick.** At 659 s it is the
+  only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
+  Also correct `sim-clock.ts`'s "~1 fps" with the measured 0.28–1.5 range.
+
+### Trap for a future you
+
+`npx tsc --noEmit` and `npm test` share this box with other lanes. The perf
+tests (`capacity-regression`, and the live-stage suite) fail under that load and
+pass isolated — check `pgrep -fa vitest|playwright|vite` before believing one.
+Do NOT measure contention on this box for the same reason: the local
+`workers: 1` vs `2` A/B was started and thrown away (DECISIONS §5). The real
+runner answers it in one push, and one push is ~13 minutes now.
 
 Known-unrelated: `tests/net/capacity/capacity-regression.test.ts` fails locally
 under load (34.6 ms vs a 33 ms budget) and passes both isolated and in CI. Not
