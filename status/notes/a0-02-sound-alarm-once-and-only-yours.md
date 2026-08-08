@@ -214,15 +214,36 @@ and a recording AudioContext, which is the finer instrument anyway; the live
 class earns its keep on the *wire* (`alarm-ownership-online.spec.ts`), which is
 where the defect actually was.
 
-## TRAP, re-hit: the preview on 4173 is shared across lanes
+## TRAP, and this time it actually bit: 4173 served a NEIGHBOUR'S bundle
 
 `tests/live-stage/playwright.config.ts` uses port 4173 with
-`reuseExistingServer: !CI`, so a run can silently be served a neighbouring lane's
-bundle. Fingerprinted before trusting this session's run: served
-`assets/index-BqT9NfUA.js` / sha `cbbc090` == `dist/` == HEAD. Ours.
-Also, again: `vite preview` listens on `::1` only — `curl 127.0.0.1:4173`
-returns nothing while `curl localhost:4173` returns 200, and Node's `fetch`
-prefers the v4 address. Use `http://[::1]:4173/` when pointing a script at it.
+`reuseExistingServer: !CI`, and the lanes share one box.
+
+- The `cbbc090` run was fingerprinted first and was **ours** (served
+  `assets/index-BqT9NfUA.js` / sha `cbbc090` == `dist/` == HEAD).
+- The run after the `03ed194` merge was **not**. Served sha `5665364` against a
+  HEAD of `52c137a` and a `dist/` of `e293990` — Playwright found something
+  already answering on 4173 and reused it, so the whole suite ran to completion
+  describing another lane's build, with nothing in the output saying so. Killed
+  and re-run. Other lanes were also holding 4207 and 4208.
+
+**Fingerprint before believing any live-stage result.** `version.json` carries
+the sha, so it is one comparison:
+`curl -s http://localhost:4173/version.json` vs `dist/version.json` vs
+`git rev-parse --short HEAD`.
+
+**The re-run route, since the suite config is the Platform Engineer's file and
+not ours to edit:** a throwaway copy at the repo root on a free port
+(`playwright.live-stage-private.tmp.config.ts`, port 4191,
+`reuseExistingServer: false`, `--host 127.0.0.1`), run with
+`npx playwright test --config …`, then deleted. **Do not kill a neighbour's
+preview** to free the port.
+
+Also, again: `vite preview` binds `::1` only unless told otherwise —
+`curl 127.0.0.1:4173` returns nothing while `curl localhost:4173` returns 200,
+and Node's `fetch` prefers the v4 address, so a readiness probe times out against
+a server that is up. `ss -lptn` returns nothing useful in this sandbox, so port
+checks have to be curl + fingerprint rather than a socket list.
 
 ## NEXT
 
