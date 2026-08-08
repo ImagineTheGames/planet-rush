@@ -255,3 +255,58 @@ passes on the bug. The `expect(ROSTER).toContain(...)` is the one that catches i
 (`castDisplayNames` would have printed such a seat as **"Object"** —
 `PERSONALITIES['constructor']?.name` is `Function.prototype.name`. Left alone: it
 is fed from seated bots, which now pass the guard upstream.)
+
+### Session 2026-08-08 (fourth) — re-ran every gate on the pushed head, and killed a scare
+
+Inherited `6436687` with two commits **unpushed** and 36 evidence PNGs dirty in
+the tree. Nothing was broken; no feature work was outstanding and none was
+invented. Committed the note (`12d60d0`), pushed `595538d..12d60d0`
+fast-forward, and re-ran the whole DoD.
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **3965 passed, 0 failed**, 236 files.
+- `npm run test:live-stage` (full, `PREVIEW_PORT=4193`) — 66 passed / 33 failed /
+  3 skipped. **`lobby-cast.spec.ts` is not in the failure list**; its three cases
+  pass, and pass again in isolation.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor origin/main HEAD`
+  OK against `b32d0a7`.
+
+**The proof re-verified, not re-asserted:** the full run regenerated
+`lobby-cast-readback.txt` **byte-identical** — a fresh boot of the real client
+through the front door still seats exactly the cast the lobby picked, all seven
+Hard with three Wardens / two Sables / two Vultures, `identical: true`. That file,
+not the PNGs, is the evidence.
+
+#### The scare, and why it was not ours
+
+`unified-play-flow.spec.ts` failed **in isolation** (not just under contention) on
+all three profiles, and its assertion block reads `lobbyPresent` — close enough to
+this branch's lobby work to be worth an hour. It is not ours, and the reason is
+worth writing down so a future you does not re-run the same hour:
+
+**The failing line is 185, `doors.kinds`** — the doors screen's control list
+(`['solo','create','join','back']`) — *not* line 186, `lobbyPresent`. Read the
+line number, not the nearest interesting-looking variable. Confirmed by
+measurement in a throwaway `origin/main` worktree on an isolated port 4197:
+**`origin/main` fails the identical 7 at the identical `185:65`** —
+`unified-play-flow` ×3, `map-picker` ×3, `lobby-flow` ×1. Same set, same line,
+main and branch. This branch adds none of them.
+
+(This also extends the standing "do not re-litigate" list from `codex-lobby` /
+`lobby-flow` / `map-picker` to `unified-play-flow`. They are *lobby-shaped* spec
+names and they will keep looking damning. Verify by re-running against main, not
+by reading the names.)
+
+#### Trap for a future you, the second one
+
+**A full live-stage run dirties every `*-evidence.png` in the folder — all 36 —
+whether or not the picture changed**, because the build badge stamps the commit
+hash into each frame. Thirty-two of them belong to *other briefs*; committing that
+churn would put another agent's evidence in this PR. Restore with
+`git checkout -- tests/live-stage/`. **Not `git clean`** — that is a hard rule,
+and it is also the wrong tool: these are tracked files with committed content to
+return to.
+
+There is no version of this that converges, either: a frame can never carry the
+hash of the commit that contains it. The committed set is shot one commit back
+and that is correct, not stale.
