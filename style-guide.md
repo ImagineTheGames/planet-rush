@@ -300,8 +300,14 @@ Every mark on the body is something the rig is **doing**. Nothing is dressing.
 - **Ownership = beacon ring in the player's colour (§3), always visible**, plus
   **trim marks** — the lug keyways, the apron blocks, the barge marker. Trim,
   never the steel (§3). The ring answers at any zoom; the keyways answer close up.
-- **Health = a damage ring, visible only within sensor range** (GDD §2.2) —
-  enemy facility HP is scouted, never broadcast.
+- **Health = a damage ring, always visible, at every range** (GDD §2.2, amended
+  2026-08-07) — every station's ring reads true whoever owns it and however far
+  away it is. The previous rule ("visible only within sensor range — enemy
+  facility HP is scouted, never broadcast") is **withdrawn**: because the
+  owner-colour beacon ring underneath is always drawn, an unscouted station
+  looked exactly like an undamaged one, so the display did not withhold a fact,
+  it asserted a false one. Ship hull bars and a rival's ore, bank and upgrade
+  tiers are unchanged — this is about the station ring only.
 - **Four arrangements** differ by the bearing the whole deck circuit sits on, the
   seeded claim rim and cut face, the hopper levels, and which face the kerf is
   opening. All four stay in one palette: **variety comes from arrangement, not
