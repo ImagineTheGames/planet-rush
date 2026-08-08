@@ -352,10 +352,23 @@ Used it here (`PREVIEW_PORT=4191`) and the run never collided.
 - `npm test -- --run` — **3992 passed, 0 failed**, 238 files. `capacity-regression`
   passed this time; it is a wall-clock benchmark and it only trips under lane
   contention, which is the same conclusion as sessions 2 and 4. Do not chase it.
-- `npm run test:live-stage` — full sweep, `PREVIEW_PORT=4191`. **All three
+- `npm run test:live-stage` — full sweep, `PREVIEW_PORT=4191`: **27 failed, 72
+  passed, 3 skipped** in 10.7 m of test time (the wall clock was ~2.5 h — the box
+  sat at load 15–23 with four other lanes running headless Chromium). **All three
   `lobby-cast` cases pass** (cast round trip, `?` by click on PC, `?` by tap at
-  390 px landscape); no `lobby-cast` directory appears under `test-results/`,
-  which is where Playwright puts failures.
+  390 px landscape). `lobby-cast.spec.ts` appears in the output **only** as a
+  "Slow test file (2.1 m)" line, never in the failure block, and no `lobby-cast`
+  directory exists under `test-results/`, which is where Playwright puts failures.
+
+  The 27 fall in **13 spec files and every one is already on the standing
+  not-mine list**: `connect-trace` ×4, `upgrade-wheel` ×3, `unified-play-flow` ×3,
+  `map-picker` ×3, `fullscreen` ×3, `codex-lobby` ×3, `ore-conservation` ×2, and
+  one each of `tap-markers`, `tap-commander`, `tap-autofire`, `repair-core`,
+  `lobby-flow`, `audio-alive`. Sessions 2 and 4 measured `origin/main` in
+  throwaway worktrees on isolated ports at **30 failed / 66 passed** over the same
+  families; this run is 27/72, i.e. inside that baseline rather than adding to it.
+  **Honest caveat: main was not re-measured this session** — the claim rests on
+  those earlier measurements plus the fact that no failing file is new.
 - GDD.md differs from `origin/main`; `merge-base --is-ancestor origin/main HEAD`
   OK against `13e9649`.
 
@@ -375,3 +388,35 @@ briefs with `git checkout -- tests/live-stage/` (never `git clean`). Also — do
 buffers everything until the process exits, so the output file sits at 0 bytes
 for the entire hour and looks hung. Watch `git status` and `ls -1t test-results/`
 instead; the newest regenerated frame tells you which spec is executing.
+
+#### `f517ef7` — the four frames re-shot, and one lucky nameplate
+
+Committed the four `lobby-cast-*-evidence.png` (the readback did not change, so it
+is not in the diff — that is the point). The **match frame caught a rival's
+nameplate this time**, reading `Warden 1 (HARD)`, so the duplicate numbering and
+the derived tier are legible in the match itself and not only in the lobby. Session
+3's note called the *absence* of such a plate honest, and that still stands: it is
+luck either way, which is exactly why the spec writes all seven names to the
+readback instead of hoping a plate drifts into shot. Do not treat it as a
+regression if a future re-shoot loses it again.
+
+The lobby frame is the developer's case in one picture: seven rows reading
+`Warden 1 / Warden 2 / Sable 1 / Vulture 1 / Warden 3 / Sable 2 / Vulture 2`, each
+with its hull under the name, a read-only `HARD` chip, and a `?`.
+
+**PR #319 is MERGEABLE at `f517ef7`.** It read CONFLICTING for this whole session's
+first hour purely because `a74a199` had never been pushed — one `git push` fixed
+it, no re-resolution.
+
+## NEXT (unchanged from session 1, restated so it is not lost)
+
+- **ONLINE still carries the tier, not the name.** `LobbyChoiceMessage` has
+  `botDifficulties` and no character row, so an online room seats the right
+  *tiers* and may seat different *names* within them. Offline — the flavour both
+  developer reports were filed against — is exact. Closing it is a **Netcode**
+  seam (`transport.ts` → `wire.ts` → `session.ts` → `server/room.ts` `castFor`),
+  four files across two other agents' ownership and outside this brief. Stated in
+  the PR body and in `docs/design-amendments.md`.
+- `PREVIEW_PORT` remains marked *(a0-06, proposed)* — `tests/live-stage/` is
+  Platform's to accept or reject.
+- No other feature work outstanding. Do not invent any.
