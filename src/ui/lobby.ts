@@ -1101,6 +1101,35 @@ export function activeTeams(state: LobbyState): number {
 }
 
 /**
+ * The slots on `player`'s **side** — the roster the end-of-match summary reads to
+ * answer "did MY side take the claim?" (`./end-of-match` `MatchOutcome.allies`,
+ * a0-09).
+ *
+ * The lobby's twin of `art/audio/scope` `deriveAlarmAllies`, which builds the
+ * identical set off live world truth for the under-attack alarm. This one exists
+ * because the flow-driven client (`./lobby-flow`) learns a match ended from a
+ * `matchEnd` message and never holds a `World` — but it does hold the roster the
+ * match was built from, and allegiance is static match config fixed at match
+ * start (GDD §2.1, §4.2), so the lobby's own `team` table is the same answer.
+ *
+ * **FFA returns `{player}`** — teams-of-one, the `mode` gate rather than the seat
+ * table, because a seat keeps its side assignment across a mode switch so that
+ * flipping to TEAMS and back never loses it ({@link LobbySeat.team}). CLOSED
+ * seats are skipped: a shut door takes no field and is on nobody's side. A
+ * `player` with no seat is still on their own side, never on nobody's.
+ */
+export function sideRosterOf(state: LobbyState, player: PlayerId): ReadonlySet<PlayerId> {
+  const side = new Set<PlayerId>([player]);
+  if (state.mode !== 'teams') return side;
+  const seat = state.seats.find((s) => s.player === player);
+  if (!seat) return side;
+  for (const s of state.seats) {
+    if (s.occupant !== 'closed' && s.team === seat.team) side.add(s.player);
+  }
+  return side;
+}
+
+/**
  * Cycle one seat's occupancy — the host's tap on a roster row: OPEN → BOT →
  * CLOSED → OPEN ({@link SEAT_STATE_CYCLE}). A no-op from a guest, after RUSH!, or
  * on a HUMAN seat — you cannot cycle a seat somebody is sitting in (the same three
