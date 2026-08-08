@@ -318,6 +318,53 @@ and CI's own "Typecheck, test, build" is green on this branch. Do not chase it,
 do not report it as this lane's failure, and do not report the full run as clean
 without saying which test it was.
 
+## ROUND 4 (this session) — nothing to build; the branch was already complete
+
+Inspected first, per RESUME. `b2ecfaa` is HEAD, **fully pushed**, PR #318 open and
+`MERGEABLE`. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 3's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **fully green — 3911 passed / 234 files, 0 failed** |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` is still `03ed194`, already merged in at `52c137a` |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** — `guest seat 1 → {"local":1,"localPlayer":1,"allies":[1]}` |
+| deploy probe | **still `03ed194`, still pre-fix** — unchanged, `evidence/s9-01-live-probe.json` already reads this |
+
+The guest readout is the whole claim in one line: a second engine on the same
+bundle reporting seat 1, which the captured-constant wiring could not produce.
+
+**The unit suite came back CLEAN this round — 0 failed.** Round 3 ran it with
+`tests/net/capacity/capacity-regression.test.ts` red at 38.38 ms against a 33 ms
+budget and called it a load flake on a shared box; a full green run at the same
+HEAD **confirms that call**. The PR body's DoD table still says "1 failed"; that
+was true when written and is worth updating to the clean run rather than leaving
+a reader to wonder. Nothing about the code changed between the two runs — only
+how busy the box was, which is the point.
+
+**CI note:** "Typecheck, test, build" is green on both runs; "Mobile emulation
+(Playwright)" has sat **pending since 05:38Z** — a queue, not a failure. It is why
+`mergeStateStatus` reads UNSTABLE rather than CLEAN. Nothing to act on here; if it
+is still pending at merge time it is the Platform Engineer's runner, not this lane.
+
+**The 4173 trap did not bite this round** because I never went near it — the
+throwaway private-port config (`playwright.live-stage-private.tmp.config.ts`,
+port 4191, `reuseExistingServer: false`, `--host 127.0.0.1`) was written before the
+first run, not after a suspicious result. Delete it after use; it is deliberately
+untracked. Also: `git checkout -- tests/live-stage/` cleared **39** foreign
+`*-evidence.png` left dirty by the previous session's full run. As predicted — they
+come back after every full-suite run, revert them, never commit them.
+
+**Re-confirmed the `audio-alive.spec.ts:239` call rather than re-opening it.**
+`graph.setBus` really does default to a 50 ms ramp (`src/art/audio/graph.ts:223`)
+and the spec really does read `r.sfxBusGain` synchronously inside the same
+`page.evaluate` as `setSfx(0)` (lines 316-326). Round 3's diagnosis holds. **Left
+unfixed again, deliberately** — it is a different brief, it fails identically on
+clean `origin/main`, and slipping an unrelated audio spec green into the alarm PR
+is exactly how a real regression hides. It stays this lane's next pick-up.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
