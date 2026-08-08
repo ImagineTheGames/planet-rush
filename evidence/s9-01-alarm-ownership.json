@@ -1,0 +1,30 @@
+{
+  "what": "s9-01 — the audio engine listens as the seat the server gave this client",
+  "room": "BLQ2",
+  "host": {
+    "seat": 0,
+    "alarm": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    }
+  },
+  "guest": {
+    "seat": 1,
+    "alarm": {
+      "local": 1,
+      "localPlayer": 1,
+      "allies": [
+        1
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    }
+  }
+}

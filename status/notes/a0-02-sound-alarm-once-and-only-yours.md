@@ -74,6 +74,25 @@ out-dir (`dist-alarm-stage/`). Slow, and the only route to the claim.
 guest was seated at 0, because with the wire dead `local` defaults to 0 and reads
 identical to a live one — which is precisely how this survived merged and tested.
 
+**The sting retries when the mix is full.** Found while reviewing the diff, not
+by a test: `graph.play` refuses a one-shot past the 24-voice cap, and a fierce
+siege frame is exactly when that happens — which is exactly when a not-cuttable
+mechanic must not be the thing dropped. A loop never had to survive this; one
+sting does. The engagement stays unclaimed until a sting actually starts. The
+headless engine and the death hush fall through instead, because retrying through
+the three seconds of quiet would fire the klaxon on the far side of them.
+
+**The preview is fingerprinted, not just polled.** The first green run of the
+spec was served by a *leftover* preview from an earlier failed run — same outDir,
+so it happened to be right, and would silently have been wrong the first time the
+bundle changed. `--strictPort` does not help: it kills the new child while the
+old one keeps answering 200. `alarm-fleet.ts` now compares the served
+`index.html` against the one just built (the entry chunk is content-hashed), so a
+stale run or a neighbouring working copy on the port fails loudly and by name.
+Also `--host 127.0.0.1` on both ends: left alone `vite preview` listens on `::1`
+while Node's `fetch` tries `127.0.0.1` first, and the readiness probe times out
+against a server printing its own URL to the log.
+
 ## NEXT
 
 - Evidence against the LIVE deployment: an online match on a non-zero slot, own

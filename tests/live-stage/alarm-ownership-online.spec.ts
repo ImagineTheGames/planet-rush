@@ -44,7 +44,14 @@
  * wiring, and there was no cheaper way to reach an online match from this suite.
  */
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { startAlarmFleet, type AlarmFleet } from './alarm-fleet';
+
+/** Where the run leaves its readout. Sound cannot screenshot, so the attestation
+ *  for this one is numbers: two clients, two seats, two engines, from one bundle
+ *  (the a3-03 evidence-note discipline, applied to a wire instead of a mix). */
+const EVIDENCE = resolve(import.meta.dirname, '..', '..', 'evidence', 's9-01-alarm-ownership.json');
 
 interface PhysicalPoint {
   readonly x: number;
@@ -82,6 +89,7 @@ interface LobbySeam {
   you: number;
   isHost: boolean;
   humanCount: number;
+  mode: 'ffa' | 'teams';
   rushControl: { physicalCenter: PhysicalPoint };
 }
 
@@ -204,9 +212,10 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
       you: window.__lobby!.you,
       online: window.__lobby!.online,
     }));
-    // A refusal here means the bundle being served has no allocator baked into it
-    // — i.e. something else is on the preview port. `./alarm-fleet.ts` pins it
-    // strictly for exactly this reason; the message is the diagnosis.
+    // A refusal here would mean the bundle being served has no allocator baked
+    // into it — the offline artifact. `./alarm-fleet.ts` has already fingerprinted
+    // the served `index.html` against the one it built, so that case fails there,
+    // by name, rather than arriving here disguised as a design problem.
     expect(room.online, 'CREATE ROOM reached a real allocator and opened the online lobby').toBe(
       true,
     );
@@ -223,7 +232,11 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
     await guest.page.waitForFunction(() => window.__lobby?.visible === true, undefined, {
       timeout: 90_000,
     });
-    const seat = await guest.page.evaluate(() => window.__lobby!.you);
+    const joined = await guest.page.evaluate(() => ({
+      you: window.__lobby!.you,
+      mode: window.__lobby!.mode,
+    }));
+    const seat = joined.you;
 
     // --- 3. THE PRECONDITION. A guest seated at 0 would make this whole spec
     //        vacuous: with the wire dead, `local` defaults to 0 and would match.
@@ -271,6 +284,19 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
       seat,
       JSON.stringify(guestAlarm),
     );
+    writeFileSync(
+      EVIDENCE,
+      `${JSON.stringify(
+        {
+          what: 's9-01 — the audio engine listens as the seat the server gave this client',
+          room: room.code,
+          host: { seat: room.you, alarm: hostAlarm },
+          guest: { seat, alarm: guestAlarm },
+        },
+        null,
+        2,
+      )}\n`,
+    );
 
     expect(
       guestAlarm.local,
@@ -282,10 +308,12 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
     ).not.toBe(0);
     expect(guestAlarm.localPlayer, "and it agrees with the ship main.ts is flying").toBe(seat);
 
-    // The alarm's roster is the local side and nothing else. In FFA (this room's
-    // default) that is one slot — the guest's own — so the host's home under fire
-    // is not this player's klaxon, which is the developer's sentence exactly.
-    expect(guestAlarm.allies, "only this player's own home rings their alarm (FFA)").toEqual([seat]);
+    // The alarm's roster is the local side and nothing else — your own home
+    // always, an ally's in Teams, an enemy's never. This room is FFA (nobody
+    // touched the MODE row), so the side is one slot and the host's home under
+    // fire is not this player's klaxon: the developer's sentence exactly.
+    expect(joined.mode, 'the room is FFA, so a side is one seat').toBe('ffa');
+    expect(guestAlarm.allies, "only this player's own home rings their alarm").toEqual([seat]);
     expect(guestAlarm.allies, "and the host's home is not in it").not.toContain(room.you);
 
     // The host is the control: it reads its own seat too. Two clients, two

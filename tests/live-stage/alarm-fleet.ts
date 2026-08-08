@@ -40,6 +40,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /** The match server: the room host the browsers open their sockets to. */
@@ -122,6 +123,30 @@ async function waitForFleet(timeoutMs = 30_000): Promise<void> {
   throw new Error('no Machine registered with the allocator — the fleet never formed');
 }
 
+/**
+ * Prove the thing answering on the preview port is the bundle we just built.
+ *
+ * `--strictPort` makes `vite preview` *exit* on a clash rather than move — but it
+ * exits into a detached child, and a readiness poll cannot tell "my server came
+ * up" from "somebody else's was already there". A stale preview from an earlier
+ * run of this spec, or a neighbouring working copy on a shared port, answers 200
+ * and serves a DIFFERENT bundle, and the suite reports on code nobody changed.
+ *
+ * `index.html` names its entry chunk by content hash, so comparing the served
+ * bytes against the ones on disk is a real fingerprint, not a liveness check.
+ */
+async function assertServingOurBundle(): Promise<void> {
+  const onDisk = readFileSync(resolve(repoRoot, OUT_DIR, 'index.html'), 'utf8').trim();
+  const served = (await (await fetch(`${PREVIEW_URL}/index.html`)).text()).trim();
+  if (served !== onDisk) {
+    throw new Error(
+      `the preview on ${PREVIEW_URL} is serving a DIFFERENT bundle than ${OUT_DIR}/ — ` +
+        'something else already held the port (a stale run, or another working copy). ' +
+        'Kill it and re-run; this spec must not report on a bundle it did not build.',
+    );
+  }
+}
+
 /** Spawn a long-lived process, inheriting stderr so a crash is readable. */
 function launch(command: string, args: string[], env: Record<string, string>): ChildProcess {
   const child = spawn(command, args, {
@@ -202,6 +227,7 @@ export async function startAlarmFleet(): Promise<AlarmFleet> {
     await waitForHttp(`http://127.0.0.1:${MATCH_PORT}/health`, 'the match server');
     await waitForFleet();
     await waitForHttp(PREVIEW_URL, 'the preview server');
+    await assertServingOurBundle();
   } catch (e) {
     await stop();
     throw e;
