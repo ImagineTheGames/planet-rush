@@ -38,6 +38,16 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  // One worker, unconditionally (a0-00c). `fullyParallel: false` only serialises
+  // files *within* a project; the two projects below are separate work units and
+  // Playwright's default pool (`os.cpus().length / 2`) would happily run the
+  // desktop capture and the phone capture at the same instant — each measuring
+  // frame time while the other saturates the box. An instrument that reports the
+  // frame rate of a machine running a second copy of itself is not measuring the
+  // game. This is not the container cap that `playwright.config.ts` takes from
+  // `harness/pool-size.ts`: it is 1 everywhere, including on an idle laptop,
+  // because a shared box invalidates the reading no matter how many cores it has.
+  workers: 1,
   // Never retry a performance measurement: a retry that passes would report the
   // best of two runs as if it were the run.
   retries: 0,
