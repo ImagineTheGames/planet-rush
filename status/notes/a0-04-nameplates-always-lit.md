@@ -69,7 +69,20 @@ always be lit...."*
   25/70. Brawl: Warden 39/55, Sable 15/35, Rusty 54/70 — all lit, every bar
   readable directly beneath its name. Every drawn alpha in all three scenes: 0.92.
 
+- Merged `origin/main` (`cf7edab`) in at `2272263`; re-ran tsc, the unit suite and
+  the live-stage spec on the merged tree — all green.
+- **PR #317** opened.
+
 ## NEXT
 
-- PR open; nothing outstanding. If a future brief wants the own-ship label on,
+- Nothing outstanding. If a future brief wants the own-ship label on,
   `showOwnShipLabel` is still the seam — untouched here.
+- One thing worth knowing for a resume: a full-suite run taken *while* a build, a
+  Playwright run and another vitest shared the box reported 1 unnamed failure
+  (truncated log). Clean isolated runs before and after are 3899/3899 and
+  3900/3900. Treat a lone failure under load as contention, and re-run isolated
+  before chasing it.
+- Scratch, deliberately uncommitted: `playwright.a004.config.ts` (live-stage
+  config on private port 4198, so this lane never serves its bundle to another's
+  suite). Recreate it if you resume; do NOT `git clean` it away alongside the
+  other lanes' scratch configs.
