@@ -1,0 +1,16 @@
+{
+  "what": "s9-01 — is the alarm fix (one-shot + correct seat) on the live deployment?",
+  "url": "https://imaginethegames.github.io/planet-rush/",
+  "servedSha": "9803e3b",
+  "servedAt": "2026-08-08T03:13:28.310Z",
+  "entryChunk": "assets/index-D7Hl6a83.js",
+  "entryBytes": 761978,
+  "markers": {
+    "__alarmStage": false,
+    "alarmStings": false,
+    "__pauseStage": true
+  },
+  "methodValid": true,
+  "deployed": false,
+  "verdict": "the fix is NOT deployed — this bundle still carries the looping, slot-0 alarm, so the by-ear attestation cannot be written yet"
+}
