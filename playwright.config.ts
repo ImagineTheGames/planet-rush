@@ -75,7 +75,11 @@ function shardMatch(project: string): PlaywrightTestConfig['testMatch'] {
 
 // Say out loud what this runner is about to do. A shard that silently ran the
 // wrong quarter of the suite is the failure mode worth one line of log.
-if (SHARDING) {
+//
+// Once, though: every worker process loads this config too, and Playwright sets
+// TEST_WORKER_INDEX in them, so the plan is printed by the runner alone rather
+// than three times over.
+if (SHARDING && process.env.TEST_WORKER_INDEX === undefined) {
   const plan = planShards(PROJECT_NAMES, SPEC_FILES, SHARDS);
   const mine = plan.find((s) => s.shard === SHARD);
   console.log(
