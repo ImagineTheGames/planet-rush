@@ -798,6 +798,24 @@ fixed it, and nothing notifies you when they do. Re-check every inherited-red cl
 each round against the *current* main, not against the run ID you recorded when you
 wrote it.
 
+**CI is now FULLY GREEN on this branch, for the first time in the lane's life** —
+at `9ee7d85`: `Typecheck, test, build` (both runs), all six
+`Mobile emulation (Playwright) — shard N/6`, and the roll-up
+`Mobile emulation (Playwright)`. The PR body's old red-CI section was replaced with
+the account above rather than deleted silently, because a reviewer who saw the
+earlier red should find out what happened to it. `mergeStateStatus` should now read
+CLEAN rather than the UNSTABLE it has shown since round 4.
+
+**One real bug in my own conflict resolution, caught by reading the result rather
+than trusting the diff** (`9ee7d85`). Resolving `docs/design-amendments.md` left the
+`---` separator immediately under the last line of this lane's entry, with no blank
+line. Markdown reads `---` directly beneath text as a **setext heading**, so that
+closing sentence would have rendered as an H2 in the middle of the document. Fixed,
+and both files are now scanned for the pattern:
+`awk '/^---$/{if(prev!="")print NR} {prev=$0}'`. Worth keeping — this file gets a
+top-of-file insertion conflict every time any lane lands an amendment, which is
+three times now, and the resolution puts a separator next to text every time.
+
 **Housekeeping.** 33 foreign `tests/live-stage/*-evidence.png` were dirty at session
 start — `git checkout -- tests/live-stage/`, never committed, as every round. Only my
 own spec was run (not the full suite), so nothing went dirty again: `git status` after
@@ -809,12 +827,58 @@ was already present and was reused from the first run.
 The `audio-alive.spec.ts:239` ramp fix was left out for the **ninth** time, same
 reasoning, unchanged.
 
+## ROUND 11, PART 2 — PR #318 MERGED, and the deploy probe finally went POSITIVE
+
+**`origin/main` moved twice more during the session**, and the second time it was
+this lane landing: **PR #318 merged at 2026-08-08T15:27:39Z**, merge commit
+**`f3ace95`**. The ancestry gate went red a second time in one session and was
+merged again; `git merge-base --is-ancestor 9ee7d85 origin/main` confirms the work
+is in main.
+
+**One commit missed the merge by minutes.** `dcda22d` — the round-11 note addendum
+recording CI going fully green — was pushed at ~15:27, and the merge captured
+`9ee7d85`. The *code* it describes (the setext fix) is in main; only the prose is
+not. Carried in the follow-up below rather than abandoned.
+
+### The probe flipped, and this is the thing eight rounds were blocked on
+
+Watched the deployment after the merge, once a minute:
+
+```
+[1-8] servedSha=08c00ac  deployed=false     (main's #322 shard follow-up)
+[9]   servedSha=f3ace95  deployed=true
+```
+
+```
+servedSha    f3ace95   ·  servedAt 2026-08-08T15:34:31Z
+entryChunk   assets/index-DRdviTAb.js
+__alarmStage true  ·  alarmStings true  ·  __pauseStage true
+verdict      the fix IS deployed
+```
+
+**First positive reading in the lane's life.** Every round from 3 to 11 recorded
+`deployed: false` against a pre-fix bundle and correctly refused to write the
+attestation. The committed `evidence/s9-01-live-probe.json` in main said *"the fix
+is NOT deployed"* — true when written, **wrong within the hour**, and precisely the
+self-contradicting artifact this session spent its time removing from the PR body.
+Refreshed and landed rather than left to rot.
+
+**What this does and does not close.** It closes *"is the fixed code actually being
+served?"* — mechanically, by fingerprint, with `__pauseStage` as the negative
+control proving the grep is not permanently-true. It does **not** close the
+developer's item, which is a by-ear attestation: an online match on a non-zero slot,
+your station attacked (**one** sting, arrow holds), then another player's attacked
+(**silence**). That is QA's to write and it is now **unblocked** — `f3ace95` is the
+sha to name in it.
+
 ## NEXT
 
-- QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
-  `deployed: true` and the new sha, then the by-ear attestation — online match,
+- **QA — this is now unblocked and it is the only thing left.** The deploy check is
+  already done for you: the probe reads `deployed: true` at **`f3ace95`** (see
+  ROUND 11, PART 2). What remains is the by-ear attestation itself — online match,
   non-zero slot, own station attacked (**one** sting, arrow holds), another
-  player's attacked (silence).
+  player's attacked (silence) — named against `f3ace95`. Re-run
+  `node evidence/s9-01-live-probe.mjs` first if the deploy has moved on since.
 - This lane's own next pick-up: the `audio-alive.spec.ts:239` ramp read (above) —
   a ~100 ms wait before `sfxBusGain` is sampled. Deliberately not folded into
   PR #318.
