@@ -61,6 +61,12 @@ interface ConservationRun {
   readonly totalMined: number;
   readonly totalDeposited: number;
   readonly totalSpent: number;
+  /** a0-08: every ship's `lootTake` summed over every tick of the match — the
+   *  render tell's own claim about how much ore it saw arrive in a hold. */
+  readonly tellTakeTotal: number;
+  /** a0-08: ticks on which SOME ship sat with a full hold inside tractor range of
+   *  loose ore it could not accept (`lootBlocked`) — the reported frame. */
+  readonly blockedTicks: number;
 }
 
 /**
@@ -79,6 +85,10 @@ function runConservationMatch(seed: number, maxSeconds = 20 * 60): ConservationR
   let maxResidual = 0;
   let brokeAtTick = -1;
   let ticks = 0;
+  // a0-08's tells, sampled on the same ticks and from the same matches — a second
+  // run of an eight-slot match to its ending just to watch them is not affordable.
+  let tellTakeTotal = 0;
+  let blockedTicks = 0;
 
   const snapshotLedger = (): Record<string, number> => ({ ...(world.ledger ?? {}) }) as Record<string, number>;
 
@@ -89,6 +99,8 @@ function runConservationMatch(seed: number, maxSeconds = 20 * 60): ConservationR
   while (!isOver(world) && world.time < maxSeconds && ticks < maxTicks) {
     step(world, botInputs(world, bots, TICK_DT), TICK_DT);
     ticks++;
+    for (const s of world.ships) tellTakeTotal += s.lootTake ?? 0;
+    if (world.ships.some((s) => s.lootBlocked)) blockedTicks++;
     const r = Math.abs(oreResidual(world));
     if (r > maxResidual) maxResidual = r;
     if (r > CONSERVATION_TOL && brokeAtTick < 0) {
@@ -105,6 +117,8 @@ function runConservationMatch(seed: number, maxSeconds = 20 * 60): ConservationR
         totalMined: world.ledger?.mined ?? 0,
         totalDeposited: world.ledger?.deposited ?? 0,
         totalSpent: world.ledger?.spent ?? 0,
+        tellTakeTotal,
+        blockedTicks,
       };
     }
   }
@@ -121,6 +135,8 @@ function runConservationMatch(seed: number, maxSeconds = 20 * 60): ConservationR
     totalMined: world.ledger?.mined ?? 0,
     totalDeposited: world.ledger?.deposited ?? 0,
     totalSpent: world.ledger?.spent ?? 0,
+    tellTakeTotal,
+    blockedTicks,
   };
 }
 
@@ -157,6 +173,37 @@ describe('ore conservation over a full natural match (the loot black-hole soak)'
     expect(sawBank, 'a match should bank a hold').toBe(true);
     expect(sawDrop, 'a match should drop ore on a death').toBe(true);
     expect(sawLoot, 'a match should loot loose ore into a hold').toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // a0-08 — the loot TELLS, held to the same standard as the ore itself.
+  //
+  // The developer's fourth report of this shape ("sometimes picked up ore from
+  // dead ships dont count") was NOT a leak: the residual above stays flat zero
+  // through every kill and every wreck on every seed. It was a legibility bug —
+  // looted ore lands in the hold while the prominent readout is the bank, and a
+  // full hold refuses a chunk in total silence. `Ship.lootTake`/`lootBlocked` are
+  // the tells that fix it, and a tell that lies is worse than no tell, so the
+  // same full natural matches audit them.
+  // -------------------------------------------------------------------------
+
+  it('the loot tell reports EXACTLY the ore that moved, never a unit more (a0-08)', () => {
+    // `lootTake` summed over every ship over every tick must equal the ledger's
+    // `looted` — the authoritative chunk → cargo total. If the tell ever inflated
+    // a partial take into the whole chunk it was offered (the exact way this bug
+    // reads from the cockpit), this sum runs ahead of the ledger and fails here.
+    for (const run of RUNS) {
+      expect(run.tellTakeTotal, `seed ${run.seed}: tell vs ledger`).toBeCloseTo(run.totalLooted, 6);
+    }
+  });
+
+  it('a full hold sitting on ore it cannot take is a NORMAL state, not an edge case (a0-08)', () => {
+    // The base hold is 2 (GDD §2.8), so refusing a pickup is routine play — which
+    // is why the silence about it was worth a report. If this ever stops firing
+    // across six full matches, the tell has been wired to a state that no longer
+    // occurs and the fix has quietly become dead code.
+    const sawBlocked = RUNS.some((r) => r.blockedTicks > 0);
+    expect(sawBlocked, 'some ship should hit a full hold over loose ore').toBe(true);
   });
 
   it('the seeded baseline balances at world-build (no ore minted or lost in setup)', () => {

@@ -914,6 +914,14 @@ function targetPos(world: World, hit: AimTarget): Vec2 {
 
 function updateChunks(world: World, dt: number): void {
   const range2 = TRACTOR.range * TRACTOR.range;
+  // The loot tells (a0-08) are decided fresh here every tick and nowhere else —
+  // this is the only chunk → cargo path in the sim — so they are cleared for
+  // EVERY ship first, dead ones included, and a tell can never outlive the tick
+  // that earned it. Write-only signalling: nothing below reads them back.
+  for (const ship of world.ships) {
+    ship.lootTake = 0;
+    ship.lootBlocked = false;
+  }
   for (const chunk of world.chunks) {
     // Deposit couriers fly home and are absorbed, and are never tractored or
     // collected — the ore they represent already left the hold for the bank in
@@ -931,8 +939,17 @@ function updateChunks(world: World, dt: number): void {
     let bestD2 = range2;
     for (const ship of world.ships) {
       if (!ship.alive) continue;
-      if (holdFull(ship)) continue;
       const d2 = dist2(chunk.pos, ship.pos);
+      if (holdFull(ship)) {
+        // The FULL-HOLD TELL (a0-08). A full hold drops out of the tractor here,
+        // and until now that was the whole of it: the chunk was never pulled, the
+        // contact branch below was never reached, and the player floating over a
+        // wreck saw nothing happen and nothing said. Record that this ship is
+        // sitting in range of ore it cannot take — same distance test, same loop,
+        // no extra work — and the hold pips can say so.
+        if (d2 < range2) ship.lootBlocked = true;
+        continue;
+      }
       if (d2 < bestD2) {
         bestD2 = d2;
         target = ship;
@@ -964,6 +981,11 @@ function updateChunks(world: World, dt: number): void {
           // all arrive here, so this one counter is every unit a ship ever picks
           // up (`./ore-ledger`), the flow three regressions have lost.
           ledgerAdd(world, 'looted', take);
+          // …and the same `take`, per ship, as the tick's render tell (a0-08): the
+          // ore that arrived, not the chunk that was offered, so a PARTIAL take
+          // (`room` 1 against a 3-ore chunk) shows as the 1 it was. Accumulated,
+          // because two chunks can land in one hold on one tick.
+          target.lootTake = (target.lootTake ?? 0) + take;
         }
       }
     }

@@ -8,6 +8,75 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Looted ore that "doesn't count" — the ledger says it always counted
+
+**Date:** 2026-08-08 · branch `agent/gameplay/a0-08-looted-ore-that-does-not-count`
+**Reported by:** Developer (Reinaldo), from real play
+**Amends:** GDD §2.3 and §2.7 (folded in directly). **No rule, constant, or ore
+flow changed** — `CARGO_BASE`, `DEATH_ORE_DROP_FRACTION` and the full-hold refusal
+are untouched. This entry is here because the *finding* is the deliverable.
+
+### The report, verbatim
+
+> "sometimes picked up ore from dead ships dont count"
+
+### The verdict: nothing was ever lost
+
+This is the **fourth** report of this shape, and the ore ledger
+(`src/sim/ore-ledger.ts`) was built after the third precisely to settle the next
+one. Ran the reproduction it was built for — kill a loaded ship, fly the wreck
+drop, once with an empty hold and once with a full one — and
+
+> `liveOre === seeded + injected + debrisFloor − spent − deathLoss − capLoss`
+
+held **exactly**, residual `0.0e+0`, at every frame of every run, and holds every
+tick of six full natural matches. **No ore is leaking.** The previous three
+reports were leaks; this one is not, and the difference is the whole point of
+having the instrument. The trace is `evidence/a0-08-loot-tell/trace.txt`.
+
+### "Sometimes" was three outcomes of the same kill, told apart by nothing
+
+Same wreck, same 2 ore on the field, three holds:
+
+| looter's hold | ore taken | left floating | what the player sees |
+|---|---|---|---|
+| **0 / 2** empty | 2 | 0 | hold fills — but the big readout is the **bank**, which correctly does not move |
+| **2 / 2** full | **0** | 2 | *nothing whatsoever*: a full hold exerts no tractor pull and refuses the chunk in silence |
+| **1 / 2** partial | 1 | 1 | takes one of the two — a partial take that looks exactly like a whole one |
+
+The base hold is **2** (GDD §2.8), so the middle row is the *normal* state, not an
+edge case. And a fourth thing stacks on top: looted ore lands in `cargo`, while
+the prominent top-left readout is `banked`, which only moves in your own
+atmosphere. So a *correct, complete* pickup moves no number the player is
+watching. **`a0-03` is renaming that readout `BANKED` → `ORE`** on the same day —
+which makes this worse, not better, if it lands alone: a number labelled `ORE`
+that does not move when you pick up ore. The two reports are one problem.
+
+### The fix is a tell, and only a tell
+
+Two per-tick, write-only fields on `Ship`, decided in the chunk step and read by
+nothing in the simulation:
+
+- **`lootTake`** — ore that arrived in this hold on this tick. The ore that
+  *moved*, not the chunk that was offered, so a partial take reads as partial.
+- **`lootBlocked`** — this hold is full and loose ore sits inside tractor range:
+  the wreck it is floating over that is never coming.
+
+Both are pure derivations of already-hashed state, stay out of `hashState`, and
+cannot perturb determinism (GDD §4.8). Drawing them is the render/UI lanes' call;
+the hold pips are the obvious home, since they already drain visibly on deposit.
+
+### Explicitly NOT done — three balance questions left for the developer
+
+Raising `cargoCap`, lowering `DEATH_ORE_DROP_FRACTION`, or letting a pickup
+ignore the cap would each make the complaint go away, and each is a §2.8 balance
+decision with no ratification. They are listed in the PR body as questions, not
+taken. In particular **a kill never gives you what the victim was holding** — half
+their hold is destroyed with the hull (GDD §2.3, working as designed) — and if the
+expectation is otherwise, that is a rules change and needs saying out loud.
+
+---
+
 ## The lobby picks the CHARACTER. Difficulty is shown, not chosen.
 
 **Date:** 2026-08-07 · branch `agent/bots/a0-06-pick-the-character`
