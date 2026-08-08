@@ -529,6 +529,70 @@ a0-08 changed how looted ore is accounted and the cast seam did not notice. Each
 clean merge is a small re-confirmation of "this brief changes who you choose, not
 how a bot plays."
 
+### Session 2026-08-08 (eighth) — main moved onto MY files and auto-merged anyway
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, session 5's lesson, before believing an empty-looking tree) with
+33 evidence PNGs dirty, none of them mine. Restored with `git checkout --
+tests/live-stage/` (never `git clean`). No feature work outstanding; none
+invented.
+
+**`origin/main` had moved to `337784e`** (a0-09 team-aware end-of-match, PR
+#327), so `merge-base --is-ancestor` was red. Merged first, before measuring
+anything — session 7's rule, and it mattered more than usual here because **a0-09
+edits `src/ui/lobby.ts`, `src/ui/lobby-flow.ts` and `src/main.ts`, which are the
+three files this brief rewrote most.**
+
+**It auto-merged clean, all six shared files, no conflicts** — and that is worth
+one sentence of *why*, because "no conflict" on a file both sides rewrote is a
+claim to verify rather than accept. a0-09's `lobby.ts` change is a single
+**additive** export, `sideRosterOf` (the end screen's "did MY side win?"), placed
+after `activeTeams` and touching no seat field. It reads `seat.team`; this brief
+owns `seat.character`. They are neighbours in one type and nothing else.
+`design-amendments.md` did **not** conflict for once — a0-09 added no entry — so
+the top-of-file anchor that collided in sessions 6 and 7 stayed quiet. Verified
+after the fact by grep, not assumed: §2.1's *"the host picks each bot's
+CHARACTER"* and §2.9's *"characters, not difficulty labels"* are both still in
+`GDD.md`, and the a0-06 entry is still at `design-amendments.md:80` under a0-08's
+in the file's newest-first order.
+
+**This is the fifth merge in a row to leave the cast seam untouched.** a0-09
+changed who the end screen calls a winner; the seam did not notice. That is what
+"this brief changes who you choose, not how a bot plays" is supposed to mean, and
+each clean merge re-confirms it a little more cheaply than a test does.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run **before** committing, which is the point of
+  running it).
+- `npm test -- --run` — **4031 passed, 0 failed**, 240 files.
+  `capacity-regression` passed at load ~9. Sessions 2/4/5/6/7 already settled it
+  as a wall-clock benchmark that only trips under lane contention; do not chase
+  it.
+- `PREVIEW_PORT=4196 npm run test:live-stage -- lobby-cast.spec.ts` — **3
+  passed** (cast round trip, `?` by click on PC, `?` by tap at 390 px landscape).
+  Full sweep result recorded below.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `337784e`.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** on top of the a0-09 merge — slots 1–7 read
+`warden warden sable vulture warden sable vulture` in the lobby and the *same
+seven* in the match, `identical: true`. It is absent from the evidence commit's
+diff and that absence IS the result. **That file is the evidence; the PNGs are
+the picture of it.**
+
+`2f3acf4` re-shot the four frames (the committed set was from `85b38c9`, older
+than this merge, and the build badge stamps the commit hash into every frame).
+Pushed `85b38c9..2f3acf4` fast-forward **immediately after committing**, not at
+the end of the session — sessions 5 and 7 each lost an hour to a finished merge
+that never left the box, and the fix is to push the merge before doing anything
+else with it. PR **#319** reads MERGEABLE at `2f3acf4`.
+
+**A correction to session 5's port probe, kept because it will save the time
+again:** `pgrep -fa "vite preview"` is the wrong tool on this box — every lane's
+`claude -p` carries the brief in its argv and matches. `ss -ltnp | grep ':41'`
+names the lane and the port directly and is what I used to pick 4196.
+
 ## NEXT (unchanged from session 1, restated so it is not lost)
 
 - **ONLINE still carries the tier, not the name.** `LobbyChoiceMessage` has
