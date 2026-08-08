@@ -15,6 +15,8 @@ evidence** — the DoD, the PR body and QA attestation are the evidence.
 | `7e79d24` | re-baseline all 35 goldens |
 | `758f67b` | untrack three scratch playwright configs swept up by `git add -A` |
 | `30c3a92` | the per-frame cost table, and the frame-time measurement that was thrown out |
+| `7ffc837` | **merge `origin/main`** — a0-03 (wheel cost) and a0-04 (nameplates) landed under this branch |
+| `78dc317` | re-baseline the 35 goldens **again**, on the merged tree |
 
 ### The pick, as implemented
 
@@ -141,7 +143,39 @@ now visible (see `frames/1-…` vs `frames/2-…`). Arguably on-direction for
 Gantry/Bone ("machined plates, lit top edges"), but it is a real change and it is
 UI's call, not art's.
 
+### The merge, and why the goldens were shot twice
+
+`main` moved mid-brief: **a0-03** (the wheel cost is one number) and **a0-04**
+(nameplates always lit) both landed, and both move frames. Thirteen goldens
+conflicted. Taking either side would have shipped a baseline that is half one
+change and half the other, so the merge took **main's** for all thirteen and then
+all 35 were regenerated from the merged tree. Same diff profile as before the
+merge, so nothing in the explanation changed.
+
+One incident worth remembering: a blanket `git add -A` in this shared workspace
+swept three *other lanes'* untracked scratch configs into a commit
+(`playwright.a003/a004/isolated.config.ts`, one headed "SCRATCH — NOT FOR
+COMMIT"). Untracked again in `758f67b`, index-only, files left on disk. **Do not
+`git add -A` at the repo root in a lane workspace.**
+
+## DoD, as run
+
+| check | result |
+|---|---|
+| `npx tsc --noEmit` | clean (post-merge) |
+| `npm test -- --run` | **235 files, 3946 tests, 0 failed** (post-merge). One earlier run showed 1/3946 failing and did not reproduce — a perf-benchmark flake on a loaded box. |
+| `MAP_NEBULA` in `src/art` | present in `src/art/backdrop.ts` |
+| goldens differ from `origin/main` | **34 of 35** (`phone-portrait-eliminated` is byte-identical) |
+| `origin/main` is an ancestor of HEAD | yes |
+| goldens re-run clean (not in the DoD, done anyway) | **35/35 pass** against the committed baselines, twice — once before the merge and once after |
+
 ## NEXT
 
 - [ ] Open the PR; flag §2.2 at the top as the one thing needing a decision.
 - [ ] QA attestation on the re-baselined goldens.
+- [ ] For **a0-12**: `MAP_NEBULA` needs two more lines and `UNASSIGNED_NEBULAE`
+      needs to empty out — `backdrop.test.ts` fails until both happen, by design.
+      Iron Veil and Deep Ember are the two skies waiting, and taking them means
+      taking style-guide §2.2 with them.
+- [ ] For the **UI Agent**: HUD plates no longer vanish into the ground. Flagged
+      above; not touched, because `src/ui` is not mine.
