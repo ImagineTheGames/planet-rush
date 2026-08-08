@@ -1,6 +1,7 @@
 # s9-01 — the alarm plays once, and only for YOUR station · working notes
 
-Branch: `agent/sound/s9-alarm-once-and-ownership` · from `4960540` (main).
+Branch: `agent/sound/s9-alarm-once-and-ownership` · from `4960540` (main),
+merged up to `9803e3b`. **PR #318.**
 
 Working note, not evidence. The DoD, the PR body and QA attestation are the record.
 
@@ -20,12 +21,20 @@ spent re-finding them.
   spec (same bar, same two tones, ordinary edge fades). `alarmSounds` counts
   stings headless. `deriveAlarmAllies` moved presenter.ts → `audio/scope.ts`.
   Nine unit tests.
-- *(second commit)* — **defect 2, the wire.** `audio.setLocal(LOCAL_PLAYER)` and
-  the `WorldObserver` construction moved to the seat assignment; `setAlarmScope`
-  fed every frame from live world truth; `window.__alarmStage` installed on BOTH
-  boots.
-- *(third commit)* — the live-stage online spec + its own fleet, GDD §2.2
-  fold-in, `docs/design-amendments.md` entry.
+- `64b4a4c` — **defect 2, the wire.** `audio.setLocal(LOCAL_PLAYER)` and the
+  `WorldObserver` construction moved to the seat assignment; `setAlarmScope` fed
+  every frame from live world truth; `window.__alarmStage` installed on BOTH boots.
+- `ffd5d00` — the live-stage online spec + its own fleet, the GDD §2.2 fold-in,
+  the `docs/design-amendments.md` entry.
+- `6688ce9` — the sting retries when the mix is full; the seam is read in-match.
+- `4625945` — the preview is fingerprinted; the readout lands in
+  `evidence/s9-01-alarm-ownership.json`.
+- `1543429` — the fleet is killed by process group, so a preview cannot outlive
+  the run.
+- `f053f2e` — merge `origin/main` (`9803e3b`). One conflict, in
+  `docs/design-amendments.md`: a0-03 added its entry at the top of the file on
+  the same day. Both kept, mine first. GDD §2.2 auto-merged — a0-03's `ORE`
+  caption and this lane's alarm paragraphs are in different parts of the section.
 
 ## DECISIONS, and what was rejected
 
