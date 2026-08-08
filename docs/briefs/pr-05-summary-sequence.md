@@ -71,9 +71,12 @@ real player is not shown rather than estimated.
    is a pure function of `(model, elapsed)`.
 3. **`prefers-reduced-motion` is honoured** — collapse to the end state, **with the level-up still
    marked** as a static state. ⚠ **This client honours it nowhere today**: a grep over `src/`,
-   `index.html`, `public/` and `style-guide.md` returns nothing. You are **building the seam**,
-   not inheriting one: `prefersReducedMotion(): boolean` on the `platform.ts` abstraction, never a
-   bare `window.matchMedia` in UI code (GDD §4.1). Small, but scope nobody costed.
+   `index.html`, `public/` and `style-guide.md` returns nothing. `reduceVfx`
+   (`src/render/index.ts:409`) is **not** it — that is a frame-rate reducer that sheds decorative
+   VFX (GDD §4.3, risk 5) — though it is the right neighbour to sit a motion preference beside.
+   You are **building the seam**, not inheriting one: `prefersReducedMotion(): boolean` on the
+   `platform.ts` abstraction, never a bare `window.matchMedia` in UI code (GDD §4.1). Small, but
+   scope nobody costed.
 4. **Landscape phone.** Everything fits at **390 px** wide with **no scroll**, safe areas
    included. *Test:* the layout function at 390×844 and 844×390 places every element inside the
    viewport. If it does not fit, **cut a row** — do not add a scrollbar.

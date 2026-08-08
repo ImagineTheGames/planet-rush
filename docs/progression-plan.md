@@ -1115,7 +1115,12 @@ twice, which is why beat 6 exists:
    section said reduced motion is "already respected elsewhere in the client." It is not.**
    `grep -rn "reduced-motion\|reducedMotion" src/ index.html public/ style-guide.md` returns
    **nothing** — there is no media-query read, no setting and no seam anywhere in the client
-   today. So PR-5 is where the seam gets built, not where an existing one is honoured: a
+   today. The nearest neighbour is **`reduceVfx`** (`src/render/index.ts:409`,
+   `main.ts:1964`), and it is *not* this: it is a **performance** reducer driven by a sustained
+   frame-rate drop plus a match setting, it sheds decorative VFX while keeping the load-bearing
+   tells (GDD §4.3, risk 5), and it says nothing about what the player asked their operating
+   system for. It is, however, exactly where a motion preference belongs *beside*. So PR-5 is
+   where the seam gets built, not where an existing one is honoured: a
    `prefersReducedMotion(): boolean` read on the `platform.ts` abstraction (never a bare
    `window.matchMedia` in UI code — GDD §4.1's platform rule), with the same defensive-default
    discipline as every other setting. It is small, and it is the honest scope note.
@@ -1247,9 +1252,10 @@ on the credit ledger existing.
     Assert it as an **absence**, over nameplates, HUD and the end screen — an absence nobody
     tests for is an absence that comes back. (§Q2, PR-6)
 15. **`prefers-reduced-motion` is NOT honoured anywhere in this client today.** A grep over
-    `src/`, `index.html`, `public/` and the style guide returns nothing. PR-5 builds the seam
-    (on `platform.ts`, never a bare `window.matchMedia` in UI code); it does not inherit one.
-    (§6.4 rule 3)
+    `src/`, `index.html`, `public/` and the style guide returns nothing. `reduceVfx` is **not**
+    it — that is a frame-rate reducer that sheds decorative VFX (GDD §4.3, risk 5), not a motion
+    preference. PR-5 **builds** the seam (on `platform.ts`, never a bare `window.matchMedia` in
+    UI code); it does not inherit one. (§6.4 rule 3)
 16. **The end-of-match sound may not come from the existing bank.** All forty slots are under
     `deny-all` (a0-01), including `matchEnd`, `musicWin` (Victory Sting) and `musicLoss`
     (Defeat Sting). Reaching for them ships a sound the developer has already rejected. Four
