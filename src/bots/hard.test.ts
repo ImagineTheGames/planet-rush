@@ -170,11 +170,18 @@ describe('Hard — threat', () => {
 });
 
 describe('Hard — the fog holds inside the scoring function', () => {
-  it('scores an unscouted home identically whatever its core is really at', () => {
+  // Off screen — comfortably past `visualRange` (720) measured to the surface.
+  // These two cases used 700 until a0-05, when the station-health gate widened
+  // from the retired 180-unit `SENSOR_RANGE` to the on-screen test (GDD §2.2
+  // amended 2026-08-07). The claim is unchanged — a Hard bot does not act on a
+  // core it has not looked at — only the distance at which "not looked at"
+  // starts. It is deliberately still tested: always-visible is not omniscient.
+  const OFF_SCREEN = 1200;
+
+  it('scores an unseen home identically whatever its core is really at', () => {
     const world = board();
     const target = world.stations.find((p) => p.owner === 2)!;
-    // Well outside sensor range: the damage ring is not drawn (GDD §2.2).
-    world.ships[0]!.pos = { x: target.pos.x + 700, y: target.pos.y };
+    world.ships[0]!.pos = { x: target.pos.x + OFF_SCREEN, y: target.pos.y };
 
     const healthy = scoreStation(ctxOf(world), home(ctxOf(world), 2));
     target.coreHp = 3; // one weapon-second from dead, and invisible from here
@@ -183,20 +190,37 @@ describe('Hard — the fog holds inside the scoring function', () => {
     expect(dying).toEqual(healthy);
   });
 
-  it('acts on it the moment it has been scouted — which is the trip', () => {
+  it('acts on it the moment it is on screen — which is still the trip', () => {
     const world = board();
     const target = world.stations.find((p) => p.owner === 2)!;
     target.coreHp = target.maxCoreHp * 0.15;
 
-    // Parked on the surface: inside sensor range, so the ring is readable.
+    // Parked on the surface: the ring is readable, as it now is at any range
+    // the home is drawn at.
     world.ships[0]!.pos = { x: target.pos.x + target.radius + 40, y: target.pos.y };
     const scouted = scoreStation(ctxOf(world), home(ctxOf(world), 2));
 
-    // The same wounded core, seen from outside sensor range.
-    world.ships[0]!.pos = { x: target.pos.x + 700, y: target.pos.y };
+    // The same wounded core, from off screen.
+    world.ships[0]!.pos = { x: target.pos.x + OFF_SCREEN, y: target.pos.y };
     const rumour = scoreStation(ctxOf(world), home(ctxOf(world), 2));
 
     expect(scouted.opportunity).toBeGreaterThan(rumour.opportunity);
+  });
+
+  it('reads a wounded home from across the screen, where it used to be blind', () => {
+    // The a0-05 gain, stated as a bot test: at 500 units — nearly three times
+    // the retired 180-unit gate, and plainly on screen — the core is readable,
+    // so the bot values the opportunity a human can see. Without this the
+    // amendment would have handicapped every bot (GDD §2.9 symmetry).
+    const world = board();
+    const target = world.stations.find((p) => p.owner === 2)!;
+    world.ships[0]!.pos = { x: target.pos.x + target.radius + 500, y: target.pos.y };
+
+    const healthy = scoreStation(ctxOf(world), home(ctxOf(world), 2));
+    target.coreHp = target.maxCoreHp * 0.15;
+    const cracked = scoreStation(ctxOf(world), home(ctxOf(world), 2));
+
+    expect(cracked.opportunity).toBeGreaterThan(healthy.opportunity);
   });
 
   it('never offers a wreck as a target — there is no core left to kill', () => {

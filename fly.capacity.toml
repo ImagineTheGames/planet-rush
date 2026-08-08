@@ -1,0 +1,73 @@
+# fly.capacity.toml — a THROWAWAY match Machine, for capacity measurement only.
+# OWNER: Netcode Engineer (m11 server stress; docs/server-capacity.md).
+#
+# ── Read this before deploying it ──────────────────────────────────────────
+# This app exists to be filled with synthetic matches until its event loop
+# starts missing ticks. Never run that against `planet-rush-gameserver`: every
+# room on a Machine lags together, so a capacity run on the live fleet is an
+# outage with a spreadsheet attached. Deploy this, measure it, destroy it:
+#
+#   fly apps create planet-rush-capacity
+#   fly deploy --config fly.capacity.toml           # ~2 min
+#   npx vite-node tests/net/capacity/ramp-cli.ts -- \
+#     --direct wss://planet-rush-capacity.fly.dev/play \
+#     --health https://planet-rush-capacity.fly.dev/health \
+#     --rooms 1,2,4,6,8,12,16 --settle 60 --window 60 --confirm 120
+#   fly apps destroy planet-rush-capacity --yes     # ALWAYS
+#
+# The full runbook — including the 20-minute sustained soak that is the only
+# thing that can tell a healthy shared core from one living on burst credit, and
+# the second run one guest size up — is docs/server-capacity.md.
+#
+# ── How it differs from fly.gameserver.toml, and why ───────────────────────
+#   • no ALLOCATOR_URL and no TICKET_SECRET — it is not a fleet member. With no
+#     secret the Machine admits joins with no ticket (server/match-server.ts:
+#     the presence of the secret IS the switch), so the harness can dial it
+#     directly and no control plane has to exist beside it. It also means this
+#     app can never be handed a room by the real allocator.
+#   • no MATCH_ROUTER — one Machine, so there is no socket hop to pin.
+#   • MAX_ROOMS is raised past the advertised ceiling, because a run that stops
+#     at the number it is questioning answers nothing.
+#   • one Machine, not two: the question is what ONE Machine holds.
+# Everything else — the image, the Node process, the tick rate — is identical to
+# the fleet's, which is the only reason the number transfers.
+
+app = "planet-rush-capacity"
+primary_region = "iad"
+
+[build]
+  # The same image the fleet runs; the build context is the repository root.
+  dockerfile = "server/Dockerfile"
+
+[env]
+  HOST = "::"
+  PORT = "8080"
+  # A fixed seed, so two runs are the same matches.
+  MATCH_SEED = "20260807"
+  # Above any ceiling the ramp will ask for. This Machine is not placed on by an
+  # allocator, so a high ceiling risks nothing but this box.
+  MAX_ROOMS = "128"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+
+# The size under test. This is the row being measured — change it (and only it)
+# for the "one size up" run:
+#   shared-cpu-1x  → cpu_kind = "shared",      cpus = 1  (the fleet's size today)
+#   shared-cpu-2x  → cpu_kind = "shared",      cpus = 2
+#   performance-1x → cpu_kind = "performance", cpus = 1
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

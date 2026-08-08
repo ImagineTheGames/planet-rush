@@ -5,8 +5,11 @@
  *
  *  1. **Every slot's home is drawn**, and the layer is *pooled* — a second frame
  *     must not grow the tree (GDD §4.3: zero per-frame allocation).
- *  2. **Fog is drawn.** A rival's damage ring appears only from inside sensor
- *     range (GDD §2.2, "scouted, not broadcast"); your own home always shows.
+ *  2. **Health is always drawn.** Every station's damage ring reads true at every
+ *     range, own or rival (GDD §2.2, amended 2026-08-07 — a0-05). It used to be
+ *     gated on sensor range, and that gate is what the developer reported as a
+ *     glitch: out of range the ring vanished and the owner-colour beacon ring
+ *     under it made a wounded home look untouched.
  *  3. **A wreck stays on the map** and reads as one (GDD §2.7).
  *
  * Headless, like the muzzle tests: Pixi builds Graphics geometry with no WebGL, so
@@ -16,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import { Renderer } from './index';
-import { createWorld, damageStation, placeOrder, SENSOR_RANGE } from '../sim';
+import { createWorld, damageStation, placeOrder } from '../sim';
 import type { World } from '../sim';
 
 const VIEW = { width: 800, height: 600, originX: 0, originY: 0 };
@@ -87,8 +90,13 @@ describe('stations are on screen at all (the M2 integration gap)', () => {
   });
 });
 
-describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
-  it('shows a wounded rival only from inside sensor range', () => {
+describe('station health is always visible (GDD §2.2, amended 2026-08-07)', () => {
+  /** The retired `SENSOR_RANGE` — 2× the 90-unit shield radius. Written out
+   *  rather than imported, because the constant is gone and the point of these
+   *  cases is that the number no longer does anything. */
+  const RETIRED_SENSOR_RANGE = 180;
+
+  it('shows a wounded rival from across the map — the frame that was lying', () => {
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
     const world = arena();
@@ -96,16 +104,43 @@ describe('the damage ring is scouted, not broadcast (GDD §2.2)', () => {
     rival.spawnProtect = 0;
     damageStation(world, rival, 40);
 
-    // Viewer parked at its own home, half the map away: nothing to read.
-    r.draw(world, { cameraTarget: 0, muzzles: [] });
-    expect(drewSomething(stage, 'station-overlay-4')).toBe(false);
-
-    // Fly to it — the ring is information you earn by scouting.
+    // Viewer parked at its own home, half the map away — far outside the radius
+    // that used to blank this ring entirely.
     const viewer = world.ships[0]!;
-    viewer.pos.x = rival.pos.x;
-    viewer.pos.y = rival.pos.y - (SENSOR_RANGE + rival.radius) * 0.5;
+    expect(Math.hypot(rival.pos.x - viewer.pos.x, rival.pos.y - viewer.pos.y)).toBeGreaterThan(
+      RETIRED_SENSOR_RANGE,
+    );
     r.draw(world, { cameraTarget: 0, muzzles: [] });
     expect(drewSomething(stage, 'station-overlay-4')).toBe(true);
+  });
+
+  it('reads the same near and far — same ring, same fill', () => {
+    const stage = new Container();
+    const r = new Renderer(stage, VIEW);
+    const world = arena();
+    const rival = world.stations[4]!;
+    const healthy = world.stations[2]!;
+    rival.spawnProtect = 0;
+    damageStation(world, rival, 40);
+
+    const viewer = world.ships[0]!;
+
+    // Long range: the developer's complaint, the frame that used to lie.
+    viewer.pos.x = rival.pos.x;
+    viewer.pos.y = rival.pos.y - RETIRED_SENSOR_RANGE * 12;
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    const far = instructionCount(stage, 'station-overlay-4');
+    // …and, from that same eye, an undamaged home draws strictly less: the
+    // wounded one carries the extra threat-red segment. Unknown state and healthy
+    // state are no longer the same picture (LESSONS §20).
+    expect(far).toBeGreaterThan(instructionCount(stage, 'station-overlay-2'));
+    expect(healthy.coreHp).toBe(healthy.maxCoreHp);
+
+    // Close range: byte-for-byte the same ring. The camera is translate-only, so
+    // a world-unit ring is the same size on screen either way.
+    viewer.pos.y = rival.pos.y - (RETIRED_SENSOR_RANGE + rival.radius) * 0.5;
+    r.draw(world, { cameraTarget: 0, muzzles: [] });
+    expect(instructionCount(stage, 'station-overlay-4')).toBe(far);
   });
 
   it('always shows your own home, at any distance', () => {

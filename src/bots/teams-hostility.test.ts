@@ -149,10 +149,11 @@ function blankWorld(side: Side): World {
  *
  *   y=2600  the bot's own station
  *   y=2380  slot 1 — wounded, in the alarm ring, the nearest hull on the map,
- *           and (at x=2150, alongside the bot) its home, scouted and cracked
+ *           and (at x=2150, alongside the bot) its home, on screen and cracked
  *   y=2260  the bot
  *   y=2100  slot 2 — a healthy rival, further away, still inside the ring
- *   y=1700  slot 2's home, in view but unscouted
+ *   y=1700  slot 2's home, in view — and, since a0-05, read like anything
+ *           else on screen (it sits at full core, so it reads full)
  *
  * Slot 1 is deliberately the most tempting thing in the game: nearest, most
  * wounded, most exposed, and sitting on the observer's doorstep with a cracked
@@ -168,8 +169,8 @@ function board(side: Side): World {
   place(world, DISTANT, { x: 200, y: 200 }, { x: 200, y: 400 });
 
   shipOf(world, SWING).hull = shipOf(world, SWING).maxHull * 0.15;
-  // A cracked core beside the bot: scouted (inside sensor range) and worth
-  // besieging, which is what makes an unfiltered `scoreStation` reach for it.
+  // A cracked core beside the bot: on screen, readable, and worth besieging,
+  // which is what makes an unfiltered `scoreStation` reach for it.
   stationOf(world, SWING).coreHp = stationOf(world, SWING).maxCoreHp * 0.2;
   return world;
 }
@@ -394,14 +395,20 @@ describe('a bot never sieges an ally', () => {
   });
 
   it('"gangs up on the leader" never means "gang up on your own side"', () => {
-    // The leader read prefers the STRONGEST-looking home, and an unscouted core
-    // is assumed full — so a teammate's home, the one home a bot is rarely close
-    // enough to scout, is exactly the shape that wins this comparison.
+    // The leader read prefers the STRONGEST-looking home, and an UNREAD core is
+    // assumed full — so a teammate's home, the one home a bot is rarely close
+    // enough to look at, is exactly the shape that wins this comparison.
     for (const side of ['ally', 'foe'] as const) {
       const world = blankWorld(side);
       place(world, SELF, { x: 2000, y: 2000 }, { x: 2000, y: 2600 });
-      place(world, SWING, { x: 2600, y: 2100 }, { x: 2600, y: 2000 }); // far: unscouted, reads healthy
-      place(world, RIVAL, { x: 2150, y: 2100 }, { x: 2150, y: 2000 }); // near: scouted, and cracked
+      // SWING's home sits OFF SCREEN (surface past the 720-unit `visualRange`),
+      // so its core reads `null` and the leader heuristic assumes it full. It
+      // used to sit at x=2600: outside the retired 180-unit `SENSOR_RANGE`, but
+      // comfortably on screen. a0-05 widened the station-health gate to the
+      // on-screen test (GDD §2.2, amended 2026-08-07), so the board moved out to
+      // keep saying exactly what it was always saying.
+      place(world, SWING, { x: 3100, y: 2100 }, { x: 3100, y: 2000 }); // off screen: unread, reads healthy
+      place(world, RIVAL, { x: 2150, y: 2100 }, { x: 2150, y: 2000 }); // on screen: read, and cracked
       place(world, DISTANT, { x: 200, y: 200 }, { x: 200, y: 400 });
       stationOf(world, RIVAL).coreHp = stationOf(world, RIVAL).maxCoreHp * 0.2;
 

@@ -432,10 +432,10 @@ export function scoreShip(ctx: BotCtx, ship: PerceivedShip): TargetScore {
  *    "gangs up on the current leader" (GDD §2.9, Medium) falls out of one
  *    scoring function instead of a special case.
  *  - *proximity* — surface distance over visual range.
- *  - *opportunity* — how crackable it is *now*: a scouted-low core, an alarm
+ *  - *opportunity* — how crackable it is *now*: a core seen low, an alarm
  *    nobody answered (under attack, owner's ship not at home), and thin turret
- *    cover. Discounted by how stale the scouting is, so a Hard bot's fresher
- *    memory is worth something and a ten-second-old read is worth less.
+ *    cover. Discounted by how stale the read is, so a Hard bot's fresher memory
+ *    is worth something and a ten-second-old read is worth less.
  *
  * A wreck scores zero — it has no core left to kill (GDD §2.7). Its *debris* is
  * a separate, scavenger-shaped errand (`./behaviors`). **An ally's home scores
@@ -555,22 +555,24 @@ export function nearestLivingRival(ctx: BotCtx): PerceivedStation | null {
 
 /**
  * The rival that looks strongest from what this bot has actually seen: core
- * health where it has scouted (assumed full where it has not), turret cover
+ * health where it has looked (assumed full where it has not), turret cover
  * where it has been close enough to count barrels, and still alive.
  *
- * This is a *guess*, and it is supposed to be. A global scoreboard "would let
- * everyone free-ride on every attack; fog makes third-party awareness a skill"
- * (GDD §2.2) — so a bot that has scouted nobody thinks the nearest healthy
- * neighbour is the leader, and is often wrong.
+ * This is a *guess*, and it is supposed to be. Station health stopped being
+ * range-gated on 2026-08-07 (GDD §2.2, amended; a0-05), but "always visible" is
+ * not "omniscient": the ring is on the station, so a bot still has to have the
+ * home *on screen* to read it, exactly as a human does. A bot that has looked at
+ * nobody still thinks the nearest healthy neighbour is the leader, and is still
+ * often wrong — the guess just gets corrected from four times further out now.
  *
  * When several rivals look equally strong — the common early-match case, where
- * every unscouted home reads at one standing — the dead heat is broken
+ * every unread home reads at one standing — the dead heat is broken
  * index-blind ({@link breaksTie}), not toward slot 0: without that, "gang the
  * leader" quietly means "gang the lowest slot" (p8 aggression-bias fix).
  *
  * **The leader is a rival**, so allies are not in the running ({@link isFoe}).
  * They would otherwise win it routinely: a teammate's home is the one a bot has
- * been parked next to all match, so it is the best-scouted, healthiest-looking
+ * been parked next to all match, so it is the best-read, healthiest-looking
  * standing on the board — "gang up on the leader" meant "besiege your own side"
  * (p16-01).
  */

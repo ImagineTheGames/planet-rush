@@ -753,15 +753,15 @@ export function beaconRingSprite(playerId: number): SpriteDef {
 }
 
 /**
- * The scouted health ring (GDD §2.2, style-guide §5), in the ratified p11
- * grammar: a whole ring in the OWNER's colour is the health you still have, and
- * a threat-red segment FILLS it — from twelve o'clock, clockwise — as HP is
- * lost. A fully red ring is core death, exactly. Drawn only when the viewer's
- * ship is within sensor range — this function has no opinion about that, it just
- * makes the ring the renderer asks for, so fog stays a decision the sim/UI owns.
+ * The health ring (GDD §2.2, style-guide §5), in the ratified p11 grammar: a
+ * whole ring in the OWNER's colour is the health you still have, and a
+ * threat-red segment FILLS it — from twelve o'clock, clockwise — as HP is lost.
+ * A fully red ring is core death, exactly. Drawn on every station, at every
+ * range (GDD §2.2, amended 2026-08-07) — this function has never had an opinion
+ * about that, it just makes the ring the renderer asks for.
  *
- * One primitive with the shield layers ({@link ringDamageShapes}), so a scouted
- * rival reads in THEIR colour by exactly the same verb as your own home.
+ * One primitive with the shield layers ({@link ringDamageShapes}), so a rival
+ * reads in THEIR colour by exactly the same verb as your own home.
  *
  * @param playerId The core's owner — the base ring wears their roster colour.
  * @param fraction Core HP REMAINING, 0..1 (1 = whole owner ring, 0 = fully red).
