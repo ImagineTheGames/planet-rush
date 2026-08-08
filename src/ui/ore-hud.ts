@@ -6,15 +6,19 @@
  * left is to show total ore"*), the two halves of GDD §2.2's "ore at a glance"
  * now live in two places, each from this one model:
  *
- *  - **`banked`** feeds the **top-left TOTAL** — the safe bank the Build wheel
- *    spends ({@link ./hud}).
+ *  - **`banked`** feeds the **top-left readout, captioned `ORE`** (a0-03,
+ *    2026-08-07 — it was `TOTAL`) — the safe bank the Build wheel spends
+ *    ({@link ./hud}). The caption changed; this number did not.
  *  - **`slots` / `filled` / `full`** feed the **under-ship hold indicator** —
  *    one pip per cargo slot, so upgrades visibly widen it, flashing when full
  *    ({@link ./ore-hold}, {@link ./ore-hold-view}).
  *
- * Held ore is not safe; banked ore is (GDD §2.3) — and now they are shown in two
+ * Held ore is not safe; banked ore is (GDD §2.3) — and they are shown in two
  * clearly different places and forms (a labelled total vs. pips under the ship)
- * so the two numbers can never be confused.
+ * so the two numbers can never be confused. Since a0-03 the separation is
+ * carried by PLACE AND FORM alone rather than also by the word: the caption is
+ * `ORE`, which is true of the pips beside it too. The wheel hub is a third ORE
+ * (hold + bank) — see the note in `./hud`.
  *
  * Signal yellow is ORE (style-guide §2, RESERVED) — the hold pips and the banked
  * total are among the few things allowed to be yellow, and the reason the rule

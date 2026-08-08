@@ -33,6 +33,7 @@ import {
   WHEEL_ORDER,
 } from './build-wheel';
 import type { BuildWheelSignals, WheelSegmentId } from './build-wheel';
+import { segmentCostPaint } from './wheel-stack';
 import type { BuildItem } from '@shared/types';
 import { REPAIR_COOLDOWN_SECONDS, REPAIR_HP_PER_ORE, SATELLITE, SHIELD, TURRET } from '../sim/constants';
 
@@ -184,30 +185,79 @@ describe('RADAR — cost, one-per-station cap, and the "0/1" count (p13)', () =>
 });
 
 // ---------------------------------------------------------------------------
-// u7-02 — the Gantry/Bone wedge: cost/held, and the cap counts (closing u2-02)
+// a0-03 — the cost is ONE number, and the colour says whether you can pay it
 // ---------------------------------------------------------------------------
 //
-// The developer ratified the Gantry/Bone build wheel (2026-08-05), which draws
-// `3/4` where this wheel drew a bare `3`, and `2 / 4 BUILT` on the two wedges
-// that used to "cap silently". Both ship as STRINGS: a second numeric field on a
-// segment would break the one guarantee this module exists to keep (below), so
-// the pair travels through the same door the RADAR count already used.
+// u7-02 shipped the cost as `cost/held` — `3/4` where this wheel drew a bare `3`.
+// The developer retracted their own amendment on 2026-08-07, with a screenshot of
+// the live wheel at 2 ore:
+//
+//   "i was wrong about this we don't need to show ore need as 5/2 .. just need
+//    the needed amount in yellow, and red if insufficient..."
+//
+// So the denominator goes and the COLOUR carries the whole message. Nothing else
+// moves: `FULL`, `OPEN ▸`, the refusal precedence, and — a DIFFERENT amendment,
+// pointed at by a different sentence — the `4 / 4 BUILT` count over its cap all
+// stay exactly as they were. These tests were re-pointed rather than deleted,
+// because the thing worth pinning (what the cost slot says, in every state) did
+// not stop being worth pinning.
 
-describe('the cost line — `cost/held`, a string (u7-02)', () => {
-  it('prints the cost over what the player can actually spend', () => {
-    const byId = new Map(buildWheelModel(sig({ cargo: 2, banked: 2 })).segments.map((s) => [s.id, s]));
-    // 2 held + 2 banked = 4 spendable, exactly the design's frame.
-    expect(byId.get('turret')?.costLabel).toBe('3/4');
-    expect(byId.get('shield')?.costLabel).toBe('5/4');
-    expect(byId.get('repair')?.costLabel).toBe('1/4');
+describe('the cost line — the cost, one number (a0-03)', () => {
+  /** The developer's own screenshot frame: 2 ore held, nothing banked, a reactor
+   *  with damage on it so REPAIR REACTOR is live rather than inert. At 2 ore
+   *  SHIELD (5) and RADAR (6) cannot be paid and REPAIR REACTOR (1) can — the
+   *  three wedges the screenshot showed as `5/2`, `6/2` and `1/2`. */
+  const SCREENSHOT = { cargo: 2, banked: 0, coreHp: 40, maxCoreHp: 100 } as const;
+
+  it('prints the bare cost, in signal yellow, when the player can pay it', () => {
+    const byId = new Map(buildWheelModel(sig(SCREENSHOT)).segments.map((s) => [s.id, s]));
+    const repair = byId.get('repair')!;
+    expect(repair.costLabel).toBe(`${REPAIR_ENTRY_ORE}`);
+    expect(segmentCostPaint(repair)).toBe('ore');
   });
 
-  it('quotes the same spendable total the hub prints — never a second opinion', () => {
-    const model = buildWheelModel(sig({ cargo: 1, banked: 6.8 }));
-    // The hub floors fractional ore (repair spends fractional); the wedge must
-    // print the same whole number, or the wheel disagrees with itself.
-    expect(model.ore).toBe(7);
-    expect(model.segments.find((s) => s.id === 'turret')?.costLabel).toBe('3/7');
+  it('prints the same bare cost, in threat red, when they cannot', () => {
+    const byId = new Map(buildWheelModel(sig(SCREENSHOT)).segments.map((s) => [s.id, s]));
+    const shield = byId.get('shield')!;
+    const radar = byId.get('satellite')!;
+    expect(shield.costLabel).toBe(`${SHIELD.cost}`);
+    expect(segmentCostPaint(shield)).toBe('refused');
+    expect(radar.costLabel).toBe(`${SATELLITE.cost}`);
+    expect(segmentCostPaint(radar)).toBe('refused');
+  });
+
+  it('says the SAME number whatever the player holds — only the colour moves', () => {
+    // The one assertion that proves the denominator is gone rather than merely
+    // hidden: the label is a function of the price alone, and affordability is a
+    // function of the wallet alone. Two channels, one each.
+    const broke = buildWheelModel(sig({ cargo: 0, banked: 0 })).segments.find((s) => s.id === 'turret')!;
+    const flush = buildWheelModel(sig({ cargo: 1, banked: 6.8 })).segments.find((s) => s.id === 'turret')!;
+    expect(broke.costLabel).toBe(`${TURRET.cost}`);
+    expect(flush.costLabel).toBe(`${TURRET.cost}`);
+    expect(segmentCostPaint(broke)).toBe('refused');
+    expect(segmentCostPaint(flush)).toBe('ore');
+    // ...and the hub still prints the spendable total, which is where "how much
+    // you have" belongs and why the denominator was redundant.
+    expect(buildWheelModel(sig({ cargo: 1, banked: 6.8 })).ore).toBe(7);
+  });
+
+  it('puts NO SLASH in any cost label, in any state — the denominator cannot creep back', () => {
+    // Small, and the one that stops a future pass quietly re-attaching the wallet
+    // to the price. Every wedge, over a spread of frames that between them hit
+    // ready / unaffordable / capped / inactive.
+    const frames: Partial<BuildWheelSignals>[] = [
+      {},
+      { cargo: 2 },
+      { banked: 99 },
+      { banked: 99, turrets: TURRET.capPerStation, shields: SHIELD.capPerStation, satellites: 1 },
+      { banked: 99, coreHp: 40, repairGate: REPAIR_COOLDOWN_SECONDS },
+      { banked: 99, coreHp: 40, collapsed: true },
+    ];
+    for (const frame of frames) {
+      for (const seg of buildWheelModel(sig(frame)).segments) {
+        expect(seg.costLabel ?? '', `${seg.id} @ ${JSON.stringify(frame)}`).not.toContain('/');
+      }
+    }
   });
 
   it('says FULL where there is no price left to quote (at the cap)', () => {
@@ -217,6 +267,8 @@ describe('the cost line — `cost/held`, a string (u7-02)', () => {
     expect(turret?.costLabel).toBe('FULL');
     // ...and the numeric cost underneath it is untouched — the label is a label.
     expect(turret?.cost).toBe(TURRET.cost);
+    // FULL is steel, never red: "you are poor" is not the reason (style-guide §2.1).
+    expect(segmentCostPaint(turret!)).toBe('spent');
   });
 
   it('gives UPGRADE SHIP no cost line at all — it opens a screen (GDD §2.5)', () => {
@@ -227,8 +279,8 @@ describe('the cost line — `cost/held`, a string (u7-02)', () => {
   });
 
   it('keeps the cost line a STRING, so the numeric guarantee survives it', () => {
-    // The whole reason `cost/held` is not two numbers: `segmentCostLabel` returns a
-    // string, so no rate, stat or wallet total can ever occupy a numeric field.
+    // A string because `FULL` shares the slot — and so no rate, stat or wallet
+    // total can ever occupy a numeric field.
     expect(typeof segmentCostLabel('turret', sig({ banked: 4 }))).toBe('string');
   });
 });

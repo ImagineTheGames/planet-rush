@@ -51,15 +51,24 @@
  *
  *   TURRET            ← the words        (label)
  *   YOUR STATION      ← what it spends on (target)
- *   3/4               ← cost over spendable ore  ({@link WheelSegment.costLabel})
- *   2 / 4 BUILT       ← the count and its cap    ({@link WheelSegment.capLabel})
+ *   3                 ← the cost, and only the cost ({@link WheelSegment.costLabel})
+ *   2 / 4 BUILT       ← the count and its cap      ({@link WheelSegment.capLabel})
  *
- * Both of the new lines are **strings**, never numbers, and that is deliberate
- * rather than incidental: the guarantee this file exists to keep is that a
- * segment's only *numeric* field is `cost` (build-wheel.test.ts asserts the
- * numeric keys are exactly `['angle', 'cost']`), which is what stops a rate or a
- * stat leaking onto the wheel. `cost/held` and `2 / 4 BUILT` ship the design's
- * pixels through the same door the RADAR count already used.
+ * **The cost line is one number (a0-03, ratified 2026-08-07).** It briefly read
+ * `cost/held` — `3/4` — and the developer retracted their own amendment with a
+ * screenshot of the live wheel: *"i was wrong about this we don't need to show
+ * ore need as 5/2 .. just need the needed amount in yellow, and red if
+ * insufficient..."* The colour carries what the denominator was carrying: signal
+ * yellow when the cost is payable, threat red when it is not
+ * ({@link ./wheel-stack.costPaintFor}), which is a rule this module already had.
+ * The count line is a DIFFERENT amendment and is untouched — `4 / 4 BUILT` stays.
+ *
+ * The count line is a **string**, never a number, and that is deliberate rather
+ * than incidental: the guarantee this file exists to keep is that a segment's
+ * only *numeric* field is `cost` (build-wheel.test.ts asserts the numeric keys
+ * are exactly `['angle', 'cost']`), which is what stops a rate or a stat leaking
+ * onto the wheel. `2 / 4 BUILT` ships the design's pixels through the same door
+ * the RADAR count already used.
  */
 
 import type { BuildItem } from '@shared/types';
@@ -363,22 +372,24 @@ export interface WheelSegment {
    */
   readonly capLabelCompact: string | null;
   /**
-   * The cost line as the design draws it: **`cost/held`** — what the thing costs
-   * over what the player can actually spend (`"3/4"`, `"5/4"`), or `"FULL"` on a
+   * The cost line: **the cost, one number** (`"3"`, `"5"`), or `"FULL"` on a
    * capped segment, where there is no price to quote because there is nothing to
    * buy. `null` on UPGRADE SHIP, which opens a screen instead of spending.
    *
-   * A **string**, and that is the load-bearing part. The design shows two numbers
-   * here; a second numeric field on a segment would break the guarantee that a
-   * segment's only number is its cost — the guarantee that keeps rates and stats
-   * off the wheel. So the pair ships as one label, the same trick
-   * {@link capLabel} uses, and {@link cost} stays the single numeric truth
-   * underneath it.
+   * **Whether the player can pay it is said in COLOUR, not in a second numeral**
+   * — signal yellow when payable, threat red when not
+   * ({@link ./wheel-stack.costPaintFor}, style-guide §2.1). Ratified 2026-08-07
+   * (a0-03), the developer retracting their own 2026-08-06 amendment: *"we don't
+   * need to show ore need as 5/2 .. just need the needed amount in yellow, and
+   * red if insufficient."* This line briefly read `cost/held` — `3/4` — on the
+   * argument that a player reading `5/4` knows they are one ore short without the
+   * wheel saying so. The colour was already saying so, and how much you hold is
+   * what the hub is for. GDD §2.5's older sentence — *"the only number on a
+   * segment is its cost"* — is true again, character for character.
    *
-   * The second half is not new information: it is the same spendable total the
-   * hub already prints, restated at the point of decision so a player reading
-   * `5/4` knows they are one ore short without the wheel having to say so in
-   * words ("no 'need 2 more' copy, because the numbers already say it").
+   * Still a **string**, so `FULL` can occupy the same slot and so the guarantee
+   * that a segment's only numeric field is {@link cost} survives a label that
+   * sometimes is not a number at all.
    */
   readonly costLabel: string | null;
 }
@@ -479,13 +490,16 @@ export function capBuiltLabelCompact(id: WheelSegmentId, signals: BuildWheelSign
 }
 
 /**
- * The cost line: `cost/held` — `"3/4"` — or `"FULL"` at the cap, where there is
- * nothing left to buy and so no price worth quoting (the design's own copy).
- * `null` where a segment has no price at all (UPGRADE SHIP).
+ * The cost line: **the cost, and nothing else** — `"3"` — or `"FULL"` at the cap,
+ * where there is nothing left to buy and so no price worth quoting (the design's
+ * own copy). `null` where a segment has no price at all (UPGRADE SHIP).
  *
- * `held` is the same spendable total the hub prints ({@link spendableOre},
- * floored to whole ore because costs are whole ore), so the two can never
- * disagree — one is the other, restated where the decision is made.
+ * No denominator. Whether the player can *pay* the cost is carried by the
+ * numeral's colour — yellow payable, red not ({@link ./wheel-stack.costPaintFor},
+ * driven by {@link segmentState}, which mirrors the sim's `spendableOre`) — so
+ * the affordability answer is said once, in the channel the developer ratified
+ * for it on 2026-08-07, and how much ore the player holds stays where it belongs:
+ * the hub ({@link BuildWheelModel.ore}).
  */
 export function segmentCostLabel(
   id: WheelSegmentId,
@@ -495,7 +509,7 @@ export function segmentCostLabel(
   const cost = segmentCost(id);
   if (cost === null) return null;
   if (state === 'capped') return 'FULL';
-  return `${cost}/${Math.floor(spendableOre(signals))}`;
+  return `${cost}`;
 }
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's
