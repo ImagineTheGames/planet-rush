@@ -446,3 +446,51 @@ export function tuningFor(id: PersonalityId): DifficultyTuning {
 export function rosterAt(difficulty: Difficulty): readonly PersonalityId[] {
   return ROSTER.filter((id) => PERSONALITIES[id].difficulty === difficulty);
 }
+
+/**
+ * The names a seated cast wears — **and what a REPEAT looks like** *(a0-06,
+ * 2026-08-07)*.
+ *
+ * The lobby picks characters now, and there are eight slots for seven characters,
+ * only three of which are Hard. A full house therefore needs a repeat and a
+ * balanced 4v4 of Hard bots needs a *fourth* Hard bot that does not exist, so
+ * duplicates are legal (`./harness` `fillEmptySlots`). This function answers the
+ * question that legality raises: two Wardens in one match have to be tellable
+ * apart, and the answer is a **numeral, and only when there is something to
+ * disambiguate**.
+ *
+ *  - One Warden in the cast reads `Warden`, exactly as it always has. The common
+ *    case — every default lobby, every match anyone has played so far — is
+ *    untouched, which is the whole reason the numeral is conditional rather than
+ *    always-on: `Warden 1` alone would be a worse name for no gain.
+ *  - Two or more read `Warden 1`, `Warden 2`, numbered in **slot order**, so the
+ *    numeral matches the roster a player just read top-to-bottom.
+ *
+ * It is deliberately *not* a new livery or a new character. The cast is GDD §2.9
+ * and it is not this file's to extend; and the slot's identity colour and its
+ * `P1`…`P8` decal already tell two Wardens apart on the field (style-guide §3
+ * rule 3) — the numeral is what makes the *name* stop lying, nothing more.
+ *
+ * Indexed by slot: entry `i` is the name for `cast[i]`, and a slot with no
+ * character (a human, a closed seat) stays `null` so the caller's own name for
+ * that slot is left alone.
+ */
+export function castDisplayNames(
+  cast: readonly (PersonalityId | null | undefined)[],
+): (string | null)[] {
+  const counts = new Map<PersonalityId, number>();
+  for (const id of cast) {
+    if (id == null) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  const seen = new Map<PersonalityId, number>();
+  return cast.map((id) => {
+    if (id == null) return null;
+    const name = PERSONALITIES[id]?.name;
+    if (name === undefined) return null;
+    if ((counts.get(id) ?? 0) < 2) return name;
+    const nth = (seen.get(id) ?? 0) + 1;
+    seen.set(id, nth);
+    return `${name} ${nth}`;
+  });
+}

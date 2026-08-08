@@ -206,13 +206,14 @@ import {
   // per-SLOT for the server's seats, DENSE for the world the client builds. Both
   // read the one authored `MatchConfig`, which is what makes an offline TEAMS
   // match and an online one the same match.
+  lobbyRosterCast,
   lobbyRosterTeams,
   lobbyWireTeams,
   startLobbyMatch,
   wireFireMode,
   selectShipClass,
   selectMap,
-  cycleBotDifficulty,
+  cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
   // The lobby's own side ceiling and seat count — read by the debug `?sides=N`
@@ -340,7 +341,8 @@ import codexBots from '../content/codex/codex-bots.json';
 import codexShips from '../content/codex/codex-ships.json';
 import codexSystems from '../content/codex/codex-systems.json';
 import codexStrategy from '../content/codex/codex-strategy.json';
-import { personality } from './bots';
+import { castDisplayNames, personality } from './bots';
+import type { PersonalityId } from './bots';
 import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext, type AudioCue } from './art/audio';
 import { TellQueue, TELL_CAPACITY } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
@@ -889,6 +891,13 @@ async function boot(): Promise<void> {
   // everyone," reproduced offline through the unified lobby. In FFA the table is
   // `[0,1,2,…]`, which is exactly what the world defaulted to, so nothing moves.
   const chosenTeams = chosen.teams;
+  // The cast the lobby authored, in the sim's dense player order (a0-06). THIS is
+  // the offline half of "the host picks the character": without it the roster
+  // reached `fillEmptySlots` with no cast and every match seated the same seven
+  // names in the same seats, which is what the developer saw when they set every
+  // enemy to HARD and met a mixed field. Absent under `?debug=1` (no lobby), where
+  // the roster-order fallback keeps every existing harness on the cast it had.
+  const chosenCast = chosen.cast;
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
@@ -900,6 +909,7 @@ async function boot(): Promise<void> {
       mapId: chosenMapId,
       ...(chosenSize !== undefined ? { slots: chosenSize } : {}),
       ...(chosenTeams !== undefined ? { teams: chosenTeams } : {}),
+      ...(chosenCast !== undefined ? { cast: chosenCast } : {}),
     });
   }
   // Online the match is already running on the server: present the live session as
@@ -952,6 +962,11 @@ async function boot(): Promise<void> {
     world.ships.find(isLocalShip)?.shipClass ?? chosenShipClass,
     chosenMapId,
     world.stations.map((p) => ({ x: p.pos.x, y: p.pos.y })),
+    // …and the cast the match SEATED, by slot (a0-06) — read off the bots the boot
+    // actually constructed, not off the lobby that asked for them. That distinction
+    // is the whole test: the lobby's roster and this list agreeing is the fix, and
+    // they disagreed silently for the life of the feature.
+    matchCast(match),
   );
 
   // --- Renderer. Added to `gameRoot` (not the raw stage) so the world rotates
@@ -1751,8 +1766,18 @@ async function boot(): Promise<void> {
     const table: string[] = [];
     const tiers: (string | undefined)[] = [];
     table[LOCAL_PLAYER] = chosenName;
+    // **The cast is keyed by SLOT, and a repeated character is numbered** (a0-06).
+    // The lobby can seat two Wardens now — eight slots over seven characters, only
+    // three of them Hard — and two nameplates reading `Warden` would be a roster a
+    // player cannot check against the field. `castDisplayNames` numbers a name only
+    // when it actually repeats, so every match anyone has played so far is
+    // unchanged. The table itself was already indexed by slot rather than by
+    // character, so nothing here had to be re-keyed.
+    const cast: (PersonalityId | null)[] = [];
+    for (const bot of match.bots) cast[bot.seat.id] = bot.seat.personality;
+    const names = castDisplayNames(cast);
     for (const bot of match.bots) {
-      table[bot.seat.id] = personality(bot.seat.personality).name;
+      table[bot.seat.id] = names[bot.seat.id] ?? personality(bot.seat.personality).name;
       tiers[bot.seat.id] = bot.difficulty;
     }
     playerNames = table;
@@ -5305,6 +5330,21 @@ type LaunchPlan =
 type ClientMatch = Pick<MatchBoot, 'world' | 'bots' | 'tick' | 'close'>;
 
 /**
+ * The cast a booted match actually seated, indexed by slot — a personality id per
+ * bot, `null` in every slot a person (or nobody) holds (a0-06).
+ *
+ * Read off the constructed bots rather than off the lobby that asked for them,
+ * which is the only reading worth testing: for the whole life of the feature the
+ * lobby said one thing and this said another, and nothing compared them.
+ */
+function matchCast(match: ClientMatch): (string | null)[] {
+  const cast: (string | null)[] = [];
+  for (const bot of match.bots) cast[bot.seat.id] = bot.seat.personality;
+  for (let i = 0; i < cast.length; i++) if (cast[i] === undefined) cast[i] = null;
+  return cast;
+}
+
+/**
  * Present an open {@link OnlineSession} as a {@link ClientMatch}. The predicted
  * world is already built (the caller waited for `matchStart`), and it is a stable
  * object mutated in place by prediction + reconciliation (`src/net/prediction`),
@@ -7036,6 +7076,19 @@ interface LobbyChoice {
    * in TEAMS, where it is the whole feature (m10 teams-wire).
    */
   readonly teams?: readonly number[];
+  /**
+   * **The cast the host picked**, indexed by the same dense player id `teams` is
+   * (a0-06; GDD §2.1 amended 2026-08-07 — the host picks each bot's character and
+   * its difficulty is shown).
+   *
+   * This is the field whose absence was the bug. The lobby resolved a character
+   * per seat and drew it on the roster; nothing carried it to `bootOfflineMatch`,
+   * which called `fillEmptySlots` with no cast at all, so the round-robin ran over
+   * the whole mixed roster and the match was Rusty, Bolt, Foreman, Patch, Sable,
+   * Vulture, Warden in seat order whatever the host had chosen. Entry `i` is
+   * `null` for a seat with a person in it.
+   */
+  readonly cast?: readonly (PersonalityId | null)[];
 }
 
 /**
@@ -7073,13 +7126,16 @@ interface LobbyHandle {
    *    guest never counted at all and simply waits on the roster.
    */
   untilRush(): Promise<LobbyChoice>;
-  /** Report what the built world actually made: the hull the local ship flies and
-   *  the arena's home-station positions — the proof both picks reached the sim
-   *  (drives `window.__lobby.localShipClass` / `.worldMapId` / `.worldStations`). */
+  /** Report what the built world actually made: the hull the local ship flies, the
+   *  arena's home-station positions, and — since a0-06 — **the cast it seated** —
+   *  the proof every lobby pick reached the sim (drives
+   *  `window.__lobby.localShipClass` / `.worldMapId` / `.worldStations` /
+   *  `.worldCast`). */
   matchStarted(
     worldShipClass: ShipClass,
     worldMapId: string,
     worldStations: readonly { x: number; y: number }[],
+    worldCast: readonly (string | null)[],
   ): void;
 }
 
@@ -7183,6 +7239,32 @@ interface LobbySeam {
   /** The hull the built world gave the local ship, or null until the match boots
    *  — the debug hook that proves the pick reached the sim (GDD §2.11). */
   localShipClass: ShipClass | null;
+  /**
+   * **The cast the roster is showing**, by slot — a personality id on a bot row,
+   * `null` on a human or closed one (a0-06). Read-only: the live-stage suite taps
+   * a row for real and reads what the row now says.
+   */
+  seatCharacters: readonly (string | null)[];
+  /** Each roster row's physical centre, so a live-stage run can tap the row BODY
+   *  the way a player does and watch the character change. */
+  seatControls: readonly { index: number; physicalCenter: { x: number; y: number } }[];
+  /** Each row's `?` control — its logical rect and the physical point a real press
+   *  must land on. Zero-extent rows are omitted, so a suite can also assert the
+   *  control was actually drawn at the width it was tapped at. */
+  seatHelpControls: readonly {
+    index: number;
+    logical: Rect;
+    physicalCenter: { x: number; y: number };
+  }[];
+  /**
+   * **The cast the booted match actually seated**, by slot — the other half of the
+   * assertion, and the one that would have caught this bug (LESSONS §1: the class
+   * of failure where the selection never arrived). Null until the match boots.
+   *
+   * The lobby's `seatCharacters` and this agreeing is the whole fix: two pictures
+   * of the same cast, one before RUSH! and one after.
+   */
+  worldCast: readonly (string | null)[] | null;
   /** The title of the codex hint (hull description / bot dossier) currently shown,
    *  or null when none is up — readback proof the lobby reuse (GDD §2.10 point 2)
    *  fires on hover / long-press. */
@@ -7331,6 +7413,10 @@ function openLobby(
     modeControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
+    seatCharacters: [],
+    seatControls: [],
+    seatHelpControls: [],
+    worldCast: null,
     hintTitle: null,
     classControls: [],
     selectClass: (index: number): void => selectClassAt(index),
@@ -7379,6 +7465,37 @@ function openLobby(
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
     seam.seatRows = layout.seats.map((r) => ({ ...r }));
+    // The cast the roster is showing, and the two controls a live-stage run drives
+    // to change or explain it (a0-06). Read off the same `state` the view drew, so
+    // the seam cannot report a character the screen is not showing.
+    seam.seatCharacters = state.seats.map((s) => s.personality);
+    seam.seatControls = layout.seats.map((r, i) => {
+      // The row BODY's midpoint — after the leading state control, before the
+      // leftmost trailing chip. That is the strip the name is drawn in, and the
+      // point a player's tap on a name actually lands on; taking the row's own
+      // centre would land on a chip on a narrow row and drive the wrong control.
+      const stateRect = layout.seatStates[i];
+      const left = stateRect && stateRect.width > 0 ? stateRect.x + stateRect.width : r.x;
+      const teamChip = layout.seatTeamChips[i];
+      const tierChip = layout.seatChips[i];
+      const right =
+        teamChip && teamChip.width > 0
+          ? teamChip.x
+          : tierChip && tierChip.width > 0
+            ? tierChip.x
+            : r.x + r.width;
+      return {
+        index: i,
+        physicalCenter: ctx.toPhysical((left + right) / 2, r.y + r.height / 2),
+      };
+    });
+    seam.seatHelpControls = layout.seatHelp
+      .map((r, i) => ({
+        index: i,
+        logical: { ...r },
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+      }))
+      .filter((c) => c.logical.width > 0);
     // The per-row STATE controls, exactly as drawn (u5): the word, the live/dead
     // look, the rect and the physical press point. Built from the SAME layout the
     // view drew from and the SAME model row it drew the word from, so the seam
@@ -7453,6 +7570,22 @@ function openLobby(
 
   // --- Codex reuse (GDD §2.10 point 2): the hint under the pointer ------------
 
+  /**
+   * The seat whose dossier is **pinned open by a `?` tap** (a0-06), or null.
+   *
+   * A hovered hint is transient — it follows the pointer and dies with it. A
+   * tapped one is not: it has to survive until the player dismisses it, which on a
+   * phone is the only kind there is. Holding the seat rather than a boolean is
+   * what makes the `?` a toggle: a second tap on the *same* `?` closes it, and a
+   * tap on a different row's opens that one instead.
+   */
+  let pinnedHintSeat: number | null = null;
+  /** What was pinned when the current press went DOWN. The down handler dismisses
+   *  any open hint (tap-away is the dismissal, `pause-menu`'s grammar), so the tap
+   *  that lands after it needs the pre-press value to tell "the player pressed the
+   *  same `?` again" from "the player pressed a fresh one". */
+  let pinnedAtPress: number | null = null;
+
   /** The codex hint for the lobby row at `(x, y)`, plus the logical point to
    *  anchor its tooltip at — a hull description for a class tile, a bot dossier for
    *  a cast bot seat, or null for anything else (an empty seat, your own row, the
@@ -7472,15 +7605,55 @@ function openLobby(
       if (!hint || !rect) return null;
       return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
     }
-    if (hit.kind === 'seat') {
-      const seat = state.seats.find((s) => s.player === hit.index);
-      const rect = layout.seats[hit.index];
-      if (!seat || seat.occupant === 'human' || !seat.personality || !rect) return null;
-      const hint = codexBotHint(CODEX_DATA, seat.personality);
-      if (!hint) return null;
-      return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
+    // A bot row — from its body, its trailing `?`, or any other segment of it. All
+    // of them are "the pointer is over this seat", which is what a hover means.
+    if (hit.kind === 'seat' || hit.kind === 'seatHelp' || hit.kind === 'seatState' || hit.kind === 'seatTeamChip') {
+      return seatHint(hit.index, layout);
     }
     return null;
+  }
+
+  /** The codex dossier for one roster row, anchored above it — null on a row with
+   *  no character to write one about (yours, a joiner's, a closed seat). */
+  function seatHint(
+    index: number,
+    layout: ReturnType<typeof lobbyLayout>,
+  ): { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number } | null {
+    const seat = state.seats.find((s) => s.player === index);
+    const rect = layout.seats[index];
+    if (!seat || seat.occupant === 'human' || !seat.personality || !rect) return null;
+    const hint = codexBotHint(CODEX_DATA, seat.personality);
+    if (!hint) return null;
+    return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
+  }
+
+  /**
+   * The row's `?` control (a0-06) — **tap to open, tap again or tap away to
+   * dismiss.**
+   *
+   * This is the affordance half of a feature that already had its content. The
+   * dossier has been reachable since c1, on a desktop *hover* and a touch
+   * *long-press*, and nothing on the row said so; a hover is not an affordance and
+   * a hover-only feature is a desktop-only one, which the ratified input-parity
+   * principle does not allow (GDD §2.4). A tap works identically on a trackpad, a
+   * pad-less desktop and a phone, so this is the same content behind a control
+   * every device can reach.
+   *
+   * It **toggles**, and dismissal is a tap anywhere else (the pointer-down handler
+   * hides the hint before it acts). That is the ratified dismissal grammar the
+   * minimap overlay already keeps — press away to close — rather than a second one
+   * a player has to learn per overlay.
+   */
+  function toggleSeatHint(index: number): void {
+    if (pinnedAtPress === index) {
+      hideHint();
+      return;
+    }
+    const { w, h } = ctx.logicalSize();
+    const resolved = seatHint(index, lobbyLayout({ width: w, height: h }, { isTouch }));
+    if (!resolved) return;
+    pinnedHintSeat = index;
+    showHint(resolved);
   }
 
   function showHint(resolved: { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number }): void {
@@ -7490,6 +7663,7 @@ function openLobby(
   }
 
   function hideHint(): void {
+    pinnedHintSeat = null;
     hintView.hide();
     seam.hintTitle = null;
   }
@@ -7641,6 +7815,10 @@ function openLobby(
       // world is the server's, built from the sides the same lobby already sent it
       // (`sendChoice`), and `matchStart` hands them back for the predicted world.
       teams: lobbyRosterTeams(state),
+      // The cast the host authored, in the sim's dense player order — the seam
+      // this whole report turned on (a0-06). Online this is ignored for the same
+      // reason `teams` is: the world is the server's.
+      cast: lobbyRosterCast(state),
     };
     teardown();
     seam.visible = false;
@@ -7673,32 +7851,47 @@ function openLobby(
       case 'map':
         selectMapAt(hit.index);
         break;
-      case 'seat':
-      case 'seatState':
-        // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E) — the
-        // host shrinks or shapes the match here. Reached from the row BODY, where
-        // it has always lived, and from the row's LEADING STATE control, the drawn
-        // and labelled button u5 added because nothing on this screen said a slot
-        // could be closed at all. One case, so the two can never diverge. Persist the
-        // resulting size so a returning host reopens on the same count, and tell the
-        // room: closing a seat changes which bots it will cast, and the cast list
-        // rides the host's own `lobbyChoice`.
+      case 'seat': {
+        // **The row BODY cycles the seat's CHARACTER** (a0-06) — the tap that lands
+        // on a name changes the name. A CLOSED row has no character to cycle and
+        // still re-opens on a body tap, which is the same rule stated once: the body
+        // edits whatever the row is showing.
+        //
         // A guest's tap returns the identical state — so the sound is the same
         // refusal the host's tap is a detent (s6-01, rule 2). One helper for all
-        // five slot-editor cycles below, so they can never disagree.
+        // the slot-editor cycles here, so they can never disagree.
+        const seat = state.seats[hit.index];
+        if (seat && seat.occupant === 'closed') {
+          state = stepped(state, cycleSeatState(state, hit.index));
+          platform.storage.set(MATCH_SIZE_KEY, String(matchSizeOf(state)));
+        } else {
+          state = stepped(state, cycleSeatCharacter(state, hit.index));
+        }
+        // Online the room is told in empty-seat order: the wire carries the tier the
+        // chosen character flies at (`botDifficulties`), which is as much of the
+        // pick as the ratified protocol has a field for.
+        sendChoice();
+        render();
+        break;
+      }
+      case 'seatState':
+        // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E) — the
+        // host shrinks or shapes the match here, through the drawn and labelled
+        // button u5 added because nothing on this screen said a slot could be closed
+        // at all. Persist the resulting size so a returning host reopens on the same
+        // count, and tell the room: closing a seat changes which bots it will cast.
         state = stepped(state, cycleSeatState(state, hit.index));
         platform.storage.set(MATCH_SIZE_KEY, String(matchSizeOf(state)));
         sendChoice();
         render();
         break;
-      case 'seatChip':
-        // The trailing DIFFICULTY chip — the bot-tier cycle, in BOTH modes (n2):
-        // the shared slot-editor control, so a bot's tier is reachable in TEAMS
-        // exactly as in FFA (the TEAMS lobby had lost it when the side control took
-        // the only chip). Online the room is told, in empty-seat order.
-        state = stepped(state, cycleBotDifficulty(state, hit.index));
-        sendChoice();
-        render();
+      case 'seatHelp':
+        // The row's trailing `?` — the codex dossier for this seat's character
+        // (a0-06; the developer asked for it by name). A **tap**, on every device,
+        // because a hover-only tooltip is a desktop-only feature and the parity
+        // principle has no cell for one (GDD §2.4). It changes no lobby state, so
+        // nothing is stepped, persisted or sent — it opens (or closes) an overlay.
+        toggleSeatHint(hit.index);
         break;
       case 'seatTeamChip':
         // The TEAM chip — the side cycle, composed alongside the difficulty chip in
@@ -7750,6 +7943,10 @@ function openLobby(
     // Un-rotate the physical tap into the logical space the lobby is drawn in
     // (landscape lock), then test it against the same geometry the view drew.
     const { x, y } = ctx.toLogical(e.clientX, e.clientY);
+    // **Tap away dismisses** (a0-06): any press, anywhere, closes an open dossier
+    // before it does anything else — including a press on the `?` that opened it,
+    // which is why the pre-press pin is remembered for `toggleSeatHint` to read.
+    pinnedAtPress = pinnedHintSeat;
     hideHint();
     press = { x, y, moved: false, hold: false, timer: null };
     // Arm the long-press dossier: after a held moment on a hull tile or bot seat,
@@ -7788,6 +7985,11 @@ function openLobby(
       hovered = key;
       if (key !== null && e.pointerType !== 'touch') ctx.cue('hover');
     }
+    // A PINNED dossier owns the overlay (a0-06): while one is open, hover neither
+    // replaces it nor closes it, so the desktop and the phone behave identically
+    // and the only thing that dismisses a tapped hint is a tap. Nothing is pinned
+    // in the hover-only flow this line has always served, so that path is unchanged.
+    if (pinnedHintSeat !== null) return;
     const resolved = resolveHint(x, y);
     if (resolved) showHint(resolved);
     else hideHint();
@@ -7891,10 +8093,14 @@ function openLobby(
       worldShipClass: ShipClass,
       worldMapId: string,
       worldStations: readonly { x: number; y: number }[],
+      worldCast: readonly (string | null)[],
     ): void => {
       seam.localShipClass = worldShipClass;
       seam.worldMapId = worldMapId;
       seam.worldStations = worldStations.map((p) => ({ x: p.x, y: p.y }));
+      // The cast the match really seated (a0-06) — the readback that turns "the
+      // roster showed Warden" into "the match contains Warden".
+      seam.worldCast = worldCast.map((c) => c);
     },
   };
 }

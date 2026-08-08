@@ -55,26 +55,50 @@
  * WHAT THE EMPTY SEATS SHOW
  * ---------------------------------------------------------------------------
  * "Empty slots are filled by AI bots; before the match, the host picks each
- * bot's difficulty" (GDD §2.1) — and the bots are "characters, not difficulty
- * labels" (GDD §2.9). So an unclaimed seat does not read as a hole: it previews
- * the character who will fly it, at the difficulty the host has set, and is
- * marked OPEN for as long as somebody can still take it by room code.
+ * bot's **character**, and its difficulty is shown" (GDD §2.1, amended
+ * 2026-08-07) — because the bots are "characters, not difficulty labels" (GDD
+ * §2.9) and that stopped being an aspiration and became the literal interface. So
+ * an unclaimed seat does not read as a hole: it names the character who will fly
+ * it, states that character's tier beside the name as information, offers a `?`
+ * to its codex dossier, and is marked OPEN for as long as somebody can still take
+ * it by room code.
  *
- * That preview is computed with the *server's* rule, not a prettier one of our
- * own ({@link castForEmptySeat} mirrors `server/room.ts` `castFor`): the host's
- * difficulty list is honoured seat by seat, in **empty-seat order**, and
- * whatever it does not name falls back to roster order. A lobby nobody touches
- * therefore previews the whole seven-character cast, one of each — see
- * {@link defaultDifficultyForEmptySeat} — and a lobby the host does touch shows
- * exactly who the room will seat, repeats included. Showing the truth beats
- * showing a nicer roster than the match will actually have.
+ * ---------------------------------------------------------------------------
+ * ONE CONTROL, SO THERE IS NOTHING LEFT TO DISAGREE WITH IT (a0-06)
+ * ---------------------------------------------------------------------------
+ * This screen used to carry a per-seat **difficulty** and resolve a character
+ * from it. Two things were wrong with that, and the second is the one that got
+ * reported. It was hard to reason about — *"this bot personality thing makes no
+ * sense … its difficult to understand and difficult to balance a team with it"* —
+ * and the resolved character never actually reached the match, so the developer
+ * saw *"i chose HARD for all enemies but they were at other difficulties than i
+ * selected."*
+ *
+ * The seat stores a {@link LobbySeat.character} now and the tier is *read off it*
+ * ({@link seatDifficulty}). That is not the same fix as carrying a difficulty
+ * through properly: it **deletes the possibility of a mismatch**, because there
+ * is no longer a second control that can hold a different opinion from the cast.
+ * The character then travels — {@link lobbyRosterCast} → `MatchBootConfig.cast` →
+ * `fillEmptySlots` — which is the half that was missing entirely.
+ *
+ * A lobby nobody touches still opens on the whole seven-character cast, one of
+ * each, at each character's own tier ({@link defaultCharacterForEmptySeat}), so
+ * the default roster is exactly the one this screen has always previewed.
+ * **Repeats are allowed** — eight slots, seven characters, three of them Hard, so
+ * a full house needs one and a balanced 4v4 of Hard bots needs a fourth Hard bot
+ * that does not exist — and a repeated character is numbered in the name
+ * (`Warden 1` / `Warden 2`, `../bots` `castDisplayNames`) rather than forbidden.
+ *
+ * {@link castForEmptySeat} survives for the wire alone: a `lobbyState` broadcast
+ * carries a bot's tier and no character, so a seat the *server* re-tiered still
+ * has to resolve to the name `server/room.ts` `castFor` will really seat.
  */
 
 import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
 import { BONE, MATERIAL_SHADES } from '../art/materials';
-import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, rosterAt } from '../bots';
+import { Difficulty, MATCH_SLOTS, PERSONALITIES, ROSTER, castDisplayNames, rosterAt } from '../bots';
 import type { PersonalityId } from '../bots';
 import type { BotDifficulty, LobbySlot, RoomCode } from '../net/transport';
 import { seatPing } from '../net/ping';
@@ -128,17 +152,39 @@ export const LOBBY_EYEBROW = 'CLAIM';
 export const RUSH_COUNTDOWN_SECONDS = 5;
 
 /** The words a difficulty is shown as. The tier is named in full on the row —
- *  a bot is a character *and* a competence level, and the host is picking the
- *  second one (GDD §2.1, §2.9). */
+ *  and since a0-06 it is **shown, not chosen** (GDD §2.1 amended 2026-08-07): the
+ *  host picks the character, and this word is what the character's tier reads as
+ *  ({@link seatDifficulty}). */
 export const DIFFICULTY_LABELS: Readonly<Record<BotDifficulty, string>> = {
   easy: 'EASY',
   medium: 'MEDIUM',
   hard: 'HARD',
 };
 
-/** Cycle order for the host's per-seat difficulty tap. Easiest first, so the
- *  host walks *up* the ladder rather than down into Hard by accident. */
-export const DIFFICULTY_CYCLE: readonly BotDifficulty[] = ['easy', 'medium', 'hard'];
+/**
+ * Cycle order for the host's per-seat **character** tap — the whole roster, in
+ * GDD §2.9's own order, which is also tier order: Rusty and Bolt (Easy), Foreman
+ * and Patch (Medium), Sable, Vulture and Warden (Hard).
+ *
+ * It replaces the three-rung difficulty cycle this constant's neighbour used to
+ * be, and the gesture is identical — *"cycling seven names is the same gesture as
+ * cycling three tiers"* (a0-06). Walking the roster in this order means the tap
+ * still walks *up* the ladder rather than down into Hard by accident, so the one
+ * thing the old cycle got right is kept.
+ */
+export const CHARACTER_CYCLE: readonly PersonalityId[] = ROSTER;
+
+/**
+ * The glyph on a roster row's codex control (a0-06 — the developer asked for
+ * *"a ? question mark icon"*). A bare ASCII `?`: it is one character wide at any
+ * type size, it needs no icon asset, and it is the same mark every interface a
+ * player has ever used puts on "explain this."
+ *
+ * It lives here rather than in the view for the reason every other lobby string
+ * does — the copy sweep reads the models, and a string typed into a draw call is
+ * a string nobody can find (`docs/copy-sweep-industrial-voice.md`).
+ */
+export const SEAT_HELP_GLYPH = '?';
 
 // ---------------------------------------------------------------------------
 // Variable matches (docs/variable-slots-plan.md, Milestone E) — the lobby as a
@@ -715,10 +761,21 @@ export interface LobbySeat {
   readonly occupant: SeatOccupant;
   /** The hull this seat flies. Locked for the match at RUSH! (GDD §2.11). */
   readonly shipClass: ShipClass;
-  /** The tier this seat's bot flies at — meaningless on a human seat, and kept
-   *  anyway, so a seat that empties again shows the difficulty it had. */
-  readonly difficulty: BotDifficulty;
-  /** The character previewed (or seated) here, or `null` on a human/closed seat. */
+  /**
+   * **The character the host chose for this seat** — the one per-seat bot control
+   * there is (a0-06, 2026-08-07), replacing the `difficulty` field that used to
+   * live here.
+   *
+   * It is kept on *every* seat, meaningless as it is on a human or a closed one,
+   * for exactly the reason the tier was: a seat that empties again shows the
+   * character it had rather than snapping back to roster order. The tier is no
+   * longer stored beside it — it is read off the character
+   * ({@link seatDifficulty}), which is what makes a lobby where the two disagree
+   * unrepresentable rather than merely unlikely.
+   */
+  readonly character: PersonalityId;
+  /** The character previewed (or seated) here, or `null` on a human/closed seat —
+   *  {@link character} gated by {@link isBotSeat}. Derived, never authored. */
   readonly personality: PersonalityId | null;
   /** The side this slot fights for in TEAMS (variable-slots Milestone E). FFA
    *  ignores it (teams-of-one, `team === slot`); TEAMS shares one value across
@@ -855,7 +912,13 @@ export function createLobby(options: LobbyOptions): LobbyState {
       player,
       occupant,
       shipClass: player === you ? shipClass : DEFAULT_SHIP_CLASS,
-      difficulty: human || closed ? 'medium' : defaultDifficultyForEmptySeat(emptyIndex++),
+      // Roster order, one of each: a lobby nobody touches opens on the whole
+      // seven-character cast at each character's own tier, which is what it has
+      // always previewed — the default is unchanged, only its authority is (the
+      // character is the stored value now, and the tier is read off it).
+      // A CLOSED seat consumes an index too, so re-opening one hands it the
+      // character it would have had all along rather than a repeat of seat 1's.
+      character: defaultCharacterForEmptySeat(human ? 0 : emptyIndex++),
       personality: null,
       team: defaultTeamForSlot(player),
       // Nobody has been measured yet — and offline nobody ever will be.
@@ -892,25 +955,32 @@ function clampSize(size: number | undefined, count: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * The difficulty an untouched empty seat starts at: **the tier of the character
- * who sits there in roster order**. Rusty and Bolt are Easy, Foreman and Patch
- * Medium, Sable, Vulture and Warden Hard (GDD §2.9), so a lobby nobody touches
- * previews the whole cast, one of each, at each character's own tier — a full
- * house of seven distinct rivals rather than seven copies of one Medium bot.
+ * The character an untouched empty seat starts on: **roster order, one of each**
+ * (GDD §2.9). Rusty, Bolt, Foreman, Patch, Sable, Vulture, Warden — so a lobby
+ * nobody touches opens on the whole seven-character cast, each at its own tier,
+ * which is exactly what it previewed before the host had a character control.
+ *
+ * It replaces {@link defaultDifficultyForEmptySeat}: the default is now stated in
+ * the units the host actually edits, and the tier follows from it rather than the
+ * other way round.
  */
-export function defaultDifficultyForEmptySeat(emptyIndex: number): BotDifficulty {
-  const id = ROSTER[emptyIndex % ROSTER.length];
-  return id ? (PERSONALITIES[id].difficulty as BotDifficulty) : 'medium';
+export function defaultCharacterForEmptySeat(emptyIndex: number): PersonalityId {
+  const at = Math.max(0, Math.floor(emptyIndex)) % ROSTER.length;
+  return ROSTER[at] as PersonalityId;
 }
 
 /**
- * The character the room will seat in the nth **empty** seat, given the
- * difficulty the host set for it.
+ * The character a *tier* resolves to in the nth empty seat.
  *
- * Mirrors `server/room.ts` `castFor` deliberately, including its modulo: the
- * lobby's job is to show what will happen, so when the host sets four seats to
- * Hard and the Hard tier has three characters, the fourth row must show the
- * repeat the server is going to seat rather than a name it invented.
+ * This used to be the lobby's whole cast rule — the host set a difficulty and
+ * this picked a character to show for it. **It is no longer how a local lobby is
+ * authored** (the host picks the character; see {@link cycleSeatCharacter}), and
+ * it survives for one job: folding an authoritative `lobbyState` broadcast in
+ * ({@link applyLobbySlots}). The wire carries a bot's *tier* and no character
+ * (`../net/transport` `LobbySlot.botDifficulty`), so a remote seat the server has
+ * re-tiered still has to be turned into a name, and it must be the same name the
+ * server will seat — `server/room.ts` `castFor`, modulo and all, which is why the
+ * repeat is reproduced rather than a nicer roster invented.
  */
 export function castForEmptySeat(emptyIndex: number, difficulty: BotDifficulty): PersonalityId {
   const tier = rosterAt(difficulty as Difficulty);
@@ -919,21 +989,37 @@ export function castForEmptySeat(emptyIndex: number, difficulty: BotDifficulty):
   return ROSTER[emptyIndex % ROSTER.length] as PersonalityId;
 }
 
-/** Recompute every non-human seat's previewed character from its difficulty and
- *  its position in empty-seat order. Called after anything that moves either. */
+/** The tier a seat's bot flies at — **read off its character, never stored beside
+ *  it** (a0-06). This is the whole shape of the fix in one function: there is no
+ *  second value that can disagree with the cast, so the class of bug the developer
+ *  reported ("i chose HARD … they were at other difficulties") is not merely fixed
+ *  but unrepresentable. Null on a seat with no bot in it. */
+export function seatDifficulty(seat: LobbySeat): BotDifficulty | null {
+  if (!isBotSeat(seat.occupant)) return null;
+  return PERSONALITIES[seat.character].difficulty as BotDifficulty;
+}
+
+/**
+ * Republish every seat's derived fields from its authored {@link LobbySeat.character}:
+ * the previewed `personality` (null where no bot flies) and the hull that
+ * character brings (style-guide §4 — the livery is a palette swap over one of the
+ * four silhouettes, so the roster shows the hull it will really fly).
+ *
+ * It **no longer re-picks the character**. That is the change: this function used
+ * to recompute the cast from each seat's difficulty on every state transition, so
+ * a host's pick could not have survived even if there had been one to make. Now
+ * it only projects what the host authored, which is why a repeat stays a repeat
+ * and closing the seat above one does not shuffle the rest of the roster.
+ */
 function withCast(state: LobbyState): LobbyState {
-  let emptyIndex = 0;
   const seats = state.seats.map((seat) => {
     // A human sits in their seat, a closed seat holds nobody: neither previews a
-    // bot, and a closed seat must not consume an empty-seat cast index (it is not
-    // a seat the room will ever cast into).
-    if (seat.occupant === 'human' || seat.occupant === 'closed') {
+    // bot. The seat KEEPS its character through both, so a seat that empties
+    // again comes back as the character the host chose for it.
+    if (!isBotSeat(seat.occupant)) {
       return seat.personality === null ? seat : { ...seat, personality: null };
     }
-    const personality = castForEmptySeat(emptyIndex++, seat.difficulty);
-    // A bot the server has actually seated flies its character's hull
-    // (style-guide §4: the livery is a palette swap over one of four
-    // silhouettes), so the roster shows the hull it will really fly.
+    const personality = seat.character;
     const shipClass = PERSONALITIES[personality].shipClass;
     return seat.personality === personality && seat.shipClass === shipClass
       ? seat
@@ -1017,11 +1103,22 @@ export function nameFor(state: LobbyState, slot: PlayerId): string {
   const seat = state.seats.find((s) => s.player === slot);
   if (!seat) return `P${Math.floor(slot) + 1}`;
   if (seat.occupant !== 'human') {
-    const character = seat.personality ? PERSONALITIES[seat.personality] : null;
-    return character?.name ?? `P${slot + 1}`;
+    // A REPEATED character is numbered, and only when repeated (a0-06;
+    // `../bots` `castDisplayNames`). The cast may hold two Wardens now — a full
+    // house has eight slots for seven characters — and two rows reading `Warden`
+    // is a roster the host cannot check their own work against.
+    return castNames(state)[slot] ?? `P${slot + 1}`;
   }
   if (seat.player === state.you) return state.name;
   return `PLAYER ${seat.player + 1}`;
+}
+
+/** The whole roster's bot names in slot order, numbered where a character repeats
+ *  — one pass, so every row is numbered against the same cast. */
+function castNames(state: LobbyState): (string | null)[] {
+  const cast: (PersonalityId | null)[] = [];
+  for (const seat of state.seats) cast[seat.player] = seat.personality;
+  return castDisplayNames(cast);
 }
 
 /**
@@ -1044,21 +1141,34 @@ export function hostControls(state: LobbyState): boolean {
 }
 
 /**
- * Cycle one seat's bot difficulty (the host's tap on a roster row). A no-op from
- * a guest, on a human seat, or after the countdown has started — the same three
- * refusals the server applies to `lobbyChoice.botDifficulties`.
+ * Cycle one seat's **character** — the host's tap on a roster row (a0-06;
+ * developer, 2026-08-07: *"for bots we are able to select their personality
+ * instead of EASY/MEDIUM/HARD"*).
+ *
+ * It is the same gesture, the same three refusals and the same seat predicate the
+ * difficulty tap had — a guest, a human seat, and a lobby past RUSH! are all
+ * no-ops, and the identity of the returned state is what the flow sounds a
+ * refusal off. What changed is what it walks: {@link CHARACTER_CYCLE}, seven
+ * names instead of three tiers. **Repeats are reachable and that is the point** —
+ * the ring has no memory of what other seats hold, so a host can seat four
+ * Wardens for the balanced 4v4 that four Hard characters could not otherwise
+ * make (GDD §2.9 has three).
+ *
+ * The tier follows the name automatically ({@link seatDifficulty}), so there is
+ * no second control left to disagree with the cast.
  */
-export function cycleBotDifficulty(state: LobbyState, player: PlayerId): LobbyState {
+export function cycleSeatCharacter(state: LobbyState, player: PlayerId): LobbyState {
   if (!hostControls(state)) return state;
   const seat = state.seats[player];
-  // Only a bot-bearing seat has a difficulty: a human flies their own hull, a
-  // closed seat holds nobody.
+  // Only a bot-bearing seat has a character to cycle: a human flies their own
+  // hull, a closed seat holds nobody.
   if (!seat || !isBotSeat(seat.occupant)) return state;
-  const at = DIFFICULTY_CYCLE.indexOf(seat.difficulty);
-  const next = DIFFICULTY_CYCLE[(at + 1) % DIFFICULTY_CYCLE.length] ?? 'medium';
+  const at = CHARACTER_CYCLE.indexOf(seat.character);
+  const next = CHARACTER_CYCLE[(at + 1) % CHARACTER_CYCLE.length] ?? ROSTER[0]!;
+  if (next === seat.character) return state;
   return withCast({
     ...state,
-    seats: state.seats.map((s) => (s.player === player ? { ...s, difficulty: next } : s)),
+    seats: state.seats.map((s) => (s.player === player ? { ...s, character: next } : s)),
   });
 }
 
@@ -1067,9 +1177,19 @@ export function cycleBotDifficulty(state: LobbyState, player: PlayerId): LobbySt
  * **empty seat, in empty-seat order** — which is the order `server/room.ts`
  * indexes it in (`castFor(botIndex++)` over the seats with no socket), *not*
  * slot order. Getting this wrong would hand seat 5's difficulty to seat 2.
+ *
+ * **Derived from the chosen cast since a0-06.** The wire carries a tier per bot
+ * seat and no character (`../net/transport` `LobbyChoiceMessage`), so this is the
+ * most of the host's pick that currently fits down it: an online room seats the
+ * right *tiers* and may seat different *names* within them. That gap is
+ * Netcode's seam to close (a `botPersonalities` row beside this one); the offline
+ * game — the flavour the report was filed against — carries the full cast through
+ * {@link lobbyRosterCast} instead, and loses nothing.
  */
 export function botDifficulties(state: LobbyState): readonly BotDifficulty[] {
-  return state.seats.filter((s) => isBotSeat(s.occupant)).map((s) => s.difficulty);
+  return state.seats
+    .filter((s) => isBotSeat(s.occupant))
+    .map((s) => PERSONALITIES[s.character].difficulty as BotDifficulty);
 }
 
 // ---------------------------------------------------------------------------
@@ -1187,7 +1307,7 @@ export function lobbyMatchConfig(state: LobbyState): MatchConfig {
       shipClass: seat.shipClass,
       team: state.mode === 'ffa' ? seat.player : seat.team,
       ...(bot && seat.personality ? { botPersonality: seat.personality } : {}),
-      ...(bot ? { botDifficulty: seat.difficulty } : {}),
+      ...(bot ? { botDifficulty: PERSONALITIES[seat.character].difficulty as BotDifficulty } : {}),
     };
   });
   return { mode: state.mode, slots, abundance: state.abundance };
@@ -1218,6 +1338,27 @@ export function lobbyWireTeams(state: LobbyState): number[] {
  */
 export function lobbyRosterTeams(state: LobbyState): number[] {
   return configToPlayers(lobbyMatchConfig(state)).map((spec) => spec.team ?? spec.id);
+}
+
+/**
+ * **The cast the host authored, as the world builds it** — dense, closed slots
+ * dropped and the survivors re-indexed 0..N-1, exactly like {@link lobbyRosterTeams}
+ * and for exactly the same reason (`configToPlayers`, spike Trap 6): entry `i` is
+ * the character of the ship the sim will call player `i`.
+ *
+ * This is the offline handoff `MatchBootConfig.cast` consumes, and it is the seam
+ * that was missing — the lobby has resolved a character per seat since it shipped
+ * and showed it on the roster, and nothing ever carried it to `fillEmptySlots`
+ * (`src/platform/match-boot`, a0-06). A seat with no bot in it (yours, a joiner's)
+ * reads `null`, so the boot leaves that slot to the human it belongs to.
+ *
+ * Repeats ride through untouched: two Wardens authored is `['warden','warden']`
+ * out, and the match seats two Wardens.
+ */
+export function lobbyRosterCast(state: LobbyState): (PersonalityId | null)[] {
+  return lobbyMatchConfig(state)
+    .slots.filter((slot) => slot.state !== 'closed')
+    .map((slot) => (slot.botPersonality as PersonalityId | undefined) ?? null);
 }
 
 /** One seat's occupancy as the config's {@link SlotState}: an OPEN preview is a
@@ -1254,6 +1395,10 @@ function seatSlotState(occupant: SeatOccupant, online: boolean): SlotState {
  * looking at back to the hull you just left.
  */
 export function applyLobbySlots(state: LobbyState, slots: readonly LobbySlot[]): LobbyState {
+  // Empty-seat order, the index `server/room.ts` casts by — counted across the
+  // whole roster so a re-tiered remote seat resolves to the same name the server
+  // will seat rather than to one this client invented.
+  let emptyIndex = 0;
   const seats = state.seats.map((seat) => {
     const wire = slots[seat.player];
     if (!wire) return seat;
@@ -1268,11 +1413,23 @@ export function applyLobbySlots(state: LobbyState, slots: readonly LobbySlot[]):
           ? 'closed'
           : 'open';
     const mine = seat.player === state.you && state.phase === 'gathering';
+    // The wire carries a TIER and no character. A seat whose authored character
+    // already flies at that tier keeps its name — which is every seat in a room
+    // this client is the host of, because the tier it sent was derived from that
+    // very character. Only a seat the server has genuinely re-tiered is renamed,
+    // and then to the name `castFor` will actually seat.
+    const bumped = isBotSeat(occupant) ? emptyIndex++ : emptyIndex;
+    const character =
+      isBotSeat(occupant) &&
+      wire.botDifficulty !== undefined &&
+      PERSONALITIES[seat.character].difficulty !== (wire.botDifficulty as Difficulty)
+        ? castForEmptySeat(bumped, wire.botDifficulty)
+        : seat.character;
     return {
       ...seat,
       occupant,
       shipClass: mine ? state.shipClass : wire.shipClass,
-      difficulty: wire.botDifficulty ?? seat.difficulty,
+      character,
       // Allegiance is static config the server carries on the slot (Task C4);
       // absent (a pre-teams host), the seat keeps the side it already had.
       team: wire.team ?? seat.team,
@@ -1485,7 +1642,11 @@ export function lobbyModel(state: LobbyState): LobbyModel {
   // whether this client may edit the slots at all (the host, before RUSH!). It is
   // what makes each row's state control draw live or dead — honestly, per seat.
   const canEdit = hostControls(state);
-  const seats = state.seats.map((seat) => seatView(state, seat, viewer, canEdit));
+  // The bot names, numbered against the WHOLE cast in one pass (a0-06), so two
+  // Wardens read `Warden 1` / `Warden 2` on the roster the host is checking and a
+  // lone Warden still reads `Warden`.
+  const names = castNames(state);
+  const seats = state.seats.map((seat) => seatView(state, seat, viewer, canEdit, names[seat.player] ?? null));
   // Counts are of the ACTIVE field only — a closed seat is neither a player nor a
   // bot, it is a shut door, so the RUSH hint and the team tally both ignore it.
   const active = seats.filter((s) => !s.isClosed);
@@ -1548,14 +1709,14 @@ function seatView(
   seat: LobbySeat,
   viewerTeam: number | undefined,
   canEdit: boolean,
+  castName: string | null,
 ): LobbySeatView {
   const isBot = isBotSeat(seat.occupant);
   const isClosed = seat.occupant === 'closed';
-  const character = seat.personality ? PERSONALITIES[seat.personality] : null;
   const name = isClosed
     ? 'CLOSED'
     : isBot
-      ? (character?.name ?? 'BOT')
+      ? (castName ?? 'BOT')
       : seat.player === state.you
         ? state.name
         : `PLAYER ${seat.player + 1}`;
@@ -1591,7 +1752,9 @@ function seatView(
     // character is covered by the same rule the wire keeps: no number on a row
     // nobody is dialing in from.
     ping: seatPing({ isBot: isBot || isClosed, rtt: seat.rtt }),
-    ...(isBot ? { botDifficulty: seat.difficulty } : {}),
+    // Shown, not chosen (a0-06): the row's tier chip is read off the character
+    // the host picked, so the row cannot advertise a tier the cast disagrees with.
+    ...(isBot ? { botDifficulty: PERSONALITIES[seat.character].difficulty as BotDifficulty } : {}),
   };
 }
 

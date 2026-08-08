@@ -40,14 +40,15 @@ export const MATCH_SLOTS = 8;
 // ---------------------------------------------------------------------------
 
 /**
- * Seat a bot in every slot below `slots` that no human holds, in roster order
- * (GDD §2.9). Deterministic and side-effect free: same humans in, same cast out,
- * on the client and on the server.
+ * Seat a bot in every slot below `slots` that no human holds — **the character the
+ * host chose for that slot**, and roster order only where they chose none (GDD
+ * §2.9, §2.1 amended 2026-08-07). Deterministic and side-effect free: same humans
+ * and same cast in, same seats out, on the client and on the server.
  *
- * The roster has seven characters and a match has at most seven empty slots, so
- * the cycle below never actually repeats a name in a real lobby — it exists so
- * that a widened `slots` (a QA harness running sixteen) degrades to a repeated
- * character rather than an undefined one.
+ * With no cast supplied the roster has seven characters for at most seven empty
+ * slots, so the cycle below never repeats a name on its own — it exists so that a
+ * widened `slots` (a QA harness running sixteen) degrades to a repeated character
+ * rather than an undefined one.
  *
  * **Teams are a table indexed by slot, and FFA supplies none.** `teams[id]` is
  * the side slot `id` fights for — the same shape `sim/match-config.ts` resolves
@@ -59,22 +60,50 @@ export const MATCH_SLOTS = 8;
  * undefined` would not compile under `exactOptionalPropertyTypes`, and if it did
  * it would still be the wrong thing to ship (`docs/team-bots-plan.md`, Trap 10).
  *
+ * **The CAST is a table indexed by slot, and it wins** *(a0-06, 2026-08-07 — the
+ * lobby picks the character)*. `cast[id]` is the character the host chose for slot
+ * `id`; where it names one, that slot seats exactly that character, and the roster
+ * cycle below is only the fallback for a slot the table does not name. This is the
+ * seam the lobby's choice was missing: before it, `bootOfflineMatch` called this
+ * function with no cast at all, the round-robin ran over the whole mixed roster,
+ * and whatever the lobby had resolved was discarded — the match was always Rusty,
+ * Bolt, Foreman, Patch, Sable, Vulture, Warden in seat order no matter what the
+ * host picked (developer report: *"i chose HARD for all enemies but they were at
+ * other difficulties than i selected"*).
+ *
+ * **Duplicates are legal, on purpose.** Eight slots, seven characters, and only
+ * three of them Hard (GDD §2.9) — so a full house needs a repeat, and the
+ * developer's own stated goal of a balanced 4v4 of Hard bots needs *four* Hard
+ * bots, which is more Hard characters than exist. Forbidding repeats would make
+ * the use case that motivated this change impossible, so the table is honoured
+ * verbatim: two Wardens in, two Wardens out. Telling them apart is a *naming*
+ * problem, and it is answered where names are made
+ * ({@link ./personalities} `castDisplayNames`), not by refusing the cast.
+ *
  * @param humans slots already taken by people.
  * @param slots  total slots in the match.
- * @param roster the cast to draw from, in order.
+ * @param roster the cast to draw from, in order, for any slot `cast` leaves unnamed.
  * @param teams  per-slot side table, indexed by slot id. Omit for FFA.
+ * @param cast   per-slot character table, indexed by slot id. A `null`/absent entry
+ *               falls back to `roster` in empty-seat order.
  */
 export function fillEmptySlots(
   humans: readonly PlayerId[] = [],
   slots: number = MATCH_SLOTS,
   roster: readonly PersonalityId[] = ROSTER,
   teams?: readonly number[],
+  cast?: readonly (PersonalityId | null | undefined)[],
 ): BotSeat[] {
   const taken = new Set(humans);
   const seats: BotSeat[] = [];
   for (let id = 0; id < slots; id++) {
     if (taken.has(id)) continue;
-    const character = roster[seats.length % roster.length];
+    // The host's pick first; roster order only where they made none. An unknown
+    // string in the table is ignored rather than seated, so a stale saved lobby
+    // can never construct a bot with no personality row behind it.
+    const chosen = cast?.[id];
+    const character =
+      chosen != null && chosen in PERSONALITIES ? chosen : roster[seats.length % roster.length];
     if (character === undefined) break; // empty roster: no bots, not a crash
     const team = teams?.[id];
     seats.push(team === undefined ? { id, personality: character } : { id, personality: character, team });
